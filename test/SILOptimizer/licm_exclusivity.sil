@@ -186,9 +186,9 @@ bb2:
 // CHECK: [[GLOBALY:%.*]] = global_addr @globalY : $*X
 // CHECK: [[BEGIN:%.*]] = begin_access [read] [static] [[GLOBAL]] : $*X
 // CHECK: [[BEGINY:%.*]] = begin_access [read] [dynamic] [[GLOBALY]] : $*X
+// CHECK-NEXT: load [[BEGIN]]
+// CHECK-NEXT: load [[BEGINY]]
 // CHECK-NEXT: br bb1
-// CHECK: load
-// CHECK: load
 // CHECK: cond_br
 // CHECK: bb2
 // CHECK: end_access [[BEGINY]]

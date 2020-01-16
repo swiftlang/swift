@@ -49,6 +49,26 @@ func testCallable(
   d(x1: 1, 2.0, x2: 3)
 }
 
+func testCallableDiagnostics(
+  a: Callable, b: DiscardableResult, c: Throwing, d: KeywordArgumentCallable
+) {
+  a("hello", "world")
+  // expected-error@-1:5  {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  // expected-error@-2:14 {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  b("hello", "world")
+  // expected-error@-1:5  {{cannot convert value of type 'String' to expected argument type 'Double'}}
+  // expected-error@-2:14 {{cannot convert value of type 'String' to expected argument type 'Double'}}
+  try? c(1, 2, 3, 4)
+  // expected-error@-1:10 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@-2:13 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@-3:16 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@-4:19 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+
+  d(x1: "hello", x2: "world")
+  // expected-error@-1:9  {{cannot convert value of type 'String' to expected argument type 'Float'}}
+  // expected-error@-2:22 {{cannot convert value of type 'String' to expected argument type 'Float'}}
+}
+
 func testIUO(
   a: Callable!, b: DiscardableResult!, c: Throwing!, d: KeywordArgumentCallable!
 ) {
@@ -421,3 +441,49 @@ func testGenericType5<T>(a: CallableGeneric5<T>) -> Double {
 func testArchetypeType5<T, C : CallableGeneric5<T>>(a: C) -> Double {
   return a(1, 2, 3) + a(x1: 1, 2, x3: 3)
 }
+
+// SR-9239 Default argument in initializer
+
+@dynamicCallable
+struct A {
+  init(_ x: Int = 0) {}
+  func dynamicallyCall(withArguments args: [Int]) {}
+}
+
+func test9239() {
+  _ = A()() // ok
+}
+
+// SR-10313
+//
+// Modified version of the code snippet in the SR to not crash.
+
+struct MissingKeyError: Error {}
+
+@dynamicCallable
+class DictionaryBox {
+  var dictionary: [String: Any] = [:]
+
+  func dynamicallyCall<T>(withArguments args: [String]) throws -> T {
+    guard let value = dictionary[args[0]] as? T else {
+      throw MissingKeyError()
+    }
+    return value
+  }
+}
+
+func test10313() {
+  let box = DictionaryBox()
+  box.dictionary["bool"] = false
+  let _: Bool = try! box("bool") // ok
+}
+
+// SR-10753
+
+@dynamicCallable
+struct B {
+	public func dynamicallyCall(withArguments arguments: [String]) {}
+}
+
+B()("hello") // ok
+B()("\(1)") // ok

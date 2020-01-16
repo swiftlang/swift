@@ -16,7 +16,7 @@ var Accelerate_vDSPClippingLimitThresholdTests = TestSuite("Accelerate_vDSPClipp
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     let count = 256
     let n = vDSP_Length(256)
@@ -184,7 +184,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     let count = 256
     let n = vDSP_Length(256)

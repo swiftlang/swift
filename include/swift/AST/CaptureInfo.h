@@ -13,11 +13,15 @@
 #ifndef SWIFT_AST_CAPTURE_INFO_H
 #define SWIFT_AST_CAPTURE_INFO_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/TrailingObjects.h"
 #include <vector>
 
 namespace swift {
@@ -44,8 +48,9 @@ public:
 
 private:
   Storage Value;
+  SourceLoc Loc;
 
-  explicit CapturedValue(Storage V) : Value(V) {}
+  explicit CapturedValue(Storage V, SourceLoc Loc) : Value(V), Loc(Loc) {}
 
 public:
   friend struct llvm::DenseMapInfo<CapturedValue>;
@@ -61,12 +66,14 @@ public:
     IsNoEscape = 1 << 1
   };
 
-  CapturedValue(llvm::PointerUnion<ValueDecl*, OpaqueValueExpr*> Ptr,
-                unsigned Flags)
-      : Value(Ptr, Flags) {}
+  CapturedValue(ValueDecl *Val, unsigned Flags, SourceLoc Loc)
+      : Value(Val, Flags), Loc(Loc) {}
+
+  CapturedValue(OpaqueValueExpr *Val, unsigned Flags)
+      : Value(Val, Flags), Loc(SourceLoc()) {}
 
   static CapturedValue getDynamicSelfMetadata() {
-    return CapturedValue((ValueDecl *)nullptr, 0);
+    return CapturedValue((ValueDecl *)nullptr, 0, SourceLoc());
   }
 
   bool isDirect() const { return Value.getInt() & IsDirect; }
@@ -80,7 +87,9 @@ public:
   CapturedValue mergeFlags(CapturedValue cv) {
     assert(Value.getPointer() == cv.Value.getPointer() &&
            "merging flags on two different value decls");
-    return CapturedValue(Value.getPointer(), getFlags() & cv.getFlags());
+    return CapturedValue(
+        Storage(Value.getPointer(), getFlags() & cv.getFlags()),
+        Loc);
   }
 
   ValueDecl *getDecl() const {
@@ -95,48 +104,12 @@ public:
     return Value.getPointer().dyn_cast<OpaqueValueExpr *>();
   }
 
+  SourceLoc getLoc() const { return Loc; }
+
   unsigned getFlags() const { return Value.getInt(); }
-
-  bool operator==(CapturedValue RHS) const {
-    return Value == RHS.Value;
-  }
-
-  bool operator!=(CapturedValue RHS) const {
-    return Value != RHS.Value;
-  }
-
-  bool operator<(CapturedValue RHS) const {
-    return Value < RHS.Value;
-  }
 };
 
 } // end swift namespace
-
-namespace llvm {
-
-template <> struct DenseMapInfo<swift::CapturedValue> {
-  using CapturedValue = swift::CapturedValue;
-
-  using PtrIntPairDenseMapInfo = DenseMapInfo<CapturedValue::Storage>;
-
-  static inline swift::CapturedValue getEmptyKey() {
-    return CapturedValue{PtrIntPairDenseMapInfo::getEmptyKey()};
-  }
-
-  static inline CapturedValue getTombstoneKey() {
-    return CapturedValue{PtrIntPairDenseMapInfo::getTombstoneKey()};
-  }
-
-  static unsigned getHashValue(const CapturedValue &Val) {
-    return PtrIntPairDenseMapInfo::getHashValue(Val.Value);
-  }
-
-  static bool isEqual(const CapturedValue &LHS, const CapturedValue &RHS) {
-    return PtrIntPairDenseMapInfo::isEqual(LHS.Value, RHS.Value);
-  }
-};
-
-} // end llvm namespace
 
 namespace swift {
 
@@ -144,31 +117,63 @@ class DynamicSelfType;
 
 /// Stores information about captured variables.
 class CaptureInfo {
-  const CapturedValue *Captures;
-  DynamicSelfType *DynamicSelf;
-  OpaqueValueExpr *OpaqueValue;
-  unsigned Count = 0;
-  bool GenericParamCaptures : 1;
-  bool Computed : 1;
+  class CaptureInfoStorage final
+      : public llvm::TrailingObjects<CaptureInfoStorage, CapturedValue> {
+
+    DynamicSelfType *DynamicSelf;
+    OpaqueValueExpr *OpaqueValue;
+    unsigned Count;
+  public:
+    explicit CaptureInfoStorage(unsigned count, DynamicSelfType *dynamicSelf,
+                                OpaqueValueExpr *opaqueValue)
+      : DynamicSelf(dynamicSelf), OpaqueValue(opaqueValue), Count(count) { }
+
+    ArrayRef<CapturedValue> getCaptures() const {
+      return llvm::makeArrayRef(this->getTrailingObjects<CapturedValue>(),
+                                Count);
+    }
+
+    DynamicSelfType *getDynamicSelfType() const {
+      return DynamicSelf;
+    }
+
+    OpaqueValueExpr *getOpaqueValue() const {
+      return OpaqueValue;
+    }
+  };
+
+  enum class Flags : unsigned {
+    HasGenericParamCaptures = 1 << 0
+  };
+
+  llvm::PointerIntPair<const CaptureInfoStorage *, 2, OptionSet<Flags>>
+      StorageAndFlags;
 
 public:
-  CaptureInfo()
-    : Captures(nullptr), DynamicSelf(nullptr), OpaqueValue(nullptr), Count(0),
-      GenericParamCaptures(0), Computed(0) { }
+  /// The default-constructed CaptureInfo is "not yet computed".
+  CaptureInfo() = default;
+  CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
+              DynamicSelfType *dynamicSelf, OpaqueValueExpr *opaqueValue,
+              bool genericParamCaptures);
 
-  bool hasBeenComputed() { return Computed; }
+  /// A CaptureInfo representing no captures at all.
+  static CaptureInfo empty();
 
-  bool isTrivial() {
-    return Count == 0 && !GenericParamCaptures && !DynamicSelf && !OpaqueValue;
+  bool hasBeenComputed() const {
+    return StorageAndFlags.getPointer();
+  }
+
+  bool isTrivial() const {
+    return getCaptures().empty() && !hasGenericParamCaptures() &&
+           !hasDynamicSelfCapture() && !hasOpaqueValueCapture();
   }
 
   ArrayRef<CapturedValue> getCaptures() const {
-    return llvm::makeArrayRef(Captures, Count);
-  }
-  void setCaptures(ArrayRef<CapturedValue> C) {
-    Captures = C.data();
-    Computed = true;
-    Count = C.size();
+    // FIXME: Ideally, everywhere that synthesizes a function should include
+    // its capture info.
+    if (!hasBeenComputed())
+      return None;
+    return StorageAndFlags.getPointer()->getCaptures();
   }
 
   /// Return a filtered list of the captures for this function,
@@ -182,40 +187,40 @@ public:
 
   /// \returns true if the function captures any generic type parameters.
   bool hasGenericParamCaptures() const {
-    return GenericParamCaptures;
-  }
-
-  void setGenericParamCaptures(bool genericParamCaptures) {
-    GenericParamCaptures = genericParamCaptures;
+    // FIXME: Ideally, everywhere that synthesizes a function should include
+    // its capture info.
+    if (!hasBeenComputed())
+      return false;
+    return StorageAndFlags.getInt().contains(Flags::HasGenericParamCaptures);
   }
 
   /// \returns true if the function captures the dynamic Self type.
   bool hasDynamicSelfCapture() const {
-    return DynamicSelf != nullptr;
+    return getDynamicSelfType() != nullptr;
   }
 
   /// \returns the captured dynamic Self type, if any.
   DynamicSelfType *getDynamicSelfType() const {
-    return DynamicSelf;
-  }
-
-  void setDynamicSelfType(DynamicSelfType *dynamicSelf) {
-    DynamicSelf = dynamicSelf;
+    // FIXME: Ideally, everywhere that synthesizes a function should include
+    // its capture info.
+    if (!hasBeenComputed())
+      return nullptr;
+    return StorageAndFlags.getPointer()->getDynamicSelfType();
   }
 
   bool hasOpaqueValueCapture() const {
-    return OpaqueValue != nullptr;
+    return getOpaqueValue() != nullptr;
   }
 
   OpaqueValueExpr *getOpaqueValue() const {
-    return OpaqueValue;
+    // FIXME: Ideally, everywhere that synthesizes a function should include
+    // its capture info.
+    if (!hasBeenComputed())
+      return nullptr;
+    return StorageAndFlags.getPointer()->getOpaqueValue();
   }
 
-  void setOpaqueValue(OpaqueValueExpr *OVE) {
-    OpaqueValue = OVE;
-  }
-
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void print(raw_ostream &OS) const;
 };
 

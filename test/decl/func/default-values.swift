@@ -132,8 +132,14 @@ func inoutFuncWithDefaultArg1(x: inout Int = 1) {} // expected-error {{cannot pr
 func inoutFuncWithDefaultArg2(x: inout Int = bLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
 func inoutFuncWithDefaultArg3(x: inout Int = aLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
 func inoutFuncWithDefaultArg4(x: inout Int = &aLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+// expected-error@-1 {{use of extraneous '&'}}
+
 func inoutFuncWithDefaultArg5(x: inout Int = &bLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+// expected-error@-1 {{use of extraneous '&'}}
+
 func inoutFuncWithDefaultArg6(x: inout Int = #file) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+// expected-error@-1 {{default argument value of type 'String' cannot be converted to type 'Int'}}
+
 func inoutFuncWithDefaultArg7(_: inout Int = 1) {} // expected-error {{cannot provide default value to inout parameter '_'}}
 
 // SE-0242 - Test that memberwise constructor generates default values
@@ -162,9 +168,25 @@ let fooThing4 = Foo(a: 0, b: true, d: 1, e: 2, f: false, g: 10, h: nil) // ok
 
 // Ensure that tuple init is not allowed
 // Here b = false and g = nil, but we're checking that e and f don't get a default value
-let fooThing5 = Foo(a: 0, d: 1, h: nil) // expected-error {{missing argument for parameter 'e' in call}}
+let fooThing5 = Foo(a: 0, d: 1, h: nil) // expected-error {{missing arguments for parameters 'e', 'f' in call}}
                                         // expected-note@-25 {{'init(a:b:d:e:f:g:h:)' declared here}}
 
 // Here b = false and g = nil, but we're checking that f doesn't get a default value
 let fooThing6 = Foo(a: 0, d: 1, e: 2, h: nil) // expected-error {{missing argument for parameter 'f' in call}}
                                               // expected-note@-29 {{'init(a:b:d:e:f:g:h:)' declared here}}
+
+// SR-11085
+func sr_11085(x: Int) {}
+func sr_11085(line: String = #line) {} // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
+sr_11085()
+
+class SR_11085_C { init(line: String = #line) {} } // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
+let _ = SR_11085_C()
+
+// SR-11623
+func badGenericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #function) -> T { x } // expected-error {{default argument value of type 'String' cannot be converted to type 'T'}}
+let _: Int = badGenericMagicLiteral()
+
+func genericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #line) -> T { x } // expected-note {{where 'T' = 'String'}}
+let _: Int = genericMagicLiteral()
+let _: String = genericMagicLiteral() // expected-error {{global function 'genericMagicLiteral' requires that 'String' conform to 'ExpressibleByIntegerLiteral'}}

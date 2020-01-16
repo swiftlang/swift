@@ -5,9 +5,7 @@ struct Tagged<Tag, Entity> {
   let entity: Entity
 }
 
-protocol Taggable {
-}
-
+protocol Taggable {}
 extension Taggable {
   func tag<Tag>(_ tag: Tag) -> Tagged<Tag, Self> {
     return Tagged(tag: tag, entity: self)
@@ -38,8 +36,16 @@ enum Color {
 }
 
 func acceptColorTagged<Result>(@TaggedBuilder<Color> body: () -> Result) {
+// CHECK: [[@LINE-1]]:6 | function/Swift | acceptColorTagged(body:) | s:14swift_ide_test17acceptColorTagged4bodyyxyXE_tlF | Def | rel: 0
+// CHECK: [[@LINE-2]]:33 | struct/Swift | TaggedBuilder | s:14swift_ide_test13TaggedBuilderV | Ref,RelCont | rel: 1
+// CHECK: [[@LINE-3]]:47 | enum/Swift | Color | s:14swift_ide_test5ColorO | Ref,RelCont | rel: 1
   print(body())
 }
 
-// CHECK: 40:33 | struct/Swift | TaggedBuilder | s:14swift_ide_test13TaggedBuilderV | Ref,RelCont | rel: 1
-// CHECK: 40:47 | enum/Swift | Color | s:14swift_ide_test5ColorO | Ref,RelCont | rel: 1
+struct Context {
+    @TaggedBuilder<Color>
+    // CHECK: [[@LINE-1]]:6 | struct/Swift | TaggedBuilder | s:14swift_ide_test13TaggedBuilderV | Ref | rel: 0
+    // CHECK: [[@LINE-2]]:20 | enum/Swift | Color | s:14swift_ide_test5ColorO | Ref | rel: 0
+    func foo() -> () {}
+    // CHECK: [[@LINE-1]]:10 | instance-method/Swift | foo() | s:14swift_ide_test7ContextV3fooyyF | Def,RelChild | rel: 1
+}

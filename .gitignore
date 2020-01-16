@@ -24,6 +24,8 @@
 #==============================================================================#
 cscope.files
 cscope.out
+.vimrc
+tags
 
 #==============================================================================#
 # Directories to ignore (do not add trailing '/'s, they skip symlinks).
@@ -36,6 +38,9 @@ docs/_build
 
 # Visual Studio metadata
 .vs
+
+# clangd
+.clangd
 
 #==============================================================================#
 # Ignore CMake temporary files

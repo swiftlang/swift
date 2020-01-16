@@ -513,6 +513,10 @@ void Remangler::mangleTypeMetadataCompletionFunction(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleTypeMetadataDemanglingCache(Node *node) {
+  unreachable("not supported");
+}
+
 void Remangler::mangleTypeMetadataLazyCache(Node *node) {
   Buffer << "ML";
   mangleSingleChildNode(node); // type
@@ -790,6 +794,11 @@ void Remangler::mangleAccessor(Node *storageNode, StringRef accessorCode,
 
 void Remangler::mangleInitializer(Node *node, EntityContext &ctx) {
   mangleSimpleEntity(node, 'I', "i", ctx);
+}
+
+void Remangler::manglePropertyWrapperBackingInitializer(Node *node,
+                                                        EntityContext &ctx) {
+  mangleSimpleEntity(node, 'I', "P", ctx);
 }
 
 void Remangler::mangleDefaultArgumentInitializer(Node *node,
@@ -1243,6 +1252,14 @@ void Remangler::mangleImplEscaping(Node *node) {
   // The old mangler does not encode escaping.
 }
 
+void Remangler::mangleImplSubstitutions(Node *node) {
+  // The old mangler does not encode substituted function types.
+}
+
+void Remangler::mangleImplImpliedSubstitutions(Node *node) {
+  // The old mangler does not encode substituted function types.
+}
+
 void Remangler::mangleImplConvention(Node *node) {
   assert(node->getKind() == Node::Kind::ImplConvention);
   StringRef text = node->getText();
@@ -1607,6 +1624,10 @@ void Remangler::mangleDependentGenericParamType(Node *node) {
 
 void Remangler::mangleIndex(Node *node) {
   mangleIndex(node->getIndex());
+}
+
+void Remangler::mangleUnknownIndex(Node *node) {
+  unreachable("should not be reached in an arbitrary context");
 }
 
 void Remangler::mangleProtocol(Node *node, EntityContext &ctx) {

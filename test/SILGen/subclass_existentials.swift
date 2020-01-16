@@ -253,37 +253,37 @@ func downcasts(
   derivedType: Derived.Type) {
   // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Base<Int> & P, [[ARG1:%.*]] : @guaranteed $Derived, [[ARG2:%.*]] : $@thick (Base<Int> & P).Type, [[ARG3:%.*]] : $@thick Derived.Type):
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $Base<Int> & P
-  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $Derived
+  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to Derived
   let _ = baseAndP as? Derived
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $Base<Int> & P
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to $Derived
+  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to Derived
   let _ = baseAndP as! Derived
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $Base<Int> & P
-  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $Derived & R
+  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to Derived & R
   let _ = baseAndP as? (Derived & R)
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $Base<Int> & P
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to $Derived & R
+  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to Derived & R
   let _ = baseAndP as! (Derived & R)
 
-  // CHECK:      checked_cast_br %3 : $@thick Derived.Type to $@thick (Derived & R).Type
+  // CHECK:      checked_cast_br %3 : $@thick Derived.Type to (Derived & R).Type
   let _ = derivedType as? (Derived & R).Type
 
-  // CHECK:      unconditional_checked_cast %3 : $@thick Derived.Type to $@thick (Derived & R).Type
+  // CHECK:      unconditional_checked_cast %3 : $@thick Derived.Type to (Derived & R).Type
   let _ = derivedType as! (Derived & R).Type
 
-  // CHECK:      checked_cast_br %2 : $@thick (Base<Int> & P).Type to $@thick Derived.Type
+  // CHECK:      checked_cast_br %2 : $@thick (Base<Int> & P).Type to Derived.Type
   let _ = baseAndPType as? Derived.Type
 
-  // CHECK:      unconditional_checked_cast %2 : $@thick (Base<Int> & P).Type to $@thick Derived.Type
+  // CHECK:      unconditional_checked_cast %2 : $@thick (Base<Int> & P).Type to Derived.Type
   let _ = baseAndPType as! Derived.Type
 
-  // CHECK:      checked_cast_br %2 : $@thick (Base<Int> & P).Type to $@thick (Derived & R).Type
+  // CHECK:      checked_cast_br %2 : $@thick (Base<Int> & P).Type to (Derived & R).Type
   let _ = baseAndPType as? (Derived & R).Type
 
-  // CHECK:      unconditional_checked_cast %2 : $@thick (Base<Int> & P).Type to $@thick (Derived & R).Type
+  // CHECK:      unconditional_checked_cast %2 : $@thick (Base<Int> & P).Type to (Derived & R).Type
   let _ = baseAndPType as! (Derived & R).Type
 
   // CHECK:      return
@@ -365,11 +365,11 @@ func archetypeDowncasts<S,
   let _ = s as! (Base<Int> & P)
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG5]] : $BaseTAndP
-  // CHECK-NEXT: checked_cast_br [[COPIED]] : $BaseTAndP to $Derived & R
+  // CHECK-NEXT: checked_cast_br [[COPIED]] : $BaseTAndP to Derived & R
   let _ = baseTAndP_archetype as? (Derived & R)
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG5]] : $BaseTAndP
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $BaseTAndP to $Derived & R
+  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $BaseTAndP to Derived & R
   let _ = baseTAndP_archetype as! (Derived & R)
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
@@ -388,35 +388,35 @@ func archetypeDowncasts<S,
   let _ = baseTAndP_concrete as! S
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
-  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<T> & P to $BaseT
+  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<T> & P to BaseT
   let _ = baseTAndP_concrete as? BaseT
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<T> & P to $BaseT
+  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<T> & P to BaseT
   let _ = baseTAndP_concrete as! BaseT
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
-  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<T> & P to $BaseInt
+  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<T> & P to BaseInt
   let _ = baseTAndP_concrete as? BaseInt
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<T> & P to $BaseInt
+  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<T> & P to BaseInt
   let _ = baseTAndP_concrete as! BaseInt
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
-  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<T> & P to $BaseTAndP
+  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<T> & P to BaseTAndP
   let _ = baseTAndP_concrete as? BaseTAndP
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<T> & P to $BaseTAndP
+  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<T> & P to BaseTAndP
   let _ = baseTAndP_concrete as! BaseTAndP
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG6]] : $BaseIntAndP
-  // CHECK-NEXT: checked_cast_br [[COPIED]] : $BaseIntAndP to $Derived & R
+  // CHECK-NEXT: checked_cast_br [[COPIED]] : $BaseIntAndP to Derived & R
   let _ = baseIntAndP_archetype as? (Derived & R)
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG6]] : $BaseIntAndP
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $BaseIntAndP to $Derived & R
+  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $BaseIntAndP to Derived & R
   let _ = baseIntAndP_archetype as! (Derived & R)
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
@@ -435,35 +435,35 @@ func archetypeDowncasts<S,
   let _ = baseIntAndP_concrete as! S
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
-  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $DerivedT
+  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to DerivedT
   let _ = baseIntAndP_concrete as? DerivedT
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to $DerivedT
+  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to DerivedT
   let _ = baseIntAndP_concrete as! DerivedT
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
-  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $BaseT
+  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to BaseT
   let _ = baseIntAndP_concrete as? BaseT
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to $BaseT
+  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to BaseT
   let _ = baseIntAndP_concrete as! BaseT
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
-  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $BaseInt
+  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to BaseInt
   let _ = baseIntAndP_concrete as? BaseInt
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to $BaseInt
+  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to BaseInt
   let _ = baseIntAndP_concrete as! BaseInt
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
-  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $BaseTAndP
+  // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to BaseTAndP
   let _ = baseIntAndP_concrete as? BaseTAndP
 
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
-  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to $BaseTAndP
+  // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to BaseTAndP
   let _ = baseIntAndP_concrete as! BaseTAndP
 
   // CHECK:      return

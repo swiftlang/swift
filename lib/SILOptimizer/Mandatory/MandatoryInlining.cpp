@@ -20,9 +20,9 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
@@ -53,21 +53,6 @@ static SILValue stripCopiesAndBorrows(SILValue v) {
   return v;
 }
 
-/// If \p applySite is a terminator then pass the first instruction of each
-/// successor to fun. Otherwise, pass std::next(applySite).
-static void
-insertAfterApply(SILInstruction *applySite,
-                 llvm::function_ref<void(SILBasicBlock::iterator)> &&fun) {
-  auto *ti = dyn_cast<TermInst>(applySite);
-  if (!ti) {
-    return fun(std::next(applySite->getIterator()));
-  }
-
-  for (auto *succBlocks : ti->getSuccessorBlocks()) {
-    fun(succBlocks->begin());
-  }
-}
-
 /// Fixup reference counts after inlining a function call (which is a no-op
 /// unless the function is a thick function).
 ///
@@ -75,7 +60,7 @@ insertAfterApply(SILInstruction *applySite,
 /// apply site, or the callee value are control dependent in any way. This
 /// requires us to need to be very careful. See inline comments.
 static void fixupReferenceCounts(
-    PartialApplyInst *pai, SILInstruction *applySite, SILValue calleeValue,
+    PartialApplyInst *pai, FullApplySite applySite, SILValue calleeValue,
     ArrayRef<ParameterConvention> captureArgConventions,
     MutableArrayRef<SILValue> capturedArgs, bool isCalleeGuaranteed) {
 
@@ -108,7 +93,7 @@ static void fixupReferenceCounts(
       continue;
     }
 
-    auto *f = applySite->getFunction();
+    auto *f = applySite.getFunction();
 
     // See if we have a trivial value. In such a case, just continue. We do not
     // need to fix up anything.
@@ -137,10 +122,23 @@ static void fixupReferenceCounts(
       }
 
       visitedBlocks.clear();
+
       // If we need to insert compensating destroys, do so.
-      auto error =
-          valueHasLinearLifetime(copy, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      //
+      // NOTE: We use pai here since in non-ossa code emitCopyValueOperation
+      // returns the operand of the strong_retain which may have a ValueBase
+      // that is not in the same block. An example of where this is important is
+      // if we are performing emitCopyValueOperation in non-ossa code on an
+      // argument when the partial_apply is not in the entrance block. In truth,
+      // the linear lifetime checker does not /actually/ care what the value is
+      // (ignoring diagnostic error msgs that we do not care about here), it
+      // just cares about the block the value is in. In a forthcoming commit, I
+      // am going to change this to use a different API on the linear lifetime
+      // checker that makes this clearer.
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(
+          pai, {BranchPropagatedUser(applySite.getCalleeOperand())}, {},
+          errorBehavior, &leakingBlocks);
       if (error.getFoundLeak()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -161,7 +159,7 @@ static void fixupReferenceCounts(
       // insert a destroy after the apply since the leak will just cover the
       // other path.
       if (!error.getFoundOverConsume()) {
-        insertAfterApply(applySite, [&](SILBasicBlock::iterator iter) {
+        applySite.insertAfterInvocation([&](SILBasicBlock::iterator iter) {
           if (hasOwnership) {
             SILBuilderWithScope(iter).createEndBorrow(loc, argument);
           }
@@ -175,12 +173,23 @@ static void fixupReferenceCounts(
     // TODO: Do we need to lifetime extend here?
     case ParameterConvention::Direct_Unowned: {
       v = SILBuilderWithScope(pai).emitCopyValueOperation(loc, v);
-
       visitedBlocks.clear();
+
       // If we need to insert compensating destroys, do so.
-      auto error =
-          valueHasLinearLifetime(v, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      //
+      // NOTE: We use pai here since in non-ossa code emitCopyValueOperation
+      // returns the operand of the strong_retain which may have a ValueBase
+      // that is not in the same block. An example of where this is important is
+      // if we are performing emitCopyValueOperation in non-ossa code on an
+      // argument when the partial_apply is not in the entrance block. In truth,
+      // the linear lifetime checker does not /actually/ care what the value is
+      // (ignoring diagnostic error msgs that we do not care about here), it
+      // just cares about the block the value is in. In a forthcoming commit, I
+      // am going to change this to use a different API on the linear lifetime
+      // checker that makes this clearer.
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(pai, {applySite.getCalleeOperand()}, {},
+                                      errorBehavior, &leakingBlocks);
       if (error.getFoundError()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -190,7 +199,7 @@ static void fixupReferenceCounts(
         }
       }
 
-      insertAfterApply(applySite, [&](SILBasicBlock::iterator iter) {
+      applySite.insertAfterInvocation([&](SILBasicBlock::iterator iter) {
         SILBuilderWithScope(iter).emitDestroyValueOperation(loc, v);
       });
       break;
@@ -203,12 +212,23 @@ static void fixupReferenceCounts(
     // apply has another use that would destroy our value first.
     case ParameterConvention::Direct_Owned: {
       v = SILBuilderWithScope(pai).emitCopyValueOperation(loc, v);
-
       visitedBlocks.clear();
+
       // If we need to insert compensating destroys, do so.
-      auto error =
-          valueHasLinearLifetime(v, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      //
+      // NOTE: We use pai here since in non-ossa code emitCopyValueOperation
+      // returns the operand of the strong_retain which may have a ValueBase
+      // that is not in the same block. An example of where this is important is
+      // if we are performing emitCopyValueOperation in non-ossa code on an
+      // argument when the partial_apply is not in the entrance block. In truth,
+      // the linear lifetime checker does not /actually/ care what the value is
+      // (ignoring diagnostic error msgs that we do not care about here), it
+      // just cares about the block the value is in. In a forthcoming commit, I
+      // am going to change this to use a different API on the linear lifetime
+      // checker that makes this clearer.
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(pai, {applySite.getCalleeOperand()}, {},
+                                      errorBehavior, &leakingBlocks);
       if (error.getFoundError()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -226,15 +246,19 @@ static void fixupReferenceCounts(
   // Destroy the callee as the apply would have done if our function is not
   // callee guaranteed.
   if (!isCalleeGuaranteed) {
-    insertAfterApply(applySite, [&](SILBasicBlock::iterator iter) {
+    applySite.insertAfterInvocation([&](SILBasicBlock::iterator iter) {
       SILBuilderWithScope(iter).emitDestroyValueOperation(loc, calleeValue);
     });
   }
 }
 
 static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
-  auto *pbi = cast<ProjectBoxInst>(li->getOperand());
-  auto *abi = cast<AllocBoxInst>(pbi->getOperand());
+  auto *pbi = dyn_cast<ProjectBoxInst>(li->getOperand());
+  if (!pbi)
+    return SILValue();
+  auto *abi = dyn_cast<AllocBoxInst>(pbi->getOperand());
+  if (!abi)
+    return SILValue();
 
   // The load instruction must have no more uses or a single destroy left to
   // erase it.
@@ -889,9 +913,8 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
         // We need to insert the copies before the partial_apply since if we can
         // not remove the partial_apply the captured values will be dead by the
         // time we hit the call site.
-        fixupReferenceCounts(PAI, InnerAI.getInstruction(), CalleeValue,
-                             CapturedArgConventions, CapturedArgs,
-                             IsCalleeGuaranteed);
+        fixupReferenceCounts(PAI, InnerAI, CalleeValue, CapturedArgConventions,
+                             CapturedArgs, IsCalleeGuaranteed);
       }
 
       // Register a callback to record potentially unused function values after

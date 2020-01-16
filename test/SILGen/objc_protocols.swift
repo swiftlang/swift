@@ -124,7 +124,7 @@ func objc_protocol_partial_apply(_ x: NSRuncing) {
   // FIXME: rdar://21289579
   // _ = NSRuncing.runce
 }
-// CHECK : } // end sil function '$s14objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pF'
+// CHECK: } // end sil function '$s14objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pF'
 
 // CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F
 func objc_protocol_composition(_ x: NSRuncing & NSFunging) {

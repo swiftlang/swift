@@ -205,12 +205,14 @@ public func resilientAny(s : ResilientWeakRef) {
 // CHECK: [[ANY:%.*]] = alloca %Any
 // CHECK: [[META:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct16ResilientWeakRefVMa"([[INT]] 0)
 // CHECK: [[META2:%.*]] = extractvalue %swift.metadata_response %3, 0
-// CHECK: [[TYADDR:%.*]] = getelementptr inbounds %Any, %Any* %1, i32 0, i32 1
-// CHECK:  store %swift.type* [[META2]], %swift.type** [[TYADDR]]
-// CHECK:  call %swift.opaque* @__swift_allocate_boxed_opaque_existential_0(%Any* [[ANY]])
-// CHECK:  call swiftcc void @"$s17struct_resilience8wantsAnyyyypF"(%Any* noalias nocapture dereferenceable({{(32|16)}}) [[ANY]])
-// CHECK:  call void @__swift_destroy_boxed_opaque_existential_0(%Any* [[ANY]])
-// CHECK:  ret void
+// CHECK: [[TYADDR:%.*]] = getelementptr inbounds %Any, %Any* [[ANY]], i32 0, i32 1
+// CHECK: store %swift.type* [[META2]], %swift.type** [[TYADDR]]
+// CHECK: [[BITCAST:%.*]] = bitcast %Any* [[ANY]] to %__opaque_existential_type_0*
+// CHECK: call %swift.opaque* @__swift_allocate_boxed_opaque_existential_0(%__opaque_existential_type_0* [[BITCAST]])
+// CHECK: call swiftcc void @"$s17struct_resilience8wantsAnyyyypF"(%Any* noalias nocapture dereferenceable({{(32|16)}}) [[ANY]])
+// CHECK: [[BITCAST:%.*]] = bitcast %Any* [[ANY]] to %__opaque_existential_type_0*
+// CHECK: call void @__swift_destroy_boxed_opaque_existential_0(%__opaque_existential_type_0* [[BITCAST]])
+// CHECK: ret void
 
 // Make sure that MemoryLayout properties access resilient types' metadata
 // instead of hardcoding sizes based on compile-time layouts.

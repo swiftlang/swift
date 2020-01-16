@@ -65,7 +65,7 @@ public:
   bool shouldAllPrivateDeclsBeVisibleFromOtherFiles() const {
     return HasMultipleIGMs;
   }
-  /// In case of multipe llvm modules, private lazy protocol
+  /// In case of multiple llvm modules, private lazy protocol
   /// witness table accessors could be emitted by two different IGMs during
   /// IRGen into different object files and the linker would complain about
   /// duplicate symbols.
@@ -367,6 +367,10 @@ class LinkEntity {
     /// A lazy cache variable for type metadata.
     /// The pointer is a canonical TypeBase*.
     TypeMetadataLazyCacheVariable,
+
+    /// A lazy cache variable for fetching type metadata from a mangled name.
+    /// The pointer is a canonical TypeBase*.
+    TypeMetadataDemanglingCacheVariable,
 
     /// A reflection metadata descriptor for a builtin or imported type.
     ReflectionBuiltinDescriptor,
@@ -702,6 +706,12 @@ public:
   static LinkEntity forTypeMetadataLazyCacheVariable(CanType type) {
     LinkEntity entity;
     entity.setForType(Kind::TypeMetadataLazyCacheVariable, type);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataDemanglingCacheVariable(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::TypeMetadataDemanglingCacheVariable, type);
     return entity;
   }
 
@@ -1101,8 +1111,7 @@ public:
   }
 
   /// Determine whether this entity will be weak-imported.
-  bool isWeakImported(ModuleDecl *module,
-                      AvailabilityContext fromContext) const;
+  bool isWeakImported(ModuleDecl *module) const;
   
   /// Return the source file whose codegen should trigger emission of this
   /// link entity, if one can be identified.
@@ -1172,7 +1181,6 @@ public:
 
   static LinkInfo get(const UniversalLinkageInfo &linkInfo,
                       ModuleDecl *swiftModule,
-                      AvailabilityContext availabilityContext,
                       const LinkEntity &entity,
                       ForDefinition_t forDefinition);
 

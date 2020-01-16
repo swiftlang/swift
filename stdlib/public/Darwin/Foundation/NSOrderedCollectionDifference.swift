@@ -13,7 +13,7 @@
 @_exported import Foundation // Clang module
 
 // CollectionDifference<ChangeElement>.Change is conditionally bridged to NSOrderedCollectionChange
-@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 extension CollectionDifference.Change : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSOrderedCollectionChange {
@@ -66,7 +66,7 @@ extension CollectionDifference.Change : _ObjectiveCBridgeable {
 }
 
 // CollectionDifference<ChangeElement> is conditionally bridged to NSOrderedCollectionDifference
-@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 extension CollectionDifference : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSOrderedCollectionDifference {
@@ -101,6 +101,6 @@ extension CollectionDifference : _ObjectiveCBridgeable {
   
   @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(_ s: NSOrderedCollectionDifference?) -> CollectionDifference {
-    return _formDifference(from: s!) { $0 as! Change }!
+    return _formDifference(from: s!) { ($0 as! Change) }!
   }
 }

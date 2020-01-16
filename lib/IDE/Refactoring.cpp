@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/Refactoring.h"
+#include "swift/IDE/IDERequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -544,7 +545,7 @@ public:
   RenameRangeCollector(const ValueDecl *D, StringRef newName)
       : newName(newName.str()) {
     llvm::raw_string_ostream OS(USR);
-    printDeclUSR(D, OS);
+    printValueDeclUSR(D, OS);
   }
 
   ArrayRef<RenameLoc> results() const { return locations; }
@@ -689,12 +690,10 @@ public:
                               SourceEditConsumer &EditConsumer,
                               DiagnosticConsumer &DiagConsumer) :
   RefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {
-    // We can only proceed with valid location and source file.
-    if (StartLoc.isValid() && TheFile) {
-      // Resolve the sema token and save it for later use.
-      CursorInfoResolver Resolver(*TheFile);
-      CursorInfo = Resolver.resolve(StartLoc);
-    }
+  // Resolve the sema token and save it for later use.
+  CursorInfo = evaluateOrDefault(TheFile->getASTContext().evaluator,
+                          CursorInfoRequest{ CursorInfoOwner(TheFile, StartLoc)},
+                                 ResolvedCursorInfo());
   }
 };
 
@@ -714,7 +713,6 @@ class RefactoringAction##KIND: public TokenBasedRefactoringAction {           \
 #include "swift/IDE/RefactoringKinds.def"
 
 class RangeBasedRefactoringAction : public RefactoringAction {
-  RangeResolver Resolver;
 protected:
   ResolvedRangeInfo RangeInfo;
 public:
@@ -722,8 +720,9 @@ public:
                               SourceEditConsumer &EditConsumer,
                               DiagnosticConsumer &DiagConsumer) :
   RefactoringAction(MD, Opts, EditConsumer, DiagConsumer),
-  Resolver(*TheFile, Opts.Range.getStart(SM), Opts.Range.getEnd(SM)),
-  RangeInfo(Resolver.resolve()) {}
+  RangeInfo(evaluateOrDefault(MD->getASTContext().evaluator,
+    RangeInfoRequest(RangeInfoOwner(TheFile, Opts.Range.getStart(SM), Opts.Range.getEnd(SM))),
+                              ResolvedRangeInfo())) {}
 };
 
 #define RANGE_REFACTORING(KIND, NAME, ID)                                     \
@@ -781,10 +780,11 @@ bool RefactoringActionLocalRename::performChange() {
                         MD->getNameStr());
     return true;
   }
-  CursorInfoResolver Resolver(*TheFile);
-  ResolvedCursorInfo CursorInfo = Resolver.resolve(StartLoc);
+  CursorInfo = evaluateOrDefault(TheFile->getASTContext().evaluator,
+                          CursorInfoRequest{CursorInfoOwner(TheFile, StartLoc)},
+                                 ResolvedCursorInfo());
   if (CursorInfo.isValid() && CursorInfo.ValueD) {
-    ValueDecl *VD = CursorInfo.ValueD;
+    ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
     llvm::SmallVector<DeclContext *, 8> Scopes;
     analyzeRenameScope(VD, DiagEngine, Scopes);
     if (Scopes.empty())
@@ -1004,7 +1004,7 @@ static StringRef correctNewDeclName(DeclContext *DC, StringRef Name) {
   llvm::SmallVector<ValueDecl*, 16> AllVisibles;
   VectorDeclConsumer Consumer(AllVisibles);
   ASTContext &Ctx = DC->getASTContext();
-  lookupVisibleDecls(Consumer, DC, Ctx.getLazyResolver(), true);
+  lookupVisibleDecls(Consumer, DC, true);
   return correctNameInternal(Ctx, Name, AllVisibles);
 }
 
@@ -1618,8 +1618,9 @@ class FindAllSubDecls : public SourceEntityWalker {
       return false;
 
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D)) {
-      auto accessors = ASD->getAllAccessors();
-      Found.insert(accessors.begin(), accessors.end());
+      ASD->visitParsedAccessors([&](AccessorDecl *accessor) {
+        Found.insert(accessor);
+      });
     }
     return true;
   }
@@ -1691,7 +1692,7 @@ findCollapseNestedIfTarget(ResolvedCursorInfo CursorInfo) {
     return {};
 
   IfStmt *InnerIf =
-      dyn_cast_or_null<IfStmt>(Body->getElement(0).dyn_cast<Stmt *>());
+      dyn_cast_or_null<IfStmt>(Body->getFirstElement().dyn_cast<Stmt *>());
   if (!InnerIf)
     return {};
 
@@ -2068,6 +2069,180 @@ bool RefactoringActionExpandTernaryExpr::performChange() {
   return false; //don't abort
 }
 
+bool RefactoringActionConvertIfLetExprToGuardExpr::
+  isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+
+  if (Info.Kind != RangeKind::SingleStatement
+      && Info.Kind != RangeKind::MultiStatement)
+    return false;
+
+  if (Info.ContainedNodes.empty())
+    return false;
+
+  IfStmt *If = nullptr;
+
+  if (Info.ContainedNodes.size() == 1) {
+    if (auto S = Info.ContainedNodes[0].dyn_cast<Stmt*>()) {
+      If = dyn_cast<IfStmt>(S);
+    }
+  }
+
+  if (!If)
+    return false;
+
+  auto CondList = If->getCond();
+
+  if (CondList.size() == 1) {
+    auto E = CondList[0];
+    auto P = E.getKind();
+    if (P == swift::StmtConditionElement::CK_PatternBinding) {
+      auto Body = dyn_cast_or_null<BraceStmt>(If->getThenStmt());
+      if (Body)
+        return true;
+    }
+  }
+
+  return false;
+}
+
+bool RefactoringActionConvertIfLetExprToGuardExpr::performChange() {
+
+  auto S = RangeInfo.ContainedNodes[0].dyn_cast<Stmt*>();
+  IfStmt *If = dyn_cast<IfStmt>(S);
+  auto CondList = If->getCond();
+
+  // Get if-let condition
+  SourceRange range = CondList[0].getSourceRange();
+  SourceManager &SM = RangeInfo.RangeContext->getASTContext().SourceMgr;
+  auto CondCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
+  
+  auto Body = dyn_cast_or_null<BraceStmt>(If->getThenStmt());
+  
+  // Get if-let then body.
+  auto firstElement = Body->getFirstElement();
+  auto lastElement = Body->getLastElement();
+  SourceRange bodyRange = firstElement.getSourceRange();
+  bodyRange.widen(lastElement.getSourceRange());
+  auto BodyCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, bodyRange);
+  
+  llvm::SmallString<64> DeclBuffer;
+  llvm::raw_svector_ostream OS(DeclBuffer);
+  
+  llvm::StringRef Space = " ";
+  llvm::StringRef NewLine = "\n";
+  
+  OS << tok::kw_guard << Space;
+  OS << CondCharRange.str().str() << Space;
+  OS << tok::kw_else << Space;
+  OS << tok::l_brace << NewLine;
+  
+  // Get if-let else body.
+  if (auto *ElseBody = dyn_cast_or_null<BraceStmt>(If->getElseStmt())) {
+    auto firstElseElement = ElseBody->getFirstElement();
+    auto lastElseElement = ElseBody->getLastElement();
+    SourceRange elseBodyRange = firstElseElement.getSourceRange();
+    elseBodyRange.widen(lastElseElement.getSourceRange());
+    auto ElseBodyCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, elseBodyRange);
+    OS << ElseBodyCharRange.str().str() << NewLine;
+  }
+  
+  OS << tok::kw_return << NewLine;
+  OS << tok::r_brace << NewLine;
+  OS << BodyCharRange.str().str();
+  
+  // Replace if-let to guard
+  auto ReplaceRange = RangeInfo.ContentRange;
+  EditConsumer.accept(SM, ReplaceRange, DeclBuffer.str());
+
+  return false;
+}
+
+bool RefactoringActionConvertGuardExprToIfLetExpr::
+  isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+  if (Info.Kind != RangeKind::SingleStatement
+      && Info.Kind != RangeKind::MultiStatement)
+    return false;
+
+  if (Info.ContainedNodes.empty())
+    return false;
+
+  GuardStmt *guardStmt = nullptr;
+
+  if (Info.ContainedNodes.size() > 0) {
+    if (auto S = Info.ContainedNodes[0].dyn_cast<Stmt*>()) {
+      guardStmt = dyn_cast<GuardStmt>(S);
+    }
+  }
+
+  if (!guardStmt)
+    return false;
+
+  auto CondList = guardStmt->getCond();
+
+  if (CondList.size() == 1) {
+    auto E = CondList[0];
+    auto P = E.getPatternOrNull();
+    if (P && E.getKind() == swift::StmtConditionElement::CK_PatternBinding)
+      return true;
+  }
+
+  return false;
+}
+
+bool RefactoringActionConvertGuardExprToIfLetExpr::performChange() {
+
+  // Get guard stmt
+  auto S = RangeInfo.ContainedNodes[0].dyn_cast<Stmt*>();
+  GuardStmt *Guard = dyn_cast<GuardStmt>(S);
+
+  // Get guard condition
+  auto CondList = Guard->getCond();
+
+  // Get guard condition source
+  SourceRange range = CondList[0].getSourceRange();
+  SourceManager &SM = RangeInfo.RangeContext->getASTContext().SourceMgr;
+  auto CondCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
+  
+  llvm::SmallString<64> DeclBuffer;
+  llvm::raw_svector_ostream OS(DeclBuffer);
+  
+  llvm::StringRef Space = " ";
+  llvm::StringRef NewLine = "\n";
+  
+  OS << tok::kw_if << Space;
+  OS << CondCharRange.str().str() << Space;
+  OS << tok::l_brace << NewLine;
+
+  // Get nodes after guard to place them at if-let body
+  if (RangeInfo.ContainedNodes.size() > 1) {
+    auto S = RangeInfo.ContainedNodes[1].getSourceRange();
+    S.widen(RangeInfo.ContainedNodes.back().getSourceRange());
+    auto BodyCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, S);
+    OS << BodyCharRange.str().str() << NewLine;
+  }
+  OS << tok::r_brace;
+
+  // Get guard body
+  auto Body = dyn_cast_or_null<BraceStmt>(Guard->getBody());
+  
+  if (Body && Body->getNumElements() > 1) {
+    auto firstElement = Body->getFirstElement();
+    auto lastElement = Body->getLastElement();
+    SourceRange bodyRange = firstElement.getSourceRange();
+    bodyRange.widen(lastElement.getSourceRange());
+    auto BodyCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, bodyRange);
+    OS << Space << tok::kw_else << Space << tok::l_brace << NewLine;
+    OS << BodyCharRange.str().str() << NewLine;
+    OS << tok::r_brace;
+  }
+  
+  // Replace guard to if-let
+  auto ReplaceRange = RangeInfo.ContentRange;
+  EditConsumer.accept(SM, ReplaceRange, DeclBuffer.str());
+  
+  return false;
+}
+
 /// Struct containing info about an IfStmt that can be converted into an IfExpr.
 struct ConvertToTernaryExprInfo {
   ConvertToTernaryExprInfo() {}
@@ -2340,7 +2515,7 @@ getUnsatisfiedRequirements(const DeclContext *DC) {
   for(ProtocolConformance *Con : DC->getLocalConformances()) {
 
     // Collect non-witnessed requirements.
-    Con->forEachNonWitnessedRequirement(DC->getASTContext().getLazyResolver(),
+    Con->forEachNonWitnessedRequirement(
       [&](ValueDecl *VD) { NonWitnessedReqs.push_back(VD); });
   }
 
@@ -2389,11 +2564,12 @@ collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
   DiagnosticEngine DiagEngine(SM);
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
                 [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
-  CursorInfoResolver Resolver(*SF);
   SourceLoc Loc = SM.getLocForLineCol(SF->getBufferID().getValue(), Line, Column);
   if (Loc.isInvalid())
     return {};
-  ResolvedCursorInfo Tok = Resolver.resolve(Lexer::getLocForStartOfToken(SM, Loc));
+  ResolvedCursorInfo Tok = evaluateOrDefault(SF->getASTContext().evaluator,
+    CursorInfoRequest{CursorInfoOwner(SF, Lexer::getLocForStartOfToken(SM, Loc))},
+                                             ResolvedCursorInfo());
   return collectAvailableRefactorings(SF, Tok, Scratch, /*Exclude rename*/false);
 }
 
@@ -2577,78 +2753,106 @@ bool RefactoringActionLocalizeString::performChange() {
   return false;
 }
 
+struct MemberwiseParameter {
+  Identifier Name;
+  Type MemberType;
+  Expr *DefaultExpr;
+
+  MemberwiseParameter(Identifier name, Type type, Expr *initialExpr)
+    : Name(name), MemberType(type), DefaultExpr(initialExpr) {}
+};
+
 static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
-                            SourceManager &SM,
-                            SmallVectorImpl<std::string>& memberNameVector,
-                            SmallVectorImpl<std::string>& memberTypeVector,
-                            SourceLoc targetLocation) {
+                                   SourceManager &SM,
+                                   ArrayRef<MemberwiseParameter> memberVector,
+                                   SourceLoc targetLocation) {
   
-  assert(!memberTypeVector.empty());
-  assert(memberTypeVector.size() == memberNameVector.size());
-  
+  assert(!memberVector.empty());
+
   EditConsumer.accept(SM, targetLocation, "\ninternal init(");
-  
-  for (size_t i = 0, n = memberTypeVector.size(); i < n ; i++) {
-    EditConsumer.accept(SM, targetLocation, memberNameVector[i] + ": " +
-                        memberTypeVector[i]);
-    
-    if (i != memberTypeVector.size() - 1) {
-      EditConsumer.accept(SM, targetLocation, ", ");
+  auto insertMember = [&SM](const MemberwiseParameter &memberData,
+                            llvm::raw_ostream &OS, bool wantsSeparator) {
+    OS << memberData.Name << ": " << memberData.MemberType.getString();
+    if (auto *expr = memberData.DefaultExpr) {
+      if (isa<NilLiteralExpr>(expr)) {
+        OS << " = nil";
+      } else if (expr->getSourceRange().isValid()) {
+        auto range =
+          Lexer::getCharSourceRangeFromSourceRange(
+            SM, expr->getSourceRange());
+        OS << " = " << SM.extractText(range);
+      }
     }
+
+    if (wantsSeparator) {
+      OS << ", ";
+    }
+  };
+
+  // Process the initial list of members, inserting commas as appropriate.
+  std::string Buffer;
+  llvm::raw_string_ostream OS(Buffer);
+  for (const auto &memberData : memberVector.drop_back()) {
+    insertMember(memberData, OS, /*wantsSeparator*/ true);
   }
-  
-  EditConsumer.accept(SM, targetLocation, ") {\n");
-  
-  for (auto varName: memberNameVector) {
-    EditConsumer.accept(SM, targetLocation,
-                        "self." + varName + " = " + varName + "\n");
+
+  // Process the last (or perhaps, only) member.
+  insertMember(memberVector.back(), OS, /*wantsSeparator*/ false);
+
+  // Synthesize the body.
+  OS << ") {\n";
+  for (auto &member : memberVector) {
+    // self.<property> = <property>
+    OS << "self." << member.Name << " = " << member.Name << "\n";
   }
-  
-  EditConsumer.accept(SM, targetLocation, "}\n");
+  OS << "}\n";
+
+  // Accept the entire edit.
+  EditConsumer.accept(SM, targetLocation, OS.str());
 }
-  
-static SourceLoc collectMembersForInit(ResolvedCursorInfo CursorInfo,
-                           SmallVectorImpl<std::string>& memberNameVector,
-                           SmallVectorImpl<std::string>& memberTypeVector) {
-  
+
+static SourceLoc
+collectMembersForInit(ResolvedCursorInfo CursorInfo,
+                      SmallVectorImpl<MemberwiseParameter> &memberVector) {
+
   if (!CursorInfo.ValueD)
     return SourceLoc();
   
-  ClassDecl *classDecl = dyn_cast<ClassDecl>(CursorInfo.ValueD);
-  if (!classDecl || classDecl->getStoredProperties().empty() ||
+  NominalTypeDecl *nominalDecl = dyn_cast<NominalTypeDecl>(CursorInfo.ValueD);
+  if (!nominalDecl || nominalDecl->getStoredProperties().empty() ||
       CursorInfo.IsRef) {
     return SourceLoc();
   }
-  
-  SourceLoc bracesStart = classDecl->getBraces().Start;
+
+  SourceLoc bracesStart = nominalDecl->getBraces().Start;
   if (!bracesStart.isValid())
     return SourceLoc();
   
   SourceLoc targetLocation = bracesStart.getAdvancedLoc(1);
   if (!targetLocation.isValid())
     return SourceLoc();
-  
-  for (auto varDecl : classDecl->getStoredProperties()) {
-    auto parentPatternBinding = varDecl->getParentPatternBinding();
-    if (!parentPatternBinding)
+
+  for (auto varDecl : nominalDecl->getStoredProperties()) {
+    auto patternBinding = varDecl->getParentPatternBinding();
+    if (!patternBinding)
       continue;
-    
-    auto varDeclIndex =
-      parentPatternBinding->getPatternEntryIndexForVarDecl(varDecl);
-    
-    if (auto init = varDecl->getParentPatternBinding()->getInit(varDeclIndex)) {
-      if (init->getStartLoc().isValid())
-        continue;
+
+    if (!varDecl->isMemberwiseInitialized(/*preferDeclaredProperties=*/true)) {
+      continue;
     }
-    
-    StringRef memberName = varDecl->getName().str();
-    memberNameVector.push_back(memberName.str());
-    
-    std::string memberType = varDecl->getType().getString();
-    memberTypeVector.push_back(memberType);
+
+    const auto i = patternBinding->getPatternEntryIndexForVarDecl(varDecl);
+    Expr *defaultInit = nullptr;
+    if (patternBinding->isExplicitlyInitialized(i) ||
+        patternBinding->isDefaultInitializable()) {
+      defaultInit = varDecl->getParentInitializer();
+    }
+
+    memberVector.emplace_back(varDecl->getName(),
+                              varDecl->getType(), defaultInit);
   }
   
-  if (memberNameVector.empty() || memberTypeVector.empty()) {
+  if (memberVector.empty()) {
     return SourceLoc();
   }
   
@@ -2658,25 +2862,18 @@ static SourceLoc collectMembersForInit(ResolvedCursorInfo CursorInfo,
 bool RefactoringActionMemberwiseInitLocalRefactoring::
 isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   
-  SmallVector<std::string, 8> memberNameVector;
-  SmallVector<std::string, 8> memberTypeVector;
-  
-  return collectMembersForInit(Tok, memberNameVector,
-                               memberTypeVector).isValid();
+  SmallVector<MemberwiseParameter, 8> memberVector;
+  return collectMembersForInit(Tok, memberVector).isValid();
 }
     
 bool RefactoringActionMemberwiseInitLocalRefactoring::performChange() {
   
-  SmallVector<std::string, 8> memberNameVector;
-  SmallVector<std::string, 8> memberTypeVector;
-  
-  SourceLoc targetLocation = collectMembersForInit(CursorInfo, memberNameVector,
-                                         memberTypeVector);
+  SmallVector<MemberwiseParameter, 8> memberVector;
+  SourceLoc targetLocation = collectMembersForInit(CursorInfo, memberVector);
   if (targetLocation.isInvalid())
     return true;
   
-  generateMemberwiseInit(EditConsumer, SM, memberNameVector,
-                         memberTypeVector, targetLocation);
+  generateMemberwiseInit(EditConsumer, SM, memberVector, targetLocation);
   
   return false;
 }
@@ -2742,30 +2939,36 @@ static NumberLiteralExpr *getTrailingNumberLiteral(ResolvedCursorInfo Tok) {
   // This cursor must point to the start of an expression.
   if (Tok.Kind != CursorInfoKind::ExprStart)
     return nullptr;
-  Expr *Parent = Tok.TrailingExpr;
-  assert(Parent);
 
-  // Check if an expression is a number literal.
-  auto IsLiteralNumber = [&](Expr *E) -> NumberLiteralExpr* {
-    if (auto *NL = dyn_cast<NumberLiteralExpr>(E)) {
-
-      // The sub-expression must have the same start loc with the outermost
-      // expression, i.e. the cursor position.
-      if (Parent->getStartLoc().getOpaquePointerValue() ==
-        E->getStartLoc().getOpaquePointerValue()) {
-        return NL;
-      }
-    }
-    return nullptr;
-  };
   // For every sub-expression, try to find the literal expression that matches
   // our criteria.
-  for (auto Pair: Parent->getDepthMap()) {
-    if (auto Result = IsLiteralNumber(Pair.getFirst())) {
-      return Result;
+  class FindLiteralNumber : public ASTWalker {
+    Expr * const parent;
+
+  public:
+    NumberLiteralExpr *found = nullptr;
+
+    explicit FindLiteralNumber(Expr *parent) : parent(parent) { }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (auto *literal = dyn_cast<NumberLiteralExpr>(expr)) {
+        // The sub-expression must have the same start loc with the outermost
+        // expression, i.e. the cursor position.
+        if (!found &&
+            parent->getStartLoc().getOpaquePointerValue() ==
+              expr->getStartLoc().getOpaquePointerValue()) {
+          found = literal;
+        }
+      }
+
+      return { found == nullptr, expr };
     }
-  }
-  return nullptr;
+  };
+
+  auto parent = Tok.TrailingExpr;
+  FindLiteralNumber finder(parent);
+  parent->walk(finder);
+  return finder.found;
 }
 
 static std::string insertUnderscore(StringRef Text) {
@@ -2962,6 +3165,97 @@ static bool rangeStartMayNeedRename(ResolvedRangeInfo Info) {
       return false;
   }
   llvm_unreachable("unhandled kind");
+}
+    
+bool RefactoringActionConvertToComputedProperty::
+isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+  if (Info.Kind != RangeKind::SingleDecl) {
+    return false;
+  }
+  
+  if (Info.ContainedNodes.size() != 1) {
+    return false;
+  }
+  
+  auto D = Info.ContainedNodes[0].dyn_cast<Decl*>();
+  if (!D) {
+    return false;
+  }
+  
+  auto Binding = dyn_cast<PatternBindingDecl>(D);
+  if (!Binding) {
+    return false;
+  }
+
+  auto SV = Binding->getSingleVar();
+  if (!SV) {
+    return false;
+  }
+
+  // willSet, didSet cannot be provided together with a getter
+  for (auto AD : SV->getAllAccessors()) {
+    if (AD->isObservingAccessor()) {
+      return false;
+    }
+  }
+  
+  // 'lazy' must not be used on a computed property
+  // NSCopying and IBOutlet attribute requires property to be mutable
+  auto Attributies = SV->getAttrs();
+  if (Attributies.hasAttribute<LazyAttr>() ||
+      Attributies.hasAttribute<NSCopyingAttr>() ||
+      Attributies.hasAttribute<IBOutletAttr>()) {
+    return false;
+  }
+
+  // Property wrapper cannot be applied to a computed property
+  if (SV->hasAttachedPropertyWrapper()) {
+    return false;
+  }
+
+  // has an initializer
+  return Binding->hasInitStringRepresentation(0);
+}
+
+bool RefactoringActionConvertToComputedProperty::performChange() {
+  // Get an initialization
+  auto D = RangeInfo.ContainedNodes[0].dyn_cast<Decl*>();
+  auto Binding = dyn_cast<PatternBindingDecl>(D);
+  SmallString<128> scratch;
+  auto Init = Binding->getInitStringRepresentation(0, scratch);
+  
+  // Get type
+  auto SV = Binding->getSingleVar();
+  auto SVType = SV->getType();
+  auto TR = SV->getTypeReprOrParentPatternTypeRepr();
+  
+  llvm::SmallString<64> DeclBuffer;
+  llvm::raw_svector_ostream OS(DeclBuffer);
+  llvm::StringRef Space = " ";
+  llvm::StringRef NewLine = "\n";
+  
+  OS << tok::kw_var << Space;
+  // Add var name
+  OS << SV->getNameStr().str() << ":" << Space;
+  // For computed property must write a type of var
+  if (TR) {
+    OS << Lexer::getCharSourceRangeFromSourceRange(SM, TR->getSourceRange()).str();
+  } else {
+    SVType.print(OS);
+  }
+
+  OS << Space << tok::l_brace << NewLine;
+  // Add an initialization
+  OS << tok::kw_return << Space << Init.str() << NewLine;
+  OS << tok::r_brace;
+  
+  // Replace initializer to computed property
+  auto ReplaceStartLoc = Binding->getLoc();
+  auto ReplaceEndLoc = Binding->getSourceRange().End;
+  auto ReplaceRange = SourceRange(ReplaceStartLoc, ReplaceEndLoc);
+  auto ReplaceCharSourceRange = Lexer::getCharSourceRangeFromSourceRange(SM, ReplaceRange);
+  EditConsumer.accept(SM, ReplaceCharSourceRange, DeclBuffer.str());
+  return false; // success
 }
 }// end of anonymous namespace
 
@@ -3164,10 +3458,11 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
   DiagnosticEngine DiagEngine(SM);
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
     [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
-
-  RangeResolver Resolver(*SF, Range.getStart(SF->getASTContext().SourceMgr),
-                         Range.getEnd(SF->getASTContext().SourceMgr));
-  ResolvedRangeInfo Result = Resolver.resolve();
+  ResolvedRangeInfo Result = evaluateOrDefault(SF->getASTContext().evaluator,
+    RangeInfoRequest(RangeInfoOwner({SF,
+                      Range.getStart(SF->getASTContext().SourceMgr),
+                      Range.getEnd(SF->getASTContext().SourceMgr)})),
+                                               ResolvedRangeInfo());
 
   bool enableInternalRefactoring = getenv("SWIFT_ENABLE_INTERNAL_REFACTORING_ACTIONS");
 
@@ -3345,14 +3640,15 @@ int swift::ide::findLocalRenameRanges(
   Diags.addConsumer(DiagConsumer);
 
   auto StartLoc = Lexer::getLocForStartOfToken(SM, Range.getStart(SM));
-
-  CursorInfoResolver Resolver(*SF);
-  ResolvedCursorInfo CursorInfo = Resolver.resolve(StartLoc);
+  ResolvedCursorInfo CursorInfo =
+    evaluateOrDefault(SF->getASTContext().evaluator,
+                      CursorInfoRequest{CursorInfoOwner(SF, StartLoc)},
+                      ResolvedCursorInfo());
   if (!CursorInfo.isValid() || !CursorInfo.ValueD) {
     Diags.diagnose(StartLoc, diag::unresolved_location);
     return true;
   }
-  ValueDecl *VD = CursorInfo.ValueD;
+  ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
   llvm::SmallVector<DeclContext *, 8> Scopes;
   analyzeRenameScope(VD, Diags, Scopes);
   if (Scopes.empty())

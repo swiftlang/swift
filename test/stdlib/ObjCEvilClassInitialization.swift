@@ -14,12 +14,14 @@ import StdlibUnittest
 let tests = TestSuite("ObjCEvilClassInitialization")
 
 tests.test("GenericOnEvilClass") {
-  struct Generic<T> {
-    var type: T.Type { return T.self }
+  if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
+    struct Generic<T> {
+      var type: T.Type { return T.self }
+    }
+    let g = Generic<EvilClass>()
+    expectEqual("\(type(of: g))", "Generic<EvilClass>")
+    expectEqual(g.type, EvilClass.self)
   }
-  let g = Generic<EvilClass>()
-  expectEqual("\(type(of: g))", "Generic<EvilClass>")
-  expectEqual(g.type, EvilClass.self)
 }
 
 runAllTests()

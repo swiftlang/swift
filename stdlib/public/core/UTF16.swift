@@ -155,7 +155,7 @@ extension Unicode.UTF16 {
 
   @inlinable
   public // @testable
-  static func _copy<T : _StringElement, U : _StringElement>(
+  static func _copy<T: _StringElement, U: _StringElement>(
     source: UnsafeMutablePointer<T>,
     destination: UnsafeMutablePointer<U>,
     count: Int
@@ -210,8 +210,8 @@ extension Unicode.UTF16 {
   ///   `nil`.
   @inlinable
   public static func transcodedLength<
-    Input : IteratorProtocol,
-    Encoding : Unicode.Encoding
+    Input: IteratorProtocol,
+    Encoding: Unicode.Encoding
   >(
     of input: Input,
     decodedAs sourceEncoding: Encoding.Type,
@@ -259,7 +259,7 @@ extension Unicode.UTF16 {
   }
 }
 
-extension Unicode.UTF16 : Unicode.Encoding {
+extension Unicode.UTF16: Unicode.Encoding {
   public typealias CodeUnit = UInt16
   public typealias EncodedScalar = _UIntBuffer<UInt16>
 
@@ -269,7 +269,7 @@ extension Unicode.UTF16 : Unicode.Encoding {
   }
   
   @inlinable
-  public static var encodedReplacementCharacter : EncodedScalar {
+  public static var encodedReplacementCharacter: EncodedScalar {
     return EncodedScalar(_storage: 0xFFFD, _bitCount: 16)
   }
 
@@ -327,7 +327,7 @@ extension Unicode.UTF16 : Unicode.Encoding {
 
   @inlinable
   @inline(__always)
-  public static func transcode<FromEncoding : Unicode.Encoding>(
+  public static func transcode<FromEncoding: Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
     if _fastPath(FromEncoding.self == UTF8.self) {
@@ -386,7 +386,7 @@ extension Unicode.UTF16 : Unicode.Encoding {
   }
 }
 
-extension UTF16.ReverseParser : Unicode.Parser, _UTFParser {
+extension UTF16.ReverseParser: Unicode.Parser, _UTFParser {
   public typealias Encoding = Unicode.UTF16
 
   @inlinable
@@ -409,7 +409,7 @@ extension UTF16.ReverseParser : Unicode.Parser, _UTFParser {
   }
 }
 
-extension Unicode.UTF16.ForwardParser : Unicode.Parser, _UTFParser {
+extension Unicode.UTF16.ForwardParser: Unicode.Parser, _UTFParser {
   public typealias Encoding = Unicode.UTF16
   
   @inlinable

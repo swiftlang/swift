@@ -108,7 +108,7 @@ static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
    || defined(__HAIKU__) || defined(__FreeBSD__)
 static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
 #if defined(__ANDROID__)
-#if __ANDROID_API__ >= 17
+#if !defined(__ANDROID_API__) || __ANDROID_API__ >= 17
   extern __swift_size_t malloc_usable_size(const void *ptr);
 #endif
 #else
@@ -127,342 +127,45 @@ static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
 
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_remainderf(float _self, float other) {
-  return __builtin_remainderf(_self, other);
+float _stdlib_remainderf(float _self, float _other) {
+  return __builtin_remainderf(_self, _other);
 }
   
 static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_squareRootf(float _self) {
+float _stdlib_squareRootf(float _self) {
   return __builtin_sqrtf(_self);
 }
-  
+
 static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_tanf(float x) {
-  return __builtin_tanf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_acosf(float x) {
-  return __builtin_acosf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_asinf(float x) {
-  return __builtin_asinf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_atanf(float x) {
-  return __builtin_atanf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_atan2f(float y, float x) {
-  return __builtin_atan2f(y, x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_coshf(float x) {
-  return __builtin_coshf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_sinhf(float x) {
-  return __builtin_sinhf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_tanhf(float x) {
-  return __builtin_tanhf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_acoshf(float x) {
-  return __builtin_acoshf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_asinhf(float x) {
-  return __builtin_asinhf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_atanhf(float x) {
-  return __builtin_atanhf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_exp10f(float x) {
-#if defined __APPLE__
-  extern float __exp10f(float);
-  return __exp10f(x);
-#else
-  return __builtin_powf(10, x);
-#endif
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_expm1f(float x) {
-  return __builtin_expm1f(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_log1pf(float x) {
-  return __builtin_log1pf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_hypotf(float x, float y) {
-#if defined(_WIN32)
-  extern float _hypotf(float, float);
-  return _hypotf(x, y);
-#else
-  return __builtin_hypotf(x, y);
-#endif
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_erff(float x) {
-  return __builtin_erff(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_erfcf(float x) {
-  return __builtin_erfcf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_tgammaf(float x) {
-  return __builtin_tgammaf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-float _swift_stdlib_lgammaf(float x) {
-  extern float lgammaf_r(float x, int *psigngam);
-  int dontCare;
-  return lgammaf_r(x, &dontCare);
+double _stdlib_remainder(double _self, double _other) {
+  return __builtin_remainder(_self, _other);
 }
 
 static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_remainder(double _self, double other) {
-  return __builtin_remainder(_self, other);
-}
-
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_squareRoot(double _self) {
+double _stdlib_squareRoot(double _self) {
   return __builtin_sqrt(_self);
-}
-
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_tan(double x) {
-  return __builtin_tan(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_acos(double x) {
-  return __builtin_acos(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_asin(double x) {
-  return __builtin_asin(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_atan(double x) {
-  return __builtin_atan(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_atan2(double y, double x) {
-  return __builtin_atan2(y, x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_cosh(double x) {
-  return __builtin_cosh(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_sinh(double x) {
-  return __builtin_sinh(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_tanh(double x) {
-  return __builtin_tanh(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_acosh(double x) {
-  return __builtin_acosh(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_asinh(double x) {
-  return __builtin_asinh(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_atanh(double x) {
-  return __builtin_atanh(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_exp10(double x) {
-#if defined __APPLE__
-  extern double __exp10(double);
-  return __exp10(x);
-#else
-  return __builtin_pow(10, x);
-#endif
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_expm1(double x) {
-  return __builtin_expm1(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_log1p(double x) {
-  return __builtin_log1p(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_hypot(double x, double y) {
-  return __builtin_hypot(x, y);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_erf(double x) {
-  return __builtin_erf(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_erfc(double x) {
-  return __builtin_erfc(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_tgamma(double x) {
-  return __builtin_tgamma(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-double _swift_stdlib_lgamma(double x) {
-  extern double lgamma_r(double x, int *psigngam);
-  int dontCare;
-  return lgamma_r(x, &dontCare);
 }
 
 #if !defined _WIN32 && (defined __i386__ || defined __x86_64__)
 static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_remainderl(long double _self, long double other) {
-  return __builtin_remainderl(_self, other);
+long double _stdlib_remainderl(long double _self, long double _other) {
+  return __builtin_remainderl(_self, _other);
 }
-
+  
 static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_squareRootl(long double _self) {
+long double _stdlib_squareRootl(long double _self) {
   return __builtin_sqrtl(_self);
 }
-
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_tanl(long double x) {
-  return __builtin_tanl(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_acosl(long double x) {
-  return __builtin_acosl(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_asinl(long double x) {
-  return __builtin_asinl(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_atanl(long double x) {
-  return __builtin_atanl(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_atan2l(long double y, long double x) {
-  return __builtin_atan2l(y, x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_coshl(long double x) {
-  return __builtin_coshl(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_sinhl(long double x) {
-  return __builtin_sinhl(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_tanhl(long double x) {
-  return __builtin_tanhl(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_acoshl(long double x) {
-  return __builtin_acoshl(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_asinhl(long double x) {
-  return __builtin_asinhl(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_atanhl(long double x) {
-  return __builtin_atanhl(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_exp10l(long double x) {
-  return __builtin_powl(10, x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_expm1l(long double x) {
-  return __builtin_expm1l(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_log1pl(long double x) {
-  return __builtin_log1pl(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_hypotl(long double x, long double y) {
-  return __builtin_hypotl(x, y);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_erfl(long double x) {
-  return __builtin_erfl(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_erfcl(long double x) {
-  return __builtin_erfcl(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_tgammal(long double x) {
-  return __builtin_tgammal(x);
-}
-  
-static inline SWIFT_ALWAYS_INLINE
-long double _swift_stdlib_lgammal(long double x) {
-  extern long double lgammal_r(long double x, int *psigngam);
-  int dontCare;
-  return lgammal_r(x, &dontCare);
-}
 #endif
+
+// Apple's math.h does not declare lgamma_r() etc by default, but they're
+// unconditionally exported by libsystem_m.dylib in all OS versions that
+// support Swift development; we simply need to provide declarations here.
+#if defined(__APPLE__)
+float lgammaf_r(float x, int *psigngam);
+double lgamma_r(double x, int *psigngam);
+long double lgammal_r(long double x, int *psigngam);
+#endif // defined(__APPLE__)
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

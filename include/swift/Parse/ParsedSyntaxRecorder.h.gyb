@@ -43,25 +43,24 @@ struct ParsedSyntaxRecorder {
 %     end
 %     child_params = ', '.join(child_params)
 private:
-  static Parsed${node.name} record${node.syntax_kind}(${child_params},
+  static Parsed${node.name} record${node.syntax_kind}(MutableArrayRef<ParsedRawSyntaxNode> layout,
                                               ParsedRawSyntaxRecorder &rec);
-public:
-  static Parsed${node.name} defer${node.syntax_kind}(${child_params},
+  static Parsed${node.name} defer${node.syntax_kind}(MutableArrayRef<ParsedRawSyntaxNode> layout,
                                               SyntaxParsingContext &SPCtx);
+public:
   static Parsed${node.name} make${node.syntax_kind}(${child_params},
                                               SyntaxParsingContext &SPCtx);
 %   elif node.is_syntax_collection():
 private:
   static Parsed${node.name} record${node.syntax_kind}(
-      ArrayRef<Parsed${node.collection_element_type}> elts,
+      MutableArrayRef<ParsedRawSyntaxNode> layout,
       ParsedRawSyntaxRecorder &rec);
-
-public:
   static Parsed${node.name} defer${node.syntax_kind}(
-      ArrayRef<Parsed${node.collection_element_type}> elts,
+      MutableArrayRef<ParsedRawSyntaxNode> layout,
       SyntaxParsingContext &SPCtx);
+public:
   static Parsed${node.name} make${node.syntax_kind}(
-      ArrayRef<Parsed${node.collection_element_type}> elts,
+      MutableArrayRef<Parsed${node.collection_element_type}> elts,
       SyntaxParsingContext &SPCtx);
 
   static Parsed${node.name} makeBlank${node.syntax_kind}(SourceLoc loc,
@@ -75,8 +74,8 @@ public:
   /// optional trailing comma.
   static ParsedTupleTypeElementSyntax
   makeTupleTypeElement(ParsedTypeSyntax Type,
-                         Optional<ParsedTokenSyntax> TrailingComma,
-                         SyntaxParsingContext &SPCtx);
+                       Optional<ParsedTokenSyntax> TrailingComma,
+                       SyntaxParsingContext &SPCtx);
 
   /// The provided \c elements are in the appropriate order for the syntax
   /// \c kind's layout but optional elements are not be included.
@@ -84,9 +83,12 @@ public:
   /// substituting missing parts with a null ParsedRawSyntaxNode object.
   ///
   /// \returns true if the layout could be formed, false otherwise.
-  static bool formExactLayoutFor(syntax::SyntaxKind kind,
-                                 ArrayRef<ParsedRawSyntaxNode> elements,
-         function_ref<void(syntax::SyntaxKind, ArrayRef<ParsedRawSyntaxNode>)> receiver);
+  static bool
+  formExactLayoutFor(syntax::SyntaxKind kind,
+                     MutableArrayRef<ParsedRawSyntaxNode> elements,
+                     function_ref<void(syntax::SyntaxKind,
+                                       MutableArrayRef<ParsedRawSyntaxNode>)>
+                         receiver);
 };
 }
 

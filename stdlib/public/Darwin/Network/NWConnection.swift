@@ -110,7 +110,7 @@ public final class NWConnection : CustomDebugStringConvertible {
 	/// Retrieve the maximum datagram size that can be sent
 	/// on the connection. Any datagrams sent should be less
 	/// than or equal to this size.
-	@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+	@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
 	public var maximumDatagramSize: Int {
 		get {
 			return Int(nw_connection_get_maximum_datagram_size(self.nw))
@@ -479,7 +479,7 @@ public final class NWConnection : CustomDebugStringConvertible {
 											   _ isComplete: Bool, _ error: NWError?) -> Void) {
 		nw_connection_receive(self.nw, UInt32(minimumIncompleteLength), UInt32(maximumLength)) {
 			(content, context, complete, nwError) in
-			completion(NWCreateNSDataFromDispatchData(content) as Data?, ContentContext(context), complete, NWError(nwError));
+			completion(NWCreateNSDataFromDispatchData(content), ContentContext(context), complete, NWError(nwError));
 		}
 	}
 
@@ -491,7 +491,7 @@ public final class NWConnection : CustomDebugStringConvertible {
                                                       _ contentContext: NWConnection.ContentContext?,
                                                       _ isComplete: Bool, _ error: NWError?) -> Void) {
 		nw_connection_receive_message(self.nw) { (content, context, complete, nwError) in
-			completion(NWCreateNSDataFromDispatchData(content) as Data?, ContentContext(context), complete, NWError(nwError))
+			completion(NWCreateNSDataFromDispatchData(content), ContentContext(context), complete, NWError(nwError))
 		}
 	}
 

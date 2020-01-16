@@ -61,7 +61,9 @@ func test9() {
   let constFridge: CCRefrigerator = fridge
   CCRefrigeratorOpen(fridge)
   let item = CCRefrigeratorGet(fridge, 0).takeUnretainedValue()
+  // TODO(diagnostics): In this case we should probably suggest to flip `item` and `fridge`
   CCRefrigeratorInsert(item, fridge) // expected-error {{cannot convert value of type 'CCItem' to expected argument type 'CCMutableRefrigerator?'}}
+  // expected-error@-1 {{cannot convert value of type 'CCMutableRefrigerator' to expected argument type 'CCItem?'}}
   CCRefrigeratorInsert(constFridge, item) // expected-error {{cannot convert value of type 'CCRefrigerator' to expected argument type 'CCMutableRefrigerator?'}}
   CCRefrigeratorInsert(fridge, item)
   CCRefrigeratorClose(fridge)

@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/LLVM.h"
@@ -28,11 +29,14 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Triple.h"
-
-#include "tapi/InterfaceFile.h"
+#include "llvm/TextAPI/MachO/InterfaceFile.h"
 
 using namespace swift::irgen;
 using StringSet = llvm::StringSet<>;
+
+namespace llvm {
+class DataLayout;
+}
 
 namespace swift {
 
@@ -42,18 +46,22 @@ namespace tbdgen {
 
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 public:
-  tapi::internal::InterfaceFile &Symbols;
-  tapi::internal::ArchitectureSet Archs;
+  llvm::MachO::InterfaceFile &Symbols;
+  llvm::MachO::TargetList Targets;
   StringSet *StringSymbols;
+  const llvm::DataLayout &DataLayout;
 
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
-  AvailabilityContext AvailCtx;
   const TBDGenOptions &Opts;
+  Decl* TopLevelDecl = nullptr;
 
 private:
-  void addSymbol(StringRef name, tapi::internal::SymbolKind kind =
-                                     tapi::internal::SymbolKind::GlobalSymbol);
+  void addSymbolInternal(StringRef name, llvm::MachO::SymbolKind kind,
+                         bool isLinkerDirective = false);
+  void addLinkerDirectiveSymbols(StringRef name, llvm::MachO::SymbolKind kind);
+  void addSymbol(StringRef name, llvm::MachO::SymbolKind kind =
+                                     llvm::MachO::SymbolKind::GlobalSymbol);
 
   void addSymbol(SILDeclRef declRef);
 
@@ -71,14 +79,14 @@ private:
   void addBaseConformanceDescriptor(BaseConformance conformance);
 
 public:
-  TBDGenVisitor(tapi::internal::InterfaceFile &symbols,
-                tapi::internal::ArchitectureSet archs, StringSet *stringSymbols,
+  TBDGenVisitor(llvm::MachO::InterfaceFile &symbols,
+                llvm::MachO::TargetList targets, StringSet *stringSymbols,
+                const llvm::DataLayout &dataLayout,
                 const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule, AvailabilityContext availCtx,
-                const TBDGenOptions &opts)
-      : Symbols(symbols), Archs(archs), StringSymbols(stringSymbols),
-        UniversalLinkInfo(universalLinkInfo), SwiftModule(swiftModule),
-        AvailCtx(availCtx), Opts(opts) {}
+                ModuleDecl *swiftModule, const TBDGenOptions &opts)
+      : Symbols(symbols), Targets(targets), StringSymbols(stringSymbols),
+        DataLayout(dataLayout), UniversalLinkInfo(universalLinkInfo),
+        SwiftModule(swiftModule), Opts(opts) {}
 
   void addMainIfNecessary(FileUnit *file) {
     // HACK: 'main' is a special symbol that's always emitted in SILGen if
@@ -90,6 +98,8 @@ public:
 
   /// Adds the global symbols associated with the first file.
   void addFirstFileSymbols();
+
+  void visitDefaultArguments(ValueDecl *VD, ParameterList *PL);
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);
 
@@ -114,6 +124,8 @@ public:
   void visitVarDecl(VarDecl *VD);
 
   void visitEnumDecl(EnumDecl *ED);
+
+  void visitEnumElementDecl(EnumElementDecl *EED);
 
   void visitDecl(Decl *D) {}
 };

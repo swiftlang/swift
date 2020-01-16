@@ -21,6 +21,7 @@
 #ifndef SWIFT_SIL_APPLYSITE_H
 #define SWIFT_SIL_APPLYSITE_H
 
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
@@ -130,8 +131,13 @@ public:
     llvm_unreachable("covered switch");                                        \
   } while (0)
 
+  /// Return the callee operand as a value.
+  SILValue getCallee() const { return getCalleeOperand()->get(); }
+
   /// Return the callee operand.
-  SILValue getCallee() const { FOREACH_IMPL_RETURN(getCallee()); }
+  const Operand *getCalleeOperand() const {
+    FOREACH_IMPL_RETURN(getCalleeOperand());
+  }
 
   /// Return the callee value by looking through function conversions until we
   /// find a function_ref, partial_apply, or unrecognized callee value.
@@ -264,7 +270,8 @@ public:
   /// Returns true if \p oper is an argument operand and not the callee
   /// operand.
   bool isArgumentOperand(const Operand &oper) const {
-    return oper.getOperandNumber() >= getOperandIndexOfFirstArgument();
+    return oper.getOperandNumber() >= getOperandIndexOfFirstArgument() &&
+      oper.getOperandNumber() < getOperandIndexOfFirstArgument() + getNumArguments();
   }
 
   /// Return the applied argument index for the given operand.
@@ -506,6 +513,63 @@ public:
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const {
     return getCalleeArgIndex(op) < getNumIndirectSILResults();
+  }
+
+  /// If this is a terminator apply site, then pass the first instruction of
+  /// each successor to fun. Otherwise, pass std::next(Inst).
+  ///
+  /// The intention is that this abstraction will enable the compiler writer to
+  /// ignore whether or not an apply site is a terminator when inserting
+  /// instructions after an apply site. This results in eliminating unnecessary
+  /// if-else code otherwise required to handle such situations.
+  ///
+  /// NOTE: We return std::next() for begin_apply. If one wishes to insert code
+  /// /after/ the end_apply/abort_apply, please use instead
+  /// insertAfterFullEvaluation.
+  void insertAfterInvocation(
+      function_ref<void(SILBasicBlock::iterator)> func) const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+    case FullApplySiteKind::BeginApplyInst:
+      return func(std::next(getInstruction()->getIterator()));
+    case FullApplySiteKind::TryApplyInst:
+      for (auto *succBlock :
+           cast<TermInst>(getInstruction())->getSuccessorBlocks()) {
+        func(succBlock->begin());
+      }
+      return;
+    }
+    llvm_unreachable("Covered switch isn't covered");
+  }
+
+  /// Pass to func insertion points that are guaranteed to be immediately after
+  /// this full apply site has completely finished executing.
+  ///
+  /// This is just like insertAfterInvocation except that if the full apply site
+  /// is a begin_apply, we pass the insertion points after the end_apply,
+  /// abort_apply rather than an insertion point right after the
+  /// begin_apply. For such functionality, please invoke insertAfterInvocation.
+  void insertAfterFullEvaluation(
+      function_ref<void(SILBasicBlock::iterator)> func) const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+    case FullApplySiteKind::TryApplyInst:
+      return insertAfterInvocation(func);
+    case FullApplySiteKind::BeginApplyInst:
+      SmallVector<EndApplyInst *, 2> endApplies;
+      SmallVector<AbortApplyInst *, 2> abortApplies;
+      auto *bai = cast<BeginApplyInst>(getInstruction());
+      bai->getCoroutineEndPoints(endApplies, abortApplies);
+      for (auto *eai : endApplies) {
+        func(std::next(eai->getIterator()));
+      }
+      for (auto *aai : abortApplies) {
+        func(std::next(aai->getIterator()));
+      }
+      return;
+    }
+
+    llvm_unreachable("covered switch isn't covered");
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }

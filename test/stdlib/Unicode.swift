@@ -63,7 +63,7 @@ typealias UTF16 = Unicode.UTF16
 typealias UTF32 = Unicode.UTF32
 
 UnicodeAPIs.test("UTF-8 and UTF-16 queries") {
-  guard #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) else {
+  guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else {
     return
   }
   let str = "abéÏ01😓🎃👨‍👨‍👧‍👦アイウエオ"

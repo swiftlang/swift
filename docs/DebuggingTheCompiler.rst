@@ -86,6 +86,14 @@ diagnostic engine to assert on the first error/warning:
 These allow one to dump a stack trace of where the diagnostic is being emitted
 (if run without a debugger) or drop into the debugger if a debugger is attached.
 
+Finding Diagnostic Names
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Some diagnostics rely heavily on format string arguments, so it can be difficult
+to find their implementation by searching for parts of the emitted message in
+the codebase. To print the corresponding diagnostic name at the end of each
+emitted message, use the ``-Xfrontend -debug-diagnostic-names`` argument.
+
 Debugging the Type Checker
 --------------------------
 
@@ -205,6 +213,11 @@ This opens a preview window containing the CFG of the function. To continue
 debugging press <CTRL>-C on the LLDB prompt.
 Note that this only works in Xcode if the PATH variable in the scheme's
 environment setting contains the path to the dot tool.
+
+swift/Basic/Debug.h includes macros to help contributors declare these methods
+with the proper attributes to ensure they'll be available in the debugger. In
+particular, if you see ``SWIFT_DEBUG_DUMP`` in a class declaration, that class
+has a ``dump()`` method you can call.
 
 Debugging and Profiling on SIL level
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

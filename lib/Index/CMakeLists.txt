@@ -4,4 +4,5 @@ add_swift_host_library(swiftIndex STATIC
   IndexRecord.cpp
   IndexSymbol.cpp)
 target_link_libraries(swiftIndex PRIVATE
-  swiftAST)
+  swiftAST
+  swiftIDE)

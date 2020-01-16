@@ -61,7 +61,7 @@ func customHashable() {
 enum InvalidCustomHashable {
   case A, B
 
-  var hashValue: String { return "" } // expected-note{{previously declared here}}
+  var hashValue: String { return "" } // expected-note {{previously declared here}}
 }
 func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String {
   return ""
@@ -105,8 +105,7 @@ enum Complex {
 }
 
 func complex() {
-  if Complex.A(1) == .B { } // expected-error{{binary operator '==' cannot be applied to operands of type 'Complex' and '_'}}
-  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: }}
+  if Complex.A(1) == .B { } // expected-error{{cannot convert value of type 'Complex' to expected argument type 'CustomHashable'}}
 }
 
 // Enums with equatable payloads are equatable if they explicitly conform.
@@ -299,7 +298,7 @@ enum BadGenericDeriveExtension<T> {
     case A(T) //expected-note {{associated value type 'T' does not conform to protocol 'Hashable', preventing synthesized conformance of 'BadGenericDeriveExtension<T>' to 'Hashable'}}
   //expected-note@-1 {{associated value type 'T' does not conform to protocol 'Equatable', preventing synthesized conformance of 'BadGenericDeriveExtension<T>' to 'Equatable'}}
 }
-extension BadGenericDeriveExtension: Equatable {}
+extension BadGenericDeriveExtension: Equatable {} //
 // expected-error@-1 {{type 'BadGenericDeriveExtension<T>' does not conform to protocol 'Equatable'}}
 extension BadGenericDeriveExtension: Hashable where T: Equatable {}
 // expected-error@-1 {{type 'BadGenericDeriveExtension' does not conform to protocol 'Hashable'}}

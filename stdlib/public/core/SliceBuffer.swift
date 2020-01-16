@@ -123,7 +123,7 @@ internal struct _SliceBuffer<Element>
     _ subrange: Range<Int>,
     with insertCount: Int,
     elementsOf newValues: __owned C
-  ) where C : Collection, C.Element == Element {
+  ) where C: Collection, C.Element == Element {
 
     _invariantCheck()
     _internalInvariant(insertCount <= numericCast(newValues.count))
@@ -286,7 +286,7 @@ internal struct _SliceBuffer<Element>
   /// Traps unless the given `index` is valid for subscripting, i.e.
   /// `startIndex ≤ index < endIndex`
   @inlinable
-  internal func _checkValidSubscript(_ index : Int) {
+  internal func _checkValidSubscript(_ index: Int) {
     _precondition(
       index >= startIndex && index < endIndex, "Index out of bounds")
   }

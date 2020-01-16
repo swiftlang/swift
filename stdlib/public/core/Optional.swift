@@ -119,7 +119,7 @@
 /// Unconditionally unwrapping a `nil` instance with `!` triggers a runtime
 /// error.
 @frozen
-public enum Optional<Wrapped> : ExpressibleByNilLiteral {
+public enum Optional<Wrapped>: ExpressibleByNilLiteral {
   // The compiler has special knowledge of Optional<Wrapped>, including the fact
   // that it is an `enum` with cases named `none` and `some`.
 
@@ -264,7 +264,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   }
 }
 
-extension Optional : CustomDebugStringConvertible {
+extension Optional: CustomDebugStringConvertible {
   /// A textual representation of this instance, suitable for debugging.
   public var debugDescription: String {
     switch self {
@@ -279,7 +279,7 @@ extension Optional : CustomDebugStringConvertible {
   }
 }
 
-extension Optional : CustomReflectable {
+extension Optional: CustomReflectable {
   public var customMirror: Mirror {
     switch self {
     case .some(let value):
@@ -302,17 +302,24 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
                                     _isImplicitUnwrap: Builtin.Int1) {
   // Cannot use _preconditionFailure as the file and line info would not be
   // printed.
-  preconditionFailure(
-    Bool(_isImplicitUnwrap)
-      ? "Unexpectedly found nil while implicitly unwrapping an Optional value"
-      : "Unexpectedly found nil while unwrapping an Optional value",
-    file: StaticString(_start: _filenameStart,
-                       utf8CodeUnitCount: _filenameLength,
-                       isASCII: _filenameIsASCII),
-    line: UInt(_line))
+  if Bool(_isImplicitUnwrap) {
+    _preconditionFailure(
+      "Unexpectedly found nil while implicitly unwrapping an Optional value",
+      file: StaticString(_start: _filenameStart,
+                         utf8CodeUnitCount: _filenameLength,
+                         isASCII: _filenameIsASCII),
+      line: UInt(_line))
+  } else {
+    _preconditionFailure(
+      "Unexpectedly found nil while unwrapping an Optional value",
+      file: StaticString(_start: _filenameStart,
+                         utf8CodeUnitCount: _filenameLength,
+                         isASCII: _filenameIsASCII),
+      line: UInt(_line))
+  }
 }
 
-extension Optional : Equatable where Wrapped : Equatable {
+extension Optional: Equatable where Wrapped: Equatable {
   /// Returns a Boolean value indicating whether two optional instances are
   /// equal.
   ///
@@ -391,7 +398,7 @@ extension Optional: Hashable where Wrapped: Hashable {
 // Enable pattern matching against the nil literal, even if the element type
 // isn't equatable.
 @frozen
-public struct _OptionalNilComparisonType : ExpressibleByNilLiteral {
+public struct _OptionalNilComparisonType: ExpressibleByNilLiteral {
   /// Create an instance initialized with `nil`.
   @_transparent
   public init(nilLiteral: ()) {
@@ -668,9 +675,9 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
 //===----------------------------------------------------------------------===//
 
 #if _runtime(_ObjC)
-extension Optional : _ObjectiveCBridgeable {
+extension Optional: _ObjectiveCBridgeable {
   // The object that represents `none` for an Optional of this type.
-  internal static var _nilSentinel : AnyObject {
+  internal static var _nilSentinel: AnyObject {
     @_silgen_name("_swift_Foundation_getOptionalNilSentinelObject")
     get
   }

@@ -181,49 +181,21 @@ internal extension TGMath {
 % end
 
 extension ${T}: TGMath {
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-% Module = 'CoreGraphics' if T == 'CGFloat' else 'Darwin'
 % for f in unary:
-  static func _${f}(_ x: ${T}) -> ${T} { return ${Module}.${f}(x) }
+  static func _${f}(_ x: ${T}) -> ${T} { return ${f}(x) }
 % end
 %for f in binary:
-  static func _${f}(_ x: ${T}, _ y: ${T}) -> ${T} { return ${Module}.${f}(x, y) }
+  static func _${f}(_ x: ${T}, _ y: ${T}) -> ${T} { return ${f}(x, y) }
 %end
-  static func _remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) { return ${Module}.remquo(x, y) }
-  static func _fma(_ x: ${T}, _ y: ${T}, _ z: ${T}) -> ${T} { return ${Module}.fma(x, y, z) }
-  static func _lgamma(_ x: ${T}) -> (${T}, Int) { return ${Module}.lgamma(x) }
-  static func _modf(_ x: ${T}) -> (${T}, ${T}) { return ${Module}.modf(x) }
-  static func _scalbn(_ x: ${T}, _ n: Int) -> ${T} { return ${Module}.scalbn(x, n) }
-  static func _frexp(_ x: ${T}) -> (${T}, Int) { return ${Module}.frexp(x) }
-  static func _ilogb(_ x: ${T}) -> Int { return ${Module}.ilogb(x) }
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
-% for f in unary:
-  static func _${f}(_ x: ${T}) -> ${T} { return Glibc.${f}(x) }
-% end
-%for f in binary:
-  static func _${f}(_ x: ${T}, _ y: ${T}) -> ${T} { return Glibc.${f}(x, y) }
-%end
-  static func _remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) { return Glibc.remquo(x, y) }
-  static func _fma(_ x: ${T}, _ y: ${T}, _ z: ${T}) -> ${T} { return Glibc.fma(x, y, z) }
-  static func _lgamma(_ x: ${T}) -> (${T}, Int) { return Glibc.lgamma(x) }
-  static func _modf(_ x: ${T}) -> (${T}, ${T}) { return Glibc.modf(x) }
-  static func _scalbn(_ x: ${T}, _ n: Int) -> ${T} { return Glibc.scalbn(x, n) }
-  static func _frexp(_ x: ${T}) -> (${T}, Int) { return Glibc.frexp(x) }
-  static func _ilogb(_ x: ${T}) -> Int { return Glibc.ilogb(x) }
-#elseif os(Windows)
-% for f in unary:
-  static func _${f}(_ x: ${T}) -> ${T} { return MSVCRT.${f}(x) }
-% end
-%for f in binary:
-  static func _${f}(_ x: ${T}, _ y: ${T}) -> ${T} { return MSVCRT.${f}(x, y) }
-%end
-  static func _remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) { return MSVCRT.remquo(x, y) }
-  static func _fma(_ x: ${T}, _ y: ${T}, _ z: ${T}) -> ${T} { return MSVCRT.fma(x, y, z) }
-  static func _modf(_ x: ${T}) -> (${T}, ${T}) { return MSVCRT.modf(x) }
-  static func _scalbn(_ x: ${T}, _ n: Int) -> ${T} { return MSVCRT.scalbn(x, n) }
-  static func _frexp(_ x: ${T}) -> (${T}, Int) { return MSVCRT.frexp(x) }
-  static func _ilogb(_ x: ${T}) -> Int { return MSVCRT.ilogb(x) }
+  static func _remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) { return remquo(x, y) }
+  static func _fma(_ x: ${T}, _ y: ${T}, _ z: ${T}) -> ${T} { return fma(x, y, z) }
+#if !os(Windows)
+  static func _lgamma(_ x: ${T}) -> (${T}, Int) { return lgamma(x) }
 #endif
+  static func _modf(_ x: ${T}) -> (${T}, ${T}) { return modf(x) }
+  static func _scalbn(_ x: ${T}, _ n: Int) -> ${T} { return scalbn(x, n) }
+  static func _frexp(_ x: ${T}) -> (${T}, Int) { return frexp(x) }
+  static func _ilogb(_ x: ${T}) -> Int { return ilogb(x) }
 }
 
 MathTests.test("${T}") {

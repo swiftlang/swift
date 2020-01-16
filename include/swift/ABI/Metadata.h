@@ -160,6 +160,7 @@ using TargetRelativeIndirectablePointer
 
 struct HeapObject;
 class WeakReference;
+struct UnownedReference;
   
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
@@ -645,6 +646,9 @@ public:
   // NOTE: This *is* a box for copy-on-write existentials.
   OpaqueValue *allocateBoxForExistentialIn(ValueBuffer *Buffer) const;
 
+  // Deallocate an out-of-line buffer box if one is present.
+  void deallocateBoxForExistentialIn(ValueBuffer *Buffer) const;
+
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.
   ConstTargetMetadataPointer<Runtime, TargetTypeContextDescriptor>
@@ -692,6 +696,8 @@ public:
   }
 
   bool satisfiesClassConstraint() const;
+
+  bool isCanonicalStaticallySpecializedGenericMetadata() const;
 
 #if SWIFT_OBJC_INTEROP
   /// Get the ObjC class object for this type if it has one, or return null if
@@ -997,8 +1003,6 @@ template <typename Runtime>
 struct TargetClassMetadata : public TargetAnyClassMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
-
-  friend class ReflectionContext;
 
   TargetClassMetadata() = default;
   constexpr TargetClassMetadata(const TargetAnyClassMetadata<Runtime> &base,
@@ -1346,6 +1350,34 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
     return reinterpret_cast<const uint32_t *>(asWords + offset);
   }
 
+  bool isCanonicalStaticallySpecializedGenericMetadata() const {
+    auto *description = getDescription();
+    if (!description->isGeneric())
+      return false;
+
+    auto *trailingFlags = getTrailingFlags();
+    if (trailingFlags == nullptr)
+      return false;
+
+    return trailingFlags->isCanonicalStaticSpecialization();
+  }
+
+  const MetadataTrailingFlags *getTrailingFlags() const {
+    auto description = getDescription();
+    auto flags = description->getFullGenericContextHeader()
+                     .DefaultInstantiationPattern->PatternFlags;
+    if (!flags.hasTrailingFlags())
+      return nullptr;
+    auto fieldOffset = description->FieldOffsetVectorOffset;
+    auto offset =
+        fieldOffset +
+        // Pad to the nearest pointer.
+        ((description->NumFields * sizeof(uint32_t) + sizeof(void *) - 1) /
+         sizeof(void *));
+    auto asWords = reinterpret_cast<const void *const *>(this);
+    return reinterpret_cast<const MetadataTrailingFlags *>(asWords + offset);
+  }
+
   static constexpr int32_t getGenericArgumentOffset() {
     return sizeof(TargetStructMetadata<Runtime>) / sizeof(StoredPointer);
   }
@@ -1495,7 +1527,11 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
     ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> Type;
 
     /// The offset of the tuple element within the tuple.
+#if __APPLE__
     StoredSize Offset;
+#else
+    uint32_t Offset;
+#endif
 
     OpaqueValue *findIn(OpaqueValue *tuple) const {
       return (OpaqueValue*) (((char*) tuple) + Offset);
@@ -1505,6 +1541,9 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
       return Type->getTypeLayout();
     }
   };
+
+  static_assert(sizeof(Element) == sizeof(StoredSize) * 2,
+                "element size should be two words");
 
   Element *getElements() {
     return reinterpret_cast<Element*>(this + 1);
@@ -2333,6 +2372,12 @@ public:
     return TypeRef.getTypeDescriptor(getTypeKind());
   }
 
+  const TargetContextDescriptor<Runtime> **_getTypeDescriptorLocation() const {
+    if (getTypeKind() != TypeReferenceKind::IndirectTypeDescriptor)
+      return nullptr;
+    return TypeRef.IndirectTypeDescriptor.get();
+  }
+
   /// Retrieve the context of a retroactive conformance.
   const TargetContextDescriptor<Runtime> *getRetroactiveContext() const {
     if (!Flags.isRetroactive()) return nullptr;
@@ -2478,6 +2523,12 @@ struct TargetContextDescriptor {
               ? genericContext->getGenericContextHeader().NumParams
               : 0;
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                            "only for use in the debugger");
+#endif
+
 private:
   TargetContextDescriptor(const TargetContextDescriptor &) = delete;
   TargetContextDescriptor(TargetContextDescriptor &&) = delete;
@@ -2810,8 +2861,8 @@ struct TargetExtensionContextDescriptor final
       TrailingGenericContextObjects<TargetExtensionContextDescriptor<Runtime>>
 {
 private:
-  using TrailingGenericContextObjects
-    = TrailingGenericContextObjects<TargetExtensionContextDescriptor<Runtime>>;
+  using TrailingGenericContextObjects =
+      swift::TrailingGenericContextObjects<TargetExtensionContextDescriptor<Runtime>>;
 
 public:
   /// A mangling of the `Self` type context that the extension extends.
@@ -2851,10 +2902,10 @@ struct TargetAnonymousContextDescriptor final
                                     TargetMangledContextName<Runtime>>
 {
 private:
-  using TrailingGenericContextObjects
-    = TrailingGenericContextObjects<TargetAnonymousContextDescriptor<Runtime>,
-                                    TargetGenericContextDescriptorHeader,
-                                    TargetMangledContextName<Runtime>>;
+  using TrailingGenericContextObjects =
+      swift::TrailingGenericContextObjects<TargetAnonymousContextDescriptor<Runtime>,
+                                           TargetGenericContextDescriptorHeader,
+                                           TargetMangledContextName<Runtime>>;
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
   friend TrailingObjects;
@@ -3016,10 +3067,10 @@ struct TargetOpaqueTypeDescriptor final
                                   RelativeDirectPointer<const char>>
 {
 private:
-  using TrailingGenericContextObjects
-    = TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
-                                    TargetGenericContextDescriptorHeader,
-                                    RelativeDirectPointer<const char>>;
+  using TrailingGenericContextObjects =
+      swift::TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
+                                           TargetGenericContextDescriptorHeader,
+                                           RelativeDirectPointer<const char>>;
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
   friend TrailingObjects;
@@ -3207,6 +3258,8 @@ public:
   /// metadata header (e.g. after the last members declared in StructMetadata).
   /// In class metadata, this section is relative to the end of the entire
   /// class metadata.
+  ///
+  /// See also: [pre-5.2-extra-data-zeroing]
   const GenericMetadataPartialPattern *getExtraDataPattern() const {
     assert(asSelf()->hasExtraDataPattern());
     return this->template getTrailingObjects<GenericMetadataPartialPattern>();
@@ -3552,7 +3605,7 @@ struct TargetSingletonMetadataInitialization {
   }
 
   /// This method can only be called from the runtime itself. It is defined
-  /// in MetadataCache.h.
+  /// in Metadata.cpp.
   TargetMetadata<Runtime> *allocate(
       const TargetTypeContextDescriptor<Runtime> *description) const;
 };
@@ -3642,11 +3695,6 @@ public:
     return cd->getKind() >= ContextDescriptorKind::Type_First
         && cd->getKind() <= ContextDescriptorKind::Type_Last;
   }
-
-#ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "Only meant for use in the debugger");
-#endif
 };
 
 using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
@@ -3785,16 +3833,16 @@ class TargetClassDescriptor final
                               TargetObjCResilientClassStubInfo<Runtime>> {
 private:
   using TrailingGenericContextObjects =
-    TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
-                                  TargetTypeGenericContextDescriptorHeader,
-                                  TargetResilientSuperclass<Runtime>,
-                                  TargetForeignMetadataInitialization<Runtime>,
-                                  TargetSingletonMetadataInitialization<Runtime>,
-                                  TargetVTableDescriptorHeader<Runtime>,
-                                  TargetMethodDescriptor<Runtime>,
-                                  TargetOverrideTableHeader<Runtime>,
-                                  TargetMethodOverrideDescriptor<Runtime>,
-                                  TargetObjCResilientClassStubInfo<Runtime>>;
+    swift::TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
+                                         TargetTypeGenericContextDescriptorHeader,
+                                         TargetResilientSuperclass<Runtime>,
+                                         TargetForeignMetadataInitialization<Runtime>,
+                                         TargetSingletonMetadataInitialization<Runtime>,
+                                         TargetVTableDescriptorHeader<Runtime>,
+                                         TargetMethodDescriptor<Runtime>,
+                                         TargetOverrideTableHeader<Runtime>,
+                                         TargetMethodOverrideDescriptor<Runtime>,
+                                         TargetObjCResilientClassStubInfo<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4102,10 +4150,10 @@ public:
 
 private:
   using TrailingGenericContextObjects =
-    TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
-                                  TargetTypeGenericContextDescriptorHeader,
-                                  ForeignMetadataInitialization,
-                                  SingletonMetadataInitialization>;
+      swift::TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
+                                           TargetTypeGenericContextDescriptorHeader,
+                                           ForeignMetadataInitialization,
+                                           SingletonMetadataInitialization>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4178,10 +4226,10 @@ public:
 
 private:
   using TrailingGenericContextObjects =
-    TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
-                                  TargetTypeGenericContextDescriptorHeader,
-                                  ForeignMetadataInitialization,
-                                  SingletonMetadataInitialization>;
+    swift::TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
+                                        TargetTypeGenericContextDescriptorHeader,
+                                        ForeignMetadataInitialization,
+                                        SingletonMetadataInitialization>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;

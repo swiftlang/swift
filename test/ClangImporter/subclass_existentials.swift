@@ -21,7 +21,7 @@ class SwiftLaundryService : NSLaundry {
 
 // FIXME: Consider better diagnostics here.
 
-class OldSwiftLaundryService : NSLaundry {
+class OldSwiftLaundryService : NSLaundry { 
 // expected-error@-1 {{type 'OldSwiftLaundryService' does not conform to protocol 'NSLaundry'}}
 
   var g: Coat? = nil

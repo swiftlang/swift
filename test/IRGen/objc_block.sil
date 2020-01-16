@@ -24,16 +24,3 @@ entry(%b : $@convention(block) (Foo) -> Foo, %x : $Foo):
 // CHECK:         [[T5:%.*]] = bitcast i8* [[T4]] to %T10objc_block3FooC*
 // CHECK:         ret %T10objc_block3FooC* [[T5]]
 // CHECK:       }
-
-sil @generic : $@convention(thin) <T> (@in T) -> ()
-
-sil @generic_with_block : $@convention(thin) (@in @convention(block) () -> ()) -> () {
-entry(%b : $*@convention(block) () -> ()):
-  %f = function_ref @generic : $@convention(thin) <T> (@in T) -> ()
-  %z = apply %f<@convention(block) () -> ()>(%b) : $@convention(thin) <T> (@in T) -> ()
-  return %z : $()
-}
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @generic_with_block(%objc_block** noalias nocapture dereferenceable({{.*}}))
-// --                                                                               0x100_0001 = block convention, 1 arg
-// CHECK: call %swift.type* @swift_getFunctionTypeMetadata0([[WORD:i(32|64)]] 65536, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1))

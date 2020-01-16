@@ -41,24 +41,9 @@ sil @takesMetadata : $@convention(thin) <T> (@thick T.Type) -> ()
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkMetadata()
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s21subclass_existentials1P_AA1CCXcMa"([[INT]] 0)
-// CHECK-NEXT:   [[TYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK-NEXT:   [[TYPE:%.*]] = call {{.*}}@"$s21subclass_existentials1P_AA1CCXcMD"
 // CHECK-NEXT:   call swiftcc void @takesMetadata(%swift.type* [[TYPE]], %swift.type* [[TYPE]])
 // CHECK-NEXT:   ret void
-
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s21subclass_existentials1P_AA1CCXcMa"
-// CHECK-SAME:    ([[INT]])
-// CHECK:      entry:
-// CHECK-NEXT:   [[PROTOCOL_ARRAY:%.*]] = alloca [1 x [[INT]]]
-// CHECK:      cacheIsNull:
-// CHECK:        [[PROTOCOLS:%.*]] = bitcast [1 x [[INT]]]* [[PROTOCOL_ARRAY]] to [[INT]]*
-// CHECK-NEXT:   [[PROTOCOL:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[PROTOCOLS]], i32 0
-// CHECK-NEXT:   store [[INT]] ptrtoint ({{.*}} @"$s21subclass_existentials1PMp" to [[INT]]), [[INT]]* [[PROTOCOL]]
-// CHECK-NEXT:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s21subclass_existentials1CCMa"([[INT]] 255)
-// CHECK-NEXT:   [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK-NEXT:   extractvalue %swift.metadata_response [[TMP]], 1
-// CHECK-NEXT:   [[METATYPE:%.*]] = call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* [[SUPERCLASS]], {{i32|i64}} 1, [[INT]]* [[PROTOCOLS]])
-// CHECK:        ret
 
 sil [ossa] @checkMetadata : $@convention(thin) () -> () {
 bb0:
@@ -105,7 +90,7 @@ bb0(%0 : @owned $C, %1 : @owned $C & P):
 // CHECK-NEXT:  [[VALUE_ADDR:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast i8* [[VALUE_ADDR]] to %T21subclass_existentials1DC*
 // CHECK-NEXT:  [[WTABLE:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 1
-  %2 = unconditional_checked_cast %0 : $C to $D & R
+  %2 = unconditional_checked_cast %0 : $C to D & R
 
 // CHECK-NEXT:  call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T21subclass_existentials1DC*)*)(%T21subclass_existentials1DC* [[VALUE]])
   destroy_value %2 : $D & R
@@ -114,7 +99,7 @@ bb0(%0 : @owned $C, %1 : @owned $C & P):
 // CHECK-NEXT:  [[CLASS_ADDR:%.*]] = bitcast %swift.type* [[SUPERCLASS]] to i8*
 // CHECK-NEXT:  [[RESULT:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[VALUE]], i8* [[CLASS_ADDR]], {{.*}})
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast i8* [[RESULT]] to %T21subclass_existentials1DC*
-  %3 = unconditional_checked_cast %1 : $C & P to $D
+  %3 = unconditional_checked_cast %1 : $C & P to D
 
 // CHECK-NEXT:  call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T21subclass_existentials1DC*)*)(%T21subclass_existentials1DC* [[VALUE]])
   destroy_value %3 : $D
@@ -155,7 +140,7 @@ bb0(%0 : @owned $C):
 // CHECK-NEXT:  [[VALUE_ADDR:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast i8* [[VALUE_ADDR]] to %T21subclass_existentials1CC*
 // CHECK-NEXT:  [[WTABLE:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 1
-  %2 = unconditional_checked_cast %0 : $C to $C & P
+  %2 = unconditional_checked_cast %0 : $C to C & P
 
 // CHECK-NEXT:  call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T21subclass_existentials1CC*)*)(%T21subclass_existentials1CC* [[VALUE]])
   destroy_value %2 : $C & P
@@ -191,10 +176,10 @@ bb0(%0 : $@thick C.Type, %1 : $@thick (C & P).Type):
 // CHECK-NEXT:  [[VALUE_ADDR:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast i8* [[VALUE_ADDR]] to %swift.type*
 // CHECK-NEXT:  [[WTABLE:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 1
-  %2 = unconditional_checked_cast %0 : $@thick C.Type to $@thick (D & R).Type
+  %2 = unconditional_checked_cast %0 : $@thick C.Type to @thick (D & R).Type
 
 // CHECK-NEXT:  [[RESULT:%.*]] = call %swift.type* @swift_dynamicCastMetatypeUnconditional(%swift.type* %1, %swift.type* [[SUPERCLASS]], {{.*}})
-  %3 = unconditional_checked_cast %1 : $@thick (C & P).Type to $@thick D.Type
+  %3 = unconditional_checked_cast %1 : $@thick (C & P).Type to @thick D.Type
 
 // CHECK-NEXT:  ret void
   %result = tuple ()
@@ -210,7 +195,7 @@ bb0(%0 : $@thick C.Type):
 // CHECK-NEXT:  [[VALUE_ADDR:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast i8* [[VALUE_ADDR]] to %swift.type*
 // CHECK-NEXT:  [[WTABLE:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 1
-  %2 = unconditional_checked_cast %0 : $@thick C.Type to $@thick (C & P).Type
+  %2 = unconditional_checked_cast %0 : $@thick C.Type to @thick (C & P).Type
 
 // CHECK-NEXT:  ret void
   %result = tuple ()

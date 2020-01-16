@@ -29,15 +29,15 @@ extension TestStruct {
   func doTheThing() {} // expected-note {{'doTheThing()' was introduced in Swift 400}}
 }
 
-@available(swift 400) // FIXME: This has no effect and should be complained about.
+@available(swift 400)
 extension TestStruct {
-  func doAnotherThing() {}
+  func doAnotherThing() {} // expected-note {{'doAnotherThing()' was introduced in Swift 400}}
 }
 
 @available(macOS 10.11, *)
 func testMemberAvailability() {
   TestStruct().doTheThing() // expected-error {{'doTheThing()' is unavailable}}
-  TestStruct().doAnotherThing() // okay (for now)
+  TestStruct().doAnotherThing() // expected-error {{'doAnotherThing()' is unavailable}}
 }
 
 @available(swift 400) // FIXME: This has no effect and should be complained about.

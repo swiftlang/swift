@@ -70,7 +70,7 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
     def __init__(self, binary, xfail_list, csv_output):
         perf_test_driver.BenchmarkDriver.__init__(
             self, binary, xfail_list,
-            enable_parallel=False,
+            enable_parallel=True,
             opt_levels=['O'])
         self.csv_output = csv_output
 
@@ -86,11 +86,14 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
         sys.stdout.flush()
 
         def get_results_with_iters(iters):
+            e = os.environ
+            e['SWIFT_DETERMINISTIC_HASHING'] = '1'
             p = subprocess.Popen([
                 'sudo', 'dtrace', '-s', DTRACE_PATH,
-                '-c', '%s %s %s' % (data['path'], data['test_name'],
-                                    '--num-iters=%d' % iters)
-            ], stdout=subprocess.PIPE, stderr=open('/dev/null', 'w'))
+                '-c', '%s %s %s %s' % (data['path'], data['test_name'],
+                                       '--num-iters=%d' % iters,
+                                       '--num-samples=2')
+            ], stdout=subprocess.PIPE, stderr=open('/dev/null', 'w'), env=e)
             results = [x for x in p.communicate()[0].split("\n") if len(x) > 0]
             return [
                 x.split(',')[1] for x in

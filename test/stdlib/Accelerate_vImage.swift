@@ -10,7 +10,7 @@ import Accelerate
 
 var Accelerate_vImageTests = TestSuite("Accelerate_vImage")
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     let width = UInt(64)
     let height = UInt(32)
     let widthi = 64

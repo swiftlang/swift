@@ -2,7 +2,9 @@
 // test only verifies that the variables show up in the debug info at
 // all. There are other tests testing liveness and representation.
 
-// REQUIRES: rdar47777473
+// rdar://problem/57611302
+// XFAIL: windows
+
 // RUN: %gyb %s -o %t.swift
 // RUN: %target-swift-frontend %t.swift -g -emit-ir -o - | %FileCheck %t.swift
 // RUN: %target-swift-frontend %t.swift -g -c -o %t.o
@@ -67,7 +69,7 @@ type_initializer_map = [
    ("(Int, C)", "(42, C(42))"),
    ("C", "C(42)"),
    ("S", "S()"),
-   ("SLarge", "SLarge(tuple: (1,2,3,4,5,6,7,8))"),  
+   ("SLarge", "SLarge(tuple: (1,2,3,4,5,6,7,8))"),
   #// Enums.
    ("ENoPayload", ".two"),
    ("ESinglePayload", ".two"),
@@ -86,14 +88,14 @@ def derive_name((type, val)):
 for name, type, val in map(derive_name, type_initializer_map):
   generic = (type in ['T', 'U'])
   function = "->" in type
-}%                                  
+}%
 %  if generic:
 public class ContextA_${name}<T, U : Proto> {
   let t : T
   let u : U
   init(_ t: T, _ u: U) { self.t = t; self.u = u; }
 %  end
-  
+
 public func constant_${name}() -> ${type} {
   let v : ${type} = ${val}
   // CHECK: !DILocalVariable(name: "v",{{.*}} line: [[@LINE-1]]
@@ -223,7 +225,7 @@ public func case_let_${name}() {
   // DWARF-NOT: DW_TAG
   // DWARF: DW_AT_name ("v")
 }
-  
+
 public func optional_${name}() -> ${type}? {
   return constant_${name}();
 }
@@ -402,7 +404,7 @@ public func arg_tuple_${name}(_ v: (${type}, ${type})) {
   // DWARF: DW_AT_name {{.*}}"y"
   use(y)
 }
-  
+
 public func closure_capture_${name}() {
   let v : ${type} = constant_${name}();
   // CHECK: !DILocalVariable(name: "v",{{.*}} line: [[@LINE-1]]
@@ -465,7 +467,7 @@ public func closure_capture_byref_${name}() {
   // DWARF: DW_AT_artificial
 %  end
 }
-  
+
 %  if generic:
 } // End of Context_${name}.
 %  end

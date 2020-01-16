@@ -36,6 +36,7 @@ TriviaPiece TriviaPiece::fromText(TriviaKind kind, StringRef text) {
 % end
 % end
   }
+  llvm_unreachable("Unhandled TriviaKind in switch");
 }
 
 void TriviaPiece::dump(llvm::raw_ostream &OS, unsigned Indent) const {

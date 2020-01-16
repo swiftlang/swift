@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -Onone -parse-stdlib %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
+// RUN: %target-swift-emit-silgen -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Onone -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
 
 import Swift
 
@@ -360,6 +360,23 @@ func projectTailElems<T>(h: Header, ty: T.Type) -> Builtin.RawPointer {
 }
 // CHECK: } // end sil function '$s8builtins16projectTailElems1h2tyBpAA6HeaderC_xmtlF'
 
+// Make sure we borrow if this is owned.
+//
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins21projectTailElemsOwned{{[_0-9a-zA-Z]*}}F
+func projectTailElemsOwned<T>(h: __owned Header, ty: T.Type) -> Builtin.RawPointer {
+  // CHECK: bb0([[ARG1:%.*]] : @owned $Header
+  // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
+  // CHECK:   [[TA:%.*]] = ref_tail_addr [[BORROWED_ARG1]] : $Header
+  //   -- Once we have passed the address through a2p, we no longer provide any guarantees.
+  //   -- We still need to make sure that the a2p itself is in the borrow site though.
+  // CHECK:   [[A2P:%.*]] = address_to_pointer [[TA]]
+  // CHECK:   end_borrow [[BORROWED_ARG1]]
+  // CHECK:   destroy_value [[ARG1]]
+  // CHECK:   return [[A2P]]
+  return Builtin.projectTailElems(h, ty)
+}
+// CHECK: } // end sil function '$s8builtins21projectTailElemsOwned{{[_0-9a-zA-Z]*}}F'
+
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins11getTailAddr{{[_0-9a-zA-Z]*}}F
 func getTailAddr<T1, T2>(start: Builtin.RawPointer, i: Builtin.Word, ty1: T1.Type, ty2: T2.Type) -> Builtin.RawPointer {
   // CHECK: [[P2A:%.*]] = pointer_to_address %0
@@ -394,10 +411,16 @@ func performInstantaneousReadAccess<T1>(address: Builtin.RawPointer, scratch: Bu
   Builtin.performInstantaneousReadAccess(address, ty1);
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins15legacy_condfail{{[_0-9a-zA-Z]*}}F
+func legacy_condfail(_ i: Builtin.Int1) {
+  Builtin.condfail(i)
+  // CHECK: cond_fail {{%.*}} : $Builtin.Int1, "unknown runtime failure"
+}
+
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8condfail{{[_0-9a-zA-Z]*}}F
 func condfail(_ i: Builtin.Int1) {
-  Builtin.condfail(i)
-  // CHECK: cond_fail {{%.*}} : $Builtin.Int1
+  Builtin.condfail_message(i, StaticString("message").unsafeRawPointer)
+  // CHECK: builtin "condfail_message"({{%.*}} : $Builtin.Int1, {{%.*}} : $Builtin.RawPointer) : $()
 }
 
 struct S {}
@@ -601,23 +624,23 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 
-// UnknownObject (ObjC)
+// AnyObject (ObjC)
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8isUnique{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : $*Optional<Builtin.UnknownObject>):
+// CHECK: bb0(%0 : $*Optional<AnyObject>):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<Builtin.UnknownObject>
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<AnyObject>
 // CHECK: return
-func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
+func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
   return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 
-// UnknownObject (ObjC) nonNull
+// AnyObject (ObjC) nonNull
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8isUnique{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : $*Builtin.UnknownObject):
+// CHECK: bb0(%0 : $*AnyObject):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Builtin.UnknownObject
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*AnyObject
 // CHECK: return
-func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
+func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
   return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 

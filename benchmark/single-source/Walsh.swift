@@ -13,6 +13,8 @@
 import TestsUtils
 #if os(Linux)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
 #else
 import Darwin
 #endif
@@ -89,4 +91,3 @@ public func run_Walsh(_ N: Int) {
     InverseWalshTransform(&data2)
   }
 }
-

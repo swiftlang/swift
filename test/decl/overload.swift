@@ -5,8 +5,10 @@ var_redecl1 = 0
 var var_redecl1: UInt // expected-error {{invalid redeclaration of 'var_redecl1'}}
 
 var var_redecl2: Int // expected-note {{previously declared here}}
-var_redecl2 = 0
+// expected-note@-1 {{found this candidate}}
+var_redecl2 = 0 // expected-error {{ambiguous use of 'var_redecl2'}}
 var var_redecl2: Int // expected-error {{invalid redeclaration of 'var_redecl2'}}
+// expected-note@-1 {{found this candidate}}
 
 var var_redecl3: (Int) -> () { get {} } // expected-note {{previously declared here}}
 var var_redecl3: () -> () { get {} } // expected-error {{invalid redeclaration of 'var_redecl3'}}
@@ -76,6 +78,8 @@ class mixed_redecl3 {} // expected-note {{previously declared here}}
 enum mixed_redecl3 {} // expected-error {{invalid redeclaration}}
 // expected-note @-1 2{{found this candidate}}
 enum mixed_redecl3a : mixed_redecl3 {} // expected-error {{'mixed_redecl3' is ambiguous for type lookup in this context}}
+// expected-error@-1 {{an enum with no cases cannot declare a raw type}}
+// expected-error@-2 {{raw type}}
 class mixed_redecl3b : mixed_redecl3 {} // expected-error {{'mixed_redecl3' is ambiguous for type lookup in this context}}
 
 class mixed_redecl4 {} // expected-note {{previously declared here}}
@@ -366,6 +370,10 @@ struct Escaping {
 func autoclosure(f: () -> Int) { }
 func autoclosure(f: @autoclosure () -> Int) { }
 
+// @_nonEphemeral
+func nonEphemeral(x: UnsafeMutableRawPointer) {} // expected-note {{'nonEphemeral(x:)' previously declared here}}
+func nonEphemeral(@_nonEphemeral x: UnsafeMutableRawPointer) {} // expected-error {{invalid redeclaration of 'nonEphemeral(x:)'}}
+
 // inout
 func inout2(x: Int) { }
 func inout2(x: inout Int) { }
@@ -536,9 +544,10 @@ enum SR_10084_E_2 {
   }
 }
 
+// N.B. Redeclaration checks don't see this case because `protocol A` is invalid.
 enum SR_10084_E_3 {
-  protocol A {} //expected-error {{protocol 'A' cannot be nested inside another declaration}} // expected-note {{'A' previously declared here}}
-  case A // expected-error {{invalid redeclaration of 'A'}}
+  protocol A {} //expected-error {{protocol 'A' cannot be nested inside another declaration}}
+  case A
 }
 
 enum SR_10084_E_4 {
@@ -551,9 +560,10 @@ enum SR_10084_E_5 {
   case C // expected-error {{invalid redeclaration of 'C'}}
 }
 
+// N.B. Redeclaration checks don't see this case because `protocol D` is invalid.
 enum SR_10084_E_6 {
-  case D // expected-note {{'D' previously declared here}}
-  protocol D {} //expected-error {{protocol 'D' cannot be nested inside another declaration}} // expected-error {{invalid redeclaration of 'D'}}
+  case D
+  protocol D {} //expected-error {{protocol 'D' cannot be nested inside another declaration}}
 }
 
 enum SR_10084_E_7 {
@@ -567,23 +577,23 @@ enum SR_10084_E_8 {
 }
 
 enum SR_10084_E_9 {
-  case A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}}
-  static let A: SR_10084_E_9 = .A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}} // expected-error {{ambiguous use of 'A'}}
+  case A // expected-note {{'A' previously declared here}}
+  static let A: SR_10084_E_9 = .A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum SR_10084_E_10 {
-  static let A: SR_10084_E_10 = .A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}} // expected-error {{ambiguous use of 'A'}}
-  case A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}}
+  static let A: SR_10084_E_10 = .A // expected-note {{'A' previously declared here}}
+  case A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum SR_10084_E_11 {
-  case A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}}
-  static var A: SR_10084_E_11 = .A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}} // expected-error {{ambiguous use of 'A'}}
+  case A // expected-note {{'A' previously declared here}}
+  static var A: SR_10084_E_11 = .A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum SR_10084_E_12 {
-  static var A: SR_10084_E_12 = .A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}} // expected-error {{ambiguous use of 'A'}}
-  case A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}}
+  static var A: SR_10084_E_12 = .A // expected-note {{'A' previously declared here}}
+  case A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum SR_10084_E_13 {

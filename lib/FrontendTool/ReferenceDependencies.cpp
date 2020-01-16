@@ -22,6 +22,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
@@ -251,7 +252,7 @@ ProvidesEmitter::emitTopLevelNames() const {
   out << providesTopLevel << ":\n";
 
   CollectedDeclarations cpd;
-  for (const Decl *D : SF->Decls)
+  for (const Decl *D : SF->getTopLevelDecls())
     emitTopLevelDecl(D, cpd);
   for (auto *operatorFunction : cpd.memberOperatorDecls)
     out << "- \"" << escape(operatorFunction->getName()) << "\"\n";

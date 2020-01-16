@@ -84,9 +84,10 @@ void simple_display(llvm::raw_ostream &out, ArithmeticExpr *expr) {
 /// Rule to evaluate the value of the expression.
 template<typename Derived, CacheKind Caching>
 struct EvaluationRule
-  : public SimpleRequest<Derived, Caching, double, ArithmeticExpr *>
+  : public SimpleRequest<Derived, double(ArithmeticExpr *), Caching>
 {
-  using SimpleRequest<Derived, Caching, double, ArithmeticExpr *>::SimpleRequest;
+  using SimpleRequest<Derived, double(ArithmeticExpr *), Caching>
+      ::SimpleRequest;
 
   llvm::Expected<double>
   evaluate(Evaluator &evaluator, ArithmeticExpr *expr) const {
@@ -116,8 +117,7 @@ struct EvaluationRule
     }
   }
 
-  void diagnoseCycle(DiagnosticEngine &diags) const { }
-  void noteCycleStep(DiagnosticEngine &diags) const { }
+  SourceLoc getNearestLoc() const { return SourceLoc(); }
 };
 
 struct InternallyCachedEvaluationRule :
@@ -174,12 +174,11 @@ struct ExternallyCachedEvaluationRule
 
 // Define the arithmetic evaluator's zone.
 namespace swift {
-#define SWIFT_ARITHMETIC_EVALUATOR_ZONE 255
-#define SWIFT_TYPEID_ZONE SWIFT_ARITHMETIC_EVALUATOR_ZONE
+#define SWIFT_TYPEID_ZONE ArithmeticEvaluator
 #define SWIFT_TYPEID_HEADER "ArithmeticEvaluatorTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 
-#define SWIFT_TYPEID_ZONE SWIFT_ARITHMETIC_EVALUATOR_ZONE
+#define SWIFT_TYPEID_ZONE ArithmeticEvaluator
 #define SWIFT_TYPEID_HEADER "ArithmeticEvaluatorTypeIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 
@@ -187,10 +186,10 @@ namespace swift {
 
 /// All of the arithmetic request functions.
 static AbstractRequestFunction *arithmeticRequestFunctions[] = {
-#define SWIFT_TYPEID(Name)                                    \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "ArithmeticEvaluatorTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 };
 
 /// Helper to short-circuit errors to NaN.
@@ -211,8 +210,10 @@ TEST(ArithmeticEvaluator, Simple) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags);
-  evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
+  Evaluator evaluator(diags,
+                      /*debugDumpCycles=*/false,
+                      /*buildDependencyGraph=*/true);
+  evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);
 
   const double expectedResult = (3.14159 + 2.71828) * 42.0;
@@ -334,8 +335,10 @@ TEST(ArithmeticEvaluator, Cycle) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags);
-  evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
+  Evaluator evaluator(diags,
+                      /*debugDumpCycles=*/false,
+                      /*buildDependencyGraph=*/false);
+  evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);
 
   // Evaluate when there is a cycle.

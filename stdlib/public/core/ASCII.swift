@@ -14,12 +14,12 @@ extension Unicode {
   public enum ASCII {}
 }
 
-extension Unicode.ASCII : Unicode.Encoding {
+extension Unicode.ASCII: Unicode.Encoding {
   public typealias CodeUnit = UInt8
   public typealias EncodedScalar = CollectionOfOne<CodeUnit>
 
   @inlinable
-  public static var encodedReplacementCharacter : EncodedScalar {
+  public static var encodedReplacementCharacter: EncodedScalar {
     return EncodedScalar(0x1a) // U+001A SUBSTITUTE; best we can do for ASCII
   }
 
@@ -51,7 +51,7 @@ extension Unicode.ASCII : Unicode.Encoding {
 
   @inline(__always)
   @inlinable
-  public static func transcode<FromEncoding : Unicode.Encoding>(
+  public static func transcode<FromEncoding: Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
     if _fastPath(FromEncoding.self == UTF16.self) {
@@ -78,12 +78,12 @@ extension Unicode.ASCII : Unicode.Encoding {
   public typealias ReverseParser = Parser
 }
 
-extension Unicode.ASCII.Parser : Unicode.Parser {
+extension Unicode.ASCII.Parser: Unicode.Parser {
   public typealias Encoding = Unicode.ASCII
 
   /// Parses a single Unicode scalar value from `input`.
   @inlinable
-  public mutating func parseScalar<I : IteratorProtocol>(
+  public mutating func parseScalar<I: IteratorProtocol>(
     from input: inout I
   ) -> Unicode.ParseResult<Encoding.EncodedScalar>
   where I.Element == Encoding.CodeUnit {

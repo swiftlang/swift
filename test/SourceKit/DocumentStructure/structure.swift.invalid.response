@@ -16,7 +16,6 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
-      key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "OuterCls",
       key.offset: 12,
       key.length: 43,
@@ -27,7 +26,6 @@
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.class,
-          key.accessibility: source.lang.swift.accessibility.internal,
           key.name: "InnerCls1",
           key.offset: 35,
           key.length: 18,

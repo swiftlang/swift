@@ -13,6 +13,7 @@
 #ifndef SWIFT_SERIALIZATION_MODULELOADER_H
 #define SWIFT_SERIALIZATION_MODULELOADER_H
 
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -20,17 +21,17 @@
 namespace swift {
 class ModuleFile;
 
-/// Spceifies how to load modules when both a parseable interface and serialized
+/// Spceifies how to load modules when both a module interface and serialized
 /// AST are present, or whether to disallow one format or the other altogether.
 enum class ModuleLoadingMode {
-  PreferParseable,
+  PreferInterface,
   PreferSerialized,
-  OnlyParseable,
+  OnlyInterface,
   OnlySerialized
 };
 
-/// Common functionality shared between \c SerializedModuleLoader and
-/// \c ParseableInterfaceModuleLoader.
+/// Common functionality shared between \c SerializedModuleLoader,
+/// \c ModuleInterfaceLoader and \c MemoryBufferSerializedModuleLoader.
 class SerializedModuleLoaderBase : public ModuleLoader {
   /// A { module, generation # } pair.
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
@@ -41,16 +42,20 @@ class SerializedModuleLoaderBase : public ModuleLoader {
 protected:
   ASTContext &Ctx;
   ModuleLoadingMode LoadMode;
+  bool IgnoreSwiftSourceInfoFile;
   SerializedModuleLoaderBase(ASTContext &ctx, DependencyTracker *tracker,
-                             ModuleLoadingMode LoadMode);
+                             ModuleLoadingMode LoadMode,
+                             bool IgnoreSwiftSourceInfoFile);
 
   void collectVisibleTopLevelModuleNamesImpl(SmallVectorImpl<Identifier> &names,
                                              StringRef extension) const;
 
-  using AccessPathElem = std::pair<Identifier, SourceLoc>;
+  using AccessPathElem = Located<Identifier>;
   bool findModule(AccessPathElem moduleID,
+                  SmallVectorImpl<char> *moduleInterfacePath,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
                   bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
@@ -68,19 +73,31 @@ protected:
   virtual std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
+      StringRef ModuleSourceInfoFilename,
+      SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) = 0;
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) = 0;
 
   std::error_code
   openModuleFiles(AccessPathElem ModuleID,
                   StringRef ModulePath, StringRef ModuleDocPath,
+                  StringRef ModuleSourceInfoName,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
 
   std::error_code
   openModuleDocFile(AccessPathElem ModuleID,
                     StringRef ModuleDocPath,
                     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
+
+  void
+  openModuleSourceInfoFileIfPresent(
+      AccessPathElem ModuleID,
+      StringRef ModulePath,
+      StringRef ModuleSourceInfoFileName,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
 
   /// If the module loader subclass knows that all options have been tried for
   /// loading an architecture-specific file out of a swiftmodule bundle, try
@@ -112,8 +129,10 @@ public:
   /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
   /// printed. (Note that \p diagLoc is allowed to be invalid.)
   FileUnit *loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
+                    StringRef moduleInterfacePath,
                     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
                     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+                    std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
                     bool isFramework, bool treatAsPartialModule);
 
   /// Check whether the module with a given name can be imported without
@@ -121,7 +140,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
+  virtual bool canImportModule(Located<Identifier> named) override;
 
   /// Import a module with the given module path.
   ///
@@ -134,7 +153,7 @@ public:
   /// emits a diagnostic and returns a FailedImportModule object.
   virtual ModuleDecl *
   loadModule(SourceLoc importLoc,
-             ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
+             ArrayRef<Located<Identifier>> path) override;
 
 
   virtual void loadExtensions(NominalTypeDecl *nominal,
@@ -154,15 +173,18 @@ public:
 class SerializedModuleLoader : public SerializedModuleLoaderBase {
 
   SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
-                         ModuleLoadingMode loadMode)
-    : SerializedModuleLoaderBase(ctx, tracker, loadMode)
+                         ModuleLoadingMode loadMode, bool IgnoreSwiftSourceInfo)
+    : SerializedModuleLoaderBase(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
   {}
 
   std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
+      StringRef ModuleSourceInfoFilename,
+      SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) override;
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
 
   bool maybeDiagnoseTargetMismatch(SourceLoc sourceLocation,
                                    StringRef moduleName,
@@ -181,9 +203,10 @@ public:
   /// into the given ASTContext.
   static std::unique_ptr<SerializedModuleLoader>
   create(ASTContext &ctx, DependencyTracker *tracker = nullptr,
-         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized) {
+         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized,
+         bool IgnoreSwiftSourceInfo = false) {
     return std::unique_ptr<SerializedModuleLoader>{
-      new SerializedModuleLoader(ctx, tracker, loadMode)
+      new SerializedModuleLoader(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
     };
   }
 };
@@ -195,14 +218,19 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
 
   MemoryBufferSerializedModuleLoader(ASTContext &ctx,
                                      DependencyTracker *tracker,
-                                     ModuleLoadingMode loadMode)
-      : SerializedModuleLoaderBase(ctx, tracker, loadMode) {}
+                                     ModuleLoadingMode loadMode,
+                                     bool IgnoreSwiftSourceInfo)
+      : SerializedModuleLoaderBase(ctx, tracker, loadMode,
+                                   IgnoreSwiftSourceInfo) {}
 
   std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
+      StringRef ModuleSourceInfoFilename,
+      SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) override;
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
 
   bool maybeDiagnoseTargetMismatch(SourceLoc sourceLocation,
                                    StringRef moduleName,
@@ -212,10 +240,10 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
 public:
   virtual ~MemoryBufferSerializedModuleLoader();
 
-  bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
+  bool canImportModule(Located<Identifier> named) override;
   ModuleDecl *
   loadModule(SourceLoc importLoc,
-             ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
+             ArrayRef<Located<Identifier>> path) override;
 
   /// Register a memory buffer that contains the serialized module for the given
   /// access path. This API is intended to be used by LLDB to add swiftmodules
@@ -235,9 +263,11 @@ public:
   /// into the given ASTContext.
   static std::unique_ptr<MemoryBufferSerializedModuleLoader>
   create(ASTContext &ctx, DependencyTracker *tracker = nullptr,
-         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized) {
+         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized,
+         bool IgnoreSwiftSourceInfo = false) {
     return std::unique_ptr<MemoryBufferSerializedModuleLoader>{
-        new MemoryBufferSerializedModuleLoader(ctx, tracker, loadMode)};
+        new MemoryBufferSerializedModuleLoader(ctx, tracker, loadMode,
+                                               IgnoreSwiftSourceInfo)};
   }
 };
 
@@ -250,13 +280,7 @@ class SerializedASTFile final : public LoadedFile {
 
   ModuleFile &File;
 
-  /// The parseable interface this module was generated from if any.
-  /// Used for debug info.
-  std::string ParseableInterface;
-
   bool IsSIB;
-
-  ~SerializedASTFile() = default;
 
   SerializedASTFile(ModuleDecl &M, ModuleFile &file, bool isSIB = false)
     : LoadedFile(FileUnitKind::SerializedAST, M), File(file), IsSIB(isSIB) {}
@@ -273,14 +297,16 @@ public:
 
   virtual bool isSystemModule() const override;
 
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath,
-                           DeclName name, NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
+
+  virtual StringRef
+  getFilenameForPrivateDecl(const ValueDecl *decl) const override;
 
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
   
   virtual OpaqueTypeDecl *
-  lookupOpaqueResultType(StringRef MangledName, LazyResolver *resolver) override;
+  lookupOpaqueResultType(StringRef MangledName) override;
 
   virtual TypeDecl *
   lookupNestedType(Identifier name,
@@ -319,9 +345,16 @@ public:
 
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const override;
 
+  Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const override;
+
   void collectAllGroups(std::vector<StringRef> &Names) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void
+  getTopLevelDeclsWhereAttributesMatch(
+      SmallVectorImpl<Decl*> &Results,
+      llvm::function_ref<bool(DeclAttributes)> matchAttributes) const override;
 
   virtual void
   getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const override;
@@ -350,15 +383,8 @@ public:
 
   virtual const clang::Module *getUnderlyingClangModule() const override;
 
-  /// If this is a module imported from a parseable interface, return the path
-  /// to the interface file, otherwise an empty StringRef.
-  virtual StringRef getParseableInterface() const override {
-    return ParseableInterface;
-  }
-  void setParseableInterface(StringRef PI) { ParseableInterface = PI; }
-  
   virtual bool getAllGenericSignatures(
-                   SmallVectorImpl<GenericSignature*> &genericSignatures)
+                   SmallVectorImpl<GenericSignature> &genericSignatures)
                 override;
 
   static bool classof(const FileUnit *file) {

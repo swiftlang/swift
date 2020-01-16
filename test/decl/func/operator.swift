@@ -11,7 +11,27 @@ struct Y {}
 
 func +(lhs: X, rhs: X) -> X {} // okay
 
-func +++(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}
+func <=>(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=infix operator <=> : <# Precedence Group #>\n}}
+
+extension X {
+    static func <=>(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=infix operator <=> : <# Precedence Group #>\n}}
+}
+
+extension X {
+    struct Z {
+        static func <=> (lhs: Z, rhs: Z) -> Z {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=infix operator <=> : <# Precedence Group #>\n}}
+    }
+}
+
+extension X {
+    static prefix func <=>(lhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=prefix operator <=> : <# Precedence Group #>\n}}
+}
+
+extension X {
+    struct ZZ {
+        static prefix func <=>(lhs: ZZ) -> ZZ {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=prefix operator <=> : <# Precedence Group #>\n}}
+    }
+}
 
 infix operator ++++ : ReallyHighPrecedence
 precedencegroup ReallyHighPrecedence {
@@ -148,7 +168,7 @@ prefix operator ++
 prefix postfix func ++(x: Int) {} // expected-error {{'postfix' contradicts previous modifier 'prefix'}} {{8-16=}}
 postfix prefix func ++(x: Float) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}}
 postfix prefix infix func ++(x: Double) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}} expected-error {{'infix' contradicts previous modifier 'postfix'}} {{16-22=}}
-infix prefix func +-+(x: Int, y: Int) {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}} expected-error{{'prefix' contradicts previous modifier 'infix'}} {{7-14=}}
+infix prefix func +-+(x: Double, y: Double) {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}} expected-error{{'prefix' contradicts previous modifier 'infix'}} {{7-14=}}
 
 // Don't allow one to define a postfix '!'; it's built into the
 // language. Also illegal to have any postfix operator starting with '!'.
@@ -223,7 +243,7 @@ struct S1 {
 }
 
 extension S1 {
-  func %%%%(lhs: S1, rhs: S1) -> S1 { return lhs } // expected-error{{operator '%%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
+  func %%%%(lhs: S1, rhs: S1) -> S1 { return lhs } // expected-error{{operator '%%%%' declared in extension of 'S1' must be 'static'}}{{3-3=static }}
 }
 
 class C0 {
@@ -355,8 +375,8 @@ class C6 {
   static func == (lhs: C6, rhs: C6) -> Bool { return false }
 
   func test1(x: C6) {
-    // FIXME: Better would be: use of '=' in a boolean context, did you mean '=='?
-    if x == x && x = x { } // expected-error{{cannot convert value of type 'C6' to expected argument type 'Bool'}}
+    if x == x && x = x { } // expected-error{{use of '=' in a boolean context, did you mean '=='?}} {{20-21===}}
+    // expected-error@-1 {{cannot convert value of type 'C6' to expected argument type 'Bool'}}
   }
 }
 

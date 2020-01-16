@@ -98,7 +98,7 @@ struct TestSingleExprClosureRetUnresolved {
 
 // TestSingleExprClosureRetUnresolved: Begin completions
 // TestSingleExprClosureRetUnresolved-NOT: notMine
-// TestSingleExprClosureRetUnresolved: Decl[EnumElement]/ExprSpecific: myEnum[#TestSingleExprClosure{{(Ret)?}}Unresolved.MyEnum#];
+// TestSingleExprClosureRetUnresolved: Decl[EnumElement]/ExprSpecific: myEnum[#MyEnum#];
 // TestSingleExprClosureRetUnresolved-NOT: notMine
 // TestSingleExprClosureRetUnresolved: End completions
 }
@@ -263,7 +263,7 @@ struct TestSingleExprFuncUnresolved {
 
 // TestSingleExprFuncUnresolved: Begin completions
 // TestSingleExprFuncUnresolved-NOT: notMine
-// TestSingleExprFuncUnresolved: Decl[EnumElement]/ExprSpecific: myEnum[#TestSingleExpr{{(Local)?}}FuncUnresolved.MyEnum#];
+// TestSingleExprFuncUnresolved: Decl[EnumElement]/ExprSpecific: myEnum[#MyEnum#];
 // TestSingleExprFuncUnresolved-NOT: notMine
 // TestSingleExprFuncUnresolved: End completions
 }
@@ -373,7 +373,7 @@ struct TestSingleExprAccessorUnresolved {
 
 // TestSingleExprAccessorUnresolved: Begin completions
 // TestSingleExprAccessorUnresolved-NOT: notMine
-// TestSingleExprAccessorUnresolved: Decl[EnumElement]/ExprSpecific: myEnum[#TestSingleExpr{{(Local)?}}Accessor{{(Get)?}}Unresolved.MyEnum#];
+// TestSingleExprAccessorUnresolved: Decl[EnumElement]/ExprSpecific: myEnum[#MyEnum#];
 // TestSingleExprAccessorUnresolved-NOT: notMine
 // TestSingleExprAccessorUnresolved: End completions
 }
@@ -525,7 +525,7 @@ struct TestSingleExprSubscriptUnresolved {
 
 // TestSingleExprSubscriptUnresolved: Begin completions
 // TestSingleExprSubscriptUnresolved-NOT: notMine
-// TestSingleExprSubscriptUnresolved: Decl[EnumElement]/ExprSpecific: myEnum[#TestSingleExpr{{(Local)?}}Subscript{{(Get)?}}Unresolved.MyEnum#];
+// TestSingleExprSubscriptUnresolved: Decl[EnumElement]/ExprSpecific: myEnum[#MyEnum#];
 // TestSingleExprSubscriptUnresolved-NOT: notMine
 // TestSingleExprSubscriptUnresolved: End completions
 }
@@ -556,7 +556,7 @@ struct TestSingleExprSubscriptGlobal {
 
 // TestSingleExprSubscriptGlobal: Begin completions
 // TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
-// TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
+// TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal: int()[#Int#];
 // TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestSingleExprSubscriptGlobal: End completions
 }

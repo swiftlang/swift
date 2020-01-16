@@ -74,6 +74,19 @@ For historical reasons, the existing codebase generally uses `internal` as the c
 
 Optionals can be unwrapped with `!`, which triggers a trap on nil. Alternatively, they can be `.unsafelyUnwrapped()`, which will check and trap in debug builds of user code. Internal to the standard library is `._unsafelyUnwrappedUnchecked()` which will only check and trap in debug builds of the standard library itself. These correspond directly with `_precondition`, `_debugPrecondition`, and `_sanityCheck`. See [that section](#precondition) for details.
 
+#### UnsafeBitCast and Casting References
+
+In general `unsafeBitCast` should be avoided because its correctness relies on subtle assumptions that will never be enforced, and it indicates a bug in Swift's type system that should be fixed. It's less bad for non-pointer trivial types. Pointer casting should go through one of the memory binding API instead as a last resort.
+
+Reference casting is more interesting. References casting can include converting to an Optional reference and converting from a class constrained existential.
+
+The regular `as` operator should be able to convert between reference types with full dynamic checking.
+
+`unsafeDownCast` is just as capable, but is only dynamically checked in debug mode or if the cast requires runtime support.
+
+`_unsafeUncheckedDowncast` is the same but is only dynamically checked in the stdlib asserts build, or if the cast requires runtime support.
+
+`_unsafeReferenceCast` is only dynamically checked if the cast requires runtime support. Additionally, it does not impose any static `AnyObject` constraint on the incoming reference. This is useful in a generic context where the object-ness can be determined dynamically, as done in some bridged containers.
 
 ### Builtins
 
@@ -251,27 +264,6 @@ Because `_roundSlowPath(_:)` isn't inlinable, the version of `round(_:)` that ge
 
 Maybe some day we'll have special syntax in the language to say "call this method without allowing inlining" to get the same effect, but for now, this Curiously Recursive Inlinable Switch Pattern allows for safe inlining of switches over non-frozen enums with less boilerplate than you might otherwise have. Not none, but less.
 
-
-## Productivity Hacks
-
-### Be a Ninja
-
-To *be* a productivity ninja, one must *use* `ninja`. `ninja` can be invoked inside the swift build directory, e.g. `<path>/build/Ninja-ReleaseAssert/swift-macosx-x86_64/`. Running `ninja` (which is equivalent to `ninja all`) will build the local swift, stdlib and overlays. It doesn’t necessarily build all the testing infrastructure, benchmarks, etc.
-
-`ninja -t targets` gives a list of all possible targets to pass to ninja. This is useful for grepping.
-
-For this example, we will figure out how to quickly iterate on a change to the standard library to fix 32-bit build errors while building on a 64-bit host, suppressing warnings along the way.
-
-`ninja -t targets | grep stdlib | grep i386` will output many targets, but at the bottom we see `swift-stdlib-iphonesimulator-i386`, which looks like a good first step. This target will just build i386 parts and not waste our time also building the 64-bit stdlib, overlays, etc.
-
-Going further, ninja can spawn a web browser for you to navigate dependencies and rules. `ninja -t browse swift-stdlib-iphonesimulator-i386`  will open a webpage with hyperlinks for all related targets. “target is built using” lists all this target’s dependencies, while “dependent edges build” list all the targets that depend directly on this.
-
-Clicking around a little bit, we can find `lib/swift/iphonesimulator/i386/libswiftCore.dylib` as a commonly-depended-upon target. This will perform just what is needed to compile the standard library for i386 and nothing else.
-
-Going further, for various reasons the standard library has lots of warnings. This is actively being addressed, but fixing all of them may require language features, etc. In the mean time, let’s suppress warnings in our build so that we just see the errors. `ninja -nv lib/swift/iphonesimulator/i386/libswiftCore.dylib` will show us the actual commands ninja will issue to build the i386 stdlib. (You’ll notice that an incremental build here is merely 3 commands as opposed to ~150 for `swift-stdlib-iphonesimulator-i386`).
-
-Copy the invocation that has  ` -o <build-path>/swift-macosx-x86_64/stdlib/public/core/iphonesimulator/i386/Swift.o`, so that we can perform the actual call to swiftc ourselves. Tack on `-suppress-warnings` at the end, and now we have the command to just build `Swift.o` for i386 while only displaying the actual errors.
-
 ## (Meta): List of wants and TODOs for this guide
 
 1. Library Organization
@@ -307,5 +299,3 @@ Copy the invocation that has  ` -o <build-path>/swift-macosx-x86_64/stdlib/publi
     1. Why all the underscores and extra protocols?
     1. How does the `...` ranges work?
 1. Frequently Encountered Issues
-
-

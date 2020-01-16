@@ -8,7 +8,7 @@ protocol FooProtocol {}
 
 func garbage() -> () {
   var a : Int
-  ] this line is invalid, but we will stop at the keyword below... // expected-error{{expected expression}}
+  ) this line is invalid, but we will stop at the keyword below... // expected-error{{expected expression}}
   return a + "a" // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String)}}
 }
 
@@ -435,8 +435,8 @@ struct ErrorTypeInVarDeclFunctionType1 {
   var v2 : Int
 }
 
-struct ErrorTypeInVarDeclArrayType1 { // expected-note{{in declaration of 'ErrorTypeInVarDeclArrayType1'}}
-  var v1 : Int[+] // expected-error {{expected declaration}} expected-error {{consecutive declarations on a line must be separated by ';'}}
+struct ErrorTypeInVarDeclArrayType1 {
+  var v1 : Int[+] // expected-error {{unexpected ']' in type; did you mean to write an array type?}}
   // expected-error @-1 {{expected expression after unary operator}}
   // expected-error @-2 {{expected expression}}
   var v2 : Int
@@ -455,11 +455,34 @@ struct ErrorTypeInVarDeclArrayType3 {
 
 struct ErrorTypeInVarDeclArrayType4 {
   var v1 : Int[1 // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
+  var v2 : Int] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{12-12=[}}
 
+}
+
+struct ErrorTypeInVarDeclArrayType5 { // expected-note {{in declaration of 'ErrorTypeInVarDeclArrayType5'}}
+  let a1: Swift.Int] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{11-11=[}}
+  let a2: Set<Int]> // expected-error {{expected '>' to complete generic argument list}} // expected-note {{to match this opening '<'}}
+  let a3: Set<Int>] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{11-11=[}}
+  let a4: Int]? // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{11-11=[}}
+  // expected-error @-1 {{consecutive declarations on a line must be separated by ';'}} // expected-error @-1 {{expected declaration}}
+  let a5: Int?] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{11-11=[}}
+  let a6: [Int]] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{11-11=[}}
+  let a7: [String: Int]] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{11-11=[}}
+}
+
+struct ErrorTypeInVarDeclDictionaryType {
+  let a1: String: // expected-error {{unexpected ':' in type; did you mean to write a dictionary type?}} {{11-11=[}}
+  // expected-error @-1 {{expected dictionary value type}}
+  let a2: String: Int] // expected-error {{unexpected ':' in type; did you mean to write a dictionary type?}} {{11-11=[}}
+  let a3: String: [Int] // expected-error {{unexpected ':' in type; did you mean to write a dictionary type?}} {{11-11=[}} {{24-24=]}}
+  let a4: String: Int // expected-error {{unexpected ':' in type; did you mean to write a dictionary type?}} {{11-11=[}} {{22-22=]}}
 }
 
 struct ErrorInFunctionSignatureResultArrayType1 {
   func foo() -> Int[ { // expected-error {{expected '{' in body of function declaration}}
+    return [0]
+  }
+  func bar() -> Int] { // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{17-17=[}}
     return [0]
   }
 }
@@ -540,19 +563,26 @@ func use_BracesInsideNominalDecl1() {
   var _ : BracesInsideNominalDecl1.A // no-error
 }
 
-class SR771 { // expected-note {{in declaration of 'SR771'}}
-    print("No one else was in the room where it happened") // expected-error {{expected declaration}}
+class SR771 {
+    print("No one else was in the room where it happened") // expected-note {{'print()' previously declared here}}
+    // expected-error @-1 {{expected 'func' keyword in instance method declaration}}
+    // expected-error @-2 {{expected '{' in body of function declaration}}
+    // expected-error @-3 {{expected parameter name followed by ':'}}
 }
 
-extension SR771 { // expected-note {{in extension of 'SR771'}}
-    print("The room where it happened, the room where it happened") // expected-error {{expected declaration}}
+extension SR771 {
+    print("The room where it happened, the room where it happened")
+    // expected-error @-1 {{expected 'func' keyword in instance method declaration}}
+    // expected-error @-2 {{expected '{' in body of function declaration}}
+    // expected-error @-3 {{invalid redeclaration of 'print()'}}
+    // expected-error @-4 {{expected parameter name followed by ':'}}
 }
 
 
 //===--- Recovery for wrong decl introducer keyword.
 
-class WrongDeclIntroducerKeyword1 { // expected-note{{in declaration of 'WrongDeclIntroducerKeyword1'}}
-  notAKeyword() {} // expected-error {{expected declaration}}
+class WrongDeclIntroducerKeyword1 {
+  notAKeyword() {} // expected-error {{expected 'func' keyword in instance method declaration}}
   func foo() {}
   class func bar() {}
 }
@@ -589,9 +619,11 @@ class WrongInheritanceClause6(Int {}
 class WrongInheritanceClause7<T>(Int where T:AnyObject {}
 
 // <rdar://problem/18502220> [swift-crashes 078] parser crash on invalid cast in sequence expr
-Base=1 as Base=1  // expected-error {{cannot assign to immutable expression of type 'Base.Type'}}
-
-
+Base=1 as Base=1 // expected-error{{cannot convert value of type 'Int' to type 'Base' in coercion}}
+// expected-error@-1 {{cannot assign to immutable expression of type 'Base.Type'}}
+// expected-error@-2 {{cannot assign to immutable expression of type 'Base'}}
+// expected-error@-3 {{cannot assign value of type '()' to type 'Base.Type'}}
+// expected-error@-4 {{cannot assign value of type 'Int' to type 'Base'}}
 
 // <rdar://problem/18634543> Parser hangs at swift::Parser::parseType
 public enum TestA {
@@ -649,7 +681,7 @@ func a(s: S[{{g) -> Int {}
 // expected-error@+3{{expected '(' for initializer parameters}}
 // expected-error@+2{{initializers may only be declared within a type}}
 // expected-error@+1{{expected an identifier to name generic parameter}}
-func F() { init<( } )} // expected-note {{did you mean 'F'?}}
+func F() { init<( } )} // expected-note 2{{did you mean 'F'?}}
 
 struct InitializerWithName {
   init x() {} // expected-error {{initializers cannot have a name}} {{8-9=}}
@@ -665,9 +697,6 @@ struct InitializerWithNameAndParam {
 struct InitializerWithLabels {
   init c d: Int {}
   // expected-error @-1 {{expected '(' for initializer parameters}}
-  // expected-error @-2 {{expected declaration}}
-  // expected-error @-3 {{consecutive declarations on a line must be separated by ';'}}
-  // expected-note @-5 {{in declaration of 'InitializerWithLabels'}}
 }
 
 // rdar://20337695
@@ -727,7 +756,7 @@ let curlyQuotes2 = “hello world!"
 
 
 // <rdar://problem/21196171> compiler should recover better from "unicode Specials" characters
-let ￼tryx  = 123        // expected-error 2 {{invalid character in source file}}  {{5-8= }}
+let ￼tryx  = 123        // expected-error {{invalid character in source file}}  {{5-8= }}
 
 
 // <rdar://problem/21369926> Malformed Swift Enums crash playground service
@@ -811,6 +840,15 @@ func postfixDot(a : String) {
 }
 
 // <rdar://problem/22290244> QoI: "UIColor." gives two issues, should only give one
-func f() {
+func f() { // expected-note 2{{did you mean 'f'?}}
   _ = ClassWithStaticDecls.  // expected-error {{expected member name following '.'}}
 }
+
+
+// <rdar://problem/22478168> | SR-11006
+// expected-error@+1 {{expected '=' instead of '==' to assign default value for parameter}} {{21-23==}}
+func SR11006(a: Int == 0) {}
+
+// rdar://38225184
+extension Collection where Element == Int && Index == Int {}
+// expected-error@-1 {{expected ',' to separate the requirements of this 'where' clause}} {{43-45=,}}

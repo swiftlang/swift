@@ -319,7 +319,7 @@ public class MyString: NSString {}
 // CHECK:   [[BRIDGED_VALUE:%.*]] = apply [[FUNC]]([[ARG]])
 // CHECK-NOT: apply
 // CHECK-NOT: unconditional_checked_cast
-// CHECK: checked_cast_br [[BRIDGED_VALUE]] : $NSString to $MyString, [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
+// CHECK: checked_cast_br [[BRIDGED_VALUE]] : $NSString to MyString, [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
 //
 // CHECK: [[SUCC_BB]]([[CAST_BRIDGED_VALUE:%.*]] : $MyString)
 // CHECK:   [[SOME:%.*]] = enum $Optional<MyString>, #Optional.some!enumelt.1, [[CAST_BRIDGED_VALUE]] : $MyString
@@ -353,4 +353,9 @@ public func testConditionalBridgedCastFromSwiftToNSObjectDerivedClass(_ s: Strin
 @inline(never)
 public func testForcedBridgedCastFromSwiftToNSObjectDerivedClass(_ s: String) -> MyString {
     return s as! MyString
+}
+
+// rdar://problem/51078136
+func foo(x: CFMutableDictionary) -> [AnyHashable:AnyObject]? {
+  return x as? [AnyHashable:AnyObject]
 }

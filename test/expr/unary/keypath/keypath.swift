@@ -36,7 +36,7 @@ struct A: Hashable {
   func hash(into hasher: inout Hasher) { fatalError() }
 }
 struct B {}
-struct C<T> { // expected-note 2 {{'T' declared as parameter to type 'C'}}
+struct C<T> { // expected-note 3 {{'T' declared as parameter to type 'C'}}
   var value: T
   subscript() -> T { get { return value } }
   subscript(sub: Sub) -> T { get { return value } set { } }
@@ -122,20 +122,21 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   // expected-error@+1{{}}
   _ = \(() -> ()).noMember
 
+  let _: (A) -> Prop = \.property
   let _: PartialKeyPath<A> = \.property
   let _: KeyPath<A, Prop> = \.property
   let _: WritableKeyPath<A, Prop> = \.property
   let _: ReferenceWritableKeyPath<A, Prop> = \.property
   //expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, Prop>' to specified type 'ReferenceWritableKeyPath<A, Prop>'}}
 
-  // FIXME: shouldn't be ambiguous
-  // expected-error@+1{{ambiguous}}
+  let _: (A) -> A = \.[sub]
   let _: PartialKeyPath<A> = \.[sub]
   let _: KeyPath<A, A> = \.[sub]
   let _: WritableKeyPath<A, A> = \.[sub]
   let _: ReferenceWritableKeyPath<A, A> = \.[sub]
-  // expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, A>' to specified type 'ReferenceWritableKeyPath<A, A>}}
+  //expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, A>' to specified type 'ReferenceWritableKeyPath<A, A>'}}
 
+  let _: (A) -> Prop? = \.optProperty?
   let _: PartialKeyPath<A> = \.optProperty?
   let _: KeyPath<A, Prop?> = \.optProperty?
   // expected-error@+1{{cannot convert}}
@@ -143,6 +144,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   // expected-error@+1{{cannot convert}}
   let _: ReferenceWritableKeyPath<A, Prop?> = \.optProperty?
 
+  let _: (A) -> A? = \.optProperty?[sub]
   let _: PartialKeyPath<A> = \.optProperty?[sub]
   let _: KeyPath<A, A?> = \.optProperty?[sub]
   // expected-error@+1{{cannot convert}}
@@ -155,18 +157,21 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: KeyPath<A, Prop?> = \.property[optSub]?.optProperty!
   let _: KeyPath<A, A?> = \.property[optSub]?.optProperty![sub]
 
+  let _: (C<A>) -> A = \.value
   let _: PartialKeyPath<C<A>> = \.value
   let _: KeyPath<C<A>, A> = \.value
   let _: WritableKeyPath<C<A>, A> = \.value
   let _: ReferenceWritableKeyPath<C<A>, A> = \.value
   // expected-error@-1 {{cannot convert value of type 'WritableKeyPath<C<A>, A>' to specified type 'ReferenceWritableKeyPath<C<A>, A>'}}
 
+  let _: (C<A>) -> A = \C.value
   let _: PartialKeyPath<C<A>> = \C.value
   let _: KeyPath<C<A>, A> = \C.value
   let _: WritableKeyPath<C<A>, A> = \C.value
   // expected-error@+1{{cannot convert}}
   let _: ReferenceWritableKeyPath<C<A>, A> = \C.value
 
+  let _: (Prop) -> B = \.nonMutatingProperty
   let _: PartialKeyPath<Prop> = \.nonMutatingProperty
   let _: KeyPath<Prop, B> = \.nonMutatingProperty
   let _: WritableKeyPath<Prop, B> = \.nonMutatingProperty
@@ -175,8 +180,9 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   var m = [\A.property, \A.[sub], \A.optProperty!]
   expect(&m, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
-  // FIXME: shouldn't be ambiguous
-  // expected-error@+1{{ambiguous}}
+  // \.optProperty returns an optional of Prop and `\.[sub]` returns `A`
+  // expected-error@+2 {{key path value type 'Prop?' cannot be converted to contextual type 'Prop'}}
+  // expected-error@+1 {{key path value type 'A' cannot be converted to contextual type 'Prop'}}
   var n = [\A.property, \.optProperty, \.[sub], \.optProperty!]
   expect(&n, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
@@ -225,6 +231,8 @@ func testDisembodiedStringInterpolation(x: Int) {
 func testNoComponents() {
   let _: KeyPath<A, A> = \A // expected-error{{must have at least one component}}
   let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}} expected-error{{}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-2 {{cannot convert value of type 'KeyPath<Root, Value>' to specified type 'KeyPath<C<T>, A>'}}
 }
 
 struct TupleStruct {
@@ -499,8 +507,11 @@ func testLabeledSubscript() {
   let k = \AA.[labeled: 0]
 
   // TODO: These ought to work without errors.
-  let _ = \AA.[keyPath: k] // expected-error{{}}
-  let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error{{}}
+  let _ = \AA.[keyPath: k] // expected-error {{extraneous argument label 'keyPath:' in call}}
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
+
+  let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error {{extraneous argument label 'keyPath:' in call}}
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
 }
 
 func testInvalidKeyPathComponents() {
@@ -536,23 +547,19 @@ func testImplicitConversionInSubscriptIndex() {
   _ = \BassSubscript.["hello"] // expected-error{{must be Hashable}}
 }
 
-// Crash in diagnostics
-struct AmbiguousSubscript {
+// Crash in diagnostics + SR-11438
+struct UnambiguousSubscript {
   subscript(sub: Sub) -> Int { get { } set { } }
-  // expected-note@-1 {{'subscript(_:)' declared here}}
-
   subscript(y y: Sub) -> Int { get { } set { } }
-  // expected-note@-1 {{'subscript(y:)' declared here}}
 }
 
-func useAmbiguousSubscript(_ sub: Sub) {
-  let _: PartialKeyPath<AmbiguousSubscript> = \.[sub]
-  // expected-error@-1 {{ambiguous reference to member 'subscript'}}
+func useUnambiguousSubscript(_ sub: Sub) {
+  let _: PartialKeyPath<UnambiguousSubscript> = \.[sub]
 }
 
 struct BothUnavailableSubscript {
   @available(*, unavailable)
-  subscript(sub: Sub) -> Int { get { } set { } }
+  subscript(sub: Sub) -> Int { get { } set { } } // expected-note {{'subscript(_:)' has been explicitly marked unavailable here}}
 
   @available(*, unavailable)
   subscript(y y: Sub) -> Int { get { } set { } }
@@ -560,7 +567,7 @@ struct BothUnavailableSubscript {
 
 func useBothUnavailableSubscript(_ sub: Sub) {
   let _: PartialKeyPath<BothUnavailableSubscript> = \.[sub]
-  // expected-error@-1 {{type of expression is ambiguous without more context}}
+  // expected-error@-1 {{'subscript(_:)' is unavailable}}
 }
 
 // SR-6106
@@ -706,6 +713,8 @@ var identity8: PartialKeyPath = \Container.self
 var identity9: PartialKeyPath<Container> = \Container.self
 var identity10: PartialKeyPath<Container> = \.self
 var identity11: AnyKeyPath = \Container.self
+var identity12: (Container) -> Container = \Container.self
+var identity13: (Container) -> Container = \.self
 
 var interleavedIdentityComponents = \Container.self.base.self?.self.i.self
 
@@ -825,6 +834,34 @@ func test_keypath_inference_with_optionals() {
 
     var foo: Int? = nil
   }
+}
+
+func sr11562() {
+  struct S1 {
+    subscript(x x: Int) -> Int { x }
+  }
+
+  _ = \S1.[5] // expected-error {{missing argument label 'x:' in call}} {{12-12=x: }}
+
+  struct S2 {
+    subscript(x x: Int) -> Int { x } // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(x:)')}}
+    subscript(y y: Int) -> Int { y } // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(y:)')}}
+  }
+
+  _ = \S2.[5] // expected-error {{no exact matches in call to subscript}}
+
+  struct S3 {
+    subscript(x x: Int, y y: Int) -> Int { x }
+  }
+
+  _ = \S3.[y: 5, x: 5] // expected-error {{argument 'x' must precede argument 'y'}}
+
+  struct S4 {
+    subscript(x: (Int, Int)) -> Int { x.0 }
+  }
+
+  _ = \S4.[1, 4] // expected-error {{subscript expects a single parameter of type '(Int, Int)'}} {{12-12=(}} {{16-16=)}}
+  // expected-error@-1 {{subscript index of type '(Int, Int)' in a key path must be Hashable}}
 }
 
 func testSyntaxErrors() { // expected-note{{}}

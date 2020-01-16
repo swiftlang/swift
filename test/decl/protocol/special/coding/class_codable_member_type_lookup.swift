@@ -174,7 +174,7 @@ struct SynthesizedClass : Codable {
 
 // Classes which don't get synthesized Codable implementations should expose the
 // appropriate CodingKeys type.
-struct NonSynthesizedClass : Codable {
+struct NonSynthesizedClass : Codable { // expected-note 4 {{'NonSynthesizedClass' declared here}}
   // No synthesized type since we implemented both methods.
   init(from decoder: Decoder) throws {}
   func encode(to encoder: Encoder) throws {}

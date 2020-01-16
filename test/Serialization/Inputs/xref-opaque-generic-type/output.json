@@ -1,0 +1,8 @@
+{
+  "./best-protocol.swift": {
+    "swiftmodule": "./best-protocol.swiftmodule"
+  },
+  "./xref-opaque-generic-type.swift": {
+    "swiftmodule": "./xref-opaque-generic-type.swiftmodule"
+  }
+}

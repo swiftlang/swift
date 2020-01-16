@@ -50,7 +50,7 @@ print(someFunc())
 // RUN: %target-swift-frontend \
 // RUN:     -emit-module \
 // RUN:     -module-name SomeModule \
-// RUN:     -emit-parseable-module-interface-path %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftinterface \
+// RUN:     -emit-module-interface-path %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftinterface \
 // RUN:     -o /dev/null \
 // RUN:     -swift-version 5 \
 // RUN:     -enable-library-evolution \
@@ -114,7 +114,7 @@ print(someFunc())
 // --- Prebuild SDK module.
 // RUN: mkdir -p %t/prebuiltcache/SomeModule.swiftmodule
 // RUN: %target-swift-frontend \
-// RUN:     -build-module-from-parseable-interface \
+// RUN:     -compile-module-from-interface \
 // RUN:     -module-name SomeModule \
 // RUN:     -o %t/prebuiltcache/SomeModule.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:     %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftinterface

@@ -106,10 +106,10 @@ internal final class __DataStorage {
     @usableFromInline var _bytes: UnsafeMutableRawPointer?
     @usableFromInline var _length: Int
     @usableFromInline var _capacity: Int
-    @usableFromInline var _needToZero: Bool
-    @usableFromInline var _deallocator: ((UnsafeMutableRawPointer, Int) -> Void)?
     @usableFromInline var _offset: Int
-    
+    @usableFromInline var _deallocator: ((UnsafeMutableRawPointer, Int) -> Void)?
+    @usableFromInline var _needToZero: Bool
+
     @inlinable // This is @inlinable as trivially computable.
     var bytes: UnsafeRawPointer? {
         return UnsafeRawPointer(_bytes)?.advanced(by: -_offset)
@@ -1402,7 +1402,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                         if newValue == 0 {
                             return nil
                         } else if InlineData.canStore(count: newValue) {
-                            return .inline(InlineData())
+                            return .inline(InlineData(count: newValue))
                         } else if InlineSlice.canStore(count: newValue) {
                             return .slice(InlineSlice(count: newValue))
                         } else {

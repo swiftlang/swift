@@ -12,7 +12,6 @@
 
 // MARK: Quadrature
 
-@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 /// A structure that approximates the definite integral of a function over a finite interval.
 ///
 /// The following code is an example of using a `Quadrature` structure to calculate the
@@ -49,6 +48,7 @@
 ///
 ///     let vRresult = quadrature.integrate(over: 0.0 ... diameter,
 ///                                         integrand: vectorExp)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public struct Quadrature {
     
     private var integrateOptions = quadrature_integrate_options()

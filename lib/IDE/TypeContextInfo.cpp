@@ -130,7 +130,6 @@ void ContextInfoCallbacks::getImplicitMembers(
 
   class LocalConsumer : public VisibleDeclConsumer {
     DeclContext *DC;
-    LazyResolver *TypeResolver;
     ModuleDecl *CurModule;
     Type T;
     SmallVectorImpl<ValueDecl *> &Result;
@@ -138,12 +137,6 @@ void ContextInfoCallbacks::getImplicitMembers(
     bool canBeImplictMember(ValueDecl *VD) {
       if (VD->isOperator())
         return false;
-
-      if (!VD->hasInterfaceType()) {
-        TypeResolver->resolveDeclSignature(VD);
-        if (!VD->hasInterfaceType())
-          return false;
-      }
 
       // Enum element decls can always be referenced by implicit member
       // expression.
@@ -153,7 +146,8 @@ void ContextInfoCallbacks::getImplicitMembers(
       // Static properties which is convertible to 'Self'.
       if (isa<VarDecl>(VD) && VD->isStatic()) {
         auto declTy = T->getTypeOfMember(CurModule, VD);
-        if (declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC))
+        if (declTy->isEqual(T) ||
+            swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC))
           return true;
       }
 
@@ -162,8 +156,7 @@ void ContextInfoCallbacks::getImplicitMembers(
 
   public:
     LocalConsumer(DeclContext *DC, Type T, SmallVectorImpl<ValueDecl *> &Result)
-        : DC(DC), TypeResolver(DC->getASTContext().getLazyResolver()),
-          CurModule(DC->getParentModule()), T(T), Result(Result) {}
+        : DC(DC), CurModule(DC->getParentModule()), T(T), Result(Result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                    DynamicLookupInfo) {
@@ -174,7 +167,6 @@ void ContextInfoCallbacks::getImplicitMembers(
   } LocalConsumer(CurDeclContext, T, Result);
 
   lookupVisibleMemberDecls(LocalConsumer, MetatypeType::get(T), CurDeclContext,
-                           CurDeclContext->getASTContext().getLazyResolver(),
                            /*includeInstanceMembers=*/false);
 }
 

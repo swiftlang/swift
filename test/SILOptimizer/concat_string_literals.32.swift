@@ -47,7 +47,7 @@ public func test_scalar_strng() -> String {
 
 // NOTE: 7450828190687388257.byteSwapped = 0x61 'a', 0x62 'b', 0x63 'c', 0x64 'd', 0xC3 0xA8 'è', 0x66 'f', 0x67 'g', ...
 // NOTE: 1684234849 = 0x64636261, 1734781123 = 0x6766a8c3
-// CHECK-LABEL test_strng_concat_smol
+// CHECK-LABEL: test_strng_concat_smol
 // CHECK: ret { i32, i32, i32 } { i32 1684234849, i32 1734781123,
 public func test_strng_concat_smol() -> String {
   return "a" + "bc" + "dèf" + "gĥ"
@@ -55,7 +55,7 @@ public func test_strng_concat_smol() -> String {
 
 // NOTE: 11 = code-unit length
 // NOTE: 20 = native bias
-// CHECK-LABEL test_strng_concat_not_quite_smol
+// CHECK-LABEL: test_strng_concat_not_quite_smol
 // CHECK: ret { i32, i32, i32 } { i32 11, i32 sub (i32 {{.*}}, i32 20)
 public func test_strng_concat_not_quite_smol() -> String {
   return "a" + "bc" + "dèf" + "ghī"
@@ -63,7 +63,7 @@ public func test_strng_concat_not_quite_smol() -> String {
 
 // NOTE: 23 = code-unit length
 // NOTE: 20 = native bias
-// CHECK-LABEL test_strng_concat_large
+// CHECK-LABEL: test_strng_concat_large
 // CHECK: ret { i32, i32, i32 } { i32 23, i32 sub (i32 {{.*}}, i32 20)
 public func test_strng_concat_large() -> String {
   return "a" + "bc" + "dèf" + "ghī" + "jklmn" + "o" + "𝛒qr"

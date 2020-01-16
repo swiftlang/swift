@@ -22,7 +22,6 @@
     "StringObject.swift",
     "StringGuts.swift",
     "StringGutsSlice.swift",
-    "StringGutsVisitor.swift",
     "StringGraphemeBreaking.swift",
     "StringHashable.swift",
     "StringIndex.swift",
@@ -157,7 +156,7 @@
   ],
   "Math": [
     "SetAlgebra.swift",
-    "MathFunctions.swift",
+    "BuiltinMath.swift",
     {
     "Integers": [
       "Integers.swift",
@@ -199,6 +198,7 @@
   "Misc": [
     "AtomicInt.swift",
     "ErrorType.swift",
+    "Identifiable.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
     "ManagedBuffer.swift",

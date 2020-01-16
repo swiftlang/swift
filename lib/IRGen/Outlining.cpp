@@ -35,13 +35,20 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
     return;
   }
 
+  // Substitute opaque types if allowed.
+  auto origType = type;
+  type =
+      IGF.IGM.substOpaqueTypesWithUnderlyingTypes(type, CanGenericSignature());
+
   auto formalType = type.getASTType();
   auto &ti = IGF.IGM.getTypeInfoForLowered(formalType);
 
   // We don't need the metadata for fixed size types or types that are not ABI
   // accessible. Outlining will call the value witness of the enclosing type of
   // non ABI accessible field/element types.
-  if (isa<FixedTypeInfo>(ti) || !ti.isABIAccessible()) {
+  if ((!origType.getASTType()->hasOpaqueArchetype() &&
+       isa<FixedTypeInfo>(ti)) ||
+      !ti.isABIAccessible()) {
     return;
   }
 
@@ -120,7 +127,7 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
       });
     assert(env && "has archetype but no archetype?!");
     return {loweredType->mapTypeOutOfContext()->getCanonicalType(),
-            env->getGenericSignature()->getCanonicalSignature()};
+            env->getGenericSignature().getCanonicalSignature()};
   }
   return {loweredType, nullptr};
 }

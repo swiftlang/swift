@@ -296,8 +296,8 @@ extension LazyFilterCollection: Collection {
 
 extension LazyFilterCollection: LazyCollectionProtocol { }
 
-extension LazyFilterCollection : BidirectionalCollection
-  where Base : BidirectionalCollection {
+extension LazyFilterCollection: BidirectionalCollection
+  where Base: BidirectionalCollection {
 
   @inlinable // lazy-performance
   public func index(before i: Index) -> Index {
@@ -339,7 +339,7 @@ extension LazyFilterSequence {
     _ isIncluded: @escaping (Element) -> Bool
   ) -> LazyFilterSequence<Base> {
     return LazyFilterSequence(_base: _base) {
-      isIncluded($0) && self._predicate($0)
+      self._predicate($0) && isIncluded($0)
     }
   }
 }

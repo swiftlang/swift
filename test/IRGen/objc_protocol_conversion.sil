@@ -23,14 +23,3 @@ entry:
   %p = objc_protocol #OP : $Protocol
   return %p : $Protocol
 }
-
-// The Protocol class has been hidden in newer ObjC APIs, so when we need its
-// metadata, we treat it like a foreign class.
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @protocol_metatype()
-sil @protocol_metatype : $@convention(thin) () -> @thick Protocol.Type {
-entry:
-  // CHECK: call %objc_class* @objc_lookUpClass
-  // CHECK: call %swift.type* @swift_getObjCClassMetadata
-  %t = metatype $@thick Protocol.Type
-  return %t : $@thick Protocol.Type
-}

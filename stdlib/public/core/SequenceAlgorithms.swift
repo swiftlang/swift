@@ -335,7 +335,7 @@ extension Sequence {
   }
 }
 
-extension Sequence where Element : Equatable {
+extension Sequence where Element: Equatable {
   /// Returns a Boolean value indicating whether this sequence and another
   /// sequence contain the same elements in the same order.
   ///
@@ -430,7 +430,7 @@ extension Sequence {
   }
 }
 
-extension Sequence where Element : Comparable {
+extension Sequence where Element: Comparable {
   /// Returns a Boolean value indicating whether the sequence precedes another
   /// sequence in a lexicographical (dictionary) ordering, using the
   /// less-than operator (`<`) to compare elements.
@@ -544,7 +544,7 @@ extension Sequence {
   }
 }
 
-extension Sequence where Element : Equatable {
+extension Sequence where Element: Equatable {
   /// Returns a Boolean value indicating whether the sequence contains the
   /// given element.
   ///
@@ -751,7 +751,7 @@ extension Sequence {
   /// - Complexity: O(*m* + *n*), where *n* is the length of this sequence
   ///   and *m* is the length of the result.
   @inlinable
-  public func flatMap<SegmentOfResult : Sequence>(
+  public func flatMap<SegmentOfResult: Sequence>(
     _ transform: (Element) throws -> SegmentOfResult
   ) rethrows -> [SegmentOfResult.Element] {
     var result: [SegmentOfResult.Element] = []

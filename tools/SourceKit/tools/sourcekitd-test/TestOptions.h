@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/StringMap.h"
 #include <string>
 
 namespace sourcekitd_test {
@@ -63,6 +64,7 @@ enum class SourceKitRequest {
   SyntaxTree,
   EnableCompileNotifications,
   CollectExpresstionType,
+  GlobalConfiguration,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
 #include "swift/IDE/RefactoringKinds.def"
 };
@@ -109,7 +111,17 @@ struct TestOptions {
   bool CollectActionables = false;
   bool isAsyncRequest = false;
   bool timeRequest = false;
+  llvm::Optional<bool> OptimizeForIde;
+  bool SuppressDefaultConfigRequest = false;
   unsigned repeatRequest = 1;
+  struct VFSFile {
+    std::string path;
+    bool passAsSourceText;
+    VFSFile(std::string path, bool passAsSourceText)
+        : path(std::move(path)), passAsSourceText(passAsSourceText) {}
+  };
+  llvm::StringMap<VFSFile> VFSFiles;
+  llvm::Optional<std::string> VFSName;
   llvm::Optional<bool> CancelOnSubsequentRequest;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;

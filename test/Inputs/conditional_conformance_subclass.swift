@@ -66,8 +66,7 @@ public func subclassgeneric_concrete() {
 
 // CHECK-LABEL: define{{( dllexport| protected)?}} swiftcc void @"$s32conditional_conformance_subclass24subclassgeneric_concreteyyF"()
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMa"(i64 0)
-// CHECK-NEXT:    [[SubclassGeneric_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT:    [[SubclassGeneric_TYPE:%.*]] = call {{.*}}@"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD"
 // CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGAA4BaseCyxGAA2P1A2A0G0RzlWl"()
 // CHECK-NEXT:    call swiftcc void @"$s32conditional_conformance_subclass8takes_p1yyxmAA2P1RzlF"(%swift.type* [[SubclassGeneric_TYPE]], %swift.type* [[SubclassGeneric_TYPE]], i8** [[Base_P1]])
 // CHECK-NEXT:    ret void
@@ -83,9 +82,21 @@ public func subclassgeneric_concrete() {
 // CHECK-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMa"(i64 255)
-// CHECK-NEXT:    [[SubclassGeneric_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// macosx-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMa"(i64 255)
+// macosx-NEXT:    [[SubclassGeneric_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// macosx-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// ios-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMa"(i64 255)
+// ios-NEXT:    [[SubclassGeneric_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// ios-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// watchos-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMa"(i64 255)
+// watchos-NEXT:    [[SubclassGeneric_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// watchos-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// tvos-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMa"(i64 255)
+// tvos-NEXT:    [[SubclassGeneric_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// tvos-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// linux-gnu-NEXT:     [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
+// linux-android-NEXT: [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
+// windows-msvc-NEXT: [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
 
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0

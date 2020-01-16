@@ -100,18 +100,31 @@ ALPHASORT: FatCompactMap
 
 ````
 
+Substring filters using + and - prefix
+
+````
+RUN: %Benchmark_O --list -.A +Angry -Small AngryPhonebook.ASCII.Small \
+RUN:             | %FileCheck %s --check-prefix FILTERS
+FILTERS: AngryPhonebook.ASCII.Small
+FILTERS-NOT: AngryPhonebook.Armenian
+FILTERS-NOT: AngryPhonebook.Cyrillic.Small
+FILTERS: AngryPhonebook.Cyrillic
+FILTERS: AngryPhonebook.Strasse
+````
+
 ## Running Benchmarks
-Each real benchmark execution takes about a second per sample. If possible,
-multiple checks are combined into one run to minimise the test time.
+By default, each real benchmark execution takes about a second per sample.
+To minimise the test time, multiple checks are combined into one run.
 
 ````
 RUN: %Benchmark_O AngryPhonebook --num-iters=1 \
+RUN:                             --sample-time=0.000001 --min-samples=7 \
 RUN:              | %FileCheck %s --check-prefix NUMITERS1 \
 RUN:                              --check-prefix LOGHEADER \
 RUN:                              --check-prefix LOGBENCH
 LOGHEADER-LABEL: #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
 LOGBENCH: {{[0-9]+}},
-NUMITERS1: AngryPhonebook,{{[0-9]+}}
+NUMITERS1: AngryPhonebook,7
 NUMITERS1-NOT: 0,0,0,0,0
 LOGBENCH-SAME: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
 ````
@@ -132,6 +145,22 @@ VENTILES: V7(μs),V8(μs),V9(μs),VA(μs),VB(μs),VC(μs),VD(μs),VE(μs),VF(μs
 VENTILES: VH(μs),VI(μs),VJ(μs),MAX(μs)
 ````
 
+### Reporting Measurement Metadata
+The presence of optional argument `--meta`, controls logging of measurement
+metadata at the end of the benchmark summary.
+
+* PAGES – number of memory pages used
+* ICS – number of involuntary context switches
+* YIELD – number of voluntary yields
+
+````
+RUN: %Benchmark_O 0 --quantile=1 --meta | %FileCheck %s --check-prefix META
+META: #,TEST,SAMPLES,MIN(μs),MAX(μs),PAGES,ICS,YIELD
+RUN: %Benchmark_O 0 --quantile=1 --meta --memory \
+RUN:              | %FileCheck %s --check-prefix MEMMETA
+MEMMETA: #,TEST,SAMPLES,MIN(μs),MAX(μs),MAX_RSS(B),PAGES,ICS,YIELD
+````
+
 ### Verbose Mode
 Reports detailed information during measurement, including configuration
 details, environmental statistics (memory used and number of context switches)
@@ -149,7 +178,8 @@ RUN:              | %FileCheck %s --check-prefix RUNJUSTONCE \
 RUN:                              --check-prefix CONFIG \
 RUN:                              --check-prefix LOGVERBOSE \
 RUN:                              --check-prefix MEASUREENV \
-RUN:                              --check-prefix LOGFORMAT
+RUN:                              --check-prefix LOGFORMAT \
+RUN:                              --check-prefix YIELDCOUNT
 CONFIG: NumSamples: 2
 CONFIG: Tests Filter: ["1", "Ackermann", "1", "AngryPhonebook"]
 CONFIG: Tests to run: Ackermann, AngryPhonebook
@@ -162,6 +192,7 @@ LOGVERBOSE: Sample 1,{{[0-9]+}}
 MEASUREENV: MAX_RSS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}} ({{[0-9]+}} pages)
 MEASUREENV: ICS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 MEASUREENV: VCS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
+YIELDCOUNT: yieldCount 1
 RUNJUSTONCE-LABEL: 1,Ackermann
 RUNJUSTONCE-NOT: 1,Ackermann
 LOGFORMAT: ,{{[0-9]+}},{{[0-9]+}},,{{[0-9]*}},{{[0-9]+}}

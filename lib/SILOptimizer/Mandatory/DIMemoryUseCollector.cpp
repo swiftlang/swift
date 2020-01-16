@@ -28,34 +28,32 @@ using namespace ownership;
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
-static void gatherDestroysOfContainer(const MarkUninitializedInst *MUI,
-                                      DIElementUseInfo &UseInfo) {
-  // The MUI must be used on an alloc_box, alloc_stack, or global_addr. If we
-  // have an alloc_stack or a global_addr, there is nothing further to do.
-  if (isa<AllocStackInst>(MUI->getOperand()) ||
-      isa<GlobalAddrInst>(MUI->getOperand()) ||
-      isa<SILArgument>(MUI->getOperand()) ||
+static void gatherDestroysOfContainer(const DIMemoryObjectInfo &memoryInfo,
+                                      DIElementUseInfo &useInfo) {
+  auto *uninitMemory = memoryInfo.getUninitializedValue();
+
+  // The uninitMemory must be used on an alloc_box, alloc_stack, or global_addr.
+  // If we have an alloc_stack or a global_addr, there is nothing further to do.
+  if (isa<AllocStackInst>(uninitMemory->getOperand(0)) ||
+      isa<GlobalAddrInst>(uninitMemory->getOperand(0)) ||
+      isa<SILArgument>(uninitMemory->getOperand(0)) ||
       // FIXME: We only support pointer to address here to not break LLDB. It is
       // important that long term we get rid of this since this is a situation
       // where LLDB is breaking SILGen/DI invariants by not creating a new
       // independent stack location for the pointer to address.
-      isa<PointerToAddressInst>(MUI->getOperand()))
+      isa<PointerToAddressInst>(uninitMemory->getOperand(0))) {
     return;
+  }
 
-  // Otherwise, we assume that we have a project_box. This is a hard cast to
-  // ensure that we catch any new patterns emitted by SILGen and assert.
-  auto *PBI = cast<ProjectBoxInst>(MUI->getOperand());
-  auto *ABI = cast<AllocBoxInst>(PBI->getOperand());
-
-  // Treat destroys of the container as load+destroys of the original value.
+  // Otherwise, we assume that we have an alloc_box. Treat destroys of the
+  // alloc_box as load+destroys of the value stored in the box.
   //
   // TODO: This should really be tracked separately from other destroys so that
   // we distinguish the lifetime of the container from the value itself.
-  for (auto *Op : ABI->getUses()) {
-    SILInstruction *User = Op->getUser();
-    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
-      UseInfo.trackDestroy(User);
-    }
+  assert(isa<ProjectBoxInst>(uninitMemory));
+  auto *mui = cast<MarkUninitializedInst>(uninitMemory->getOperand(0));
+  for (auto *user : mui->getUsersOfType<DestroyValueInst>()) {
+    useInfo.trackDestroy(user);
   }
 }
 
@@ -63,7 +61,8 @@ static void gatherDestroysOfContainer(const MarkUninitializedInst *MUI,
 //                     DIMemoryObjectInfo Implementation
 //===----------------------------------------------------------------------===//
 
-static unsigned getElementCountRec(SILModule &Module, SILType T,
+static unsigned getElementCountRec(TypeExpansionContext context,
+                                   SILModule &Module, SILType T,
                                    bool IsSelfOfNonDelegatingInitializer) {
   // If this is a tuple, it is always recursively flattened.
   if (CanTupleType TT = T.getAs<TupleType>()) {
@@ -71,7 +70,7 @@ static unsigned getElementCountRec(SILModule &Module, SILType T,
     unsigned NumElements = 0;
     for (unsigned i = 0, e = TT->getNumElements(); i < e; i++)
       NumElements +=
-          getElementCountRec(Module, T.getTupleElementType(i), false);
+          getElementCountRec(context, Module, T.getTupleElementType(i), false);
     return NumElements;
   }
 
@@ -83,8 +82,8 @@ static unsigned getElementCountRec(SILModule &Module, SILType T,
     if (auto *NTD = T.getNominalOrBoundGenericNominal()) {
       unsigned NumElements = 0;
       for (auto *VD : NTD->getStoredProperties())
-        NumElements +=
-            getElementCountRec(Module, T.getFieldType(VD, Module), false);
+        NumElements += getElementCountRec(
+            context, Module, T.getFieldType(VD, Module, context), false);
       return NumElements;
     }
   }
@@ -97,7 +96,11 @@ static std::pair<SILType, bool>
 computeMemorySILType(MarkUninitializedInst *MemoryInst) {
   // Compute the type of the memory object.
   auto *MUI = MemoryInst;
-  SILType MemorySILType = MUI->getType().getObjectType();
+  SILValue Address = MUI;
+  if (auto *PBI = Address->getSingleUserOfType<ProjectBoxInst>()) {
+    Address = PBI;
+  }
+  SILType MemorySILType = Address->getType().getObjectType();
 
   // If this is a let variable we're initializing, remember this so we don't
   // allow reassignment.
@@ -134,7 +137,8 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(MarkUninitializedInst *MI)
 
   // Otherwise, we break down the initializer.
   NumElements =
-      getElementCountRec(Module, MemorySILType, isNonDelegatingInit());
+      getElementCountRec(TypeExpansionContext(*MI->getFunction()), Module,
+                         MemorySILType, isNonDelegatingInit());
 
   // If this is a derived class init method, track an extra element to determine
   // whether super.init has been called at each program point.
@@ -152,16 +156,18 @@ SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
 }
 
 /// Given a symbolic element number, return the type of the element.
-static SILType getElementTypeRec(SILModule &Module, SILType T, unsigned EltNo,
+static SILType getElementTypeRec(TypeExpansionContext context,
+                                 SILModule &Module, SILType T, unsigned EltNo,
                                  bool IsSelfOfNonDelegatingInitializer) {
   // If this is a tuple type, walk into it.
   if (CanTupleType TT = T.getAs<TupleType>()) {
     assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
     for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
       auto FieldType = T.getTupleElementType(i);
-      unsigned NumFieldElements = getElementCountRec(Module, FieldType, false);
+      unsigned NumFieldElements =
+          getElementCountRec(context, Module, FieldType, false);
       if (EltNo < NumFieldElements)
-        return getElementTypeRec(Module, FieldType, EltNo, false);
+        return getElementTypeRec(context, Module, FieldType, EltNo, false);
       EltNo -= NumFieldElements;
     }
     // This can only happen if we look at a symbolic element number of an empty
@@ -177,11 +183,11 @@ static SILType getElementTypeRec(SILModule &Module, SILType T, unsigned EltNo,
       bool HasStoredProperties = false;
       for (auto *VD : NTD->getStoredProperties()) {
         HasStoredProperties = true;
-        auto FieldType = T.getFieldType(VD, Module);
+        auto FieldType = T.getFieldType(VD, Module, context);
         unsigned NumFieldElements =
-            getElementCountRec(Module, FieldType, false);
+            getElementCountRec(context, Module, FieldType, false);
         if (EltNo < NumFieldElements)
-          return getElementTypeRec(Module, FieldType, EltNo, false);
+          return getElementTypeRec(context, Module, FieldType, EltNo, false);
         EltNo -= NumFieldElements;
       }
 
@@ -202,15 +208,16 @@ static SILType getElementTypeRec(SILModule &Module, SILType T, unsigned EltNo,
 /// getElementTypeRec - Return the swift type of the specified element.
 SILType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
   auto &Module = MemoryInst->getModule();
-  return getElementTypeRec(Module, MemorySILType, EltNo, isNonDelegatingInit());
+  return getElementTypeRec(TypeExpansionContext(*MemoryInst->getFunction()),
+                           Module, MemorySILType, EltNo, isNonDelegatingInit());
 }
 
-/// computeTupleElementAddress - Given a tuple element number (in the flattened
-/// sense) return a pointer to a leaf element of the specified number.
-SILValue DIMemoryObjectInfo::emitElementAddress(
+/// Given a tuple element number (in the flattened sense) return a pointer to a
+/// leaf element of the specified number, so we can insert destroys for it.
+SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
     unsigned EltNo, SILLocation Loc, SILBuilder &B,
-    llvm::SmallVectorImpl<std::pair<SILValue, SILValue>> &EndBorrowList) const {
-  SILValue Ptr = getAddress();
+    SmallVectorImpl<std::pair<SILValue, EndScopeKind>> &EndScopeList) const {
+  SILValue Ptr = getUninitializedValue();
   bool IsSelf = isNonDelegatingInit();
   auto &Module = MemoryInst->getModule();
 
@@ -225,7 +232,8 @@ SILValue DIMemoryObjectInfo::emitElementAddress(
       unsigned FieldNo = 0;
       for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
         auto EltTy = PointeeType.getTupleElementType(i);
-        unsigned NumSubElt = getElementCountRec(Module, EltTy, false);
+        unsigned NumSubElt = getElementCountRec(
+            TypeExpansionContext(B.getFunction()), Module, EltTy, false);
         if (EltNo < NumSubElt) {
           Ptr = B.createTupleElementAddr(Loc, Ptr, FieldNo);
           PointeeType = EltTy;
@@ -252,13 +260,14 @@ SILValue DIMemoryObjectInfo::emitElementAddress(
             if (isa<ClassDecl>(NTD) && Ptr->getType().isAddress()) {
               SILValue Original = Ptr;
               SILValue Borrowed = Ptr = B.createLoadBorrow(Loc, Ptr);
-              EndBorrowList.emplace_back(Borrowed, Original);
+              EndScopeList.emplace_back(Borrowed, EndScopeKind::Borrow);
             }
           }
-
-          auto FieldType = PointeeType.getFieldType(VD, Module);
+          auto expansionContext = TypeExpansionContext(B.getFunction());
+          auto FieldType =
+              PointeeType.getFieldType(VD, Module, expansionContext);
           unsigned NumFieldElements =
-              getElementCountRec(Module, FieldType, false);
+              getElementCountRec(expansionContext, Module, FieldType, false);
           if (EltNo < NumFieldElements) {
             if (isa<StructDecl>(NTD)) {
               Ptr = B.createStructElementAddr(Loc, Ptr, VD);
@@ -268,12 +277,13 @@ SILValue DIMemoryObjectInfo::emitElementAddress(
               if (Ptr.getOwnershipKind() != ValueOwnershipKind::Guaranteed) {
                 Original = Ptr;
                 Borrowed = Ptr = B.createBeginBorrow(Loc, Ptr);
+                EndScopeList.emplace_back(Borrowed, EndScopeKind::Borrow);
               }
               Ptr = B.createRefElementAddr(Loc, Ptr, VD);
-              if (Original) {
-                assert(Borrowed);
-                EndBorrowList.emplace_back(Borrowed, Original);
-              }
+              Ptr = B.createBeginAccess(
+                  Loc, Ptr, SILAccessKind::Deinit, SILAccessEnforcement::Static,
+                  false /*noNestedConflict*/, false /*fromBuiltin*/);
+              EndScopeList.emplace_back(Ptr, EndScopeKind::Access);
             }
 
             PointeeType = FieldType;
@@ -300,7 +310,8 @@ SILValue DIMemoryObjectInfo::emitElementAddress(
 
 /// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
-static void getPathStringToElementRec(SILModule &Module, SILType T,
+static void getPathStringToElementRec(TypeExpansionContext context,
+                                      SILModule &Module, SILType T,
                                       unsigned EltNo, std::string &Result) {
   CanTupleType TT = T.getAs<TupleType>();
   if (!TT) {
@@ -313,7 +324,7 @@ static void getPathStringToElementRec(SILModule &Module, SILType T,
   for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
     auto Field = TT->getElement(i);
     SILType FieldTy = T.getTupleElementType(i);
-    unsigned NumFieldElements = getElementCountRec(Module, FieldTy, false);
+    unsigned NumFieldElements = getElementCountRec(context, Module, FieldTy, false);
 
     if (EltNo < NumFieldElements) {
       Result += '.';
@@ -321,7 +332,7 @@ static void getPathStringToElementRec(SILModule &Module, SILType T,
         Result += Field.getName().str();
       else
         Result += llvm::utostr(FieldNo);
-      return getPathStringToElementRec(Module, FieldTy, EltNo, Result);
+      return getPathStringToElementRec(context, Module, FieldTy, EltNo, Result);
     }
 
     EltNo -= NumFieldElements;
@@ -346,14 +357,16 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
     Result = "<unknown>";
 
   // If this is indexing into a field of 'self', look it up.
+  auto expansionContext = TypeExpansionContext(*MemoryInst->getFunction());
   if (isNonDelegatingInit() && !isDerivedClassSelfOnly()) {
     if (auto *NTD = MemorySILType.getNominalOrBoundGenericNominal()) {
       bool HasStoredProperty = false;
       for (auto *VD : NTD->getStoredProperties()) {
         HasStoredProperty = true;
-        auto FieldType = MemorySILType.getFieldType(VD, Module);
+        auto FieldType =
+            MemorySILType.getFieldType(VD, Module, expansionContext);
         unsigned NumFieldElements =
-            getElementCountRec(Module, FieldType, false);
+            getElementCountRec(expansionContext, Module, FieldType, false);
         if (Element < NumFieldElements) {
           Result += '.';
           auto originalProperty = VD->getOriginalWrappedProperty();
@@ -362,7 +375,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
           } else {
             Result += VD->getName().str();
           }
-          getPathStringToElementRec(Module, FieldType, Element, Result);
+          getPathStringToElementRec(expansionContext, Module, FieldType,
+                                    Element, Result);
           return VD;
         }
         Element -= NumFieldElements;
@@ -375,7 +389,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
   }
 
   // Get the path through a tuple, if relevant.
-  getPathStringToElementRec(Module, MemorySILType, Element, Result);
+  getPathStringToElementRec(expansionContext, Module, MemorySILType, Element,
+                            Result);
 
   // If we are analyzing a variable, we can generally get the decl associated
   // with it.
@@ -402,9 +417,11 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
     return false;
   }
 
+  auto expansionContext = TypeExpansionContext(*MemoryInst->getFunction());
   for (auto *VD : NTD->getStoredProperties()) {
-    auto FieldType = MemorySILType.getFieldType(VD, Module);
-    unsigned NumFieldElements = getElementCountRec(Module, FieldType, false);
+    auto FieldType = MemorySILType.getFieldType(VD, Module, expansionContext);
+    unsigned NumFieldElements =
+        getElementCountRec(expansionContext, Module, FieldType, false);
     if (Element < NumFieldElements)
       return VD->isLet();
     Element -= NumFieldElements;
@@ -471,7 +488,7 @@ static void getScalarizedElements(SILValue V,
                                   SmallVectorImpl<SILValue> &ElementVals,
                                   SILLocation Loc, SILBuilder &B) {
   auto *DTI = B.createDestructureTuple(Loc, V);
-  copy(DTI->getResults(), std::back_inserter(ElementVals));
+  llvm::copy(DTI->getResults(), std::back_inserter(ElementVals));
 }
 
 /// Scalarize a load down to its subelements.  If NewLoads is specified, this
@@ -498,27 +515,16 @@ static SILValue scalarizeLoad(LoadInst *LI,
 
 namespace {
 
+/// Gathers information about a specific address and its uses to determine
+/// definite initialization.
 class ElementUseCollector {
   SILModule &Module;
   const DIMemoryObjectInfo &TheMemory;
   DIElementUseInfo &UseInfo;
 
-  /// This is true if definite initialization has finished processing assign
-  /// and other ambiguous instructions into init vs assign classes.
-  bool isDefiniteInitFinished;
-
   /// IsSelfOfNonDelegatingInitializer - This is true if we're looking at the
   /// top level of a 'self' variable in a non-delegating init method.
   bool IsSelfOfNonDelegatingInitializer;
-
-  /// How should address_to_pointer be handled?
-  ///
-  /// In DefiniteInitialization it is considered as an inout parameter to get
-  /// diagnostics about passing a let variable to an inout mutable-pointer
-  /// argument.
-  /// In PredictableMemOpt it is considered as an escape point to be
-  /// conservative.
-  bool TreatAddressToPointerAsInout;
 
   /// When walking the use list, if we index into a struct element, keep track
   /// of this, so that any indexes into tuple subelements don't affect the
@@ -531,11 +537,8 @@ class ElementUseCollector {
 
 public:
   ElementUseCollector(const DIMemoryObjectInfo &TheMemory,
-                      DIElementUseInfo &UseInfo, bool isDefiniteInitFinished,
-                      bool TreatAddressToPointerAsInout)
-      : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
-        UseInfo(UseInfo), isDefiniteInitFinished(isDefiniteInitFinished),
-        TreatAddressToPointerAsInout(TreatAddressToPointerAsInout) {}
+                      DIElementUseInfo &UseInfo)
+      : Module(TheMemory.getModule()), TheMemory(TheMemory), UseInfo(UseInfo) {}
 
   /// This is the main entry point for the use walker.  It collects uses from
   /// the address and the refcount result of the allocation.
@@ -544,7 +547,7 @@ public:
 
     // If this is a delegating initializer, collect uses specially.
     if (IsSelfOfNonDelegatingInitializer &&
-        TheMemory.getType()->getClassOrBoundGenericClass() != nullptr) {
+        TheMemory.getASTType()->getClassOrBoundGenericClass() != nullptr) {
       assert(!TheMemory.isDerivedClassSelfOnly() &&
              "Should have been handled outside of here");
       // If this is a class pointer, we need to look through ref_element_addrs.
@@ -552,17 +555,16 @@ public:
       return;
     }
 
-    collectUses(TheMemory.MemoryInst, 0);
-    gatherDestroysOfContainer(TheMemory.MemoryInst, UseInfo);
+    collectUses(TheMemory.getUninitializedValue(), 0);
+    gatherDestroysOfContainer(TheMemory, UseInfo);
   }
 
   void trackUse(DIMemoryUse Use) { UseInfo.trackUse(Use); }
 
   void trackDestroy(SILInstruction *Destroy) { UseInfo.trackDestroy(Destroy); }
 
-  unsigned getNumMemoryElements() const { return TheMemory.NumElements; }
-
-  SILInstruction *getMemoryInst() const { return TheMemory.MemoryInst; }
+  /// Return the raw number of elements including the 'super.init' value.
+  unsigned getNumMemoryElements() const { return TheMemory.getNumElements(); }
 
 private:
   void collectUses(SILValue Pointer, unsigned BaseEltNo);
@@ -573,8 +575,6 @@ private:
   void addElementUses(unsigned BaseEltNo, SILType UseTy, SILInstruction *User,
                       DIUseKind Kind);
   void collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseEltNo);
-  void collectDestructureTupleResultUses(DestructureTupleResult *DTR,
-                                         unsigned BaseEltNo);
   void collectStructElementUses(StructElementAddrInst *SEAI,
                                 unsigned BaseEltNo);
 };
@@ -589,9 +589,11 @@ void ElementUseCollector::addElementUses(unsigned BaseEltNo, SILType UseTy,
   // If we're in a subelement of a struct or enum, just mark the struct, not
   // things that come after it in a parent tuple.
   unsigned NumElements = 1;
-  if (TheMemory.NumElements != 1 && !InStructSubElement && !InEnumSubElement)
+  if (TheMemory.getNumElements() != 1 && !InStructSubElement &&
+      !InEnumSubElement)
     NumElements =
-        getElementCountRec(Module, UseTy, IsSelfOfNonDelegatingInitializer);
+        getElementCountRec(TypeExpansionContext(*User->getFunction()), Module,
+                           UseTy, IsSelfOfNonDelegatingInitializer);
 
   trackUse(DIMemoryUse(User, Kind, BaseEltNo, NumElements));
 }
@@ -617,38 +619,12 @@ void ElementUseCollector::collectTupleElementUses(TupleElementAddrInst *TEAI,
   if (T.is<TupleType>()) {
     for (unsigned i = 0; i != FieldNo; ++i) {
       SILType EltTy = T.getTupleElementType(i);
-      BaseEltNo += getElementCountRec(Module, EltTy, false);
+      BaseEltNo += getElementCountRec(TypeExpansionContext(*TEAI->getFunction()),
+                                      Module, EltTy, false);
     }
   }
 
   collectUses(TEAI, BaseEltNo);
-}
-
-/// Given a destructure_tuple, compute the new BaseEltNo implicit in the
-/// selected member, and recursively add uses of the instruction.
-void ElementUseCollector::collectDestructureTupleResultUses(
-    DestructureTupleResult *DTR, unsigned BaseEltNo) {
-
-  // If we're walking into a tuple within a struct or enum, don't adjust the
-  // BaseElt.  The uses hanging off the tuple_element_addr are going to be
-  // counted as uses of the struct or enum itself.
-  if (InStructSubElement || InEnumSubElement)
-    return collectUses(DTR, BaseEltNo);
-
-  assert(!IsSelfOfNonDelegatingInitializer && "self doesn't have tuple type");
-
-  // tuple_element_addr P, 42 indexes into the current tuple element.
-  // Recursively process its uses with the adjusted element number.
-  unsigned FieldNo = DTR->getIndex();
-  auto T = DTR->getParent()->getOperand()->getType();
-  if (T.is<TupleType>()) {
-    for (unsigned i = 0; i != FieldNo; ++i) {
-      SILType EltTy = T.getTupleElementType(i);
-      BaseEltNo += getElementCountRec(Module, EltTy, false);
-    }
-  }
-
-  collectUses(DTR, BaseEltNo);
 }
 
 void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
@@ -670,8 +646,9 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
     if (SEAI->getField() == VD)
       break;
 
-    auto FieldType = SEAI->getOperand()->getType().getFieldType(VD, Module);
-    BaseEltNo += getElementCountRec(Module, FieldType, false);
+    auto expansionContext = TypeExpansionContext(*SEAI->getFunction());
+    auto FieldType = SEAI->getOperand()->getType().getFieldType(VD, Module, expansionContext);
+    BaseEltNo += getElementCountRec(expansionContext, Module, FieldType, false);
   }
 
   collectUses(SEAI, BaseEltNo);
@@ -715,15 +692,15 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    // Look through begin_access and begin_borrow
-    if (isa<BeginAccessInst>(User) || isa<BeginBorrowInst>(User)) {
+    // Look through begin_access.
+    if (isa<BeginAccessInst>(User)) {
       auto begin = cast<SingleValueInstruction>(User);
       collectUses(begin, BaseEltNo);
       continue;
     }
 
-    // Ignore end_access and end_borrow.
-    if (isa<EndAccessInst>(User) || isa<EndBorrowInst>(User)) {
+    // Ignore end_access.
+    if (isa<EndAccessInst>(User)) {
       continue;
     }
 
@@ -785,8 +762,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
           Kind = DIUseKind::PartialStore; \
         else if (SWI->isInitializationOfDest()) \
           Kind = DIUseKind::Initialization; \
-        else if (isDefiniteInitFinished) \
-          Kind = DIUseKind::Assign; \
         else \
           Kind = DIUseKind::InitOrAssign; \
         trackUse(DIMemoryUse(User, Kind, BaseEltNo, 1)); \
@@ -813,8 +788,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         Kind = DIUseKind::PartialStore;
       else if (CAI->isInitializationOfDest())
         Kind = DIUseKind::Initialization;
-      else if (isDefiniteInitFinished)
-        Kind = DIUseKind::Assign;
       else
         Kind = DIUseKind::InitOrAssign;
 
@@ -872,14 +845,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         // by the callee, and this is enforced by sema, so we can consider it
         // a nonmutating use.
         bool isLet = true;
-        
-        for (unsigned i = 0; i < TheMemory.NumElements; ++i) {
+
+        for (unsigned i = 0; i < TheMemory.getNumElements(); ++i) {
           if (!TheMemory.isElementLetProperty(i)) {
             isLet = false;
             break;
           }
         }
-        
+
         if (isLet) {
           addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
           continue;
@@ -894,7 +867,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         // inout use.
         DIUseKind Kind;
         if (TheMemory.isStructInitSelf() &&
-            getAccessedPointer(Pointer) == TheMemory.getAddress()) {
+            getAccessedPointer(Pointer) == TheMemory.getUninitializedValue()) {
           Kind = DIUseKind::Escape;
         } else if (Apply.hasSelfArgument() &&
                    Op == &Apply.getSelfArgumentOperand()) {
@@ -910,7 +883,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       llvm_unreachable("bad parameter convention");
     }
 
-    if (isa<AddressToPointerInst>(User) && TreatAddressToPointerAsInout) {
+    if (isa<AddressToPointerInst>(User)) {
       // address_to_pointer is a mutable escape, which we model as an inout use.
       addElementUses(BaseEltNo, PointeeType, User,
                      DIUseKind::InOutArgument);
@@ -1096,9 +1069,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         collectTupleElementUses(TEAI, BaseEltNo);
         continue;
       }
-
-      auto *DTRI = cast<DestructureTupleResult>(EltPtr);
-      collectDestructureTupleResultUses(DTRI, BaseEltNo);
     }
   }
 }
@@ -1107,28 +1077,30 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 /// constructor.  The memory object has class type.
 void ElementUseCollector::collectClassSelfUses() {
   assert(IsSelfOfNonDelegatingInitializer &&
-         TheMemory.getType()->getClassOrBoundGenericClass() != nullptr);
+         TheMemory.getASTType()->getClassOrBoundGenericClass() != nullptr);
 
   // For efficiency of lookup below, compute a mapping of the local ivars in the
   // class to their element number.
   llvm::SmallDenseMap<VarDecl *, unsigned> EltNumbering;
 
   {
-    SILType T = TheMemory.MemorySILType;
+    SILType T = TheMemory.getType();
     auto *NTD = T.getNominalOrBoundGenericNominal();
     unsigned NumElements = 0;
     for (auto *VD : NTD->getStoredProperties()) {
       EltNumbering[VD] = NumElements;
-      NumElements +=
-          getElementCountRec(Module, T.getFieldType(VD, Module), false);
+      auto expansionContext = TypeExpansionContext(TheMemory.getFunction());
+      NumElements += getElementCountRec(
+          expansionContext, Module,
+          T.getFieldType(VD, Module, expansionContext), false);
     }
   }
 
   // If we are looking at the init method for a root class, just walk the
   // MUI use-def chain directly to find our uses.
-  auto *MemoryInst = TheMemory.MemoryInst;
-  if (MemoryInst->getKind() == MarkUninitializedInst::RootSelf) {
-    collectClassSelfUses(MemoryInst, TheMemory.MemorySILType, EltNumbering);
+  if (TheMemory.isRootSelf()) {
+    collectClassSelfUses(TheMemory.getUninitializedValue(), TheMemory.getType(),
+                         EltNumbering);
     return;
   }
 
@@ -1145,7 +1117,7 @@ void ElementUseCollector::collectClassSelfUses() {
   //   4) Potential escapes after super.init, if self is closed over.
   //
   // Handle each of these in turn.
-  SmallVector<Operand *, 8> Uses(MemoryInst->getUses());
+  SmallVector<Operand *, 8> Uses(TheMemory.getUninitializedValue()->getUses());
   while (!Uses.empty()) {
     Operand *Op = Uses.pop_back_val();
     SILInstruction *User = Op->getUser();
@@ -1156,7 +1128,7 @@ void ElementUseCollector::collectClassSelfUses() {
         // The initial store of 'self' into the box at the start of the
         // function. Ignore it.
         if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
-          if (Arg->getParent() == MemoryInst->getParent()) {
+          if (Arg->getParent() == TheMemory.getParentBlock()) {
             StoresOfArgumentToSelf++;
             continue;
           }
@@ -1171,7 +1143,7 @@ void ElementUseCollector::collectClassSelfUses() {
           src = conversion->getConverted();
         
         if (auto *LI = dyn_cast<LoadInst>(src))
-          if (LI->getOperand() == MemoryInst)
+          if (LI->getOperand() == TheMemory.getUninitializedValue())
             continue;
 
         // Any other store needs to be recorded.
@@ -1196,7 +1168,7 @@ void ElementUseCollector::collectClassSelfUses() {
     // Loads of the box produce self, so collect uses from them.
     if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
       auto load = cast<SingleValueInstruction>(User);
-      collectClassSelfUses(load, TheMemory.MemorySILType, EltNumbering);
+      collectClassSelfUses(load, TheMemory.getType(), EltNumbering);
       continue;
     }
 
@@ -1215,7 +1187,7 @@ void ElementUseCollector::collectClassSelfUses() {
     // We can safely handle anything else as an escape.  They should all happen
     // after super.init is invoked.  As such, all elements must be initialized
     // and super.init must be called.
-    trackUse(DIMemoryUse(User, DIUseKind::Load, 0, TheMemory.NumElements));
+    trackUse(DIMemoryUse(User, DIUseKind::Load, 0, TheMemory.getNumElements()));
   }
 
   assert(StoresOfArgumentToSelf == 1 &&
@@ -1490,7 +1462,7 @@ void ElementUseCollector::collectClassSelfUses(
       Kind = DIUseKind::Escape;
     }
 
-    trackUse(DIMemoryUse(User, Kind, 0, TheMemory.NumElements));
+    trackUse(DIMemoryUse(User, Kind, 0, TheMemory.getNumElements()));
   }
 }
 
@@ -1610,7 +1582,7 @@ public:
 
   // *NOTE* Even though this takes a SILInstruction it actually only accepts
   // load_borrow and load instructions. This is enforced via an assert.
-  void collectClassInitSelfLoadUses(MarkUninitializedInst *MUI,
+  void collectClassInitSelfLoadUses(SingleValueInstruction *MUI,
                                     SingleValueInstruction *LI);
 };
 
@@ -1622,22 +1594,22 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
   // When we're analyzing a delegating constructor, we aren't field sensitive at
   // all.  Just treat all members of self as uses of the single
   // non-field-sensitive value.
-  assert(TheMemory.NumElements == 1 && "delegating inits only have 1 bit");
-  auto *MUI = TheMemory.MemoryInst;
+  assert(TheMemory.getNumElements() == 1 && "delegating inits only have 1 bit");
+  auto *uninitMemory = TheMemory.getUninitializedValue();
 
   // The number of stores of the initial 'self' argument into the self box
   // that we saw.
   unsigned StoresOfArgumentToSelf = 0;
 
-  // We walk the use chains of the self MUI to find any accesses to it.  The
-  // possible uses are:
+  // We walk the use chains of the self uninitMemory to find any accesses to it.
+  // The possible uses are:
   //   1) The initialization store.
   //   2) Loads of the box, which have uses of self hanging off of them.
   //   3) An assign to the box, which happens at super.init.
   //   4) Potential escapes after super.init, if self is closed over.
   // Handle each of these in turn.
   //
-  SmallVector<Operand *, 8> Uses(MUI->getUses());
+  SmallVector<Operand *, 8> Uses(uninitMemory->getUses());
   while (!Uses.empty()) {
     Operand *Op = Uses.pop_back_val();
     SILInstruction *User = Op->getUser();
@@ -1661,7 +1633,7 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
         // A store of 'self' into the box at the start of the
         // function. Ignore it.
         if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
-          if (Arg->getParent() == MUI->getParent()) {
+          if (Arg->getParent() == uninitMemory->getParent()) {
             StoresOfArgumentToSelf++;
             continue;
           }
@@ -1676,7 +1648,7 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
           src = conversion->getConverted();
         
         if (auto *LI = dyn_cast<LoadInst>(src))
-          if (LI->getOperand() == MUI)
+          if (LI->getOperand() == uninitMemory)
             continue;
 
         // Any other store needs to be recorded.
@@ -1726,7 +1698,8 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
 
     // Loads of the box produce self, so collect uses from them.
     if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
-      collectClassInitSelfLoadUses(MUI, cast<SingleValueInstruction>(User));
+      collectClassInitSelfLoadUses(uninitMemory,
+                                   cast<SingleValueInstruction>(User));
       continue;
     }
 
@@ -1743,14 +1716,11 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
 
   assert(StoresOfArgumentToSelf == 1 &&
          "The 'self' argument should have been stored into the box exactly once");
-
-  // Gather the uses of the
-  gatherDestroysOfContainer(MUI, UseInfo);
 }
 
-void ClassInitElementUseCollector::
-collectClassInitSelfLoadUses(MarkUninitializedInst *MUI,
-                                       SingleValueInstruction *LI) {
+void ClassInitElementUseCollector::collectClassInitSelfLoadUses(
+    SingleValueInstruction *MUI, SingleValueInstruction *LI) {
+  assert(isa<ProjectBoxInst>(MUI) || isa<MarkUninitializedInst>(MUI));
   assert(isa<LoadBorrowInst>(LI) || isa<LoadInst>(LI));
 
   // If we have a load, then this is a use of the box.  Look at the uses of
@@ -1789,7 +1759,7 @@ collectClassInitSelfLoadUses(MarkUninitializedInst *MUI,
         isa<UpcastInst>(User) ||
         isa<UncheckedRefCastInst>(User)) {
       auto I = cast<SingleValueInstruction>(User);
-      copy(I->getUses(), std::back_inserter(Worklist));
+      llvm::copy(I->getUses(), std::back_inserter(Worklist));
       continue;
     }
 
@@ -1832,24 +1802,24 @@ collectClassInitSelfLoadUses(MarkUninitializedInst *MUI,
 //===----------------------------------------------------------------------===//
 
 static bool shouldPerformClassInitSelf(const DIMemoryObjectInfo &MemoryInfo) {
-  if (MemoryInfo.MemoryInst->isDelegatingSelfAllocated())
+  if (MemoryInfo.isDelegatingSelfAllocated())
     return true;
 
   return MemoryInfo.isNonDelegatingInit() &&
-         MemoryInfo.getType()->getClassOrBoundGenericClass() != nullptr &&
+         MemoryInfo.getASTType()->getClassOrBoundGenericClass() != nullptr &&
          MemoryInfo.isDerivedClassSelfOnly();
 }
 
-/// collectDIElementUsesFrom - Analyze all uses of the specified allocation
-/// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
-/// and storing the information found into the Uses and Releases lists.
+/// Analyze all uses of the specified allocation instruction (alloc_box,
+/// alloc_stack or mark_uninitialized), classifying them and storing the
+/// information found into the Uses and Releases lists.
 void swift::ownership::collectDIElementUsesFrom(
-    const DIMemoryObjectInfo &MemoryInfo, DIElementUseInfo &UseInfo,
-    bool isDIFinished, bool TreatAddressToPointerAsInout) {
+    const DIMemoryObjectInfo &MemoryInfo, DIElementUseInfo &UseInfo) {
 
   if (shouldPerformClassInitSelf(MemoryInfo)) {
     ClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
     UseCollector.collectClassInitSelfUses();
+    gatherDestroysOfContainer(MemoryInfo, UseInfo);
     return;
   }
 
@@ -1857,12 +1827,13 @@ void swift::ownership::collectDIElementUsesFrom(
     // When we're analyzing a delegating constructor, we aren't field sensitive
     // at all. Just treat all members of self as uses of the single
     // non-field-sensitive value.
-    assert(MemoryInfo.NumElements == 1 && "delegating inits only have 1 bit");
-    collectDelegatingInitUses(MemoryInfo, UseInfo, MemoryInfo.MemoryInst);
+    assert(MemoryInfo.getNumElements() == 1 &&
+           "delegating inits only have 1 bit");
+    collectDelegatingInitUses(MemoryInfo, UseInfo,
+                              MemoryInfo.getUninitializedValue());
+    gatherDestroysOfContainer(MemoryInfo, UseInfo);
     return;
   }
 
-  ElementUseCollector(MemoryInfo, UseInfo, isDIFinished,
-                      TreatAddressToPointerAsInout)
-      .collectFrom();
+  ElementUseCollector(MemoryInfo, UseInfo).collectFrom();
 }

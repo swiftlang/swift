@@ -26,9 +26,10 @@ namespace llvm {
 }
 
 namespace clang {
-  class ValueDecl;
+  class CXXMethodDecl;
   class ObjCMethodDecl;
   class Type;
+  class ValueDecl;
 }
 
 namespace swift {
@@ -178,6 +179,15 @@ class AbstractionPattern {
     /// type.  ObjCMethod is valid.  OtherData is an encoded foreign
     /// error index.
     ObjCMethodType,
+    /// The uncurried imported type of a C++ method. OrigType is valid and is a
+    /// function type. CXXMethod is valid.
+    CXXMethodType,
+    /// The curried imported type of a C++ method. OrigType is valid and is a
+    /// function type. CXXMethod is valid.
+    CurriedCXXMethodType,
+    /// The partially-applied curried imported type of a C++ method. OrigType is
+    /// valid and is a function type. CXXMethod is valid.
+    PartialCurriedCXXMethodType,
   };
 
   class EncodedForeignErrorInfo {
@@ -234,6 +244,7 @@ class AbstractionPattern {
   union {
     const clang::Type *ClangType;
     const clang::ObjCMethodDecl *ObjCMethod;
+    const clang::CXXMethodDecl *CXXMethod;
     const AbstractionPattern *OrigTupleElements;
   };
   CanGenericSignature GenericSig;
@@ -259,6 +270,18 @@ class AbstractionPattern {
     case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
+      return true;
+
+    default:
+      return false;
+    }
+  }
+
+  bool hasStoredCXXMethod() const {
+    switch (getKind()) {
+    case Kind::CXXMethodType:
+    case Kind::CurriedCXXMethodType:
+    case Kind::PartialCurriedCXXMethodType:
       return true;
 
     default:
@@ -327,6 +350,12 @@ class AbstractionPattern {
     OtherData = memberStatus.getRawValue();
   }
 
+  void initCXXMethod(CanGenericSignature signature, CanType origType,
+                     const clang::CXXMethodDecl *method, Kind kind) {
+    initSwiftType(signature, origType, kind);
+    CXXMethod = method;
+  }
+
   AbstractionPattern() {}
   explicit AbstractionPattern(Kind kind) : TheKind(unsigned(kind)) {}
 
@@ -354,20 +383,39 @@ public:
   }
 
   bool hasGenericSignature() const {
-    return (getKind() == Kind::Type ||
-            getKind() == Kind::Discard ||
-            hasStoredClangType() ||
-            hasStoredObjCMethod());
+    switch (getKind()) {
+    case Kind::Type:
+    case Kind::Discard:
+    case Kind::ClangType:
+    case Kind::CFunctionAsMethodType:
+    case Kind::CurriedCFunctionAsMethodType:
+    case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CurriedObjCMethodType:
+    case Kind::PartialCurriedObjCMethodType:
+    case Kind::ObjCMethodType:
+    case Kind::CXXMethodType:
+    case Kind::CurriedCXXMethodType:
+    case Kind::PartialCurriedCXXMethodType:
+      return true;
+    case Kind::Invalid:
+    case Kind::Opaque:
+    case Kind::Tuple:
+      return false;
+    }
+    llvm_unreachable("Unhandled AbstractionPatternKind in switch");
   }
 
   CanGenericSignature getGenericSignature() const {
-    assert(getKind() == Kind::Type ||
-           getKind() == Kind::Discard ||
-           hasStoredClangType() ||
-           hasStoredObjCMethod());
+    assert(hasGenericSignature());
     return CanGenericSignature(GenericSig);
   }
-  
+
+  CanGenericSignature getGenericSignatureOrNull() const {
+    if (!hasGenericSignature())
+      return CanGenericSignature();
+    return CanGenericSignature(GenericSig);
+  }
+
   /// Return an open-coded abstraction pattern for a tuple.  The
   /// caller is responsible for ensuring that the storage for the
   /// tuple elements is valid for as long as the abstraction pattern is.
@@ -418,6 +466,41 @@ public:
   getCurriedCFunctionAsMethod(CanType origType,
                               const AbstractFunctionDecl *function);
 
+  /// Return an abstraction pattern for the curried type of a C++ method.
+  static AbstractionPattern
+  getCurriedCXXMethod(CanType origType, const AbstractFunctionDecl *function);
+
+  /// Return an abstraction pattern for the uncurried type of a C++ method.
+  ///
+  /// For example, if the original function is:
+  ///   void Refrigerator::SetTemperature(RefrigeratorCompartment compartment,
+  ///                                     Temperature temperature);
+  /// then the uncurried type is:
+  ///   ((RefrigeratorCompartment, Temperature), Refrigerator) -> ()
+  static AbstractionPattern getCXXMethod(CanType origType,
+                                         const clang::CXXMethodDecl *method) {
+    assert(isa<AnyFunctionType>(origType));
+    AbstractionPattern pattern;
+    pattern.initCXXMethod(nullptr, origType, method, Kind::CXXMethodType);
+    return pattern;
+  }
+
+  /// Return an abstraction pattern for the curried type of a C++ method.
+  ///
+  /// For example, if the original function is:
+  ///   void Refrigerator::SetTemperature(RefrigeratorCompartment compartment,
+  ///                                     Temperature temperature);
+  /// then the curried type:
+  ///   (Refrigerator) -> (Compartment, Temperature) -> ()
+  static AbstractionPattern
+  getCurriedCXXMethod(CanType origType, const clang::CXXMethodDecl *method) {
+    assert(isa<AnyFunctionType>(origType));
+    AbstractionPattern pattern;
+    pattern.initCXXMethod(nullptr, origType, method,
+                          Kind::CurriedCXXMethodType);
+    return pattern;
+  }
+
   /// For a C-function-as-method pattern,
   /// get the index of the C function parameter that was imported as the
   /// `self` parameter of the imported method, or None if this is a static
@@ -435,6 +518,15 @@ public:
     pattern.initSwiftType(signature, origType, Kind::Discard);
     return pattern;
   }
+  
+  /// Return an abstraction pattern for the type of the given struct field or enum case
+  /// substituted in `this` type.
+  ///
+  /// Note that, for most purposes, you should lower a field's type against its
+  /// *unsubstituted* interface type.
+  AbstractionPattern
+  unsafeGetSubstFieldType(ValueDecl *member,
+                          CanType origMemberType = CanType()) const;
   
 private:
   /// Return an abstraction pattern for the curried type of an
@@ -497,6 +589,24 @@ private:
     return pattern;
   }
 
+  /// Return an abstraction pattern for the partially-applied curried
+  /// type of an C++ method.
+  ///
+  /// For example, if the original function is:
+  ///   void Refrigerator::SetTemperature(RefrigeratorCompartment compartment,
+  ///                                     Temperature temperature);
+  /// then the partially-applied curried type is:
+  ///   (Compartment, Temperature) -> ()
+  static AbstractionPattern
+  getPartialCurriedCXXMethod(CanGenericSignature signature, CanType origType,
+                             const clang::CXXMethodDecl *method) {
+    assert(isa<AnyFunctionType>(origType));
+    AbstractionPattern pattern;
+    pattern.initCXXMethod(signature, origType, method,
+                          Kind::PartialCurriedCXXMethodType);
+    return pattern;
+  }
+
 public:
   /// Return an abstraction pattern for the type of an Objective-C method.
   static AbstractionPattern
@@ -520,18 +630,13 @@ private:
   /// current Objective-C method.
   AbstractionPattern getObjCMethodSelfPattern(CanType paramType) const;
 
-  /// Return a pattern corresponding to the formal parameters of the
-  /// current Objective-C method.
-  AbstractionPattern getObjCMethodFormalParamPattern(CanType paramType) const;
-  
   /// Return a pattern corresponding to the 'self' parameter of the
   /// current C function imported as a method.
   AbstractionPattern getCFunctionAsMethodSelfPattern(CanType paramType) const;
-  
-  /// Return a pattern corresponding to the formal parameters of the
-  /// current C function imported as a method.
-  AbstractionPattern getCFunctionAsMethodFormalParamPattern(CanType paramType)
-    const;
+
+  /// Return a pattern corresponding to the 'self' parameter of the
+  /// current C++ method.
+  AbstractionPattern getCXXMethodSelfPattern(CanType paramType) const;
 
 public:
   /// Return an abstraction pattern with an added level of optionality.
@@ -558,11 +663,34 @@ public:
     return getKind() != Kind::Invalid;
   }
 
+  bool isTypeParameterOrOpaqueArchetype() const {
+    switch (getKind()) {
+    case Kind::Opaque:
+      return true;
+    case Kind::Type:
+    case Kind::ClangType:
+    case Kind::Discard: {
+      auto type = getType();
+      if (isa<DependentMemberType>(type) ||
+          isa<GenericTypeParamType>(type)) {
+        return true;
+      }
+      if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+        return true;
+      }
+      return false;
+    }
+    default:
+      return false;
+    }
+  }
+
   bool isTypeParameter() const {
     switch (getKind()) {
     case Kind::Opaque:
       return true;
     case Kind::Type:
+    case Kind::ClangType:
     case Kind::Discard: {
       auto type = getType();
       if (isa<DependentMemberType>(type) ||
@@ -578,12 +706,13 @@ public:
       return false;
     }
   }
-
+  
   /// Is this an interface type that is subject to a concrete
   /// same-type constraint?
   bool isConcreteType() const;
 
-  bool requiresClass();
+  bool requiresClass() const;
+  LayoutConstraint getLayoutConstraint() const;
 
   /// Return the Swift type which provides structure for this
   /// abstraction pattern.
@@ -606,6 +735,9 @@ public:
     case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CXXMethodType:
+    case Kind::CurriedCXXMethodType:
+    case Kind::PartialCurriedCXXMethodType:
     case Kind::Type:
     case Kind::Discard:
       return OrigType;
@@ -637,6 +769,9 @@ public:
     case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CXXMethodType:
+    case Kind::CurriedCXXMethodType:
+    case Kind::PartialCurriedCXXMethodType:
     case Kind::Type:
     case Kind::Discard:
       assert(signature || !type->hasTypeParameter());
@@ -669,6 +804,9 @@ public:
     case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CXXMethodType:
+    case Kind::CurriedCXXMethodType:
+    case Kind::PartialCurriedCXXMethodType:
       return true;
     }
     llvm_unreachable("bad kind");
@@ -702,6 +840,18 @@ public:
     return ObjCMethod;
   }
 
+  /// Return whether this abstraction pattern represents a C++ method.
+  /// If so, it is legal to call getCXXMethod().
+  bool isCXXMethod() const {
+    return (getKind() == Kind::CXXMethodType ||
+            getKind() == Kind::CurriedCXXMethodType);
+  }
+
+  const clang::CXXMethodDecl *getCXXMethod() const {
+    assert(hasStoredCXXMethod());
+    return CXXMethod;
+  }
+
   EncodedForeignErrorInfo getEncodedForeignErrorInfo() const {
     assert(hasStoredForeignErrorInfo());
     return EncodedForeignErrorInfo::fromOpaqueValue(OtherData);
@@ -721,6 +871,9 @@ public:
     case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CXXMethodType:
+    case Kind::CurriedCXXMethodType:
+    case Kind::PartialCurriedCXXMethodType:
       return false;
     case Kind::PartialCurriedObjCMethodType:
     case Kind::CurriedObjCMethodType:
@@ -749,6 +902,9 @@ public:
     case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CXXMethodType:
+    case Kind::CurriedCXXMethodType:
+    case Kind::PartialCurriedCXXMethodType:
     case Kind::Type:
     case Kind::Discard:
       return dyn_cast<TYPE>(getType());
@@ -774,6 +930,9 @@ public:
     case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CXXMethodType:
+    case Kind::CurriedCXXMethodType:
+    case Kind::PartialCurriedCXXMethodType:
       // We assume that the Clang type might provide additional structure.
       return false;
     case Kind::Type:
@@ -798,6 +957,9 @@ public:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
     case Kind::ObjCMethodType:
+    case Kind::CXXMethodType:
+    case Kind::CurriedCXXMethodType:
+    case Kind::PartialCurriedCXXMethodType:
       return false;
     case Kind::Tuple:
       return true;
@@ -820,6 +982,9 @@ public:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
     case Kind::ObjCMethodType:
+    case Kind::CXXMethodType:
+    case Kind::CurriedCXXMethodType:
+    case Kind::PartialCurriedCXXMethodType:
       llvm_unreachable("pattern is not a tuple");      
     case Kind::Tuple:
       return getNumTupleElements_Stored();

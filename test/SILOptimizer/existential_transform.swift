@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -O -Xllvm -enable-existential-specializer -Xllvm -sil-disable-pass=GenericSpecializer -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=SILCombine -emit-sil -sil-verify-all %s | %FileCheck %s
+// REQUIRES: optimized_stdlib
 
 internal protocol SomeProtocol : class {
   func foo()  -> Int
@@ -301,8 +302,8 @@ func wrap_gcp<T:GP>(_ a:T,_ b:GP) -> Int {
 // CHECK: strong_retain 
 // CHECK: apply
 // CHECK: destroy_addr 
-// CHECK: dealloc_stack
 // CHECK: strong_release 
+// CHECK: dealloc_stack
 // CHECK: return 
 // CHECK: } // end sil function '$s21existential_transform3gcpySixAA2GPRzlF'
 @inline(never) func gcp<T:GP>(_ a:T) -> Int {
@@ -328,8 +329,8 @@ func wrap_gcp_arch<T:GP>(_ a:T,_ b:GP, _ c:inout Array<T>) -> Int {
 // CHECK: strong_retain
 // CHECK: apply
 // CHECK: destroy_addr
-// CHECK: dealloc_stack
 // CHECK: strong_release
+// CHECK: dealloc_stack
 // CHECK: return
 // CHECK-LABEL: } // end sil function '$s21existential_transform8gcp_archySix_SayxGztAA2GPRzlF'
 @inline(never) func gcp_arch<T:GP>(_ a:T, _ b:inout Array<T>) -> Int {

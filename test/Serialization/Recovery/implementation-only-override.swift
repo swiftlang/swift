@@ -14,6 +14,9 @@ import FooKit
 //  CHECK-NEXT:   /* placeholder for init(SECRET:) */
 //  CHECK-NEXT:   /* placeholder for init(requiredSECRET:) */
 //  CHECK-NEXT:   @_implementationOnly func methodSECRET()
+//  CHECK-NEXT:   /* placeholder for roPropSECRET */
+//  CHECK-NEXT:   /* placeholder for rwPropSECRET */
+//  CHECK-NEXT:   /* placeholder for subscript(_:) */
 //  CHECK-NEXT:   @_implementationOnly override var redefinedPropSECRET: Parent?
 //  CHECK-NEXT: }
 public class GoodChild: Parent {
@@ -41,6 +44,9 @@ public class GoodChild: Parent {
 //  CHECK-NEXT:   /* placeholder for init(SECRET:) */
 //  CHECK-NEXT:   /* placeholder for init(requiredSECRET:) */
 //  CHECK-NEXT:   @_implementationOnly func methodSECRET()
+//  CHECK-NEXT:   /* placeholder for roPropSECRET */
+//  CHECK-NEXT:   /* placeholder for rwPropSECRET */
+//  CHECK-NEXT:   /* placeholder for subscript(_:) */
 //  CHECK-NEXT:   @_implementationOnly override var redefinedPropSECRET: Parent?
 //  CHECK-NEXT: }
 public class GoodGenericChild<Toy>: Parent {

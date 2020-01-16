@@ -158,7 +158,7 @@
 ///     print("Average: \(average)°F in \(validTemps.count) " +
 ///           "out of \(tempsFahrenheit.count) observations.")
 ///     // Prints "Average: 74.84°F in 5 out of 7 observations."
-public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
+public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
                                 where Magnitude == Self {
 
   /// A type that can represent any written exponent.
@@ -244,14 +244,14 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// with more trailing zeros in its significand bit pattern.
   ///
   /// - Parameter value: The integer to convert to a floating-point value.
-  init<Source : BinaryInteger>(_ value: Source)
+  init<Source: BinaryInteger>(_ value: Source)
 
   /// Creates a new value, if the given integer can be represented exactly.
   ///
   /// If the given integer cannot be represented exactly, the result is `nil`.
   ///
   /// - Parameter value: The integer to convert to a floating-point value.
-  init?<Source : BinaryInteger>(exactly value: Source)
+  init?<Source: BinaryInteger>(exactly value: Source)
 
   /// The radix, or base of exponentiation, for a floating-point type.
   ///
@@ -468,7 +468,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// is defined as follows:
   ///
   /// - If `x` is zero, then `x.significand` is 0.0.
-  /// - If `x` is infinity, then `x.significand` is 1.0.
+  /// - If `x` is infinite, then `x.significand` is infinity.
   /// - If `x` is NaN, then `x.significand` is NaN.
   /// - Note: The significand is frequently also called the *mantissa*, but
   ///   significand is the preferred terminology in the [IEEE 754
@@ -1197,13 +1197,27 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   var floatingPointClass: FloatingPointClassification { get }
 
   /// A Boolean value indicating whether the instance's representation is in
-  /// the canonical form.
+  /// its canonical form.
   ///
   /// The [IEEE 754 specification][spec] defines a *canonical*, or preferred,
-  /// encoding of a floating-point value's representation. Every `Float` or
-  /// `Double` value is canonical, but noncanonical values of the `Float80`
-  /// type exist, and noncanonical values may exist for other types that
-  /// conform to the `FloatingPoint` protocol.
+  /// encoding of a floating-point value. On platforms that fully support
+  /// IEEE 754, every `Float` or `Double` value is canonical, but
+  /// non-canonical values can exist on other platforms or for other types.
+  /// Some examples:
+  ///
+  /// - On platforms that flush subnormal numbers to zero (such as armv7
+  ///   with the default floating-point environment), Swift interprets
+  ///   subnormal `Float` and `Double` values as non-canonical zeros.
+  ///   (In Swift 5.1 and earlier, `isCanonical` is `true` for these
+  ///   values, which is the incorrect value.)
+  ///
+  /// - On i386 and x86_64, `Float80` has a number of non-canonical
+  ///   encodings. "Pseudo-NaNs", "pseudo-infinities", and "unnormals" are
+  ///   interpreted as non-canonical NaN encodings. "Pseudo-denormals" are
+  ///   interpreted as non-canonical encodings of subnormal values.
+  ///
+  /// - Decimal floating-point types admit a large number of non-canonical
+  ///   encodings. Consult the IEEE 754 standard for additional details.
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   var isCanonical: Bool { get }
@@ -1512,7 +1526,7 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// with more trailing zeros in its significand bit pattern.
   ///
   /// - Parameter value: A floating-point value to be converted.
-  init<Source : BinaryFloatingPoint>(_ value: Source)
+  init<Source: BinaryFloatingPoint>(_ value: Source)
 
   /// Creates a new instance from the given value, if it can be represented
   /// exactly.
@@ -1522,7 +1536,7 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// represented exactly if its payload cannot be encoded exactly.
   ///
   /// - Parameter value: A floating-point value to be converted.
-  init?<Source : BinaryFloatingPoint>(exactly value: Source)
+  init?<Source: BinaryFloatingPoint>(exactly value: Source)
 
   /// The number of bits used to represent the type's exponent.
   ///
@@ -1615,64 +1629,15 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// - If `x` is Float.pi, `x.significand` is `1.10010010000111111011011` in
   ///   binary, and `x.significandWidth` is 23.
   var significandWidth: Int { get }
-
-  /*  TODO: Implement these once it becomes possible to do so. (Requires
-   *  revised Integer protocol).
-  func isEqual<Other: BinaryFloatingPoint>(to other: Other) -> Bool
-
-  func isLess<Other: BinaryFloatingPoint>(than other: Other) -> Bool
-
-  func isLessThanOrEqualTo<Other: BinaryFloatingPoint>(other: Other) -> Bool
-
-  func isTotallyOrdered<Other: BinaryFloatingPoint>(belowOrEqualTo other: Other) -> Bool
-  */
 }
 
 extension FloatingPoint {
 
-  /// The unit in the last place of 1.0.
-  ///
-  /// The positive difference between 1.0 and the next greater representable
-  /// number. The `ulpOfOne` constant corresponds to the C macros
-  /// `FLT_EPSILON`, `DBL_EPSILON`, and others with a similar purpose.
   @inlinable // FIXME(sil-serialize-all)
   public static var ulpOfOne: Self {
     return (1 as Self).ulp
   }
 
-  /// Returns this value rounded to an integral value using the specified
-  /// rounding rule.
-  ///
-  /// The following example rounds a value using four different rounding rules:
-  ///
-  ///     let x = 6.5
-  ///
-  ///     // Equivalent to the C 'round' function:
-  ///     print(x.rounded(.toNearestOrAwayFromZero))
-  ///     // Prints "7.0"
-  ///
-  ///     // Equivalent to the C 'trunc' function:
-  ///     print(x.rounded(.towardZero))
-  ///     // Prints "6.0"
-  ///
-  ///     // Equivalent to the C 'ceil' function:
-  ///     print(x.rounded(.up))
-  ///     // Prints "7.0"
-  ///
-  ///     // Equivalent to the C 'floor' function:
-  ///     print(x.rounded(.down))
-  ///     // Prints "6.0"
-  ///
-  /// For more information about the available rounding rules, see the
-  /// `FloatingPointRoundingRule` enumeration. To round a value using the
-  /// default "schoolbook rounding", you can use the shorter `rounded()`
-  /// method instead.
-  ///
-  ///     print(x.rounded())
-  ///     // Prints "7.0"
-  ///
-  /// - Parameter rule: The rounding rule to use.
-  /// - Returns: The integral value found by rounding using `rule`.
   @_transparent
   public func rounded(_ rule: FloatingPointRoundingRule) -> Self {
     var lhs = self
@@ -1680,67 +1645,16 @@ extension FloatingPoint {
     return lhs
   }
 
-  /// Returns this value rounded to an integral value using "schoolbook
-  /// rounding."
-  ///
-  /// The `rounded()` method uses the `.toNearestOrAwayFromZero` rounding rule,
-  /// where a value halfway between two integral values is rounded to the one
-  /// with greater magnitude. The following example rounds several values
-  /// using this default rule:
-  ///
-  ///     (5.2).rounded()
-  ///     // 5.0
-  ///     (5.5).rounded()
-  ///     // 6.0
-  ///     (-5.2).rounded()
-  ///     // -5.0
-  ///     (-5.5).rounded()
-  ///     // -6.0
-  ///
-  /// To specify an alternative rule for rounding, use the `rounded(_:)` method
-  /// instead.
-  ///
-  /// - Returns: The nearest integral value, or, if two integral values are
-  ///   equally close, the integral value with greater magnitude.
   @_transparent
   public func rounded() -> Self {
     return rounded(.toNearestOrAwayFromZero)
   }
 
-  /// Rounds this value to an integral value using "schoolbook rounding."
-  ///
-  /// The `round()` method uses the `.toNearestOrAwayFromZero` rounding rule,
-  /// where a value halfway between two integral values is rounded to the one
-  /// with greater magnitude. The following example rounds several values
-  /// using this default rule:
-  ///
-  ///     var x = 5.2
-  ///     x.round()
-  ///     // x == 5.0
-  ///     var y = 5.5
-  ///     y.round()
-  ///     // y == 6.0
-  ///     var z = -5.5
-  ///     z.round()
-  ///     // z == -6.0
-  ///
-  /// To specify an alternative rule for rounding, use the `round(_:)` method
-  /// instead.
   @_transparent
   public mutating func round() {
     round(.toNearestOrAwayFromZero)
   }
 
-  /// The greatest representable value that compares less than this value.
-  ///
-  /// For any finite value `x`, `x.nextDown` is less than `x`. For `nan` or
-  /// `-infinity`, `x.nextDown` is `x` itself. The following special cases
-  /// also apply:
-  ///
-  /// - If `x` is `infinity`, then `x.nextDown` is `greatestFiniteMagnitude`.
-  /// - If `x` is `leastNonzeroMagnitude`, then `x.nextDown` is `0.0`.
-  /// - If `x` is zero, then `x.nextDown` is `-leastNonzeroMagnitude`.
-  /// - If `x` is `-greatestFiniteMagnitude`, then `x.nextDown` is `-infinity`.
   @inlinable // FIXME(inline-always)
   public var nextDown: Self {
     @inline(__always)
@@ -1749,37 +1663,6 @@ extension FloatingPoint {
     }
   }
 
-  /// Returns the remainder of this value divided by the given value using
-  /// truncating division.
-  ///
-  /// Performing truncating division with floating-point values results in a
-  /// truncated integer quotient and a remainder. For values `x` and `y` and
-  /// their truncated integer quotient `q`, the remainder `r` satisfies
-  /// `x == y * q + r`.
-  ///
-  /// The following example calculates the truncating remainder of dividing
-  /// 8.625 by 0.75:
-  ///
-  ///     let x = 8.625
-  ///     print(x / 0.75)
-  ///     // Prints "11.5"
-  ///
-  ///     let q = (x / 0.75).rounded(.towardZero)
-  ///     // q == 11.0
-  ///     let r = x.truncatingRemainder(dividingBy: 0.75)
-  ///     // r == 0.375
-  ///
-  ///     let x1 = 0.75 * q + r
-  ///     // x1 == 8.625
-  ///
-  /// If this value and `other` are both finite numbers, the truncating
-  /// remainder has the same sign as this value and is strictly smaller in
-  /// magnitude than `other`. The `truncatingRemainder(dividingBy:)` method
-  /// is always exact.
-  ///
-  /// - Parameter other: The value to use when dividing this value.
-  /// - Returns: The remainder of this value divided by `other` using
-  ///   truncating division.
   @inlinable // FIXME(inline-always)
   @inline(__always)
   public func truncatingRemainder(dividingBy other: Self) -> Self {
@@ -1788,38 +1671,6 @@ extension FloatingPoint {
     return lhs
   }
 
-  /// Returns the remainder of this value divided by the given value.
-  ///
-  /// For two finite values `x` and `y`, the remainder `r` of dividing `x` by
-  /// `y` satisfies `x == y * q + r`, where `q` is the integer nearest to
-  /// `x / y`. If `x / y` is exactly halfway between two integers, `q` is
-  /// chosen to be even. Note that `q` is *not* `x / y` computed in
-  /// floating-point arithmetic, and that `q` may not be representable in any
-  /// available integer type.
-  ///
-  /// The following example calculates the remainder of dividing 8.625 by 0.75:
-  ///
-  ///     let x = 8.625
-  ///     print(x / 0.75)
-  ///     // Prints "11.5"
-  ///
-  ///     let q = (x / 0.75).rounded(.toNearestOrEven)
-  ///     // q == 12.0
-  ///     let r = x.remainder(dividingBy: 0.75)
-  ///     // r == -0.375
-  ///
-  ///     let x1 = 0.75 * q + r
-  ///     // x1 == 8.625
-  ///
-  /// If this value and `other` are finite numbers, the remainder is in the
-  /// closed range `-abs(other / 2)...abs(other / 2)`. The
-  /// `remainder(dividingBy:)` method is always exact. This method implements
-  /// the remainder operation defined by the [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameter other: The value to use when dividing this value.
-  /// - Returns: The remainder of this value divided by `other`.
   @inlinable // FIXME(inline-always)
   @inline(__always)
   public func remainder(dividingBy other: Self) -> Self {
@@ -1828,20 +1679,6 @@ extension FloatingPoint {
     return lhs
   }
 
-  /// Returns the square root of the value, rounded to a representable value.
-  ///
-  /// The following example declares a function that calculates the length of
-  /// the hypotenuse of a right triangle given its two perpendicular sides.
-  ///
-  ///     func hypotenuse(_ a: Double, _ b: Double) -> Double {
-  ///         return (a * a + b * b).squareRoot()
-  ///     }
-  ///
-  ///     let (dx, dy) = (3.0, 4.0)
-  ///     let distance = hypotenuse(dx, dy)
-  ///     // distance == 5.0
-  ///
-  /// - Returns: The square root of the value.
   @_transparent
   public func squareRoot( ) -> Self {
     var lhs = self
@@ -1849,19 +1686,6 @@ extension FloatingPoint {
     return lhs
   }
 
-  /// Returns the result of adding the product of the two given values to this
-  /// value, computed without intermediate rounding.
-  ///
-  /// This method is equivalent to the C `fma` function and implements the
-  /// `fusedMultiplyAdd` operation defined by the [IEEE 754
-  /// specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameters:
-  ///   - lhs: One of the values to multiply before adding to this value.
-  ///   - rhs: The other value to multiply.
-  /// - Returns: The product of `lhs` and `rhs`, added to this value.
   @_transparent
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
@@ -1869,148 +1693,30 @@ extension FloatingPoint {
     return addend
   }
 
-  /// Returns the lesser of the two given values.
-  ///
-  /// This method returns the minimum of two values, preserving order and
-  /// eliminating NaN when possible. For two values `x` and `y`, the result of
-  /// `minimum(x, y)` is `x` if `x <= y`, `y` if `y < x`, or whichever of `x`
-  /// or `y` is a number if the other is a quiet NaN. If both `x` and `y` are
-  /// NaN, or either `x` or `y` is a signaling NaN, the result is NaN.
-  ///
-  ///     Double.minimum(10.0, -25.0)
-  ///     // -25.0
-  ///     Double.minimum(10.0, .nan)
-  ///     // 10.0
-  ///     Double.minimum(.nan, -25.0)
-  ///     // -25.0
-  ///     Double.minimum(.nan, .nan)
-  ///     // nan
-  ///
-  /// The `minimum` method implements the `minNum` operation defined by the
-  /// [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameters:
-  ///   - x: A floating-point value.
-  ///   - y: Another floating-point value.
-  /// - Returns: The minimum of `x` and `y`, or whichever is a number if the
-  ///   other is NaN.
   @inlinable
   public static func minimum(_ x: Self, _ y: Self) -> Self {
     if x <= y || y.isNaN { return x }
     return y
   }
 
-  /// Returns the greater of the two given values.
-  ///
-  /// This method returns the maximum of two values, preserving order and
-  /// eliminating NaN when possible. For two values `x` and `y`, the result of
-  /// `maximum(x, y)` is `x` if `x > y`, `y` if `x <= y`, or whichever of `x`
-  /// or `y` is a number if the other is a quiet NaN. If both `x` and `y` are
-  /// NaN, or either `x` or `y` is a signaling NaN, the result is NaN.
-  ///
-  ///     Double.maximum(10.0, -25.0)
-  ///     // 10.0
-  ///     Double.maximum(10.0, .nan)
-  ///     // 10.0
-  ///     Double.maximum(.nan, -25.0)
-  ///     // -25.0
-  ///     Double.maximum(.nan, .nan)
-  ///     // nan
-  ///
-  /// The `maximum` method implements the `maxNum` operation defined by the
-  /// [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameters:
-  ///   - x: A floating-point value.
-  ///   - y: Another floating-point value.
-  /// - Returns: The greater of `x` and `y`, or whichever is a number if the
-  ///   other is NaN.
   @inlinable
   public static func maximum(_ x: Self, _ y: Self) -> Self {
     if x > y || y.isNaN { return x }
     return y
   }
 
-  /// Returns the value with lesser magnitude.
-  ///
-  /// This method returns the value with lesser magnitude of the two given
-  /// values, preserving order and eliminating NaN when possible. For two
-  /// values `x` and `y`, the result of `minimumMagnitude(x, y)` is `x` if
-  /// `x.magnitude <= y.magnitude`, `y` if `y.magnitude < x.magnitude`, or
-  /// whichever of `x` or `y` is a number if the other is a quiet NaN. If both
-  /// `x` and `y` are NaN, or either `x` or `y` is a signaling NaN, the result
-  /// is NaN.
-  ///
-  ///     Double.minimumMagnitude(10.0, -25.0)
-  ///     // 10.0
-  ///     Double.minimumMagnitude(10.0, .nan)
-  ///     // 10.0
-  ///     Double.minimumMagnitude(.nan, -25.0)
-  ///     // -25.0
-  ///     Double.minimumMagnitude(.nan, .nan)
-  ///     // nan
-  ///
-  /// The `minimumMagnitude` method implements the `minNumMag` operation
-  /// defined by the [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameters:
-  ///   - x: A floating-point value.
-  ///   - y: Another floating-point value.
-  /// - Returns: Whichever of `x` or `y` has lesser magnitude, or whichever is
-  ///   a number if the other is NaN.
   @inlinable
   public static func minimumMagnitude(_ x: Self, _ y: Self) -> Self {
     if x.magnitude <= y.magnitude || y.isNaN { return x }
     return y
   }
 
-  /// Returns the value with greater magnitude.
-  ///
-  /// This method returns the value with greater magnitude of the two given
-  /// values, preserving order and eliminating NaN when possible. For two
-  /// values `x` and `y`, the result of `maximumMagnitude(x, y)` is `x` if
-  /// `x.magnitude > y.magnitude`, `y` if `x.magnitude <= y.magnitude`, or
-  /// whichever of `x` or `y` is a number if the other is a quiet NaN. If both
-  /// `x` and `y` are NaN, or either `x` or `y` is a signaling NaN, the result
-  /// is NaN.
-  ///
-  ///     Double.maximumMagnitude(10.0, -25.0)
-  ///     // -25.0
-  ///     Double.maximumMagnitude(10.0, .nan)
-  ///     // 10.0
-  ///     Double.maximumMagnitude(.nan, -25.0)
-  ///     // -25.0
-  ///     Double.maximumMagnitude(.nan, .nan)
-  ///     // nan
-  ///
-  /// The `maximumMagnitude` method implements the `maxNumMag` operation
-  /// defined by the [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameters:
-  ///   - x: A floating-point value.
-  ///   - y: Another floating-point value.
-  /// - Returns: Whichever of `x` or `y` has greater magnitude, or whichever is
-  ///   a number if the other is NaN.
   @inlinable
   public static func maximumMagnitude(_ x: Self, _ y: Self) -> Self {
     if x.magnitude > y.magnitude || y.isNaN { return x }
     return y
   }
 
-  /// The classification of this value.
-  ///
-  /// A value's `floatingPointClass` property describes its "class" as
-  /// described by the [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   @inlinable
   public var floatingPointClass: FloatingPointClassification {
     if isSignalingNaN { return .signalingNaN }
@@ -2024,45 +1730,21 @@ extension FloatingPoint {
 
 extension BinaryFloatingPoint {
 
-  /// The radix, or base of exponentiation, for this floating-point type.
-  ///
-  /// All binary floating-point types have a radix of 2. The magnitude of a
-  /// floating-point value `x` of type `F` can be calculated by using the
-  /// following formula, where `**` is exponentiation:
-  ///
-  ///     let magnitude = x.significand * F.radix ** x.exponent
   @inlinable @inline(__always)
   public static var radix: Int { return 2 }
 
-  /// Creates a new floating-point value using the sign of one value and the
-  /// magnitude of another.
-  ///
-  /// The following example uses this initializer to create a new `Double`
-  /// instance with the sign of `a` and the magnitude of `b`:
-  ///
-  ///     let a = -21.5
-  ///     let b = 305.15
-  ///     let c = Double(signOf: a, magnitudeOf: b)
-  ///     print(c)
-  ///     // Prints "-305.15"
-  ///
-  /// This initializer implements the IEEE 754 `copysign` operation.
-  ///
-  /// - Parameters:
-  ///   - signOf: A value from which to use the sign. The result of the
-  ///     initializer has the same sign as `signOf`.
-  ///   - magnitudeOf: A value from which to use the magnitude. The result of
-  ///     the initializer has the same magnitude as `magnitudeOf`.
   @inlinable
   public init(signOf: Self, magnitudeOf: Self) {
-    self.init(sign: signOf.sign,
+    self.init(
+      sign: signOf.sign,
       exponentBitPattern: magnitudeOf.exponentBitPattern,
-      significandBitPattern: magnitudeOf.significandBitPattern)
+      significandBitPattern: magnitudeOf.significandBitPattern
+    )
   }
 
   @inlinable
   public // @testable
-  static func _convert<Source : BinaryFloatingPoint>(
+  static func _convert<Source: BinaryFloatingPoint>(
     from source: Source
   ) -> (value: Self, exact: Bool) {
     guard _fastPath(!source.isZero) else {
@@ -2203,7 +1885,7 @@ extension BinaryFloatingPoint {
   ///
   /// - Parameter value: A floating-point value to be converted.
   @inlinable
-  public init<Source : BinaryFloatingPoint>(_ value: Source) {
+  public init<Source: BinaryFloatingPoint>(_ value: Source) {
     self = Self._convert(from: value).value
   }
 
@@ -2215,34 +1897,12 @@ extension BinaryFloatingPoint {
   ///
   /// - Parameter value: A floating-point value to be converted.
   @inlinable
-  public init?<Source : BinaryFloatingPoint>(exactly value: Source) {
+  public init?<Source: BinaryFloatingPoint>(exactly value: Source) {
     let (value_, exact) = Self._convert(from: value)
     guard exact else { return nil }
     self = value_
   }
-
-  /// Returns a Boolean value indicating whether this instance should precede
-  /// or tie positions with the given value in an ascending sort.
-  ///
-  /// This relation is a refinement of the less-than-or-equal-to operator
-  /// (`<=`) that provides a total order on all values of the type, including
-  /// signed zeros and NaNs.
-  ///
-  /// The following example uses `isTotallyOrdered(belowOrEqualTo:)` to sort an
-  /// array of floating-point values, including some that are NaN:
-  ///
-  ///     var numbers = [2.5, 21.25, 3.0, .nan, -9.5]
-  ///     numbers.sort { !$1.isTotallyOrdered(belowOrEqualTo: $0) }
-  ///     // numbers == [-9.5, 2.5, 3.0, 21.25, NaN]
-  ///
-  /// The `isTotallyOrdered(belowOrEqualTo:)` method implements the total order
-  /// relation as defined by the [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameter other: A floating-point value to compare to this value.
-  /// - Returns: `true` if this value is ordered below or the same as `other`
-  ///   in a total ordering of the floating-point type; otherwise, `false`.
+  
   @inlinable
   public func isTotallyOrdered(belowOrEqualTo other: Self) -> Bool {
     // Quick return when possible.
@@ -2268,11 +1928,11 @@ extension BinaryFloatingPoint {
   }
 }
 
-extension BinaryFloatingPoint where Self.RawSignificand : FixedWidthInteger {
+extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
   
   @inlinable
   public // @testable
-  static func _convert<Source : BinaryInteger>(
+  static func _convert<Source: BinaryInteger>(
     from source: Source
   ) -> (value: Self, exact: Bool) {
     //  Useful constants:
@@ -2335,7 +1995,7 @@ extension BinaryFloatingPoint where Self.RawSignificand : FixedWidthInteger {
   ///
   /// - Parameter value: The integer to convert to a floating-point value.
   @inlinable
-  public init<Source : BinaryInteger>(_ value: Source) {
+  public init<Source: BinaryInteger>(_ value: Source) {
     self = Self._convert(from: value).value
   }
   
@@ -2345,7 +2005,7 @@ extension BinaryFloatingPoint where Self.RawSignificand : FixedWidthInteger {
   ///
   /// - Parameter value: The integer to convert to a floating-point value.
   @inlinable
-  public init?<Source : BinaryInteger>(exactly value: Source) {
+  public init?<Source: BinaryInteger>(exactly value: Source) {
     let (value_, exact) = Self._convert(from: value)
     guard exact else { return nil }
     self = value_

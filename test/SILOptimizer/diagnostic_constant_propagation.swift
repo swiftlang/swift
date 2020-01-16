@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -enable-ownership-stripping-after-serialization -primary-file %s -o /dev/null -verify
 //
 // These are tests for diagnostics produced by constant propagation pass.
 // Due to the change in the implementation of Integer initializers some of the
@@ -353,4 +354,17 @@ func applyBinary<T : SignedInteger>(_ fn: (T, T) -> (T), _ left: T, _ right: T) 
 
 func testTransparentApply() -> Int8 {
   return applyBinary(add, Int8.max, Int8.max) // expected-error {{arithmetic operation '127 + 127' (on signed 8-bit integer type) results in an overflow}}
+}
+
+func testBuiltinGlobalStringTablePointerNoError() -> UnsafePointer<CChar> {
+  return _getGlobalStringTablePointer("A literal")
+}
+
+func testBuiltinGlobalStringTablePointerError(s: String) -> UnsafePointer<CChar> {
+  return _getGlobalStringTablePointer(s) // expected-error {{globalStringTablePointer builtin must used only on string literals}}
+}
+
+@_transparent
+func testBuiltinGlobalStringTablePointerNoError(s: String) -> UnsafePointer<CChar> {
+  return _getGlobalStringTablePointer(s)
 }

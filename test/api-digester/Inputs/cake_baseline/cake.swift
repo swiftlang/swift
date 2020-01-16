@@ -53,6 +53,9 @@ public struct fixedLayoutStruct {
   public var b = 2
   public func foo() {}
   public var a = 1
+  public var height: Int {
+    _read { yield 0 }
+  }
 }
 
 @usableFromInline
@@ -102,7 +105,26 @@ public protocol DerivedProtocolRequiementChanges: RequiementChanges {}
 
 public class SuperClassRemoval: C3 {}
 
-public class ClassToStruct {}
+public class ClassToStruct {
+  public init() {}
+}
+
+open class ClassWithMissingDesignatedInits {
+  internal init() {}
+  public convenience init(x: Int) { self.init() }
+}
+
+open class ClassWithoutMissingDesignatedInits {
+  public init() {}
+  public convenience init(x: Int) { self.init() }
+}
+
+public class SubclassWithMissingDesignatedInits: ClassWithMissingDesignatedInits {
+}
+
+public class SubclassWithoutMissingDesignatedInits: ClassWithoutMissingDesignatedInits {
+}
+
 public protocol ProtocolToEnum {}
 
 public class SuperClassChange: C7 {}
@@ -171,4 +193,39 @@ public protocol HasMutatingMethodClone: HasMutatingMethod {
 
 public extension Int {
   public func IntEnhancer() {}
+}
+
+public protocol Animal {}
+public class Cat: Animal { public init() {} }
+public class Dog: Animal { public init() {} }
+
+public class Zoo {
+  public init() {}
+  @inlinable
+  @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+  public var current: some Animal {
+    return Cat()
+  }
+  @inlinable
+  @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+  public func getCurrentAnimalInlinable() -> some Animal {
+    return Cat()
+  }
+}
+
+public func returnFunctionTypeOwnershipChange() -> (C1) -> () { return { _ in } }
+
+@objc(OldObjCClass)
+public class SwiftObjcClass {
+  @objc(OldObjCFool:OldObjCA:OldObjCB:)
+  public func foo(a:Int, b:Int, c: Int) {}
+}
+
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+open class AddingNewDesignatedInit {
+  public init() {}
+  public convenience init(foo: Int) {
+    self.init()
+    print(foo)
+  }
 }

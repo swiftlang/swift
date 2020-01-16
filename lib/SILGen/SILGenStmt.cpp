@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Condition.h"
 #include "Initialization.h"
@@ -369,7 +370,9 @@ namespace {
 } // end anonymous namespace
 
 static InitializationPtr
-prepareIndirectResultInit(SILGenFunction &SGF, CanType resultType,
+prepareIndirectResultInit(SILGenFunction &SGF,
+                          CanSILFunctionType fnTypeForResults,
+                          CanType resultType,
                           ArrayRef<SILResultInfo> &allResults,
                           MutableArrayRef<SILValue> &directResults,
                           ArrayRef<SILArgument*> &indirectResultAddrs,
@@ -380,7 +383,8 @@ prepareIndirectResultInit(SILGenFunction &SGF, CanType resultType,
     tupleInit->SubInitializations.reserve(resultTupleType->getNumElements());
 
     for (auto resultEltType : resultTupleType.getElementTypes()) {
-      auto eltInit = prepareIndirectResultInit(SGF, resultEltType, allResults,
+      auto eltInit = prepareIndirectResultInit(SGF, fnTypeForResults,
+                                               resultEltType, allResults,
                                                directResults,
                                                indirectResultAddrs, cleanups);
       tupleInit->SubInitializations.push_back(std::move(eltInit));
@@ -438,7 +442,9 @@ SILGenFunction::prepareIndirectResultInit(CanType formalResultType,
   MutableArrayRef<SILValue> directResults = directResultsBuffer;
   ArrayRef<SILArgument*> indirectResultAddrs = F.getIndirectResults();
 
-  auto init = ::prepareIndirectResultInit(*this, formalResultType, allResults,
+  auto init = ::prepareIndirectResultInit(*this,
+                                          fnConv.funcTy,
+                                          formalResultType, allResults,
                                           directResults, indirectResultAddrs,
                                           cleanups);
 
@@ -476,6 +482,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     RValue RV = emitRValue(ret).ensurePlusOne(*this, CleanupLocation(ret));
     std::move(RV).forwardAll(*this, directResults);
   }
+
   Cleanups.emitBranchAndCleanups(ReturnDest, branchLoc, directResults);
 }
 
@@ -896,9 +903,36 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
 }
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
+  // Dig out information about the sequence conformance.
+  auto sequenceConformance = S->getSequenceConformance();
+  Type sequenceType = S->getSequence()->getType();
+  auto sequenceProto =
+      SGF.getASTContext().getProtocol(KnownProtocolKind::Sequence);
+  auto sequenceSubs = SubstitutionMap::getProtocolSubstitutions(
+      sequenceProto, sequenceType, sequenceConformance);
+
   // Emit the 'iterator' variable that we'll be using for iteration.
   LexicalScope OuterForScope(SGF, CleanupLocation(S));
-  SGF.visitPatternBindingDecl(S->getIterator());
+  {
+    auto initialization =
+        SGF.emitInitializationForVarDecl(S->getIteratorVar(), false);
+    SILLocation loc = SILLocation(S->getSequence());
+
+    // Compute the reference to the Sequence's makeIterator().
+    FuncDecl *makeIteratorReq = SGF.getASTContext().getSequenceMakeIterator();
+    ConcreteDeclRef makeIteratorRef(makeIteratorReq, sequenceSubs);
+
+    // Call makeIterator().
+    RValue result = SGF.emitApplyMethod(
+        loc, makeIteratorRef, ArgumentSource(S->getSequence()),
+        PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
+        SGFContext(initialization.get()));
+    if (!result.isInContext()) {
+      ArgumentSource(SILLocation(S->getSequence()),
+                     std::move(result).ensurePlusOne(SGF, loc))
+          .forwardInto(SGF, initialization.get());
+    }
+  }
 
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
@@ -908,7 +942,15 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // to hold the results.  This will be initialized on every entry into the loop
   // header and consumed by the loop body. On loop exit, the terminating value
   // will be in the buffer.
-  auto optTy = S->getIteratorNext()->getType()->getCanonicalType();
+  CanType optTy;
+  if (S->getConvertElementExpr()) {
+    optTy = S->getConvertElementExpr()->getType()->getCanonicalType();
+  } else {
+    optTy = OptionalType::get(S->getSequenceConformance().getTypeWitnessByName(
+                                  S->getSequence()->getType(),
+                                  SGF.getASTContext().Id_Element))
+                ->getCanonicalType();
+  }
   auto &optTL = SGF.getTypeLowering(optTy);
   SILValue addrOnlyBuf;
   ManagedValue nextBufOrValue;
@@ -924,6 +966,52 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   JumpDest endDest = createJumpDest(S->getBody());
   SGF.BreakContinueDestStack.push_back({ S, endDest, loopDest });
 
+  // Compute the reference to the the iterator's next().
+  auto iteratorProto =
+      SGF.getASTContext().getProtocol(KnownProtocolKind::IteratorProtocol);
+  ValueDecl *iteratorNextReq = iteratorProto->getSingleRequirement(
+      DeclName(SGF.getASTContext(), SGF.getASTContext().Id_next,
+               ArrayRef<Identifier>()));
+  auto iteratorAssocType =
+      sequenceProto->getAssociatedType(SGF.getASTContext().Id_Iterator);
+  auto iteratorMemberRef = DependentMemberType::get(
+      sequenceProto->getSelfInterfaceType(), iteratorAssocType);
+  auto iteratorType = sequenceConformance.getAssociatedType(
+      sequenceType, iteratorMemberRef);
+  auto iteratorConformance = sequenceConformance.getAssociatedConformance(
+      sequenceType, iteratorMemberRef, iteratorProto);
+  auto iteratorSubs = SubstitutionMap::getProtocolSubstitutions(
+      iteratorProto, iteratorType, iteratorConformance);
+  ConcreteDeclRef iteratorNextRef(iteratorNextReq, iteratorSubs);
+
+  auto buildArgumentSource = [&]() {
+    if (cast<FuncDecl>(iteratorNextRef.getDecl())->getSelfAccessKind() ==
+        SelfAccessKind::Mutating) {
+      LValue lv =
+          SGF.emitLValue(S->getIteratorVarRef(), SGFAccessKind::ReadWrite);
+      return ArgumentSource(S, std::move(lv));
+    }
+    LValue lv =
+        SGF.emitLValue(S->getIteratorVarRef(), SGFAccessKind::OwnedObjectRead);
+    return ArgumentSource(
+        S, SGF.emitLoadOfLValue(S->getIteratorVarRef(), std::move(lv),
+                                SGFContext().withFollowingSideEffects()));
+  };
+
+  auto buildElementRValue = [&](SILLocation loc, SGFContext ctx) {
+    RValue result;
+    result = SGF.emitApplyMethod(
+        loc, iteratorNextRef, buildArgumentSource(),
+        PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
+        S->getElementExpr() ? SGFContext() : ctx);
+    if (S->getElementExpr()) {
+      SILGenFunction::OpaqueValueRAII pushOpaqueValue(
+          SGF, S->getElementExpr(),
+          std::move(result).getAsSingleValue(SGF, loc));
+      result = SGF.emitRValue(S->getConvertElementExpr(), ctx);
+    }
+    return result;
+  };
   // Then emit the loop destination block.
   //
   // Advance the generator.  Use a scope to ensure that any temporary stack
@@ -933,15 +1021,22 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
     // innerForScope doesn't clean it up.
     auto nextInit = SGF.useBufferAsTemporary(addrOnlyBuf, optTL);
     {
-      Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
-      SGF.emitExprInto(S->getIteratorNext(), nextInit.get());
+      ArgumentScope innerForScope(SGF, SILLocation(S));
+      SILLocation loc = SILLocation(S);
+      RValue result = buildElementRValue(loc, SGFContext(nextInit.get()));
+      if (!result.isInContext()) {
+        ArgumentSource(SILLocation(S->getSequence()),
+                       std::move(result).ensurePlusOne(SGF, loc))
+            .forwardInto(SGF, nextInit.get());
+      }
+      innerForScope.pop();
     }
     nextBufOrValue = nextInit->getManagedAddress();
-
   } else {
-    Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
+    ArgumentScope innerForScope(SGF, SILLocation(S));
     nextBufOrValue = innerForScope.popPreservingValue(
-        SGF.emitRValueAsSingleValue(S->getIteratorNext()));
+        buildElementRValue(SILLocation(S), SGFContext())
+            .getAsSingleValue(SGF, SILLocation(S)));
   }
 
   SILBasicBlock *failExitingBlock = createBasicBlock();
@@ -1086,6 +1181,7 @@ void StmtEmitter::visitFailStmt(FailStmt *S) {
 /// try_apply instruction.  The block is implicitly emitted and filled in.
 SILBasicBlock *
 SILGenFunction::getTryApplyErrorDest(SILLocation loc,
+                                     CanSILFunctionType fnTy,
                                      SILResultInfo exnResult,
                                      bool suppressErrorPath) {
   assert(exnResult.getConvention() == ResultConvention::Owned);
@@ -1093,7 +1189,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // For now, don't try to re-use destination blocks for multiple
   // failure sites.
   SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
-  SILValue exn = destBB->createPhiArgument(getSILType(exnResult),
+  SILValue exn = destBB->createPhiArgument(getSILType(exnResult, fnTy),
                                            ValueOwnershipKind::Owned);
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());

@@ -256,6 +256,10 @@ public:
   /// unwrapped.
   bool isImplicitlyUnwrappedValueOrReturnValue() const;
 
+  bool isKeyPathDynamicMemberLookup() const {
+    return getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup;
+  }
+
   /// Get the name of the overload choice.
   DeclName getName() const;
 

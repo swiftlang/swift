@@ -59,15 +59,30 @@ static void *loadRuntimeLib(StringRef runtimeLibPathWithName) {
 #endif
 }
 
-static void *loadRuntimeLib(StringRef sharedLibName, StringRef runtimeLibPath) {
+static void *loadRuntimeLibAtPath(StringRef sharedLibName,
+                                  StringRef runtimeLibPath) {
   // FIXME: Need error-checking.
   llvm::SmallString<128> Path = runtimeLibPath;
   llvm::sys::path::append(Path, sharedLibName);
   return loadRuntimeLib(Path);
 }
 
-void *swift::immediate::loadSwiftRuntime(StringRef runtimeLibPath) {
-  return loadRuntimeLib("libswiftCore" LTDL_SHLIB_EXT, runtimeLibPath);
+static void *loadRuntimeLib(StringRef sharedLibName,
+                            ArrayRef<std::string> runtimeLibPaths) {
+  for (auto &runtimeLibPath : runtimeLibPaths) {
+    if (void *handle = loadRuntimeLibAtPath(sharedLibName, runtimeLibPath))
+      return handle;
+  }
+  return nullptr;
+}
+
+void *swift::immediate::loadSwiftRuntime(ArrayRef<std::string>
+                                         runtimeLibPaths) {
+#if defined(_WIN32)
+  return loadRuntimeLib("swiftCore" LTDL_SHLIB_EXT, runtimeLibPaths);
+#else
+  return loadRuntimeLib("libswiftCore" LTDL_SHLIB_EXT, runtimeLibPaths);
+#endif
 }
 
 static bool tryLoadLibrary(LinkLibrary linkLib,
@@ -105,9 +120,9 @@ static bool tryLoadLibrary(LinkLibrary linkLib,
     if (!success)
       success = loadRuntimeLib(stem);
 
-    // If that fails, try our runtime library path.
+    // If that fails, try our runtime library paths.
     if (!success)
-      success = loadRuntimeLib(stem, searchPathOpts.RuntimeLibraryPath);
+      success = loadRuntimeLib(stem, searchPathOpts.RuntimeLibraryPaths);
     break;
   }
   case LibraryKind::Framework: {
@@ -205,7 +220,7 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
 }
 
 bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
-                                               IRGenOptions &IRGenOpts) {
+                                               const IRGenOptions &IRGenOpts) {
   // Perform autolinking.
   SmallVector<LinkLibrary, 4> AllLinkLibraries(IRGenOpts.LinkLibraries);
   auto addLinkLibrary = [&](LinkLibrary linkLib) {
@@ -219,8 +234,11 @@ bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
   return false;
 }
 
-int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                          IRGenOptions &IRGenOpts, const SILOptions &SILOpts) {
+int swift::RunImmediately(CompilerInstance &CI,
+                          const ProcessCmdLine &CmdLine,
+                          const IRGenOptions &IRGenOpts,
+                          const SILOptions &SILOpts,
+                          std::unique_ptr<SILModule> &&SM) {
   ASTContext &Context = CI.getASTContext();
   
   // IRGen the main module.
@@ -229,7 +247,7 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
   auto ModuleOwner = performIRGeneration(
-      IRGenOpts, swiftModule, CI.takeSILModule(), swiftModule->getName().str(),
+      IRGenOpts, swiftModule, std::move(SM), swiftModule->getName().str(),
       PSPs, getGlobalLLVMContext(), ArrayRef<std::string>());
   auto *Module = ModuleOwner.get();
 
@@ -240,7 +258,7 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   //
   // This must be done here, before any library loading has been done, to avoid
   // racing with the static initializers in user code.
-  auto stdlib = loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPath);
+  auto stdlib = loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPaths);
   if (!stdlib) {
     CI.getDiags().diagnose(SourceLoc(),
                            diag::error_immediate_mode_missing_stdlib);

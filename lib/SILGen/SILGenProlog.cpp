@@ -85,20 +85,27 @@ public:
   SILGenFunction &SGF;
   SILBasicBlock *parent;
   SILLocation loc;
+  CanSILFunctionType fnTy;
   ArrayRef<SILParameterInfo> &parameters;
 
   EmitBBArguments(SILGenFunction &sgf, SILBasicBlock *parent, SILLocation l,
+                  CanSILFunctionType fnTy,
                   ArrayRef<SILParameterInfo> &parameters)
-    : SGF(sgf), parent(parent), loc(l), parameters(parameters) {}
+    : SGF(sgf), parent(parent), loc(l), fnTy(fnTy), parameters(parameters) {}
 
   ManagedValue visitType(CanType t) {
     return visitType(t, /*isInOut=*/false);
   }
 
   ManagedValue visitType(CanType t, bool isInOut) {
-    // The calling convention always uses minimal resilience expansion.
-    auto argType =
-        SGF.SGM.Types.getLoweredType(t, ResilienceExpansion::Minimal);
+    // The calling convention always uses minimal resilience expansion but
+    // inside the function we lower/expand types in context of the current
+    // function.
+    auto argType = SGF.SGM.Types.getLoweredType(t, SGF.getTypeExpansionContext());
+    auto argTypeConv =
+        SGF.SGM.Types.getLoweredType(t, TypeExpansionContext::minimal());
+    argType = argType.getCategoryType(argTypeConv.getCategory());
+
     if (isInOut)
       argType = SILType::getPrimitiveAddressType(argType.getASTType());
 
@@ -106,7 +113,8 @@ public:
     auto parameterInfo = parameters.front();
     parameters = parameters.slice(1);
 
-    auto paramType = SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo));
+    auto paramType =
+      SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
         paramType, loc.getAsASTNode<ValueDecl>());
 
@@ -153,7 +161,7 @@ public:
   ManagedValue visitTupleType(CanTupleType t) {
     SmallVector<ManagedValue, 4> elements;
 
-    auto &tl = SGF.SGM.Types.getTypeLowering(t, ResilienceExpansion::Minimal);
+    auto &tl = SGF.SGM.Types.getTypeLowering(t, SGF.getTypeExpansionContext());
     bool canBeGuaranteed = tl.isLoadable();
 
     // Collect the exploded elements.
@@ -223,9 +231,10 @@ struct ArgumentInitHelper {
   uint16_t ArgNo = 0;
 
   ArgumentInitHelper(SILGenFunction &SGF, SILFunction &f)
-    : SGF(SGF), f(f), initB(SGF.B),
-      parameters(f.getLoweredFunctionType()->getParameters()) {
-  }
+      : SGF(SGF), f(f), initB(SGF.B),
+        parameters(
+            f.getLoweredFunctionTypeInContext(SGF.B.getTypeExpansionContext())
+                ->getParameters()) {}
 
   unsigned getNumArgs() const { return ArgNo; }
 
@@ -235,7 +244,8 @@ struct ArgumentInitHelper {
 
     // Create an RValue by emitting destructured arguments into a basic block.
     CanType canTy = ty->getCanonicalType();
-    EmitBBArguments argEmitter(SGF, parent, l, parameters);
+    EmitBBArguments argEmitter(SGF, parent, l,
+                               f.getLoweredFunctionType(), parameters);
 
     // Note: inouts of tuples are not exploded, so we bypass visit().
     if (isInOut)
@@ -245,23 +255,23 @@ struct ArgumentInitHelper {
 
   /// Create a SILArgument and store its value into the given Initialization,
   /// if not null.
-  void makeArgumentIntoBinding(Type ty, SILBasicBlock *parent, VarDecl *vd) {
-    SILLocation loc(vd);
+  void makeArgumentIntoBinding(Type ty, SILBasicBlock *parent, ParamDecl *pd) {
+    SILLocation loc(pd);
     loc.markAsPrologue();
 
-    ManagedValue argrv = makeArgument(ty, vd->isInOut(), parent, loc);
+    ManagedValue argrv = makeArgument(ty, pd->isInOut(), parent, loc);
 
-    if (vd->isInOut()) {
+    if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
     } else {
-      assert(vd->isImmutable() && "expected parameter to be immutable!");
+      assert(pd->isImmutable() && "expected parameter to be immutable!");
       // If the variable is immutable, we can bind the value as is.
       // Leave the cleanup on the argument, if any, in place to consume the
       // argument if we're responsible for it.
     }
-    SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(argrv.getValue());
+    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(argrv.getValue());
     SILValue value = argrv.getValue();
-    SILDebugVariable varinfo(vd->isLet(), ArgNo);
+    SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
       SGF.B.createDebugValue(loc, value, varinfo);
     } else {
@@ -311,13 +321,12 @@ static void makeArgument(Type ty, ParamDecl *decl,
                          SmallVectorImpl<SILValue> &args, SILGenFunction &SGF) {
   assert(ty && "no type?!");
   
-  // Destructure tuple arguments.
-  if (TupleType *tupleTy = ty->getAs<TupleType>()) {
+  // Destructure tuple value arguments.
+  if (TupleType *tupleTy = decl->isInOut() ? nullptr : ty->getAs<TupleType>()) {
     for (auto fieldType : tupleTy->getElementTypes())
       makeArgument(fieldType, decl, args, SGF);
   } else {
-    auto loweredTy = SGF.SGM.Types.getLoweredType(ty,
-                                                  ResilienceExpansion::Minimal);
+    auto loweredTy = SGF.getLoweredTypeForFunctionArgument(ty);
     if (decl->isInOut())
       loweredTy = SILType::getPrimitiveAddressType(loweredTy.getASTType());
     auto arg = SGF.F.begin()->createFunctionArgument(loweredTy, decl);
@@ -338,27 +347,24 @@ void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
 }
 
 static void emitCaptureArguments(SILGenFunction &SGF,
-                                 AnyFunctionRef closure,
+                                 GenericSignature origGenericSig,
                                  CapturedValue capture,
                                  uint16_t ArgNo) {
 
-  auto *VD = capture.getDecl();
+  auto *VD = cast<VarDecl>(capture.getDecl());
   SILLocation Loc(VD);
   Loc.markAsPrologue();
 
   // Local function to get the captured variable type within the capturing
   // context.
   auto getVarTypeInCaptureContext = [&]() -> Type {
-    auto interfaceType = VD->getInterfaceType();
-    return GenericEnvironment::mapTypeIntoContext(
-      closure.getGenericEnvironment(), interfaceType);
+    auto interfaceType = VD->getInterfaceType()->getCanonicalType(
+        origGenericSig);
+    return SGF.F.mapTypeIntoContext(interfaceType);
   };
 
-  auto expansion = SGF.F.getResilienceExpansion();
+  auto expansion = SGF.getTypeExpansionContext();
   switch (SGF.SGM.Types.getDeclCaptureKind(capture, expansion)) {
-  case CaptureKind::None:
-    break;
-
   case CaptureKind::Constant: {
     auto type = getVarTypeInCaptureContext();
     auto &lowering = SGF.getTypeLowering(type);
@@ -399,9 +405,13 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // LValues are captured as a retained @box that owns
     // the captured value.
     auto type = getVarTypeInCaptureContext();
-    auto boxTy = SGF.SGM.Types.getContextBoxTypeForCapture(VD,
-                               SGF.SGM.Types.getLoweredRValueType(type),
-                               SGF.F.getGenericEnvironment(), /*mutable*/ true);
+    // Get the content for the box in the minimal  resilience domain because we
+    // are declaring a type.
+    auto boxTy = SGF.SGM.Types.getContextBoxTypeForCapture(
+        VD,
+        SGF.SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
+                                           type),
+        SGF.F.getGenericEnvironment(), /*mutable*/ true);
     SILValue box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
@@ -423,29 +433,20 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   }
 }
 
-void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
+void SILGenFunction::emitProlog(CaptureInfo captureInfo,
                                 ParameterList *paramList,
                                 ParamDecl *selfParam,
-                                Type resultType, bool throws) {
+                                DeclContext *DC,
+                                Type resultType,
+                                bool throws,
+                                SourceLoc throwsLoc) {
   uint16_t ArgNo = emitProlog(paramList, selfParam, resultType,
-                              TheClosure.getAsDeclContext(), throws);
+                              DC, throws, throwsLoc);
   
-  // Emit an unreachable instruction if a parameter type is
-  // uninhabited
-  if (paramList) {
-    for (auto *param : *paramList) {
-      if (param->getType()->isStructurallyUninhabited()) {
-        SILLocation unreachableLoc(param);
-        unreachableLoc.markAsPrologue();
-        B.createUnreachable(unreachableLoc);
-        break;
-      }
-    }
-  }
-
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
-  auto captureInfo = SGM.Types.getLoweredLocalCaptures(TheClosure);
+  assert(captureInfo.hasBeenComputed() &&
+         "can't emit prolog of function with uncomputed captures");
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {
       auto selfMetatype = MetatypeType::get(
@@ -460,8 +461,7 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
     if (capture.isOpaqueValue()) {
       OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
       Type type = opaqueValue->getType()->mapTypeOutOfContext();
-      type = GenericEnvironment::mapTypeIntoContext(
-          TheClosure.getGenericEnvironment(), type);
+      type = F.mapTypeIntoContext(type);
       auto &lowering = getTypeLowering(type);
       SILType ty = lowering.getLoweredType();
       SILValue val = F.begin()->createFunctionArgument(ty);
@@ -474,7 +474,21 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
       continue;
     }
 
-    emitCaptureArguments(*this, TheClosure, capture, ++ArgNo);
+    emitCaptureArguments(*this, DC->getGenericSignatureOfContext(),
+                         capture, ++ArgNo);
+  }
+
+  // Emit an unreachable instruction if a parameter type is
+  // uninhabited
+  if (paramList) {
+    for (auto *param : *paramList) {
+      if (param->getType()->isStructurallyUninhabited()) {
+        SILLocation unreachableLoc(param);
+        unreachableLoc.markAsPrologue();
+        B.createUnreachable(unreachableLoc);
+        break;
+      }
+    }
   }
 }
 
@@ -493,21 +507,23 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
   // The calling convention always uses minimal resilience expansion.
   auto &resultTI =
     SGF.SGM.Types.getTypeLowering(DC->mapTypeIntoContext(resultType),
-                                  ResilienceExpansion::Minimal);
+                                  SGF.getTypeExpansionContext());
+  auto &resultTIConv = SGF.SGM.Types.getTypeLowering(
+      DC->mapTypeIntoContext(resultType), TypeExpansionContext::minimal());
+
   if (!SILModuleConventions::isReturnedIndirectlyInSIL(
-          resultTI.getLoweredType(), SGF.SGM.M)) {
+          resultTIConv.getLoweredType(), SGF.SGM.M)) {
     return;
   }
   auto &ctx = SGF.getASTContext();
-  auto var = new (ctx) ParamDecl(VarDecl::Specifier::InOut,
-                                 SourceLoc(), SourceLoc(),
+  auto var = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
                                  ctx.getIdentifier("$return_value"),
                                  DC);
+  var->setSpecifier(ParamSpecifier::InOut);
   var->setInterfaceType(resultType);
-
-  auto *arg =
-      SGF.F.begin()->createFunctionArgument(resultTI.getLoweredType(), var);
+  auto *arg = SGF.F.begin()->createFunctionArgument(
+      resultTI.getLoweredType().getAddressType(), var);
   (void)arg;
 }
 
@@ -515,9 +531,10 @@ uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
                                     ParamDecl *selfParam,
                                     Type resultType,
                                     DeclContext *DC,
-                                    bool throws) {
+                                    bool throws,
+                                    SourceLoc throwsLoc) {
   // Create the indirect result parameters.
-  auto *genericSig = DC->getGenericSignatureOfContext();
+  auto genericSig = DC->getGenericSignatureOfContext();
   resultType = resultType->getCanonicalType(genericSig);
 
   emitIndirectResultParameters(*this, resultType, DC);
@@ -536,17 +553,14 @@ uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
   // Record the ArgNo of the artificial $error inout argument. 
   unsigned ArgNo = emitter.getNumArgs();
   if (throws) {
-    RegularLocation Loc = RegularLocation::getAutoGeneratedLocation();
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC))
-      Loc = AFD->getThrowsLoc();
-    else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC))
-      Loc = ACE->getLoc();
-    auto NativeErrorTy = SILType::getExceptionType(getASTContext());
+     auto NativeErrorTy = SILType::getExceptionType(getASTContext());
     ManagedValue Undef = emitUndef(NativeErrorTy);
     SILDebugVariable DbgVar("$error", /*Constant*/ false, ++ArgNo);
-    B.createDebugValue(Loc, Undef.getValue(), DbgVar);
+    RegularLocation loc = RegularLocation::getAutoGeneratedLocation();
+    if (throwsLoc.isValid())
+      loc = throwsLoc;
+    B.createDebugValue(loc, Undef.getValue(), DbgVar);
   }
 
   return ArgNo;
 }
-

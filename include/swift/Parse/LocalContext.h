@@ -19,6 +19,7 @@
 #define SWIFT_PARSE_LOCALCONTEXT_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "swift/AST/Identifier.h"
 #include <cassert>
 
 namespace swift {
@@ -61,12 +62,7 @@ public:
 };
 
 /// Information associated with parsing the top-level context.
-class TopLevelContext : public LocalContext {
-public:
-  /// The next auto-closure discriminator.  This needs to be preserved
-  /// across invocations of both the parser and the type-checker.
-  unsigned NextAutoClosureDiscriminator = 0;
-};
+class TopLevelContext : public LocalContext {};
 
 } // end namespace swift
 

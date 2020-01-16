@@ -81,14 +81,20 @@ static SILBasicBlock *cloneEdge(TermInst *TI, unsigned SuccIndex) {
 }
 
 // A utility function for cloning the apply instruction.
-static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
+static FullApplySite CloneApply(FullApplySite AI, SILValue SelfArg,
+                                SILBuilder &Builder) {
   // Clone the Apply.
   Builder.setCurrentDebugScope(AI.getDebugScope());
   Builder.addOpenedArchetypeOperands(AI.getInstruction());
   auto Args = AI.getArguments();
   SmallVector<SILValue, 8> Ret(Args.size());
-  for (unsigned i = 0, e = Args.size(); i != e; ++i)
-    Ret[i] = Args[i];
+  for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+    if (i == e - 1 && SelfArg) {
+      Ret[i] = SelfArg;
+    } else {
+      Ret[i] = Args[i];
+    }
+  }
 
   FullApplySite NAI;
 
@@ -160,8 +166,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   CCBI = Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true,
                                       CMI->getOperand(),
                                       SILType::getPrimitiveObjectType(SubType),
-                                      Iden,
-                                      Virt);
+                                      SubType, Iden, Virt);
   It = CCBI->getIterator();
 
   SILBuilderWithScope VirtBuilder(Virt, AI.getInstruction());
@@ -170,8 +175,8 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILValue DownCastedClassInstance = Iden->getArgument(0);
 
   // Copy the two apply instructions into the two blocks.
-  FullApplySite IdenAI = CloneApply(AI, IdenBuilder);
-  FullApplySite VirtAI = CloneApply(AI, VirtBuilder);
+  FullApplySite IdenAI = CloneApply(AI, DownCastedClassInstance, IdenBuilder);
+  FullApplySite VirtAI = CloneApply(AI, SILValue(), VirtBuilder);
 
   // See if Continue has a release on self as the instruction right after the
   // apply. If it exists, move it into position in the diamond.
@@ -192,7 +197,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILArgument *Arg =
       Continue->createPhiArgument(AI.getType(), ValueOwnershipKind::Owned);
   if (!isa<TryApplyInst>(AI)) {
-    if (AI.getSubstCalleeType()->isNoReturnFunction()) {
+    if (AI.getSubstCalleeType()->isNoReturnFunction(F->getModule())) {
       IdenBuilder.createUnreachable(AI.getLoc());
       VirtBuilder.createUnreachable(AI.getLoc());
     } else {
@@ -275,7 +280,9 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
                                ClassDecl *CD,
                                ClassHierarchyAnalysis::ClassList &Subs) {
   ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
-  auto *Method = CMI->getMember().getFuncDecl();
+  auto *Method = CMI->getMember().getAbstractFunctionDecl();
+  assert(Method && "not a function");
+
   const DeclContext *DC = AI.getModule().getAssociatedContext();
 
   if (CD->isFinal())
@@ -561,7 +568,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
     SILBuilderWithScope B(LastCCBI);
     auto CastedValue = B.createUncheckedBitCast(LastCCBI->getLoc(),
                                                 LastCCBI->getOperand(),
-                                                LastCCBI->getCastType());
+                                                LastCCBI->getTargetLoweredType());
     B.createBranch(LastCCBI->getLoc(), LastCCBI->getSuccessBB(), {CastedValue});
     LastCCBI->eraseFromParent();
     ORE.emit(RB);
@@ -617,6 +624,8 @@ namespace {
         Changed |= tryToSpeculateTarget(AI, CHA, ORE);
 
       if (Changed) {
+        CurFn.getModule().linkFunction(&CurFn, SILModule::LinkingMode::LinkAll);
+
         invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
       }
     }

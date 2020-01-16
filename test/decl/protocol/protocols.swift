@@ -101,10 +101,10 @@ struct DoesNotConform : Up {
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error {{protocol 'CircleMiddle' refines itself}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 3 {{protocol 'CircleMiddle' refines itself}}
 protocol CircleStart : CircleEnd { func circle_start() }
-// expected-note@-1{{protocol 'CircleStart' declared here}}
-protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
+// expected-note@-1 3 {{protocol 'CircleStart' declared here}}
+protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 3 {{protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }
 protocol CircleTrivial : CircleTrivial { } // expected-error {{protocol 'CircleTrivial' refines itself}}
@@ -118,7 +118,7 @@ struct Circle {
 func testCircular(_ circle: Circle) {
   // FIXME: It would be nice if this failure were suppressed because the protocols
   // have circular definitions.
-  _ = circle as CircleStart // expected-error{{'Circle' is not convertible to 'CircleStart'; did you mean to use 'as!' to force downcast?}} {{14-16=as!}}
+  _ = circle as CircleStart // expected-error{{value of type 'Circle' does not conform to 'CircleStart' in coercion}}
 }
 
 // <rdar://problem/14750346>
@@ -482,14 +482,24 @@ func f<T : C1>(_ x : T) {
 
 class C2 {}
 func g<T : C2>(_ x : T) {
-  x as P2 // expected-error{{'T' is not convertible to 'P2'; did you mean to use 'as!' to force downcast?}} {{5-7=as!}}
+  x as P2 // expected-error{{value of type 'T' does not conform to 'P2' in coercion}}
 }
 
 class C3 : P1 {} // expected-error{{type 'C3' does not conform to protocol 'P1'}}
 func h<T : C3>(_ x : T) {
   _ = x as P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
-
+func i<T : C3>(_ x : T?) -> Bool {
+  return x is P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+  // FIXME: Bogus diagnostic.  See SR-11920.
+  // expected-warning@-2 {{checking a value with optional type 'T?' against dynamic type 'P1' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
+}
+func j(_ x : C1) -> Bool {
+  return x is P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+}
+func k(_ x : C1?) -> Bool {
+  return x is P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+}
 
 
 protocol P4 {
@@ -510,4 +520,72 @@ protocol LetThereBeCrash {
 extension LetThereBeCrash {
   init() { x = 1 }
   // expected-error@-1 {{'let' property 'x' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
+}
+
+// SR-11412
+// Offer fix-it to conform type of context to the missing protocols
+
+protocol SR_11412_P1 {}
+protocol SR_11412_P2 {}
+protocol SR_11412_P3 {}
+protocol SR_11412_P4: AnyObject {}
+
+class SR_11412_C0 {
+  var foo1: SR_11412_P1?
+  var foo2: (SR_11412_P1 & SR_11412_P2)?
+  weak var foo3: SR_11412_P4?
+}
+
+// Context has no inherited types and does not conform to protocol //
+
+class SR_11412_C1 {
+  let c0 = SR_11412_C0()
+
+  func conform() {
+    c0.foo1 = self // expected-error {{cannot assign value of type 'SR_11412_C1' to type 'SR_11412_P1?'}}
+    // expected-note@-1 {{add missing conformance to 'SR_11412_P1' to class 'SR_11412_C1'}}{{18-18=: SR_11412_P1}}
+  }
+}
+
+// Context has no inherited types and does not conform to protocol composition //
+
+class SR_11412_C2 {
+  let c0 = SR_11412_C0()
+
+  func conform() {
+    c0.foo2 = self // expected-error {{cannot assign value of type 'SR_11412_C2' to type '(SR_11412_P1 & SR_11412_P2)?'}}
+    // expected-note@-1 {{add missing conformance to 'SR_11412_P1 & SR_11412_P2' to class 'SR_11412_C2'}}{{18-18=: SR_11412_P1 & SR_11412_P2}}
+  }
+}
+
+// Context already has an inherited type, but does not conform to protocol //
+
+class SR_11412_C3: SR_11412_P3 {
+  let c0 = SR_11412_C0()
+
+  func conform() {
+    c0.foo1 = self // expected-error {{cannot assign value of type 'SR_11412_C3' to type 'SR_11412_P1?'}}
+    // expected-note@-1 {{add missing conformance to 'SR_11412_P1' to class 'SR_11412_C3'}}{{31-31=, SR_11412_P1}}
+  }
+}
+
+// Context conforms to only one protocol in the protocol composition //
+
+class SR_11412_C4: SR_11412_P1 {
+  let c0 = SR_11412_C0()
+
+  func conform() {
+    c0.foo2 = self // expected-error {{cannot assign value of type 'SR_11412_C4' to type '(SR_11412_P1 & SR_11412_P2)?'}}
+    // expected-note@-1 {{add missing conformance to 'SR_11412_P1 & SR_11412_P2' to class 'SR_11412_C4'}}{{31-31=, SR_11412_P2}}
+  }
+}
+
+// Context is a value type, but protocol requires class //
+
+struct SR_11412_S0 {
+  let c0 = SR_11412_C0()
+
+  func conform() {
+    c0.foo3 = self // expected-error {{cannot assign value of type 'SR_11412_S0' to type 'SR_11412_P4?'}}
+  }
 }

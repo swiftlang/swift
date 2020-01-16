@@ -328,10 +328,10 @@ public protocol Sequence {
 
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
-  associatedtype Iterator : IteratorProtocol where Iterator.Element == Element
+  associatedtype Iterator: IteratorProtocol where Iterator.Element == Element
 
   /// A type that represents a subsequence of some of the sequence's elements.
-  // associatedtype SubSequence : Sequence = AnySequence<Element>
+  // associatedtype SubSequence: Sequence = AnySequence<Element>
   //   where Element == SubSequence.Element,
   //         SubSequence.SubSequence == SubSequence
   // typealias SubSequence = AnySequence<Element>
@@ -753,7 +753,7 @@ extension Sequence {
   }
 }
 
-extension Sequence where Element : Equatable {
+extension Sequence where Element: Equatable {
   /// Returns the longest possible subsequences of the sequence, in order,
   /// around elements equal to the given element.
   ///
@@ -1133,7 +1133,7 @@ extension Sequence {
 ///
 ///     for x in IteratorSequence(i) { ... }
 @frozen
-public struct IteratorSequence<Base : IteratorProtocol> {
+public struct IteratorSequence<Base: IteratorProtocol> {
   @usableFromInline
   internal var _base: Base
 

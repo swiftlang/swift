@@ -22,6 +22,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -618,15 +619,16 @@ static ManagedValue emitBuiltinEndUnpairedAccess(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
-/// Specialized emitter for Builtin.condfail.
-static ManagedValue emitBuiltinCondFail(SILGenFunction &SGF,
-                                        SILLocation loc,
-                                        SubstitutionMap substitutions,
-                                        ArrayRef<ManagedValue> args,
-                                        SGFContext C) {
+/// Specialized emitter for the legacy Builtin.condfail.
+static ManagedValue emitBuiltinLegacyCondFail(SILGenFunction &SGF,
+                                              SILLocation loc,
+                                              SubstitutionMap substitutions,
+                                              ArrayRef<ManagedValue> args,
+                                              SGFContext C) {
   assert(args.size() == 1 && "condfail should be given one argument");
-  
-  SGF.B.createCondFail(loc, args[0].getUnmanagedValue());
+
+  SGF.B.createCondFail(loc, args[0].getUnmanagedValue(),
+    "unknown runtime failure");
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
@@ -647,13 +649,14 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   auto &toTL = SGF.getTypeLowering(toTy);
   assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
 
+  auto arg = args[0];
+
   // TODO: Fix this API.
   if (!fromTL.isAddress() || !toTL.isAddress()) {
-    if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, args[0],
-                                                       toTL.getLoweredType())) {
+    if (SILType::canRefCast(arg.getType(), toTL.getLoweredType(), SGF.SGM.M)) {
       // Create a reference cast, forwarding the cleanup.
       // The cast takes the source reference.
-      return refCast;
+      return SGF.B.createUncheckedRefCast(loc, arg, toTL.getLoweredType());
     }
   }
 
@@ -668,7 +671,7 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   // TODO: For now, we leave invalid casts in address form so that the runtime
   // will trap. We could emit a noreturn call here instead which would provide
   // more information to the optimizer.
-  SILValue srcVal = args[0].ensurePlusOne(SGF, loc).forward(SGF);
+  SILValue srcVal = arg.ensurePlusOne(SGF, loc).forward(SGF);
   SILValue fromAddr;
   if (!fromTL.isAddress()) {
     // Move the loadable value into a "source temp".  Since the source and
@@ -743,17 +746,9 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
   }
   // Create the appropriate bitcast based on the source and dest types.
   ManagedValue in = args[0];
+
   SILType resultTy = toTL.getLoweredType();
-  if (resultTy.isTrivial(SGF.F))
-    return SGF.B.createUncheckedTrivialBitCast(loc, in, resultTy);
-
-  // If we can perform a ref cast, just return.
-  if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, in, resultTy))
-    return refCast;
-
-  // Otherwise leave the original cleanup and retain the cast value.
-  SILValue out = SGF.B.createUncheckedBitwiseCast(loc, in.getValue(), resultTy);
-  return SGF.emitManagedRetain(loc, out, toTL);
+  return SGF.B.createUncheckedBitCast(loc, in, resultTy);
 }
 
 /// Specialized emitter for Builtin.castToBridgeObject.
@@ -974,8 +969,8 @@ static ManagedValue emitBuiltinProjectTailElems(SILGenFunction &SGF,
   SILType ElemType = SGF.getLoweredType(subs.getReplacementTypes()[1]->
                                         getCanonicalType()).getObjectType();
 
-  SILValue result = SGF.B.createRefTailAddr(loc, args[0].getValue(),
-                                            ElemType.getAddressType());
+  SILValue result = SGF.B.createRefTailAddr(
+      loc, args[0].borrow(SGF, loc).getValue(), ElemType.getAddressType());
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
   result = SGF.B.createAddressToPointer(loc, result, rawPointerType);
   return ManagedValue::forUnmanaged(result);
@@ -1028,6 +1023,28 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(val);
 }
 
+/// Emit SIL for the named builtin: globalStringTablePointer. Unlike the default
+/// ownership convention for named builtins, which is to take (non-trivial)
+/// arguments as Owned, this builtin accepts owned as well as guaranteed
+/// arguments, and hence doesn't require the arguments to be at +1. Therefore,
+/// this builtin is emitted specially.
+static ManagedValue
+emitBuiltinGlobalStringTablePointer(SILGenFunction &SGF, SILLocation loc,
+                                    SubstitutionMap subs,
+                                    ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(args.size() == 1);
+
+  SILValue argValue = args[0].getValue();
+  auto &astContext = SGF.getASTContext();
+  Identifier builtinId = astContext.getIdentifier(
+      getBuiltinName(BuiltinValueKind::GlobalStringTablePointer));
+
+  auto resultVal = SGF.B.createBuiltin(loc, builtinId,
+                                       SILType::getRawPointerType(astContext),
+                                       subs, ArrayRef<SILValue>(argValue));
+  return SGF.emitManagedRValueWithCleanup(resultVal);
+}
+
 Optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.
@@ -1052,6 +1069,7 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
 #define BUILTIN(Id, Name, Attrs)                                            \
   case BuiltinValueKind::Id:
 #define BUILTIN_SIL_OPERATION(Id, Name, Overload)
+#define BUILTIN_MISC_OPERATION_WITH_SILGEN(Id, Name, Attrs, Overload)
 #define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs)
 #define BUILTIN_TYPE_CHECKER_OPERATION(Id, Name)
 #define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name)
@@ -1068,8 +1086,12 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   case BuiltinValueKind::Id:                                                \
     return SpecializedEmitter(&emitBuiltin##Id);
 
-  // Sanitizer builtins should never directly be called; they should only
-  // be inserted as instrumentation by SILGen.
+#define BUILTIN_MISC_OPERATION_WITH_SILGEN(Id, Name, Attrs, Overload)          \
+  case BuiltinValueKind::Id:                                                   \
+    return SpecializedEmitter(&emitBuiltin##Id);
+
+    // Sanitizer builtins should never directly be called; they should only
+    // be inserted as instrumentation by SILGen.
 #define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs)                        \
   case BuiltinValueKind::Id:                                                \
     llvm_unreachable("Sanitizer builtin called directly?");

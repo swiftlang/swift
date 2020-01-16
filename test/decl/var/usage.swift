@@ -420,3 +420,18 @@ extension MemberGetterExtension {
     }
   }
 }
+
+func testLocalFunc() {
+  var unusedVar = 0
+  // expected-warning@-1 {{initialization of variable 'unusedVar' was never used; consider replacing with assignment to '_' or removing it}}
+
+  var notMutatedVar = 0
+  // FIXME: All captures are read/write for the purposes of this analysis.
+
+  var mutatedVar = 0
+
+  func localFunc() {
+    _ = notMutatedVar
+    mutatedVar = 1
+  }
+}

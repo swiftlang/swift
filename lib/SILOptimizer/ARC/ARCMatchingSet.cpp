@@ -12,24 +12,24 @@
 
 #define DEBUG_TYPE "arc-sequence-opts"
 
-#include "RefCountState.h"
 #include "ARCMatchingSet.h"
+#include "RefCountState.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -77,7 +77,7 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
 
     bool BUCodeMotionSafe = (*BURefCountState)->second.isCodeMotionSafe();
     LLVM_DEBUG(llvm::dbgs() << "        BOTTOM UP CODEMOTIONSAFE: "
-                            << (BUIsKnownSafe ? "true" : "false") << "\n");
+                            << (BUCodeMotionSafe ? "true" : "false") << "\n");
     Flags.CodeMotionSafe &= BUCodeMotionSafe;
 
     // Now that we know we have an inst, grab the decrement.
@@ -161,7 +161,7 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
 
     bool TDCodeMotionSafe = (*TDRefCountState)->second.isCodeMotionSafe();
     LLVM_DEBUG(llvm::dbgs() << "        TOP DOWN CODEMOTIONSAFE: "
-                            << (TDIsKnownSafe ? "true" : "false") << "\n");
+                            << (TDCodeMotionSafe ? "true" : "false") << "\n");
     Flags.CodeMotionSafe &= TDCodeMotionSafe;
 
     // Now that we know we have an inst, grab the decrement.

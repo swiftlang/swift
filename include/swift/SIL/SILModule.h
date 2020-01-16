@@ -194,6 +194,15 @@ private:
   /// The list of SILDefaultWitnessTables in the module.
   DefaultWitnessTableListType defaultWitnessTables;
 
+  /// Declarations which are externally visible.
+  ///
+  /// These are method declarations which are referenced from inlinable
+  /// functions due to cross-module-optimzation. Those declarations don't have
+  /// any attributes or linkage which mark them as externally visible by
+  /// default.
+  /// Currently this table is not serialized.
+  llvm::SetVector<ValueDecl *> externallyVisible;
+
   /// Lookup table for SIL Global Variables.
   llvm::StringMap<SILGlobalVariable *> GlobalVariableMap;
 
@@ -245,7 +254,7 @@ private:
   bool wholeModule;
 
   /// The options passed into this SILModule.
-  SILOptions &Options;
+  const SILOptions &Options;
 
   /// Set if the SILModule was serialized already. It is used
   /// to ensure that the module is serialized only once.
@@ -260,7 +269,8 @@ private:
 
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(ModuleDecl *M, SILOptions &Options, const DeclContext *associatedDC,
+  SILModule(ModuleDecl *M, Lowering::TypeConverter &TC,
+            const SILOptions &Options, const DeclContext *associatedDC,
             bool wholeModule);
 
   SILModule(const SILModule&) = delete;
@@ -313,7 +323,7 @@ public:
   void serialize();
 
   /// This converts Swift types to SILTypes.
-  mutable Lowering::TypeConverter Types;
+  Lowering::TypeConverter &Types;
 
   /// Invalidate cached entries in SIL Loader.
   void invalidateSILLoaderCaches();
@@ -340,12 +350,14 @@ public:
   /// If a source file is provided, SIL will only be emitted for decls in that
   /// source file.
   static std::unique_ptr<SILModule>
-  constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr);
+  constructSIL(ModuleDecl *M, Lowering::TypeConverter &TC,
+               const SILOptions &Options, FileUnit *sf = nullptr);
 
   /// Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule>
-  createEmptyModule(ModuleDecl *M, SILOptions &Options,
+  createEmptyModule(ModuleDecl *M, Lowering::TypeConverter &TC,
+                    const SILOptions &Options,
                     bool WholeModule = false);
 
   /// Get the Swift module associated with this SIL module.
@@ -378,7 +390,7 @@ public:
   /// Returns true if it is the optimized OnoneSupport module.
   bool isOptimizedOnoneSupportModule() const;
 
-  SILOptions &getOptions() const { return Options; }
+  const SILOptions &getOptions() const { return Options; }
 
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;
@@ -441,6 +453,13 @@ public:
   }
   iterator_range<default_witness_table_const_iterator> getDefaultWitnessTables() const {
     return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
+  }
+
+  void addExternallyVisibleDecl(ValueDecl *decl) {
+    externallyVisible.insert(decl);
+  }
+  bool isExternallyVisibleDecl(ValueDecl *decl) {
+    return externallyVisible.count(decl) != 0;
   }
 
   using sil_global_iterator = GlobalListType::iterator;
@@ -506,6 +525,13 @@ public:
   /// Attempt to deserialize the SILFunction. Returns true if deserialization
   /// succeeded, false otherwise.
   bool loadFunction(SILFunction *F);
+
+  /// Update the linkage of the SILFunction with the linkage of the serialized
+  /// function.
+  ///
+  /// The serialized SILLinkage can differ from the linkage derived from the
+  /// AST, e.g. cross-module-optimization can change the SIL linkages.
+  void updateFunctionLinkage(SILFunction *F);
 
   /// Attempt to link the SILFunction. Returns true if linking succeeded, false
   /// otherwise.
@@ -592,7 +618,7 @@ public:
   /// Can value operations (copies and destroys) on the given lowered type
   /// be performed in this module?
   bool isTypeABIAccessible(SILType type,
-                           ResilienceExpansion forExpansion);
+                           TypeExpansionContext forExpansion);
 
   /// Can type metadata for the given formal type be fetched in
   /// the given module?

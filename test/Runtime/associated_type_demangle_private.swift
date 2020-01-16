@@ -101,7 +101,7 @@ private struct Parent<Unused> {
 
 AssociatedTypeDemangleTests.test("nested private generic types in associated type witnesses") {
   // Fixed in custom runtimes.
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, * ) {}
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, * ) {}
   // Fixed in Swift 5.1+ runtimes.
   else if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {}
   // Bug is still present in Swift 5.0 runtime.

@@ -186,7 +186,11 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
       SILValue addr =
           B.createRefElementAddr(cleanupLoc, selfValue.getValue(), vd,
                                  ti.getLoweredType().getAddressType());
+      addr = B.createBeginAccess(
+          cleanupLoc, addr, SILAccessKind::Deinit, SILAccessEnforcement::Static,
+          false /*noNestedConflict*/, false /*fromBuiltin*/);
       B.createDestroyAddr(cleanupLoc, addr);
+      B.createEndAccess(cleanupLoc, addr, false /*is aborting*/);
     }
   }
 }
@@ -232,7 +236,8 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   auto superclassDtor = SILDeclRef(superclassDtorDecl,
                                    SILDeclRef::Kind::Deallocator)
     .asForeign();
-  auto superclassDtorType = SGM.Types.getConstantType(superclassDtor);
+  auto superclassDtorType =
+      SGM.Types.getConstantType(getTypeExpansionContext(), superclassDtor);
   SILValue superclassDtorValue = B.createObjCSuperMethod(
                                    cleanupLoc, selfValue, superclassDtor,
                                    superclassDtorType);

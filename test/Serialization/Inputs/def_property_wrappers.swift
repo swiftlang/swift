@@ -1,9 +1,17 @@
+public struct OtherWrapper<T> {
+  var value: T
+}
+
 @propertyWrapper
 public struct SomeWrapper<T> {
-  public var value: T
+  public var wrappedValue: T
 
-  public init(initialValue: T) {
-    self.value = initialValue
+  public init(wrappedValue initialValue: T) {
+    self.wrappedValue = initialValue
+  }
+
+  public var projectedValue: OtherWrapper<T> {
+    OtherWrapper(value: wrappedValue)
   }
 }
 
@@ -17,21 +25,21 @@ class A<T: Equatable> {
 
   private var _value: T
 
-  var value: T {
+  var wrappedValue: T {
     get { _value }
     set { _value = newValue }
   }
 
-  init(initialValue: T) {
+  init(wrappedValue initialValue: T) {
     _value = initialValue
   }
 }
 
 @propertyWrapper
 class B: A<Double> {
-  override var value: Double {
-    get { super.value }
-    set { super.value = newValue }
+  override var wrappedValue: Double {
+    get { super.wrappedValue }
+    set { super.wrappedValue = newValue }
   }
 }
 

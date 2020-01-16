@@ -169,7 +169,12 @@ UID_KEYS = [
     KEY('ExpressionOffset', 'key.expression_offset'),
     KEY('ExpressionLength', 'key.expression_length'),
     KEY('ExpressionType', 'key.expression_type'),
+    KEY('CanonicalizeType', 'key.canonicalize_type'),
     KEY('InternalDiagnostic', "key.internal_diagnostic"),
+    KEY('VFSName', 'key.vfs.name'),
+    KEY('VFSOptions', 'key.vfs.options'),
+    KEY('Files', 'key.files'),
+    KEY('OptimizeForIDE', 'key.optimize_for_ide'),
 ]
 
 
@@ -227,6 +232,7 @@ UID_REQUESTS = [
             'source.request.enable-compile-notifications'),
     REQUEST('TestNotification', 'source.request.test_notification'),
     REQUEST('CollectExpressionType', 'source.request.expression.type'),
+    REQUEST('GlobalConfiguration', 'source.request.configuration.global')
 ]
 
 

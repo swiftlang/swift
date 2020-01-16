@@ -5,7 +5,8 @@
 // RUN: %target-swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -c | %FileCheck -check-prefix=OBJECT %s
 // RUN: cd %t && %target-swiftc_driver -parseable-output -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -c 2> %t/parseable-output
 // RUN: cat %t/parseable-output | %FileCheck -check-prefix=PARSEABLE %s
-// RUN: cd %t && env TMPDIR=/tmp %swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -o a.out | %FileCheck -check-prefix=EXEC %s
+// RUN: %empty-directory(%t/tmp)
+// RUN: cd %t && env TMPDIR=%t/tmp/ %swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -o a.out | %FileCheck -check-prefix=EXEC %s
 // RUN: echo "{\"%/s\": {\"llvm-bc\": \"%/t/multi-threaded.bc\", \"object\": \"%/t/multi-threaded.o\"}, \"%/S/Inputs/main.swift\": {\"llvm-bc\": \"%/t/main.bc\", \"object\": \"%/t/main.o\"}}" > %t/ofmo.json
 // RUN: %target-swiftc_driver -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s  -emit-dependencies -output-file-map %t/ofmo.json -c
 // RUN: cat %t/*.d | %FileCheck -check-prefix=DEPENDENCIES %s
@@ -25,19 +26,19 @@
 // MODULE-DAG: -num-threads 4
 // MODULE-DAG: {{[^ ]*[/\\]}}Inputs{{/|\\\\}}main.swift{{"?}} {{[^ ]*[/\\]}}multi-threaded.swift 
 // MODULE-DAG: -o test.swiftmodule
-// MODULE-NOT: {{ld|clang\+\+}}
+// MODULE-NOT: {{ld|clang}}
 
 // ASSEMBLY: -frontend
 // ASSEMBLY-DAG: -num-threads 4
 // ASSEMBLY-DAG: {{[^ ]*[/\\]}}Inputs{{/|\\\\}}main.swift{{"?}} {{[^ ]*[/\\]}}multi-threaded.swift 
 // ASSEMBLY-DAG: -o /build/main.s -o /build/multi-threaded.s
-// ASSEMBLY-NOT: {{ld|clang\+\+}}
+// ASSEMBLY-NOT: {{ld|clang}}
 
 // OBJECT: -frontend
 // OBJECT-DAG: -num-threads 4
 // OBJECT-DAG: {{[^ ]*[/\\]}}Inputs{{/|\\\\}}main.swift{{"?}} {{[^ ]*[/\\]}}multi-threaded.swift 
 // OBJECT-DAG: -o main.o -o multi-threaded.o 
-// OBJECT-NOT: {{ld|clang\+\+}}
+// OBJECT-NOT: {{ld|clang}}
 
 // BITCODE: -frontend
 // BITCODE-DAG: -num-threads 4
@@ -45,7 +46,7 @@
 // BITCODE-DAG: -o {{.*[/\\]}}main.bc -o {{.*[/\\]}}multi-threaded.bc
 // BITCODE-DAG: -frontend -c -primary-file {{.*[/\\]}}main.bc {{.*}} -o {{[^ ]*}}main.o
 // BITCODE-DAG: -frontend -c -primary-file {{.*[/\\]}}multi-threaded.bc {{.*}} -o {{[^ ]*}}multi-threaded.o
-// BITCODE-NOT: {{ld|clang\+\+}}
+// BITCODE-NOT: {{ld|clang}}
 
 // PARSEABLE: "outputs": [
 // PARSEABLE: "path": "main.o"
@@ -54,9 +55,9 @@
 // EXEC: -frontend
 // EXEC-DAG: -num-threads 4
 // EXEC-DAG: {{[^ ]*[/\\]}}Inputs{{/|\\\\}}main.swift{{"?}} {{[^ ]*[/\\]}}multi-threaded.swift 
-// EXEC-DAG:  -o {{.*te?mp.*[/\\]}}main{{[^ ]*}}.o{{"?}} -o {{.*te?mp.*[/\\]}}multi-threaded{{[^ ]*}}.o
-// EXEC: {{ld|clang\+\+}}
-// EXEC:  {{.*te?mp.*[/\\]}}main{{[^ ]*}}.o{{"?}} {{.*te?mp.*[/\\]}}multi-threaded{{[^ ]*}}.o
+// EXEC-DAG:  -o {{.*[tT]e?mp.*[/\\]}}main{{[^ ]*}}.o{{"?}} -o {{.*[tT]e?mp.*[/\\]}}multi-threaded{{[^ ]*}}.o
+// EXEC: {{ld|clang}}
+// EXEC:  {{.*[tT]e?mp.*[/\\]}}main{{[^ ]*}}.o{{"?}} {{.*[tT]e?mp.*[/\\]}}multi-threaded{{[^ ]*}}.o
 
 // DEPENDENCIES-DAG: {{.*}}multi-threaded.o : {{.*[/\\]}}multi-threaded.swift {{.*[/\\]}}Inputs{{[/\\]}}main.swift
 // DEPENDENCIES-DAG: {{.*}}main.o : {{.*[/\\]}}multi-threaded.swift {{.*[/\\]}}Inputs{{[/\\]}}main.swift

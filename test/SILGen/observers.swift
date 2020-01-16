@@ -26,40 +26,6 @@ public struct DidSetWillSetTests {
   }
 
   public var a: Int {
-    // This is the synthesized getter and setter for the willset/didset variable.
-
-    // CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s9observers010DidSetWillC5TestsV1aSivg
-    // CHECK: bb0(%0 : $DidSetWillSetTests):
-    // CHECK-NEXT:   debug_value %0
-    // CHECK-NEXT:   %2 = struct_extract %0 : $DidSetWillSetTests, #DidSetWillSetTests.a
-    // CHECK-NEXT:   return %2 : $Int{{.*}}                      // id: %3
-
-
-    // CHECK-LABEL: sil [ossa] @$s9observers010DidSetWillC5TestsV1aSivs
-    // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
-    // CHECK-NEXT: debug_value %0
-    // CHECK-NEXT: debug_value_addr %1
-
-    // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] %1
-    // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[READ]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
-    // CHECK-NEXT: [[OLDVAL:%.*]] = load [trivial] [[AADDR]] : $*Int
-    // CHECK-NEXT: end_access [[READ]]
-    // CHECK-NEXT: debug_value [[OLDVAL]] : $Int, let, name "tmp"
-
-    // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
-    // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.willset : Swift.Int
-    // CHECK-NEXT: [[WILLSETFN:%.*]] = function_ref @$s9observers010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
-    // CHECK-NEXT:  apply [[WILLSETFN]](%0, [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
-    // CHECK-NEXT: end_access [[WRITE]]
-    // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
-    // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
-    // CHECK-NEXT: assign %0 to [[AADDR]] : $*Int
-    // CHECK-NEXT: end_access [[WRITE]]
-    // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
-    // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.didset : Swift.Int
-    // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @$s9observers010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
-    // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
-
     // CHECK-LABEL: sil private [ossa] @$s9observers010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
     willSet(newA) {
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
@@ -124,6 +90,40 @@ public struct DidSetWillSetTests {
       // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: assign [[ZERO]] to [[AADDR]]
     }
+
+    // This is the synthesized getter and setter for the willset/didset variable.
+
+    // CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s9observers010DidSetWillC5TestsV1aSivg
+    // CHECK: bb0(%0 : $DidSetWillSetTests):
+    // CHECK-NEXT:   debug_value %0
+    // CHECK-NEXT:   %2 = struct_extract %0 : $DidSetWillSetTests, #DidSetWillSetTests.a
+    // CHECK-NEXT:   return %2 : $Int{{.*}}                      // id: %3
+
+
+    // CHECK-LABEL: sil [ossa] @$s9observers010DidSetWillC5TestsV1aSivs
+    // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
+    // CHECK-NEXT: debug_value %0
+    // CHECK-NEXT: debug_value_addr %1
+
+    // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] %1
+    // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[READ]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+    // CHECK-NEXT: [[OLDVAL:%.*]] = load [trivial] [[AADDR]] : $*Int
+    // CHECK-NEXT: end_access [[READ]]
+    // CHECK-NEXT: debug_value [[OLDVAL]] : $Int, let, name "tmp"
+
+    // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
+    // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.willset : Swift.Int
+    // CHECK-NEXT: [[WILLSETFN:%.*]] = function_ref @$s9observers010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
+    // CHECK-NEXT:  apply [[WILLSETFN]](%0, [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+    // CHECK-NEXT: end_access [[WRITE]]
+    // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
+    // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+    // CHECK-NEXT: assign %0 to [[AADDR]] : $*Int
+    // CHECK-NEXT: end_access [[WRITE]]
+    // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
+    // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.didset : Swift.Int
+    // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @$s9observers010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+    // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s9observers010DidSetWillC5TestsV8testReadSiyF

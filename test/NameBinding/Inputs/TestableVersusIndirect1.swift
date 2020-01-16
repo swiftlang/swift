@@ -1,0 +1,1 @@
+internal func t1() {}

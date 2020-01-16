@@ -19,9 +19,11 @@
 #include "TypeCheckAvailability.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
@@ -29,6 +31,8 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
+
+#define DEBUG_TYPE "Sema"
 using namespace swift;
 
 /// Return true if this expression is an implicit promotion from T to T?.
@@ -58,8 +62,7 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 ///   - Error about collection literals that default to Any collections in
 ///     invalid positions.
 ///
-static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
-                                         const DeclContext *DC,
+static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                          bool isExprStmt) {
   class DiagnoseWalker : public ASTWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
@@ -74,11 +77,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     bool IsExprStmt;
 
   public:
-    TypeChecker &TC;
+    ASTContext &Ctx;
     const DeclContext *DC;
 
-    DiagnoseWalker(TypeChecker &TC, const DeclContext *DC, bool isExprStmt)
-      : IsExprStmt(isExprStmt), TC(TC), DC(DC) {}
+    DiagnoseWalker(const DeclContext *DC, bool isExprStmt)
+      : IsExprStmt(isExprStmt), Ctx(DC->getASTContext()), DC(DC) {}
 
     // Not interested in going outside a basic expression.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
@@ -223,7 +226,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E)) {
         if (!CorrectDiscardAssignmentExprs.count(DAE) &&
             !DAE->getType()->hasError())
-          TC.diagnose(DAE->getLoc(), diag::discard_expr_outside_of_assignment);
+          Ctx.Diags.diagnose(DAE->getLoc(),
+                             diag::discard_expr_outside_of_assignment);
       }
 
       // Diagnose 'self.init' or 'super.init' nested in another expression
@@ -232,8 +236,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         if (!Parent.isNull() || !IsExprStmt || DC->getParent()->isLocalContext()) {
           bool isChainToSuper;
           (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
-          TC.diagnose(E->getLoc(), diag::init_delegation_nested,
-                      isChainToSuper, !IsExprStmt);
+          Ctx.Diags.diagnose(E->getLoc(), diag::init_delegation_nested,
+                             isChainToSuper, !IsExprStmt);
         }
       }
 
@@ -241,8 +245,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
         if (!CallArgs.count(tupleExpr)) {
           if (tupleExpr->getNumElements() == 1) {
-            TC.diagnose(tupleExpr->getElementNameLoc(0),
-                        diag::tuple_single_element)
+            Ctx.Diags.diagnose(tupleExpr->getElementNameLoc(0),
+                               diag::tuple_single_element)
               .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
                                 tupleExpr->getElement(0)->getStartLoc());
           }
@@ -280,7 +284,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           }
 
           if (diagnose) {
-            TC.diagnose(tupleExpr->getLoc(), diag::tuple_duplicate_label);
+            Ctx.Diags.diagnose(tupleExpr->getLoc(),
+                               diag::tuple_duplicate_label);
           }
         }
       }
@@ -384,13 +389,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // produce an error with a fixit to add the type as an explicit
       // annotation.
       if (c->getNumElements() == 0)
-        TC.diagnose(c->getLoc(), diag::collection_literal_empty)
+        Ctx.Diags.diagnose(c->getLoc(), diag::collection_literal_empty)
           .highlight(c->getSourceRange());
       else {
         assert(c->getType()->hasTypeRepr() &&
                "a defaulted type should always be printable");
-        TC.diagnose(c->getLoc(), diag::collection_literal_heterogeneous,
-                    c->getType())
+        Ctx.Diags.diagnose(c->getLoc(), diag::collection_literal_heterogeneous,
+                           c->getType())
           .highlight(c->getSourceRange())
           .fixItInsertAfter(c->getEndLoc(), " as " + c->getType()->getString());
       }
@@ -427,7 +432,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           return;
       }
 
-      TC.diagnose(E->getStartLoc(), diag::value_of_module_type);
+      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_module_type);
     }
 
     // Diagnose metatype values that don't appear as part of a property,
@@ -460,7 +465,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Is this a protocol metatype?
 
-      TC.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
+      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
 
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
@@ -470,15 +475,15 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         isExistential = instanceTy->isExistentialType();
         if (!isExistential &&
             instanceTy->mayHaveMembers() &&
-            !TC.lookupConstructors(const_cast<DeclContext *>(DC),
-                                   instanceTy).empty()) {
-          TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
+            !TypeChecker::lookupConstructors(const_cast<DeclContext *>(DC),
+                                             instanceTy).empty()) {
+          Ctx.Diags.diagnose(E->getEndLoc(), diag::add_parens_to_type)
             .fixItInsertAfter(E->getEndLoc(), "()");
         }
       }
 
       // Add fix-it to insert ".self".
-      auto diag = TC.diagnose(E->getEndLoc(), diag::add_self_to_type);
+      auto diag = Ctx.Diags.diagnose(E->getEndLoc(), diag::add_self_to_type);
       if (E->canAppendPostfixExpression()) {
         diag.fixItInsertAfter(E->getEndLoc(), ".self");
       } else {
@@ -514,24 +519,28 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         declParent = VD->getDeclContext()->getParentModule();
       }
 
-      TC.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
-                  VD->getBaseName().getIdentifier(), VD->getDescriptiveKind(),
-                  declParent->getDescriptiveKind(), declParent->getFullName());
-      TC.diagnose(VD, diag::decl_declared_here, VD->getFullName());
+      Ctx.Diags.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
+                         VD->getBaseName().getIdentifier(),
+                         VD->getDescriptiveKind(),
+                         declParent->getDescriptiveKind(),
+                         declParent->getFullName());
+      Ctx.Diags.diagnose(VD, diag::decl_declared_here, VD->getFullName());
 
       if (VD->getDeclContext()->isTypeContext()) {
-        TC.diagnose(DRE->getLoc(), diag::fix_unqualified_access_member)
+        Ctx.Diags.diagnose(DRE->getLoc(), diag::fix_unqualified_access_member)
           .fixItInsert(DRE->getStartLoc(), "self.");
       }
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
-      UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext, &TC,
-                               /*Loc=*/SourceLoc(),
-                               UnqualifiedLookup::Flags::KnownPrivate);
+      auto descriptor = UnqualifiedLookupDescriptor(
+          DeclNameRef(VD->getBaseName()), topLevelContext, SourceLoc(),
+          UnqualifiedLookupFlags::KnownPrivate);
+      auto lookup = evaluateOrDefault(Ctx.evaluator,
+                                      UnqualifiedLookupRequest{descriptor}, {});
 
       // Group results by module. Pick an arbitrary result from each module.
       llvm::SmallDenseMap<const ModuleDecl*,const ValueDecl*,4> resultsByModule;
-      for (auto &result : lookup.Results) {
+      for (auto &result : lookup) {
         const ValueDecl *value = result.getValueDecl();
         resultsByModule.insert(std::make_pair(value->getModuleContext(),value));
       }
@@ -557,8 +566,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         SmallString<32> namePlusDot = pair.first->getName().str();
         namePlusDot.push_back('.');
 
-        TC.diagnose(DRE->getLoc(), topLevelDiag,
-                    namePlusDot, k, pair.first->getName())
+        Ctx.Diags.diagnose(DRE->getLoc(), topLevelDiag,
+                           namePlusDot, k, pair.first->getName())
           .fixItInsert(DRE->getStartLoc(), namePlusDot);
       }
     }
@@ -567,10 +576,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // Referencing type(of:) and other decls with special type-checking
       // behavior as functions is not implemented. Maybe we could wrap up the
       // special-case behavior in a closure someday...
-      if (TC.getDeclTypeCheckingSemantics(DRE->getDecl())
+      if (TypeChecker::getDeclTypeCheckingSemantics(DRE->getDecl())
             != DeclTypeCheckingSemantics::Normal) {
-        TC.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
-                    DRE->getDecl()->getBaseName().getIdentifier());
+        Ctx.Diags.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
+                           DRE->getDecl()->getBaseName().getIdentifier());
       }
     }
     
@@ -592,7 +601,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     BitcastableNumberKind getBitcastableNumberKind(Type t) const {
       auto decl = t->getNominalOrBoundGenericNominal();
 #define MATCH_DECL(type) \
-      if (decl == TC.Context.get##type##Decl()) \
+      if (decl == Ctx.get##type##Decl()) \
         return BNK_##type;
       MATCH_DECL(Int8)
       MATCH_DECL(Int16)
@@ -618,7 +627,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     
     void checkForSuspiciousBitCasts(DeclRefExpr *DRE,
                                     Expr *Parent = nullptr) {
-      if (DRE->getDecl() != TC.Context.getUnsafeBitCast())
+      if (DRE->getDecl() != Ctx.getUnsafeBitCast())
         return;
       
       if (DRE->getDeclRef().getSubstitutions().empty())
@@ -629,10 +638,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
 
       auto subMap = DRE->getDeclRef().getSubstitutions();
-      auto fromTy =
-        Type(GenericTypeParamType::get(0, 0, TC.Context)).subst(subMap);
-      auto toTy =
-        Type(GenericTypeParamType::get(0, 1, TC.Context)).subst(subMap);
+      auto fromTy = subMap.getReplacementTypes()[0];
+      auto toTy = subMap.getReplacementTypes()[1];
 
       // Warn about `unsafeBitCast` formulations that are undefined behavior
       // or have better-defined alternative APIs that can be used instead.
@@ -646,15 +653,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           subExpr = args->getElement(0);
           // Determine the fixit range from the start of the application to
           // the first argument, `unsafeBitCast(`
-          removeBeforeRange = CharSourceRange(TC.Context.SourceMgr,
-                                              DRE->getLoc(),
+          removeBeforeRange = CharSourceRange(Ctx.SourceMgr, DRE->getLoc(),
                                               subExpr->getStartLoc());
           // Determine the fixit range from the end of the first argument to
           // the end of the application, `, to: T.self)`
-          removeAfterRange = CharSourceRange(TC.Context.SourceMgr,
-                         Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+          removeAfterRange = CharSourceRange(Ctx.SourceMgr,
+                         Lexer::getLocForEndOfToken(Ctx.SourceMgr,
                                                     subExpr->getEndLoc()),
-                         Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                         Lexer::getLocForEndOfToken(Ctx.SourceMgr,
                                                     apply->getEndLoc()));          
         }
       }
@@ -662,8 +668,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // Casting to the same type or a superclass is a no-op.
       if (toTy->isEqual(fromTy) ||
           toTy->isExactSuperclassOf(fromTy)) {
-        auto d = TC.diagnose(DRE->getLoc(), diag::bitcasting_is_no_op,
-                             fromTy, toTy);
+        auto d = Ctx.Diags.diagnose(DRE->getLoc(), diag::bitcasting_is_no_op,
+                                    fromTy, toTy);
         if (subExpr) {
           d.fixItRemoveChars(removeBeforeRange.getStart(),
                              removeBeforeRange.getEnd())
@@ -678,14 +684,15 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           // Casting a nonescaping function to escaping is UB.
           // `withoutActuallyEscaping` ought to be used instead.
           if (fromFnTy->isNoEscape() && !toFnTy->isNoEscape()) {
-            TC.diagnose(DRE->getLoc(), diag::bitcasting_away_noescape,
-                        fromTy, toTy);
+            Ctx.Diags.diagnose(DRE->getLoc(), diag::bitcasting_away_noescape,
+                               fromTy, toTy);
           }
           // Changing function representation (say, to try to force a
           // @convention(c) function pointer to exist) is also unlikely to work.
           if (fromFnTy->getRepresentation() != toFnTy->getRepresentation()) {
-            TC.diagnose(DRE->getLoc(), diag::bitcasting_to_change_function_rep,
-                        fromTy, toTy);
+            Ctx.Diags.diagnose(DRE->getLoc(),
+                               diag::bitcasting_to_change_function_rep, fromTy,
+                               toTy);
           }
           return;
         }
@@ -693,8 +700,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       
       // Unchecked casting to a subclass is better done by unsafeDowncast.
       if (fromTy->isBindableToSuperclassOf(toTy)) {
-        TC.diagnose(DRE->getLoc(), diag::bitcasting_to_downcast,
-                    fromTy, toTy)
+        Ctx.Diags.diagnose(DRE->getLoc(), diag::bitcasting_to_downcast,
+                           fromTy, toTy)
           .fixItReplace(DRE->getNameLoc().getBaseNameLoc(),
                         "unsafeDowncast");
         return;
@@ -710,10 +717,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // normal initializers on the destination type.
         if (toPointee->isEqual(fromPointee)
             || isRawPointerKind(toPTK)) {
-          auto d = TC.diagnose(DRE->getLoc(),
-                         diag::bitcasting_to_change_pointer_kind,
-                         fromTy, toTy,
-                         toTy->getStructOrBoundGenericStruct()->getName());
+          auto d = Ctx.Diags.diagnose(DRE->getLoc(),
+                              diag::bitcasting_to_change_pointer_kind,
+                              fromTy, toTy,
+                              toTy->getStructOrBoundGenericStruct()->getName());
           if (subExpr) {
             StringRef before, after;
             switch (toPTK) {
@@ -755,9 +762,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // Casting to a different typed pointer type should use
         // withMemoryRebound.
         if (!isRawPointerKind(fromPTK) && !isRawPointerKind(toPTK)) {
-          TC.diagnose(DRE->getLoc(),
-                      diag::bitcasting_to_change_pointee_type,
-                      fromTy, toTy);
+          Ctx.Diags.diagnose(DRE->getLoc(),
+                             diag::bitcasting_to_change_pointee_type,
+                             fromTy, toTy);
           return;
         }
         
@@ -765,9 +772,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // (or assume it's already bound).
         assert(isRawPointerKind(fromPTK) && !isRawPointerKind(toPTK)
                && "unhandled cast combo?!");
-        TC.diagnose(DRE->getLoc(),
-                    diag::bitcasting_to_give_type_to_raw_pointer,
-                    fromTy, toTy);
+        Ctx.Diags.diagnose(DRE->getLoc(),
+                           diag::bitcasting_to_give_type_to_raw_pointer,
+                           fromTy, toTy);
         if (subExpr) {
           SmallString<64> fixitBuf;
           {
@@ -776,9 +783,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             toPointee->print(os);
             os << ".self)";
           }
-          TC.diagnose(DRE->getLoc(),
-                      diag::bitcast_assume_memory_rebound,
-                      toPointee)
+          Ctx.Diags.diagnose(DRE->getLoc(),
+                             diag::bitcast_assume_memory_rebound,
+                             toPointee)
             .fixItRemoveChars(removeBeforeRange.getStart(),
                               removeBeforeRange.getEnd())
             .fixItReplaceChars(removeAfterRange.getStart(),
@@ -791,9 +798,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             toPointee->print(os);
             os << ".self, capacity: <""#capacity#"">)";
           }
-          TC.diagnose(DRE->getLoc(),
-                      diag::bitcast_bind_memory,
-                      toPointee)
+          Ctx.Diags.diagnose(DRE->getLoc(),
+                             diag::bitcast_bind_memory,
+                             toPointee)
             .fixItRemoveChars(removeBeforeRange.getStart(),
                               removeBeforeRange.getEnd())
             .fixItReplaceChars(removeAfterRange.getStart(),
@@ -1070,7 +1077,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
       
       if (diagID) {
-        auto d = TC.diagnose(DRE->getLoc(), *diagID, fromTy, toTy);
+        auto d = Ctx.Diags.diagnose(DRE->getLoc(), *diagID, fromTy, toTy);
         if (subExpr) {
           d.fixItReplaceChars(removeBeforeRange.getStart(),
                               removeBeforeRange.getEnd(),
@@ -1103,7 +1110,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // First case -- Optional.none
       if (auto DRE = dyn_cast<DeclRefExpr>(CE->getSemanticFn()))
-        return DRE->getDecl() == TC.Context.getOptionalNoneDecl();
+        return DRE->getDecl() == Ctx.getOptionalNoneDecl();
 
       return false;
     }
@@ -1138,8 +1145,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       Expr *subExpr = nullptr;
       if (calleeName == "??" &&
           (subExpr = isImplicitPromotionToOptional(lhs))) {
-        TC.diagnose(DRE->getLoc(), diag::use_of_qq_on_non_optional_value,
-                    subExpr->getType())
+        Ctx.Diags.diagnose(DRE->getLoc(), diag::use_of_qq_on_non_optional_value,
+                           subExpr->getType())
           .highlight(lhs->getSourceRange())
           .fixItRemove(SourceRange(DRE->getLoc(), rhs->getEndLoc()));
         return;
@@ -1153,8 +1160,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
              (subExpr = isImplicitPromotionToOptional(rhs)))) {
           bool isTrue = calleeName == "!=" || calleeName == "!==";
               
-          TC.diagnose(DRE->getLoc(), diag::nonoptional_compare_to_nil,
-                      subExpr->getType(), isTrue)
+          Ctx.Diags.diagnose(DRE->getLoc(), diag::nonoptional_compare_to_nil,
+                             subExpr->getType(), isTrue)
             .highlight(lhs->getSourceRange())
             .highlight(rhs->getSourceRange());
           return;
@@ -1163,7 +1170,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     }
   };
 
-  DiagnoseWalker Walker(TC, DC, isExprStmt);
+  DiagnoseWalker Walker(DC, isExprStmt);
   const_cast<Expr *>(E)->walk(Walker);
 
   // Diagnose uses of collection literals with defaulted types at the top
@@ -1179,8 +1186,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
 
 /// Diagnose recursive use of properties within their own accessors
-static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
-                                        const DeclContext *DC) {
+static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
   auto fn = dyn_cast<AccessorDecl>(DC);
   if (!fn)
     return;
@@ -1190,14 +1196,13 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
     return;
 
   class DiagnoseWalker : public ASTWalker {
-    TypeChecker &TC;
+    ASTContext &Ctx;
     VarDecl *Var;
     const AccessorDecl *Accessor;
 
   public:
-    explicit DiagnoseWalker(TypeChecker &TC, VarDecl *var,
-                            const AccessorDecl *Accessor)
-      : TC(TC), Var(var), Accessor(Accessor) {}
+    explicit DiagnoseWalker(VarDecl *var, const AccessorDecl *Accessor)
+      : Ctx(var->getASTContext()), Var(var), Accessor(Accessor) {}
 
     /// Return true if this is an implicit reference to self.
     static bool isImplicitSelfUse(Expr *E) {
@@ -1248,8 +1253,9 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
               shouldDiagnose = false;
 
             if (shouldDiagnose) {
-              TC.diagnose(subExpr->getLoc(), diag::recursive_accessor_reference,
-                          Var->getName(), Accessor->isSetter());
+              Ctx.Diags.diagnose(subExpr->getLoc(),
+                                 diag::recursive_accessor_reference,
+                                 Var->getName(), Accessor->isSetter());
             }
           }
           
@@ -1258,7 +1264,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
           if (isStore &&
               DRE->getAccessSemantics() == AccessSemantics::DirectToStorage &&
               Accessor->getAccessorKind() == AccessorKind::WillSet) {
-            TC.diagnose(E->getLoc(), diag::store_in_willset, Var->getName());
+            Ctx.Diags.diagnose(E->getLoc(), diag::store_in_willset,
+                               Var->getName());
           }
         }
 
@@ -1280,10 +1287,11 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
               shouldDiagnose = isStore;
 
             if (shouldDiagnose) {
-              TC.diagnose(subExpr->getLoc(), diag::recursive_accessor_reference,
-                          Var->getName(), Accessor->isSetter());
-              TC.diagnose(subExpr->getLoc(),
-                          diag::recursive_accessor_reference_silence)
+              Ctx.Diags.diagnose(subExpr->getLoc(),
+                                 diag::recursive_accessor_reference,
+                                 Var->getName(), Accessor->isSetter());
+              Ctx.Diags.diagnose(subExpr->getLoc(),
+                                 diag::recursive_accessor_reference_silence)
               .fixItInsert(subExpr->getStartLoc(), "self.");
             }
           }
@@ -1293,8 +1301,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
           if (isStore &&
               MRE->getAccessSemantics() == AccessSemantics::DirectToStorage &&
               Accessor->getAccessorKind() == AccessorKind::WillSet) {
-              TC.diagnose(subExpr->getLoc(), diag::store_in_willset,
-                          Var->getName());
+            Ctx.Diags.diagnose(subExpr->getLoc(), diag::store_in_willset,
+                               Var->getName());
           }
         }
 
@@ -1304,25 +1312,31 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
     }
   };
 
-  DiagnoseWalker walker(TC, var, fn);
+  DiagnoseWalker walker(var, fn);
   const_cast<Expr *>(E)->walk(walker);
 }
 
-/// Look for any property references in closures that lack a "self." qualifier.
-/// Within a closure, we require that the source code contain "self." explicitly
-/// because 'self' is captured, not the property value.  This is a common source
-/// of confusion, so we force an explicit self.
-static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
+/// Look for any property references in closures that lack a 'self.' qualifier.
+/// Within a closure, we require that the source code contain 'self.' explicitly
+/// (or that the closure explicitly capture 'self' in the capture list) because
+/// 'self' is captured, not the property value.  This is a common source of
+/// confusion, so we force an explicit self.
+static void diagnoseImplicitSelfUseInClosure(const Expr *E,
                                              const DeclContext *DC) {
   class DiagnoseWalker : public ASTWalker {
-    TypeChecker &TC;
-    unsigned InClosure;
+    ASTContext &Ctx;
+    SmallVector<AbstractClosureExpr *, 4> Closures;
   public:
-    explicit DiagnoseWalker(TypeChecker &TC, bool isAlreadyInClosure)
-        : TC(TC), InClosure(isAlreadyInClosure) {}
+    explicit DiagnoseWalker(ASTContext &ctx, AbstractClosureExpr *ACE)
+        : Ctx(ctx), Closures() {
+          if (ACE)
+            Closures.push_back(ACE);
+        }
 
-    /// Return true if this is an implicit reference to self.
-    static bool isImplicitSelfUse(Expr *E) {
+    /// Return true if this is an implicit reference to self which is required
+    /// to be explicit in an escaping closure. Metatype references and value
+    /// type references are excluded.
+    static bool isImplicitSelfParamUseLikelyToCauseCycle(Expr *E) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
 
       if (!DRE || !DRE->isImplicit() || !isa<VarDecl>(DRE->getDecl()) ||
@@ -1337,11 +1351,19 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
         return false;
 
       // Metatype self captures don't extend the lifetime of an object.
-      return !ty->is<MetatypeType>();
+      if (ty->is<MetatypeType>())
+        return false;
+
+      // If self does not have reference semantics, it is very unlikely that
+      // capturing it will create a reference cycle.
+      if (!ty->hasReferenceSemantics())
+        return false;
+
+      return true;
     }
 
-    /// Return true if this is a closure expression that will require "self."
-    /// qualification of member references.
+    /// Return true if this is a closure expression that will require explicit
+    /// use or capture of "self." for qualification of member references.
     static bool isClosureRequiringSelfQualification(
                   const AbstractClosureExpr *CE) {
       // If the closure's type was inferred to be noescape, then it doesn't
@@ -1363,42 +1385,49 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
         // If this is a potentially-escaping closure expression, start looking
         // for references to self if we aren't already.
         if (isClosureRequiringSelfQualification(CE))
-          ++InClosure;
+          Closures.push_back(CE);
       }
 
 
       // If we aren't in a closure, no diagnostics will be produced.
-      if (!InClosure)
+      if (Closures.size() == 0)
         return { true, E };
 
-      // If we see a property reference with an implicit base from within a
-      // closure, then reject it as requiring an explicit "self." qualifier.  We
-      // do this in explicit closures, not autoclosures, because otherwise the
-      // transparence of autoclosures is lost.
+      auto &Diags = Ctx.Diags;
+      
+      // Diagnostics should correct the innermost closure
+      auto *ACE = Closures[Closures.size() - 1];
+      assert(ACE);
+      
+      SourceLoc memberLoc = SourceLoc();
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
-        if (isImplicitSelfUse(MRE->getBase())) {
-          TC.diagnose(MRE->getLoc(),
-                      diag::property_use_in_closure_without_explicit_self,
-                      MRE->getMember().getDecl()->getBaseName().getIdentifier())
-            .fixItInsert(MRE->getLoc(), "self.");
-          return { false, E };
+        if (isImplicitSelfParamUseLikelyToCauseCycle(MRE->getBase())) {
+          auto baseName = MRE->getMember().getDecl()->getBaseName();
+          memberLoc = MRE->getLoc();
+          Diags.diagnose(memberLoc,
+                         diag::property_use_in_closure_without_explicit_self,
+                         baseName.getIdentifier());
         }
 
       // Handle method calls with a specific diagnostic + fixit.
       if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
-        if (isImplicitSelfUse(DSCE->getBase()) &&
+        if (isImplicitSelfParamUseLikelyToCauseCycle(DSCE->getBase()) &&
             isa<DeclRefExpr>(DSCE->getFn())) {
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
-          TC.diagnose(DSCE->getLoc(),
-                      diag::method_call_in_closure_without_explicit_self,
-                      MethodExpr->getDecl()->getBaseName().getIdentifier())
-            .fixItInsert(DSCE->getLoc(), "self.");
-          return { false, E };
+          memberLoc = DSCE->getLoc();
+          Diags.diagnose(DSCE->getLoc(),
+                         diag::method_call_in_closure_without_explicit_self,
+                         MethodExpr->getDecl()->getBaseName().getIdentifier());
         }
 
+      if (memberLoc.isValid()) {
+        emitFixIts(Diags, memberLoc, ACE);
+        return { false, E };
+      }
+      
       // Catch any other implicit uses of self with a generic diagnostic.
-      if (isImplicitSelfUse(E))
-        TC.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
+      if (isImplicitSelfParamUseLikelyToCauseCycle(E))
+        Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
 
       return { true, E };
     }
@@ -1406,25 +1435,144 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
     Expr *walkToExprPost(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         if (isClosureRequiringSelfQualification(CE)) {
-          assert(InClosure);
-          --InClosure;
+          assert(Closures.size() > 0);
+          Closures.pop_back();
         }
       }
       
       return E;
     }
+
+    /// Emit any fix-its for this error.
+    void emitFixIts(DiagnosticEngine &Diags,
+                    SourceLoc memberLoc,
+                    const AbstractClosureExpr *ACE) {
+      // This error can be fixed by either capturing self explicitly (if in an
+      // explicit closure), or referencing self explicitly.
+      if (auto *CE = dyn_cast<const ClosureExpr>(ACE)) {
+        if (diagnoseAlmostMatchingCaptures(Diags, memberLoc, CE)) {
+          // Bail on the rest of the diagnostics. Offering the option to
+          // capture 'self' explicitly will result in an error, and using
+          // 'self.' explicitly will be accessing something other than the
+          // self param.
+          // FIXME: We could offer a special fixit in the [weak self] case to insert 'self?.'...
+          return;
+        }
+        emitFixItsForExplicitClosure(Diags, memberLoc, CE);
+      } else {
+        // If this wasn't an explicit closure, just offer the fix-it to
+        // reference self explicitly.
+        Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
+          .fixItInsert(memberLoc, "self.");
+      }
+    }
+    
+    /// Diagnose any captures which might have been an attempt to capture
+    /// \c self strongly, but do not actually enable implicit \c self. Returns
+    /// whether there were any such captures to diagnose.
+    bool diagnoseAlmostMatchingCaptures(DiagnosticEngine &Diags,
+                                        SourceLoc memberLoc,
+                                        const ClosureExpr *closureExpr) {
+      // If we've already captured something with the name "self" other than
+      // the actual self param, offer special diagnostics.
+      if (auto *VD = closureExpr->getCapturedSelfDecl()) {
+        // Either this is a weak capture of self...
+        if (VD->getType()->is<WeakStorageType>()) {
+          Diags.diagnose(VD->getLoc(), diag::note_self_captured_weakly);
+        // ...or something completely different.
+        } else {
+          Diags.diagnose(VD->getLoc(), diag::note_other_self_capture);
+        }
+        
+        return true;
+      }
+      return false;
+    }
+
+    /// Emit fix-its for invalid use of implicit \c self in an explicit closure.
+    /// The error can be solved by capturing self explicitly,
+    /// or by using \c self. explicitly.
+    void emitFixItsForExplicitClosure(DiagnosticEngine &Diags,
+                                      SourceLoc memberLoc,
+                                      const ClosureExpr *closureExpr) {
+      Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
+        .fixItInsert(memberLoc, "self.");
+      auto diag = Diags.diagnose(closureExpr->getLoc(),
+                                 diag::note_capture_self_explicitly);
+      // There are four different potential fix-its to offer based on the
+      // closure signature:
+      //   1. There is an existing capture list which already has some
+      //      entries. We need to insert 'self' into the capture list along
+      //      with a separating comma.
+      //   2. There is an existing capture list, but it is empty (jusr '[]').
+      //      We can just insert 'self'.
+      //   3. Arguments or types are already specified in the signature,
+      //      but there is no existing capture list. We will need to insert
+      //      the capture list, but 'in' will already be present.
+      //   4. The signature empty so far. We must insert the full capture
+      //      list as well as 'in'.
+      const auto brackets = closureExpr->getBracketRange();
+      if (brackets.isValid()) {
+        emitInsertSelfIntoCaptureListFixIt(brackets, diag);
+      }
+      else {
+        emitInsertNewCaptureListFixIt(closureExpr, diag);
+      }
+    }
+
+    /// Emit a fix-it for inserting \c self into in existing capture list, along
+    /// with a trailing comma if needed. The fix-it will be attached to the
+    /// provided diagnostic \c diag.
+    void emitInsertSelfIntoCaptureListFixIt(SourceRange brackets,
+                                            InFlightDiagnostic &diag) {
+      // Look for any non-comment token. If there's anything before the
+      // closing bracket, we assume that it is a valid capture list entry and
+      // insert 'self,'. If it wasn't a valid entry, then we will at least not
+      // be introducing any new errors/warnings...
+      const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
+      const auto nextAfterBracket =
+          Lexer::getTokenAtLocation(Ctx.SourceMgr, locAfterBracket,
+                                    CommentRetentionMode::None);
+      if (nextAfterBracket.getLoc() != brackets.End)
+        diag.fixItInsertAfter(brackets.Start, "self, ");
+      else
+        diag.fixItInsertAfter(brackets.Start, "self");
+    }
+
+    /// Emit a fix-it for inserting a capture list into a closure that does not
+    /// already have one, along with a trailing \c in if necessary. The fix-it
+    /// will be attached to the provided diagnostic \c diag.
+    void emitInsertNewCaptureListFixIt(const ClosureExpr *closureExpr,
+                                       InFlightDiagnostic &diag) {
+      if (closureExpr->getInLoc().isValid()) {
+        diag.fixItInsertAfter(closureExpr->getLoc(), " [self]");
+        return;
+      }
+
+      // If there's a (non-comment) token immediately following the
+      // opening brace of the closure, we may need to pad the fix-it
+      // with a space.
+      const auto nextLoc = closureExpr->getLoc().getAdvancedLoc(1);
+      const auto next =
+      Lexer::getTokenAtLocation(Ctx.SourceMgr, nextLoc,
+                                CommentRetentionMode::None);
+      std::string trailing = next.getLoc() == nextLoc ? " " : "";
+
+      diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
+    }
   };
 
-  bool isAlreadyInClosure = false;
+  AbstractClosureExpr *ACE = nullptr;
   if (DC->isLocalContext()) {
-    while (DC->getParent()->isLocalContext() && !isAlreadyInClosure) {
+    while (DC->getParent()->isLocalContext() && !ACE) {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(DC))
         if (DiagnoseWalker::isClosureRequiringSelfQualification(closure))
-          isAlreadyInClosure = true;
+          ACE = const_cast<AbstractClosureExpr *>(closure);
       DC = DC->getParent();
     }
   }
-  const_cast<Expr *>(E)->walk(DiagnoseWalker(TC, isAlreadyInClosure));
+  auto &ctx = DC->getASTContext();
+  const_cast<Expr *>(E)->walk(DiagnoseWalker(ctx, ACE));
 }
 
 bool TypeChecker::getDefaultGenericArgumentsString(
@@ -1477,9 +1625,13 @@ bool TypeChecker::getDefaultGenericArgumentsString(
     genericParamText << contextTy;
   };
 
-  interleave(typeDecl->getInnermostGenericParamTypes(),
-             printGenericParamSummary, [&]{ genericParamText << ", "; });
-
+  // FIXME: We can potentially be in the middle of creating a generic signature
+  // if we get here.  Break this cycle.
+  if (typeDecl->hasComputedGenericSignature()) {
+    interleave(typeDecl->getInnermostGenericParamTypes(),
+               printGenericParamSummary, [&]{ genericParamText << ", "; });
+  }
+  
   genericParamText << ">";
   return true;
 }
@@ -1685,7 +1837,7 @@ static const Expr *lookThroughExprsToImmediateDeallocation(const Expr *E) {
   }
 }
 
-static void diagnoseUnownedImmediateDeallocationImpl(TypeChecker &TC,
+static void diagnoseUnownedImmediateDeallocationImpl(ASTContext &ctx,
                                                      const VarDecl *varDecl,
                                                      const Expr *initExpr,
                                                      SourceLoc diagLoc,
@@ -1736,17 +1888,18 @@ static void diagnoseUnownedImmediateDeallocationImpl(TypeChecker &TC,
   if (varDecl->getDeclContext()->isTypeContext())
     storageKind = SK_Property;
 
-  TC.diagnose(diagLoc, diag::unowned_assignment_immediate_deallocation,
-              varDecl->getName(), ownershipAttr->get(), unsigned(storageKind))
+  ctx.Diags.diagnose(diagLoc, diag::unowned_assignment_immediate_deallocation,
+                     varDecl->getName(), ownershipAttr->get(),
+                     unsigned(storageKind))
     .highlight(diagRange);
 
-  TC.diagnose(diagLoc, diag::unowned_assignment_requires_strong)
+  ctx.Diags.diagnose(diagLoc, diag::unowned_assignment_requires_strong)
     .highlight(diagRange);
 
-  TC.diagnose(varDecl, diag::decl_declared_here, varDecl->getFullName());
+  ctx.Diags.diagnose(varDecl, diag::decl_declared_here, varDecl->getFullName());
 }
 
-void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+void swift::diagnoseUnownedImmediateDeallocation(ASTContext &ctx,
                                                  const AssignExpr *assignExpr) {
   auto *destExpr = assignExpr->getDest()->getValueProvidingExpr();
   auto *initExpr = assignExpr->getSrc();
@@ -1760,12 +1913,12 @@ void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
   }
 
   if (VD)
-    diagnoseUnownedImmediateDeallocationImpl(TC, VD, initExpr,
+    diagnoseUnownedImmediateDeallocationImpl(ctx, VD, initExpr,
                                              assignExpr->getLoc(),
                                              initExpr->getSourceRange());
 }
 
-void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+void swift::diagnoseUnownedImmediateDeallocation(ASTContext &ctx,
                                                  const Pattern *pattern,
                                                  SourceLoc equalLoc,
                                                  const Expr *initExpr) {
@@ -1783,36 +1936,42 @@ void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
         const Pattern *subPattern = elt.getPattern();
         Expr *subInitExpr = TE->getElement(i);
 
-        diagnoseUnownedImmediateDeallocation(TC, subPattern, equalLoc,
+        diagnoseUnownedImmediateDeallocation(ctx, subPattern, equalLoc,
                                              subInitExpr);
       }
     }
   } else if (auto *NP = dyn_cast<NamedPattern>(pattern)) {
-    diagnoseUnownedImmediateDeallocationImpl(TC, NP->getDecl(), initExpr,
+    diagnoseUnownedImmediateDeallocationImpl(ctx, NP->getDecl(), initExpr,
                                              equalLoc,
                                              initExpr->getSourceRange());
   }
 }
 
-bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
-                                          ValueDecl *decl,
-                                          const ValueDecl *base) {
+namespace {
+enum NoteKind_t {
+  FixItReplace,
+  FixItInsert,
+};
+
+static bool fixItOverrideDeclarationTypesImpl(
+    ValueDecl *decl, const ValueDecl *base,
+    SmallVectorImpl<std::tuple<NoteKind_t, SourceRange, std::string>> &notes) {
   // For now, just rewrite cases where the base uses a value type and the
   // override uses a reference type, and the value type is bridged to the
   // reference type. This is a way to migrate code that makes use of types
   // that previously were not bridged to value types.
   auto checkValueReferenceType =
-      [&](Type overrideTy, VarDecl::Specifier overrideSpec,
-          Type baseTy, VarDecl::Specifier baseSpec,
+      [&](Type overrideTy, ParamDecl::Specifier overrideSpec,
+          Type baseTy, ParamDecl::Specifier baseSpec,
           SourceRange typeRange) -> bool {
     if (typeRange.isInvalid())
       return false;
 
-    auto normalizeType = [](Type &ty, VarDecl::Specifier spec) -> Type {
+    auto normalizeType = [](Type &ty, ParamDecl::Specifier spec) -> Type {
       Type normalizedTy = ty;
       if (Type unwrappedTy = normalizedTy->getOptionalObjectType())
         normalizedTy = unwrappedTy;
-      if (spec == VarDecl::Specifier::InOut)
+      if (spec == ParamDecl::Specifier::InOut)
         ty = InOutType::get(ty);
       return normalizedTy;
     };
@@ -1859,7 +2018,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
     options.SynthesizeSugarOnTypes = true;
 
     newOverrideTy->print(baseTypeStr, options);
-    diag.fixItReplace(typeRange, baseTypeStr.str());
+    notes.emplace_back(FixItReplace, typeRange, baseTypeStr.str().str());
     return true;
   };
 
@@ -1879,25 +2038,33 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
         overrideFnTy->getExtInfo().isNoEscape() &&
         // The overridden function type should be escaping.
         !baseFnTy->getExtInfo().isNoEscape()) {
-      diag.fixItInsert(typeRange.Start, "@escaping ");
+      notes.emplace_back(FixItInsert, typeRange, "@escaping ");
       return true;
     }
     return false;
   };
 
-  auto checkType = [&](Type overrideTy, VarDecl::Specifier overrideSpec,
-                       Type baseTy, VarDecl::Specifier baseSpec,
+  auto checkType = [&](Type overrideTy, ParamDecl::Specifier overrideSpec,
+                       Type baseTy, ParamDecl::Specifier baseSpec,
                        SourceRange typeRange) -> bool {
     return checkValueReferenceType(overrideTy, overrideSpec,
                                    baseTy, baseSpec, typeRange) ||
       checkTypeMissingEscaping(overrideTy, baseTy, typeRange);
   };
 
+  if (auto *param = dyn_cast<ParamDecl>(decl)) {
+    SourceRange typeRange = param->getTypeSourceRangeForDiagnostics();
+    auto *baseParam = cast<ParamDecl>(base);
+    return checkType(param->getInterfaceType(), param->getSpecifier(),
+                     baseParam->getInterfaceType(), baseParam->getSpecifier(),
+                     typeRange);
+  }
+
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     SourceRange typeRange = var->getTypeSourceRangeForDiagnostics();
     auto *baseVar = cast<VarDecl>(base);
-    return checkType(var->getInterfaceType(), var->getSpecifier(),
-                     baseVar->getInterfaceType(), var->getSpecifier(),
+    return checkType(var->getInterfaceType(), ParamDecl::Specifier::Default,
+                     baseVar->getInterfaceType(), ParamDecl::Specifier::Default,
                      typeRange);
   }
 
@@ -1909,7 +2076,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
       for_each(*fn->getParameters(),
                *baseFn->getParameters(),
                [&](ParamDecl *param, const ParamDecl *baseParam) {
-        fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
+        fixedAny |= fixItOverrideDeclarationTypesImpl(param, baseParam, notes);
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
@@ -1920,8 +2087,8 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
       auto baseResultType = baseMethod->mapTypeIntoContext(
           baseMethod->getResultInterfaceType());
 
-      fixedAny |= checkType(resultType, VarDecl::Specifier::Default,
-                            baseResultType, VarDecl::Specifier::Default,
+      fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
+                            baseResultType, ParamDecl::Specifier::Default,
                             method->getBodyResultTypeLoc().getSourceRange());
     }
     return fixedAny;
@@ -1935,7 +2102,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
       for_each(*subscript->getIndices(),
                *baseSubscript->getIndices(),
                [&](ParamDecl *param, const ParamDecl *baseParam) {
-        fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
+        fixedAny |= fixItOverrideDeclarationTypesImpl(param, baseParam, notes);
       });
     }
 
@@ -1943,13 +2110,33 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
         subscript->getElementInterfaceType());
     auto baseResultType = baseSubscript->getDeclContext()->mapTypeIntoContext(
         baseSubscript->getElementInterfaceType());
-    fixedAny |= checkType(resultType, VarDecl::Specifier::Default,
-                          baseResultType, VarDecl::Specifier::Default,
+    fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
+                          baseResultType, ParamDecl::Specifier::Default,
                           subscript->getElementTypeLoc().getSourceRange());
     return fixedAny;
   }
 
   llvm_unreachable("unknown overridable member");
+}
+};
+
+bool swift::computeFixitsForOverridenDeclaration(
+    ValueDecl *decl, const ValueDecl *base,
+    llvm::function_ref<Optional<InFlightDiagnostic>(bool)> diag) {
+  SmallVector<std::tuple<NoteKind_t, SourceRange, std::string>, 4> Notes;
+  bool hasNotes = ::fixItOverrideDeclarationTypesImpl(decl, base, Notes);
+
+  Optional<InFlightDiagnostic> diagnostic = diag(hasNotes);
+  if (!diagnostic) return hasNotes;
+
+  for (const auto &note : Notes) {
+    if (std::get<0>(note) == FixItReplace) {
+      diagnostic->fixItReplace(std::get<1>(note), std::get<2>(note));
+    } else {
+      diagnostic->fixItInsert(std::get<1>(note).Start, std::get<2>(note));
+    }
+  }
+  return hasNotes;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1986,6 +2173,10 @@ class VarDeclUsageChecker : public ASTWalker {
   /// This is a mapping from VarDecls to the if/while/guard statement that they
   /// occur in, when they are in a pattern in a StmtCondition.
   llvm::SmallDenseMap<VarDecl*, LabeledConditionalStmt*> StmtConditionForVD;
+
+#ifndef NDEBUG
+  llvm::SmallPtrSet<Expr*, 32> AllExprsSeen;
+#endif
   
   bool sawError = false;
   
@@ -1993,7 +2184,8 @@ class VarDeclUsageChecker : public ASTWalker {
   void operator=(const VarDeclUsageChecker &) = delete;
 
 public:
-  VarDeclUsageChecker(TypeChecker &TC, AbstractFunctionDecl *AFD) : Diags(TC.Diags) {
+  VarDeclUsageChecker(AbstractFunctionDecl *AFD)
+    : Diags(AFD->getASTContext().Diags) {
     // If this AFD is a setter, track the parameter and the getter for
     // the containing property so if newValue isn't used but the getter is used
     // an error can be reported.
@@ -2010,7 +2202,7 @@ public:
 
   VarDeclUsageChecker(DiagnosticEngine &Diags) : Diags(Diags) {}
 
-  VarDeclUsageChecker(TypeChecker &tc, VarDecl *vd) : Diags(tc.Diags) {
+  VarDeclUsageChecker(VarDecl *vd) : Diags(vd->getASTContext().Diags) {
     // Track a specific VarDecl
     VarDecls[vd] = 0;
     if (auto *childVd = vd->getCorrespondingCaseBodyVariable().getPtrOrNull()) {
@@ -2036,8 +2228,8 @@ public:
     if (!PBD) return false;
 
     bool sawMutation = false;
-    for (const auto &PBE : PBD->getPatternList()) {
-      PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
+    for (auto idx : range(PBD->getNumPatternEntries())) {
+      PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
         auto it = VarDecls.find(VD);
         sawMutation |= it != VarDecls.end() && (it->second & RK_Written);
       });
@@ -2060,7 +2252,7 @@ public:
     
     // If the variable was invalid, ignore it and notice that the code is
     // malformed.
-    if (VD->isInvalid() || !VD->hasType()) {
+    if (VD->isInvalid()) {
       sawError = true;
       return false;
     }
@@ -2123,10 +2315,17 @@ public:
       }
     }
 
+    // Don't walk into implicit accessors, since eg. an observer's setter
+    // references the variable, but we don't want to consider it as a real
+    // "use".
+    if (isa<AccessorDecl>(D) && D->isImplicit())
+      return false;
+
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
       // If this is a nested function with a capture list, mark any captured
       // variables.
       if (afd->isBodyTypeChecked()) {
+        TypeChecker::computeCaptures(afd);
         for (const auto &capture : afd->getCaptureInfo().getCaptures())
           addMark(capture.getDecl(), RK_Read|RK_Written);
       } else {
@@ -2149,8 +2348,8 @@ public:
           Decl *D = node.get<Decl *>();
           auto *PBD = dyn_cast<PatternBindingDecl>(D);
           if (!PBD) continue;
-          for (PatternBindingEntry PBE : PBD->getPatternList()) {
-            PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
+          for (auto idx : range(PBD->getNumPatternEntries())) {
+            PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
               VarDecls[VD] = RK_Read|RK_Written;
             });
           }
@@ -2232,26 +2431,28 @@ public:
 /// An AST walker that determines the underlying type of an opaque return decl
 /// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
-  TypeChecker &TC;
+  ASTContext &Ctx;
   AbstractFunctionDecl *Implementation;
   OpaqueTypeDecl *OpaqueDecl;
+  BraceStmt *Body;
   SmallVector<std::pair<Expr*, Type>, 4> Candidates;
 
   bool HasInvalidReturn = false;
 
 public:
-  OpaqueUnderlyingTypeChecker(TypeChecker &TC,
-                              AbstractFunctionDecl *Implementation,
-                              OpaqueTypeDecl *OpaqueDecl)
-    : TC(TC),
+  OpaqueUnderlyingTypeChecker(AbstractFunctionDecl *Implementation,
+                              OpaqueTypeDecl *OpaqueDecl,
+                              BraceStmt *Body)
+    : Ctx(Implementation->getASTContext()),
       Implementation(Implementation),
-      OpaqueDecl(OpaqueDecl)
+      OpaqueDecl(OpaqueDecl),
+      Body(Body)
   {
     
   }
   
   void check() {
-    Implementation->getBody()->walk(*this);
+    Body->walk(*this);
 
     // If given function has any invalid returns in the body
     // let's not try to validate the types, since it wouldn't
@@ -2262,8 +2463,7 @@ public:
     // If there are no candidates, then the body has no return statements, and
     // we have nothing to infer the underlying type from.
     if (Candidates.empty()) {
-      TC.diagnose(Implementation->getLoc(),
-                  diag::opaque_type_no_underlying_type_candidates);
+      Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
       return;
     }
     
@@ -2285,12 +2485,12 @@ public:
     }
     
     if (mismatch) {
-      TC.diagnose(Implementation->getLoc(),
-                  diag::opaque_type_mismatched_underlying_type_candidates);
+      Implementation->diagnose(
+          diag::opaque_type_mismatched_underlying_type_candidates);
       for (auto candidate : Candidates) {
-        TC.diagnose(candidate.first->getLoc(),
-                    diag::opaque_type_underlying_type_candidate_here,
-                    candidate.second);
+        Ctx.Diags.diagnose(candidate.first->getLoc(),
+                           diag::opaque_type_underlying_type_candidate_here,
+                           candidate.second);
       }
       return;
     }
@@ -2302,9 +2502,9 @@ public:
     });
     
     if (isSelfReferencing) {
-      TC.diagnose(Candidates.front().first->getLoc(),
-                  diag::opaque_type_self_referential_underlying_type,
-                  underlyingType);
+      Ctx.Diags.diagnose(Candidates.front().first->getLoc(),
+                         diag::opaque_type_self_referential_underlying_type,
+                         underlyingType);
       return;
     }
     
@@ -2388,24 +2588,6 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       access |= VarDecls[childVar];
     }
 
-    // If this is a 'let' value, any stores to it are actually initializations,
-    // not mutations.
-    auto isWrittenLet = false;
-    if (var->isImmutable()) {
-      isWrittenLet = (access & RK_Written) != 0;
-      access &= ~RK_Written;
-    }
-    
-    // If this variable has WeakStorageType, then it can be mutated in ways we
-    // don't know.
-    if (var->getType()->is<WeakStorageType>())
-      access |= RK_Written;
-    
-    // If this is a vardecl with 'inout' type, then it is an inout argument to a
-    // function, never diagnose anything related to it.
-    if (var->isInOut())
-      continue;    
-    
     // If the setter parameter is not used, but the property is read, report
     // a warning. Otherwise, parameters should not generate usage warnings. It
     // is common to name a parameter and not use it (e.g. because you are an
@@ -2427,6 +2609,19 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       }
       continue;
     }
+
+    // If this is a 'let' value, any stores to it are actually initializations,
+    // not mutations.
+    auto isWrittenLet = false;
+    if (var->isLet()) {
+      isWrittenLet = (access & RK_Written) != 0;
+      access &= ~RK_Written;
+    }
+    
+    // If this variable has WeakStorageType, then it can be mutated in ways we
+    // don't know.
+    if (var->getType()->is<WeakStorageType>())
+      access |= RK_Written;
     
     // Diagnose variables that were never used (other than their
     // initialization).
@@ -2448,11 +2643,11 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       //    _ = foo()
       if (auto *pbd = var->getParentPatternBinding())
         if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
-            !isa<TypedPattern>(pbd->getPatternList()[0].getPattern())) {
+            !isa<TypedPattern>(pbd->getPattern(0))) {
           unsigned varKind = var->isLet();
           SourceRange replaceRange(
               pbd->getStartLoc(),
-              pbd->getPatternList()[0].getPattern()->getEndLoc());
+              pbd->getPattern(0)->getEndLoc());
           Diags.diagnose(var->getLoc(), diag::pbd_never_used,
                          var->getName(), varKind)
             .fixItReplace(replaceRange, "_");
@@ -2529,8 +2724,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     }
     
     // If this is a mutable 'var', and it was never written to, suggest
-    // upgrading to 'let'.  We do this even for a parameter.
-    if (!var->isImmutable() && (access & RK_Written) == 0 &&
+    // upgrading to 'let'.
+    if (!var->isLet() && (access & RK_Written) == 0 &&
         // Don't warn if we have something like "let (x,y) = ..." and 'y' was
         // never mutated, but 'x' was.
         !isVarDeclPartOfPBDThatHadSomeMutation(var)) {
@@ -2554,10 +2749,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       }
 
       // If this is a parameter explicitly marked 'var', remove it.
-      unsigned varKind = isa<ParamDecl>(var);
       if (FixItLoc.isInvalid()) {
         Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
-                       var->getName(), varKind, true);
+                       var->getName(), true);
       }
       else {
         bool suggestLet = true;
@@ -2569,7 +2763,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         }
 
         auto diag = Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
-                                   var->getName(), varKind, suggestLet);
+                                   var->getName(), suggestLet);
 
         if (suggestLet)
           diag.fixItReplace(FixItLoc, "let");
@@ -2582,8 +2776,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     
     // If this is a variable that was only written to, emit a warning.
     if ((access & RK_Read) == 0) {
-      Diags.diagnose(var->getLoc(), diag::variable_never_read, var->getName(),
-                  isa<ParamDecl>(var));
+      Diags.diagnose(var->getLoc(), diag::variable_never_read, var->getName());
       continue;
     }
   }
@@ -2729,12 +2922,18 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
 
 /// The heavy lifting happens when visiting expressions.
 std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
+  STATISTIC(VarDeclUsageCheckerExprVisits,
+            "# of times VarDeclUsageChecker::walkToExprPre is called");
+  ++VarDeclUsageCheckerExprVisits;
+
   // Sema leaves some subexpressions null, which seems really unfortunate.  It
   // should replace them with ErrorExpr.
   if (E == nullptr || !E->getType() || E->getType()->hasError()) {
     sawError = true;
     return { false, E };
   }
+
+  assert(AllExprsSeen.insert(E).second && "duplicate traversal");
 
   // If this is a DeclRefExpr found in a random place, it is a load of the
   // vardecl.
@@ -2780,9 +2979,13 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     return { false, E };
   }
   
-  // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue.
-  if (auto *oee = dyn_cast<OpenExistentialExpr>(E))
+  // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue
+  // and only walk the subexpr.
+  if (auto *oee = dyn_cast<OpenExistentialExpr>(E)) {
     OpaqueValueMap[oee->getOpaqueValue()] = oee->getExistentialValue();
+    oee->getSubExpr()->walk(*this);
+    return { false, E };
+  }
 
   // Visit bindings.
   if (auto ove = dyn_cast<OpaqueValueExpr>(E)) {
@@ -2828,15 +3031,16 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
 /// Apply the warnings managed by VarDeclUsageChecker to the top level
 /// code declarations that haven't been checked yet.
 void swift::
-performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD) {
-  VarDeclUsageChecker checker(TC.Diags);
+performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
+  auto &ctx = TLCD->getDeclContext()->getASTContext();
+  VarDeclUsageChecker checker(ctx.Diags);
   TLCD->walk(checker);
 }
 
 /// Perform diagnostics for func/init/deinit declarations.
-void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
-                                               AbstractFunctionDecl *AFD) {
-  assert(AFD->getBody() && "Need a body to check");
+void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD,
+                                               BraceStmt *body) {
+  assert(body && "Need a body to check");
   
   // Don't produce these diagnostics for implicitly generated code.
   if (AFD->getLoc().isInvalid() || AFD->isImplicit() || AFD->isInvalid())
@@ -2844,28 +3048,28 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
   
   // Check for unused variables, as well as variables that are could be
   // declared as constants.
-  AFD->getBody()->walk(VarDeclUsageChecker(TC, AFD));
+  body->walk(VarDeclUsageChecker(AFD));
   
   // If the function has an opaque return type, check the return expressions
   // to determine the underlying type.
   if (auto opaqueResultTy = AFD->getOpaqueResultTypeDecl()) {
-    OpaqueUnderlyingTypeChecker(TC, AFD, opaqueResultTy).check();
+    OpaqueUnderlyingTypeChecker(AFD, opaqueResultTy, body).check();
   } else if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
     if (accessor->isGetter()) {
       if (auto opaqueResultTy
                           = accessor->getStorage()->getOpaqueResultTypeDecl()) {
-        OpaqueUnderlyingTypeChecker(TC, AFD, opaqueResultTy).check();
+        OpaqueUnderlyingTypeChecker(AFD, opaqueResultTy, body).check();
       }
     }
   }
 }
 
 // Perform MiscDiagnostics on Switch Statements.
-static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
+static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt) {
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
   for (auto cs : stmt->getCases()) {
-    TC.checkUnsupportedProtocolType(cs);
+    TypeChecker::checkUnsupportedProtocolType(ctx, cs);
 
     // The case statement can have multiple case items, each can have a where.
     // If we find a "where", and there is a preceding item without a where, and
@@ -2892,32 +3096,32 @@ static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
       if (prevLoc.isInvalid() || thisLoc.isInvalid())
         continue;
       
-      auto &SM = TC.Context.SourceMgr;
+      auto &SM = ctx.SourceMgr;
       auto prevLineCol = SM.getLineAndColumn(prevLoc);
       if (SM.getLineNumber(thisLoc) != prevLineCol.first)
         continue;
-      
-      TC.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)
+
+      ctx.Diags.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)
         .highlight(items[i].getPattern()->getSourceRange())
         .highlight(where->getSourceRange());
       
       // Whitespace it out to the same column as the previous item.
       std::string whitespace(prevLineCol.second-1, ' ');
-      TC.diagnose(thisLoc, diag::add_where_newline)
+      ctx.Diags.diagnose(thisLoc, diag::add_where_newline)
         .fixItInsert(thisLoc, "\n"+whitespace);
 
       auto whereRange = SourceRange(items[i].getWhereLoc(),
                                     where->getEndLoc());
       auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, whereRange);
       auto whereText = SM.extractText(charRange);
-      TC.diagnose(prevLoc, diag::duplicate_where)
+      ctx.Diags.diagnose(prevLoc, diag::duplicate_where)
         .fixItInsertAfter(items[i-1].getEndLoc(), " " + whereText.str())
         .highlight(items[i-1].getSourceRange());
     }
   }
 }
 
-void swift::fixItEncloseTrailingClosure(TypeChecker &TC,
+void swift::fixItEncloseTrailingClosure(ASTContext &ctx,
                                         InFlightDiagnostic &diag,
                                         const CallExpr *call,
                                         Identifier closureLabel) {
@@ -2953,19 +3157,19 @@ void swift::fixItEncloseTrailingClosure(TypeChecker &TC,
     replacement += ": ";
   }
 
-  lastLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, lastLoc);
+  lastLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, lastLoc);
   diag
     .fixItReplaceChars(lastLoc, closureRange.Start, replacement)
     .fixItInsertAfter(closureRange.End, ")");
 }
 
 // Perform checkStmtConditionTrailingClosure for single expression.
-static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
+static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   if (E == nullptr || isa<ErrorExpr>(E)) return;
 
-  // Shallow walker. just dig into implicit expression.
+  // Walk into expressions which might have invalid trailing closures
   class DiagnoseWalker : public ASTWalker {
-    TypeChecker &TC;
+    ASTContext &Ctx;
 
     void diagnoseIt(const CallExpr *E) {
       if (!E->hasTrailingClosure()) return;
@@ -2987,28 +3191,37 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
         closureLabel = TT->getElement(TT->getNumElements() - 1).getName();
       }
 
-      auto diag = TC.diagnose(closureLoc,
-                              diag::trailing_closure_requires_parens);
-      fixItEncloseTrailingClosure(TC, diag, E, closureLabel);
+      auto diag = Ctx.Diags.diagnose(closureLoc,
+                                     diag::trailing_closure_requires_parens);
+      fixItEncloseTrailingClosure(Ctx, diag, E, closureLabel);
     }
 
   public:
-    DiagnoseWalker(TypeChecker &tc) : TC(tc) { }
+    DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
 
     bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      // Dig into implicit expression.
-      if (E->isImplicit()) return { true, E };
-      // Diagnose call expression.
-      if (auto CE = dyn_cast<CallExpr>(E))
-        diagnoseIt(CE);
-      // Don't dig any further.
-      return { false, E };
+      switch (E->getKind()) {
+      case ExprKind::Paren:
+      case ExprKind::Tuple:
+      case ExprKind::Array:
+      case ExprKind::Dictionary:
+      case ExprKind::InterpolatedStringLiteral:
+        // If a trailing closure appears as a child of one of these types of
+        // expression, don't diagnose it as there is no ambiguity.
+        return {E->isImplicit(), E};
+      case ExprKind::Call:
+        diagnoseIt(cast<CallExpr>(E));
+        break;
+      default:
+        break;
+      }
+      return {true, E};
     }
   };
 
-  DiagnoseWalker Walker(TC);
+  DiagnoseWalker Walker(ctx);
   const_cast<Expr *>(E)->walk(Walker);
 }
 
@@ -3021,23 +3234,27 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
 /// E.g.:
 ///   if let _ = arr?.map {$0+1} { ... }
 ///   for _ in numbers.filter {$0 > 4} { ... }
-static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Stmt *S) {
+static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
   if (auto LCS = dyn_cast<LabeledConditionalStmt>(S)) {
     for (auto elt : LCS->getCond()) {
-      if (elt.getKind() == StmtConditionElement::CK_PatternBinding)
-        checkStmtConditionTrailingClosure(TC, elt.getInitializer());
-      else if (elt.getKind() == StmtConditionElement::CK_Boolean)
-        checkStmtConditionTrailingClosure(TC, elt.getBoolean());
+
+      if (elt.getKind() == StmtConditionElement::CK_PatternBinding) {
+        checkStmtConditionTrailingClosure(ctx, elt.getInitializer());
+        if (auto *exprPattern = dyn_cast<ExprPattern>(elt.getPattern())) {
+          checkStmtConditionTrailingClosure(ctx, exprPattern->getMatchExpr());
+        }
+      } else if (elt.getKind() == StmtConditionElement::CK_Boolean)
+        checkStmtConditionTrailingClosure(ctx, elt.getBoolean());
       // No trailing closure for CK_Availability: e.g. `if #available() {}`.
     }
   } else if (auto SS = dyn_cast<SwitchStmt>(S)) {
-    checkStmtConditionTrailingClosure(TC, SS->getSubjectExpr());
+    checkStmtConditionTrailingClosure(ctx, SS->getSubjectExpr());
   } else if (auto FES = dyn_cast<ForEachStmt>(S)) {
-    checkStmtConditionTrailingClosure(TC, FES->getSequence());
-    checkStmtConditionTrailingClosure(TC, FES->getWhere());
+    checkStmtConditionTrailingClosure(ctx, FES->getSequence());
+    checkStmtConditionTrailingClosure(ctx, FES->getWhere());
   } else if (auto DCS = dyn_cast<DoCatchStmt>(S)) {
     for (auto CS : DCS->getCatches())
-      checkStmtConditionTrailingClosure(TC, CS->getGuardExpr());
+      checkStmtConditionTrailingClosure(ctx, CS->getGuardExpr());
   }
 }
 
@@ -3078,7 +3295,7 @@ parseObjCSelector(ASTContext &ctx, StringRef string) {
 namespace {
 
 class ObjCSelectorWalker : public ASTWalker {
-  TypeChecker &TC;
+  ASTContext &Ctx;
   const DeclContext *DC;
   Type SelectorTy;
 
@@ -3095,11 +3312,10 @@ class ObjCSelectorWalker : public ASTWalker {
 
     // Look for members with the given name.
     auto nominal = method->getDeclContext()->getSelfNominalTypeDecl();
-    auto result = TC.lookupMember(const_cast<DeclContext *>(DC),
-                                  nominal->getDeclaredInterfaceType(),
-                                  lookupName,
-                                  (defaultMemberLookupOptions |
-                                   NameLookupFlags::KnownPrivate));
+    auto result = TypeChecker::lookupMember(
+        const_cast<DeclContext *>(DC), nominal->getDeclaredInterfaceType(),
+        DeclNameRef(lookupName),
+        (defaultMemberLookupOptions | NameLookupFlags::KnownPrivate));
 
     // If we didn't find multiple methods, there is no ambiguity.
     if (result.size() < 2) return false;
@@ -3125,8 +3341,8 @@ class ObjCSelectorWalker : public ASTWalker {
   }
 
 public:
-  ObjCSelectorWalker(TypeChecker &tc, const DeclContext *dc, Type selectorTy)
-    : TC(tc), DC(dc), SelectorTy(selectorTy) { }
+  ObjCSelectorWalker(const DeclContext *dc, Type selectorTy)
+    : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
 
   bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
 
@@ -3175,7 +3391,7 @@ public:
       if (argNames.size() != 1) return { true, expr };
 
       // Is this the init(stringLiteral:) initializer or init(_:) initializer?
-      if (argNames[0] == TC.Context.Id_stringLiteral)
+      if (argNames[0] == Ctx.Id_stringLiteral)
         fromStringLiteral = true;
       else if (!argNames[0].empty())
         return { true, expr };
@@ -3226,7 +3442,7 @@ public:
       if (auto coerce = getParentCoercion()) {
         // If the string literal was coerced to Selector, replace the
         // coercion with the ")".
-        SourceLoc endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+        SourceLoc endLoc = Lexer::getLocForEndOfToken(Ctx.SourceMgr,
                                                       expr->getEndLoc());
         diag.fixItReplace(SourceRange(endLoc, coerce->getEndLoc()), ")");
       } else {
@@ -3237,10 +3453,10 @@ public:
 
     // Try to parse the string literal as an Objective-C selector, and complain
     // if it isn't one.
-    auto selector = parseObjCSelector(TC.Context, stringLiteral->getValue());
+    auto selector = parseObjCSelector(Ctx, stringLiteral->getValue());
     if (!selector) {
-      auto diag = TC.diagnose(stringLiteral->getLoc(),
-                              diag::selector_literal_invalid);
+      auto diag = Ctx.Diags.diagnose(stringLiteral->getLoc(),
+                                     diag::selector_literal_invalid);
       diag.highlight(stringLiteral->getSourceRange());
       addSelectorConstruction(diag);
       return { true, expr };
@@ -3258,9 +3474,9 @@ public:
         return { true, expr };
 
       {
-        auto diag = TC.diagnose(stringLiteral->getLoc(),
-                                diag::selector_literal_undeclared,
-                                *selector);
+        auto diag = Ctx.Diags.diagnose(stringLiteral->getLoc(),
+                                       diag::selector_literal_undeclared,
+                                       *selector);
         addSelectorConstruction(diag);
       }
 
@@ -3268,8 +3484,8 @@ public:
       // separate note that suggests wrapping the selector in
       // parentheses to silence the warning.
       if (!fromStringLiteral) {
-        TC.diagnose(stringLiteral->getLoc(),
-                    diag::selector_construction_suppress_warning)
+        Ctx.Diags.diagnose(stringLiteral->getLoc(),
+                           diag::selector_construction_suppress_warning)
           .fixItInsert(stringLiteral->getStartLoc(), "(")
           .fixItInsertAfter(stringLiteral->getEndLoc(), ")");
       }
@@ -3354,7 +3570,20 @@ public:
           name = bestMethod->getFullName();
         }
 
-        out << nominal->getName().str() << "." << name.getBaseName();
+        auto typeName = nominal->getName().str();
+        // If we're inside a type Foo (or an extension of it) and the suggestion
+        // is going to be #selector(Foo.bar) (or #selector(SuperclassOfFoo.bar),
+        // then suggest the more natural #selector(self.bar) instead.
+        if (auto containingTypeContext = DC->getInnermostTypeContext()) {
+          auto methodNominalType = nominal->getDeclaredType();
+          auto outerNomType = containingTypeContext->getSelfNominalTypeDecl()
+                                                   ->getDeclaredType();
+          if (methodNominalType->isEqual(outerNomType) ||
+              methodNominalType->isExactSuperclassOf(outerNomType))
+            typeName = "self";
+        }
+
+        out << typeName << "." << name.getBaseName();
         auto argNames = name.getArgumentNames();
 
         // Only print the parentheses if there are some argument
@@ -3394,18 +3623,20 @@ public:
       if (auto coerce = getParentCoercion())
         replacementRange.End = coerce->getEndLoc();
 
-      TC.diagnose(expr->getLoc(),
-                  fromStringLiteral ? diag::selector_literal_deprecated_suggest
-                                    : diag::selector_construction_suggest)
-        .fixItReplace(replacementRange, replacement);
+      Ctx.Diags
+          .diagnose(expr->getLoc(),
+                    fromStringLiteral
+                        ? diag::selector_literal_deprecated_suggest
+                        : diag::selector_construction_suggest)
+          .fixItReplace(replacementRange, replacement);
       return { true, expr };
     }
 
     // If we couldn't pick a method to use for #selector, just wrap
     // the string literal in Selector(...).
     if (fromStringLiteral) {
-      auto diag = TC.diagnose(stringLiteral->getLoc(),
-                              diag::selector_literal_deprecated);
+      auto diag = Ctx.Diags.diagnose(stringLiteral->getLoc(),
+                                     diag::selector_literal_deprecated);
       addSelectorConstruction(diag);
       return { true, expr };
     }
@@ -3416,12 +3647,12 @@ public:
 };
 } // end anonymous namespace
 
-static void diagDeprecatedObjCSelectors(TypeChecker &tc, const DeclContext *dc,
+static void diagDeprecatedObjCSelectors(const DeclContext *dc,
                                         const Expr *expr) {
-  auto selectorTy = tc.getObjCSelectorType(const_cast<DeclContext *>(dc));
+  auto selectorTy = dc->getASTContext().getSelectorType();
   if (!selectorTy) return;
 
-  const_cast<Expr *>(expr)->walk(ObjCSelectorWalker(tc, dc, selectorTy));
+  const_cast<Expr *>(expr)->walk(ObjCSelectorWalker(dc, selectorTy));
 }
 
         
@@ -3430,7 +3661,7 @@ static void diagDeprecatedObjCSelectors(TypeChecker &tc, const DeclContext *dc,
 ///     if let x: Int = i {
 static void
 checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
-                                   TypeChecker &TC) {
+                                   ASTContext &ctx) {
   auto *p = cond.getPatternOrNull();
   if (!p) return;
   
@@ -3443,33 +3674,35 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
         // Check for 'if let' to produce a tuned diagnostic.
         if (isa<OptionalSomePattern>(TP->getSubPattern()) &&
             TP->getSubPattern()->isImplicit()) {
-          TC.diagnose(cond.getIntroducerLoc(), diag::optional_check_promotion,
-                      subExpr->getType())
+          ctx.Diags.diagnose(cond.getIntroducerLoc(),
+                             diag::optional_check_promotion,
+                             subExpr->getType())
             .highlight(subExpr->getSourceRange())
             .fixItReplace(TP->getTypeLoc().getSourceRange(),
                           ooType->getString());
           return;
         }
-      TC.diagnose(cond.getIntroducerLoc(),
-                  diag::optional_pattern_match_promotion,
-                  subExpr->getType(), cond.getInitializer()->getType())
+      ctx.Diags.diagnose(cond.getIntroducerLoc(),
+                         diag::optional_pattern_match_promotion,
+                         subExpr->getType(), cond.getInitializer()->getType())
         .highlight(subExpr->getSourceRange());
       return;
     }
     
-    TC.diagnose(cond.getIntroducerLoc(), diag::optional_check_nonoptional,
-                subExpr->getType())
+    ctx.Diags.diagnose(cond.getIntroducerLoc(),
+                       diag::optional_check_nonoptional,
+                       subExpr->getType())
       .highlight(subExpr->getSourceRange());
   }
 }
 
-static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
+static void diagnoseUnintendedOptionalBehavior(const Expr *E,
                                                const DeclContext *DC) {
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
   class UnintendedOptionalBehaviorWalker : public ASTWalker {
-    TypeChecker &TC;
+    ASTContext &Ctx;
     SmallPtrSet<Expr *, 16> IgnoredExprs;
 
     class OptionalToAnyCoercion {
@@ -3552,8 +3785,8 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       coercionString += " as ";
       coercionString += destType->getWithoutParens()->getString();
 
-      TC.diagnose(E->getLoc(), diag::silence_optional_to_any,
-                  destType, coercionString.substr(1))
+      Ctx.Diags.diagnose(E->getLoc(), diag::silence_optional_to_any,
+                         destType, coercionString.substr(1))
         .highlight(E->getSourceRange())
         .fixItInsertAfter(E->getEndLoc(), coercionString);
     }
@@ -3561,8 +3794,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     static bool hasImplicitlyUnwrappedResult(Expr *E) {
       auto *decl = getDeclForImplicitlyUnwrappedExpr(E);
 
-      return decl
-        && decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      return decl && decl->isImplicitlyUnwrappedOptional();
     }
 
     static ValueDecl *getDeclForImplicitlyUnwrappedExpr(Expr *E) {
@@ -3607,7 +3839,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
 
       // Do not warn on coercions from implicitly unwrapped optionals
       // for Swift versions less than 5.
-      if (!TC.Context.isSwiftVersionAtLeast(5) &&
+      if (!Ctx.isSwiftVersionAtLeast(5) &&
           hasImplicitlyUnwrappedResult(subExpr))
         return;
 
@@ -3627,25 +3859,26 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       // diagnostic
       if (hasImplicitlyUnwrappedResult(subExpr)) {
         if (auto decl = getDeclForImplicitlyUnwrappedExpr(subExpr)) {
-          TC.diagnose(subExpr->getStartLoc(), diag::iuo_to_any_coercion,
-                      /* from */ srcType, /* to */ destType)
+          Ctx.Diags.diagnose(subExpr->getStartLoc(), diag::iuo_to_any_coercion,
+                             /* from */ srcType, /* to */ destType)
               .highlight(subExpr->getSourceRange());
 
           auto noteDiag = isa<FuncDecl>(decl)
                               ? diag::iuo_to_any_coercion_note_func_result
                               : diag::iuo_to_any_coercion_note;
 
-          TC.diagnose(decl->getLoc(), noteDiag, decl->getDescriptiveKind(),
-                      decl->getFullName());
+          Ctx.Diags.diagnose(decl->getLoc(), noteDiag,
+                             decl->getDescriptiveKind(), decl->getFullName());
         }
       } else {
-        TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
-                    /* from */ srcType, /* to */ destType)
+        Ctx.Diags.diagnose(subExpr->getStartLoc(),
+                           diag::optional_to_any_coercion,
+                           /* from */ srcType, /* to */ destType)
             .highlight(subExpr->getSourceRange());
       }
       
       if (optionalityDifference == 1) {
-        TC.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
+        Ctx.Diags.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
             .highlight(subExpr->getSourceRange())
             .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
       }
@@ -3654,7 +3887,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       for (size_t i = 0; i < optionalityDifference; i++)
         forceUnwrapString += "!";
 
-      TC.diagnose(subExpr->getLoc(), diag::force_optional_to_any)
+      Ctx.Diags.diagnose(subExpr->getLoc(), diag::force_optional_to_any)
         .highlight(subExpr->getSourceRange())
         .fixItInsertAfter(subExpr->getEndLoc(), forceUnwrapString);
 
@@ -3680,8 +3913,8 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
 
       auto subExpr = E->getSubExpr();
 
-      TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
-                  /* from */ subExpr->getType(), /* to */ E->getType())
+      Ctx.Diags.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
+                         /* from */ subExpr->getType(), /* to */ E->getType())
         .highlight(subExpr->getSourceRange());
 
       emitSilenceOptionalAnyWarningWithCoercion(subExpr, E->getType());
@@ -3713,7 +3946,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     };
 
     void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
-      E->forEachSegment(TC.Context,
+      E->forEachSegment(Ctx,
           [&](bool isInterpolation, CallExpr *segment) -> void {
         if (isInterpolation) {
           diagnoseIfUnintendedInterpolation(segment,
@@ -3737,8 +3970,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       ValueDecl * fnDecl = appendMethod.getDecl();
 
       // If things aren't set up right, just hope for the best.
-      if (!fnDecl || !fnDecl->getInterfaceType() ||
-           fnDecl->getInterfaceType()->hasError())
+      if (!fnDecl || fnDecl->isInvalid())
         return false;
 
       // If the decl expects an optional, that's fine.
@@ -3805,22 +4037,25 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     }
 
     void diagnoseUnintendedInterpolation(Expr * arg, UnintendedInterpolationKind kind) {
-      TC.diagnose(arg->getStartLoc(),
-                  diag::debug_description_in_string_interpolation_segment,
-                  (bool)kind)
-        .highlight(arg->getSourceRange());
+      Ctx.Diags
+          .diagnose(arg->getStartLoc(),
+                    diag::debug_description_in_string_interpolation_segment,
+                    (bool)kind)
+          .highlight(arg->getSourceRange());
 
       // Suggest 'String(describing: <expr>)'.
       auto argStart = arg->getStartLoc();
-      TC.diagnose(arg->getLoc(),
-                  diag::silence_debug_description_in_interpolation_segment_call)
-        .highlight(arg->getSourceRange())
-        .fixItInsert(argStart, "String(describing: ")
-        .fixItInsertAfter(arg->getEndLoc(), ")");
+      Ctx.Diags
+          .diagnose(
+              arg->getLoc(),
+              diag::silence_debug_description_in_interpolation_segment_call)
+          .highlight(arg->getSourceRange())
+          .fixItInsert(argStart, "String(describing: ")
+          .fixItInsertAfter(arg->getEndLoc(), ")");
 
       if (kind == UnintendedInterpolationKind::Optional) {
         // Suggest inserting a default value.
-        TC.diagnose(arg->getLoc(), diag::default_optional_to_any)
+        Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_to_any)
           .highlight(arg->getSourceRange())
           .fixItInsertAfter(arg->getEndLoc(), " ?? <#default value#>");
       }
@@ -3851,20 +4086,20 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     }
 
   public:
-    UnintendedOptionalBehaviorWalker(TypeChecker &tc) : TC(tc) { }
+    UnintendedOptionalBehaviorWalker(ASTContext &ctx) : Ctx(ctx) { }
   };
 
-  UnintendedOptionalBehaviorWalker Walker(TC);
+  UnintendedOptionalBehaviorWalker Walker(DC->getASTContext());
   const_cast<Expr *>(E)->walk(Walker);
 }
 
-static void diagnoseDeprecatedWritableKeyPath(TypeChecker &TC, const Expr *E,
+static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
                                               const DeclContext *DC) {
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
   class DeprecatedWritableKeyPathWalker : public ASTWalker {
-    TypeChecker &TC;
+    ASTContext &Ctx;
     const DeclContext *DC;
 
     void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E) {
@@ -3879,8 +4114,8 @@ static void diagnoseDeprecatedWritableKeyPath(TypeChecker &TC, const Expr *E,
 
       if (auto *keyPathExpr = dyn_cast<KeyPathExpr>(E->getKeyPath())) {
         auto *decl = keyPathExpr->getType()->getNominalOrBoundGenericNominal();
-        if (decl != TC.Context.getWritableKeyPathDecl() &&
-            decl != TC.Context.getReferenceWritableKeyPathDecl())
+        if (decl != Ctx.getWritableKeyPathDecl() &&
+            decl != Ctx.getReferenceWritableKeyPathDecl())
           return;
 
         assert(keyPathExpr->getComponents().size() > 0);
@@ -3890,9 +4125,9 @@ static void diagnoseDeprecatedWritableKeyPath(TypeChecker &TC, const Expr *E,
             cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
           if (!storage->isSettable(nullptr) ||
               !storage->isSetterAccessibleFrom(DC)) {
-            TC.diagnose(keyPathExpr->getLoc(),
-                        swift::diag::expr_deprecated_writable_keypath,
-                        storage->getFullName());
+            Ctx.Diags.diagnose(keyPathExpr->getLoc(),
+                               swift::diag::expr_deprecated_writable_keypath,
+                               storage->getFullName());
           }
         }
       }
@@ -3913,11 +4148,64 @@ static void diagnoseDeprecatedWritableKeyPath(TypeChecker &TC, const Expr *E,
     }
 
   public:
-    DeprecatedWritableKeyPathWalker(TypeChecker &TC, const DeclContext *DC)
-        : TC(TC), DC(DC) {}
+    DeprecatedWritableKeyPathWalker(const DeclContext *DC)
+        : Ctx(DC->getASTContext()), DC(DC) {}
   };
 
-  DeprecatedWritableKeyPathWalker Walker(TC, DC);
+  DeprecatedWritableKeyPathWalker Walker(DC);
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
+static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
+                                                     const DeclContext *DC) {
+  class KVOObserveCallWalker : public ASTWalker {
+    const ASTContext &C;
+
+  public:
+    KVOObserveCallWalker(ASTContext &ctx) : C(ctx) {}
+
+    void maybeDiagnoseCallExpr(CallExpr *expr) {
+      auto fn = expr->getCalledValue();
+      if (!fn)
+        return;
+      if (fn->getModuleContext()->getName() != C.Id_Foundation)
+        return;
+      if (!fn->getFullName().isCompoundName("observe",
+                                            {"", "options", "changeHandler"}))
+        return;
+      auto args = cast<TupleExpr>(expr->getArg());
+      auto firstArg = dyn_cast<KeyPathExpr>(args->getElement(0));
+      if (!firstArg)
+        return;
+      auto lastComponent = firstArg->getComponents().back();
+      if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Property)
+        return;
+      auto property = lastComponent.getDeclRef().getDecl();
+      if (!property)
+        return;
+      if (property->isObjCDynamic())
+        return;
+      C.Diags
+          .diagnose(expr->getLoc(),
+                    diag::observe_keypath_property_not_objc_dynamic,
+                    property->getFullName(), fn->getFullName())
+          .highlight(lastComponent.getLoc());
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return {false, E};
+
+      if (auto *CE = dyn_cast<CallExpr>(E)) {
+        maybeDiagnoseCallExpr(CE);
+        return {false, E};
+      }
+
+      return {true, E};
+    }
+  };
+
+  KVOObserveCallWalker Walker(DC->getASTContext());
   const_cast<Expr *>(E)->walk(Walker);
 }
 
@@ -3926,34 +4214,36 @@ static void diagnoseDeprecatedWritableKeyPath(TypeChecker &TC, const Expr *E,
 //===----------------------------------------------------------------------===//
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
-void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
+void swift::performSyntacticExprDiagnostics(const Expr *E,
                                             const DeclContext *DC,
                                             bool isExprStmt) {
-  TC.diagnoseSelfAssignment(E);
-  diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
-  diagRecursivePropertyAccess(TC, E, DC);
-  diagnoseImplicitSelfUseInClosure(TC, E, DC);
-  diagnoseUnintendedOptionalBehavior(TC, E, DC);
-  if (!TC.Context.isSwiftVersionAtLeast(5))
-    diagnoseDeprecatedWritableKeyPath(TC, E, DC);
-  if (!TC.getLangOpts().DisableAvailabilityChecking)
-    diagAvailability(TC, E, const_cast<DeclContext*>(DC));
-  if (TC.Context.LangOpts.EnableObjCInterop)
-    diagDeprecatedObjCSelectors(TC, DC, E);
+  auto &ctx = DC->getASTContext();
+  TypeChecker::diagnoseSelfAssignment(E);
+  diagSyntacticUseRestrictions(E, DC, isExprStmt);
+  diagRecursivePropertyAccess(E, DC);
+  diagnoseImplicitSelfUseInClosure(E, DC);
+  diagnoseUnintendedOptionalBehavior(E, DC);
+  maybeDiagnoseCallToKeyValueObserveMethod(E, DC);
+  if (!ctx.isSwiftVersionAtLeast(5))
+    diagnoseDeprecatedWritableKeyPath(E, DC);
+  if (!ctx.LangOpts.DisableAvailabilityChecking)
+    diagAvailability(E, const_cast<DeclContext*>(DC));
+  if (ctx.LangOpts.EnableObjCInterop)
+    diagDeprecatedObjCSelectors(DC, E);
 }
 
-void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
-  TC.checkUnsupportedProtocolType(const_cast<Stmt *>(S));
+void swift::performStmtDiagnostics(ASTContext &ctx, const Stmt *S) {
+  TypeChecker::checkUnsupportedProtocolType(ctx, const_cast<Stmt *>(S));
     
   if (auto switchStmt = dyn_cast<SwitchStmt>(S))
-    checkSwitch(TC, switchStmt);
+    checkSwitch(ctx, switchStmt);
 
-  checkStmtConditionTrailingClosure(TC, S);
+  checkStmtConditionTrailingClosure(ctx, S);
   
   // Check for implicit optional promotions in stmt-condition patterns.
   if (auto *lcs = dyn_cast<LabeledConditionalStmt>(S))
     for (const auto &elt : lcs->getCond())
-      checkImplicitPromotionsInCondition(elt, TC);
+      checkImplicitPromotionsInCondition(elt, ctx);
 }
 
 //===----------------------------------------------------------------------===//
@@ -3982,7 +4272,7 @@ void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
     VD->overwriteAccess(desiredAccess);
 
     if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD)) {
-      if (auto *getter = ASD->getGetter())
+      if (auto *getter = ASD->getAccessor(AccessorKind::Get))
         getter->overwriteAccess(desiredAccess);
 
       if (auto *setterAttr = attrs.getAttribute<SetterAccessAttr>()) {
@@ -4019,6 +4309,11 @@ void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
       attr->setInvalid();
     }
 
+  } else if (auto *override = VD->getAttrs().getAttribute<OverrideAttr>()) {
+    // Insert the access in front of 'override', if it exists, in order to
+    // match the same keyword order as produced by method autocompletion.
+    diag.fixItInsert(override->getLocation(), fixItString);
+
   } else if (auto var = dyn_cast<VarDecl>(VD)) {
     if (auto PBD = var->getParentPatternBinding())
       diag.fixItInsert(PBD->getStartLoc(), fixItString);
@@ -4038,9 +4333,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   Type boolType;
   if (auto boolDecl = ctx.getBoolDecl())
     boolType = boolDecl->getDeclaredInterfaceType();
-  Type objcBoolType;
-  if (auto objcBoolDecl = ctx.getObjCBoolDecl())
-    objcBoolType = objcBoolDecl->getDeclaredInterfaceType();
+  auto objcBoolType = ctx.getObjCBoolType();
 
   /// Determine the options associated with the given type.
   auto getOptions = [&](Type type) {
@@ -4145,9 +4438,6 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
-  if (!afd->hasInterfaceType())
-    validateDecl(afd);
-
   if (afd->isInvalid() || isa<DestructorDecl>(afd))
     return None;
 
@@ -4228,10 +4518,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
-  if (!var->hasInterfaceType())
-    validateDecl(var);
-
-  if (var->isInvalid() || !var->hasInterfaceType())
+  if (var->isInvalid())
     return None;
 
   if (var->getName().empty())

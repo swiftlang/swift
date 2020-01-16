@@ -9,7 +9,7 @@ struct Wrapper<T: Codable> {
 struct WrapperWithInitialValue<T: Codable> {
   var wrappedValue: T
 
-  init(initialValue: T) {
+  init(wrappedValue initialValue: T) {
     self.wrappedValue = initialValue
   }
 }

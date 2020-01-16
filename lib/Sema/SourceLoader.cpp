@@ -17,9 +17,10 @@
 
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
-#include "swift/Parse/DelayedParsingCallbacks.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallString.h"
@@ -56,34 +57,20 @@ static FileOrError findModule(ASTContext &ctx, StringRef moduleID,
   return make_error_code(std::errc::no_such_file_or_directory);
 }
 
-namespace {
-
-/// Don't parse any function bodies except those that are transparent.
-class SkipNonTransparentFunctions : public DelayedParsingCallbacks {
-  bool shouldDelayFunctionBodyParsing(Parser &TheParser,
-                                      AbstractFunctionDecl *AFD,
-                                      const DeclAttributes &Attrs,
-                                      SourceRange BodyRange) override {
-    return Attrs.hasAttribute<TransparentAttr>();
-  }
-};
-
-} // unnamed namespace
-
 void SourceLoader::collectVisibleTopLevelModuleNames(
     SmallVectorImpl<Identifier> &names) const {
   // TODO: Implement?
 }
 
-bool SourceLoader::canImportModule(std::pair<Identifier, SourceLoc> ID) {
+bool SourceLoader::canImportModule(Located<Identifier> ID) {
   // Search the memory buffers to see if we can find this file on disk.
-  FileOrError inputFileOrError = findModule(Ctx, ID.first.str(),
-                                            ID.second);
+  FileOrError inputFileOrError = findModule(Ctx, ID.Item.str(),
+                                            ID.Loc);
   if (!inputFileOrError) {
     auto err = inputFileOrError.getError();
     if (err != std::errc::no_such_file_or_directory) {
-      Ctx.Diags.diagnose(ID.second, diag::sema_opening_import,
-                         ID.first, err.message());
+      Ctx.Diags.diagnose(ID.Loc, diag::sema_opening_import,
+                         ID.Item, err.message());
     }
 
     return false;
@@ -92,21 +79,20 @@ bool SourceLoader::canImportModule(std::pair<Identifier, SourceLoc> ID) {
 }
 
 ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
-                                     ArrayRef<std::pair<Identifier,
-                                     SourceLoc>> path) {
+                                     ArrayRef<Located<Identifier>> path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
 
   auto moduleID = path[0];
 
-  FileOrError inputFileOrError = findModule(Ctx, moduleID.first.str(),
-                                            moduleID.second);
+  FileOrError inputFileOrError = findModule(Ctx, moduleID.Item.str(),
+                                            moduleID.Loc);
   if (!inputFileOrError) {
     auto err = inputFileOrError.getError();
     if (err != std::errc::no_such_file_or_directory) {
-      Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
-                         moduleID.first, err.message());
+      Ctx.Diags.diagnose(moduleID.Loc, diag::sema_opening_import,
+                         moduleID.Item, err.message());
     }
 
     return nullptr;
@@ -119,8 +105,8 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
                                      /*isSystem=*/false);
 
   // Turn off debugging while parsing other modules.
-  llvm::SaveAndRestore<bool> turnOffDebug(Ctx.LangOpts.DebugConstraintSolver,
-                                          false);
+  llvm::SaveAndRestore<bool>
+      turnOffDebug(Ctx.TypeCheckerOpts.DebugConstraintSolver, false);
 
   unsigned bufferID;
   if (auto BufID =
@@ -129,10 +115,10 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   else
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
-  auto *importMod = ModuleDecl::create(moduleID.first, Ctx);
+  auto *importMod = ModuleDecl::create(moduleID.Item, Ctx);
   if (EnableLibraryEvolution)
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
-  Ctx.LoadedModules[moduleID.first] = importMod;
+  Ctx.LoadedModules[moduleID.Item] = importMod;
 
   auto implicitImportKind = SourceFile::ImplicitModuleImportKind::Stdlib;
   if (!Ctx.getStdlibModule())
@@ -145,23 +131,11 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   importMod->addFile(*importFile);
 
   bool done;
-  PersistentParserState persistentState(Ctx);
-  SkipNonTransparentFunctions delayCallbacks;
-  parseIntoSourceFile(*importFile, bufferID, &done, nullptr, &persistentState,
-                      SkipBodies ? &delayCallbacks : nullptr);
+  parseIntoSourceFile(*importFile, bufferID, &done, nullptr, nullptr);
   assert(done && "Parser returned early?");
   (void)done;
 
-  if (SkipBodies)
-    performDelayedParsing(importMod, persistentState, nullptr);
-
-  // FIXME: Support recursive definitions in immediate modes by making type
-  // checking even lazier.
-  if (SkipBodies)
-    performNameBinding(*importFile);
-  else
-    performTypeChecking(*importFile, persistentState.getTopLevelContext(),
-                        None);
+  performNameBinding(*importFile);
   importMod->setHasResolvedImports();
   return importMod;
 }

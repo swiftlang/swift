@@ -19,6 +19,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -34,6 +35,7 @@ class SemaAnnotator : public ASTWalker {
   SmallVector<ConstructorRefCallExpr *, 2> CtorRefs;
   SmallVector<ExtensionDecl *, 2> ExtDecls;
   llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpaqueValueMap;
+  llvm::SmallPtrSet<Expr *, 16> ExprsToSkip;
   bool Cancelled = false;
   Optional<AccessKind> OpAccess;
 
@@ -44,6 +46,10 @@ public:
   bool isDone() const { return Cancelled; }
 
 private:
+
+  // FIXME: Remove this
+  bool shouldWalkAccessorsTheOldWay() override { return true; }
+
   bool shouldWalkIntoGenericParams() override {
     return SEWalker.shouldWalkIntoGenericParams();
   }
@@ -61,13 +67,14 @@ private:
   std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override;
 
   bool handleImports(ImportDecl *Import);
+  bool handleCustomAttributes(Decl *D);
   bool passModulePathElements(ArrayRef<ImportDecl::AccessPathElement> Path,
                               const clang::Module *ClangMod);
 
   bool passReference(ValueDecl *D, Type Ty, SourceLoc Loc, SourceRange Range,
                      ReferenceMetaData Data);
   bool passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data);
-  bool passReference(ModuleEntity Mod, std::pair<Identifier, SourceLoc> IdLoc);
+  bool passReference(ModuleEntity Mod, Located<Identifier> IdLoc);
 
   bool passSubscriptReference(ValueDecl *D, SourceLoc Loc,
                               ReferenceMetaData Data, bool IsOpenBracket);
@@ -94,6 +101,11 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   bool ShouldVisitChildren;
   if (shouldIgnore(D, ShouldVisitChildren))
     return ShouldVisitChildren;
+
+  if (!handleCustomAttributes(D)) {
+    Cancelled = true;
+    return false;
+  }
 
   SourceLoc Loc = D->getLoc();
   unsigned NameLen = 0;
@@ -126,7 +138,9 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
         return false;
     }
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    SourceRange SR = ED->getExtendedTypeLoc().getSourceRange();
+    SourceRange SR = SourceRange();
+    if (auto *repr = ED->getExtendedTypeRepr())
+      SR = repr->getSourceRange();
     Loc = SR.Start;
     if (Loc.isValid())
       NameLen = ED->getASTContext().SourceMgr.getByteDistance(SR.Start, SR.End);
@@ -174,25 +188,6 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
   bool ShouldVisitChildren;
   if (shouldIgnore(D, ShouldVisitChildren))
     return true;
-
-  // FIXME: rdar://17671977 the initializer for a lazy property has already
-  // been moved into its implicit getter.
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-    if (auto *VD = PBD->getSingleVar()) {
-      if (VD->getAttrs().hasAttribute<LazyAttr>()) {
-        if (auto *Get = VD->getGetter()) {
-          assert((Get->isImplicit() || Get->isInvalid())
-            && "lazy var getter must be either implicitly computed or invalid");
-
-          // Note that an implicit getter may not have the body synthesized
-          // in case the owning PatternBindingDecl is invalid.
-          if (auto *Body = Get->getBody()) {
-            Body->walk(*this);
-          }
-        }
-      }
-    }
-  }
 
   if (isa<ExtensionDecl>(D)) {
     assert(ExtDecls.back() == D);
@@ -252,6 +247,9 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (isDone())
     return { false, nullptr };
 
+  if (ExprsToSkip.count(E) != 0)
+    return { false, E };
+
   if (!SEWalker.walkToExprPre(E))
     return { false, E };
 
@@ -272,7 +270,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
       if (!passReference(ModuleEntity(module),
-                         std::make_pair(module->getName(), E->getLoc())))
+                         {module->getName(), E->getLoc()}))
         return { false, nullptr };
     } else if (!passReference(DRE->getDecl(), DRE->getType(),
                               DRE->getNameLoc(),
@@ -491,11 +489,12 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
 
   if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
     if (ValueDecl *VD = IdT->getBoundDecl()) {
-      if (auto *ModD = dyn_cast<ModuleDecl>(VD))
-        return passReference(ModD, std::make_pair(IdT->getIdentifier(),
-                                                  IdT->getIdLoc()));
+      if (auto *ModD = dyn_cast<ModuleDecl>(VD)) {
+        auto ident = IdT->getNameRef().getBaseIdentifier();
+        return passReference(ModD, { ident, IdT->getLoc() });
+      }
 
-      return passReference(VD, Type(), DeclNameLoc(IdT->getIdLoc()),
+      return passReference(VD, Type(), IdT->getNameLoc(),
                            ReferenceMetaData(SemaReferenceKind::TypeRef, None));
     }
   }
@@ -539,6 +538,41 @@ std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
   // subpattern.  The type will be walked as a part of another TypedPattern.
   TP->getSubPattern()->walk(*this);
   return { false, P };
+}
+
+bool SemaAnnotator::handleCustomAttributes(Decl *D) {
+  // CustomAttrs of non-param VarDecls are handled when this method is called
+  // on their containing PatternBindingDecls (see below).
+  if (isa<VarDecl>(D) && !isa<ParamDecl>(D))
+    return true;
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    if (auto *SingleVar = PBD->getSingleVar()) {
+      D = SingleVar;
+    } else {
+      return true;
+    }
+  }
+  for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
+    if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+      if (!Repr->walk(*this))
+        return false;
+    }
+    if (auto *SemaInit = customAttr->getSemanticInit()) {
+      if (!SemaInit->isImplicit()) {
+        assert(customAttr->getArg());
+        if (!SemaInit->walk(*this))
+          return false;
+        // Don't walk this again via the associated PatternBindingDecl's
+        // initializer
+        ExprsToSkip.insert(SemaInit);
+      }
+    } else if (auto *Arg = customAttr->getArg()) {
+      if (!Arg->walk(*this))
+        return false;
+    }
+  }
+  return true;
 }
 
 bool SemaAnnotator::handleImports(ImportDecl *Import) {
@@ -615,7 +649,9 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
     }
 
     if (!ExtDecls.empty() && BaseNameLoc.isValid()) {
-      auto ExtTyLoc = ExtDecls.back()->getExtendedTypeLoc().getLoc();
+      SourceLoc ExtTyLoc = SourceLoc();
+      if (auto *repr = ExtDecls.back()->getExtendedTypeRepr())
+        ExtTyLoc = repr->getLoc();
       if (ExtTyLoc.isValid() && ExtTyLoc == BaseNameLoc) {
         ExtDecl = ExtDecls.back();
       }
@@ -633,11 +669,11 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
 }
 
 bool SemaAnnotator::passReference(ModuleEntity Mod,
-                                  std::pair<Identifier, SourceLoc> IdLoc) {
-  if (IdLoc.second.isInvalid())
+                                  Located<Identifier> IdLoc) {
+  if (IdLoc.Loc.isInvalid())
     return true;
-  unsigned NameLen = IdLoc.first.getLength();
-  CharSourceRange Range{ IdLoc.second, NameLen };
+  unsigned NameLen = IdLoc.Item.getLength();
+  CharSourceRange Range{ IdLoc.Loc, NameLen };
   bool Continue = SEWalker.visitModuleReference(Mod, Range);
   if (!Continue)
     Cancelled = true;

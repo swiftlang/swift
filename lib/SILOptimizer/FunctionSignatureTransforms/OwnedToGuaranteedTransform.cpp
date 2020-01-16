@@ -56,7 +56,7 @@ static SILInstruction *findOnlyApply(SILFunction *F) {
 
 bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
   SILFunction *F = TransformDescriptor.OriginalFunction;
-  auto Args = F->begin()->getFunctionArguments();
+  auto Args = F->begin()->getSILFunctionArguments();
   // A map from consumed SILArguments to the release associated with an
   // argument.
   //
@@ -94,9 +94,9 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
         if (!ArgToThrowReleaseMap.hasBlock() || !ReleasesInThrow.empty()) {
           assert(A.CalleeRelease.empty());
           assert(A.CalleeReleaseInThrowBlock.empty());
-          copy(Releases, std::back_inserter(A.CalleeRelease));
-          copy(ReleasesInThrow,
-               std::back_inserter(A.CalleeReleaseInThrowBlock));
+          llvm::copy(Releases, std::back_inserter(A.CalleeRelease));
+          llvm::copy(ReleasesInThrow,
+                     std::back_inserter(A.CalleeReleaseInThrowBlock));
           // We can convert this parameter to a @guaranteed.
           A.OwnedToGuaranteed = true;
           SignatureOptimize = true;

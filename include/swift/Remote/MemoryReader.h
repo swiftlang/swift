@@ -69,7 +69,7 @@ public:
   /// NOTE: subclasses MUST override at least one of the readBytes functions. The default
   /// implementation calls through to the other one.
   virtual ReadBytesResult
-    readBytes(RemoteAddress address, uint64_t size) {
+  readBytes(RemoteAddress address, uint64_t size) {
     auto *Buf = malloc(size);
     ReadBytesResult Result(Buf, [](const void *ptr) {
       free(const_cast<void *>(ptr));
@@ -95,6 +95,34 @@ public:
     
     memcpy(dest, Ptr.get(), size);
     return true;
+  }
+  
+  /// Attempts to resolve a pointer value read from the given remote address.
+  virtual RemoteAbsolutePointer resolvePointer(RemoteAddress address,
+                                               uint64_t readValue) {
+    // Default implementation returns the read value as is.
+    return RemoteAbsolutePointer("", readValue);
+  }
+  
+  /// Attempt to read and resolve a pointer value at the given remote address.
+  llvm::Optional<RemoteAbsolutePointer> readPointer(RemoteAddress address,
+                                                    unsigned pointerSize) {
+    auto result = readBytes(address, pointerSize);
+    if (!result)
+      return llvm::None;
+    
+    uint64_t pointerData;
+    if (pointerSize == 4) {
+      uint32_t theData;
+      memcpy(&theData, result.get(), 4);
+      pointerData = theData;
+    } else if (pointerSize == 8) {
+      memcpy(&pointerData, result.get(), 8);
+    } else {
+      return llvm::None;
+    }
+    
+    return resolvePointer(address, pointerData);
   }
           
   virtual ~MemoryReader() = default;

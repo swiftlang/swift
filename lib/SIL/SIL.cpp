@@ -186,7 +186,7 @@ static bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type) {
 /// ABI-private, we can always at least fetch its metadata and use the
 /// value witness table stored there.
 bool SILModule::isTypeABIAccessible(SILType type,
-                                    ResilienceExpansion forExpansion) {
+                                    TypeExpansionContext forExpansion) {
   // Fixed-ABI types can have value operations done without metadata.
   if (Types.getTypeLowering(type, forExpansion).isFixedABI())
     return true;
@@ -213,9 +213,10 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   if (isa<ProtocolDecl>(getDeclContext()))
     return false;
   
-  // Any property that's potentially resilient should have accessors
-  // synthesized.
-  if (!getGetter())
+  // FIXME: We should support properties and subscripts with '_read' accessors;
+  // 'get' is not part of the opaque accessor set there.
+  auto *getter = getOpaqueAccessor(AccessorKind::Get);
+  if (!getter)
     return false;
 
   // If the getter is mutating, we cannot form a keypath to it at all.
@@ -231,8 +232,7 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   // then we still do.
 
   // Check the linkage of the declaration.
-  auto getter = SILDeclRef(getGetter());
-  auto getterLinkage = getter.getLinkage(ForDefinition);
+  auto getterLinkage = SILDeclRef(getter).getLinkage(ForDefinition);
   
   switch (getterLinkage) {
   case SILLinkage::Public:

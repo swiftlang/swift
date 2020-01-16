@@ -41,6 +41,15 @@ struct SupplementaryOutputPaths {
   /// \sa swift::serialize
   std::string ModuleOutputPath;
 
+  /// The path to which we should emit a module source information file.
+  /// It is valid whenever there are any inputs.
+  ///
+  /// This binary format stores source locations and other information about the
+  /// declarations in a module.
+  ///
+  /// \sa swift::serialize
+  std::string ModuleSourceInfoOutputPath;
+
   /// The path to which we should emit a module documentation file.
   /// It is valid whenever there are any inputs.
   ///
@@ -73,6 +82,22 @@ struct SupplementaryOutputPaths {
   /// \sa swift::emitReferenceDependencies
   /// \sa DependencyGraph
   std::string ReferenceDependenciesFilePath;
+
+  /// The path to which we should output a Swift "unparsed ranges" file.
+  /// It is valid whenever there are any inputs.
+  ///
+  /// "Unparsed ranges" track source ranges in non-primary files whose parsing
+  /// was skipped
+  /// (a.k.a. "delayed).\
+  /// These files are consumed by the Swift driver (or will be someday) to
+  /// decide whether a source file needs to be recompiled during a build.
+  ///
+  /// \sa swift::emitSwiftRanges
+  std::string SwiftRangesFilePath;
+
+  /// The path to which we should save the source code of a primary source file
+  /// to be compiled. Used to diff sources of primary inputs.
+  std::string CompiledSourceFilePath;
 
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.
@@ -113,7 +138,7 @@ struct SupplementaryOutputPaths {
   /// \sa swift::writeTBDFile
   std::string TBDPath;
 
-  /// The path to which we should emit a parseable module interface, which can
+  /// The path to which we should emit a module interface, which can
   /// be used by a client source file to import this module.
   ///
   /// This format is similar to the binary format used for #ModuleOutputPath,
@@ -121,8 +146,18 @@ struct SupplementaryOutputPaths {
   ///
   /// Currently only makes sense when the compiler has whole-module knowledge.
   ///
-  /// \sa swift::emitParseableInterface
-  std::string ParseableInterfaceOutputPath;
+  /// \sa swift::emitSwiftInterface
+  std::string ModuleInterfaceOutputPath;
+
+  /// The path to a .c file where we should declare $ld$add symbols for those
+  /// symbols moved to the current module.
+  /// When symbols are moved to this module, this module declares them as HIDE
+  /// for the OS versions prior to when the move happened. On the other hand, the
+  /// original module should ADD them for these OS versions. An executable
+  /// can choose the right library to link against depending on the deployment target.
+  /// This is a walk-around that linker directives cannot specify other install
+  /// name per symbol, we should eventually remove this.
+  std::string LdAddCFilePath;
 
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
@@ -132,7 +167,8 @@ struct SupplementaryOutputPaths {
            ModuleDocOutputPath.empty() && DependenciesFilePath.empty() &&
            ReferenceDependenciesFilePath.empty() &&
            SerializedDiagnosticsPath.empty() && LoadedModuleTracePath.empty() &&
-           TBDPath.empty() && ParseableInterfaceOutputPath.empty();
+           TBDPath.empty() && ModuleInterfaceOutputPath.empty() &&
+           ModuleSourceInfoOutputPath.empty() && LdAddCFilePath.empty();
   }
 };
 } // namespace swift

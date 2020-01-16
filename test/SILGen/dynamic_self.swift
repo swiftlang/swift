@@ -349,7 +349,7 @@ class Derived : Base {
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZ : $@convention(method) (@thick Derived.Type) -> @owned Derived
-  // CHECK; [[DYNAMIC_SELF:%.*]] = unchecked_trivial_bit_cast %0 : $@thick Derived.Type to $@thick @synamic_self Derived.Type
+  // CHECK: [[DYNAMIC_SELF:%.*]] = unchecked_trivial_bit_cast %0 : $@thick Derived.Type to $@thick @dynamic_self Derived.Type
   // CHECK: [[SUPER:%.*]] = upcast [[DYNAMIC_SELF]] : $@thick @dynamic_self Derived.Type to $@thick Base.Type
   // CHECK: [[METHOD:%.*]] = function_ref @$s12dynamic_self4BaseC17returnsSelfStaticACXDyFZ
   // CHECK: apply [[METHOD]]([[SUPER]])
@@ -439,6 +439,25 @@ public class FunctionConversionTest : EmptyProtocol {
     takesNoEscapeWithSelf(fn)
 
     return self
+  }
+}
+
+public class CaptureTwoValuesTest {
+  public required init() {}
+
+  // CHECK-LABEL: sil [ossa] @$s12dynamic_self20CaptureTwoValuesTestC08capturesdE0yyFZ : $@convention(method) (@thick CaptureTwoValuesTest.Type) -> () {
+  public static func capturesTwoValues() {
+    let a = Self()
+    let b = Self()
+
+    // CHECK: function_ref @$s12dynamic_self20CaptureTwoValuesTestC08capturesdE0yyFZyycfU_ : $@convention(thin) (@guaranteed CaptureTwoValuesTest, @guaranteed CaptureTwoValuesTest) -> ()
+    _ = {
+      _ = a
+      _ = b
+      _ = Self.self
+    }
+
+    // CHECK-LABEL: sil private [ossa] @$s12dynamic_self20CaptureTwoValuesTestC08capturesdE0yyFZyycfU_ : $@convention(thin) (@guaranteed CaptureTwoValuesTest, @guaranteed CaptureTwoValuesTest) -> () {
   }
 }
 

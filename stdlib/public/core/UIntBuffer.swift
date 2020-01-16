@@ -35,11 +35,11 @@ public struct _UIntBuffer<Element: UnsignedInteger & FixedWidthInteger> {
   }
 }
 
-extension _UIntBuffer : Sequence {
+extension _UIntBuffer: Sequence {
   public typealias SubSequence = Slice<_UIntBuffer>
   
   @frozen
-  public struct Iterator : IteratorProtocol, Sequence {
+  public struct Iterator: IteratorProtocol, Sequence {
     @inlinable
     @inline(__always)
     public init(_ x: _UIntBuffer) { _impl = x }
@@ -65,9 +65,9 @@ extension _UIntBuffer : Sequence {
   }
 }
 
-extension _UIntBuffer : Collection {  
+extension _UIntBuffer: Collection {
   @frozen
-  public struct Index : Comparable {
+  public struct Index: Comparable {
     @usableFromInline
     internal var bitOffset: UInt8
     
@@ -85,13 +85,13 @@ extension _UIntBuffer : Collection {
   }
 
   @inlinable
-  public var startIndex : Index {
+  public var startIndex: Index {
     @inline(__always)
     get { return Index(bitOffset: 0) }
   }
   
   @inlinable
-  public var endIndex : Index {
+  public var endIndex: Index {
     @inline(__always)
     get { return Index(bitOffset: _bitCount) }
   }
@@ -103,7 +103,7 @@ extension _UIntBuffer : Collection {
   }
 
   @inlinable
-  internal var _elementWidth : UInt8 {
+  internal var _elementWidth: UInt8 {
     return UInt8(truncatingIfNeeded: Element.bitWidth)
   }
   
@@ -116,7 +116,7 @@ extension _UIntBuffer : Collection {
   }
 }
 
-extension _UIntBuffer : BidirectionalCollection {
+extension _UIntBuffer: BidirectionalCollection {
   @inlinable
   @inline(__always)
   public func index(before i: Index) -> Index {
@@ -124,7 +124,7 @@ extension _UIntBuffer : BidirectionalCollection {
   }
 }
 
-extension _UIntBuffer : RandomAccessCollection {
+extension _UIntBuffer: RandomAccessCollection {
   public typealias Indices = DefaultIndices<_UIntBuffer>
   
   @inlinable
@@ -167,7 +167,7 @@ extension Range {
   }
 }
 
-extension _UIntBuffer : RangeReplaceableCollection {
+extension _UIntBuffer: RangeReplaceableCollection {
   @inlinable
   @inline(__always)
   public init() {

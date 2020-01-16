@@ -267,7 +267,7 @@ func rdar29960565(_ o: AnyObject) {
 
 @objc class DynamicIUO : NSObject, Q {
   @objc var t: String! = ""
-  @objc func bar() -> String! {}
+  @objc func baz() -> String! {}
   @objc subscript(_: DynamicIUO) -> DynamicIUO! {
     get {
       return self
@@ -299,11 +299,11 @@ let _: String = o.t
 let _: String = o.t!
 let _: String = o.t!!
 let _: String? = o.t
-let _: String = o.bar()
-let _: String = o.bar!()
-let _: String = o.bar()!
-let _: String = o.bar!()!
-let _: String? = o.bar()
+let _: String = o.baz()
+let _: String = o.baz!()
+let _: String = o.baz()!
+let _: String = o.baz!()!
+let _: String? = o.baz()
 let _: DynamicIUO = o[dyn_iuo]
 let _: DynamicIUO = o[dyn_iuo]!
 let _: DynamicIUO = o[dyn_iuo]!!
@@ -388,4 +388,23 @@ func testAnyObjectAmbiguity(_ x: AnyObject) {
 
   // FIX-ME(SR-8611): This is currently ambiguous but shouldn't be.
   _ = x[unambiguousSubscript: ""] // expected-error {{ambiguous use of 'subscript(unambiguousSubscript:)'}}
+}
+
+// SR-11648
+class HasMethodWithDefault {
+  @objc func hasDefaultParam(_ x: Int = 0) {}
+}
+
+func testAnyObjectWithDefault(_ x: AnyObject) {
+  x.hasDefaultParam()
+}
+
+// SR-11829: Don't perform dynamic lookup for callAsFunction.
+class ClassWithObjcCallAsFunction {
+  @objc func callAsFunction() {}
+}
+
+func testCallAsFunctionAnyObject(_ x: AnyObject) {
+  x() // expected-error {{cannot call value of non-function type 'AnyObject'}}
+  x.callAsFunction() // Okay.
 }

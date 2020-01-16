@@ -189,8 +189,7 @@ int main(int argc, char **argv) {
   if (Invocation.hasSerializedAST()) {
     assert(!CI.hasSILModule() &&
            "performSema() should not create a SILModule.");
-    CI.setSILModule(SILModule::createEmptyModule(
-        CI.getMainModule(), CI.getSILOptions(), PerformWMO));
+    CI.createSILModule();
     std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
         CI.getASTContext(), CI.getSILModule(), nullptr);
 

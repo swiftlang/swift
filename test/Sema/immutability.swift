@@ -159,7 +159,7 @@ struct SomeStruct {
       return 42
     }
     nonmutating
-    set {      // expected-note {{mark accessor 'mutating' to make 'self' mutable}} {{5-5=mutating }}
+    set {      // expected-note {{mark accessor 'mutating' to make 'self' mutable}} {{5-16=mutating}}
       iv = newValue // expected-error {{cannot assign to property: 'self' is immutable}}
     }
   }
@@ -370,7 +370,7 @@ func testSelectorStyleArguments1(_ x: Int, bar y: Int) {
 func testSelectorStyleArguments2(let x: Int, // expected-warning {{'let' in this position is interpreted as an argument label}}{{34-37=`let`}}
                                  let bar y: Int) { // expected-warning {{'let' in this position is interpreted as an argument label}}{{34-37=`let`}}
 // expected-error @-1 {{expected ',' separator}}
-// expected-error @-2 {{parameter requires an explicit type}}
+// expected-error @-2 {{expected ':' following argument label and parameter name}}
 }
 func testSelectorStyleArguments3(_ x: Int, bar y: Int) {
   ++x  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}
@@ -457,6 +457,7 @@ func assignmentsToFuncs() {
 
   var x = 0
   (x, func1() = 0) = (4, 5) // expected-error {{expression is not assignable: 'func1' returns immutable value}}
+  // expected-error@-1 {{cannot assign value of type '(Int, Int)' to type '(Int, ())'}}
 }
 
 // <rdar://problem/17051675> Structure initializers in an extension cannot assign to constant properties
@@ -508,8 +509,10 @@ struct StructWithDelegatingInit {
 }
 
 // <rdar://problem/16792027> compiler infinite loops on a really really mutating function
-struct F { // expected-note 1 {{in declaration of 'F'}}
-  mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}} expected-note 2 {{modifier already specified here}} expected-error {{expected declaration}}
+struct F {
+  mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}}
+                                   // expected-note@-1 2 {{modifier already specified here}}
+                                   // expected-error@-2 {{expected 'func' keyword in instance method declaration}}
   }
   
   mutating nonmutating func g() {}  // expected-error {{method must not be declared both 'mutating' and 'nonmutating'}}
@@ -654,8 +657,8 @@ func sr4214() {
   let closure = { val in val.x = 7 } as (inout MutableSubscripts) -> () // Ok
   var v = MutableSubscripts()
   closure(&v)
-  // FIXME: This diagnostic isn't really all that much better
-  // expected-error@+1 {{cannot convert value of type '(inout MutableSubscripts) -> ()' to expected argument type '(_) -> _'}}
+  // expected-error@+2 {{declared closure result '()' is incompatible with contextual type 'MutableSubscripts'}}
+  // expected-error@+1 {{cannot convert value of type '(inout MutableSubscripts) -> ()' to expected argument type '(MutableSubscripts) -> MutableSubscripts'}}
   sequence(v) { (state : inout MutableSubscripts) -> () in
     _ = MutableSubscripts.initialize(from: &state)
     return ()
@@ -677,5 +680,65 @@ struct SS {
     i = i // expected-error {{cannot assign to value: 'i' is a 'let' constant}}
     // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'SS'}}{{5-5=self.}}
     j = j // expected-error {{cannot assign to value: 'j' is a 'let' constant}}
+  }
+}
+
+protocol JustAProtocol {
+  var name: String { get set }
+}
+
+extension JustAProtocol {
+  var foo: String {
+    get { return name }
+    nonmutating set { name = newValue } // expected-error {{cannot assign to property: 'self' is immutable}} 
+    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-16=mutating}}
+  }
+
+  nonmutating func bar() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-14=mutating}}
+    name = "Hello" // expected-error {{cannot assign to property: 'self' is immutable}}
+  }
+  
+  func baz() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-3=mutating }}
+    name = "World" // expected-error {{cannot assign to property: 'self' is immutable}}
+  }
+}
+
+struct S {
+  var x = 0
+  static var y = 0
+
+  struct Nested {
+    func foo() {
+      // SR-11786: Make sure we don't offer the 'self.' fix-it here.
+      let x = 0 // expected-note {{change 'let' to 'var' to make it mutable}}
+      x += 1 // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
+    }
+  }
+
+  func bar() {
+    // SR-11787: Make sure we insert "self." in the right location.
+    let x = 0 // expected-note 3{{change 'let' to 'var' to make it mutable}}
+    x += 1 // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'S'}} {{5-5=self.}}
+
+    (try x) += 1 // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'S'}} {{10-10=self.}}
+
+    x = 1 // expected-error {{cannot assign to value: 'x' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'S'}} {{5-5=self.}}
+
+    // SR-11788: Insert "Type." for a static property.
+    let y = 0 // expected-note {{change 'let' to 'var' to make it mutable}}
+    y += 1 // expected-error {{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'S.' to refer to mutable static property of 'S'}} {{5-5=S.}}
+  }
+}
+
+struct S2<T> {
+  static var y: Int { get { 0 } set {} }
+  func foo() {
+    let y = 0 // expected-note {{change 'let' to 'var' to make it mutable}}
+    y += 1 // expected-error {{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'S2<T>.' to refer to mutable static property of 'S2<T>'}} {{5-5=S2<T>.}}
   }
 }

@@ -53,11 +53,18 @@ public:
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
 
+  /// Controls whether specific OSSA optimizations are run. For benchmarking
+  /// purposes.
+  bool EnableOSSAOptimizations = true;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
   bool DisableSILPerfOptimizations = false;
 
+  /// Controls whether cross module optimization is enabled.
+  bool CrossModuleOptimization = false;
+  
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
@@ -67,8 +74,15 @@ public:
   /// Whether to dump verbose SIL with scope and location information.
   bool EmitVerboseSIL = false;
 
+  /// Should we sort SIL functions, vtables, witness tables, and global
+  /// variables by name when we print it out. This eases diffing of SIL files.
+  bool EmitSortedSIL = false;
+
   /// Whether to stop the optimization pipeline after serializing SIL.
   bool StopOptimizationAfterSerialization = false;
+
+  /// Whether to skip emitting non-inlinable function bodies.
+  bool SkipNonInlinableFunctionBodies = false;
 
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;
@@ -141,7 +155,7 @@ public:
 
   /// Should the default pass pipelines strip ownership during the diagnostic
   /// pipeline or after serialization.
-  bool StripOwnershipAfterSerialization = false;
+  bool StripOwnershipAfterSerialization = true;
 
   /// The name of the file to which the backend should save YAML optimization
   /// records.

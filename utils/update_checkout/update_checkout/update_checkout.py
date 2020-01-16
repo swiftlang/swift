@@ -40,18 +40,9 @@ def confirm_tag_in_repo(tag, repo_name):
 
 
 def find_rev_by_timestamp(timestamp, repo_name, refspec):
-    base_args = ["git", "log", "-1", "--format=%H",
-                 '--before=' + timestamp]
-    # On repos with regular batch-automerges from swift-ci -- namely clang,
-    # llvm and lldb -- prefer the most-recent change _made by swift-ci_
-    # before the timestamp, falling back to most-recent in general if there
-    # is none by swift-ci.
-    if repo_name in ["llvm", "clang", "lldb"]:
-        rev = shell.capture(base_args +
-                            ['--author', 'swift-ci', refspec]).strip()
-        if rev:
-            return rev
-    rev = shell.capture(base_args + [refspec]).strip()
+    args = ["git", "log", "-1", "--format=%H", "--first-parent",
+            '--before=' + timestamp, refspec]
+    rev = shell.capture(args).strip()
     if rev:
         return rev
     else:
@@ -85,7 +76,7 @@ def update_single_repository(pool_args):
     source_root, config, repo_name, scheme_name, scheme_map, tag, timestamp, \
         reset_to_remote, should_clean, cross_repos_pr = pool_args
     repo_path = os.path.join(source_root, repo_name)
-    if not os.path.isdir(repo_path):
+    if not os.path.isdir(repo_path) or os.path.islink(repo_path):
         return
 
     try:

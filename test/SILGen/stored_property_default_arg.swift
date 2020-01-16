@@ -206,3 +206,19 @@ func checkReferenceTuple() {
 // CHECK-NEXT: [[AA1:%.*]] = apply [[AA1_REF]]([[ELT0]], [[ELT1]], {{.*}}) : $@convention(method) (@owned Optional<Z>, @owned Optional<Z>, @thin AA.Type) -> @owned AA
   let ae = AA.init(ab:)()
 }
+
+struct OptionalGeneric<T> {
+  var t: T?
+  var x: Int
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s27stored_property_default_arg31checkDefaultInitGenericOptionalyyF : $@convention(thin) () -> () {
+func checkDefaultInitGenericOptional() {
+  let og = OptionalGeneric<Int>(x: 0)
+
+  // CHECK: [[VALUE:%.*]] = enum $Optional<Int>, #Optional.none!enumelt
+  // CHECK: [[NIL:%.*]] = alloc_stack $Optional<Int>
+  // CHECK: store [[VALUE]] to [trivial] [[NIL]] : $*Optional<Int>
+  // CHECK: [[FN:%.*]] =  function_ref @$s27stored_property_default_arg15OptionalGenericV1t1xACyxGxSg_SitcfC : $@convention(method) <τ_0_0> (@in Optional<τ_0_0>, Int, @thin OptionalGeneric<τ_0_0>.Type) -> @out OptionalGeneric<τ_0_0>
+  // CHECK: apply [[FN]]<Int>(%0, [[NIL]], {{%.*}}, %1)
+}

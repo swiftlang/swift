@@ -17,7 +17,6 @@
 #ifndef SWIFT_PARSE_PERSISTENTPARSERSTATE_H
 #define SWIFT_PARSE_PERSISTENTPARSERSTATE_H
 
-#include "swift/AST/LazyResolver.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Parse/ParserPosition.h"
@@ -25,12 +24,40 @@
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
-  class AbstractFunctionDecl;
-  class LazyMemberParser;
-  class ASTContext;
+
+class SourceFile;
+class DeclContext;
+class IterableDeclContext;
+
+enum class CodeCompletionDelayedDeclKind {
+  TopLevelCodeDecl,
+  Decl,
+  FunctionBody,
+};
+
+class CodeCompletionDelayedDeclState {
+public:
+  CodeCompletionDelayedDeclKind Kind;
+  unsigned Flags;
+  DeclContext *ParentContext;
+  SavedScope Scope;
+  unsigned StartOffset;
+  unsigned EndOffset;
+  unsigned PrevOffset;
+
+  SavedScope takeScope() { return std::move(Scope); }
+
+  CodeCompletionDelayedDeclState(CodeCompletionDelayedDeclKind Kind,
+                                 unsigned Flags, DeclContext *ParentContext,
+                                 SavedScope &&Scope, unsigned StartOffset,
+                                 unsigned EndOffset, unsigned PrevOffset)
+      : Kind(Kind), Flags(Flags), ParentContext(ParentContext),
+        Scope(std::move(Scope)), StartOffset(StartOffset), EndOffset(EndOffset),
+        PrevOffset(PrevOffset) {}
+};
 
 /// Parser state persistent across multiple parses.
-class PersistentParserState: public LazyMemberParser {
+class PersistentParserState {
 public:
   struct ParserPos {
     SourceLoc Loc;
@@ -39,146 +66,49 @@ public:
     bool isValid() const { return Loc.isValid(); }
   };
 
-  class FunctionBodyState {
-    ParserPos BodyPos;
-    SavedScope Scope;
-    friend class Parser;
-
-    SavedScope takeScope() {
-      return std::move(Scope);
-    }
-
-  public:
-    FunctionBodyState(SourceRange BodyRange, SourceLoc PreviousLoc,
-                      SavedScope &&Scope)
-      : BodyPos{BodyRange.Start, PreviousLoc}, Scope(std::move(Scope))
-    {}
-  };
-
-  enum class DelayedDeclKind {
-    TopLevelCodeDecl,
-    Decl,
-  };
-
-  class DelayedDeclState {
-    friend class PersistentParserState;
-    friend class Parser;
-    DelayedDeclKind Kind;
-    unsigned Flags;
-    DeclContext *ParentContext;
-    ParserPos BodyPos;
-    SourceLoc BodyEnd;
-    SavedScope Scope;
-
-    SavedScope takeScope() {
-      return std::move(Scope);
-    }
-
-  public:
-    DelayedDeclState(DelayedDeclKind Kind, unsigned Flags,
-                     DeclContext *ParentContext, SourceRange BodyRange,
-                     SourceLoc PreviousLoc, SavedScope &&Scope)
-      : Kind(Kind), Flags(Flags), ParentContext(ParentContext),
-        BodyPos{BodyRange.Start, PreviousLoc},
-        BodyEnd(BodyRange.End), Scope(std::move(Scope))
-    {}
-  };
-
-  class DelayedDeclListState {
-    friend class PersistentParserState;
-    friend class Parser;
-    unsigned Flags;
-    DeclContext *ParentContext;
-    ParserPos BodyPos;
-    SourceLoc BodyEnd;
-    SavedScope Scope;
-
-    SavedScope takeScope() {
-      return std::move(Scope);
-    }
-
-  public:
-    DelayedDeclListState(unsigned Flags,
-                     DeclContext *ParentContext, SourceRange BodyRange,
-                     SourceLoc PreviousLoc, SavedScope &&Scope)
-    : Flags(Flags), ParentContext(ParentContext), BodyPos{BodyRange.Start, PreviousLoc},
-      BodyEnd(BodyRange.End), Scope(std::move(Scope))
-    {}
-  };
-
   bool InPoundLineEnvironment = false;
   // FIXME: When condition evaluation moves to a later phase, remove this bit
   // and adjust the client call 'performParseOnly'.
   bool PerformConditionEvaluation = true;
 private:
-  ASTContext &Ctx;
-  ScopeInfo ScopeInfo;
-  using DelayedFunctionBodiesTy =
-      llvm::DenseMap<AbstractFunctionDecl *,
-                     std::unique_ptr<FunctionBodyState>>;
-  DelayedFunctionBodiesTy DelayedFunctionBodies;
+  swift::ScopeInfo ScopeInfo;
 
   /// Parser sets this if it stopped parsing before the buffer ended.
   ParserPosition MarkedPos;
 
-  std::unique_ptr<DelayedDeclState> CodeCompletionDelayedDeclState;
-
-  llvm::DenseMap<IterableDeclContext *, std::unique_ptr<DelayedDeclListState>>
-    DelayedDeclListStates;
+  std::unique_ptr<CodeCompletionDelayedDeclState> CodeCompletionDelayedDeclStat;
 
   /// The local context for all top-level code.
   TopLevelContext TopLevelCode;
 
 public:
   swift::ScopeInfo &getScopeInfo() { return ScopeInfo; }
-  PersistentParserState(ASTContext &Ctx);
+  PersistentParserState();
+  PersistentParserState(ASTContext &ctx) : PersistentParserState() { }
   ~PersistentParserState();
 
-  void delayFunctionBodyParsing(AbstractFunctionDecl *AFD,
-                                SourceRange BodyRange,
-                                SourceLoc PreviousLoc);
-  std::unique_ptr<FunctionBodyState>
-  takeFunctionBodyState(AbstractFunctionDecl *AFD);
+  void setCodeCompletionDelayedDeclState(SourceManager &SM, unsigned BufferID,
+                                         CodeCompletionDelayedDeclKind Kind,
+                                         unsigned Flags,
+                                         DeclContext *ParentContext,
+                                         SourceRange BodyRange,
+                                         SourceLoc PreviousLoc);
+  void restoreCodeCompletionDelayedDeclState(
+      const CodeCompletionDelayedDeclState &other);
 
-  bool hasFunctionBodyState(AbstractFunctionDecl *AFD);
-
-  void delayDecl(DelayedDeclKind Kind, unsigned Flags,
-                 DeclContext *ParentContext,
-                 SourceRange BodyRange, SourceLoc PreviousLoc);
-
-  void delayDeclList(IterableDeclContext *D, unsigned Flags,
-                     DeclContext *ParentContext,
-                     SourceRange BodyRange, SourceLoc PreviousLoc);
-
-  void delayTopLevel(TopLevelCodeDecl *TLCD, SourceRange BodyRange,
-                     SourceLoc PreviousLoc);
-
-  void parseMembers(IterableDeclContext *IDC) override;
-
-  bool hasDelayedDecl() {
-    return CodeCompletionDelayedDeclState.get() != nullptr;
-  }
-  DelayedDeclKind getDelayedDeclKind() {
-    return CodeCompletionDelayedDeclState->Kind;
-  }
-  SourceLoc getDelayedDeclLoc() {
-    return CodeCompletionDelayedDeclState->BodyPos.Loc;
-  }
-  DeclContext *getDelayedDeclContext() {
-    return CodeCompletionDelayedDeclState->ParentContext;
-  }
-  std::unique_ptr<DelayedDeclState> takeDelayedDeclState() {
-    return std::move(CodeCompletionDelayedDeclState);
+  bool hasCodeCompletionDelayedDeclState() {
+    return CodeCompletionDelayedDeclStat.get() != nullptr;
   }
 
-  std::unique_ptr<DelayedDeclListState>
-    takeDelayedDeclListState(IterableDeclContext *IDC);
-
-  bool hasUnparsedMembers(const IterableDeclContext *IDC) override {
-    return DelayedDeclListStates.find(IDC) != DelayedDeclListStates.end();
+  CodeCompletionDelayedDeclState &getCodeCompletionDelayedDeclState() {
+    return *CodeCompletionDelayedDeclStat.get();
   }
 
-  void parseAllDelayedDeclLists() override;
+  std::unique_ptr<CodeCompletionDelayedDeclState>
+  takeCodeCompletionDelayedDeclState() {
+    assert(hasCodeCompletionDelayedDeclState());
+    return std::move(CodeCompletionDelayedDeclStat);
+  }
 
   TopLevelContext &getTopLevelContext() {
     return TopLevelCode;

@@ -25,7 +25,7 @@
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -454,6 +454,19 @@ SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
 }
 
 static SILValue simplifyBuiltin(BuiltinInst *BI) {
+
+  switch (BI->getBuiltinInfo().ID) {
+    case BuiltinValueKind::IntToPtr:
+      if (auto *OpBI = dyn_cast<BuiltinInst>(BI->getOperand(0))) {
+        if (OpBI->getBuiltinInfo().ID == BuiltinValueKind::PtrToInt) {
+          return OpBI->getOperand(0);
+        }
+      }
+      return SILValue();
+    default:
+      break;
+  }
+
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
 
   switch (Intrinsic.ID) {

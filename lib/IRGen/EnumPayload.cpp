@@ -10,10 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "BitPatternReader.h"
 #include "EnumPayload.h"
 #include "Explosion.h"
 #include "GenEnum.h"
 #include "IRGenModule.h"
+
+#include <algorithm>
 #include <map>
 
 using namespace swift;
@@ -37,6 +40,23 @@ static llvm::Type *getPayloadType(EnumPayload::LazyValue value) {
   return value.dyn_cast<llvm::Value *>()->getType();
 }
 
+// Clear bits starting from the most significant until the number
+// of set bits in the value is less than or equal to numSetBits.
+//
+// For example: getLowestNSetBits(0x11111100, 2) = 0x00001100
+static llvm::APInt getLowestNSetBits(llvm::APInt value,
+                                     unsigned numSetBits) {
+  // TODO: optimize
+  for (unsigned i = 0; i < value.getBitWidth(); ++i) {
+    if (numSetBits == 0) {
+      value.clearBit(i);
+    } else if (value[i]) {
+      numSetBits -= 1;
+    }
+  }
+  return value;
+}
+
 EnumPayload EnumPayload::zero(IRGenModule &IGM, EnumPayloadSchema schema) {
   // We don't need to create any values yet; they can be filled in when
   // real values are inserted.
@@ -48,18 +68,19 @@ EnumPayload EnumPayload::zero(IRGenModule &IGM, EnumPayloadSchema schema) {
 }
 
 EnumPayload EnumPayload::fromBitPattern(IRGenModule &IGM,
-                                        APInt bitPattern,
+                                        const APInt &bitPattern,
                                         EnumPayloadSchema schema) {
+  auto maskReader = BitPatternReader(bitPattern, IGM.Triple.isLittleEndian());
+
   EnumPayload result;
-  
   schema.forEachType(IGM, [&](llvm::Type *type) {
     unsigned bitSize = IGM.DataLayout.getTypeSizeInBits(type);
 
     llvm::IntegerType *intTy
       = llvm::IntegerType::get(IGM.getLLVMContext(), bitSize);
-    
+
     // Take some bits off of the bottom of the pattern.
-    auto bits = bitPattern.zextOrTrunc(bitSize);
+    auto bits = maskReader.read(bitSize);
     auto val = llvm::ConstantInt::get(intTy, bits);
     if (val->getType() != type) {
       if (type->isPointerTy())
@@ -67,198 +88,72 @@ EnumPayload EnumPayload::fromBitPattern(IRGenModule &IGM,
       else
         val = llvm::ConstantExpr::getBitCast(val, type);
     }
-    
+
     result.PayloadValues.push_back(val);
-    
-    // Shift the remaining bits down.
-    bitPattern = bitPattern.lshr(bitSize);
   });
-    
+
   return result;
 }
 
-// Fn: void(LazyValue &payloadValue, unsigned payloadBitWidth,
-//          unsigned payloadValueOffset, unsigned valueBitWidth,
-//          unsigned valueOffset)
-template<typename Fn>
-static void withValueInPayload(IRGenFunction &IGF,
-                               const EnumPayload &payload,
-                               llvm::Type *valueType,
-                               int numBitsUsedInValue,
+/// Create a mask for an element with the given type at the provided
+/// offset into the payload. The offset and size are in bits but
+/// must be a multiple of 8 (i.e. byte aligned).
+static APInt createElementMask(const llvm::DataLayout &DL,
+                               llvm::Type *type,
                                unsigned payloadOffset,
-                               Fn &&f) {
-  auto &DataLayout = IGF.IGM.DataLayout;
-  int valueTypeBitWidth = DataLayout.getTypeSizeInBits(valueType);
-  int valueBitWidth =
-      numBitsUsedInValue < 0 ? valueTypeBitWidth : numBitsUsedInValue;
-  assert(numBitsUsedInValue <= valueTypeBitWidth);
+                               unsigned payloadSizeInBits) {
+  // Create a mask for the bytes that make up the stored element
+  // by zero extending the element's mask to its storage size.
+  // This makes the mask valid regardless of endianness.
+  auto elSize = DL.getTypeSizeInBits(type);
+  auto elStoreSize = DL.getTypeStoreSizeInBits(type);
+  auto elMask = APInt::getLowBitsSet(elStoreSize, elSize);
 
-  // Find the elements we need to touch.
-  // TODO: Linear search through the payload elements is lame.
-  MutableArrayRef<EnumPayload::LazyValue> payloads = payload.PayloadValues;
-  llvm::Type *payloadType;
-  int payloadBitWidth;
-  int valueOffset = 0, payloadValueOffset = payloadOffset;
-  for (;;) {
-    payloadType = getPayloadType(payloads.front());
-    payloadBitWidth = IGF.IGM.DataLayout.getTypeSizeInBits(payloadType);
-    
-    // Does this element overlap the area we need to touch?
-    if (payloadValueOffset < payloadBitWidth) {
-      // See how much of the value we can fit here.
-      int valueChunkWidth = payloadBitWidth - payloadValueOffset;
-      valueChunkWidth = std::min(valueChunkWidth, valueBitWidth - valueOffset);
-    
-      f(payloads.front(),
-        payloadBitWidth, payloadValueOffset,
-        valueTypeBitWidth, valueOffset);
-      
-      // If we used the entire value, we're done.
-      valueOffset += valueChunkWidth;
-      if (valueOffset >= valueBitWidth)
-        return;
-    }
-    
-    payloadValueOffset = std::max(payloadValueOffset - payloadBitWidth, 0);
-    payloads = payloads.slice(1);
+  // Pad the valueMask so that it can be applied to the entire
+  // payload.
+  auto mask = APInt::getNullValue(payloadSizeInBits);
+  auto offset = payloadOffset;
+  if (DL.isBigEndian()) {
+    offset = payloadSizeInBits - payloadOffset - elStoreSize;
   }
+  mask.insertBits(elMask, offset);
+  return mask;
 }
 
 void EnumPayload::insertValue(IRGenFunction &IGF, llvm::Value *value,
-                              unsigned payloadOffset,
-                              int numBitsUsedInValue) {
-  withValueInPayload(IGF, *this, value->getType(), numBitsUsedInValue, payloadOffset,
-    [&](LazyValue &payloadValue,
-        unsigned payloadBitWidth,
-        unsigned payloadValueOffset,
-        unsigned valueBitWidth,
-        unsigned valueOffset) {
-      auto payloadType = getPayloadType(payloadValue);
-      // See if the value matches the payload type exactly. In this case we
-      // don't need to do any work to use the value.
-      if (payloadValueOffset == 0 && valueOffset == 0) {
-        if (value->getType() == payloadType) {
-          payloadValue = value;
-          return;
-        }
-        // If only the width matches exactly, we can still do a bitcast.
-        if (payloadBitWidth == valueBitWidth) {
-          auto bitcast = IGF.Builder.CreateBitOrPointerCast(value, payloadType);
-          payloadValue = bitcast;
-          return;
-        }
-      }
-      
-      // Select out the chunk of the value to merge with the existing payload.
-      llvm::Value *subvalue = value;
-      
-      auto valueIntTy =
-        llvm::IntegerType::get(IGF.IGM.getLLVMContext(), valueBitWidth);
-      auto payloadIntTy =
-        llvm::IntegerType::get(IGF.IGM.getLLVMContext(), payloadBitWidth);
-      auto payloadTy = getPayloadType(payloadValue);
-      subvalue = IGF.Builder.CreateBitOrPointerCast(subvalue, valueIntTy);
-      if (valueOffset > 0)
-        subvalue = IGF.Builder.CreateLShr(subvalue,
-                               llvm::ConstantInt::get(valueIntTy, valueOffset));
-      subvalue = IGF.Builder.CreateZExtOrTrunc(subvalue, payloadIntTy);
-      if (IGF.IGM.Triple.isLittleEndian()) {
-        if (payloadValueOffset > 0)
-          subvalue = IGF.Builder.CreateShl(subvalue,
-                        llvm::ConstantInt::get(payloadIntTy, payloadValueOffset));
-      } else {
-        if ((valueBitWidth == 32 || valueBitWidth == 16 || valueBitWidth == 8 || valueBitWidth == 1) &&
-            payloadBitWidth > (payloadValueOffset + valueBitWidth)) {
-          unsigned shiftBitWidth = valueBitWidth;
-          if (valueBitWidth == 1) {
-            shiftBitWidth = 8;
-          }
-          subvalue = IGF.Builder.CreateShl(subvalue,
-            llvm::ConstantInt::get(payloadIntTy, (payloadBitWidth - shiftBitWidth) - payloadValueOffset));
-        }
-      }
+                              unsigned payloadOffset) {
+  auto &DL = IGF.IGM.DataLayout;
 
-      // If there hasn't yet been a value stored here, we can use the adjusted
-      // value directly.
-      if (payloadValue.is<llvm::Type *>()) {
-        payloadValue = IGF.Builder.CreateBitOrPointerCast(subvalue, payloadTy);
-      }
-      // Otherwise, bitwise-or it in, brazenly assuming there are zeroes
-      // underneath.
-      else {
-        // TODO: This creates a bunch of bitcasting noise for non-integer
-        // payload fields.
-        auto lastValue = payloadValue.get<llvm::Value *>();
-        lastValue = IGF.Builder.CreateBitOrPointerCast(lastValue, payloadIntTy);
-        lastValue = IGF.Builder.CreateOr(lastValue, subvalue);
-        payloadValue = IGF.Builder.CreateBitOrPointerCast(lastValue, payloadTy);
-      }
-    });
+  // Create a mask for the value we are going to insert.
+  auto type = value->getType();
+  auto payloadSize = getAllocSizeInBits(DL);
+  auto mask = createElementMask(DL, type, payloadOffset, payloadSize);
+
+  // Scatter the value into the payload.
+  emitScatterBits(IGF, mask, value);
 }
 
 llvm::Value *EnumPayload::extractValue(IRGenFunction &IGF, llvm::Type *type,
                                        unsigned payloadOffset) const {
-  llvm::Value *result = nullptr;
-  withValueInPayload(IGF, *this, type, -1, payloadOffset,
-    [&](LazyValue &payloadValue,
-        unsigned payloadBitWidth,
-        unsigned payloadValueOffset,
-        unsigned valueBitWidth,
-        unsigned valueOffset) {
-      auto payloadType = getPayloadType(payloadValue);
-      // If the desired type matches the payload slot exactly, we don't need
-      // to do anything.
-      if (payloadValueOffset == 0 && valueOffset == 0) {
-        if (type == payloadType) {
-          result = forcePayloadValue(payloadValue);
-          return;
-        }
-        // If only the width matches exactly, do a bitcast.
-        if (payloadBitWidth == valueBitWidth) {
-          result =
-            IGF.Builder.CreateBitOrPointerCast(forcePayloadValue(payloadValue),
-                                               type);
-          return;
-        }
-      }
-      
-      // Integrate the chunk of payload into the result value.
-      auto value = forcePayloadValue(payloadValue);
-      auto valueIntTy =
-        llvm::IntegerType::get(IGF.IGM.getLLVMContext(), valueBitWidth);
-      auto payloadIntTy =
-        llvm::IntegerType::get(IGF.IGM.getLLVMContext(), payloadBitWidth);
+  auto &DL = IGF.IGM.DataLayout;
 
-      value = IGF.Builder.CreateBitOrPointerCast(value, payloadIntTy);
-      if (IGF.IGM.Triple.isLittleEndian()) {
-        if (payloadValueOffset > 0)
-          value = IGF.Builder.CreateLShr(value,
-                    llvm::ConstantInt::get(value->getType(), payloadValueOffset));
-      } else {
-        if ((valueBitWidth == 32 || valueBitWidth == 16 || valueBitWidth == 8 || valueBitWidth == 1) &&
-            payloadBitWidth > (payloadValueOffset + valueBitWidth)) {
-          unsigned shiftBitWidth = valueBitWidth;
-          if (valueBitWidth == 1) {
-            shiftBitWidth = 8;
-          }
-          value = IGF.Builder.CreateLShr(value,
-            llvm::ConstantInt::get(value->getType(), (payloadBitWidth - shiftBitWidth) - payloadValueOffset));
-        }
-      }
-      if (valueBitWidth > payloadBitWidth)
-        value = IGF.Builder.CreateZExt(value, valueIntTy);
-      if (valueOffset > 0)
-        value = IGF.Builder.CreateShl(value,
-                         llvm::ConstantInt::get(value->getType(), valueOffset));
-      if (valueBitWidth < payloadBitWidth)
-        value = IGF.Builder.CreateTrunc(value, valueIntTy);
-      
-      if (!result)
-        result = value;
-      else
-        result = IGF.Builder.CreateOr(result, value);
-    });
-  return IGF.Builder.CreateBitOrPointerCast(result, type);
+  // Create a mask for the value we are going to extract.
+  auto payloadSize = getAllocSizeInBits(DL);
+  auto mask = createElementMask(DL, type, payloadOffset, payloadSize);
+
+  // Convert the payload mask into a SpareBitVector.
+  // TODO: make emitGatherSpareBits take an APInt and delete.
+  auto bits = SpareBitVector::fromAPInt(std::move(mask));
+
+  // Gather the value from the payload.
+  auto valueSize = DL.getTypeSizeInBits(type);
+  auto value = emitGatherSpareBits(IGF, bits, 0, valueSize);
+
+  // Convert the integer value to the required type.
+  if (value->getType() != type) {
+    value = IGF.Builder.CreateBitOrPointerCast(value, type);
+  }
+  return value;
 }
 
 EnumPayload EnumPayload::fromExplosion(IRGenModule &IGM,
@@ -391,20 +286,22 @@ void EnumPayload::emitSwitch(IRGenFunction &IGF,
   }
 
   // Otherwise emit a switch statement.
-  auto &context = IGF.IGM.getLLVMContext();
+  auto &C = IGF.IGM.getLLVMContext();
   unsigned numBits = mask.countPopulation();
   auto target = emitGatherSpareBits(IGF, SpareBitVector::fromAPInt(mask),
                                     0, numBits);
   auto swi = IGF.Builder.CreateSwitch(target, dflt.getPointer(), cases.size());
   for (auto &c : cases) {
-    auto value = llvm::ConstantInt::get(context, gatherBits(mask, c.first));
+    auto value = llvm::ConstantInt::get(C, gatherBits(mask, c.first));
     swi->addCase(value, c.second);
   }
   assert(IGF.Builder.hasPostTerminatorIP());
 }
 
 llvm::Value *
-EnumPayload::emitCompare(IRGenFunction &IGF, APInt mask, APInt value) const {
+EnumPayload::emitCompare(IRGenFunction &IGF,
+                         const APInt &mask,
+                         const APInt &value) const {
   // Succeed trivially for an empty payload, or if the payload is masked
   // out completely.
   if (PayloadValues.empty() || mask == 0)
@@ -412,20 +309,20 @@ EnumPayload::emitCompare(IRGenFunction &IGF, APInt mask, APInt value) const {
 
   assert((~mask & value) == 0
          && "value has masked out bits set?!");
-  
+
   auto &DL = IGF.IGM.DataLayout;
+  auto valueReader = BitPatternReader(value, DL.isLittleEndian());
+  auto maskReader = BitPatternReader(mask, DL.isLittleEndian());
+
   llvm::Value *condition = nullptr;
   for (auto &pv : PayloadValues) {
     auto v = forcePayloadValue(pv);
     unsigned size = DL.getTypeSizeInBits(v->getType());
 
     // Break off a piece of the mask and value.
-    auto maskPiece = mask.zextOrTrunc(size);
-    auto valuePiece = value.zextOrTrunc(size);
-    
-    mask = mask.lshr(size);
-    value = value.lshr(size);
-    
+    auto maskPiece = maskReader.read(size);
+    auto valuePiece = valueReader.read(size);
+
     // If this piece is zero, it doesn't affect the comparison.
     if (maskPiece == 0)
       continue;
@@ -462,19 +359,20 @@ EnumPayload::emitCompare(IRGenFunction &IGF, APInt mask, APInt value) const {
 }
 
 void
-EnumPayload::emitApplyAndMask(IRGenFunction &IGF, APInt mask) {
+EnumPayload::emitApplyAndMask(IRGenFunction &IGF, const APInt &mask) {
   // Early exit if the mask has no effect.
   if (mask.isAllOnesValue())
     return;
 
   auto &DL = IGF.IGM.DataLayout;
+  auto maskReader = BitPatternReader(mask, DL.isLittleEndian());
+
   for (auto &pv : PayloadValues) {
     auto payloadTy = getPayloadType(pv);
     unsigned size = DL.getTypeSizeInBits(payloadTy);
 
-    // Break off a chunk of the mask.
-    auto maskPiece = mask.zextOrTrunc(size);
-    mask = mask.lshr(size);
+    // Read a chunk of the mask.
+    auto maskPiece = maskReader.read(size);
     
     // If this piece is all ones, it has no effect.
     if (maskPiece.isAllOnesValue())
@@ -503,19 +401,20 @@ EnumPayload::emitApplyAndMask(IRGenFunction &IGF, APInt mask) {
 }
 
 void
-EnumPayload::emitApplyOrMask(IRGenFunction &IGF, APInt mask) {
+EnumPayload::emitApplyOrMask(IRGenFunction &IGF, const APInt &mask) {
   // Early exit if the mask has no effect.
   if (mask == 0)
     return;
 
   auto &DL = IGF.IGM.DataLayout;
+  auto maskReader = BitPatternReader(mask, DL.isLittleEndian());
+
   for (auto &pv : PayloadValues) {
     auto payloadTy = getPayloadType(pv);
     unsigned size = DL.getTypeSizeInBits(payloadTy);
 
-    // Break off a chunk of the mask.
-    auto maskPiece = mask.zextOrTrunc(size);
-    mask = mask.lshr(size);
+    // Read a chunk of the mask.
+    auto maskPiece = maskReader.read(size);
 
     // If this piece is zero, it has no effect.
     if (maskPiece == 0)
@@ -573,55 +472,126 @@ EnumPayload::emitApplyOrMask(IRGenFunction &IGF,
   }
 }
 
+void EnumPayload::emitScatterBits(IRGenFunction &IGF,
+                                  const APInt &mask,
+                                  llvm::Value *value) {
+  auto &DL = IGF.IGM.DataLayout;
+  auto &B = IGF.Builder;
+
+  unsigned valueBits = DL.getTypeSizeInBits(value->getType());
+  auto totalBits = std::min(valueBits, mask.countPopulation());
+  auto maskReader = BitPatternReader(getLowestNSetBits(mask, totalBits),
+                                     DL.isLittleEndian());
+  auto usedBits = 0u;
+  for (auto &pv : PayloadValues) {
+    auto partType = getPayloadType(pv);
+    auto partSize = DL.getTypeSizeInBits(partType);
+    auto partMask = maskReader.read(partSize);
+
+    // Skip this element if there are no set bits in the mask.
+    if (partMask == 0) {
+      continue;
+    }
+
+    // Calculate the number of bits we are going to scatter.
+    auto partCount = partMask.countPopulation();
+
+    // Scatter bits from the source into the bits specified by the mask.
+    auto offset = usedBits;
+    if (DL.isBigEndian()) {
+      offset = totalBits - partCount - usedBits;
+    }
+    auto partValue = irgen::emitScatterBits(IGF, partMask, value, offset);
+
+    // If necessary OR with the existing value.
+    if (auto existingValue = pv.dyn_cast<llvm::Value*>()) {
+      if (partType != partValue->getType()) {
+        existingValue = B.CreateBitOrPointerCast(existingValue,
+                                                 partValue->getType());
+      }
+      partValue = B.CreateOr(partValue, existingValue);
+    }
+
+    // Convert the integer result to the target type.
+    if (partType != partValue->getType()) {
+      partValue = B.CreateBitOrPointerCast(partValue, partType);
+    }
+
+    // Update this payload element.
+    pv = partValue;
+
+    // Update our position in the source integer.
+    usedBits += partCount;
+    if (usedBits >= totalBits) {
+      break;
+    }
+  }
+}
+
 llvm::Value *
 EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,
                                  const SpareBitVector &spareBits,
                                  unsigned firstBitOffset,
-                                 unsigned bitWidth) const {
+                                 unsigned resultBitWidth) const {
   auto &DL = IGF.IGM.DataLayout;
-  unsigned payloadOffset = 0;
+  auto &C = IGF.IGM.getLLVMContext();
+
+  auto mask = getLowestNSetBits(spareBits.asAPInt(),
+                                resultBitWidth - firstBitOffset);
+  auto bitWidth = mask.countPopulation();
+  auto spareBitReader = BitPatternReader(std::move(mask),
+                                         DL.isLittleEndian());
+  auto usedBits = firstBitOffset;
+
   llvm::Value *spareBitValue = nullptr;
-  auto destTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), bitWidth);
   for (auto &pv : PayloadValues) {
     // If this value is zero, it has nothing to add to the spare bits.
     auto v = pv.dyn_cast<llvm::Value*>();
     if (!v) {
-      payloadOffset += DL.getTypeSizeInBits(pv.get<llvm::Type*>());
+      spareBitReader.skip(DL.getTypeSizeInBits(pv.get<llvm::Type*>()));
       continue;
     }
-    
-    unsigned size = DL.getTypeSizeInBits(v->getType());
+
     // Slice the spare bit vector.
-    // FIXME: this is inefficient.
-    auto spareBitsPart = SpareBitVector::getConstant(size, false);
-    unsigned numBitsInPart = 0;
-    for (unsigned i = 0; i < size; ++i)
-      if (spareBits[payloadOffset + i]) {
-        spareBitsPart.setBit(i);
-        ++numBitsInPart;
-      }
-    
-    payloadOffset += size;
-    
+    unsigned size = DL.getTypeSizeInBits(v->getType());
+    auto spareBitsPart = spareBitReader.read(size);
+    unsigned numBitsInPart = spareBitsPart.countPopulation();
+
     // If there were no spare bits in this part, it has nothing to add.
     if (numBitsInPart == 0)
       continue;
-    
-    if (firstBitOffset >= bitWidth)
+
+    if (usedBits >= bitWidth)
       break;
 
+    unsigned offset = usedBits;
+    if (DL.isBigEndian()) {
+      offset = bitWidth - usedBits - numBitsInPart;
+    }
     // Get the spare bits from this part.
-    auto bits = irgen::emitGatherBits(IGF, spareBitsPart.asAPInt(),
-                                      v, firstBitOffset, bitWidth);
-    firstBitOffset += numBitsInPart;
-    
+    auto bits = irgen::emitGatherBits(IGF, spareBitsPart,
+                                      v, offset, resultBitWidth);
+    usedBits += numBitsInPart;
+
     // Accumulate it into the full set.
-    if (!spareBitValue)
-      spareBitValue = bits;
-    else
-      spareBitValue = IGF.Builder.CreateOr(spareBitValue, bits);
+    if (spareBitValue) {
+      bits = IGF.Builder.CreateOr(spareBitValue, bits);
+    }
+    spareBitValue = bits;
   }
-  if (!spareBitValue)
-    return llvm::ConstantInt::get(destTy, 0);
-  return spareBitValue;
+  auto destTy = llvm::IntegerType::get(C, resultBitWidth);
+  if (spareBitValue) {
+    assert(spareBitValue->getType() == destTy);
+    return spareBitValue;
+  }
+  return llvm::ConstantInt::get(destTy, 0);
+}
+
+unsigned EnumPayload::getAllocSizeInBits(const llvm::DataLayout &DL) const {
+  unsigned size = 0u;
+  for (const auto &pv : PayloadValues) {
+    size += DL.getTypeAllocSizeInBits(getPayloadType(pv));
+    assert(size % 8 == 0 && "allocation size must be a multiple of bytes");
+  }
+  return size;
 }

@@ -35,6 +35,7 @@ func forgotCall() {
   // As a call
   f5(f4) // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}{{8-8=()}}
   f6(f4, f2) // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}{{8-8=()}}
+  // expected-error@-1 {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{12-12=()}}
 
   // With overloading: only one succeeds.
   a = createB // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}
@@ -145,14 +146,17 @@ struct Q {
 }
 let q = Q(s: nil)
 let a: Int? = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
-// expected-note@-1{{chain the optional using '?'}}{{18-18=?}}
-// expected-note@-2{{force-unwrap using '!'}}{{18-18=!}}
+// expected-error@-1 {{cannot convert value of type 'String.UTF8View' to specified type 'Int?'}}
+// expected-note@-2{{chain the optional using '?'}}{{18-18=?}}
+// expected-note@-3{{force-unwrap using '!'}}{{18-18=!}}
 let b: Int = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
-// expected-note@-1{{chain the optional using '?'}}{{17-17=?}}
-// expected-note@-2{{force-unwrap using '!'}}{{17-17=!}}
+// expected-error@-1 {{cannot convert value of type 'String.UTF8View' to specified type 'Int'}}
+// expected-note@-2{{chain the optional using '?'}}{{17-17=?}}
+// expected-note@-3{{force-unwrap using '!'}}{{17-17=!}}
 let d: Int! = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
-// expected-note@-1{{chain the optional using '?'}}{{18-18=?}}
-// expected-note@-2{{force-unwrap using '!'}}{{18-18=!}}
+// expected-error@-1 {{cannot convert value of type 'String.UTF8View' to specified type 'Int?'}}
+// expected-note@-2{{chain the optional using '?'}}{{18-18=?}}
+// expected-note@-3{{force-unwrap using '!'}}{{18-18=!}}
 let c = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
 // expected-note@-1{{chain the optional using '?' to access member 'utf8' only for non-'nil' base values}}{{12-12=?}}
 // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{12-12=!}}
@@ -163,8 +167,9 @@ struct S1116 {
 }
 
 let a1116: [S1116] = []
-var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{cannot convert value of type '[Int?]' to expected argument type 'Set<Int>'}}
-
+var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+// expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{49-49=(}} {{53-53= ?? <#default value#>)}}
+// expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{53-53=!}}
 
 func moreComplexUnwrapFixes() {
   struct S {
@@ -194,14 +199,14 @@ func moreComplexUnwrapFixes() {
   // expected-note@-2{{force-unwrap using '!'}}{{12-12=!}}
 
   takeOpt(t.optS.value) // expected-error{{value of optional type 'T?' must be unwrapped to refer to member 'optS' of wrapped base type 'T'}}
-  // expected-note@-1{{chain the optional using '?'}}{{17-17=?}}
+  // expected-note@-1{{chain the optional using '?'}}{{12-12=?}}
   // expected-error@-2{{value of optional type 'S?' must be unwrapped to refer to member 'value' of wrapped base type 'S'}}
-  // expected-note@-3{{chain the optional using '?'}}{{12-12=?}}
+  // expected-note@-3{{chain the optional using '?'}}{{17-17=?}}
 
   takeNon(t.optS.value) // expected-error{{value of optional type 'T?' must be unwrapped to refer to member 'optS' of wrapped base type 'T'}}
-  // expected-note@-1{{chain the optional using '?'}}{{17-17=?}}
+  // expected-note@-1{{chain the optional using '?'}}{{12-12=?}}
   // expected-error@-2{{value of optional type 'S?' must be unwrapped to refer to member 'value' of wrapped base type 'S'}}
-  // expected-note@-3{{chain the optional using '?'}}{{12-12=?}}
+  // expected-note@-3{{chain the optional using '?'}}{{17-17=?}}
   // expected-note@-4{{force-unwrap using '!'}}{{17-17=!}}
 
   takeNon(os?.value) // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
@@ -261,6 +266,8 @@ struct FooStruct {
   }
 
   let e: BarStruct? = BarStruct()
+
+  func f() -> Optional<Optional<Int>> { return 29 }
 }
 
 struct BarStruct {
@@ -290,6 +297,9 @@ let _: Int = thing?.e?.a() // expected-error {{value of optional type 'Int?' mus
 let _: Int? = thing?.e?.b // expected-error {{value of optional type 'Int??' must be unwrapped to a value of type 'Int?'}}
 // expected-note@-1{{coalesce}}
 // expected-note@-2{{force-unwrap}}
+let _: Int? = thing?.f() // expected-error {{value of optional type 'Int??' must be unwrapped to a value of type 'Int?'}}
+// expected-note@-1{{coalesce}}
+// expected-note@-2{{force-unwrap}}
 
 // SR-9851 - https://bugs.swift.org/browse/SR-9851
 func coalesceWithParensRootExprFix() {
@@ -297,4 +307,33 @@ func coalesceWithParensRootExprFix() {
   if !optionalBool { }  // expected-error{{value of optional type 'Bool?' must be unwrapped to a value of type 'Bool'}}
   // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}{{7-7=(}}{{19-19= ?? <#default value#>)}}
   // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+}
+
+func test_explicit_call_with_overloads() {
+  func foo(_: Int) {}
+
+  struct S {
+    func foo(_: Int) -> Int { return 0 }
+    func foo(_: Int = 32, _: String = "hello") -> Int {
+      return 42
+    }
+  }
+
+  foo(S().foo)
+  // expected-error@-1 {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{14-14=()}}
+}
+
+// SR-11476
+func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
+  struct S {
+    subscript(x: Int) -> Int { x }
+  }
+
+  var i: Int?
+  _ = \S.[i] // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}{{12-12= ?? <#default value#>}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{12-12=!}}
+
+  _ = \S.[nil] // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
+  _ = \S.[fn] // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{13-13=()}}
 }

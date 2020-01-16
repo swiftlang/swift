@@ -417,7 +417,7 @@ UnicodeScalarTests.test("LosslessStringConvertible") {
   checkLosslessStringConvertible((0...127).map { UnicodeScalar(Int($0))! })
 }
 
-if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
   UnicodeScalarTests.test("Views") {
     let scalars = baseScalars + continuingScalars
     for scalar in scalars {

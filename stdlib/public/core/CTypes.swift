@@ -141,7 +141,7 @@ public struct OpaquePointer {
 
   /// Converts a typed `UnsafePointer` to an opaque C pointer.
   @_transparent
-  public init<T>(_ from: UnsafePointer<T>) {
+  public init<T>(@_nonEphemeral _ from: UnsafePointer<T>) {
     self._rawValue = from._rawValue
   }
 
@@ -149,14 +149,14 @@ public struct OpaquePointer {
   ///
   /// The result is `nil` if `from` is `nil`.
   @_transparent
-  public init?<T>(_ from: UnsafePointer<T>?) {
+  public init?<T>(@_nonEphemeral _ from: UnsafePointer<T>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
 
   /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
   @_transparent
-  public init<T>(_ from: UnsafeMutablePointer<T>) {
+  public init<T>(@_nonEphemeral _ from: UnsafeMutablePointer<T>) {
     self._rawValue = from._rawValue
   }
 
@@ -164,7 +164,7 @@ public struct OpaquePointer {
   ///
   /// The result is `nil` if `from` is `nil`.
   @_transparent
-  public init?<T>(_ from: UnsafeMutablePointer<T>?) {
+  public init?<T>(@_nonEphemeral _ from: UnsafeMutablePointer<T>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
@@ -189,7 +189,7 @@ extension OpaquePointer: Hashable {
   }
 }
 
-extension OpaquePointer : CustomDebugStringConvertible {
+extension OpaquePointer: CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
@@ -246,7 +246,7 @@ public struct CVaListPointer {
   }
 }
 
-extension CVaListPointer : CustomDebugStringConvertible {
+extension CVaListPointer: CustomDebugStringConvertible {
   public var debugDescription: String {
     return "(\(_value.__stack.debugDescription), " +
            "\(_value.__gr_top.debugDescription), " +
@@ -270,7 +270,7 @@ public struct CVaListPointer {
   }
 }
 
-extension CVaListPointer : CustomDebugStringConvertible {
+extension CVaListPointer: CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
     return _value.debugDescription

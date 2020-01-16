@@ -15,6 +15,31 @@ def get_immediate_subdirectories(a_dir):
             if os.path.isdir(os.path.join(a_dir, name))]
 
 
+def collect_catalyst_frameworks(frameworks_path):
+    names = []
+    for frame in os.listdir(frameworks_path):
+        if frame.endswith(".framework"):
+            name = frame[:-len(".framework")]
+            # using the existence of this interface file as a sign of catalyst
+            # being supported
+            macabi_interface_path = \
+                os.path.join(frameworks_path, frame,
+                             'Modules', name + '.swiftmodule',
+                             'x86_64-apple-ios-macabi.swiftinterface')
+            if os.path.exists(macabi_interface_path):
+                if name not in blacklist:
+                    names.append(name)
+    return names
+
+
+def get_catalyst_frameworks(sdk_path):
+    frameworks_path = sdk_path + "/System/Library/Frameworks"
+    ios_support_path = sdk_path + \
+        '/System/iOSSupport/System/Library/Frameworks/'
+    return collect_catalyst_frameworks(frameworks_path) + \
+        collect_catalyst_frameworks(ios_support_path)
+
+
 def get_frameworks(sdk_path, swift_frameworks_only):
     frameworks_path = sdk_path + "/System/Library/Frameworks"
     names = []
@@ -54,6 +79,18 @@ def get_frameworks(sdk_path, swift_frameworks_only):
             if name in blacklist:
                 continue
             names.append(name)
+    return names
+
+
+def get_overlays(sdk_path):
+    overlay_path = sdk_path + "/usr/lib/swift/"
+    names = []
+    for overlay in os.listdir(overlay_path):
+        if overlay.endswith(".swiftmodule"):
+            overlay = overlay[:-len(".swiftmodule")]
+            if overlay in blacklist:
+                continue
+            names.append(overlay)
     return names
 
 
@@ -99,7 +136,9 @@ def main():
                       type=str, dest="out_mode", default="list")
     parser.add_option("--hash", action="store_true", dest="use_hash")
     parser.add_option("--swift-frameworks-only", action="store_true")
+    parser.add_option("--swift-overlay-only", action="store_true")
     parser.add_option("--v", action="store_true")
+    parser.add_option("--catalyst", action="store_true")
     (opts, cmd) = parser.parse_args()
 
     if not opts.sdk:
@@ -109,7 +148,17 @@ def main():
         parser.error(
             "output mode not specified: 'clang-import'/'swift-import'/'list'")
 
-    frames = get_frameworks(opts.sdk, opts.swift_frameworks_only)
+    if opts.swift_overlay_only:
+        frames = get_overlays(opts.sdk)
+    else:
+        if opts.catalyst:
+            if opts.swift_frameworks_only:
+                frames = get_catalyst_frameworks(opts.sdk)
+            else:
+                parser.error("only support find catalyst frameworks "
+                             "with --swift-frameworks-only")
+        else:
+            frames = get_frameworks(opts.sdk, opts.swift_frameworks_only)
     if opts.v:
         for name in frames:
             print >>sys.stderr, 'Including: ', name

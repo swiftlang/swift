@@ -31,6 +31,7 @@
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include <algorithm>
 #include <cctype>
+#include <cinttypes>
 #include <condition_variable>
 #include <new>
 #include <unordered_set>
@@ -403,7 +404,10 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
     auto extraDataPattern = pattern->getExtraDataPattern();
 
     // Zero memory up to the offset.
-    memset(metadataExtraData, 0, size_t(extraDataPattern->OffsetInWords));
+    // [pre-5.2-extra-data-zeroing] Before Swift 5.2, the runtime did not
+    // correctly zero the zero-prefix of the extra-data pattern.
+    memset(metadataExtraData, 0,
+           size_t(extraDataPattern->OffsetInWords) * sizeof(void *));
 
     // Copy the pattern into the rest of the extra data.
     copyMetadataPattern(metadataExtraData, extraDataPattern);
@@ -1008,8 +1012,8 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
 
   case FunctionMetadataConvention::Block:
 #if SWIFT_OBJC_INTEROP
-    // Blocks are ObjC objects, so can share the Builtin.UnknownObject value
-    // witnesses.
+    // Blocks are ObjC objects, so can share the AnyObject value
+    // witnesses (stored as "BO" rather than "yXl" for ABI compat).
     Data.ValueWitnesses = &VALUE_WITNESS_SYM(BO);
 #else
     assert(false && "objc block without objc interop?");
@@ -2168,7 +2172,10 @@ namespace {
 #if __POINTER_WIDTH__ == 64
     uint32_t Reserved;
 #endif
-    const uint8_t *IvarLayout;
+    union {
+      const uint8_t *IvarLayout;
+      ClassMetadata *NonMetaClass;
+    };
     const char *Name;
     const void *MethodList;
     const void *ProtocolList;
@@ -2193,12 +2200,9 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
   return (ClassROData*)(theClass->Data & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
 }
 
-static void initGenericClassObjCName(ClassMetadata *theClass) {
+static char *copyGenericClassObjCName(ClassMetadata *theClass) {
   // Use the remangler to generate a mangled name from the type metadata.
   Demangle::StackAllocatedDemangler<4096> Dem;
-  // Resolve symbolic references to a unique mangling that can be encoded in
-  // the class name.
-  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
 
   auto demangling = _swift_buildDemanglingForMetadata(theClass, Dem);
 
@@ -2229,11 +2233,54 @@ static void initGenericClassObjCName(ClassMetadata *theClass) {
   } else {
     fullNameBuf[string.size()] = '\0';
   }
+  return fullNameBuf;
+}
 
+static void initGenericClassObjCName(ClassMetadata *theClass) {
   auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
 
-  getROData(theClass)->Name = fullNameBuf;
-  getROData(theMetaclass)->Name = fullNameBuf;
+  char *name = copyGenericClassObjCName(theClass);
+  getROData(theClass)->Name = name;
+  getROData(theMetaclass)->Name = name;
+}
+
+static bool installLazyClassNameHook() {
+#if !OBJC_SETHOOK_LAZYCLASSNAMER_DEFINED
+  using objc_hook_lazyClassNamer =
+    const char * _Nullable (*)(_Nonnull Class cls);
+  auto objc_setHook_lazyClassNamer =
+    (void (*)(objc_hook_lazyClassNamer, objc_hook_lazyClassNamer *))
+    dlsym(RTLD_NEXT, "objc_setHook_lazyClassNamer");  
+#endif
+
+  static objc_hook_lazyClassNamer oldHook;
+  auto myHook = [](Class theClass) -> const char * {
+    ClassMetadata *metadata = (ClassMetadata *)theClass;
+    if (metadata->isTypeMetadata())
+      return copyGenericClassObjCName(metadata);
+    return oldHook(theClass);
+  };
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability"
+  if (objc_setHook_lazyClassNamer == nullptr)
+    return false;
+  objc_setHook_lazyClassNamer(myHook, &oldHook);
+#pragma clang diagnostic pop
+
+  return true;
+}
+
+static void setUpGenericClassObjCName(ClassMetadata *theClass) {
+  bool supportsLazyNames = SWIFT_LAZY_CONSTANT(installLazyClassNameHook());
+  if (supportsLazyNames) {
+    getROData(theClass)->Name = nullptr;
+    auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
+    getROData(theMetaclass)->Name = nullptr;
+    getROData(theMetaclass)->NonMetaClass = theClass;
+  } else {
+    initGenericClassObjCName(theClass);
+  }
 }
 #endif
 
@@ -2487,7 +2534,7 @@ initGenericObjCClass(ClassMetadata *self, size_t numFields,
                      const TypeLayout * const *fieldTypes,
                      size_t *fieldOffsets) {
   // If the class is generic, we need to give it a name for Objective-C.
-  initGenericClassObjCName(self);
+  setUpGenericClassObjCName(self);
 
   ClassROData *rodata = getROData(self);
 
@@ -3861,6 +3908,13 @@ template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buff
   return refAndValueAddr.buffer;
 }
 
+template <> void Metadata::deallocateBoxForExistentialIn(ValueBuffer *buffer) const {
+  auto *vwt = getValueWitnesses();
+  if (vwt->isValueInline())
+    return;
+  swift_deallocBox(reinterpret_cast<HeapObject *>(buffer->PrivateData[0]));
+}
+
 template <> OpaqueValue *Metadata::allocateBufferIn(ValueBuffer *buffer) const {
   auto *vwt = getValueWitnesses();
   if (vwt->isValueInline())
@@ -3897,10 +3951,15 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
                                             size_t size,
                                             const char *description) {
   auto presentValue = [&](const void *value) {
-    if (size < sizeof(long long)) {
-      long long intValue = 0;
-      memcpy(&intValue, value, size);
-      fprintf(stderr, "%lld (%#llx)\n                  ", intValue, intValue);
+    if (size <= sizeof(uint64_t)) {
+      uint64_t intValue = 0;
+      auto ptr = reinterpret_cast<uint8_t *>(&intValue);
+#if defined(__BIG_ENDIAN__)
+      ptr += sizeof(uint64_t) - size;
+#endif
+      memcpy(ptr, value, size);
+      fprintf(stderr, "%" PRIu64 " (%#" PRIx64 ")\n", intValue, intValue);
+      fprintf(stderr, "                  ");
     }
     auto bytes = reinterpret_cast<const uint8_t *>(value);
     for (unsigned i = 0; i < size; ++i) {
@@ -3945,20 +4004,67 @@ void Metadata::dump() const {
   printf("TargetMetadata.\n");
   printf("Kind: %s.\n", getStringForMetadataKind(getKind()).data());
   printf("Value Witnesses: %p.\n", getValueWitnesses());
-  printf("Class Object: %p.\n", getClassObject());
-  printf("Type Context Description: %p.\n", getTypeContextDescriptor());
-  printf("Generic Args: %p.\n", getGenericArgs());
+
+  if (auto *contextDescriptor = getTypeContextDescriptor()) {
+    printf("Name: %s.\n", contextDescriptor->Name.get());
+    printf("Type Context Description: %p.\n", contextDescriptor);
+
+    if (contextDescriptor->isGeneric()) {
+      auto genericCount = contextDescriptor->getFullGenericContextHeader().Base.getNumArguments();
+      auto *args = getGenericArgs();
+      printf("Generic Args: %u: [", genericCount);
+      for (uint32_t i = 0; i < genericCount; i++) {
+        if (i > 0)
+          printf(", ");
+        printf("%p", args[i]);
+      }
+      printf("]\n");
+    }
+  }
+
+  if (auto *tuple = dyn_cast<TupleTypeMetadata>(this)) {
+    printf("Labels: %s.\n", tuple->Labels);
+  }
+
+  if (auto *existential = dyn_cast<ExistentialTypeMetadata>(this)) {
+    printf("Is class bounded: %s.\n",
+           existential->isClassBounded() ? "true" : "false");
+    auto protocols = existential->getProtocols();
+    bool first = true;
+    printf("Protocols: ");
+    for (auto protocol : protocols) {
+      if (!first)
+        printf(" & ");
+      printf("%s", protocol.getName());
+      first = false;
+    }
+    if (auto *superclass = existential->getSuperclassConstraint())
+      if (auto *contextDescriptor = superclass->getTypeContextDescriptor())
+        printf("Superclass constraint: %s.\n", contextDescriptor->Name.get());
+    printf("\n");
+  }
+
+#if SWIFT_OBJC_INTEROP
+  if (auto *classObject = getClassObject()) {
+    printf("ObjC Name: %s.\n", class_getName(
+        reinterpret_cast<Class>(const_cast<ClassMetadata *>(classObject))));
+    printf("Class Object: %p.\n", classObject);
+  }
+#endif
 }
 
 template <>
 LLVM_ATTRIBUTE_USED
-void TypeContextDescriptor::dump() const {
+void ContextDescriptor::dump() const {
   printf("TargetTypeContextDescriptor.\n");
   printf("Flags: 0x%x.\n", this->Flags.getIntValue());
   printf("Parent: %p.\n", this->Parent.get());
-  printf("Name: %s.\n", Name.get());
-  printf("Access function: %p.\n", static_cast<void *>(getAccessFunction()));
-  printf("Fields: %p.\n", Fields.get());
+  if (auto *typeDescriptor = dyn_cast<TypeContextDescriptor>(this)) {
+    printf("Name: %s.\n", typeDescriptor->Name.get());
+    printf("Fields: %p.\n", typeDescriptor->Fields.get());
+    printf("Access function: %p.\n",
+           static_cast<void *>(typeDescriptor->getAccessFunction()));
+  }
 }
 
 template<>
@@ -4524,6 +4630,14 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
 template <class Result, class Callbacks>
 static Result performOnMetadataCache(const Metadata *metadata,
                                      Callbacks &&callbacks) {
+  // TODO: Once more than just structs have canonical statically specialized
+  //       metadata, calling an updated
+  //       isCanonicalStaticallySpecializedGenericMetadata would entail
+  //       dyn_casting to the same type more than once.  Avoid that by combining
+  //       that function's implementation with the dyn_casts below.
+  if (metadata->isCanonicalStaticallySpecializedGenericMetadata())
+    return std::move(callbacks).forOtherMetadata(metadata);
+
   // Handle different kinds of type that can delay their metadata.
   const TypeContextDescriptor *description;
   if (auto classMetadata = dyn_cast<ClassMetadata>(metadata)) {
@@ -5015,7 +5129,7 @@ namespace {
 
 // A statically-allocated pool.  It's zero-initialized, so this
 // doesn't cost us anything in binary size.
-LLVM_ALIGNAS(alignof(void*)) static char InitialAllocationPool[64*1024];
+alignas(void *) static char InitialAllocationPool[64 * 1024];
 static std::atomic<PoolRange>
 AllocationPool{PoolRange{InitialAllocationPool,
                          sizeof(InitialAllocationPool)}};
@@ -5105,6 +5219,14 @@ bool Metadata::satisfiesClassConstraint() const {
   return isAnyClass();
 }
 
+template <>
+bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
+  if (auto *metadata = dyn_cast<StructMetadata>(this))
+    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+
+  return false;
+}
+
 #if !NDEBUG
 static bool referencesAnonymousContext(Demangle::Node *node) {
   if (node->getKind() == Demangle::Node::Kind::AnonymousContext)
@@ -5130,8 +5252,6 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   if (!verificationEnabled) return;
   
   Demangle::StackAllocatedDemangler<1024> Dem;
-  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
-
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
   // If the mangled node involves types in an AnonymousContext, then by design,
   // it cannot be looked up by name.
@@ -5168,3 +5288,14 @@ const HeapObject *swift_getKeyPathImpl(const void *pattern,
 #define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
 #define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"
+
+#if defined(_WIN32) && defined(_M_ARM64)
+namespace std {
+template <>
+inline void _Atomic_storage<::PoolRange, 16>::_Unlock() const noexcept {
+  __dmb(0x8);
+  __iso_volatile_store32(&reinterpret_cast<volatile int &>(_Spinlock), 0);
+  __dmb(0x8);
+}
+}
+#endif

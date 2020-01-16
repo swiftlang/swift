@@ -370,12 +370,12 @@ guesswork. However, we note that the type of an enum member actually
 has a regular structure. For example, consider the ``Optional`` type::
 
   enum Optional<T> {
-    case None
-    case Some(T)
+    case none
+    case some(T)
   }
 
-The type of ``Optional<T>.None`` is ``Optional<T>``, while the type of
-``Optional<T>.Some`` is ``(T) -> Optional<T>``. In fact, the
+The type of ``Optional<T>.none`` is ``Optional<T>``, while the type of
+``Optional<T>.some`` is ``(T) -> Optional<T>``. In fact, the
 type of an enum element can have one of two forms: it can be ``T0``,
 for an enum element that has no extra data, or it can be ``T2 -> T0``,
 where ``T2`` is the data associated with the enum element.  For the
@@ -970,4 +970,25 @@ well-typed suggestions.
 .. [#] Again, as of this writing, the solver doesn't actually compute
   meets and joins, so the solver continues until it runs out of
   supertypes to enumerate.
+
+New Diagnostic Architecture
+---------------------------
+
+We are currently working on porting type-check based diagnostics over
+to the new diagnostic framework, which is described in detail in this
+`blog post
+<https://swift.org/blog/new-diagnostic-arch-overview/>`_.
+
+The things in the queue yet to be ported are:
+
+- Diagnostics related to member references: ``diagnoseMemberFailures``.
+  Most of the associated diagnostics have been ported and fixes are
+  located in ``ConstraintSystem::simplifyMemberConstraint``.
+
+- Problems related to calls and operator applications e.g.
+
+  - Missing explicit ``Self.`` and ``self.``
+  - Logic related to overload candidate ranking (``CalleeCandidateInfo``)
+  - ``diagnoseParameterErrors``
+  - ``diagnoseSimpleErrors``
 

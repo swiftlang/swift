@@ -34,7 +34,7 @@ class ConstructibleArray<T:Constructible> {
     array = [T]()
     array.reserveCapacity(1_000)
     for _ in 0...1_000 {
-      array.append(T(e:e) as T)
+      array.append(T(e:e))
     }
   }
 }

@@ -21,7 +21,7 @@ import SwiftShims
 /// an indication that no more Unicode scalars are available, or an indication
 /// of a decoding error.
 @frozen
-public enum UnicodeDecodingResult : Equatable {
+public enum UnicodeDecodingResult: Equatable {
   /// A decoded Unicode scalar value.
   case scalarValue(Unicode.Scalar)
   
@@ -58,7 +58,7 @@ public enum UnicodeDecodingResult : Equatable {
 /// UTF-8, UTF-16, and UTF-32 encoding schemes as the `UTF8`, `UTF16`, and
 /// `UTF32` types, respectively. Use the `Unicode.Scalar` type to work with
 /// decoded Unicode scalar values.
-public protocol UnicodeCodec : Unicode.Encoding {
+public protocol UnicodeCodec: Unicode.Encoding {
 
   /// Creates an instance of the codec.
   init()
@@ -103,7 +103,7 @@ public protocol UnicodeCodec : Unicode.Encoding {
   /// - Returns: A `UnicodeDecodingResult` instance, representing the next
   ///   Unicode scalar, an indication of an error, or an indication that the
   ///   UTF sequence has been fully decoded.
-  mutating func decode<I : IteratorProtocol>(
+  mutating func decode<I: IteratorProtocol>(
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit
 
@@ -139,7 +139,7 @@ public protocol UnicodeCodec : Unicode.Encoding {
 
 /// A codec for translating between Unicode scalar values and UTF-8 code
 /// units.
-extension Unicode.UTF8 : UnicodeCodec {
+extension Unicode.UTF8: UnicodeCodec {
   /// Creates an instance of the UTF-8 codec.
   @inlinable
   public init() { self = ._swift3Buffer(ForwardParser()) }
@@ -187,7 +187,7 @@ extension Unicode.UTF8 : UnicodeCodec {
   ///   UTF sequence has been fully decoded.
   @inlinable
   @inline(__always)
-  public mutating func decode<I : IteratorProtocol>(
+  public mutating func decode<I: IteratorProtocol>(
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
     guard case ._swift3Buffer(var parser) = self else {
@@ -316,7 +316,7 @@ extension Unicode.UTF8 : UnicodeCodec {
 
 /// A codec for translating between Unicode scalar values and UTF-16 code
 /// units.
-extension Unicode.UTF16 : UnicodeCodec {
+extension Unicode.UTF16: UnicodeCodec {
   /// Creates an instance of the UTF-16 codec.
   @inlinable
   public init() { self = ._swift3Buffer(ForwardParser()) }
@@ -363,7 +363,7 @@ extension Unicode.UTF16 : UnicodeCodec {
   ///   Unicode scalar, an indication of an error, or an indication that the
   ///   UTF sequence has been fully decoded.
   @inlinable
-  public mutating func decode<I : IteratorProtocol>(
+  public mutating func decode<I: IteratorProtocol>(
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
     guard case ._swift3Buffer(var parser) = self else {
@@ -381,7 +381,7 @@ extension Unicode.UTF16 : UnicodeCodec {
   /// units it spanned in the input.  This function may consume more code
   /// units than required for this scalar.
   @inlinable
-  internal mutating func _decodeOne<I : IteratorProtocol>(
+  internal mutating func _decodeOne<I: IteratorProtocol>(
     _ input: inout I
   ) -> (UnicodeDecodingResult, Int) where I.Element == CodeUnit {
     let result = decode(&input)
@@ -428,7 +428,7 @@ extension Unicode.UTF16 : UnicodeCodec {
 
 /// A codec for translating between Unicode scalar values and UTF-32 code
 /// units.
-extension Unicode.UTF32 : UnicodeCodec {
+extension Unicode.UTF32: UnicodeCodec {
   /// Creates an instance of the UTF-32 codec.
   @inlinable
   public init() { self = ._swift3Codec }
@@ -475,7 +475,7 @@ extension Unicode.UTF32 : UnicodeCodec {
   ///   Unicode scalar, an indication of an error, or an indication that the
   ///   UTF sequence has been fully decoded.
   @inlinable
-  public mutating func decode<I : IteratorProtocol>(
+  public mutating func decode<I: IteratorProtocol>(
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
     var parser = ForwardParser()
@@ -550,9 +550,9 @@ extension Unicode.UTF32 : UnicodeCodec {
 @inlinable
 @inline(__always)
 public func transcode<
-  Input : IteratorProtocol,
-  InputEncoding : Unicode.Encoding,
-  OutputEncoding : Unicode.Encoding
+  Input: IteratorProtocol,
+  InputEncoding: Unicode.Encoding,
+  OutputEncoding: Unicode.Encoding
 >(
   _ input: Input,
   from inputEncoding: InputEncoding.Type,
@@ -596,7 +596,7 @@ protocol _StringElement {
   static func _fromUTF16CodeUnit(_ utf16: UTF16.CodeUnit) -> Self
 }
 
-extension UTF16.CodeUnit : _StringElement {
+extension UTF16.CodeUnit: _StringElement {
   @inlinable
   public // @testable
   static func _toUTF16CodeUnit(_ x: UTF16.CodeUnit) -> UTF16.CodeUnit {
@@ -611,7 +611,7 @@ extension UTF16.CodeUnit : _StringElement {
   }
 }
 
-extension UTF8.CodeUnit : _StringElement {
+extension UTF8.CodeUnit: _StringElement {
   @inlinable
   public // @testable
   static func _toUTF16CodeUnit(_ x: UTF8.CodeUnit) -> UTF16.CodeUnit {
@@ -663,9 +663,9 @@ public func transcode<Input, InputEncoding, OutputEncoding>(
   stopOnError: Bool
 ) -> Bool
   where
-  Input : IteratorProtocol,
-  InputEncoding : UnicodeCodec,
-  OutputEncoding : UnicodeCodec,
+  Input: IteratorProtocol,
+  InputEncoding: UnicodeCodec,
+  OutputEncoding: UnicodeCodec,
   InputEncoding.CodeUnit == Input.Element {
   Builtin.unreachable()
 }

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 public protocol LazyCollectionProtocol: Collection, LazySequenceProtocol 
-where Elements : Collection {	}
+where Elements: Collection {	}
 
 extension LazyCollectionProtocol {		
    // Lazy things are already lazy		
@@ -36,7 +36,7 @@ extension LazyCollectionProtocol {
 /// - See also: `LazySequenceProtocol`, `LazyCollection`
 public typealias LazyCollection<T: Collection> = LazySequence<T>
 
-extension LazyCollection : Collection {
+extension LazyCollection: Collection {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -147,16 +147,16 @@ extension LazyCollection : Collection {
 
 extension LazyCollection: LazyCollectionProtocol { }
 
-extension LazyCollection : BidirectionalCollection
-  where Base : BidirectionalCollection {
+extension LazyCollection: BidirectionalCollection
+  where Base: BidirectionalCollection {
   @inlinable
   public func index(before i: Index) -> Index {
     return _base.index(before: i)
   }
 }
 
-extension LazyCollection : RandomAccessCollection
-  where Base : RandomAccessCollection {}
+extension LazyCollection: RandomAccessCollection
+  where Base: RandomAccessCollection {}
 
 extension Slice: LazySequenceProtocol where Base: LazySequenceProtocol { }
 extension ReversedCollection: LazySequenceProtocol where Base: LazySequenceProtocol { }

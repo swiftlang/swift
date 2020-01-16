@@ -52,8 +52,12 @@ ToolChain::JobContext::getTemporaryFilePath(const llvm::Twine &name,
   SmallString<128> buffer;
   std::error_code EC = llvm::sys::fs::createTemporaryFile(name, suffix, buffer);
   if (EC) {
+    // Use the constructor that prints both the error code and the description.
     // FIXME: This should not take down the entire process.
-    llvm::report_fatal_error("unable to create temporary file for filelist");
+    auto error = llvm::make_error<llvm::StringError>(
+        EC,
+        "- unable to create temporary file for " + name + "." + suffix);
+    llvm::report_fatal_error(std::move(error));
   }
 
   C.addTemporaryFile(buffer.str(), PreserveOnSignal::Yes);
@@ -174,26 +178,6 @@ file_types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
   return file_types::lookupTypeForExtension(Ext);
 }
 
-/// Return a _single_ TY_Swift InputAction, if one exists;
-/// if 0 or >1 such inputs exist, return nullptr.
-static const InputAction *findSingleSwiftInput(const CompileJobAction *CJA) {
-  auto Inputs = CJA->getInputs();
-  const InputAction *IA = nullptr;
-  for (auto const *I : Inputs) {
-    if (auto const *S = dyn_cast<InputAction>(I)) {
-      if (S->getType() == file_types::TY_Swift) {
-        if (IA == nullptr) {
-          IA = S;
-        } else {
-          // Already found one, two is too many.
-          return nullptr;
-        }
-      }
-    }
-  }
-  return IA;
-}
-
 static bool jobsHaveSameExecutableNames(const Job *A, const Job *B) {
   // Jobs that get here (that are derived from CompileJobActions) should always
   // have the same executable name -- it should always be SWIFT_EXECUTABLE_NAME
@@ -234,7 +218,12 @@ bool ToolChain::jobIsBatchable(const Compilation &C, const Job *A) const {
   auto const *CJActA = dyn_cast<const CompileJobAction>(&A->getSource());
   if (!CJActA)
     return false;
-  return findSingleSwiftInput(CJActA) != nullptr;
+  // When having only one job output a dependency file, that job is not
+  // batchable since it has an oddball set of additional output types.
+  if (C.OnlyOneDependencyFile &&
+      A->getOutput().hasAdditionalOutputForType(file_types::TY_Dependencies))
+    return false;
+  return CJActA->findSingleSwiftInput() != nullptr;
 }
 
 bool ToolChain::jobsAreBatchCombinable(const Compilation &C, const Job *A,
@@ -296,33 +285,6 @@ mergeBatchInputs(ArrayRef<const Job *> jobs,
   return false;
 }
 
-/// Unfortunately the success or failure of a Swift compilation is currently
-/// sensitive to the order in which files are processed, at least in terms of
-/// the order of processing extensions (and likely other ways we haven't
-/// discovered yet). So long as this is true, we need to make sure any batch job
-/// we build names its inputs in an order that's a subsequence of the sequence
-/// of inputs the driver was initially invoked with.
-static void
-sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
-                                 SmallVectorImpl<const Job *> &sortedJobs,
-                                 Compilation &C) {
-  llvm::DenseMap<StringRef, const Job *> jobsByInput;
-  for (const Job *J : unsortedJobs) {
-    const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
-    const InputAction *IA = findSingleSwiftInput(CJA);
-    auto R =
-        jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
-    assert(R.second);
-    (void)R;
-  }
-  for (const InputPair &P : C.getInputFiles()) {
-    auto I = jobsByInput.find(P.second->getValue());
-    if (I != jobsByInput.end()) {
-      sortedJobs.push_back(I->second);
-    }
-  }
-}
-
 /// Construct a \c BatchJob by merging the constituent \p jobs' CommandOutput,
 /// input \c Job and \c Action members. Call through to \c constructInvocation
 /// on \p BatchJob, to build the \c InvocationInfo.
@@ -334,7 +296,7 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
     return nullptr;
 
   llvm::SmallVector<const Job *, 16> sortedJobs;
-  sortJobsToMatchCompilationInputs(unsortedJobs, sortedJobs, C);
+  C.sortJobsToMatchCompilationInputs(unsortedJobs, sortedJobs);
 
   // Synthetic OutputInfo is a slightly-modified version of the initial
   // compilation's OI.

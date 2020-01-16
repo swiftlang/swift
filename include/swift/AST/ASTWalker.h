@@ -221,6 +221,15 @@ public:
   /// bodies of closures that have not yet been type checked.
   virtual bool shouldWalkIntoNonSingleExpressionClosure() { return true; }
 
+  /// This method configures whether the walker should exhibit the legacy
+  /// behavior where accessors appear as peers of their storage, rather
+  /// than children nested inside of it.
+  ///
+  /// Please don't write new ASTWalker implementations that override this
+  /// method to return true; instead, refactor existing code as needed
+  /// until eventually we can remove this altogether.
+  virtual bool shouldWalkAccessorsTheOldWay() { return false; }
+
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.  If it returns false,
   /// the subtree is skipped.

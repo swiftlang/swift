@@ -150,6 +150,9 @@ testSuite.test("Basic")
   requireClass(named: "main.ObjCSuperclass")
 }
 
+class Çlass<T> {}
+class SubÇlass: Çlass<Int> {}
+
 testSuite.test("BasicMangled")
   .requireOwnProcess()
   .code {
@@ -179,7 +182,7 @@ testSuite.test("GenericMangled")
                 reason: "objc_getClass hook not present"))
   .requireOwnProcess()
   .code {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+  guard #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) else { return }
   requireClass(named:   "_TtC4main24ConstrainedSwiftSubclass",
                demangledName: "main.ConstrainedSwiftSubclass")
   requireClass(named:   "_TtC4main26ConstrainedSwiftSuperclass",
@@ -188,6 +191,10 @@ testSuite.test("GenericMangled")
                demangledName: "main.ConstrainedObjCSubclass")
   requireClass(named:   "_TtC4main25ConstrainedObjCSuperclass",
                demangledName: "main.ConstrainedObjCSuperclass")
+
+  // Make sure we don't accidentally ban high-bit characters.
+  requireClass(named: "_TtC4main9SubÇlass", demangledName: "main.SubÇlass")
+  requireClass(named: "4main9SubÇlassC", demangledName: "main.SubÇlass")
 }
 
 testSuite.test("ResilientSubclass")
@@ -226,7 +233,7 @@ testSuite.test("ResilientNSObject")
                 reason: "objc_getClass hook not present"))
   .requireOwnProcess()
   .code {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+  guard #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) else { return }
   requireClass(named: "_TtC4main27ResilientSubclassOfNSObject",
                demangledName: "main.ResilientSubclassOfNSObject")
   requireClass(named: "_TtC4main34ResilientSubclassOfGenericNSObject",
@@ -248,6 +255,12 @@ testSuite.test("NotPresent") {
 
   // Swift.Int is not a class type.
   expectNil(NSClassFromString("Si"))
+
+  // Mangled names with byte sequences that look like symbolic references
+  // should not be demangled.
+  expectNil(NSClassFromString("\u{1}badnews"));
+  expectNil(NSClassFromString("$s\u{1}badnews"));
+  expectNil(NSClassFromString("_T\u{1}badnews"));
 }
 
 runAllTests()

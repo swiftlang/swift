@@ -486,7 +486,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 // CHECK-NEXT: return
 // CHECK: } // end sil function 'test_recursive_nativeobject_baz'
 sil [transparent] [ossa] @test_recursive_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @owned $Builtin.NativeObject):
   return %0 : $Builtin.NativeObject
 }
 
@@ -734,7 +734,7 @@ bb0(%0 : @owned $CP):
 // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
 // CHECK:   [[ARG1_COPY_COPY:%.*]] = copy_value [[ARG1_COPY]]
 // CHECK:   open_existential_ref [[ARG1_COPY_COPY]] : $CP to $@opened([[N1:".*"]]) CP
-// CHECK" } // end sil function '_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_'
+// CHECK: } // end sil function '_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_'
 sil [ossa] @_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_ : $@convention(thin) (@owned CP, @owned CP) -> () {
 bb0(%0 : @owned $CP, %1 : @owned $CP):
   %4 = function_ref @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@convention(thin) (@owned CP) -> ()
@@ -1197,7 +1197,7 @@ bb0:
 // CHECK-LABEL: sil [ossa] @test_thin_convert_function_inline
 // CHECK-NEXT: bb0
 // CHECK-NEXT: [[RES:%.*]] = integer_literal $Builtin.Int32, 1
-// CHECK-NEXT  return [[RES]]
+// CHECK-NEXT:  return [[RES]]
 sil [ossa] @test_thin_convert_function_inline : $@convention(thin) () -> Builtin.Int32 {
 bb0:
   %0 = function_ref @return_one : $@convention(thin) () -> Builtin.Int32

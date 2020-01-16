@@ -71,3 +71,11 @@ internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
   // value without any branch hint.
   return actual
 }
+
+extension String {
+  @usableFromInline // Never actually used in inlinable code...
+  internal func _nativeCopyUTF16CodeUnits(
+    into buffer: UnsafeMutableBufferPointer<UInt16>,
+    range: Range<String.Index>
+  ) { fatalError() }
+}

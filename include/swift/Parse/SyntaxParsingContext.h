@@ -14,6 +14,7 @@
 #define SWIFT_PARSE_SYNTAXPARSINGCONTEXT_H
 
 #include "llvm/ADT/PointerUnion.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/ParsedRawSyntaxNode.h"
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
@@ -65,7 +66,7 @@ constexpr size_t SyntaxAlignInBits = 3;
 ///
 /// e.g.
 ///   parseExprParen() {
-///     SyntaxParsingContext LocalCtxt(SyntaxKind::ParenExpr, SyntaxContext);
+///     SyntaxParsingContext LocalCtxt(SyntaxContext, SyntaxKind::ParenExpr);
 ///     consumeToken(tok::l_paren) // In consumeToken(), a RawTokenSyntax is
 ///                                // added to the context.
 ///     parseExpr(); // On returning from parseExpr(), a Expr Syntax node is
@@ -162,6 +163,10 @@ private:
   /// true if it's in backtracking context.
   bool IsBacktracking = false;
 
+  /// true if ParsedSyntaxBuilders and ParsedSyntaxRecorder should create
+  /// deferred nodes
+  bool ShouldDefer = false;
+
   // If false, context does nothing.
   bool Enabled;
 
@@ -173,14 +178,17 @@ private:
   ArrayRef<ParsedRawSyntaxNode> getParts() const {
     return llvm::makeArrayRef(getStorage()).drop_front(Offset);
   }
+  MutableArrayRef<ParsedRawSyntaxNode> getParts() {
+    return llvm::makeMutableArrayRef(getStorage().data(), getStorage().size()).drop_front(Offset);
+  }
 
   ParsedRawSyntaxNode makeUnknownSyntax(SyntaxKind Kind,
-                                  ArrayRef<ParsedRawSyntaxNode> Parts);
+                                  MutableArrayRef<ParsedRawSyntaxNode> Parts);
   ParsedRawSyntaxNode createSyntaxAs(SyntaxKind Kind,
-                                     ArrayRef<ParsedRawSyntaxNode> Parts,
+                                     MutableArrayRef<ParsedRawSyntaxNode> Parts,
                                      SyntaxNodeCreationKind nodeCreateK);
   Optional<ParsedRawSyntaxNode> bridgeAs(SyntaxContextKind Kind,
-                              ArrayRef<ParsedRawSyntaxNode> Parts);
+                              MutableArrayRef<ParsedRawSyntaxNode> Parts);
 
 public:
   /// Construct root context.
@@ -193,6 +201,7 @@ public:
       : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
         RootData(CtxtHolder->RootData), Offset(RootData->Storage.size()),
         IsBacktracking(CtxtHolder->IsBacktracking),
+        ShouldDefer(CtxtHolder->ShouldDefer),
         Enabled(CtxtHolder->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&
            "SyntaxParsingContext cannot have multiple children");
@@ -258,17 +267,16 @@ public:
   /// Add Syntax to the parts.
   void addSyntax(ParsedSyntax Node);
 
-
   template<typename SyntaxNode>
   llvm::Optional<SyntaxNode> popIf() {
     auto &Storage = getStorage();
-    assert(Storage.size() > Offset);
-    if (SyntaxNode::kindof(Storage.back().getKind())) {
-      auto rawNode = std::move(Storage.back());
-      Storage.pop_back();
-      return SyntaxNode(rawNode);
-    }
-    return None;
+    if (Storage.size() <= Offset)
+      return llvm::None;
+    if (!SyntaxNode::kindof(Storage.back().getKind()))
+      return llvm::None;
+    auto rawNode = std::move(Storage.back());
+    Storage.pop_back();
+    return SyntaxNode(std::move(rawNode));
   }
 
   ParsedTokenSyntax popToken();
@@ -320,11 +328,17 @@ public:
 
   bool isBacktracking() const { return IsBacktracking; }
 
+  void setShouldDefer(bool Value = true) { ShouldDefer = Value; }
+
+  bool shouldDefer() const {
+    return ShouldDefer || IsBacktracking || Mode == AccumulationMode::Discard;
+  }
+
   /// Explicitly finalizing syntax tree creation.
   /// This function will be called during the destroying of a root syntax
   /// parsing context. However, we can explicitly call this function to get
   /// the syntax tree before closing the root context.
-  ParsedRawSyntaxNode finalizeRoot();
+  OpaqueSyntaxNode finalizeRoot();
 
   /// Make a missing node corresponding to the given token kind and
   /// push this node into the context. The synthesized node can help
@@ -332,8 +346,7 @@ public:
   void synthesize(tok Kind, SourceLoc Loc);
 
   /// Dump the nodes that are in the storage stack of the SyntaxParsingContext
-  LLVM_ATTRIBUTE_DEPRECATED(void dumpStorage() const LLVM_ATTRIBUTE_USED,
-                            "Only meant for use in the debugger");
+  SWIFT_DEBUG_DUMPER(dumpStorage());
 };
 
 } // namespace swift

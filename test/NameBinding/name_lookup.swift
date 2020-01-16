@@ -223,11 +223,11 @@ class ThisDerived1 : ThisBase1 {
     self.baseInstanceVar = 42 // expected-error {{member 'baseInstanceVar' cannot be used on type 'ThisDerived1'}}
     self.baseProp = 42 // expected-error {{member 'baseProp' cannot be used on type 'ThisDerived1'}}
     self.baseFunc0() // expected-error {{instance member 'baseFunc0' cannot be used on type 'ThisDerived1'}}
-    self.baseFunc0(ThisBase1())() // expected-error {{'ThisBase1' is not convertible to 'ThisDerived1'}}
-    
+    self.baseFunc0(ThisBase1())() // expected-error {{cannot convert value of type 'ThisBase1' to expected argument type 'ThisDerived1'}}
+
     self.baseFunc0(ThisDerived1())()
     self.baseFunc1(42) // expected-error {{instance member 'baseFunc1' cannot be used on type 'ThisDerived1'}}
-    self.baseFunc1(ThisBase1())(42) // expected-error {{'ThisBase1' is not convertible to 'ThisDerived1'}}
+    self.baseFunc1(ThisBase1())(42) // expected-error {{cannot convert value of type 'ThisBase1' to expected argument type 'ThisDerived1'}}
     self.baseFunc1(ThisDerived1())(42)
     self[0] = 42.0 // expected-error {{instance member 'subscript' cannot be used on type 'ThisDerived1'}}
     self.baseStaticVar = 42
@@ -236,7 +236,7 @@ class ThisDerived1 : ThisBase1 {
 
     self.baseExtProp = 42 // expected-error {{member 'baseExtProp' cannot be used on type 'ThisDerived1'}}
     self.baseExtFunc0() // expected-error {{instance member 'baseExtFunc0' cannot be used on type 'ThisDerived1'}}
-    self.baseExtStaticVar = 42
+    self.baseExtStaticVar = 42 // expected-error {{instance member 'baseExtStaticVar' cannot be used on type 'ThisDerived1'}}
     self.baseExtStaticProp = 42 // expected-error {{member 'baseExtStaticProp' cannot be used on type 'ThisDerived1'}}
     self.baseExtStaticFunc0()
 
@@ -253,7 +253,7 @@ class ThisDerived1 : ThisBase1 {
     self.derivedInstanceVar = 42 // expected-error {{member 'derivedInstanceVar' cannot be used on type 'ThisDerived1'}}
     self.derivedProp = 42 // expected-error {{member 'derivedProp' cannot be used on type 'ThisDerived1'}}
     self.derivedFunc0() // expected-error {{instance member 'derivedFunc0' cannot be used on type 'ThisDerived1'}}
-    self.derivedFunc0(ThisBase1())() // expected-error {{'ThisBase1' is not convertible to 'ThisDerived1'}}
+    self.derivedFunc0(ThisBase1())() // expected-error {{cannot convert value of type 'ThisBase1' to expected argument type 'ThisDerived1'}}
     self.derivedFunc0(ThisDerived1())()
     self.derivedStaticVar = 42
     self.derivedStaticProp = 42
@@ -261,7 +261,7 @@ class ThisDerived1 : ThisBase1 {
 
     self.derivedExtProp = 42 // expected-error {{member 'derivedExtProp' cannot be used on type 'ThisDerived1'}}
     self.derivedExtFunc0() // expected-error {{instance member 'derivedExtFunc0' cannot be used on type 'ThisDerived1'}}
-    self.derivedExtStaticVar = 42
+    self.derivedExtStaticVar = 42 // expected-error {{instance member 'derivedExtStaticVar' cannot be used on type 'ThisDerived1'}}
     self.derivedExtStaticProp = 42 // expected-error {{member 'derivedExtStaticProp' cannot be used on type 'ThisDerived1'}}
     self.derivedExtStaticFunc0()
 
@@ -302,7 +302,7 @@ class ThisDerived1 : ThisBase1 {
 
     super.baseExtProp = 42 // expected-error {{member 'baseExtProp' cannot be used on type 'ThisBase1'}}
     super.baseExtFunc0() // expected-error {{instance member 'baseExtFunc0' cannot be used on type 'ThisBase1'}}
-    super.baseExtStaticVar = 42 
+    super.baseExtStaticVar = 42 // expected-error {{instance member 'baseExtStaticVar' cannot be used on type 'ThisBase1'}}
     super.baseExtStaticProp = 42 // expected-error {{member 'baseExtStaticProp' cannot be used on type 'ThisBase1'}}
     super.baseExtStaticFunc0()
 
@@ -407,13 +407,14 @@ extension ThisDerived1 {
 
 // <rdar://problem/11554141>
 func shadowbug() {
-  var Foo = 10
+  let Foo = 10
   func g() {
     struct S {
       var x : Foo
       typealias Foo = Int
     }
   }
+  _ = Foo
 }
 func scopebug() {
   let Foo = 10
@@ -481,7 +482,7 @@ struct MyStruct {
 // <rdar://problem/19935319> QoI: poor diagnostic initializing a variable with a non-class func
 class Test19935319 {
   let i = getFoo()  // expected-error {{cannot use instance member 'getFoo' within property initializer; property initializers run before 'self' is available}}
-  
+
   func getFoo() -> Int {}
 }
 
@@ -552,9 +553,9 @@ default:
 }
 
 func foo() {
-  _ = MyEnum.One // expected-error {{enum type 'MyEnum' has no case 'One'; did you mean 'one'}}{{14-17=one}}
-  _ = MyEnum.Two // expected-error {{enum type 'MyEnum' has no case 'Two'; did you mean 'two'}}{{14-17=two}}
-  _ = MyEnum.OneTwoThree // expected-error {{enum type 'MyEnum' has no case 'OneTwoThree'; did you mean 'oneTwoThree'}}{{14-25=oneTwoThree}}
+  _ = MyEnum.One // expected-error {{enum type 'MyEnum' has no case 'One'; did you mean 'one'?}}{{14-17=one}}
+  _ = MyEnum.Two // expected-error {{enum type 'MyEnum' has no case 'Two'; did you mean 'two'?}}{{14-17=two}}
+  _ = MyEnum.OneTwoThree // expected-error {{enum type 'MyEnum' has no case 'OneTwoThree'; did you mean 'oneTwoThree'?}}{{14-25=oneTwoThree}}
 }
 
 enum MyGenericEnum<T> {
@@ -563,8 +564,8 @@ enum MyGenericEnum<T> {
 }
 
 func foo1() {
-  _ = MyGenericEnum<Int>.One // expected-error {{enum type 'MyGenericEnum<Int>' has no case 'One'; did you mean 'one'}}{{26-29=one}}
-  _ = MyGenericEnum<Int>.OneTwo // expected-error {{enum type 'MyGenericEnum<Int>' has no case 'OneTwo'; did you mean 'oneTwo'}}{{26-32=oneTwo}}
+  _ = MyGenericEnum<Int>.One // expected-error {{enum type 'MyGenericEnum<Int>' has no case 'One'; did you mean 'one'?}}{{26-29=one}}
+  _ = MyGenericEnum<Int>.OneTwo // expected-error {{enum type 'MyGenericEnum<Int>' has no case 'OneTwo'; did you mean 'oneTwo'?}}{{26-32=oneTwo}}
 }
 
 // SR-4082
@@ -609,3 +610,32 @@ class ShadowingGenericParameter<T> {
 }
 
 _ = ShadowingGenericParameter<String>().foo(t: "hi")
+
+// rdar://problem/51266778
+struct PatternBindingWithTwoVars1 { var x = 3, y = x }
+// expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
+
+struct PatternBindingWithTwoVars2 { var x = y, y = 3 }
+// expected-error@-1 {{cannot use instance member 'y' within property initializer; property initializers run before 'self' is available}}
+
+struct PatternBindingWithTwoVars3 { var x = y, y = x }
+// expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
+// expected-error@-2 {{cannot use instance member 'y' within property initializer; property initializers run before 'self' is available}}
+// expected-error@-3 {{circular reference}}
+// expected-note@-4 {{through reference here}}
+// expected-note@-5 {{through reference here}}
+// expected-note@-6 {{through reference here}}
+// expected-note@-7 {{through reference here}}
+// expected-note@-8 {{through reference here}}
+// expected-error@-9 {{circular reference}}
+// expected-note@-10 {{through reference here}}
+// expected-note@-11 {{through reference here}}
+// expected-note@-12 {{through reference here}}
+// expected-note@-13 {{through reference here}}
+// expected-note@-14 {{through reference here}}
+
+// https://bugs.swift.org/browse/SR-9015
+func sr9015() {
+  let closure1 = { closure2() } // expected-error {{circular reference}} expected-note {{through reference here}} expected-note {{through reference here}}
+  let closure2 = { closure1() } // expected-note {{through reference here}} expected-note {{through reference here}} expected-note {{through reference here}}
+}

@@ -215,6 +215,18 @@ extension Slice: Collection {
   public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
     _base._failEarlyRangeCheck(range, bounds: bounds)
   }
+
+  @_alwaysEmitIntoClient @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    try _base.withContiguousStorageIfAvailable { buffer in
+      let start = _base.distance(from: _base.startIndex, to: _startIndex)
+      let count = _base.distance(from: _startIndex, to: _endIndex)
+      let slice = UnsafeBufferPointer(rebasing: buffer[start ..< start + count])
+      return try body(slice)
+    }
+  }
 }
 
 extension Slice: BidirectionalCollection where Base: BidirectionalCollection {
@@ -258,6 +270,34 @@ extension Slice: MutableCollection where Base: MutableCollection {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
   }
+
+  @_alwaysEmitIntoClient @inlinable
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    // We're calling `withContiguousMutableStorageIfAvailable` twice here so
+    // that we don't calculate index distances unless we know we'll use them.
+    // The expectation here is that the base collection will make itself
+    // contiguous on the first try and the second call will be relatively cheap.
+    guard _base.withContiguousMutableStorageIfAvailable({ _ in }) != nil
+    else {
+      return nil
+    }
+    let start = _base.distance(from: _base.startIndex, to: _startIndex)
+    let count = _base.distance(from: _startIndex, to: _endIndex)
+    return try _base.withContiguousMutableStorageIfAvailable { buffer in
+      var slice = UnsafeMutableBufferPointer(
+        rebasing: buffer[start ..< start + count])
+      let copy = slice
+      defer {
+        _precondition(
+          slice.baseAddress == copy.baseAddress &&
+          slice.count == copy.count,
+          "Slice.withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
+      }
+      return try body(&slice)
+    }
+  }
 }
 
 
@@ -289,7 +329,7 @@ extension Slice: RangeReplaceableCollection
   @inlinable // generic-performance
   public mutating func replaceSubrange<C>(
     _ subRange: Range<Index>, with newElements: C
-  ) where C : Collection, C.Element == Base.Element {
+  ) where C: Collection, C.Element == Base.Element {
 
     // FIXME: swift-3-indexing-model: range check.
     let sliceOffset =
@@ -354,7 +394,7 @@ extension Slice
   @inlinable // generic-performance
   public mutating func replaceSubrange<C>(
     _ subRange: Range<Index>, with newElements: C
-  ) where C : Collection, C.Element == Base.Element {
+  ) where C: Collection, C.Element == Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if subRange.lowerBound == _base.startIndex {
       let newSliceCount =
@@ -400,7 +440,7 @@ extension Slice
 
   @inlinable // generic-performance
   public mutating func insert<S>(contentsOf newElements: S, at i: Index)
-  where S : Collection, S.Element == Base.Element {
+  where S: Collection, S.Element == Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if i == _base.startIndex {
       let newSliceCount = count + numericCast(newElements.count)

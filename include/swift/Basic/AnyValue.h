@@ -165,6 +165,14 @@ namespace llvm {
   bool operator!=(const TinyPtrVector<T> &lhs, const TinyPtrVector<T> &rhs) {
     return !(lhs == rhs);
   }
+
+  template<typename T>
+  void simple_display(raw_ostream &out, const Optional<T> &opt) {
+    if (opt) {
+      simple_display(out, *opt);
+    }
+    out << "None";
+  }
 } // end namespace llvm
 
 #endif //

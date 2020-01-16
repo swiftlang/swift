@@ -17,6 +17,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -24,6 +25,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/Threading.h"
@@ -48,44 +50,18 @@ using namespace sourcekitd_test;
 #if defined(_WIN32)
 namespace {
 int STDOUT_FILENO = _fileno(stdout);
-const constexpr size_t MAXPATHLEN = MAX_PATH + 1;
-char *realpath(const char *path, char *resolved_path) {
-  wchar_t full_path[MAXPATHLEN] = {0};
-  llvm::SmallVector<llvm::UTF16, 50> utf16Path;
-  llvm::convertUTF8ToUTF16String(path, utf16Path);
-
-  HANDLE fileHandle = CreateFileW(
-      (LPCWSTR)utf16Path.data(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-
-  if (fileHandle == INVALID_HANDLE_VALUE)
-    return nullptr;
-  DWORD success = GetFinalPathNameByHandleW(fileHandle, full_path, MAX_PATH,
-                                            FILE_NAME_NORMALIZED);
-  CloseHandle(fileHandle);
-  if (!success) return nullptr;
-
-  std::string utf8Path;
-  llvm::ArrayRef<char> pathRef((const char *)full_path,
-                               (const char *)(full_path + MAX_PATH));
-  if (!llvm::convertUTF16ToUTF8String(pathRef, utf8Path))
-    return nullptr;
-
-  if (!resolved_path) {
-    resolved_path = static_cast<char *>(malloc(utf8Path.length() + 1));
-  }
-  std::copy(std::begin(utf8Path), std::end(utf8Path), resolved_path);
-  return resolved_path;
-}
 }
 #endif
 
-static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts);
+static bool sendGlobalConfigRequest();
+static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts,
+                                bool IsFirstInvocation);
 static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                            const std::string &SourceFile,
                            std::unique_ptr<llvm::MemoryBuffer> SourceBuf,
                            TestOptions *InitOpts);
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef Filename,
+                            const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                             llvm::raw_ostream &OS);
 static void printNameTranslationInfo(sourcekitd_variant_t Info, llvm::raw_ostream &OS);
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef Filename,
@@ -95,6 +71,7 @@ static void printDocInfo(sourcekitd_variant_t Info, StringRef Filename);
 static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII);
 static void printSemanticInfo();
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
+                               const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                                llvm::raw_ostream &OS);
 static void printFoundInterface(sourcekitd_variant_t Info,
                                 llvm::raw_ostream &OS);
@@ -118,17 +95,21 @@ static void prepareMangleRequest(sourcekitd_object_t Req,
 static void printMangleResults(sourcekitd_variant_t Info, raw_ostream &OS);
 static void printStatistics(sourcekitd_variant_t Info, raw_ostream &OS);
 
-static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
-                                   StringRef Filename);
+static unsigned
+resolveFromLineCol(unsigned Line, unsigned Col, StringRef Filename,
+                   const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
 static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
                                    llvm::MemoryBuffer *InputBuf);
-static std::pair<unsigned, unsigned> resolveToLineCol(unsigned Offset,
-                                                      StringRef Filename);
+static std::pair<unsigned, unsigned>
+resolveToLineCol(unsigned Offset, StringRef Filename,
+                 const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
 static std::pair<unsigned, unsigned> resolveToLineCol(unsigned Offset,
                                                   llvm::MemoryBuffer *InputBuf);
 static std::pair<unsigned, unsigned> resolveToLineColFromBuf(unsigned Offset,
                                                       const char *Buf);
-static llvm::MemoryBuffer *getBufferForFilename(StringRef Filename);
+static llvm::MemoryBuffer *
+getBufferForFilename(StringRef Filename,
+                     const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
 
 static void notification_receiver(sourcekitd_response_t resp);
 
@@ -259,6 +240,7 @@ static void skt_main(skt_args *args) {
   // invocations.
   TestOptions InitOpts;
   auto Args = llvm::makeArrayRef(argv+1, argc-1);
+  bool firstInvocation = true;
   while (1) {
     unsigned i = 0;
     for (auto Arg: Args) {
@@ -268,15 +250,17 @@ static void skt_main(skt_args *args) {
     }
     if (i == Args.size())
       break;
-    if (int ret = handleTestInvocation(Args.slice(0, i), InitOpts)) {
+    if (int ret = handleTestInvocation(Args.slice(0, i), InitOpts,
+                                       firstInvocation)) {
       sourcekitd_shutdown();
       args->ret = ret;
       return;
     }
     Args = Args.slice(i + 1);
+    firstInvocation = false;
   }
 
-  if (int ret = handleTestInvocation(Args, InitOpts)) {
+  if (int ret = handleTestInvocation(Args, InitOpts, firstInvocation)) {
     sourcekitd_shutdown();
     args->ret = ret;
     return;
@@ -301,10 +285,12 @@ static void skt_main(skt_args *args) {
   return;
 }
 
-static inline const char *getInterfaceGenDocumentName() {
-  // Absolute "path" so that handleTestInvocation doesn't try to make it
-  // absolute.
-  return "/<interface-gen>";
+static inline std::string getInterfaceGenDocumentName() {
+  // "Absolute path" on all platforms since handleTestInvocation will attempt to make this absolute
+  llvm::SmallString<64> path = llvm::StringRef("/<interface-gen>");
+  llvm::sys::fs::make_absolute(path);
+  llvm::sys::path::native(path);
+  return path.str();
 }
 
 static int printAnnotations();
@@ -383,7 +369,7 @@ static sourcekitd_response_t sendRequestSync(sourcekitd_object_t req,
 }
 
 static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
-  auto Buffer = getBufferForFilename(QueryPath)->getBuffer();
+  auto Buffer = getBufferForFilename(QueryPath, Opts.VFSFiles)->getBuffer();
   char *Err = nullptr;
   auto Req = sourcekitd_request_create_from_yaml(Buffer.data(), &Err);
   if (!Req) {
@@ -404,7 +390,7 @@ static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts);
 
 static int handleTestInvocation(ArrayRef<const char *> Args,
-                                TestOptions &InitOpts) {
+                                TestOptions &InitOpts, bool firstInvocation) {
 
   unsigned Optargc = 0;
   for (auto Arg: Args) {
@@ -419,6 +405,16 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
+
+  if (firstInvocation && Opts.Request != SourceKitRequest::GlobalConfiguration &&
+      !Opts.SuppressDefaultConfigRequest) {
+    // We don't fail if this request fails for now so that sourcekitd-test is
+    // still usable with older versions of sourcekitd that don't have the
+    // global-configuration request.
+    if (sendGlobalConfigRequest()) {
+      llvm::outs() << "warning: global configuration request failed\n";
+    }
+  }
 
   assert(Opts.repeatRequest >= 1);
   for (unsigned i = 0; i < Opts.repeatRequest; ++i) {
@@ -454,8 +450,29 @@ static int setExpectedTypes(const sourcekitd_test::TestOptions &Opts,
   return 0;
 }
 
-static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
+static bool sendGlobalConfigRequest() {
+  TestOptions Opts;
+  sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
+                                                                 nullptr, 0);
+  sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
 
+  // For test invocations we default to setting OptimizeForIDE to true. This
+  // matches the use case of the most popular clients of sourcekitd (editors)
+  // and also disables loading locations from .swiftsourceinfo files. This is
+  // desirable for testing because the .swiftsourceinfo for the stdlib is
+  // available when sourcekitd is tested, and can make some stdlib-dependent
+  // sourcekitd tests unstable due to changing source locations from the stdlib
+  // module.
+  sourcekitd_request_dictionary_set_int64(Req, KeyOptimizeForIDE, static_cast<int64_t>(true));
+  sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
+  bool IsError = sourcekitd_response_is_error(Resp);
+  if (IsError)
+    sourcekitd_response_description_dump(Resp);
+  sourcekitd_request_release(Req);
+  return IsError;
+}
+
+static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   if (!Opts.JsonRequestPath.empty())
     return handleJsonRequestPath(Opts.JsonRequestPath, Opts);
 
@@ -468,12 +485,13 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     llvm::SmallString<64> AbsSourceFile;
     AbsSourceFile += SourceFile;
     llvm::sys::fs::make_absolute(AbsSourceFile);
+    llvm::sys::path::native(AbsSourceFile);
     SourceFile = AbsSourceFile.str();
   }
   std::string SemaName = !Opts.Name.empty() ? Opts.Name : SourceFile;
 
   if (!Opts.TextInputFile.empty()) {
-    auto Buf = getBufferForFilename(Opts.TextInputFile);
+    auto Buf = getBufferForFilename(Opts.TextInputFile, Opts.VFSFiles);
     Opts.SourceText = Buf->getBuffer();
   }
 
@@ -482,7 +500,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     SourceBuf = llvm::MemoryBuffer::getMemBuffer(*Opts.SourceText, Opts.SourceFile);
   } else if (!SourceFile.empty()) {
     SourceBuf = llvm::MemoryBuffer::getMemBuffer(
-          getBufferForFilename(SourceFile)->getBuffer(), SourceFile);
+        getBufferForFilename(SourceFile, Opts.VFSFiles)->getBuffer(),
+        SourceFile);
   }
 
   // FIXME: we should detect if offset is required but not set.
@@ -506,6 +525,12 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     //        In other words, despite returning 1 here, the program still exits
     //        with a zero (successful) exit code.
     return 1;
+
+  case SourceKitRequest::GlobalConfiguration:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
+    if (Opts.OptimizeForIde.hasValue())
+      sourcekitd_request_dictionary_set_int64(Req, KeyOptimizeForIDE, static_cast<int64_t>(Opts.OptimizeForIde.getValue()));
+    break;
 
   case SourceKitRequest::ProtocolVersion:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestProtocolVersion);
@@ -548,6 +573,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::CodeComplete:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCodeComplete);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    addCodeCompleteOptions(Req, Opts);
     break;
 
   case SourceKitRequest::CodeCompleteOpen:
@@ -647,7 +674,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     auto Length = Opts.Length;
     if (Opts.Length == 0 && Opts.EndLine > 0) {
-      auto EndOff = resolveFromLineCol(Opts.EndLine, Opts.EndCol, SourceFile);
+      auto EndOff = resolveFromLineCol(Opts.EndLine, Opts.EndCol, SourceFile,
+                                       Opts.VFSFiles);
       Length = EndOff - ByteOffset;
     }
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Length);
@@ -859,7 +887,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                             RequestEditorOpenHeaderInterface);
     }
 
-    sourcekitd_request_dictionary_set_string(Req, KeyName, getInterfaceGenDocumentName());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, getInterfaceGenDocumentName().c_str());
     if (!Opts.ModuleGroupName.empty())
       sourcekitd_request_dictionary_set_string(Req, KeyGroupName,
                                                Opts.ModuleGroupName.c_str());
@@ -913,7 +941,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
       llvm::errs() << "Missing '-rename-spec <file path>'\n";
       return 1;
     }
-    auto Buffer = getBufferForFilename(Opts.RenameSpecPath)->getBuffer();
+    auto Buffer =
+        getBufferForFilename(Opts.RenameSpecPath, Opts.VFSFiles)->getBuffer();
     char *Err = nullptr;
     auto RenameSpec = sourcekitd_request_create_from_yaml(Buffer.data(), &Err);
     if (!RenameSpec) {
@@ -932,7 +961,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   if (!SourceFile.empty()) {
     if (Opts.PassAsSourceText) {
-      auto Buf = getBufferForFilename(SourceFile);
+      auto Buf = getBufferForFilename(SourceFile, Opts.VFSFiles);
       sourcekitd_request_dictionary_set_string(Req, KeySourceText,
                                                Buf->getBufferStart());
     }
@@ -943,6 +972,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   if (Opts.SourceText) {
     sourcekitd_request_dictionary_set_string(Req, KeySourceText,
                                              Opts.SourceText->c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeySourceFile,
+                                             SemaName.c_str());
   }
 
   if (!Opts.CompilerArgs.empty()) {
@@ -980,6 +1011,29 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     }
   }
 
+  if (Opts.VFSName) {
+    sourcekitd_request_dictionary_set_string(Req, KeyVFSName, Opts.VFSName->c_str());
+  }
+  if (!Opts.VFSFiles.empty()) {
+    sourcekitd_object_t files = sourcekitd_request_array_create(nullptr, 0);
+    for (auto &NameAndTarget : Opts.VFSFiles) {
+      sourcekitd_object_t file = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+      sourcekitd_request_dictionary_set_string(file, KeyName, NameAndTarget.first().data());
+
+      if (NameAndTarget.second.passAsSourceText) {
+        auto content = getBufferForFilename(NameAndTarget.first(), Opts.VFSFiles);
+        sourcekitd_request_dictionary_set_string(file, KeySourceText,  content->getBufferStart());
+      } else {
+        sourcekitd_request_dictionary_set_string(file, KeySourceFile,  NameAndTarget.second.path.c_str());
+      }
+      sourcekitd_request_array_set_value(files, SOURCEKITD_ARRAY_APPEND, file);
+    }
+    sourcekitd_object_t vfsOpts = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+    sourcekitd_request_dictionary_set_value(vfsOpts, KeyFiles, files);
+    sourcekitd_request_dictionary_set_value(Req, KeyVFSOptions, vfsOpts);
+    sourcekitd_request_release(vfsOpts);
+    sourcekitd_request_release(files);
+  }
 
   if (!Opts.isAsyncRequest) {
     sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
@@ -1072,6 +1126,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       printMangleResults(sourcekitd_response_get_value(Resp), outs());
       break;
 
+    case SourceKitRequest::GlobalConfiguration:
     case SourceKitRequest::ProtocolVersion:
     case SourceKitRequest::CompilerVersion:
     case SourceKitRequest::Close:
@@ -1088,11 +1143,11 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       break;
 
     case SourceKitRequest::RelatedIdents:
-      printRelatedIdents(Info, SourceFile, llvm::outs());
+      printRelatedIdents(Info, SourceFile, Opts.VFSFiles, llvm::outs());
       break;
 
     case SourceKitRequest::CursorInfo:
-      printCursorInfo(Info, SourceFile, llvm::outs());
+      printCursorInfo(Info, SourceFile, Opts.VFSFiles, llvm::outs());
       break;
 
     case SourceKitRequest::NameTranslation:
@@ -1153,7 +1208,8 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::Structure:
       sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
       if (Opts.ReplaceText.hasValue()) {
-        unsigned Offset = resolveFromLineCol(Opts.Line, Opts.Col, SourceFile);
+        unsigned Offset =
+            resolveFromLineCol(Opts.Line, Opts.Col, SourceFile, Opts.VFSFiles);
         unsigned Length = Opts.Length;
         sourcekitd_object_t EdReq = sourcekitd_request_dictionary_create(nullptr,
                                                                     nullptr, 0);
@@ -1381,6 +1437,7 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
 }
 
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
+                            const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                             llvm::raw_ostream &OS) {
   const char *InternalDiagnostic =
       sourcekitd_variant_dictionary_get_string(Info, KeyInternalDiagnostic);
@@ -1397,9 +1454,9 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   }
 
   std::string Filename = FilenameIn;
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(Filename.c_str(), full_path))
-    Filename = path;
+  llvm::SmallString<256> output;
+  if (!llvm::sys::fs::real_path(Filename, output))
+    Filename = output.str();
 
   const char *Kind = sourcekitd_uid_get_string_ptr(KindUID);
   const char *USR = sourcekitd_variant_dictionary_get_string(Info, KeyUSR);
@@ -1496,9 +1553,10 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   if (Offset.hasValue()) {
     if (Filename != FilePath)
       OS << FilePath << ":";
-    auto LineCol = resolveToLineCol(Offset.getValue(), FilePath);
+    auto LineCol = resolveToLineCol(Offset.getValue(), FilePath, VFSFiles);
     OS << LineCol.first << ':' << LineCol.second;
-    auto EndLineCol = resolveToLineCol(Offset.getValue()+Length, FilePath);
+    auto EndLineCol =
+        resolveToLineCol(Offset.getValue() + Length, FilePath, VFSFiles);
     OS << '-' << EndLineCol.first << ':' << EndLineCol.second;
   }
   OS << ")\n";
@@ -1568,9 +1626,9 @@ static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   }
 
   std::string Filename = FilenameIn;
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(Filename.c_str(), full_path))
-    Filename = path;
+  llvm::SmallString<256> output;
+  if (llvm::sys::fs::real_path(Filename, output))
+    Filename = output.str();
 
   sourcekitd_variant_t OffsetObj =
     sourcekitd_variant_dictionary_get_value(Info, KeyOffset);
@@ -1854,6 +1912,7 @@ static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII) {
 }
 
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
+                               const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                                llvm::raw_ostream &OS) {
   OS << "START RANGES\n";
   sourcekitd_variant_t Res =
@@ -1862,7 +1921,7 @@ static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
     sourcekitd_variant_t Range = sourcekitd_variant_array_get_value(Res, i);
     int64_t Offset = sourcekitd_variant_dictionary_get_int64(Range, KeyOffset);
     int64_t Length = sourcekitd_variant_dictionary_get_int64(Range, KeyLength);
-    auto LineCol = resolveToLineCol(Offset, Filename);
+    auto LineCol = resolveToLineCol(Offset, Filename, VFSFiles);
     OS << LineCol.first << ':' << LineCol.second << " - " << Length << '\n';
   }
   OS << "END RANGES\n";
@@ -2064,8 +2123,9 @@ static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
 }
 
 static std::pair<unsigned, unsigned>
-resolveToLineCol(unsigned Offset, StringRef Filename) {
-  return resolveToLineCol(Offset, getBufferForFilename(Filename));
+resolveToLineCol(unsigned Offset, StringRef Filename,
+                 const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
+  return resolveToLineCol(Offset, getBufferForFilename(Filename, VFSFiles));
 }
 
 static std::pair<unsigned, unsigned>
@@ -2095,9 +2155,11 @@ resolveToLineColFromBuf(unsigned Offset, const char *Ptr) {
   return { Line, Col };
 }
 
-static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
-                                   StringRef Filename) {
-  return resolveFromLineCol(Line, Col, getBufferForFilename(Filename));
+static unsigned
+resolveFromLineCol(unsigned Line, unsigned Col, StringRef Filename,
+                   const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
+  return resolveFromLineCol(Line, Col,
+                            getBufferForFilename(Filename, VFSFiles));
 }
 
 static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
@@ -2136,18 +2198,23 @@ static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
 
 static llvm::StringMap<llvm::MemoryBuffer*> Buffers;
 
-static llvm::MemoryBuffer *getBufferForFilename(StringRef Filename) {
-  auto It = Buffers.find(Filename);
+static llvm::MemoryBuffer *
+getBufferForFilename(StringRef Filename,
+                     const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
+  auto VFSFileIt = VFSFiles.find(Filename);
+  auto MappedFilename =
+      VFSFileIt == VFSFiles.end() ? Filename : StringRef(VFSFileIt->second.path);
+
+  auto It = Buffers.find(MappedFilename);
   if (It != Buffers.end())
     return It->second;
 
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    llvm::MemoryBuffer::getFile(Filename);
+  auto FileBufOrErr = llvm::MemoryBuffer::getFile(MappedFilename);
   if (!FileBufOrErr) {
-    llvm::errs() << "error opening input file '" << Filename << "' ("
+    llvm::errs() << "error opening input file '" << MappedFilename << "' ("
                  << FileBufOrErr.getError().message() << ")\n";
     exit(1);
   }
 
-  return Buffers[Filename] = FileBufOrErr.get().release();
+  return Buffers[MappedFilename] = FileBufOrErr.get().release();
 }

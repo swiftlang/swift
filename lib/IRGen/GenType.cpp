@@ -18,6 +18,7 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
@@ -30,6 +31,7 @@
 #include "llvm/Support/Path.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 
+#include "BitPatternBuilder.h"
 #include "EnumPayload.h"
 #include "LegacyLayoutFormat.h"
 #include "LoadableTypeInfo.h"
@@ -196,15 +198,11 @@ void LoadableTypeInfo::addScalarToAggLowering(IRGenModule &IGM,
                         offset.asCharUnits() + storageSize.asCharUnits());
 }
 
-static llvm::Constant *asSizeConstant(IRGenModule &IGM, Size size) {
-  return llvm::ConstantInt::get(IGM.SizeTy, size.getValue());
-}
-
 llvm::Value *FixedTypeInfo::getSize(IRGenFunction &IGF, SILType T) const {
   return FixedTypeInfo::getStaticSize(IGF.IGM);
 }
 llvm::Constant *FixedTypeInfo::getStaticSize(IRGenModule &IGM) const {
-  return asSizeConstant(IGM, getFixedSize());
+  return IGM.getSize(getFixedSize());
 }
 
 llvm::Value *FixedTypeInfo::getAlignmentMask(IRGenFunction &IGF,
@@ -212,7 +210,7 @@ llvm::Value *FixedTypeInfo::getAlignmentMask(IRGenFunction &IGF,
   return FixedTypeInfo::getStaticAlignmentMask(IGF.IGM);
 }
 llvm::Constant *FixedTypeInfo::getStaticAlignmentMask(IRGenModule &IGM) const {
-  return asSizeConstant(IGM, Size(getFixedAlignment().getValue() - 1));
+  return IGM.getSize(Size(getFixedAlignment().getValue() - 1));
 }
 
 llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF, SILType T) const {
@@ -227,7 +225,7 @@ llvm::Value *FixedTypeInfo::getIsBitwiseTakable(IRGenFunction &IGF, SILType T) c
                                 isBitwiseTakable(ResilienceExpansion::Maximal) == IsBitwiseTakable);
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
-  return asSizeConstant(IGM, getFixedStride());
+  return IGM.getSize(getFixedStride());
 }
 
 llvm::Value *FixedTypeInfo::isDynamicallyPackedInline(IRGenFunction &IGF,
@@ -254,21 +252,27 @@ unsigned FixedTypeInfo::getSpareBitExtraInhabitantCount() const {
                   unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
 }
 
-void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask) const {
+void FixedTypeInfo::applyFixedSpareBitsMask(const IRGenModule &IGM,
+                                            SpareBitVector &mask) const {
+  auto builder = BitPatternBuilder(IGM.Triple.isLittleEndian());
+
   // If the mask is no longer than the stored spare bits, we can just
   // apply the stored spare bits.
   if (mask.size() <= SpareBits.size()) {
     // Grow the mask out if necessary; the tail padding is all spare bits.
-    mask.extendWithSetBits(SpareBits.size());
+    builder.append(mask);
+    builder.padWithSetBitsTo(SpareBits.size());
+    mask = SpareBitVector(builder.build());
     mask &= SpareBits;
     return;
   }
 
   // Otherwise, we have to grow out the stored spare bits before we
   // can intersect.
-  auto paddedSpareBits = SpareBits;
-  paddedSpareBits.extendWithSetBits(mask.size());
-  mask &= paddedSpareBits;
+  builder.append(SpareBits);
+  builder.padWithSetBitsTo(mask.size());
+  mask &= builder.build();
+  return;
 }
 
 APInt
@@ -391,7 +395,7 @@ static llvm::Value *computeExtraTagBytes(IRGenFunction &IGF, IRBuilder &Builder,
   }
 
   auto *entryBB = Builder.GetInsertBlock();
-  llvm::Value *size = asSizeConstant(IGM, fixedSize);
+  llvm::Value *size = IGM.getSize(fixedSize);
   auto *returnBB = llvm::BasicBlock::Create(Ctx);
   size = Builder.CreateZExtOrTrunc(size, int32Ty); // We know size < 4.
 
@@ -609,9 +613,8 @@ llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
   if (fixedSize > Size(0)) {
     // Read up to one pointer-sized 'chunk' of the payload.
     // The size of the chunk does not have to be a power of 2.
-    Size limit = IGM.getPointerSize();
     auto *caseIndexType = llvm::IntegerType::get(Ctx,
-        std::min(limit, fixedSize).getValueInBits());
+        fixedSize.getValueInBits());
     auto *caseIndexAddr = Builder.CreateBitCast(valueAddr,
         caseIndexType->getPointerTo());
     caseIndexFromValue = Builder.CreateZExtOrTrunc(
@@ -771,24 +774,11 @@ void irgen::storeFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
   payloadIndex->addIncoming(payloadIndex0, payloadLT4BB);
 
   if (fixedSize > Size(0)) {
-    // Write the value into the first pointer-sized (or smaller)
-    // 'chunk' of the payload.
-    // The size of the chunk does not have to be a power of 2.
-    Size limit = IGM.getPointerSize();
-    auto *chunkType = Builder.getIntNTy(
-        std::min(fixedSize, limit).getValueInBits());
+    // Write the value to the payload as a zero extended integer.
+    auto *intType = Builder.getIntNTy(fixedSize.getValueInBits());
     Builder.CreateStore(
-        Builder.CreateZExtOrTrunc(payloadIndex, chunkType),
-        Builder.CreateBitCast(valueAddr, chunkType->getPointerTo()));
-
-    // Zero the remainder of the payload.
-    if (fixedSize > limit) {
-      auto zeroAddr = Builder.CreateConstByteArrayGEP(valueAddr, limit);
-      auto zeroSize = Builder.CreateSub(
-          size,
-          llvm::ConstantInt::get(size->getType(), limit.getValue()));
-      Builder.CreateMemSet(zeroAddr, Builder.getInt8(0), zeroSize);
-    }
+        Builder.CreateZExtOrTrunc(payloadIndex, intType),
+        Builder.CreateBitCast(valueAddr, intType->getPointerTo()));
   }
   // Write to the extra tag bytes, if any.
   emitSetTag(IGF, extraTagBitsAddr, extraTagIndex, numExtraTagBytes);
@@ -1111,8 +1101,9 @@ TypeConverter::createImmovable(llvm::Type *type, Size size, Alignment align) {
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
 
-bool TypeConverter::readLegacyTypeInfo(StringRef path) {
-  auto fileOrErr = llvm::MemoryBuffer::getFile(path);
+bool TypeConverter::readLegacyTypeInfo(llvm::vfs::FileSystem &fs,
+                                       StringRef path) {
+  auto fileOrErr = fs.getBufferForFile(path);
   if (!fileOrErr)
     return true;
 
@@ -1215,6 +1206,8 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   llvm::SmallString<128> defaultPath;
 
   StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
+  auto fs =
+      IGM.getSwiftModule()->getASTContext().SourceMgr.getFileSystem();
   if (path.empty()) {
     const auto &Triple = IGM.Context.LangOpts.Target;
 
@@ -1227,7 +1220,23 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
     if (!doesPlatformUseLegacyLayouts(platformName, archName))
       return;
 
-    defaultPath.append(IGM.Context.SearchPathOpts.RuntimeLibraryPath);
+    // Find the first runtime library path that exists.
+    bool found = false;
+    for (auto &RuntimeLibraryPath
+         : IGM.Context.SearchPathOpts.RuntimeLibraryPaths) {
+      if (fs->exists(RuntimeLibraryPath)) {
+        defaultPath.append(RuntimeLibraryPath);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      auto joined = llvm::join(IGM.Context.SearchPathOpts.RuntimeLibraryPaths,
+                               "', '");
+      llvm::report_fatal_error("Unable to find a runtime library path at '"
+                               + joined + "'");
+    }
+
     llvm::sys::path::append(defaultPath, "layouts-");
     defaultPath.append(archName);
     defaultPath.append(".yaml");
@@ -1235,7 +1244,7 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
     path = defaultPath;
   }
 
-  bool error = readLegacyTypeInfo(path);
+  bool error = readLegacyTypeInfo(*fs, path);
   if (error)
     llvm::report_fatal_error("Cannot read '" + path + "'");
 }
@@ -1249,13 +1258,11 @@ TypeConverter::~TypeConverter() {
   }
 }
 
-void TypeConverter::pushGenericContext(CanGenericSignature signature) {
+void TypeConverter::setGenericContext(CanGenericSignature signature) {
   if (!signature)
     return;
   
-  // Push the generic context down to the SIL TypeConverter, so we can share
-  // archetypes with SIL.
-  IGM.getSILTypes().pushGenericContext(signature);
+  CurGenericSignature = signature;
 
   // Clear the dependent type info cache since we have a new active signature
   // now.
@@ -1264,21 +1271,12 @@ void TypeConverter::pushGenericContext(CanGenericSignature signature) {
   Types.getCacheFor(/*isDependent*/ true, Mode::CompletelyFragile).clear();
 }
 
-void TypeConverter::popGenericContext(CanGenericSignature signature) {
-  if (!signature)
-    return;
-
-  // Pop the SIL TypeConverter's generic context too.
-  IGM.getSILTypes().popGenericContext(signature);
-  
-  Types.getCacheFor(/*isDependent*/ true, Mode::Normal).clear();
-  Types.getCacheFor(/*isDependent*/ true, Mode::Legacy).clear();
-  Types.getCacheFor(/*isDependent*/ true, Mode::CompletelyFragile).clear();
+CanGenericSignature IRGenModule::getCurGenericContext() {
+  return Types.getCurGenericContext();
 }
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
-  auto genericSig = IGM.getSILTypes().getCurGenericContext();
-  return genericSig->getCanonicalSignature().getGenericEnvironment();
+  return CurGenericSignature->getGenericEnvironment();
 }
 
 GenericEnvironment *IRGenModule::getGenericEnvironment() {
@@ -1453,25 +1451,25 @@ const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
 
 /// Return the SIL-lowering of the given type.
 SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) const {
-  return getSILTypes().getLoweredType(orig, subst,
-                                      ResilienceExpansion::Maximal);
+  return getSILTypes().getLoweredType(
+      orig, subst, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 /// Return the SIL-lowering of the given type.
 SILType IRGenModule::getLoweredType(Type subst) const {
-  return getSILTypes().getLoweredType(subst,
-                                      ResilienceExpansion::Maximal);
+  return getSILTypes().getLoweredType(
+      subst, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 /// Return the SIL-lowering of the given type.
 const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
-  return getSILTypes().getTypeLowering(type,
-                                       ResilienceExpansion::Maximal);
+  return getSILTypes().getTypeLowering(
+      type, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 bool IRGenModule::isTypeABIAccessible(SILType type) const {
-  return getSILModule().isTypeABIAccessible(type,
-                                            ResilienceExpansion::Maximal);
+  return getSILModule().isTypeABIAccessible(
+      type, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 /// Get a pointer to the storage type for the given type.  Note that,
@@ -1551,8 +1549,8 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
 
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
-  auto canGenericSig = genericSig->getCanonicalSignature();
-  auto canGenericEnv = canGenericSig.getGenericEnvironment();
+  auto canGenericSig = genericSig.getCanonicalSignature();
+  auto canGenericEnv = canGenericSig->getGenericEnvironment();
   if (canGenericEnv == genericEnv) return t;
 
   // Map the archetype out of its own generic environment and into the
@@ -1596,7 +1594,7 @@ const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
       return it->second;
     }
   }
-  
+
   // If the type is dependent, substitute it into our current context.
   auto contextTy = canonicalTy;
   if (contextTy->hasTypeParameter()) {
@@ -1778,8 +1776,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinNativeObject:
     return &getNativeObjectTypeInfo();
-  case TypeKind::BuiltinUnknownObject:
-    return &getUnknownObjectTypeInfo();
   case TypeKind::BuiltinBridgeObject:
     return &getBridgeObjectTypeInfo();
   case TypeKind::BuiltinUnsafeValueBuffer:
@@ -1931,9 +1927,10 @@ namespace {
         return false;
 
       for (auto elt : decl->getAllElements()) {
-        if (elt->hasAssociatedValues() &&
-            !elt->isIndirect() &&
-            visit(elt->getArgumentInterfaceType()->getCanonicalType()))
+        if (!elt->hasAssociatedValues() || elt->isIndirect())
+          continue;
+
+        if (visit(elt->getArgumentInterfaceType()->getCanonicalType()))
           return true;
       }
       return false;
@@ -2238,10 +2235,16 @@ unsigned IRGenModule::getBuiltinIntegerWidth(BuiltinIntegerWidth w) {
   llvm_unreachable("impossible width value");
 }
 
-void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,
+void IRGenFunction::setLocalSelfMetadata(CanType selfClass,
+                                         bool isExactSelfClass,
+                                         llvm::Value *value,
                                          IRGenFunction::LocalSelfKind kind) {
   assert(!LocalSelf && "already have local self metadata");
   LocalSelf = value;
+  assert(selfClass->getClassOrBoundGenericClass()
+         && "self type not a class?");
+  LocalSelfIsExact = isExactSelfClass;
+  LocalSelfType = selfClass;
   SelfKind = kind;
 }
 
@@ -2253,8 +2256,8 @@ bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
 
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
-  auto canGenericSig = genericSig->getCanonicalSignature();
-  auto canGenericEnv = canGenericSig.getGenericEnvironment();
+  auto canGenericSig = genericSig.getCanonicalSignature();
+  auto canGenericEnv = canGenericSig->getGenericEnvironment();
 
   // If this archetype is in the canonical generic environment, it's an
   // exemplar archetype.
@@ -2288,9 +2291,11 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     // If there's only one stored property, we have the layout of its field.
     auto allFields = structDecl->getStoredProperties();
     
-    auto field = allFields.begin();
-    if (!allFields.empty() && std::next(field) == allFields.end()) {
-      auto fieldTy = t.getFieldType(*field, IGM.getSILModule());
+    if (allFields.size() == 1) {
+      auto fieldTy = t.getFieldType(
+          allFields[0], IGM.getSILModule(),
+          TypeExpansionContext(expansion, IGM.getSwiftModule(),
+                               IGM.getSILModule().isWholeModule()));
       if (!IGM.isTypeABIAccessible(fieldTy))
         return SILType();
       return fieldTy;
@@ -2310,7 +2315,10 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
         && (*theCase)->hasAssociatedValues()) {
-      auto enumEltTy = t.getEnumElementType(*theCase, IGM.getSILModule());
+      auto enumEltTy = t.getEnumElementType(
+          *theCase, IGM.getSILModule(),
+          TypeExpansionContext(expansion, IGM.getSwiftModule(),
+                               IGM.getSILModule().isWholeModule()));
       if (!IGM.isTypeABIAccessible(enumEltTy))
         return SILType();
       return enumEltTy;

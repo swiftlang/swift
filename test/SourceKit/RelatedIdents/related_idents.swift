@@ -44,6 +44,31 @@ switch X.first(2, "") {
     break
 }
 
+@propertyWrapper
+struct Wrapper<T> {
+  var wrappedValue: T
+  init(initialValue: T) {
+    wrappedValue = initialValue
+  }
+  var projectedValue: Projection<T> {
+    get { Projection(item: wrappedValue) }
+  }
+}
+
+struct MyStruct {
+  @Wrapper
+  var foo: Int = 10
+  func doStuff() {
+    _ = foo
+    _ = _foo
+    _ = $foo
+  }
+}
+
+struct Projection<T> {
+  var item: T
+}
+
 // RUN: %sourcekitd-test -req=related-idents -pos=6:17 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1: START RANGES
 // CHECK1-NEXT: 1:7 - 2
@@ -108,3 +133,16 @@ switch X.first(2, "") {
 // CHECK9-NEXT: 41:20 - 1
 // CHECK9-NEXT: 43:11 - 1
 // CHECK9-NEXT: END RANGES
+
+// Test find-related-idents considers wrapped properties and their associated property wrapper backing properties as 'related'
+// but only returns the name portion of the property wrapper backing property occurrences (i.e. just the 'foo' in '$foo'),
+// RUN: %sourcekitd-test -req=related-idents -pos=60:7 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK10 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=62:9 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK10 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=63:9 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK10 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=64:9 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK10 %s
+// CHECK10:      START RANGES
+// CHECK10-NEXT: 60:7 - 3
+// CHECK10-NEXT: 62:9 - 3
+// CHECK10-NEXT: 63:10 - 3
+// CHECK10-NEXT: 64:10 - 3
+// CHECK10-NEXT: END RANGES

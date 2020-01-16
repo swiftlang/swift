@@ -56,6 +56,12 @@ constants.""")
              "available if Windows compatibility is enabled.",
         action="store_true")
 
+    parser.add_argument(
+        "--dry-run",
+        help="Apply the replacements to the input and print the result "
+             "to standard output",
+        action="store_true")
+
     args, unknown_args = parser.parse_known_args()
 
     if args.enable_windows_compatibility:
@@ -70,19 +76,25 @@ constants.""")
 
     for s in args.sanitize_strings:
         replacement, pattern = s.split('=', 1)
-        # We are replacing the Unix path separators in the paths passed as
-        # arguments with a broader pattern to also allow forward slashes and
-        # double escaped slashes in the result that we are checking. Sigh.
-        stdin = re.sub(re.sub(r'/', slashes_re, pattern), replacement, stdin)
+        # Since we want to use pattern as a regex in some platforms, we need
+        # to escape it first, and then replace the escaped slash
+        # literal (r'\\/') for our platform-dependent slash regex.
+        stdin = re.sub(re.sub(r'\\/', slashes_re, re.escape(pattern)),
+                       replacement,
+                       stdin)
 
-    p = subprocess.Popen(
-        [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)
-    stdout, stderr = p.communicate(stdin)
-    if stdout is not None:
-        print(stdout)
-    if stderr is not None:
-        print(stderr, file=sys.stderr)
-    return p.wait()
+    if args.dry_run:
+        print(stdin)
+        return 0
+    else:
+        p = subprocess.Popen(
+            [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)
+        stdout, stderr = p.communicate(stdin)
+        if stdout is not None:
+            print(stdout)
+        if stderr is not None:
+            print(stderr, file=sys.stderr)
+        return p.wait()
 
 
 if __name__ == '__main__':

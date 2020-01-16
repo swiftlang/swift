@@ -29,8 +29,8 @@ def AutolinkExtractOption : OptionFlag;
 // The option should be accepted by swift -modulewrap
 def ModuleWrapOption : OptionFlag;
 
-// The option should be accepted by swift-format
-def SwiftFormatOption : OptionFlag;
+// The option should be accepted by swift-indent
+def SwiftIndentOption : OptionFlag;
 
 // The option should not be accepted by the driver.
 def NoDriverOption : OptionFlag;
@@ -104,6 +104,12 @@ def driver_show_incremental : Flag<["-"], "driver-show-incremental">,
 def driver_show_job_lifecycle : Flag<["-"], "driver-show-job-lifecycle">,
   InternalDebugOpt,
   HelpText<"Show every step in the lifecycle of driver jobs">;
+def driver_dump_swift_ranges : Flag<["-"], "driver-dump-swift-ranges">,
+  InternalDebugOpt,
+  HelpText<"Show the unparsed ranges read upon startup">;
+def driver_dump_compiled_source_diffs : Flag<["-"], "driver-dump-compiled-source-diffs">,
+  InternalDebugOpt,
+  HelpText<"Show the compiled source diffs read upon startup">;
 def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
   InternalDebugOpt, HelpText<"Pass input files as filelists whenever possible">;
 def driver_filelist_threshold : Separate<["-"], "driver-filelist-threshold">,
@@ -129,30 +135,68 @@ def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
   HelpText<"Always rebuild dependents of files that have been modified">;
 
-def enable_experimental_dependencies :
-Flag<["-"], "enable-experimental-dependencies">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
+def enable_fine_grained_dependencies :
+Flag<["-"], "enable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Be more selective about incremental recompilation">;
 
-def driver_verify_experimental_dependency_graph_after_every_import :
-Flag<["-"], "driver-verify-experimental-dependency-graph-after-every-import">,
+def disable_fine_grained_dependencies :
+Flag<["-"], "disable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Don't be more selective about incremental recompilation">;
+
+
+def enable_only_one_dependency_file :
+Flag<["-"], "enable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
+ HelpText<"Enables incremental build optimization that only produces one dependencies file">;
+
+def disable_only_one_dependency_file :
+Flag<["-"], "disable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
+ HelpText<"Disables incremental build optimization that only produces one dependencies file">;
+ 
+
+def enable_source_range_dependencies :
+Flag<["-"], "enable-source-range-dependencies">, Flags<[]>,
+HelpText<"Try using source range information">;
+
+
+def driver_compare_incremental_schemes :
+Flag<["-"], "driver-compare-incremental-schemes">, Flags<[DoesNotAffectIncrementalBuild]>,
+HelpText<"Print a simple message comparing dependencies with source ranges (w/ fallback)">;
+
+def driver_compare_incremental_schemes_path :
+Separate<["-"], "driver-compare-incremental-schemes-path">, Flags<[ArgumentIsPath,DoesNotAffectIncrementalBuild]>,
+HelpText<"Path to use for machine-readable comparision">,
+MetaVarName<"<path>">;
+
+def driver_compare_incremental_schemes_path_EQ :
+Joined<["-"], "driver-compare-incremental-schemes-path=">, Flags<[]>,
+Alias<driver_compare_incremental_schemes_path>;
+
+
+def driver_verify_fine_grained_dependency_graph_after_every_import :
+Flag<["-"], "driver-verify-fine-grained-dependency-graph-after-every-import">,
 InternalDebugOpt,
 HelpText<"Debug DriverGraph by verifying it after every import">;
 
-def driver_emit_experimental_dependency_dot_file_after_every_import :
-Flag<["-"], "driver-emit-experimental-dependency-dot-file-after-every-import">,
+def driver_emit_fine_grained_dependency_dot_file_after_every_import :
+Flag<["-"], "driver-emit-fine-grained-dependency-dot-file-after-every-import">,
 InternalDebugOpt,
-HelpText<"Emit dot files every time driver imports an experimental swiftdeps file.">;
+HelpText<"Emit dot files every time driver imports an fine-grained swiftdeps file.">;
 
-def experimental_dependency_include_intrafile :
-Flag<["-"], "experimental-dependency-include-intrafile">,
+def fine_grained_dependency_include_intrafile :
+Flag<["-"], "fine-grained-dependency-include-intrafile">,
 InternalDebugOpt,
 HelpText<"Include within-file dependencies.">;
+
+def emit_fine_grained_dependency_sourcefile_dot_files :
+Flag<["-"], "emit-fine-grained-dependency-sourcefile-dot-files">,
+InternalDebugOpt,
+HelpText<"Emit dot files for every source file.">;
 
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 
 def help : Flag<["-", "--"], "help">,
-  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption, SwiftFormatOption]>,
+  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption, SwiftIndentOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
 def help_hidden : Flag<["-", "--"], "help-hidden">,
@@ -174,7 +218,7 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
-         NoInteractiveOption, SwiftFormatOption, ArgumentIsPath]>,
+         NoInteractiveOption, SwiftIndentOption, ArgumentIsPath]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
@@ -254,6 +298,10 @@ def stats_output_dir: Separate<["-"], "stats-output-dir">,
 def trace_stats_events: Flag<["-"], "trace-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Trace changes to stats in -stats-output-dir">;
+def experimental_skip_non_inlinable_function_bodies:
+  Flag<["-"], "experimental-skip-non-inlinable-function-bodies">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Skip type-checking and SIL generation for non-inlinable function bodies">;
 def profile_stats_events: Flag<["-"], "profile-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Profile changes to stats in -stats-output-dir">;
@@ -303,6 +351,12 @@ def serialize_diagnostics_path_EQ: Joined<["-"], "serialize-diagnostics-path=">,
 def color_diagnostics : Flag<["-"], "color-diagnostics">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Print diagnostics in color">;
+def no_color_diagnostics : Flag<["-"], "no-color-diagnostics">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Do not print diagnostics in color">;
+def debug_diagnostic_names : Flag<["-"], "debug-diagnostic-names">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>,
+  HelpText<"Include diagnostic names when printing">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
@@ -358,6 +412,12 @@ def emit_module_interface_path :
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
 
+def emit_module_source_info_path :
+  Separate<["-"], "emit-module-source-info-path">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath]>,
+  MetaVarName<"<path>">, HelpText<"Output module source info file to <path>">;
+
 def emit_parseable_module_interface :
   Flag<["-"], "emit-parseable-module-interface">,
   Alias<emit_module_interface>,
@@ -407,6 +467,16 @@ def enable_bridging_pch : Flag<["-"], "enable-bridging-pch">,
 def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Disable automatic generation of bridging PCH files">;
+
+// Experimental feature options
+def enable_experimental_differentiable_programming : Flag<["-"], "enable-experimental-differentiable-programming">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable experimental differentiable programming features">;
+
+def enable_experimental_concise_pound_file : Flag<["-"],
+    "enable-experimental-concise-pound-file">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable experimental concise '#file' identifier and '#filePath' alternative">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
@@ -499,6 +569,15 @@ def static_stdlib: Flag<["-"], "static-stdlib">,
 def no_static_stdlib: Flag<["-"], "no-static-stdlib">,
   Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
   HelpText<"Don't statically link the Swift standard library">;
+def toolchain_stdlib_rpath: Flag<["-"], "toolchain-stdlib-rpath">,
+  Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
+  HelpText<"Add an rpath entry for the toolchain's standard library, rather than the OS's">;
+def no_toolchain_stdlib_rpath: Flag<["-"], "no-toolchain-stdlib-rpath">,
+  Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
+  HelpText<"Do not add an rpath entry for the toolchain's standard library (default)">;
+def no_stdlib_rpath: Flag<["-"], "no-stdlib-rpath">,
+  Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
+  HelpText<"Don't add any rpath entries.">;
 
 def static_executable : Flag<["-"], "static-executable">,
   HelpText<"Statically link the executable">;
@@ -533,6 +612,10 @@ def Ounchecked : Flag<["-"], "Ounchecked">, Group<O_Group>,
 def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
+
+def CrossModuleOptimization : Flag<["-"], "cross-module-optimization">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Perform cross-module optimization">;
 
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
   Flags<[FrontendOption]>,
@@ -585,28 +668,28 @@ def AssertConfig : Separate<["-"], "assert-config">,
 def code_formatting_Group : OptionGroup<"<code formatting options>">;
 
 def use_tabs : Flag<["-"], "use-tabs">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
   HelpText<"Use tabs for indentation.">;
 
 def indent_switch_case : Flag<["-"], "indent-switch-case">,
   Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
   HelpText<"Indent cases in switch statements.">;
 
 def in_place : Flag<["-"], "in-place">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
   HelpText<"Overwrite input file with formatted file.">;
 
 def tab_width : Separate<["-"], "tab-width">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
   HelpText<"Width of tab character.">, MetaVarName<"<n>">;
 
 def indent_width : Separate<["-"], "indent-width">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
   HelpText<"Number of characters to indent.">, MetaVarName<"<n>">;
 
 def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftIndentOption]>,
   HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
            "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 
@@ -718,6 +801,9 @@ def emit_sibgen : Flag<["-"], "emit-sibgen">,
 def emit_imported_modules : Flag<["-"], "emit-imported-modules">,
   HelpText<"Emit a list of the imported modules">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_pcm : Flag<["-"], "emit-pcm">,
+  HelpText<"Emit a precompiled Clang module from a module map">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def c : Flag<["-"], "c">, Alias<emit_object>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
@@ -760,6 +846,10 @@ def dump_type_info : Flag<["-"], "dump-type-info">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def print_ast : Flag<["-"], "print-ast">,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def dump_pcm : Flag<["-"], "dump-pcm">,
+  HelpText<"Dump debugging information about a precompiled Clang module">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
@@ -822,6 +912,9 @@ def target : Separate<["-"], "target">,
   HelpText<"Generate code for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
+def print_target_info : Flag<["-"], "print-target-info">,
+    Flags<[FrontendOption]>,
+    HelpText<"Print target information for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
 
 def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Generate code for a particular CPU variant">;
@@ -859,6 +952,15 @@ def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
   Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,
   HelpText<"Turn on runtime checks for erroneous behavior.">;
 
+def sanitize_recover_EQ
+    : CommaJoined<["-"], "sanitize-recover=">,
+      Flags<[FrontendOption, NoInteractiveOption]>,
+      MetaVarName<"<check>">,
+      HelpText<"Specify which sanitizer runtime checks (see -sanitize=) will "
+               "generate instrumentation that allows error recovery. Listed "
+               "checks should be comma separated. Default behavior is to not "
+               "allow error recovery.">;
+
 def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   MetaVarName<"<type>">,
@@ -869,7 +971,12 @@ def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
   Flags<[FrontendOption]>,
   HelpText<"Enable ASTScope-based unqualified name lookup">;
 
-def disable_parser_lookup : Flag<["-"], "disable_parser_lookup">,
+def disable_astscope_lookup : Flag<["-"], "disable-astscope-lookup">,
+  Flags<[FrontendOption]>,
+  HelpText<"Disable ASTScope-based unqualified name lookup">;
+
+def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
+  Flags<[FrontendOption]>,
   HelpText<"Disable parser lookup & use ast scope lookup only (experimental)">;
 
 def index_file : Flag<["-"], "index-file">,

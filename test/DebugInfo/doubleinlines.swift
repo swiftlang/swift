@@ -2,15 +2,15 @@
 // RUN: -debug-info-format=codeview -O -parse-as-library \
 // RUN: -module-name DoubleInlines -o - | %FileCheck %s
 
-func condFail(arg: Builtin.Int1 ) {
-    Builtin.condfail(arg)
+func condFail(arg: Builtin.Int1, msg: Builtin.RawPointer) {
+    Builtin.condfail_message(arg, msg)
 }
 
-func callCondFail(arg: Builtin.Int1) {
-    condFail(arg: arg)
+func callCondFail(arg: Builtin.Int1, msg: Builtin.RawPointer) {
+    condFail(arg: arg, msg: msg)
 }
 
-// CHECK: define hidden swiftcc void @"$s13DoubleInlines12callCondFail3argyBi1__tF"{{.*}} !dbg ![[FUNCSCOPE:.*]] {
+// CHECK: define hidden swiftcc void @"$s13DoubleInlines12callCondFail3arg3msgyBi1__BptF"{{.*}} !dbg ![[FUNCSCOPE:.*]] {
 // CHECK: tail call void asm sideeffect "", "n"(i32 0) #3, !dbg ![[SCOPEONE:.*]]
 // CHECK: ![[FUNCSCOPEOTHER:.*]] = distinct !DISubprogram(name: "condFail",{{.*}}
 // CHECK: ![[SCOPEFIVE:.*]] = distinct !DILexicalBlock(scope: ![[FUNCSCOPE]], file: ![[FILE:.*]], line: 9)

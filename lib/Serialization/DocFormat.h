@@ -69,6 +69,15 @@ const uint16_t SWIFTDOC_VERSION_MAJOR = 1;
 /// adhering to the 80-column limit for this line.
 const uint16_t SWIFTDOC_VERSION_MINOR = 1; // Last change: skipping 0 for testing purposes
 
+/// The hash seed used for the string hashes in a Swift 5.1 swiftdoc file.
+///
+/// 0 is not a good seed for llvm::djbHash, but swiftdoc files use a stable
+/// format, so we can't change the hash seed without a version bump. Any new
+/// hashed strings should use a new stable hash seed constant. (No such constant
+/// has been defined at the time this doc comment was last updated because there
+/// are no other strings to hash.)
+const uint32_t SWIFTDOC_HASH_SEED_5_1 = 0;
+
 /// The record types within the comment block.
 ///
 /// Be very careful when changing this block; it must remain

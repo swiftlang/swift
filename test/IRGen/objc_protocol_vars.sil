@@ -1,0 +1,29 @@
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -parse-as-library -emit-ir %s | %FileCheck %s
+
+// It tests whether the vars @"\01l_OBJC_LABEL_PROTOCOL_$__TtP18objc_protocol_vars1T_"
+// and @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP18objc_protocol_vars1T_" are in llvm.used.
+//
+// import Foundation
+// @objc
+// public protocol T: AnyObject {
+//
+//    var current: Int32 { get }
+//
+//    func clone() -> T
+//
+//}
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import Foundation
+
+@objc public protocol T : AnyObject {
+  @objc var current: Int32 { get }
+  @objc func clone() -> T
+}
+
+// CHECK: @llvm.used = appending global [{{.*}}] [{{.*}}, i8* bitcast (i8** @"\01l_OBJC_LABEL_PROTOCOL_$__TtP18objc_protocol_vars1T_" to i8*), i8* bitcast (i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP18objc_protocol_vars1T_" to i8*), {{.*}}], {{.*}}
+

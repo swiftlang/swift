@@ -128,7 +128,7 @@ bb3(%6 : $Builtin.Int32):
 // CHECK: bb0([[ARG:%.*]] : $Builtin.Int1):
 // CHECK:   [[ZERO:%.*]] =  integer_literal $Builtin.Int1, 0
 // CHECK:   [[EXPECT:%.*]] = builtin "int_expect_Int1"([[ARG]] : $Builtin.Int1, [[ZERO]]
-// CHECK    cond_br [[EXPECT]], bb2, bb1
+// CHECK:    cond_br [[EXPECT]], bb2, bb1
 // CHECK: bb1:
 // CHECK:   integer_literal {{.*}} 2
 // CHECK:   br
@@ -1119,8 +1119,8 @@ sil @redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : $Base):
 // CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %1 = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-// CHECK: checked_cast_br [exact] %0 : $Base to $Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
-  checked_cast_br [exact] %0 : $Base to $Base, bb2, bb7
+// CHECK: checked_cast_br [exact] %0 : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
+  checked_cast_br [exact] %0 : $Base to Base, bb2, bb7
 
 // CHECK: bb1
 bb1:
@@ -1131,7 +1131,7 @@ bb2(%5 : $Base):
 // CHECK: [[SUCCESS]]
   %7 = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
 // CHECK-NOT: checked_cast_br
-  checked_cast_br [exact] %0 : $Base to $Base, bb3, bb5
+  checked_cast_br [exact] %0 : $Base to Base, bb3, bb5
 // CHECK: [[INNER:%.*]] = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@convention(method) (@guaranteed Base) -> ()
 // CHECK: apply [[INNER]]
 // CHECK: br bb1
@@ -1167,8 +1167,8 @@ sil @not_redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> 
 bb0(%0 : $Base):
 // CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %1 = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-// CHECK: checked_cast_br [exact] %0 : $Base to $Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
-  checked_cast_br [exact] %0 : $Base to $Base, bb2, bb7
+// CHECK: checked_cast_br [exact] %0 : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
+  checked_cast_br [exact] %0 : $Base to Base, bb2, bb7
 
 bb1:
   %3 = tuple ()
@@ -1203,8 +1203,8 @@ bb6(%17 : $()):
 // CHECK: return
 
 bb7:
-// CHECK: checked_cast_br [exact] %0 : $Base to $Derived
-  checked_cast_br [exact] %0 : $Base to $Derived, bb3, bb5
+// CHECK: checked_cast_br [exact] %0 : $Base to Derived
+  checked_cast_br [exact] %0 : $Base to Derived, bb3, bb5
 }
 
 // CHECK-LABEL: sil @failing_checked_cast_br
@@ -1212,8 +1212,8 @@ sil @failing_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : $Base):
 // CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %1 = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-// CHECK: checked_cast_br [exact] %0 : $Base to $Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
-  checked_cast_br [exact] %0 : $Base to $Base, bb2, bb7
+// CHECK: checked_cast_br [exact] %0 : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
+  checked_cast_br [exact] %0 : $Base to Base, bb2, bb7
 
 // CHECK-LABEL: bb1
 bb1:
@@ -1224,13 +1224,13 @@ bb2(%5 : $Base):
 // CHECK: [[SUCCESS]]
 // CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %7 = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-// CHECK-NOT: checked_cast_br [exact] %0 : $Base to $Derived
+// CHECK-NOT: checked_cast_br [exact] %0 : $Base to Derived
 // CHECK: apply [[METHOD2]]
 // Check that checked_cast_br [exact] was replaced by a branch to the failure BB of the checked_cast_br.
 // This is because bb2 is reached via the success branch of the checked_cast_br [exact] from bb0.
 // It means that the exact dynamic type of %0 is $Base. Thus it cannot be $Derived.
 // CHECK: br bb1
-  checked_cast_br [exact] %5 : $Base to $Derived, bb3, bb5
+  checked_cast_br [exact] %5 : $Base to Derived, bb3, bb5
 
 bb3(%9 : $Derived):
   %10 = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@convention(method) (@guaranteed Base) -> ()
@@ -1267,7 +1267,7 @@ sil @no_checked_cast_br_threading_with_alloc_ref_stack : $@convention(method) (@
 bb0(%0 : $Base):
   %fu = function_ref @unknown : $@convention(thin) () -> ()
   %fu2 = function_ref @unknown2 : $@convention(thin) () -> ()
-  checked_cast_br [exact] %0 : $Base to $Base, bb1, bb2
+  checked_cast_br [exact] %0 : $Base to Base, bb1, bb2
 
 bb1(%1 : $Base):
   apply %fu() : $@convention(thin) () -> ()
@@ -1279,7 +1279,7 @@ bb2:
 
 bb3:
   %a = alloc_ref [stack] $Base
-  checked_cast_br [exact] %0 : $Base to $Base, bb4, bb5
+  checked_cast_br [exact] %0 : $Base to Base, bb4, bb5
 
 bb4(%2 : $Base):
   apply %fu() : $@convention(thin) () -> ()
@@ -1425,24 +1425,24 @@ bb6(%r : $Int32):
 // CHECK:      bb0:
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 // CHECK:      bb1:
-// CHECK-NEXT:   cond_br undef, bb3, bb4
+// CHECK:        enum $Optional<Int32>, #Optional.none!enumelt
+// CHECK:        br bb3
 // CHECK:      bb2:
+// CHECK:        integer_literal $Builtin.Int32, 0
+// CHECK:        enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK:        br bb3
+// CHECK:      bb3
 // CHECK:        integer_literal {{.*}}, 27
-// CHECK:        br bb5
-// CHECK:      bb3:
-// CHECK:        br bb4
-// CHECK:      bb4:
 // CHECK:        integer_literal {{.*}}, 28
-// CHECK:        br bb5
-// CHECK:      bb5({{.*}}):
-// CHECK-NEXT:   return
+// CHECK:        return
 sil @jumpthread_switch_enum4 : $@convention(thin) () -> Builtin.Int32 {
 bb0:
+  %c0 = builtin "assert_configuration"() : $Builtin.Int32
   cond_br undef, bb1, bb2
 
 bb1:
   %4 = enum $Optional<Int32>, #Optional.none!enumelt
-  cond_br undef, bb3(%4 : $Optional<Int32>), bb4(%4 : $Optional<Int32>)
+  cond_br undef, bb3(%4 : $Optional<Int32>), bb4(%4 : $Optional<Int32>, %c0 : $Builtin.Int32)
 
 bb2:
   %6 = integer_literal $Builtin.Int32, 0
@@ -1454,23 +1454,22 @@ bb2:
 bb3(%10 : $Optional<Int32>):
   // Some instruction which is not "trivial"
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
-  br bb4(%10 : $Optional<Int32>)
+  br bb4(%10 : $Optional<Int32>, %c1 : $Builtin.Int32)
 
-
-bb4(%13 : $Optional<Int32>):
+bb4(%13 : $Optional<Int32>, %carg1 : $Builtin.Int32):
   switch_enum %13 : $Optional<Int32>, case #Optional.some!enumelt.1: bb5, case #Optional.none!enumelt: bb6
 
 bb5:
   %r1 = integer_literal $Builtin.Int32, 27
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  br bb7(%r1 : $Builtin.Int32)
+  br bb7(%r1 : $Builtin.Int32, %c2 : $Builtin.Int32)
 
 bb6:
   %r2 = integer_literal $Builtin.Int32, 28
   %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  br bb7(%r2 : $Builtin.Int32)
+  br bb7(%r2 : $Builtin.Int32, %c3 : $Builtin.Int32)
 
-bb7(%r : $Builtin.Int32):
+bb7(%r : $Builtin.Int32, %carg2 : $Builtin.Int32):
   return %r : $Builtin.Int32
 }
 
@@ -1782,7 +1781,7 @@ class E : B {}
 sil @checked_cast_anyobject_metatypeinst_to_class : $@convention(thin)() -> () {
 bb0:
   %0 = metatype $@thick AnyObject.Protocol
-  checked_cast_br %0 : $@thick AnyObject.Protocol to $@thick B.Type, bb1, bb2
+  checked_cast_br %0 : $@thick AnyObject.Protocol to B.Type, bb1, bb2
 
 bb1(%3 : $@thick B.Type):
   br bb3
@@ -2157,7 +2156,7 @@ bb3(%a3 : $Builtin.Int1):
 sil @successful_checked_cast_br_on_alloc_ref : $() -> Builtin.Int32 {
 bb0:
   %1 = alloc_ref $B
-  checked_cast_br [exact] %1 : $B to $B, bb1, bb2
+  checked_cast_br [exact] %1 : $B to B, bb1, bb2
 
 bb1(%2 : $B):
   %3 = integer_literal $Builtin.Int32, 1
@@ -2184,7 +2183,7 @@ sil @failing_checked_cast_br_on_alloc_ref : $() -> Builtin.Int32 {
 bb0:
   %1 = alloc_ref $E
   %2 = upcast %1 : $E to $B
-  checked_cast_br [exact] %2 : $B to $B, bb1, bb2
+  checked_cast_br [exact] %2 : $B to B, bb1, bb2
 
 bb1(%3 : $B):
   %4 = integer_literal $Builtin.Int32, 1
@@ -3164,27 +3163,27 @@ sil @external_g : $@convention(thin) () -> ()
 // CHECK: dynamic_method_br
 // CHECK-NOT: dynamic_method_br
 // CHECK: return
-sil @dont_tail_duplicate_dynamic_method_br : $@convention(thin) (@owned Builtin.UnknownObject, Builtin.Int1) -> () {
-bb0(%x : $Builtin.UnknownObject, %b : $Builtin.Int1):
+sil @dont_tail_duplicate_dynamic_method_br : $@convention(thin) (@owned Builtin.AnyObject, Builtin.Int1) -> () {
+bb0(%x : $Builtin.AnyObject, %b : $Builtin.Int1):
   cond_br %b, bb1, bb2
 
 bb1:
   %f = function_ref @external_f : $@convention(thin) () -> ()
   apply %f() : $@convention(thin) () -> ()
-  strong_retain %x : $Builtin.UnknownObject
-  br bb3(%x : $Builtin.UnknownObject)
+  strong_retain %x : $Builtin.AnyObject
+  br bb3(%x : $Builtin.AnyObject)
 
 bb2:
   %g = function_ref @external_g : $@convention(thin) () -> ()
   apply %g() : $@convention(thin) () -> ()
-  strong_retain %x : $Builtin.UnknownObject
-  br bb3(%x : $Builtin.UnknownObject)
+  strong_retain %x : $Builtin.AnyObject
+  br bb3(%x : $Builtin.AnyObject)
 
-bb3(%y: $Builtin.UnknownObject):
-  strong_release %y : $Builtin.UnknownObject
-  dynamic_method_br %x : $Builtin.UnknownObject, #X.f!1.foreign, bb4, bb5
+bb3(%y: $Builtin.AnyObject):
+  strong_release %y : $Builtin.AnyObject
+  dynamic_method_br %x : $Builtin.AnyObject, #X.f!1.foreign, bb4, bb5
 
-bb4(%m : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+bb4(%m : $@convention(objc_method) (Builtin.AnyObject) -> ()):
   br bb6
 
 bb5:

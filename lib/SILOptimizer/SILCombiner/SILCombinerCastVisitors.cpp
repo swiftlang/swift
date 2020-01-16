@@ -12,19 +12,19 @@
 
 #define DEBUG_TYPE "sil-combine"
 #include "SILCombiner.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/CFG.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -113,9 +113,9 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
           m_IndexRawPointerInst(IndexRawPtr))) {
     SILValue Ptr = IndexRawPtr->getOperand(0);
     SILValue TruncOrBitCast = IndexRawPtr->getOperand(1);
-    if (match(TruncOrBitCast,
-              m_ApplyInst(BuiltinValueKind::TruncOrBitCast,
-                          m_TupleExtractInst(m_BuiltinInst(StrideMul), 0)))) {
+    if (match(TruncOrBitCast, m_ApplyInst(BuiltinValueKind::TruncOrBitCast,
+                                          m_TupleExtractOperation(
+                                              m_BuiltinInst(StrideMul), 0)))) {
       if (match(StrideMul,
                 m_ApplyInst(
                     BuiltinValueKind::SMulOver, m_SILValue(Distance),
@@ -164,11 +164,13 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   //   %addr = pointer_to_address %ptr, [strict] $T
   //   %result = index_addr %addr, %distance
   //
-  BuiltinInst *Bytes;
+  BuiltinInst *Bytes = nullptr;
   if (match(PTAI->getOperand(),
-            m_IndexRawPointerInst(m_ValueBase(),
-                                  m_TupleExtractInst(m_BuiltinInst(Bytes),
-                                                     0)))) {
+            m_IndexRawPointerInst(
+                m_ValueBase(),
+                m_TupleExtractOperation(m_BuiltinInst(Bytes), 0)))) {
+    assert(Bytes != nullptr &&
+           "Bytes should have been assigned a non-null value");
     if (match(Bytes, m_ApplyInst(BuiltinValueKind::SMulOver, m_ValueBase(),
                                  m_ApplyInst(BuiltinValueKind::Strideof,
                                              m_MetatypeInst(Metatype)),
@@ -284,9 +286,12 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
   Builder.setCurrentDebugScope(URCI->getDebugScope());
   LoadInst *load = Builder.createLoad(Loc, URCI->getSrc(),
                                       LoadOwnershipQualifier::Unqualified);
-  auto *cast = Builder.tryCreateUncheckedRefCast(Loc, load,
-                                                 DestTy.getObjectType());
-  assert(cast && "SILBuilder cannot handle reference-castable types");
+
+  assert(SILType::canRefCast(load->getType(), DestTy.getObjectType(),
+                             Builder.getModule()) &&
+         "SILBuilder cannot handle reference-castable types");
+  auto *cast = Builder.createUncheckedRefCast(Loc, load,
+                                              DestTy.getObjectType());
   Builder.createStore(Loc, cast, URCI->getDest(),
                       StoreOwnershipQualifier::Unqualified);
 
@@ -391,11 +396,12 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
                                                  UBCI->getOperand(),
                                                  UBCI->getType());
 
-  if (auto refCast = Builder.tryCreateUncheckedRefCast(
-        UBCI->getLoc(), UBCI->getOperand(), UBCI->getType()))
-    return refCast;
+  if (!SILType::canRefCast(UBCI->getOperand()->getType(), UBCI->getType(),
+                           Builder.getModule()))
+    return nullptr;
 
-  return nullptr;
+  return Builder.createUncheckedRefCast(UBCI->getLoc(), UBCI->getOperand(),
+                                        UBCI->getType());
 }
 
 SILInstruction *

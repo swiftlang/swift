@@ -11,8 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import TestsUtils
-import Foundation
-
 
 // A micro benchmark for checking the speed of string-based enums.
 public let OpenClose = BenchmarkInfo(
@@ -38,4 +36,3 @@ public func run_OpenClose(_ N: Int) {
   }
   CheckResults(c == 0)
 }
-

@@ -85,7 +85,7 @@ class TestUUID : TestUUIDSuper {
     }
     
     func test_hash() {
-        guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+        guard #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) else { return }
         let values: [UUID] = [
             // This list takes a UUID and tweaks every byte while
             // leaving the version/variant intact.

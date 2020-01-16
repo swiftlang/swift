@@ -184,7 +184,8 @@ static void indexModule(llvm::MemoryBuffer *Input,
     // documentation file.
     // FIXME: refactor the frontend to provide an easy way to figure out the
     // correct filename here.
-    auto FUnit = Loader->loadAST(*Mod, None, std::move(Buf), nullptr,
+    auto FUnit = Loader->loadAST(*Mod, None, /*moduleInterfacePath*/"",
+                                 std::move(Buf), nullptr, nullptr,
                                  /*isFramework*/false,
                                  /*treatAsPartialModule*/false);
 
@@ -274,6 +275,8 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   if (IsModuleIndexing) {
     if (CI.setup(Invocation))
       return;
+    // Indexing needs IDE requests
+    registerIDERequestFunctions(CI.getASTContext().evaluator);
     bool IsClangModule = (FileExt == ".pcm");
     if (IsClangModule) {
       IdxConsumer.failed("Clang module files are not supported");
@@ -292,7 +295,8 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
 
   if (CI.setup(Invocation))
     return;
-
+  // Indexing needs IDE requests
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   trace::TracedOperation TracedOp(trace::OperationKind::IndexSource);
   if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;

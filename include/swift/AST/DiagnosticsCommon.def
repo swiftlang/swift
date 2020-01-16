@@ -41,6 +41,10 @@
   DIAG(REMARK,ID,Options,Text,Signature)
 #endif
 
+#ifndef FIXIT
+#  define FIXIT(ID, Text, Signature)
+#endif
+
 ERROR(invalid_diagnostic,none,
       "INTERNAL ERROR: this diagnostic should not be produced", ())
 
@@ -132,15 +136,14 @@ ERROR(sdk_node_unrecognized_decl_attr_kind,none,
       "unrecognized declaration attribute '%0' in SDK node", (StringRef))
 ERROR(sdk_node_unrecognized_decl_kind,none,
       "unrecognized declaration kind '%0' in SDK node", (StringRef))
+ERROR(sdk_node_unrecognized_accessor_kind,none,
+      "unrecognized accessor kind '%0' in SDK node", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Circular reference diagnostics
 //------------------------------------------------------------------------------
 ERROR(circular_reference, none,
       "circular reference", ())
-
-ERROR(redundant_type_alias_define, none,
-      "redundant type alias declaration", ())
 
 NOTE(circular_reference_through, none,
      "through reference here", ())
@@ -151,6 +154,17 @@ ERROR(circular_class_inheritance,none,
 ERROR(circular_enum_inheritance,none,
       "%0 has a raw type that depends on itself", (Identifier))
 
+ERROR(circular_protocol_def,none,
+      "protocol %0 refines itself", (Identifier))
+
+NOTE(kind_declname_declared_here,none,
+     "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
+
+WARNING(warn_property_wrapper_module_scope,none,
+        "ignoring associated type %0 in favor of module-scoped property "
+        "wrapper %0; please qualify the reference with %1",
+        (DeclNameRef, Identifier))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
@@ -158,4 +172,5 @@ ERROR(circular_enum_inheritance,none,
 # undef NOTE
 # undef WARNING
 # undef ERROR
+# undef FIXIT
 #endif

@@ -63,18 +63,19 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
-#include "swift/SILOptimizer/Analysis/CFG.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
-#include "llvm/ADT/SmallString.h"
+#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -283,7 +284,7 @@ public:
 
   bool isTrivialNoEscapeParameter() const {
     auto ClosureParmFnTy =
-        getClosureParameterInfo().getType()->getAs<SILFunctionType>();
+        getClosureParameterInfo().getInterfaceType()->getAs<SILFunctionType>();
     return ClosureParmFnTy->isTrivialNoEscape();
   }
 
@@ -653,7 +654,7 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
                       : ParameterConvention::Direct_Owned;
     }
 
-    SILParameterInfo NewPInfo(PInfo.getType(), ParamConv);
+    SILParameterInfo NewPInfo(PInfo.getInterfaceType(), ParamConv);
     NewParameterInfoList.push_back(NewPInfo);
   }
 
@@ -664,11 +665,14 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
   ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
 
   auto ClonedTy = SILFunctionType::get(
-      ClosureUserFunTy->getGenericSignature(), ExtInfo,
+      ClosureUserFunTy->getSubstGenericSignature(), ExtInfo,
       ClosureUserFunTy->getCoroutineKind(),
       ClosureUserFunTy->getCalleeConvention(), NewParameterInfoList,
       ClosureUserFunTy->getYields(), ClosureUserFunTy->getResults(),
-      ClosureUserFunTy->getOptionalErrorResult(), M.getASTContext());
+      ClosureUserFunTy->getOptionalErrorResult(),
+      ClosureUserFunTy->getSubstitutions(),
+      ClosureUserFunTy->isGenericSignatureImplied(),
+      M.getASTContext());
 
   // We make this function bare so we don't have to worry about decls in the
   // SILArgument.
@@ -788,18 +792,17 @@ void ClosureSpecCloner::populateCloned() {
   entryArgs.reserve(ClosureUserEntryBB->getArguments().size());
 
   // Remove the closure argument.
-  SILArgument *ClosureArg = nullptr;
   for (size_t i = 0, e = ClosureUserEntryBB->args_size(); i != e; ++i) {
     SILArgument *Arg = ClosureUserEntryBB->getArgument(i);
     if (i == CallSiteDesc.getClosureIndex()) {
-      ClosureArg = Arg;
       entryArgs.push_back(SILValue());
       continue;
     }
 
     // Otherwise, create a new argument which copies the original argument
+    auto typeInContext = Cloned->getLoweredType(Arg->getType());
     SILValue MappedValue =
-        ClonedEntryBB->createFunctionArgument(Arg->getType(), Arg->getDecl());
+        ClonedEntryBB->createFunctionArgument(typeInContext, Arg->getDecl());
     entryArgs.push_back(MappedValue);
   }
 
@@ -819,6 +822,8 @@ void ClosureSpecCloner::populateCloned() {
   unsigned idx = 0;
   for (auto &PInfo : ClosedOverFunConv.getParameters().slice(NumNotCaptured)) {
     auto paramTy = ClosedOverFunConv.getSILType(PInfo);
+    // Get the type in context of the new function.
+    paramTy = Cloned->getLoweredType(paramTy);
     SILValue MappedValue = ClonedEntryBB->createFunctionArgument(paramTy);
     NewPAIArgs.push_back(MappedValue);
     auto CapturedVal =
@@ -1214,7 +1219,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
 
         // We currently only support copying intermediate reabastraction
         // closures if the closure is ultimately passed trivially.
-        bool IsClosurePassedTrivially = ClosureParamInfo.getType()
+        bool IsClosurePassedTrivially = ClosureParamInfo.getInterfaceType()
                                             ->castTo<SILFunctionType>()
                                             ->isTrivialNoEscape();
         if (HaveUsedReabstraction &&  !IsClosurePassedTrivially)

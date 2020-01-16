@@ -1,3 +1,5 @@
+// XFAIL: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift %S/Inputs/ImportedTypes.swift %S/Inputs/ImportedTypesOther.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect) -I %S/Inputs

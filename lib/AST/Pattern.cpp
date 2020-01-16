@@ -16,10 +16,11 @@
 
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/Support/raw_ostream.h"
@@ -494,4 +495,34 @@ template<>
 const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const Pattern *>() {
   return &TF;
+}
+
+
+ContextualPattern ContextualPattern::forPatternBindingDecl(
+    PatternBindingDecl *pbd, unsigned index) {
+  return ContextualPattern(
+      pbd->getPattern(index), /*isTopLevel=*/true, pbd, index);
+}
+
+DeclContext *ContextualPattern::getDeclContext() const {
+  if (auto pbd = getPatternBindingDecl())
+    return pbd->getDeclContext();
+
+  return declOrContext.get<DeclContext *>();
+}
+
+PatternBindingDecl *ContextualPattern::getPatternBindingDecl() const {
+  return declOrContext.dyn_cast<PatternBindingDecl *>();
+}
+
+bool ContextualPattern::allowsInference() const {
+  if (auto pbd = getPatternBindingDecl())
+    return pbd->isInitialized(index);
+
+  return true;
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ContextualPattern &pattern) {
+  out << "(pattern @ " << pattern.getPattern() << ")";
 }

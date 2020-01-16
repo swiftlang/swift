@@ -24,6 +24,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Witness.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -94,8 +95,7 @@ public:
 /// associated type.
 ///
 /// \returns an empty result on success, or a description of the error.
-CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
-                                        ProtocolDecl *proto,
+CheckTypeWitnessResult checkTypeWitness(DeclContext *dc, ProtocolDecl *proto,
                                         AssociatedTypeDecl *assocType,
                                         Type type);
 
@@ -115,8 +115,7 @@ struct InferredAssociatedTypesByWitness {
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 /// The set of witnesses that were considered when attempting to
@@ -470,16 +469,18 @@ struct RequirementCheck;
 class WitnessChecker {
 public:
   using RequirementEnvironmentCacheKey =
-      std::pair<const GenericSignature *, const ClassDecl *>;
+      std::pair<const GenericSignatureImpl *, const ClassDecl *>;
   using RequirementEnvironmentCache =
       llvm::DenseMap<RequirementEnvironmentCacheKey, RequirementEnvironment>;
 
 protected:
-  TypeChecker &TC;
+  ASTContext &Context;
   ProtocolDecl *Proto;
   Type Adoptee;
   // The conforming context, either a nominal type or extension.
   DeclContext *DC;
+
+  ASTContext &getASTContext() const { return Context; }
 
   // An auxiliary lookup table to be used for witnesses remapped via
   // @_implements(Protocol, DeclName)
@@ -489,8 +490,8 @@ protected:
 
   Optional<std::pair<AccessScope, bool>> RequiredAccessScopeAndUsableFromInline;
 
-  WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
-                 Type adoptee, DeclContext *dc);
+  WitnessChecker(ASTContext &ctx, ProtocolDecl *proto, Type adoptee,
+                 DeclContext *dc);
 
   bool isMemberOperator(FuncDecl *decl, Type type);
 
@@ -675,8 +676,8 @@ public:
   /// Emit any diagnostics that have been delayed.
   void emitDelayedDiags();
 
-  ConformanceChecker(TypeChecker &tc, NormalProtocolConformance *conformance,
-                     llvm::SetVector<ValueDecl*> &GlobalMissingWitnesses,
+  ConformanceChecker(ASTContext &ctx, NormalProtocolConformance *conformance,
+                     llvm::SetVector<ValueDecl *> &GlobalMissingWitnesses,
                      bool suppressDiagnostics = true);
 
   /// Resolve all of the type witnesses.
@@ -701,12 +702,7 @@ public:
 
   /// Check all of the protocols requirements are actually satisfied by a
   /// the chosen type witnesses.
-  ///
-  /// \param failUnsubstituted Whether to fail when the requirements of the
-  /// protocol could not be substituted (e.g., due to missing information).
-  /// When true, emits a diagnostic in such cases; when false, enqueues the
-  /// conformance for later checking.
-  void ensureRequirementsAreSatisfied(bool failUnsubstituted);
+  void ensureRequirementsAreSatisfied();
 
   /// Check the entire protocol conformance, ensuring that all
   /// witnesses are resolved and emitting any diagnostics.
@@ -716,7 +712,7 @@ public:
 /// Captures the state needed to infer associated types.
 class AssociatedTypeInference {
   /// The type checker we'll need to validate declarations etc.
-  TypeChecker &tc;
+  ASTContext &ctx;
 
   /// The conformance for which we are inferring associated types.
   NormalProtocolConformance *conformance;
@@ -756,10 +752,13 @@ class AssociatedTypeInference {
   unsigned numTypeWitnessesBeforeConflict = 0;
 
 public:
-  AssociatedTypeInference(TypeChecker &tc,
+  AssociatedTypeInference(ASTContext &ctx,
                           NormalProtocolConformance *conformance);
 
 private:
+  /// Retrieve the AST context.
+  ASTContext &getASTContext() const { return ctx; }
+
   /// Infer associated type witnesses for the given tentative
   /// requirement/witness match.
   InferredAssociatedTypesByWitness inferTypeWitnessesViaValueWitness(
@@ -884,7 +883,6 @@ public:
 
   /// Find an associated type declaration that provides a default definition.
   static AssociatedTypeDecl *findDefaultedAssociatedType(
-                                                 TypeChecker &tc,
                                                  AssociatedTypeDecl *assocType);
 };
 
@@ -903,10 +901,9 @@ RequirementMatch matchWitness(
                    > finalize);
 
 RequirementMatch
-  matchWitness(TypeChecker &tc,
-               WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
-               ProtocolDecl *proto, ProtocolConformance *conformance,
-               DeclContext *dc, ValueDecl *req, ValueDecl *witness);
+matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
+             ProtocolDecl *proto, ProtocolConformance *conformance,
+             DeclContext *dc, ValueDecl *req, ValueDecl *witness);
 
 /// If the given type is a direct reference to an associated type of
 /// the given protocol, return the referenced associated type.

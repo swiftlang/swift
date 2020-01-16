@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Foundation
 import TestsUtils
 
 public let BinaryFloatingPointPropertiesBinade = BenchmarkInfo(

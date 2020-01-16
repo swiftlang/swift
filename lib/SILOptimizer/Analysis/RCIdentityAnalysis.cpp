@@ -508,8 +508,8 @@ void RCIdentityFunctionInfo::getRCUsers(
   getRCUses(V, TmpUsers);
 
   // Then map our operands out of TmpUsers into Users.
-  transform(TmpUsers, std::back_inserter(Users),
-            [](Operand *Op) { return Op->getUser(); });
+  llvm::transform(TmpUsers, std::back_inserter(Users),
+                  [](Operand *Op) { return Op->getUser(); });
 
   // Finally sort/unique our users array.
   sortUnique(Users);

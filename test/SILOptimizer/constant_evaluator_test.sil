@@ -279,7 +279,7 @@ bb0:
   %0 = integer_literal $Builtin.Int64, -5
   %2 = function_ref @factorial : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
   %3 = apply %2(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
-    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: exceeded instruction limit: 512 when evaluating the expression at compile time
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: exceeded instruction limit: {{.*}} when evaluating the expression at compile time
     // CHECK: {{.*}}: note: limit exceeded here
   return %3 : $Builtin.Int64
 }
@@ -449,7 +449,7 @@ bb0:
 sil hidden @interpretAndDiagnoseNonConstantVars : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %4 = struct_extract %0 : $Int, #Int._value
-    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: cannot evaluate expression as constant here
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: encountered use of a variable not tracked by the evaluator
   %10 = tuple ()
   return %10 : $()
 }
@@ -464,7 +464,7 @@ bb0:
   // function_ref readLine(strippingNewline:)
   %2 = function_ref @$ss8readLine16strippingNewlineSSSgSb_tF : $@convention(thin) (Bool) -> @owned Optional<String>
   %3 = apply %2(%1) : $@convention(thin) (Bool) -> @owned Optional<String>
-    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: encountered call to a function whose body is not available
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: encountered call to 'readLine(strippingNewline:)' whose body is not available
   release_value %3 : $Optional<String>
   %5 = tuple ()
   return %5 : $()
@@ -495,7 +495,7 @@ bb3:
 
 // Test stack allocation and memory access.
 
-// CHECK-LABEL @interpretLoadStore
+// CHECK-LABEL: @interpretLoadStore
 sil hidden @interpretLoadStore : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = alloc_stack $Builtin.Int64, var, name "i"
@@ -506,7 +506,7 @@ bb0:
   return %3 : $Builtin.Int64
 } // CHECK: Returns int: 11
 
-// CHECK-LABEL @interpretBeginEndAccess
+// CHECK-LABEL: @interpretBeginEndAccess
 sil hidden @interpretBeginEndAccess : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = alloc_stack $Builtin.Int64, var, name "i"
@@ -1152,3 +1152,354 @@ bb0:
   cond_fail %19 : $Builtin.Int1
   return %18 : $Builtin.Int64
 } // CHECK: Returns int: 36
+
+// Tests for builtin "ptrtoint_Word", which is supported only for string
+// constants in order to handle 'StaticString' construction.
+
+// CHECK-LABEL: @interpretPtrToInt
+sil @interpretPtrToInt : $@convention(thin) () -> Builtin.Word {
+  %0 = string_literal utf8 "Fatal error"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  return %1 : $Builtin.Word
+} // CHECK: Returns string: "Fatal error"
+
+// CHECK-LABEL: @interpretStaticStringInit
+sil @interpretStaticStringInit : $@convention(thin) () -> Builtin.Word {
+  %0 = string_literal utf8 "static error message"
+  %1 = integer_literal $Builtin.Word, 11
+  %2 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %3 = integer_literal $Builtin.Int8, 2
+  %4 = struct $StaticString (%2 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int8)
+  %5 = struct_extract %4 : $StaticString, #StaticString._startPtrOrData
+  return %5 : $Builtin.Word
+} // CHECK: Returns string: "static error message"
+
+// Tests for builtin "assert_configuration". Constant evaluator evaluates this
+// builtin to 0, meaning that the the configuration is "debug".
+
+// CHECK-LABEL: @interpretAssertConfiguration
+sil @interpretAssertConfiguration : $@convention(thin) () -> Builtin.Int32 {
+  %0 = builtin "assert_configuration"() : $Builtin.Int32
+  return %0 : $Builtin.Int32
+} // CHECK: Returns int: 0
+
+// Tests for "assertionFailure" stdlib functions. Such functions have the
+// @_semantics attribute: "programtermination_point"
+
+sil [noinline] [_semantics "programtermination_point"] [canonical] @$assertionFailure : $@convention(thin) (StaticString, StaticString, UInt64) -> Never
+
+// CHECK-LABEL: @interpretAssertionFailure
+sil @interpretAssertionFailure : $@convention(thin) () -> Never {
+  // Construct error prefix.
+  %0 = string_literal utf8 "error-prefix"
+  %1 = integer_literal $Builtin.Word, 12
+  %2 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %3 = integer_literal $Builtin.Int8, 2
+  %4 = struct $StaticString (%2 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int8)
+
+  // Construct error message.
+  %10 = string_literal utf8 "message"
+  %11 = integer_literal $Builtin.Word, 7
+  %12 = builtin "ptrtoint_Word"(%10 : $Builtin.RawPointer) : $Builtin.Word
+  %13 = integer_literal $Builtin.Int8, 2
+  %14 = struct $StaticString (%12 : $Builtin.Word, %11 : $Builtin.Word, %13 : $Builtin.Int8)
+
+  // Construct line number.
+  %20 = integer_literal $Builtin.Int64, 1208
+  %21 = struct $UInt64 (%20 : $Builtin.Int64)
+
+  %22 = function_ref @$assertionFailure : $@convention(thin) (StaticString, StaticString, UInt64) -> Never
+  %23 = apply %22(%4, %14, %21) : $@convention(thin) (StaticString, StaticString, UInt64) -> Never
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: error-prefix: message
+  unreachable
+}
+
+// Tests for arrays.
+
+// Array.init()
+sil [serialized] [_semantics "array.init.empty"] @$sS2ayxGycfC : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+
+// _allocateUninitializedArray<A>(_:)
+sil [serialized] [always_inline] [_semantics "array.uninitialized_intrinsic"] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+
+// CHECK-LABEL: @interpretArrayInit
+sil @interpretArrayInit : $@convention(thin) () -> @owned Array<Int> {
+bb0:
+  %0 = metatype $@thin Array<Int>.Type
+  // function_ref Array.init()
+  %1 = function_ref @$sS2ayxGycfC : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  %2 = apply %1<Int>(%0) : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  return %2 : $Array<Int>
+} // CHECK: Returns Array<Int>
+  // CHECK: size: 0 contents []
+
+// CHECK-LABEL: @interpretEmptyArrayLiteral
+sil [ossa] @interpretEmptyArrayLiteral : $@convention(thin) () -> @owned Array<String> {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %1 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  %2 = apply %1<String>(%0) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  (%3, %4) = destructure_tuple %2 : $(Array<String>, Builtin.RawPointer)
+  return %3 : $Array<String>
+} // CHECK: Returns Array<String>
+  // CHECK: size: 0 contents []
+
+sil [ossa] @initializeArrayWithLiterals : $@convention(thin) () -> @owned Array<Int64> {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 11 // element 1
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 12  // element 2
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %4 = integer_literal $Builtin.Int64, 14 // element 3
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+
+  %6 = integer_literal $Builtin.Word, 3 // array literal size
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %7 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  %8 = apply %7<Int64>(%6) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  (%9, %10) = destructure_tuple %8 : $(Array<Int64>, Builtin.RawPointer)
+  %11 = pointer_to_address %10 : $Builtin.RawPointer to [strict] $*Int64
+  store %1 to [trivial] %11 : $*Int64
+  %13 = integer_literal $Builtin.Word, 1 // Index: 1
+  %14 = index_addr %11 : $*Int64, %13 : $Builtin.Word
+  store %3 to [trivial] %14 : $*Int64
+  %16 = integer_literal $Builtin.Word, 2 // Index: 2
+  %17 = index_addr %11 : $*Int64, %16 : $Builtin.Word
+  store %5 to [trivial] %17 : $*Int64
+  return %9 : $Array<Int64>
+}
+
+// CHECK-LABEL: @interpretArrayLiteral
+sil [ossa] @interpretArrayLiteral : $@convention(thin) () -> @owned Array<Int64> {
+bb0:
+  %7 = function_ref @initializeArrayWithLiterals : $@convention(thin) () -> @owned Array<Int64>
+  %8 = apply %7() : $@convention(thin) () -> @owned Array<Int64>
+  return %8 : $Array<Int64>
+} // CHECK: Returns Array<Int64>
+  // CHECK: size: 3
+  // CHECK: agg: 1 elt: int: 11
+  // CHECK: agg: 1 elt: int: 12
+  // CHECK: agg: 1 elt: int: 14
+
+// Array.append(_:)
+sil [serialized] [_semantics "array.append_element"] @$sSa6appendyyxnF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+
+// CHECK-LABEL: @interpretArrayAppend
+sil [ossa] @interpretArrayAppend : $@convention(thin) () -> @owned Array<Int64> {
+  %0 = integer_literal $Builtin.Int64, 71
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = alloc_stack $Array<Int64>, var, name "a"
+  %3 = metatype $@thin Array<Int64>.Type
+  // function_ref Array.init()
+  %4 = function_ref @$sS2ayxGycfC : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  %5 = apply %4<Int64>(%3) : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  store %5 to [init] %2 : $*Array<Int64>
+  %10 = alloc_stack $Int64
+  store %1 to [trivial] %10 : $*Int64
+  // function_ref Array.append(_:)
+  %13 = function_ref @$sSa6appendyyxnF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  %14 = apply %13<Int64>(%10, %2) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  dealloc_stack %10 : $*Int64
+  %18 = load [copy] %2 : $*Array<Int64>
+  destroy_addr %2 : $*Array<Int64>
+  dealloc_stack %2 : $*Array<Int64>
+  return %18 : $Array<Int64>
+} // CHECK: Returns Array<Int64>
+  // CHECK: size: 1
+  // CHECK: agg: 1 elt: int: 71
+
+// CHECK-LABEL: @interpretArrayAppendNonEmpty
+sil [ossa] @interpretArrayAppendNonEmpty : $@convention(thin) () -> @owned Array<Int64> {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 100
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = alloc_stack $Array<Int64>, var, name "a"
+  %3 = metatype $@thin Array<Int64>.Type
+  %4 = function_ref @initializeArrayWithLiterals : $@convention(thin) () -> @owned Array<Int64>
+  %5 = apply %4() : $@convention(thin) () -> @owned Array<Int64>
+  store %5 to [init] %2 : $*Array<Int64>
+  %10 = alloc_stack $Int64
+  store %1 to [trivial] %10 : $*Int64
+  // function_ref Array.append(_:)
+  %13 = function_ref @$sSa6appendyyxnF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  %14 = apply %13<Int64>(%10, %2) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  dealloc_stack %10 : $*Int64
+  %18 = load [copy] %2 : $*Array<Int64>
+  destroy_addr %2 : $*Array<Int64>
+  dealloc_stack %2 : $*Array<Int64>
+  return %18 : $Array<Int64>
+} // CHECK: Returns Array<Int64>
+  // CHECK: size: 4
+  // CHECK: agg: 1 elt: int: 11
+  // CHECK: agg: 1 elt: int: 12
+  // CHECK: agg: 1 elt: int: 14
+  // CHECK: agg: 1 elt: int: 100
+
+struct StructContainingArray {
+  var array: [Int64]
+}
+
+// CHECK-LABEL: @interpretArrayAppendViaStructElementAddr
+sil [ossa] @interpretArrayAppendViaStructElementAddr : $@convention(thin) () -> @owned StructContainingArray {
+bb0:
+  %3 = metatype $@thin Array<Int64>.Type
+  // function_ref Array.init()
+  %4 = function_ref @$sS2ayxGycfC : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  %5 = apply %4<Int64>(%3) : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  %6 = struct $StructContainingArray (%5 : $Array<Int64>)
+
+  %7 = alloc_stack $StructContainingArray, var, name "s"
+  store %6 to [init] %7 : $*StructContainingArray
+  %8 = struct_element_addr %7 : $*StructContainingArray, #StructContainingArray.array
+
+  %9 = integer_literal $Builtin.Int64, 105
+  %10 = struct $Int64 (%9 : $Builtin.Int64)
+  %11 = alloc_stack $Int64
+  store %10 to [trivial] %11 : $*Int64
+
+  // function_ref Array.append(_:)
+  %13 = function_ref @$sSa6appendyyxnF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  %14 = apply %13<Int64>(%11, %8) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  dealloc_stack %11 : $*Int64
+
+  %18 = load [copy] %7 : $*StructContainingArray
+  destroy_addr %7 : $*StructContainingArray
+  dealloc_stack %7 : $*StructContainingArray
+  return %18 : $StructContainingArray
+} // CHECK: agg: 1 elt: Array<Int64>:
+  // CHECK: size: 1
+  // CHECK: agg: 1 elt: int: 105
+
+/// Test appending of a static string to an array. The construction of a static
+/// string is a bit complicated due to the use of instructions like "ptrtoint".
+/// This tests that array append works with such complex constant values as well.
+// CHECK-LABEL: @interpretArrayAppendStaticString
+sil @interpretArrayAppendStaticString : $@convention(thin) () -> @owned Array<StaticString> {
+  %0 = string_literal utf8 "constant" // string to be appended.
+
+  // Initialize an empty array
+  %2 = alloc_stack $Array<StaticString>, var, name "a"
+  %3 = metatype $@thin Array<StaticString>.Type
+  // function_ref Array.init()
+  %4 = function_ref @$sS2ayxGycfC : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  %5 = apply %4<StaticString>(%3) : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  store %5 to %2 : $*Array<StaticString>
+
+  // Initialize a static string.
+  %6 = integer_literal $Builtin.Word, 8
+  %7 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %8 = integer_literal $Builtin.Int8, 2
+  %9 = struct $StaticString (%7 : $Builtin.Word, %6 : $Builtin.Word, %8 : $Builtin.Int8)
+
+  %10 = alloc_stack $StaticString
+  store %9 to %10 : $*StaticString
+  // function_ref Array.append(_:)
+  %13 = function_ref @$sSa6appendyyxnF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  %14 = apply %13<StaticString>(%10, %2) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  dealloc_stack %10 : $*StaticString
+  %18 = load %2 : $*Array<StaticString>
+  destroy_addr %2 : $*Array<StaticString>
+  dealloc_stack %2 : $*Array<StaticString>
+  return %18 : $Array<StaticString>
+} // CHECK: Returns Array<StaticString>
+  // CHECK: size: 1
+  // CHECK: string: "constant"
+
+// Test partial apply and closure creation.
+
+sil private @closure1 : $@convention(thin) (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  return %0 : $Int32
+}
+
+// CHECK-LABEL: @interpretPartialApply
+sil @interpretPartialApply: $@convention(thin) () -> @owned @callee_guaranteed () -> Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 81
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %2 = function_ref @closure1 : $@convention(thin) (Int32) -> Int32
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@convention(thin) (Int32) -> Int32
+  return %3 : $@callee_guaranteed () -> Int32
+} // CHECK: Returns closure: target: closure1 captures
+  // CHECK: %1
+  // CHECK: values:
+  // CHECK: int: 81
+
+sil private @closure2 : $@convention(thin) (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1: $Int32):
+  return %0 : $Int32
+}
+
+sil private @closure3 : $@convention(thin) (@guaranteed @callee_guaranteed (Int32) -> Int32) -> Int32 {
+bb0(%0 : $@callee_guaranteed (Int32) -> Int32):
+  %3 = integer_literal $Builtin.Int32, 19
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %5 = apply %0(%4) : $@callee_guaranteed (Int32) -> Int32
+  return %5 : $Int32
+}
+
+// CHECK-LABEL: @interpretPartialApplyChain
+sil @interpretPartialApplyChain: $@convention(thin) () -> @owned @callee_guaranteed () -> Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 991
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %2 = function_ref @closure2 : $@convention(thin) (Int32, Int32) -> Int32
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@convention(thin) (Int32, Int32) -> Int32
+  %5 = function_ref @closure3 : $@convention(thin) (@guaranteed @callee_guaranteed (Int32) -> Int32) -> Int32
+  strong_retain %3 : $@callee_guaranteed (Int32) -> Int32
+  %7 = partial_apply [callee_guaranteed] %5(%3) : $@convention(thin) (@guaranteed @callee_guaranteed (Int32) -> Int32) -> Int32
+  strong_release %3 : $@callee_guaranteed (Int32) -> Int32
+  return %7 : $@callee_guaranteed () -> Int32
+} // CHECK: Returns closure: target: closure3 captures
+  // CHECK: %3
+  // CHECK: values:
+  // CHECK:   closure: target: closure2 captures
+  // CHECK:     %1
+  // CHECK:   values:
+  // CHECK:     int: 991
+
+
+sil private @closure4 : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 71
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  return %1 : $Int64
+}
+
+// CHECK-LABEL: @interpretThinToThickFunction
+sil @interpretThinToThickFunction: $@convention(thin) () -> @owned @callee_guaranteed () -> Int64 {
+bb0:
+  %0 = function_ref @closure4 : $@convention(thin) () -> Int64
+  %3 = thin_to_thick_function %0 : $@convention(thin) () -> Int64 to $@callee_guaranteed () -> Int64
+  return %3 : $@callee_guaranteed () -> Int64
+} // CHECK: Returns closure: target: closure4 captures
+  // CHECK-NEXT: values:
+
+// Tests for checked cast instruction.
+
+sil [ossa] @testMetatypeCast : $@convention(thin) <T> (@thick T.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick T.Type):
+  checked_cast_br %0 : $@thick T.Type to Int64.Type, bb1, bb2
+
+bb1(%3 : $@thick Int64.Type):
+  %4 = metatype $@thin Int64.Type
+  %5 = integer_literal $Builtin.Int1, -1
+  br bb3(%5 : $Builtin.Int1)
+
+bb2(%7 : $@thick T.Type):
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb3(%8 : $Builtin.Int1)
+
+bb3(%10 : $Builtin.Int1):
+  return %10 : $Builtin.Int1
+}
+
+// CHECK-LABEL: @interpretMetatypeCast
+sil [ossa] @interpretMetatypeCast : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %1 = metatype $@thick Int64.Type
+  %2 = function_ref @testMetatypeCast : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1
+  %3 = apply %2<Int64>(%1) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1
+  return %3 : $Builtin.Int1
+} // CHECK: Returns int: -1

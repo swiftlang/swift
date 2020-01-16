@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 
 #include "llvm/Support/MathExtras.h"
@@ -25,7 +26,7 @@ using namespace swift;
 
 namespace swift {
 // Implement the access-control type zone.
-#define SWIFT_TYPEID_ZONE SWIFT_ACCESSS_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE AccessControl
 #define SWIFT_TYPEID_HEADER "swift/AST/AccessTypeIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
@@ -80,7 +81,7 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   // Special case for dtors and enum elements: inherit from container
   if (D->getKind() == DeclKind::Destructor ||
       D->getKind() == DeclKind::EnumElement) {
-    if (D->isInvalid()) {
+    if (D->hasInterfaceType() && D->isInvalid()) {
       return AccessLevel::Private;
     } else {
       auto container = cast<NominalTypeDecl>(D->getDeclContext());
@@ -123,18 +124,6 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   llvm_unreachable("unhandled kind");
 }
 
-void AccessLevelRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
-  auto valueDecl = std::get<0>(getStorage());
-  diags.diagnose(valueDecl, diag::circular_reference);
-}
-
-void AccessLevelRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto valueDecl = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(valueDecl, diag::circular_reference_through);
-}
-
 Optional<AccessLevel> AccessLevelRequest::getCachedResult() const {
   auto valueDecl = std::get<0>(getStorage());
   if (valueDecl->hasAccess())
@@ -160,25 +149,37 @@ void AccessLevelRequest::cacheResult(AccessLevel value) const {
 // the cycle of computation associated with formal accesses, we give it its own
 // request.
 
+// In a .swiftinterface file, a stored property with an explicit @_hasStorage
+// attribute but no setter is assumed to have originally been a private(set).
+static bool isStoredWithPrivateSetter(VarDecl *VD) {
+  auto *HSA = VD->getAttrs().getAttribute<HasStorageAttr>();
+  if (!HSA || HSA->isImplicit())
+    return false;
+
+  auto *DC = VD->getDeclContext();
+  auto *SF = DC->getParentSourceFile();
+  if (!SF || SF->Kind != SourceFileKind::Interface)
+    return false;
+
+  if (VD->isLet() ||
+      VD->getParsedAccessor(AccessorKind::Set))
+    return false;
+
+  return true;
+}
+
 llvm::Expected<AccessLevel>
 SetterAccessLevelRequest::evaluate(Evaluator &evaluator,
                                    AbstractStorageDecl *ASD) const {
   assert(!ASD->Accessors.getInt().hasValue());
-  if (auto *AA = ASD->getAttrs().getAttribute<SetterAccessAttr>())
-    return AA->getAccess();
+  if (auto *SAA = ASD->getAttrs().getAttribute<SetterAccessAttr>())
+    return SAA->getAccess();
+
+  if (auto *VD = dyn_cast<VarDecl>(ASD))
+    if (isStoredWithPrivateSetter(VD))
+      return AccessLevel::Private;
+
   return ASD->getFormalAccess();
-}
-
-void SetterAccessLevelRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
-  auto abstractStorageDecl = std::get<0>(getStorage());
-  diags.diagnose(abstractStorageDecl, diag::circular_reference);
-}
-
-void SetterAccessLevelRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto abstractStorageDecl = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(abstractStorageDecl, diag::circular_reference_through);
 }
 
 Optional<AccessLevel> SetterAccessLevelRequest::getCachedResult() const {
@@ -273,18 +274,6 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
   return std::make_pair(defaultAccess, maxAccess);
 }
 
-void DefaultAndMaxAccessLevelRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
-  auto extensionDecl = std::get<0>(getStorage());
-  diags.diagnose(extensionDecl, diag::circular_reference);
-}
-
-void DefaultAndMaxAccessLevelRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto extensionDecl = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(extensionDecl, diag::circular_reference_through);
-}
-
 // Default and Max access levels are stored combined as a 3-bit bitset. The Bits
 // are numbered using the 3 middle values of the AccessLevel enumeration, and
 // the combined value is just the bitwise-OR of the bits for Default and Max.
@@ -333,13 +322,13 @@ DefaultAndMaxAccessLevelRequest::cacheResult(
 
 // Define request evaluation functions for each of the access requests.
 static AbstractRequestFunction *accessRequestFunctions[] = {
-#define SWIFT_TYPEID(Name)                                    \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)         \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/AST/AccessTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 };
 
 void swift::registerAccessRequestFunctions(Evaluator &evaluator) {
-  evaluator.registerRequestFunctions(SWIFT_ACCESS_REQUESTS_TYPEID_ZONE,
+  evaluator.registerRequestFunctions(Zone::AccessControl,
                                      accessRequestFunctions);
 }

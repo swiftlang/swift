@@ -66,9 +66,13 @@ extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 extern int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
                            void *MainAddr);
 
-/// Run 'swift-format'
-extern int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
+/// Run 'swift-indent'
+extern int swift_indent_main(ArrayRef<const char *> Args, const char *Argv0,
                              void *MainAddr);
+
+/// Run 'swift-symbolgraph-extract'
+extern int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv0,
+void *MainAddr);
 
 /// Determine if the given invocation should run as a subcommand.
 ///
@@ -148,10 +152,12 @@ static int run_driver(StringRef ExecName,
     return autolink_extract_main(
       TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),
       argv[0], (void *)(intptr_t)getExecutablePath);
-  case Driver::DriverKind::SwiftFormat:
-    return swift_format_main(
+  case Driver::DriverKind::SwiftIndent:
+    return swift_indent_main(
       TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),
       argv[0], (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::SymbolGraph:
+      return swift_symbolgraph_extract_main(TheDriver.getArgsWithoutProgramNameAndDriverMode(argv), argv[0], (void *)(intptr_t)getExecutablePath);
   default:
     break;
   }

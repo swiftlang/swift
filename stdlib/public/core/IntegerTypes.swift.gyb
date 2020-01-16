@@ -30,12 +30,12 @@ class struct(object):
     return 'struct(%r)' % self.__dict__
 
 binaryArithmetic = {
-  'Numeric' : [
+  'Numeric': [
     struct(operator='+', name='adding',      firstArg='_',  llvmName='add', kind='+'),
     struct(operator='-', name='subtracting', firstArg='_',  llvmName='sub', kind='-'),
     struct(operator='*', name='multiplied',  firstArg='by', llvmName='mul', kind='*'),
   ],
-  'BinaryInteger' : [
+  'BinaryInteger': [
     struct(operator='/', name='divided',     firstArg='by', llvmName='div', kind='/'),
     struct(operator='%', name='remainder',   firstArg='dividingBy', llvmName='rem', kind='/'),
   ],
@@ -1115,7 +1115,7 @@ public struct ${Self}
   }
 
 %   if Self in ['Int32', 'Int64']:
-%     Floating = {32 : 'Float', 64 : 'Double'}[bits]
+%     Floating = {32: 'Float', 64: 'Double'}[bits]
   @available(*, unavailable,
     message: "Please use ${Self}(bitPattern: ${OtherSelf}) in combination with ${Floating}.bitPattern property.")
   public init(bitPattern x: ${Floating}) {
@@ -1234,7 +1234,8 @@ ${assignmentOperatorComment(x.operator, True)}
       Builtin.${u}${x.llvmName}_with_overflow_Int${bits}(
         lhs._value, rhs._value, true._value)
 %   end
-    Builtin.condfail(overflow)
+    Builtin.condfail_message(overflow,
+      StaticString("arithmetic overflow").unsafeRawPointer)
     lhs = ${Self}(result)
   }
 %       end
@@ -1333,7 +1334,7 @@ ${assignmentOperatorComment(x.operator, True)}
   /// The bit width of ${Article.lower()} `${Self}` instance is ${bits}.
 %   end
   @_transparent
-  public static var bitWidth : Int { return ${bits} }
+  public static var bitWidth: Int { return ${bits} }
 
   /// The number of leading zeros in this value's binary representation.
   ///
@@ -1384,7 +1385,7 @@ ${assignmentOperatorComment(x.operator, True)}
 
   /// A type that represents the words of this integer.
   @frozen
-  public struct Words : RandomAccessCollection {
+  public struct Words: RandomAccessCollection {
     public typealias Indices = Range<Int>
     public typealias SubSequence = Slice<${Self}.Words>
 
@@ -1626,7 +1627,7 @@ ${assignmentOperatorComment(x.operator, True)}
 }
 %# end of concrete type: ${Self}
 
-extension ${Self} : Hashable {
+extension ${Self}: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
@@ -1652,7 +1653,7 @@ extension ${Self} : Hashable {
   }
 }
 
-extension ${Self} : _HasCustomAnyHashableRepresentation {
+extension ${Self}: _HasCustomAnyHashableRepresentation {
   // Not @inlinable
   public func _toCustomAnyHashable() -> AnyHashable? {
     return AnyHashable(_box: _IntegerAnyHashableBox(self))

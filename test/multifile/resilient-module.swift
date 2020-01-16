@@ -6,6 +6,7 @@
 // RUN: %target-codesign %t/main %t/%target-library-name(A)
 // RUN: %target-run %t/main %t/%target-library-name(A) | %FileCheck %s
 
+// REQUIRES: executable_test
 
 // METADATA: @"$s1A8SomeEnumOMn" = {{.*}}constant <{ i32, i32, i32, i32, i32, i32, i32 }> <{{{.*}} i32 33554434, i32 0 }>
 

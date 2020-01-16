@@ -33,7 +33,7 @@ class ConformingMethodListCallbacks : public CodeCompletionCallbacks {
   DeclContext *CurDeclContext = nullptr;
 
   void getMatchingMethods(Type T,
-                          llvm::MapVector<ProtocolDecl*, StringRef> &expectedTypes,
+                          llvm::SmallPtrSetImpl<ProtocolDecl*> &expectedTypes,
                           SmallVectorImpl<ValueDecl *> &result);
 
 public:
@@ -91,8 +91,12 @@ void ConformingMethodListCallbacks::doneParsing() {
   if (T->hasArchetype())
     T = T->mapTypeOutOfContext();
 
-  llvm::MapVector<ProtocolDecl*, StringRef> expectedProtocols;
-  resolveProtocolNames(CurDeclContext, ExpectedTypeNames, expectedProtocols);
+  llvm::SmallPtrSet<ProtocolDecl*, 8> expectedProtocols;
+  for (auto Name: ExpectedTypeNames) {
+    if (auto *PD = resolveProtocolName(CurDeclContext, Name)) {
+      expectedProtocols.insert(PD);
+    }
+  }
 
   // Collect the matching methods.
   ConformingMethodListResult result(CurDeclContext, T);
@@ -102,7 +106,7 @@ void ConformingMethodListCallbacks::doneParsing() {
 }
 
 void ConformingMethodListCallbacks::getMatchingMethods(
-    Type T, llvm::MapVector<ProtocolDecl*, StringRef> &expectedTypes,
+    Type T, llvm::SmallPtrSetImpl<ProtocolDecl*> &expectedTypes,
     SmallVectorImpl<ValueDecl *> &result) {
   if (!T->mayHaveMembers())
     return;
@@ -114,7 +118,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
     Type T;
 
     /// The list of expected types.
-    llvm::MapVector<ProtocolDecl*, StringRef> &ExpectedTypes;
+    llvm::SmallPtrSetImpl<ProtocolDecl*> &ExpectedTypes;
 
     /// Result sink to populate.
     SmallVectorImpl<ValueDecl *> &Result;
@@ -137,7 +141,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
 
       // The return type conforms to any of the requested protocols.
       for (auto Proto : ExpectedTypes) {
-        if (CurModule->conformsToProtocol(declTy, Proto.first))
+        if (CurModule->conformsToProtocol(declTy, Proto))
           return true;
       }
 
@@ -146,7 +150,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
 
   public:
     LocalConsumer(DeclContext *DC, Type T,
-                  llvm::MapVector<ProtocolDecl*, StringRef> &expectedTypes,
+                  llvm::SmallPtrSetImpl<ProtocolDecl*> &expectedTypes,
                   SmallVectorImpl<ValueDecl *> &result)
         : CurModule(DC->getParentModule()), T(T), ExpectedTypes(expectedTypes),
           Result(result) {}
@@ -160,7 +164,6 @@ void ConformingMethodListCallbacks::getMatchingMethods(
   } LocalConsumer(CurDeclContext, T, expectedTypes, result);
 
   lookupVisibleMemberDecls(LocalConsumer, MetatypeType::get(T), CurDeclContext,
-                           CurDeclContext->getASTContext().getLazyResolver(),
                            /*includeInstanceMembers=*/false);
 }
 
