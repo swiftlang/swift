@@ -2659,11 +2659,16 @@ numerical computing becomes more prominent in Swift.
 
 This feature does not change any existing APIs. New implicit function
 conversions are added to the type system, which slightly increases type checking
-complexity. We have not observed source compatibility breakages so far. Effect
-on ABI stability This feature has additions to the ABI. Specifically, the
-`@differentiable` function representation will be added and must be kept stable.
-Effect on API resilience This feature adds the
-[`Differentiable` protocol](#differentiable-protocol) and
+complexity. We have not observed source compatibility breakages so far.
+
+## Effect on ABI stability
+
+This feature has additions to the ABI. Specifically, the `@differentiable`
+function representation will be added and must be kept stable.
+
+## Effect on API resilience
+
+This feature adds the [`Differentiable` protocol](#differentiable-protocol) and
 [differential operators](#differential-operators) to the standard library as
 public APIs. They introduce additions to the standard library.
 

@@ -25,6 +25,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/Located.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
@@ -69,16 +70,13 @@ public:
   struct Convention {
     StringRef Name = {};
     DeclNameRef WitnessMethodProtocol = {};
-    StringRef ClangType = {};
-    // Carry the source location for diagnostics.
-    SourceLoc ClangTypeLoc = {};
-
+    Located<StringRef> ClangType = Located<StringRef>(StringRef(), {});
     /// Convenience factory function to create a Swift convention.
     ///
     /// Don't use this function if you are creating a C convention as you
     /// probably need a ClangType field as well.
     static Convention makeSwiftConvention(StringRef name) {
-      return {name, DeclNameRef(), "", {}};
+      return {name, DeclNameRef(), Located<StringRef>("", {})};
     }
   };
 
@@ -684,23 +682,6 @@ public:
   
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SwiftNativeObjCRuntimeBase;
-  }
-};
-
-/// Defines the @_implicitly_synthesizes_nested_requirement attribute.
-class ImplicitlySynthesizesNestedRequirementAttr : public DeclAttribute {
-public:
-  ImplicitlySynthesizesNestedRequirementAttr(StringRef Value, SourceLoc AtLoc,
-                                             SourceRange Range)
-    : DeclAttribute(DAK_ImplicitlySynthesizesNestedRequirement,
-                    AtLoc, Range, /*Implicit*/false),
-      Value(Value) {}
-
-  /// The name of the phantom requirement.
-  const StringRef Value;
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ImplicitlySynthesizesNestedRequirement;
   }
 };
 
@@ -1650,9 +1631,13 @@ class DifferentiableAttr final
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
+  /// The declaration on which the `@differentiable` attribute is declared.
+  /// May not be a valid declaration for `@differentiable` attributes.
+  /// Resolved during parsing and deserialization.
+  Decl *OriginalDeclaration = nullptr;
   /// Whether this function is linear (optional).
   bool Linear;
-  /// The number of parsed parameters specified in 'wrt:'.
+  /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The JVP function.
   Optional<DeclNameRefWithLoc> JVP;
@@ -1664,7 +1649,7 @@ class DifferentiableAttr final
   /// The VJP function (optional), resolved by the type checker if VJP name is
   /// specified.
   FuncDecl *VJPFunction = nullptr;
-  /// The differentiation parameters' indices, resolved by the type checker.
+  /// The differentiability parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
@@ -1705,6 +1690,12 @@ public:
                                     Optional<DeclNameRefWithLoc> vjp,
                                     GenericSignature derivativeGenSig);
 
+  Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
+
+  /// Sets the original declaration on which this attribute is declared.
+  /// Should only be used by parsing and deserialization.
+  void setOriginalDeclaration(Decl *originalDeclaration);
+
   /// Get the optional 'jvp:' function name and location.
   /// Use this instead of `getJVPFunction` to check whether the attribute has a
   /// registered JVP.
@@ -1722,7 +1713,7 @@ public:
     ParameterIndices = parameterIndices;
   }
 
-  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
@@ -1757,10 +1748,9 @@ public:
 
   // Print the attribute to the given stream.
   // If `omitWrtClause` is true, omit printing the `wrt:` clause.
-  // If `omitAssociatedFunctions` is true, omit printing associated functions.
-  void print(llvm::raw_ostream &OS, const Decl *D,
-             bool omitWrtClause = false,
-             bool omitAssociatedFunctions = false) const;
+  // If `omitDerivativeFunctions` is true, omit printing derivative functions.
+  void print(llvm::raw_ostream &OS, const Decl *D, bool omitWrtClause = false,
+             bool omitDerivativeFunctions = false) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
@@ -1773,15 +1763,15 @@ public:
 ///
 /// The `@derivative(of:)` attribute also has an optional `wrt:` clause
 /// specifying the parameters that are differentiated "with respect to", i.e.
-/// the differentiation parameters. The differentiation parameters must conform
-/// to the `Differentiable` protocol.
+/// the differentiability parameters. The differentiability parameters must
+/// conform to the `Differentiable` protocol.
 ///
-/// If the `wrt:` clause is unspecified, the differentiation parameters are
+/// If the `wrt:` clause is unspecified, the differentiability parameters are
 /// inferred to be all parameters that conform to `Differentiable`.
 ///
 /// `@derivative(of:)` attribute type-checking verifies that the type of the
 /// derivative function declaration is consistent with the type of the
-/// referenced original declaration and the differentiation parameters.
+/// referenced original declaration and the differentiability parameters.
 ///
 /// Examples:
 ///   @derivative(of: sin(_:))
@@ -1791,7 +1781,7 @@ class DerivativeAttr final
       private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// The base type repr for the referenced original function. This field is
+  /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
   /// resolve the original declaration, which is serialized.
@@ -1800,9 +1790,9 @@ class DerivativeAttr final
   DeclNameRefWithLoc OriginalFunctionName;
   /// The original function declaration, resolved by the type checker.
   AbstractFunctionDecl *OriginalFunction = nullptr;
-  /// The number of parsed parameters specified in 'wrt:'.
+  /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
-  /// The differentiation parameters' indices, resolved by the type checker.
+  /// The differentiability parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
   /// The derivative function kind (JVP or VJP), resolved by the type checker.
   Optional<AutoDiffDerivativeFunctionKind> Kind = None;
@@ -1845,7 +1835,7 @@ public:
   }
   void setDerivativeKind(AutoDiffDerivativeFunctionKind kind) { Kind = kind; }
 
-  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
@@ -1874,7 +1864,7 @@ public:
 /// computed property declaration.
 ///
 /// The `@transpose(of:)` attribute also has a `wrt:` clause specifying the
-/// parameters that are transposed "with respect to", i.e. the transposed
+/// parameters that are transposed "with respect to", i.e. the linearity
 /// parameters.
 ///
 /// Examples:
@@ -1885,7 +1875,7 @@ class TransposeAttr final
       private llvm::TrailingObjects<TransposeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// The base type repr for the referenced original function. This field is
+  /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
   /// resolve the original declaration, which is serialized.
@@ -1894,9 +1884,9 @@ class TransposeAttr final
   DeclNameRefWithLoc OriginalFunctionName;
   /// The original function declaration, resolved by the type checker.
   AbstractFunctionDecl *OriginalFunction = nullptr;
-  /// The number of parsed parameters specified in 'wrt:'.
+  /// The number of parsed linearity parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
-  /// The transposed parameters' indices, resolved by the type checker.
+  /// The linearity parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
 
   explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
@@ -1929,7 +1919,7 @@ public:
     OriginalFunction = decl;
   }
 
-  /// The parsed transposed parameters, i.e. the list of parameters specified in
+  /// The parsed linearity parameters, i.e. the list of parameters specified in
   /// 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};

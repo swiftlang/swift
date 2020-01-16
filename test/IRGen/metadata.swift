@@ -1,6 +1,24 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -module-name A -I %t  %S/Inputs/metadata2.swift -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -module-name A -I %t  %S/Inputs/metadata2.swift -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-os
+
+import resilient_struct
+
+enum Singleton {
+  case only
+}
+
+// CHECK: @"$s1A1GC14zeroSizedFieldAA9SingletonOvpWvd" = hidden constant i{{(64|32)}} 0
+// Check that the instance start is after the header (at 8 or 16).
+// CHECK-macosx: _DATA__TtC1A1G = private constant {{.*}} { i32 128, i32 {{(16|8)}}
+// CHECK-ios: _DATA__TtC1A1G = private constant {{.*}} { i32 128, i32 {{(16|8)}}
+// CHECK-watchos: _DATA__TtC1A1G = private constant {{.*}} { i32 128, i32 {{(16|8)}}
+// CHECK-tvos: _DATA__TtC1A1G = private constant {{.*}} { i32 128, i32 {{(16|8)}}
+
+class G {
+  var zeroSizedField = Singleton.only
+  var r = ResilientInt(i:1)
+}
 
 // CHECK-LABEL: define {{.*}}swiftcc %swift.metadata_response @"$s1A12MyControllerCMr"(%swift.type*, i8*, i8**)
 // CHECK-NOT: ret

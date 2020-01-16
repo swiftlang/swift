@@ -700,9 +700,16 @@ public:
                                                  SourceLoc EndTypeCheckLoc);
   static bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
-  static BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
-                                                      BraceStmt *body,
-                                                      Type builderType);
+  /// Try to apply the function builder transform of the given builder type
+  /// to the body of the function.
+  ///
+  /// \returns \c None if the builder transformation cannot be applied at all,
+  /// e.g., because of a \c return statement. Otherwise, returns either the
+  /// fully type-checked body of the function (on success) or a \c nullptr
+  /// value if an error occurred while type checking the transformed body.
+  static Optional<BraceStmt *> applyFunctionBuilderBodyTransform(
+      FuncDecl *func, Type builderType);
+
   static bool typeCheckClosureBody(ClosureExpr *closure);
 
   static bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
@@ -1201,17 +1208,6 @@ public:
   static Type deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
                                 AssociatedTypeDecl *assocType);
 
-  /// Derive an implicit type witness for a given "phantom" nested type
-  /// requirement that is known to the compiler but unstated as a
-  /// formal type requirement.
-  ///
-  /// This exists to support Codable and only Codable. Do not expand its
-  /// usage outside of that domain.
-  static TypeDecl *derivePhantomWitness(DeclContext *DC,
-                                        NominalTypeDecl *nominal,
-                                        ProtocolDecl *proto,
-                                        const StringRef Name);
-
   /// \name Name lookup
   ///
   /// Routines that perform name lookup.
@@ -1580,18 +1576,19 @@ public:
   static DeclTypeCheckingSemantics
   getDeclTypeCheckingSemantics(ValueDecl *decl);
 
-  /// Creates an `IndexSubset` for the given function type, representing
-  /// all inferred differentiation parameters. Used by `@differentiable` and
-  /// `@derivative` attribute type-checking.
+  /// Infers the differentiability parameter indices for the given
+  /// original or derivative `AbstractFunctionDecl`.
   ///
-  /// The differentiation parameters are inferred to be:
-  /// - All parameters of the function type that conform to `Differentiable`.
-  /// - If the function type's result is a function type (i.e. it is a curried
-  ///   method type), then also all parameters of the function result type that
-  ///   conform to `Differentiable`.
+  /// The differentiability parameters are inferred to be:
+  /// - All parameters of the function that conform to `Differentiable`.
+  /// - If the function result type is a function type (i.e. the function has
+  ///   a curried method type), then also all parameters of the function result
+  ///   type that conform to `Differentiable`.
+  ///
+  /// Used by `@differentiable` and `@derivative` attribute type-checking.
   static IndexSubset *
-  inferDifferentiationParameters(AbstractFunctionDecl *AFD,
-                                 GenericEnvironment *derivativeGenEnv);
+  inferDifferentiabilityParameters(AbstractFunctionDecl *AFD,
+                                   GenericEnvironment *derivativeGenEnv);
 
 public:
   /// Require that the library intrinsics for working with Optional<T>

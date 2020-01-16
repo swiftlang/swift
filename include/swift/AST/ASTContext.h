@@ -25,6 +25,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -282,6 +283,9 @@ public:
   /// The next auto-closure discriminator.  This needs to be preserved
   /// across invocations of both the parser and the type-checker.
   unsigned NextAutoClosureDiscriminator = 0;
+
+  /// Cached mapping from types to their associated tangent spaces.
+  llvm::DenseMap<Type, Optional<TangentSpace>> AutoDiffTangentSpaces;
 
   /// Cache of `@derivative` attributes keyed by parameter indices and
   /// derivative function kind. Used to diagnose duplicate `@derivative`
@@ -613,6 +617,14 @@ public:
   /// swift_getTypeByMangledNameInContextInMetadataState.
   AvailabilityContext getTypesInAbstractMetadataStateAvailability();
 
+  /// Get the runtime availability of support for prespecialized generic 
+  /// metadata.
+  AvailabilityContext getPrespecializedGenericMetadataAvailability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.2
+  /// compiler for the target platform.
+  AvailabilityContext getSwift52Availability();
+
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
@@ -721,12 +733,12 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModule(std::pair<Identifier, SourceLoc> ModulePath);
+  bool canImportModule(Located<Identifier> ModulePath);
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.
   ModuleDecl *getLoadedModule(
-      ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) const;
+      ArrayRef<Located<Identifier>> ModulePath) const;
 
   ModuleDecl *getLoadedModule(Identifier ModuleName) const;
 
@@ -736,7 +748,7 @@ public:
   /// be returned.
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  ModuleDecl *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath);
+  ModuleDecl *getModule(ArrayRef<Located<Identifier>> ModulePath);
 
   ModuleDecl *getModuleByName(StringRef ModuleName);
 

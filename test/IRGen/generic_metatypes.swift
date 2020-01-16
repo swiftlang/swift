@@ -145,5 +145,5 @@ func makeGenericMetatypes() {
 // CHECK-NOT: call void @llvm.lifetime.end
 // CHECK:   ret %swift.metadata_response
 
-// CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
-// CHECK: attributes [[NOUNWIND_OPT]] = { noinline nounwind "frame-pointer"="none" "target-cpu"
+// CHECK-DAG: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
+// CHECK-DAG: attributes [[NOUNWIND_OPT]] = { noinline nounwind "frame-pointer"="none" "target-cpu"

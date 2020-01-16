@@ -265,7 +265,7 @@ protocol P2 {}
 protocol P3 {}
 func compositionType() {
   _ = P1 & P2 // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self'}} {{7-7=(}} {{14-14=).self}}
-  _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type 'P1.Protocol' and 'P2.Protocol'}} expected-note {{overloads}}
+  _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type 'P1.Protocol' and 'P2.Protocol'}}
   _ = (P1 & P2).self // Ok.
   _ = (P1 & (P2)).self // FIXME: OK? while `typealias P = P1 & (P2)` is rejected.
   _ = (P1 & (P2, P3)).self // expected-error {{non-protocol, non-class type '(P2, P3)' cannot be used within a protocol-constrained type}}

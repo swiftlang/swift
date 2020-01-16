@@ -442,6 +442,25 @@ public class FunctionConversionTest : EmptyProtocol {
   }
 }
 
+public class CaptureTwoValuesTest {
+  public required init() {}
+
+  // CHECK-LABEL: sil [ossa] @$s12dynamic_self20CaptureTwoValuesTestC08capturesdE0yyFZ : $@convention(method) (@thick CaptureTwoValuesTest.Type) -> () {
+  public static func capturesTwoValues() {
+    let a = Self()
+    let b = Self()
+
+    // CHECK: function_ref @$s12dynamic_self20CaptureTwoValuesTestC08capturesdE0yyFZyycfU_ : $@convention(thin) (@guaranteed CaptureTwoValuesTest, @guaranteed CaptureTwoValuesTest) -> ()
+    _ = {
+      _ = a
+      _ = b
+      _ = Self.self
+    }
+
+    // CHECK-LABEL: sil private [ossa] @$s12dynamic_self20CaptureTwoValuesTestC08capturesdE0yyFZyycfU_ : $@convention(thin) (@guaranteed CaptureTwoValuesTest, @guaranteed CaptureTwoValuesTest) -> () {
+  }
+}
+
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
 // CHECK: method #P.f!1: {{.*}} : @$s12dynamic_self1XCAA1PA2aDP1f{{[_0-9a-zA-Z]*}}FTW
 

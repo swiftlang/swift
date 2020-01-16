@@ -266,6 +266,8 @@ struct AssociatedTypeRecordIterator {
     return *this;
   }
 
+  AssociatedTypeRecordIterator(const AssociatedTypeRecordIterator &Other)
+      : Cur(Other.Cur), End(Other.End) {}
   AssociatedTypeRecordIterator
   operator=(const AssociatedTypeRecordIterator &Other) {
     return { Other.Cur, Other.End };

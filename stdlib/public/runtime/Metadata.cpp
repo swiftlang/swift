@@ -2172,7 +2172,10 @@ namespace {
 #if __POINTER_WIDTH__ == 64
     uint32_t Reserved;
 #endif
-    const uint8_t *IvarLayout;
+    union {
+      const uint8_t *IvarLayout;
+      ClassMetadata *NonMetaClass;
+    };
     const char *Name;
     const void *MethodList;
     const void *ProtocolList;
@@ -2197,7 +2200,7 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
   return (ClassROData*)(theClass->Data & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
 }
 
-static void initGenericClassObjCName(ClassMetadata *theClass) {
+static char *copyGenericClassObjCName(ClassMetadata *theClass) {
   // Use the remangler to generate a mangled name from the type metadata.
   Demangle::StackAllocatedDemangler<4096> Dem;
 
@@ -2230,11 +2233,54 @@ static void initGenericClassObjCName(ClassMetadata *theClass) {
   } else {
     fullNameBuf[string.size()] = '\0';
   }
+  return fullNameBuf;
+}
 
+static void initGenericClassObjCName(ClassMetadata *theClass) {
   auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
 
-  getROData(theClass)->Name = fullNameBuf;
-  getROData(theMetaclass)->Name = fullNameBuf;
+  char *name = copyGenericClassObjCName(theClass);
+  getROData(theClass)->Name = name;
+  getROData(theMetaclass)->Name = name;
+}
+
+static bool installLazyClassNameHook() {
+#if !OBJC_SETHOOK_LAZYCLASSNAMER_DEFINED
+  using objc_hook_lazyClassNamer =
+    const char * _Nullable (*)(_Nonnull Class cls);
+  auto objc_setHook_lazyClassNamer =
+    (void (*)(objc_hook_lazyClassNamer, objc_hook_lazyClassNamer *))
+    dlsym(RTLD_NEXT, "objc_setHook_lazyClassNamer");  
+#endif
+
+  static objc_hook_lazyClassNamer oldHook;
+  auto myHook = [](Class theClass) -> const char * {
+    ClassMetadata *metadata = (ClassMetadata *)theClass;
+    if (metadata->isTypeMetadata())
+      return copyGenericClassObjCName(metadata);
+    return oldHook(theClass);
+  };
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability"
+  if (objc_setHook_lazyClassNamer == nullptr)
+    return false;
+  objc_setHook_lazyClassNamer(myHook, &oldHook);
+#pragma clang diagnostic pop
+
+  return true;
+}
+
+static void setUpGenericClassObjCName(ClassMetadata *theClass) {
+  bool supportsLazyNames = SWIFT_LAZY_CONSTANT(installLazyClassNameHook());
+  if (supportsLazyNames) {
+    getROData(theClass)->Name = nullptr;
+    auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
+    getROData(theMetaclass)->Name = nullptr;
+    getROData(theMetaclass)->NonMetaClass = theClass;
+  } else {
+    initGenericClassObjCName(theClass);
+  }
 }
 #endif
 
@@ -2488,7 +2534,7 @@ initGenericObjCClass(ClassMetadata *self, size_t numFields,
                      const TypeLayout * const *fieldTypes,
                      size_t *fieldOffsets) {
   // If the class is generic, we need to give it a name for Objective-C.
-  initGenericClassObjCName(self);
+  setUpGenericClassObjCName(self);
 
   ClassROData *rodata = getROData(self);
 
@@ -4584,6 +4630,14 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
 template <class Result, class Callbacks>
 static Result performOnMetadataCache(const Metadata *metadata,
                                      Callbacks &&callbacks) {
+  // TODO: Once more than just structs have canonical statically specialized
+  //       metadata, calling an updated
+  //       isCanonicalStaticallySpecializedGenericMetadata would entail
+  //       dyn_casting to the same type more than once.  Avoid that by combining
+  //       that function's implementation with the dyn_casts below.
+  if (metadata->isCanonicalStaticallySpecializedGenericMetadata())
+    return std::move(callbacks).forOtherMetadata(metadata);
+
   // Handle different kinds of type that can delay their metadata.
   const TypeContextDescriptor *description;
   if (auto classMetadata = dyn_cast<ClassMetadata>(metadata)) {
@@ -5163,6 +5217,14 @@ bool Metadata::satisfiesClassConstraint() const {
 
   // or it's a class.
   return isAnyClass();
+}
+
+template <>
+bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
+  if (auto *metadata = dyn_cast<StructMetadata>(this))
+    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+
+  return false;
 }
 
 #if !NDEBUG

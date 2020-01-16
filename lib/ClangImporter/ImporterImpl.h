@@ -447,10 +447,6 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
-  /// Keep track of all member declarations that have been imported into a nominal type.
-  llvm::DenseMap<const NominalTypeDecl *, std::vector<ValueDecl *>>
-      MembersForNominal;
-
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
   }
@@ -499,6 +495,13 @@ public:
   /// nominal type.
   llvm::DenseMap<const NominalTypeDecl *, TinyPtrVector<ConstructorDecl *>>
       ConstructorsForNominal;
+
+  /// Keep track of all member declarations that have been imported into
+  /// a nominal type.
+  llvm::DenseMap<const NominalTypeDecl *,
+                 llvm::DenseMap<DeclBaseName,
+                                TinyPtrVector<ValueDecl *>>>
+      MembersForNominal;
 
   /// Keep track of the nested 'Code' enum for imported error wrapper
   /// structs.
@@ -621,17 +624,17 @@ private:
 
   /// Load a module using the clang::CompilerInstance.
   ModuleDecl *loadModuleClang(SourceLoc importLoc,
-                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+                              ArrayRef<Located<Identifier>> path);
   
   /// "Load" a module from debug info. Because debug info types are read on
   /// demand, this doesn't really do any work.
   ModuleDecl *loadModuleDWARF(SourceLoc importLoc,
-                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+                              ArrayRef<Located<Identifier>> path);
 
 public:
   /// Load a module using either method.
   ModuleDecl *loadModule(SourceLoc importLoc,
-                         ArrayRef<std::pair<Identifier, SourceLoc>> path);
+                         ArrayRef<Located<Identifier>> path);
 
   void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
     if (!isIUO)
@@ -1180,12 +1183,22 @@ public:
   ///
   /// FIXME: This is all a hack; we should have lazier deserialization
   /// of protocols separate from their conformances.
-  void recordImportedProtocols(const Decl *decl,
+  void recordImportedProtocols(Decl *decl,
                                ArrayRef<ProtocolDecl *> protocols) {
+    // Nothing to do for protocols.
+    if (isa<ProtocolDecl>(decl)) return;
+
     if (protocols.empty())
       return;
 
     ImportedProtocols[decl] = SwiftContext.AllocateCopy(protocols);
+
+    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      nominal->setConformanceLoader(this, 0);
+    } else {
+      auto ext = cast<ExtensionDecl>(decl);
+      ext->setConformanceLoader(this, 0);
+    }
   }
 
   /// Retrieve the imported protocols for the given declaration.

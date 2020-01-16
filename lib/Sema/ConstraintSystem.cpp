@@ -432,9 +432,12 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, newPath);
 }
 
-ConstraintLocator *
-ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
-                                   bool lookThroughApply) {
+ConstraintLocator *ConstraintSystem::getCalleeLocator(
+    ConstraintLocator *locator, bool lookThroughApply,
+    llvm::function_ref<Type(const Expr *)> getType,
+    llvm::function_ref<Type(Type)> simplifyType,
+    llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
+        getOverloadFor) {
   auto *anchor = locator->getAnchor();
   assert(anchor && "Expected an anchor!");
 
@@ -494,7 +497,7 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
     // Unfortunately CSDiag currently calls into getCalleeLocator, so all bets
     // are off. Once we remove that legacy diagnostic logic, we should be able
     // to assert here.
-    fnTy = getFixedTypeRecursive(fnTy, /*wantRValue*/ true);
+    fnTy = simplifyType(fnTy);
 
     // For an apply of a metatype, we have a short-form constructor. Unlike
     // other locators to callees, these are anchored on the apply expression
@@ -550,7 +553,7 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
     // and clean up a bunch of other special cases. Doing so may require a bit
     // of hacking in CSGen though.
     if (UME->hasArguments()) {
-      if (auto overload = findSelectedOverloadFor(calleeLoc)) {
+      if (auto overload = getOverloadFor(calleeLoc)) {
         if (auto *loc = getSpecialFnCalleeLoc(overload->boundType))
           return loc;
       }
@@ -2671,8 +2674,10 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
     auto *lhs = binaryOp->getArg()->getElement(0);
     auto *rhs = binaryOp->getArg()->getElement(1);
 
-    auto lhsType = solution.simplifyType(cs.getType(lhs))->getRValueType();
-    auto rhsType = solution.simplifyType(cs.getType(rhs))->getRValueType();
+    auto lhsType =
+        solution.simplifyType(solution.getType(lhs))->getRValueType();
+    auto rhsType =
+        solution.simplifyType(solution.getType(rhs))->getRValueType();
 
     if (lhsType->isEqual(rhsType)) {
       DE.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_same_args,
@@ -2694,7 +2699,7 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
           .highlight(rhs->getSourceRange());
     }
   } else {
-    auto argType = solution.simplifyType(cs.getType(applyExpr->getArg()));
+    auto argType = solution.simplifyType(solution.getType(applyExpr->getArg()));
     DE.diagnose(anchor->getLoc(), diag::cannot_apply_unop_to_arg,
                 operatorName.str(), argType->getRValueType());
   }
@@ -2788,7 +2793,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
           locator = getConstraintLocator(assignExpr->getSrc());
       }
 
-      auto *calleeLocator = getCalleeLocator(locator);
+      auto *calleeLocator = solution.getCalleeLocator(locator);
       if (!commonCalleeLocator)
         commonCalleeLocator = calleeLocator;
       else if (commonCalleeLocator != calleeLocator)
@@ -2872,9 +2877,28 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
       return true;
     }
-    case AmbiguityKind::General:
-      // TODO: Handle general ambiguity here.
-      return false;
+    case AmbiguityKind::General: {
+      emitGeneralAmbiguityFailure();
+
+      // Notes for operators are diagnosed through emitGeneralAmbiguityFailure
+      if (name.isOperator())
+        return true;
+
+      llvm::SmallSet<CanType, 4> candidateTypes;
+      for (const auto &viable: viableSolutions) {
+        auto overload = viable->getOverloadChoice(commonCalleeLocator);
+        auto *decl = overload.choice.getDecl();
+        auto type = viable->simplifyType(overload.openedType);
+        if (decl->getLoc().isInvalid()) {
+          if (candidateTypes.insert(type->getCanonicalType()).second)
+            DE.diagnose(commonAnchor->getLoc(), diag::found_candidate_type, type);
+        } else {
+          DE.diagnose(decl->getLoc(), diag::found_candidate);
+        }
+      }
+
+      return true;
+    }
     }
 
     auto *fix = viableSolutions.front()->Fixes.front();
@@ -3313,6 +3337,15 @@ void constraints::simplifyLocator(Expr *&anchor,
       continue;
     }
 
+    case ConstraintLocator::TernaryBranch: {
+      auto branch = path[0].castTo<LocatorPathElt::TernaryBranch>();
+      auto *ifExpr = cast<IfExpr>(anchor);
+
+      anchor = branch.forThen() ? ifExpr->getThenExpr() : ifExpr->getElseExpr();
+      path = path.slice(1);
+      continue;
+    }
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
@@ -3356,8 +3389,12 @@ Expr *constraints::getArgumentExpr(Expr *expr, unsigned index) {
     return PE->getSubExpr();
   }
 
-  assert(isa<TupleExpr>(argExpr));
-  return cast<TupleExpr>(argExpr)->getElement(index);
+  if (auto *tuple = dyn_cast<TupleExpr>(argExpr)) {
+    return (tuple->getNumElements() > index) ? tuple->getElement(index)
+                                             : nullptr;
+  }
+
+  return nullptr;
 }
 
 bool constraints::isAutoClosureArgument(Expr *argExpr) {
@@ -3911,4 +3948,20 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
 
   cacheExprTypes(result);
   return result;
+}
+
+/// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
+/// constraint system, return the decl that it references.
+ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
+  // See if we have a resolution for this member.
+  auto overload = findSelectedOverloadFor(locator);
+  if (!overload)
+    return nullptr;
+
+  // We only want to handle the simplest decl binding.
+  auto choice = overload->choice;
+  if (choice.getKind() != OverloadChoiceKind::Decl)
+    return nullptr;
+
+  return choice.getDecl();
 }

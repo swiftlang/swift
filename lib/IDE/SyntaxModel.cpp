@@ -57,7 +57,7 @@ struct SyntaxModelContext::Implementation {
 /// If the given tokens start with the expected tokens and they all appear on
 ///  the same line, the source location beyond the final matched token and
 ///  number of matched tokens are returned. Otherwise None is returned.
-static Optional<std::pair<SourceLoc, unsigned>>
+static Optional<Located<unsigned>>
 matchImageOrFileLiteralArg(ArrayRef<Token> Tokens) {
   const unsigned NUM_TOKENS = 5;
   if (Tokens.size() < NUM_TOKENS)
@@ -76,8 +76,7 @@ matchImageOrFileLiteralArg(ArrayRef<Token> Tokens) {
   if (Tokens[1].getText() != "resourceName")
     return None;
   auto EndToken = Tokens[NUM_TOKENS-1];
-  return std::make_pair(EndToken.getLoc().getAdvancedLoc(EndToken.getLength()),
-                        NUM_TOKENS);
+  return Located<unsigned>(NUM_TOKENS, EndToken.getLoc().getAdvancedLoc(EndToken.getLength()));
 }
 
 /// Matches the tokens in the argument of an image literal expression if its
@@ -86,7 +85,7 @@ matchImageOrFileLiteralArg(ArrayRef<Token> Tokens) {
 /// If the given tokens start with the expected tokens and they all appear on
 /// the same line, the source location beyond the final matched token and number
 /// of matched tokens are returned. Otherwise None is returned.
-static Optional<std::pair<SourceLoc, unsigned>>
+static Optional<Located<unsigned>>
 matchColorLiteralArg(ArrayRef<Token> Tokens) {
   const unsigned NUM_TOKENS = 17;
   if (Tokens.size() < NUM_TOKENS)
@@ -112,8 +111,7 @@ matchColorLiteralArg(ArrayRef<Token> Tokens) {
       Tokens[9].getText() != "blue" || Tokens[13].getText() != "alpha")
     return None;
   auto EndToken = Tokens[NUM_TOKENS-1];
-  return std::make_pair(EndToken.getLoc().getAdvancedLoc(EndToken.getLength()),
-                        NUM_TOKENS);
+  return Located<unsigned>(NUM_TOKENS, EndToken.getLoc().getAdvancedLoc(EndToken.getLength()));
 }
 
 SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
@@ -172,9 +170,9 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       case tok::pound_imageLiteral:
         if (auto Match = matchImageOrFileLiteralArg(Tokens.slice(I+1))) {
           Kind = SyntaxNodeKind::ObjectLiteral;
-          Length = SM.getByteDistance(Loc, Match->first);
+          Length = SM.getByteDistance(Loc, Match->Loc);
           // skip over the extra matched tokens
-          I += Match->second - 1;
+          I += Match->Item - 1;
         } else {
           Kind = SyntaxNodeKind::Keyword;
         }
@@ -182,9 +180,9 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       case tok::pound_colorLiteral:
         if (auto Match = matchColorLiteralArg(Tokens.slice(I+1))) {
           Kind = SyntaxNodeKind::ObjectLiteral;
-          Length = SM.getByteDistance(Loc, Match->first);
+          Length = SM.getByteDistance(Loc, Match->Loc);
           // skip over the matches tokens
-          I += Match->second - 1;
+          I += Match->Item - 1;
         } else {
           Kind = SyntaxNodeKind::Keyword;
         }

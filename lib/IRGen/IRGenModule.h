@@ -194,7 +194,7 @@ enum RequireMetadata_t : bool {
 /// IRGenModules - one for each LLVM module (= one for each input/output file).
 class IRGenerator {
 public:
-  IRGenOptions &Opts;
+  const IRGenOptions &Opts;
 
   SILModule &SIL;
 
@@ -244,6 +244,21 @@ private:
   /// queued up.
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
 
+  /// Maps every generic type that is specialized within the module to its
+  /// specializations.
+  llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<CanType, 4>>
+      SpecializationsForGenericTypes;
+
+  /// The queue of specialized generic types whose prespecialized metadata to
+  /// emit.
+  llvm::SmallVector<CanType, 4> LazySpecializedTypeMetadataRecords;
+
+  /// The queue of metadata accessors to emit.
+  ///
+  /// The accessors must be emitted after everything else which might result in
+  /// a statically-known-canonical prespecialization.
+  llvm::SmallSetVector<NominalTypeDecl *, 4> LazyMetadataAccessors;
+
   struct LazyOpaqueInfo {
     bool IsDescriptorUsed = false;
     bool IsDescriptorEmitted = false;
@@ -283,7 +298,7 @@ private:
   
   friend class CurrentIGMPtr;  
 public:
-  explicit IRGenerator(IRGenOptions &opts, SILModule &module);
+  explicit IRGenerator(const IRGenOptions &opts, SILModule &module);
 
   /// Attempt to create an llvm::TargetMachine for the current target.
   std::unique_ptr<llvm::TargetMachine> createTargetMachine();
@@ -375,9 +390,21 @@ public:
 
   void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
 
+  llvm::SmallVector<CanType, 4> specializationsForType(NominalTypeDecl *type) {
+    return SpecializationsForGenericTypes.lookup(type);
+  }
+
+  void noteUseOfMetadataAccessor(NominalTypeDecl *decl) {
+    if (LazyMetadataAccessors.count(decl) == 0) {
+      LazyMetadataAccessors.insert(decl);
+    }
+  }
+
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
     noteUseOfTypeGlobals(type, true, RequireMetadata);
   }
+
+  void noteUseOfSpecializedGenericTypeMetadata(CanType type);
 
   void noteUseOfTypeMetadata(CanType type) {
     type.visit([&](Type t) {
@@ -744,6 +771,8 @@ public:
   void error(SourceLoc loc, const Twine &message);
 
   bool useDllStorage();
+
+  bool shouldPrespecializeGenericMetadata();
   
   Size getAtomicBoolSize() const { return AtomicBoolSize; }
   Alignment getAtomicBoolAlignment() const { return AtomicBoolAlign; }
@@ -1196,14 +1225,15 @@ public:
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
               SourceFile *SF, llvm::LLVMContext &LLVMContext,
               StringRef ModuleName, StringRef OutputFilename,
-              StringRef MainInputFilenameForDebugInfo);
+              StringRef MainInputFilenameForDebugInfo,
+              StringRef PrivateDiscriminator);
 
   /// The constructor used when we just need an IRGenModule for type lowering.
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
               llvm::LLVMContext &LLVMContext)
     : IRGenModule(irgen, std::move(target), /*SF=*/nullptr, LLVMContext,
                   "<fake module name>", "<fake output filename>",
-                  "<fake main input filename>") {}
+                  "<fake main input filename>", "") {}
 
   ~IRGenModule();
 
@@ -1283,6 +1313,9 @@ public:
                                         ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
                                              ConstantInit init = ConstantInit());
+  llvm::Constant *
+  getAddrOfEffectiveValueWitnessTable(CanType concreteType,
+                                      ConstantInit init = ConstantInit());
   Optional<llvm::Function*> getAddrOfIVarInitDestroy(ClassDecl *cd,
                                                      bool isDestroyer,
                                                      bool isForeign,

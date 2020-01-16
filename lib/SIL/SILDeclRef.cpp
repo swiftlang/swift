@@ -958,31 +958,52 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (!isa<AbstractFunctionDecl>(decl))
     return SubclassScope::NotApplicable;
 
-  // If this declaration is a function which goes into a vtable, then it's
-  // symbol must be as visible as its class, because derived classes have to put
-  // all less visible methods of the base class into their vtables.
+  DeclContext *context = decl->getDeclContext();
+
+  // Only methods in non-final classes go in the vtable.
+  auto *classType = dyn_cast<ClassDecl>(context);
+  if (!classType || classType->isFinal())
+    return SubclassScope::NotApplicable;
+
+  // If a method appears in the vtable of a class, we must give it's symbol
+  // special consideration when computing visibility because the SIL-level
+  // linkage does not map to the symbol's visibility in a straightforward
+  // way.
+  //
+  // In particular, the rules are:
+  // - If the class metadata is not resilient, then all method symbols must
+  //   be visible from any translation unit where a subclass might be defined,
+  //   because the subclass metadata will re-emit all vtable entries.
+  //
+  // - For resilient classes, we do the opposite: generally, a method's symbol
+  //   can be hidden from other translation units, because we want to enforce
+  //   that resilient access patterns are used for method calls and overrides.
+  //
+  //   Constructors and final methods are the exception here, because they can
+  //   be called directly.
+
+  // FIXME: This is too narrow. Any class with resilient metadata should
+  // probably have this, at least for method overrides that don't add new
+  // vtable entries.
+  bool isResilientClass = classType->isResilient();
 
   if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
+    if (isResilientClass)
+      return SubclassScope::NotApplicable;
     // Initializing entry points do not appear in the vtable.
     if (kind == SILDeclRef::Kind::Initializer)
       return SubclassScope::NotApplicable;
-    // Non-required convenience inits do not apper in the vtable.
+    // Non-required convenience inits do not appear in the vtable.
     if (!CD->isRequired() && !CD->isDesignatedInit())
       return SubclassScope::NotApplicable;
   } else if (isa<DestructorDecl>(decl)) {
-    // Detructors do not appear in the vtable.
+    // Destructors do not appear in the vtable.
     return SubclassScope::NotApplicable;
   } else {
     assert(isa<FuncDecl>(decl));
   }
 
-  DeclContext *context = decl->getDeclContext();
-
-  // Methods from extensions don't go in the vtable.
-  if (isa<ExtensionDecl>(context))
-    return SubclassScope::NotApplicable;
-
-  // Various forms of thunks don't either.
+  // Various forms of thunks don't go in the vtable.
   if (isThunk() || isForeign)
     return SubclassScope::NotApplicable;
 
@@ -990,35 +1011,41 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (isDefaultArgGenerator())
     return SubclassScope::NotApplicable;
 
-  // Only methods in non-final classes go in the vtable.
-  auto *classType = context->getSelfClassDecl();
-  if (!classType || classType->isFinal())
-    return SubclassScope::NotApplicable;
+  if (decl->isFinal()) {
+    // Final methods only go in the vtable if they override something.
+    if (!decl->getOverriddenDecl())
+      return SubclassScope::NotApplicable;
 
-  // Final methods only go in the vtable if they override something.
-  if (decl->isFinal() && !decl->getOverriddenDecl())
-    return SubclassScope::NotApplicable;
+    // In the resilient case, we're going to be making symbols _less_
+    // visible, so make sure we stop now; final methods can always be
+    // called directly.
+    if (isResilientClass)
+      return SubclassScope::Internal;
+  }
 
   assert(decl->getEffectiveAccess() <= classType->getEffectiveAccess() &&
          "class must be as visible as its members");
 
-  // FIXME: This is too narrow. Any class with resilient metadata should
-  // probably have this, at least for method overrides that don't add new
-  // vtable entries.
-  if (classType->isResilient()) {
-    if (isa<ConstructorDecl>(decl))
-      return SubclassScope::NotApplicable;
+  if (isResilientClass) {
+    // The symbol should _only_ be reached via the vtable, so we're
+    // going to make it hidden.
     return SubclassScope::Resilient;
   }
 
   switch (classType->getEffectiveAccess()) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
+    // If the class is private, it can only be subclassed from the same
+    // SILModule, so we don't need to do anything.
     return SubclassScope::NotApplicable;
   case AccessLevel::Internal:
   case AccessLevel::Public:
+    // If the class is internal or public, it can only be subclassed from
+    // the same AST Module, but possibly a different SILModule.
     return SubclassScope::Internal;
   case AccessLevel::Open:
+    // If the class is open, it can be subclassed from a different
+    // AST Module. All method symbols are public.
     return SubclassScope::External;
   }
 

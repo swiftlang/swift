@@ -30,7 +30,7 @@ import os
 import platform
 import sys
 
-from build_swift import argparse, defaults
+from build_swift.build_swift import argparse, defaults
 from swift_build_support.swift_build_support import (
     shell,
     xcrun,

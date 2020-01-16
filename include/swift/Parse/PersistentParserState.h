@@ -78,8 +78,6 @@ private:
 
   std::unique_ptr<CodeCompletionDelayedDeclState> CodeCompletionDelayedDeclStat;
 
-  std::vector<IterableDeclContext *> DelayedDeclLists;
-
   /// The local context for all top-level code.
   TopLevelContext TopLevelCode;
 
@@ -111,10 +109,6 @@ public:
     assert(hasCodeCompletionDelayedDeclState());
     return std::move(CodeCompletionDelayedDeclStat);
   }
-
-  void delayDeclList(IterableDeclContext *D);
-
-  void parseAllDelayedDeclLists();
 
   TopLevelContext &getTopLevelContext() {
     return TopLevelCode;

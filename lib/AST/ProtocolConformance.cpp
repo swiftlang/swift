@@ -547,8 +547,8 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
   }
 
   auto extensionSig = ext->getGenericSignature();
-  auto canExtensionSig = extensionSig->getCanonicalSignature();
-  auto canTypeSig = typeSig->getCanonicalSignature();
+  auto canExtensionSig = extensionSig.getCanonicalSignature();
+  auto canTypeSig = typeSig.getCanonicalSignature();
   if (canTypeSig == canExtensionSig) {
     success({});
     return;

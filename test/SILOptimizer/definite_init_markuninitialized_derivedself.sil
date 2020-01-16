@@ -195,7 +195,9 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
 // Now we destroy the stored value.
 // CHECK: [[SELF:%[0-9]+]] = load_borrow [[SELFBOX]]
 // CHECK: [[SELF_FIELD:%.*]] = ref_element_addr [[SELF]]
-// CHECK: destroy_addr [[SELF_FIELD]]
+// CHECK: [[SELF_FIELD_ACCESS:%.*]] = begin_access [deinit] [static] [[SELF_FIELD]]
+// CHECK: destroy_addr [[SELF_FIELD_ACCESS]]
+// CHECK: end_access [[SELF_FIELD_ACCESS]]
 // CHECK: end_borrow [[SELF]]
 //
 // And then perform dealloc_partial_ref.

@@ -492,7 +492,7 @@ public:
   SILFunction &getFunction() { return F; }
   SILModule &getModule() { return F.getModule(); }
   SILGenBuilder &getBuilder() { return B; }
-  SILOptions &getOptions() { return getModule().getOptions(); }
+  const SILOptions &getOptions() { return getModule().getOptions(); }
 
   // Returns the type expansion context for types in this function.
   TypeExpansionContext getTypeExpansionContext() {
@@ -557,6 +557,9 @@ public:
   Optional<SILAccessEnforcement> getUnknownEnforcement(VarDecl *var = nullptr);
 
   SourceManager &getSourceManager() { return SGM.M.getASTContext().SourceMgr; }
+  std::string getMagicFileString(SourceLoc loc);
+  StringRef getMagicFilePathString(SourceLoc loc);
+  StringRef getMagicFunctionString();
 
   /// Push a new debug scope and set its parent pointer.
   void enterDebugScope(SILLocation Loc) {

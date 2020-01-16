@@ -985,9 +985,6 @@ The things in the queue yet to be ported are:
   Most of the associated diagnostics have been ported and fixes are
   located in ``ConstraintSystem::simplifyMemberConstraint``.
 
-- Diagnostics related to ``if`` statement - "conditional" type mismatch
-  and, in case of ternary operator, type mismatches between branches.
-
 - Problems related to calls and operator applications e.g.
 
   - Missing explicit ``Self.`` and ``self.``
@@ -995,4 +992,3 @@ The things in the queue yet to be ported are:
   - ``diagnoseParameterErrors``
   - ``diagnoseSimpleErrors``
 
-- Diagnostics related to array/dictionary literals: ``visit{Array, Dictionary}Expr``.

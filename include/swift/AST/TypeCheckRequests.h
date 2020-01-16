@@ -16,6 +16,7 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
@@ -1681,6 +1682,8 @@ public:
 enum class ImplicitMemberAction : uint8_t {
   ResolveImplicitInit,
   ResolveCodingKeys,
+  ResolveEncodable,
+  ResolveDecodable,
 };
 
 class ResolveImplicitMemberRequest
@@ -1760,7 +1763,7 @@ enum class FunctionBuilderClosurePreCheck : uint8_t {
 
 class PreCheckFunctionBuilderRequest
     : public SimpleRequest<PreCheckFunctionBuilderRequest,
-                           FunctionBuilderClosurePreCheck(ClosureExpr *),
+                           FunctionBuilderClosurePreCheck(AnyFunctionRef),
                            CacheKind::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1770,7 +1773,7 @@ private:
 
   // Evaluation.
   llvm::Expected<FunctionBuilderClosurePreCheck>
-  evaluate(Evaluator &evaluator, ClosureExpr *closure) const;
+  evaluate(Evaluator &evaluator, AnyFunctionRef fn) const;
 
 public:
   // Separate caching.

@@ -836,4 +836,22 @@ ErrorBridgingTests.test("SR-9207 crash in failed cast to NSError") {
   }
 }
 
+// SR-7652
+
+enum SwiftError: Error, CustomStringConvertible {
+  case something
+  var description: String { return "Something" }
+}
+
+ErrorBridgingTests.test("Swift Error bridged to NSError description") {
+  func checkDescription() {
+    let bridgedError = SwiftError.something as NSError
+    expectEqual("Something", bridgedError.description)
+  }
+
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    checkDescription()
+  }
+}
+
 runAllTests()

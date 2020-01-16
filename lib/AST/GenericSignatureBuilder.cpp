@@ -3923,13 +3923,13 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
   // Local function to find the insertion point for the protocol's "where"
   // clause, as well as the string to start the insertion ("where" or ",");
-  auto getProtocolWhereLoc = [&]() -> std::pair<SourceLoc, const char *> {
+  auto getProtocolWhereLoc = [&]() -> Located<const char *> {
     // Already has a trailing where clause.
     if (auto trailing = proto->getTrailingWhereClause())
-      return { trailing->getRequirements().back().getSourceRange().End, ", " };
+      return { ", ", trailing->getRequirements().back().getSourceRange().End };
 
     // Inheritance clause.
-    return { proto->getInherited().back().getSourceRange().End, " where " };
+    return { " where ", proto->getInherited().back().getSourceRange().End };
   };
 
   // Retrieve the set of requirements that a given associated type declaration
@@ -4044,8 +4044,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
                          assocTypeDecl->getFullName(),
                          inheritedFromProto->getDeclaredInterfaceType())
             .fixItInsertAfter(
-                      fixItWhere.first,
-                      getAssociatedTypeReqs(assocTypeDecl, fixItWhere.second))
+                      fixItWhere.Loc,
+                      getAssociatedTypeReqs(assocTypeDecl, fixItWhere.Item))
             .fixItRemove(assocTypeDecl->getSourceRange());
 
           Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
@@ -4120,8 +4120,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
                              diag::typealias_override_associated_type,
                              name,
                              inheritedFromProto->getDeclaredInterfaceType())
-                .fixItInsertAfter(fixItWhere.first,
-                                  getConcreteTypeReq(type, fixItWhere.second))
+                .fixItInsertAfter(fixItWhere.Loc,
+                                  getConcreteTypeReq(type, fixItWhere.Item))
                 .fixItRemove(type->getSourceRange());
               Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
                              inheritedAssocTypeDecl->getFullName());
@@ -7276,7 +7276,7 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
     }
 
     // Canonicalize the signature to check that it is canonical.
-    (void)newSig->getCanonicalSignature();
+    (void)newSig.getCanonicalSignature();
   }
 }
 
@@ -7298,7 +7298,7 @@ void GenericSignatureBuilder::verifyGenericSignaturesInModule(
   for (auto genericSig : allGenericSignatures) {
     // Check whether this is the first time we've checked this (canonical)
     // signature.
-    auto canGenericSig = genericSig->getCanonicalSignature();
+    auto canGenericSig = genericSig.getCanonicalSignature();
     if (!knownGenericSignatures.insert(canGenericSig).second) continue;
 
     verifyGenericSignature(context, canGenericSig);
@@ -7367,7 +7367,7 @@ AbstractGenericSignatureRequest::evaluate(
   // generic signature builder.
   if (!isCanonicalRequest(baseSignature, addedParameters, addedRequirements)) {
     // Canonicalize the inputs so we can form the canonical request.
-    GenericSignature canBaseSignature = GenericSignature();
+    GenericSignature canBaseSignature;
     if (baseSignature)
       canBaseSignature = baseSignature->getCanonicalSignature();
 
