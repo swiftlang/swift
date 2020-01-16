@@ -570,12 +570,19 @@ clang::QualType ClangTypeConverter::visitFunctionType(FunctionType *type) {
 }
 
 clang::QualType ClangTypeConverter::visitSILFunctionType(SILFunctionType *type) {
-  llvm::report_fatal_error("Expected only AST types but found a SIL function.");
+  // We must've already computed it before if applicable.
+  return clang::QualType(type->getClangFunctionType(), 0);
 }
 
 clang::QualType
 ClangTypeConverter::visitSILBlockStorageType(SILBlockStorageType *type) {
-  llvm::report_fatal_error("Expected only AST types but found a SIL block.");
+  // We'll select (void)(^)(). This isn't correct for all blocks, but block
+  // storage type should only be converted for function signature lowering,
+  // where the parameter types do not matter.
+  auto &clangCtx = ClangASTContext;
+  auto fnTy = clangCtx.getFunctionNoProtoType(clangCtx.VoidTy);
+  auto blockTy = clangCtx.getBlockPointerType(fnTy);
+  return clangCtx.getCanonicalType(blockTy);
 }
 
 clang::QualType
