@@ -3728,6 +3728,9 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
 // deserialized before loading the named member of this class. This allows the
 // decl members table to be warmed up and enables the correct identification of
 // overrides.
+//
+// FIXME: Very low hanging fruit: Loading everything is extremely wasteful. We
+// should be able to just load the name lazy member loading is asking for.
 static void ensureSuperclassMembersAreLoaded(const ClassDecl *CD) {
   if (!CD)
     return;
@@ -3737,6 +3740,9 @@ static void ensureSuperclassMembersAreLoaded(const ClassDecl *CD) {
     return;
   
   CD->loadAllMembers();
+
+  for (auto *ED : const_cast<ClassDecl *>(CD)->getExtensions())
+    ED->loadAllMembers();
 }
 
 Optional<TinyPtrVector<ValueDecl *>>
