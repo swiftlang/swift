@@ -942,3 +942,8 @@ class Foo<State: StateType> {
                        })
   }
 }
+
+// Make sure that `String...` is translated into `[String]` in the body
+func test_explicit_variadic_is_interpreted_correctly() {
+  _ = { (T: String...) -> String in T[0] + "" } // Ok
+}
