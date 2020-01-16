@@ -54,3 +54,20 @@ public func testString(_ a: inout [String], s: String) {
 public func dontPropagateContiguousArray(_ a: inout ContiguousArray<UInt8>) {
   a += [4]
 }
+
+// Check if the specialized Array.append<A>(contentsOf:) is reasonably optimized for Array<Int>.
+
+// CHECK-LABEL: sil shared {{.*}}@$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5
+
+// There should only be a single call to _createNewBuffer or reserveCapacityForAppend/reserveCapacityImpl.
+
+// CHECK-NOT: apply
+// CHECK: [[F:%[0-9]+]] = function_ref @{{.*(_createNewBuffer|reserveCapacity).*}}
+// CHECK-NEXT: apply [[F]]
+// CHECK-NOT: apply
+
+// The number of basic blocks should not exceed 20 (ideally there are no more than 16 blocks in this function).
+// CHECK-NOT: bb20:
+
+// CHECK: } // end sil function '$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5
+
