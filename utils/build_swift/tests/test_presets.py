@@ -1,6 +1,6 @@
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -12,8 +12,8 @@ from __future__ import unicode_literals
 import os
 
 from .utils import TestCase, UTILS_PATH, add_metaclass
-from .. import presets
-from ..presets import Preset, PresetParser
+from ..build_swift import presets
+from ..build_swift.presets import Preset, PresetParser
 
 try:
     # Python 2
