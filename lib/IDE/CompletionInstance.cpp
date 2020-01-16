@@ -64,10 +64,12 @@ unsigned findIndexInRange(Decl *D, const Range &Decls) {
 
 /// Return the element at \p N in \p Decls .
 template <typename Range> Decl *getElementAt(const Range &Decls, unsigned N) {
-  assert(std::distance(Decls.begin(), Decls.end()) > N);
-  auto I = Decls.begin();
-  std::advance(I, N);
-  return *I;
+  for (auto I = Decls.begin(), E = Decls.end(); I != E; ++I) {
+    if (N == 0)
+      return *I;
+    --N;
+  }
+  return nullptr;
 }
 
 /// Find the equivalent \c DeclContext with \p DC from \p SF AST.
@@ -85,8 +87,24 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
   SmallVector<unsigned, 4> IndexStack;
   do {
     auto *D = newDC->getAsDecl();
+    if (!D)
+      return nullptr;
     auto *parentDC = newDC->getParent();
     unsigned N;
+
+    if (auto accessor = dyn_cast<AccessorDecl>(D)) {
+      // The AST for accessors is like:
+      //   DeclContext -> AbstractStorageDecl -> AccessorDecl
+      // We need to push the index of the accessor within the accessor list
+      // of the storage.
+      auto *storage = accessor->getStorage();
+      if (!storage)
+        return nullptr;
+      auto accessorN = findIndexInRange(accessor, storage->getAllAccessors());
+      IndexStack.push_back(accessorN);
+      D = storage;
+    }
+
     if (auto parentSF = dyn_cast<SourceFile>(parentDC))
       N = findIndexInRange(D, parentSF->Decls);
     else if (auto parentIDC =
@@ -119,7 +137,15 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       D = getElementAt(parentIDC->getMembers(), N);
     else
       llvm_unreachable("invalid DC kind for finding equivalent DC (query)");
+
+    if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
+      auto accessorN = IndexStack.pop_back_val();
+      D = getElementAt(storage->getAllAccessors(), accessorN);
+    }
+
     newDC = dyn_cast<DeclContext>(D);
+    if (!newDC)
+      return nullptr;
   } while (!IndexStack.empty());
 
   assert(newDC->getContextKind() == DC->getContextKind());
