@@ -18,10 +18,10 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/SILOptimizer/Utils/Differentiation/PullbackEmitter.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
-#include "swift/SILOptimizer/Utils/Differentiation/PullbackEmitter.h"
 #include "swift/SILOptimizer/Utils/Differentiation/Thunk.h"
 #include "swift/SILOptimizer/Utils/Differentiation/VJPEmitter.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -119,19 +119,18 @@ SILValue PullbackEmitter::getPullbackStructElement(SILBasicBlock *origBB,
   return pullbackStructElements.lookup(field);
 }
 
-
 //--------------------------------------------------------------------------//
 // Temporary value management
 //--------------------------------------------------------------------------//
 
 SILValue PullbackEmitter::recordTemporary(SILValue value) {
   assert(value->getType().isObject());
-    assert(value->getFunction() == &getPullback());
-    auto inserted = blockTemporaries[value->getParentBlock()].insert(value);
-    (void)inserted;
-    LLVM_DEBUG(getADDebugStream() << "Recorded temporary " << value);
-    assert(inserted && "Temporary already recorded?");
-    return value;
+  assert(value->getFunction() == &getPullback());
+  auto inserted = blockTemporaries[value->getParentBlock()].insert(value);
+  (void)inserted;
+  LLVM_DEBUG(getADDebugStream() << "Recorded temporary " << value);
+  assert(inserted && "Temporary already recorded?");
+  return value;
 }
 
 void PullbackEmitter::cleanUpTemporariesForBlock(SILBasicBlock *bb,
@@ -727,29 +726,30 @@ bool PullbackEmitter::run() {
   builder.createReturn(pbLoc, joinElements(retElts, builder, pbLoc));
 
 #ifndef NDEBUG
-    bool leakFound = false;
-    // Ensure all temporaries have been cleaned up.
-    for (auto &bb : pullback) {
-      for (auto temp : blockTemporaries[&bb]) {
-        if (blockTemporaries[&bb].count(temp)) {
-          leakFound = true;
-          getADDebugStream() << "Found leaked temporary:\n" << temp;
-        }
-      }
-    }
-    // Ensure all local allocations have been cleaned up.
-    for (auto localAlloc : functionLocalAllocations) {
-      if (!destroyedLocalAllocations.count(localAlloc)) {
+  bool leakFound = false;
+  // Ensure all temporaries have been cleaned up.
+  for (auto &bb : pullback) {
+    for (auto temp : blockTemporaries[&bb]) {
+      if (blockTemporaries[&bb].count(temp)) {
         leakFound = true;
-        getADDebugStream() << "Found leaked local buffer:\n" << localAlloc;
+        getADDebugStream() << "Found leaked temporary:\n" << temp;
       }
     }
-    assert(!leakFound && "Leaks found!");
+  }
+  // Ensure all local allocations have been cleaned up.
+  for (auto localAlloc : functionLocalAllocations) {
+    if (!destroyedLocalAllocations.count(localAlloc)) {
+      leakFound = true;
+      getADDebugStream() << "Found leaked local buffer:\n" << localAlloc;
+    }
+  }
+  assert(!leakFound && "Leaks found!");
 #endif
 
-    LLVM_DEBUG(getADDebugStream() << "Generated pullback for "
-                                  << original.getName() << ":\n" << pullback);
-    return errorOccurred;
+  LLVM_DEBUG(getADDebugStream()
+             << "Generated pullback for " << original.getName() << ":\n"
+             << pullback);
+  return errorOccurred;
 }
 
 void PullbackEmitter::emitZeroDerivativesForNonvariedResult(
@@ -988,15 +988,15 @@ void PullbackEmitter::visit(SILInstruction *inst) {
 
   LLVM_DEBUG(getADDebugStream() << "PullbackEmitter visited:\n[ORIG]" << *inst);
 #ifndef NDEBUG
-    auto beforeInsertion = std::prev(builder.getInsertionPoint());
+  auto beforeInsertion = std::prev(builder.getInsertionPoint());
 #endif
-    SILInstructionVisitor::visit(inst);
-    LLVM_DEBUG({
-      auto &s = llvm::dbgs() << "[ADJ] Emitted in pullback:\n";
-      auto afterInsertion = builder.getInsertionPoint();
-      for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
-        s << *it;
-    });
+  SILInstructionVisitor::visit(inst);
+  LLVM_DEBUG({
+    auto &s = llvm::dbgs() << "[ADJ] Emitted in pullback:\n";
+    auto afterInsertion = builder.getInsertionPoint();
+    for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
+      s << *it;
+  });
 }
 
 void PullbackEmitter::visitSILInstruction(SILInstruction *inst) {
@@ -1561,19 +1561,17 @@ void PullbackEmitter::visitUnconditionalCheckedCastAddrInst(
 NOT_DIFFERENTIABLE(RefElementAddr, autodiff_class_property_not_supported)
 #undef NOT_DIFFERENTIABLE
 
-
 AdjointValue PullbackEmitter::makeZeroAdjointValue(SILType type) {
   return AdjointValue::createZero(allocator, remapType(type));
 }
 
-AdjointValue
-PullbackEmitter::makeConcreteAdjointValue(SILValue value) {
+AdjointValue PullbackEmitter::makeConcreteAdjointValue(SILValue value) {
   return AdjointValue::createConcrete(allocator, value);
 }
 
-template<typename EltRange>
-AdjointValue PullbackEmitter::makeAggregateAdjointValue(
-    SILType type, EltRange elements) {
+template <typename EltRange>
+AdjointValue PullbackEmitter::makeAggregateAdjointValue(SILType type,
+                                                        EltRange elements) {
   AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
       elements.size() * sizeof(AdjointValue), alignof(AdjointValue)));
   MutableArrayRef<AdjointValue> elementsCopy(buf, elements.size());
@@ -1583,11 +1581,11 @@ AdjointValue PullbackEmitter::makeAggregateAdjointValue(
                                        elementsCopy);
 }
 
-SILValue PullbackEmitter::materializeAdjointDirect(
-    AdjointValue val, SILLocation loc) {
+SILValue PullbackEmitter::materializeAdjointDirect(AdjointValue val,
+                                                   SILLocation loc) {
   assert(val.getType().isObject());
-  LLVM_DEBUG(getADDebugStream() <<
-             "Materializing adjoints for " << val << '\n');
+  LLVM_DEBUG(getADDebugStream()
+             << "Materializing adjoints for " << val << '\n');
   switch (val.getKind()) {
   case AdjointValueKind::Zero:
     return recordTemporary(emitZeroDirect(val.getType().getASTType(), loc));
@@ -1598,8 +1596,7 @@ SILValue PullbackEmitter::materializeAdjointDirect(
       elements.push_back(builder.emitCopyValueOperation(loc, eltVal));
     }
     if (val.getType().is<TupleType>())
-      return recordTemporary(
-          builder.createTuple(loc, val.getType(), elements));
+      return recordTemporary(builder.createTuple(loc, val.getType(), elements));
     else
       return recordTemporary(
           builder.createStruct(loc, val.getType(), elements));
@@ -1613,7 +1610,7 @@ SILValue PullbackEmitter::materializeAdjoint(AdjointValue val,
                                              SILLocation loc) {
   if (val.isConcrete()) {
     LLVM_DEBUG(getADDebugStream()
-        << "Materializing adjoint: Value is concrete.\n");
+               << "Materializing adjoint: Value is concrete.\n");
     return val.getConcreteValue();
   }
   LLVM_DEBUG(getADDebugStream() << "Materializing adjoint: Value is "
@@ -1621,8 +1618,9 @@ SILValue PullbackEmitter::materializeAdjoint(AdjointValue val,
   return materializeAdjointDirect(val, loc);
 }
 
-void PullbackEmitter::materializeAdjointIndirect(
-    AdjointValue val, SILValue destBufferAccess, SILLocation loc) {
+void PullbackEmitter::materializeAdjointIndirect(AdjointValue val,
+                                                 SILValue destBufferAccess,
+                                                 SILLocation loc) {
   switch (val.getKind()) {
   /// Given a `%buf : *T, emit instructions that produce a zero or an aggregate
   /// of zeros of the expected type. When `T` conforms to
@@ -1647,8 +1645,7 @@ void PullbackEmitter::materializeAdjointIndirect(
             tupTy->getElementType(idx)->getCanonicalType());
         auto *eltBuf =
             builder.createTupleElementAddr(loc, destBufferAccess, idx, eltTy);
-        materializeAdjointIndirect(
-            val.getAggregateElement(idx), eltBuf, loc);
+        materializeAdjointIndirect(val.getAggregateElement(idx), eltBuf, loc);
       }
     } else if (auto *structDecl =
                    val.getSwiftType()->getStructOrBoundGenericStruct()) {
@@ -1657,8 +1654,7 @@ void PullbackEmitter::materializeAdjointIndirect(
            ++fieldIt, ++i) {
         auto eltBuf =
             builder.createStructElementAddr(loc, destBufferAccess, *fieldIt);
-        materializeAdjointIndirect(
-            val.getAggregateElement(i), eltBuf, loc);
+        materializeAdjointIndirect(val.getAggregateElement(i), eltBuf, loc);
       }
     } else {
       llvm_unreachable("Not an aggregate type");
@@ -1694,7 +1690,7 @@ void PullbackEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
   }
   case VectorSpace::Kind::Function: {
     llvm_unreachable(
-      "Unimplemented: Emit thunks for abstracting zero initialization");
+        "Unimplemented: Emit thunks for abstracting zero initialization");
   }
   }
 }
@@ -1704,18 +1700,17 @@ SILValue PullbackEmitter::emitZeroDirect(CanType type, SILLocation loc) {
       type, TypeExpansionContext::minimal(), getModule());
   auto *buffer = builder.createAllocStack(loc, silType);
   emitZeroIndirect(type, buffer, loc);
-  auto loaded = builder.emitLoadValueOperation(
-      loc, buffer, LoadOwnershipQualifier::Take);
+  auto loaded =
+      builder.emitLoadValueOperation(loc, buffer, LoadOwnershipQualifier::Take);
   builder.createDeallocStack(loc, buffer);
   return loaded;
 }
 
-AdjointValue
-PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
-                                          SILLocation loc) {
-  LLVM_DEBUG(getADDebugStream()
-             << "Materializing adjoint directly.\nLHS: " << lhs
-             << "\nRHS: " << rhs << '\n');
+AdjointValue PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs,
+                                                       AdjointValue rhs,
+                                                       SILLocation loc) {
+  LLVM_DEBUG(getADDebugStream() << "Materializing adjoint directly.\nLHS: "
+                                << lhs << "\nRHS: " << rhs << '\n');
 
   switch (lhs.getKind()) {
   // x
@@ -1752,9 +1747,8 @@ PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
                        [this](SILValue result) { recordTemporary(result); });
         for (unsigned i : indices(elts->getResults())) {
           auto rhsElt = rhs.getAggregateElement(i);
-          newElements.push_back(
-              accumulateAdjointsDirect(
-                  makeConcreteAdjointValue(elts->getResult(i)), rhsElt, loc));
+          newElements.push_back(accumulateAdjointsDirect(
+              makeConcreteAdjointValue(elts->getResult(i)), rhsElt, loc));
         }
       } else {
         llvm_unreachable("Not an aggregate type");
@@ -1779,10 +1773,8 @@ PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
     case AdjointValueKind::Aggregate: {
       SmallVector<AdjointValue, 8> newElements;
       for (auto i : range(lhs.getNumAggregateElements()))
-        newElements.push_back(
-            accumulateAdjointsDirect(lhs.getAggregateElement(i),
-                                     rhs.getAggregateElement(i),
-                                     loc));
+        newElements.push_back(accumulateAdjointsDirect(
+            lhs.getAggregateElement(i), rhs.getAggregateElement(i), loc));
       return makeAggregateAdjointValue(lhs.getType(), newElements);
     }
     }
@@ -1792,9 +1784,8 @@ PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
 SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs,
                                            SILLocation loc) {
   // TODO: Optimize for the case when lhs == rhs.
-  LLVM_DEBUG(getADDebugStream() <<
-             "Emitting adjoint accumulation for lhs: " << lhs <<
-             " and rhs: " << rhs);
+  LLVM_DEBUG(getADDebugStream() << "Emitting adjoint accumulation for lhs: "
+                                << lhs << " and rhs: " << rhs);
   assert(lhs->getType() == rhs->getType() && "Adjoints must have equal types!");
   assert(lhs->getType().isObject() && rhs->getType().isObject() &&
          "Adjoint types must be both object types!");
@@ -1821,8 +1812,8 @@ SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs,
     // Deallocate input buffers.
     builder.createDeallocStack(loc, rhsBuf);
     builder.createDeallocStack(loc, lhsBuf);
-    auto val = builder.emitLoadValueOperation(
-        loc, resultBuf, LoadOwnershipQualifier::Take);
+    auto val = builder.emitLoadValueOperation(loc, resultBuf,
+                                              LoadOwnershipQualifier::Take);
     // Deallocate result buffer.
     builder.createDeallocStack(loc, resultBuf);
     return val;
@@ -1843,9 +1834,10 @@ SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs,
   }
 }
 
-void PullbackEmitter::accumulateIndirect(
-    SILValue resultBufAccess, SILValue lhsBufAccess, SILValue rhsBufAccess,
-    SILLocation loc) {
+void PullbackEmitter::accumulateIndirect(SILValue resultBufAccess,
+                                         SILValue lhsBufAccess,
+                                         SILValue rhsBufAccess,
+                                         SILLocation loc) {
   // TODO: Optimize for the case when lhs == rhs.
   assert(lhsBufAccess->getType() == rhsBufAccess->getType() &&
          "Adjoint values must have same type!");
@@ -1863,22 +1855,21 @@ void PullbackEmitter::accumulateIndirect(
     auto *proto = getContext().getAdditiveArithmeticProtocol();
     auto *combinerFuncDecl = getContext().getPlusDecl();
     // Call the combiner function and return.
-    auto adjointParentModule = tangentSpace->getNominal()
-        ? tangentSpace->getNominal()->getModuleContext()
-        : getModule().getSwiftModule();
-    auto confRef = adjointParentModule->lookupConformance(adjointASTTy,
-                                                           proto);
+    auto adjointParentModule =
+        tangentSpace->getNominal()
+            ? tangentSpace->getNominal()->getModuleContext()
+            : getModule().getSwiftModule();
+    auto confRef = adjointParentModule->lookupConformance(adjointASTTy, proto);
     assert(!confRef.isInvalid() &&
            "Missing conformance to `AdditiveArithmetic`");
     SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
     auto silFnTy = getContext().getTypeConverter().getConstantType(
         TypeExpansionContext::minimal(), declRef);
     // %0 = witness_method @+
-    auto witnessMethod = builder.createWitnessMethod(loc, adjointASTTy,
-                                                     confRef, declRef,
-                                                     silFnTy);
-    auto subMap = SubstitutionMap::getProtocolSubstitutions(
-        proto, adjointASTTy, confRef);
+    auto witnessMethod = builder.createWitnessMethod(loc, adjointASTTy, confRef,
+                                                     declRef, silFnTy);
+    auto subMap =
+        SubstitutionMap::getProtocolSubstitutions(proto, adjointASTTy, confRef);
     // %1 = metatype $T.Type
     auto metatypeType =
         CanMetatypeType::get(adjointASTTy, MetatypeRepresentation::Thick);
@@ -1902,9 +1893,8 @@ void PullbackEmitter::accumulateIndirect(
     return;
   }
   case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting adjoint value "
-        "accumulation");
+    llvm_unreachable("Unimplemented: Emit thunks for abstracting adjoint value "
+                     "accumulation");
   }
   }
 }
@@ -1959,9 +1949,8 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
     return;
   }
   case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting adjoint value "
-        "accumulation");
+    llvm_unreachable("Unimplemented: Emit thunks for abstracting adjoint value "
+                     "accumulation");
   }
   }
 }

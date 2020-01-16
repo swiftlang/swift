@@ -113,8 +113,7 @@ void collectAllActualResultsInTypeOrder(
 
 /// Returns the underlying instruction for the given SILValue, if it exists,
 /// peering through function conversion instructions.
-template<class Inst>
-Inst *peerThroughFunctionConversions(SILValue value) {
+template <class Inst> Inst *peerThroughFunctionConversions(SILValue value) {
   if (auto *inst = dyn_cast<Inst>(value))
     return inst;
   if (auto *cvi = dyn_cast<CopyValueInst>(value))
@@ -139,7 +138,6 @@ void collectMinimalIndicesForFunctionCall(
     const DifferentiableActivityInfo &activityInfo,
     SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices);
-
 
 /// Emit a zero value into the given buffer access by calling
 /// `AdditiveArithmetic.zero`. The given type must conform to

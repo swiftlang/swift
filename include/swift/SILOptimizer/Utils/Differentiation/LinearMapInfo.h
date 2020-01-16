@@ -19,6 +19,7 @@
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_LINEARMAPINFO_H
 
 #include "swift/AST/AutoDiff.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -107,8 +108,7 @@ private:
 
   /// Computes and sets the access level for the given nominal type, given the
   /// original function linkage.
-  void computeAccessLevel(
-      NominalTypeDecl *nominal, SILLinkage originalLinkage);
+  void computeAccessLevel(NominalTypeDecl *nominal, SILLinkage originalLinkage);
 
   /// Creates an enum declaration with the given JVP/VJP generic signature,
   /// whose cases represent the predecessors/successors of the given original
@@ -121,9 +121,9 @@ private:
   /// Creates a struct declaration with the given JVP/VJP generic signature, for
   /// storing the linear map values and predecessor/successor basic block of the
   /// given original block.
-  StructDecl *
-  createLinearMapStruct(SILBasicBlock *originalBB, SILAutoDiffIndices indices,
-                        CanGenericSignature genericSig);
+  StructDecl *createLinearMapStruct(SILBasicBlock *originalBB,
+                                    SILAutoDiffIndices indices,
+                                    CanGenericSignature genericSig);
 
   /// Adds a linear map field to the linear map struct.
   VarDecl *addLinearMapDecl(ApplyInst *ai, SILType linearMapType);
