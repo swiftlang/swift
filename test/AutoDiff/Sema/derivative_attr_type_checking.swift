@@ -225,18 +225,20 @@ protocol InstanceMethod: Differentiable {
 }
 
 extension InstanceMethod {
+  // expected-note @+2 {{'foo' previously declared here}}
   // expected-note @+1 {{'foo' defined here}}
   func foo(_ x: Self) -> Self { x }
 
+  // expected-note @+2 {{'generic' previously declared here}}
   // expected-note @+1 {{'generic' defined here}}
   func generic<T: Differentiable>(_ x: T) -> Self { self }
 }
 
 extension InstanceMethod {
-  // expected-note @+1 {{'foo' defined here}}
+  // expected-error @+1 {{invalid redeclaration of 'foo'}}
   func foo(_ x: Self) -> Self { self }
 
-  // expected-note @+1 {{'generic' defined here}}
+  // expected-error @+1 {{invalid redeclaration of 'generic'}}
   func generic<T: Differentiable>(_ x: T) -> Self { self }
 }
 
