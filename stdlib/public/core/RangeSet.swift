@@ -254,20 +254,6 @@ extension RangeSet {
 // MARK: - Collection APIs
 
 extension RangeSet {
-  /// Creates a new range set containing a range that contains only the
-  /// specified index in the given collection.
-  ///
-  /// - Parameters:
-  ///   - index: The index to include in the range set. `index` must be a
-  ///     valid index of `collection` that isn't the collection's `endIndex`.
-  ///   - collection: The collection that contains `index`.
-  public init<C>(_ index: Bound, within collection: C)
-    where C: Collection, C.Index == Bound
-  {
-    let range = index..<collection.index(after: index)
-    self.init(range)
-  }
-  
   /// Creates a new range set containing ranges that contain only the
   /// specified indices in the given collection.
   ///
@@ -282,20 +268,7 @@ extension RangeSet {
       self.insert(i, within: collection)
     }
   }
-  
-  /// Creates a new range set containing the range represented by the
-  /// specified range expression.
-  ///
-  /// - Parameters:
-  ///   - range: The range expression to use as the set's initial range.
-  ///   - collection: The collection that `range` is relative to.
-  public init<R, C>(_ range: R, within collection: C)
-    where C: Collection, C.Index == Bound, R: RangeExpression, R.Bound == Bound
-  {
-    let concreteRange = range.relative(to: collection)
-    self.init(concreteRange)
-  }
-  
+    
   /// Inserts a range that contains only the specified index into the range
   /// set.
   ///
@@ -310,22 +283,6 @@ extension RangeSet {
     where C: Collection, C.Index == Bound
   {
     insert(index ..< collection.index(after: index))
-  }
-  
-  /// Inserts the range represented by the specified range expression into
-  /// the range set.
-  ///
-  /// - Parameters:
-  ///   - range: The range expression to insert into the range set.
-  ///   - collection: The collection that `range` is relative to.
-  ///
-  /// - Complexity: O(*n*), where *n* is the number of ranges in the range
-  ///   set.
-  public mutating func insert<R, C>(_ range: R, within collection: C)
-    where C: Collection, C.Index == Bound, R: RangeExpression, R.Bound == Bound
-  {
-    let concreteRange = range.relative(to: collection)
-    insert(concreteRange)
   }
   
   /// Removes the range that contains only the specified index from the range
@@ -343,38 +300,9 @@ extension RangeSet {
   {
     remove(index ..< collection.index(after: index))
   }
-  
-  /// Removes the range represented by the specified range expression from
-  /// the range set.
-  ///
-  /// - Parameters:
-  ///   - range: The range expression to remove from the range set.
-  ///   - collection: The collection that `range` is relative to.
-  ///
-  /// - Complexity: O(*n*), where *n* is the number of ranges in the range
-  ///   set.
-  public mutating func remove<R, C>(_ range: R, within collection: C)
-    where C: Collection, C.Index == Bound, R: RangeExpression, R.Bound == Bound
-  {
-    let concreteRange = range.relative(to: collection)
-    remove(concreteRange)
-  }
-  
+
   /// Returns a range set that represents all the elements in the given
   /// collection that aren't represented by this range set.
-  ///
-  /// The following example finds the indices of the vowels in a string, and
-  /// then inverts the range set to find the non-vowels parts of the string.
-  ///
-  ///     let str = "The rain in Spain stays mainly in the plain."
-  ///     let vowels = "aeiou"
-  ///     let vowelIndices = str.indices(where: { vowels.contains($0) })
-  ///     print(String(str[vowelIndices]))
-  ///     // Prints "eaiiaiaaiieai"
-  ///
-  ///     let nonVowelIndices = vowelIndices.inverted(within: str)
-  ///     print(String(str[nonVowelIndices]))
-  ///     // Prints "Th rn n Spn stys mnly n th pln."
   ///
   /// - Parameter collection: The collection that the range set is relative
   ///   to.
@@ -383,7 +311,7 @@ extension RangeSet {
   ///
   /// - Complexity: O(*n*), where *n* is the number of ranges in the range
   ///   set.
-  public func inverted<C>(within collection: C) -> RangeSet
+  internal func _inverted<C>(within collection: C) -> RangeSet
     where C: Collection, C.Index == Bound
   {
     var result: RangeSet = []

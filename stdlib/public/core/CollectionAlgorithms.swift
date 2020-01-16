@@ -210,65 +210,65 @@ extension BidirectionalCollection where Element: Equatable {
 }
 
 //===----------------------------------------------------------------------===//
-// indices(where:) / indices(of:)
+// subranges(where:) / subranges(of:)
 //===----------------------------------------------------------------------===//
 
 extension Collection {
-    /// Returns the indices of all the elements that match the given predicate.
-    ///
-    /// For example, you can use this method to find all the places that a
-    /// vowel occurs in a string.
-    ///
-    ///     let str = "Fresh cheese in a breeze"
-    ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
-    ///     let allTheVowels = str.indices(where: { vowels.contains($0) })
-    ///     // str[allTheVowels].count == 9
-    ///
-    /// - Parameter predicate: A closure that takes an element as its argument
-    ///   and returns a Boolean value that indicates whether the passed element
-    ///   represents a match.
-    /// - Returns: A set of the indices of the elements for which `predicate`
-    ///   returns `true`.
-    ///
-    /// - Complexity: O(*n*), where *n* is the length of the collection.
-    public func indices(where predicate: (Element) throws -> Bool) rethrows
-        -> RangeSet<Index>
-    {
-        if isEmpty { return [] }
-        
-        var result = RangeSet<Index>()
-        var i = startIndex
-        while i != endIndex {
-            let next = index(after: i)
-            if try predicate(self[i]) {
-                result._append(i..<next)
-            }
-            i = next
-        }
-        
-        return result
+  /// Returns the indices of all the elements that match the given predicate.
+  ///
+  /// For example, you can use this method to find all the places that a
+  /// vowel occurs in a string.
+  ///
+  ///     let str = "Fresh cheese in a breeze"
+  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  ///     let allTheVowels = str.subranges(where: { vowels.contains($0) })
+  ///     // str[allTheVowels].count == 9
+  ///
+  /// - Parameter predicate: A closure that takes an element as its argument
+  ///   and returns a Boolean value that indicates whether the passed element
+  ///   represents a match.
+  /// - Returns: A set of the indices of the elements for which `predicate`
+  ///   returns `true`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  public func subranges(where predicate: (Element) throws -> Bool) rethrows
+    -> RangeSet<Index>
+  {
+    if isEmpty { return [] }
+
+    var result = RangeSet<Index>()
+    var i = startIndex
+    while i != endIndex {
+      let next = index(after: i)
+      if try predicate(self[i]) {
+        result._append(i..<next)
+      }
+      i = next
     }
+
+    return result
+  }
 }
 
 extension Collection where Element: Equatable {
-    /// Returns the indices of all the elements that are equal to the given
-    /// element.
-    ///
-    /// For example, you can use this method to find all the places that a
-    /// particular letter occurs in a string.
-    ///
-    ///     let str = "Fresh cheese in a breeze"
-    ///     let allTheEs = str.indices(of: "e")
-    ///     // str[allTheEs].count == 7
-    ///
-    /// - Parameter element: An element to look for in the collection.
-    /// - Returns: A set of the indices of the elements that are equal to
-    ///   `element`.
-    ///
-    /// - Complexity: O(*n*), where *n* is the length of the collection.
-    public func indices(of element: Element) -> RangeSet<Index> {
-        indices(where: { $0 == element })
-    }
+  /// Returns the indices of all the elements that are equal to the given
+  /// element.
+  ///
+  /// For example, you can use this method to find all the places that a
+  /// particular letter occurs in a string.
+  ///
+  ///     let str = "Fresh cheese in a breeze"
+  ///     let allTheEs = str.subranges(of: "e")
+  ///     // str[allTheEs].count == 7
+  ///
+  /// - Parameter element: An element to look for in the collection.
+  /// - Returns: A set of the indices of the elements that are equal to
+  ///   `element`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  public func subranges(of element: Element) -> RangeSet<Index> {
+    subranges(where: { $0 == element })
+  }
 }
 
 //===----------------------------------------------------------------------===//

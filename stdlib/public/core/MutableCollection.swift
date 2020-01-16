@@ -268,108 +268,10 @@ extension MutableCollection {
 }
 
 //===----------------------------------------------------------------------===//
-// shift(from:to:) / gather(_:at:)
+// gather(_:at:)
 //===----------------------------------------------------------------------===//
 
 extension MutableCollection {
-  /// Shifts the elements in the given range to just before the element at
-  /// the specified index.
-  ///
-  /// - Parameters:
-  ///   - range: The range of the elements to move.
-  ///   - insertionPoint: The index to use as the insertion point for the
-  ///     elements. `insertionPoint` must be a valid index of the collection.
-  /// - Returns: The new bounds of the moved elements.
-  ///
-  /// - Complexity: O(*n*) where *n* is the length of the collection.
-  @discardableResult
-  public mutating func shift(
-    from range: Range<Index>, to insertionPoint: Index
-  ) -> Range<Index> {
-    if insertionPoint < range.lowerBound {
-      let endIndex = _rotate(
-        in: insertionPoint..<range.upperBound,
-        shiftingToStart: range.lowerBound)
-      return insertionPoint..<endIndex
-    }
-    
-    if range.upperBound < insertionPoint {
-      let startIndex = _rotate(
-        in: range.lowerBound..<insertionPoint,
-        shiftingToStart: range.upperBound)
-      return startIndex..<insertionPoint
-    }
-    
-    return range
-  }
-  
-  /// Shifts the elements in the given range expression to just before the
-  /// element at the specified index.
-  ///
-  /// - Parameters:
-  ///   - range: The range of the elements to move.
-  ///   - insertionPoint: The index to use as the insertion point for the
-  ///     elements. `insertionPoint` must be a valid index of the collection.
-  /// - Returns: The new bounds of the moved elements.
-  ///
-  /// - Complexity: O(*n*) where *n* is the length of the collection.
-  @discardableResult
-  public mutating func shift<R : RangeExpression>(
-    from range: R, to insertionPoint: Index
-  ) -> Range<Index> where R.Bound == Index {
-    return shift(from: range.relative(to: self), to: insertionPoint)
-  }
-  
-  /// Moves the element at the given index to just before the element at the
-  /// specified index.
-  ///
-  /// This method moves the element at position `i` to immediately before
-  /// `insertionPoint`. This example shows moving elements forward and
-  /// backward in an array of integers.
-  ///
-  ///     var numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-  ///     let newIndexOfNine = numbers.shift(from: 9, toJustBefore: 7)
-  ///     // numbers == [0, 1, 2, 3, 4, 5, 6, 9, 7, 8, 10]
-  ///     // newIndexOfNine == 7
-  ///
-  ///     let newIndexOfOne = numbers.shift(from: 1, toJustBefore: 4)
-  ///     // numbers == [0, 2, 3, 1, 4, 5, 6, 9, 7, 8, 10]
-  ///     // newIndexOfOne == 3
-  ///
-  /// To move an element to the end of a collection, pass the collection's
-  /// `endIndex` as `insertionPoint`.
-  ///
-  ///     numbers.shift(from: 0, toJustBefore: numbers.endIndex)
-  ///     // numbers == [2, 3, 1, 4, 5, 6, 9, 7, 8, 10, 0]
-  ///
-  /// - Parameters:
-  ///   - source: The index of the element to move. `source` must be a valid
-  ///     index of the collection that isn't `endIndex`.
-  ///   - insertionPoint: The index to use as the destination of the element.
-  ///     `insertionPoint` must be a valid index of the collection.
-  /// - Returns: The resulting index of the element that began at `source`.
-  ///
-  /// - Complexity: O(*n*) where *n* is the length of the collection.
-  @discardableResult
-  public mutating func shift(
-    from source: Index, to insertionPoint: Index
-  ) -> Index {
-    _failEarlyRangeCheck(source, bounds: startIndex..<endIndex)
-    _failEarlyRangeCheck(insertionPoint, bounds: startIndex..<endIndex)
-    if source == insertionPoint {
-      return source
-    } else if source < insertionPoint {
-      return _rotate(
-        in: source..<insertionPoint,
-        shiftingToStart: index(after: source))
-    } else {
-      _rotate(
-        in: insertionPoint..<index(after: source),
-        shiftingToStart: source)
-      return insertionPoint
-    }
-  }
-  
   /// Collects the elements at the given indices just before the element at
   /// the specified index.
   ///
@@ -377,7 +279,7 @@ extension MutableCollection {
   /// gathers them between `"i"` and `"j"`.
   ///
   ///     var letters = Array("ABCdeFGhijkLMNOp")
-  ///     let uppercase = letters.indices(where: { $0.isUppercase })
+  ///     let uppercase = letters.subranges(where: { $0.isUppercase })
   ///     let rangeOfUppercase = letters.gather(uppercase, justBefore: 10)
   ///     // String(letters) == "dehiABCFGLMNOjkp"
   ///     // rangeOfUppercase == 4..<13
@@ -402,41 +304,6 @@ extension MutableCollection {
       count: upperCount,
       range: insertionPoint..<endIndex,
       by: { !indices.contains($0) })
-    return start..<end
-  }
-  
-  /// Collects the elements that satisfy the given predicate just before the
-  /// element at the specified index.
-  ///
-  /// This example gathers all the uppercase letters in the array between
-  /// `"i"` and `"j"`.
-  ///
-  ///     var letters = Array("ABCdeFGhijkLMNOp")
-  ///     let rangeOfUppercase = letters.gather(justBefore: 10) { $0.isUppercase }
-  ///     // String(letters) == "dehiABCFGLMNOjkp"
-  ///     // rangeOfUppercase == 4..<13
-  ///
-  /// - Parameters:
-  ///   - insertionPoint: The index to use as the destination of the elements.
-  ///   - predicate: A closure that returns `true` for elements that should
-  ///     move to `destination`.
-  /// - Returns: The new bounds of the moved elements.
-  ///
-  /// - Complexity: O(*n* log *n*) where *n* is the length of the collection.
-  @discardableResult
-  public mutating func gather(
-    at insertionPoint: Index, where predicate: (Element) -> Bool
-  ) -> Range<Index> {
-    let lowerCount = distance(from: startIndex, to: insertionPoint)
-    let upperCount = distance(from: insertionPoint, to: endIndex)
-    let start = _stablePartition(
-      count: lowerCount,
-      range: startIndex..<insertionPoint,
-      by: { predicate($0) })
-    let end = _stablePartition(
-      count: upperCount,
-      range: insertionPoint..<endIndex,
-      by: { !predicate($0) })
     return start..<end
   }
 }

@@ -1147,20 +1147,20 @@ extension RangeReplaceableCollection {
   ///
   ///     var str = "The rain in Spain stays mainly in the plain."
   ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
-  ///     let vowelIndices = str.indices(where: { vowels.contains($0) })
+  ///     let vowelIndices = str.subranges(where: { vowels.contains($0) })
   ///
-  ///     str.removeAll(at: vowelIndices)
+  ///     str.removeAll(in: vowelIndices)
   ///     // str == "Th rn n Spn stys mnly n th pln."
   ///
-  /// - Parameter indices: The indices of the elements to remove.
+  /// - Parameter subranges: The indices of the elements to remove.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  public mutating func removeAll(at indices: RangeSet<Index>) {
-    guard !indices.isEmpty else {
+  public mutating func removeAll(in subranges: RangeSet<Index>) {
+    guard !subranges.isEmpty else {
       return
     }
     
-    let inversion = indices.inverted(within: self)
+    let inversion = subranges.inverted(within: self)
     var result = Self()
     for range in inversion.ranges {
       result.append(contentsOf: self[range])
@@ -1176,15 +1176,15 @@ extension MutableCollection where Self: RangeReplaceableCollection {
   /// numbers in the array, and then removes those values.
   ///
   ///     var numbers = [5, 7, -3, -8, 11, 2, -1, 6]
-  ///     let negativeIndices = numbers.indices(where: { $0 < 0 })
+  ///     let negativeIndices = numbers.subranges(where: { $0 < 0 })
   ///
   ///     numbers.removeAll(at: negativeIndices)
   ///     // numbers == [5, 7, 11, 2, 6]
   ///
-  /// - Parameter indices: The indices of the elements to remove.
+  /// - Parameter subranges: The indices of the elements to remove.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  public mutating func removeAll(at indices: RangeSet<Index>) {
+  public mutating func removeAll(in subranges: RangeSet<Index>) {
     guard let firstRange = indices.ranges.first else {
       return
     }
@@ -1205,7 +1205,7 @@ extension MutableCollection where Self: RangeReplaceableCollection {
     //
     // Each iteration of this loop moves the elements that are _between_
     // two ranges to remove from the third region to the first region.
-    for range in indices.ranges.dropFirst() {
+    for range in subranges.ranges.dropFirst() {
       let nextLow = range.lowerBound
       while firstUnprocessed != nextLow {
         swapAt(endOfElementsToKeep, firstUnprocessed)

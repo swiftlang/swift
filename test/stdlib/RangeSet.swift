@@ -49,7 +49,7 @@ RangeSetTests.test("contains") {
       expectTrue(set.contains(i))
     }
     
-    let inverted = set.inverted(within: parent)
+    let inverted = set._inverted(within: parent)
     for i in parent.indices[inverted] {
       expectFalse(set.contains(i))
     }
@@ -219,9 +219,9 @@ RangeSetTests.test("symmetricDifference") {
   }
 }
 
-RangeSetTests.test("indices(of:/where:)") {
+RangeSetTests.test("subranges(of:/where:)") {
   let a = [1, 2, 3, 4, 3, 3, 4, 5, 3, 4, 3, 3, 3]
-  let indices = a.indices(of: 3)
+  let indices = a.subranges(of: 3)
   expectEqual(indices, [2..<3, 4..<6, 8..<9, 10..<13])
   
   let allTheThrees = a[indices]
@@ -229,33 +229,33 @@ RangeSetTests.test("indices(of:/where:)") {
   expectTrue(allTheThrees.allSatisfy { $0 == 3 })
   expectEqual(Array(allTheThrees), Array(repeating: 3, count: 7))
   
-  let lowerIndices = letterString.indices(where: { $0.isLowercase })
+  let lowerIndices = letterString.subranges(where: { $0.isLowercase })
   let lowerOnly = letterString[lowerIndices]
   expectEqualSequence(lowerOnly, lowercaseLetters)
   expectEqualSequence(lowerOnly.reversed(), lowercaseLetters.reversed())
   
-  let upperOnly = letterString[lowerIndices.inverted(within: letterString)]
+  let upperOnly = letterString[lowerIndices._inverted(within: letterString)]
   expectEqualSequence(upperOnly, uppercaseLetters)
   expectEqualSequence(upperOnly.reversed(), uppercaseLetters.reversed())
 }
 
 RangeSetTests.test("removeAll") {
   var a = [1, 2, 3, 4, 3, 3, 4, 5, 3, 4, 3, 3, 3]
-  let indices = a.indices(of: 3)
-  a.removeAll(at: indices)
+  let indices = a.subranges(of: 3)
+  a.removeAll(in: indices)
   expectEqual(a, [1, 2, 4, 4, 5, 4])
   
   var numbers = Array(1...20)
-  numbers.removeAll(at: [2..<5, 10..<15, 18..<20])
+  numbers.removeAll(in: [2..<5, 10..<15, 18..<20])
   expectEqual(numbers, [1, 2, 6, 7, 8, 9, 10, 16, 17, 18])
   
   var str = letterString
-  let lowerIndices = str.indices(where: { $0.isLowercase })
+  let lowerIndices = str.subranges(where: { $0.isLowercase })
   
-  let upperOnly = str.removingAll(at: lowerIndices)
+  let upperOnly = str.removingAll(in: lowerIndices)
   expectEqualSequence(upperOnly, uppercaseLetters)
   
-  str.removeAll(at: lowerIndices)
+  str.removeAll(in: lowerIndices)
   expectEqualSequence(str, uppercaseLetters)
 }
 
@@ -401,7 +401,7 @@ RangeSetTests.test("gather/noCOW") {
     numbers.gather([10..<15, 18..<20], at: 4)
   }
   expectNoCopyOnWrite(numbers) { numbers in
-    numbers.removeAll(at: [2..<5, 10..<15, 18..<20])
+    numbers.removeAll(in: [2..<5, 10..<15, 18..<20])
   }
 }
 
