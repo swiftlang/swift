@@ -647,10 +647,11 @@ public:
   /// \param ShouldSort If set to true sorts functions, vtables, sil global
   ///        variables, and witness tables by name to ease diffing.
   /// \param PrintASTDecls If set to true print AST decls.
-  void print(raw_ostream &OS, bool Verbose = false,
-             ModuleDecl *M = nullptr, bool ShouldSort = false,
+  void print(raw_ostream &OS,
+             ModuleDecl *M = nullptr,
+             const SILOptions &Opts = SILOptions(),
              bool PrintASTDecls = true) const {
-    SILPrintContext PrintCtx(OS, Verbose, ShouldSort);
+    SILPrintContext PrintCtx(OS, Opts);
     print(PrintCtx, M, PrintASTDecls);
   }
 

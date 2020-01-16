@@ -581,7 +581,8 @@ public:
 
   std::string getAsString() const;
   void dump() const;
-  void print(raw_ostream &OS) const;
+  void print(raw_ostream &OS,
+             const PrintOptions &PO = PrintOptions::printSIL()) const;
 };
 
 // Statically prevent SILTypes from being directly cast to a type

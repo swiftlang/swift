@@ -78,6 +78,9 @@ public:
   /// variables by name when we print it out. This eases diffing of SIL files.
   bool EmitSortedSIL = false;
 
+  /// See \ref FrontendOptions.PrintFullConvention
+  bool PrintFullConvention = false;
+
   /// Whether to stop the optimization pipeline after serializing SIL.
   bool StopOptimizationAfterSerialization = false;
 
