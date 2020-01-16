@@ -33,6 +33,9 @@ struct TBDGenOptions {
   /// Whether this compilation is producing a TBD for InstallAPI.
   bool IsInstallAPI;
 
+  /// Only collect linker directive symbols.
+  bool LinkerDirectivesOnly = false;
+
   /// The install_name to use in the TBD file.
   std::string InstallName;
 
@@ -40,12 +43,16 @@ struct TBDGenOptions {
   std::string ModuleLinkName;
 
   /// The current project version to use in the generated TBD file. Defaults
-  /// to None.
-  llvm::Optional<version::Version> CurrentVersion = None;
+  /// to empty string if not provided.
+  std::string CurrentVersion;
 
   /// The dylib compatibility-version to use in the generated TBD file. Defaults
-  /// to None.
-  llvm::Optional<version::Version> CompatibilityVersion = None;
+  /// to empty string if not provided.
+  std::string CompatibilityVersion;
+
+  /// The path to a Json file indicating the module name to install-name map
+  /// used by @_originallyDefinedIn
+  std::string ModuleInstallNameMapPath;
 };
 
 void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,

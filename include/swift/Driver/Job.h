@@ -150,6 +150,9 @@ class CommandOutput {
 public:
   CommandOutput(file_types::ID PrimaryOutputType, OutputFileMap &Derived);
 
+  /// For testing dependency graphs that use Jobs
+  CommandOutput(StringRef dummyBaseName, OutputFileMap &);
+
   /// Return the primary output type for this CommandOutput.
   file_types::ID getPrimaryOutputType() const;
 
@@ -193,6 +196,11 @@ public:
   /// the _additional_ (not primary) output of type \p type associated with the
   /// first primary input.
   StringRef getAdditionalOutputForType(file_types::ID type) const;
+
+  /// Assuming (and asserting) that there are one or more input pairs, return true if there exists
+  /// an _additional_ (not primary) output of type \p type associated with the
+  /// first primary input.
+  bool hasAdditionalOutputForType(file_types::ID type) const;
 
   /// Return a vector of additional (not primary) outputs of type \p type
   /// associated with the primary inputs.
@@ -314,6 +322,12 @@ public:
         ExtraEnvironment(std::move(ExtraEnvironment)),
         FilelistFileInfos(std::move(Infos)), ResponseFile(ResponseFile) {}
 
+  /// For testing dependency graphs that use Jobs
+  Job(OutputFileMap &OFM, StringRef dummyBaseName)
+      : Job(CompileJobAction(file_types::TY_Object),
+            SmallVector<const Job *, 4>(),
+            std::make_unique<CommandOutput>(dummyBaseName, OFM), nullptr, {}) {}
+
   virtual ~Job();
 
   const JobAction &getSource() const {
@@ -382,6 +396,10 @@ public:
   bool hasResponseFile() const { return ResponseFile.hasValue(); }
 
   bool writeArgsToResponseFile() const;
+
+  /// Assumes that, if a compile job, has one primary swift input
+  /// May return empty if none.
+  StringRef getFirstSwiftPrimaryInput() const;
 };
 
 /// A BatchJob comprises a _set_ of jobs, each of which is sufficiently similar

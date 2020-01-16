@@ -205,21 +205,20 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   Ctx.SourceMgr.setCodeCompletionPoint(*BufferID, CodeCompletionOffset);
 
   // Parse, typecheck and temporarily insert the incomplete code into the AST.
-  const unsigned OriginalDeclCount = SF.Decls.size();
+  const unsigned OriginalDeclCount = SF.getTopLevelDecls().size();
 
   PersistentParserState PersistentState;
   bool Done;
   do {
     parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState);
   } while (!Done);
-  performTypeChecking(SF, PersistentState.getTopLevelContext(), None,
-                      OriginalDeclCount);
+  performTypeChecking(SF, OriginalDeclCount);
 
   performCodeCompletionSecondPass(PersistentState, *CompletionCallbacksFactory);
 
   // Now we are done with code completion.  Remove the declarations we
   // temporarily inserted.
-  SF.Decls.resize(OriginalDeclCount);
+  SF.truncateTopLevelDecls(OriginalDeclCount);
 
   // Reset the error state because it's only relevant to the code that we just
   // processed, which now gets thrown away.

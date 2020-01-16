@@ -17,6 +17,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/NameLookup.h"
@@ -30,33 +31,60 @@
 using namespace swift;
 
 namespace {
+
+/// Find available closure discriminators.
+///
+/// The parser typically takes care of assigning unique discriminators to
+/// closures, but the parser is unavailable to this transform.
+class DiscriminatorFinder : public ASTWalker {
+  unsigned NextDiscriminator = 0;
+
+public:
+  Expr *walkToExprPost(Expr *E) override {
+    auto *ACE = dyn_cast<AbstractClosureExpr>(E);
+    if (!ACE)
+      return E;
+
+    unsigned Discriminator = ACE->getDiscriminator();
+    assert(Discriminator != AbstractClosureExpr::InvalidDiscriminator &&
+           "Existing closures should have valid discriminators");
+    if (Discriminator >= NextDiscriminator)
+      NextDiscriminator = Discriminator + 1;
+    return E;
+  }
+
+  // Get the next available closure discriminator.
+  unsigned getNextDiscriminator() {
+    if (NextDiscriminator == AbstractClosureExpr::InvalidDiscriminator)
+      llvm::report_fatal_error("Out of valid closure discriminators");
+    return NextDiscriminator++;
+  }
+};
+
 struct REPLContext {
-  TypeChecker &TC;
   ASTContext &Context;
   SourceFile &SF;
   SmallVector<ValueDecl *, 4> PrintDecls;
   SmallVector<ValueDecl *, 4> DebugPrintlnDecls;
 
-  REPLContext(TypeChecker &TC, SourceFile &SF)
-      : TC(TC), Context(TC.Context), SF(SF) {}
+  REPLContext(SourceFile &SF) : Context(SF.getASTContext()), SF(SF) {}
 
   bool requirePrintDecls() {
     if (!PrintDecls.empty() && !DebugPrintlnDecls.empty())
       return false;
 
+    auto *stdlib = TypeChecker::getStdlibModule(&SF);
     {
-      Identifier Id(Context.getIdentifier("_replPrintLiteralString"));
-      auto lookup = TypeChecker::lookupUnqualified(TC.getStdlibModule(&SF), Id,
-                                                   SourceLoc());
+      DeclNameRef Id(Context.getIdentifier("_replPrintLiteralString"));
+      auto lookup = TypeChecker::lookupUnqualified(stdlib, Id, SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)
         PrintDecls.push_back(result.getValueDecl());
     }
     {
-      Identifier Id(Context.getIdentifier("_replDebugPrintln"));
-      auto lookup = TypeChecker::lookupUnqualified(TC.getStdlibModule(&SF), Id,
-                                                   SourceLoc());
+      DeclNameRef Id(Context.getIdentifier("_replDebugPrintln"));
+      auto lookup = TypeChecker::lookupUnqualified(stdlib, Id, SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)
@@ -185,14 +213,14 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
 
 namespace {
   class REPLChecker : public REPLContext {
-    TopLevelContext &TLC;
+    DiscriminatorFinder &DF;
 
     /// The index of the next response metavariable to bind to a REPL result.
     unsigned NextResponseVariableIndex = 0;
 
   public:
-    REPLChecker(TypeChecker &TC, SourceFile &SF, TopLevelContext &TLC)
-      : REPLContext(TC, SF), TLC(TLC) {}
+    REPLChecker(SourceFile &SF, DiscriminatorFinder &DF)
+        : REPLContext(SF), DF(DF) {}
 
     void processREPLTopLevelExpr(Expr *E);
     void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD);
@@ -225,11 +253,12 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   Arg->setSpecifier(ParamSpecifier::Default);
   auto params = ParameterList::createWithoutLoc(Arg);
 
-  unsigned discriminator = TLC.claimNextClosureDiscriminator();
+  unsigned discriminator = DF.getNextDiscriminator();
 
   ClosureExpr *CE =
-      new (Context) ClosureExpr(params, SourceLoc(), SourceLoc(), SourceLoc(),
-                                TypeLoc(), discriminator, newTopLevel);
+      new (Context) ClosureExpr(SourceRange(), nullptr, params, SourceLoc(),
+                                SourceLoc(), SourceLoc(), TypeLoc(),
+                                discriminator, newTopLevel);
 
   SmallVector<AnyFunctionType::Param, 1> args;
   params->getParams(args);
@@ -257,8 +286,9 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   // Typecheck the function.
   BraceStmt *Body = builder.createBodyStmt(Loc, EndLoc);
   CE->setBody(Body, false);
-  TC.typeCheckClosureBody(CE);
-  TC.ClosuresWithUncomputedCaptures.push_back(CE);
+
+  TypeChecker::typeCheckClosureBody(CE);
+  TypeChecker::computeCaptures(CE);
 
   auto *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });
   TheCall->getArg()->setType(AnyFunctionType::composeInput(Context, args, false));
@@ -270,7 +300,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   newTopLevel->setBody(BS);
   TypeChecker::checkTopLevelErrorHandling(newTopLevel);
 
-  SF.Decls.push_back(newTopLevel);
+  SF.addTopLevelDecl(newTopLevel);
 }
 
 /// When we see an expression in a TopLevelCodeDecl in the REPL, process it,
@@ -293,7 +323,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
 
   // Remove the expression from being in the list of decls to execute, we're
   // going to reparent it.
-  auto TLCD = cast<TopLevelCodeDecl>(SF.Decls.back());
+  auto TLCD = cast<TopLevelCodeDecl>(SF.getTopLevelDecls().back());
 
   E = TypeChecker::coerceToRValue(Context, E);
 
@@ -303,7 +333,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
                                       /*IsCaptureList*/false, E->getStartLoc(),
                                       name, &SF);
   vd->setInterfaceType(E->getType());
-  SF.Decls.push_back(vd);
+  SF.addTopLevelDecl(vd);
 
   // Create a PatternBindingDecl to bind the expression into the decl.
   Pattern *metavarPat = new (Context) NamedPattern(vd);
@@ -367,8 +397,8 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     //   replPrint(r123)
 
     // Remove PBD from the list of Decls so we can insert before it.
-    auto PBTLCD = cast<TopLevelCodeDecl>(SF.Decls.back());
-    SF.Decls.pop_back();
+    auto PBTLCD = cast<TopLevelCodeDecl>(SF.getTopLevelDecls().back());
+    SF.truncateTopLevelDecls(SF.getTopLevelDecls().size() - 1);
 
     // Create the meta-variable, let the typechecker name it.
     Identifier name = getNextResponseVariableName(SF.getParentModule());
@@ -377,7 +407,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
                                         /*IsCaptureList*/false,
                                         PBD->getStartLoc(), name, &SF);
     vd->setInterfaceType(pattern->getType());
-    SF.Decls.push_back(vd);
+    SF.addTopLevelDecl(vd);
 
     // Create a PatternBindingDecl to bind the expression into the decl.
     Pattern *metavarPat = new (Context) NamedPattern(vd);
@@ -392,7 +422,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
                                      metavarBinding->getEndLoc());
     
     auto *MVTLCD = new (Context) TopLevelCodeDecl(&SF, MVBrace);
-    SF.Decls.push_back(MVTLCD);
+    SF.addTopLevelDecl(MVTLCD);
     
     
     // Replace the initializer of PBD with a reference to our repl temporary.
@@ -401,7 +431,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
                                                /*Implicit=*/true);
     E = TypeChecker::coerceToRValue(Context, E);
     PBD->setInit(entryIdx, E);
-    SF.Decls.push_back(PBTLCD);
+    SF.addTopLevelDecl(PBTLCD);
     
     // Finally, print out the result, by referring to the repl temp.
     E = TypeChecker::buildCheckedRefExpr(vd, &SF,
@@ -422,7 +452,8 @@ Identifier REPLChecker::getNextResponseVariableName(DeclContext *DC) {
     names << "r" << NextResponseVariableIndex++;
 
     ident = Context.getIdentifier(names.str());
-    nameUsed = (bool)TypeChecker::lookupUnqualified(DC, ident, SourceLoc());
+    nameUsed = (bool)TypeChecker::lookupUnqualified(DC, DeclNameRef(ident),
+                                                    SourceLoc());
   } while (nameUsed);
 
   return ident;
@@ -431,18 +462,24 @@ Identifier REPLChecker::getNextResponseVariableName(DeclContext *DC) {
 /// processREPLTopLevel - This is called after we've parsed and typechecked some
 /// new decls at the top level.  We inject code to print out expressions and
 /// pattern bindings the are evaluated.
-void TypeChecker::processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
-                                      unsigned FirstDecl) {
-  // Move new declarations out.
-  std::vector<Decl *> NewDecls(SF.Decls.begin()+FirstDecl, SF.Decls.end());
-  SF.Decls.resize(FirstDecl);
+void TypeChecker::processREPLTopLevel(SourceFile &SF, unsigned FirstDecl) {
+  // Walk over all decls in the file to find the next available closure
+  // discriminator.
+  DiscriminatorFinder DF;
+  for (Decl *D : SF.getTopLevelDecls())
+    D->walk(DF);
 
-  REPLChecker RC(*this, SF, TLC);
+  // Move new declarations out.
+  std::vector<Decl *> NewDecls(SF.getTopLevelDecls().begin()+FirstDecl,
+                               SF.getTopLevelDecls().end());
+  SF.truncateTopLevelDecls(FirstDecl);
+
+  REPLChecker RC(SF, DF);
 
   // Loop over each of the new decls, processing them, adding them back to
   // the Decls list.
   for (Decl *D : NewDecls) {
-    SF.Decls.push_back(D);
+    SF.addTopLevelDecl(D);
 
     auto *TLCD = dyn_cast<TopLevelCodeDecl>(D);
     if (!TLCD || TLCD->getBody()->getElements().empty())
@@ -457,7 +494,7 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
       if (auto *PBD = dyn_cast<PatternBindingDecl>(D))
         RC.processREPLTopLevelPatternBinding(PBD);
 
-    contextualizeTopLevelCode(TLC, TLCD);
+    TypeChecker::contextualizeTopLevelCode(TLCD);
   }
 
   SF.clearLookupCache();

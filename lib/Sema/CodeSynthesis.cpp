@@ -107,7 +107,6 @@ Expr *swift::buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
 }
 
 static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
-                    SmallVectorImpl<DefaultArgumentInitializer *> &defaultInits,
                                          unsigned paramSize, ASTContext &ctx) {
   // First and foremost, if this is a constant don't bother.
   if (var->isLet())
@@ -138,13 +137,6 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
 
   // We can add a default value now.
 
-  // Give this some bogus context right now, we'll fix it after making
-  // the constructor.
-  auto *initDC = new (ctx) DefaultArgumentInitializer(
-    arg->getDeclContext(), paramSize);
-
-  defaultInits.push_back(initDC);
-
   // If the variable has a type T? and no initial value, return a nil literal
   // default arg. All lazy variables return a nil literal as well. *Note* that
   // the type will always be a sugared T? because we don't default init an
@@ -153,7 +145,8 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
     var->getAttrs().hasAttribute<LazyAttr>() ||
     (!isExplicitlyInitialized && isDefaultInitializable &&
      var->getValueInterfaceType()->getAnyNominal() == ctx.getOptionalDecl() &&
-     !var->getAttachedPropertyWrapperTypeInfo(0).defaultInit);
+     (var->getAttachedPropertyWrappers().empty() ||
+      var->isPropertyMemberwiseInitializedWithWrappedType()));
   if (isNilInitialized) {
     arg->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
     return;
@@ -244,7 +237,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       // Don't allow the parameter to accept temporary pointer conversions.
       arg->setNonEphemeralIfPossible();
 
-      maybeAddMemberwiseDefaultArg(arg, var, defaultInits, params.size(), ctx);
+      maybeAddMemberwiseDefaultArg(arg, var, params.size(), ctx);
       
       params.push_back(arg);
     }
@@ -266,11 +259,6 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
   if (ICK == ImplicitConstructorKind::Memberwise) {
     ctor->setIsMemberwiseInitializer();
-
-    // Fix default argument init contexts now that we have a constructor.
-    for (auto initDC : defaultInits) {
-      initDC->changeFunction(ctor, paramList);
-    }
   }
 
   // If we are defining a default initializer for a class that has a superclass,
@@ -654,7 +642,8 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options
     = (ParameterList::Implicit |
-       ParameterList::Inherited);
+       ParameterList::Inherited |
+       ParameterList::NamedArguments);
   auto *superclassParams = superclassCtor->getParameters();
   auto *bodyParams = superclassParams->clone(ctx, options);
 
@@ -1013,13 +1002,18 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 llvm::Expected<bool>
 InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
                                                 ClassDecl *decl) const {
+  // Check if we parsed the @_inheritsConvenienceInitializers attribute.
+  if (decl->getAttrs().hasAttribute<InheritsConvenienceInitializersAttr>())
+    return true;
+
   auto superclass = decl->getSuperclass();
   assert(superclass);
 
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.
   auto *superclassDecl = superclass->getClassOrBoundGenericClass();
-  if (superclassDecl->hasMissingDesignatedInitializers())
+  if (superclassDecl->getModuleContext() != decl->getParentModule() &&
+      superclassDecl->hasMissingDesignatedInitializers())
     return false;
 
   // If we're allowed to inherit designated initializers, then we can inherit

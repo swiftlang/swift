@@ -49,15 +49,14 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
   return createTuple(loc, tupleType, elts);
 }
 
-SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
-                                        SILModule &M,
-                                        SubstitutionMap subs,
-                                        ParameterConvention calleeConvention,
-                                        PartialApplyInst::OnStackKind onStack) {
+SILType SILBuilder::getPartialApplyResultType(
+    TypeExpansionContext context, SILType origTy, unsigned argCount,
+    SILModule &M, SubstitutionMap subs, ParameterConvention calleeConvention,
+    PartialApplyInst::OnStackKind onStack) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
-    FTI = FTI->substGenericArgs(M, subs);
-  
+    FTI = FTI->substGenericArgs(M, subs, context);
+
   assert(!FTI->isPolymorphic()
          && "must provide substitutions for generic partial_apply");
   auto params = FTI->getParameters();
@@ -104,23 +103,11 @@ ProjectBoxInst *SILBuilder::createProjectBox(SILLocation Loc,
                                              SILValue boxOperand,
                                              unsigned index) {
   auto boxTy = boxOperand->getType().castTo<SILBoxType>();
-  auto fieldTy = getSILBoxFieldType(boxTy, getModule().Types, index);
+  auto fieldTy = getSILBoxFieldType(getTypeExpansionContext(), boxTy,
+                                    getModule().Types, index);
 
   return insert(new (getModule()) ProjectBoxInst(
       getSILDebugLocation(Loc), boxOperand, index, fieldTy));
-}
-
-// If legal, create an unchecked_ref_cast from the given operand and result
-// type, otherwise return null.
-SingleValueInstruction *
-SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc, SILValue Op,
-                                      SILType ResultTy) {
-  if (!SILType::canRefCast(Op->getType(), ResultTy, getModule()))
-    return nullptr;
-
-  return insert(UncheckedRefCastInst::create(getSILDebugLocation(Loc), Op,
-                                             ResultTy, getFunction(),
-                                             C.OpenedArchetypes));
 }
 
 ClassifyBridgeObjectInst *
@@ -142,8 +129,8 @@ SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
     return insert(UncheckedTrivialBitCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
 
-  if (auto refCast = tryCreateUncheckedRefCast(Loc, Op, Ty))
-    return refCast;
+  if (SILType::canRefCast(Op->getType(), Ty, getModule()))
+    return createUncheckedRefCast(Loc, Op, Ty);
 
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.
@@ -511,11 +498,11 @@ void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
 ValueMetatypeInst *SILBuilder::createValueMetatype(SILLocation Loc,
                                                    SILType MetatypeTy,
                                                    SILValue Base) {
-  assert(
-      Base->getType().isLoweringOf(
-          getModule(), MetatypeTy.castTo<MetatypeType>().getInstanceType()) &&
-      "value_metatype result must be formal metatype of the lowered operand "
-      "type");
+  assert(Base->getType().isLoweringOf(
+             getTypeExpansionContext(), getModule(),
+             MetatypeTy.castTo<MetatypeType>().getInstanceType()) &&
+         "value_metatype result must be formal metatype of the lowered operand "
+         "type");
   return insert(new (getModule()) ValueMetatypeInst(getSILDebugLocation(Loc),
                                                       MetatypeTy, Base));
 }
@@ -541,7 +528,8 @@ void SILBuilder::emitDestructureValueOperation(
 
   // In non qualified ownership SIL, drop back to using projection code.
   SmallVector<Projection, 16> projections;
-  Projection::getFirstLevelProjections(v->getType(), getModule(), projections);
+  Projection::getFirstLevelProjections(v->getType(), getModule(),
+                                       getTypeExpansionContext(), projections);
   llvm::transform(projections, std::back_inserter(results),
                   [&](const Projection &p) -> SILValue {
                     return p.createObjectProjection(*this, loc, v).get();
@@ -562,7 +550,8 @@ void SILBuilder::emitDestructureAddressOperation(
   }
 
   SmallVector<Projection, 16> projections;
-  Projection::getFirstLevelProjections(v->getType(), getModule(), projections);
+  Projection::getFirstLevelProjections(v->getType(), getModule(),
+                                       getTypeExpansionContext(), projections);
   llvm::transform(projections, std::back_inserter(results),
                   [&](const Projection &p) -> SILValue {
                     return p.createAddressProjection(*this, loc, v).get();
@@ -618,13 +607,15 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
 }
 
 CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
-    SILLocation Loc, bool isExact, SILValue op, SILType destTy,
+    SILLocation Loc, bool isExact, SILValue op,
+    SILType destLoweredTy, CanType destFormalTy,
     SILBasicBlock *successBB, SILBasicBlock *failureBB,
     ProfileCounter target1Count, ProfileCounter target2Count) {
   assert((!hasOwnership() || !failureBB->getNumArguments() ||
           failureBB->getArgument(0)->getType() == op->getType()) &&
          "failureBB's argument doesn't match incoming argument type");
   return insertTerminator(CheckedCastBranchInst::create(
-      getSILDebugLocation(Loc), isExact, op, destTy, successBB, failureBB,
+      getSILDebugLocation(Loc), isExact, op,
+      destLoweredTy, destFormalTy, successBB, failureBB,
       getFunction(), C.OpenedArchetypes, target1Count, target2Count));
 }

@@ -19,6 +19,7 @@
 #define SWIFT_SIL_CONSTANTS_H
 
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -118,6 +119,10 @@ public:
     /// Attempted to load from/store into a SIL value that was not tracked by
     /// the interpreter.
     UntrackedSILValue,
+
+    /// Encountered a checked cast operation whose result cannot be evaluated
+    /// to a constant.
+    UnknownCastResult,
 
     /// Attempted to find a concrete protocol conformance for a witness method
     /// and failed.
@@ -572,7 +577,7 @@ public:
   static SymbolicValue makeClosure(
       SILFunction *target,
       ArrayRef<std::pair<SILValue, Optional<SymbolicValue>>> capturedArguments,
-      SubstitutionMap substMap, SILType closureType,
+      SubstitutionMap substMap, SingleValueInstruction *closureInst,
       SymbolicValueAllocator &allocator);
 
   SymbolicClosure *getClosure() const {
@@ -605,8 +610,8 @@ public:
 
 static_assert(sizeof(SymbolicValue) == 2 * sizeof(uint64_t),
               "SymbolicValue should stay small");
-static_assert(std::is_pod<SymbolicValue>::value,
-              "SymbolicValue should stay POD");
+static_assert(std::is_trivial<SymbolicValue>::value,
+              "SymbolicValue should stay trivial");
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, SymbolicValue val) {
   val.print(os);
@@ -689,21 +694,25 @@ private:
   // applied function to the generic arguments of passed to the call.
   SubstitutionMap substitutionMap;
 
-  SILType closureType;
+  // The closure instruction such as partial apply that resulted in this
+  // symbolic value. This is tracked to obtain SILType and other SIL-level
+  // information of the symbolic closure.
+  SingleValueInstruction *closureInst;
 
   SymbolicClosure() = delete;
   SymbolicClosure(const SymbolicClosure &) = delete;
   SymbolicClosure(SILFunction *callee, unsigned numArguments,
-                  SubstitutionMap substMap, SILType closureType,
+                  SubstitutionMap substMap, SingleValueInstruction *inst,
                   bool nonConstantCaptures)
       : target(callee), numCaptures(numArguments),
         hasNonConstantCaptures(nonConstantCaptures), substitutionMap(substMap),
-        closureType(closureType) {}
+        closureInst(inst) {}
 
 public:
   static SymbolicClosure *create(SILFunction *callee,
                                  ArrayRef<SymbolicClosureArgument> args,
-                                 SubstitutionMap substMap, SILType closureType,
+                                 SubstitutionMap substMap,
+                                 SingleValueInstruction *closureInst,
                                  SymbolicValueAllocator &allocator);
 
   ArrayRef<SymbolicClosureArgument> getCaptures() const {
@@ -719,7 +728,9 @@ public:
     return target;
   }
 
-  SILType getClosureType() { return closureType; }
+  SingleValueInstruction *getClosureInst() { return closureInst; }
+
+  SILType getClosureType() { return closureInst->getType(); }
 
   SubstitutionMap getCallSubstitutionMap() { return substitutionMap; }
 };

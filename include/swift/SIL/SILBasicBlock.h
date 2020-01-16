@@ -26,8 +26,6 @@ namespace swift {
 
 class SILFunction;
 class SILArgument;
-class SILPhiArgument;
-class SILFunctionArgument;
 class SILPrintContext;
 
 class SILBasicBlock :
@@ -56,7 +54,7 @@ private:
   SILBasicBlock() : Parent(nullptr) {}
   void operator=(const SILBasicBlock &) = delete;
 
-  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
+  void operator delete(void *Ptr, size_t) = delete;
 
   SILBasicBlock(SILFunction *F, SILBasicBlock *relativeToBB, bool after);
 
@@ -193,14 +191,10 @@ public:
 
   ArrayRef<SILArgument *> getArguments() const { return ArgumentList; }
 
-  /// Returns a transform array ref that performs llvm::cast<SILPhiArgument> on
+  /// Returns a transform array ref that performs llvm::cast<NAME>
   /// each argument and then returns the downcasted value.
-  PhiArgumentArrayRef getPhiArguments() const;
-
-  /// Returns a transform array ref that performs
-  /// llvm::cast<SILFunctionArgument> on each argument and then returns the
-  /// downcasted value.
-  FunctionArgumentArrayRef getFunctionArguments() const;
+#define ARGUMENT(NAME, PARENT) NAME##ArrayRef get##NAME##s() const;
+#include "swift/SIL/SILNodes.def"
 
   unsigned getNumArguments() const { return ArgumentList.size(); }
   const SILArgument *getArgument(unsigned i) const { return ArgumentList[i]; }
@@ -214,7 +208,8 @@ public:
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
   SILFunctionArgument *createFunctionArgument(SILType Ty,
-                                              const ValueDecl *D = nullptr);
+                                              const ValueDecl *D = nullptr,
+                                              bool disableEntryBlockVerification = false);
 
   SILFunctionArgument *insertFunctionArgument(unsigned Index, SILType Ty,
                                               ValueOwnershipKind OwnershipKind,

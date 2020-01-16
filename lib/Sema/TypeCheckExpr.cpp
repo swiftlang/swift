@@ -237,7 +237,7 @@ Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
     if (!left)
       // LHS is not binary expression.
       return E;
-    switch (Context.associateInfixOperators(left, right)) {
+    switch (DC->getASTContext().associateInfixOperators(left, right)) {
       case swift::Associativity::None:
         return nullptr;
       case swift::Associativity::Left:
@@ -617,47 +617,15 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
   return result;
 }
 
-Expr *TypeChecker::buildAutoClosureExpr(DeclContext *DC, Expr *expr,
-                                        FunctionType *closureType) {
-  bool isInDefaultArgumentContext = false;
-  if (auto *init = dyn_cast<Initializer>(DC))
-    isInDefaultArgumentContext =
-        init->getInitializerKind() == InitializerKind::DefaultArgument;
-
-  auto info = closureType->getExtInfo();
-  auto newClosureType = closureType;
-
-  if (isInDefaultArgumentContext && info.isNoEscape())
-    newClosureType = closureType->withExtInfo(info.withNoEscape(false))
-                         ->castTo<FunctionType>();
-
-  auto *closure = new (Context) AutoClosureExpr(
-      expr, newClosureType, AutoClosureExpr::InvalidDiscriminator, DC);
-
-  closure->setParameterList(ParameterList::createEmpty(Context));
-
-  ClosuresWithUncomputedCaptures.push_back(closure);
-
-  if (!newClosureType->isEqual(closureType)) {
-    assert(isInDefaultArgumentContext);
-    assert(newClosureType
-               ->withExtInfo(newClosureType->getExtInfo().withNoEscape(true))
-               ->isEqual(closureType));
-    return new (Context) FunctionConversionExpr(closure, closureType);
-  }
-
-  return closure;
-}
-
 static Type lookupDefaultLiteralType(const DeclContext *dc,
                                      StringRef name) {
   auto &ctx = dc->getASTContext();
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(dc))
     lookupOptions |= NameLookupFlags::KnownPrivate;
+  DeclNameRef nameRef(ctx.getIdentifier(name));
   auto lookup = TypeChecker::lookupUnqualified(dc->getModuleScopeContext(),
-                                               ctx.getIdentifier(name),
-                                               SourceLoc(),
+                                               nameRef, SourceLoc(),
                                                lookupOptions);
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
@@ -746,4 +714,89 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   assert(Elts.empty());
 
   return Result;
+}
+
+static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
+                                         SourceLoc loc) {
+  auto &ctx = param->getASTContext();
+  switch (param->getDefaultArgumentKind()) {
+  case DefaultArgumentKind::Column:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Column, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::File:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::File, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::FilePath:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::FilePath, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::Line:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Line, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::Function:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Function, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::DSOHandle:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::DSOHandle, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::NilLiteral:
+    return new (ctx) NilLiteralExpr(loc, /*Implicit=*/true);
+    break;
+
+  case DefaultArgumentKind::EmptyArray: {
+    auto *initExpr = ArrayExpr::create(ctx, loc, {}, {}, loc);
+    initExpr->setImplicit();
+    return initExpr;
+  }
+  case DefaultArgumentKind::EmptyDictionary: {
+    auto *initExpr = DictionaryExpr::create(ctx, loc, {}, {}, loc);
+    initExpr->setImplicit();
+    return initExpr;
+  }
+  case DefaultArgumentKind::None:
+  case DefaultArgumentKind::Normal:
+  case DefaultArgumentKind::Inherited:
+  case DefaultArgumentKind::StoredProperty:
+    llvm_unreachable("Not a caller-side default");
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
+llvm::Expected<Expr *> CallerSideDefaultArgExprRequest::evaluate(
+    Evaluator &evaluator, DefaultArgumentExpr *defaultExpr) const {
+  auto *param = defaultExpr->getParamDecl();
+  auto paramTy = defaultExpr->getType();
+
+  // Re-create the default argument using the location info of the call site.
+  auto *initExpr = synthesizeCallerSideDefault(param, defaultExpr->getLoc());
+  auto *dc = defaultExpr->ContextOrCallerSideExpr.get<DeclContext *>();
+  assert(dc && "Expected a DeclContext before type-checking caller-side arg");
+
+  auto &ctx = param->getASTContext();
+  DiagnosticTransaction transaction(ctx.Diags);
+  if (!TypeChecker::typeCheckParameterDefault(initExpr, dc, paramTy,
+                                              param->isAutoClosure())) {
+    if (param->hasDefaultExpr()) {
+      // HACK: If we were unable to type-check the default argument in context,
+      // then retry by type-checking it within the parameter decl, which should
+      // also fail. This will present the user with a better error message and
+      // allow us to avoid diagnosing on each call site.
+      transaction.abort();
+      (void)param->getTypeCheckedDefaultExpr();
+      assert(ctx.Diags.hadAnyError());
+    }
+    return new (ctx) ErrorExpr(initExpr->getSourceRange(), paramTy);
+  }
+  return initExpr;
 }

@@ -31,6 +31,7 @@ class IRGenModule;
 std::pair<IRGenerator *, IRGenModule *>
 createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
                   StringRef MainInputFilenameForDebugInfo,
+                  StringRef PrivateDiscriminator,
                   llvm::LLVMContext &LLVMContext);
 
 /// Delete the IRGenModule and IRGenerator obtained by the above call.

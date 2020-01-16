@@ -6,11 +6,12 @@ add_swift_target_library(swiftOSLogPrototype
   OSLogMessage.swift
   OSLogIntegerTypes.swift
   OSLogStringTypes.swift
+  OSLogNSObjectType.swift
 
-  SWIFT_MODULE_DEPENDS_IOS Darwin os
-  SWIFT_MODULE_DEPENDS_OSX Darwin os
-  SWIFT_MODULE_DEPENDS_TVOS Darwin os
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin os
+  SWIFT_MODULE_DEPENDS_IOS Darwin os ObjectiveC
+  SWIFT_MODULE_DEPENDS_OSX Darwin os ObjectiveC
+  SWIFT_MODULE_DEPENDS_TVOS Darwin os ObjectiveC
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin os ObjectiveC
   TARGET_SDKS ALL_APPLE_PLATFORMS
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT never_install

@@ -9,12 +9,11 @@ struct Wrapper<T> {
   init(stored: T) {
     self._stored = stored
   }
-  
+
   var wrappedValue: T {
     get { _stored }
     set { _stored = newValue }
   }
-  
 }
 
 @propertyWrapper
@@ -216,7 +215,11 @@ struct BadCombinations {
 }
 
 struct MultipleWrappers {
-  @Wrapper(stored: 17)
+  // FIXME: The diagnostics here aren't great. The problem is that we're
+  // attempting to splice a 'wrappedValue:' argument into the call to Wrapper's
+  // init, but it doesn't have a matching init. We're then attempting to access
+  // the nested 'wrappedValue', but Wrapper's 'wrappedValue' is Int.
+  @Wrapper(stored: 17) // expected-error{{value of type 'Int' has no member 'wrappedValue'}}
   @WrapperWithInitialValue // expected-error{{extra argument 'wrappedValue' in call}}
   var x: Int = 17
 
@@ -245,7 +248,7 @@ struct Initialization {
   var y = true
 
   @WrapperWithInitialValue<Int>
-  var y2 = true // expected-error{{Bool' is not convertible to 'Int}}
+  var y2 = true // expected-error{{cannot convert value of type 'Bool' to specified type 'Int'}}
 
   mutating func checkTypes(s: String) {
     x2 = s // expected-error{{cannot assign value of type 'String' to type 'Double'}}
@@ -831,6 +834,42 @@ struct UsesExplicitClosures {
 
   @WrapperAcceptingAutoclosure(body: { return 42 })
   var y: Int
+}
+
+// ---------------------------------------------------------------------------
+// Enclosing instance diagnostics
+// ---------------------------------------------------------------------------
+@propertyWrapper
+struct Observable<Value> {
+  private var stored: Value
+
+  init(wrappedValue: Value) {
+    self.stored = wrappedValue
+  }
+
+  @available(*, unavailable, message: "must be in a class")
+  var wrappedValue: Value { // expected-note{{'wrappedValue' has been explicitly marked unavailable here}}
+    get { fatalError("called wrappedValue getter") }
+    set { fatalError("called wrappedValue setter") }
+  }
+
+  static subscript<EnclosingSelf>(
+      _enclosingInstance observed: EnclosingSelf,
+      wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Value>,
+      storage storageKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Self>
+    ) -> Value {
+    get {
+      observed[keyPath: storageKeyPath].stored
+    }
+    set {
+      observed[keyPath: storageKeyPath].stored = newValue
+    }
+  }
+}
+
+struct MyObservedValueType {
+  @Observable // expected-error{{'wrappedValue' is unavailable: must be in a class}}
+  var observedProperty = 17
 }
 
 // ---------------------------------------------------------------------------
@@ -1584,12 +1623,12 @@ struct SR_11288_S3: SR_11288_P3 {
 // typealias as propertyWrapper in a constrained protocol extension //
 
 protocol SR_11288_P4 {}
-extension SR_11288_P4 where Self: AnyObject { // expected-note 2 {{where 'Self' = 'SR_11288_S4'}}
+extension SR_11288_P4 where Self: AnyObject { // expected-note {{requirement specified as 'Self' : 'AnyObject' [with Self = SR_11288_S4]}}
   typealias SR_11288_Wrapper4 = SR_11288_S0
 }
 
 struct SR_11288_S4: SR_11288_P4 {
-  @SR_11288_Wrapper4 var answer = 42 // expected-error 2 {{referencing type alias 'SR_11288_Wrapper4' on 'SR_11288_P4' requires that 'SR_11288_S4' be a class type}}
+  @SR_11288_Wrapper4 var answer = 42 // expected-error {{'SR_11288_S4.SR_11288_Wrapper4' (aka 'SR_11288_S0') requires that 'SR_11288_S4' be a class type}}
 }
 
 class SR_11288_C0: SR_11288_P4 {
@@ -1808,4 +1847,36 @@ func test_rdar56350060() {
       return self[keyPath: keyPath] // Ok
     }
   }
+}
+
+// rdar://problem/57411331 - crash due to incorrectly synthesized "nil" default
+// argument.
+@propertyWrapper
+struct Blah<Value> {
+  init(blah _: Int) { }
+
+  var wrappedValue: Value {
+    let val: Value? = nil
+    return val!
+  }
+}
+
+struct UseRdar57411331 {
+  let x = Rdar57411331(other: 5)
+}
+
+struct Rdar57411331 {
+  @Blah(blah: 17) var something: Int?
+
+  var other: Int
+}
+
+// SR-11994
+@propertyWrapper
+open class OpenPropertyWrapperWithPublicInit {
+  public init(wrappedValue: String) { // Okay
+    self.wrappedValue = wrappedValue
+  }
+  
+  open var wrappedValue: String = "Hello, world"
 }

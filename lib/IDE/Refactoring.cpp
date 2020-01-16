@@ -2939,30 +2939,36 @@ static NumberLiteralExpr *getTrailingNumberLiteral(ResolvedCursorInfo Tok) {
   // This cursor must point to the start of an expression.
   if (Tok.Kind != CursorInfoKind::ExprStart)
     return nullptr;
-  Expr *Parent = Tok.TrailingExpr;
-  assert(Parent);
 
-  // Check if an expression is a number literal.
-  auto IsLiteralNumber = [&](Expr *E) -> NumberLiteralExpr* {
-    if (auto *NL = dyn_cast<NumberLiteralExpr>(E)) {
-
-      // The sub-expression must have the same start loc with the outermost
-      // expression, i.e. the cursor position.
-      if (Parent->getStartLoc().getOpaquePointerValue() ==
-        E->getStartLoc().getOpaquePointerValue()) {
-        return NL;
-      }
-    }
-    return nullptr;
-  };
   // For every sub-expression, try to find the literal expression that matches
   // our criteria.
-  for (auto Pair: Parent->getDepthMap()) {
-    if (auto Result = IsLiteralNumber(Pair.getFirst())) {
-      return Result;
+  class FindLiteralNumber : public ASTWalker {
+    Expr * const parent;
+
+  public:
+    NumberLiteralExpr *found = nullptr;
+
+    explicit FindLiteralNumber(Expr *parent) : parent(parent) { }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (auto *literal = dyn_cast<NumberLiteralExpr>(expr)) {
+        // The sub-expression must have the same start loc with the outermost
+        // expression, i.e. the cursor position.
+        if (!found &&
+            parent->getStartLoc().getOpaquePointerValue() ==
+              expr->getStartLoc().getOpaquePointerValue()) {
+          found = literal;
+        }
+      }
+
+      return { found == nullptr, expr };
     }
-  }
-  return nullptr;
+  };
+
+  auto parent = Tok.TrailingExpr;
+  FindLiteralNumber finder(parent);
+  parent->walk(finder);
+  return finder.found;
 }
 
 static std::string insertUnderscore(StringRef Text) {
@@ -3159,6 +3165,97 @@ static bool rangeStartMayNeedRename(ResolvedRangeInfo Info) {
       return false;
   }
   llvm_unreachable("unhandled kind");
+}
+    
+bool RefactoringActionConvertToComputedProperty::
+isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+  if (Info.Kind != RangeKind::SingleDecl) {
+    return false;
+  }
+  
+  if (Info.ContainedNodes.size() != 1) {
+    return false;
+  }
+  
+  auto D = Info.ContainedNodes[0].dyn_cast<Decl*>();
+  if (!D) {
+    return false;
+  }
+  
+  auto Binding = dyn_cast<PatternBindingDecl>(D);
+  if (!Binding) {
+    return false;
+  }
+
+  auto SV = Binding->getSingleVar();
+  if (!SV) {
+    return false;
+  }
+
+  // willSet, didSet cannot be provided together with a getter
+  for (auto AD : SV->getAllAccessors()) {
+    if (AD->isObservingAccessor()) {
+      return false;
+    }
+  }
+  
+  // 'lazy' must not be used on a computed property
+  // NSCopying and IBOutlet attribute requires property to be mutable
+  auto Attributies = SV->getAttrs();
+  if (Attributies.hasAttribute<LazyAttr>() ||
+      Attributies.hasAttribute<NSCopyingAttr>() ||
+      Attributies.hasAttribute<IBOutletAttr>()) {
+    return false;
+  }
+
+  // Property wrapper cannot be applied to a computed property
+  if (SV->hasAttachedPropertyWrapper()) {
+    return false;
+  }
+
+  // has an initializer
+  return Binding->hasInitStringRepresentation(0);
+}
+
+bool RefactoringActionConvertToComputedProperty::performChange() {
+  // Get an initialization
+  auto D = RangeInfo.ContainedNodes[0].dyn_cast<Decl*>();
+  auto Binding = dyn_cast<PatternBindingDecl>(D);
+  SmallString<128> scratch;
+  auto Init = Binding->getInitStringRepresentation(0, scratch);
+  
+  // Get type
+  auto SV = Binding->getSingleVar();
+  auto SVType = SV->getType();
+  auto TR = SV->getTypeReprOrParentPatternTypeRepr();
+  
+  llvm::SmallString<64> DeclBuffer;
+  llvm::raw_svector_ostream OS(DeclBuffer);
+  llvm::StringRef Space = " ";
+  llvm::StringRef NewLine = "\n";
+  
+  OS << tok::kw_var << Space;
+  // Add var name
+  OS << SV->getNameStr().str() << ":" << Space;
+  // For computed property must write a type of var
+  if (TR) {
+    OS << Lexer::getCharSourceRangeFromSourceRange(SM, TR->getSourceRange()).str();
+  } else {
+    SVType.print(OS);
+  }
+
+  OS << Space << tok::l_brace << NewLine;
+  // Add an initialization
+  OS << tok::kw_return << Space << Init.str() << NewLine;
+  OS << tok::r_brace;
+  
+  // Replace initializer to computed property
+  auto ReplaceStartLoc = Binding->getLoc();
+  auto ReplaceEndLoc = Binding->getSourceRange().End;
+  auto ReplaceRange = SourceRange(ReplaceStartLoc, ReplaceEndLoc);
+  auto ReplaceCharSourceRange = Lexer::getCharSourceRangeFromSourceRange(SM, ReplaceRange);
+  EditConsumer.accept(SM, ReplaceCharSourceRange, DeclBuffer.str());
+  return false; // success
 }
 }// end of anonymous namespace
 

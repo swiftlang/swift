@@ -387,7 +387,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       // type is identical to the argument type, or substitutable via handling
       // of functions with primary archetypes in one or more parameters.
       // We can still do something more sophisticated with this.
-      // FIXME: Use TC.isConvertibleTo?
+      // FIXME: Use TypeChecker::isConvertibleTo?
       
       TypeSubstitutionMap archetypesMap;
       bool matched;
@@ -602,8 +602,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
       auto ctors = TypeChecker::lookupConstructors(
           CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
       for (auto ctor : ctors) {
-        if (ctor.getValueDecl()->getInterfaceType())
-          candidates.push_back({ ctor.getValueDecl(), 1 });
+        candidates.push_back({ ctor.getValueDecl(), 1 });
       }
     }
     
@@ -968,7 +967,7 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
     assert(decl && "Only decl-based candidates may be marked inaccessible");
 
     InaccessibleMemberFailure failure(
-        nullptr, CS, decl, CS.getConstraintLocator(const_cast<Expr *>(E)));
+        CS, decl, CS.getConstraintLocator(const_cast<Expr *>(E)));
     auto diagnosed = failure.diagnoseAsError();
     assert(diagnosed && "failed to produce expected diagnostic");
 

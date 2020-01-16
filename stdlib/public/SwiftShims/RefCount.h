@@ -1475,25 +1475,13 @@ HeapObject* RefCounts<SideTableRefCountBits>::getHeapObject() {
 // for use by SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS
 typedef swift::InlineRefCounts InlineRefCounts;
 
-// __cplusplus
-#endif
-
 // These assertions apply to both the C and the C++ declarations.
-#if defined(_MSC_VER) && !defined(__clang__)
 static_assert(sizeof(InlineRefCounts) == sizeof(InlineRefCountsPlaceholder),
               "InlineRefCounts and InlineRefCountsPlaceholder must match");
 static_assert(sizeof(InlineRefCounts) == sizeof(__swift_uintptr_t),
               "InlineRefCounts must be pointer-sized");
 static_assert(__alignof(InlineRefCounts) == __alignof(__swift_uintptr_t),
               "InlineRefCounts must be pointer-aligned");
-#else
-_Static_assert(sizeof(InlineRefCounts) == sizeof(InlineRefCountsPlaceholder),
-  "InlineRefCounts and InlineRefCountsPlaceholder must match");
-_Static_assert(sizeof(InlineRefCounts) == sizeof(__swift_uintptr_t),
-  "InlineRefCounts must be pointer-sized");
-_Static_assert(_Alignof(InlineRefCounts) == _Alignof(__swift_uintptr_t),
-  "InlineRefCounts must be pointer-aligned");
-#endif
 
 #if defined(_WIN32) && defined(_M_ARM64)
 #if defined(__cplusplus)
@@ -1507,5 +1495,7 @@ inline void _Atomic_storage<swift::SideTableRefCountBits, 16>::_Unlock() const n
 }
 #endif
 #endif
+
+#endif // !defined(__swift__)
 
 #endif

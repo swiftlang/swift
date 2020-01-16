@@ -47,7 +47,7 @@ AbstractionPattern
 TypeConverter::getAbstractionPattern(SubscriptDecl *decl, bool isNonObjC) {
   CanGenericSignature genericSig;
   if (auto sig = decl->getGenericSignatureOfContext())
-    genericSig = sig->getCanonicalSignature();
+    genericSig = sig.getCanonicalSignature();
   return AbstractionPattern(genericSig,
                             decl->getElementInterfaceType()
                                 ->getCanonicalType());
@@ -77,7 +77,7 @@ AbstractionPattern
 TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
   CanGenericSignature genericSig;
   if (auto sig = var->getDeclContext()->getGenericSignatureOfContext())
-    genericSig = sig->getCanonicalSignature();
+    genericSig = sig.getCanonicalSignature();
 
   CanType swiftType = var->getInterfaceType()
                          ->getCanonicalType();
@@ -110,7 +110,7 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
 
   CanGenericSignature genericSig;
   if (auto sig = decl->getParentEnum()->getGenericSignatureOfContext())
-    genericSig = sig->getCanonicalSignature();
+    genericSig = sig.getCanonicalSignature();
   return AbstractionPattern(genericSig,
                             decl->getArgumentInterfaceType()
                                 ->getCanonicalType());
@@ -203,25 +203,54 @@ bool AbstractionPattern::isConcreteType() const {
           GenericSig->isConcreteType(getType()));
 }
 
-bool AbstractionPattern::requiresClass() {
+bool AbstractionPattern::requiresClass() const {
   switch (getKind()) {
   case Kind::Opaque:
     return false;
   case Kind::Type:
-  case Kind::Discard: {
+  case Kind::Discard:
+  case Kind::ClangType: {
     auto type = getType();
     if (auto archetype = dyn_cast<ArchetypeType>(type))
       return archetype->requiresClass();
-    else if (isa<DependentMemberType>(type) ||
-             isa<GenericTypeParamType>(type)) {
+    if (isa<DependentMemberType>(type) ||
+        isa<GenericTypeParamType>(type)) {
+      if (getKind() == Kind::ClangType) {
+        // ObjC generics are always class constrained.
+        return true;
+      }
+      
       assert(GenericSig &&
              "Dependent type in pattern without generic signature?");
       return GenericSig->requiresClass(type);
     }
     return false;
   }
+    
   default:
     return false;
+  }
+}
+
+LayoutConstraint AbstractionPattern::getLayoutConstraint() const {
+  switch (getKind()) {
+  case Kind::Opaque:
+    return LayoutConstraint();
+  case Kind::Type:
+  case Kind::Discard: {
+    auto type = getType();
+    if (auto archetype = dyn_cast<ArchetypeType>(type))
+      return archetype->getLayoutConstraint();
+    else if (isa<DependentMemberType>(type) ||
+             isa<GenericTypeParamType>(type)) {
+      assert(GenericSig &&
+             "Dependent type in pattern without generic signature?");
+      return GenericSig->getLayoutConstraint(type);
+    }
+    return LayoutConstraint();
+  }
+  default:
+    return LayoutConstraint();
   }
 }
 
@@ -391,7 +420,7 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
   case Kind::Opaque:
     return *this;
   case Kind::Type:
-    if (isTypeParameter())
+    if (isTypeParameterOrOpaqueArchetype())
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               getResultType(getType()));
@@ -440,7 +469,7 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
   case Kind::Opaque:
     return *this;
   case Kind::Type: {
-    if (isTypeParameter())
+    if (isTypeParameterOrOpaqueArchetype())
       return AbstractionPattern::getOpaque();
     auto params = cast<AnyFunctionType>(getType()).getParams();
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
@@ -596,6 +625,8 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
   case Kind::Type:
     if (isTypeParameter())
       return AbstractionPattern::getOpaque();
+    if (isa<OpaqueTypeArchetypeType>(getType()))
+      return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
                               ::getOptionalObjectType(getType()));
 
@@ -697,6 +728,9 @@ void AbstractionPattern::print(raw_ostream &out) const {
             getKind() == Kind::PartialCurriedCXXMethodType
               ? "AP::PartialCurriedCXXMethodType("
               : "AP::PartialCurriedCFunctionAsMethodType(");
+    if (auto sig = getGenericSignature()) {
+      sig->print(out);
+    }
     getType().dump(out);
     out << ", ";
     // It would be better to use print, but we need a PrintingPolicy
@@ -793,4 +827,45 @@ bool AbstractionPattern::hasSameBasicTypeStructure(CanType l, CanType r) {
 
   // Otherwise, the structure is similar enough.
   return true;
+}
+
+AbstractionPattern
+AbstractionPattern::unsafeGetSubstFieldType(ValueDecl *member,
+                                            CanType origMemberInterfaceType)
+const {
+  if (isTypeParameterOrOpaqueArchetype()) {
+    // Fall back to the generic abstraction pattern for the member.
+    auto sig = member->getDeclContext()->getGenericSignatureOfContext();
+    CanType memberTy = origMemberInterfaceType
+      ? origMemberInterfaceType
+      : member->getInterfaceType()->getCanonicalType(sig);
+    return AbstractionPattern(sig.getCanonicalSignature(), memberTy);
+  }
+
+  switch (getKind()) {
+  case Kind::Opaque:
+    llvm_unreachable("should be handled by isTypeParameter");
+  case Kind::Invalid:
+    llvm_unreachable("called on invalid abstraction pattern");
+  case Kind::Tuple:
+    llvm_unreachable("should not have a tuple pattern matching a struct/enum "
+                     "type");
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::ClangType:
+  case Kind::Type:
+  case Kind::Discard:
+    auto memberTy = getType()->getTypeOfMember(member->getModuleContext(),
+                                      member, origMemberInterfaceType)
+                             ->getCanonicalType(getGenericSignature());
+      
+    return AbstractionPattern(getGenericSignature(), memberTy);
+  }
 }

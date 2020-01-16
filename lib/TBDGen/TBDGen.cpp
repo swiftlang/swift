@@ -19,6 +19,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -35,10 +36,12 @@
 #include "swift/SIL/TypeLowering.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/YAMLParser.h"
 #include "llvm/TextAPI/MachO/InterfaceFile.h"
 #include "llvm/TextAPI/MachO/TextAPIReader.h"
 #include "llvm/TextAPI/MachO/TextAPIWriter.h"
@@ -48,6 +51,7 @@
 using namespace swift;
 using namespace swift::irgen;
 using namespace swift::tbdgen;
+using namespace llvm::yaml;
 using StringSet = llvm::StringSet<>;
 using SymbolKind = llvm::MachO::SymbolKind;
 
@@ -55,19 +59,224 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
 }
 
+void TBDGenVisitor::addSymbolInternal(StringRef name,
+                                      llvm::MachO::SymbolKind kind,
+                                      bool isLinkerDirective) {
+  if (!isLinkerDirective && Opts.LinkerDirectivesOnly)
+    return;
+  Symbols.addSymbol(kind, name, Targets);
+  if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
+    auto isNewValue = StringSymbols->insert(name).second;
+    (void)isNewValue;
+    assert(isNewValue && "symbol appears twice");
+  }
+}
+
+static Optional<llvm::VersionTuple> getDeclMoveOSVersion(Decl *D) {
+  for (auto *attr: D->getAttrs()) {
+    if (auto *ODA = dyn_cast<OriginallyDefinedInAttr>(attr)) {
+      if (ODA->isActivePlatform(D->getASTContext()))
+        return ODA->MovedVersion;
+    }
+  }
+  return None;
+}
+
+enum class LinkerPlatformId: uint8_t {
+#define LD_PLATFORM(Name, Id) Name = Id,
+#include "ldPlatformKinds.def"
+};
+
+static StringRef getLinkerPlatformName(uint8_t Id) {
+  switch (Id) {
+#define LD_PLATFORM(Name, Id) case Id: return #Name;
+#include "ldPlatformKinds.def"
+  default:
+    llvm_unreachable("unrecognized platform id");
+  }
+}
+
+static Optional<uint8_t> getLinkerPlatformId(StringRef Platform) {
+  return llvm::StringSwitch<Optional<uint8_t>>(Platform)
+#define LD_PLATFORM(Name, Id) .Case(#Name, Id)
+#include "ldPlatformKinds.def"
+    .Default(None);
+}
+
+struct InstallNameStore {
+  // The default install name to use when no specific install name is specified.
+  std::string InstallName;
+  // The install name specific to the platform id. This takes precedence over
+  // the default install name.
+  std::map<uint8_t, std::string> PlatformInstallName;
+  StringRef getInstallName(LinkerPlatformId Id) const {
+    auto It = PlatformInstallName.find((uint8_t)Id);
+    if (It == PlatformInstallName.end())
+      return InstallName;
+    else
+      return It->second;
+  }
+  void remark(ASTContext &Ctx, StringRef ModuleName) const {
+    Ctx.Diags.diagnose(SourceLoc(), diag::default_previous_install_name,
+                       ModuleName, InstallName);
+    for (auto Pair: PlatformInstallName) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::platform_previous_install_name,
+                         ModuleName, getLinkerPlatformName(Pair.first),
+                         Pair.second);
+    }
+  }
+};
+
+static std::string getScalaNodeText(Node *N) {
+  SmallString<32> Buffer;
+  return cast<ScalarNode>(N)->getValue(Buffer).str();
+}
+
+static std::set<int8_t> getSequenceNodePlatformList(ASTContext &Ctx, Node *N) {
+  std::set<int8_t> Results;
+  for (auto &E: *cast<SequenceNode>(N)) {
+    auto Platform = getScalaNodeText(&E);
+    auto Id = getLinkerPlatformId(Platform);
+    if (Id.hasValue()) {
+      Results.insert(*Id);
+    } else {
+      // Diagnose unrecognized platform name.
+      Ctx.Diags.diagnose(SourceLoc(), diag::unknown_platform_name, Platform);
+    }
+  }
+  return Results;
+}
+
+/// Parse an entry like this, where the "platforms" key-value pair is optional:
+///  {
+///     "module": "Foo",
+///     "platforms": ["macOS"],
+///     "install_name": "/System/MacOS"
+///  },
+static int
+parseEntry(ASTContext &Ctx,
+           Node *Node, std::map<std::string, InstallNameStore> &Stores) {
+  if (auto *SN = cast<SequenceNode>(Node)) {
+    for (auto It = SN->begin(); It != SN->end(); ++It) {
+      auto *MN = cast<MappingNode>(&*It);
+      std::string ModuleName;
+      std::string InstallName;
+      Optional<std::set<int8_t>> Platforms;
+      for (auto &Pair: *MN) {
+        auto Key = getScalaNodeText(Pair.getKey());
+        auto* Value = Pair.getValue();
+        if (Key == "module") {
+          ModuleName = getScalaNodeText(Value);
+        } else if (Key == "platforms") {
+          Platforms = getSequenceNodePlatformList(Ctx, Value);
+        } else if (Key == "install_name") {
+          InstallName = getScalaNodeText(Value);
+        } else {
+          return 1;
+        }
+      }
+      if (ModuleName.empty() || InstallName.empty())
+        return 1;
+      auto &Store = Stores.insert(std::make_pair(ModuleName,
+        InstallNameStore())).first->second;
+      if (Platforms.hasValue()) {
+        // This install name is platform-specific.
+        for (auto Id: Platforms.getValue()) {
+          Store.PlatformInstallName[Id] = InstallName;
+        }
+      } else {
+        // The install name is the default one.
+        Store.InstallName = InstallName;
+      }
+    }
+  } else {
+    return 1;
+  }
+  return 0;
+}
+
+static std::map<std::string, InstallNameStore>
+parsePreviousModuleInstallNameMap(ASTContext &Ctx, StringRef FileName) {
+  namespace yaml = llvm::yaml;
+  std::map<std::string, InstallNameStore> AllInstallNames;
+  SWIFT_DEFER {
+    for (auto Pair: AllInstallNames) {
+      Pair.second.remark(Ctx, Pair.first);
+    }
+  };
+  // Load the input file.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+    vfs::getFileOrSTDIN(*Ctx.SourceMgr.getFileSystem(), FileName);
+  if (!FileBufOrErr) {
+    Ctx.Diags.diagnose(SourceLoc(), diag::previous_installname_map_missing,
+                       FileName);
+    return AllInstallNames;
+  }
+  StringRef Buffer = FileBufOrErr->get()->getBuffer();
+  yaml::Stream Stream(llvm::MemoryBufferRef(Buffer, FileName),
+                      Ctx.SourceMgr.getLLVMSourceMgr());
+  for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
+    assert(DI != Stream.end() && "Failed to read a document");
+    yaml::Node *N = DI->getRoot();
+    assert(N && "Failed to find a root");
+    if (parseEntry(Ctx, N, AllInstallNames)) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::previous_installname_map_corrupted,
+                         FileName);
+      return AllInstallNames;
+    }
+  }
+  return AllInstallNames;
+}
+
+void TBDGenVisitor::addLinkerDirectiveSymbols(StringRef name,
+                                              llvm::MachO::SymbolKind kind) {
+  if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
+    return;
+  if (!TopLevelDecl)
+    return;
+  auto MovedVer = getDeclMoveOSVersion(TopLevelDecl);
+  if (!MovedVer.hasValue())
+    return;
+  assert(MovedVer.hasValue());
+  unsigned Major[2];
+  unsigned Minor[2];
+  Major[1] = MovedVer->getMajor();
+  Minor[1] = MovedVer->getMinor().hasValue() ? *MovedVer->getMinor(): 0;
+  auto AvailRange = AvailabilityInference::availableRange(TopLevelDecl,
+                                TopLevelDecl->getASTContext()).getOSVersion();
+  assert(AvailRange.hasLowerEndpoint() &&
+         "cannot find the start point of availability");
+  if (!AvailRange.hasLowerEndpoint())
+    return;
+  assert(AvailRange.getLowerEndpoint() < *MovedVer);
+  if (AvailRange.getLowerEndpoint() >= *MovedVer)
+    return;
+  Major[0] = AvailRange.getLowerEndpoint().getMajor();
+  Minor[0] = AvailRange.getLowerEndpoint().getMinor().hasValue() ?
+    AvailRange.getLowerEndpoint().getMinor().getValue() : 0;
+  for (auto CurMaj = Major[0]; CurMaj <= Major[1]; ++ CurMaj) {
+    unsigned MinRange[2] = {0, 31};
+    if (CurMaj == Major[0])
+      MinRange[0] = Minor[0];
+    if (CurMaj == Major[1])
+      MinRange[1] = Minor[1];
+    for (auto CurMin = MinRange[0]; CurMin != MinRange[1]; ++ CurMin) {
+      llvm::SmallString<64> Buffer;
+      llvm::raw_svector_ostream OS(Buffer);
+      OS << "$ld$hide$os" << CurMaj << "." << CurMin << "$" << name;
+      addSymbolInternal(OS.str(), llvm::MachO::SymbolKind::GlobalSymbol,
+                        /*LinkerDirective*/true);
+    }
+  }
+}
+
 void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
   // The linker expects to see mangled symbol names in TBD files, so make sure
   // to mangle before inserting the symbol.
   SmallString<32> mangled;
   llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
-
-  Symbols.addSymbol(kind, mangled, Targets);
-
-  if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
-    auto isNewValue = StringSymbols->insert(mangled).second;
-    (void)isNewValue;
-    assert(isNewValue && "symbol appears twice");
-  }
+  addSymbolInternal(mangled, kind);
+  addLinkerDirectiveSymbols(mangled, kind);
 }
 
 void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
@@ -225,7 +434,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
   }
-  if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+  if (AFD->getDynamicallyReplacedDecl()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
         AFD, useAllocator));
@@ -253,7 +462,7 @@ void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
-    if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+    if (FD->getDynamicallyReplacedDecl()) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
@@ -281,7 +490,7 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
-    if (ASD->hasAnyDynamicReplacementAccessors()) {
+    if (ASD->getDynamicallyReplacedDecl()) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
@@ -593,16 +802,44 @@ void TBDGenVisitor::addFirstFileSymbols() {
   }
 }
 
-/// Converts a version tuple into a packed version, ignoring components beyond
-/// major, minor, and subminor.
-static llvm::MachO::PackedVersion
-convertToPacked(const version::Version &version) {
-  // FIXME: Warn if version is greater than 3 components?
-  unsigned major = 0, minor = 0, subminor = 0;
-  if (version.size() > 0) major = version[0];
-  if (version.size() > 1) minor = version[1];
-  if (version.size() > 2) subminor = version[2];
-  return llvm::MachO::PackedVersion(major, minor, subminor);
+/// The kind of version being parsed, used for diagnostics.
+/// Note: Must match the order in DiagnosticsFrontend.def
+enum DylibVersionKind_t: unsigned {
+  CurrentVersion,
+  CompatibilityVersion
+};
+
+/// Converts a version string into a packed version, truncating each component
+/// if necessary to fit all 3 into a 32-bit packed structure.
+///
+/// For example, the version '1219.37.11' will be packed as
+///
+///  Major (1,219)       Minor (37) Patch (11)
+/// ┌───────────────────┬──────────┬──────────┐
+/// │ 00001100 11000011 │ 00100101 │ 00001011 │
+/// └───────────────────┴──────────┴──────────┘
+///
+/// If an individual component is greater than the highest number that can be
+/// represented in its alloted space, it will be truncated to the maximum value
+/// that fits in the alloted space, which matches the behavior of the linker.
+static Optional<llvm::MachO::PackedVersion>
+parsePackedVersion(DylibVersionKind_t kind, StringRef versionString,
+                   ASTContext &ctx) {
+  if (versionString.empty())
+    return None;
+
+  llvm::MachO::PackedVersion version;
+  auto result = version.parse64(versionString);
+  if (!result.first) {
+    ctx.Diags.diagnose(SourceLoc(), diag::tbd_err_invalid_version,
+                       (unsigned)kind, versionString);
+    return None;
+  }
+  if (result.second) {
+    ctx.Diags.diagnose(SourceLoc(), diag::tbd_warn_truncating_version,
+                       (unsigned)kind, versionString);
+  }
+  return version;
 }
 
 static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
@@ -610,6 +847,10 @@ static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
   return LangOpts.EnableAppExtensionRestrictions ||
          llvm::sys::Process::GetEnv("LD_NO_ENCRYPT") ||
          llvm::sys::Process::GetEnv("LD_APPLICATION_EXTENSION_SAFE");
+}
+
+static bool hasLinkerDirective(Decl *D) {
+  return getDeclMoveOSVersion(D).hasValue();
 }
 
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
@@ -627,15 +868,23 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setApplicationExtensionSafe(
     isApplicationExtensionSafe(M->getASTContext().LangOpts));
   file.setInstallName(opts.InstallName);
-  if (auto currentVersion = opts.CurrentVersion) {
-    file.setCurrentVersion(convertToPacked(*currentVersion));
-  }
-  if (auto compatibilityVersion = opts.CompatibilityVersion) {
-    file.setCompatibilityVersion(convertToPacked(*compatibilityVersion));
-  }
   file.setTwoLevelNamespace();
   file.setSwiftABIVersion(irgen::getSwiftABIVersion());
   file.setInstallAPI(opts.IsInstallAPI);
+
+  if (auto packed = parsePackedVersion(CurrentVersion,
+                                       opts.CurrentVersion, ctx)) {
+    file.setCurrentVersion(*packed);
+  }
+
+  if (auto packed = parsePackedVersion(CompatibilityVersion,
+                                       opts.CompatibilityVersion, ctx)) {
+    file.setCompatibilityVersion(*packed);
+  }
+
+  if (!opts.ModuleInstallNameMapPath.empty()) {
+    parsePreviousModuleInstallNameMap(ctx, opts.ModuleInstallNameMapPath);
+  }
 
   llvm::MachO::Target target(triple);
   file.addTarget(target);
@@ -655,8 +904,13 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
 
     visitor.addMainIfNecessary(file);
 
-    for (auto d : decls)
+    for (auto d : decls) {
+      if (opts.LinkerDirectivesOnly && !hasLinkerDirective(d))
+        continue;
+      visitor.TopLevelDecl = d;
+      SWIFT_DEFER { visitor.TopLevelDecl = nullptr; };
       visitor.visit(d);
+    }
   };
 
   if (singleFile) {

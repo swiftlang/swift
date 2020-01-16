@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -894,7 +895,7 @@ private:
                                  const ParsedDeclName renamedParsedDeclName) {
     auto declContext = D->getDeclContext();
     ASTContext &astContext = D->getASTContext();
-    auto renamedDeclName = renamedParsedDeclName.formDeclName(astContext);
+    auto renamedDeclName = renamedParsedDeclName.formDeclNameRef(astContext);
 
     if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
       if (!renamedParsedDeclName.ContextName.empty()) {
@@ -902,7 +903,7 @@ private:
       }
       SmallVector<ValueDecl *, 1> decls;
       declContext->lookupQualified(declContext->getParentModule(),
-                                   renamedDeclName.getBaseIdentifier(),
+                                   renamedDeclName.withoutArgumentLabels(),
                                    NL_OnlyTypes,
                                    decls);
       if (decls.size() == 1)
@@ -1559,8 +1560,7 @@ private:
     ASTContext &ctx = getASTContext();
     auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
     clang::QualType clangTy = clangASTContext.getTypeDeclType(clangTypeDecl);
-    return clangTy->isPointerType() || clangTy->isBlockPointerType() ||
-      clangTy->isObjCObjectPointerType();
+    return swift::canImportAsOptional(clangTy.getTypePtr());
   }
 
   bool printImportedAlias(const TypeAliasDecl *alias,
@@ -1881,8 +1881,8 @@ private:
       assert(extension->getGenericParams()->size() ==
              extendedClass->getGenericParams()->size() &&
              "extensions with custom generic parameters?");
-      assert(extension->getGenericSignature()->getCanonicalSignature() ==
-             extendedClass->getGenericSignature()->getCanonicalSignature() &&
+      assert(extension->getGenericSignature().getCanonicalSignature() ==
+                 extendedClass->getGenericSignature().getCanonicalSignature() &&
              "constrained extensions or custom generic parameters?");
       type = extendedClass->getGenericEnvironment()->getSugaredType(type);
       decl = type->getDecl();
@@ -1934,7 +1934,18 @@ private:
     if (!FT->getParams().empty()) {
       interleave(FT->getParams(),
                  [this](const AnyFunctionType::Param &param) {
-                   print(param.getOldType(), OTK_None, param.getLabel(),
+                   switch (param.getValueOwnership()) {
+                   case ValueOwnership::Default:
+                   case ValueOwnership::Shared:
+                     break;
+                   case ValueOwnership::Owned:
+                     os << "SWIFT_RELEASES_ARGUMENT ";
+                     break;
+                   case ValueOwnership::InOut:
+                     llvm_unreachable("bad specifier");
+                   }
+
+                   print(param.getParameterType(), OTK_None, param.getLabel(),
                          IsFunctionParam);
                  },
                  [this] { os << ", "; });

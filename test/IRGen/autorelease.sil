@@ -46,6 +46,14 @@ bb0(%0 : @owned $C?):
 // arm64-NEXT: [[T3:%.*]] = ptrtoint i8* [[T2]] to i64
 // arm64-NEXT: ret i64 [[T3]]
 
+// aarch64:    define{{( dllexport| protected)?}} swiftcc i64 @bar(i64)
+// aarch64:      [[T0:%.*]] = call swiftcc i64 @foo(i64 %0)
+// aarch64-NEXT: call void asm sideeffect "mov
+// aarch64-NEXT: [[T1:%.*]] = inttoptr i64 [[T0]] to i8*
+// aarch64-NEXT: [[T2:%.*]] = call i8* @llvm.objc.retainAutoreleasedReturnValue(i8* [[T1]])
+// aarch64-NEXT: [[T3:%.*]] = ptrtoint i8* [[T2]] to i64
+// aarch64-NEXT: ret i64 [[T3]]
+
 // i386:    define{{( dllexport| protected)?}} swiftcc i32 @bar(i32)
 // i386:      [[T0:%.*]] = call swiftcc i32 @foo(i32 %0)
 // i386-NEXT: [[T1:%.*]] = inttoptr i32 [[T0]] to i8*
@@ -76,3 +84,4 @@ bb0(%0 : @owned $C?):
 // armv7k-NEXT: [[T2:%.*]] = call i8* @llvm.objc.retainAutoreleasedReturnValue(i8* [[T1]])
 // armv7k-NEXT: [[T3:%.*]] = ptrtoint i8* [[T2]] to i32
 // armv7k-NEXT: ret i32 [[T3]]
+

@@ -348,33 +348,6 @@ Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes,
 Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
     Type output, FunctionTypeFlags flags) {
-  FunctionTypeRepresentation representation;
-  switch (flags.getConvention()) {
-  case FunctionMetadataConvention::Swift:
-    representation = FunctionTypeRepresentation::Swift;
-    break;
-  case FunctionMetadataConvention::Block:
-    representation = FunctionTypeRepresentation::Block;
-    break;
-  case FunctionMetadataConvention::Thin:
-    representation = FunctionTypeRepresentation::Thin;
-    break;
-  case FunctionMetadataConvention::CFunctionPointer:
-    representation = FunctionTypeRepresentation::CFunctionPointer;
-    break;
-  }
-
-  auto einfo = AnyFunctionType::ExtInfo(representation,
-                                        /*throws*/ flags.throws());
-
-  if (representation == FunctionTypeRepresentation::Swift ||
-      representation == FunctionTypeRepresentation::Block) {
-    if (flags.isEscaping())
-      einfo = einfo.withNoEscape(false);
-    else
-      einfo = einfo.withNoEscape(true);
-  }
-
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();
 
@@ -396,6 +369,42 @@ Type ASTBuilder::createFunctionType(
 
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
   }
+
+  FunctionTypeRepresentation representation;
+  switch (flags.getConvention()) {
+  case FunctionMetadataConvention::Swift:
+    representation = FunctionTypeRepresentation::Swift;
+    break;
+  case FunctionMetadataConvention::Block:
+    representation = FunctionTypeRepresentation::Block;
+    break;
+  case FunctionMetadataConvention::Thin:
+    representation = FunctionTypeRepresentation::Thin;
+    break;
+  case FunctionMetadataConvention::CFunctionPointer:
+    representation = FunctionTypeRepresentation::CFunctionPointer;
+    break;
+  }
+
+  auto noescape =
+    (representation == FunctionTypeRepresentation::Swift
+     || representation == FunctionTypeRepresentation::Block)
+    && !flags.isEscaping();
+
+  FunctionType::ExtInfo incompleteExtInfo(
+    FunctionTypeRepresentation::Swift,
+    noescape, flags.throws(),
+    DifferentiabilityKind::NonDifferentiable,
+    /*clangFunctionType*/nullptr);
+
+  const clang::Type *clangFunctionType = nullptr;
+  if (representation == FunctionTypeRepresentation::CFunctionPointer)
+    clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
+                                                 incompleteExtInfo,
+                                                 representation);
+
+  auto einfo = incompleteExtInfo.withRepresentation(representation)
+                                .withClangFunctionType(clangFunctionType);
 
   return FunctionType::get(funcParams, output, einfo);
 }
@@ -445,7 +454,7 @@ Type ASTBuilder::createImplFunctionType(
     ArrayRef<Demangle::ImplFunctionResult<Type>> results,
     Optional<Demangle::ImplFunctionResult<Type>> errorResult,
     ImplFunctionTypeFlags flags) {
-  GenericSignature genericSig = GenericSignature();
+  GenericSignature genericSig;
 
   SILCoroutineKind funcCoroutineKind = SILCoroutineKind::None;
   ParameterConvention funcCalleeConvention =
@@ -479,9 +488,11 @@ Type ASTBuilder::createImplFunctionType(
     break;
   }
 
-  auto einfo = SILFunctionType::ExtInfo(representation,
-                                        flags.isPseudogeneric(),
-                                        !flags.isEscaping());
+  // TODO: [store-sil-clang-function-type]
+  auto einfo = SILFunctionType::ExtInfo(
+      representation, flags.isPseudogeneric(), !flags.isEscaping(),
+      DifferentiabilityKind::NonDifferentiable,
+      /*clangFunctionType*/ nullptr);
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;
@@ -854,12 +865,13 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
     }
   }
 
-  return evaluateOrDefault(
-      Ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        nominalDecl->getGenericSignature().getPointer(), { },
-        std::move(requirements)},
-      GenericSignature())->getCanonicalSignature();
+  return evaluateOrDefault(Ctx.evaluator,
+                           AbstractGenericSignatureRequest{
+                               nominalDecl->getGenericSignature().getPointer(),
+                               {},
+                               std::move(requirements)},
+                           GenericSignature())
+      .getCanonicalSignature();
 }
 
 DeclContext *
@@ -969,8 +981,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
         continue;
       }
 
-      if (ext->getGenericSignature()->getCanonicalSignature()
-          == genericSig) {
+      if (ext->getGenericSignature().getCanonicalSignature() == genericSig) {
         return ext;
       }
     }

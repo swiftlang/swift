@@ -485,37 +485,48 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
 }
 
 ManagedValue SILGenBuilder::createUnconditionalCheckedCastValue(
-    SILLocation loc, ManagedValue operand, SILType type) {
+    SILLocation loc, ManagedValue op, CanType srcFormalTy,
+    SILType destLoweredTy, CanType destFormalTy) {
   SILValue result =
-      createUnconditionalCheckedCastValue(loc, operand.forward(SGF), type);
+      createUnconditionalCheckedCastValue(loc, op.forward(SGF),
+                                          srcFormalTy, destLoweredTy,
+                                          destFormalTy);
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
-ManagedValue SILGenBuilder::createUnconditionalCheckedCast(SILLocation loc,
-                                                           ManagedValue operand,
-                                                           SILType type) {
+ManagedValue SILGenBuilder::createUnconditionalCheckedCast(
+    SILLocation loc, ManagedValue op,
+    SILType destLoweredTy, CanType destFormalTy) {
   SILValue result =
-      createUnconditionalCheckedCast(loc, operand.forward(SGF), type);
+      createUnconditionalCheckedCast(loc, op.forward(SGF),
+                                     destLoweredTy, destFormalTy);
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
 void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
-                                            ManagedValue operand, SILType type,
+                                            ManagedValue op,
+                                            SILType destLoweredTy,
+                                            CanType destFormalTy,
                                             SILBasicBlock *trueBlock,
                                             SILBasicBlock *falseBlock,
                                             ProfileCounter Target1Count,
                                             ProfileCounter Target2Count) {
-  createCheckedCastBranch(loc, isExact, operand.forward(SGF), type, trueBlock,
-                          falseBlock, Target1Count, Target2Count);
+  createCheckedCastBranch(loc, isExact, op.forward(SGF),
+                          destLoweredTy, destFormalTy,
+                          trueBlock, falseBlock,
+                          Target1Count, Target2Count);
 }
 
 void SILGenBuilder::createCheckedCastValueBranch(SILLocation loc,
-                                                 ManagedValue operand,
-                                                 SILType type,
+                                                 ManagedValue op,
+                                                 CanType srcFormalTy,
+                                                 SILType destLoweredTy,
+                                                 CanType destFormalTy,
                                                  SILBasicBlock *trueBlock,
                                                  SILBasicBlock *falseBlock) {
-  createCheckedCastValueBranch(loc, operand.forward(SGF), type, trueBlock,
-                               falseBlock);
+  createCheckedCastValueBranch(loc, op.forward(SGF), srcFormalTy,
+                               destLoweredTy, destFormalTy,
+                               trueBlock, falseBlock);
 }
 
 ManagedValue SILGenBuilder::createUpcast(SILLocation loc, ManagedValue original,
@@ -658,8 +669,7 @@ ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
                                         SILValue address,
                                         StoreOwnershipQualifier qualifier) {
   CleanupCloner cloner(*this, value);
-  if (value.getType().isTrivial(SGF.F) ||
-      value.getOwnershipKind() == ValueOwnershipKind::None)
+  if (value.getOwnershipKind() == ValueOwnershipKind::None)
     qualifier = StoreOwnershipQualifier::Trivial;
   createStore(loc, value.forward(SGF), address, qualifier);
   return cloner.clone(address);
@@ -756,14 +766,15 @@ ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
     return ManagedValue::forUnmanaged(result);
   }
 
-  // We need to look for the first non-trivial value and use that as our cleanup
-  // cloner value.
+  // We need to look for the first value without .none ownership and use that as
+  // our cleanup cloner value.
   auto iter = find_if(elements, [&](ManagedValue mv) -> bool {
-    return !mv.getType().isTrivial(getFunction());
+    return mv.getOwnershipKind() != ValueOwnershipKind::None;
   });
 
   llvm::SmallVector<SILValue, 8> forwardedValues;
-  // If we have all trivial values, then just create the tuple and return. No
+
+  // If we have all .none values, then just create the tuple and return. No
   // cleanups need to be cloned.
   if (iter == elements.end()) {
     llvm::transform(elements, std::back_inserter(forwardedValues),
@@ -790,17 +801,6 @@ ManagedValue SILGenBuilder::createUncheckedAddrCast(SILLocation loc, ManagedValu
   CleanupCloner cloner(*this, op);
   SILValue cast = createUncheckedAddrCast(loc, op.forward(SGF), resultTy);
   return cloner.clone(cast);
-}
-
-ManagedValue SILGenBuilder::tryCreateUncheckedRefCast(SILLocation loc,
-                                                      ManagedValue original,
-                                                      SILType type) {
-  CleanupCloner cloner(*this, original);
-  SILValue result = tryCreateUncheckedRefCast(loc, original.getValue(), type);
-  if (!result)
-    return ManagedValue();
-  original.forward(SGF);
-  return cloner.clone(result);
 }
 
 ManagedValue SILGenBuilder::createUncheckedTrivialBitCast(SILLocation loc,

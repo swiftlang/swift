@@ -36,6 +36,7 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/LockFileManager.h"
 
 using namespace swift;
 using FileDependency = SerializationOptions::FileDependency;
@@ -240,7 +241,7 @@ bool ModuleInterfaceBuilder::collectDepsForSerialization(
   return false;
 }
 
-bool ModuleInterfaceBuilder::buildSwiftModule(
+bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     StringRef OutPath, bool ShouldSerializeDeps,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer) {
   bool SubError = false;
@@ -348,6 +349,8 @@ bool ModuleInterfaceBuilder::buildSwiftModule(
     std::string OutPathStr = OutPath;
     SerializationOpts.OutputPath = OutPathStr.c_str();
     SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
+    SerializationOpts.AutolinkForceLoad =
+      !subInvocation.getIRGenOptions().ForceLoadSymbolName.empty();
 
     // Record any non-SDK module interface files for the debug info.
     StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;
@@ -381,4 +384,72 @@ bool ModuleInterfaceBuilder::buildSwiftModule(
     SubError = SubInstance.getDiags().hadAnyError();
   });
   return !RunSuccess || SubError;
+}
+
+bool ModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
+                                              bool ShouldSerializeDeps,
+                          std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                          llvm::function_ref<void()> RemarkRebuild) {
+
+  while (1) {
+  // Attempt to lock the interface file. Only one process is allowed to build
+  // module from the interface so we don't consume too much memory when multiple
+  // processes are doing the same.
+  // FIXME: We should surface the module building step to the build system so
+  // we don't need to synchronize here.
+  llvm::LockFileManager Locked(interfacePath);
+  switch (Locked) {
+  case llvm::LockFileManager::LFS_Error:{
+    // ModuleInterfaceBuilder takes care of correctness and locks are only
+    // necessary for performance. Fallback to building the module in case of any lock
+    // related errors.
+    if (RemarkRebuild) {
+      diags.diagnose(SourceLoc(), diag::interface_file_lock_failure,
+                     interfacePath);
+    }
+    // Clear out any potential leftover.
+    Locked.unsafeRemoveLockFile();
+    LLVM_FALLTHROUGH;
+  }
+  case llvm::LockFileManager::LFS_Owned: {
+    if (RemarkRebuild) {
+      RemarkRebuild();
+    }
+    return buildSwiftModuleInternal(OutPath, ShouldSerializeDeps, ModuleBuffer);
+  }
+  case llvm::LockFileManager::LFS_Shared: {
+    // Someone else is responsible for building the module. Wait for them to
+    // finish.
+    switch (Locked.waitForUnlock()) {
+    case llvm::LockFileManager::Res_Success: {
+      // This process may have a different module output path. If the other
+      // process doesn't build the interface to this output path, we should try
+      // building ourselves.
+      auto bufferOrError = llvm::MemoryBuffer::getFile(OutPath);
+      if (!bufferOrError)
+        continue;
+      if (ModuleBuffer)
+        *ModuleBuffer = std::move(bufferOrError.get());
+      return false;
+    }
+    case llvm::LockFileManager::Res_OwnerDied: {
+      continue; // try again to get the lock.
+    }
+    case llvm::LockFileManager::Res_Timeout: {
+      // Since ModuleInterfaceBuilder takes care of correctness, we try waiting for
+      // another process to complete the build so swift does not do it done
+      // twice. If case of timeout, build it ourselves.
+      if (RemarkRebuild) {
+        diags.diagnose(SourceLoc(), diag::interface_file_lock_timed_out,
+                       interfacePath);
+      }
+      // Clear the lock file so that future invocations can make progress.
+      Locked.unsafeRemoveLockFile();
+      continue;
+    }
+    }
+    break;
+  }
+  }
+  }
 }

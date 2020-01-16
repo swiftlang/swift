@@ -303,10 +303,10 @@ SILBasicBlock *ConstantTracker::getTakenBlock(TermInst *term) {
     if (SILInstruction *def = getDefInCaller(CCB->getOperand())) {
       if (auto *UCI = dyn_cast<UpcastInst>(def)) {
         SILType castType = UCI->getOperand()->getType();
-        if (CCB->getCastType().isExactSuperclassOf(castType)) {
+        if (CCB->getTargetLoweredType().isExactSuperclassOf(castType)) {
           return CCB->getSuccessBB();
         }
-        if (!castType.isBindableToSuperclassOf(CCB->getCastType())) {
+        if (!castType.isBindableToSuperclassOf(CCB->getTargetLoweredType())) {
           return CCB->getFailureBB();
         }
       }
@@ -735,9 +735,9 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     // Check if passed Self is the same as the Self of the caller.
     // In this case, it is safe to inline because both functions
     // use the same Self.
-    if (AI.hasSelfArgument() && Caller->hasSelfParam()) {
+    if (AI.hasSelfArgument() && Caller->hasSelfMetadataParam()) {
       auto CalleeSelf = stripCasts(AI.getSelfArgument());
-      auto CallerSelf = Caller->getSelfArgument();
+      auto CallerSelf = Caller->getSelfMetadataArgument();
       if (CalleeSelf != SILValue(CallerSelf))
         return nullptr;
     } else

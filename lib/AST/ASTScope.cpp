@@ -39,7 +39,7 @@ using namespace ast_scope;
 #pragma mark ASTScope
 
 llvm::SmallVector<const ASTScopeImpl *, 0> ASTScope::unqualifiedLookup(
-    SourceFile *SF, DeclName name, SourceLoc loc,
+    SourceFile *SF, DeclNameRef name, SourceLoc loc,
     const DeclContext *startingContext,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
   if (auto *s = SF->getASTContext().Stats)
@@ -228,6 +228,7 @@ DEFINE_GET_CLASS_NAME(ClosureParametersScope)
 DEFINE_GET_CLASS_NAME(ClosureBodyScope)
 DEFINE_GET_CLASS_NAME(TopLevelCodeScope)
 DEFINE_GET_CLASS_NAME(SpecializeAttributeScope)
+DEFINE_GET_CLASS_NAME(DifferentiableAttributeScope)
 DEFINE_GET_CLASS_NAME(SubscriptDeclScope)
 DEFINE_GET_CLASS_NAME(VarDeclScope)
 DEFINE_GET_CLASS_NAME(EnumElementScope)

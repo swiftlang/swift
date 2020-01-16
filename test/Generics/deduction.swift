@@ -7,7 +7,7 @@
 func identity<T>(_ value: T) -> T { return value }
 
 func identity2<T>(_ value: T) -> T { return value }
-// expected-note@-1 {{candidate expects value of type 'X' for parameter #1}}
+// expected-note@-1 {{'identity2' produces 'Y', not the expected contextual result type 'X'}}
 func identity2<T>(_ value: T) -> Int { return 0 }
 // expected-note@-1 {{'identity2' produces 'Int', not the expected contextual result type 'X'}}
 
@@ -342,3 +342,29 @@ prefix func +-<T>(_: T) where T: Sequence, T.Element == Int {}
 
 +-"hello"
 // expected-error@-1 {{operator function '+-' requires the types 'String.Element' (aka 'Character') and 'Int' be equivalent}}
+
+func test_transitive_subtype_deduction_for_generic_params() {
+  class A {}
+
+  func foo<T: A>(_: [(String, (T) -> Void)]) {}
+
+  func bar<U>(_: @escaping (U) -> Void) -> (U) -> Void {
+    return { _ in }
+  }
+
+  // Here we have:
+  //  - `W subtype of A`
+  //  - `W subtype of U`
+  //
+  // Type variable associated with `U` has to be attempted
+  // first because solver can't infer bindings for `W` transitively
+  // through `U`.
+  func baz<W: A>(_ arr: [(String, (W) -> Void)]) {
+    foo(arr.map { ($0.0, bar($0.1)) }) // Ok
+  }
+
+  func fiz<T>(_ a: T, _ op: (T, T) -> Bool, _ b: T) {}
+  func biz(_ v: Int32) {
+    fiz(v, !=, -1) // Ok because -1 literal should be inferred as Int32
+  }
+}

@@ -22,7 +22,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "llvm/Bitcode/RecordLayout.h"
-#include "llvm/Bitcode/BitCodes.h"
+#include "llvm/Bitstream/BitCodes.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 
 namespace swift {
@@ -39,6 +39,9 @@ using llvm::BCVBR;
 /// Magic number for serialized module files.
 const unsigned char SWIFTMODULE_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x0E };
 
+/// Alignment of each serialized modules inside a .swift_ast section.
+const unsigned char SWIFTMODULE_ALIGNMENT = 4;
+
 /// Serialized module format major version number.
 ///
 /// Always 0 for Swift 1.x - 4.x.
@@ -52,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 523; // @_nonEphemeral
+const uint16_t SWIFTMODULE_VERSION_MINOR = 533; // removed @_implicitly_synthesizes_nested_requirement
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -222,6 +225,23 @@ enum class FunctionTypeRepresentation : uint8_t {
   CFunctionPointer,
 };
 using FunctionTypeRepresentationField = BCFixed<4>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class DifferentiabilityKind : uint8_t {
+  NonDifferentiable = 0,
+  Normal,
+  Linear,
+};
+using DifferentiabilityKindField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing the
+// module version.
+enum class AutoDiffDerivativeFunctionKind : uint8_t {
+  JVP = 0,
+  VJP
+};
+using AutoDiffDerivativeFunctionKindField = BCFixed<1>;
 
 enum class ForeignErrorConventionKind : uint8_t {
   ZeroResult,
@@ -428,6 +448,7 @@ enum class DefaultArgumentKind : uint8_t {
   None = 0,
   Normal,
   File,
+  FilePath,
   Line,
   Column,
   Function,
@@ -876,19 +897,21 @@ namespace decls_block {
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,  // noescape?
-    BCFixed<1>   // throws?
+    BCFixed<1>,   // throws?
+    DifferentiabilityKindField // differentiability kind
 
     // trailed by parameters
   >;
 
   using FunctionParamLayout = BCRecordLayout<
     FUNCTION_PARAM,
-    IdentifierIDField,  // name
-    TypeIDField,        // type
-    BCFixed<1>,         // vararg?
-    BCFixed<1>,         // autoclosure?
-    BCFixed<1>,         // non-ephemeral?
-    ValueOwnershipField // inout, shared or owned?
+    IdentifierIDField,   // name
+    TypeIDField,         // type
+    BCFixed<1>,          // vararg?
+    BCFixed<1>,          // autoclosure?
+    BCFixed<1>,          // non-ephemeral?
+    ValueOwnershipField, // inout, shared or owned?
+    BCFixed<1>           // noDerivative?
   >;
 
   using MetatypeTypeLayout = BCRecordLayout<
@@ -950,6 +973,7 @@ namespace decls_block {
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
+    DifferentiabilityKindField, // differentiability kind
     GenericSignatureIDField // generic signture
 
     // trailed by parameters
@@ -962,15 +986,19 @@ namespace decls_block {
     SILFunctionTypeRepresentationField, // representation
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // noescape?
+    DifferentiabilityKindField, // differentiability kind
     BCFixed<1>,            // error result?
     BCVBR<6>,              // number of parameters
     BCVBR<5>,              // number of yields
     BCVBR<5>,              // number of results
+    BCFixed<1>,            // generic signature implied
     GenericSignatureIDField, // generic signature
+    SubstitutionMapIDField, // substitutions
     BCArray<TypeIDField>   // parameter types/conventions, alternating
                            // followed by result types/conventions, alternating
                            // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
+    // Optionally a substitution map (for substituted function types)
   >;
   
   using SILBlockStorageTypeLayout = BCRecordLayout<
@@ -1086,6 +1114,7 @@ namespace decls_block {
     BCFixed<1>,             // implicit?
     BCFixed<1>,             // explicitly objc?
     BCFixed<1>,             // inherits convenience initializers from its superclass?
+    BCFixed<1>,             // has missing designated initializers?
     GenericSignatureIDField, // generic environment
     TypeIDField,            // superclass
     AccessLevelField,       // access level
@@ -1718,6 +1747,14 @@ namespace decls_block {
     BCBlob      // platform, followed by message
   >;
 
+  using OriginallyDefinedInDeclAttrLayout = BCRecordLayout<
+    OriginallyDefinedIn_DECL_ATTR,
+    BCFixed<1>,     // implicit flag
+    BC_AVAIL_TUPLE, // moved OS version
+    BCVBR<5>,       // platform
+    BCBlob          // original module name
+  >;
+
   using ObjCDeclAttrLayout = BCRecordLayout<
     ObjC_DECL_ATTR,
     BCFixed<1>, // implicit flag
@@ -1734,7 +1771,36 @@ namespace decls_block {
     GenericSignatureIDField // specialized signature
   >;
 
-#define SIMPLE_DECL_ATTR(X, CLASS, ...) \
+  using DifferentiableDeclAttrLayout = BCRecordLayout<
+    Differentiable_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
+    BCFixed<1>, // Linear flag.
+    IdentifierIDField, // JVP name.
+    DeclIDField, // JVP function declaration.
+    IdentifierIDField, // VJP name.
+    DeclIDField, // VJP function declaration.
+    GenericSignatureIDField, // Derivative generic signature.
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+  >;
+
+  using DerivativeDeclAttrLayout = BCRecordLayout<
+    Derivative_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
+    IdentifierIDField, // Original name.
+    DeclIDField, // Original function declaration.
+    AutoDiffDerivativeFunctionKindField, // Derivative function kind.
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+  >;
+
+  using TransposeDeclAttrLayout = BCRecordLayout<
+    Transpose_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
+    IdentifierIDField, // Original name.
+    DeclIDField, // Original function declaration.
+    BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
+  >;
+
+#define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
   using CLASS##DeclAttrLayout = BCRecordLayout< \
     CLASS##_DECL_ATTR, \
     BCFixed<1> /* implicit flag */ \

@@ -487,6 +487,12 @@ void Remangler::mangleAnyNominalType(Node *node) {
 void Remangler::mangleGenericArgs(Node *node, char &Separator,
                                   bool fullSubstitutionMap) {
   switch (node->getKind()) {
+    case Node::Kind::Protocol:
+      // A protocol cannot be the parent of a nominal type, so this case should
+      // never be hit by valid swift code. But the indexer might generate a URL
+      // from invalid swift code, which has a bound generic inside a protocol.
+      // The ASTMangler treats a protocol like any other nominal type in this
+      // case, so we also support it in the remangler.
     case Node::Kind::Structure:
     case Node::Kind::Enum:
     case Node::Kind::Class:
@@ -1390,30 +1396,59 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
   unreachable("handled inline");
 }
 
+void Remangler::mangleImplSubstitutions(Node *node) {
+  unreachable("handled inline");
+}
+
+void Remangler::mangleImplImpliedSubstitutions(Node *node) {
+  unreachable("handled inline");
+}
+
 void Remangler::mangleImplFunctionType(Node *node) {
   const char *PseudoGeneric = "";
   Node *GenSig = nullptr;
+  Node *GenSubs = nullptr;
+  bool isImplied;
   for (NodePointer Child : *node) {
-    switch (Child->getKind()) {
-      case Node::Kind::ImplParameter:
-      case Node::Kind::ImplResult:
-      case Node::Kind::ImplErrorResult:
-        mangleChildNode(Child, 1);
-        break;
-      case Node::Kind::DependentPseudogenericSignature:
-        PseudoGeneric = "P";
-        LLVM_FALLTHROUGH;
-      case Node::Kind::DependentGenericSignature:
-        GenSig = Child;
-        break;
-      default:
-        break;
+    switch (auto kind = Child->getKind()) {
+    case Node::Kind::ImplParameter:
+    case Node::Kind::ImplResult:
+    case Node::Kind::ImplErrorResult:
+      mangleChildNode(Child, 1);
+      break;
+    case Node::Kind::DependentPseudogenericSignature:
+      PseudoGeneric = "P";
+      LLVM_FALLTHROUGH;
+    case Node::Kind::DependentGenericSignature:
+      GenSig = Child;
+      break;
+    case Node::Kind::ImplSubstitutions:
+    case Node::Kind::ImplImpliedSubstitutions:
+      GenSubs = Child;
+      isImplied = kind == Node::Kind::ImplImpliedSubstitutions;
+      break;
+    default:
+      break;
     }
   }
   if (GenSig)
     mangle(GenSig);
+  if (GenSubs) {
+    Buffer << 'y';
+    mangleChildNodes(GenSubs->getChild(0));
+    if (GenSubs->getNumChildren() >= 2)
+      mangleRetroactiveConformance(GenSubs->getChild(1));
+  }
 
-  Buffer << 'I' << PseudoGeneric;
+  Buffer << 'I';
+
+  if (GenSubs) {
+    Buffer << 's';
+    if (!isImplied)
+      Buffer << 'i';
+  }
+
+  Buffer << PseudoGeneric;
   for (NodePointer Child : *node) {
     switch (Child->getKind()) {
       case Node::Kind::ImplEscaping:

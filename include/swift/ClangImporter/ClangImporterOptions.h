@@ -60,7 +60,10 @@ public:
     /// Swift code.
     Normal,
     /// Set up Clang for backend compilation only.
-    EmbedBitcode
+    EmbedBitcode,
+    /// Set up Clang to emit a precompiled module from a C/Objective-C module
+    /// map or dump debugging info about a precompiled module.
+    PrecompiledModule
   };
 
   /// Controls how Clang is initially set up.
@@ -95,6 +98,10 @@ public:
 
   /// When set, don't enforce warnings with -Werror.
   bool DebuggerSupport = false;
+
+  /// When set, ClangImporter is disabled, and all requests go to the
+  /// DWARFImporter delegate.
+  bool DisableSourceImport = false;
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.

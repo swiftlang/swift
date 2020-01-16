@@ -319,7 +319,7 @@ fileprivate func _myers<C,D>(
         y &-= 1
       }
 
-      assert((x == prev_x && y > prev_y) || (y == prev_y && x > prev_x))
+      _internalInvariant((x == prev_x && y > prev_y) || (y == prev_y && x > prev_x))
       if y != prev_y {
         changes.append(.insert(offset: prev_y, element: b[prev_y], associatedWith: nil))
       } else {

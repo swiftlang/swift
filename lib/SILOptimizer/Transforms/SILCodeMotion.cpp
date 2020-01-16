@@ -60,7 +60,8 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
   // argument to the refcount instruction.
   SILValue EnumVal = DefOfEnum ? DefOfEnum : I->getOperand(0);
 
-  SILType ArgType = EnumVal->getType().getEnumElementType(EnumDecl, Mod);
+  SILType ArgType = EnumVal->getType().getEnumElementType(
+      EnumDecl, Mod, TypeExpansionContext(Builder.getFunction()));
 
   auto *UEDI =
     Builder.createUncheckedEnumData(I->getLoc(), EnumVal, EnumDecl, ArgType);
@@ -1260,7 +1261,7 @@ static bool sinkArgument(EnumCaseDataflowContext &Context, SILBasicBlock *BB, un
       TI->setOperand(ArgNum, CloneInst->getOperand(*DifferentOperandIndex));
       // Now delete the clone as we only needed it operand.
       if (CloneInst != FSI)
-        recursivelyDeleteTriviallyDeadInstructions(CloneInst);
+        eliminateDeadInstruction(CloneInst);
       ++CloneIt;
     }
     assert(CloneIt == Clones.end() && "Clone/pred mismatch");

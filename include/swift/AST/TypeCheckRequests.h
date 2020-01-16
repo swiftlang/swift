@@ -16,10 +16,12 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/AnyValue.h"
@@ -33,6 +35,8 @@ namespace swift {
 class AbstractStorageDecl;
 class AccessorDecl;
 enum class AccessorKind;
+class ContextualPattern;
+class DefaultArgumentExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
 struct PropertyWrapperBackingPropertyInfo;
@@ -334,7 +338,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ArrayRef<Requirement>> evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+  llvm::Expected<ArrayRef<Requirement>> evaluate(Evaluator &evaluator,
+                                                 ProtocolDecl *proto) const;
 
 public:
   // Separate caching.
@@ -1745,6 +1750,278 @@ public:
   void cacheResult(Witness value) const;
 };
 
+enum class FunctionBuilderClosurePreCheck : uint8_t {
+  /// There were no problems pre-checking the closure.
+  Okay,
+
+  /// There was an error pre-checking the closure.
+  Error,
+
+  /// The closure has a return statement.
+  HasReturnStmt,
+};
+
+class PreCheckFunctionBuilderRequest
+    : public SimpleRequest<PreCheckFunctionBuilderRequest,
+                           FunctionBuilderClosurePreCheck(AnyFunctionRef),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<FunctionBuilderClosurePreCheck>
+  evaluate(Evaluator &evaluator, AnyFunctionRef fn) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
+/// Computes whether a class has a circular reference in its inheritance
+/// hierarchy.
+class HasCircularInheritanceRequest
+    : public SimpleRequest<HasCircularInheritanceRequest, bool(ClassDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ClassDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Computes whether a protocol has a circular reference in its list of
+/// inherited protocols.
+class HasCircularInheritedProtocolsRequest
+    : public SimpleRequest<HasCircularInheritedProtocolsRequest,
+                           bool(ProtocolDecl *), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Computes whether an enum's raw value has a circular reference.
+class HasCircularRawValueRequest
+    : public SimpleRequest<HasCircularRawValueRequest, bool(EnumDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, EnumDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Computes an initializer context for a parameter with a default argument.
+class DefaultArgumentInitContextRequest
+    : public SimpleRequest<DefaultArgumentInitContextRequest,
+                           Initializer *(ParamDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Initializer *> evaluate(Evaluator &evaluator,
+                                         ParamDecl *param) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Initializer *> getCachedResult() const;
+  void cacheResult(Initializer *init) const;
+};
+
+/// Computes the fully type-checked default argument expression for a given
+/// parameter.
+class DefaultArgumentExprRequest
+    : public SimpleRequest<DefaultArgumentExprRequest, Expr *(ParamDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Expr *> evaluate(Evaluator &evaluator, ParamDecl *param) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Expr *> getCachedResult() const;
+  void cacheResult(Expr *expr) const;
+};
+
+/// Computes the fully type-checked caller-side default argument within the
+/// context of the call site that it will be inserted into.
+class CallerSideDefaultArgExprRequest
+    : public SimpleRequest<CallerSideDefaultArgExprRequest,
+                           Expr *(DefaultArgumentExpr *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Expr *> evaluate(Evaluator &evaluator,
+                                  DefaultArgumentExpr *defaultExpr) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Expr *> getCachedResult() const;
+  void cacheResult(Expr *expr) const;
+};
+
+/// Computes whether this is a type that supports being called through the
+/// implementation of a \c callAsFunction method.
+class IsCallableNominalTypeRequest
+    : public SimpleRequest<IsCallableNominalTypeRequest,
+                           bool(CanType, DeclContext *), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, CanType ty,
+                                DeclContext *dc) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+class DynamicallyReplacedDeclRequest
+    : public SimpleRequest<DynamicallyReplacedDeclRequest,
+                           ValueDecl *(ValueDecl *), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ValueDecl *> evaluate(Evaluator &evaluator,
+                                       ValueDecl *VD) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class TypeCheckSourceFileRequest :
+    public SimpleRequest<TypeCheckSourceFileRequest,
+                         bool (SourceFile *, unsigned),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                SourceFile *SF, unsigned StartElem) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool result) const;
+};
+
+/// Computes whether the specified type or a super-class/super-protocol has the
+/// @dynamicMemberLookup attribute on it.
+class HasDynamicMemberLookupAttributeRequest
+    : public SimpleRequest<HasDynamicMemberLookupAttributeRequest,
+                           bool(CanType), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, CanType ty) const;
+
+public:
+  bool isCached() const {
+    // Don't cache types containing type variables, as they must not outlive
+    // the constraint system that created them.
+    auto ty = std::get<0>(getStorage());
+    return !ty->hasTypeVariable();
+  }
+};
+
+/// Determines the type of a given pattern.
+///
+/// Note that this returns the "raw" pattern type, which can involve
+/// unresolved types and unbound generic types where type inference is
+/// allowed.
+class PatternTypeRequest
+    : public SimpleRequest<PatternTypeRequest, Type(ContextualPattern),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(
+      Evaluator &evaluator, ContextualPattern pattern) const;
+
+public:
+  bool isCached() const { return true; }
+
+  SourceLoc getNearestLoc() const {
+    return std::get<0>(getStorage()).getPattern()->getLoc();
+  }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
@@ -1767,6 +2044,7 @@ AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
+void simple_display(llvm::raw_ostream &out, FunctionBuilderClosurePreCheck pck);
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

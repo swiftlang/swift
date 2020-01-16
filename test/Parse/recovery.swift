@@ -619,9 +619,11 @@ class WrongInheritanceClause6(Int {}
 class WrongInheritanceClause7<T>(Int where T:AnyObject {}
 
 // <rdar://problem/18502220> [swift-crashes 078] parser crash on invalid cast in sequence expr
-Base=1 as Base=1  // expected-error {{cannot convert value of type 'Int' to type 'Base' in coercion}}
-
-
+Base=1 as Base=1 // expected-error{{cannot convert value of type 'Int' to type 'Base' in coercion}}
+// expected-error@-1 {{cannot assign to immutable expression of type 'Base.Type'}}
+// expected-error@-2 {{cannot assign to immutable expression of type 'Base'}}
+// expected-error@-3 {{cannot assign value of type '()' to type 'Base.Type'}}
+// expected-error@-4 {{cannot assign value of type 'Int' to type 'Base'}}
 
 // <rdar://problem/18634543> Parser hangs at swift::Parser::parseType
 public enum TestA {
@@ -679,7 +681,7 @@ func a(s: S[{{g) -> Int {}
 // expected-error@+3{{expected '(' for initializer parameters}}
 // expected-error@+2{{initializers may only be declared within a type}}
 // expected-error@+1{{expected an identifier to name generic parameter}}
-func F() { init<( } )} // expected-note {{did you mean 'F'?}}
+func F() { init<( } )} // expected-note 2{{did you mean 'F'?}}
 
 struct InitializerWithName {
   init x() {} // expected-error {{initializers cannot have a name}} {{8-9=}}
@@ -695,9 +697,6 @@ struct InitializerWithNameAndParam {
 struct InitializerWithLabels {
   init c d: Int {}
   // expected-error @-1 {{expected '(' for initializer parameters}}
-  // expected-error @-2 {{expected declaration}}
-  // expected-error @-3 {{consecutive declarations on a line must be separated by ';'}}
-  // expected-note @-5 {{in declaration of 'InitializerWithLabels'}}
 }
 
 // rdar://20337695
@@ -757,7 +756,7 @@ let curlyQuotes2 = “hello world!"
 
 
 // <rdar://problem/21196171> compiler should recover better from "unicode Specials" characters
-let ￼tryx  = 123        // expected-error 2 {{invalid character in source file}}  {{5-8= }}
+let ￼tryx  = 123        // expected-error {{invalid character in source file}}  {{5-8= }}
 
 
 // <rdar://problem/21369926> Malformed Swift Enums crash playground service
@@ -841,7 +840,7 @@ func postfixDot(a : String) {
 }
 
 // <rdar://problem/22290244> QoI: "UIColor." gives two issues, should only give one
-func f() {
+func f() { // expected-note 2{{did you mean 'f'?}}
   _ = ClassWithStaticDecls.  // expected-error {{expected member name following '.'}}
 }
 

@@ -504,14 +504,14 @@ public:
 class EnumElementPattern : public Pattern {
   TypeLoc ParentType;
   SourceLoc DotLoc;
-  SourceLoc NameLoc;
-  Identifier Name;
+  DeclNameLoc NameLoc;
+  DeclNameRef Name;
   PointerUnion<EnumElementDecl *, Expr*> ElementDeclOrUnresolvedOriginalExpr;
   Pattern /*nullable*/ *SubPattern;
   
 public:
-  EnumElementPattern(TypeLoc ParentType, SourceLoc DotLoc, SourceLoc NameLoc,
-                     Identifier Name, EnumElementDecl *Element,
+  EnumElementPattern(TypeLoc ParentType, SourceLoc DotLoc, DeclNameLoc NameLoc,
+                     DeclNameRef Name, EnumElementDecl *Element,
                      Pattern *SubPattern, Optional<bool> Implicit = None)
     : Pattern(PatternKind::EnumElement),
       ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
@@ -524,8 +524,8 @@ public:
   /// Create an unresolved EnumElementPattern for a `.foo` pattern relying on
   /// contextual type.
   EnumElementPattern(SourceLoc DotLoc,
-                     SourceLoc NameLoc,
-                     Identifier Name,
+                     DeclNameLoc NameLoc,
+                     DeclNameRef Name,
                      Pattern *SubPattern,
                      Expr *UnresolvedOriginalExpr)
     : Pattern(PatternKind::EnumElement),
@@ -551,7 +551,7 @@ public:
   
   void setSubPattern(Pattern *p) { SubPattern = p; }
   
-  Identifier getName() const { return Name; }
+  DeclNameRef getName() const { return Name; }
   
   EnumElementDecl *getElementDecl() const {
     return ElementDeclOrUnresolvedOriginalExpr.dyn_cast<EnumElementDecl*>();
@@ -567,18 +567,18 @@ public:
     return ElementDeclOrUnresolvedOriginalExpr.is<Expr*>();
   }
   
-  SourceLoc getNameLoc() const { return NameLoc; }
-  SourceLoc getLoc() const { return NameLoc; }
+  DeclNameLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
   SourceLoc getStartLoc() const {
     return ParentType.hasLocation() ? ParentType.getSourceRange().Start :
            DotLoc.isValid()         ? DotLoc
-                                    : NameLoc;
+                                    : NameLoc.getBaseNameLoc();
   }
   SourceLoc getEndLoc() const {
     if (SubPattern && SubPattern->getSourceRange().isValid()) {
       return SubPattern->getSourceRange().End;
     }
-    return NameLoc;
+    return NameLoc.getEndLoc();
   }
   SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
   
@@ -756,7 +756,93 @@ inline Pattern *Pattern::getSemanticsProvidingPattern() {
     return vp->getSubPattern()->getSemanticsProvidingPattern();
   return this;
 }
-  
+
+/// Describes a pattern and the context in which it occurs.
+class ContextualPattern {
+  /// The pattern and whether this is the top-level pattern.
+  llvm::PointerIntPair<Pattern *, 1, bool> patternAndTopLevel;
+
+  /// Either the declaration context or the enclosing pattern binding
+  /// declaration.
+  llvm::PointerUnion<PatternBindingDecl *, DeclContext *> declOrContext;
+
+  /// Index into the pattern binding declaration, when there is one.
+  unsigned index = 0;
+
+  ContextualPattern(
+      Pattern *pattern, bool topLevel,
+      llvm::PointerUnion<PatternBindingDecl *, DeclContext *> declOrContext,
+      unsigned index
+    ) : patternAndTopLevel(pattern, topLevel),
+        declOrContext(declOrContext),
+        index(index) { }
+
+public:
+  /// Produce a contextual pattern for a pattern binding declaration entry.
+  static ContextualPattern forPatternBindingDecl(
+     PatternBindingDecl *pbd, unsigned index);
+
+  /// Produce a contextual pattern for a raw pattern that always allows
+  /// inference.
+  static ContextualPattern forRawPattern(Pattern *pattern, DeclContext *dc) {
+    return ContextualPattern(pattern, /*topLevel=*/true, dc, /*index=*/0);
+  }
+
+  /// Retrieve a contextual pattern for the given subpattern.
+  ContextualPattern forSubPattern(
+      Pattern *subpattern, bool retainTopLevel) const {
+    return ContextualPattern(
+        subpattern, isTopLevel() && retainTopLevel, declOrContext, index);
+  }
+
+  /// Retrieve the pattern.
+  Pattern *getPattern() const {
+    return patternAndTopLevel.getPointer();
+  }
+
+  /// Whether this is the top-level pattern in this context.
+  bool isTopLevel() const {
+    return patternAndTopLevel.getInt();
+  }
+
+  /// Retrieve the declaration context of the pattern.
+  DeclContext *getDeclContext() const;
+
+  /// Retrieve the pattern binding declaration that owns this pattern, if
+  /// there is one.
+  PatternBindingDecl *getPatternBindingDecl() const;
+
+  /// Retrieve the index into the pattern binding declaration for the top-level
+  /// pattern.
+  unsigned getPatternBindingIndex() const {
+    assert(getPatternBindingDecl() != nullptr);
+    return index;
+  }
+
+  /// Whether this pattern allows type inference, e.g., from an initializer
+  /// expression.
+  bool allowsInference() const;
+
+  friend llvm::hash_code hash_value(const ContextualPattern &pattern) {
+    return llvm::hash_combine(pattern.getPattern(),
+                              pattern.isTopLevel(),
+                              pattern.declOrContext);
+  }
+
+  friend bool operator==(const ContextualPattern &lhs,
+                         const ContextualPattern &rhs) {
+    return lhs.patternAndTopLevel == rhs.patternAndTopLevel &&
+        lhs.declOrContext == rhs.declOrContext;
+  }
+
+  friend bool operator!=(const ContextualPattern &lhs,
+                         const ContextualPattern &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const ContextualPattern &pattern);
+
 } // end namespace swift
 
 #endif

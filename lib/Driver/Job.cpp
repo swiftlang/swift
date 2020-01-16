@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/STLExtras.h"
+#include "swift/Driver/DriverIncrementalRanges.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/PrettyStackTrace.h"
 #include "llvm/ADT/STLExtras.h"
@@ -23,6 +24,11 @@
 
 using namespace swift;
 using namespace swift::driver;
+
+CommandOutput::CommandOutput(StringRef dummyBase, OutputFileMap &dummyOFM)
+    : Inputs({CommandInputPair(dummyBase, "")}), DerivedOutputMap(dummyOFM) {
+  setAdditionalOutputForType(file_types::TY_SwiftDeps, dummyBase);
+}
 
 StringRef CommandOutput::getOutputForInputAndType(StringRef PrimaryInputFile,
                                                   file_types::ID Type) const {
@@ -235,6 +241,10 @@ CommandOutput::getAdditionalOutputsForType(file_types::ID Type) const {
   return V;
 }
 
+bool CommandOutput::hasAdditionalOutputForType(file_types::ID type) const {
+  return AdditionalOutputTypes.count(type);
+}
+
 StringRef CommandOutput::getAnyOutputForType(file_types::ID Type) const {
   if (PrimaryOutputType == Type)
     return getPrimaryOutputFilename();
@@ -418,6 +428,7 @@ void Job::printSummary(raw_ostream &os) const {
   os << "}";
 }
 
+
 bool Job::writeArgsToResponseFile() const {
   assert(hasResponseFile());
   std::error_code EC;
@@ -431,6 +442,16 @@ bool Job::writeArgsToResponseFile() const {
   }
   OS.flush();
   return false;
+}
+
+StringRef Job::getFirstSwiftPrimaryInput() const {
+  const JobAction &source = getSource();
+  if (!isa<CompileJobAction>(source))
+    return StringRef();
+  const auto *firstInput = source.getInputs().front();
+  if (auto *inputInput = dyn_cast<InputAction>(firstInput))
+    return inputInput->getInputArg().getValue();
+  return StringRef();
 }
 
 BatchJob::BatchJob(const JobAction &Source,

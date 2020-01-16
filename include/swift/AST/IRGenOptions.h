@@ -106,6 +106,9 @@ public:
   /// Which sanitizer is turned on.
   OptionSet<SanitizerKind> Sanitizers;
 
+  /// Which sanitizer(s) have recovery instrumentation enabled.
+  OptionSet<SanitizerKind> SanitizersWithRecoveryInstrumentation;
+
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebugPrefixMap;
 
@@ -142,6 +145,9 @@ public:
   /// Emit runtime calls to check the end of the lifetime of stack promoted
   /// objects.
   unsigned EmitStackPromotionChecks : 1;
+
+  /// Emit functions to separate sections.
+  unsigned FunctionSections : 1;
 
   /// The maximum number of bytes used on a stack frame for stack promotion
   /// (includes alloc_stack allocations).
@@ -186,6 +192,10 @@ public:
   /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
   /// Passing this flag completely disables this behavior.
   unsigned DisableLegacyTypeInfo : 1;
+
+  /// Create metadata specializations for generic types at statically known type
+  /// arguments.
+  unsigned PrespecializeGenericMetadata : 1;
 
   /// The path to load legacy type layouts from.
   StringRef ReadLegacyTypeInfoPath;
@@ -239,20 +249,22 @@ public:
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
+        SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
         DebugInfoLevel(IRGenDebugInfoLevel::None),
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
         IntegratedREPL(false), DisableLLVMOptzns(false),
         DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
         DisableFPElim(true), Playground(false), EmitStackPromotionChecks(false),
-        PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
+        FunctionSections(false), PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
         HasValueNamesSetting(false), ValueNames(false),
         EnableReflectionMetadata(true), EnableReflectionNames(true),
         EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
         LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
-        UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
-        GenerateProfile(false), EnableDynamicReplacementChaining(false),
+        PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
+        UseSwiftCall(false), GenerateProfile(false),
+        EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
@@ -260,7 +272,7 @@ public:
   /// Appends to \p os an arbitrary string representing all options which
   /// influence the llvm compilation but are not reflected in the llvm module
   /// itself.
-  void writeLLVMCodeGenOptionsTo(llvm::raw_ostream &os) {
+  void writeLLVMCodeGenOptionsTo(llvm::raw_ostream &os) const {
     // We put a letter between each value simply to keep them from running into
     // one another. There might be a vague correspondence between meaning and
     // letter, but don't sweat it.
@@ -289,6 +301,16 @@ public:
 
   bool optimizeForSize() const {
     return OptMode == OptimizationMode::ForSize;
+  }
+
+  std::string getDebugFlags(StringRef PrivateDiscriminator) const {
+    std::string Flags = DebugFlags;
+    if (!PrivateDiscriminator.empty()) {
+      if (!Flags.empty())
+        Flags += " ";
+      Flags += ("-private-discriminator " + PrivateDiscriminator).str();
+    }
+    return Flags;
   }
 
   /// Return a hash code of any components from these options that should

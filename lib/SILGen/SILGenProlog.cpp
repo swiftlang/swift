@@ -98,9 +98,14 @@ public:
   }
 
   ManagedValue visitType(CanType t, bool isInOut) {
-    // The calling convention always uses minimal resilience expansion.
-    auto argType =
-        SGF.SGM.Types.getLoweredType(t, ResilienceExpansion::Minimal);
+    // The calling convention always uses minimal resilience expansion but
+    // inside the function we lower/expand types in context of the current
+    // function.
+    auto argType = SGF.SGM.Types.getLoweredType(t, SGF.getTypeExpansionContext());
+    auto argTypeConv =
+        SGF.SGM.Types.getLoweredType(t, TypeExpansionContext::minimal());
+    argType = argType.getCategoryType(argTypeConv.getCategory());
+
     if (isInOut)
       argType = SILType::getPrimitiveAddressType(argType.getASTType());
 
@@ -156,7 +161,7 @@ public:
   ManagedValue visitTupleType(CanTupleType t) {
     SmallVector<ManagedValue, 4> elements;
 
-    auto &tl = SGF.SGM.Types.getTypeLowering(t, ResilienceExpansion::Minimal);
+    auto &tl = SGF.SGM.Types.getTypeLowering(t, SGF.getTypeExpansionContext());
     bool canBeGuaranteed = tl.isLoadable();
 
     // Collect the exploded elements.
@@ -226,9 +231,10 @@ struct ArgumentInitHelper {
   uint16_t ArgNo = 0;
 
   ArgumentInitHelper(SILGenFunction &SGF, SILFunction &f)
-    : SGF(SGF), f(f), initB(SGF.B),
-      parameters(f.getLoweredFunctionType()->getParameters()) {
-  }
+      : SGF(SGF), f(f), initB(SGF.B),
+        parameters(
+            f.getLoweredFunctionTypeInContext(SGF.B.getTypeExpansionContext())
+                ->getParameters()) {}
 
   unsigned getNumArgs() const { return ArgNo; }
 
@@ -320,8 +326,7 @@ static void makeArgument(Type ty, ParamDecl *decl,
     for (auto fieldType : tupleTy->getElementTypes())
       makeArgument(fieldType, decl, args, SGF);
   } else {
-    auto loweredTy = SGF.SGM.Types.getLoweredType(ty,
-                                                  ResilienceExpansion::Minimal);
+    auto loweredTy = SGF.getLoweredTypeForFunctionArgument(ty);
     if (decl->isInOut())
       loweredTy = SILType::getPrimitiveAddressType(loweredTy.getASTType());
     auto arg = SGF.F.begin()->createFunctionArgument(loweredTy, decl);
@@ -358,7 +363,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     return SGF.F.mapTypeIntoContext(interfaceType);
   };
 
-  auto expansion = SGF.F.getResilienceExpansion();
+  auto expansion = SGF.getTypeExpansionContext();
   switch (SGF.SGM.Types.getDeclCaptureKind(capture, expansion)) {
   case CaptureKind::Constant: {
     auto type = getVarTypeInCaptureContext();
@@ -400,9 +405,13 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // LValues are captured as a retained @box that owns
     // the captured value.
     auto type = getVarTypeInCaptureContext();
-    auto boxTy = SGF.SGM.Types.getContextBoxTypeForCapture(VD,
-                               SGF.SGM.Types.getLoweredRValueType(type),
-                               SGF.F.getGenericEnvironment(), /*mutable*/ true);
+    // Get the content for the box in the minimal  resilience domain because we
+    // are declaring a type.
+    auto boxTy = SGF.SGM.Types.getContextBoxTypeForCapture(
+        VD,
+        SGF.SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
+                                           type),
+        SGF.F.getGenericEnvironment(), /*mutable*/ true);
     SILValue box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
@@ -434,23 +443,9 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
   uint16_t ArgNo = emitProlog(paramList, selfParam, resultType,
                               DC, throws, throwsLoc);
   
-  // Emit an unreachable instruction if a parameter type is
-  // uninhabited
-  if (paramList) {
-    for (auto *param : *paramList) {
-      if (param->getType()->isStructurallyUninhabited()) {
-        SILLocation unreachableLoc(param);
-        unreachableLoc.markAsPrologue();
-        B.createUnreachable(unreachableLoc);
-        break;
-      }
-    }
-  }
-
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
-  assert((captureInfo.hasBeenComputed() ||
-          !TypeConverter::canCaptureFromParent(DC)) &&
+  assert(captureInfo.hasBeenComputed() &&
          "can't emit prolog of function with uncomputed captures");
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {
@@ -482,6 +477,19 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
     emitCaptureArguments(*this, DC->getGenericSignatureOfContext(),
                          capture, ++ArgNo);
   }
+
+  // Emit an unreachable instruction if a parameter type is
+  // uninhabited
+  if (paramList) {
+    for (auto *param : *paramList) {
+      if (param->getType()->isStructurallyUninhabited()) {
+        SILLocation unreachableLoc(param);
+        unreachableLoc.markAsPrologue();
+        B.createUnreachable(unreachableLoc);
+        break;
+      }
+    }
+  }
 }
 
 static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
@@ -499,9 +507,12 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
   // The calling convention always uses minimal resilience expansion.
   auto &resultTI =
     SGF.SGM.Types.getTypeLowering(DC->mapTypeIntoContext(resultType),
-                                  ResilienceExpansion::Minimal);
+                                  SGF.getTypeExpansionContext());
+  auto &resultTIConv = SGF.SGM.Types.getTypeLowering(
+      DC->mapTypeIntoContext(resultType), TypeExpansionContext::minimal());
+
   if (!SILModuleConventions::isReturnedIndirectlyInSIL(
-          resultTI.getLoweredType(), SGF.SGM.M)) {
+          resultTIConv.getLoweredType(), SGF.SGM.M)) {
     return;
   }
   auto &ctx = SGF.getASTContext();
@@ -511,9 +522,8 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
                                  DC);
   var->setSpecifier(ParamSpecifier::InOut);
   var->setInterfaceType(resultType);
-
-  auto *arg =
-      SGF.F.begin()->createFunctionArgument(resultTI.getLoweredType(), var);
+  auto *arg = SGF.F.begin()->createFunctionArgument(
+      resultTI.getLoweredType().getAddressType(), var);
   (void)arg;
 }
 

@@ -19,10 +19,10 @@ import platform
 import sys
 import time
 
-from build_swift import defaults
-from build_swift import driver_arguments
-from build_swift import presets
-from build_swift.migration import migrate_swift_sdks
+from build_swift.build_swift import defaults
+from build_swift.build_swift import driver_arguments
+from build_swift.build_swift import presets
+from build_swift.build_swift.migration import migrate_swift_sdks
 
 from swift_build_support.swift_build_support import (
     arguments,
@@ -498,6 +498,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-watchos-simulator"]
         if not args.build_android:
             impl_args += ["--skip-build-android"]
+        if not args.build_clang_tools_extra:
+            impl_args += ["--skip-build-clang-tools-extra"]
 
         if not args.test and not args.long_test and not args.stress_test:
             impl_args += ["--skip-test-swift"]

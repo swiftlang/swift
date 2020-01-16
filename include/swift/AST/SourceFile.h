@@ -125,15 +125,42 @@ private:
   /// been validated.
   llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
 
+  /// The list of top-level declarations in the source file.
+  std::vector<Decl *> Decls;
+
   friend ASTContext;
   friend Impl;
+
 public:
-  /// The list of top-level declarations in the source file.
-  std::vector<Decl*> Decls;
+  /// Appends the given declaration to the end of the top-level decls list.
+  void addTopLevelDecl(Decl *d) {
+    Decls.push_back(d);
+  }
+
+  /// Prepends a declaration to the top-level decls list.
+  ///
+  /// FIXME: This entrypoint exists to support LLDB. Calls to this function are
+  /// always a mistake, and additional uses should not be added.
+  ///
+  /// See rdar://58355191
+  void prependTopLevelDecl(Decl *d) {
+    Decls.insert(Decls.begin(), d);
+  }
+
+  /// Retrieves an immutable view of the list of top-level decls in this file.
+  ArrayRef<Decl *> getTopLevelDecls() const {
+    return Decls;
+  }
+
+  /// Truncates the list of top-level decls so it contains \c count elements.
+  void truncateTopLevelDecls(unsigned count) {
+    assert(count <= Decls.size() && "Can only truncate top-level decls!");
+    Decls.resize(count);
+  }
 
   /// A cache of syntax nodes that can be reused when creating the syntax tree
   /// for this file.
-  SyntaxParsingCache *SyntaxParsingCache = nullptr;
+  swift::SyntaxParsingCache *SyntaxParsingCache = nullptr;
 
   /// The list of local type declarations in the source file.
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
@@ -404,9 +431,11 @@ public:
     InterfaceHash->update(a);
   }
 
-  void getInterfaceHash(llvm::SmallString<32> &str) {
+  void getInterfaceHash(llvm::SmallString<32> &str) const {
+    // Copy to preserve idempotence.
+    llvm::MD5 md5 = *InterfaceHash;
     llvm::MD5::MD5Result result;
-    InterfaceHash->final(result);
+    md5.final(result);
     llvm::MD5::stringifyResult(result, str);
   }
 
@@ -482,6 +511,11 @@ inline bool ModuleDecl::EntryPointInfoTy::markDiagnosedMainClassWithScript() {
   return !res;
 }
 
+inline void simple_display(llvm::raw_ostream &out, const SourceFile *SF) {
+  assert(SF && "Cannot display null source file!");
+
+  out << "source_file " << '\"' << SF->getFilename() << '\"';
+}
 } // end namespace swift
 
 #endif

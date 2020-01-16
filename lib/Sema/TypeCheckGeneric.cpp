@@ -467,7 +467,7 @@ GenericSignature TypeChecker::checkGenericSignature(
 
   // Debugging of the generic signature builder and generic signature
   // generation.
-  if (dc->getASTContext().LangOpts.DebugGenericSignatures) {
+  if (dc->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
     if (auto *VD = dyn_cast_or_null<ValueDecl>(dc->getAsDecl())) {
       VD->dumpRef(llvm::errs());
     } else {
@@ -478,7 +478,7 @@ GenericSignature TypeChecker::checkGenericSignature(
     sig->print(llvm::errs());
     llvm::errs() << "\n";
     llvm::errs() << "Canonical generic signature: ";
-    sig->getCanonicalSignature()->print(llvm::errs());
+    sig.getCanonicalSignature()->print(llvm::errs());
     llvm::errs() << "\n";
   }
 
@@ -589,14 +589,14 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
     // Debugging of the generic signature builder and generic signature
     // generation.
-    if (GC->getASTContext().LangOpts.DebugGenericSignatures) {
+    if (GC->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
       PD->printContext(llvm::errs());
       llvm::errs() << "\n";
       llvm::errs() << "Generic signature: ";
       sig->print(llvm::errs());
       llvm::errs() << "\n";
       llvm::errs() << "Canonical generic signature: ";
-      sig->getCanonicalSignature()->print(llvm::errs());
+      sig.getCanonicalSignature()->print(llvm::errs());
       llvm::errs() << "\n";
     }
     return sig;

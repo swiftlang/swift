@@ -107,8 +107,10 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
     break;
   }
   assert(CKind.hasValue());
-  return canSatisfy(Owner.Pair.FirstTy, Owner.Pair.SecondTy, Owner.OpenArchetypes,
-                    *CKind, Owner.DC);
+  return TypeChecker::typesSatisfyConstraint(Owner.Pair.FirstTy,
+                                             Owner.Pair.SecondTy,
+                                             Owner.OpenArchetypes,
+                                             *CKind, Owner.DC);
 }
 
 llvm::Expected<TypePair>
@@ -125,11 +127,4 @@ RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
   assert(!genericArgs.empty() && genericArgs.size() == 2 &&
          "invalid keypath dynamic member");
   return TypePair(genericArgs[0], genericArgs[1]);
-}
-
-llvm::Expected<bool>
-HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
-                                                 TypeBase *ty) const {
-  llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
-  return hasDynamicMemberLookupAttribute(Type(ty), DynamicMemberLookupCache);
 }

@@ -1687,6 +1687,21 @@ public:
   friend class GenericSignatureBuilder;
 };
 
+template <typename C>
+bool GenericSignatureBuilder::Constraint<C>::isSubjectEqualTo(Type T) const {
+  return getSubjectDependentType({ })->isEqual(T);
+}
+
+template <typename T>
+bool GenericSignatureBuilder::Constraint<T>::isSubjectEqualTo(const GenericSignatureBuilder::PotentialArchetype *PA) const {
+  return getSubjectDependentType({ })->isEqual(PA->getDependentType({ }));
+}
+
+template <typename T>
+bool GenericSignatureBuilder::Constraint<T>::hasSameSubjectAs(const GenericSignatureBuilder::Constraint<T> &C) const {
+  return getSubjectDependentType({ })->isEqual(C.getSubjectDependentType({ }));
+}
+
 /// Describes a requirement whose processing has been delayed for some reason.
 class GenericSignatureBuilder::DelayedRequirement {
 public:

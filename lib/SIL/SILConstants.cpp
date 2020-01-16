@@ -249,7 +249,7 @@ SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
     ArrayRef<SymbolicClosureArgument> closureArgs = clo->getCaptures();
     return SymbolicValue::makeClosure(clo->getTarget(), closureArgs,
                                       clo->getCallSubstitutionMap(),
-                                      clo->getClosureType(), allocator);
+                                      clo->getClosureInst(), allocator);
   }
   }
   llvm_unreachable("covered switch");
@@ -747,10 +747,10 @@ Type SymbolicValue::getArrayType() const {
 SymbolicValue SymbolicValue::makeClosure(SILFunction *target,
                                          ArrayRef<SymbolicClosureArgument> args,
                                          SubstitutionMap substMap,
-                                         SILType closureType,
+                                         SingleValueInstruction *closureInst,
                                          SymbolicValueAllocator &allocator) {
   auto clo =
-      SymbolicClosure::create(target, args, substMap, closureType, allocator);
+      SymbolicClosure::create(target, args, substMap, closureInst, allocator);
   SymbolicValue result;
   result.representationKind = RK_Closure;
   result.value.closure = clo;
@@ -760,7 +760,7 @@ SymbolicValue SymbolicValue::makeClosure(SILFunction *target,
 SymbolicClosure *SymbolicClosure::create(SILFunction *target,
                                          ArrayRef<SymbolicClosureArgument> args,
                                          SubstitutionMap substMap,
-                                         SILType closureType,
+                                         SingleValueInstruction *closureInst,
                                          SymbolicValueAllocator &allocator) {
   // Determine whether there are captured arguments without a symbolic value.
   bool hasNonConstantCapture = false;
@@ -776,7 +776,7 @@ SymbolicClosure *SymbolicClosure::create(SILFunction *target,
   auto rawMem = allocator.allocate(byteSizeOfArgs, alignof(SymbolicClosure));
   //  Placement initialize the object.
   auto closure = ::new (rawMem) SymbolicClosure(
-      target, args.size(), substMap, closureType, hasNonConstantCapture);
+      target, args.size(), substMap, closureInst, hasNonConstantCapture);
   std::uninitialized_copy(
       args.begin(), args.end(),
       closure->getTrailingObjects<SymbolicClosureArgument>());
@@ -1000,6 +1000,13 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
       diagnose(ctx, triggerLoc, diag::constexpr_untracked_sil_value_used_here,
                triggerLocSkipsInternalLocs);
     return;
+  case UnknownReason::UnknownCastResult: {
+    diagnose(ctx, diagLoc, diag::constexpr_unevaluable_cast_found);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, triggerLoc, diag::constexpr_unevaluable_cast_used_here,
+               triggerLocSkipsInternalLocs);
+    return;
+  }
   case UnknownReason::UnknownWitnessMethodConformance: {
     SmallString<8> witnessMethodName;
     getWitnessMethodName(dyn_cast<WitnessMethodInst>(unknownNode),

@@ -325,6 +325,7 @@ enum r23942743 {
   case Tomato(cloud: String)
 }
 let _ = .Tomato(cloud: .none)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'none'}}
 
 
 
@@ -566,15 +567,15 @@ func rdar_48114578() {
 }
 
 struct S_Min {
-  var min: Int = 42
+  var xmin: Int = 42
 }
 
-func min(_: Int, _: Float) -> Int { return 0 }
-func min(_: Float, _: Int) -> Int { return 0 }
+func xmin(_: Int, _: Float) -> Int { return 0 }
+func xmin(_: Float, _: Int) -> Int { return 0 }
 
 extension S_Min : CustomStringConvertible {
   public var description: String {
-    return "\(min)" // Ok
+    return "\(xmin)" // Ok
   }
 }
 
@@ -615,8 +616,11 @@ func rdar50679161() {
 
 func rdar_50467583_and_50909555() {
   // rdar://problem/50467583
-  let _: Set = [Int][]
-  // expected-error@-1 {{instance member 'subscript' cannot be used on type '[Int]'}}
+  let _: Set = [Int][] // expected-error {{no exact matches in call to subscript}}
+  // expected-note@-1 {{found candidate with type '(Int) -> Int'}}
+  // expected-note@-2 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
+  // expected-note@-3 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
+  // expected-note@-4 {{found candidate with type '(Range<Array<Int>.Index>) -> Slice<[Int]>' (aka '(Range<Int>) -> Slice<Array<Int>>')}}
 
   // rdar://problem/50909555
   struct S {

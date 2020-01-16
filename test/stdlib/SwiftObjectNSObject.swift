@@ -23,6 +23,7 @@
 
 // rdar://problem/56959761
 // UNSUPPORTED: OS=watchos
+// UNSUPPORTED: OS=tvos
 
 import Foundation
 
@@ -45,7 +46,7 @@ func TestSwiftObjectNSObject(_ c: C, _ d: D)
 // This check is for NSLog() output from TestSwiftObjectNSObject().
 // CHECK: c ##SwiftObjectNSObject.C##
 // CHECK-NEXT: d ##SwiftObjectNSObject.D##
-// CHECK-NEXT: S ##{{(Swift._)?}}SwiftObject##
+// CHECK-NEXT: S ##{{.*}}SwiftObject##
 
 // Temporarily disable this test on older OSes until we have time to
 // look into why it's failing there. rdar://problem/47870743

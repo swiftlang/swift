@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "allocbox-to-stack"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILArgument.h"
@@ -328,7 +329,7 @@ findUnexpectedBoxUse(SILValue Box, bool examinePartialApply,
         (!inAppliedFunction && isa<DeallocBoxInst>(User)))
       continue;
 
-    // If our user instruction is a copy_value or a marked_uninitialized, visit
+    // If our user instruction is a copy_value or a mark_uninitialized, visit
     // the users recursively.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
       llvm::copy(cast<SingleValueInstruction>(User)->getUses(),
@@ -354,6 +355,12 @@ findUnexpectedBoxUse(SILValue Box, bool examinePartialApply,
   return nullptr;
 }
 
+template <typename... T, typename... U>
+static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
+                                   Diag<T...> diag, U &&... args) {
+  return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+}
+
 /// canPromoteAllocBox - Can we promote this alloc_box to an alloc_stack?
 static bool canPromoteAllocBox(AllocBoxInst *ABI,
                                SmallVectorImpl<Operand *> &PromotedOperands) {
@@ -368,6 +375,21 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
     LLVM_DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
                << ABI->getFunction()->getName() << ": " << *ABI
                << "    Due to user: " << *User << "\n");
+
+    // Check if the vardecl has a "boxtostack.mustbeonstack" attribute. If so,
+    // emit a diagnostic.
+    if (auto *decl = ABI->getDecl()) {
+      if (decl->hasSemanticsAttr("boxtostack.mustbeonstack")) {
+        auto allocDiag =
+            diag::box_to_stack_cannot_promote_box_to_stack_due_to_escape_alloc;
+        diagnose(ABI->getModule().getASTContext(), ABI->getLoc().getSourceLoc(),
+                 allocDiag);
+        auto escapeNote = diag::
+            box_to_stack_cannot_promote_box_to_stack_due_to_escape_location;
+        diagnose(ABI->getModule().getASTContext(),
+                 User->getLoc().getSourceLoc(), escapeNote);
+      }
+    }
 
     return false;
   }
@@ -436,7 +458,8 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
          && "rewriting multi-field box not implemented");
   auto *ASI = Builder.createAllocStack(
       ABI->getLoc(),
-      getSILBoxFieldType(ABI->getBoxType(), ABI->getModule().Types, 0),
+      getSILBoxFieldType(TypeExpansionContext(*ABI->getFunction()),
+                         ABI->getBoxType(), ABI->getModule().Types, 0),
       ABI->getVarInfo(), ABI->hasDynamicLifetime());
 
   // Transfer a mark_uninitialized if we have one.
@@ -452,9 +475,9 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
 
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "promoting multi-field box not implemented");
-  auto &Lowering = ABI->getFunction()
-    ->getTypeLowering(
-      getSILBoxFieldType(ABI->getBoxType(), ABI->getModule().Types, 0));
+  auto &Lowering = ABI->getFunction()->getTypeLowering(
+      getSILBoxFieldType(TypeExpansionContext(*ABI->getFunction()),
+                         ABI->getBoxType(), ABI->getModule().Types, 0));
   auto Loc = CleanupLocation::get(ABI->getLoc());
 
   for (auto LastRelease : FinalReleases) {
@@ -583,9 +606,7 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
       SILType paramTy;
       {
         auto &TC = Orig->getModule().Types;
-        Lowering::GenericContextScope scope(TC,
-                                      OrigFTI->getSubstGenericSignature());
-        paramTy = getSILBoxFieldType(boxTy, TC, 0);
+        paramTy = getSILBoxFieldType(TypeExpansionContext(*Orig), boxTy, TC, 0);
       }
       auto promotedParam = SILParameterInfo(paramTy.getASTType(),
                                   ParameterConvention::Indirect_InoutAliasable);
@@ -613,7 +634,7 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
   auto *Fn = FuncBuilder.createFunction(
       SILLinkage::Shared, ClonedName, ClonedTy, Orig->getGenericEnvironment(),
-      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
+      Orig->getLocation(), Orig->isBare(), Orig->isTransparent(), Serialized,
       IsNotDynamic, Orig->getEntryCount(), Orig->isThunk(),
       Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
@@ -650,7 +671,8 @@ PromotedParamCloner::populateCloned() {
       auto boxTy = (*I)->getType().castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting multi-field boxes not implemented yet");
-      auto promotedTy = getSILBoxFieldType(boxTy, Cloned->getModule().Types, 0);
+      auto promotedTy = getSILBoxFieldType(TypeExpansionContext(*Cloned), boxTy,
+                                           Cloned->getModule().Types, 0);
       auto *promotedArg =
           ClonedEntryBB->createFunctionArgument(promotedTy, (*I)->getDecl());
       OrigPromotedParameters.insert(*I);

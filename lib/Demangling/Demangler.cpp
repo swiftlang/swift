@@ -529,7 +529,7 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
   // Demangle old-style class and protocol names, which are still used in the
   // ObjC metadata.
   if (nextIf("_Tt"))
-    return demangleObjCTypeName();
+    return demangleOldSymbolAsNode(Text, *this);
 
   unsigned PrefixLength = getManglingPrefixLength(MangledName);
   if (PrefixLength == 0)
@@ -1733,6 +1733,24 @@ NodePointer Demangler::demangleImplResultConvention(Node::Kind ConvKind) {
 NodePointer Demangler::demangleImplFunctionType() {
   NodePointer type = createNode(Node::Kind::ImplFunctionType);
 
+  if (nextIf('s')) {
+    Vector<NodePointer> Substitutions;
+    NodePointer SubstitutionRetroConformances;
+    if (!demangleBoundGenerics(Substitutions, SubstitutionRetroConformances))
+      return nullptr;
+    
+    bool isImplied = !nextIf('i');
+    
+    auto subsNode = createNode(isImplied
+                               ? Node::Kind::ImplImpliedSubstitutions
+                               : Node::Kind::ImplSubstitutions);
+    assert(Substitutions.size() == 1);
+    subsNode->addChild(Substitutions[0], *this);
+    if (SubstitutionRetroConformances)
+      subsNode->addChild(SubstitutionRetroConformances, *this);
+    type->addChild(subsNode, *this);
+  }
+  
   NodePointer GenSig = popNode(Node::Kind::DependentGenericSignature);
   if (GenSig && nextIf('P'))
     GenSig = changeKind(GenSig, Node::Kind::DependentPseudogenericSignature);
@@ -1794,6 +1812,7 @@ NodePointer Demangler::demangleImplFunctionType() {
       return nullptr;
     type->getChild(type->getNumChildren() - Idx - 1)->addChild(ConvTy, *this);
   }
+  
   return createType(type);
 }
 
@@ -2339,7 +2358,7 @@ std::string Demangler::demangleBridgedMethodParams() {
 
   while (!nextIf('_')) {
     auto c = nextChar();
-    if (!c && c != 'n' && c != 'b')
+    if (c != 'n' && c != 'b' && c != 'g')
       return std::string();
     Str.push_back(c);
   }
@@ -3192,46 +3211,4 @@ NodePointer Demangler::demangleValueWitness() {
   NodePointer VW = createNode(Node::Kind::ValueWitness);
   addChild(VW, createNode(Node::Kind::Index, unsigned(Kind)));
   return addChild(VW, popNode(Node::Kind::Type));
-}
-
-NodePointer Demangler::demangleObjCTypeName() {
-  NodePointer Ty = createNode(Node::Kind::Type);
-  NodePointer Global = addChild(createNode(Node::Kind::Global),
-                         addChild(createNode(Node::Kind::TypeMangling), Ty));
-  NodePointer Nominal = nullptr;
-  bool isProto = false;
-  if (nextIf('C')) {
-    Nominal = createNode(Node::Kind::Class);
-    addChild(Ty, Nominal);
-  } else if (nextIf('P')) {
-    isProto = true;
-    Nominal = createNode(Node::Kind::Protocol);
-    addChild(Ty, addChild(createNode(Node::Kind::ProtocolList),
-                    addChild(createNode(Node::Kind::TypeList),
-                      addChild(createNode(Node::Kind::Type), Nominal))));
-  } else {
-    return nullptr;
-  }
-
-  if (nextIf('s')) {
-    Nominal->addChild(createNode(Node::Kind::Module, "Swift"), *this);
-  } else {
-    NodePointer Module = demangleIdentifier();
-    if (!Module)
-      return nullptr;
-    Nominal->addChild(changeKind(Module, Node::Kind::Module), *this);
-  }
-
-  NodePointer Ident = demangleIdentifier();
-  if (!Ident)
-    return nullptr;
-  Nominal->addChild(Ident, *this);
-
-  if (isProto && !nextIf('_'))
-    return nullptr;
-
-  if (Pos < Text.size())
-    return nullptr;
-
-  return Global;
 }

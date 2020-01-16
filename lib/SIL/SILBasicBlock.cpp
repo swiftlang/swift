@@ -129,22 +129,24 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
          "Expected to both blocks to be entries or not");
   if (isEntry()) {
     assert(args_empty() && "Expected to have no arguments");
-    for (auto *FuncArg : Other->getFunctionArguments()) {
+    for (auto *FuncArg : Other->getSILFunctionArguments()) {
       createFunctionArgument(FuncArg->getType(),
                              FuncArg->getDecl());
     }
     return;
   }
 
-  for (auto *PHIArg : Other->getPhiArguments()) {
+  for (auto *PHIArg : Other->getSILPhiArguments()) {
     createPhiArgument(PHIArg->getType(), PHIArg->getOwnershipKind(),
                       PHIArg->getDecl());
   }
 }
 
-SILFunctionArgument *SILBasicBlock::createFunctionArgument(SILType Ty,
-                                                           const ValueDecl *D) {
-  assert(isEntry() && "Function Arguments can only be in the entry block");
+SILFunctionArgument *
+SILBasicBlock::createFunctionArgument(SILType Ty, const ValueDecl *D,
+                                      bool disableEntryBlockVerification) {
+  assert((disableEntryBlockVerification || isEntry()) &&
+         "Function Arguments can only be in the entry block");
   const SILFunction *Parent = getParent();
   auto OwnershipKind = ValueOwnershipKind(
       *Parent, Ty,
@@ -357,18 +359,12 @@ bool SILBasicBlock::isEntry() const {
 }
 
 /// Declared out of line so we can have a declaration of SILArgument.
-PhiArgumentArrayRef SILBasicBlock::getPhiArguments() const {
-  return PhiArgumentArrayRef(getArguments(), [](SILArgument *arg) {
-    return cast<SILPhiArgument>(arg);
-  });
-}
-
-/// Declared out of line so we can have a declaration of SILArgument.
-FunctionArgumentArrayRef SILBasicBlock::getFunctionArguments() const {
-  return FunctionArgumentArrayRef(getArguments(), [](SILArgument *arg) {
-    return cast<SILFunctionArgument>(arg);
-  });
-}
+#define ARGUMENT(NAME, PARENT)                                                 \
+  NAME##ArrayRef SILBasicBlock::get##NAME##s() const {                         \
+    return NAME##ArrayRef(getArguments(),                                      \
+                          [](SILArgument *arg) { return cast<NAME>(arg); });   \
+  }
+#include "swift/SIL/SILNodes.def"
 
 /// Returns true if this block ends in an unreachable or an apply of a
 /// no-return apply or builtin.

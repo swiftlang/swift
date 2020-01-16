@@ -404,7 +404,7 @@ ManagedValue Transform::transform(ManagedValue v,
     // If the conversion is trivial, just cast.
     if (SGF.SGM.Types.checkForABIDifferences(SGF.SGM.M,
                                              v.getType(), loweredResultTy)
-          == TypeConverter::ABIDifference::Trivial) {
+          == TypeConverter::ABIDifference::CompatibleRepresentation) {
       if (v.getType().isAddress())
         return SGF.B.createUncheckedAddrCast(Loc, v, loweredResultTy);
       return SGF.B.createUncheckedBitCast(Loc, v, loweredResultTy);
@@ -787,7 +787,11 @@ void SILGenFunction::collectThunkParams(
   // Add the indirect results.
   for (auto resultTy : F.getConventions().getIndirectSILResultTypes()) {
     auto paramTy = F.mapTypeIntoContext(resultTy);
-    SILArgument *arg = F.begin()->createFunctionArgument(paramTy);
+    // Lower result parameters in the context of the function: opaque result
+    // types will be lowered to their underlying type if allowed by resilience.
+    auto inContextParamTy = F.getLoweredType(paramTy.getASTType())
+                                .getCategoryType(paramTy.getCategory());
+    SILArgument *arg = F.begin()->createFunctionArgument(inContextParamTy);
     if (indirectResults)
       indirectResults->push_back(arg);
   }
@@ -796,7 +800,11 @@ void SILGenFunction::collectThunkParams(
   auto paramTypes = F.getLoweredFunctionType()->getParameters();
   for (auto param : paramTypes) {
     auto paramTy = F.mapTypeIntoContext(F.getConventions().getSILType(param));
-    params.push_back(B.createInputFunctionArgument(paramTy, loc));
+    // Lower parameters in the context of the function: opaque result types will
+    // be lowered to their underlying type if allowed by resilience.
+    auto inContextParamTy = F.getLoweredType(paramTy.getASTType())
+                                .getCategoryType(paramTy.getCategory());
+    params.push_back(B.createInputFunctionArgument(inContextParamTy, loc));
   }
 }
 
@@ -2689,8 +2697,8 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
   // A helper function to add an outer direct result.
   auto addOuterDirectResult = [&](ManagedValue resultValue,
                                   SILResultInfo result) {
-    assert(resultValue.getType()
-           == SGF.F.mapTypeIntoContext(SGF.getSILType(result, CanSILFunctionType())));
+    assert(resultValue.getType() ==
+           SGF.getSILTypeInContext(result, CanSILFunctionType()));
     outerDirectResults.push_back(resultValue.forward(SGF));
   };
 
@@ -2926,7 +2934,7 @@ buildThunkSignature(SILGenFunction &SGF,
 
   // Add the existing generic signature.
   int depth = 0;
-  GenericSignature baseGenericSig = GenericSignature();
+  GenericSignature baseGenericSig;
   if (inheritGenericSig) {
     if (auto genericSig = SGF.F.getLoweredFunctionType()->getSubstGenericSignature()) {
       baseGenericSig = genericSig;
@@ -2971,7 +2979,7 @@ buildThunkSignature(SILGenFunction &SGF,
     },
     MakeAbstractConformanceForGenericType());
 
-  return genericSig->getCanonicalSignature();
+  return genericSig.getCanonicalSignature();
 }
 
 /// Build the type of a function transformation thunk.
@@ -2984,8 +2992,10 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     SubstitutionMap &interfaceSubs,
     CanType &dynamicSelfType,
     bool withoutActuallyEscaping) {
-  assert(!expectedType->isPolymorphic());
-  assert(!sourceType->isPolymorphic());
+  // We shouldn't be thunking generic types here, and substituted function types
+  // ought to have their substitutions applied before we get here.
+  assert(!expectedType->isPolymorphic() && !expectedType->getSubstitutions());
+  assert(!sourceType->isPolymorphic() && !sourceType->getSubstitutions());
 
   // Can't build a thunk without context, so we require ownership semantics
   // on the result type.
@@ -3179,8 +3189,22 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                                 AbstractionPattern outputOrigType,
                                 CanAnyFunctionType outputSubstType,
                                 const TypeLowering &expectedTL) {
-  auto sourceType = fn.getType().castTo<SILFunctionType>();
-  auto expectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
+  auto substSourceType = fn.getType().castTo<SILFunctionType>();
+  auto substExpectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
+  
+  // Apply substitutions in the source and destination types, since the thunk
+  // doesn't change because of different function representations.
+  CanSILFunctionType sourceType;
+  if (substSourceType->getSubstitutions()) {
+    sourceType = substSourceType->getUnsubstitutedType(SGF.SGM.M);
+    fn = SGF.B.createConvertFunction(loc, fn,
+                                   SILType::getPrimitiveObjectType(sourceType));
+  } else {
+    sourceType = substSourceType;
+  }
+  
+  auto expectedType = substExpectedType
+    ->getUnsubstitutedType(SGF.SGM.M);
 
   // We can't do bridging here.
   assert(expectedType->getLanguage() ==
@@ -3223,14 +3247,22 @@ static ManagedValue createThunk(SILGenFunction &SGF,
     createPartialApplyOfThunk(SGF, loc, thunk, interfaceSubs, dynamicSelfType,
                               toType, fn.ensurePlusOne(SGF, loc));
 
-  if (!expectedType->isNoEscape()) {
+  // Convert to the substituted result type.
+  if (expectedType != substExpectedType) {
+    auto substEscapingExpectedType = substExpectedType
+      ->getWithExtInfo(substExpectedType->getExtInfo().withNoEscape(false));
+    thunkedFn = SGF.B.createConvertFunction(loc, thunkedFn,
+                    SILType::getPrimitiveObjectType(substEscapingExpectedType));
+  }
+  
+  if (!substExpectedType->isNoEscape()) {
     return thunkedFn;
   }
 
   // Handle the escaping to noescape conversion.
-  assert(expectedType->isNoEscape());
+  assert(substExpectedType->isNoEscape());
   return SGF.B.createConvertEscapeToNoEscape(
-      loc, thunkedFn, SILType::getPrimitiveObjectType(expectedType));
+      loc, thunkedFn, SILType::getPrimitiveObjectType(substExpectedType));
 }
 
 static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
@@ -3563,16 +3595,19 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
 
   CanSILFunctionType derivedFTy;
   if (baseLessVisibleThanDerived) {
-    derivedFTy = SGM.Types.getConstantOverrideType(derived);
+    derivedFTy =
+        SGM.Types.getConstantOverrideType(getTypeExpansionContext(), derived);
   } else {
-    derivedFTy = SGM.Types.getConstantInfo(derived).SILFnType;
+    derivedFTy =
+        SGM.Types.getConstantInfo(getTypeExpansionContext(), derived).SILFnType;
   }
 
-  SubstitutionMap subs;
-  if (auto *genericEnv = fd->getGenericEnvironment()) {
-    F.setGenericEnvironment(genericEnv);
-    subs = getForwardingSubstitutionMap();
-    derivedFTy = derivedFTy->substGenericArgs(SGM.M, subs);
+  auto subs = getForwardingSubstitutionMap();
+  if (auto genericSig = derivedFTy->getSubstGenericSignature()) {
+    subs = SubstitutionMap::get(genericSig, subs);
+
+    derivedFTy =
+        derivedFTy->substGenericArgs(SGM.M, subs, getTypeExpansionContext());
 
     inputSubstType = cast<FunctionType>(
         cast<GenericFunctionType>(inputSubstType)
@@ -3622,7 +3657,8 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
   if (baseLessVisibleThanDerived) {
     // See the comment in SILVTableVisitor.h under maybeAddMethod().
     auto selfValue = thunkArgs.back().getValue();
-    auto derivedTy = SGM.Types.getConstantOverrideType(derived);
+    auto derivedTy =
+        SGM.Types.getConstantOverrideType(getTypeExpansionContext(), derived);
     derivedRef = emitClassMethodRef(loc, selfValue, derived, derivedTy);
   } else {
     derivedRef = B.createFunctionRefFor(loc, implFn);
@@ -3744,16 +3780,15 @@ static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness,
 }
 
 static CanSILFunctionType
-getWitnessFunctionType(SILGenModule &SGM,
-                       SILDeclRef witness,
-                       WitnessDispatchKind witnessKind) {
+getWitnessFunctionType(TypeExpansionContext context, SILGenModule &SGM,
+                       SILDeclRef witness, WitnessDispatchKind witnessKind) {
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
   case WitnessDispatchKind::Dynamic:
   case WitnessDispatchKind::Witness:
-    return SGM.Types.getConstantInfo(witness).SILFnType;
+    return SGM.Types.getConstantInfo(context, witness).SILFnType;
   case WitnessDispatchKind::Class:
-    return SGM.Types.getConstantOverrideType(witness);
+    return SGM.Types.getConstantOverrideType(context, witness);
   }
 
   llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
@@ -3838,7 +3873,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   collectThunkParams(loc, origParams);
 
   // Get the type of the witness.
-  auto witnessInfo = getConstantInfo(witness);
+  auto witnessInfo = getConstantInfo(getTypeExpansionContext(), witness);
   CanAnyFunctionType witnessSubstTy = witnessInfo.LoweredType;
   if (auto genericFnType = dyn_cast<GenericFunctionType>(witnessSubstTy)) {
     witnessSubstTy = cast<FunctionType>(genericFnType
@@ -3857,10 +3892,12 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   }
 
   // Get the lowered type of the witness.
-  auto origWitnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
+  auto origWitnessFTy = getWitnessFunctionType(getTypeExpansionContext(), SGM,
+                                               witness, witnessKind);
   auto witnessFTy = origWitnessFTy;
   if (!witnessSubs.empty())
-    witnessFTy = origWitnessFTy->substGenericArgs(SGM.M, witnessSubs);
+    witnessFTy = origWitnessFTy->substGenericArgs(SGM.M, witnessSubs,
+                                                  getTypeExpansionContext());
 
   auto reqtSubstParams = reqtSubstTy.getParams();
   auto witnessSubstParams = witnessSubstTy.getParams();

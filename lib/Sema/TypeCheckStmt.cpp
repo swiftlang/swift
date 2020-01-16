@@ -112,6 +112,8 @@ namespace {
         ParentDC = CE;
         CE->getBody()->walk(*this);
         ParentDC = oldParentDC;
+
+        TypeChecker::computeCaptures(CE);
         return { false, E };
       } 
 
@@ -148,9 +150,14 @@ namespace {
         if (CE->hasSingleExpressionBody())
           CE->getBody()->walk(ContextualizeClosures(CE));
 
-        // In neither case do we need to continue the *current* walk.
+        TypeChecker::computeCaptures(CE);
         return { false, E };
       }
+
+      // Caller-side default arguments need their @autoclosures checked.
+      if (auto *DAE = dyn_cast<DefaultArgumentExpr>(E))
+        if (DAE->isCallerSide() && DAE->getParamDecl()->isAutoClosure())
+          DAE->getCallerSideDefaultExpr()->walk(*this);
 
       return { true, E };
     }
@@ -178,13 +185,9 @@ namespace {
   class FunctionBodyTimer {
     AnyFunctionRef Function;
     llvm::TimeRecord StartTime = llvm::TimeRecord::getCurrentTime();
-    unsigned WarnLimit;
-    bool ShouldDump;
 
   public:
-    FunctionBodyTimer(AnyFunctionRef Fn, bool shouldDump,
-                      unsigned warnLimit)
-        : Function(Fn), WarnLimit(warnLimit), ShouldDump(shouldDump) {}
+    FunctionBodyTimer(AnyFunctionRef Fn) : Function(Fn) {}
 
     ~FunctionBodyTimer() {
       llvm::TimeRecord endTime = llvm::TimeRecord::getCurrentTime(false);
@@ -195,7 +198,7 @@ namespace {
       ASTContext &ctx = Function.getAsDeclContext()->getASTContext();
       auto *AFD = Function.getAbstractFunctionDecl();
 
-      if (ShouldDump) {
+      if (ctx.TypeCheckerOpts.WarnLongFunctionBodies) {
         // Round up to the nearest 100th of a millisecond.
         llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100) << "ms\t";
         Function.getLoc().print(llvm::errs(), ctx.SourceMgr);
@@ -210,6 +213,7 @@ namespace {
         llvm::errs() << "\n";
       }
 
+      const auto WarnLimit = ctx.TypeCheckerOpts.DebugTimeFunctionBodies;
       if (WarnLimit != 0 && elapsedMS >= WarnLimit) {
         if (AFD) {
           ctx.Diags.diagnose(AFD, diag::debug_long_function_body,
@@ -234,14 +238,14 @@ bool TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
   return CC.hasAutoClosures();
 }
 
-void TypeChecker::contextualizeTopLevelCode(TopLevelContext &TLC,
-                                            TopLevelCodeDecl *TLCD) {
-  unsigned nextDiscriminator = TLC.NextAutoClosureDiscriminator;
+void TypeChecker::contextualizeTopLevelCode(TopLevelCodeDecl *TLCD) {
+  auto &Context = TLCD->DeclContext::getASTContext();
+  unsigned nextDiscriminator = Context.NextAutoClosureDiscriminator;
   ContextualizeClosures CC(TLCD, nextDiscriminator);
   TLCD->getBody()->walk(CC);
-  assert(nextDiscriminator == TLC.NextAutoClosureDiscriminator &&
+  assert(nextDiscriminator == Context.NextAutoClosureDiscriminator &&
          "reentrant/concurrent invocation of contextualizeTopLevelCode?");
-  TLC.NextAutoClosureDiscriminator = CC.NextDiscriminator;
+  Context.NextAutoClosureDiscriminator = CC.NextDiscriminator;
 }
 
 /// Emits an error with a fixit for the case of unnecessary cast over a
@@ -297,7 +301,7 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
 namespace {
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
-  TypeChecker &TC;
+  ASTContext &Ctx;
 
   /// This is the current function or closure being checked.
   /// This is null for top level code.
@@ -332,7 +336,7 @@ public:
   /// Used to distinguish the first BraceStmt that starts a TopLevelCodeDecl.
   bool IsBraceStmtFromTopLevelDecl;
 
-  ASTContext &getASTContext() const { return TC.Context; };
+  ASTContext &getASTContext() const { return Ctx; };
   
   struct AddLabeledStmt {
     StmtChecker &SC;
@@ -373,16 +377,16 @@ public:
     }
   };
 
-  StmtChecker(TypeChecker &TC, AbstractFunctionDecl *AFD)
-      : TC(TC), TheFunc(AFD), DC(AFD), IsREPL(false),
+  StmtChecker(AbstractFunctionDecl *AFD)
+      : Ctx(AFD->getASTContext()), TheFunc(AFD), DC(AFD), IsREPL(false),
         IsBraceStmtFromTopLevelDecl(false) {}
 
-  StmtChecker(TypeChecker &TC, ClosureExpr *TheClosure)
-      : TC(TC), TheFunc(TheClosure), DC(TheClosure), IsREPL(false),
-        IsBraceStmtFromTopLevelDecl(false) {}
+  StmtChecker(ClosureExpr *TheClosure)
+      : Ctx(TheClosure->getASTContext()), TheFunc(TheClosure),
+        DC(TheClosure), IsREPL(false), IsBraceStmtFromTopLevelDecl(false) {}
 
-  StmtChecker(TypeChecker &TC, DeclContext *DC)
-      : TC(TC), TheFunc(), DC(DC), IsREPL(false),
+  StmtChecker(DeclContext *DC)
+      : Ctx(DC->getASTContext()), TheFunc(), DC(DC), IsREPL(false),
         IsBraceStmtFromTopLevelDecl(false) {
     if (const SourceFile *SF = DC->getParentSourceFile())
       if (SF->Kind == SourceFileKind::REPL)
@@ -544,9 +548,9 @@ public:
       }
     }
 
-    auto exprTy = TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(ResultTy),
-                                         ctp,
-                                         options);
+    auto exprTy = TypeChecker::typeCheckExpression(E, DC,
+                                                   TypeLoc::withoutLoc(ResultTy),
+                                                   ctp, options);
     RS->setResult(E);
 
     if (!exprTy) {
@@ -605,9 +609,9 @@ public:
         contextTypePurpose = CTP_YieldByValue;
       }
 
-      TC.typeCheckExpression(exprToCheck, DC,
-                             TypeLoc::withoutLoc(contextType),
-                             contextTypePurpose);
+      TypeChecker::typeCheckExpression(exprToCheck, DC,
+                                       TypeLoc::withoutLoc(contextType),
+                                       contextTypePurpose);
 
       // Propagate the change into the inout expression we stripped before.
       if (inout) {
@@ -636,7 +640,8 @@ public:
     Type exnType = getASTContext().getErrorDecl()->getDeclaredType();
     if (!exnType) return TS;
 
-    TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(exnType), CTP_ThrowStmt);
+    TypeChecker::typeCheckExpression(E, DC, TypeLoc::withoutLoc(exnType),
+                                     CTP_ThrowStmt);
     TS->setSubExpr(E);
     
     return TS;
@@ -644,16 +649,16 @@ public:
 
   Stmt *visitPoundAssertStmt(PoundAssertStmt *PA) {
     Expr *C = PA->getCondition();
-    TC.typeCheckCondition(C, DC);
+    TypeChecker::typeCheckCondition(C, DC);
     PA->setCondition(C);
     return PA;
   }
     
   Stmt *visitDeferStmt(DeferStmt *DS) {
-    TC.typeCheckDecl(DS->getTempDecl());
+    TypeChecker::typeCheckDecl(DS->getTempDecl());
 
     Expr *theCall = DS->getCallExpr();
-    TC.typeCheckExpression(theCall, DC);
+    TypeChecker::typeCheckExpression(theCall, DC);
     DS->setCallExpr(theCall);
 
     return DS;
@@ -661,7 +666,7 @@ public:
   
   Stmt *visitIfStmt(IfStmt *IS) {
     StmtCondition C = IS->getCond();
-    TC.typeCheckStmtCondition(C, DC, diag::if_always_true);
+    TypeChecker::typeCheckStmtCondition(C, DC, diag::if_always_true);
     IS->setCond(C);
 
     AddLabeledStmt ifNest(*this, IS);
@@ -680,7 +685,7 @@ public:
   
   Stmt *visitGuardStmt(GuardStmt *GS) {
     StmtCondition C = GS->getCond();
-    TC.typeCheckStmtCondition(C, DC, diag::guard_always_succeeds);
+    TypeChecker::typeCheckStmtCondition(C, DC, diag::guard_always_succeeds);
     GS->setCond(C);
     
     AddLabeledStmt ifNest(*this, GS);
@@ -701,7 +706,7 @@ public:
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
     StmtCondition C = WS->getCond();
-    TC.typeCheckStmtCondition(C, DC, diag::while_always_true);
+    TypeChecker::typeCheckStmtCondition(C, DC, diag::while_always_true);
     WS->setCond(C);
 
     AddLabeledStmt loopNest(*this, WS);
@@ -718,171 +723,16 @@ public:
       typeCheckStmt(S);
       RWS->setBody(S);
     }
-    
+
     Expr *E = RWS->getCond();
-    TC.typeCheckCondition(E, DC);
+    TypeChecker::typeCheckCondition(E, DC);
     RWS->setCond(E);
     return RWS;
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    TypeResolutionOptions options(TypeResolverContext::InExpression);
-    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-
-    if (auto *P = TypeChecker::resolvePattern(S->getPattern(), DC,
-                                              /*isStmtCondition*/false)) {
-      S->setPattern(P);
-    } else {
-      S->getPattern()->setType(ErrorType::get(getASTContext()));
+    if (TypeChecker::typeCheckForEachBinding(DC, S))
       return nullptr;
-    }
-  
-    if (TC.typeCheckPattern(S->getPattern(), DC, options)) {
-      // FIXME: Handle errors better.
-      S->getPattern()->setType(ErrorType::get(getASTContext()));
-      return nullptr;
-    }
-
-    if (TC.typeCheckForEachBinding(DC, S))
-      return nullptr;
-
-    if (auto *Where = S->getWhere()) {
-      if (TC.typeCheckCondition(Where, DC))
-        return nullptr;
-      S->setWhere(Where);
-    }
-
-
-    // Retrieve the 'Sequence' protocol.
-    ProtocolDecl *sequenceProto = TypeChecker::getProtocol(
-        getASTContext(), S->getForLoc(), KnownProtocolKind::Sequence);
-    if (!sequenceProto) {
-      return nullptr;
-    }
-
-    // Retrieve the 'Iterator' protocol.
-    ProtocolDecl *iteratorProto = TypeChecker::getProtocol(
-        getASTContext(), S->getForLoc(), KnownProtocolKind::IteratorProtocol);
-    if (!iteratorProto) {
-      return nullptr;
-    }
-
-    Expr *sequence = S->getSequence();
-
-    // Invoke iterator() to get an iterator from the sequence.
-    Type iteratorTy;
-    VarDecl *iterator;
-    {
-      Type sequenceType = sequence->getType();
-      auto conformance =
-        TypeChecker::conformsToProtocol(sequenceType, sequenceProto, DC,
-                                        ConformanceCheckFlags::InExpression,
-                                        sequence->getLoc());
-      if (conformance.isInvalid())
-        return nullptr;
-      S->setSequenceConformance(conformance);
-
-      iteratorTy =
-          conformance.getTypeWitnessByName(sequenceType,
-                                           getASTContext().Id_Iterator);
-      if (iteratorTy->hasError())
-        return nullptr;
-
-      auto witness =
-          conformance.getWitnessByName(sequenceType,
-                                       getASTContext().Id_makeIterator);
-      if (!witness)
-        return nullptr;
-      S->setMakeIterator(witness);
-
-      // Create a local variable to capture the iterator.
-      std::string name;
-      if (auto np = dyn_cast_or_null<NamedPattern>(S->getPattern()))
-        name = "$"+np->getBoundName().str().str();
-      name += "$generator";
-
-      iterator = new (getASTContext()) VarDecl(
-          /*IsStatic*/ false, VarDecl::Introducer::Var,
-          /*IsCaptureList*/ false, S->getInLoc(),
-          getASTContext().getIdentifier(name), DC);
-      iterator->setInterfaceType(iteratorTy->mapTypeOutOfContext());
-      iterator->setImplicit();
-      S->setIteratorVar(iterator);
-
-      auto genPat = new (getASTContext()) NamedPattern(iterator);
-      genPat->setImplicit();
-
-      // TODO: test/DebugInfo/iteration.swift requires this extra info to
-      // be around.
-      auto nextResultType = OptionalType::get(conformance.getTypeWitnessByName(
-          sequenceType, getASTContext().Id_Element));
-      PatternBindingDecl::createImplicit(
-          getASTContext(), StaticSpellingKind::None, genPat,
-          new (getASTContext()) OpaqueValueExpr(S->getInLoc(), nextResultType),
-          DC, /*VarLoc*/ S->getForLoc());
-
-      Type newSequenceType = cast<AbstractFunctionDecl>(witness.getDecl())
-            ->getInterfaceType()
-            ->castTo<AnyFunctionType>()
-            ->getParams()[0].getPlainType().subst(witness.getSubstitutions());
-
-      // Necessary type coersion for method application.
-      if (TC.convertToType(sequence, newSequenceType, DC, None)) {
-        return nullptr;
-      }
-      S->setSequence(sequence);
-    }
-
-    // Working with iterators requires Optional.
-    if (TypeChecker::requireOptionalIntrinsics(getASTContext(), S->getForLoc()))
-      return nullptr;
-
-    // Gather the witnesses from the Iterator protocol conformance, which
-    // we'll use to drive the loop.
-    // FIXME: Would like to customize the diagnostic emitted in
-    // conformsToProtocol().
-    auto genConformance = TypeChecker::conformsToProtocol(
-        iteratorTy, iteratorProto, DC, ConformanceCheckFlags::InExpression,
-        sequence->getLoc());
-    if (genConformance.isInvalid())
-      return nullptr;
-
-    Type elementTy =
-        genConformance.getTypeWitnessByName(iteratorTy,
-                                            getASTContext().Id_Element);
-    if (elementTy->hasError())
-      return nullptr;
-
-    auto *varRef = TypeChecker::buildCheckedRefExpr(iterator, DC,
-                                                    DeclNameLoc(S->getInLoc()),
-                                                    /*implicit*/ true);
-    if (!varRef)
-      return nullptr;
-
-    S->setIteratorVarRef(varRef);
-
-    auto witness =
-        genConformance.getWitnessByName(iteratorTy, getASTContext().Id_next);
-    S->setIteratorNext(witness);
-
-    auto nextResultType = cast<FuncDecl>(S->getIteratorNext().getDecl())
-                              ->getResultInterfaceType()
-                              .subst(S->getIteratorNext().getSubstitutions());
-
-    // Convert that Optional<T> value to Optional<Element>.
-    auto optPatternType = OptionalType::get(S->getPattern()->getType());
-    if (!optPatternType->isEqual(nextResultType)) {
-      OpaqueValueExpr *elementExpr =
-          new (getASTContext()) OpaqueValueExpr(S->getInLoc(), nextResultType);
-      Expr *convertElementExpr = elementExpr;
-      if (TC.convertToType(convertElementExpr, optPatternType, DC,
-                           S->getPattern())) {
-        return nullptr;
-      }
-      S->setElementExpr(elementExpr);
-      S->setConvertElementExpr(convertElementExpr);
-    }
 
     // Type-check the body of the loop.
     AddLabeledStmt loopNest(*this, S);
@@ -918,7 +768,7 @@ public:
         } else {
           unsigned distance =
             TypeChecker::getCallEditDistance(
-                S->getTargetName(), (*I)->getLabelInfo().Name,
+                DeclNameRef(S->getTargetName()), (*I)->getLabelInfo().Name,
                 TypeChecker::UnreasonableCallEditDistance);
           if (distance < TypeChecker::UnreasonableCallEditDistance)
             labelCorrections.insert(distance, std::move(*I));
@@ -983,7 +833,7 @@ public:
         } else {
           unsigned distance =
             TypeChecker::getCallEditDistance(
-                S->getTargetName(), (*I)->getLabelInfo().Name,
+                DeclNameRef(S->getTargetName()), (*I)->getLabelInfo().Name,
                 TypeChecker::UnreasonableCallEditDistance);
           if (distance < TypeChecker::UnreasonableCallEditDistance)
             labelCorrections.insert(distance, std::move(*I));
@@ -1081,11 +931,21 @@ public:
     }
 
     pattern = newPattern;
+
     // Coerce the pattern to the subject's type.
-    TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-    if (!subjectType ||
-        TC.coercePatternToType(pattern, TypeResolution::forContextual(DC),
-                               subjectType, patternOptions)) {
+    bool coercionError = false;
+    if (subjectType) {
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
+      TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+      auto coercedPattern = TypeChecker::coercePatternToType(
+          contextualPattern, subjectType, patternOptions);
+      if (coercedPattern)
+        pattern = coercedPattern;
+      else
+        coercionError = true;
+    }
+
+    if (!subjectType || coercionError) {
       limitExhaustivityChecks = true;
 
       // If that failed, mark any variables binding pieces of the pattern
@@ -1163,8 +1023,7 @@ public:
         }
         assert(isa<CaseStmt>(initialCaseVarDecl->getParentPatternStmt()));
 
-        if (vd->getInterfaceType() && initialCaseVarDecl->getType() &&
-            !initialCaseVarDecl->isInvalid() &&
+        if (!initialCaseVarDecl->isInvalid() &&
             !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
           getASTContext().Diags.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
                       vd->getType(), initialCaseVarDecl->getType());
@@ -1282,7 +1141,7 @@ public:
   Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
     // Type-check the subject expression.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
-    auto resultTy = TC.typeCheckExpression(subjectExpr, DC);
+    auto resultTy = TypeChecker::typeCheckExpression(subjectExpr, DC);
     auto limitExhaustivityChecks = !resultTy;
     if (Expr *newSubjectExpr =
             TypeChecker::coerceToRValue(getASTContext(), subjectExpr))
@@ -1299,7 +1158,7 @@ public:
     for (auto &node : switchStmt->getRawCases()) {
       if (!node.is<Decl *>())
         continue;
-      TC.typeCheckDecl(node.get<Decl *>());
+      TypeChecker::typeCheckDecl(node.get<Decl *>());
     }
 
     SmallVector<VarDecl *, 8> scratchMemory1;
@@ -1341,7 +1200,7 @@ public:
 
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
-          limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
+          limitExhaustivityChecks |= TypeChecker::typeCheckCondition(guard, DC);
           labelItem.setGuardExpr(guard);
         }
       }
@@ -1367,7 +1226,7 @@ public:
                                   subjectType, &prevCaseDecls, &nextCaseDecls);
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
-          limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
+          limitExhaustivityChecks |= TypeChecker::typeCheckCondition(guard, DC);
           labelItem.setGuardExpr(guard);
         }
       }
@@ -1418,7 +1277,8 @@ public:
     }
 
     if (!switchStmt->isImplicit()) {
-      TC.checkSwitchExhaustiveness(switchStmt, DC, limitExhaustivityChecks);
+      TypeChecker::checkSwitchExhaustiveness(switchStmt, DC,
+                                             limitExhaustivityChecks);
     }
 
     return switchStmt;
@@ -1436,11 +1296,11 @@ public:
 
   void checkCatchStmt(CatchStmt *S) {
     // Check the catch pattern.
-    TC.typeCheckCatchPattern(S, DC);
+    TypeChecker::typeCheckCatchPattern(S, DC);
 
     // Check the guard expression, if present.
     if (Expr *guard = S->getGuardExpr()) {
-      TC.typeCheckCondition(guard, DC);
+      TypeChecker::typeCheckCondition(guard, DC);
       S->setGuardExpr(guard);
     }
       
@@ -1481,7 +1341,7 @@ public:
 
 bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
   // Grab the standard exception type.
-  Type exnType = Context.getErrorDecl()->getDeclaredType();
+  Type exnType = DC->getASTContext().getErrorDecl()->getDeclaredType();
 
   Pattern *pattern = S->getErrorPattern();
   if (Pattern *newPattern = TypeChecker::resolvePattern(pattern, DC,
@@ -1489,10 +1349,19 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
     pattern = newPattern;
 
     // Coerce the pattern to the exception type.
-    TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-    if (!exnType ||
-        coercePatternToType(pattern, TypeResolution::forContextual(DC), exnType,
-                            patternOptions)) {
+    bool coercionError = false;
+    if (exnType) {
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
+      TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+      auto coercedPattern = coercePatternToType(
+          contextualPattern, exnType, patternOptions);
+      if (coercedPattern)
+        pattern = coercedPattern;
+      else
+        coercionError = true;
+    }
+
+    if (!exnType || coercionError) {
       // If that failed, be sure to give the variables error types
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)
@@ -1523,6 +1392,7 @@ static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
     case ExprKind::MagicIdentifierLiteral:
       switch (cast<MagicIdentifierLiteralExpr>(LE)->getKind()) {
       case MagicIdentifierLiteralExpr::Kind::File: return "#file";
+      case MagicIdentifierLiteralExpr::Kind::FilePath: return "#filePath";
       case MagicIdentifierLiteralExpr::Kind::Line: return "#line";
       case MagicIdentifierLiteralExpr::Kind::Column: return "#column";
       case MagicIdentifierLiteralExpr::Kind::Function: return "#function";
@@ -1825,7 +1695,8 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       }
 
       auto resultTy =
-          TC.typeCheckExpression(SubExpr, DC, TypeLoc(), CTP_Unused, options);
+          TypeChecker::typeCheckExpression(SubExpr, DC, TypeLoc(),
+                                           CTP_Unused, options);
 
       // If a closure expression is unused, the user might have intended
       // to write "do { ... }".
@@ -1864,7 +1735,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
       break;
 
-    TC.typeCheckDecl(SubDecl);
+    TypeChecker::typeCheckDecl(SubDecl);
   }
 
   return BS;
@@ -1895,20 +1766,17 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
   ASTContext &Context = ctor->getASTContext();
   Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
                                               SourceLoc(), /*Implicit=*/true);
-  Expr *r = new (Context) UnresolvedDotExpr(superRef, SourceLoc(),
-                                            DeclBaseName::createConstructor(),
-                                            DeclNameLoc(),
-                                            /*Implicit=*/true);
+  Expr *r = UnresolvedDotExpr::createImplicit(
+      Context, superRef, DeclBaseName::createConstructor());
   r = CallExpr::createImplicit(Context, r, { }, { });
 
   if (ctor->hasThrows())
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
 
-  TypeChecker &tc = *Context.getLegacyGlobalTypeChecker();
   DiagnosticSuppression suppression(ctor->getASTContext().Diags);
   auto resultTy =
-      tc.typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
-                             TypeCheckExprFlags::IsDiscarded);
+      TypeChecker::typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
+                                       TypeCheckExprFlags::IsDiscarded);
   if (!resultTy)
     return nullptr;
   
@@ -2104,29 +1972,30 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
     ctx.Stats->getFrontendCounters().NumFunctionsTypechecked++;
 
   Optional<FunctionBodyTimer> timer;
-  TypeChecker &tc = *ctx.getLegacyGlobalTypeChecker();
-  if (tc.DebugTimeFunctionBodies || tc.WarnLongFunctionBodies)
-    timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
+  const auto &tyOpts = ctx.TypeCheckerOpts;
+  if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
+    timer.emplace(AFD);
 
   BraceStmt *body = AFD->getBody();
   if (!body || AFD->isBodyTypeChecked())
     return false;
 
+  bool alreadyTypeChecked = false;
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
     if (Type builderType = getFunctionBuilderType(func)) {
-      body = TypeChecker::applyFunctionBuilderBodyTransform(func, body,
-                                                            builderType);
-      if (!body)
-        return true;
-    } else if (func->hasSingleExpressionBody()) {
-      auto resultTypeLoc = func->getBodyResultTypeLoc();
-      auto expr = func->getSingleExpressionBody();
+      if (auto optBody =
+            TypeChecker::applyFunctionBuilderBodyTransform(func, builderType)) {
+        if (!*optBody)
+          return true;
 
-      if (resultTypeLoc.isNull() || resultTypeLoc.getType()->isVoid()) {
-        // The function returns void.  We don't need an explicit return, no matter
-        // what the type of the expression is.  Take the inserted return back out.
-        body->setFirstElement(expr);
+        body = *optBody;
+        alreadyTypeChecked = true;
       }
+    } else if (func->hasSingleExpressionBody() &&
+               func->getResultInterfaceType()->isVoid()) {
+      // The function returns void.  We don't need an explicit return, no matter
+      // what the type of the expression is.  Take the inserted return back out.
+      body->setFirstElement(func->getSingleExpressionBody());
     }
   } else if (isa<ConstructorDecl>(AFD) &&
              (body->empty() ||
@@ -2149,9 +2018,13 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (ctx.LangOpts.EnableASTScopeLookup)
     ASTScope::expandFunctionBody(AFD);
 
-  StmtChecker SC(tc, AFD);
-  SC.EndTypeCheckLoc = endTypeCheckLoc;
-  bool hadError = SC.typeCheckBody(body);
+  // Type check the function body if needed.
+  bool hadError = false;
+  if (!alreadyTypeChecked) {
+    StmtChecker SC(AFD);
+    SC.EndTypeCheckLoc = endTypeCheckLoc;
+    hadError = SC.typeCheckBody(body);
+  }
 
   // If this was a function with a single expression body, let's see
   // if implicit return statement came out to be `Never` which means
@@ -2199,10 +2072,11 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   BraceStmt *body = closure->getBody();
 
   Optional<FunctionBodyTimer> timer;
-  if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
-    timer.emplace(closure, DebugTimeFunctionBodies, WarnLongFunctionBodies);
+  const auto &tyOpts = closure->getASTContext().TypeCheckerOpts;
+  if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
+    timer.emplace(closure);
 
-  bool HadError = StmtChecker(*this, closure).typeCheckBody(body);
+  bool HadError = StmtChecker(closure).typeCheckBody(body);
   if (body) {
     closure->setBody(body, closure->hasSingleExpressionBody());
   }
@@ -2213,7 +2087,7 @@ bool TypeChecker::typeCheckTapBody(TapExpr *expr, DeclContext *DC) {
   // We intentionally use typeCheckStmt instead of typeCheckBody here
   // because we want to contextualize TapExprs with the body they're in.
   BraceStmt *body = expr->getBody();
-  bool HadError = StmtChecker(*this, DC).typeCheckStmt(body);
+  bool HadError = StmtChecker(DC).typeCheckStmt(body);
   if (body) {
     expr->setBody(body);
   }
@@ -2225,7 +2099,7 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   // because we want to contextualize all the TopLevelCode
   // declarations simultaneously.
   BraceStmt *Body = TLCD->getBody();
-  StmtChecker(*this, TLCD).typeCheckStmt(Body);
+  StmtChecker(TLCD).typeCheckStmt(Body);
   TLCD->setBody(Body);
   checkTopLevelErrorHandling(TLCD);
   performTopLevelDeclDiagnostics(TLCD);

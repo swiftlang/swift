@@ -91,7 +91,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
     CanSymbolicReferenceLocally(CanSymbolicReference);
 
   AllowSymbolicReferences = true;
-  CanSymbolicReference = [&IGM](SymbolicReferent s) -> bool {
+  CanSymbolicReference = [](SymbolicReferent s) -> bool {
     if (auto type = s.dyn_cast<const NominalTypeDecl *>()) {
       // The short-substitution types in the standard library have compact
       // manglings already, and the runtime ought to have a lookup table for
@@ -119,19 +119,6 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
         }
       }
 
-      // TODO: ObjectMemoryReader for PE platforms still does not
-      // implement symbol relocations. For now, on non-Mach-O platforms,
-      // only symbolic reference things in the same module.
-      if (IGM.TargetInfo.OutputObjectFormat != llvm::Triple::MachO
-          && IGM.TargetInfo.OutputObjectFormat != llvm::Triple::ELF) {
-        auto formalAccessScope = type->getFormalAccessScope(nullptr, true);
-        if ((formalAccessScope.isPublic() || formalAccessScope.isInternal()) &&
-            (!IGM.CurSourceFile ||
-             IGM.CurSourceFile != type->getParentSourceFile())) {
-          return false;
-        }
-      }
-      
       return true;
     } else if (auto opaque = s.dyn_cast<const OpaqueTypeDecl *>()) {
       // Always symbolically reference opaque types.
@@ -267,7 +254,7 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
       = '_';
     Buffer << ' ';
     if (auto ty = referent.dyn_cast<const NominalTypeDecl*>())
-      appendContext(ty);
+      appendContext(ty, ty->getAlternateModuleName());
     else if (auto opaque = referent.dyn_cast<const OpaqueTypeDecl*>())
       appendOpaqueDeclName(opaque);
     else

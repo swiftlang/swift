@@ -11,58 +11,31 @@ else()
   set(UUID_INCLUDE "${UUID_INCLUDE_DIRS}")
 endif()
 
-# Figure out if we can track VC revisions.
-# FIXME: Copied from Clang.
-function(find_first_existing_file out_var)
-  foreach(file ${ARGN})
-    if(EXISTS "${file}")
-      set(${out_var} "${file}" PARENT_SCOPE)
-      return()
-    endif()
-  endforeach()
-endfunction()
-
-macro(find_first_existing_vc_file out_var path)
-  find_first_existing_file(${out_var}
-    "${path}/.git/logs/HEAD" # Git
-    "${path}/.svn/wc.db"     # SVN 1.7
-    "${path}/.svn/entries"   # SVN 1.6
-    )
-endmacro()
-
-set(generate_vcs_version_script "${LLVM_MAIN_SRC_DIR}/cmake/modules/GenerateVersionFromVCS.cmake")
-
 function(generate_revision_inc revision_inc_var name dir)
-  find_first_existing_vc_file(dep_file "${dir}")
+  find_first_existing_vc_file("${dir}" ${name}_vc)
+
   # Create custom target to generate the VC revision include.
-  set(revision_inc "${CMAKE_CURRENT_BINARY_DIR}/${name}Revision.inc")
-  string(TOUPPER ${name} upper_name)
-  if(DEFINED dep_file)
-    add_custom_command(OUTPUT "${revision_inc}"
-      DEPENDS "${dep_file}" "${generate_vcs_version_script}"
-      COMMAND
-      ${CMAKE_COMMAND} "-DNAMES=${upper_name}"
-                       "-D${upper_name}_SOURCE_DIR=${dir}"
-                       "-DHEADER_FILE=${revision_inc}"
-                       -P "${generate_vcs_version_script}")
-  else()
-    # Generate an empty Revision.inc file if we are not using git or SVN.
-    file(WRITE "${revision_inc}" "")
-  endif()
+  set(version_inc "${CMAKE_CURRENT_BINARY_DIR}/${name}Revision.inc")
+
+  set(generate_vcs_version_script "${LLVM_MAIN_SRC_DIR}/cmake/modules/GenerateVersionFromVCS.cmake")
+
+  add_custom_command(OUTPUT "${version_inc}"
+    DEPENDS "${${name}_vc}" "${generate_vcs_version_script}"
+    COMMAND ${CMAKE_COMMAND} "-DNAMES=$<UPPER_CASE:name>"
+                             "-D$<UPPER_CASE:name>_SOURCE_DIR=${dir}"
+                             "-DHEADER_FILE=${version_inc}"
+                             -P "${generate_vcs_version_script}")
 
   # Mark the generated header as being generated.
-  set_source_files_properties("${revision_inc}"
+  set_source_files_properties("${version_inc}"
     PROPERTIES GENERATED TRUE
                HEADER_FILE_ONLY TRUE)
-  set(${revision_inc_var} ${revision_inc} PARENT_SCOPE)
+  set(${revision_inc_var} ${version_inc} PARENT_SCOPE)
 endfunction()
 
 generate_revision_inc(llvm_revision_inc LLVM "${LLVM_MAIN_SRC_DIR}")
 generate_revision_inc(clang_revision_inc Clang "${CLANG_MAIN_SRC_DIR}")
 generate_revision_inc(swift_revision_inc Swift "${SWIFT_SOURCE_DIR}")
-
-set(version_inc_files
-  ${llvm_revision_inc} ${clang_revision_inc} ${swift_revision_inc})
 
 add_swift_host_library(swiftBasic STATIC
   AnyValue.cpp
@@ -77,6 +50,7 @@ add_swift_host_library(swiftBasic STATIC
   JSONSerialization.cpp
   LangOptions.cpp
   LLVMContext.cpp
+  Located.cpp
   Mangler.cpp
   OutputFileMap.cpp
   Platform.cpp
@@ -94,7 +68,10 @@ add_swift_host_library(swiftBasic STATIC
   Unicode.cpp
   UUID.cpp
   Version.cpp
-  ${version_inc_files}
+
+  ${llvm_revision_inc}
+  ${clang_revision_inc}
+  ${swift_revision_inc}
 
   # Platform-specific TaskQueue implementations
   Unix/TaskQueue.inc

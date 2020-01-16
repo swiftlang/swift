@@ -692,7 +692,7 @@ namespace {
       case clang::Type::Class:
 #define NON_CANONICAL_UNLESS_DEPENDENT_TYPE(Class, Base) \
       case clang::Type::Class:
-#include "clang/AST/TypeNodes.def"
+#include "clang/AST/TypeNodes.inc"
         llvm_unreachable("canonical or dependent type in ABI lowering");
 
       // These shouldn't occur in expandable struct types.
@@ -3347,10 +3347,43 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
   return nativeExplosion;
 }
 
-void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result,
+Explosion IRGenFunction::coerceValueTo(SILType fromTy, Explosion &from,
+                                       SILType toTy) {
+  if (fromTy == toTy)
+    return std::move(from);
+
+  auto &fromTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(fromTy));
+  auto &toTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(toTy));
+
+  Explosion result;
+  if (fromTI.getStorageType()->isPointerTy() &&
+      toTI.getStorageType()->isPointerTy()) {
+    auto ptr = from.claimNext();
+    ptr = Builder.CreateBitCast(ptr, toTI.getStorageType());
+    result.add(ptr);
+    return result;
+  }
+
+  auto temporary = toTI.allocateStack(*this, toTy, "coerce.temp");
+
+  auto addr =
+      Address(Builder.CreateBitCast(temporary.getAddressPointer(),
+                                    fromTI.getStorageType()->getPointerTo()),
+              temporary.getAlignment());
+  fromTI.initialize(*this, from, addr, false);
+
+  toTI.loadAsTake(*this, temporary.getAddress(), result);
+  toTI.deallocateStack(*this, temporary, toTy);
+  return result;
+}
+
+void IRGenFunction::emitScalarReturn(SILType returnResultType,
+                                     SILType funcResultType, Explosion &result,
                                      bool isSwiftCCReturn, bool isOutlined) {
   if (result.empty()) {
-    assert(IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGM).empty() &&
+    assert(IGM.getTypeInfo(returnResultType)
+               .nativeReturnValueSchema(IGM)
+               .empty() &&
            "Empty explosion must match the native calling convention");
 
     Builder.CreateRetVoid();
@@ -3359,12 +3392,13 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result,
 
   // In the native case no coercion is needed.
   if (isSwiftCCReturn) {
+    result = coerceValueTo(returnResultType, result, funcResultType);
     auto &nativeSchema =
-        IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGM);
+        IGM.getTypeInfo(funcResultType).nativeReturnValueSchema(IGM);
     assert(!nativeSchema.requiresIndirect());
 
-    Explosion native =
-        nativeSchema.mapIntoNative(IGM, *this, result, resultType, isOutlined);
+    Explosion native = nativeSchema.mapIntoNative(IGM, *this, result,
+                                                  funcResultType, isOutlined);
     if (native.size() == 1) {
       Builder.CreateRet(native.claimNext());
       return;
@@ -3391,7 +3425,7 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result,
     return;
   }
 
-  auto &resultTI = IGM.getTypeInfo(resultType);
+  auto &resultTI = IGM.getTypeInfo(returnResultType);
   auto schema = resultTI.getSchema();
   auto *bodyType = schema.getScalarResultType(IGM);
 

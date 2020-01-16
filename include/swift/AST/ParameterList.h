@@ -103,15 +103,15 @@ public:
   /// Change the DeclContext of any contained parameters to the specified
   /// DeclContext.
   void setDeclContextOfParamDecls(DeclContext *DC);
-  
-  
+
   /// Flags used to indicate how ParameterList cloning should operate.
   enum CloneFlags {
     /// The cloned ParamDecls should be marked implicit.
     Implicit = 0x01,
-    /// The cloned pattern is for an inherited constructor; mark default
-    /// arguments as inherited, and mark unnamed arguments as named.
+    /// Mark default arguments as inherited.
     Inherited = 0x02,
+    /// Mark unnamed arguments as named.
+    NamedArguments = 0x04,
   };
 
   friend OptionSet<CloneFlags> operator|(CloneFlags flag1, CloneFlags flag2) {

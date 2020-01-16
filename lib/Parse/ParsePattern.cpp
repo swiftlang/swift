@@ -48,6 +48,8 @@ static DefaultArgumentKind getDefaultArgKind(Expr *init) {
     return DefaultArgumentKind::Column;
   case MagicIdentifierLiteralExpr::File:
     return DefaultArgumentKind::File;
+  case MagicIdentifierLiteralExpr::FilePath:
+    return DefaultArgumentKind::FilePath;
   case MagicIdentifierLiteralExpr::Line:
     return DefaultArgumentKind::Line;
   case MagicIdentifierLiteralExpr::Function:
@@ -163,6 +165,10 @@ static bool startsParameterName(Parser &parser, bool isClosure) {
   if (nextTok.is(tok::colon) || nextTok.canBeArgumentLabel())
     return true;
 
+  if (parser.isOptionalToken(nextTok)
+      || parser.isImplicitlyUnwrappedOptionalToken(nextTok))
+    return false;
+
   // The identifier could be a name or it could be a type. In a closure, we
   // assume it's a name, because the type can be inferred. Elsewhere, we
   // assume it's a type.
@@ -202,9 +208,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       diagnose(leftParenLoc, diagnostic)
         .highlight({leftParenLoc, rightParenLoc});
       diagnose(leftParenLoc, diag::enum_element_empty_arglist_delete)
-        .fixItRemoveChars(leftParenLoc, rightParenLoc);
+        .fixItRemoveChars(leftParenLoc,
+                          Lexer::getLocForEndOfToken(SourceMgr, rightParenLoc));
       diagnose(leftParenLoc, diag::enum_element_empty_arglist_add_void)
-        .fixItInsert(leftParenLoc, "Void");
+        .fixItInsertAfter(leftParenLoc, "Void");
     }
     return ParserStatus();
   }
@@ -363,12 +370,26 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         if (param.Type) {
           // Mark current parameter type as invalid so it is possible
           // to diagnose it as destructuring of the closure parameter list.
-          param.Type->setInvalid();
-          param.isInvalid = true;
+          param.isPotentiallyDestructured = true;
           if (!isClosure) {
             // Unnamed parameters must be written as "_: Type".
             diagnose(typeStartLoc, diag::parameter_unnamed)
                 .fixItInsert(typeStartLoc, "_: ");
+          } else {
+            // Unnamed parameters were accidentally possibly accepted after
+            // SE-110 depending on the kind of declaration.  We now need to
+            // warn about the misuse of this syntax and offer to
+            // fix it.
+            // An exception to this rule is when the type is declared with type sugar
+            // Reference: SR-11724
+            if (isa<OptionalTypeRepr>(param.Type)
+                || isa<ImplicitlyUnwrappedOptionalTypeRepr>(param.Type)) {
+                diagnose(typeStartLoc, diag::parameter_unnamed)
+                    .fixItInsert(typeStartLoc, "_: ");
+            } else {
+                diagnose(typeStartLoc, diag::parameter_unnamed_warn)
+                    .fixItInsert(typeStartLoc, "_: ");
+            }
           }
         }
       } else {
@@ -492,7 +513,13 @@ mapParsedParameters(Parser &parser,
     // If we diagnosed this parameter as a parse error, propagate to the decl.
     if (paramInfo.isInvalid)
       param->setInvalid();
-    
+
+    // If we need to diagnose this parameter as a destructuring, propagate that
+    // to the decl.
+    // FIXME: This is a terrible way to catch this.
+    if (paramInfo.isPotentiallyDestructured)
+      param->setDestructured(true);
+
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
       // If 'inout' was specified, turn the type into an in-out type.
@@ -642,7 +669,7 @@ mapParsedParameters(Parser &parser,
     if (param.DefaultArg) {
       DefaultArgumentKind kind = getDefaultArgKind(param.DefaultArg);
       result->setDefaultArgumentKind(kind);
-      result->setDefaultValue(param.DefaultArg);
+      result->setDefaultExpr(param.DefaultArg, /*isTypeChecked*/ false);
     } else if (param.hasInheritedDefaultArg) {
       result->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
     }

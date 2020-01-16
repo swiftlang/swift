@@ -63,34 +63,11 @@ public:
   /// element kind.
   static unsigned numNumericValuesInPathElement(PathElementKind kind) {
     switch (kind) {
-    case ApplyArgument:
-    case ApplyFunction:
+#define SIMPLE_LOCATOR_PATH_ELT(Name) case Name :
+#include "ConstraintLocatorPathElts.def"
     case GenericParameter:
-    case FunctionArgument:
-    case FunctionResult:
-    case OptionalPayload:
-    case Member:
-    case MemberRefBase:
-    case UnresolvedMember:
-    case SubscriptMember:
-    case ConstructorMember:
-    case LValueConversion:
-    case RValueAdjustment:
-    case ClosureResult:
-    case ParentType:
-    case InstanceType:
-    case ExistentialSuperclassType:
-    case SequenceElementType:
-    case AutoclosureResult:
     case ProtocolRequirement:
     case Witness:
-    case ImplicitlyUnwrappedDisjunctionChoice:
-    case DynamicLookupResult:
-    case KeyPathType:
-    case KeyPathRoot:
-    case KeyPathValue:
-    case KeyPathComponentResult:
-    case Condition:
       return 0;
 
     case ContextualType:
@@ -101,6 +78,7 @@ public:
     case KeyPathComponent:
     case SynthesizedArgument:
     case KeyPathDynamicMember:
+    case TernaryBranch:
       return 1;
 
     case TypeParameterRequirement:
@@ -805,6 +783,20 @@ public:
   }
 };
 
+class LocatorPathElt::TernaryBranch final : public LocatorPathElt {
+public:
+  TernaryBranch(bool side)
+      : LocatorPathElt(ConstraintLocator::TernaryBranch, side) {}
+
+  bool forThen() const { return bool(getValue(0)); }
+
+  bool forElse() const { return !bool(getValue(0)); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::TernaryBranch;
+  }
+};
+
 /// A simple stack-only builder object that constructs a
 /// constraint locator without allocating memory.
 ///
@@ -834,8 +826,10 @@ public:
     : previous(locator), element(),
       summaryFlags(locator ? locator->getSummaryFlags() : 0) { }
 
-  /// Retrieve a new path with the given path element added to it.
-  ConstraintLocatorBuilder withPathElement(LocatorPathElt newElt) {
+  /// Retrieve a new path with the given path element added to it. Note that
+  /// the produced locator stores a reference to this locator, and therefore
+  /// must not outlive it.
+  ConstraintLocatorBuilder withPathElement(LocatorPathElt newElt) & {
     unsigned newFlags = summaryFlags | newElt.getNewSummaryFlags();
     if (!element)
       return ConstraintLocatorBuilder(previous, newElt, newFlags);

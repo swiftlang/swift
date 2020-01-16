@@ -1,5 +1,9 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution
-// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution %S/Inputs/exhaustive_switch_testable_helper.swift -emit-module -o %t
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -I %t
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics -I %t
+
+import exhaustive_switch_testable_helper
 
 func foo(a: Int?, b: Int?) -> Int {
   switch (a, b) {
@@ -1211,6 +1215,54 @@ func sr11160_extra() {
                       // expected-note@-1 {{add missing case: '.z3((let c, let d))'}}
   case .z1(_):    ()
   case .z2(_, _): ()
+  }
+}
+
+public enum SR11672Tests {
+  
+  @frozen public enum FrozenSameModule {
+    case a, b
+  }
+  
+  func testNotRequired(_ value: NonExhaustive, _ value2: FrozenEnum, _ value3: FrozenSameModule) {
+    switch value {
+      // expected-error@-1 {{switch must be exhaustive}}
+      // expected-note@-2 {{add missing case: '.a'}}
+      // expected-note@-3 {{add missing case: '.b'}}
+      // Do not suggest adding '@unknown default'
+    }
+    
+    switch value2 {
+      // expected-error@-1 {{switch must be exhaustive}}
+      // expected-note@-2 {{add missing case: '.a'}}
+      // expected-note@-3 {{add missing case: '.b'}}
+      // expected-note@-4 {{add missing case: '.c'}}
+    }
+    
+    switch value3 {
+      // expected-error@-1 {{switch must be exhaustive}}
+      // expected-note@-2 {{add missing case: '.a'}}
+      // expected-note@-3 {{add missing case: '.b'}}
+    }
+  }
+  
+  @inlinable public func testNotRequired2(_ value: FrozenSameModule) {
+    switch value {
+      // expected-error@-1 {{switch must be exhaustive}}
+      // expected-note@-2 {{add missing case: '.a'}}
+      // expected-note@-3 {{add missing case: '.b'}}
+    }
+  }
+  
+  // Inlinable code is considered "outside" the module and must include a default
+  // case.
+  @inlinable public func testRequired(_ value: NonExhaustive) {
+    switch value {
+      // expected-error@-1 {{switch must be exhaustive}}
+      // expected-note@-2 {{add missing case: '.a'}}
+      // expected-note@-3 {{add missing case: '.b'}}
+      // expected-note@-4 {{handle unknown values using "@unknown default"}}
+    }
   }
 }
 

@@ -74,7 +74,6 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
 /// Passes for performing definite initialization. Must be run together in this
 /// order.
 static void addDefiniteInitialization(SILPassPipelinePlan &P) {
-  P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
   P.addRawSILInstLowering();
 }
@@ -258,7 +257,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addCOWArrayOpts();
   // Cleanup.
   P.addDCE();
-  P.addSwiftArrayOpts();
+  P.addSwiftArrayPropertyOpt();
 }
 
 // Perform classic SSA optimizations.
@@ -291,10 +290,6 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
 
   // Mainly for Array.append(contentsOf) optimization.
   P.addArrayElementPropagation();
-
-  // Specialize opaque archetypes.
-  // This can expose oportunities for the generic specializer.
-  P.addOpaqueArchetypeSpecializer();
 
   // Run the devirtualizer, specializer, and inliner. If any of these
   // makes a change we'll end up restarting the function passes on the
@@ -401,6 +396,8 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // we do not spend time optimizing them.
   P.addDeadFunctionElimination();
 
+  P.addSemanticARCOpts();
+
   // Strip ownership from non-transparent functions.
   if (P.getOptions().StripOwnershipAfterSerialization)
     P.addNonTransparentFunctionOwnershipModelEliminator();
@@ -413,6 +410,14 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
 
   // Add the outliner pass (Osize).
   P.addOutliner();
+
+  P.addCrossModuleSerializationSetup();
+  
+  // In case of cross-module-optimization, we need to serialize right after
+  // CrossModuleSerializationSetup. Eventually we want to serialize early
+  // anyway, but for now keep the SerializeSILPass at the later stage of the
+  // pipeline in case cross-module-optimization is not enabled.
+  P.addCMOSerializeSILPass();
 }
 
 static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
@@ -685,6 +690,20 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // Has only an effect if the -gsil option is specified.
   P.addSILDebugInfoGenerator();
 
+  return P;
+}
+
+//===----------------------------------------------------------------------===//
+//                        Serialize SIL Pass Pipeline
+//===----------------------------------------------------------------------===//
+
+// Add to P a new pipeline that just serializes SIL. Meant to be used in
+// situations where perf optzns are disabled, but we may need to serialize.
+SILPassPipelinePlan
+SILPassPipelinePlan::getSerializeSILPassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P(Options);
+  P.startPipeline("Serialize SIL");
+  P.addSerializeSILPass();
   return P;
 }
 

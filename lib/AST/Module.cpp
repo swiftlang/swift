@@ -230,7 +230,7 @@ void SourceLookupCache::populateMemberCache(const SourceFile &SF) {
 
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "populate-source-file-class-member-cache");
-  addToMemberCache(SF.Decls);
+  addToMemberCache(SF.getTopLevelDecls());
   MemberCachePopulated = true;
 }
 
@@ -243,7 +243,7 @@ void SourceLookupCache::populateMemberCache(const ModuleDecl &Mod) {
 
   for (const FileUnit *file : Mod.getFiles()) {
     auto &SF = *cast<SourceFile>(file);
-    addToMemberCache(SF.Decls);
+    addToMemberCache(SF.getTopLevelDecls());
   }
 
   MemberCachePopulated = true;
@@ -275,7 +275,7 @@ void SourceLookupCache::addToMemberCache(Range decls) {
 SourceLookupCache::SourceLookupCache(const SourceFile &SF) {
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "source-file-populate-cache");
-  addToUnqualifiedLookupCache(SF.Decls, false);
+  addToUnqualifiedLookupCache(SF.getTopLevelDecls(), false);
 }
 
 SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
@@ -283,7 +283,7 @@ SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
                              "module-populate-cache");
   for (const FileUnit *file : M.getFiles()) {
     auto &SF = *cast<SourceFile>(file);
-    addToUnqualifiedLookupCache(SF.Decls, false);
+    addToUnqualifiedLookupCache(SF.getTopLevelDecls(), false);
   }
 }
 
@@ -303,7 +303,7 @@ void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
   assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
 
   if (!AccessPath.empty()) {
-    auto I = TopLevelValues.find(AccessPath.front().first);
+    auto I = TopLevelValues.find(AccessPath.front().Item);
     if (I == TopLevelValues.end()) return;
 
     for (auto vd : I->second)
@@ -335,7 +335,7 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
 
       for (ValueDecl *vd : member.second) {
         auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
-        if (nominal && nominal->getName() == accessPath.front().first)
+        if (nominal && nominal->getName() == accessPath.front().Item)
           consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
                              DynamicLookupInfo::AnyObject);
       }
@@ -367,7 +367,7 @@ void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
   if (!accessPath.empty()) {
     for (ValueDecl *vd : iter->second) {
       auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
-      if (nominal && nominal->getName() == accessPath.front().first)
+      if (nominal && nominal->getName() == accessPath.front().Item)
         results.push_back(vd);
     }
     return;
@@ -642,6 +642,12 @@ void ModuleDecl::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
 
 void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getTopLevelDecls, (Results));
+}
+
+void ModuleDecl::getTopLevelDeclsWhereAttributesMatch(
+              SmallVectorImpl<Decl*> &Results,
+              llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
+  FORWARD(getTopLevelDeclsWhereAttributesMatch, (Results, matchAttributes));
 }
 
 void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
@@ -1175,13 +1181,13 @@ void ModuleDecl::getImportedModulesForLookup(
 }
 
 bool ModuleDecl::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
-  using AccessPathElem = std::pair<Identifier, SourceLoc>;
+  using AccessPathElem = Located<Identifier>;
   if (lhs.size() != rhs.size())
     return false;
   return std::equal(lhs.begin(), lhs.end(), rhs.begin(),
                     [](const AccessPathElem &lElem,
                        const AccessPathElem &rElem) {
-    return lElem.first == rElem.first;
+    return lElem.Item == rElem.Item;
   });
 }
 
@@ -1245,12 +1251,12 @@ ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
           lhs.second->getReverseFullModuleName(), {},
           rhs.second->getReverseFullModuleName(), {});
     }
-    using AccessPathElem = std::pair<Identifier, SourceLoc>;
+    using AccessPathElem = Located<Identifier>;
     return std::lexicographical_compare(lhs.first.begin(), lhs.first.end(),
                                         rhs.first.begin(), rhs.first.end(),
                                         [](const AccessPathElem &lElem,
                                            const AccessPathElem &rElem) {
-      return lElem.first.str() < rElem.first.str();
+      return lElem.Item.str() < rElem.Item.str();
     });
   });
   auto last = std::unique(imports.begin(), imports.end(),
@@ -1871,6 +1877,22 @@ SourceFile::lookupOpaqueResultType(StringRef MangledName) {
 void FileUnit::anchor() {}
 void *FileUnit::operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
+}
+
+void FileUnit::getTopLevelDeclsWhereAttributesMatch(
+            SmallVectorImpl<Decl*> &Results,
+            llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
+  auto prevSize = Results.size();
+  getTopLevelDecls(Results);
+
+  // Filter out unwanted decls that were just added to Results.
+  // Note: We could apply this check in all implementations of
+  // getTopLevelDecls instead or in everything that creates a Decl.
+  auto newEnd = std::remove_if(Results.begin() + prevSize, Results.end(),
+                               [&matchAttributes](const Decl *D) -> bool {
+      return !matchAttributes(D->getAttrs());
+    });
+  Results.erase(newEnd, Results.end());
 }
 
 StringRef LoadedFile::getFilename() const {

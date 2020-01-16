@@ -394,3 +394,29 @@ func sr8411() {
   _ = S.foo(&foo)  // Ok
   _ = S.bar(&foo, 42) // Ok
 }
+
+// SR-11104 - Slightly misleading diagnostics for contextual failures with multiple fixes
+func sr_11104() {
+  func bar(_: Int) {}
+
+  bar(["hello"].first)
+  // expected-error@-1 {{cannot convert value of type 'String?' to expected argument type 'Int'}}
+}
+
+// rdar://problem/57668873 - Too eager force optional unwrap fix
+
+@objc class Window {}
+
+@objc protocol WindowDelegate {
+  @objc optional var window: Window? { get set }
+}
+
+func test_force_unwrap_not_being_too_eager() {
+  struct WindowContainer {
+    unowned(unsafe) var delegate: WindowDelegate? = nil
+  }
+
+  let obj: WindowContainer = WindowContainer()
+  if let _ = obj.delegate?.window { // Ok
+  }
+}

@@ -649,13 +649,14 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   auto &toTL = SGF.getTypeLowering(toTy);
   assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
 
+  auto arg = args[0];
+
   // TODO: Fix this API.
   if (!fromTL.isAddress() || !toTL.isAddress()) {
-    if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, args[0],
-                                                       toTL.getLoweredType())) {
+    if (SILType::canRefCast(arg.getType(), toTL.getLoweredType(), SGF.SGM.M)) {
       // Create a reference cast, forwarding the cleanup.
       // The cast takes the source reference.
-      return refCast;
+      return SGF.B.createUncheckedRefCast(loc, arg, toTL.getLoweredType());
     }
   }
 
@@ -670,7 +671,7 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   // TODO: For now, we leave invalid casts in address form so that the runtime
   // will trap. We could emit a noreturn call here instead which would provide
   // more information to the optimizer.
-  SILValue srcVal = args[0].ensurePlusOne(SGF, loc).forward(SGF);
+  SILValue srcVal = arg.ensurePlusOne(SGF, loc).forward(SGF);
   SILValue fromAddr;
   if (!fromTL.isAddress()) {
     // Move the loadable value into a "source temp".  Since the source and
@@ -745,17 +746,9 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
   }
   // Create the appropriate bitcast based on the source and dest types.
   ManagedValue in = args[0];
+
   SILType resultTy = toTL.getLoweredType();
-  if (resultTy.isTrivial(SGF.F))
-    return SGF.B.createUncheckedTrivialBitCast(loc, in, resultTy);
-
-  // If we can perform a ref cast, just return.
-  if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, in, resultTy))
-    return refCast;
-
-  // Otherwise leave the original cleanup and retain the cast value.
-  SILValue out = SGF.B.createUncheckedBitwiseCast(loc, in.getValue(), resultTy);
-  return SGF.emitManagedRetain(loc, out, toTL);
+  return SGF.B.createUncheckedBitCast(loc, in, resultTy);
 }
 
 /// Specialized emitter for Builtin.castToBridgeObject.
@@ -976,8 +969,8 @@ static ManagedValue emitBuiltinProjectTailElems(SILGenFunction &SGF,
   SILType ElemType = SGF.getLoweredType(subs.getReplacementTypes()[1]->
                                         getCanonicalType()).getObjectType();
 
-  SILValue result = SGF.B.createRefTailAddr(loc, args[0].getValue(),
-                                            ElemType.getAddressType());
+  SILValue result = SGF.B.createRefTailAddr(
+      loc, args[0].borrow(SGF, loc).getValue(), ElemType.getAddressType());
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
   result = SGF.B.createAddressToPointer(loc, result, rawPointerType);
   return ManagedValue::forUnmanaged(result);

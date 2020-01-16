@@ -114,7 +114,30 @@ public protocol DerivedProtocolRequiementChanges: RequiementChanges {}
 
 public class SuperClassRemoval {}
 
-public struct ClassToStruct {}
+public struct ClassToStruct {
+  public init() {}
+}
+
+open class ClassWithMissingDesignatedInits {
+  // Remove the @_hasMissingDesignatedInitializers attribute
+  public init() {}
+  public convenience init(x: Int) { self.init() }
+}
+
+open class ClassWithoutMissingDesignatedInits {
+  // Add the @_hasMissingDesignatedInitializers attribute by adding an inaccessible
+  // init
+  public init() {}
+  public convenience init(x: Int) { self.init() }
+  internal init(y: Int) {}
+}
+
+public class SubclassWithMissingDesignatedInits: ClassWithMissingDesignatedInits {
+}
+
+public class SubclassWithoutMissingDesignatedInits: ClassWithoutMissingDesignatedInits {
+}
+
 public enum ProtocolToEnum {}
 
 public class SuperClassChange: C8 {}

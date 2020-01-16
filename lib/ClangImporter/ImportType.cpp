@@ -185,7 +185,7 @@ namespace {
       llvm_unreachable("Dependent types cannot be converted");    \
     }
 #define TYPE(Class, Base)
-#include "clang/AST/TypeNodes.def"
+#include "clang/AST/TypeNodes.inc"
 
     // Given a loaded type like CInt, look through the type alias sugar that the
     // stdlib uses to show the underlying type.  We want to import the signature
@@ -418,8 +418,10 @@ namespace {
         auto funcTy = pointeeType->castTo<FunctionType>();
         return {
           FunctionType::get(funcTy->getParams(), funcTy->getResult(),
-            funcTy->getExtInfo().withRepresentation(
-                          AnyFunctionType::Representation::CFunctionPointer)),
+            funcTy->getExtInfo()
+              .withRepresentation(
+                AnyFunctionType::Representation::CFunctionPointer)
+              .withClangFunctionType(type)),
           ImportHint::CFunctionPointer
         };
       }
@@ -573,7 +575,7 @@ namespace {
       }
 
       // Form the function type.
-      return FunctionType::get(params, resultTy);
+      return FunctionType::get(params, resultTy, FunctionType::ExtInfo());
     }
 
     ImportResult
@@ -606,7 +608,7 @@ namespace {
     importObjCTypeParamDecl(const clang::ObjCTypeParamDecl *objcTypeParamDecl) {
       // Pull the corresponding generic type parameter from the imported class.
       const auto *typeParamContext = objcTypeParamDecl->getDeclContext();
-      GenericSignature genericSig = GenericSignature();
+      GenericSignature genericSig;
       if (auto *category =
             dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
         auto ext = cast_or_null<ExtensionDecl>(

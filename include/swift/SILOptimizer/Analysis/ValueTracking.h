@@ -47,7 +47,7 @@ bool pointsToLocalObject(SILValue V);
 /// allocated object).
 ///
 /// - an address projection based on an exclusive argument with no levels of
-/// indirection.
+/// indirection (e.g. ref_element_addr, project_box, etc.).
 inline bool isUniquelyIdentified(SILValue V) {
   return pointsToLocalObject(V)
          || isExclusiveArgument(getUnderlyingAddressRoot(V));

@@ -789,6 +789,22 @@ void swift::ide::api::SDKNodeDeclType::diagnose(SDKNode *Right) {
         emitDiag(Loc, diag::super_class_changed, LSuperClass, RSuperClass);
       }
     }
+
+    // Check for @_hasMissingDesignatedInitializers and
+    // @_inheritsConvenienceInitializers changes.
+    if (isOpen() && R->isOpen()) {
+      // It's not safe to add new, invisible designated inits to open
+      // classes.
+      if (!hasMissingDesignatedInitializers() &&
+          R->hasMissingDesignatedInitializers())
+        R->emitDiag(R->getLoc(), diag::added_invisible_designated_init);
+    }
+
+    // It's not safe to stop inheriting convenience inits, it changes
+    // the set of initializers that are available.
+    if (inheritsConvenienceInitializers() &&
+        !R->inheritsConvenienceInitializers())
+      R->emitDiag(R->getLoc(), diag::not_inheriting_convenience_inits);
     break;
   }
   default:
@@ -961,9 +977,6 @@ void swift::ide::api::SDKNodeDeclVar::diagnose(SDKNode *Right) {
   if (Ctx.checkingABI()) {
     if (hasFixedBinaryOrder() != RV->hasFixedBinaryOrder()) {
       emitDiag(Loc, diag::var_has_fixed_order_change, hasFixedBinaryOrder());
-    }
-    if (isLet() != RV->isLet()) {
-      emitDiag(Loc, diag::var_let_changed, isLet());
     }
   }
 }

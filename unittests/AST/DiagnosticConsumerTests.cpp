@@ -11,13 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/Basic/Located.h"
 #include "swift/Basic/SourceManager.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
 
 namespace {
-  using ExpectedDiagnostic = std::pair<SourceLoc, StringRef>;
+  using ExpectedDiagnostic = Located<StringRef>;
 
   class ExpectationDiagnosticConsumer: public DiagnosticConsumer {
     ExpectationDiagnosticConsumer *previous;
@@ -37,7 +38,7 @@ namespace {
     void handleDiagnostic(SourceManager &SM,
                           const DiagnosticInfo &Info) override {
       ASSERT_FALSE(expected.empty());
-      EXPECT_EQ(std::make_pair(Info.Loc, Info.FormatString), expected.front());
+      EXPECT_EQ(Located<StringRef>(Info.FormatString, Info.Loc), expected.front());
       expected.erase(expected.begin());
     }
 
@@ -83,7 +84,7 @@ TEST(FileSpecificDiagnosticConsumer, InvalidLocDiagsGoToEveryConsumer) {
   (void)sourceMgr.addMemBufferCopy("abcde", "A");
   (void)sourceMgr.addMemBufferCopy("vwxyz", "B");
 
-  ExpectedDiagnostic expected[] = { {SourceLoc(), "dummy"} };
+  ExpectedDiagnostic expected[] = { Located<StringRef>("dummy", SourceLoc()) };
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expected);
   auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
@@ -116,14 +117,14 @@ TEST(FileSpecificDiagnosticConsumer, ErrorsWithLocationsGoToExpectedConsumers) {
   SourceLoc backOfB = sourceMgr.getLocForOffset(bufferB, 4);
 
   ExpectedDiagnostic expectedA[] = {
-    {frontOfA, "front"},
-    {middleOfA, "middle"},
-    {backOfA, "back"},
+    {"front", frontOfA},
+    {"middle", middleOfA},
+    {"back", backOfA},
   };
   ExpectedDiagnostic expectedB[] = {
-    {frontOfB, "front"},
-    {middleOfB, "middle"},
-    {backOfB, "back"}
+    {"front", frontOfB},
+    {"middle", middleOfB},
+    {"back", backOfB}
   };
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
@@ -170,17 +171,17 @@ TEST(FileSpecificDiagnosticConsumer,
   SourceLoc backOfB = sourceMgr.getLocForOffset(bufferB, 4);
 
   ExpectedDiagnostic expectedA[] = {
-    {frontOfA, "front"},
-    {frontOfB, "front"},
-    {middleOfA, "middle"},
-    {middleOfB, "middle"},
-    {backOfA, "back"},
-    {backOfB, "back"}
+    {"front", frontOfA},
+    {"front", frontOfB},
+    {"middle", middleOfA},
+    {"middle", middleOfB},
+    {"back", backOfA},
+    {"back", backOfB}
   };
   ExpectedDiagnostic expectedUnaffiliated[] = {
-    {frontOfB, "front"},
-    {middleOfB, "middle"},
-    {backOfB, "back"}
+    {"front", frontOfB},
+    {"middle", middleOfB},
+    {"back", backOfB}
   };
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
@@ -221,14 +222,14 @@ TEST(FileSpecificDiagnosticConsumer, WarningsAndRemarksAreTreatedLikeErrors) {
   SourceLoc frontOfB = sourceMgr.getLocForBufferStart(bufferB);
 
   ExpectedDiagnostic expectedA[] = {
-    {frontOfA, "warning"},
-    {frontOfB, "warning"},
-    {frontOfA, "remark"},
-    {frontOfB, "remark"},
+    {"warning", frontOfA},
+    {"warning", frontOfB},
+    {"remark", frontOfA},
+    {"remark", frontOfB},
   };
   ExpectedDiagnostic expectedUnaffiliated[] = {
-    {frontOfB, "warning"},
-    {frontOfB, "remark"},
+    {"warning", frontOfB},
+    {"remark", frontOfB},
   };
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
@@ -272,20 +273,20 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrors) {
   SourceLoc backOfB = sourceMgr.getLocForOffset(bufferB, 4);
 
   ExpectedDiagnostic expectedA[] = {
-    {frontOfA, "error"},
-    {middleOfA, "note"},
-    {backOfA, "note"},
-    {frontOfB, "error"},
-    {middleOfB, "note"},
-    {backOfB, "note"},
-    {frontOfA, "error"},
-    {middleOfA, "note"},
-    {backOfA, "note"},
+    {"error", frontOfA},
+    {"note", middleOfA},
+    {"note", backOfA},
+    {"error", frontOfB},
+    {"note", middleOfB},
+    {"note", backOfB},
+    {"error", frontOfA},
+    {"note", middleOfA},
+    {"note", backOfA},
   };
   ExpectedDiagnostic expectedUnaffiliated[] = {
-    {frontOfB, "error"},
-    {middleOfB, "note"},
-    {backOfB, "note"},
+    {"error", frontOfB},
+    {"note", middleOfB},
+    {"note", backOfB},
   };
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
@@ -335,20 +336,20 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToWarningsAndRemarks) {
   SourceLoc backOfB = sourceMgr.getLocForOffset(bufferB, 4);
 
   ExpectedDiagnostic expectedA[] = {
-    {frontOfA, "warning"},
-    {middleOfA, "note"},
-    {backOfA, "note"},
-    {frontOfB, "warning"},
-    {middleOfB, "note"},
-    {backOfB, "note"},
-    {frontOfA, "remark"},
-    {middleOfA, "note"},
-    {backOfA, "note"},
+    {"warning", frontOfA},
+    {"note", middleOfA},
+    {"note", backOfA},
+    {"warning", frontOfB},
+    {"note", middleOfB},
+    {"note", backOfB},
+    {"remark", frontOfA},
+    {"note", middleOfA},
+    {"note", backOfA},
   };
   ExpectedDiagnostic expectedUnaffiliated[] = {
-    {frontOfB, "warning"},
-    {middleOfB, "note"},
-    {backOfB, "note"},
+    {"warning", frontOfB},
+    {"note", middleOfB},
+    {"note", backOfB},
   };
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
@@ -401,17 +402,17 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrorsEvenAcrossFiles) {
   SourceLoc backOfB = sourceMgr.getLocForOffset(bufferB, 4);
 
   ExpectedDiagnostic expectedA[] = {
-    {frontOfA, "error"},
-    {middleOfB, "note"},
-    {backOfA, "note"},
-    {frontOfA, "error"},
-    {middleOfB, "note"},
-    {backOfA, "note"},
+    {"error", frontOfA},
+    {"note", middleOfB},
+    {"note", backOfA},
+    {"error", frontOfA},
+    {"note", middleOfB},
+    {"note", backOfA},
   };
   ExpectedDiagnostic expectedB[] = {
-    {frontOfB, "error"},
-    {middleOfA, "note"},
-    {backOfB, "note"},
+    {"error", frontOfB},
+    {"note", middleOfA},
+    {"note", backOfB},
   };
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
@@ -462,20 +463,20 @@ TEST(FileSpecificDiagnosticConsumer,
   SourceLoc backOfB = sourceMgr.getLocForOffset(bufferB, 4);
 
   ExpectedDiagnostic expectedA[] = {
-    {frontOfA, "error"},
-    {middleOfB, "note"},
-    {backOfA, "note"},
-    {frontOfB, "error"},
-    {middleOfA, "note"},
-    {backOfB, "note"},
-    {frontOfA, "error"},
-    {middleOfB, "note"},
-    {backOfA, "note"},
+    {"error", frontOfA},
+    {"note", middleOfB},
+    {"note", backOfA},
+    {"error", frontOfB},
+    {"note", middleOfA},
+    {"note", backOfB},
+    {"error", frontOfA},
+    {"note", middleOfB},
+    {"note", backOfA},
   };
   ExpectedDiagnostic expectedUnaffiliated[] = {
-    {frontOfB, "error"},
-    {middleOfA, "note"},
-    {backOfB, "note"},
+    {"error", frontOfB},
+    {"note", middleOfA},
+    {"note", backOfB},
   };
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
@@ -522,16 +523,16 @@ TEST(FileSpecificDiagnosticConsumer,
   SourceLoc frontOfB = sourceMgr.getLocForBufferStart(bufferB);
 
   ExpectedDiagnostic expectedA[] = {
-    {frontOfA, "error"},
-    {SourceLoc(), "note"},
-    {frontOfB, "error"},
-    {SourceLoc(), "note"},
-    {frontOfA, "error"},
-    {SourceLoc(), "note"},
+    {"error", frontOfA},
+    {"note", SourceLoc()},
+    {"error", frontOfB},
+    {"note", SourceLoc()},
+    {"error", frontOfA},
+    {"note", SourceLoc()},
   };
   ExpectedDiagnostic expectedUnaffiliated[] = {
-    {frontOfB, "error"},
-    {SourceLoc(), "note"},
+    {"error", frontOfB},
+    {"note", SourceLoc()},
   };
 
   auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(

@@ -186,6 +186,14 @@ class StdlibDeploymentTarget(object):
         machine = platform.machine()
 
         if system == 'Linux':
+            if 'ANDROID_DATA' in os.environ:
+                if machine.startswith('armv7'):
+                    return StdlibDeploymentTarget.Android.armv7
+                elif machine == 'aarch64':
+                    return StdlibDeploymentTarget.Android.aarch64
+                raise NotImplementedError('Android System with architecture '
+                                          '"%s" is not supported' % machine)
+
             if machine == 'x86_64':
                 return StdlibDeploymentTarget.Linux.x86_64
             elif machine == 'i686':

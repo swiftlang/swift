@@ -199,7 +199,8 @@
       "usr": "s:4cake2C0C",
       "moduleName": "cake",
       "genericSig": "<τ_0_0, τ_0_1, τ_0_2>",
-      "sugared_genericSig": "<T1, T2, T3>"
+      "sugared_genericSig": "<T1, T2, T3>",
+      "hasMissingDesignatedInitializers": true
     },
     {
       "kind": "TypeDecl",
@@ -428,6 +429,8 @@
       "usr": "s:4cake2C1C",
       "moduleName": "cake",
       "superclassUsr": "s:4cake2C0C",
+      "hasMissingDesignatedInitializers": true,
+      "inheritsConvenienceInitializers": true,
       "superclassNames": [
         "cake.C0<cake.S1, cake.S1, cake.S1>"
       ]
@@ -1330,7 +1333,8 @@
       "declAttributes": [
         "FixedLayout",
         "UsableFromInline"
-      ]
+      ],
+      "hasMissingDesignatedInitializers": true
     },
     {
       "kind": "TypeDecl",
@@ -1387,6 +1391,7 @@
       "declKind": "Class",
       "usr": "s:4cake15FutureContainerC",
       "moduleName": "cake",
+      "hasMissingDesignatedInitializers": true,
       "conformances": [
         {
           "kind": "Conformance",
@@ -1418,7 +1423,8 @@
         "Available",
         "Available",
         "Available"
-      ]
+      ],
+      "hasMissingDesignatedInitializers": true
     },
     {
       "kind": "TypeDecl",
@@ -1430,7 +1436,8 @@
       "intro_swift": "5",
       "declAttributes": [
         "Available"
-      ]
+      ],
+      "hasMissingDesignatedInitializers": true
     },
     {
       "kind": "TypeDecl",
@@ -1482,7 +1489,8 @@
       "objc_name": "NewObjCClass",
       "declAttributes": [
         "ObjC"
-      ]
+      ],
+      "hasMissingDesignatedInitializers": true
     },
     {
       "kind": "TypeDecl",
@@ -1670,18 +1678,6 @@
         },
         {
           "kind": "Conformance",
-          "name": "MirrorPath",
-          "printedName": "MirrorPath",
-          "usr": "s:s10MirrorPathP"
-        },
-        {
-          "kind": "Conformance",
-          "name": "CVarArg",
-          "printedName": "CVarArg",
-          "usr": "s:s7CVarArgP"
-        },
-        {
-          "kind": "Conformance",
           "name": "Encodable",
           "printedName": "Encodable",
           "usr": "s:SE"
@@ -1691,6 +1687,30 @@
           "name": "Decodable",
           "printedName": "Decodable",
           "usr": "s:Se"
+        },
+        {
+          "kind": "Conformance",
+          "name": "CustomReflectable",
+          "printedName": "CustomReflectable",
+          "usr": "s:s17CustomReflectableP"
+        },
+        {
+          "kind": "Conformance",
+          "name": "_CustomPlaygroundQuickLookable",
+          "printedName": "_CustomPlaygroundQuickLookable",
+          "usr": "s:s30_CustomPlaygroundQuickLookableP"
+        },
+        {
+          "kind": "Conformance",
+          "name": "MirrorPath",
+          "printedName": "MirrorPath",
+          "usr": "s:s10MirrorPathP"
+        },
+        {
+          "kind": "Conformance",
+          "name": "CVarArg",
+          "printedName": "CVarArg",
+          "usr": "s:s7CVarArgP"
         },
         {
           "kind": "Conformance",
@@ -1709,18 +1729,6 @@
           "name": "_HasCustomAnyHashableRepresentation",
           "printedName": "_HasCustomAnyHashableRepresentation",
           "usr": "s:s35_HasCustomAnyHashableRepresentationP"
-        },
-        {
-          "kind": "Conformance",
-          "name": "CustomReflectable",
-          "printedName": "CustomReflectable",
-          "usr": "s:s17CustomReflectableP"
-        },
-        {
-          "kind": "Conformance",
-          "name": "_CustomPlaygroundQuickLookable",
-          "printedName": "_CustomPlaygroundQuickLookable",
-          "usr": "s:s30_CustomPlaygroundQuickLookableP"
         },
         {
           "kind": "Conformance",

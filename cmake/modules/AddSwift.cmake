@@ -1105,9 +1105,13 @@ function(_add_swift_library_single target name)
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
-    # CMake generates incorrect rule `$SONAME_FLAG $INSTALLNAME_DIR$SONAME` for Android build on macOS cross-compile host.
-    # Proper linker flags constructed manually. See below variable `swiftlib_link_flags_all`.
-    set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
+    # CMake generates an incorrect rule `$SONAME_FLAG $INSTALLNAME_DIR$SONAME`
+    # for an Android cross-build from a macOS host. Construct the proper linker
+    # flags manually in add_swift_target_library instead, see there with
+    # variable `swiftlib_link_flags_all`.
+    if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
+      set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
+    endif()
     # Only set the install RPATH if cross-compiling the host tools, in which
     # case both the NDK and Sysroot paths must be set.
     if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND
@@ -1260,6 +1264,14 @@ function(_add_swift_library_single target name)
       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
+
+  # In certain cases when building, the environment variable SDKROOT is set to override
+  # where the sdk root is located in the system. If that environment variable has been
+  # set by the user, respect it and add the specified SDKROOT directory to the
+  # library_search_directories so we are able to link against those libraries
+  if(DEFINED ENV{SDKROOT} AND EXISTS "$ENV{SDKROOT}/usr/lib/swift")
+      list(APPEND library_search_directories "$ENV{SDKROOT}/usr/lib/swift")
+  endif()
 
   # Add variant-specific flags.
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
@@ -1709,6 +1721,7 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS_TVOS
         SWIFT_MODULE_DEPENDS_WATCHOS
         SWIFT_MODULE_DEPENDS_WINDOWS
+        SWIFT_MODULE_DEPENDS_FROM_SDK
         TARGET_SDKS)
 
   cmake_parse_arguments(SWIFTLIB
@@ -1948,6 +1961,9 @@ function(add_swift_target_library name)
       set(swiftlib_c_compile_flags_all ${SWIFTLIB_C_COMPILE_FLAGS})
       if(sdk IN_LIST SWIFT_APPLE_PLATFORMS AND SWIFTLIB_IS_SDK_OVERLAY)
         set(swiftlib_swift_compile_private_frameworks_flag "-Fsystem" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/System/Library/PrivateFrameworks/")
+        foreach(tbd_lib ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FROM_SDK})
+          list(APPEND swiftlib_link_flags_all "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/usr/lib/swift/libswift${tbd_lib}.tbd")
+        endforeach()
       endif()
 
       list(APPEND swiftlib_c_compile_flags_all "-DSWIFT_TARGET_LIBRARY_NAME=${name}")

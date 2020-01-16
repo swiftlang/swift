@@ -168,8 +168,8 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
 
   if (sig && declGenericCtx &&
-      declGenericCtx->getGenericSignature()->getCanonicalSignature() !=
-          sig->getCanonicalSignature()) {
+      declGenericCtx->getGenericSignature().getCanonicalSignature() !=
+          sig.getCanonicalSignature()) {
     return false;
   }
 
@@ -234,6 +234,11 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
     return false;
   }
 
+  // Ignore declarations that are defined inside constrained extensions.
+  if (auto *ext = dyn_cast<ExtensionDecl>(parentDecl->getDeclContext()))
+    if (ext->isConstrainedExtension())
+      return false;
+
   // The declarations must be of the same kind.
   if (decl->getKind() != parentDecl->getKind())
     return false;
@@ -281,9 +286,6 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
   auto checkParam = [&](const ParamDecl *decl, const ParamDecl *parentDecl) {
     Type paramTy = decl->getType();
     Type parentParamTy = parentDecl->getType();
-
-    if (!paramTy || !parentParamTy)
-      return;
 
     auto *repr = decl->getTypeRepr();
     if (!repr)
@@ -737,7 +739,13 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
   if (members.empty() || name != membersName) {
     membersName = name;
     members.clear();
-    dc->lookupQualified(superContexts, membersName,
+    // FIXME: This suggests we need to use TypeChecker's high-level lookup
+    // entrypoints.  But first we need one that supports additive qualified
+    // lookup.
+    for (auto *ctx : superContexts) {
+      ctx->synthesizeSemanticMembersIfNeeded(membersName);
+    }
+    dc->lookupQualified(superContexts, DeclNameRef(membersName),
                         NL_QualifiedDefault, members);
   }
 
@@ -1169,6 +1177,11 @@ bool swift::checkOverrides(ValueDecl *decl) {
     // Otherwise, we have more checking to do.
   }
 
+  // Members of constrained extensions are not considered to be overrides.
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext()))
+    if (ext->isConstrainedExtension())
+      return false;
+
   // Accessor methods get overrides through their storage declaration, and
   // all checking can be performed via that mechanism.
   if (isa<AccessorDecl>(decl)) {
@@ -1279,12 +1292,14 @@ namespace  {
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
+    UNINTERESTING_ATTR(HasMissingDesignatedInitializers)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(IBSegueAction)
     UNINTERESTING_ATTR(Indirect)
+    UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Optimize)
     UNINTERESTING_ATTR(Inlinable)
@@ -1320,6 +1335,11 @@ namespace  {
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
 
+    // Differentiation-related attributes.
+    UNINTERESTING_ATTR(Differentiable)
+    UNINTERESTING_ATTR(Derivative)
+    UNINTERESTING_ATTR(Transpose)
+
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)
@@ -1349,6 +1369,7 @@ namespace  {
     UNINTERESTING_ATTR(DisfavoredOverload)
     UNINTERESTING_ATTR(FunctionBuilder)
     UNINTERESTING_ATTR(ProjectedValueProperty)
+    UNINTERESTING_ATTR(OriginallyDefinedIn)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

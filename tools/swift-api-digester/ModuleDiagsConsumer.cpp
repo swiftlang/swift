@@ -42,7 +42,6 @@ static StringRef getCategoryName(uint32_t ID) {
     return "/* Renamed Decls */";
   case LocalDiagID::decl_attr_change:
   case LocalDiagID::decl_new_attr:
-  case LocalDiagID::var_let_changed:
   case LocalDiagID::func_self_access_change:
   case LocalDiagID::new_decl_without_intro:
     return "/* Decl Attribute changes */";
@@ -74,6 +73,8 @@ static StringRef getCategoryName(uint32_t ID) {
   case LocalDiagID::super_class_changed:
   case LocalDiagID::no_longer_open:
   case LocalDiagID::desig_init_added:
+  case LocalDiagID::added_invisible_designated_init:
+  case LocalDiagID::not_inheriting_convenience_inits:
     return "/* Class Inheritance Change */";
   default:
     return StringRef();

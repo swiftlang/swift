@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -61,10 +62,9 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
     if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
       if (auto *PBD = patternInit->getBinding()) {
         auto i = patternInit->getBindingIndex();
+        PBD->getPattern(i)->forEachVariable(
+            [](VarDecl *VD) { (void)VD->getInterfaceType(); });
         if (PBD->getInit(i)) {
-          PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
-            (void) VD->getInterfaceType();
-          });
           if (!PBD->isInitializerChecked(i))
             typeCheckPatternBinding(PBD, i);
         }
@@ -74,7 +74,14 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    swift::typeCheckAbstractFunctionBodyUntil(AFD, Loc);
+    auto &SM = DC->getASTContext().SourceMgr;
+    auto bodyRange = AFD->getBodySourceRange();
+    if (SM.rangeContainsTokenLoc(bodyRange, Loc)) {
+      swift::typeCheckAbstractFunctionBodyUntil(AFD, Loc);
+    } else {
+      assert(bodyRange.isInvalid() && "The body should not be parsed if the "
+                                      "completion happens in the signature");
+    }
     break;
   }
 
@@ -91,15 +98,29 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 } // anonymous namespace
 
 void swift::ide::typeCheckContextUntil(DeclContext *DC, SourceLoc Loc) {
-  // The only time we have to explicitly check a TopLevelCodeDecl
-  // is when we're directly inside of one. In this case,
-  // performTypeChecking() did not type check it for us.
   while (isa<AbstractClosureExpr>(DC))
     DC = DC->getParent();
-  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC))
-    typeCheckTopLevelCodeDecl(TLCD);
-  else
+
+  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC)) {
+    // Typecheck all 'TopLevelCodeDecl's up to the target one.
+    // In theory, this is not needed, but it fails to resolve the type of
+    // 'guard'ed variable. e.g.
+    //
+    //   guard value = something() else { fatalError() }
+    //   <complete>
+    // Here, 'value' is '<error type>' unless we explicitly typecheck the
+    // 'guard' statement.
+    SourceFile *SF = DC->getParentSourceFile();
+    for (auto *D : SF->getTopLevelDecls()) {
+      if (auto Code = dyn_cast<TopLevelCodeDecl>(D)) {
+        typeCheckTopLevelCodeDecl(Code);
+        if (Code == TLCD)
+          break;
+      }
+    }
+  } else {
     typeCheckContextImpl(DC, Loc);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -139,8 +160,6 @@ public:
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     return {isInterstingRange(S), S};
   }
-
-  bool walkToDeclPre(Decl *D) override { return isInterstingRange(D); }
 
   bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
@@ -257,12 +276,13 @@ public:
 
 /// Collect function (or subscript) members with the given \p name on \p baseTy.
 static void collectPossibleCalleesByQualifiedLookup(
-    DeclContext &DC, Type baseTy, DeclBaseName name,
+    DeclContext &DC, Type baseTy, DeclNameRef name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
   SmallVector<ValueDecl *, 2> decls;
-  if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(), name,
+  if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(),
+                          name.withoutArgumentLabels(),
                           NL_QualifiedDefault | NL_ProtocolMembers,
                           decls))
     return;
@@ -274,9 +294,6 @@ static void collectPossibleCalleesByQualifiedLookup(
     if (!isMemberDeclApplied(&DC, baseTy->getMetatypeInstanceType(), VD))
       continue;
     Type declaredMemberType = VD->getInterfaceType();
-    if (!declaredMemberType) {
-      continue;
-    }
     if (!declaredMemberType->is<AnyFunctionType>())
       continue;
     if (VD->getDeclContext()->isTypeContext()) {
@@ -323,7 +340,7 @@ static void collectPossibleCalleesByQualifiedLookup(
 /// Collect function (or subscript) members with the given \p name on
 /// \p baseExpr expression.
 static void collectPossibleCalleesByQualifiedLookup(
-    DeclContext &DC, Expr *baseExpr, DeclBaseName name,
+    DeclContext &DC, Expr *baseExpr, DeclNameRef name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   ConcreteDeclRef ref = nullptr;
   auto baseTyOpt = getTypeOfCompletionContextExpr(
@@ -370,11 +387,12 @@ static bool collectPossibleCalleesForApply(
     }
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
-        DC, UDE->getBase(), UDE->getName().getBaseName(), candidates);
+        DC, UDE->getBase(), UDE->getName(), candidates);
   } else if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(fnExpr)) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
     collectPossibleCalleesByQualifiedLookup(
-        DC, DSCE->getArg(), DRE->getDecl()->getBaseName(), candidates);
+        DC, DSCE->getArg(), DeclNameRef(DRE->getDecl()->getFullName()),
+                                            candidates);
     }
   }
 
@@ -391,7 +409,7 @@ static bool collectPossibleCalleesForApply(
       auto baseTy = AMT->getInstanceType();
       if (baseTy->mayHaveMembers())
         collectPossibleCalleesByQualifiedLookup(
-            DC, AMT, DeclBaseName::createConstructor(), candidates);
+            DC, AMT, DeclNameRef::createConstructor(), candidates);
     }
   }
 
@@ -412,7 +430,7 @@ static bool collectPossibleCalleesForSubscript(
     }
   } else {
     collectPossibleCalleesByQualifiedLookup(DC, subscriptExpr->getBase(),
-                                            DeclBaseName::createSubscript(),
+                                            DeclNameRef::createSubscript(),
                                             candidates);
   }
   return !candidates.empty();
@@ -424,7 +442,6 @@ static bool collectPossibleCalleesForUnresolvedMember(
     DeclContext &DC, UnresolvedMemberExpr *unresolvedMemberExpr,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   auto currModule = DC.getParentModule();
-  auto baseName = unresolvedMemberExpr->getName().getBaseName();
 
   // Get the context of the expression itself.
   ExprContextInfo contextInfo(&DC, unresolvedMemberExpr);
@@ -433,7 +450,8 @@ static bool collectPossibleCalleesForUnresolvedMember(
       continue;
     SmallVector<FunctionTypeAndDecl, 2> members;
     collectPossibleCalleesByQualifiedLookup(DC, MetatypeType::get(expectedTy),
-                                            baseName, members);
+                                            unresolvedMemberExpr->getName(),
+                                            members);
     for (auto member : members) {
       if (isReferenceableByImplicitMemberExpr(currModule, &DC, expectedTy,
                                               member.second))

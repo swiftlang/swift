@@ -49,15 +49,15 @@ using namespace Lowering;
 
 SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
     : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr) {
-  SILOptions &Opts = M.getOptions();
+  const SILOptions &Opts = M.getOptions();
   if (!Opts.UseProfile.empty()) {
     auto ReaderOrErr = llvm::IndexedInstrProfReader::create(Opts.UseProfile);
     if (auto E = ReaderOrErr.takeError()) {
       diagnose(SourceLoc(), diag::profile_read_error, Opts.UseProfile,
                llvm::toString(std::move(E)));
-      Opts.UseProfile.erase();
+    } else {
+      M.setPGOReader(std::move(ReaderOrErr.get()));
     }
-    M.setPGOReader(std::move(ReaderOrErr.get()));
   }
 }
 
@@ -110,11 +110,12 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     // Check that the function takes the expected arguments and returns the
     // expected result type.
     SILDeclRef c(fd);
-    auto funcTy = SGM.Types.getConstantFunctionType(c);
+    auto funcTy =
+        SGM.Types.getConstantFunctionType(TypeExpansionContext::minimal(), c);
     SILFunctionConventions fnConv(funcTy, SGM.M);
 
     auto toSILType = [&SGM](Type ty) {
-      return SGM.Types.getLoweredType(ty, ResilienceExpansion::Minimal);
+      return SGM.Types.getLoweredType(ty, TypeExpansionContext::minimal());
     };
 
     if (inputTypes) {
@@ -415,10 +416,12 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                     : ParameterConvention::Indirect_In_Guaranteed },
   };
 
-  auto extInfo =
-    SILFunctionType::ExtInfo(SILFunctionTypeRepresentation::Thin,
-                             /*pseudogeneric*/false,
-                             /*non-escaping*/false);
+  auto extInfo = SILFunctionType::ExtInfo(
+      SILFunctionTypeRepresentation::Thin,
+      /*pseudogeneric*/ false,
+      /*non-escaping*/ false,
+      DifferentiabilityKind::NonDifferentiable,
+      /*clangFunctionType*/ nullptr);
 
   auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,
@@ -916,7 +919,6 @@ SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
   // initializer of the containing type.
   if (!f->isExternalDeclaration())
     return f;
-
   preEmitFunction(constant, ce, f, ce);
   PrettyStackTraceSILFunction X("silgen closureexpr", f);
   SILGenFunction(*this, *f, ce).emitClosure(ce);
@@ -947,8 +949,8 @@ bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
     auto *vd = dyn_cast<VarDecl>(member);
     if (!vd || !vd->hasStorage()) continue;
 
-    auto &ti = Types.getTypeLowering(vd->getType(),
-                                     ResilienceExpansion::Maximal);
+    auto &ti = Types.getTypeLowering(
+        vd->getType(), TypeExpansionContext::maximalResilienceExpansionOnly());
     if (!ti.isTrivial())
       return true;
   }
@@ -1060,7 +1062,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
     llvm_unreachable("No default argument here?");
 
   case DefaultArgumentKind::Normal: {
-    auto arg = param->getDefaultValue();
+    auto arg = param->getTypeCheckedDefaultExpr();
     emitOrDelayFunction(*this, constant,
         [this,constant,arg,initDC](SILFunction *f) {
       preEmitFunction(constant, arg, f, arg);
@@ -1088,6 +1090,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
   case DefaultArgumentKind::Inherited:
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::File:
+  case DefaultArgumentKind::FilePath:
   case DefaultArgumentKind::Line:
   case DefaultArgumentKind::Function:
   case DefaultArgumentKind::DSOHandle:
@@ -1113,8 +1116,8 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
             ->isPropertyMemberwiseInitializedWithWrappedType()) {
       auto wrapperInfo =
           originalProperty->getPropertyWrapperBackingPropertyInfo();
-      if (wrapperInfo.originalInitialValue)
-        init = wrapperInfo.originalInitialValue;
+      assert(wrapperInfo.originalInitialValue);
+      init = wrapperInfo.originalInitialValue;
     }
   }
 
@@ -1170,7 +1173,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   Type initType = FunctionType::get({}, TupleType::getEmpty(C),
                                     type->getExtInfo());
   auto initSILType = cast<SILFunctionType>(
-      Types.getLoweredRValueType(initType));
+      Types.getLoweredRValueType(TypeExpansionContext::minimal(), initType));
 
   SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(
@@ -1354,11 +1357,12 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
     if (auto genericEnv =
               decl->getInnermostDeclContext()->getGenericEnvironmentOfContext())
       componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
-    auto storageTy = M.Types.getSubstitutedStorageType(decl, componentObjTy);
-    auto opaqueTy =
-      M.Types.getLoweredRValueType(AbstractionPattern::getOpaque(),
-                                   componentObjTy);
-    
+    auto storageTy = M.Types.getSubstitutedStorageType(
+        TypeExpansionContext::minimal(), decl, componentObjTy);
+    auto opaqueTy = M.Types.getLoweredRValueType(
+        TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion),
+        AbstractionPattern::getOpaque(), componentObjTy);
+
     return storageTy.getASTType() == opaqueTy;
   }
   case AccessStrategy::DirectToAccessor:
@@ -1666,7 +1670,7 @@ public:
 void SILGenModule::emitSourceFile(SourceFile *sf) {
   SourceFileScope scope(*this, sf);
   FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-file", sf);
-  for (Decl *D : sf->Decls) {
+  for (Decl *D : sf->getTopLevelDecls()) {
     FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-decl", D);
     visit(D);
   }
@@ -1687,8 +1691,8 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
 
 std::unique_ptr<SILModule>
 SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
-                        SILOptions &options, FileUnit *SF) {
-  SharedTimer timer("SILGen");
+                        const SILOptions &options, FileUnit *SF) {
+  FrontendStatsTracer tracer(mod->getASTContext().Stats, "SILGen");
   const DeclContext *DC;
   if (SF) {
     DC = SF;
@@ -1747,12 +1751,12 @@ SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(ModuleDecl *mod, Lowering::TypeConverter &tc,
-                            SILOptions &options) {
+                            const SILOptions &options) {
   return SILModule::constructSIL(mod, tc, options, nullptr);
 }
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(FileUnit &sf, Lowering::TypeConverter &tc,
-                            SILOptions &options) {
+                            const SILOptions &options) {
   return SILModule::constructSIL(sf.getParentModule(), tc, options, &sf);
 }

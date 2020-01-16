@@ -28,7 +28,8 @@ private:
 
 public:
   Added() {}
-  Added(E NewContents) { Contents = NewContents; }
+  Added(E NewContents) : Contents(NewContents) {}
+  Added(const Added<E> &rhs) : Contents(rhs.Contents) {}
   const Added<E> &operator=(const Added<E> &rhs) {
     Contents = rhs.Contents;
     return *this;
@@ -42,14 +43,18 @@ class InstrumenterBase {
 protected:
   ASTContext &Context;
   DeclContext *TypeCheckDC;
-  Identifier ModuleIdentifier;
-  Identifier FileIdentifier;
+  Optional<DeclNameRef> ModuleIdentifier;
+  Optional<DeclNameRef> FileIdentifier;
 
   InstrumenterBase(ASTContext &C, DeclContext *DC);
   virtual ~InstrumenterBase() = default;
   virtual void anchor();
   virtual BraceStmt *transformBraceStmt(BraceStmt *BS,
                                         bool TopLevel = false) = 0;
+
+  /// Create an expression which retrieves a valid ModuleIdentifier or
+  /// FileIdentifier, if available.
+  Expr *buildIDArgumentExpr(Optional<DeclNameRef> name, SourceRange SR);
 
   class ClosureFinder : public ASTWalker {
   private:

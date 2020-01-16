@@ -1475,3 +1475,31 @@ bb0:
   return %3 : $@callee_guaranteed () -> Int64
 } // CHECK: Returns closure: target: closure4 captures
   // CHECK-NEXT: values:
+
+// Tests for checked cast instruction.
+
+sil [ossa] @testMetatypeCast : $@convention(thin) <T> (@thick T.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick T.Type):
+  checked_cast_br %0 : $@thick T.Type to Int64.Type, bb1, bb2
+
+bb1(%3 : $@thick Int64.Type):
+  %4 = metatype $@thin Int64.Type
+  %5 = integer_literal $Builtin.Int1, -1
+  br bb3(%5 : $Builtin.Int1)
+
+bb2(%7 : $@thick T.Type):
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb3(%8 : $Builtin.Int1)
+
+bb3(%10 : $Builtin.Int1):
+  return %10 : $Builtin.Int1
+}
+
+// CHECK-LABEL: @interpretMetatypeCast
+sil [ossa] @interpretMetatypeCast : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %1 = metatype $@thick Int64.Type
+  %2 = function_ref @testMetatypeCast : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1
+  %3 = apply %2<Int64>(%1) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1
+  return %3 : $Builtin.Int1
+} // CHECK: Returns int: -1

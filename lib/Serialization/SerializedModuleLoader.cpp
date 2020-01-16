@@ -428,7 +428,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
            std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
            bool &isFramework, bool &isSystemModule) {
-  llvm::SmallString<64> moduleName(moduleID.first.str());
+  llvm::SmallString<64> moduleName(moduleID.Item.str());
   ModuleFilenamePair fileNames(moduleName);
 
   SmallVector<ModuleFilenamePair, 4> targetFileNamePairs;
@@ -465,7 +465,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
     // We can only get here if all targetFileNamePairs failed with
     // 'std::errc::no_such_file_or_directory'.
-    if (maybeDiagnoseTargetMismatch(moduleID.second, moduleName,
+    if (maybeDiagnoseTargetMismatch(moduleID.Loc, moduleName,
                                     primaryTargetSpecificName, currPath)) {
       return false;
     } else {
@@ -517,7 +517,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
         case SearchPathKind::Framework: {
           isFramework = true;
           llvm::sys::path::append(currPath,
-                                  moduleID.first.str() + ".framework");
+                                  moduleID.Item.str() + ".framework");
 
           // Check if the framework directory exists.
           if (!fs.exists(currPath))
@@ -747,7 +747,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     auto circularDependencyIter =
         llvm::find_if(loadedModuleFile->getDependencies(),
                       [](const ModuleFile::Dependency &next) {
-                        return !next.Import.second->hasResolvedImports();
+                        return next.isLoaded() &&
+                               !next.Import.second->hasResolvedImports();
                       });
     assert(circularDependencyIter !=
                loadedModuleFile->getDependencies().end() &&
@@ -824,7 +825,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
 }
 
 bool SerializedModuleLoaderBase::canImportModule(
-    std::pair<Identifier, SourceLoc> mID) {
+    Located<Identifier> mID) {
   // Look on disk.
   SmallVector<char, 0> *unusedModuleInterfacePath = nullptr;
   std::unique_ptr<llvm::MemoryBuffer> *unusedModuleBuffer = nullptr;
@@ -838,9 +839,9 @@ bool SerializedModuleLoaderBase::canImportModule(
 }
 
 bool MemoryBufferSerializedModuleLoader::canImportModule(
-    std::pair<Identifier, SourceLoc> mID) {
+    Located<Identifier> mID) {
   // See if we find it in the registered memory buffers.
-  return MemoryBuffers.count(mID.first.str());
+  return MemoryBuffers.count(mID.Item.str());
 }
 
 ModuleDecl *
@@ -875,15 +876,15 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   assert(moduleInputBuffer);
 
-  auto M = ModuleDecl::create(moduleID.first, Ctx);
+  auto M = ModuleDecl::create(moduleID.Item, Ctx);
   M->setIsSystemModule(isSystemModule);
-  Ctx.LoadedModules[moduleID.first] = M;
+  Ctx.LoadedModules[moduleID.Item] = M;
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
   StringRef moduleInterfacePathStr =
     Ctx.AllocateCopy(moduleInterfacePath.str());
 
-  if (!loadAST(*M, moduleID.second, moduleInterfacePathStr,
+  if (!loadAST(*M, moduleID.Loc, moduleInterfacePathStr,
                std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
                std::move(moduleSourceInfoInputBuffer),
                isFramework, /*treatAsPartialModule*/false)) {
@@ -907,7 +908,7 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   // FIXME: Right now this works only with access paths of length 1.
   // Once submodules are designed, this needs to support suffix
   // matching and a search path.
-  auto bufIter = MemoryBuffers.find(moduleID.first.str());
+  auto bufIter = MemoryBuffers.find(moduleID.Item.str());
   if (bufIter == MemoryBuffers.end())
     return nullptr;
 
@@ -918,16 +919,16 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   MemoryBuffers.erase(bufIter);
   assert(moduleInputBuffer);
 
-  auto *M = ModuleDecl::create(moduleID.first, Ctx);
+  auto *M = ModuleDecl::create(moduleID.Item, Ctx);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
-  if (!loadAST(*M, moduleID.second, /*moduleInterfacePath*/ "",
+  if (!loadAST(*M, moduleID.Loc, /*moduleInterfacePath*/ "",
                std::move(moduleInputBuffer), {}, {},
                isFramework, treatAsPartialModule)) {
     return nullptr;
   }
 
-  Ctx.LoadedModules[moduleID.first] = M;
+  Ctx.LoadedModules[moduleID.Item] = M;
   return M;
 }
 
@@ -1118,6 +1119,12 @@ SerializedASTFile::getGroupNameByUSR(StringRef USR) const {
 void
 SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   File.getTopLevelDecls(results);
+}
+
+void SerializedASTFile::getTopLevelDeclsWhereAttributesMatch(
+              SmallVectorImpl<Decl*> &results,
+              llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
+  File.getTopLevelDecls(results, matchAttributes);
 }
 
 void SerializedASTFile::getPrecedenceGroups(

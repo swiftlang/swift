@@ -14,6 +14,7 @@
 #define SWIFT_AST_ASTPRINTER_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/StringRef.h"
@@ -185,10 +186,15 @@ public:
     return *this;
   }
 
+  ASTPrinter &operator<<(QuotedString s);
+
   ASTPrinter &operator<<(unsigned long long N);
   ASTPrinter &operator<<(UUID UU);
 
+  ASTPrinter &operator<<(Identifier name);
+  ASTPrinter &operator<<(DeclBaseName name);
   ASTPrinter &operator<<(DeclName name);
+  ASTPrinter &operator<<(DeclNameRef name);
 
   // Special case for 'char', but not arbitrary things that convert to 'char'.
   template <typename T>

@@ -604,7 +604,7 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
   // Build refinement contexts, if necessary, for all declarations starting
   // with StartElem.
   TypeRefinementContextBuilder Builder(RootTRC, Context);
-  for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
+  for (auto D : SF.getTopLevelDecls().slice(StartElem)) {
     Builder.build(D);
   }
 }
@@ -904,8 +904,9 @@ static const Decl *findContainingDeclaration(SourceRange ReferenceRange,
   if (!SF)
     return nullptr;
 
-  auto BestTopLevelDecl = llvm::find_if(SF->Decls, ContainsReferenceRange);
-  if (BestTopLevelDecl != SF->Decls.end())
+  auto BestTopLevelDecl = llvm::find_if(SF->getTopLevelDecls(),
+                                        ContainsReferenceRange);
+  if (BestTopLevelDecl != SF->getTopLevelDecls().end())
     return *BestTopLevelDecl;
 
   return nullptr;
@@ -1785,8 +1786,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
   auto I = argumentLabelIDs.begin();
 
   auto updateLabelsForArg = [&](Expr *expr) -> bool {
-    if (isa<DefaultArgumentExpr>(expr) ||
-        isa<CallerDefaultArgumentExpr>(expr)) {
+    if (isa<DefaultArgumentExpr>(expr)) {
       // Defaulted: remove param label of it.
       if (I == argumentLabelIDs.end())
         return true;

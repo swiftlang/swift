@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -typecheck -update-code -primary-file %s -F %S/mock-sdk -emit-migrated-file-path %t/result.swift -swift-version 4
-// RUN: diff -u %s.expected %t/result.swift
+// RUN: diff --strip-trailing-cr -u %s.expected %t/result.swift
 
 import TestMyTime
 

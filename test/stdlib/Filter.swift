@@ -73,4 +73,26 @@ FilterTests.test("single-count") {
   expectEqual(30, count)
 }
 
+FilterTests.test("chained filter order") {
+  let array = [1]
+  
+  let lazyFilter = array.lazy
+    .filter { _ in false }
+    .filter { _ in
+      expectUnreachable("Executed second filter before first")
+      return true
+    }
+  let lazyResult = Array(lazyFilter)
+  
+  let result = array
+    .filter { _ in false }
+    .filter { _ in
+      expectUnreachable("Executed second filter before first")
+      return true
+    }
+  
+  expectEqual(lazyResult.count, 0)
+  expectEqual(result.count, 0)
+}
+
 runAllTests()
