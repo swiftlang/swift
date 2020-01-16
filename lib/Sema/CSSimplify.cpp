@@ -6040,10 +6040,6 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     switch (*reason) {
     case MemberLookupResult::UR_InstanceMemberOnType:
     case MemberLookupResult::UR_TypeMemberOnInstance: {
-      if (choice.getKind() == OverloadChoiceKind::DynamicMemberLookup ||
-          choice.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup)
-        return nullptr;
-
       return choice.isDecl()
                  ? AllowTypeOrInstanceMember::create(
                        cs, baseTy, choice.getDecl(), memberName, locator)
@@ -6371,14 +6367,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         }
       }
     }
-
-    // FIXME(diagnostics): Errors related to `AnyObject` could be diagnosed
-    // better in the future, relevant failure information has to be extracted
-    // from `performMemberLookup` result, in order to figure out if it was a
-    // simple labeling or # of arguments mismatch, or member with requested name
-    // really doesn't exist.
-    if (baseTy->isAnyObject())
-      return SolutionKind::Error;
 
     result = performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                                  /*includeInaccessibleMembers*/ true);
