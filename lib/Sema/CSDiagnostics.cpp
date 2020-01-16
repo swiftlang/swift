@@ -639,6 +639,18 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     case ConstraintLocator::ContextualType: {
       auto purpose = getContextualTypePurpose();
       assert(!(purpose == CTP_Unused && purpose == CTP_CannotFail));
+
+      // If this is call to a closure e.g. `let _: A = { B() }()`
+      // let's point diagnostic to its result.
+      if (auto *call = dyn_cast<CallExpr>(anchor)) {
+        auto *fnExpr = call->getFn();
+        if (auto *closure = dyn_cast<ClosureExpr>(fnExpr)) {
+          purpose = CTP_ClosureResult;
+          if (closure->hasSingleExpressionBody())
+            anchor = closure->getSingleExpressionBody();
+        }
+      }
+
       diagnostic = getDiagnosticFor(purpose);
       break;
     }
@@ -1958,6 +1970,11 @@ bool ContextualFailure::diagnoseAsError() {
       return true;
     }
 
+    if (auto *call = dyn_cast<CallExpr>(anchor)) {
+      if (isa<ClosureExpr>(call->getFn()))
+        CTP = CTP_ClosureResult;
+    }
+
     if (auto msg = getDiagnosticFor(CTP, toType->isExistentialType())) {
       diagnostic = *msg;
       break;
@@ -2621,7 +2638,15 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
       if (auto *CE = dyn_cast<CoerceExpr>(anchor)) {
         anchor = CE->getSubExpr();
       }
-      
+
+      if (auto *call = dyn_cast<CallExpr>(anchor)) {
+        auto *fnExpr = call->getFn();
+        if (auto *closure = dyn_cast<ClosureExpr>(fnExpr)) {
+          if (closure->hasSingleExpressionBody())
+            anchor = closure->getSingleExpressionBody();
+        }
+      }
+
       auto range = anchor->getSourceRange();
       diagnostic.fixItInsert(range.Start, "String(");
       diagnostic.fixItInsertAfter(range.End, ")");

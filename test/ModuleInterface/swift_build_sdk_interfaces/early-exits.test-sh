@@ -1,8 +1,8 @@
-RUN: not %swift_build_sdk_interfaces 2>&1 | %FileCheck -check-prefix NO-OUTPUT %s
+RUN: env SWIFT_EXEC=%swiftc_driver_plain not %{python} %utils/swift_build_sdk_interfaces.py %mcp_opt 2>&1 | %FileCheck -check-prefix NO-OUTPUT %s
 NO-OUTPUT: argument -o is required
 
-RUN: not env -u SDKROOT %swift_build_sdk_interfaces -o %t 2>&1 | %FileCheck -check-prefix NO-SDK %s
+RUN: env -u SDKROOT SWIFT_EXEC=%swiftc_driver_plain not %{python} %utils/swift_build_sdk_interfaces.py %mcp_opt -o %t 2>&1 | %FileCheck -check-prefix NO-SDK %s
 NO-SDK: SDKROOT must be set
 
-RUN: not %swift_build_sdk_interfaces -o %t -sdk %S/nonexistent 2>&1 | %FileCheck -check-prefix BAD-SDK %s
+RUN: env SWIFT_EXEC=%swiftc_driver_plain not %{python} %utils/swift_build_sdk_interfaces.py %mcp_opt -o %t -sdk %S/nonexistent 2>&1 | %FileCheck -check-prefix BAD-SDK %s
 BAD-SDK: invalid SDK: {{.+[/\\]nonexistent$}}

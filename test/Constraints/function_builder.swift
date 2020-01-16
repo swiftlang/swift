@@ -409,3 +409,18 @@ testForEach1.show()
 
 // CHECK: ("testForEach1", main.Either<(Swift.String, Swift.Bool), (Swift.Bool, Swift.String)>.first("begin", true))
 // CHECK: ("testForEach1", main.Either<(Swift.String, Swift.Bool), (Swift.Bool, Swift.String)>.second(true, "end"))
+
+func test_single_stmt_closure_support() {
+  @_functionBuilder
+  struct MyBuilder {
+    static func buildBlock(_ numbers: Int...) -> Int {
+      return 42
+    }
+  }
+
+  func test(@MyBuilder builder: () -> Int) -> Int {
+    builder()
+  }
+
+  let _ = test { 0 } // ok
+}

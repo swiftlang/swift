@@ -335,6 +335,13 @@ void truncate(llvm::SmallSetVector<T, N> &vec, unsigned newSize) {
     vec.pop_back();
 }
 
+template <typename K, typename V>
+void truncate(llvm::MapVector<K, V> &map, unsigned newSize) {
+  assert(newSize <= map.size() && "Not a truncation!");
+  for (unsigned i = 0, n = map.size() - newSize; i != n; ++i)
+    map.pop_back();
+}
+
 } // end anonymous namespace
 
 ConstraintSystem::SolverState::SolverState(
@@ -440,6 +447,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
   numFunctionBuilderTransformed = cs.functionBuilderTransformed.size();
   numResolvedOverloads = cs.ResolvedOverloads.size();
+  numInferredClosureTypes = cs.ClosureTypes.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -452,8 +460,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   while (cs.TypeVariables.size() > numTypeVariables)
     cs.TypeVariables.pop_back();
 
-  while (cs.ResolvedOverloads.size() > numResolvedOverloads)
-    cs.ResolvedOverloads.pop_back();
+  truncate(cs.ResolvedOverloads, numResolvedOverloads);
 
   // Restore bindings.
   cs.restoreTypeVariableBindings(cs.solverState->savedBindings.size() -
@@ -506,6 +513,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   /// Remove any builder transformed closures.
   truncate(cs.functionBuilderTransformed, numFunctionBuilderTransformed);
+
+  // Remove any inferred closure types (e.g. used in function builder body).
+  truncate(cs.ClosureTypes, numInferredClosureTypes);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -1686,6 +1696,7 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       case ConstraintKind::ConformsTo:
       case ConstraintKind::Defaultable:
       case ConstraintKind::OneWayEqual:
+      case ConstraintKind::DefaultClosureType:
         break;
       }
     }

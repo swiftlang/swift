@@ -1603,7 +1603,8 @@ public:
   ParserResult<Stmt> parseStmtGuard();
   ParserResult<Stmt> parseStmtWhile(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtRepeat(LabeledStmtInfo LabelInfo);
-  ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo);
+  ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo,
+                                 bool shouldSkipDoTokenConsume = false);
   ParserResult<CatchStmt> parseStmtCatch();
   ParserResult<Stmt> parseStmtForEach(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);

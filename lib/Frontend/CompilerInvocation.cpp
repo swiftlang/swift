@@ -111,6 +111,54 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   }
 }
 
+static void
+setIRGenOutputOptsFromFrontendOptions(IRGenOptions &IRGenOpts,
+                                      const FrontendOptions &FrontendOpts) {
+  // Set the OutputKind for the given Action.
+  IRGenOpts.OutputKind = [](FrontendOptions::ActionType Action) {
+    switch (Action) {
+    case FrontendOptions::ActionType::EmitIR:
+      return IRGenOutputKind::LLVMAssembly;
+    case FrontendOptions::ActionType::EmitBC:
+      return IRGenOutputKind::LLVMBitcode;
+    case FrontendOptions::ActionType::EmitAssembly:
+      return IRGenOutputKind::NativeAssembly;
+    case FrontendOptions::ActionType::Immediate:
+      return IRGenOutputKind::Module;
+    case FrontendOptions::ActionType::EmitObject:
+    default:
+      // Just fall back to emitting an object file. If we aren't going to run
+      // IRGen, it doesn't really matter what we put here anyways.
+      return IRGenOutputKind::ObjectFile;
+    }
+  }(FrontendOpts.RequestedAction);
+
+  // If we're in JIT mode, set the requisite flags.
+  if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate) {
+    IRGenOpts.UseJIT = true;
+    IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
+    IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+  }
+}
+
+static void
+setBridgingHeaderFromFrontendOptions(ClangImporterOptions &ImporterOpts,
+                                     const FrontendOptions &FrontendOpts) {
+  if (FrontendOpts.RequestedAction != FrontendOptions::ActionType::EmitPCH)
+    return;
+
+  // If there aren't any inputs, there's nothing to do.
+  if (!FrontendOpts.InputsAndOutputs.hasInputs())
+    return;
+
+  // If we aren't asked to output a bridging header, we don't need to set this.
+  if (ImporterOpts.PrecompiledHeaderOutputDir.empty())
+    return;
+
+  ImporterOpts.BridgingHeader =
+      FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
+}
+
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
   SearchPathOpts.RuntimeResourcePath = Path;
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
@@ -893,6 +941,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
+  Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);
   if (const Arg *A = Args.getLastArg(OPT_external_pass_pipeline_filename))
     Opts.ExternalPassPipelineFilename = A->getValue();
@@ -1485,6 +1534,10 @@ bool CompilerInvocation::parseArgs(
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
   setDefaultPrebuiltCacheIfNecessary(FrontendOpts, SearchPathOpts,
                                      LangOpts.Target);
+
+  // Now that we've parsed everything, setup some inter-option-dependent state.
+  setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
+  setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
 
   return false;
 }

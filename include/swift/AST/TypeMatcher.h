@@ -114,8 +114,7 @@ class TypeMatcher {
     bool visitUnresolvedType(CanUnresolvedType firstType, Type secondType,
                              Type sugaredFirstType) {
       // Unresolved types never match.
-      return mismatch(firstType.getPointer(), secondType,                \
-                      sugaredFirstType);                                 \
+      return mismatch(firstType.getPointer(), secondType, sugaredFirstType);
     }
 
     bool visitTupleType(CanTupleType firstTuple, Type secondType,

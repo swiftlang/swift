@@ -18,4 +18,4 @@ func foo1() {
 // CHECK2: ACTIONS BEGIN
 // CHECK2-NEXT: ACTIONS END
 
-// REQUIRES-ANY: OS=macosx, OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu

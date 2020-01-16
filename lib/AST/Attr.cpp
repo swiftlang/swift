@@ -958,11 +958,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DAK_ImplicitlySynthesizesNestedRequirement:
-    Printer.printAttrName("@_implicitly_synthesizes_nested_requirement");
-    Printer << "(\"" << cast<ImplicitlySynthesizesNestedRequirementAttr>(this)->Value << "\")";
-    break;
-
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -1024,8 +1019,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "_swift_native_objc_runtime_base";
   case DAK_Semantics:
     return "_semantics";
-  case DAK_ImplicitlySynthesizesNestedRequirement:
-    return "_implicitly_synthesizes_nested_requirement";
   case DAK_Available:
     return "availability";
   case DAK_ObjC:
