@@ -87,6 +87,18 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     auto *D = newDC->getAsDecl();
     auto *parentDC = newDC->getParent();
     unsigned N;
+
+    if (auto accessor = dyn_cast<AccessorDecl>(D)) {
+      // The AST for accessors is like:
+      //   DeclContext -> AbstractStorageDecl -> AccessorDecl
+      // We need to push the index of the accessor within the accessor list
+      // of the storage.
+      auto accessorN =
+          findIndexInRange(accessor, accessor->getStorage()->getAllAccessors());
+      IndexStack.push_back(accessorN);
+      D = accessor->getStorage();
+    }
+
     if (auto parentSF = dyn_cast<SourceFile>(parentDC))
       N = findIndexInRange(D, parentSF->Decls);
     else if (auto parentIDC =
@@ -119,7 +131,13 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       D = getElementAt(parentIDC->getMembers(), N);
     else
       llvm_unreachable("invalid DC kind for finding equivalent DC (query)");
-    newDC = dyn_cast<DeclContext>(D);
+
+    if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
+      auto accessorN = IndexStack.pop_back_val();
+      D = getElementAt(storage->getAllAccessors(), accessorN);
+    }
+
+    newDC = cast<DeclContext>(D);
   } while (!IndexStack.empty());
 
   assert(newDC->getContextKind() == DC->getContextKind());
