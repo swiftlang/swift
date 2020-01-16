@@ -1,6 +1,8 @@
 // Compile the imported module to a .swiftinterface and ensure the convenience
 // init delegates through the subclasses correctly.
 
+// REQUIRES: executable_test
+
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Module)) %S/inherits-superclass-initializers.swift -emit-module-path %t/Module.swiftmodule -emit-module-interface-path %t/Module.swiftinterface -module-name Module -enable-library-evolution
 // RUN: rm %t/Module.swiftmodule
