@@ -6569,13 +6569,16 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   auto *paramList = closure->getParameters();
   for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
-    const auto *param = paramList->get(i);
+    const auto &param = closureType->getParams()[i];
 
-    Type externalType = closureType->getParams()[i].getOldType();
     Type internalType;
 
-    if (param->getTypeRepr()) {
-      internalType = externalType;
+    if (paramList->get(i)->getTypeRepr()) {
+      // Internal type is the type used in the body of the closure,
+      // so "external" type translates to it as follows:
+      //  - `Int...` -> `[Int]`,
+      //  - `inout Int` -> `@lvalue Int`.
+      internalType = param.getParameterType();
     } else {
       auto *paramLoc =
           getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
@@ -6583,11 +6586,12 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       internalType = createTypeVariable(paramLoc, TVO_CanBindToLValue |
                                                       TVO_CanBindToNoEscape);
 
+      auto externalType = param.getOldType();
       addConstraint(ConstraintKind::BindParam, externalType, internalType,
                     paramLoc);
     }
 
-    setType(param, internalType);
+    setType(paramList->get(i), internalType);
   }
 
   assignFixedType(typeVar, closureType, closureLocator);
