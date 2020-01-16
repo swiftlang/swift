@@ -658,7 +658,7 @@ class BuilderClosureRewriter
     auto recorded = found->second;
     if (auto temporaryVar = recorded.temporaryVar) {
       Type type = solution.simplifyType(solution.getType(temporaryVar));
-      temporaryVar->setInterfaceType(type);
+      temporaryVar->setInterfaceType(type->mapTypeOutOfContext());
     }
 
     // Erase the captured expression, so we're sure we never do this twice.
@@ -676,7 +676,7 @@ public:
     // Set the type of the temporary variable.
     auto temporaryVar = found->second.first;
     Type type = solution.simplifyType(solution.getType(temporaryVar));
-    temporaryVar->setInterfaceType(type);
+    temporaryVar->setInterfaceType(type->mapTypeOutOfContext());
 
     // Take the expressions.
     auto exprs = std::move(found->second.second);
@@ -849,6 +849,13 @@ public:
     auto cond = ifStmt->getCond();
     auto condExpr = cond.front().getBoolean();
     auto finalCondExpr = rewriteExpr(condExpr);
+
+    // Load the condition if needed.
+    if (finalCondExpr->getType()->is<LValueType>()) {
+      auto &cs = solution.getConstraintSystem();
+      finalCondExpr = cs.addImplicitLoadExpr(finalCondExpr);
+    }
+
     cond.front().setBoolean(finalCondExpr);
     ifStmt->setCond(cond);
 
