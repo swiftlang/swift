@@ -19,14 +19,11 @@ import os.path
 import re
 import shlex
 
-import six
-
 from . import ArgumentTypeError
+from ..versions import Version
 
 
 __all__ = [
-    'CompilerVersion',
-
     'BoolType',
     'PathType',
     'RegexType',
@@ -34,31 +31,6 @@ __all__ = [
     'SwiftVersionType',
     'ShellSplitType',
 ]
-
-
-# -----------------------------------------------------------------------------
-
-class CompilerVersion(object):
-    """Wrapper type around compiler version strings.
-    """
-
-    def __init__(self, *components):
-        if len(components) == 1:
-            if isinstance(components[0], six.string_types):
-                components = components[0].split('.')
-            elif isinstance(components[0], (list, tuple)):
-                components = components[0]
-
-        if len(components) == 0:
-            raise ValueError('compiler version cannot be empty')
-
-        self.components = tuple(int(part) for part in components)
-
-    def __eq__(self, other):
-        return self.components == other.components
-
-    def __str__(self):
-        return '.'.join([six.text_type(part) for part in self.components])
 
 
 # -----------------------------------------------------------------------------
@@ -175,10 +147,8 @@ class ClangVersionType(RegexType):
             ClangVersionType.ERROR_MESSAGE)
 
     def __call__(self, value):
-        matches = super(ClangVersionType, self).__call__(value)
-        components = filter(lambda x: x is not None, matches.group(1, 2, 3, 5))
-
-        return CompilerVersion(components)
+        super(ClangVersionType, self).__call__(value)
+        return Version(value)
 
 
 class SwiftVersionType(RegexType):
@@ -195,10 +165,8 @@ class SwiftVersionType(RegexType):
             SwiftVersionType.ERROR_MESSAGE)
 
     def __call__(self, value):
-        matches = super(SwiftVersionType, self).__call__(value)
-        components = filter(lambda x: x is not None, matches.group(1, 2, 4))
-
-        return CompilerVersion(components)
+        super(SwiftVersionType, self).__call__(value)
+        return Version(value)
 
 
 class ShellSplitType(object):
