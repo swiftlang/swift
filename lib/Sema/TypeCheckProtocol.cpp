@@ -3394,14 +3394,6 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
     return ResolveWitnessResult::Missing;
   }
 
-  // If the protocol has a phantom nested type requirement, resolve it now.
-  auto &attrs = Proto->getAttrs();
-  if (auto *IARA =
-          attrs.getAttribute<ImplicitlySynthesizesNestedRequirementAttr>()) {
-    (void)TypeChecker::derivePhantomWitness(DC, derivingTypeDecl,
-                                            Proto, IARA->Value);
-  }
-
   // Attempt to derive the witness.
   auto derived =
       TypeChecker::deriveProtocolRequirement(DC, derivingTypeDecl, requirement);
@@ -5407,34 +5399,6 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
     return derived.deriveRawRepresentable(AssocType);
   case KnownProtocolKind::CaseIterable:
     return derived.deriveCaseIterable(AssocType);
-  default:
-    return nullptr;
-  }
-}
-
-
-TypeDecl *TypeChecker::derivePhantomWitness(DeclContext *DC,
-                                            NominalTypeDecl *nominal,
-                                            ProtocolDecl *proto,
-                                            const StringRef Name) {
-  assert(proto->getASTContext().Id_CodingKeys.is(Name) &&
-         "CodingKeys is the only supported phantom requirement");
-
-  if (nominal->addedPhantomCodingKeys())
-    return nullptr;
-  nominal->setAddedPhantomCodingKeys();
-
-  auto knownKind = proto->getKnownProtocolKind();
-  if (!knownKind)
-    return nullptr;
-
-  auto Decl = DC->getInnermostDeclarationDeclContext();
-
-  DerivedConformance derived(nominal->getASTContext(), Decl, nominal, proto);
-  switch (*knownKind) {
-  case KnownProtocolKind::Decodable:
-  case KnownProtocolKind::Encodable:
-    return derived.derivePhantomCodingKeysRequirement();
   default:
     return nullptr;
   }

@@ -4233,13 +4233,6 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
-      case decls_block::ImplicitlySynthesizesNestedRequirement_DECL_ATTR: {
-        serialization::decls_block::ImplicitlySynthesizesNestedRequirementDeclAttrLayout
-            ::readRecord(scratch);
-        Attr = new (ctx) ImplicitlySynthesizesNestedRequirementAttr(blobData, {}, {});
-        break;
-      }
-
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \
