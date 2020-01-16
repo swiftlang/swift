@@ -139,20 +139,21 @@ public:
     case AdjointValueKind::Aggregate:
       s << "Aggregate<";
       if (auto *decl =
-            getType().getASTType()->getStructOrBoundGenericStruct()) {
+              getType().getASTType()->getStructOrBoundGenericStruct()) {
         s << "Struct>(";
-        interleave(llvm::zip(decl->getStoredProperties(),
-                             base->value.aggregate),
-                             [&s](std::tuple<VarDecl *,
-                                             const AdjointValue &> elt) {
-                               s << std::get<0>(elt)->getName() << ": ";
-                               std::get<1>(elt).print(s);
-                             }, [&s] { s << ", "; });
+        interleave(
+            llvm::zip(decl->getStoredProperties(), base->value.aggregate),
+            [&s](std::tuple<VarDecl *, const AdjointValue &> elt) {
+              s << std::get<0>(elt)->getName() << ": ";
+              std::get<1>(elt).print(s);
+            },
+            [&s] { s << ", "; });
       } else if (auto tupleType = getType().getAs<TupleType>()) {
         s << "Tuple>(";
-        interleave(base->value.aggregate,
-                   [&s](const AdjointValue &elt) { elt.print(s); },
-                   [&s] { s << ", "; });
+        interleave(
+            base->value.aggregate,
+            [&s](const AdjointValue &elt) { elt.print(s); },
+            [&s] { s << ", "; });
       } else {
         llvm_unreachable("Invalid aggregate");
       }

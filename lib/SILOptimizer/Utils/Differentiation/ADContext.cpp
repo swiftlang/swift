@@ -17,9 +17,9 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
 
 using llvm::DenseMap;
 using llvm::SmallPtrSet;
@@ -61,8 +61,8 @@ ADContext::ADContext(SILModuleTransform &transform)
 
 FuncDecl *ADContext::getPlusDecl() const {
   if (!cachedPlusFn) {
-    cachedPlusFn = findOperatorDeclInProtocol(
-      astCtx.getIdentifier("+"), additiveArithmeticProtocol);
+    cachedPlusFn = findOperatorDeclInProtocol(astCtx.getIdentifier("+"),
+                                              additiveArithmeticProtocol);
     assert(cachedPlusFn && "AdditiveArithmetic.+ not found");
   }
   return cachedPlusFn;
@@ -70,8 +70,8 @@ FuncDecl *ADContext::getPlusDecl() const {
 
 FuncDecl *ADContext::getPlusEqualDecl() const {
   if (!cachedPlusEqualFn) {
-    cachedPlusEqualFn = findOperatorDeclInProtocol(
-      astCtx.getIdentifier("+="), additiveArithmeticProtocol);
+    cachedPlusEqualFn = findOperatorDeclInProtocol(astCtx.getIdentifier("+="),
+                                                   additiveArithmeticProtocol);
     assert(cachedPlusEqualFn && "AdditiveArithmetic.+= not found");
   }
   return cachedPlusEqualFn;
@@ -81,16 +81,15 @@ void ADContext::cleanUp() {
   // Delete all references to generated functions.
   for (auto fnRef : generatedFunctionReferences) {
     if (auto *fnRefInst =
-        peerThroughFunctionConversions<FunctionRefInst>(fnRef)) {
+            peerThroughFunctionConversions<FunctionRefInst>(fnRef)) {
       fnRefInst->replaceAllUsesWithUndef();
       fnRefInst->eraseFromParent();
     }
   }
   // Delete all generated functions.
   for (auto *generatedFunction : generatedFunctions) {
-    LLVM_DEBUG(getADDebugStream()
-               << "Deleting generated function "
-               << generatedFunction->getName() << '\n');
+    LLVM_DEBUG(getADDebugStream() << "Deleting generated function "
+                                  << generatedFunction->getName() << '\n');
     generatedFunction->dropAllReferences();
     transform.notifyWillDeleteFunction(generatedFunction);
     module.eraseFunction(generatedFunction);
@@ -98,11 +97,11 @@ void ADContext::cleanUp() {
 }
 
 DifferentiableFunctionInst *ADContext::createDifferentiableFunction(
-  SILBuilder &builder, SILLocation loc,
-  IndexSubset *parameterIndices, SILValue original,
-  Optional<std::pair<SILValue, SILValue>> derivativeFunctions) {
+    SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
+    SILValue original,
+    Optional<std::pair<SILValue, SILValue>> derivativeFunctions) {
   auto *dfi = builder.createDifferentiableFunction(
-    loc, parameterIndices, original, derivativeFunctions);
+      loc, parameterIndices, original, derivativeFunctions);
   processedDifferentiableFunctionInsts.erase(dfi);
   return dfi;
 }

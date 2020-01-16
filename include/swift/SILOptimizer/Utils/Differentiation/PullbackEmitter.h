@@ -90,7 +90,8 @@ private:
   /// Mapping from original basic blocks to local temporary values to be cleaned
   /// up. This is populated when pullback emission is run on one basic block and
   /// cleaned before processing another basic block.
-  llvm::DenseMap<SILBasicBlock *, SmallSetVector<SILValue, 64>> blockTemporaries;
+  llvm::DenseMap<SILBasicBlock *, SmallSetVector<SILValue, 64>>
+      blockTemporaries;
 
   /// The main builder.
   SILBuilder builder;
@@ -143,7 +144,7 @@ private:
 
   AdjointValue makeConcreteAdjointValue(SILValue value);
 
-  template<typename EltRange>
+  template <typename EltRange>
   AdjointValue makeAggregateAdjointValue(SILType type, EltRange elements);
 
   //--------------------------------------------------------------------------//
@@ -197,9 +198,8 @@ private:
 
   /// Given two materialized adjoint values, accumulate them using
   /// `AdditiveArithmetic.+`, depending on the differentiation mode.
-  void accumulateIndirect(SILValue resultBufAccess,
-                          SILValue lhsBufAccess, SILValue rhsBufAccess,
-                          SILLocation loc);
+  void accumulateIndirect(SILValue resultBufAccess, SILValue lhsBufAccess,
+                          SILValue rhsBufAccess, SILLocation loc);
 
   /// Given two buffers of an `AdditiveArithmetic` type, accumulate the right
   /// hand side into the left hand side using `+=`.
@@ -258,8 +258,7 @@ private:
   // Buffer mapping
   //--------------------------------------------------------------------------//
 
-  void setAdjointBuffer(SILBasicBlock *origBB,
-                        SILValue originalBuffer,
+  void setAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
                         SILValue adjointBuffer);
 
   SILValue getAdjointProjection(SILBasicBlock *origBB,
@@ -296,8 +295,8 @@ private:
     return pullbackBBMap.lookup(originalBlock);
   }
 
-  SILBasicBlock *getPullbackTrampolineBlock(
-      SILBasicBlock *originalBlock, SILBasicBlock *successorBlock) {
+  SILBasicBlock *getPullbackTrampolineBlock(SILBasicBlock *originalBlock,
+                                            SILBasicBlock *successorBlock) {
     return pullbackTrampolineBBMap.lookup({originalBlock, successorBlock});
   }
 
@@ -387,12 +386,12 @@ public:
   /// Handle `store` or `store_borrow` instruction.
   ///   Original: store/store_borrow x to y
   ///    Adjoint: adj[x] += load adj[y]; adj[y] = 0
-  void visitStoreOperation(SILBasicBlock *bb, SILLocation loc,
-                           SILValue origSrc, SILValue origDest);
+  void visitStoreOperation(SILBasicBlock *bb, SILLocation loc, SILValue origSrc,
+                           SILValue origDest);
   void visitStoreInst(StoreInst *si);
   void visitStoreBorrowInst(StoreBorrowInst *sbi) {
-    visitStoreOperation(
-        sbi->getParent(), sbi->getLoc(), sbi->getSrc(), sbi->getDest());
+    visitStoreOperation(sbi->getParent(), sbi->getLoc(), sbi->getSrc(),
+                        sbi->getDest());
   }
 
   /// Handle `copy_addr` instruction.
@@ -426,7 +425,7 @@ public:
   NOT_DIFFERENTIABLE(RefElementAddr, autodiff_class_property_not_supported)
 #undef NOT_DIFFERENTIABLE
 
-#define NO_ADJOINT(INST) \
+#define NO_ADJOINT(INST)                                                       \
   void visit##INST##Inst(INST##Inst *inst) {}
   // Terminators.
   NO_ADJOINT(Return)

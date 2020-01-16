@@ -18,11 +18,11 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/SILOptimizer/Utils/Differentiation/JVPEmitter.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Utils/Differentiation/Thunk.h"
-#include "swift/SILOptimizer/Utils/Differentiation/JVPEmitter.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 
 namespace swift {
 namespace autodiff {
@@ -690,19 +690,19 @@ CLONE_AND_EMIT_TANGENT(TupleElementAddr, teai) {
     if (getTangentSpace(
             origTupleTy->getElement(i).getType()->getCanonicalType()))
       ++tanIndex;
-    }
-    auto tanType = getRemappedTangentType(teai->getType());
-    auto tanSource = getTangentBuffer(teai->getParent(), teai->getOperand());
-    SILValue tanBuf;
-    // If the tangent buffer of the source does not have a tuple type, then
-    // it must represent a "single element tuple type". Use it directly.
-    if (!tanSource->getType().is<TupleType>()) {
-      tanBuf = tanSource;
-    } else {
-      tanBuf = diffBuilder.createTupleElementAddr(
-          teai->getLoc(), tanSource, tanIndex, tanType);
-    }
-    bufferMap.try_emplace({teai->getParent(), teai}, tanBuf);
+  }
+  auto tanType = getRemappedTangentType(teai->getType());
+  auto tanSource = getTangentBuffer(teai->getParent(), teai->getOperand());
+  SILValue tanBuf;
+  // If the tangent buffer of the source does not have a tuple type, then
+  // it must represent a "single element tuple type". Use it directly.
+  if (!tanSource->getType().is<TupleType>()) {
+    tanBuf = tanSource;
+  } else {
+    tanBuf = diffBuilder.createTupleElementAddr(teai->getLoc(), tanSource,
+                                                tanIndex, tanType);
+  }
+  bufferMap.try_emplace({teai->getParent(), teai}, tanBuf);
 }
 
 /// Handle `destructure_tuple` instruction.
@@ -1146,18 +1146,18 @@ void JVPEmitter::visit(SILInstruction *inst) {
   if (differentialInfo.shouldDifferentiateInstruction(inst)) {
     LLVM_DEBUG(getADDebugStream() << "JVPEmitter visited:\n[ORIG]" << *inst);
 #ifndef NDEBUG
-      auto beforeInsertion = std::prev(diffBuilder.getInsertionPoint());
+    auto beforeInsertion = std::prev(diffBuilder.getInsertionPoint());
 #endif
-      TypeSubstCloner::visit(inst);
-      LLVM_DEBUG({
-        auto &s = llvm::dbgs() << "[TAN] Emitted in differential:\n";
-        auto afterInsertion = diffBuilder.getInsertionPoint();
-        for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
-          s << *it;
-      });
-    } else {
-      TypeSubstCloner::visit(inst);
-    }
+    TypeSubstCloner::visit(inst);
+    LLVM_DEBUG({
+      auto &s = llvm::dbgs() << "[TAN] Emitted in differential:\n";
+      auto afterInsertion = diffBuilder.getInsertionPoint();
+      for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
+        s << *it;
+    });
+  } else {
+    TypeSubstCloner::visit(inst);
+  }
 }
 
 void JVPEmitter::visitSILInstruction(SILInstruction *inst) {
