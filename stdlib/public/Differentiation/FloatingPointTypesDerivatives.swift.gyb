@@ -16,6 +16,10 @@ import SwiftShims
 % for self_type in all_floating_point_types():
 % Self = self_type.stdlib_name
 
+% if self_type.bits == 80:
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+% end
+
 /// Derivatives of standard unary operators.
 extension ${Self} {
   @usableFromInline
@@ -146,4 +150,7 @@ extension ${Self} : VectorProtocol {
   }
 }
 
+% if self_type.bits == 80:
+#endif
+% end
 % end
