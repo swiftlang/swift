@@ -1878,8 +1878,8 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
   assert(!(flags & DynamicCastFlags::Unconditional));
   assert(!(flags & DynamicCastFlags::DestroyOnFailure));
 
-  auto srcTypeName = swift_getTypeName(srcType, true); // UNUSED -- REMOVE -- FOR DEBUGGING ONLY
-  auto destTypeName = swift_getTypeName(targetType, true); // UNUSED -- REMOVE -- FOR DEBUGGING ONLY
+  auto originalSrc = src;
+  auto originalSrcType = srcType;
 
   // Swift type should be AnyObject or a class type.
   while (true) {
@@ -1894,8 +1894,8 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
       // If it's a Class object, it must be `AnyObject`
       if (isAnyObjectExistentialType(existentialType)) {
         goto validated;
-			}
-			return false;
+      }
+      return false;
     }
     case ExistentialTypeRepresentation::Opaque: {
       // If it's an opaque existential, unwrap it and check again
@@ -1915,7 +1915,7 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
   if (swift_unboxFromSwiftValueWithType(src, dest, targetType)) {
     // Release the source if we need to.
     if (flags & DynamicCastFlags::TakeOnSuccess)
-      srcType->vw_destroy(src);
+      originalSrcType->vw_destroy(originalSrc);
     return true;
   }
 #endif
@@ -1945,7 +1945,7 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
                                       const_cast<OpaqueValue*>(boxedValue));
     // Release the box if we need to.
     if (flags & DynamicCastFlags::TakeOnSuccess)
-      objc_release((id)srcSwiftValue);
+      originalSrcType->vw_destroy(originalSrc);
     return true;
   }
   
@@ -1957,7 +1957,7 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
                         boxedType, targetType, innerFlags)) {
     // Release the box if we need to.
     if (flags & DynamicCastFlags::TakeOnSuccess)
-      objc_release((id)srcSwiftValue);
+      originalSrcType->vw_destroy(originalSrc);
     return true;
   }
 #endif
