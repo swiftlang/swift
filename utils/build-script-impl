@@ -1516,7 +1516,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 llvm_enable_projects=("clang")
 
-                if [[ ! "${SKIP_BUILD_COMPILER_RT}" ]]; then
+                if [[ ! "${SKIP_BUILD_COMPILER_RT}" && ! $(is_cross_tools_host ${host}) ]]; then
                     llvm_enable_projects+=("compiler-rt")
                 fi
 
