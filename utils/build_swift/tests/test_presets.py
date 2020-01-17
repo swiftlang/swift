@@ -165,9 +165,7 @@ class TestPresetParser(TestCase):
 
     def test_read_file(self):
         parser = PresetParser()
-
-        with self.assertNotRaises():
-            parser.read_file(PRESET_FILES[0])
+        parser.read_file(PRESET_FILES[0])
 
     def test_read_string(self):
         parser = PresetParser()

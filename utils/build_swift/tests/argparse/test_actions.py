@@ -41,10 +41,9 @@ class TestAction(TestCase):
         self.assertEqual(action.dests, ['foo', 'bar'])
 
     def test_supports_dest_argument(self):
-        with self.assertNotRaises(Exception):
-            action = actions.Action([], [], dest='foo')
+        action = actions.Action([], [], dest='foo')
 
-            self.assertEqual(action.dest, SUPPRESS)
+        self.assertEqual(action.dest, SUPPRESS)
 
     def test_call_not_implemented(self):
         action = actions.Action([], [])

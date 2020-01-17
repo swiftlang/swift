@@ -113,8 +113,7 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def generate_default_value_test(cls, dest, default_value):
         def test(self):
-            with self.assertNotRaises(ParserError):
-                parsed_values = self.parse_default_args([])
+            parsed_values = self.parse_default_args([])
 
             parsed_value = getattr(parsed_values, dest)
             if default_value.__class__ is str:
@@ -138,9 +137,8 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_set_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
-                namespace = self.parse_args([option.option_string])
-                self.assertEqual(getattr(namespace, option.dest), option.value)
+            namespace = self.parse_args([option.option_string])
+            self.assertEqual(getattr(namespace, option.dest), option.value)
 
             with self.assertRaises(ParserError):
                 self.parse_args([option.option_string, 'foo'])
@@ -150,103 +148,98 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_set_true_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
-                # TODO: Move to unit-tests for the action class
-                namespace = self.parse_args([])
-                self.assertFalse(getattr(namespace, option.dest))
+            # TODO: Move to unit-tests for the action class
+            namespace = self.parse_args([])
+            self.assertFalse(getattr(namespace, option.dest))
 
-                namespace = self.parse_args([option.option_string])
-                self.assertTrue(getattr(namespace, option.dest))
+            namespace = self.parse_args([option.option_string])
+            self.assertTrue(getattr(namespace, option.dest))
 
         return test
 
     @classmethod
     def _generate_set_false_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
-                # TODO: Move to unit-tests for the action class
-                namespace = self.parse_args([])
-                self.assertTrue(getattr(namespace, option.dest))
+            # TODO: Move to unit-tests for the action class
+            namespace = self.parse_args([])
+            self.assertTrue(getattr(namespace, option.dest))
 
-                namespace = self.parse_args([option.option_string])
-                self.assertFalse(getattr(namespace, option.dest))
+            namespace = self.parse_args([option.option_string])
+            self.assertFalse(getattr(namespace, option.dest))
 
         return test
 
     @classmethod
     def _generate_enable_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
-                # TODO: Move to unit-tests for the action class
-                # Test parsing True values
-                self.parse_args([option.option_string, '1'])
-                self.parse_args([option.option_string, 'true'])
-                self.parse_args([option.option_string, 'True'])
-                self.parse_args([option.option_string, 'TRUE'])
+            # TODO: Move to unit-tests for the action class
+            # Test parsing True values
+            self.parse_args([option.option_string, '1'])
+            self.parse_args([option.option_string, 'true'])
+            self.parse_args([option.option_string, 'True'])
+            self.parse_args([option.option_string, 'TRUE'])
 
-                # TODO: Move to unit-tests for the action class
-                # Test parsing False values
-                self.parse_args([option.option_string, '0'])
-                self.parse_args([option.option_string, 'false'])
-                self.parse_args([option.option_string, 'False'])
-                self.parse_args([option.option_string, 'FALSE'])
+            # TODO: Move to unit-tests for the action class
+            # Test parsing False values
+            self.parse_args([option.option_string, '0'])
+            self.parse_args([option.option_string, 'false'])
+            self.parse_args([option.option_string, 'False'])
+            self.parse_args([option.option_string, 'FALSE'])
 
-                # TODO: Move to unit-tests for the action class
-                # Test default value
-                namespace = self.parse_args([option.option_string])
-                self.assertTrue(getattr(namespace, option.dest))
+            # TODO: Move to unit-tests for the action class
+            # Test default value
+            namespace = self.parse_args([option.option_string])
+            self.assertTrue(getattr(namespace, option.dest))
 
-                # Test setting value to True
-                namespace = self.parse_args([option.option_string, 'True'])
-                self.assertTrue(getattr(namespace, option.dest))
+            # Test setting value to True
+            namespace = self.parse_args([option.option_string, 'True'])
+            self.assertTrue(getattr(namespace, option.dest))
 
-                # Test setting value to False
-                namespace = self.parse_args([option.option_string, 'False'])
-                self.assertFalse(getattr(namespace, option.dest))
+            # Test setting value to False
+            namespace = self.parse_args([option.option_string, 'False'])
+            self.assertFalse(getattr(namespace, option.dest))
 
         return test
 
     @classmethod
     def _generate_disable_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
-                # TODO: Move to unit-tests for the action class
-                # Test parsing True values
-                self.parse_args([option.option_string, '1'])
-                self.parse_args([option.option_string, 'true'])
-                self.parse_args([option.option_string, 'True'])
-                self.parse_args([option.option_string, 'TRUE'])
+            # TODO: Move to unit-tests for the action class
+            # Test parsing True values
+            self.parse_args([option.option_string, '1'])
+            self.parse_args([option.option_string, 'true'])
+            self.parse_args([option.option_string, 'True'])
+            self.parse_args([option.option_string, 'TRUE'])
 
-                # TODO: Move to unit-tests for the action class
-                # Test parsing False values
-                self.parse_args([option.option_string, '0'])
-                self.parse_args([option.option_string, 'false'])
-                self.parse_args([option.option_string, 'False'])
-                self.parse_args([option.option_string, 'FALSE'])
+            # TODO: Move to unit-tests for the action class
+            # Test parsing False values
+            self.parse_args([option.option_string, '0'])
+            self.parse_args([option.option_string, 'false'])
+            self.parse_args([option.option_string, 'False'])
+            self.parse_args([option.option_string, 'FALSE'])
 
-                # TODO: Move to unit-tests for the action class
-                # Test default value
-                namespace = self.parse_args([option.option_string])
-                self.assertFalse(getattr(namespace, option.dest))
+            # TODO: Move to unit-tests for the action class
+            # Test default value
+            namespace = self.parse_args([option.option_string])
+            self.assertFalse(getattr(namespace, option.dest))
 
-                # Test setting value to True resulting in False
-                namespace = self.parse_args([option.option_string, 'True'])
-                self.assertFalse(getattr(namespace, option.dest))
+            # Test setting value to True resulting in False
+            namespace = self.parse_args([option.option_string, 'True'])
+            self.assertFalse(getattr(namespace, option.dest))
 
-                # Test setting value to False resulting in True
-                namespace = self.parse_args([option.option_string, 'False'])
-                self.assertTrue(getattr(namespace, option.dest))
+            # Test setting value to False resulting in True
+            namespace = self.parse_args([option.option_string, 'False'])
+            self.assertTrue(getattr(namespace, option.dest))
 
         return test
 
     @classmethod
     def _generate_choices_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
-                for choice in option.choices:
-                    namespace = self.parse_args(
-                        [option.option_string, str(choice)])
-                    self.assertEqual(getattr(namespace, option.dest), choice)
+            for choice in option.choices:
+                namespace = self.parse_args(
+                    [option.option_string, str(choice)])
+                self.assertEqual(getattr(namespace, option.dest), choice)
 
             with self.assertRaises(ParserError):
                 self.parse_args([option.option_string, 'INVALID'])
@@ -256,50 +249,42 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_int_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
-                for i in [0, 1, 42]:
-                    namespace = self.parse_args([option.option_string, str(i)])
-                    self.assertEqual(int(getattr(namespace, option.dest)), i)
+            for i in [0, 1, 42]:
+                namespace = self.parse_args([option.option_string, str(i)])
+                self.assertEqual(int(getattr(namespace, option.dest)), i)
 
             # FIXME: int-type options should not accept non-int strings
-            # with self.assertRaises(ParserError):
-            #     self.parse_args([option.option_string, str(0.0)])
-            #     self.parse_args([option.option_string, str(1.0)])
-            #     self.parse_args([option.option_string, str(3.14)])
-            #     self.parse_args([option.option_string, 'NaN'])
+            # self.parse_args([option.option_string, str(0.0)])
+            # self.parse_args([option.option_string, str(1.0)])
+            # self.parse_args([option.option_string, str(3.14)])
+            # self.parse_args([option.option_string, 'NaN'])
 
         return test
 
     @classmethod
     def _generate_str_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
-                self.parse_args([option.option_string, 'foo'])
+            self.parse_args([option.option_string, 'foo'])
 
         return test
 
     @classmethod
     def _generate_path_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
-                self.parse_args([option.option_string, sys.executable])
+            self.parse_args([option.option_string, sys.executable])
 
             # FIXME: path-type options should not accept non-path inputs
-            # with self.assertRaises(ParserError):
-            #     self.parse_args([option.option_string, 'foo'])
+            # self.parse_args([option.option_string, 'foo'])
 
         return test
 
     @classmethod
     def _generate_append_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
-                # Range size is arbitrary, just needs to be more than once
-                for i in range(1, 4):
-                    namespace = self.parse_args(
-                        [option.option_string, 'ARG'] * i)
-                    self.assertEqual(getattr(namespace, option.dest),
-                                     ['ARG'] * i)
+            # Range size is arbitrary, just needs to be more than once
+            for i in range(1, 4):
+                namespace = self.parse_args([option.option_string, 'ARG'] * i)
+                self.assertEqual(getattr(namespace, option.dest), ['ARG'] * i)
 
         return test
 
@@ -314,17 +299,16 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_build_script_impl_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
-                namespace, unknown_args = self.parse_args_and_unknown_args([])
-                self.assertFalse(hasattr(namespace, option.dest))
-                self.assertEqual(unknown_args, [])
+            namespace, unknown_args = self.parse_args_and_unknown_args([])
+            self.assertFalse(hasattr(namespace, option.dest))
+            self.assertEqual(unknown_args, [])
 
-                namespace, unknown_args = self.parse_args_and_unknown_args(
-                    [option.option_string])
-                # The argument should never show up in the namespace
-                self.assertFalse(hasattr(namespace, option.dest))
-                # It should instead be forwareded to unkown_args
-                self.assertEqual(unknown_args, [option.option_string])
+            namespace, unknown_args = self.parse_args_and_unknown_args(
+                [option.option_string])
+            # The argument should never show up in the namespace
+            self.assertFalse(hasattr(namespace, option.dest))
+            # It should instead be forwareded to unkown_args
+            self.assertEqual(unknown_args, [option.option_string])
 
         return test
 
@@ -499,10 +483,9 @@ class TestDriverArgumentParser(unittest.TestCase):
     def test_option_clang_compiler_version(self):
         option_string = '--clang-compiler-version'
 
-        with self.assertNotRaises(ParserError):
-            self.parse_default_args([option_string, '5.0.0'])
-            self.parse_default_args([option_string, '5.0.1'])
-            self.parse_default_args([option_string, '5.0.0.1'])
+        self.parse_default_args([option_string, '5.0.0'])
+        self.parse_default_args([option_string, '5.0.1'])
+        self.parse_default_args([option_string, '5.0.0.1'])
 
         with self.assertRaises(ParserError):
             self.parse_default_args([option_string, '1'])
@@ -512,10 +495,9 @@ class TestDriverArgumentParser(unittest.TestCase):
     def test_option_clang_user_visible_version(self):
         option_string = '--clang-user-visible-version'
 
-        with self.assertNotRaises(ParserError):
-            self.parse_default_args([option_string, '5.0.0'])
-            self.parse_default_args([option_string, '5.0.1'])
-            self.parse_default_args([option_string, '5.0.0.1'])
+        self.parse_default_args([option_string, '5.0.0'])
+        self.parse_default_args([option_string, '5.0.1'])
+        self.parse_default_args([option_string, '5.0.0.1'])
 
         with self.assertRaises(ParserError):
             self.parse_default_args([option_string, '1'])
@@ -525,10 +507,9 @@ class TestDriverArgumentParser(unittest.TestCase):
     def test_option_swift_compiler_version(self):
         option_string = '--swift-compiler-version'
 
-        with self.assertNotRaises(ParserError):
-            self.parse_default_args([option_string, '4.1'])
-            self.parse_default_args([option_string, '4.0.1'])
-            self.parse_default_args([option_string, '200.99.1'])
+        self.parse_default_args([option_string, '4.1'])
+        self.parse_default_args([option_string, '4.0.1'])
+        self.parse_default_args([option_string, '200.99.1'])
 
         with self.assertRaises(ParserError):
             self.parse_default_args([option_string, '1'])
@@ -537,10 +518,9 @@ class TestDriverArgumentParser(unittest.TestCase):
     def test_option_swift_user_visible_version(self):
         option_string = '--swift-user-visible-version'
 
-        with self.assertNotRaises(ParserError):
-            self.parse_default_args([option_string, '4.1'])
-            self.parse_default_args([option_string, '4.0.1'])
-            self.parse_default_args([option_string, '200.99.1'])
+        self.parse_default_args([option_string, '4.1'])
+        self.parse_default_args([option_string, '4.0.1'])
+        self.parse_default_args([option_string, '200.99.1'])
 
         with self.assertRaises(ParserError):
             self.parse_default_args([option_string, '1'])
@@ -566,175 +546,150 @@ class TestDriverArgumentParser(unittest.TestCase):
     # Implied defaults tests
 
     def test_implied_defaults_assertions(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--assertions'])
+        namespace = self.parse_default_args(['--assertions'])
 
-            self.assertTrue(namespace.cmark_assertions)
-            self.assertTrue(namespace.llvm_assertions)
-            self.assertTrue(namespace.swift_assertions)
-            self.assertTrue(namespace.swift_stdlib_assertions)
+        self.assertTrue(namespace.cmark_assertions)
+        self.assertTrue(namespace.llvm_assertions)
+        self.assertTrue(namespace.swift_assertions)
+        self.assertTrue(namespace.swift_stdlib_assertions)
 
     def test_implied_defaults_cmark_build_variant(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--debug-cmark'])
-            self.assertTrue(namespace.build_cmark)
+        namespace = self.parse_default_args(['--debug-cmark'])
+        self.assertTrue(namespace.build_cmark)
 
     def test_implied_defaults_lldb_build_variant(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--debug-lldb'])
-            self.assertTrue(namespace.build_lldb)
+        namespace = self.parse_default_args(['--debug-lldb'])
+        self.assertTrue(namespace.build_lldb)
 
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--lldb-assertions'])
-            self.assertTrue(namespace.build_lldb)
+        namespace = self.parse_default_args(['--lldb-assertions'])
+        self.assertTrue(namespace.build_lldb)
 
     def test_implied_defaults_build_variant(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--debug'])
+        namespace = self.parse_default_args(['--debug'])
 
-            self.assertEqual(namespace.cmark_build_variant, 'Debug')
-            self.assertEqual(namespace.foundation_build_variant, 'Debug')
-            self.assertEqual(namespace.libdispatch_build_variant, 'Debug')
-            self.assertEqual(namespace.libicu_build_variant, 'Debug')
-            self.assertEqual(namespace.lldb_build_variant, 'Debug')
-            self.assertEqual(namespace.llvm_build_variant, 'Debug')
-            self.assertEqual(namespace.swift_build_variant, 'Debug')
-            self.assertEqual(namespace.swift_stdlib_build_variant, 'Debug')
+        self.assertEqual(namespace.cmark_build_variant, 'Debug')
+        self.assertEqual(namespace.foundation_build_variant, 'Debug')
+        self.assertEqual(namespace.libdispatch_build_variant, 'Debug')
+        self.assertEqual(namespace.libicu_build_variant, 'Debug')
+        self.assertEqual(namespace.lldb_build_variant, 'Debug')
+        self.assertEqual(namespace.llvm_build_variant, 'Debug')
+        self.assertEqual(namespace.swift_build_variant, 'Debug')
+        self.assertEqual(namespace.swift_stdlib_build_variant, 'Debug')
 
     def test_implied_defaults_skip_build(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--skip-build'])
+        namespace = self.parse_default_args(['--skip-build'])
 
-            self.assertFalse(namespace.build_benchmarks)
+        self.assertFalse(namespace.build_benchmarks)
 
-            self.assertFalse(namespace.build_linux)
-            self.assertFalse(namespace.build_android)
-            self.assertFalse(namespace.build_freebsd)
-            self.assertFalse(namespace.build_cygwin)
-            self.assertFalse(namespace.build_osx)
-            self.assertFalse(namespace.build_ios)
-            self.assertFalse(namespace.build_tvos)
-            self.assertFalse(namespace.build_watchos)
+        self.assertFalse(namespace.build_linux)
+        self.assertFalse(namespace.build_android)
+        self.assertFalse(namespace.build_freebsd)
+        self.assertFalse(namespace.build_cygwin)
+        self.assertFalse(namespace.build_osx)
+        self.assertFalse(namespace.build_ios)
+        self.assertFalse(namespace.build_tvos)
+        self.assertFalse(namespace.build_watchos)
 
-            self.assertFalse(namespace.build_foundation)
-            self.assertFalse(namespace.build_libdispatch)
-            self.assertFalse(namespace.build_libicu)
-            self.assertFalse(namespace.build_lldb)
-            self.assertFalse(namespace.build_llbuild)
-            self.assertFalse(namespace.build_libcxx)
-            self.assertFalse(namespace.build_playgroundsupport)
-            self.assertFalse(namespace.build_swiftpm)
-            self.assertFalse(namespace.build_xctest)
+        self.assertFalse(namespace.build_foundation)
+        self.assertFalse(namespace.build_libdispatch)
+        self.assertFalse(namespace.build_libicu)
+        self.assertFalse(namespace.build_lldb)
+        self.assertFalse(namespace.build_llbuild)
+        self.assertFalse(namespace.build_libcxx)
+        self.assertFalse(namespace.build_playgroundsupport)
+        self.assertFalse(namespace.build_swiftpm)
+        self.assertFalse(namespace.build_xctest)
 
     def test_implied_defaults_skip_build_ios(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--skip-build-ios'])
-            self.assertFalse(namespace.build_ios_device)
-            self.assertFalse(namespace.build_ios_simulator)
+        namespace = self.parse_default_args(['--skip-build-ios'])
+        self.assertFalse(namespace.build_ios_device)
+        self.assertFalse(namespace.build_ios_simulator)
 
-            # Also implies that the tests should be skipped
-            self.assertFalse(namespace.test_ios_host)
-            self.assertFalse(namespace.test_ios_simulator)
+        # Also implies that the tests should be skipped
+        self.assertFalse(namespace.test_ios_host)
+        self.assertFalse(namespace.test_ios_simulator)
 
     def test_implied_defaults_skip_build_tvos(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--skip-build-tvos'])
-            self.assertFalse(namespace.build_tvos_device)
-            self.assertFalse(namespace.build_tvos_simulator)
+        namespace = self.parse_default_args(['--skip-build-tvos'])
+        self.assertFalse(namespace.build_tvos_device)
+        self.assertFalse(namespace.build_tvos_simulator)
 
-            # Also implies that the tests should be skipped
-            self.assertFalse(namespace.test_tvos_host)
-            self.assertFalse(namespace.test_tvos_simulator)
+        # Also implies that the tests should be skipped
+        self.assertFalse(namespace.test_tvos_host)
+        self.assertFalse(namespace.test_tvos_simulator)
 
     def test_implied_defaults_skip_build_watchos(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--skip-build-watchos'])
-            self.assertFalse(namespace.build_watchos_device)
-            self.assertFalse(namespace.build_watchos_simulator)
+        namespace = self.parse_default_args(['--skip-build-watchos'])
+        self.assertFalse(namespace.build_watchos_device)
+        self.assertFalse(namespace.build_watchos_simulator)
 
-            # Also implies that the tests should be skipped
-            self.assertFalse(namespace.test_watchos_host)
-            self.assertFalse(namespace.test_watchos_simulator)
+        # Also implies that the tests should be skipped
+        self.assertFalse(namespace.test_watchos_host)
+        self.assertFalse(namespace.test_watchos_simulator)
 
     def test_implied_defaults_validation_test(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--validation-test'])
-            self.assertTrue(namespace.test)
+        namespace = self.parse_default_args(['--validation-test'])
+        self.assertTrue(namespace.test)
 
     def test_implied_defaults_test_optimized(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--test-optimized'])
-            self.assertTrue(namespace.test)
+        namespace = self.parse_default_args(['--test-optimized'])
+        self.assertTrue(namespace.test)
 
     def test_implied_defaults_test_optimize_for_size(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--test-optimize-for-size'])
-            self.assertTrue(namespace.test)
+        namespace = self.parse_default_args(['--test-optimize-for-size'])
+        self.assertTrue(namespace.test)
 
     def test_implied_defaults_test_optimize_none_with_implicit_dynamic(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(
-                ['--test-optimize-none-with-implicit-dynamic'])
-            self.assertTrue(namespace.test)
+        namespace = self.parse_default_args(
+            ['--test-optimize-none-with-implicit-dynamic'])
+        self.assertTrue(namespace.test)
 
     def test_implied_defaults_skip_all_tests(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args([
-                '--test', '0',
-                '--validation-test', '0',
-                '--long-test', '0',
-                '--stress-test', '0',
-            ])
+        namespace = self.parse_default_args([
+            '--test', '0',
+            '--validation-test', '0',
+            '--long-test', '0',
+            '--stress-test', '0',
+        ])
 
-            self.assertFalse(namespace.test_linux)
-            self.assertFalse(namespace.test_freebsd)
-            self.assertFalse(namespace.test_cygwin)
-            self.assertFalse(namespace.test_osx)
-            self.assertFalse(namespace.test_ios)
-            self.assertFalse(namespace.test_tvos)
-            self.assertFalse(namespace.test_watchos)
+        self.assertFalse(namespace.test_linux)
+        self.assertFalse(namespace.test_freebsd)
+        self.assertFalse(namespace.test_cygwin)
+        self.assertFalse(namespace.test_osx)
+        self.assertFalse(namespace.test_ios)
+        self.assertFalse(namespace.test_tvos)
+        self.assertFalse(namespace.test_watchos)
 
     def test_implied_defaults_skip_test_ios(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--skip-test-ios'])
-            self.assertFalse(namespace.test_ios_host)
-            self.assertFalse(namespace.test_ios_simulator)
+        namespace = self.parse_default_args(['--skip-test-ios'])
+        self.assertFalse(namespace.test_ios_host)
+        self.assertFalse(namespace.test_ios_simulator)
 
     def test_implied_defaults_skip_test_tvos(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--skip-test-tvos'])
-            self.assertFalse(namespace.test_tvos_host)
-            self.assertFalse(namespace.test_tvos_simulator)
+        namespace = self.parse_default_args(['--skip-test-tvos'])
+        self.assertFalse(namespace.test_tvos_host)
+        self.assertFalse(namespace.test_tvos_simulator)
 
     def test_implied_defaults_skip_test_watchos(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--skip-test-watchos'])
-            self.assertFalse(namespace.test_watchos_host)
-            self.assertFalse(namespace.test_watchos_simulator)
+        namespace = self.parse_default_args(['--skip-test-watchos'])
+        self.assertFalse(namespace.test_watchos_host)
+        self.assertFalse(namespace.test_watchos_simulator)
 
     def test_implied_defaults_skip_build_android(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--android', '0'])
-            self.assertFalse(namespace.test_android_host)
+        namespace = self.parse_default_args(['--android', '0'])
+        self.assertFalse(namespace.test_android_host)
 
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--skip-build-android'])
-            self.assertFalse(namespace.test_android_host)
+        namespace = self.parse_default_args(['--skip-build-android'])
+        self.assertFalse(namespace.test_android_host)
 
     def test_implied_defaults_host_test(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--host-test', '0'])
-            self.assertFalse(namespace.test_ios_host)
-            self.assertFalse(namespace.test_tvos_host)
-            self.assertFalse(namespace.test_watchos_host)
-            self.assertFalse(namespace.test_android_host)
-            self.assertFalse(namespace.build_libparser_only)
+        namespace = self.parse_default_args(['--host-test', '0'])
+        self.assertFalse(namespace.test_ios_host)
+        self.assertFalse(namespace.test_tvos_host)
+        self.assertFalse(namespace.test_watchos_host)
+        self.assertFalse(namespace.test_android_host)
+        self.assertFalse(namespace.build_libparser_only)
 
     def test_build_lib_swiftsyntaxparser_only(self):
-        with self.assertNotRaises(ParserError):
-            namespace = self.parse_default_args(['--build-libparser-only'])
-            self.assertTrue(namespace.build_libparser_only)
-
-
-if __name__ == '__main__':
-    unittest.main()
+        namespace = self.parse_default_args(['--build-libparser-only'])
+        self.assertTrue(namespace.build_libparser_only)
