@@ -171,6 +171,8 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
 
   auto &CI = *CachedCI;
 
+  if (!CI.hasPersistentParserState())
+    return false;
   auto &oldState = CI.getPersistentParserState();
   if (!oldState.hasCodeCompletionDelayedDeclState())
     return false;
@@ -321,7 +323,8 @@ bool CompletionInstance::performNewOperation(
   registerIDERequestFunctions(CI.getASTContext().evaluator);
 
   CI.performParseAndResolveImportsOnly();
-  Callback(CI);
+  if (CI.hasPersistentParserState())
+    Callback(CI);
 
   if (DiagC)
     CI.removeDiagnosticConsumer(DiagC);
