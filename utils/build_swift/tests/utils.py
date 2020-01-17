@@ -85,13 +85,3 @@ class TestCase(unittest.TestCase):
         with open(os.devnull, 'w') as devnull:
             with redirect_stderr(devnull), redirect_stdout(devnull):
                 yield
-
-    @contextmanager
-    def assertNotRaises(self, exception=BaseException):
-        assert issubclass(exception, BaseException)
-
-        try:
-            yield
-        except exception as e:
-            message = '{} raised: {}'.format(exception.__name__, str(e))
-            raise self.failureException(message)
