@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift
 // NOTE(TF-813): verify that enabling forward-mode does not affect reverse-mode.
-// RUN: %target_run_simple_swift_forward_mode_differentiation
+// RUN: %target-run-simple-swift-forward-mode-differentiation
 // RUN: %target-swift-frontend -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 

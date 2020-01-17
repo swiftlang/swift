@@ -1,4 +1,4 @@
-// RUN: %target_run_simple_swift_forward_mode_differentiation
+// RUN: %target-run-simple-swift-forward-mode-differentiation
 // REQUIRES: executable_test
 
 import StdlibUnittest
