@@ -11,7 +11,6 @@
 
 from __future__ import print_function
 
-import argparse
 import json
 import os
 import pipes
@@ -19,13 +18,13 @@ import platform
 import sys
 import time
 
+from build_swift.build_swift import argparse
 from build_swift.build_swift import defaults
 from build_swift.build_swift import driver_arguments
 from build_swift.build_swift import migration
 from build_swift.build_swift import presets
 
 from swift_build_support.swift_build_support import (
-    arguments,
     debug,
     diagnostics,
     products,
@@ -906,11 +905,13 @@ def main_preset():
     parser.add_argument(
         "--show-presets",
         help="list all presets and exit",
-        action=arguments.action.optional_bool)
+        action=argparse.actions.StoreTrueAction,
+        nargs=argparse.Nargs.OPTIONAL)
     parser.add_argument(
         "--distcc",
         help="use distcc",
-        action=arguments.action.optional_bool)
+        action=argparse.actions.StoreTrueAction,
+        nargs=argparse.Nargs.OPTIONAL)
     parser.add_argument(
         "--cmake-c-launcher",
         help="the absolute path to set CMAKE_C_COMPILER_LAUNCHER",
@@ -933,7 +934,8 @@ def main_preset():
         "--expand-invocation", "--expand-build-script-invocation",
         help="Print the expanded build-script invocation generated "
              "by the preset, but do not run the preset",
-        action=arguments.action.optional_bool)
+        action=argparse.actions.StoreTrueAction,
+        nargs=argparse.Nargs.OPTIONAL)
     parser.add_argument(
         "--swiftsyntax-install-prefix",
         help="specify the directory to where SwiftSyntax should be installed")
@@ -971,7 +973,7 @@ def main_preset():
         diagnostics.fatal(e.message)
 
     if args.show_presets:
-        for name in sorted(preset_parser.preset_names(),
+        for name in sorted(preset_parser.preset_names,
                            key=lambda name: name.lower()):
             print(name)
         return 0

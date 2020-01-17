@@ -10,18 +10,14 @@
 import os
 import platform
 import sys
-import unittest
-from contextlib import contextmanager
-from io import StringIO
-
-from swift_build_support.swift_build_support.SwiftBuildSupport import (
-    get_all_preset_names, get_preset_options)
 
 from . import expected_options as eo
-from .utils import BUILD_SCRIPT_IMPL_PATH, UTILS_PATH
+from . import utils
+from .utils import TestCase, UTILS_PATH, redirect_stdout
 from ..build_swift import argparse
 from ..build_swift import driver_arguments
 from ..build_swift import migration
+from ..build_swift.presets import PresetParser
 
 
 PRESETS_FILES = [
@@ -33,46 +29,22 @@ class ParserError(Exception):
     pass
 
 
-@contextmanager
-def redirect_stderr(stream=None):
-    stream = stream or StringIO()
-    old_stderr, sys.stderr = sys.stderr, stream
-    try:
-        yield stream
-    finally:
-        sys.stderr = old_stderr
-
-
-@contextmanager
-def redirect_stdout(stream=None):
-    stream = stream or StringIO()
-    old_stdout, sys.stdout = sys.stdout, stream
-    try:
-        yield stream
-    finally:
-        sys.stdout = old_stdout
-
-
-def _load_all_presets(presets_files):
-    preset_names = get_all_preset_names(presets_files)
+def _load_all_presets(preset_files):
+    parser = PresetParser()
+    parser.read(preset_files)
 
     # Hack to filter out mixins which are not expected to be valid presets
-    preset_names = [n for n in preset_names if not n.startswith('mixin')]
-
-    substitutions = {
-        'install_destdir': '/tmp/install',
-        'install_symroot': '/tmp/symroot',
-        'installable_package': '/tmp/xcode-xyz-root.tar.gz',
-    }
+    preset_names = [
+        name for name in parser.preset_names
+        if not name.startswith('mixin')
+    ]
 
     presets = dict()
     for name in preset_names:
-        try:
-            # Attempt to parse preset
-            presets[name] = get_preset_options(substitutions,
-                                               presets_files, name)
-        except SystemExit:
-            continue
+        preset = parser.get_preset(name, raw=True)
+        args = migration.migrate_swift_sdks(preset.format_args())
+
+        presets[name] = args
 
     return presets
 
@@ -351,15 +323,8 @@ class TestDriverArgumentParserMeta(type):
         return test
 
 
-class TestDriverArgumentParser(unittest.TestCase):
-
-    __metaclass__ = TestDriverArgumentParserMeta
-
-    @contextmanager
-    def _quiet_output(self):
-        with open(os.devnull, 'w') as devnull:
-            with redirect_stderr(devnull), redirect_stdout(devnull):
-                yield
+@utils.add_metaclass(TestDriverArgumentParserMeta)
+class TestDriverArgumentParser(TestCase):
 
     def _parse_args(self, args):
         try:
@@ -372,8 +337,9 @@ class TestDriverArgumentParser(unittest.TestCase):
         assert hasattr(namespace, 'build_script_impl_args')
 
         try:
-            migration.check_impl_args(BUILD_SCRIPT_IMPL_PATH,
-                                      namespace.build_script_impl_args)
+            migration.check_impl_args(
+                utils.BUILD_SCRIPT_IMPL_PATH,
+                namespace.build_script_impl_args)
         except (SystemExit, ValueError) as e:
             raise ParserError('failed to parse impl arguments: ' +
                               str(namespace.build_script_impl_args), e)
@@ -382,7 +348,7 @@ class TestDriverArgumentParser(unittest.TestCase):
         if namespace is None:
             namespace = argparse.Namespace()
 
-        with self._quiet_output():
+        with self.quietOutput():
             try:
                 namespace, unknown_args = (
                     super(self.parser.__class__, self.parser).parse_known_args(
@@ -396,8 +362,8 @@ class TestDriverArgumentParser(unittest.TestCase):
         return namespace, unknown_args
 
     def parse_args(self, args, namespace=None):
-        namespace, unknown_args = self.parse_args_and_unknown_args(args,
-                                                                   namespace)
+        namespace, unknown_args = self.parse_args_and_unknown_args(
+            args, namespace)
 
         if unknown_args:
             raise ParserError('unknown arguments: ' + str(unknown_args))
@@ -405,22 +371,13 @@ class TestDriverArgumentParser(unittest.TestCase):
         return namespace
 
     def parse_default_args(self, args, check_impl_args=False):
-        with self._quiet_output():
+        with self.quietOutput():
             namespace = self._parse_args(args)
 
             if check_impl_args:
                 self._check_impl_args(namespace)
 
             return namespace
-
-    @contextmanager
-    def assertNotRaises(self, exception):
-        assert issubclass(exception, BaseException)
-
-        try:
-            yield
-        except exception as e:
-            self.fail(str(e))
 
     def setUp(self):
         self.parser = driver_arguments.create_argument_parser()

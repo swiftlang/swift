@@ -11,6 +11,7 @@
 Swift preset parsing and handling functionality.
 """
 
+
 from __future__ import absolute_import, unicode_literals
 
 from collections import namedtuple
@@ -337,6 +338,7 @@ class PresetParser(object):
 
         return preset
 
+    @property
     def preset_names(self):
         """Returns a list of all parsed preset names.
         """
