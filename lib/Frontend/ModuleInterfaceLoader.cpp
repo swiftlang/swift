@@ -989,7 +989,6 @@ bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
 std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
   StringRef ModuleDocFilename,
-  StringRef ModuleSourceInfoFilename,
   SmallVectorImpl<char> *ModuleInterfacePath,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -1043,7 +1042,6 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   // Open .swiftsourceinfo file if it's present.
   SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(ModuleID,
                                                                 ModPath,
-                                                       ModuleSourceInfoFilename,
                                                        ModuleSourceInfoBuffer);
   // Delegate back to the serialized module loader to load the module doc.
   llvm::SmallString<256> DocPath{DirPath};

@@ -73,7 +73,6 @@ protected:
   virtual std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
-      StringRef ModuleSourceInfoFilename,
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -82,7 +81,6 @@ protected:
   std::error_code
   openModuleFiles(AccessPathElem ModuleID,
                   StringRef ModulePath, StringRef ModuleDocPath,
-                  StringRef ModuleSourceInfoName,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
@@ -96,7 +94,6 @@ protected:
   openModuleSourceInfoFileIfPresent(
       AccessPathElem ModuleID,
       StringRef ModulePath,
-      StringRef ModuleSourceInfoFileName,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
 
   /// If the module loader subclass knows that all options have been tried for
@@ -180,7 +177,6 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
   std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
-      StringRef ModuleSourceInfoFilename,
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -226,7 +222,6 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
   std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
-      StringRef ModuleSourceInfoFilename,
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,

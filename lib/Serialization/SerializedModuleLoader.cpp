@@ -269,7 +269,6 @@ void
 SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(
     AccessPathElem ModuleID,
     StringRef ModulePath,
-    StringRef ModuleSourceInfoFilename,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
   if (!ModuleSourceInfoBuffer)
     return;
@@ -298,7 +297,6 @@ SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(
 
 std::error_code SerializedModuleLoaderBase::openModuleFiles(
     AccessPathElem ModuleID, StringRef ModulePath, StringRef ModuleDocPath,
-    StringRef ModuleSourceInfoFileName,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
@@ -331,7 +329,6 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
   if (!IgnoreSwiftSourceInfoFile) {
     // Open .swiftsourceinfo file if it's present.
     openModuleSourceInfoFileIfPresent(ModuleID, ModulePath,
-                                      ModuleSourceInfoFileName,
                                       ModuleSourceInfoBuffer);
   }
   auto ModuleDocErr =
@@ -346,7 +343,7 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
 
 std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
     AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
-    StringRef ModuleDocFilename, StringRef ModuleSourceInfoFileName,
+    StringRef ModuleDocFilename,
     SmallVectorImpl<char> *ModuleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -361,7 +358,6 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
   return SerializedModuleLoaderBase::openModuleFiles(ModuleID,
                                                      ModulePath,
                                                      ModuleDocPath,
-                                                     ModuleSourceInfoFileName,
                                                      ModuleBuffer,
                                                      ModuleDocBuffer,
                                                      ModuleSourceInfoBuffer);
@@ -450,7 +446,6 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     for (const auto &targetFileNames : targetFileNamePairs) {
       auto result = findModuleFilesInDirectory(moduleID, currPath,
                         targetFileNames.module, targetFileNames.moduleDoc,
-                        targetFileNames.moduleSourceInfo,
                         moduleInterfacePath,
                         moduleBuffer, moduleDocBuffer,
                         moduleSourceInfoBuffer);
@@ -505,7 +500,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
           auto result = findModuleFilesInDirectory(
               moduleID, path, fileNames.module.str(), fileNames.moduleDoc.str(),
-              fileNames.moduleSourceInfo.str(), moduleInterfacePath,
+              moduleInterfacePath,
               moduleBuffer, moduleDocBuffer, moduleSourceInfoBuffer);
           if (!result)
             return true;
@@ -957,7 +952,7 @@ void SerializedModuleLoaderBase::loadObjCMethods(
 
 std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
     AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
-    StringRef ModuleDocFilename, StringRef ModuleSourceInfoFilename,
+    StringRef ModuleDocFilename,
     SmallVectorImpl<char> *ModuleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
