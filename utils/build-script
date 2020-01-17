@@ -21,14 +21,13 @@ import time
 
 from build_swift.build_swift import defaults
 from build_swift.build_swift import driver_arguments
+from build_swift.build_swift import migration
 from build_swift.build_swift import presets
-from build_swift.build_swift.migration import migrate_swift_sdks
 
 from swift_build_support.swift_build_support import (
     arguments,
     debug,
     diagnostics,
-    migration,
     products,
     shell,
     tar,
@@ -991,7 +990,7 @@ def main_preset():
     except presets.Error as e:
         diagnostics.fatal(e.message)
 
-    preset_args = migrate_swift_sdks(preset.format_args())
+    preset_args = migration.migrate_swift_sdks(preset.format_args())
 
     if args.distcc and (args.cmake_c_launcher or args.cmake_cxx_launcher):
         diagnostics.fatal(
