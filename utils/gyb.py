@@ -7,13 +7,16 @@ from __future__ import print_function
 import os
 import re
 import sys
+import textwrap
+import tokenize
+from bisect import bisect
+
+
 try:
     from cStringIO import StringIO
 except ImportError:
     from io import StringIO
-import textwrap
-import tokenize
-from bisect import bisect
+
 
 try:
     basestring
