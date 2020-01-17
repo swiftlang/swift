@@ -286,23 +286,22 @@ bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
   parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
   return operationName.empty();
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
-Type VectorSpace::getType() const {
+Type TangentSpace::getType() const {
   switch (kind) {
-  case Kind::Vector:
-    return value.vectorType;
+  case Kind::TangentVector:
+    return value.tangentVectorType;
   case Kind::Tuple:
     return value.tupleType;
-  case Kind::Function:
-    return value.functionType;
   }
 }
 
-CanType VectorSpace::getCanonicalType() const {
+CanType TangentSpace::getCanonicalType() const {
   return getType()->getCanonicalType();
 }
 
-NominalTypeDecl *VectorSpace::getNominal() const {
-  return getVector()->getNominalOrBoundGenericNominal();
+NominalTypeDecl *TangentSpace::getNominal() const {
+  assert(isTangentVector());
+  return getTangentVector()->getNominalOrBoundGenericNominal();
 }
-// SWIFT_ENABLE_TENSORFLOW END

@@ -178,10 +178,10 @@ void JVPEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
   auto tangentSpace = getTangentSpace(type);
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case VectorSpace::Kind::Vector:
+  case TangentSpace::Kind::TangentVector:
     emitZeroIntoBuffer(builder, type, bufferAccess, loc);
     return;
-  case VectorSpace::Kind::Tuple: {
+  case TangentSpace::Kind::Tuple: {
     auto tupleType = tangentSpace->getTuple();
     SmallVector<SILValue, 8> zeroElements;
     for (unsigned i : range(tupleType->getNumElements())) {
@@ -190,10 +190,6 @@ void JVPEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
                        eltAddr, loc);
     }
     return;
-  }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting zero initialization");
   }
   }
 }
@@ -285,11 +281,11 @@ SILType JVPEmitter::remapSILTypeInDifferential(SILType ty) {
   return getDifferential().mapTypeIntoContext(ty);
 }
 
-Optional<VectorSpace> JVPEmitter::getTangentSpace(CanType type) {
+Optional<TangentSpace> JVPEmitter::getTangentSpace(CanType type) {
   // Use witness generic signature to remap types.
   if (auto witnessGenSig = witness->getDerivativeGenericSignature())
     type = witnessGenSig->getCanonicalTypeInContext(type);
-  return type->getAutoDiffAssociatedTangentSpace(
+  return type->getAutoDiffTangentSpace(
       LookUpConformanceInModule(getModule().getSwiftModule()));
 }
 
@@ -1045,7 +1041,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
       origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
   dfResults.push_back(
       SILResultInfo(origResult.getInterfaceType()
-                        ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+                        ->getAutoDiffTangentSpace(lookupConformance)
                         ->getCanonicalType(),
                     origResult.getConvention()));
 
@@ -1056,7 +1052,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
         origParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
     dfParams.push_back(SILParameterInfo(
         origParam.getInterfaceType()
-            ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+            ->getAutoDiffTangentSpace(lookupConformance)
             ->getCanonicalType(),
         origParam.getConvention()));
   }

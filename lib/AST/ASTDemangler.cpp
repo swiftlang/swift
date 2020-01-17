@@ -469,7 +469,7 @@ Type ASTBuilder::createImplFunctionType(
     ArrayRef<Demangle::ImplFunctionResult<Type>> results,
     Optional<Demangle::ImplFunctionResult<Type>> errorResult,
     ImplFunctionTypeFlags flags) {
-  GenericSignature genericSig = GenericSignature();
+  GenericSignature genericSig;
 
   SILCoroutineKind funcCoroutineKind = SILCoroutineKind::None;
   ParameterConvention funcCalleeConvention =
@@ -880,12 +880,13 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
     }
   }
 
-  return evaluateOrDefault(
-      Ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        nominalDecl->getGenericSignature().getPointer(), { },
-        std::move(requirements)},
-      GenericSignature())->getCanonicalSignature();
+  return evaluateOrDefault(Ctx.evaluator,
+                           AbstractGenericSignatureRequest{
+                               nominalDecl->getGenericSignature().getPointer(),
+                               {},
+                               std::move(requirements)},
+                           GenericSignature())
+      .getCanonicalSignature();
 }
 
 DeclContext *
@@ -995,8 +996,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
         continue;
       }
 
-      if (ext->getGenericSignature()->getCanonicalSignature()
-          == genericSig) {
+      if (ext->getGenericSignature().getCanonicalSignature() == genericSig) {
         return ext;
       }
     }

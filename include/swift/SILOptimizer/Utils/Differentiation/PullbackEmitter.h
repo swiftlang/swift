@@ -216,7 +216,7 @@ private:
   /// Remap any archetypes into the current function's context.
   SILType remapType(SILType ty);
 
-  Optional<VectorSpace> getTangentSpace(CanType type);
+  Optional<TangentSpace> getTangentSpace(CanType type);
 
   /// Assuming the given type conforms to `Differentiable` after remapping,
   /// returns the associated tangent space type.

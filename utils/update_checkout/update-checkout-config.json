@@ -234,7 +234,7 @@
             "repos": {
                 "llvm-project": "swift/swift-5.1-branch",
                 "swift": "swift-5.1-branch",
-                "cmark": "master",
+                "cmark": "swift-5.1-branch",
                 "llbuild": "swift-5.1-branch",
                 "swiftpm": "swift-5.1-branch",
                 "swift-syntax": "swift-5.1-branch",
@@ -275,31 +275,57 @@
                 "swift-format": "master"
             }
         },
-        "tensorflow": {
-            "aliases": ["tensorflow"],
+
+       "master-rebranch": {
+            "aliases": ["master-rebranch", "swift/master-rebranch"],
             "repos": {
-                "llvm-project": "f7d8385e28843e66f88a2b375b98c553967b318b",
-                "swift": "tensorflow",
-                "cmark": "swift-DEVELOPMENT-SNAPSHOT-2020-01-06-a",
-                "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2020-01-06-a",
-                "swift-tools-support-core": "0.0.1",
-                "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-01-06-a",
-                "swift-syntax": "1e524b3edc47e8ff66890d914b8bcd024e061631",
-                "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2020-01-06-a",
-                "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2020-01-06-a",
-                "swift-corelibs-foundation": "swift-DEVELOPMENT-SNAPSHOT-2020-01-06-a",
-                "swift-corelibs-libdispatch": "swift-DEVELOPMENT-SNAPSHOT-2020-01-06-a",
-                "swift-integration-tests": "swift-DEVELOPMENT-SNAPSHOT-2020-01-06-a",
-                "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2020-01-06-a",
+                "llvm-project": "swift/master-rebranch",
+                "swift": "master-rebranch",
+                "cmark": "master",
+                "llbuild": "master",
+                "swift-tools-support-core": "master",
+                "swiftpm": "master",
+                "swift-syntax": "master",
+                "swift-stress-tester": "master",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2020-01-06-a",
-                "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-01-06-a",
+                "cmake": "v3.15.1",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
+            }
+       },
+
+       "tensorflow": {
+            "aliases": ["tensorflow"],
+            "repos": {
+                "llvm-project": "64672a03c74f91c529061c2458e52a82f36b4f8e",
+                "swift": "tensorflow",
+                "cmark": "swift-DEVELOPMENT-SNAPSHOT-2020-01-13-a",
+                "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2020-01-13-a",
+                "swift-tools-support-core": "0.0.1",
+                "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-01-13-a",
+                "swift-syntax": "1e524b3edc47e8ff66890d914b8bcd024e061631",
+                "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2020-01-13-a",
+                "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2020-01-13-a",
+                "swift-corelibs-foundation": "swift-DEVELOPMENT-SNAPSHOT-2020-01-13-a",
+                "swift-corelibs-libdispatch": "swift-DEVELOPMENT-SNAPSHOT-2020-01-13-a",
+                "swift-integration-tests": "swift-DEVELOPMENT-SNAPSHOT-2020-01-13-a",
+                "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2020-01-13-a",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2020-01-13-a",
+                "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-01-13-a",
                 "swift-format": "master",
                 "tensorflow": "v2.1.0-rc1",
                 "tensorflow-swift-apis": "190cf8765b758fdcc74305e7b22aeb083c1cb9fb",
                 "tensorflow-swift-quote": "34d4112c294e9eccfb575dd8f39e6e3b0b6bc008"
-            }
+	     }
         }
     }
 }

@@ -7321,7 +7321,7 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
     }
 
     // Canonicalize the signature to check that it is canonical.
-    (void)newSig->getCanonicalSignature();
+    (void)newSig.getCanonicalSignature();
   }
 }
 
@@ -7343,7 +7343,7 @@ void GenericSignatureBuilder::verifyGenericSignaturesInModule(
   for (auto genericSig : allGenericSignatures) {
     // Check whether this is the first time we've checked this (canonical)
     // signature.
-    auto canGenericSig = genericSig->getCanonicalSignature();
+    auto canGenericSig = genericSig.getCanonicalSignature();
     if (!knownGenericSignatures.insert(canGenericSig).second) continue;
 
     verifyGenericSignature(context, canGenericSig);
@@ -7412,7 +7412,7 @@ AbstractGenericSignatureRequest::evaluate(
   // generic signature builder.
   if (!isCanonicalRequest(baseSignature, addedParameters, addedRequirements)) {
     // Canonicalize the inputs so we can form the canonical request.
-    GenericSignature canBaseSignature = GenericSignature();
+    GenericSignature canBaseSignature;
     if (baseSignature)
       canBaseSignature = baseSignature->getCanonicalSignature();
 

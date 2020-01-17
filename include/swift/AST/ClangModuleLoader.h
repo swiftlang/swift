@@ -21,6 +21,7 @@ class CompilerInstance;
 class Preprocessor;
 class Sema;
 class TargetInfo;
+class Type;
 } // namespace clang
 
 namespace swift {
@@ -100,6 +101,16 @@ public:
   lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
                       StringRef relatedEntityKind,
                       llvm::function_ref<void(TypeDecl *)> receiver) = 0;
+
+  /// Try to parse the string as a Clang function type.
+  ///
+  /// Returns null if there was a parsing failure.
+  virtual const clang::Type *parseClangFunctionType(StringRef type,
+                                                    SourceLoc loc) const = 0;
+
+  /// Print the Clang type.
+  virtual void printClangType(const clang::Type *type,
+                              llvm::raw_ostream &os) const = 0;
 };
 
 } // namespace swift

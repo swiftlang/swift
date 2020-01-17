@@ -5248,7 +5248,7 @@ void SILProperty::verify(const SILModule &M) const {
     hasIndices = subscript->getIndices()->size() != 0;
   }
 
-  auto canSig = sig ? sig->getCanonicalSignature() : nullptr;
+  auto canSig = sig.getCanonicalSignature();
 
   auto require = [&](bool reqt, StringRef message) {
       if (!reqt) {

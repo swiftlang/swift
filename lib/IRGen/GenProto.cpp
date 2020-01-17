@@ -2987,7 +2987,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   if (!ncGenerics || ncGenerics->areAllParamsConcrete()) return;
 
   // Construct a representative function type.
-  auto generics = ncGenerics->getCanonicalSignature();
+  auto generics = ncGenerics.getCanonicalSignature();
   auto fnType = SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
                                 SILCoroutineKind::None,
                                 /*callee*/ ParameterConvention::Direct_Unowned,
@@ -3031,7 +3031,7 @@ void GenericTypeRequirements::emitInitOfBuffer(IRGenFunction &IGF,
   if (Requirements.empty()) return;
 
   auto generics =
-    TheDecl->getGenericSignatureOfContext()->getCanonicalSignature();
+      TheDecl->getGenericSignatureOfContext().getCanonicalSignature();
   auto &module = *TheDecl->getParentModule();
   emitInitOfGenericRequirementsBuffer(IGF, Requirements, buffer,
                                       [&](GenericRequirement requirement) {

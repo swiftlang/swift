@@ -340,7 +340,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     SmallVector<SILParameterInfo, 8> differentialParams;
     for (auto &param : diffParams) {
       auto paramTan =
-          param.getInterfaceType()->getAutoDiffAssociatedTangentSpace(
+          param.getInterfaceType()->getAutoDiffTangentSpace(
               lookupConformance);
       assert(paramTan && "Parameter type does not have a tangent space?");
       differentialParams.push_back(
@@ -349,7 +349,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     SmallVector<SILResultInfo, 8> differentialResults;
     auto &result = getResults()[resultIndex];
     auto resultTan =
-        result.getInterfaceType()->getAutoDiffAssociatedTangentSpace(
+        result.getInterfaceType()->getAutoDiffTangentSpace(
             lookupConformance);
     assert(resultTan && "Result type does not have a tangent space?");
     differentialResults.push_back(
@@ -365,7 +365,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     SmallVector<SILParameterInfo, 8> pullbackParams;
     auto &origRes = getResults()[resultIndex];
     auto resultTan =
-        origRes.getInterfaceType()->getAutoDiffAssociatedTangentSpace(
+        origRes.getInterfaceType()->getAutoDiffTangentSpace(
             lookupConformance);
     assert(resultTan && "Result type does not have a tangent space?");
     pullbackParams.push_back(
@@ -374,7 +374,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     SmallVector<SILResultInfo, 8> pullbackResults;
     for (auto &param : diffParams) {
       auto paramTan =
-          param.getInterfaceType()->getAutoDiffAssociatedTangentSpace(
+          param.getInterfaceType()->getAutoDiffTangentSpace(
               lookupConformance);
       assert(paramTan && "Parameter type does not have a tangent space?");
       pullbackResults.push_back(getTangentResultInfoForOriginalParameter(
@@ -1631,7 +1631,7 @@ static CanSILFunctionType getSILFunctionType(
     if (!subst.substGenericParams.empty()) {
       genericSig = GenericSignature::get(subst.substGenericParams,
                                          subst.substRequirements)
-        ->getCanonicalSignature();
+                       .getCanonicalSignature();
       substitutions = SubstitutionMap::get(genericSig,
                                            subst.substReplacements,
                                            ArrayRef<ProtocolConformanceRef>());
@@ -2889,64 +2889,77 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
 
   assert(base.requiresNewVTableEntry() && "base must not be an override");
 
+  // Figure out the generic signature for the class method call. This is the
+  // signature of the derived class, with requirements transplanted from
+  // the base method. The derived method is allowed to have fewer
+  // requirements, in which case the thunk will translate the calling
+  // convention appropriately before calling the derived method.
+  bool hasGenericRequirementDifference = false;
+
+  auto derivedSig = derived.getDecl()->getAsGenericContext()
+                                     ->getGenericSignature();
+  auto genericSig = Context.getOverrideGenericSignature(base.getDecl(),
+                                                        derived.getDecl());
+  if (genericSig) {
+    hasGenericRequirementDifference =
+      !genericSig->requirementsNotSatisfiedBy(derivedSig).empty();
+  }
+
   auto baseInfo = getConstantInfo(context, base);
   auto derivedInfo = getConstantInfo(context, derived);
 
-  // If the derived method is ABI-compatible with the base method, give the
-  // vtable thunk the same signature as the derived method.
-  auto basePattern = AbstractionPattern(baseInfo.LoweredType);
-
-  auto baseInterfaceTy = baseInfo.FormalType;
-  auto derivedInterfaceTy = derivedInfo.FormalType;
-
-  auto params = derivedInterfaceTy.getParams();
+  auto params = derivedInfo.FormalType.getParams();
   assert(params.size() == 1);
   auto selfInterfaceTy = params[0].getPlainType()->getMetatypeInstanceType();
 
   auto overrideInterfaceTy =
+    cast<AnyFunctionType>(
       selfInterfaceTy->adjustSuperclassMemberDeclType(
-          base.getDecl(), derived.getDecl(), baseInterfaceTy);
+        base.getDecl(), derived.getDecl(), baseInfo.FormalType)
+          ->getCanonicalType());
 
-  // Copy generic signature from derived to the override type, to handle
-  // the case where the base member is not generic (because the base class
-  // is concrete) but the derived member is generic (because the derived
-  // class is generic).
-  if (auto derivedInterfaceFnTy = derivedInterfaceTy->getAs<GenericFunctionType>()) {
-    auto overrideInterfaceFnTy = overrideInterfaceTy->castTo<FunctionType>();
-    overrideInterfaceTy =
-        GenericFunctionType::get(derivedInterfaceFnTy->getGenericSignature(),
-                                 overrideInterfaceFnTy->getParams(),
-                                 overrideInterfaceFnTy->getResult(),
-                                 overrideInterfaceFnTy->getExtInfo());
-  }
+  // Build the formal AST function type for the class method call.
+  auto basePattern = AbstractionPattern(baseInfo.LoweredType);
 
-  // Lower the formal AST type.
-  auto bridgedTypes = getLoweredFormalTypes(derived,
-      cast<AnyFunctionType>(overrideInterfaceTy->getCanonicalType()));
-  auto overrideLoweredInterfaceTy = bridgedTypes.Uncurried;
+  if (!hasGenericRequirementDifference &&
+      !checkASTTypeForABIDifferences(derivedInfo.FormalType,
+                                     overrideInterfaceTy)) {
 
-  if (!checkASTTypeForABIDifferences(derivedInfo.LoweredType,
-                                     overrideLoweredInterfaceTy)) {
+    // The derived method is ABI-compatible with the base method. Let's
+    // just use the derived method's formal type.
     basePattern = AbstractionPattern(
       copyOptionalityFromDerivedToBase(
         *this,
         derivedInfo.LoweredType,
         baseInfo.LoweredType));
-    overrideLoweredInterfaceTy = derivedInfo.LoweredType;
+    overrideInterfaceTy = derivedInfo.FormalType;
   }
 
-  // Build the SILFunctionType for the vtable thunk.
+  if (genericSig && !genericSig->areAllParamsConcrete()) {
+    overrideInterfaceTy =
+      cast<AnyFunctionType>(
+        GenericFunctionType::get(genericSig,
+                                 overrideInterfaceTy->getParams(),
+                                 overrideInterfaceTy->getResult(),
+                                 overrideInterfaceTy->getExtInfo())
+          ->getCanonicalType());
+  }
+
+  // Build the lowered AST function type for the class method call.
+  auto bridgedTypes = getLoweredFormalTypes(derived, overrideInterfaceTy);
+
+  // Build the SILFunctionType for the class method call.
   CanSILFunctionType fnTy = getNativeSILFunctionType(
-      *this, context, basePattern, overrideLoweredInterfaceTy, base, derived,
+      *this, context, basePattern, bridgedTypes.Uncurried, base, derived,
       /*reqt subs*/ None, ProtocolConformanceRef());
 
   // Build the SILConstantInfo and cache it.
   auto resultBuf = Context.Allocate(sizeof(SILConstantInfo),
                                     alignof(SILConstantInfo));
   auto result = ::new (resultBuf) SILConstantInfo{
-    derivedInterfaceTy,
-    bridgedTypes.Pattern,
-    overrideLoweredInterfaceTy,
+    overrideInterfaceTy,
+    basePattern,
+    bridgedTypes.Uncurried,
     fnTy};
   
   auto inserted = ConstantOverrideTypes.insert({{derived, base}, result});
@@ -3194,7 +3207,7 @@ SILType SILType::subst(TypeConverter &tc, SubstitutionMap subs) const {
   auto sig = subs.getGenericSignature();
   return subst(tc, QuerySubstitutionMap{subs},
                LookUpConformanceInSubstitutionMap(subs),
-               sig ? sig->getCanonicalSignature() : nullptr);
+               sig.getCanonicalSignature());
 }
 SILType SILType::subst(SILModule &M, SubstitutionMap subs) const{
   return subst(M.Types, subs);

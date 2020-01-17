@@ -3036,7 +3036,7 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
       // FIXME: If we already looked at this for this generation,
       // skip.
 
-      for (auto entry : table.lookupGlobalsAsMembers(effectiveClangContext)) {
+      for (auto entry : table.allGlobalsAsMembersInContext(effectiveClangContext)) {
         // If the entry is not visible, skip it.
         if (!isVisibleClangEntry(clangCtx, entry)) continue;
 
@@ -3299,6 +3299,29 @@ void ClangImporter::verifyAllModules() {
 
   Impl.VerifiedDeclsCounter = verifiedCounter;
 #endif
+}
+
+const clang::Type *
+ClangImporter::parseClangFunctionType(StringRef typeStr,
+                                      SourceLoc loc) const {
+  auto &sema = Impl.getClangSema();
+  StringRef filename = Impl.SwiftContext.SourceMgr.getDisplayNameForLoc(loc);
+  // TODO: Obtain a clang::SourceLocation from the swift::SourceLoc we have
+  auto parsedType = sema.ParseTypeFromStringCallback(typeStr, filename, {});
+  if (!parsedType.isUsable())
+    return nullptr;
+  clang::QualType resultType = clang::Sema::GetTypeFromParser(parsedType.get());
+  auto *typePtr = resultType.getTypePtrOrNull();
+  if (typePtr && (typePtr->isFunctionPointerType()
+                  || typePtr->isBlockPointerType()))
+      return typePtr;
+  return nullptr;
+}
+
+void ClangImporter::printClangType(const clang::Type *type,
+                                   llvm::raw_ostream &os) const {
+  auto policy = clang::PrintingPolicy(getClangASTContext().getLangOpts());
+  clang::QualType(type, 0).print(os, policy);
 }
 
 //===----------------------------------------------------------------------===//
@@ -3789,17 +3812,6 @@ ClangImporter::Implementation::loadNamedMembers(
       return None;
   }
 
-  // Also bail out if there are any global-as-member mappings for this context;
-  // we can support some of them lazily but the full set of idioms seems
-  // prohibitively complex (also they're not stored in by-name lookup, for
-  // reasons unclear).
-  if (isa<ExtensionDecl>(D) && !checkedGlobalsAsMembers.insert(IDC).second) {
-    if (forEachLookupTable([&](SwiftLookupTable &table) -> bool {
-        return (!table.lookupGlobalsAsMembers(effectiveClangContext).empty());
-      }))
-      return None;
-  }
-
   // There are 3 cases:
   //
   //  - The decl is from a bridging header, CMO is Some(nullptr)
@@ -3835,6 +3847,27 @@ ClangImporter::Implementation::loadNamedMembers(
     if (!isVisibleClangEntry(clangCtx, member)) continue;
 
     // Skip Decls from different clang::DeclContexts
+    if (member->getDeclContext() != CDC) continue;
+
+    SmallVector<Decl*, 4> tmp;
+    insertMembersAndAlternates(member, tmp);
+    for (auto *TD : tmp) {
+      if (auto *V = dyn_cast<ValueDecl>(TD)) {
+        // Skip ValueDecls if they import under different names.
+        if (V->getBaseName() == N) {
+          Members.push_back(V);
+        }
+      }
+    }
+  }
+
+  for (auto entry : table->lookupGlobalsAsMembers(SerializedSwiftName(N),
+                                                  effectiveClangContext)) {
+    if (!entry.is<clang::NamedDecl *>()) continue;
+    auto member = entry.get<clang::NamedDecl *>();
+    if (!isVisibleClangEntry(clangCtx, member)) continue;
+
+     // Skip Decls from different clang::DeclContexts
     if (member->getDeclContext() != CDC) continue;
 
     SmallVector<Decl*, 4> tmp;

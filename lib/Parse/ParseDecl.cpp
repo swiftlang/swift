@@ -177,7 +177,7 @@ namespace {
       DebuggerClient *debug_client = getDebuggerClient();
       assert (debug_client);
       debug_client->didGlobalize(D);
-      SF->Decls.push_back(D);
+      SF->addTopLevelDecl(D);
       P.markWasHandled(D);
     }
   };
@@ -255,7 +255,7 @@ void Parser::parseTopLevel() {
   for (auto Item : Items) {
     if (auto *D = Item.dyn_cast<Decl*>()) {
       assert(!isa<AccessorDecl>(D) && "accessors should not be added here");
-      SF.Decls.push_back(D);
+      SF.addTopLevelDecl(D);
     }
   }
 
@@ -992,7 +992,8 @@ bool Parser::parseDifferentiableAttributeArguments(
         .fixItReplace(withRespectToRange, "wrt:");
     return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
-  // Parse differentiability parameters' clause.
+
+  // Parse the optional 'wrt' differentiability parameters clause.
   if (isIdentifier(Tok, "wrt")) {
     if (parseDifferentiabilityParametersClause(parameters, AttrName))
       return true;
@@ -1023,7 +1024,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     // TODO(TF-1001): Remove deprecated `jvp:` and `vjp:` arguments.
     if (result.Loc.isValid()) {
       diagnose(result.Loc.getStartLoc(),
-               diag::differentiable_attr_jvp_vjp_deprecated_warning)
+               diag::attr_differentiable_jvp_vjp_deprecated_warning)
           .highlight(result.Loc.getSourceRange());
     }
     // If no trailing comma or 'where' clause, terminate parsing arguments.
@@ -2732,7 +2733,8 @@ static bool parseDifferentiableAttributeArgument(Parser &P,
     if (P.Tok.is(tok::l_paren)) {
       backtrack.cancelBacktrack();
       if (emitDiagnostics)
-        P.diagnose(P.Tok, diag::differentiable_attribute_expected_rparen);
+        P.diagnose(P.Tok, diag::attr_expected_rparen, "@differentiable",
+                   /*DeclModifier*/ false);
       return true;
     }
     return false;
@@ -2748,7 +2750,7 @@ static bool parseDifferentiableAttributeArgument(Parser &P,
 
   if (argument.getText() != "linear") {
     if (emitDiagnostics)
-      P.diagnose(argument, diag::unexpected_argument_differentiable,
+      P.diagnose(argument, diag::attr_differentiable_unexpected_argument,
                  argument.getText());
     return true;
   }
@@ -3581,13 +3583,17 @@ void Parser::setLocalDiscriminatorToParamList(ParameterList *PL) {
   }
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-static void setOriginalFunctionInDifferentiableAttributes(
-    DeclAttributes Attributes, Decl *D) {
-  for (auto *attr : Attributes.getAttributes<DifferentiableAttr>())
+/// Set the original declaration in `@differentiable` attributes.
+///
+/// Necessary because `Parser::parseNewDeclAttribute` (which calls
+/// `Parser::parseDifferentiableAttribute`) does not have access to the
+/// parent declaration of parsed attributes.
+static void
+setOriginalDeclarationForDifferentiableAttributes(DeclAttributes attrs,
+                                                  Decl *D) {
+  for (auto *attr : attrs.getAttributes<DifferentiableAttr>())
     const_cast<DifferentiableAttr *>(attr)->setOriginalDeclaration(D);
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 /// Parse a single syntactic declaration and return a list of decl
 /// ASTs.  This can return multiple results for var decls that bind to multiple
@@ -3988,6 +3994,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
   if (DeclResult.isNonNull()) {
     Decl *D = DeclResult.get();
+
     if (!declWasHandledAlready(D)) {
       Handler(D);
       // SWIFT_ENABLE_TENSORFLOW
@@ -4031,10 +4038,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
       }
       // SWIFT_ENABLE_TENSORFLOW END
     }
-    // SWIFT_ENABLE_TENSORFLOW
-    // Set original declaration in `@differentiable` attributes.
-    setOriginalFunctionInDifferentiableAttributes(D->getAttrs(), D);
-    // SWIFT_ENABLE_TENSORFLOW END
+
+    setOriginalDeclarationForDifferentiableAttributes(D->getAttrs(), D);
   }
 
   if (!DeclResult.isParseError()) {
@@ -4602,8 +4607,6 @@ bool Parser::delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
     RBLoc = Tok.getLoc();
     error = true;
   }
-
-  State->delayDeclList(IDC);
   return error;
 }
 
@@ -5744,12 +5747,10 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
 
   accessors.record(*this, PrimaryVar, Invalid);
 
-  // SWIFT_ENABLE_TENSORFLOW
   // Set original declaration in `@differentiable` attributes.
   for (auto *accessor : accessors.Accessors)
-    setOriginalFunctionInDifferentiableAttributes(accessor->getAttrs(),
-                                                  accessor);
-  // SWIFT_ENABLE_TENSORFLOW END
+    setOriginalDeclarationForDifferentiableAttributes(accessor->getAttrs(),
+                                                      accessor);
 
   return makeParserResult(PrimaryVar);
 }
@@ -6005,11 +6006,12 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->getAttrs() = Attributes;
-      // SWIFT_ENABLE_TENSORFLOW
-      // Set original declaration in `@differentiable` attributes.
-      setOriginalFunctionInDifferentiableAttributes(Attributes, VD);
-      // SWIFT_ENABLE_TENSORFLOW END
+
       setLocalDiscriminator(VD);
+
+      // Set original declaration in `@differentiable` attributes.
+      setOriginalDeclarationForDifferentiableAttributes(Attributes, VD);
+
       Decls.push_back(VD);
       if (hasOpaqueReturnTy && sf && !InInactiveClauseEnvironment) {
         sf->addUnvalidatedDeclWithOpaqueResultType(VD);
@@ -7257,12 +7259,10 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 
   accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()));
 
-  // SWIFT_ENABLE_TENSORFLOW
   // Set original declaration in `@differentiable` attributes.
   for (auto *accessor : accessors.Accessors)
-    setOriginalFunctionInDifferentiableAttributes(accessor->getAttrs(),
-                                                  accessor);
-  // SWIFT_ENABLE_TENSORFLOW END
+    setOriginalDeclarationForDifferentiableAttributes(accessor->getAttrs(),
+                                                      accessor);
 
   // No need to setLocalDiscriminator because subscripts cannot
   // validly appear outside of type decls.

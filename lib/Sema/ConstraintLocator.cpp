@@ -61,7 +61,8 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case ConditionalRequirement:
     case TypeParameterRequirement:
     case ContextualType:
-    case SynthesizedArgument: {
+    case SynthesizedArgument:
+    case TernaryBranch: {
       auto numValues = numNumericValuesInPathElement(elt.getKind());
       for (unsigned i = 0; i < numValues; ++i)
         id.AddInteger(elt.getValue(i));
@@ -69,8 +70,8 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     }
 #define SIMPLE_LOCATOR_PATH_ELT(Name) case Name :
 #include "ConstraintLocatorPathElts.def"
-      // Nothing to do for simple locator elements.
-      break;
+    // Nothing to do for simple locator elements.
+    break;
     }
   }
 }
@@ -115,6 +116,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::Condition:
   case ConstraintLocator::DynamicCallable:
   case ConstraintLocator::ImplicitCallAsFunction:
+  case ConstraintLocator::TernaryBranch:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -462,6 +464,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
 
     case ImplicitCallAsFunction:
       out << "implicit reference to callAsFunction";
+      break;
+
+    case TernaryBranch:
+      auto branchElt = elt.castTo<LocatorPathElt::TernaryBranch>();
+      out << (branchElt.forThen() ? "'then'" : "'else'")
+          << " branch of a ternary operator";
       break;
     }
   }

@@ -168,8 +168,8 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
 
   if (sig && declGenericCtx &&
-      declGenericCtx->getGenericSignature()->getCanonicalSignature() !=
-          sig->getCanonicalSignature()) {
+      declGenericCtx->getGenericSignature().getCanonicalSignature() !=
+          sig.getCanonicalSignature()) {
     return false;
   }
 

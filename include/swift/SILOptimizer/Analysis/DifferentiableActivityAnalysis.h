@@ -144,7 +144,7 @@ private:
     // Look up conformance in the current module.
     auto lookupConformance =
         LookUpConformanceInModule(getFunction().getModule().getSwiftModule());
-    return type->getAutoDiffAssociatedTangentSpace(lookupConformance)
+    return type->getAutoDiffTangentSpace(lookupConformance)
         .hasValue();
   }
 

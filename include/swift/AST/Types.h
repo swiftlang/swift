@@ -59,6 +59,7 @@ class AssociatedTypeDecl;
 class ASTContext;
 enum BufferPointerTypeKind : unsigned;
 class ClassDecl;
+class ClangModuleLoader;
 class DependentMemberType;
 class GenericTypeParamDecl;
 class GenericTypeParamType;
@@ -1167,18 +1168,10 @@ public:
   /// object type.
   TypeTraitResult canBeClass();
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Return the associated tangent type. Return the null type if there is no
-  /// associated tangent type.
-  ///
-  /// If the type conforms to `Differentiable`, then the associated
-  /// tangent type is the associated `TangentVector` from the `Differentiable`
-  /// requirement. If the type is a tuple, then the associated tangent type is
-  /// the elementwise tangent type of its elements. If the type is a builtin
-  /// float, then the associated tangent type is itself. Otherwise, there is no
-  /// associated type.
-  Optional<VectorSpace>
-  getAutoDiffAssociatedTangentSpace(LookupConformanceFn lookupConformance);
+  /// Return the tangent space of the given type, if it exists. Otherwise,
+  /// return `None`.
+  Optional<TangentSpace>
+  getAutoDiffTangentSpace(LookupConformanceFn lookupConformance);
 
 private:
   // Make vanilla new/delete illegal for Types.
@@ -2974,6 +2967,11 @@ public:
 
       bool empty() const { return !ClangFunctionType; }
       Uncommon(const clang::Type *type) : ClangFunctionType(type) {}
+
+    public:
+      /// Use the ClangModuleLoader to print the Clang type as a string.
+      void printClangFunctionType(ClangModuleLoader *cml,
+                                  llvm::raw_ostream &os);
     };
 
   private:
@@ -3989,6 +3987,11 @@ public:
 
       bool empty() const { return !ClangFunctionType; }
       Uncommon(const clang::FunctionType *type) : ClangFunctionType(type) {}
+
+    public:
+      /// Analog of AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType.
+      void printClangFunctionType(ClangModuleLoader *cml,
+                                  llvm::raw_ostream &os) const;
     };
 
     Uncommon Other;
@@ -4040,6 +4043,11 @@ public:
     }
     Language getLanguage() const {
       return getSILFunctionLanguage(getRepresentation());
+    }
+
+    /// Return the underlying Uncommon value if it is not the default value.
+    Optional<Uncommon> getUncommonInfo() const {
+      return Other.empty() ? Optional<Uncommon>() : Other;
     }
 
     bool hasSelfParam() const {

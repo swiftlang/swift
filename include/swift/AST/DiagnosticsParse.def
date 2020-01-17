@@ -1588,12 +1588,10 @@ ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
 ERROR(attr_differentiable_expected_label,none,
       "expected either 'wrt:' or a function specifier label, e.g. 'jvp:', "
       "or 'vjp:'", ())
-ERROR(differentiable_attribute_expected_rparen,none,
-      "expected ')' in '@differentiable' attribute", ())
-ERROR(unexpected_argument_differentiable,none,
+ERROR(attr_differentiable_unexpected_argument,none,
       "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
 // TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
-WARNING(differentiable_attr_jvp_vjp_deprecated_warning,none,
+WARNING(attr_differentiable_jvp_vjp_deprecated_warning,none,
         "'jvp:' and 'vjp:' arguments in '@differentiable' attribute are "
         "deprecated; use '@derivative' attribute for derivative registration "
         "instead", ())

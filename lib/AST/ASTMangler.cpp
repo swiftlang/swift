@@ -361,7 +361,7 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   assert(ThunkType->getSubstitutions().empty() && "not implemented");
   GenericSignature GenSig = ThunkType->getSubstGenericSignature();
   if (GenSig)
-    CurGenericSignature = GenSig->getCanonicalSignature();
+    CurGenericSignature = GenSig.getCanonicalSignature();
 
   beginMangling();
   appendType(FromType);
@@ -1274,7 +1274,7 @@ void ASTMangler::bindGenericParameters(CanGenericSignature sig) {
 /// Bind the generic parameters from the given context and its parents.
 void ASTMangler::bindGenericParameters(const DeclContext *DC) {
   if (auto sig = DC->getGenericSignatureOfContext())
-    bindGenericParameters(sig->getCanonicalSignature());
+    bindGenericParameters(sig.getCanonicalSignature());
 }
 
 void ASTMangler::appendFlatGenericArgs(SubstitutionMap subs) {
@@ -2221,7 +2221,7 @@ void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
 
 bool ASTMangler::appendGenericSignature(GenericSignature sig,
                                         GenericSignature contextSig) {
-  auto canSig = sig->getCanonicalSignature();
+  auto canSig = sig.getCanonicalSignature();
   CurGenericSignature = canSig;
 
   unsigned initialParamDepth;
@@ -2231,7 +2231,7 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
   if (contextSig) {
     // If the signature is the same as the context signature, there's nothing
     // to do.
-    if (contextSig->getCanonicalSignature() == canSig) {
+    if (contextSig.getCanonicalSignature() == canSig) {
       return false;
     }
 
@@ -2542,8 +2542,8 @@ CanType ASTMangler::getDeclTypeForMangling(
 
 void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) {
   Mod = decl->getModuleContext();
-  GenericSignature genericSig = GenericSignature();
-  GenericSignature parentGenericSig = GenericSignature();
+  GenericSignature genericSig;
+  GenericSignature parentGenericSig;
   auto type = getDeclTypeForMangling(decl, genericSig, parentGenericSig);
 
   if (AnyFunctionType *FuncTy = type->getAs<AnyFunctionType>()) {
@@ -2659,7 +2659,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
 
 void
 ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
-  GenericSignature contextSig = GenericSignature();
+  GenericSignature contextSig;
   auto topLevelContext =
       conformance->getDeclContext()->getModuleScopeContext();
   Mod = topLevelContext->getParentModule();
@@ -2802,7 +2802,7 @@ void ASTMangler::appendConcreteProtocolConformance(
   auto shouldUseConformanceSig = !CurGenericSignature && conformanceSig;
   llvm::SaveAndRestore<CanGenericSignature> savedSignature(
       CurGenericSignature, shouldUseConformanceSig
-                               ? conformanceSig->getCanonicalSignature()
+                               ? conformanceSig.getCanonicalSignature()
                                : CurGenericSignature);
 
   // Conforming type.
@@ -2845,7 +2845,7 @@ void ASTMangler::appendConcreteProtocolConformance(
         // Append the conformance access path with the signature of the opaque type.
         {
           llvm::SaveAndRestore<CanGenericSignature> savedSignature(
-              CurGenericSignature, opaqueSignature->getCanonicalSignature());
+              CurGenericSignature, opaqueSignature.getCanonicalSignature());
           appendDependentProtocolConformance(conformanceAccessPath);
         }
         appendType(canType);

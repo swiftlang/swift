@@ -437,7 +437,7 @@ struct ASTContext::Implementation {
 
   // SWIFT_ENABLE_TENSORFLOW
   /// A cache of tangent spaces per type.
-  llvm::DenseMap<CanType, Optional<VectorSpace>> VectorSpaces;
+  llvm::DenseMap<CanType, Optional<TangentSpace>> TangentSpaces;
 
   /// For uniquifying `IndexSubset` allocations.
   llvm::FoldingSet<IndexSubset> IndexSubsets;
@@ -557,7 +557,9 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
   : LangOpts(langOpts),
     TypeCheckerOpts(typeckOpts),
     SearchPathOpts(SearchPathOpts), SourceMgr(SourceMgr), Diags(Diags),
-    evaluator(Diags, langOpts.DebugDumpCycles),
+    evaluator(Diags,
+              langOpts.DebugDumpCycles,
+              langOpts.BuildRequestDependencyGraph),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
@@ -1713,7 +1715,7 @@ static AllocationArena getArena(GenericSignature genericSig) {
 void ASTContext::registerGenericSignatureBuilder(
                                        GenericSignature sig,
                                        GenericSignatureBuilder &&builder) {
-  auto canSig = sig->getCanonicalSignature();
+  auto canSig = sig.getCanonicalSignature();
   auto arena = getArena(sig);
   auto &genericSignatureBuilders =
       getImpl().getArena(arena).GenericSignatureBuilders;
@@ -1752,12 +1754,12 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   auto builderSig =
     builder->computeGenericSignature(SourceLoc(),
                                      /*allowConcreteGenericParams=*/true);
-  if (builderSig->getCanonicalSignature() != sig) {
+  if (builderSig.getCanonicalSignature() != sig) {
     llvm::errs() << "ERROR: generic signature builder is not idempotent.\n";
     llvm::errs() << "Original generic signature   : ";
     sig->print(llvm::errs());
     llvm::errs() << "\nReprocessed generic signature: ";
-    auto reprocessedSig = builderSig->getCanonicalSignature();
+    auto reprocessedSig = builderSig.getCanonicalSignature();
 
     reprocessedSig->print(llvm::errs());
     llvm::errs() << "\n";
@@ -3346,6 +3348,11 @@ ArrayRef<Requirement> GenericFunctionType::getRequirements() const {
   return Signature->getRequirements();
 }
 
+void SILFunctionType::ExtInfo::Uncommon::printClangFunctionType(
+    ClangModuleLoader *cml, llvm::raw_ostream &os) const {
+  cml->printClangType(ClangFunctionType, os);
+}
+
 void SILFunctionType::Profile(
     llvm::FoldingSetNodeID &id,
     GenericSignature genericParams,
@@ -3460,9 +3467,9 @@ SILFunctionType::SILFunctionType(
             "types and substitutions");
         
   if (substitutions) {
-    assert(substitutions.getGenericSignature()->getCanonicalSignature()
-             == genericSig->getCanonicalSignature()
-           && "substitutions must match generic signature");
+    assert(substitutions.getGenericSignature().getCanonicalSignature() ==
+               genericSig.getCanonicalSignature() &&
+           "substitutions must match generic signature");
   }
         
   if (genericSig) {
@@ -4624,10 +4631,12 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
                                         const ValueDecl *derived) {
   auto baseGenericCtx = base->getAsGenericContext();
   auto derivedGenericCtx = derived->getAsGenericContext();
-  auto &ctx = base->getASTContext();
 
   if (!baseGenericCtx || !derivedGenericCtx)
     return nullptr;
+
+  if (base == derived)
+    return derivedGenericCtx->getGenericSignature();
 
   auto baseClass = base->getDeclContext()->getSelfClassDecl();
   if (!baseClass)
@@ -4684,7 +4693,7 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     }
 
     return CanGenericTypeParamType::get(
-        gp->getDepth() - baseDepth + derivedDepth, gp->getIndex(), ctx);
+        gp->getDepth() - baseDepth + derivedDepth, gp->getIndex(), *this);
   };
 
   auto lookupConformanceFn =
@@ -4704,7 +4713,7 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   }
 
   auto genericSig = evaluateOrDefault(
-      ctx.evaluator,
+      evaluator,
       AbstractGenericSignatureRequest{
         derivedClass->getGenericSignature().getPointer(),
         std::move(addedGenericParams),

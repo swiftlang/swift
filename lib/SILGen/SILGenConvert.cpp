@@ -140,11 +140,11 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
 -> SourceLocArgs {
   auto &ctx = getASTContext();
   
-  StringRef filename = "";
+  std::string filename = "";
   unsigned line = 0;
   unsigned column = 0;
   if (sourceLoc.isValid()) {
-    filename = ctx.SourceMgr.getDisplayNameForLoc(sourceLoc);
+    filename = getMagicFileString(sourceLoc);
     std::tie(line, column) = ctx.SourceMgr.getLineAndColumn(sourceLoc);
   }
   
@@ -160,7 +160,7 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
   auto i1Ty = SILType::getBuiltinIntegerType(1, ctx);
   
   SourceLocArgs result;
-  SILValue literal = B.createStringLiteral(emitLoc, filename,
+  SILValue literal = B.createStringLiteral(emitLoc, StringRef(filename),
                                            StringLiteralInst::Encoding::UTF8);
   result.filenameStartPointer = ManagedValue::forUnmanaged(literal);
   // File length

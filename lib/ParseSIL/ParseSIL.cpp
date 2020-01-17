@@ -3556,9 +3556,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    CanGenericSignature canSig = CanGenericSignature();
+    CanGenericSignature canSig;
     if (patternEnv && patternEnv->getGenericSignature()) {
-      canSig = patternEnv->getGenericSignature()->getCanonicalSignature();
+      canSig = patternEnv->getGenericSignature().getCanonicalSignature();
     }
     CanType leafType;
     if (!components.empty())
@@ -6096,9 +6096,10 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   patternEnv = handleSILGenericParams(generics, &P.SF);
 
   if (patternEnv) {
-    if (patternEnv->getGenericSignature()->getCanonicalSignature()
-           != VD->getInnermostDeclContext()->getGenericSignatureOfContext()
-                ->getCanonicalSignature()) {
+    if (patternEnv->getGenericSignature().getCanonicalSignature() !=
+        VD->getInnermostDeclContext()
+            ->getGenericSignatureOfContext()
+            .getCanonicalSignature()) {
       P.diagnose(loc, diag::sil_property_generic_signature_mismatch);
       return true;
     }

@@ -1241,7 +1241,7 @@ AnnotatedInsertionPoint
 ASTSourceFileScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   ASTScopeAssert(SF, "Must already have a SourceFile.");
-  ArrayRef<Decl *> decls = SF->Decls;
+  ArrayRef<Decl *> decls = SF->getTopLevelDecls();
   // Assume that decls are only added at the end, in source order
   ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);
   std::vector<ASTNode> newNodes(newDecls.begin(), newDecls.end());
@@ -1933,10 +1933,10 @@ void ASTScopeImpl::beCurrent() {}
 bool ASTScopeImpl::isCurrentIfWasExpanded() const { return true; }
 
 void ASTSourceFileScope::beCurrent() {
-  numberOfDeclsAlreadySeen = SF->Decls.size();
+  numberOfDeclsAlreadySeen = SF->getTopLevelDecls().size();
 }
 bool ASTSourceFileScope::isCurrentIfWasExpanded() const {
-  return SF->Decls.size() == numberOfDeclsAlreadySeen;
+  return SF->getTopLevelDecls().size() == numberOfDeclsAlreadySeen;
 }
 
 void IterableTypeScope::beCurrent() { portion->beCurrent(this); }

@@ -228,7 +228,7 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
                                                SILType type) const {
   assert(!type.hasArchetype());
 
-  auto genericSig = getGenericSignature()->getCanonicalSignature();
+  auto genericSig = getGenericSignature().getCanonicalSignature();
   return type.subst(M,
                     QueryInterfaceTypeSubstitutions(this),
                     LookUpConformanceInSignature(genericSig.getPointer()),

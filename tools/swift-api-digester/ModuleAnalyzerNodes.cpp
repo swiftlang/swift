@@ -1150,7 +1150,7 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical)
   if (auto *GC = D->getAsGenericContext()) {
     if (auto Sig = GC->getGenericSignature()) {
       if (Canonical)
-        Sig->getCanonicalSignature()->print(OS, Opts);
+        Sig.getCanonicalSignature()->print(OS, Opts);
       else
         Sig->print(OS, Opts);
       return Ctx.buffer(OS.str());

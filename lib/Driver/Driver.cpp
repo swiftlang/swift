@@ -98,6 +98,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   .Case("swiftc", DriverKind::Batch)
   .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
   .Case("swift-indent", DriverKind::SwiftIndent)
+  .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
   .Default(None);
   
   if (Kind.hasValue())
@@ -958,7 +959,8 @@ Driver::buildCompilation(const ToolChain &TC,
 
     // relies on the new dependency graph
     const bool EnableFineGrainedDependencies =
-        ArgList->hasArg(options::OPT_enable_fine_grained_dependencies);
+        ArgList->hasFlag(options::OPT_enable_fine_grained_dependencies,
+                         options::OPT_disable_fine_grained_dependencies, false);
 
     const bool VerifyFineGrainedDependencyGraphAfterEveryImport = ArgList->hasArg(
         options::
@@ -3252,6 +3254,7 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::Batch:
   case DriverKind::AutolinkExtract:
   case DriverKind::SwiftIndent:
+  case DriverKind::SymbolGraph:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }
