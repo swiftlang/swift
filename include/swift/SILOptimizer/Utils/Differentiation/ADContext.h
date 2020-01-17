@@ -130,8 +130,9 @@ public:
 
   /// Pops and returns a `differentiable_function` instruction from the
   /// worklist. Returns nullptr if the worklist is empty.
-  DifferentiableFunctionInst* popDifferentiableFunctionInstFromWorklist() {
-    if (differentiableFunctionInsts.empty()) return nullptr;
+  DifferentiableFunctionInst *popDifferentiableFunctionInstFromWorklist() {
+    if (differentiableFunctionInsts.empty())
+      return nullptr;
     return differentiableFunctionInsts.pop_back_val();
   }
 
@@ -206,8 +207,8 @@ public:
   /// TODO(TF-784): The pointer reuse is a real concern and the use of
   /// `CanonicalizeInstruction` may get rid of the need for this workaround.
   DifferentiableFunctionInst *createDifferentiableFunction(
-      SILBuilder &builder, SILLocation loc,
-      IndexSubset *parameterIndices, SILValue original,
+      SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
+      SILValue original,
       Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None);
 
   // Given an `differentiable_function` instruction, finds the corresponding
@@ -216,9 +217,9 @@ public:
   DifferentiableFunctionExpr *
   findDifferentialOperator(DifferentiableFunctionInst *inst);
 
-  template <typename ...T, typename ...U>
+  template <typename... T, typename... U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
-                              U &&...args) const {
+                              U &&... args) const {
     return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
   }
 
@@ -226,33 +227,34 @@ public:
   /// parent function, emits a "not differentiable" error based on the task. If
   /// the task is indirect, emits notes all the way up to the outermost task,
   /// and emits an error at the outer task. Otherwise, emits an error directly.
-  template<typename ...T, typename ...U>
-  InFlightDiagnostic emitNondifferentiabilityError(
-      SILInstruction *inst, DifferentiationInvoker invoker,
-      Diag<T...> diag, U &&...args);
+  template <typename... T, typename... U>
+  InFlightDiagnostic
+  emitNondifferentiabilityError(SILInstruction *inst,
+                                DifferentiationInvoker invoker, Diag<T...> diag,
+                                U &&... args);
 
   /// Given a value and a differentiation task associated with the parent
   /// function, emits a "not differentiable" error based on the task. If the
   /// task is indirect, emits notes all the way up to the outermost task, and
   /// emits an error at the outer task. Otherwise, emits an error directly.
-  template<typename ...T, typename ...U>
-  InFlightDiagnostic emitNondifferentiabilityError(
-      SILValue value, DifferentiationInvoker invoker,
-      Diag<T...> diag, U &&...args);
+  template <typename... T, typename... U>
+  InFlightDiagnostic
+  emitNondifferentiabilityError(SILValue value, DifferentiationInvoker invoker,
+                                Diag<T...> diag, U &&... args);
 
   /// Emit a "not differentiable" error based on the given differentiation task
   /// and diagnostic.
-  template<typename ...T, typename ...U>
-  InFlightDiagnostic emitNondifferentiabilityError(
-      SourceLoc loc, DifferentiationInvoker invoker,
-      Diag<T...> diag, U &&...args);
+  template <typename... T, typename... U>
+  InFlightDiagnostic
+  emitNondifferentiabilityError(SourceLoc loc, DifferentiationInvoker invoker,
+                                Diag<T...> diag, U &&... args);
 };
 
-template<typename ...T, typename ...U>
+template <typename... T, typename... U>
 InFlightDiagnostic
 ADContext::emitNondifferentiabilityError(SILValue value,
                                          DifferentiationInvoker invoker,
-                                         Diag<T...> diag, U &&...args) {
+                                         Diag<T...> diag, U &&... args) {
   LLVM_DEBUG({
     getADDebugStream() << "Diagnosing non-differentiability.\n";
     getADDebugStream() << "For value:\n" << value;
@@ -267,11 +269,11 @@ ADContext::emitNondifferentiabilityError(SILValue value,
                                        std::forward<U>(args)...);
 }
 
-template<typename ...T, typename ...U>
+template <typename... T, typename... U>
 InFlightDiagnostic
 ADContext::emitNondifferentiabilityError(SILInstruction *inst,
                                          DifferentiationInvoker invoker,
-                                         Diag<T...> diag, U &&...args) {
+                                         Diag<T...> diag, U &&... args) {
   LLVM_DEBUG({
     getADDebugStream() << "Diagnosing non-differentiability.\n";
     getADDebugStream() << "For instruction:\n" << *inst;
@@ -287,11 +289,11 @@ ADContext::emitNondifferentiabilityError(SILInstruction *inst,
                                        std::forward<U>(args)...);
 }
 
-template<typename ...T, typename ...U>
+template <typename... T, typename... U>
 InFlightDiagnostic
 ADContext::emitNondifferentiabilityError(SourceLoc loc,
                                          DifferentiationInvoker invoker,
-                                         Diag<T...> diag, U &&...args) {
+                                         Diag<T...> diag, U &&... args) {
   switch (invoker.getKind()) {
   // For `differentiable_function` instructions: if the
   // `differentiable_function` instruction comes from a differential operator,
@@ -339,7 +341,8 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
     std::tie(inst, witness) = invoker.getIndirectDifferentiation();
     auto invokerLookup = invokers.find(witness);
     assert(invokerLookup != invokers.end() && "Expected parent invoker");
-    emitNondifferentiabilityError(inst, invokerLookup->second,
+    emitNondifferentiabilityError(
+        inst, invokerLookup->second,
         diag::autodiff_expression_not_differentiable_note);
     return diagnose(loc, diag::autodiff_when_differentiating_function_call);
   }

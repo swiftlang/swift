@@ -14,10 +14,6 @@
 #
 #===----------------------------------------------------------------------===#
 
-if(NOT SWIFT_ENABLE_TENSORFLOW)
-  return()
-endif()
-
 include("../../../cmake/modules/SwiftList.cmake")
 
 find_package(TensorFlow REQUIRED)

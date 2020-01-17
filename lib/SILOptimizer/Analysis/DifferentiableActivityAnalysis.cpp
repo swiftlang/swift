@@ -449,10 +449,18 @@ void DifferentiableActivityInfo::dump(SILValue value,
   s << '[';
   auto activity = getActivity(value, indices);
   switch (activity.toRaw()) {
-  case 0: s << "NONE"; break;
-  case (unsigned)ActivityFlags::Varied: s << "VARIED"; break;
-  case (unsigned)ActivityFlags::Useful: s << "USEFUL"; break;
-  case (unsigned)ActivityFlags::Active: s << "ACTIVE"; break;
+  case 0:
+    s << "NONE";
+    break;
+  case (unsigned)ActivityFlags::Varied:
+    s << "VARIED";
+    break;
+  case (unsigned)ActivityFlags::Useful:
+    s << "USEFUL";
+    break;
+  case (unsigned)ActivityFlags::Active:
+    s << "ACTIVE";
+    break;
   }
   s << "] " << value;
 }

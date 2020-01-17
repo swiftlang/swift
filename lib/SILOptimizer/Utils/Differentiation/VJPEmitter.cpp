@@ -18,13 +18,13 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/SILOptimizer/Utils/Differentiation/VJPEmitter.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Utils/Differentiation/PullbackEmitter.h"
-#include "swift/SILOptimizer/Utils/Differentiation/VJPEmitter.h"
 #include "swift/SILOptimizer/Utils/Differentiation/Thunk.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 
 namespace swift {
 namespace autodiff {
@@ -675,9 +675,8 @@ void VJPEmitter::visitDifferentiableFunctionInst(
 
 bool VJPEmitter::run() {
   PrettyStackTraceSILFunction trace("generating VJP for", original);
-  LLVM_DEBUG(getADDebugStream()
-             << "Cloning original @" << original->getName()
-             << " to vjp @" << vjp->getName() << '\n');
+  LLVM_DEBUG(getADDebugStream() << "Cloning original @" << original->getName()
+                                << " to vjp @" << vjp->getName() << '\n');
 
   // Create entry BB and arguments.
   auto *entry = vjp->createBasicBlock();
@@ -704,8 +703,9 @@ bool VJPEmitter::run() {
     errorOccurred = true;
     return true;
   }
-  LLVM_DEBUG(getADDebugStream() << "Generated VJP for "
-                                << original->getName() << ":\n" << *vjp);
+  LLVM_DEBUG(getADDebugStream()
+             << "Generated VJP for " << original->getName() << ":\n"
+             << *vjp);
   return errorOccurred;
 }
 

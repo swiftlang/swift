@@ -19,8 +19,8 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_JVPEMITTER_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_JVPEMITTER_H
 
-#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Utils/Differentiation/AdjointValue.h"
 #include "swift/SILOptimizer/Utils/Differentiation/DifferentiationInvoker.h"
@@ -116,13 +116,12 @@ private:
     return witness->getSILAutoDiffIndices();
   }
   SILBuilder &getDifferentialBuilder() { return differentialBuilder; }
-  SILFunction &getDifferential() {
-    return differentialBuilder.getFunction();
-  }
+  SILFunction &getDifferential() { return differentialBuilder.getFunction(); }
   SILArgument *getDifferentialStructArgument(SILBasicBlock *origBB) {
 #ifndef NDEBUG
-    auto *diffStruct = differentialStructArguments[origBB]->getType()
-        .getStructOrBoundGenericStruct();
+    auto *diffStruct = differentialStructArguments[origBB]
+                           ->getType()
+                           .getStructOrBoundGenericStruct();
     assert(diffStruct == differentialInfo.getLinearMapStruct(origBB));
 #endif
     return differentialStructArguments[origBB];
@@ -177,8 +176,7 @@ private:
   // Tangent materialization
   //--------------------------------------------------------------------------//
 
-  void emitZeroIndirect(CanType type, SILValue bufferAccess,
-                        SILLocation loc);
+  void emitZeroIndirect(CanType type, SILValue bufferAccess, SILLocation loc);
 
   SILValue emitZeroDirect(CanType type, SILLocation loc);
 
@@ -355,12 +353,10 @@ public:
   void emitTangentForApplyInst(ApplyInst *ai, SILAutoDiffIndices actualIndices,
                                CanSILFunctionType originalDifferentialType);
 
-
   /// Generate a `return` instruction in the current differential basic block.
   void emitReturnInstForDifferential();
 
 private:
-
   /// Set up the differential function. This includes:
   /// - Creating all differential blocks.
   /// - Creating differential entry block arguments based on the function type.
