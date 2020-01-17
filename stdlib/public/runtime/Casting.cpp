@@ -2262,7 +2262,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
   {
     auto innerFlags = flags - DynamicCastFlags::Unconditional
                             - DynamicCastFlags::DestroyOnFailure;
-    if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,        // XXX succeeds for AnyObject, but not Any
+    if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,
                                       targetType, innerFlags)) {
       // TakeOnSuccess was handled inside tryDynamicCastBoxedSwiftValue().
       return true;

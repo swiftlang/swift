@@ -81,8 +81,9 @@ CastsTests.test("Optional<T>.none can be casted to Optional<U>.none in generic c
 }
 
 // Test for SR-3871: Cannot cast from ObjC existential without going through AnyObject
+#if _runtime(_ObjC)
 protocol P2 {}
-CastsTests.test("SR-3871: ObjC wrapper") {
+CastsTests.test("Cast from ObjC existential to Protocol (SR-3871)") {
   struct S: P2 {}
 
   class ObjCWrapper {
@@ -90,23 +91,32 @@ CastsTests.test("SR-3871: ObjC wrapper") {
     init() {}
   }
   let a = ObjCWrapper().any
+  expectTrue(a is P2)
+  // In SR-3871, the following cast failed (everything else here succeeded)
+  expectNotNil(a as? P2)
+  expectNotNil(a as? S)
   let b = a as AnyObject
-  expectNotNil(a as? P2) // SR-3871: This fails
-  expectNotNil(b as? P2) // SR-3871: This succeeds
+  expectTrue(a is P2)
+  expectNotNil(b as? P2)
+  expectNotNil(b as? S)
 }
+#endif
 
-CastsTests.test("SR-3871: Swift wrapper") {
-  struct S: P2 {}
+protocol P3 {}
+CastsTests.test("Cast from Swift existential to Protocol") {
+  struct S: P3 {}
   class SwiftWrapper {
     let any: Any = S()
     init() {}
   }
   let a = SwiftWrapper().any
-  expectTrue(a is P2)
-  expectNotNil(a as? P2)
+  expectTrue(a is P3)
+  expectNotNil(a as? P3)
+  expectNotNil(a as? S)
   let b = a as AnyObject
-  expectTrue(b is P2)
-  expectNotNil(b as? P2)
+  expectTrue(b is P3)
+  expectNotNil(b as? P3)
+  expectNotNil(b as? S)
 }
 
 
