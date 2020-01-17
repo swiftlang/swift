@@ -20,6 +20,9 @@
 
 namespace swift {
 class ModuleFile;
+namespace file_types {
+  enum ID : uint8_t;
+}
 
 /// Spceifies how to load modules when both a module interface and serialized
 /// AST are present, or whether to disallow one format or the other altogether.
@@ -28,6 +31,23 @@ enum class ModuleLoadingMode {
   PreferSerialized,
   OnlyInterface,
   OnlySerialized
+};
+
+/// Helper type used to pass and compute the sets of related filenames used by
+/// \c SerializedModuleLoader subclasses.
+struct SerializedModuleBaseName {
+  /// The base filename, wtihout any extension.
+  std::string baseName;
+
+  /// Creates a \c SerializedModuleBaseName.
+  SerializedModuleBaseName(std::string baseName) : baseName(baseName) { }
+
+  /// Gets the filename with a particular extension appended to it.
+  std::string getName(file_types::ID fileTy) const;
+
+  /// Gets the filename in a particular directory with a particular extension
+  /// appended to it.
+  std::string getName(StringRef parentDir, file_types::ID fileTy) const;
 };
 
 /// Common functionality shared between \c SerializedModuleLoader,
@@ -71,8 +91,8 @@ protected:
   ///   modules and will defer to the remaining module loaders to look up this
   ///   module.
   virtual std::error_code findModuleFilesInDirectory(
-      AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
-      StringRef ModuleDocFilename,
+      AccessPathElem ModuleID, StringRef DirPath,
+      const SerializedModuleBaseName &BaseName,
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -175,8 +195,8 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
   {}
 
   std::error_code findModuleFilesInDirectory(
-      AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
-      StringRef ModuleDocFilename,
+      AccessPathElem ModuleID, StringRef DirPath,
+      const SerializedModuleBaseName &BaseName,
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -220,8 +240,8 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
                                    IgnoreSwiftSourceInfo) {}
 
   std::error_code findModuleFilesInDirectory(
-      AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
-      StringRef ModuleDocFilename,
+      AccessPathElem ModuleID, StringRef DirPath,
+      const SerializedModuleBaseName &BaseName,
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,

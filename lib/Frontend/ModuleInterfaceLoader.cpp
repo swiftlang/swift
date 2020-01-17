@@ -987,8 +987,8 @@ bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
 /// cache or by converting it in a subordinate \c CompilerInstance, caching
 /// the results.
 std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
-  AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
-  StringRef ModuleDocFilename,
+  AccessPathElem ModuleID, StringRef DirPath,
+  const SerializedModuleBaseName &BaseName,
   SmallVectorImpl<char> *ModuleInterfacePath,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -998,16 +998,12 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   // should not have been constructed at all.
   assert(LoadMode != ModuleLoadingMode::OnlySerialized);
 
-  auto &fs = *Ctx.SourceMgr.getFileSystem();
-  llvm::SmallString<256> ModPath, InPath;
+  llvm::SmallString<256>
+  ModPath{ BaseName.getName(DirPath, file_types::TY_SwiftModuleFile) },
+  InPath{  BaseName.getName(DirPath, file_types::TY_SwiftModuleInterfaceFile) };
 
   // First check to see if the .swiftinterface exists at all. Bail if not.
-  ModPath = DirPath;
-  path::append(ModPath, ModuleFilename);
-
-  auto Ext = file_types::getExtension(file_types::TY_SwiftModuleInterfaceFile);
-  InPath = ModPath;
-  path::replace_extension(InPath, Ext);
+  auto &fs = *Ctx.SourceMgr.getFileSystem();
   if (!fs.exists(InPath)) {
     if (fs.exists(ModPath)) {
       LLVM_DEBUG(llvm::dbgs()
@@ -1044,8 +1040,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
                                                                 ModPath,
                                                        ModuleSourceInfoBuffer);
   // Delegate back to the serialized module loader to load the module doc.
-  llvm::SmallString<256> DocPath{DirPath};
-  path::append(DocPath, ModuleDocFilename);
+  llvm::SmallString<256>
+  DocPath{BaseName.getName(DirPath, file_types::TY_SwiftModuleDocFile)};
   auto DocLoadErr =
     SerializedModuleLoaderBase::openModuleDocFile(ModuleID, DocPath,
                                                   ModuleDocBuffer);

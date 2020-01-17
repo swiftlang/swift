@@ -342,8 +342,8 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
 }
 
 std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
-    AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
-    StringRef ModuleDocFilename,
+    AccessPathElem ModuleID, StringRef DirPath,
+    const SerializedModuleBaseName &BaseName,
     SmallVectorImpl<char> *ModuleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -351,10 +351,12 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
   if (LoadMode == ModuleLoadingMode::OnlyInterface)
     return std::make_error_code(std::errc::not_supported);
 
-  llvm::SmallString<256> ModulePath{DirPath};
-  llvm::sys::path::append(ModulePath, ModuleFilename);
-  llvm::SmallString<256> ModuleDocPath{DirPath};
-  llvm::sys::path::append(ModuleDocPath, ModuleDocFilename);
+  llvm::SmallString<256>
+  ModulePath{BaseName.getName(DirPath, file_types::TY_SwiftModuleFile)};
+
+  llvm::SmallString<256>
+  ModuleDocPath{BaseName.getName(DirPath, file_types::TY_SwiftModuleDocFile)};
+
   return SerializedModuleLoaderBase::openModuleFiles(ModuleID,
                                                      ModulePath,
                                                      ModuleDocPath,
@@ -398,24 +400,20 @@ bool SerializedModuleLoader::maybeDiagnoseTargetMismatch(
   return true;
 }
 
-struct ModuleFilenamePair {
-  llvm::SmallString<64> module;
-  llvm::SmallString<64> moduleDoc;
-  llvm::SmallString<64> moduleSourceInfo;
+std::string SerializedModuleBaseName::getName(file_types::ID fileTy) const {
+  std::string result = baseName;
+  result += '.';
+  result += file_types::getExtension(fileTy);
 
-  ModuleFilenamePair(StringRef baseName)
-    : module(baseName), moduleDoc(baseName), moduleSourceInfo(baseName)
-  {
-    module += '.';
-    module += file_types::getExtension(file_types::TY_SwiftModuleFile);
+  return result;
+}
 
-    moduleDoc += '.';
-    moduleDoc += file_types::getExtension(file_types::TY_SwiftModuleDocFile);
-
-    moduleSourceInfo += '.';
-    moduleSourceInfo += file_types::getExtension(file_types::TY_SwiftSourceInfoFile);
-  }
-};
+std::string SerializedModuleBaseName::getName(StringRef parentDir,
+                                              file_types::ID fileTy) const {
+  llvm::SmallString<64> scratch{parentDir};
+  llvm::sys::path::append(scratch, getName(fileTy));
+  return scratch.str();
+}
 
 bool
 SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
@@ -424,13 +422,13 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
            std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
            bool &isFramework, bool &isSystemModule) {
-  llvm::SmallString<64> moduleName(moduleID.Item.str());
-  ModuleFilenamePair fileNames(moduleName);
+  std::string moduleName(moduleID.Item.str());
+  SerializedModuleBaseName genericBaseName(moduleName);
 
-  SmallVector<ModuleFilenamePair, 4> targetFileNamePairs;
+  SmallVector<SerializedModuleBaseName, 4> targetSpecificBaseNames;
   SmallString<32> primaryTargetSpecificName;
   forEachTargetModuleBasename(Ctx, [&](StringRef targetName) {
-    targetFileNamePairs.emplace_back(targetName);
+    targetSpecificBaseNames.emplace_back(targetName);
     if (primaryTargetSpecificName.empty())
       primaryTargetSpecificName = targetName;
   });
@@ -443,9 +441,9 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
   /// was diagnosed, or None if neither one happened and the search should
   /// continue.
   auto findTargetSpecificModuleFiles = [&]() -> Optional<bool> {
-    for (const auto &targetFileNames : targetFileNamePairs) {
+    for (const auto &targetSpecificBaseName : targetSpecificBaseNames) {
       auto result = findModuleFilesInDirectory(moduleID, currPath,
-                        targetFileNames.module, targetFileNames.moduleDoc,
+                        targetSpecificBaseName,
                         moduleInterfacePath,
                         moduleBuffer, moduleDocBuffer,
                         moduleSourceInfoBuffer);
@@ -468,6 +466,9 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     }
   };
 
+  auto genericModuleFileName =
+      genericBaseName.getName(file_types::TY_SwiftModuleFile);
+
   auto result = forEachModuleSearchPath(
       Ctx,
       [&](StringRef path, SearchPathKind Kind,
@@ -479,7 +480,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
         case SearchPathKind::Import:
         case SearchPathKind::RuntimeLibrary: {
           isFramework = false;
-          llvm::sys::path::append(currPath, fileNames.module.str());
+          llvm::sys::path::append(currPath, genericModuleFileName);
 
           bool checkTargetSpecificModule;
           if (Kind == SearchPathKind::RuntimeLibrary) {
@@ -499,8 +500,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
             return findTargetSpecificModuleFiles();
 
           auto result = findModuleFilesInDirectory(
-              moduleID, path, fileNames.module.str(), fileNames.moduleDoc.str(),
-              moduleInterfacePath,
+              moduleID, path, genericBaseName, moduleInterfacePath,
               moduleBuffer, moduleDocBuffer, moduleSourceInfoBuffer);
           if (!result)
             return true;
@@ -511,8 +511,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
         }
         case SearchPathKind::Framework: {
           isFramework = true;
-          llvm::sys::path::append(currPath,
-                                  moduleID.Item.str() + ".framework");
+          llvm::sys::path::append(currPath, moduleName + ".framework");
 
           // Check if the framework directory exists.
           if (!fs.exists(currPath))
@@ -520,7 +519,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
           // Frameworks always use architecture-specific files within a
           // .swiftmodule directory.
-          llvm::sys::path::append(currPath, "Modules", fileNames.module.str());
+          llvm::sys::path::append(currPath, "Modules", genericModuleFileName);
           return findTargetSpecificModuleFiles();
         }
         }
@@ -951,8 +950,8 @@ void SerializedModuleLoaderBase::loadObjCMethods(
 }
 
 std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
-    AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
-    StringRef ModuleDocFilename,
+    AccessPathElem ModuleID, StringRef DirPath,
+    const SerializedModuleBaseName &BaseName,
     SmallVectorImpl<char> *ModuleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,

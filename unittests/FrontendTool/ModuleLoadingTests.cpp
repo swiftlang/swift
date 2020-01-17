@@ -114,7 +114,7 @@ protected:
 
     auto error =
       loader->findModuleFilesInDirectory({moduleName, SourceLoc()}, tempDir,
-        "Library.swiftmodule", "Library.swiftdoc", "Library.swiftsourceinfo",
+        SerializedModuleBaseName("Library"),
         /*ModuleInterfacePath*/nullptr,
         &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer);
     ASSERT_FALSE(error);
