@@ -1005,7 +1005,7 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   // If anchor is n explicit address-of, or expression which produces
   // an l-value (e.g. first argument of `+=` operator), let's not
   // suggest default value here because that would produce r-value type.
-  if (isa<InOutExpr>(anchor))
+  if (!anchor || isa<InOutExpr>(anchor))
     return;
 
   auto &cs = getConstraintSystem();
