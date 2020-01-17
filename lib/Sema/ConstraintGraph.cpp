@@ -1178,7 +1178,6 @@ ConstraintGraph::computeConnectedComponents(
 static bool shouldContractEdge(ConstraintKind kind) {
   switch (kind) {
   case ConstraintKind::Bind:
-  case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Equal:
     return true;
@@ -1212,49 +1211,11 @@ bool ConstraintGraph::contractEdges() {
     if (!(tyvar1 && tyvar2))
       continue;
 
-    auto isParamBindingConstraint = kind == ConstraintKind::BindParam;
-
-    // If the argument is allowed to bind to `inout`, in general,
-    // it's invalid to contract the edge between argument and parameter,
-    // but if we can prove that there are no possible bindings
-    // which result in attempt to bind `inout` type to argument
-    // type variable, we should go ahead and allow (temporary)
-    // contraction, because that greatly helps with performance.
-    // Such action is valid because argument type variable can
-    // only get its bindings from related overload, which gives
-    // us enough information to decided on l-valueness.
-    if (isParamBindingConstraint && tyvar1->getImpl().canBindToInOut()) {
-      bool isNotContractable = true;
-      if (auto bindings = CS.getPotentialBindings(tyvar1)) {
-        for (auto &binding : bindings.Bindings) {
-          auto type = binding.BindingType;
-          isNotContractable = type.findIf([&](Type nestedType) -> bool {
-            if (auto tv = nestedType->getAs<TypeVariableType>()) {
-              if (tv->getImpl().canBindToInOut())
-                return true;
-            }
-
-            return nestedType->is<InOutType>();
-          });
-
-          // If there is at least one non-contractable binding, let's
-          // not risk contracting this edge.
-          if (isNotContractable)
-            break;
-        }
-      }
-
-      if (isNotContractable)
-        continue;
-    }
-
     auto rep1 = CS.getRepresentative(tyvar1);
     auto rep2 = CS.getRepresentative(tyvar2);
 
-    if (((rep1->getImpl().canBindToLValue() ==
-          rep2->getImpl().canBindToLValue()) ||
-         // Allow l-value contractions when binding parameter types.
-         isParamBindingConstraint)) {
+    if (rep1->getImpl().canBindToLValue() ==
+        rep2->getImpl().canBindToLValue()) {
       if (CS.getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
         auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
         if (CS.solverState)

@@ -1620,7 +1620,6 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       case ConstraintKind::ArgumentConversion:
       case ConstraintKind::Conversion:
       case ConstraintKind::BridgingConversion:
-      case ConstraintKind::BindParam:
       case ConstraintKind::OpaqueUnderlyingType: {
         auto secondTy = constraint->getSecondType();
         if (secondTy->is<TypeVariableType>()) {

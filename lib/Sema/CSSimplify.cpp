@@ -1182,7 +1182,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 
   case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::Bind:
-  case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Equal:
   case ConstraintKind::Subtype:
@@ -1241,7 +1240,6 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
                                          ConstraintKind kind) {
   switch (kind) {
   case ConstraintKind::Bind:
-  case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Equal:
     return rep1 != rep2;
@@ -1518,7 +1516,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   ConstraintKind subKind;
   switch (kind) {
   case ConstraintKind::Bind:
-  case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Equal:
     subKind = kind;
@@ -3790,52 +3787,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                    formUnsolvedResult);
     }
 
-    case ConstraintKind::BindParam: {
-      if (typeVar2 && !typeVar1) {
-        // Simplify the left-hand type and perform the "occurs" check.
-        auto rep2 = getRepresentative(typeVar2);
-        type1 = simplifyType(type1, flags);
-        if (!isBindable(typeVar2, type1))
-          return formUnsolvedResult();
-
-        if (auto *iot = type1->getAs<InOutType>()) {
-          if (!rep2->getImpl().canBindToLValue())
-            return getTypeMatchFailure(locator);
-          assignFixedType(rep2, LValueType::get(iot->getObjectType()));
-        } else {
-          assignFixedType(rep2, type1);
-        }
-        return getTypeMatchSuccess();
-      } else if (typeVar1 && !typeVar2) {
-        // Simplify the right-hand type and perform the "occurs" check.
-        auto rep1 = getRepresentative(typeVar1);
-        type2 = simplifyType(type2, flags);
-        if (!isBindable(rep1, type2))
-          return formUnsolvedResult();
-
-        if (auto *lvt = type2->getAs<LValueType>()) {
-          if (!rep1->getImpl().canBindToInOut())
-            return getTypeMatchFailure(locator);
-          assignFixedType(rep1, InOutType::get(lvt->getObjectType()));
-        } else {
-          assignFixedType(rep1, type2);
-        }
-        return getTypeMatchSuccess();
-      } if (typeVar1 && typeVar2) {
-        auto rep1 = getRepresentative(typeVar1);
-        auto rep2 = getRepresentative(typeVar2);
-
-        if (!rep1->getImpl().canBindToInOut() ||
-            !rep2->getImpl().canBindToLValue()) {
-          // Merge the equivalence classes corresponding to these two variables.
-          mergeEquivalenceClasses(rep1, rep2);
-          return getTypeMatchSuccess();
-        }
-      }
-
-      return formUnsolvedResult();
-    }
-
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
@@ -4091,7 +4042,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       switch (kind) {
       case ConstraintKind::Equal:
       case ConstraintKind::Bind:
-      case ConstraintKind::BindParam:
         // If we are matching types for equality, we might still have
         // type variables inside the protocol composition's superclass
         // constraint.
@@ -4107,8 +4057,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       break;
 
     case TypeKind::LValue:
-      if (kind == ConstraintKind::BindParam)
-        return getTypeMatchFailure(locator);
       return matchTypes(cast<LValueType>(desugar1)->getObjectType(),
                         cast<LValueType>(desugar2)->getObjectType(),
                         ConstraintKind::Bind, subflags,
@@ -4116,9 +4064,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                           ConstraintLocator::LValueConversion));
     
     case TypeKind::InOut:
-      if (kind == ConstraintKind::BindParam)
-        return getTypeMatchFailure(locator);
-      
       if (kind == ConstraintKind::OperatorArgumentConversion) {
         conversionsOrFixes.push_back(
             RemoveAddressOf::create(*this, type1, type2,
@@ -4496,17 +4441,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           (type1->isUninhabited() || type2->isVoid())) {
         increaseScore(SK_FunctionConversion);
         return getTypeMatchSuccess();
-      }
-    }
-  }
-
-  if (kind == ConstraintKind::BindParam) {
-    if (auto *iot = dyn_cast<InOutType>(desugar1)) {
-      if (auto *lvt = dyn_cast<LValueType>(desugar2)) {
-        return matchTypes(iot->getObjectType(), lvt->getObjectType(),
-                          ConstraintKind::Bind, subflags,
-                          locator.withPathElement(
-                            ConstraintLocator::LValueConversion));
       }
     }
   }
@@ -8873,7 +8807,6 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   switch (kind) {
   case ConstraintKind::Equal:
   case ConstraintKind::Bind:
-  case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
@@ -9187,7 +9120,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   switch (constraint.getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
-  case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:

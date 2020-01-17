@@ -408,20 +408,6 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   if (type->is<LValueType>() && !typeVar->getImpl().canBindToLValue())
     type = type->getRValueType();
 
-  // BindParam constraints are not reflexive and must be treated specially.
-  if (constraint->getKind() == ConstraintKind::BindParam) {
-    if (kind == AllowedBindingKind::Subtypes) {
-      if (auto *lvt = type->getAs<LValueType>()) {
-        type = InOutType::get(lvt->getObjectType());
-      }
-    } else if (kind == AllowedBindingKind::Supertypes) {
-      if (auto *iot = type->getAs<InOutType>()) {
-        type = LValueType::get(iot->getObjectType());
-      }
-    }
-    kind = AllowedBindingKind::Exact;
-  }
-
   return PotentialBinding{type, kind, constraint};
 }
 
@@ -460,27 +446,12 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     switch (constraint->getKind()) {
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
-    case ConstraintKind::BindParam:
     case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::OptionalObject: {
-      // If there is a `bind param` constraint associated with
-      // current type variable, result should be aware of that
-      // fact. Binding set might be incomplete until
-      // this constraint is resolved, because we currently don't
-      // look-through constraints expect to `subtype` to try and
-      // find related bindings.
-      // This only affects type variable that appears one the
-      // right-hand side of the `bind param` constraint and
-      // represents result type of the closure body, because
-      // left-hand side gets types from overload choices.
-      if (constraint->getKind() == ConstraintKind::BindParam &&
-          constraint->getSecondType()->isEqual(typeVar))
-        result.PotentiallyIncomplete = true;
-
       auto binding = getPotentialBindingForRelationalConstraint(
           result, constraint, hasDependentMemberRelationalConstraints,
           hasNonDependentMemberRelationalConstraints,
