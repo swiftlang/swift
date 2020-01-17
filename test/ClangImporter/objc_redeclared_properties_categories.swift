@@ -5,7 +5,7 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-pch -F %S/Inputs/frameworks -o %t.pch %t.h
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.pch %s 2>&1 | %FileCheck --allow-empty -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s
-// RUNT: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.h -pch-output-dir %t/pch %s 2>&1 | %FileCheck --allow-empty -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.h -pch-output-dir %t/pch %s 2>&1 | %FileCheck --allow-empty -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s
 
 import CategoryOverrides
 
@@ -19,8 +19,23 @@ import CategoryOverrides
 // This configuration appears as an undiagnosed redeclaration of a property and
 // function, which is illegal.
 func colors() {
+  // CHECK-PUBLIC: cannot call value of non-function type 'MyColor?'
+  // CHECK-PRIVATE-NOT: cannot call value of non-function type 'MyColor?'
   let _ : MyColor = MyColor.systemRed
   let _ : MyColor = MyColor.systemRed()!
+}
+
+// Another manifestation of the above for an instance property this time.
+func structs(_ base: MyBaseClass, _ derived: MyDerivedClass) {
+  // CHECK-PUBLIC: cannot call value of non-function type 'SomeStruct'
+  // CHECK-PRIVATE-NOT: cannot call value of non-function type 'SomeStruct'
+  let _ : SomeStruct = base.myStructure
+  let _ : SomeStruct = base.myStructure()
+
+  // CHECK-PUBLIC: cannot call value of non-function type 'SomeStruct'
+  // CHECK-PRIVATE-NOT: cannot call value of non-function type 'SomeStruct'
+  let _ : SomeStruct = derived.myStructure
+  let _ : SomeStruct = derived.myStructure()
 }
 
 // A category declared in a (private) header can introduce overrides of a property
