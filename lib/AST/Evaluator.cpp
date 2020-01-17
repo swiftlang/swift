@@ -50,8 +50,9 @@ Evaluator::getAbstractRequestFunction(uint8_t zoneID, uint8_t requestID) const {
 }
 
 void Evaluator::registerRequestFunctions(
-                               uint8_t zoneID,
+                               Zone zone,
                                ArrayRef<AbstractRequestFunction *> functions) {
+  uint8_t zoneID = static_cast<uint8_t>(zone);
 #ifndef NDEBUG
   for (const auto &zone : requestFunctionsByZone) {
     assert(zone.first != zoneID);
@@ -61,8 +62,12 @@ void Evaluator::registerRequestFunctions(
   requestFunctionsByZone.push_back({zoneID, functions});
 }
 
-Evaluator::Evaluator(DiagnosticEngine &diags, bool debugDumpCycles)
-  : diags(diags), debugDumpCycles(debugDumpCycles) { }
+Evaluator::Evaluator(DiagnosticEngine &diags,
+                     bool debugDumpCycles,
+                     bool buildDependencyGraph)
+  : diags(diags),
+    debugDumpCycles(debugDumpCycles),
+    buildDependencyGraph(buildDependencyGraph) { }
 
 void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   std::error_code error;
@@ -71,9 +76,11 @@ void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
 }
 
 bool Evaluator::checkDependency(const AnyRequest &request) {
-  // If there is an active request, record it's dependency on this request.
-  if (!activeRequests.empty())
-    dependencies[activeRequests.back()].push_back(request);
+  if (buildDependencyGraph) {
+    // If there is an active request, record it's dependency on this request.
+    if (!activeRequests.empty())
+      dependencies[activeRequests.back()].push_back(request);
+  }
 
   // Record this as an active request.
   if (activeRequests.insert(request)) {
@@ -98,7 +105,7 @@ bool Evaluator::checkDependency(const AnyRequest &request) {
 
 void Evaluator::diagnoseCycle(const AnyRequest &request) {
   request.diagnoseCycle(diags);
-  for (const auto &step : reversed(activeRequests)) {
+  for (const auto &step : llvm::reverse(activeRequests)) {
     if (step == request) return;
 
     step.noteCycleStep(diags);

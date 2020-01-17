@@ -35,19 +35,17 @@ namespace swift {
   class ValueDecl;
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
-void performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
-                                     const DeclContext *DC,
+void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
                                      bool isExprStmt);
 
 /// Emit diagnostics for a given statement.
-void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
+void performStmtDiagnostics(ASTContext &ctx, const Stmt *S);
 
-void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
-                                        AbstractFunctionDecl *AFD,
+void performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD,
                                         BraceStmt *body);
 
 /// Perform diagnostics on the top level code declaration.
-void performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD);
+void performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD);
   
 /// Emit a fix-it to set the access of \p VD to \p desiredAccess.
 ///
@@ -75,13 +73,13 @@ bool diagnoseArgumentLabelError(ASTContext &ctx,
 /// with a non-owning attribute, such as 'weak' or 'unowned' and the initializer
 /// expression refers to a class constructor, emit a warning that the assigned
 /// instance will be immediately deallocated.
-void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+void diagnoseUnownedImmediateDeallocation(ASTContext &ctx,
                                           const AssignExpr *assignExpr);
 
 /// If \p pattern binds to a declaration with a non-owning attribute, such as
 /// 'weak' or 'unowned' and \p initializer refers to a class constructor,
 /// emit a warning that the bound instance will be immediately deallocated.
-void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+void diagnoseUnownedImmediateDeallocation(ASTContext &ctx,
                                           const Pattern *pattern,
                                           SourceLoc equalLoc,
                                           const Expr *initializer);
@@ -90,13 +88,18 @@ void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
 /// \p base...but only if we're highly confident that we know what the user
 /// should have written.
 ///
+/// The \p diag closure allows the caller to control the diagnostic that is
+/// emitted. It is passed true if the diagnostic will be emitted with fixits
+/// attached, and false otherwise. If None is returned, no diagnostics are
+/// emitted.  Else the fixits are attached to the returned diagnostic.
+///
 /// \returns true iff any fix-its were attached to \p diag.
-bool fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
-                                   ValueDecl *decl,
-                                   const ValueDecl *base);
+bool computeFixitsForOverridenDeclaration(
+    ValueDecl *decl, const ValueDecl *base,
+    llvm::function_ref<Optional<InFlightDiagnostic>(bool)> diag);
 
 /// Emit fix-its to enclose trailing closure in argument parens.
-void fixItEncloseTrailingClosure(TypeChecker &TC,
+void fixItEncloseTrailingClosure(ASTContext &ctx,
                                  InFlightDiagnostic &diag,
                                  const CallExpr *call,
                                  Identifier closureLabel);

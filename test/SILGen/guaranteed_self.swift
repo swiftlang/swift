@@ -243,7 +243,7 @@ struct AO<T>: Fooable {
 
 class C: Fooable, Barrable {
   // Allocating initializer
-  // CHECK-LABEL: sil hidden [ossa] @$s15guaranteed_self1CC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick C.Type) -> @owned C
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s15guaranteed_self1CC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick C.Type) -> @owned C
   // CHECK:         [[SELF1:%.*]] = alloc_ref $C
   // CHECK-NOT:     [[SELF1]]
   // CHECK:         [[SELF2:%.*]] = apply {{.*}}([[SELF1]])
@@ -330,7 +330,7 @@ class C: Fooable, Barrable {
 }
 
 class D: C {
-  // CHECK-LABEL: sil hidden [ossa] @$s15guaranteed_self1DC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick D.Type) -> @owned D
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s15guaranteed_self1DC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick D.Type) -> @owned D
   // CHECK:         [[SELF1:%.*]] = alloc_ref $D
   // CHECK-NOT:     [[SELF1]]
   // CHECK:         [[SELF2:%.*]] = apply {{.*}}([[SELF1]])
@@ -451,11 +451,14 @@ class LetFieldClass {
   // CHECK-LABEL: sil hidden [ossa] @$s15guaranteed_self13LetFieldClassC10letkMethod{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed LetFieldClass) -> () {
   // CHECK: bb0([[CLS:%.*]] : @guaranteed $LetFieldClass):
   // CHECK: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR]]
+  // CHECK-NEXT: [[KRAKEN_ADDR_ACCESS:%.*]] = begin_access [read] [unsafe] [[KRAKEN_ADDR]]
+  // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR_ACCESS]]
+  // CHECK-NEXT: end_access [[KRAKEN_ADDR_ACCESS]]
   // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[KRAKEN]]
   // CHECK-NEXT: apply [[KRAKEN_METH]]([[KRAKEN]])
   // CHECK: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR]]
+  // CHECK-NEXT: [[KRAKEN_ADDR_ACCESS:%.*]] = begin_access [read] [unsafe] [[KRAKEN_ADDR]]
+  // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR_ACCESS]]
   // CHECK:      [[REBORROWED_KRAKEN:%.*]] = begin_borrow [[KRAKEN]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$s15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[REBORROWED_KRAKEN]])
@@ -464,7 +467,9 @@ class LetFieldClass {
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
   // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR]]
+  // CHECK-NEXT: [[KRAKEN_ADDR_ACCESS:%.*]] = begin_access [read] [unsafe] [[KRAKEN_ADDR]]
+  // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR_ACCESS]]
+  // CHECK-NEXT: end_access [[KRAKEN_ADDR_ACCESS]]
   // CHECK-NEXT: store [[KRAKEN]] to [init] [[PB]]
   // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*Kraken
   // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [copy] [[READ]]

@@ -232,7 +232,7 @@ code for the target that is not the build machine:
 
 * ``%target-typecheck-verify-swift``: parse and type check the current Swift file
   for the target platform and verify diagnostics, like ``swift -frontend -typecheck -verify
-  %s``.
+  %s``. For further explanation of `-verify` mode, see [Diagnostics.md](Diagnostics.md).
 
   Use this substitution for testing semantic analysis in the compiler.
 

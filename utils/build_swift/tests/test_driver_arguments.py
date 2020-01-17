@@ -314,6 +314,23 @@ class TestDriverArgumentParserMeta(type):
         return test
 
     @classmethod
+    def _generate_build_script_impl_option_test(cls, option):
+        def test(self):
+            with self.assertNotRaises(ParserError):
+                namespace, unknown_args = self.parse_args_and_unknown_args([])
+                self.assertFalse(hasattr(namespace, option.dest))
+                self.assertEqual(unknown_args, [])
+
+                namespace, unknown_args = self.parse_args_and_unknown_args(
+                    [option.option_string])
+                # The argument should never show up in the namespace
+                self.assertFalse(hasattr(namespace, option.dest))
+                # It should instead be forwareded to unkown_args
+                self.assertEqual(unknown_args, [option.option_string])
+
+        return test
+
+    @classmethod
     def generate_option_test(cls, option):
         generate_test_funcs = {
             eo.HelpOption: cls._generate_help_option_test,
@@ -328,6 +345,8 @@ class TestDriverArgumentParserMeta(type):
             eo.PathOption: cls._generate_path_option_test,
             eo.AppendOption: cls._generate_append_option_test,
             eo.UnsupportedOption: cls._generate_unsupported_option_test,
+            eo.BuildScriptImplOption:
+                cls._generate_build_script_impl_option_test,
 
             # IgnoreOptions should be manually tested
             eo.IgnoreOption: lambda self: None,
@@ -383,7 +402,7 @@ class TestDriverArgumentParser(unittest.TestCase):
             raise ParserError('failed to parse impl arguments: ' +
                               str(namespace.build_script_impl_args), e)
 
-    def parse_args(self, args, namespace=None):
+    def parse_args_and_unknown_args(self, args, namespace=None):
         if namespace is None:
             namespace = argparse.Namespace()
 
@@ -392,8 +411,17 @@ class TestDriverArgumentParser(unittest.TestCase):
                 namespace, unknown_args =\
                     super(self.parser.__class__, self.parser)\
                     .parse_known_args(args, namespace)
+                namespace, unknown_args =\
+                    migration.process_disambiguation_arguments(namespace,
+                                                               unknown_args)
             except (SystemExit, argparse.ArgumentError) as e:
                 raise ParserError('failed to parse arguments: ' + str(args), e)
+
+        return namespace, unknown_args
+
+    def parse_args(self, args, namespace=None):
+        namespace, unknown_args = self.parse_args_and_unknown_args(args,
+                                                                   namespace)
 
         if unknown_args:
             raise ParserError('unknown arguments: ' + str(unknown_args))
@@ -452,6 +480,7 @@ class TestDriverArgumentParser(unittest.TestCase):
             eo.HelpOption,
             eo.IgnoreOption,
             eo.UnsupportedOption,
+            eo.BuildScriptImplOption,
         ]
 
         missing_defaults = set()

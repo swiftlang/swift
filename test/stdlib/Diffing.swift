@@ -629,6 +629,68 @@ if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
               }}}}}}
   }
 
+  suite.test("Fast applicator error condition") {
+    let bear = "bear"
+    let bird = "bird"
+    let bat = "bat"
+
+    let diff = bird.difference(from: bear)
+
+    expectEqual(nil, bat.applying(diff))
+  }
+
+  suite.test("Fast applicator boundary condition remove last element") {
+    let base = [1, 2, 3]
+
+    expectEqual([1, 2], base.applying(CollectionDifference<Int>([.remove(offset: base.count - 1, element: 3, associatedWith: nil)])!))
+  }
+
+  suite.test("Fast applicator boundary condition append element") {
+    let base = [1, 2, 3]
+
+    expectEqual([1, 2, 3, 4], base.applying(CollectionDifference<Int>([.insert(offset: base.count, element: 4, associatedWith: nil)])!))
+  }
+
+  suite.test("Fast applicator error boundary condition remove at endIndex") {
+    let base = [1, 2, 3]
+
+    expectEqual(nil, base.applying(CollectionDifference<Int>([.remove(offset: base.count, element: 4, associatedWith: nil)])!))
+  }
+
+  suite.test("Fast applicator error boundary condition insert beyond end") {
+    let base = [1, 2, 3]
+
+    expectEqual(nil, base.applying(CollectionDifference<Int>([.insert(offset: base.count + 1, element: 5, associatedWith: nil)])!))
+  }
+
+  suite.test("Fast applicator boundary condition replace tail") {
+    let base = [1, 2, 3]
+
+    expectEqual([1, 2, 4], base.applying(CollectionDifference<Int>([
+      .remove(offset: base.count - 1, element: 3, associatedWith: nil),
+      .insert(offset: base.count - 1, element: 4, associatedWith: nil)
+    ])!))
+  }
+
+  suite.test("Fast applicator error boundary condition insert beyond end after tail removal") {
+    let base = [1, 2, 3]
+
+    expectEqual(nil, base.applying(CollectionDifference<Int>([
+      .remove(offset: base.count - 1, element: 3, associatedWith: nil),
+      .insert(offset: base.count, element: 4, associatedWith: nil)
+    ])!))
+
+  }
+
+  suite.test("Fast applicator error boundary condition insert beyond end after non-tail removal") {
+    let base = [1, 2, 3]
+
+    expectEqual(nil, base.applying(CollectionDifference<Int>([
+      .remove(offset: base.count - 2, element: 2, associatedWith: nil),
+      .insert(offset: base.count, element: 4, associatedWith: nil)
+    ])!))
+  }
+
   suite.test("Fast applicator fuzzer") {
     func makeArray() -> [Int] {
       var arr = [Int]()

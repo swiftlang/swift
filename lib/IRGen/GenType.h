@@ -53,6 +53,7 @@ namespace swift {
   
 namespace irgen {
   class Alignment;
+  class GenericContextScope;
   class ProtocolInfo;
   class Size;
   class FixedTypeInfo;
@@ -86,6 +87,13 @@ public:
 
   IRGenModule &IGM;
 private:
+  // Set using the GenericContextScope RAII object.
+  friend GenericContextScope;
+  CanGenericSignature CurGenericSignature;
+  // Enter a generic context for lowering the parameters of a generic function
+  // type.
+  void setGenericContext(CanGenericSignature signature);
+
   Mode LoweringMode = Mode::Normal;
 
   llvm::DenseMap<ProtocolDecl*, std::unique_ptr<const ProtocolInfo>> Protocols;
@@ -116,6 +124,9 @@ private:
 
   llvm::StringMap<YAMLTypeInfoNode> LegacyTypeInfos;
   llvm::DenseMap<NominalTypeDecl *, std::string> DeclMangledNames;
+
+  /// The key is the number of witness tables.
+  llvm::DenseMap<unsigned, llvm::StructType *> OpaqueExistentialTypes;
 
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
                                           Size size, Alignment align);
@@ -182,13 +193,12 @@ public:
                                             bool isOptional);
 #include "swift/AST/ReferenceStorage.def"
 
-  /// Enter a generic context for lowering the parameters of a generic function
-  /// type.
-  void pushGenericContext(CanGenericSignature signature);
-  
-  /// Exit a generic context.
-  void popGenericContext(CanGenericSignature signature);
+  llvm::Type *getExistentialType(unsigned numWitnessTables);
 
+  /// Retrieve the generic signature for the current generic context, or null if no
+  /// generic environment is active.
+  CanGenericSignature getCurGenericContext() { return CurGenericSignature; }
+  
   /// Retrieve the generic environment for the current generic context.
   ///
   /// Fails if there is no generic context.
@@ -203,7 +213,7 @@ private:
 
   /// Read a YAML legacy type layout dump. Returns false on success, true on
   /// error.
-  bool readLegacyTypeInfo(StringRef path);
+  bool readLegacyTypeInfo(llvm::vfs::FileSystem &fs, StringRef path);
 
   Optional<YAMLTypeInfoNode> getLegacyTypeInfo(NominalTypeDecl *decl) const;
 
@@ -230,12 +240,12 @@ private:
 /// a scope.
 class GenericContextScope {
   TypeConverter &TC;
-  CanGenericSignature sig;
+  CanGenericSignature newSig, oldSig;
 public:
   GenericContextScope(TypeConverter &TC, CanGenericSignature sig)
-    : TC(TC), sig(sig)
+    : TC(TC), newSig(sig), oldSig(TC.CurGenericSignature)
   {
-    TC.pushGenericContext(sig);
+    TC.setGenericContext(newSig);
   }
   
   GenericContextScope(IRGenModule &IGM, CanGenericSignature sig)
@@ -243,7 +253,10 @@ public:
   {}
   
   ~GenericContextScope() {
-    TC.popGenericContext(sig);
+    if (!newSig)
+      return;
+    assert(TC.CurGenericSignature == newSig);
+    TC.setGenericContext(oldSig);
   }
 };
 

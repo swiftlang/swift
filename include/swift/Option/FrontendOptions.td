@@ -38,6 +38,12 @@ def emit_module_doc_path
   : Separate<["-"], "emit-module-doc-path">, MetaVarName<"<path>">,
     HelpText<"Output module documentation file <path>">;
 
+def emit_module_source_info : Flag<["-"], "emit-module-source-info">,
+  HelpText<"Output module source info file">;
+
+def ignore_module_source_info : Flag<["-"], "ignore-module-source-info">,
+  HelpText<"Avoid getting source location from .swiftsourceinfo files">;
+
 def merge_modules
   : Flag<["-"], "merge-modules">, ModeOpt,
     HelpText<"Merge the input modules without otherwise processing them">;
@@ -51,6 +57,19 @@ def emit_reference_dependencies : Flag<["-"], "emit-reference-dependencies">,
 def emit_reference_dependencies_path
   : Separate<["-"], "emit-reference-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output Swift-style dependencies file to <path>">;
+
+
+def emit_swift_ranges : Flag<["-"], "emit-swift-ranges">,
+  HelpText<"Emit unparsed source ranges">;
+def emit_swift_ranges_path
+  : Separate<["-"], "emit-swift-ranges-path">, MetaVarName<"<path>">,
+    HelpText<"Output unparsed ranges to <path>">;
+
+def emit_compiled_source : Flag<["-"], "emit-compiled-source">,
+  HelpText<"Emit compiled source">;
+def emit_compiled_source_path
+  : Separate<["-"], "emit-compiled-source-path">, MetaVarName<"<path>">,
+    HelpText<"Output compiled source to <path>">;
 
 def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
@@ -86,6 +105,10 @@ def tbd_compatibility_version
 def tbd_compatibility_version_EQ : Joined<["-"], "tbd-compatibility-version=">,
   Alias<tbd_compatibility_version>;
 
+def tbd_is_installapi: Flag<["-"], "tbd-is-installapi">,
+  HelpText<"If the TBD file should indicate it's being generated during "
+           "InstallAPI">;
+
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;
@@ -102,6 +125,13 @@ def verify_syntax_tree : Flag<["-"], "verify-syntax-tree">,
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
+  
+def enable_descriptive_diagnostics : Flag<["-"], "enable-descriptive-diagnostics">,
+  HelpText<"Show descriptive diagnostic information, if available.">;
+  
+def diagnostic_documentation_path
+  : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
+  HelpText<"Path to diagnostic documentation resources">;
 
 def enable_swiftcall : Flag<["-"], "enable-swiftcall">,
   HelpText<"Enable the use of LLVM swiftcall support">;
@@ -122,8 +152,20 @@ def disable_target_os_checking :
   Flag<["-"], "disable-target-os-checking">,
   HelpText<"Disable checking the target OS of serialized modules">;
   
-def compare_to_astscope_lookup : Flag<["-"], "compare-to-astscope-lookup">,
-  HelpText<"Compare legacy to ASTScope-based unqualified name lookup (for debugging)">;
+def crosscheck_unqualified_lookup : Flag<["-"], "crosscheck-unqualified-lookup">,
+  HelpText<"Compare legacy DeclContext- to ASTScope-based unqualified name lookup (for debugging)">;
+
+def stress_astscope_lookup : Flag<["-"], "stress-astscope-lookup">,
+  HelpText<"Stress ASTScope-based unqualified name lookup (for testing)">;
+  
+def warn_if_astscope_lookup : Flag<["-"], "warn-if-astscope-lookup">,
+  HelpText<"Print a warning if ASTScope lookup is used">;
+  
+def lazy_astscopes : Flag<["-"], "lazy-astscopes">,
+  HelpText<"Build ASTScopes lazily">;
+
+def use_clang_function_types : Flag<["-"], "use-clang-function-types">,
+  HelpText<"Use stored Clang function types for computing canonical types.">;
 
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
@@ -204,8 +246,10 @@ def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-pref
 
 def debug_cycles : Flag<["-"], "debug-cycles">,
   HelpText<"Print out debug dumps when cycles are detected in evaluation">;
+def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph">,
+  HelpText<"Build request dependency graph">;
 def output_request_graphviz : Separate<["-"], "output-request-graphviz">,
-  HelpText<"Emit GraphViz output visualizing the request graph">;
+  HelpText<"Emit GraphViz output visualizing the request dependency graph">;
 
 def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
   HelpText<"Prints the time taken by each compilation phase">;
@@ -226,8 +270,14 @@ def debug_crash_after_parse : Flag<["-"], "debug-crash-after-parse">,
 def debugger_support : Flag<["-"], "debugger-support">,
   HelpText<"Process swift code as if running in the debugger">;
 
+def disable_clangimporter_source_import : Flag<["-"],
+  "disable-clangimporter-source-import">,
+  HelpText<"Disable ClangImporter and forward all requests straight the DWARF importer.">;
+
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
+def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
+  HelpText<"Don't run SIL OSSA optimization passes.">;
 
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
@@ -284,6 +334,10 @@ def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
   HelpText<"Disable emission of names of stored properties and enum cases in"
            "reflection metadata">;
 
+def function_sections: Flag<["-"], "function-sections">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit functions to separate sections.">;
+
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
 
@@ -322,6 +376,10 @@ def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
 
+def enable_subst_sil_function_types_for_function_values :
+  Flag<["-"], "enable-subst-sil-function-types-for-function-values">,
+  HelpText<"Use substituted function types for SIL type lowering of function values">;
+  
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
@@ -332,10 +390,6 @@ def disable_deserialization_recovery :
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
-
-def disable_tsan_inout_instrumentation : Flag<["-"],
-  "disable-tsan-inout-instrumentation">,
-  HelpText<"Disable treatment of inout parameters as Thread Sanitizer accesses">;
 
 def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
   HelpText<"Deprecated, will be removed in future versions.">;
@@ -413,6 +467,14 @@ def solver_enable_operator_designated_types :
   Flag<["-"], "solver-enable-operator-designated-types">,
   HelpText<"Enable operator designated types in constraint solver">;
 
+def enable_invalid_ephemeralness_as_error :
+  Flag<["-"], "enable-invalid-ephemeralness-as-error">,
+  HelpText<"Diagnose invalid ephemeral to non-ephemeral conversions as errors">;
+
+def disable_invalid_ephemeralness_as_error :
+  Flag<["-"], "disable-invalid-ephemeralness-as-error">,
+  HelpText<"Diagnose invalid ephemeral to non-ephemeral conversions as warnings">;
+
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
 
@@ -434,6 +496,11 @@ def check_onone_completeness : Flag<["-"], "check-onone-completeness">,
 def debugger_testing_transform : Flag<["-"], "debugger-testing-transform">,
   HelpText<"Instrument the code with calls to an intrinsic that record the expected values of "
            "local variables so they can be compared against the results from the debugger.">;
+
+def disable_debugger_shadow_copies : Flag<["-"], "disable-debugger-shadow-copies">,
+  HelpText<"Disable debugger shadow copies of local variables."
+           "This option is only useful for testing the compiler.">,
+  Flags<[FrontendOption, HelpHidden]>;
 
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
@@ -541,6 +608,11 @@ def module_interface_preserve_types_as_written :
   HelpText<"When emitting a module interface, preserve types as they were "
            "written in the source">;
 
+def experimental_print_full_convention :
+ Flag<["-"], "experimental-print-full-convention">,
+ HelpText<"When emitting a module interface, emit additional @convention "
+          "arguments, regardless of whether they were written in the source">;
+
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
   HelpText<"Directory of prebuilt modules for loading module interfaces">;
@@ -576,6 +648,10 @@ def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
 def disable_legacy_type_info : Flag<["-"], "disable-legacy-type-info">,
   HelpText<"Completely disable legacy type layout">;
 
+def prespecialize_generic_metadata : Flag<["-"], "prespecialize-generic-metadata">,
+  HelpText<"Statically specialize metadata for generic types at types that "
+           "are known to be used in source.">;
+
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;
 
@@ -583,4 +659,11 @@ def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
 
+def emit_ldadd_cfile_path
+  : Separate<["-"], "emit-ldadd-cfile-path">, MetaVarName<"<path>">,
+    HelpText<"Generate .c file defining symbols to add back">;
+
+def previous_module_installname_map_file
+  : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,
+    HelpText<"Path to a Json file indicating module name to installname map for @_originallyDefinedIn">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

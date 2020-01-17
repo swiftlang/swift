@@ -20,18 +20,35 @@ class ASTContext;
 class CompilerInstance;
 class Preprocessor;
 class Sema;
+class TargetInfo;
+class Type;
 } // namespace clang
 
 namespace swift {
 
 class DeclContext;
+class VisibleDeclConsumer;
+
+/// Represents the different namespaces for types in C.
+///
+/// A simplified version of clang::Sema::LookupKind.
+enum class ClangTypeKind {
+  Typedef,
+  ObjCClass = Typedef,
+  /// Structs, enums, and unions.
+  Tag,
+  ObjCProtocol,
+};
 
 class ClangModuleLoader : public ModuleLoader {
 private:
   virtual void anchor();
+
 protected:
   using ModuleLoader::ModuleLoader;
+
 public:
+  virtual clang::TargetInfo &getTargetInfo() const = 0;
   virtual clang::ASTContext &getClangASTContext() const = 0;
   virtual clang::Preprocessor &getClangPreprocessor() const = 0;
   virtual clang::Sema &getClangSema() const = 0;
@@ -54,13 +71,48 @@ public:
   ///
   /// This routine is used for various hacks that are only permitted within
   /// overlays of imported modules, e.g., Objective-C bridging conformances.
-  virtual bool isInOverlayModuleForImportedModule(
-                                            const DeclContext *overlayDC,
-                                            const DeclContext *importedDC) = 0;
+  virtual bool
+  isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
+                                     const DeclContext *importedDC) = 0;
 
+  /// Look for declarations associated with the given name.
+  ///
+  /// \param name The name we're searching for.
+  virtual void lookupValue(DeclName name, VisibleDeclConsumer &consumer) = 0;
+
+  /// Look up a type declaration by its Clang name.
+  ///
+  /// Note that this method does no filtering. If it finds the type in a loaded
+  /// module, it returns it. This is intended for use in reflection / debugging
+  /// contexts where access is not a problem.
+  virtual void
+  lookupTypeDecl(StringRef clangName, ClangTypeKind kind,
+                 llvm::function_ref<void(TypeDecl *)> receiver) = 0;
+
+  /// Look up type a declaration synthesized by the Clang importer itself, using
+  /// a "related entity kind" to determine which type it should be. For example,
+  /// this can be used to find the synthesized error struct for an
+  /// NS_ERROR_ENUM.
+  ///
+  /// Note that this method does no filtering. If it finds the type in a loaded
+  /// module, it returns it. This is intended for use in reflection / debugging
+  /// contexts where access is not a problem.
+  virtual void
+  lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
+                      StringRef relatedEntityKind,
+                      llvm::function_ref<void(TypeDecl *)> receiver) = 0;
+
+  /// Try to parse the string as a Clang function type.
+  ///
+  /// Returns null if there was a parsing failure.
+  virtual const clang::Type *parseClangFunctionType(StringRef type,
+                                                    SourceLoc loc) const = 0;
+
+  /// Print the Clang type.
+  virtual void printClangType(const clang::Type *type,
+                              llvm::raw_ostream &os) const = 0;
 };
 
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_CLANG_MODULE_LOADER_H
-

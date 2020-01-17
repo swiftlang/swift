@@ -124,6 +124,8 @@ public:
                                           SymbolKind SKind);
 
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
+  std::string mangleBackingInitializerEntity(const VarDecl *var,
+                                             SymbolKind SKind);
 
   std::string mangleNominalType(const NominalTypeDecl *decl);
 
@@ -153,20 +155,20 @@ public:
                                              ModuleDecl *Module);
   
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
-                                             GenericSignature *signature,
+                                             GenericSignature signature,
                                              CanType baseType,
                                              SubstitutionMap subs,
                                              ResilienceExpansion expansion);
   std::string mangleKeyPathSetterThunkHelper(const AbstractStorageDecl *property,
-                                             GenericSignature *signature,
+                                             GenericSignature signature,
                                              CanType baseType,
                                              SubstitutionMap subs,
                                              ResilienceExpansion expansion);
   std::string mangleKeyPathEqualsHelper(ArrayRef<CanType> indices,
-                                        GenericSignature *signature,
+                                        GenericSignature signature,
                                         ResilienceExpansion expansion);
   std::string mangleKeyPathHashHelper(ArrayRef<CanType> indices,
-                                      GenericSignature *signature,
+                                      GenericSignature signature,
                                       ResilienceExpansion expansion);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
@@ -190,7 +192,8 @@ public:
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         const AbstractStorageDecl *decl,
-                                        StringRef USRPrefix);
+                                        StringRef USRPrefix,
+                                        bool IsStatic);
 
   std::string mangleLocalTypeDecl(const TypeDecl *type);
 
@@ -242,6 +245,9 @@ protected:
   unsigned appendBoundGenericArgs(DeclContext *dc,
                                   SubstitutionMap subs,
                                   bool &isFirstArgList);
+  
+  /// Append the bound generic arguments as a flat list, disregarding depth.
+  void appendFlatGenericArgs(SubstitutionMap subs);
 
   /// Append any retroactive conformances.
   void appendRetroactiveConformances(Type type);
@@ -251,9 +257,9 @@ protected:
 
   void appendContextOf(const ValueDecl *decl);
 
-  void appendContext(const DeclContext *ctx);
+  void appendContext(const DeclContext *ctx, StringRef useModuleName);
 
-  void appendModule(const ModuleDecl *module);
+  void appendModule(const ModuleDecl *module, StringRef useModuleName);
 
   void appendProtocolName(const ProtocolDecl *protocol,
                           bool allowStandardSubstitution = true);
@@ -287,8 +293,8 @@ protected:
   ///
   /// \returns \c true if a generic signature was appended, \c false
   /// if it was empty.
-  bool appendGenericSignature(const GenericSignature *sig,
-                              GenericSignature *contextSig = nullptr);
+  bool appendGenericSignature(GenericSignature sig,
+                              GenericSignature contextSig = nullptr);
 
   void appendRequirement(const Requirement &reqt);
 
@@ -311,10 +317,11 @@ protected:
   void appendDefaultArgumentEntity(const DeclContext *ctx, unsigned index);
 
   void appendInitializerEntity(const VarDecl *var);
+  void appendBackingInitializerEntity(const VarDecl *var);
 
   CanType getDeclTypeForMangling(const ValueDecl *decl,
-                                 GenericSignature *&genericSig,
-                                 GenericSignature *&parentGenericSig);
+                                 GenericSignature &genericSig,
+                                 GenericSignature &parentGenericSig);
 
   void appendDeclType(const ValueDecl *decl, bool isFunctionMangling = false);
 

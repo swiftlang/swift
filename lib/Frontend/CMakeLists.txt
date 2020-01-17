@@ -7,8 +7,9 @@ add_swift_host_library(swiftFrontend STATIC
   Frontend.cpp
   FrontendInputsAndOutputs.cpp
   FrontendOptions.cpp
-  ParseableInterfaceModuleLoader.cpp
-  ParseableInterfaceSupport.cpp
+  ModuleInterfaceBuilder.cpp
+  ModuleInterfaceLoader.cpp
+  ModuleInterfaceSupport.cpp
   PrintingDiagnosticConsumer.cpp
   SerializedDiagnosticConsumer.cpp)
 add_dependencies(swiftFrontend

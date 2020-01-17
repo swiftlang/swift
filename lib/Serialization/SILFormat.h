@@ -18,7 +18,7 @@
 #ifndef SWIFT_SERIALIZATION_SILFORMAT_H
 #define SWIFT_SERIALIZATION_SILFORMAT_H
 
-#include "swift/Serialization/ModuleFormat.h"
+#include "ModuleFormat.h"
 
 namespace swift {
 namespace serialization {
@@ -56,22 +56,6 @@ enum SILVTableEntryKindEncoding : uint8_t {
 };
 using SILVTableEntryKindField = BCFixed<2>;
 
-enum CheckedCastKindEncoding : uint8_t {
-  SIL_CHECKED_CAST_ARCHETYPE_TO_ARCHETYPE,
-  SIL_CHECKED_CAST_ARCHETYPE_TO_CONCRETE,
-  SIL_CHECKED_CAST_ARRAY_DOWNCAST,
-  SIL_CHECKED_CAST_ARRAY_DOWNCAST_BRIDGED,
-  SIL_CHECKED_CAST_DICTIONARY_DOWNCAST,
-  SIL_CHECKED_CAST_DICTIONARY_DOWNCAST_BRIDGED,
-  SIL_CHECKED_CAST_DOWNCAST,
-  SIL_CHECKED_CAST_IDENTICAL,
-  SIL_CHECKED_CAST_EXISTENTIAL_TO_ARCHETYPE,
-  SIL_CHECKED_CAST_EXISTENTIAL_TO_CONCRETE,
-  SIL_CHECKED_CAST_SUPER_TO_ARCHETYPE,
-  SIL_CHECKED_CAST_CONCRETE_TO_ARCHETYPE,
-  SIL_CHECKED_CAST_CONCRETE_TO_UNRELATED_EXISTENTIAL,
-};
-
 enum CastConsumptionKindEncoding : uint8_t {
   SIL_CAST_CONSUMPTION_TAKE_ALWAYS,
   SIL_CAST_CONSUMPTION_TAKE_ON_SUCCESS,
@@ -93,15 +77,6 @@ enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
   Property,
   Function,
   DeclRef,
-};
-
-// Constants for packing an encoded CheckedCastKind and
-// CastConsumptionKind together.
-enum {
-  // Must be large enough to store all the CheckedCastKindEncodings
-  SIL_CAST_CONSUMPTION_BIT_OFFSET = 4,
-  SIL_CHECKED_CAST_MASK =
-    (1 << SIL_CAST_CONSUMPTION_BIT_OFFSET) - 1
 };
 
 /// The record types within the "sil-index" block.
@@ -157,7 +132,6 @@ namespace sil_block {
     SIL_VTABLE,
     SIL_VTABLE_ENTRY,
     SIL_GLOBALVAR,
-    SIL_INST_CAST, // It has a cast kind instead of an attribute.
     SIL_INIT_EXISTENTIAL,
     SIL_WITNESS_TABLE,
     SIL_WITNESS_METHOD_ENTRY,
@@ -288,11 +262,13 @@ namespace sil_block {
                      BCFixed<3>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
                      BCFixed<1>,  // has qualified ownership
-                     BCFixed<1>,  // must be weakly referenced
+                     BCFixed<1>,  // force weak linking
+                     BC_AVAIL_TUPLE, // availability for weak linking
                      BCFixed<1>,  // is dynamically replacable
+                     BCFixed<1>,  // exact self class
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
-                     GenericEnvironmentIDField,
+                     GenericSignatureIDField,
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute
                      // followed by specialize attributes
@@ -302,7 +278,8 @@ namespace sil_block {
   using SILSpecializeAttrLayout =
       BCRecordLayout<SIL_SPECIALIZE_ATTR,
                      BCFixed<1>, // exported
-                     BCFixed<1> // specialization kind
+                     BCFixed<1>, // specialization kind
+                     GenericSignatureIDField // specialized signature
                      >;
 
   // Has an optional argument list where each argument is a typed valueref.
@@ -349,18 +326,6 @@ namespace sil_block {
     // Trailed by protocol conformance info (if any)
   >;
 
-  // SIL Cast instructions with a cast kind, one type and one typed valueref.
-  using SILInstCastLayout = BCRecordLayout<
-    SIL_INST_CAST,
-    SILInstOpCodeField,
-    BCFixed<4>,          // Cast kind
-    TypeIDField,
-    SILTypeCategoryField,
-    TypeIDField,
-    SILTypeCategoryField,
-    ValueIDField
-  >;
-
   // SIL instructions with one type and a list of values.
   using SILOneTypeValuesLayout = BCRecordLayout<
     SIL_ONE_TYPE_VALUES,
@@ -394,6 +359,7 @@ namespace sil_block {
   using SILOneTypeLayout = BCRecordLayout<
     SIL_ONE_TYPE,
     SILInstOpCodeField,
+    BCFixed<2>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField
   >;

@@ -6,8 +6,6 @@
 
 #cmakedefine SWIFT_HAVE_WORKING_STD_REGEX 1
 
-#cmakedefine HAVE_UNICODE_LIBEDIT 1
-
 #cmakedefine HAVE_WAIT4 1
 
 #cmakedefine HAVE_PROC_PID_RUSAGE 1

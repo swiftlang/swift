@@ -270,6 +270,10 @@ struct PrintOptions {
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
 
+  /// Prints type variables and unresolved types in an expanded notation suitable
+  /// for debugging.
+  bool PrintTypesForDebugging = false;
+  
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
     /// 'some P1 & P2'.
@@ -293,7 +297,7 @@ struct PrintOptions {
   std::vector<AnyAttrKind> ExcludeAttrList = {DAK_Transparent, DAK_Effects,
                                               DAK_FixedLayout,
                                               DAK_ShowInInterface,
-                                              DAK_ImplicitlyUnwrappedOptional};
+                                              DAK_ImplicitlySynthesizesNestedRequirement};
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
@@ -302,8 +306,21 @@ struct PrintOptions {
   /// List of decls that should be printed even if they are implicit and \c SkipImplicit is set to true.
   std::vector<const Decl*> TreatAsExplicitDeclList;
 
+  enum class FunctionRepresentationMode : uint8_t {
+    /// Print the entire convention, including an arguments.
+    /// For example, this will print a cType argument label if applicable.
+    Full,
+    /// Print only the name of the convention, skipping extra argument labels.
+    NameOnly,
+    /// Skip printing the @convention(..) altogether.
+    None
+  };
+
   /// Whether to print function @convention attribute on function types.
-  bool PrintFunctionRepresentationAttrs = true;
+  // FIXME: [clang-function-type-serialization] Once we start serializing Clang
+  // types, we should also start printing the full type in the swiftinterface.
+  FunctionRepresentationMode PrintFunctionRepresentationAttrs =
+    FunctionRepresentationMode::NameOnly;
 
   /// Whether to print storage representation attributes on types, e.g.
   /// '@sil_weak', '@sil_unmanaged'.
@@ -362,6 +379,13 @@ struct PrintOptions {
   /// How to print the keyword argument and parameter name in functions.
   ArgAndParamPrintingMode ArgAndParamPrinting =
       ArgAndParamPrintingMode::MatchSource;
+
+  /// Whether to print the default argument value string
+  /// representation.
+  bool PrintDefaultArgumentValue = true;
+
+  /// Whether to print "_" placeholders for empty arguments.
+  bool PrintEmptyArgumentNames = true;
 
   /// Whether to print documentation comments attached to declarations.
   /// Note that this may print documentation comments from related declarations
@@ -425,7 +449,7 @@ struct PrintOptions {
   /// and constructors) will be printed by this function.
   std::function<void(const ValueDecl *, ASTPrinter &)> FunctionBody;
 
-  BracketOptions BracketOptions;
+  swift::BracketOptions BracketOptions;
 
   // This is explicit to guarantee that it can be called from LLDB.
   PrintOptions() {}
@@ -488,17 +512,22 @@ struct PrintOptions {
         QualifyNestedDeclarations::Always;
     result.PrintDocumentationComments = true;
     result.SkipUnderscoredKeywords = true;
+    result.EnumRawValues = EnumRawValueMode::PrintObjCOnly;
     return result;
   }
 
-  /// Retrieve the set of options suitable for parseable module interfaces.
+  /// Retrieve the set of options suitable for module interfaces.
   ///
   /// This is a format that will be parsed again later, so the output must be
   /// consistent and well-formed.
   ///
-  /// \see swift::emitParseableInterface
-  static PrintOptions printParseableInterfaceFile(bool preferTypeRepr);
+  /// \see swift::emitSwiftInterface
+  static PrintOptions printSwiftInterfaceFile(bool preferTypeRepr,
+                                              bool printFullConvention);
 
+  /// Retrieve the set of options suitable for "Generated Interfaces", which
+  /// are a prettified representation of the public API of a module, to be
+  /// displayed to users in an editor.
   static PrintOptions printModuleInterface();
   static PrintOptions printTypeInterface(Type T);
 
@@ -577,7 +606,8 @@ struct PrintOptions {
     PO.SkipUnderscoredKeywords = true;
     PO.EnumRawValues = EnumRawValueMode::Print;
     PO.PrintImplicitAttrs = false;
-    PO.PrintFunctionRepresentationAttrs = false;
+    PO.PrintFunctionRepresentationAttrs =
+      PrintOptions::FunctionRepresentationMode::None;
     PO.PrintDocumentationComments = false;
     PO.ExcludeAttrList.push_back(DAK_Available);
     PO.SkipPrivateStdlibDecls = true;

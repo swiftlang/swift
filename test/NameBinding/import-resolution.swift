@@ -32,8 +32,8 @@ letters.asdf.A // expected-error{{module 'letters' has no member named 'asdf'}}
 var uA : A // expected-error {{'A' is ambiguous for type lookup in this context}}
 var uB : B = abcde.B()
 var uC : C // expected-error {{'C' is ambiguous for type lookup in this context}}
-var uD : D // expected-error {{'D' is ambiguous for type lookup in this context}}
-var uE : E // expected-error {{'E' is ambiguous for type lookup in this context}}
+var uD : D = asdf.D()
+var uE : E = aeiou.E()
 var uF : F = letters.F()
 
 var qA1 : abcde.A // okay

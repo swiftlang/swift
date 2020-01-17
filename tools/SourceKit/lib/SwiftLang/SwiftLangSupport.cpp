@@ -12,6 +12,7 @@
 
 #include "SwiftLangSupport.h"
 #include "SwiftASTManager.h"
+#include "SwiftEditorDiagConsumer.h"
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/SwiftLang/Factory.h"
 #include "SourceKit/Support/FileSystemProvider.h"
@@ -23,8 +24,10 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Config.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
+#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
 
@@ -263,8 +266,12 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
 
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
-  ASTMgr = std::make_shared<SwiftASTManager>(EditorDocuments, Stats,
-                                             RuntimeResourcePath);
+  ASTMgr = std::make_shared<SwiftASTManager>(EditorDocuments,
+                                             SKCtx.getGlobalConfiguration(),
+                                             Stats, RuntimeResourcePath);
+
+  CompletionInst = std::make_unique<CompletionInstance>();
+
   // By default, just use the in-memory cache.
   CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
 
@@ -273,26 +280,6 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
 }
 
 SwiftLangSupport::~SwiftLangSupport() {
-}
-
-std::unique_ptr<llvm::MemoryBuffer>
-SwiftLangSupport::makeCodeCompletionMemoryBuffer(
-    const llvm::MemoryBuffer *origBuf, unsigned &Offset,
-    const std::string bufferIdentifier) {
-
-  auto origBuffSize = origBuf->getBufferSize();
-  if (Offset > origBuffSize)
-    Offset = origBuffSize;
-
-  auto newBuffer = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
-      origBuffSize + 1, bufferIdentifier);
-  auto *pos = origBuf->getBufferStart() + Offset;
-  auto *newPos =
-      std::copy(origBuf->getBufferStart(), pos, newBuffer->getBufferStart());
-  *newPos = '\0';
-  std::copy(pos, origBuf->getBufferEnd(), newPos + 1);
-
-  return std::unique_ptr<llvm::MemoryBuffer>(newBuffer.release());
 }
 
 UIdent SwiftLangSupport::getUIDForDecl(const Decl *D, bool IsRef) {
@@ -784,6 +771,7 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
     }
 
     // Ignore these.
+    case DAK_ImplicitlySynthesizesNestedRequirement:
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
     case DAK_HasInitialValue:
@@ -829,7 +817,7 @@ bool SwiftLangSupport::printDisplayName(const swift::ValueDecl *D,
 }
 
 bool SwiftLangSupport::printUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
-  return ide::printDeclUSR(D, OS);
+  return ide::printValueDeclUSR(D, OS);
 }
 
 bool SwiftLangSupport::printDeclTypeUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
@@ -873,12 +861,10 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
     if (usePlaceholder)
       OS << "<#T##";
 
-    if (auto substitutedTy = paramTy.subst(substMap))
-      paramTy = substitutedTy;
-
-    if (paramTy->hasError() && param->getTypeLoc().hasLocation()) {
+    paramTy = paramTy.subst(substMap);
+    if (paramTy->hasError() && param->getTypeRepr()) {
       // Fallback to 'TypeRepr' printing.
-      param->getTypeLoc().getTypeRepr()->print(OS);
+      param->getTypeRepr()->print(OS);
     } else {
       paramTy.print(OS);
     }
@@ -913,36 +899,10 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
 
 std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
   std::string InputPath = FilePath;
-#if !defined(_WIN32)
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(InputPath.c_str(), full_path))
-    return path;
-
-  return InputPath;
-#else
-  wchar_t full_path[MAX_PATH] = {0};
-  llvm::SmallVector<llvm::UTF16, 50> utf16Path;
-  llvm::convertUTF8ToUTF16String(InputPath.c_str(), utf16Path);
-
-  HANDLE fileHandle = CreateFileW(
-      (LPCWSTR)utf16Path.data(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-
-  if (fileHandle == INVALID_HANDLE_VALUE)
+  llvm::SmallString<256> output;
+  if (llvm::sys::fs::real_path(InputPath, output))
     return InputPath;
-
-  DWORD numChars = GetFinalPathNameByHandleW(fileHandle, full_path, MAX_PATH,
-                                            FILE_NAME_NORMALIZED);
-  CloseHandle(fileHandle);
-  std::string utf8Path;
-  if (numChars > 0 && numChars <= MAX_PATH) {
-    llvm::ArrayRef<char> pathRef((const char *)full_path,
-                                 (const char *)(full_path + numChars));
-    return llvm::convertUTF16ToUTF8String(pathRef, utf8Path) ? utf8Path
-                                                             : InputPath;
-  }
-  return InputPath;
-#endif
+  return output.str();
 }
 
 void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {
@@ -991,6 +951,70 @@ SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions,
 
   // Fallback to the real filesystem.
   return llvm::vfs::getRealFileSystem();
+}
+
+bool SwiftLangSupport::performCompletionLikeOperation(
+    llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
+    ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    bool EnableASTCaching, std::string &Error,
+    llvm::function_ref<void(CompilerInstance &)> Callback) {
+  assert(FileSystem);
+
+  // Resolve symlinks for the input file; we resolve them for the input files
+  // in the arguments as well.
+  // FIXME: We need the Swift equivalent of Clang's FileEntry.
+  llvm::SmallString<128> bufferIdentifier;
+  if (auto err = FileSystem->getRealPath(
+          UnresolvedInputFile->getBufferIdentifier(), bufferIdentifier))
+    bufferIdentifier = UnresolvedInputFile->getBufferIdentifier();
+
+  // Create a buffer for code completion. This contains '\0' at 'Offset'
+  // position of 'UnresolvedInputFile' buffer.
+  auto origOffset = Offset;
+  auto newBuffer = ide::makeCodeCompletionMemoryBuffer(
+      UnresolvedInputFile, Offset, bufferIdentifier);
+
+  SourceManager SM;
+  DiagnosticEngine Diags(SM);
+  PrintingDiagnosticConsumer PrintDiags;
+  EditorDiagConsumer TraceDiags;
+  trace::TracedOperation TracedOp{trace::OperationKind::CodeCompletion};
+
+  Diags.addConsumer(PrintDiags);
+  if (TracedOp.enabled()) {
+    Diags.addConsumer(TraceDiags);
+    trace::SwiftInvocation SwiftArgs;
+    trace::initTraceInfo(SwiftArgs, bufferIdentifier, Args);
+    TracedOp.setDiagnosticProvider(
+        [&](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
+          TraceDiags.getAllDiagnostics(diags);
+        });
+    TracedOp.start(
+        SwiftArgs,
+        {std::make_pair("OriginalOffset", std::to_string(origOffset)),
+         std::make_pair("Offset", std::to_string(Offset))});
+  }
+  ForwardingDiagnosticConsumer CIDiags(Diags);
+
+  CompilerInvocation Invocation;
+  bool Failed = getASTManager()->initCompilerInvocation(
+      Invocation, Args, Diags, newBuffer->getBufferIdentifier(), FileSystem,
+      Error);
+  if (Failed)
+    return false;
+  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
+    Error = "no input filenames specified";
+    return false;
+  }
+
+  // Pin completion instance.
+  auto CompletionInst = getCompletionInstance();
+
+  return CompletionInst->performOperation(Invocation, Args, FileSystem,
+                                          newBuffer.get(), Offset,
+                                          EnableASTCaching, Error,
+                                          &CIDiags, Callback);
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {

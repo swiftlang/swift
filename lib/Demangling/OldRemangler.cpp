@@ -796,6 +796,11 @@ void Remangler::mangleInitializer(Node *node, EntityContext &ctx) {
   mangleSimpleEntity(node, 'I', "i", ctx);
 }
 
+void Remangler::manglePropertyWrapperBackingInitializer(Node *node,
+                                                        EntityContext &ctx) {
+  mangleSimpleEntity(node, 'I', "P", ctx);
+}
+
 void Remangler::mangleDefaultArgumentInitializer(Node *node,
                                                  EntityContext &ctx) {
   mangleNamedEntity(node, 'I', "A", ctx);
@@ -1245,6 +1250,14 @@ void Remangler::mangleImplResult(Node *node) {
 
 void Remangler::mangleImplEscaping(Node *node) {
   // The old mangler does not encode escaping.
+}
+
+void Remangler::mangleImplSubstitutions(Node *node) {
+  // The old mangler does not encode substituted function types.
+}
+
+void Remangler::mangleImplImpliedSubstitutions(Node *node) {
+  // The old mangler does not encode substituted function types.
 }
 
 void Remangler::mangleImplConvention(Node *node) {

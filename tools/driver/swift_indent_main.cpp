@@ -41,14 +41,11 @@ private:
   CompilerInvocation CompInv;
   std::unique_ptr<ParserUnit> Parser;
   class FormatterDiagConsumer : public swift::DiagnosticConsumer {
-    void handleDiagnostic(
-        SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-        StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-        const swift::DiagnosticInfo &Info,
-        const SourceLoc bufferIndirectlyCausingDiagnostic) override {
+    void handleDiagnostic(SourceManager &SM,
+                          const swift::DiagnosticInfo &Info) override {
       llvm::errs() << "Parse error: ";
-      DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
-                                             FormatArgs);
+      DiagnosticEngine::formatDiagnosticText(llvm::errs(), Info.FormatString,
+                                             Info.FormatArgs);
       llvm::errs() << "\n";
     }
   } DiagConsumer;
@@ -64,6 +61,7 @@ public:
     BufferID = SM.addNewSourceBuffer(std::move(Buffer));
     Parser.reset(new ParserUnit(SM, SourceFileKind::Main,
                                 BufferID, CompInv.getLangOptions(),
+                                CompInv.getTypeCheckerOptions(),
                                 CompInv.getModuleName()));
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
     Parser->parse();

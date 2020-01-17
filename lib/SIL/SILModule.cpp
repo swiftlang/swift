@@ -89,11 +89,13 @@ class SILModule::SerializationCallback final
   }
 };
 
-SILModule::SILModule(ModuleDecl *SwiftModule, SILOptions &Options,
-                     const DeclContext *associatedDC, bool wholeModule)
-    : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),
+SILModule::SILModule(ModuleDecl *SwiftModule, TypeConverter &TC,
+                     const SILOptions &Options, const DeclContext *associatedDC,
+                     bool wholeModule)
+    : TheSwiftModule(SwiftModule),
+      AssociatedDeclContext(associatedDC),
       Stage(SILStage::Raw), wholeModule(wholeModule), Options(Options),
-      serialized(false), SerializeSILAction(), Types(*this) {
+      serialized(false), SerializeSILAction(), Types(TC) {
   // We always add the base SILModule serialization callback.
   std::unique_ptr<DeserializationNotificationHandler> callback(
       new SILModule::SerializationCallback());
@@ -118,10 +120,10 @@ SILModule::~SILModule() {
 }
 
 std::unique_ptr<SILModule>
-SILModule::createEmptyModule(ModuleDecl *M, SILOptions &Options,
+SILModule::createEmptyModule(ModuleDecl *M, TypeConverter &TC, const SILOptions &Options,
                              bool WholeModule) {
   return std::unique_ptr<SILModule>(
-      new SILModule(M, Options, M, WholeModule));
+      new SILModule(M, TC, Options, M, WholeModule));
 }
 
 ASTContext &SILModule::getASTContext() const {
@@ -319,12 +321,17 @@ SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
 }
 
 bool SILModule::loadFunction(SILFunction *F) {
-  SILFunction *NewF = getSILLoader()->lookupSILFunction(F);
+  SILFunction *NewF =
+    getSILLoader()->lookupSILFunction(F, /*onlyUpdateLinkage*/ false);
   if (!NewF)
     return false;
 
   assert(F == NewF);
   return true;
+}
+
+void SILModule::updateFunctionLinkage(SILFunction *F) {
+  getSILLoader()->lookupSILFunction(F, /*onlyUpdateLinkage*/ true);
 }
 
 bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
@@ -489,7 +496,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   if (!Ret) {
     LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of "
                "witness for: ";
-               C.dump(); Requirement.dump());
+               C.dump(llvm::dbgs()); Requirement.dump());
     return std::make_pair(nullptr, nullptr);
   }
 

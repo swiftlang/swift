@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -37,8 +37,10 @@ set(SWIFTLIB_ESSENTIAL
   BridgeStorage.swift
   BridgingBuffer.swift
   Builtin.swift
+  BuiltinMath.swift
   Character.swift
   CocoaArray.swift
+  Codable.swift
   Collection.swift
   CollectionAlgorithms.swift
   Comparable.swift
@@ -61,6 +63,7 @@ set(SWIFTLIB_ESSENTIAL
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
+  ExistentialCollection.swift
   Filter.swift
   FixedArray.swift
   FlatMap.swift
@@ -91,6 +94,7 @@ set(SWIFTLIB_ESSENTIAL
   Map.swift
   MemoryLayout.swift
   UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
+  Mirrors.swift
   Misc.swift
   MutableCollection.swift
   NativeDictionary.swift
@@ -113,6 +117,7 @@ set(SWIFTLIB_ESSENTIAL
   REPL.swift
   Result.swift
   Reverse.swift
+  Runtime.swift
   RuntimeFunctionCounters.swift
   SipHash.swift
   Sequence.swift
@@ -152,6 +157,7 @@ set(SWIFTLIB_ESSENTIAL
   StringNormalization.swift
   StringRangeReplaceableCollection.swift
   StringStorage.swift
+  StringStorageBridge.swift
   StringSwitch.swift
   StringTesting.swift
   StringUnicodeScalarView.swift
@@ -162,6 +168,7 @@ set(SWIFTLIB_ESSENTIAL
   SwiftNativeNSArray.swift
   ThreadLocalStorage.swift
   UIntBuffer.swift
+  UnavailableStringAPIs.swift
   UnicodeEncoding.swift
   UnicodeHelpers.swift
   UnicodeParser.swift
@@ -184,13 +191,9 @@ set(SWIFTLIB_ESSENTIAL
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   AtomicInt.swift.gyb
-  Codable.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   IntegerTypes.swift.gyb
-  Mirrors.swift.gyb
-  Runtime.swift.gyb
-  UnavailableStringAPIs.swift.gyb
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
   )
@@ -217,8 +220,6 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
-  ExistentialCollection.swift.gyb
-  MathFunctions.swift.gyb
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   )
@@ -229,8 +230,6 @@ set(swift_core_private_link_libraries)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
 if(SWIFT_PRIMARY_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
   list(APPEND swift_core_link_flags "-all_load")
-  list(APPEND swift_core_framework_depends Foundation)
-  list(APPEND swift_core_framework_depends CoreFoundation)
   list(APPEND swift_core_private_link_libraries icucore)
 else()
   # With the GNU linker the equivalent of -all_load is to tell the linker

@@ -20,7 +20,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -65,7 +65,9 @@ class ExistentialTransform {
 
   /// Create new generic arguments from existential arguments.
   void
-  convertExistentialArgTypesToGenericArgTypes(GenericSignatureBuilder &Builder);
+  convertExistentialArgTypesToGenericArgTypes(
+      SmallVectorImpl<GenericTypeParamType *> &genericParams,
+      SmallVectorImpl<Requirement> &requirements);
 
   /// Create a name for the inner function.
   std::string createExistentialSpecializedFunctionName();

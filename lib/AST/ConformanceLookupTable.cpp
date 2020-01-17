@@ -21,6 +21,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -88,7 +89,7 @@ void ConformanceLookupTable::ConformanceEntry::dump(raw_ostream &os,
 
   if (Loc.isValid()) {
     os << " loc=";
-    Loc.dump(getProtocol()->getASTContext().SourceMgr);
+    Loc.print(os, getProtocol()->getASTContext().SourceMgr);
   }
 
   switch (getKind()) {
@@ -139,7 +140,7 @@ void ConformanceLookupTable::destroy() {
 }
 
 namespace {
-  using ConformanceConstructionInfo = std::pair<SourceLoc, ProtocolDecl *>;
+  using ConformanceConstructionInfo = Located<ProtocolDecl *>;
 }
 
 template<typename NominalFunc, typename ExtensionFunc>
@@ -193,14 +194,14 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       loader.first->loadAllConformances(next, loader.second, conformances);
       loadAllConformances(next, conformances);
       for (auto conf : conformances) {
-        protocols.push_back({SourceLoc(), conf->getProtocol()});
+        protocols.push_back({conf->getProtocol(), SourceLoc()});
       }
     } else if (next->getParentSourceFile()) {
       bool anyObject = false;
       for (const auto &found :
                getDirectlyInheritedNominalTypeDecls(next, anyObject)) {
-        if (auto proto = dyn_cast<ProtocolDecl>(found.second))
-          protocols.push_back({found.first, proto});
+        if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
+          protocols.push_back({proto, found.Loc});
       }
     }
 
@@ -280,7 +281,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
           // its inherited protocols directly.
           auto source = ConformanceSource::forExplicit(ext);
           for (auto locAndProto : protos)
-            addProtocol(locAndProto.second, locAndProto.first, source);
+            addProtocol(locAndProto.Item, locAndProto.Loc, source);
         });
     break;
 
@@ -469,8 +470,8 @@ void ConformanceLookupTable::addInheritedProtocols(
   bool anyObject = false;
   for (const auto &found :
           getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(found.second))
-      addProtocol(proto, found.first, source);
+    if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
+      addProtocol(proto, found.Loc, source);
   }
 }
 
@@ -794,16 +795,6 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
   if (!conformingDC)
     return nullptr;
 
-  // Everything about this conformance is nailed down, so we can now ensure that
-  // the extension is fully resolved.
-  if (auto resolver = nominal->getASTContext().getLazyResolver()) {
-    if (auto ED = dyn_cast<ExtensionDecl>(conformingDC)) {
-      resolver->resolveExtension(ED);
-    } else {
-      resolver->resolveDeclSignature(cast<NominalTypeDecl>(conformingDC));
-    }
-  }
-
   auto *conformingNominal = conformingDC->getSelfNominalTypeDecl();
 
   // Form the conformance.
@@ -828,7 +819,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
 
     // Form the inherited conformance.
     entry->Conformance =
-        ctx.getInheritedConformance(type, inheritedConformance->getConcrete());
+        ctx.getInheritedConformance(type, inheritedConformance.getConcrete());
   } else {
     // Create or find the normal conformance.
     Type conformingType = conformingDC->getDeclaredInterfaceType();

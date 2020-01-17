@@ -1,0 +1,3 @@
+import FunctionSections
+
+func1()

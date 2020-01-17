@@ -46,20 +46,25 @@ class StreamDiagConsumer : public DiagnosticConsumer {
 public:
   StreamDiagConsumer(llvm::raw_ostream &OS) : OS(OS) {}
 
-  void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
     // FIXME: Print location info if available.
-    switch (Kind) {
-      case DiagnosticKind::Error: OS << "error: "; break;
-      case DiagnosticKind::Warning: OS << "warning: "; break;
-      case DiagnosticKind::Note: OS << "note: "; break;
-      case DiagnosticKind::Remark: OS << "remark: "; break;
+    switch (Info.Kind) {
+    case DiagnosticKind::Error:
+      OS << "error: ";
+      break;
+    case DiagnosticKind::Warning:
+      OS << "warning: ";
+      break;
+    case DiagnosticKind::Note:
+      OS << "note: ";
+      break;
+    case DiagnosticKind::Remark:
+      OS << "remark: ";
+      break;
     }
-    DiagnosticEngine::formatDiagnosticText(OS, FormatString, FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(OS, Info.FormatString,
+                                           Info.FormatArgs);
   }
 };
 } // end anonymous namespace
@@ -366,11 +371,13 @@ struct CacheKeyHashInfo<ASTKey> {
 struct SwiftASTManager::Implementation {
   explicit Implementation(
       std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
+      std::shared_ptr<GlobalConfig> Config,
       std::shared_ptr<SwiftStatistics> Stats, StringRef RuntimeResourcePath)
-      : EditorDocs(EditorDocs), Stats(Stats),
+      : EditorDocs(EditorDocs), Config(Config), Stats(Stats),
         RuntimeResourcePath(RuntimeResourcePath) {}
 
   std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs;
+  std::shared_ptr<GlobalConfig> Config;
   std::shared_ptr<SwiftStatistics> Stats;
   std::string RuntimeResourcePath;
   SourceManager SourceMgr;
@@ -396,8 +403,10 @@ struct SwiftASTManager::Implementation {
 
 SwiftASTManager::SwiftASTManager(
     std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
+    std::shared_ptr<GlobalConfig> Config,
     std::shared_ptr<SwiftStatistics> Stats, StringRef RuntimeResourcePath)
-    : Impl(*new Implementation(EditorDocs, Stats, RuntimeResourcePath)) {}
+    : Impl(*new Implementation(EditorDocs, Config, Stats,
+                               RuntimeResourcePath)) {}
 
 SwiftASTManager::~SwiftASTManager() {
   delete &Impl;
@@ -434,6 +443,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
     llvm::SmallString<128> newFilename;
     if (auto err = FileSystem->getRealPath(input.file(), newFilename))
       newFilename = input.file();
+    llvm::sys::path::native(newFilename);
     bool newIsPrimary = input.isPrimary() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);
     if (newIsPrimary) {
@@ -528,6 +538,20 @@ bool SwiftASTManager::initCompilerInvocation(
 
   // We don't care about LLVMArgs
   FrontendOpts.LLVMArgs.clear();
+
+  // This validation may call stat(2) many times. Disable it to prevent
+  // performance issues.
+  Invocation.getSearchPathOptions().DisableModulesValidateSystemDependencies =
+      true;
+
+  // SwiftSourceInfo files provide source location information for decls coming
+  // from loaded modules. For most IDE use cases it either has an undesirable
+  // impact on performance with no benefit (code completion), results in stale
+  // locations being used instead of more up-to-date indexer locations (cursor
+  // info), or has no observable effect (diagnostics, which are filtered to just
+  // those with a location in the primary file, and everything else).
+  if (Impl.Config->shouldOptimizeForIDE())
+    FrontendOpts.IgnoreSwiftSourceInfo = true;
 
   // Disable expensive SIL options to reduce time spent in SILGen.
   disableExpensiveSILOptions(Invocation.getSILOptions());
@@ -950,7 +974,6 @@ ASTUnitRef ASTProducer::createASTUnit(
 
   if (fileSystem != llvm::vfs::getRealFileSystem()) {
     CompIns.getSourceMgr().setFileSystem(fileSystem);
-    Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
   }
 
   if (CompIns.setup(Invocation)) {
@@ -1000,7 +1023,8 @@ ASTUnitRef ASTProducer::createASTUnit(
 
     if (auto SF = CompIns.getPrimarySourceFile()) {
       SILOptions SILOpts = Invocation.getSILOptions();
-      std::unique_ptr<SILModule> SILMod = performSILGeneration(*SF, SILOpts);
+      auto &TC = CompIns.getSILTypes();
+      std::unique_ptr<SILModule> SILMod = performSILGeneration(*SF, TC, SILOpts);
       runSILDiagnosticPasses(*SILMod);
     }
   }

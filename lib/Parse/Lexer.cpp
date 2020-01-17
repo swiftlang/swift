@@ -289,17 +289,14 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
       return isCommentTriviaKind(Piece.getKind());
     });
     for (auto End = LeadingTrivia.end(); Iter != End; Iter++) {
-      if (Iter->getKind() == TriviaKind::Backtick)
-        // Since Token::getCommentRange() doesn't take backtick into account,
-        // we cannot include length of backtick.
-        break;
       CommentLength += Iter->getLength();
     }
   }
 
   StringRef TokenText { TokStart, static_cast<size_t>(CurPtr - TokStart) };
 
-  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+  if (TriviaRetention == TriviaRetentionMode::WithTrivia && Kind != tok::eof) {
+    assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
     lexTrivia(TrailingTrivia, /* IsForTrailingTrivia */ true);
   }
 
@@ -310,10 +307,6 @@ void Lexer::formEscapedIdentifierToken(const char *TokStart) {
   assert(CurPtr - TokStart >= 3 && "escaped identifier must be longer than or equal 3 bytes");
   assert(TokStart[0] == '`' && "escaped identifier starts with backtick");
   assert(CurPtr[-1] == '`' && "escaped identifier ends with backtick");
-
-  LeadingTrivia.push_back(TriviaKind::Backtick, 1);
-  assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
-  TrailingTrivia.push_back(TriviaKind::Backtick, 1);
 
   formToken(tok::identifier, TokStart);
   // If this token is at ArtificialEOF, it's forced to be tok::eof. Don't mark
@@ -2489,7 +2482,8 @@ void Lexer::lexImpl() {
   }
 }
 
-Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
+Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
+                                CommentRetentionMode CRM) {
   // Don't try to do anything with an invalid location.
   if (!Loc.isValid())
     return Token();
@@ -2508,7 +2502,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // (making this option irrelevant), or the caller lexed comments and
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, LexerMode::Swift,
-          HashbangMode::Allowed, CommentRetentionMode::ReturnAsTokens);
+          HashbangMode::Allowed, CRM);
   L.restoreState(State(Loc));
   return L.peekNextToken();
 }

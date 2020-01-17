@@ -79,19 +79,18 @@ static DemanglerPrinter &operator<<(DemanglerPrinter &printer,
     case '\n': printer << "\\n"; break;
     case '\r': printer << "\\r"; break;
     case '"': printer << "\\\""; break;
-    case '\'': printer << '\''; break; // no need to escape these
     case '\0': printer << "\\0"; break;
     default:
-      auto c = static_cast<char>(C);
-      // Other ASCII control characters should get escaped.
-      if (c < 0x20 || c == 0x7F) {
+      auto c = static_cast<unsigned char>(C);
+      // Other control or high-bit characters should get escaped.
+      if (c < 0x20 || c >= 0x7F) {
         static const char Hexdigit[] = {
           '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
           'A', 'B', 'C', 'D', 'E', 'F'
         };
         printer << "\\x" << Hexdigit[c >> 4] << Hexdigit[c & 0xF];
       } else {
-        printer << c;
+        printer << (char)c;
       }
       break;
     }
@@ -391,6 +390,8 @@ private:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplFunctionAttribute:
     case Node::Kind::ImplFunctionType:
+    case Node::Kind::ImplImpliedSubstitutions:
+    case Node::Kind::ImplSubstitutions:
     case Node::Kind::ImplicitClosure:
     case Node::Kind::ImplParameter:
     case Node::Kind::ImplResult:
@@ -398,6 +399,7 @@ private:
     case Node::Kind::InOut:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
+    case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::KeyPathGetterThunkHelper:
     case Node::Kind::KeyPathSetterThunkHelper:
     case Node::Kind::KeyPathEqualsThunkHelper:
@@ -979,7 +981,7 @@ static bool needSpaceBeforeType(NodePointer Type) {
 }
 
 NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
-  switch (Node->getKind()) {
+  switch (auto kind = Node->getKind()) {
   case Node::Kind::Static:
     Printer << "static ";
     print(Node->getChild(0));
@@ -1125,6 +1127,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::Initializer:
     return printEntity(Node, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/false, "variable initialization expression");
+  case Node::Kind::PropertyWrapperBackingInitializer:
+    return printEntity(
+         Node, asPrefixContext, TypePrinting::NoType,
+         /*hasName*/false, "property wrapper backing initializer");
   case Node::Kind::DefaultArgumentInitializer:
     return printEntity(Node, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/false, "default argument ",
@@ -1483,7 +1489,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
 
     if (Node->hasChildren()) {
       Printer << " for ";
-      print(Node->getFirstChild());
+      printChildren(Node);
     }
     return nullptr;
   case Node::Kind::PartialApplyObjCForwarder:
@@ -1494,7 +1500,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
 
     if (Node->hasChildren()) {
       Printer << " for ";
-      print(Node->getFirstChild());
+      printChildren(Node);
     }
     return nullptr;
   case Node::Kind::KeyPathGetterThunkHelper:
@@ -2012,6 +2018,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::ImplFunctionType:
     printImplFunctionType(Node);
     return nullptr;
+  case Node::Kind::ImplSubstitutions:
+  case Node::Kind::ImplImpliedSubstitutions:
+    Printer << "for <";
+    printChildren(Node->getChild(0), ", ");
+    Printer << '>';
+    if (kind == Node::Kind::ImplImpliedSubstitutions)
+      Printer << " in";
+    return nullptr;
   case Node::Kind::ErrorType:
     Printer << "<ERROR TYPE>";
     return nullptr;
@@ -2142,7 +2156,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   }
   case Node::Kind::DependentAssociatedTypeRef: {
-    Printer << Node->getFirstChild()->getText();
+    if (Node->getNumChildren() > 1) {
+      print(Node->getChild(1));
+      Printer << '.';
+    }
+    print(Node->getChild(0));
     return nullptr;
   }
   case Node::Kind::ReflectionMetadataBuiltinDescriptor:
@@ -2443,7 +2461,8 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
   if (!asPrefixContext && PostfixContext) {
     // Print any left over context which couldn't be printed in prefix form.
     if (Entity->getKind() == Node::Kind::DefaultArgumentInitializer ||
-        Entity->getKind() == Node::Kind::Initializer) {
+        Entity->getKind() == Node::Kind::Initializer ||
+        Entity->getKind() == Node::Kind::PropertyWrapperBackingInitializer) {
       Printer << " of ";
     } else {
       Printer << " in ";

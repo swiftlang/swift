@@ -27,6 +27,23 @@
 
 namespace swift {
 
+enum class Zone : uint8_t {
+  C                       = 0,
+  AST                     = 1,
+  AccessControl           = 11,
+  IDETypes                = 136,
+  IDE                     = 137,
+  IDETypeChecking         = 97,
+  NameLookup              = 9,
+  Parse                   = 8,
+  TypeChecker             = 10,
+  // N.B. This is not a formal zone and exists solely to support the unit tests.
+  ArithmeticEvaluator     = 255,
+};
+
+static_assert(std::is_same<std::underlying_type<Zone>::type, uint8_t>::value,
+              "underlying type is no longer uint8_t!");
+
 /// Form a unique 64-bit integer value describing the type `T`.
 ///
 /// This template needs to be specialized for every type that can
@@ -37,7 +54,7 @@ struct TypeID;
 
 /// Template whose specializations provide the set of type IDs within a
 /// given zone.
-template<uint8_t Zone> struct TypeIDZoneTypes;
+template<Zone Zone> struct TypeIDZoneTypes;
 
 /// Form a type ID given a zone and type value.
 constexpr uint64_t formTypeID(uint8_t zone, uint8_t type) {
@@ -45,7 +62,7 @@ constexpr uint64_t formTypeID(uint8_t zone, uint8_t type) {
 }
 
 // Define the C type zone (zone 0).
-#define SWIFT_TYPEID_ZONE 0
+#define SWIFT_TYPEID_ZONE C
 #define SWIFT_TYPEID_HEADER "swift/Basic/CTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 

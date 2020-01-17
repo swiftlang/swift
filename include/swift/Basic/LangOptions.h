@@ -37,18 +37,8 @@ namespace swift {
 
   /// Kind of implicit platform conditions.
   enum class PlatformConditionKind {
-    /// The active os target (OSX, iOS, Linux, etc.)
-    OS,
-    /// The active arch target (x86_64, i386, arm, arm64, etc.)
-    Arch,
-    /// The active endianness target (big or little)
-    Endianness,
-    /// Runtime support (_ObjC or _Native)
-    Runtime,
-    /// Conditional import of module
-    CanImport,
-    /// Target Environment (currently just 'simulator' or absent)
-    TargetEnvironment,
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) LABEL,
+#include "swift/AST/PlatformConditionKinds.def"
   };
 
   /// Describes which Swift 3 Objective-C inference warnings should be
@@ -66,7 +56,7 @@ namespace swift {
 
   /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
-  class LangOptions {
+  class LangOptions final {
   public:
 
     /// The target we are building for.
@@ -104,6 +94,10 @@ namespace swift {
     /// when using RequireExplicitAvailability.
     std::string RequireExplicitAvailabilityTarget;
 
+    /// If false, '#file' evaluates to the full path rather than a
+    /// human-readable string.
+    bool EnableConcisePoundFile = false;
+
     ///
     /// Support for alternate usage modes
     ///
@@ -115,9 +109,6 @@ namespace swift {
     /// Only used by lldb-moduleimport-test.
     bool EnableMemoryBufferImporter = false;
 
-    /// Enable the DWARFImporter. Only used by lldb-moduleimport-test.
-    bool EnableDWARFImporter = false;
-    
     /// Allows using identifiers with a leading dollar.
     bool EnableDollarIdentifiers = false;
 
@@ -173,60 +164,25 @@ namespace swift {
     /// Flags for developers
     ///
 
-    /// Whether we are debugging the constraint solver.
-    ///
-    /// This option enables verbose debugging output from the constraint
-    /// solver.
-    bool DebugConstraintSolver = false;
-
-    /// Specific solution attempt for which the constraint
-    /// solver should be debugged.
-    unsigned DebugConstraintSolverAttempt = 0;
-
-    /// Line numbers to activate the constraint solver debugger.
-    /// Should be stored sorted.
-    llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
-
     /// Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
-
-    /// Debug the generic signatures computed by the generic signature builder.
-    bool DebugGenericSignatures = false;
-
-    /// Triggers llvm fatal_error if typechecker tries to typecheck a decl or an
-    /// identifier reference with the provided prefix name.
-    /// This is for testing purposes.
-    std::string DebugForbidTypecheckPrefix;
-
-    /// Whether to dump debug info for request evaluator cycles.
-    bool DebugDumpCycles = false;
-
+    
     /// The path to which we should emit GraphViz output for the complete
     /// request-evaluator graph.
     std::string RequestEvaluatorGraphVizPath;
+    
+    /// Whether to dump debug info for request evaluator cycles.
+    bool DebugDumpCycles = false;
 
-    /// The upper bound, in bytes, of temporary data that can be
-    /// allocated by the constraint solver.
-    unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
+    /// Whether to build a request dependency graph for debugging.
+    bool BuildRequestDependencyGraph = false;
 
-    unsigned SolverBindingThreshold = 1024 * 1024;
+    /// Enable SIL type lowering
+    bool EnableSubstSILFunctionTypesForFunctionValues = false;
 
-    /// The upper bound to number of sub-expressions unsolved
-    /// before termination of the shrink phrase of the constraint solver.
-    unsigned SolverShrinkUnsolvedThreshold = 10;
-
-    /// Disable the shrink phase of the expression type checker.
-    bool SolverDisableShrink = false;
-
-    /// Disable constraint system performance hacks.
-    bool DisableConstraintSolverPerformanceHacks = false;
-
-    /// Enable experimental operator designated types feature.
-    bool EnableOperatorDesignatedTypes = false;
-
-    /// Enable constraint solver support for experimental
-    ///        operator protocol designator feature.
-    bool SolverEnableOperatorDesignatedTypes = false;
+    /// Whether to diagnose an ephemeral to non-ephemeral conversion as an
+    /// error.
+    bool DiagnoseInvalidEphemeralnessAsError = false;
 
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;
@@ -237,10 +193,6 @@ namespace swift {
 
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
-
-    /// Staging flag for treating inout parameters as Thread Sanitizer
-    /// accesses.
-    bool DisableTsanInoutInstrumentation = false;
 
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
@@ -256,13 +208,30 @@ namespace swift {
     /// Default is in \c ParseLangArgs
     ///
     /// This is a staging flag; eventually it will be removed.
-    bool EnableASTScopeLookup = false;
+    bool EnableASTScopeLookup = true;
 
     /// Someday, ASTScopeLookup will supplant lookup in the parser
     bool DisableParserLookup = false;
 
-    /// Sound we compare to ASTScope-based resolution for debugging?
-    bool CompareToASTScopeLookup = false;
+    /// Should  we compare to ASTScope-based resolution for debugging?
+    bool CrosscheckUnqualifiedLookup = false;
+
+    /// Should  we stress ASTScope-based resolution for debugging?
+    bool StressASTScopeLookup = false;
+
+    /// Since some tests fail if the warning is output, use a flag to decide
+    /// whether it is. The warning is useful for testing.
+    bool WarnIfASTScopeLookup = false;
+
+    /// Build the ASTScope tree lazily
+    bool LazyASTScopes = true;
+
+    /// Use Clang function types for computing canonical types.
+    /// If this option is false, the clang function types will still be computed
+    /// but will not be used for checking type equality.
+    /// FIXME: [clang-function-type-serialization] This option should be turned
+    /// on once we start serializing clang function types.
+    bool UseClangFunctionTypes = false;
 
     /// Whether to use the import as member inference system
     ///
@@ -316,14 +285,22 @@ namespace swift {
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
-    /// Scaffolding to permit experimentation with finer-grained dependencies
-    /// and faster rebuilds.
-    bool EnableExperimentalDependencies = false;
-    
+    /// Emit the newer, finer-grained swiftdeps file. Eventually will support
+    /// faster rebuilds.
+    bool EnableFineGrainedDependencies = false;
+
+    /// When using fine-grained dependencies, emit dot files for every swiftdeps
+    /// file.
+    bool EmitFineGrainedDependencySourcefileDotFiles = false;
+
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,
     /// set to true.
-    bool ExperimentalDependenciesIncludeIntrafileOnes = false;
+    bool FineGrainedDependenciesIncludeIntrafileOnes = false;
+
+    /// Whether to enable experimental differentiable programming features:
+    /// `@differentiable` declaration attribute, etc.
+    bool EnableExperimentalDifferentiableProgramming = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -337,20 +314,13 @@ namespace swift {
     /// This is only implemented on certain OSs. If no target has been
     /// configured, returns v0.0.0.
     llvm::VersionTuple getMinPlatformVersion() const {
-      unsigned major, minor, revision;
+      unsigned major = 0, minor = 0, revision = 0;
       if (Target.isMacOSX()) {
         Target.getMacOSXVersion(major, minor, revision);
       } else if (Target.isiOS()) {
         Target.getiOSVersion(major, minor, revision);
       } else if (Target.isWatchOS()) {
         Target.getOSVersion(major, minor, revision);
-      } else if (Target.isOSLinux() || Target.isOSFreeBSD() ||
-                 Target.isAndroid() || Target.isOSWindows() ||
-                 Target.isPS4() || Target.isOSHaiku() ||
-                 Target.getTriple().empty()) {
-        major = minor = revision = 0;
-      } else {
-        llvm_unreachable("Unsupported target OS");
       }
       return llvm::VersionTuple(major, minor, revision);
     }
@@ -430,27 +400,124 @@ namespace swift {
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///
-    /// \param suggestions Populated with suggested replacements
+    /// \param suggestedKind Populated with suggested replacement platform condition
+    /// \param suggestedValues Populated with suggested replacement values
     /// if a match is not found.
     static bool checkPlatformConditionSupported(
       PlatformConditionKind Kind, StringRef Value,
-      std::vector<StringRef> &suggestions);
+      PlatformConditionKind &suggestedKind,
+      std::vector<StringRef> &suggestedValues);
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.
     llvm::hash_code getPCHHashComponents() const {
-      auto code = llvm::hash_value(Target.str());
       SmallString<16> Scratch;
       llvm::raw_svector_ostream OS(Scratch);
       OS << EffectiveLanguageVersion;
-      code = llvm::hash_combine(code, OS.str());
-      return code;
+      return llvm::hash_combine(Target.str(), OS.str());
     }
 
   private:
     llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 5>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
+  };
+
+  class TypeCheckerOptions final {
+  public:
+    /// If non-zero, warn when a function body takes longer than this many
+    /// milliseconds to type-check.
+    ///
+    /// Intended for debugging purposes only.
+    unsigned WarnLongFunctionBodies = 0;
+
+    /// If non-zero, warn when type-checking an expression takes longer
+    /// than this many milliseconds.
+    ///
+    /// Intended for debugging purposes only.
+    unsigned WarnLongExpressionTypeChecking = 0;
+
+    /// If non-zero, abort the expression type checker if it takes more
+    /// than this many seconds.
+    unsigned ExpressionTimeoutThreshold = 600;
+
+    /// If non-zero, abort the switch statement exhaustiveness checker if
+    /// the Space::minus function is called more than this many times.
+    ///
+    /// Why this number? Times out in about a second on a 2017 iMac, Retina 5K,
+    /// 4.2 GHz Intel Core i7.
+    /// (It's arbitrary, but will keep the compiler from taking too much time.)
+    unsigned SwitchCheckingInvocationThreshold = 200000;
+
+    /// Whether to delay checking that benefits from having the entire
+    /// module parsed, e.g., Objective-C method override checking.
+    bool DelayWholeModuleChecking = false;
+
+    /// If true, the time it takes to type-check each function will be dumped
+    /// to llvm::errs().
+    bool DebugTimeFunctionBodies = false;
+
+    /// If true, the time it takes to type-check each expression will be
+    /// dumped to llvm::errs().
+    bool DebugTimeExpressions = false;
+
+    /// Indicate that the type checker is checking code that will be
+    /// immediately executed. This will suppress certain warnings
+    /// when executing scripts.
+    bool InImmediateMode = false;
+
+    /// Indicate that the type checker should skip type-checking non-inlinable
+    /// function bodies.
+    bool SkipNonInlinableFunctionBodies = false;
+    
+    ///
+    /// Flags for developers
+    ///
+
+    /// Whether we are debugging the constraint solver.
+    ///
+    /// This option enables verbose debugging output from the constraint
+    /// solver.
+    bool DebugConstraintSolver = false;
+
+    /// Specific solution attempt for which the constraint
+    /// solver should be debugged.
+    unsigned DebugConstraintSolverAttempt = 0;
+
+    /// Line numbers to activate the constraint solver debugger.
+    /// Should be stored sorted.
+    llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
+
+    /// Debug the generic signatures computed by the generic signature builder.
+    bool DebugGenericSignatures = false;
+
+    /// Triggers llvm fatal_error if typechecker tries to typecheck a decl or an
+    /// identifier reference with the provided prefix name.
+    /// This is for testing purposes.
+    std::string DebugForbidTypecheckPrefix;
+
+    /// The upper bound, in bytes, of temporary data that can be
+    /// allocated by the constraint solver.
+    unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
+
+    unsigned SolverBindingThreshold = 1024 * 1024;
+
+    /// The upper bound to number of sub-expressions unsolved
+    /// before termination of the shrink phrase of the constraint solver.
+    unsigned SolverShrinkUnsolvedThreshold = 10;
+
+    /// Disable the shrink phase of the expression type checker.
+    bool SolverDisableShrink = false;
+
+    /// Enable experimental operator designated types feature.
+    bool EnableOperatorDesignatedTypes = false;
+    
+    /// Disable constraint system performance hacks.
+    bool DisableConstraintSolverPerformanceHacks = false;
+
+    /// Enable constraint solver support for experimental
+    ///        operator protocol designator feature.
+    bool SolverEnableOperatorDesignatedTypes = false;
   };
 } // end namespace swift
 

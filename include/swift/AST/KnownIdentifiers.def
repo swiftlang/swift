@@ -34,7 +34,9 @@ IDENTIFIER_(bridgeToObjectiveC)
 IDENTIFIER(buildBlock)
 IDENTIFIER(buildDo)
 IDENTIFIER(buildEither)
+IDENTIFIER(buildExpression)
 IDENTIFIER(buildIf)
+IDENTIFIER(callAsFunction)
 IDENTIFIER(Change)
 IDENTIFIER_WITH_NAME(code_, "_code")
 IDENTIFIER(CodingKeys)
@@ -52,6 +54,7 @@ IDENTIFIER(decode)
 IDENTIFIER(decodeIfPresent)
 IDENTIFIER(Decoder)
 IDENTIFIER(decoder)
+IDENTIFIER_(Differentiation)
 IDENTIFIER(dynamicallyCall)
 IDENTIFIER(dynamicMember)
 IDENTIFIER(Element)
@@ -193,6 +196,9 @@ IDENTIFIER_(nsError)
 
 // Custom string interpolation type used by os log APIs.
 IDENTIFIER(OSLogMessage)
+
+// Differentiable programming
+IDENTIFIER(TangentVector)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

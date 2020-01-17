@@ -13,7 +13,6 @@ silopt_register_sources(
   DiagnoseUnreachable.cpp
   GuaranteedARCOpts.cpp
   IRGenPrepare.cpp
-  MarkUninitializedFixup.cpp
   MandatoryInlining.cpp
   PredictableMemOpt.cpp
   PMOMemoryUseCollector.cpp
@@ -21,5 +20,7 @@ silopt_register_sources(
   SemanticARCOpts.cpp
   SILGenCleanup.cpp
   YieldOnceCheck.cpp
+  MandatoryCombine.cpp
   OSLogOptimization.cpp
+  OwnershipModelEliminator.cpp
 )

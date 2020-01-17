@@ -144,7 +144,7 @@ struct TupleP<U> : P {
 
 @_functionBuilder
 struct Builder {
-  static func buildBlock<S0, S1>(_ stmt1: S0, _ stmt2: S1) // expected-note {{where 'S1' = 'Label<Any>.Type'}}
+  static func buildBlock<S0, S1>(_ stmt1: S0, _ stmt2: S1) // expected-note {{required by static method 'buildBlock' where 'S1' = 'Label<_>.Type'}}
            -> TupleP<(S0, S1)> where S0: P, S1: P {
     return TupleP((stmt1, stmt2))
   }
@@ -166,9 +166,84 @@ struct Label<L> : P where L : P { // expected-note {{'L' declared as parameter t
 }
 
 func test_51167632() -> some P {
-  AnyP(G { // expected-error {{static method 'buildBlock' requires that 'Label<Any>.Type' conform to 'P'}}
+  AnyP(G { // expected-error {{type 'Label<_>.Type' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
     Text("hello")
     Label  // expected-error {{generic parameter 'L' could not be inferred}}
     // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
   })
+}
+
+struct SR11440 {
+  typealias ReturnsTuple<T> = () -> (T, T)
+  subscript<T, U>(@TupleBuilder x: ReturnsTuple<T>) -> (ReturnsTuple<U>) -> Void { //expected-note {{in call to 'subscript(_:)'}}
+    return { _ in }
+  }
+
+  func foo() {
+    // This is okay, we apply the function builder for the subscript arg.
+    self[{
+      5
+      5
+    }]({
+      (5, 5)
+    })
+
+    // But we shouldn't perform the transform for the argument to the call
+    // made on the function returned from the subscript.
+    self[{ // expected-error {{generic parameter 'U' could not be inferred}}
+      5
+      5
+    }]({
+      5
+      5
+    })
+  }
+}
+
+func acceptInt(_: Int, _: () -> Void) { }
+
+// SR-11350 crash due to improper recontextualization.
+func erroneousSR11350(x: Int) {
+  tuplify(true) { b in
+    17
+    x + 25
+    Optional(tuplify(false) { b in
+      if b {
+        acceptInt(0) { }
+      }
+    }).domap(0) // expected-error{{value of type 'Optional<()>' has no member 'domap'}}
+  }
+}
+
+func extraArg() {
+  tuplify(true) { _ in
+    1
+    2
+    3
+    4
+    5
+    6 // expected-error {{extra argument in call}}
+  }
+}
+
+// rdar://problem/53209000 - use of #warning and #error
+tuplify(true) { x in
+  1
+  #error("boom")    // expected-error{{boom}}
+  "hello"
+  #warning("oops")  // expected-warning{{oops}}
+  3.14159
+}
+
+struct MyTuplifiedStruct {
+  var condition: Bool
+
+  @TupleBuilder var computed: some Any { // expected-note{{remove the attribute to explicitly disable the function builder}}{{3-17=}}
+    if condition {
+      return 17 // expected-warning{{application of function builder 'TupleBuilder' disabled by explicit 'return' statement}}
+      // expected-note@-1{{remove 'return' statements to apply the function builder}}{{7-14=}}{{12-19=}}
+    } else {
+           return 42
+    }
+  }
 }

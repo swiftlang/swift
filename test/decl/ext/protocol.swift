@@ -991,9 +991,7 @@ class BadClass5 : BadProto5 {} // expected-error{{type 'BadClass5' does not conf
 typealias A = BadProto1
 typealias B = BadProto1
 
-extension A & B { // okay
-
-}
+extension A & B {} // expected-warning {{extending a protocol composition is not supported; extending 'BadProto1' instead}}
 
 // Suppress near-miss warning for unlabeled initializers.
 protocol P9 {
@@ -1041,9 +1039,9 @@ protocol Empty2 {}
 struct Concrete1 {}
 extension Concrete1 : Empty1 & Empty2 {}
 
-typealias T = Empty1 & Empty2
+typealias TA = Empty1 & Empty2
 struct Concrete2 {}
-extension Concrete2 : T {}
+extension Concrete2 : TA {}
 
 func f<T : Empty1 & Empty2>(_: T) {}
 

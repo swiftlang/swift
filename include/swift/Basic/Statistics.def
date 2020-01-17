@@ -138,11 +138,51 @@ FRONTEND_STATISTIC(AST, NumPrefixOperators)
 /// Number of precedence groups in the AST context.
 FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
 
+/// Number of local lookups into a module.
+FRONTEND_STATISTIC(AST, NumModuleLookupValue)
+
+/// Number of local lookups into a module's class members, for
+/// AnyObject lookup.
+FRONTEND_STATISTIC(AST, NumModuleLookupClassMember)
+
+/// Number of body scopes for iterable types
+FRONTEND_STATISTIC(AST, NumIterableTypeBodyASTScopes)
+
+/// Number of expansions of body scopes for iterable types
+FRONTEND_STATISTIC(AST, NumIterableTypeBodyASTScopeExpansions)
+
+/// Number of brace statment scopes for iterable types
+FRONTEND_STATISTIC(AST, NumBraceStmtASTScopes)
+
+/// Number of expansions of brace statement scopes for iterable types
+FRONTEND_STATISTIC(AST, NumBraceStmtASTScopeExpansions)
+
+/// Number of ASTScope lookups
+FRONTEND_STATISTIC(AST, NumASTScopeLookups)
+
+/// Number of lookups of the cached import graph for a module or
+/// source file.
+FRONTEND_STATISTIC(AST, ImportSetFoldHit)
+FRONTEND_STATISTIC(AST, ImportSetFoldMiss)
+
+FRONTEND_STATISTIC(AST, ImportSetCacheHit)
+FRONTEND_STATISTIC(AST, ImportSetCacheMiss)
+
+FRONTEND_STATISTIC(AST, ModuleVisibilityCacheHit)
+FRONTEND_STATISTIC(AST, ModuleVisibilityCacheMiss)
+
+FRONTEND_STATISTIC(AST, ModuleShadowCacheHit)
+FRONTEND_STATISTIC(AST, ModuleShadowCacheMiss)
+
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 
 /// Number of full braced decl list parsed.
 FRONTEND_STATISTIC(Parse, NumIterableDeclContextParsed)
+
+#define SWIFT_REQUEST(ZONE, NAME, SIG, CACHE, LocOptions) FRONTEND_STATISTIC(Parse, NAME)
+#include "swift/AST/ParseTypeIDZone.def"
+#undef SWIFT_REQUEST
 
 /// Number of conformances that were deserialized by this frontend job.
 FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
@@ -166,18 +206,17 @@ FRONTEND_STATISTIC(Sema, NumLeafScopes)
 /// This is a measure of complexity of the contraction algorithm.
 FRONTEND_STATISTIC(Sema, NumConstraintsConsideredForEdgeContraction)
 
+/// Number of constraint-solving scopes created in the typechecker, while
+/// solving expression type constraints. A rough proxy for "how much work the
+/// expression typechecker did".
+FRONTEND_STATISTIC(Sema, NumCyclicOneWayComponentsCollapsed)
+
 /// Number of declarations that were deserialized. A rough proxy for the amount
 /// of material loaded from other modules.
 FRONTEND_STATISTIC(Sema, NumDeclsDeserialized)
 
-/// Number of declarations validated.
-FRONTEND_STATISTIC(Sema, NumDeclsValidated)
-
 /// Number of declarations type checked.
 FRONTEND_STATISTIC(Sema, NumDeclsTypechecked)
-
-/// Number of declarations finalized.
-FRONTEND_STATISTIC(Sema, NumDeclsFinalized)
 
 /// Number of synthesized accessors.
 FRONTEND_STATISTIC(Sema, NumAccessorsSynthesized)
@@ -191,12 +230,6 @@ FRONTEND_STATISTIC(Sema, NumFunctionsTypechecked)
 /// Number of generic signature builders constructed. Rough proxy for
 /// amount of work the GSB does analyzing type signatures.
 FRONTEND_STATISTIC(Sema, NumGenericSignatureBuilders)
-
-/// Number of lazy generic environments registered.
-FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironments)
-
-/// Number of lazy generic environments deserialized.
-FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironmentsLoaded)
 
 /// Number of lazy requirement signatures registered.
 FRONTEND_STATISTIC(Sema, NumLazyRequirementSignatures)
@@ -225,14 +258,16 @@ FRONTEND_STATISTIC(Sema, NumTypesValidated)
 /// Number of lazy iterable declaration contexts left unloaded.
 FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 
+/// Number of lookups into a module and its imports.
+
 /// All type check requests go into the Sema area.
-#define SWIFT_TYPEID(NAME) FRONTEND_STATISTIC(Sema, NAME)
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(Sema, NAME)
 #include "swift/AST/AccessTypeIDZone.def"
 #include "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #include "swift/IDE/IDERequestIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 
 /// The next 10 statistics count 5 kinds of SIL entities present
 /// after the SILGen and SILOpt phases. The entities are functions,

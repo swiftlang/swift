@@ -34,11 +34,11 @@ class TypeChecker;
 /// correction even if the corrected name resolves to an overload set.
 class SyntacticTypoCorrection {
 public:
-  DeclName WrittenName;
+  DeclNameRef WrittenName;
   DeclNameLoc Loc;
   DeclName CorrectedName;
 
-  SyntacticTypoCorrection(DeclName writtenName, DeclNameLoc writtenLoc,
+  SyntacticTypoCorrection(DeclNameRef writtenName, DeclNameLoc writtenLoc,
                           DeclName correctedName)
     : WrittenName(writtenName), Loc(writtenLoc), CorrectedName(correctedName) {}
 
@@ -48,15 +48,14 @@ public:
 /// A collection of typo-correction candidates.
 class TypoCorrectionResults {
 public:
-  TypeChecker &TC;
-  DeclName WrittenName;
+  DeclNameRef WrittenName;
   DeclNameLoc Loc;
   bool ClaimedCorrection = false;
 
   SmallVector<ValueDecl *, 4> Candidates;
 
-  TypoCorrectionResults(TypeChecker &tc, DeclName writtenName, DeclNameLoc loc)
-    : TC(tc), WrittenName(writtenName), Loc(loc) {}
+  TypoCorrectionResults(DeclNameRef writtenName, DeclNameLoc loc)
+    : WrittenName(writtenName), Loc(loc) {}
 
   /// Try to claim a unique correction from this collection that's simple
   /// enough to include "inline" in the primary diagnostic.  Note that

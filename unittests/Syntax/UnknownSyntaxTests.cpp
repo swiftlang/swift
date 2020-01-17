@@ -37,9 +37,9 @@ FunctionCallExprSyntax getCannedFunctionCall() {
     SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
 
-  auto Arg = SyntaxFactory::makeFunctionCallArgument(Label, Colon, One,
+  auto Arg = SyntaxFactory::makeTupleExprElement(Label, Colon, One,
                                                      NoComma);
-  auto Args = SyntaxFactory::makeFunctionCallArgumentList({ Arg });
+  auto Args = SyntaxFactory::makeTupleExprElementList({ Arg });
 
   return SyntaxFactory::makeFunctionCallExpr(getCannedSymbolicRef(), LParen,
                                              Args, RParen, None);
@@ -121,7 +121,7 @@ TEST(UnknownSyntaxTests, UnknownSyntaxGetAPIs) {
     SmallString<48> UnknownScratch;
     llvm::raw_svector_ostream UnknownOS(UnknownScratch);
     auto ArgsGottenFromUnknown = Unknown.getChild(1)
-      .castTo<FunctionCallArgumentListSyntax>();
+      .castTo<TupleExprElementListSyntax>();
     ArgsGottenFromUnknown.print(UnknownOS);
 
     ASSERT_EQ(KnownOS.str().str(), UnknownOS.str().str());
@@ -136,7 +136,7 @@ TEST(UnknownSyntaxTests, EmbedUnknownExpr) {
   auto SymbolicRef = getCannedSymbolicRef();
   auto LParen = SyntaxFactory::makeLeftParenToken({}, {});
   auto RParen = SyntaxFactory::makeRightParenToken({}, {});
-  auto EmptyArgs = SyntaxFactory::makeBlankFunctionCallArgumentList();
+  auto EmptyArgs = SyntaxFactory::makeBlankTupleExprElementList();
 
   SmallString<48> KnownScratch;
   llvm::raw_svector_ostream KnownOS(KnownScratch);

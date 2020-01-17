@@ -41,6 +41,7 @@ func test() {
 // CONTEXT-NOT: key.name:
 // CONTEXT: key.name: "test()"
 // CONTEXT: key.name: "#column"
+// CONTEXT: key.name: "complete_sort_order"
 
 // RUN: %complete-test -tok=STMT_0 %s | %FileCheck %s -check-prefix=STMT
 func test1() {
@@ -189,7 +190,7 @@ func test6() {
 // VOID_1_RAW-NEXT: key.sourcetext: "foo1()",
 // VOID_1_RAW-NEXT: key.description: "foo1()",
 // VOID_1_RAW-NEXT: key.typename: "Void",
-// VOID_1_RAW-NEXT: key.context: source.codecompletion.context.thismodule,
+// VOID_1_RAW-NEXT: key.context: source.codecompletion.context.local,
 // VOID_1_RAW-NEXT: key.num_bytes_to_erase: 0,
 // VOID_1_RAW-NEXT: key.not_recommended: 1,
 
@@ -204,8 +205,8 @@ func test7() {
   #^CASE_0,caseSensitiveCheck,CaseSensitiveCheck^#
 }
 // CASE_0: Results for filterText: caseSensitiveCheck [
-// CASE_0: caseSensitiveCheck
 // CASE_0: CaseSensitiveCheck
+// CASE_0: caseSensitiveCheck
 // CASE_0: caseSensitiveCheck.
 // CASE_0: ]
 // CASE_0: Results for filterText: CaseSensitiveCheck [

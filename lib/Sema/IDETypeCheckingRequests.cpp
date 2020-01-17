@@ -25,7 +25,7 @@ using namespace swift;
 
 namespace swift {
 // Implement the IDE type zone.
-#define SWIFT_TYPEID_ZONE SWIFT_IDE_TYPE_CHECK_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE IDETypeChecking
 #define SWIFT_TYPEID_HEADER "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
@@ -34,14 +34,14 @@ namespace swift {
 
 // Define request evaluation functions for each of the IDE type check requests.
 static AbstractRequestFunction *ideTypeCheckRequestFunctions[] = {
-#define SWIFT_TYPEID(Name)                                    \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
 reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/Sema/IDETypeCheckingRequestIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 };
 
 void swift::registerIDETypeCheckRequestFunctions(Evaluator &evaluator) {
-  evaluator.registerRequestFunctions(SWIFT_IDE_TYPE_CHECK_REQUESTS_TYPEID_ZONE,
+  evaluator.registerRequestFunctions(Zone::IDETypeChecking,
                                      ideTypeCheckRequestFunctions);
 }
 
@@ -56,10 +56,8 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   if (!ED->isConstrainedExtension())
     return true;
 
-  TypeChecker *TC = &TypeChecker::createForContext((DC->getASTContext()));
-  TC->validateExtension(const_cast<ExtensionDecl *>(ED));
-
-  GenericSignature *genericSig = ED->getGenericSignature();
+  (void)swift::createTypeChecker(DC->getASTContext());
+  GenericSignature genericSig = ED->getGenericSignature();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       DC->getParentModule(), ED->getExtendedNominal());
   return areGenericRequirementsSatisfied(DC, genericSig, substMap,
@@ -77,7 +75,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   const GenericContext *genericDecl = VD->getAsGenericContext();
   if (!genericDecl)
     return true;
-  const GenericSignature *genericSig = genericDecl->getGenericSignature();
+  GenericSignature genericSig = genericDecl->getGenericSignature();
   if (!genericSig)
     return true;
 
@@ -104,26 +102,21 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
                                    TypeRelationCheckInput Owner) const {
   Optional<constraints::ConstraintKind> CKind;
   switch (Owner.Relation) {
-  case TypeRelation::EqualTo:
-    return Owner.Pair.FirstTy->isEqual(Owner.Pair.SecondTy);
-  case TypeRelation::PossiblyEqualTo:
-    CKind = constraints::ConstraintKind::Bind;
-    break;
   case TypeRelation::ConvertTo:
     CKind = constraints::ConstraintKind::Conversion;
     break;
   }
   assert(CKind.hasValue());
-  return canSatisfy(Owner.Pair.FirstTy, Owner.Pair.SecondTy, Owner.OpenArchetypes,
-                    *CKind, Owner.DC);
+  return TypeChecker::typesSatisfyConstraint(Owner.Pair.FirstTy,
+                                             Owner.Pair.SecondTy,
+                                             Owner.OpenArchetypes,
+                                             *CKind, Owner.DC);
 }
 
 llvm::Expected<TypePair>
 RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
                                               SubscriptDecl *subscript) const {
-  auto &TC = TypeChecker::createForContext(subscript->getASTContext());
-
-  if (!isValidKeyPathDynamicMemberLookup(subscript, TC))
+  if (!isValidKeyPathDynamicMemberLookup(subscript))
     return TypePair();
 
   const auto *param = subscript->getIndices()->get(0);
@@ -134,11 +127,4 @@ RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
   assert(!genericArgs.empty() && genericArgs.size() == 2 &&
          "invalid keypath dynamic member");
   return TypePair(genericArgs[0], genericArgs[1]);
-}
-
-llvm::Expected<bool>
-HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
-                                                 TypeBase *ty) const {
-  llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
-  return hasDynamicMemberLookupAttribute(Type(ty), DynamicMemberLookupCache);
 }

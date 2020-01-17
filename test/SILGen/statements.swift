@@ -167,8 +167,8 @@ func for_loops2() {
   // rdar://problem/19316670
   // CHECK: alloc_stack $Optional<MyClass>
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown]
-  // CHECK: [[NEXT:%[0-9]+]] = function_ref @$ss16IndexingIteratorV4next{{[_0-9a-zA-Z]*}}F
-  // CHECK-NEXT: apply [[NEXT]]<Array<MyClass>>
+  // CHECK: [[NEXT:%[0-9]+]] = witness_method $IndexingIterator<Array<MyClass>>, #IteratorProtocol.next!1 : <Self where Self : IteratorProtocol> (inout Self) -> () -> Self.Element? : $@convention(witness_method: IteratorProtocol) <τ_0_0 where τ_0_0 : IteratorProtocol> (@inout τ_0_0) -> @out Optional<τ_0_0.Element>
+  // CHECK-NEXT: apply [[NEXT]]<IndexingIterator<Array<MyClass>>>
   // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
   let objects = [MyClass(), MyClass() ]
   for obj in objects {
@@ -631,7 +631,7 @@ func testCleanupEmission<T>(_ x: T) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s10statements15test_is_patternyyAA9BaseClassCF
 func test_is_pattern(_ y : BaseClass) {
-  // checked_cast_br %0 : $BaseClass to $DerivedClass
+  // checked_cast_br %0 : $BaseClass to DerivedClass
   guard case is DerivedClass = y else { marker_1(); return }
 
   marker_2()
@@ -641,7 +641,7 @@ func test_is_pattern(_ y : BaseClass) {
 func test_as_pattern(_ y : BaseClass) -> DerivedClass {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $BaseClass):
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
-  // CHECK:   checked_cast_br [[ARG_COPY]] : $BaseClass to $DerivedClass
+  // CHECK:   checked_cast_br [[ARG_COPY]] : $BaseClass to DerivedClass
   guard case let result as DerivedClass = y else {  }
   // CHECK: bb{{.*}}({{.*}} : @owned $DerivedClass):
 

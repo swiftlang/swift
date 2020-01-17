@@ -57,7 +57,7 @@ extension Final: Encodable where T: Encodable {}
 
 extension Final: Decodable where T: Decodable {}
 // CHECK-LABEL: // Final<A>.init(from:)
-// CHECK-NEXT: sil hidden [ossa] @$s29synthesized_conformance_class5FinalCAASeRzlE4fromACyxGs7Decoder_p_tKcfC : $@convention(method) <T where T : Decodable> (@in Decoder, @thick Final<T>.Type) -> (@owned Final<T>, @error Error) {
+// CHECK-NEXT: sil hidden [exact_self_class] [ossa] @$s29synthesized_conformance_class5FinalCAASeRzlE4fromACyxGs7Decoder_p_tKcfC : $@convention(method) <T where T : Decodable> (@in Decoder, @thick Final<T>.Type) -> (@owned Final<T>, @error Error) {
 
 extension Nonfinal: Encodable where T: Encodable {}
 // CHECK-LABEL: // Nonfinal<A>.encode(to:)

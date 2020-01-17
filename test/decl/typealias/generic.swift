@@ -45,7 +45,7 @@ typealias Tuple3<T1> = (T1, T1) where T1 : Hashable
 
 let _ : Tuple2<Int, String> = (1, "foo")
 let _ : Tuple2 = (1, "foo")
-let _ : Tuple2<Int, String> = ("bar",  // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
+let _ : Tuple2<Int, String> = ("bar",  // expected-error {{cannot convert value of type '(String, String)' to specified type 'Tuple2<Int, String>' (aka '(Int, String)')}}
                                "foo")
 
 func f() {
@@ -57,7 +57,7 @@ func f() {
 
 typealias A<T1, T2> = MyType<T2, T1>  // expected-note {{generic type 'A' declared here}}
 
-typealias B<T1> = MyType<T1, T1>  // expected-note {{'T1' declared as parameter to type 'B'}}
+typealias B<T1> = MyType<T1, T1>
 
 typealias C<T> = MyType<String, T>
 
@@ -68,7 +68,7 @@ typealias E<T1, T2> = Int  // expected-note {{generic type 'E' declared here}}
 // expected-note@-1 {{'T1' declared as parameter to type 'E'}}
 // expected-note@-2 {{'T2' declared as parameter to type 'E'}}
 
-typealias F<T1, T2> = (T1) -> T2
+typealias F<T1, T2> = (T1) -> T2 // expected-note {{'T1' declared as parameter to type 'F'}}
 
 // Type alias of type alias.
 typealias G<S1, S2> = A<S1, S2>
@@ -94,19 +94,18 @@ let _ : D<Int, Int, Float> = D(a: 1, b: 2)
 
 let _ : F = { (a : Int) -> Int in a }  // Infer the types of F
 
-// TODO QoI: Cannot infer T1/T2.
-let _ : F = { a in a }  // expected-error {{type of expression is ambiguous without more context}}
+let _ : F = { a in a } // expected-error {{generic parameter 'T1' could not be inferred}}
 
 _ = MyType(a: "foo", b: 42)
 _ = A(a: "foo", b: 42)
 _ = A<Int, String>(a: "foo", b: 42)
-_ = A<String, Int>(a: "foo", // expected-error {{'String' is not convertible to 'Int'}}
-  b: 42)
+_ = A<String, Int>(a: "foo", // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  b: 42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 _ = B(a: 12, b: 42)
 _ = B(a: 12, b: 42 as Float)
-_ = B(a: "foo", b: 42)     // expected-error {{generic parameter 'T1' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{6-6=<Any>}}
+_ = B(a: "foo", b: 42)     // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 _ = C(a: "foo", b: 42)
-_ = C(a: 42,        // expected-error {{'Int' is not convertible to 'String'}}
+_ = C(a: 42,        // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
   b: 42)
 
 _ = G(a: "foo", b: 42)
@@ -158,11 +157,11 @@ class GenericClass<T> {
   }
 
   func testCaptureInvalid1<S>(s: S, t: T) -> TA<Int> {
-    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'MyType<T, S>' to return type 'MyType<T, Int>'}}
+    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'GenericClass<T>.TA<S>' (aka 'MyType<T, S>') to return type 'GenericClass<T>.TA<Int>' (aka 'MyType<T, Int>')}}
   }
 
   func testCaptureInvalid2<S>(s: Int, t: T) -> TA<S> {
-    return TA(a: t, b: s) // expected-error {{cannot convert return expression of type 'MyType<T, Int>' to return type 'MyType<T, S>'}}
+    return TA(a: t, b: s) // expected-error {{cannot convert value of type 'Int' to expected argument type 'S'}}
   }
 
   struct NestedStruct<U> {
@@ -245,10 +244,10 @@ let _: ConcreteStruct.O<Int> = ConcreteStruct.O<Int>(123)
 let _ = GenericClass.TA<Float>(a: 4.0, b: 1) // FIXME
 let _ = GenericClass.TA<Float>(a: 1, b: 4.0)
 
-let _ = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
+let _ = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _ = GenericClass<Int>.TA(a: 1, b: 4.0)
 
-let _ = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
+let _ = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _ = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 
 let _: GenericClass.TA = GenericClass.TA(a: 4.0, b: 1)
@@ -263,7 +262,7 @@ let _: GenericClass.TA = GenericClass<Int>.TA(a: 1, b: 4.0)
 let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Double, Int>' to specified type 'GenericClass<Int>.TA'}}
+let _: GenericClass<Int>.TA = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass<Int>.TA = GenericClass.TA(a: 1, b: 4.0)
 
 let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot assign value of type 'MyType<Float, Int>' to type 'MyType<Int, Int>'}}
@@ -275,11 +274,11 @@ let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: 1, b: 4.0)
 let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Double, Int>' to specified type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot assign value of type 'MyType<Float, Float>' to type 'MyType<Int, Float>'}}
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // expected-error {{cannot assign value of type 'MyType<Float, Float>' to type 'MyType<Int, Float>'}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot assign value of type 'MyType<Float, Float>' to type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // expected-error {{cannot assign value of type 'MyType<Float, Float>' to type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
 
 let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 1, b: 4.0)
@@ -303,9 +302,9 @@ func takesSugaredType2(m: GenericClass<Int>.TA<Float>) {
 extension A {}
 
 extension A<T> {}  // expected-error {{generic type 'A' specialized with too few type parameters (got 1, but expected 2)}}
-extension A<Float,Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'A' with constraints specified by a 'where' clause}}
-extension C<T> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'C' with constraints specified by a 'where' clause}}
-extension C<Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'C' with constraints specified by a 'where' clause}}
+extension A<Float,Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
+extension C<T> {}  // expected-error {{use of undeclared type 'T'}}
+extension C<Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
 
 
 protocol ErrorQ {

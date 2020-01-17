@@ -649,9 +649,10 @@ getInitializerForComputedComponent(IRGenModule &IGM,
 }
 
 static llvm::Constant *
-emitMetadataTypeRefForKeyPath(IRGenModule &IGM, CanType type) {
+emitMetadataTypeRefForKeyPath(IRGenModule &IGM, CanType type,
+                              CanGenericSignature sig) {
   // Produce a mangled name for the type.
-  auto constant = IGM.getTypeRef(type, MangledTypeRefRole::Metadata).first;
+  auto constant = IGM.getTypeRef(type, sig, MangledTypeRefRole::Metadata).first;
   
   // Mask the bottom bit to tell the key path runtime this is a mangled name
   // rather than a direct reference.
@@ -694,11 +695,13 @@ emitKeyPathComponent(IRGenModule &IGM,
          && "must be 32-bit-aligned here");
 
   SILType loweredBaseTy;
-  GenericContextScope scope(IGM,
-         genericEnv ? genericEnv->getGenericSignature()->getCanonicalSignature()
-                    : nullptr);
   loweredBaseTy = IGM.getLoweredType(AbstractionPattern::getOpaque(),
                                      baseTy->getWithoutSpecifierType());
+  // TODO: Eliminate GenericContextScope entirely
+  GenericContextScope scope(
+      IGM, genericEnv
+               ? genericEnv->getGenericSignature().getCanonicalSignature()
+               : nullptr);
   switch (auto kind = component.getKind()) {
   case KeyPathPatternComponent::Kind::StoredProperty: {
     auto property = cast<VarDecl>(component.getStoredPropertyDecl());
@@ -789,9 +792,8 @@ emitKeyPathComponent(IRGenModule &IGM,
       switch (getClassFieldAccess(IGM, loweredBaseContextTy, property)) {
       case FieldAccess::ConstantDirect: {
         // Known constant fixed offset.
-        auto offset = tryEmitConstantClassFragilePhysicalMemberOffset(IGM,
-                                                                loweredClassTy,
-                                                                property);
+        auto offset = tryEmitConstantClassFragilePhysicalMemberOffset(
+            IGM, loweredClassTy, property);
         assert(offset && "no constant offset for ConstantDirect field?!");
         addFixedOffset(/*struct*/ false, property->isLet(), offset);
         break;
@@ -837,27 +839,28 @@ emitKeyPathComponent(IRGenModule &IGM,
       SmallVector<llvm::Constant *, 4> externalSubArgs;
       auto componentSig = externalDecl->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
+
+      auto componentCanSig = componentSig.getCanonicalSignature();
       auto subs = component.getExternalSubstitutions();
       if (!subs.empty()) {
         enumerateGenericSignatureRequirements(
-          componentSig->getCanonicalSignature(),
-          [&](GenericRequirement reqt) {
-            auto substType = reqt.TypeParameter.subst(subs)
-              ->getCanonicalType();
-            if (!reqt.Protocol) {
-              // Type requirement.
-              externalSubArgs.push_back(
-                emitMetadataTypeRefForKeyPath(IGM, substType));
-            } else {
-              // Protocol requirement.
-              auto conformance = subs.lookupConformance(
-                           reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
-              externalSubArgs.push_back(
-                IGM.emitWitnessTableRefString(substType, *conformance,
-                      genericEnv ? genericEnv->getGenericSignature() : nullptr,
-                      /*shouldSetLowBit*/ true));
-            }
-          });
+            componentCanSig, [&](GenericRequirement reqt) {
+              auto substType =
+                  reqt.TypeParameter.subst(subs)->getCanonicalType();
+              if (!reqt.Protocol) {
+                // Type requirement.
+                externalSubArgs.push_back(emitMetadataTypeRefForKeyPath(
+                    IGM, substType, componentCanSig));
+              } else {
+                // Protocol requirement.
+                auto conformance = subs.lookupConformance(
+                    reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
+                externalSubArgs.push_back(IGM.emitWitnessTableRefString(
+                    substType, conformance,
+                    genericEnv ? genericEnv->getGenericSignature() : nullptr,
+                    /*shouldSetLowBit*/ true));
+              }
+            });
       }
       fields.addInt32(
         KeyPathComponentHeader::forExternalComponent(externalSubArgs.size())
@@ -924,7 +927,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         fnName.append("keypath_get_selector_");
         fnName.append(selectorName);
         auto fn = cast<llvm::Function>(
-          IGM.Module.getOrInsertFunction(fnName, fnTy));
+          IGM.Module.getOrInsertFunction(fnName, fnTy).getCallee());
         if (fn->empty()) {
           fn->setLinkage(llvm::Function::PrivateLinkage);
           IRGenFunction subIGF(IGM, fn);
@@ -1099,7 +1102,8 @@ emitKeyPathComponent(IRGenModule &IGM,
   case KeyPathPatternComponent::Kind::TupleElement:
     assert(baseTy->is<TupleType>() && "not a tuple");
 
-    SILType loweredTy = IGM.getLoweredType(baseTy);
+    SILType loweredTy = IGM.getLoweredType(AbstractionPattern::getOpaque(),
+                                           baseTy);
 
     // Tuple with fixed layout
     //
@@ -1108,7 +1112,8 @@ emitKeyPathComponent(IRGenModule &IGM,
     // the compiler knows that the tuple element is always at offset 0.
     // TODO: If this is behavior is not desired we should find a way to skip to
     // the next section of code e.g. check if baseTy has archetypes?
-    if (auto offset = getFixedTupleElementOffset(IGM, loweredTy, component.getTupleIndex())) {
+    if (auto offset = getFixedTupleElementOffset(IGM, loweredTy,
+                                                 component.getTupleIndex())) {
       auto header = KeyPathComponentHeader
                       ::forStructComponentWithInlineOffset(/*isLet*/ false,
                                                            offset->getValue());
@@ -1154,7 +1159,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   
   GenericEnvironment *genericEnv = nullptr;
   if (auto sig = pattern->getGenericSignature()) {
-    genericEnv = sig->createGenericEnvironment();
+    genericEnv = sig->getGenericEnvironment();
     enumerateGenericSignatureRequirements(pattern->getGenericSignature(),
       [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   }
@@ -1182,9 +1187,11 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     getAddrOfGenericEnvironment(pattern->getGenericSignature()));
   // Store type references for the root and leaf.
   fields.addRelativeAddress(
-    emitMetadataTypeRefForKeyPath(*this, rootTy));
+    emitMetadataTypeRefForKeyPath(*this, rootTy,
+                                  pattern->getGenericSignature()));
   fields.addRelativeAddress(
-    emitMetadataTypeRefForKeyPath(*this, valueTy));
+    emitMetadataTypeRefForKeyPath(*this, valueTy,
+                                  pattern->getGenericSignature()));
   
   // Add a pointer to the ObjC KVC compatibility string, if there is one, or
   // null otherwise.
@@ -1238,7 +1245,9 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     // For all but the last component, we pack in the type of the component.
     if (i + 1 != pattern->getComponents().size()) {
       fields.addRelativeAddress(
-        emitMetadataTypeRefForKeyPath(*this, component.getComponentType()));
+        emitMetadataTypeRefForKeyPath(*this,
+                                      component.getComponentType(),
+                                      pattern->getGenericSignature()));
     }
     baseTy = component.getComponentType();
   }
@@ -1322,9 +1331,10 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
   SmallVector<GenericRequirement, 4> requirements;
   CanGenericSignature genericSig;
   if (genericEnv) {
-    genericSig = prop->getDecl()->getInnermostDeclContext()
-                                ->getGenericSignatureOfContext()
-                                ->getCanonicalSignature();
+    genericSig = prop->getDecl()
+                     ->getInnermostDeclContext()
+                     ->getGenericSignatureOfContext()
+                     .getCanonicalSignature();
     enumerateGenericSignatureRequirements(genericSig,
       [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   }

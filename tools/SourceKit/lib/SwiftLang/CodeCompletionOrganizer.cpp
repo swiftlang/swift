@@ -58,7 +58,7 @@ class ImportDepth {
 
 public:
   ImportDepth() = default;
-  ImportDepth(ASTContext &context, CompilerInvocation &invocation);
+  ImportDepth(ASTContext &context, const CompilerInvocation &invocation);
 
   Optional<uint8_t> lookup(StringRef module) {
     auto I = depths.find(module);
@@ -176,7 +176,6 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
       }
       break;
     case CompletionKind::PostfixExprBeginning:
-    case CompletionKind::AssignmentRHS:
     case CompletionKind::CallArg:
     case CompletionKind::ReturnStmtExpr:
     case CompletionKind::YieldStmtExpr:
@@ -321,7 +320,8 @@ CodeCompletionViewRef CodeCompletionOrganizer::takeResultsView() {
 // ImportDepth
 //===----------------------------------------------------------------------===//
 
-ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
+ImportDepth::ImportDepth(ASTContext &context,
+                         const CompilerInvocation &invocation) {
   llvm::DenseSet<ModuleDecl *> seen;
   std::deque<std::pair<ModuleDecl *, uint8_t>> worklist;
 

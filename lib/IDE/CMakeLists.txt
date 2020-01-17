@@ -2,6 +2,7 @@ add_swift_host_library(swiftIDE STATIC
   CodeCompletion.cpp
   CodeCompletionCache.cpp
   CommentConversion.cpp
+  CompletionInstance.cpp
   ConformingMethodList.cpp
   ExprContextAnalysis.cpp
   Formatting.cpp
@@ -19,7 +20,6 @@ add_swift_host_library(swiftIDE STATIC
 target_link_libraries(swiftIDE PRIVATE
   swiftAST
   swiftClangImporter
-  swiftDWARFImporter
   swiftFrontend
   swiftIndex
   swiftParse

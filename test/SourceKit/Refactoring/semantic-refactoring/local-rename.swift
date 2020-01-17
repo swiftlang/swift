@@ -19,4 +19,4 @@ func foo() {
 // RUN: %sourcekitd-test -req=find-local-rename-ranges -pos=7:11 %s -- %s > %t.result/local-rename-lazy.swift.expected
 // RUN: diff -u %S/local-rename-lazy.swift.expected %t.result/local-rename-lazy.swift.expected
 
-// REQUIRES-ANY: OS=macosx, OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu

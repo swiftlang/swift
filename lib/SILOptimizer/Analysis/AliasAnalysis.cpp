@@ -12,18 +12,18 @@
 
 #define DEBUG_TYPE "sil-aa"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
-#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
-#include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/SILValue.h"
+#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -101,7 +101,10 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, AliasResult R) {
   llvm_unreachable("Unhandled AliasResult in switch.");
 }
 
-SILValue getAccessedMemory(SILInstruction *User) {
+// Return the address of the directly accessed memory. If either the address is
+// unknown, or any other memory is accessed via indirection, return an invalid
+// SILValue.
+SILValue getDirectlyAccessedMemory(SILInstruction *User) {
   if (auto *LI = dyn_cast<LoadInst>(User)) {
     return LI->getOperand();
   }
@@ -128,7 +131,7 @@ static bool isFunctionArgument(SILValue V) {
 static bool isIdentifiableObject(SILValue V) {
   if (isa<AllocationInst>(V) || isa<LiteralInst>(V))
     return true;
-  if (isNotAliasingArgument(V))
+  if (isExclusiveArgument(V))
     return true;
   return false;
 }
@@ -178,8 +181,7 @@ static bool isLocalLiteral(SILValue V) {
 /// Is this a value that can be unambiguously identified as being defined at the
 /// function level.
 static bool isIdentifiedFunctionLocal(SILValue V) {
-  return isa<AllocationInst>(*V) || isNotAliasingArgument(V) ||
-         isLocalLiteral(V);
+  return isa<AllocationInst>(*V) || isExclusiveArgument(V) || isLocalLiteral(V);
 }
 
 /// Returns true if we can prove that the two input SILValues which do not equal
@@ -463,8 +465,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy,
 
   // The Builtin reference types can alias any class instance.
   if (LTyClass) {
-    if (RTy.is<BuiltinUnknownObjectType>() ||
-        RTy.is<BuiltinNativeObjectType>()  ||
+    if (RTy.is<BuiltinNativeObjectType>()  ||
         RTy.is<BuiltinBridgeObjectType>()) {
       return true;
     }
@@ -474,8 +475,8 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy,
 
   // If one type is an aggregate and it contains the other type then the record
   // reference may alias the aggregate reference.
-  if (LTy.aggregateContainsRecord(RTy, Mod) ||
-      RTy.aggregateContainsRecord(LTy, Mod))
+  if (LTy.aggregateContainsRecord(RTy, Mod, F.getTypeExpansionContext()) ||
+      RTy.aggregateContainsRecord(LTy, Mod, F.getTypeExpansionContext()))
     return true;
 
   // FIXME: All the code following could be made significantly more aggressive
@@ -618,8 +619,12 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   // non-escaping pointer with another (maybe escaping) pointer. Escape analysis
   // uses the connection graph to check if the pointers may point to the same
   // content.
-  // Note that escape analysis must work with the original pointers and not the
-  // underlying objects because it treats projections differently.
+  //
+  // canPointToSameMemory must take the original pointers used for memory
+  // access, not the underlying object, because objects projections can be
+  // modeled by escape analysis as different content, and canPointToSameMemory
+  // assumes that only the pointer itself may be accessed here, not any other
+  // address that can be derived from this pointer.
   if (!EA->canPointToSameMemory(V1, V2)) {
     LLVM_DEBUG(llvm::dbgs() << "            Found not-aliased objects based on "
                                "escape analysis\n");
@@ -673,7 +678,7 @@ bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
     if (ArgEffect.mayRelease()) {
       // The function may release this argument, so check if the pointer can
       // escape to it.
-      if (EA->canEscapeToValue(Ptr, FAS.getArgument(Idx)))
+      if (EA->mayReleaseContent(FAS.getArgument(Idx), Ptr))
         return true;
     }
   }
@@ -691,47 +696,51 @@ bool AliasAnalysis::canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr) {
 
     // A builtin can only release an object if it can escape to one of the
     // builtin's arguments.
-    if (EA->canEscapeToValue(Ptr, Arg))
+    if (EA->mayReleaseContent(Arg, Ptr))
       return true;
   }
   return false;
 }
 
+// If the deinit for releasedReference can release any values used by User, then
+// this is an interference. (The retains that originally forced liveness of
+// those values may have already been eliminated). Note that we only care about
+// avoiding a dangling pointer. The memory side affects of Release are
+// unordered.
+//
+// \p releasedReference must be a value that directly contains the references
+// being released. It cannot be an address or other kind of pointer that
+// indirectly releases a reference. Otherwise, the escape analysis query is
+// invalid.
+bool AliasAnalysis::mayValueReleaseInterfereWithInstruction(
+    SILInstruction *User, SILValue releasedReference) {
+  assert(!releasedReference->getType().isAddress()
+         && "an address is never a reference");
 
-bool AliasAnalysis::mayValueReleaseInterfereWithInstruction(SILInstruction *User,
-                                                            SILValue Ptr) {
-  // TODO: Its important to make this as precise as possible.
-  //
-  // TODO: Eventually we can plug in some analysis on the what the release of
-  // the Ptr can do, i.e. be more precise about Ptr's deinit.
-  //
-  // TODO: If we know the specific release instruction, we can potentially do
-  // more.
-  //
   // If this instruction can not read or write any memory. Its OK.
   if (!User->mayReadOrWriteMemory())
     return false;
 
-  // These instructions do read or write memory, get memory accessed.
-  SILValue V = getAccessedMemory(User);
-  if (!V)
+  // Get a pointer to the memory directly accessed by 'Users' (either via an
+  // address or heap reference operand). If additional memory may be indirectly
+  // accessed by 'User', such as via an inout argument, then stop here because
+  // mayReleaseContent can only reason about one level of memory access.
+  //
+  // TODO: Handle @inout arguments by iterating over the apply arguments. For
+  // each argument find out if any reachable content can be released. This is
+  // slightly more involved than mayReleaseContent because it needs to check all
+  // connection graph nodes reachable from accessedPointer that don't pass
+  // through another stored reference.
+  SILValue accessedPointer = getDirectlyAccessedMemory(User);
+  if (!accessedPointer)
     return true;
 
-  // Is this a local allocation ?
-  if (!pointsToLocalObject(V))
-    return true;
-
-  // This is a local allocation.
-  // The most important check: does the object escape the current function?
-  auto LO = getUnderlyingObject(V);
-  auto *ConGraph = EA->getConnectionGraph(User->getFunction());
-  auto *Node = ConGraph->getNodeOrNull(LO, EA);
-  if (Node && !Node->escapes())
-    return false;
-
-  // This is either a non-local allocation or a local allocation that escapes.
-  // We failed to prove anything, it could be read or written by the deinit.
-  return true;
+  // If releasedReference can reach the first refcounted object reachable from
+  // accessedPointer, then releasing it early may destroy the object accessed by
+  // accessedPointer. Access to any objects beyond the first released refcounted
+  // object are irrelevant--they must already have sufficient refcount that they
+  // won't be released when releasing Ptr.
+  return EA->mayReleaseContent(releasedReference, accessedPointer);
 }
 
 bool swift::isLetPointer(SILValue V) {

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module -verify %s
+// RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module -verify %s -enable-ownership-stripping-after-serialization
 
 // High-level tests that DI rejects certain invalid idioms for early
 // return from initializers.

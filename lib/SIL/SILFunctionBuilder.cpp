@@ -31,7 +31,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 
   auto fn = SILFunction::create(mod, linkage, name, type, nullptr, loc,
                                 isBareSILFunction, isTransparent, isSerialized,
-                                entryCount, isDynamic, isThunk, subclassScope);
+                                entryCount, isDynamic, IsNotExactSelfClass,
+                                isThunk, subclassScope);
   fn->setDebugScope(new (mod) SILDebugScope(loc, fn));
   return fn;
 }
@@ -51,8 +52,9 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
         SA->getSpecializationKind() == SpecializeAttr::SpecializationKind::Full
             ? SILSpecializeAttr::SpecializationKind::Full
             : SILSpecializeAttr::SpecializationKind::Partial;
-    F->addSpecializeAttr(SILSpecializeAttr::create(M, SA->getRequirements(),
-                                                   SA->isExported(), kind));
+    F->addSpecializeAttr(
+        SILSpecializeAttr::create(M, SA->getSpecializedSgnature(),
+                                  SA->isExported(), kind));
   }
 
   if (auto *OA = Attrs.getAttribute<OptimizeAttr>()) {
@@ -74,12 +76,12 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
           SILFunctionTypeRepresentation::ObjCMethod)
     return;
 
-  auto *replacedFuncAttr = Attrs.getAttribute<DynamicReplacementAttr>();
-  if (!replacedFuncAttr)
+  // Only assign replacements when the thing being replaced is function-like and
+  // explicitly declared.  
+  auto *origDecl = decl->getDynamicallyReplacedDecl();
+  auto *replacedDecl = dyn_cast_or_null<AbstractFunctionDecl>(origDecl);
+  if (!replacedDecl)
     return;
-
-  auto *replacedDecl = replacedFuncAttr->getReplacedFunction();
-  assert(replacedDecl);
 
   if (decl->isObjC()) {
     F->setObjCReplacement(replacedDecl);
@@ -105,7 +107,8 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
                                         ForDefinition_t forDefinition,
                                         ProfileCounter entryCount) {
   auto nameTmp = constant.mangle();
-  auto constantType = mod.Types.getConstantFunctionType(constant);
+  auto constantType = mod.Types.getConstantFunctionType(
+      TypeExpansionContext::minimal(), constant);
   SILLinkage linkage = constant.getLinkage(forDefinition);
 
   if (auto fn = mod.lookUpFunction(nameTmp)) {
@@ -148,6 +151,7 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
 
   auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr, None,
                                 IsNotBare, IsTrans, IsSer, entryCount, IsDyn,
+                                IsNotExactSelfClass,
                                 IsNotThunk, constant.getSubclassScope(),
                                 inlineStrategy, EK);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
@@ -159,8 +163,8 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
-    if (decl->isWeakImported(/*forModule=*/nullptr, availCtx))
-      F->setWeakLinked();
+    F->setAvailabilityForLinkage(decl->getAvailabilityForLinkage());
+    F->setAlwaysWeakImported(decl->isAlwaysWeakImported());
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
@@ -194,6 +198,7 @@ SILFunction *SILFunctionBuilder::createFunction(
     const SILDebugScope *DebugScope) {
   return SILFunction::create(mod, linkage, name, loweredType, genericEnv, loc,
                              isBareSILFunction, isTrans, isSerialized,
-                             entryCount, isDynamic, isThunk, subclassScope,
+                             entryCount, isDynamic, IsNotExactSelfClass,
+                             isThunk, subclassScope,
                              inlineStrategy, EK, InsertBefore, DebugScope);
 }

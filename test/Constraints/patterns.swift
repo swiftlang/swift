@@ -55,7 +55,7 @@ case is B,
      is D,
      is S:
   ()
-case is E: // expected-warning {{cast from 'P' to unrelated type 'E' always fails}}
+case is E:
   ()
 default:
   ()
@@ -69,7 +69,7 @@ case let d as D:
   d.d()
 case let s as S:
   s.s()
-case let e as E: // expected-warning {{cast from 'P' to unrelated type 'E' always fails}}
+case let e as E:
   e.e()
 default:
   ()
@@ -87,7 +87,7 @@ default:
 }
 
 // Raise an error if pattern productions are used in expressions.
-var b = var a // expected-error{{expected initial value after '='}} expected-error {{type annotation missing in pattern}} expected-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
+var b = var x // expected-error{{expected initial value after '='}} expected-error {{type annotation missing in pattern}} expected-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
 var c = is Int // expected-error{{expected initial value after '='}} expected-error {{expected expression}}  expected-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
 
 // TODO: Bad recovery in these cases. Although patterns are never valid
@@ -230,14 +230,14 @@ func good(_ a: A<EE>) -> Int {
 }
 
 func bad(_ a: A<EE>) {
-  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{10-10= () -> Int in }}
+  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{none}}
     let _: EE = $0
     return 1
   }
 }
 
 func ugly(_ a: A<EE>) {
-  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{10-10= () -> Int in }}
+  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{none}}
     switch $0 {
     case .A:
       return 1
@@ -274,7 +274,9 @@ struct StaticMembers: Equatable {
   static var optProp: Optional = StaticMembers()
 
   static func method(_: Int) -> StaticMembers { return prop }
+  // expected-note@-1 {{found candidate with type '(Int) -> StaticMembers'}}
   static func method(withLabel: Int) -> StaticMembers { return prop }
+  // expected-note@-1 {{found candidate with type '(Int) -> StaticMembers'}}
   static func optMethod(_: Int) -> StaticMembers? { return optProp }
 
   static func ==(x: StaticMembers, y: StaticMembers) -> Bool { return true }
@@ -284,8 +286,8 @@ let staticMembers = StaticMembers()
 let optStaticMembers: Optional = StaticMembers()
 
 switch staticMembers {
-  case .init: break // expected-error{{cannot match values of type 'StaticMembers'}}
-  case .init(opt:): break // expected-error{{cannot match values of type 'StaticMembers'}}
+  case .init: break // expected-error{{member 'init(opt:)' expects argument of type 'Int'}}
+  case .init(opt:): break // expected-error{{member 'init(opt:)' expects argument of type 'Int'}}
   case .init(): break
 
   case .init(0): break
@@ -299,17 +301,17 @@ switch staticMembers {
   // TODO: repeated error message
   case .optProp: break // expected-error* {{not unwrapped}}
 
-  case .method: break // expected-error{{cannot match}}
+  case .method: break // expected-error{{no exact matches in call to static method 'method'}}
   case .method(0): break
   case .method(_): break // expected-error{{'_' can only appear in a pattern}}
   case .method(let x): break // expected-error{{cannot appear in an expression}}
 
-  case .method(withLabel:): break // expected-error{{cannot match}}
+  case .method(withLabel:): break // expected-error{{member 'method(withLabel:)' expects argument of type 'Int'}}
   case .method(withLabel: 0): break
   case .method(withLabel: _): break // expected-error{{'_' can only appear in a pattern}}
   case .method(withLabel: let x): break // expected-error{{cannot appear in an expression}}
 
-  case .optMethod: break // expected-error{{cannot match}}
+  case .optMethod: break // expected-error{{member 'optMethod' expects argument of type 'Int'}}
   case .optMethod(0): break
   // expected-error@-1 {{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
   // expected-note@-2 {{coalesce}}
@@ -378,10 +380,10 @@ func test8347() -> String {
       return ""
     }
 
-    func h() -> String { // expected-note {{found this candidate}}
+    func h() -> String {
       return ""
     }
-    func h() -> Double { // expected-note {{found this candidate}}
+    func h() -> Double {
       return 3.0
     }
     func h() -> Int? { //expected-note{{found this candidate}}

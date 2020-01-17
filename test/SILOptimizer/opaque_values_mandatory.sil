@@ -13,7 +13,7 @@ typealias Int = Builtin.Int64
 // CHECK: return %0 : $T
 // CHECK-LABEL: } // end sil function 'f010_diagnose_identity'
 sil hidden [ossa] @f010_diagnose_identity : $@convention(thin) <T> (@in T) -> @out T {
-bb0(%0 : $T):
+bb0(%0 : @owned $T):
   %c = copy_value %0 : $T
   destroy_value %0 : $T
   return %c : $T
@@ -31,7 +31,7 @@ bb0(%0 : $T):
 // CHECK: return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function 'f020_assign_inout'
 sil hidden [ossa] @f020_assign_inout : $@convention(thin) <T> (@inout T, @in T) -> () {
-bb0(%0 : $*T, %1 : $T):
+bb0(%0 : $*T, %1 : @owned $T):
   %2 = copy_value %1 : $T
   assign %2 to %0 : $*T
   destroy_value %1 : $T

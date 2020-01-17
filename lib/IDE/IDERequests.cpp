@@ -29,7 +29,7 @@ using namespace swift::ide;
 
 namespace swift {
 // Implement the IDE type zone.
-#define SWIFT_TYPEID_ZONE SWIFT_IDE_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE IDE
 #define SWIFT_TYPEID_HEADER "swift/IDE/IDERequestIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
@@ -38,14 +38,14 @@ namespace swift {
 
 // Define request evaluation functions for each of the IDE requests.
 static AbstractRequestFunction *ideRequestFunctions[] = {
-#define SWIFT_TYPEID(Name)                                    \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
 reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/IDE/IDERequestIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 };
 
 void swift::registerIDERequestFunctions(Evaluator &evaluator) {
-  evaluator.registerRequestFunctions(SWIFT_IDE_REQUESTS_TYPEID_ZONE,
+  evaluator.registerRequestFunctions(Zone::IDE,
                                      ideRequestFunctions);
   registerIDETypeCheckRequestFunctions(evaluator);
 }
@@ -111,9 +111,8 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
     // Handle references to the implicitly generated vars in case statements
     // matching multiple patterns
     if (VD->isImplicit()) {
-      if (auto * Parent = VD->getParentVarDecl()) {
+      if (auto *Parent = VD->getParentVarDecl()) {
         D = Parent;
-        VD = Parent;
       }
     }
   }
@@ -268,6 +267,12 @@ bool CursorInfoResolver::visitCallArgName(Identifier Name,
                                           ValueDecl *D) {
   if (isDone())
     return false;
+
+  // Handle invalid code where the called decl isn't actually callable, so this
+  // argument label doesn't really refer to it.
+  if (isa<ModuleDecl>(D))
+    return true;
+
   bool Found = tryResolve(D, nullptr, nullptr, Range.getStart(), /*IsRef=*/true);
   if (Found)
     CursorInfo.IsKeywordArgument = true;
@@ -487,7 +492,7 @@ private:
           // Unbox the brace statement to find its type.
           if (auto BS = dyn_cast<BraceStmt>(N.get<Stmt*>())) {
             if (!BS->getElements().empty()) {
-              return resolveNodeType(BS->getElements().back(),
+              return resolveNodeType(BS->getLastElement(),
                                      RangeKind::SingleStatement);
             }
           }

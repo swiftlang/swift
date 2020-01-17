@@ -150,7 +150,6 @@ struct XSubP0b : SubscriptP0 {
 struct XSubP0c : SubscriptP0 {
 // expected-error@-1 {{type 'XSubP0c' does not conform to protocol 'SubscriptP0'}}
   subscript (i: Index) -> Element { get { } }
-  // expected-error@-1 {{reference to invalid associated type 'Index' of type 'XSubP0c'}}
 }
 
 struct XSubP0d : SubscriptP0 {

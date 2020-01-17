@@ -74,11 +74,6 @@ bool DestructorAnalysis::isSafeType(CanType Ty) {
 
     // Check the stored properties.
     for (auto SP : Struct->getStoredProperties()) {
-      // FIXME: Remove this once getInterfaceType() is a request.
-      if (!SP->hasInterfaceType()) {
-        ASTContext &Ctx = Mod->getSwiftModule()->getASTContext();
-        Ctx.getLazyResolver()->resolveDeclSignature(SP);
-      }
       if (!isSafeType(SP->getInterfaceType()->getCanonicalType()))
         return cacheResult(Ty, false);
     }

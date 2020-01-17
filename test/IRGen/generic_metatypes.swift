@@ -62,8 +62,8 @@ protocol Bas {}
 func protocolTypeof(_ x: Bas) -> Bas.Type {
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %T17generic_metatypes3BasP, %T17generic_metatypes3BasP* [[X:%.*]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
-  // CHECK: [[BUFFER:%.*]] = getelementptr inbounds %T17generic_metatypes3BasP, %T17generic_metatypes3BasP* [[X]], i32 0, i32 0
-  // CHECK: [[VALUE_ADDR:%.*]] = call %swift.opaque* @__swift_project_boxed_opaque_existential_1({{.*}} [[BUFFER]], %swift.type* [[METADATA]])
+  // CHECK: [[BUFFER:%.*]] = bitcast %T17generic_metatypes3BasP* [[X]] to %__opaque_existential_type_1*
+  // CHECK: [[VALUE_ADDR:%.*]] = call %swift.opaque* @__swift_project_boxed_opaque_existential_1(%__opaque_existential_type_1* [[BUFFER]], %swift.type* [[METADATA]])
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[VALUE_ADDR]], %swift.type* [[METADATA]], i1 true)
   // CHECK: [[WTABLE_ADDR:%.*]] = getelementptr inbounds %T17generic_metatypes3BasP, %T17generic_metatypes3BasP* %0, i32 0, i32 2
   // CHECK: [[WTABLE:%.*]] = load i8**, i8*** [[WTABLE_ADDR]]
@@ -119,41 +119,23 @@ func makeGenericMetatypes() {
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s17generic_metatypes6OneArgVMa"
 // CHECK-SAME:    ([[INT]], %swift.type*)
-// CHECK:   [[BUFFER:%.*]] = alloca { %swift.type* }
-// CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   call void @llvm.lifetime.start
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type* }, { %swift.type* }* [[BUFFER]], i32 0, i32 0
-// CHECK:   store %swift.type* %1, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_getGenericMetadata([[INT]] %0, i8* [[BUFFER_PTR]], %swift.type_descriptor* {{.*}} @"$s17generic_metatypes6OneArgVMn" {{.*}})
+// CHECK:   [[BITCAST_1:%.*]] = bitcast {{.*}} %1
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[BITCAST_1]], i8* undef, i8* undef, %swift.type_descriptor* {{.*}} @"$s17generic_metatypes6OneArgVMn" {{.*}})
 // CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s17generic_metatypes7TwoArgsVMa"
 // CHECK-SAME:    ([[INT]], %swift.type*, %swift.type*)
-// CHECK:   [[BUFFER:%.*]] = alloca { %swift.type*, %swift.type* }
-// CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   call void @llvm.lifetime.start
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type* }, { %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 0
-// CHECK:   store %swift.type* %1, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type* }, { %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 1
-// CHECK:   store %swift.type* %2, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_getGenericMetadata([[INT]] %0, i8* [[BUFFER_PTR]], %swift.type_descriptor* {{.*}} @"$s17generic_metatypes7TwoArgsVMn" {{.*}})
+// CHECK:   [[BITCAST_1:%.*]] = bitcast {{.*}} %1
+// CHECK:   [[BITCAST_2:%.*]] = bitcast {{.*}} %2
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[BITCAST_1]], i8* [[BITCAST_2]], i8* undef, %swift.type_descriptor* {{.*}} @"$s17generic_metatypes7TwoArgsVMn" {{.*}})
 // CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s17generic_metatypes9ThreeArgsVMa"
 // CHECK-SAME:    ({{i[0-9]+}}, %swift.type*, %swift.type*, %swift.type*)
-// CHECK:   [[BUFFER:%.*]] = alloca { %swift.type*, %swift.type*, %swift.type* }
-// CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   call void @llvm.lifetime.start
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type*, %swift.type* }, { %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 0
-// CHECK:   store %swift.type* %1, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type*, %swift.type* }, { %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 1
-// CHECK:   store %swift.type* %2, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_ELT:%.*]] = getelementptr inbounds { %swift.type*, %swift.type*, %swift.type* }, { %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]], i32 0, i32 2
-// CHECK:   store %swift.type* %3, %swift.type** [[BUFFER_ELT]]
-// CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
-// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_getGenericMetadata([[INT]] %0, i8* [[BUFFER_PTR]], %swift.type_descriptor* {{.*}} @"$s17generic_metatypes9ThreeArgsVMn" {{.*}})
+// CHECK:   [[BITCAST_1:%.*]] = bitcast {{.*}} %1
+// CHECK:   [[BITCAST_2:%.*]] = bitcast {{.*}} %2
+// CHECK:   [[BITCAST_3:%.*]] = bitcast {{.*}} %3
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[BITCAST_1]], i8* [[BITCAST_2]], i8* [[BITCAST_3]], %swift.type_descriptor* {{.*}} @"$s17generic_metatypes9ThreeArgsVMn" {{.*}})
 // CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s17generic_metatypes8FiveArgsVMa"
@@ -163,5 +145,5 @@ func makeGenericMetatypes() {
 // CHECK-NOT: call void @llvm.lifetime.end
 // CHECK:   ret %swift.metadata_response
 
-// CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
-// CHECK: attributes [[NOUNWIND_OPT]] = { noinline nounwind "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
+// CHECK-DAG: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
+// CHECK-DAG: attributes [[NOUNWIND_OPT]] = { noinline nounwind "frame-pointer"="none" "target-cpu"

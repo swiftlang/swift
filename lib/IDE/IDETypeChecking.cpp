@@ -10,19 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Identifier.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/GenericSignature.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/AST/Types.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/IDETypeCheckingRequests.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -84,27 +85,9 @@ PrintOptions PrintOptions::printDocInterface() {
       PrintOptions::ArgAndParamPrintingMode::BothAlways;
   result.PrintDocumentationComments = false;
   result.PrintRegularClangComments = false;
-  result.PrintFunctionRepresentationAttrs = false;
+  result.PrintFunctionRepresentationAttrs =
+    PrintOptions::FunctionRepresentationMode::None;
   return result;
-}
-
-/// Erase any associated types within dependent member types, so we'll resolve
-/// them again.
-static Type eraseAssociatedTypes(Type type) {
-  if (!type->hasTypeParameter()) return type;
-
-  return type.transformRec([](TypeBase *type) -> Optional<Type> {
-    if (auto depMemType = dyn_cast<DependentMemberType>(type)) {
-      auto newBase = eraseAssociatedTypes(depMemType->getBase());
-      if (newBase.getPointer() == depMemType->getBase().getPointer() &&
-          !depMemType->getAssocType())
-        return None;
-
-      return Type(DependentMemberType::get(newBase, depMemType->getName()));
-    }
-
-    return None;
-  });
 }
 
 struct SynthesizedExtensionAnalyzer::Implementation {
@@ -181,29 +164,27 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       }
     };
 
-    bool HasDocComment;
+    bool Unmergable;
     unsigned InheritsCount;
     std::set<Requirement> Requirements;
-    void addRequirement(GenericSignature *GenericSig,
+    void addRequirement(GenericSignature GenericSig,
                         Type First, Type Second, RequirementKind Kind) {
-      CanType CanFirst =
-        GenericSig->getCanonicalTypeInContext(eraseAssociatedTypes(First));
+      CanType CanFirst = GenericSig->getCanonicalTypeInContext(First);
       CanType CanSecond;
-      if (Second) CanSecond =
-        GenericSig->getCanonicalTypeInContext(eraseAssociatedTypes(Second));
+      if (Second) CanSecond = GenericSig->getCanonicalTypeInContext(Second);
 
       Requirements.insert({First, Second, Kind, CanFirst, CanSecond});
     }
     bool operator== (const ExtensionMergeInfo& Another) const {
       // Trivially unmergeable.
-      if (HasDocComment || Another.HasDocComment)
+      if (Unmergable || Another.Unmergable)
         return false;
       if (InheritsCount != 0 || Another.InheritsCount != 0)
         return false;
       return Requirements == Another.Requirements;
     }
     bool isMergeableWithTypeDef() {
-      return !HasDocComment && InheritsCount == 0 && Requirements.empty();
+      return !Unmergable && InheritsCount == 0 && Requirements.empty();
     }
   };
 
@@ -281,7 +262,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
                ExtensionDecl *EnablingExt, NormalProtocolConformance *Conf) {
     SynthesizedExtensionInfo Result(IsSynthesized, EnablingExt);
     ExtensionMergeInfo MergeInfo;
-    MergeInfo.HasDocComment = !Ext->getRawComment().isEmpty();
+    MergeInfo.Unmergable = !Ext->getRawComment().isEmpty() || // With comments
+                           Ext->getAttrs().hasAttribute<AvailableAttr>(); // With @available
     MergeInfo.InheritsCount = countInherits(Ext);
 
     // There's (up to) two extensions here: the extension with the items that we
@@ -299,7 +281,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
 
     auto handleRequirements = [&](SubstitutionMap subMap,
-                                  GenericSignature *GenericSig,
+                                  GenericSignature GenericSig,
                                   ArrayRef<Requirement> Reqs) {
       for (auto Req : Reqs) {
         auto Kind = Req.getKind();
@@ -314,7 +296,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           First = First.subst(subMap);
           Second = Second.subst(subMap);
 
-          if (!First || !Second) {
+          if (First->hasError() || Second->hasError()) {
             // Substitution with interface type bases can only fail
             // if a concrete type fails to conform to a protocol.
             // In this case, just give up on the extension altogether.
@@ -323,19 +305,28 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         }
 
         switch (Kind) {
-        case RequirementKind::Conformance:
-        case RequirementKind::Superclass:
-          // FIXME: This could be more accurate; check
-          // conformance instead of subtyping
-          if (!isConvertibleTo(First, Second, /*openArchetypes=*/true, *DC))
+        case RequirementKind::Conformance: {
+          auto *M = DC->getParentModule();
+          auto *Proto = Second->castTo<ProtocolType>()->getDecl();
+          if (!First->isTypeParameter() && !First->is<ArchetypeType>() &&
+              M->conformsToProtocol(First, Proto).isInvalid())
             return true;
-          else if (!isConvertibleTo(First, Second, /*openArchetypes=*/false,
-                                    *DC))
+          if (M->conformsToProtocol(First, Proto).isInvalid())
             MergeInfo.addRequirement(GenericSig, First, Second, Kind);
+          break;
+        }
+
+        case RequirementKind::Superclass:
+          if (!Second->isBindableToSuperclassOf(First)) {
+            return true;
+          } else if (!Second->isExactSuperclassOf(Second)) {
+            MergeInfo.addRequirement(GenericSig, First, Second, Kind);
+          }
           break;
 
         case RequirementKind::SameType:
-          if (!canPossiblyEqual(First, Second, *DC)) {
+          if (!First->isBindableTo(Second) &&
+              !Second->isBindableTo(First)) {
             return true;
           } else if (!First->isEqual(Second)) {
             MergeInfo.addRequirement(GenericSig, First, Second, Kind);
@@ -752,19 +743,6 @@ bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
     IsDeclApplicableRequest(DeclApplicabilityOwner(DC, BaseTy, VD)), false);
 }
 
-bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
-   return evaluateOrDefault(DC.getASTContext().evaluator,
-     TypeRelationCheckRequest(TypeRelationCheckInput(&DC, T1, T2,
-       TypeRelation::PossiblyEqualTo, true)), false);
-}
-
-
-bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
-  return evaluateOrDefault(DC.getASTContext().evaluator,
-    TypeRelationCheckRequest(TypeRelationCheckInput(&DC, T1, T2,
-      TypeRelation::EqualTo, true)), false);
-}
-
 bool swift::isConvertibleTo(Type T1, Type T2, bool openArchetypes,
                             DeclContext &DC) {
   return evaluateOrDefault(DC.getASTContext().evaluator,
@@ -781,9 +759,4 @@ Type swift::getResultTypeOfKeypathDynamicMember(SubscriptDecl *SD) {
   return evaluateOrDefault(SD->getASTContext().evaluator,
     RootAndResultTypeOfKeypathDynamicMemberRequest{SD}, TypePair()).
       SecondTy;
-}
-
-bool swift::hasDynamicMemberLookupAttribute(Type ty) {
-  return evaluateOrDefault(ty->getASTContext().evaluator,
-    HasDynamicMemberLookupAttributeRequest{ty.getPointer()}, false);
 }

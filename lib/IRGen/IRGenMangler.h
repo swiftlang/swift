@@ -80,7 +80,16 @@ public:
   std::string mangleValueWitness(Type type, ValueWitness witness);
 
   std::string mangleValueWitnessTable(Type type) {
-    return mangleTypeSymbol(type, "WV");
+    const char * const witnessTableOp = "WV";
+    if (type->isAnyObject()) {
+      // Special-case for AnyObject, whose witness table is under the old name
+      // Builtin.UnknownObject, even though we don't use that as a Type anymore.
+      beginMangling();
+      appendOperator("BO");
+      appendOperator(witnessTableOp);
+      return finalize();
+    }
+    return mangleTypeSymbol(type, witnessTableOp);
   }
 
   std::string mangleTypeMetadataAccessFunction(Type type) {
@@ -182,21 +191,21 @@ public:
   
   std::string mangleModuleDescriptor(const ModuleDecl *Decl) {
     beginMangling();
-    appendContext(Decl);
+    appendContext(Decl, Decl->getAlternateModuleName());
     appendOperator("MXM");
     return finalize();
   }
   
   std::string mangleExtensionDescriptor(const ExtensionDecl *Decl) {
     beginMangling();
-    appendContext(Decl);
+    appendContext(Decl, Decl->getAlternateModuleName());
     appendOperator("MXE");
     return finalize();
   }
   
   void appendAnonymousDescriptorName(PointerUnion<DeclContext*, VarDecl*> Name){
     if (auto DC = Name.dyn_cast<DeclContext *>()) {
-      return appendContext(DC);
+      return appendContext(DC, StringRef());
     }
     if (auto VD = Name.dyn_cast<VarDecl *>()) {
       return appendEntity(VD);
@@ -216,12 +225,6 @@ public:
     beginMangling();
     appendAnonymousDescriptorName(Name);
     appendOperator("MXX");
-    return finalize();
-  }
-
-  std::string mangleContext(const DeclContext *DC) {
-    beginMangling();
-    appendContext(DC);
     return finalize();
   }
 
@@ -382,7 +385,17 @@ public:
   }
 
   std::string mangleReflectionBuiltinDescriptor(Type type) {
-    return mangleTypeSymbol(type, "MB");
+    const char * const reflectionDescriptorOp = "MB";
+    if (type->isAnyObject()) {
+      // Special-case for AnyObject, whose reflection descriptor is under the
+      // old name Builtin.UnknownObject, even though we don't use that as a Type
+      // anymore.
+      beginMangling();
+      appendOperator("BO");
+      appendOperator(reflectionDescriptorOp);
+      return finalize();
+    }
+    return mangleTypeSymbol(type, reflectionDescriptorOp);
   }
 
   std::string mangleReflectionFieldDescriptor(Type type) {
@@ -504,7 +517,12 @@ public:
                                   CanType associatedType,
                                   const ProtocolDecl *proto);
 
-  std::string mangleSymbolNameForKeyPathMetadata(
+  std::string mangleSymbolNameForMangledMetadataAccessorString(
+                                           const char *kind,
+                                           CanGenericSignature genericSig,
+                                           CanType type);
+
+  std::string mangleSymbolNameForMangledConformanceAccessorString(
                                            const char *kind,
                                            CanGenericSignature genericSig,
                                            CanType type,

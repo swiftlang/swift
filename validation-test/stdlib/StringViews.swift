@@ -821,6 +821,9 @@ tests.test("String View Setters") {
 }
 
 tests.test("Scalar alignment") {
+  // Misaligned indices were fixed in 5.1
+  guard _hasSwift_5_1() else { return }
+
   let str = "😀"
   let idx = str.utf8.index(after: str.startIndex)
   let substr = str[idx...]

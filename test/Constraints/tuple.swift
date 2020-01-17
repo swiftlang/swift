@@ -181,8 +181,7 @@ variadicWithTrailingClosure(fn: +)
 func gcd_23700031<T>(_ a: T, b: T) {
   var a = a
   var b = b
-  (a, b) = (b, a % b)  // expected-error {{binary operator '%' cannot be applied to two 'T' operands}}
-  // expected-note @-1 {{overloads for '%' exist with these partially matching parameter lists: (Int, Int), (Int16, Int16), (Int32, Int32), (Int64, Int64), (Int8, Int8), (Self, Self.Scalar), (Self.Scalar, Self), (UInt, UInt), (UInt16, UInt16), (UInt32, UInt32), (UInt64, UInt64), (UInt8, UInt8)}}
+  (a, b) = (b, a % b)  // expected-error {{protocol 'BinaryInteger' requires that 'T' conform to 'BinaryInteger'}}
 }
 
 // <rdar://problem/24210190>
@@ -191,14 +190,14 @@ protocol Kingdom {
   associatedtype King
 }
 struct Victory<General> {
-  init<K: Kingdom>(_ king: K) where K.King == General {} // expected-note {{where 'General' = '(x: Int, y: Int)', 'K.King' = '(Int, Int)'}}
+  init<K: Kingdom>(_ king: K) where K.King == General {} // expected-note {{where 'General' = '(x: Int, y: Int)', 'K.King' = 'MagicKingdom<(Int, Int)>.King' (aka '(Int, Int)')}}
 }
 struct MagicKingdom<K> : Kingdom {
   typealias King = K
 }
 func magify<T>(_ t: T) -> MagicKingdom<T> { return MagicKingdom() }
 func foo(_ pair: (Int, Int)) -> Victory<(x: Int, y: Int)> {
-  return Victory(magify(pair)) // expected-error {{initializer 'init(_:)' requires the types '(x: Int, y: Int)' and '(Int, Int)' be equivalent}}
+  return Victory(magify(pair)) // expected-error {{initializer 'init(_:)' requires the types '(x: Int, y: Int)' and 'MagicKingdom<(Int, Int)>.King' (aka '(Int, Int)') be equivalent}}
 }
 
 

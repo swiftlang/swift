@@ -913,55 +913,6 @@ public:
 };
 using TupleTypeFlags = TargetTupleTypeFlags<size_t>;
 
-/// Field types and flags as represented in a nominal type's field/case type
-/// vector.
-class FieldType {
-  typedef uintptr_t int_type;
-  // Type metadata is always at least pointer-aligned, so we get at least two
-  // low bits to stash flags. We could use three low bits on 64-bit, and maybe
-  // some high bits as well.
-  enum : int_type {
-    Indirect = 1,
-    Weak = 2,
-
-    TypeMask = ((uintptr_t)-1) & ~(alignof(void*) - 1),
-  };
-  int_type Data;
-
-  constexpr FieldType(int_type Data) : Data(Data) {}
-public:
-  constexpr FieldType() : Data(0) {}
-  FieldType withType(const Metadata *T) const {
-    return FieldType((Data & ~TypeMask) | (uintptr_t)T);
-  }
-
-  constexpr FieldType withIndirect(bool indirect) const {
-    return FieldType((Data & ~Indirect)
-                     | (indirect ? Indirect : 0));
-  }
-
-  constexpr FieldType withWeak(bool weak) const {
-    return FieldType((Data & ~Weak)
-                     | (weak ? Weak : 0));
-  }
-
-  bool isIndirect() const {
-    return bool(Data & Indirect);
-  }
-
-  bool isWeak() const {
-    return bool(Data & Weak);
-  }
-
-  const Metadata *getType() const {
-    return (const Metadata *)(Data & TypeMask);
-  }
-
-  int_type getIntValue() const {
-    return Data;
-  }
-};
-
 /// Flags for exclusivity-checking operations.
 enum class ExclusivityFlags : uintptr_t {
   Read             = 0x0,
@@ -1560,6 +1511,10 @@ class GenericMetadataPatternFlags : public FlagSet<uint32_t> {
     /// Does this pattern have an extra-data pattern?
     HasExtraDataPattern = 0,
 
+    /// Do instances of this pattern have a bitset of flags that occur at the
+    /// end of the metadata, after the extra data if there is any?
+    HasTrailingFlags = 1,
+
     // Class-specific flags.
 
     /// Does this pattern have an immediate-members pattern?
@@ -1583,6 +1538,10 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasExtraDataPattern,
                                 hasExtraDataPattern,
                                 setHasExtraDataPattern)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasTrailingFlags,
+                                hasTrailingFlags,
+                                setHasTrailingFlags)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Value_MetadataKind,
                                  Value_MetadataKind_width,
@@ -1714,6 +1673,30 @@ public:
   bool isSatisfiedBy(MetadataState state) const {
     return isAtLeast(state, getState());
   }
+};
+
+struct MetadataTrailingFlags : public FlagSet<uint64_t> {
+  enum {
+    /// Whether this metadata is a specialization of a generic metadata pattern
+    /// which was created during compilation.
+    IsStaticSpecialization = 0,
+
+    /// Whether this metadata is a specialization of a generic metadata pattern
+    /// which was created during compilation and made to be canonical by
+    /// modifying the metadata accessor.
+    IsCanonicalStaticSpecialization = 1,
+  };
+
+  explicit MetadataTrailingFlags(uint64_t bits) : FlagSet(bits) {}
+  constexpr MetadataTrailingFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsStaticSpecialization,
+                                isStaticSpecialization,
+                                setIsStaticSpecialization)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCanonicalStaticSpecialization,
+                                isCanonicalStaticSpecialization,
+                                setIsCanonicalStaticSpecialization)
 };
 
 /// Flags for Builtin.IntegerLiteral values.

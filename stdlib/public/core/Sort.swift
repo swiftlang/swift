@@ -246,8 +246,8 @@ extension MutableCollection where Self: RandomAccessCollection {
   public mutating func sort(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows {
-    let didSortUnsafeBuffer = try _withUnsafeMutableBufferPointerIfSupported {
-      buffer -> Void? in
+    let didSortUnsafeBuffer: Void? = try _withUnsafeMutableBufferPointerIfSupported {
+      buffer -> Void in
         try buffer._stableSortImpl(by: areInIncreasingOrder)
     }
     if didSortUnsafeBuffer == nil {
@@ -692,7 +692,7 @@ extension UnsafeMutableBufferPointer {
       
       result = try result && _finalizeRuns(
         &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
-      assert(runs.count == 1, "Didn't complete final merge")
+      _internalInvariant(runs.count == 1, "Didn't complete final merge")
     }
 
     // FIXME: Remove this, it works around rdar://problem/45044610

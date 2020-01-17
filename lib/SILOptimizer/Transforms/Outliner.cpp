@@ -18,16 +18,17 @@
 #include "swift/AST/Types.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
@@ -50,6 +51,7 @@ class OutlinerMangler : public Mangle::ASTMangler {
   };
 
   llvm::BitVector *IsParameterBridged;
+  llvm::BitVector *IsParameterGuaranteed;
   SILDeclRef MethodDecl;
   MethodKind Kind;
   bool IsReturnBridged;
@@ -57,13 +59,15 @@ class OutlinerMangler : public Mangle::ASTMangler {
 public:
   /// Create an mangler for an outlined bridged method.
   OutlinerMangler(SILDeclRef Method, llvm::BitVector *ParameterBridged,
-                  bool ReturnBridged)
-      : IsParameterBridged(ParameterBridged), MethodDecl(Method),
+                  llvm::BitVector *IsParameterGuaranteed, bool ReturnBridged)
+      : IsParameterBridged(ParameterBridged),
+        IsParameterGuaranteed(IsParameterGuaranteed), MethodDecl(Method),
         Kind(BridgedMethod), IsReturnBridged(ReturnBridged) {}
 
   /// Create an mangler for an outlined bridged property.
   OutlinerMangler(SILDeclRef Method, bool IsAddress)
-      : IsParameterBridged(nullptr), MethodDecl(Method),
+      : IsParameterBridged(nullptr), IsParameterGuaranteed(nullptr),
+        MethodDecl(Method),
         Kind(IsAddress ? BridgedPropertyAddress : BridgedProperty),
         IsReturnBridged(true) {}
 
@@ -93,9 +97,14 @@ std::string OutlinerMangler::mangle() {
   llvm::raw_svector_ostream Out(Buffer);
 
   Out << getMethodKindMangling();
-  if (IsParameterBridged)
-    for (unsigned Idx = 0,  E = IsParameterBridged->size(); Idx != E; ++Idx)
+  if (IsParameterBridged) {
+    for (unsigned Idx = 0, E = IsParameterBridged->size(); Idx != E; ++Idx) {
       Out << (IsParameterBridged->test(Idx) ? 'b' : 'n');
+      // NOTE: We must keep owned as having nothing here to preserve ABI since
+      // mangling is part of ABI.
+      Out << (IsParameterGuaranteed->test(Idx) ? "g" : "");
+    }
+  }
   Out << (IsReturnBridged ? 'b' : 'n');
   Out << '_';
 
@@ -138,22 +147,14 @@ static SILDeclRef getBridgeToObjectiveC(CanType NativeType,
     return SILDeclRef();
   auto ConformanceRef =
       SwiftModule->lookupConformance(NativeType, Proto);
-  if (!ConformanceRef)
+  if (ConformanceRef.isInvalid())
     return SILDeclRef();
 
-  auto Conformance = ConformanceRef->getConcrete();
-  FuncDecl *Requirement = nullptr;
+  auto Conformance = ConformanceRef.getConcrete();
   // bridgeToObjectiveC
   DeclName Name(Ctx, Ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto Member : Proto->lookupDirect(Name, flags)) {
-    if (auto Func = dyn_cast<FuncDecl>(Member)) {
-      Requirement = Func;
-      break;
-    }
-  }
-  assert(Requirement);
+  auto *Requirement = dyn_cast_or_null<FuncDecl>(
+    Proto->getSingleRequirement(Name));
   if (!Requirement)
     return SILDeclRef();
 
@@ -170,22 +171,14 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
     return SILDeclRef();
   auto ConformanceRef =
       SwiftModule->lookupConformance(NativeType, Proto);
-  if (!ConformanceRef)
+  if (ConformanceRef.isInvalid())
     return SILDeclRef();
-  auto Conformance = ConformanceRef->getConcrete();
-  FuncDecl *Requirement = nullptr;
+  auto Conformance = ConformanceRef.getConcrete();
   // _unconditionallyBridgeFromObjectiveC
   DeclName Name(Ctx, Ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
                 llvm::makeArrayRef(Identifier()));
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto Member : Proto->lookupDirect(Name, flags)) {
-    if (auto Func = dyn_cast<FuncDecl>(Member)) {
-      Requirement = Func;
-      break;
-    }
-  }
-  assert(Requirement);
+  auto *Requirement = dyn_cast_or_null<FuncDecl>(
+      Proto->getSingleRequirement(Name));
   if (!Requirement)
     return SILDeclRef();
 
@@ -304,11 +297,15 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
                       ResultConvention::Owned));
   auto ExtInfo =
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                               /*pseudogeneric*/ false, /*noescape*/ false);
+                               /*pseudogeneric*/ false, /*noescape*/ false,
+                               DifferentiabilityKind::NonDifferentiable,
+                               /*clangFunctionType*/ nullptr);
   auto FunctionType = SILFunctionType::get(
       nullptr, ExtInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, Parameters, /*yields*/ {},
-      Results, None, M.getASTContext());
+      Results, None,
+      SubstitutionMap(), false,
+      M.getASTContext());
   return FunctionType;
 }
 
@@ -494,8 +491,11 @@ static bool matchSwitch(SwitchInfo &SI, SILInstruction *Inst,
   auto NativeType = Apply->getType().getASTType();
   auto *BridgeFun = FunRef->getInitiallyReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
+  // Not every type conforms to the ObjectiveCBridgeable protocol in such a case
+  // getBridgeFromObjectiveC returns SILDeclRef().
   auto bridgeWitness = getBridgeFromObjectiveC(NativeType, SwiftModule);
-  if (BridgeFun->getName() != bridgeWitness.mangle())
+  if (bridgeWitness == SILDeclRef() ||
+      BridgeFun->getName() != bridgeWitness.mangle())
     return false;
 
   // %41 = enum $Optional<String>, #Optional.some!enumelt.1, %40 : $String
@@ -655,7 +655,10 @@ bool BridgedProperty::matchInstSequence(SILBasicBlock::iterator It) {
 
 
 namespace {
+
 /// Match a bridged argument.
+///
+///
 /// %15 = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 /// %16 = apply %15(%14) :
 ///         $@convention(method) (@guaranteed String) -> @owned NSString
@@ -664,11 +667,16 @@ namespace {
 ///
 /// apply %objcMethod(%17, ...) : $@convention(objc_method) (Optional<NSString> ...) ->
 /// release_value %17 : $Optional<NSString>
+///
+/// NOTE: If release_value %14 is found, our outlined function will have an
+/// owned convention for self. Otherwise, if we do not find it, we will have a
+/// guaranteed one.
 class BridgedArgument {
 public:
   FunctionRefInst *BridgeFun;
   ApplyInst *BridgeCall;
   EnumInst *OptionalResult;
+  SILValue BridgedValue;
   ReleaseValueInst *ReleaseAfterBridge;
   ReleaseValueInst *ReleaseArgAfterCall;
   unsigned Idx = 0;
@@ -676,8 +684,9 @@ public:
   // Matched bridged argument.
   BridgedArgument(unsigned Idx, FunctionRefInst *F, ApplyInst *A, EnumInst *E,
                   ReleaseValueInst *R0, ReleaseValueInst *R1)
-      : BridgeFun(F), BridgeCall(A), OptionalResult(E), ReleaseAfterBridge(R0),
-        ReleaseArgAfterCall(R1), Idx(Idx) {}
+      : BridgeFun(F), BridgeCall(A), OptionalResult(E),
+        BridgedValue(FullApplySite(A).getSelfArgument()),
+        ReleaseAfterBridge(R0), ReleaseArgAfterCall(R1), Idx(Idx) {}
 
   /// Invalid argument constructor.
   BridgedArgument()
@@ -687,7 +696,14 @@ public:
   static BridgedArgument match(unsigned ArgIdx, SILValue Arg, ApplyInst *AI);
 
   operator bool() const { return BridgeFun != nullptr; }
-  SILValue bridgedValue() { return ReleaseAfterBridge->getOperand(); }
+  SILValue bridgedValue() { return BridgedValue; }
+
+  bool isGuaranteed() const { return ReleaseAfterBridge == nullptr; }
+  ParameterConvention getConvention() const {
+    if (isGuaranteed())
+      return ParameterConvention::Direct_Guaranteed;
+    return ParameterConvention::Direct_Owned;
+  }
 
   void eraseFromParent();
 
@@ -709,14 +725,17 @@ void BridgedArgument::transferTo(SILValue BridgedValue,
   DestBB->moveTo(SILBasicBlock::iterator(BridgedCall), BridgeCall);
   BridgeCall->setArgument(0, BridgedValue);
   DestBB->moveTo(SILBasicBlock::iterator(BridgedCall), OptionalResult);
-  DestBB->moveTo(SILBasicBlock::iterator(BridgedCall), ReleaseAfterBridge);
-  ReleaseAfterBridge->setOperand(BridgedValue);
+  if (ReleaseAfterBridge) {
+    DestBB->moveTo(SILBasicBlock::iterator(BridgedCall), ReleaseAfterBridge);
+    ReleaseAfterBridge->setOperand(BridgedValue);
+  }
   auto AfterCall = std::next(SILBasicBlock::iterator(BridgedCall));
   DestBB->moveTo(SILBasicBlock::iterator(AfterCall), ReleaseArgAfterCall);
 }
 
 void BridgedArgument::eraseFromParent() {
-  ReleaseAfterBridge->eraseFromParent();
+  if (ReleaseAfterBridge)
+    ReleaseAfterBridge->eraseFromParent();
   ReleaseArgAfterCall->eraseFromParent();
   OptionalResult->eraseFromParent();
   BridgeCall->eraseFromParent();
@@ -737,7 +756,7 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   // release_value %17 : $Optional<NSString>
   //
   auto *Enum = dyn_cast<EnumInst>(Arg);
-  if (!Enum)
+  if (!Enum || !Enum->hasOperand())
     return BridgedArgument();
 
   if (SILBasicBlock::iterator(Enum) == Enum->getParent()->begin())
@@ -745,16 +764,27 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   auto *BridgeCall =
       dyn_cast<ApplyInst>(std::prev(SILBasicBlock::iterator(Enum)));
   if (!BridgeCall || BridgeCall->getNumArguments() != 1 ||
-      Enum->getOperand() != BridgeCall || !BridgeCall->hasOneUse())
+      Enum->getOperand() != BridgeCall || !BridgeCall->hasOneUse() ||
+      !FullApplySite(BridgeCall).hasSelfArgument())
+    return BridgedArgument();
+
+  auto &selfArg = FullApplySite(BridgeCall).getSelfArgumentOperand();
+  auto selfConvention =
+      FullApplySite(BridgeCall).getArgumentConvention(selfArg);
+  if (selfConvention != SILArgumentConvention::Direct_Guaranteed &&
+      selfConvention != SILArgumentConvention::Direct_Owned)
     return BridgedArgument();
 
   auto BridgedValue = BridgeCall->getArgument(0);
   auto Next = std::next(SILBasicBlock::iterator(Enum));
   if (Next == Enum->getParent()->end())
     return BridgedArgument();
+
+  // Make sure that if we have a bridged value release that it is on the bridged
+  // value.
   auto *BridgedValueRelease =
       dyn_cast<ReleaseValueInst>(std::next(SILBasicBlock::iterator(Enum)));
-  if (!BridgedValueRelease || BridgedValueRelease->getOperand() != BridgedValue)
+  if (BridgedValueRelease && BridgedValueRelease->getOperand() != BridgedValue)
     return BridgedArgument();
 
   if (SILBasicBlock::iterator(BridgeCall) == BridgeCall->getParent()->begin())
@@ -782,8 +812,11 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   auto NativeType = BridgedValue->getType().getASTType();
   auto *BridgeFun = FunRef->getInitiallyReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
+  // Not every type conforms to the ObjectiveCBridgeable protocol in such a case
+  // getBridgeToObjectiveC returns SILDeclRef().
   auto bridgeWitness = getBridgeToObjectiveC(NativeType, SwiftModule);
-  if (BridgeFun->getName() != bridgeWitness.mangle())
+  if (bridgeWitness == SILDeclRef() ||
+      BridgeFun->getName() != bridgeWitness.mangle())
     return BridgedArgument();
 
   return BridgedArgument(ArgIdx, FunRef, BridgeCall, Enum, BridgedValueRelease,
@@ -897,7 +930,8 @@ class ObjCMethodCall : public OutlinePattern {
   SmallVector<BridgedArgument, 4> BridgedArguments;
   std::string OutlinedName;
   llvm::BitVector IsBridgedArgument;
-  BridgedReturn BridgedReturn;
+  llvm::BitVector IsGuaranteedArgument;
+  ::BridgedReturn BridgedReturn;
 public:
   bool matchInstSequence(SILBasicBlock::iterator I) override;
 
@@ -925,6 +959,7 @@ void ObjCMethodCall::clearState() {
   BridgedArguments.clear();
   OutlinedName.clear();
   IsBridgedArgument.clear();
+  IsGuaranteedArgument.clear();
 }
 
 std::pair<SILFunction *, SILBasicBlock::iterator>
@@ -1030,7 +1065,7 @@ ObjCMethodCall::outline(SILModule &M) {
 std::string ObjCMethodCall::getOutlinedFunctionName() {
   if (OutlinedName.empty()) {
     OutlinerMangler Mangler(ObjCMethod->getMember(), &IsBridgedArgument,
-                            BridgedReturn);
+                            &IsGuaranteedArgument, BridgedReturn);
     OutlinedName = Mangler.mangle();
   }
   return OutlinedName;
@@ -1058,6 +1093,7 @@ bool ObjCMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
   // Collect bridged parameters.
   unsigned Idx = 0;
   IsBridgedArgument.resize(BridgedCall->getNumArguments(), false);
+  IsGuaranteedArgument.resize(BridgedCall->getNumArguments(), false);
   for (auto &Param : BridgedCall->getArgumentOperands()) {
     unsigned CurIdx = Idx++;
 
@@ -1078,6 +1114,8 @@ bool ObjCMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
 
     BridgedArguments.push_back(BridgedArg);
     IsBridgedArgument.set(CurIdx);
+    if (BridgedArg.isGuaranteed())
+      IsGuaranteedArgument.set(CurIdx);
   }
 
   // Try to match a bridged return value.
@@ -1109,11 +1147,12 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
     // Either use the bridged type passing it @owned.
     if (BridgedArgIdx < BridgedArguments.size() &&
         BridgedArguments[BridgedArgIdx].Idx == OrigSigIdx) {
+      auto convention = BridgedArguments[BridgedArgIdx].getConvention();
       Parameters.push_back(SILParameterInfo(BridgedArguments[BridgedArgIdx]
                                                 .bridgedValue()
                                                 ->getType()
                                                 .getASTType(),
-                                            ParameterConvention::Direct_Owned));
+                                            convention));
       ++BridgedArgIdx;
     } else {
       // Otherwise, use the original type convention.
@@ -1122,10 +1161,12 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
     OrigSigIdx++;
   }
 
-  auto ExtInfo =
-      SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                               /*pseudogeneric*/ false,
-                               /*noescape*/ false);
+  auto ExtInfo = SILFunctionType::ExtInfo(
+      SILFunctionType::Representation::Thin,
+      /*pseudogeneric*/ false,
+      /*noescape*/ false,
+      DifferentiabilityKind::NonDifferentiable,
+      /*clangFunctionType*/ nullptr);
 
   SmallVector<SILResultInfo, 4> Results;
   // If we don't have a bridged return we changed from @autoreleased to @owned
@@ -1133,7 +1174,7 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
   if (!BridgedReturn) {
     if (FunTy->getNumResults()) {
       auto OrigResultInfo = FunTy->getSingleResult();
-      Results.push_back(SILResultInfo(OrigResultInfo.getType(),
+      Results.push_back(SILResultInfo(OrigResultInfo.getInterfaceType(),
                                       OrigResultInfo.getConvention() ==
                                               ResultConvention::Autoreleased
                                           ? ResultConvention::Owned
@@ -1147,7 +1188,9 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
   auto FunctionType = SILFunctionType::get(
       nullptr, ExtInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, Parameters, {},
-      Results, None, M.getASTContext());
+      Results, None,
+      SubstitutionMap(), false,
+      M.getASTContext());
   return FunctionType;
 }
 

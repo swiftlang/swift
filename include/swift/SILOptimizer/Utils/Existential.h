@@ -98,8 +98,7 @@ struct ConcreteExistentialInfo {
   // Do a conformance lookup on ConcreteType with the given requirement, P. If P
   // is satisfiable based on the existential's conformance, return the new
   // conformance on P. Otherwise return None.
-  Optional<ProtocolConformanceRef>
-  lookupExistentialConformance(ProtocolDecl *P) const {
+  ProtocolConformanceRef lookupExistentialConformance(ProtocolDecl *P) const {
     CanType selfTy = P->getSelfInterfaceType()->getCanonicalType();
     return ExistentialSubs.lookupConformance(selfTy, P);
   }

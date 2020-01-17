@@ -20,6 +20,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/REPLCodeCompletion.h"
@@ -36,7 +37,7 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
 
-#if HAVE_UNICODE_LIBEDIT
+#if HAVE_LIBEDIT
 #include <histedit.h>
 #include <wchar.h>
 #endif
@@ -119,8 +120,8 @@ public:
 };
 
 using Convert = ConvertForWcharSize<sizeof(wchar_t)>;
-  
-#if HAVE_UNICODE_LIBEDIT
+
+#if HAVE_LIBEDIT
 static void convertFromUTF8(llvm::StringRef utf8,
                             llvm::SmallVectorImpl<wchar_t> &out) {
   size_t reserve = out.size() + utf8.size();
@@ -134,7 +135,7 @@ static void convertFromUTF8(llvm::StringRef utf8,
   (void)res;
   out.set_size(wide_begin - out.begin());
 }
-  
+
 static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
                           llvm::SmallVectorImpl<char> &out) {
   size_t reserve = out.size() + wide.size()*4;
@@ -152,7 +153,7 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 
 } // end anonymous namespace
 
-#if HAVE_UNICODE_LIBEDIT
+#if HAVE_LIBEDIT
 
 static ModuleDecl *
 typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
@@ -186,15 +187,12 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
     REPLInputFile.addImports(ImportsWithOptions);
   }
 
-  bool FoundAnySideEffects = false;
   bool Done;
   do {
-    FoundAnySideEffects |=
-        parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
-                            &PersistentState);
+    parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
+                        &PersistentState);
   } while (!Done);
-  performTypeChecking(REPLInputFile, PersistentState.getTopLevelContext(),
-                      /*Options*/None);
+  performTypeChecking(REPLInputFile);
   return REPLModule;
 }
 
@@ -874,7 +872,8 @@ private:
     if (!CI.getASTContext().hadError()) {
       // We don't want anything to get stripped, so pretend we're doing a
       // non-whole-module generation.
-      sil = performSILGeneration(*M->getFiles().front(), CI.getSILOptions());
+      sil = performSILGeneration(*M->getFiles().front(), CI.getSILTypes(),
+                                 CI.getSILOptions());
       runSILDiagnosticPasses(*sil);
       runSILOwnershipEliminatorPass(*sil);
       runSILLoweringPasses(*sil);
@@ -964,7 +963,7 @@ public:
       IRGenOpts(),
       SILOpts(),
       Input(*this),
-      PersistentState(CI.getASTContext())
+      PersistentState()
   {
     ASTContext &Ctx = CI.getASTContext();
     Ctx.LangOpts.EnableAccessControl = false;
@@ -1091,16 +1090,17 @@ public:
           ASTContext &ctx = CI.getASTContext();
           SourceFile &SF =
               MostRecentModule->getMainSourceFile(SourceFileKind::REPL);
-          UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()), &SF,
-                                   nullptr);
-          for (auto result : lookup.Results) {
+          DeclNameRef name(ctx.getIdentifier(Tok.getText()));
+          auto descriptor = UnqualifiedLookupDescriptor(name, &SF);
+          auto lookup = evaluateOrDefault(
+              ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+          for (auto result : lookup) {
             printOrDumpDecl(result.getValueDecl(), doPrint);
               
             if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
               if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
                 TypeDecl *origTypeDecl = typeAliasDecl
                   ->getDeclaredInterfaceType()
-                  ->getDesugaredType()
                   ->getNominalOrBoundGenericNominal();
                 if (origTypeDecl) {
                   printOrDumpDecl(origTypeDecl, doPrint);
@@ -1164,9 +1164,9 @@ public:
           if (Tok.getText() == "debug") {
             L.lex(Tok);
             if (Tok.getText() == "on") {
-              CI.getASTContext().LangOpts.DebugConstraintSolver = true;
+              CI.getASTContext().TypeCheckerOpts.DebugConstraintSolver = true;
             } else if (Tok.getText() == "off") {
-              CI.getASTContext().LangOpts.DebugConstraintSolver = false;
+              CI.getASTContext().TypeCheckerOpts.DebugConstraintSolver = false;
             } else {
               llvm::outs() << "Unknown :constraints debug command; try :help\n";
             }

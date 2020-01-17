@@ -37,6 +37,10 @@
 // RUN: %swiftc_driver_plain -driver-print-jobs -toolchain-stdlib-rpath -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift -resource-dir garbage/ | %FileCheck -check-prefix TOOLCHAIN-RPATH -DPLATFORM=%target-sdk-name %s
 // RUN: %swiftc_driver_plain -driver-print-jobs -toolchain-stdlib-rpath -target x86_64-apple-macosx10.15 %S/../Inputs/empty.swift -resource-dir garbage/ | %FileCheck -check-prefix TOOLCHAIN-RPATH -DPLATFORM=%target-sdk-name %s
 
+// ### Test with -no-toolchain-stdlib-rpath
+// RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix RPATH %s
+// RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.15 %S/../Inputs/empty.swift | %FileCheck -check-prefix NO-RPATH %s
+
 // TOOLCHAIN-RPATH: bin/ld{{"? }}
 // TOOLCHAIN-RPATH-SAME: -rpath garbage/[[PLATFORM]]{{ }}
 // TOOLCHAIN-RPATH-SAME: -o {{[^ ]+}}

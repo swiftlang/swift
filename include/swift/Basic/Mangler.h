@@ -14,6 +14,7 @@
 #define SWIFT_BASIC_MANGLER_H
 
 #include "swift/Demangling/ManglingUtils.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
@@ -118,18 +119,29 @@ protected:
   /// Verify that demangling and remangling works.
   static void verify(StringRef mangledName);
 
-  void dump();
+  SWIFT_DEBUG_DUMP;
 
   /// Appends a mangled identifier string.
   void appendIdentifier(StringRef ident);
 
+  // NOTE: the addSubsitution functions perform the value computation before
+  // the assignment because there is no sequence point synchronising the
+  // computation of the value before the insertion of the new key, resulting in
+  // the computed value being off-by-one causing an undecoration failure during
+  // round-tripping.
   void addSubstitution(const void *ptr) {
-    if (UseSubstitutions)
-      Substitutions[ptr] = Substitutions.size() + StringSubstitutions.size();
+    if (!UseSubstitutions)
+      return;
+
+    auto value = Substitutions.size() + StringSubstitutions.size();
+    Substitutions[ptr] = value;
   }
   void addSubstitution(StringRef Str) {
-    if (UseSubstitutions)
-      StringSubstitutions[Str] = Substitutions.size() + StringSubstitutions.size();
+    if (!UseSubstitutions)
+      return;
+
+    auto value = Substitutions.size() + StringSubstitutions.size();
+    StringSubstitutions[Str] = value;
   }
 
   bool tryMangleSubstitution(const void *ptr);

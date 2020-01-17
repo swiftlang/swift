@@ -64,6 +64,7 @@ func escapedDollarAnd() {
 
 func $declareWithDollar() { // expected-error{{cannot declare entity named '$declareWithDollar'}}
   var $foo = 17 // expected-error{{cannot declare entity named '$foo'}}
+  // expected-warning@-1 {{initialization of variable '$foo' was never used; consider replacing with assignment to '_' or removing it}}
   func $bar() { } // expected-error{{cannot declare entity named '$bar'}}
   func wibble(
     $a: Int, // expected-error{{cannot declare entity named '$a'}}

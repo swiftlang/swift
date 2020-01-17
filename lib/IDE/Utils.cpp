@@ -481,7 +481,7 @@ ide::replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
 static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
   auto BufOrErr = llvm::MemoryBuffer::getFile(Path);
   if (!BufOrErr) {
-    llvm::errs() << BufOrErr.getError().message() << '\n';
+    llvm::errs() << "could not open '" << Path << "': " << BufOrErr.getError().message() << '\n';
     return {};
   }
 
@@ -954,23 +954,9 @@ bool swift::ide::isFromClang(const Decl *D) {
 }
 
 ClangNode swift::ide::getEffectiveClangNode(const Decl *decl) {
-  // Directly...
-  if (auto clangNode = decl->getClangNode())
-    return clangNode;
-
-  // Or via the nested "Code" enum.
-  if (auto nominal =
-      const_cast<NominalTypeDecl *>(dyn_cast<NominalTypeDecl>(decl))) {
-    auto &ctx = nominal->getASTContext();
-    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-    for (auto code : nominal->lookupDirect(ctx.Id_Code, flags)) {
-      if (auto clangDecl = code->getClangDecl())
-        return clangDecl;
-    }
-  }
-
-  return ClangNode();
+  auto &ctx = decl->getASTContext();
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  return importer->getEffectiveClangNode(decl);
 }
 
 /// Retrieve the Clang node for the given extension, if it has one.
@@ -989,4 +975,56 @@ ClangNode swift::ide::extensionGetClangNode(const ExtensionDecl *ext) {
   }
 
   return ClangNode();
+}
+
+std::pair<Type, ConcreteDeclRef> swift::ide::getReferencedDecl(Expr *expr) {
+  auto exprTy = expr->getType();
+
+  // Look through unbound instance member accesses.
+  if (auto *dotSyntaxExpr = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr))
+    expr = dotSyntaxExpr->getRHS();
+
+  // Look through the 'self' application.
+  if (auto *selfApplyExpr = dyn_cast<SelfApplyExpr>(expr))
+    expr = selfApplyExpr->getFn();
+
+  // Look through curry thunks.
+  if (auto *closure = dyn_cast<AutoClosureExpr>(expr)) {
+    if (closure->isThunk()) {
+      auto *body = closure->getSingleExpressionBody();
+      if (isa<AutoClosureExpr>(body) &&
+          closure->getParameters()->size() == 1)
+       expr = closure->getSingleExpressionBody();
+    }
+  }
+
+  if (auto *closure = dyn_cast<AutoClosureExpr>(expr)) {
+    if (closure->isThunk()) {
+      auto *body = closure->getSingleExpressionBody();
+      body = body->getSemanticsProvidingExpr();
+      if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
+        if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {
+          if (auto *declRef = dyn_cast<DeclRefExpr>(innerCall->getFn())) {
+            expr = declRef;
+          }
+        }
+      }
+    }
+  }
+
+  // If this is an IUO result, unwrap the optional type.
+  auto refDecl = expr->getReferencedDecl();
+  if (!refDecl) {
+    if (auto *applyExpr = dyn_cast<ApplyExpr>(expr)) {
+      auto fnDecl = applyExpr->getFn()->getReferencedDecl();
+      if (auto *func = fnDecl.getDecl()) {
+        if (func->isImplicitlyUnwrappedOptional()) {
+          if (auto objectTy = exprTy->getOptionalObjectType())
+            exprTy = objectTy;
+        }
+      }
+    }
+  }
+
+  return std::make_pair(exprTy, refDecl);
 }

@@ -123,8 +123,8 @@ class C1 {
     // CHECK-NOT: sil hidden [ossa] @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fcTo : $@convention(objc_method) (X, @owned C2) -> @owned C2 {
   }
 
-  // CHECK-LABEL: sil hidden [ossa] @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fC : $@convention(method) (X, X, @thick C2.Type) -> @owned C2 {
-  // CHECK-NOT:   sil [ossa] @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fcTo : $@convention(objc_method) (X, X, @owned C2) -> @owned C2 {
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fC : $@convention(method) (X, X, @thick C2.Type) -> @owned C2 {
+  // CHECK-NOT:   sil {{.*}} @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fcTo : $@convention(objc_method) (X, X, @owned C2) -> @owned C2 {
   init(x1: X, x2: X) { ivar = x1 }
 }
 

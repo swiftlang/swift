@@ -17,6 +17,7 @@
 
 #include "CodeSynthesis.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTContext.h"
@@ -29,6 +30,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 using namespace swift;
@@ -38,15 +40,16 @@ void swift::setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
   pattern->forEachVariable([&](VarDecl *var) {
     // Don't change the type of a variable that we've been able to
     // compute a type for.
-    if (var->hasType() && !var->getType()->hasError())
+    if (var->hasInterfaceType())
       return;
 
-    var->markInvalid();
+    var->setInvalid();
   });
 }
 
 /// Build a default initializer for the given type.
 Expr *TypeChecker::buildDefaultInitializer(Type type) {
+  auto &Context = type->getASTContext();
   // Default-initialize optional types and weak values to 'nil'.
   if (type->getReferenceStorageReferent()->getOptionalObjectType())
     return new (Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
@@ -58,7 +61,7 @@ Expr *TypeChecker::buildDefaultInitializer(Type type) {
       if (elt.isVararg())
         return nullptr;
 
-      auto eltInit = buildDefaultInitializer(elt.getType());
+      auto eltInit = TypeChecker::buildDefaultInitializer(elt.getType());
       if (!eltInit)
         return nullptr;
 
@@ -161,25 +164,25 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
 }
 
 /// Validate the \c entryNumber'th entry in \c binding.
-static void validatePatternBindingEntry(TypeChecker &tc,
-                                        PatternBindingDecl *binding,
-                                        unsigned entryNumber) {
-  // If the pattern already has a type, we're done.
-  if (binding->getPattern(entryNumber)->hasType())
-    return;
+llvm::Expected<const PatternBindingEntry *>
+PatternBindingEntryRequest::evaluate(Evaluator &eval,
+                                     PatternBindingDecl *binding,
+                                     unsigned entryNumber) const {
+  const auto &pbe = binding->getPatternList()[entryNumber];
+  auto &Context = binding->getASTContext();
 
   // Resolve the pattern.
-  auto *pattern = tc.resolvePattern(binding->getPattern(entryNumber),
-                                    binding->getDeclContext(),
-                                    /*isStmtCondition*/true);
+  auto *pattern = TypeChecker::resolvePattern(binding->getPattern(entryNumber),
+                                              binding->getDeclContext(),
+                                              /*isStmtCondition*/ true);
   if (!pattern) {
     binding->setInvalid();
-    binding->getPattern(entryNumber)->setType(ErrorType::get(tc.Context));
-    return;
+    binding->getPattern(entryNumber)->setType(ErrorType::get(Context));
+    return &pbe;
   }
 
   binding->setPattern(entryNumber, pattern,
-                      binding->getPatternList()[entryNumber].getInitContext());
+                      binding->getInitContext(entryNumber));
 
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
@@ -188,9 +191,9 @@ static void validatePatternBindingEntry(TypeChecker &tc,
     if (auto *NTD = binding->getDeclContext()->getSelfNominalTypeDecl()) {
       if (!isa<ClassDecl>(NTD)) {
         if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-          tc.diagnose(binding, diag::class_var_not_in_class, false)
-            .fixItReplace(binding->getStaticLoc(), "static");
-          tc.diagnose(NTD, diag::extended_type_declared_here);
+          binding->diagnose(diag::class_var_not_in_class, false)
+              .fixItReplace(binding->getStaticLoc(), "static");
+          NTD->diagnose(diag::extended_type_declared_here);
         }
       }
     }
@@ -203,6 +206,8 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   // In particular, it's /not/ correct to check the PBD's DeclContext because
   // top-level variables in a script file are accessible from other files,
   // even though the PBD is inside a TopLevelCodeDecl.
+  auto contextualPattern =
+      ContextualPattern::forPatternBindingDecl(binding, entryNumber);
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
   if (binding->isInitialized(entryNumber)) {
@@ -211,33 +216,61 @@ static void validatePatternBindingEntry(TypeChecker &tc,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
 
-  if (tc.typeCheckPattern(pattern, binding->getDeclContext(), options)) {
-    setBoundVarsTypeError(pattern, tc.Context);
+  Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+  if (patternType->hasError()) {
+    swift::setBoundVarsTypeError(pattern, Context);
     binding->setInvalid();
-    pattern->setType(ErrorType::get(tc.Context));
-    return;
+    pattern->setType(ErrorType::get(Context));
+    return &pbe;
   }
 
-  // If the pattern didn't get a type or if it contains an unbound generic type,
-  // we'll need to check the initializer.
-  if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
-    if (tc.typeCheckPatternBinding(binding, entryNumber))
-      return;
-    
+  // If we have a type but no initializer, check whether the type is
+  // default-initializable. If so, do it.
+  if (!pbe.isInitialized() &&
+      binding->isDefaultInitializable(entryNumber) &&
+      pattern->hasStorage()) {
+    if (auto defaultInit = TypeChecker::buildDefaultInitializer(patternType)) {
+      // If we got a default initializer, install it and re-type-check it
+      // to make sure it is properly coerced to the pattern type.
+      binding->setInit(entryNumber, defaultInit);
+    }
+  }
+
+  // If the pattern contains some form of unresolved type, we'll need to
+  // check the initializer.
+  if (patternType->hasUnresolvedType() ||
+      patternType->hasUnboundGenericType()) {
+    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber,
+                                             patternType)) {
+      binding->setInvalid();
+      return &pbe;
+    }
+
     // A pattern binding at top level is not allowed to pick up another decl's
     // opaque result type as its type by type inference.
-    if (!binding->getDeclContext()->isLocalContext()
-        && binding->getInit(entryNumber)->getType()->hasOpaqueArchetype()) {
+    if (!binding->getDeclContext()->isLocalContext() &&
+        binding->getInit(entryNumber)->getType()->hasOpaqueArchetype()) {
       // TODO: Check whether the type is the pattern binding's own opaque type.
-      tc.diagnose(binding, diag::inferred_opaque_type,
-                  binding->getInit(entryNumber)->getType());
+      binding->diagnose(diag::inferred_opaque_type,
+                        binding->getInit(entryNumber)->getType());
+    }
+  } else {
+    // Coerce the pattern to the computed type.
+    if (auto newPattern = TypeChecker::coercePatternToType(
+            contextualPattern, patternType,
+            TypeResolverContext::PatternBindingDecl)) {
+      pattern = newPattern;
+    } else {
+      binding->setInvalid();
+      pattern->setType(ErrorType::get(Context));
+      return &pbe;
     }
   }
 
   // If the pattern binding appears in a type or library file context, then
   // it must bind at least one variable.
   if (!contextAllowsPatternBindingWithoutVariables(binding->getDeclContext())) {
-    llvm::SmallVector<VarDecl*, 2> vars;
+    llvm::SmallVector<VarDecl *, 2> vars;
     binding->getPattern(entryNumber)->collectVariables(vars);
     if (vars.empty()) {
       // Selector for error message.
@@ -245,37 +278,22 @@ static void validatePatternBindingEntry(TypeChecker &tc,
         Property,
         GlobalVariable,
       };
-      tc.diagnose(binding->getPattern(entryNumber)->getLoc(),
-                  diag::pattern_binds_no_variables,
-                  binding->getDeclContext()->isTypeContext()
-                                                   ? Property : GlobalVariable);
+      Context.Diags.diagnose(binding->getPattern(entryNumber)->getLoc(),
+                             diag::pattern_binds_no_variables,
+                             binding->getDeclContext()->isTypeContext()
+                                 ? Property
+                                 : GlobalVariable);
     }
   }
-
-  // If we have any type-adjusting attributes, apply them here.
-  assert(binding->getPattern(entryNumber)->hasType() && "Type missing?");
-  if (auto var = binding->getSingleVar()) {
-    tc.checkTypeModifyingDeclAttributes(var);
-  }
-}
-
-/// Validate the entries in the given pattern binding declaration.
-void swift::validatePatternBindingEntries(TypeChecker &tc,
-                                          PatternBindingDecl *binding) {
-  if (binding->hasValidationStarted())
-    return;
-
-  DeclValidationRAII IBV(binding);
-
-  for (unsigned i = 0, e = binding->getNumPatternEntries(); i != e; ++i)
-    validatePatternBindingEntry(tc, binding, i);
+  return &pbe;
 }
 
 llvm::Expected<bool>
 IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
-  bool result = (!storage->isStatic() &&
-                 doesContextHaveValueSemantics(storage->getDeclContext()));
+  auto storageDC = storage->getDeclContext();
+  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
+                 storageDC->hasValueSemantics());
 
   // 'lazy' overrides the normal accessor-based rules and heavily
   // restricts what accessors can be used.  The getter is considered
@@ -303,7 +321,7 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
 
   // Protocol requirements are always written as '{ get }' or '{ get set }';
   // the @_borrowed attribute determines if getReadImpl() becomes Get or Read.
-  if (isa<ProtocolDecl>(storage->getDeclContext()))
+  if (isa<ProtocolDecl>(storageDC))
     return checkMutability(AccessorKind::Get);
 
   switch (storage->getReadImpl()) {
@@ -329,8 +347,9 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
   // By default, the setter is mutating if we have an instance member of a
   // value type, but this can be overridden below.
-  bool result = (!storage->isStatic() &&
-                 doesContextHaveValueSemantics(storage->getDeclContext()));
+  auto storageDC = storage->getDeclContext();
+  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
+                 storageDC->hasValueSemantics());
 
   // If we have an attached property wrapper, the setter is mutating
   // or not based on the composition of the wrappers.
@@ -418,29 +437,6 @@ static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
   }
 }
 
-static ParamDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {
-  return fn->getParameters()->get(index);
-}
-
-static VarDecl *getFirstParamDecl(FuncDecl *fn) {
-  return getParamDeclAtIndex(fn, 0);
-};
-
-
-static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
-                                StringRef name,
-                                Type interfaceType,
-                                ParamDecl::Specifier specifier,
-                                ASTContext &context) {
-  auto *param = new (context) ParamDecl(specifier, SourceLoc(), SourceLoc(),
-                                        Identifier(), loc,
-                                        context.getIdentifier(name),
-                                        DC);
-  param->setImplicit();
-  param->setInterfaceType(interfaceType);
-  return param;
-}
-
 /// Build a parameter list which can forward the formal index parameters of a
 /// declaration.
 ///
@@ -458,8 +454,7 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
 
   // Clone the parameter list over for a new decl, so we get new ParamDecls.
   auto indices = subscript->getIndices()->clone(context,
-                                                ParameterList::Implicit|
-                                                ParameterList::WithoutTypes);
+                                                ParameterList::Implicit);
 
   // Give all of the parameters meaningless names so that we can forward
   // them properly.  If it's declared anonymously, SILGen will think
@@ -606,16 +601,14 @@ getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
   return result;
 }
 
-/// Build an l-value for the storage of a declaration.
+/// Build an l-value for the storage of a declaration. Returns nullptr if there
+/// was an error. This should only occur if an invalid declaration was type
+/// checked; another diagnostic should have been emitted already.
 static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    TargetImpl target,
                                    bool isLValue,
                                    ASTContext &ctx) {
-  // FIXME: Temporary workaround.
-  if (!accessor->hasInterfaceType())
-    ctx.getLazyResolver()->resolveDeclSignature(accessor);
-
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
   Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
@@ -631,8 +624,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       ConcreteDeclRef memberRef(underlyingVar, subs);
       auto *memberRefExpr = new (ctx) MemberRefExpr(
           result, SourceLoc(), memberRef, DeclNameLoc(), /*Implicit=*/true);
-      auto type = underlyingVar->getValueInterfaceType()
-          .subst(subs, SubstFlags::UseErrorType);
+      auto type = underlyingVar->getValueInterfaceType().subst(subs);
       if (isLValue)
         type = LValueType::get(type);
       memberRefExpr->setType(type);
@@ -688,7 +680,6 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     // Otherwise do a self-reference, which is dynamically bogus but
     // should be statically valid.  This should only happen in invalid cases.    
     } else {
-      assert(storage->isInvalid());
       semantics = AccessSemantics::Ordinary;
       selfAccessKind = SelfAccessorKind::Peer;
     }
@@ -696,7 +687,13 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
   case TargetImpl::Wrapper: {
     auto var = cast<VarDecl>(accessor->getStorage());
-    storage = var->getPropertyWrapperBackingProperty();
+    auto *backing = var->getPropertyWrapperBackingProperty();
+
+    // Error recovery.
+    if (!backing)
+      return nullptr;
+
+    storage = backing;
 
     // If the outermost property wrapper uses the enclosing self pattern,
     // record that.
@@ -710,7 +707,20 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     // Perform accesses to the wrappedValues along the composition chain.
     for (unsigned i : range(firstWrapperIdx, lastWrapperIdx)) {
       auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
-      underlyingVars.push_back(wrapperInfo.valueVar);
+      auto wrappedValue = wrapperInfo.valueVar;
+
+      // Check for availability of wrappedValue.
+      if (accessor->getAccessorKind() == AccessorKind::Get ||
+          accessor->getAccessorKind() == AccessorKind::Read) {
+        if (auto *attr = wrappedValue->getAttrs().getUnavailable(ctx)) {
+          diagnoseExplicitUnavailability(
+              wrappedValue,
+              var->getAttachedPropertyWrappers()[i]->getRangeWithAt(),
+              var->getDeclContext(), nullptr);
+        }
+      }
+
+      underlyingVars.push_back(wrappedValue);
     }
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
@@ -720,7 +730,14 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   case TargetImpl::WrapperStorage: {
     auto var =
         cast<VarDecl>(accessor->getStorage())->getOriginalWrappedProperty();
-    storage = var->getPropertyWrapperBackingProperty();
+    auto *backing = var->getPropertyWrapperBackingProperty();
+
+    // Error recovery.
+    if (!backing)
+      return nullptr;
+
+    storage = backing;
+
     enclosingSelfAccess =
         getEnclosingSelfPropertyWrapperAccess(var, /*forProjected=*/true);
     if (!enclosingSelfAccess) {
@@ -737,8 +754,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     assert(target != TargetImpl::Super);
     auto *storageDRE = new (ctx) DeclRefExpr(storage, DeclNameLoc(),
                                              /*IsImplicit=*/true, semantics);
-    auto type = storage->getValueInterfaceType()
-        .subst(subs, SubstFlags::UseErrorType);
+    auto type = storage->getValueInterfaceType().subst(subs);
     if (isLValue)
       type = LValueType::get(type);
     storageDRE->setType(type);
@@ -747,18 +763,37 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   }
 
   bool isMemberLValue = isLValue;
+  auto propertyWrapperMutability =
+      [&](Decl *decl) -> Optional<std::pair<bool, bool>> {
+    auto var = dyn_cast<VarDecl>(decl);
+    if (!var)
+      return None;
+    auto mut = var->getPropertyWrapperMutability();
+    if (!mut)
+      return None;
+    return std::make_pair(mut->Getter == PropertyWrapperMutability::Mutating,
+                          mut->Setter == PropertyWrapperMutability::Mutating);
+  };
 
-  // If we're acessing a property wrapper, determine if the
+  // If we're accessing a property wrapper, determine if the
   // intermediate access requires an lvalue.
-  if (underlyingVars.size() > 0) {
-    isMemberLValue = underlyingVars[0]->isGetterMutating();
+  if (auto mut = propertyWrapperMutability(accessor->getStorage())) {
+    isMemberLValue = mut->first;
     if (isLValue)
-      isMemberLValue |= underlyingVars[0]->isSetterMutating();
+      isMemberLValue |= mut->second;
   }
 
   bool isSelfLValue = storage->isGetterMutating();
   if (isMemberLValue)
     isSelfLValue |= storage->isSetterMutating();
+
+  // If we're accessing a property wrapper, determine if
+  // the self requires an lvalue.
+  if (auto mut = propertyWrapperMutability(storage)) {
+    isSelfLValue = mut->first;
+    if (isMemberLValue)
+      isSelfLValue |= mut->second;
+  }
 
   Expr *selfDRE =
     buildSelfReference(selfDecl, selfAccessKind, isSelfLValue,
@@ -773,8 +808,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
   Expr *lookupExpr;
   ConcreteDeclRef memberRef(storage, subs);
-  auto type = storage->getValueInterfaceType()
-      .subst(subs, SubstFlags::UseErrorType);
+  auto type = storage->getValueInterfaceType().subst(subs);
   if (isMemberLValue)
     type = LValueType::get(type);
 
@@ -782,25 +816,21 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   // that accepts the enclosing self along with key paths, form that subscript
   // operation now.
   if (enclosingSelfAccess) {
-    Type storageType = storage->getValueInterfaceType()
-        .subst(subs, SubstFlags::UseErrorType);
+    Type storageType = storage->getValueInterfaceType().subst(subs);
     // Metatype instance for the wrapper type itself.
     TypeExpr *wrapperMetatype = TypeExpr::createImplicit(storageType, ctx);
 
     // Key path referring to the property being accessed.
     Expr *propertyKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
-    propertyKeyPath = new (ctx) UnresolvedDotExpr(
-        propertyKeyPath, SourceLoc(),
-        enclosingSelfAccess->accessedProperty->getFullName(), DeclNameLoc(),
-        /*Implicit=*/true);
+    propertyKeyPath = UnresolvedDotExpr::createImplicit(ctx, propertyKeyPath,
+        enclosingSelfAccess->accessedProperty->getFullName());
     propertyKeyPath = new (ctx) KeyPathExpr(
         SourceLoc(), nullptr, propertyKeyPath);
 
     // Key path referring to the backing storage property.
     Expr *storageKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
-    storageKeyPath = new (ctx) UnresolvedDotExpr(
-        storageKeyPath, SourceLoc(), storage->getFullName(), DeclNameLoc(),
-        /*Implicit=*/true);
+    storageKeyPath = UnresolvedDotExpr::createImplicit(ctx, storageKeyPath,
+                                                       storage->getFullName());
     storageKeyPath = new (ctx) KeyPathExpr(
         SourceLoc(), nullptr, storageKeyPath);
     Expr *args[3] = {
@@ -810,12 +840,16 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     };
 
     SubscriptDecl *subscriptDecl = enclosingSelfAccess->subscript;
-    auto &tc = static_cast<TypeChecker&>(*ctx.getLazyResolver());
     lookupExpr = SubscriptExpr::create(
         ctx, wrapperMetatype, SourceLoc(), args,
         subscriptDecl->getFullName().getArgumentNames(), { }, SourceLoc(),
         nullptr, subscriptDecl, /*Implicit=*/true);
-    tc.typeCheckExpression(lookupExpr, accessor);
+
+    // FIXME: Since we're not resolving overloads or anything, we should be
+    // building fully type-checked AST above; we already have all the
+    // information that we need.
+    if (!TypeChecker::typeCheckExpression(lookupExpr, accessor))
+      return nullptr;
 
     // Make sure we produce an lvalue only when desired.
     if (isMemberLValue != lookupExpr->getType()->is<LValueType>()) {
@@ -863,39 +897,19 @@ createPropertyLoadOrCallSuperclassGetter(AccessorDecl *accessor,
                                ctx);
 }
 
-/// Look up the NSCopying protocol from the Foundation module, if present.
-/// Otherwise return null.
-static ProtocolDecl *getNSCopyingProtocol(ASTContext &ctx,
-                                          DeclContext *DC) {
-  auto foundation = ctx.getLoadedModule(ctx.Id_Foundation);
-  if (!foundation)
-    return nullptr;
-
-  SmallVector<ValueDecl *, 2> results;
-  DC->lookupQualified(foundation,
-                      ctx.getSwiftId(KnownFoundationEntity::NSCopying),
-                      NL_QualifiedDefault | NL_KnownNonCascadingDependency,
-                      results);
-
-  if (results.size() != 1)
-    return nullptr;
-
-  return dyn_cast<ProtocolDecl>(results.front());
-}
-
-static Optional<ProtocolConformanceRef>
-checkConformanceToNSCopying(ASTContext &ctx, VarDecl *var, Type type) {
+static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var,
+                                                          Type type) {
   auto dc = var->getDeclContext();
-  auto proto = getNSCopyingProtocol(ctx, dc);
+  auto &ctx = dc->getASTContext();
+  auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
-    auto result = TypeChecker::conformsToProtocol(type, proto, dc, None);
-    if (result)
+    if (auto result = TypeChecker::conformsToProtocol(type, proto, dc, None))
       return result;
   }
 
   ctx.Diags.diagnose(var->getLoc(), diag::nscopying_doesnt_conform);
-  return None;
+  return ProtocolConformanceRef::forInvalid();
 }
 
 static std::pair<Type, bool> getUnderlyingTypeOfVariable(VarDecl *var) {
@@ -908,10 +922,9 @@ static std::pair<Type, bool> getUnderlyingTypeOfVariable(VarDecl *var) {
   }
 }
 
-Optional<ProtocolConformanceRef>
-TypeChecker::checkConformanceToNSCopying(VarDecl *var) {
+ProtocolConformanceRef TypeChecker::checkConformanceToNSCopying(VarDecl *var) {
   Type type = getUnderlyingTypeOfVariable(var).first;
-  return ::checkConformanceToNSCopying(Context, var, type);
+  return ::checkConformanceToNSCopying(var, type);
 }
 
 /// Synthesize the code to store 'Val' to 'VD', given that VD has an @NSCopying
@@ -928,14 +941,14 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
 
   // The element type must conform to NSCopying.  If not, emit an error and just
   // recovery by synthesizing without the copy call.
-  auto conformance = checkConformanceToNSCopying(Ctx, VD, underlyingType);
+  auto conformance = checkConformanceToNSCopying(VD, underlyingType);
   if (!conformance)
     return Val;
 
   //- (id)copyWithZone:(NSZone *)zone;
   DeclName copyWithZoneName(Ctx, Ctx.getIdentifier("copy"), { Ctx.Id_with });
   FuncDecl *copyMethod = nullptr;
-  for (auto member : conformance->getRequirement()->getMembers()) {
+  for (auto member : conformance.getRequirement()->getMembers()) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       if (func->getFullName() == copyWithZoneName) {
         copyMethod = func;
@@ -953,9 +966,8 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   }
 
   SubstitutionMap subs =
-    SubstitutionMap::get(copyMethod->getGenericSignature(),
-                         {underlyingType},
-                         ArrayRef<ProtocolConformanceRef>(*conformance));
+      SubstitutionMap::get(copyMethod->getGenericSignature(), {underlyingType},
+                           ArrayRef<ProtocolConformanceRef>(conformance));
   ConcreteDeclRef copyMethodRef(copyMethod, subs);
   auto copyMethodType = copyMethod->getInterfaceType()
                            ->castTo<GenericFunctionType>()
@@ -1028,13 +1040,27 @@ void createPropertyStoreOrCallSuperclassSetter(AccessorDecl *accessor,
       value = synthesizeCopyWithZoneCall(value, property, ctx);
   }
 
+  // Error recovery.
+  if (value->getType()->hasError())
+    return;
+
   Expr *dest = buildStorageReference(accessor, storage, target,
                                      /*isLValue=*/true, ctx);
+
+  // Error recovery.
+  if (dest == nullptr)
+    return;
 
   // A lazy property setter will store a value of type T into underlying storage
   // of type T?.
   auto destType = dest->getType()->getWithoutSpecifierType();
+
+  // Error recovery.
+  if (destType->hasError())
+    return;
+
   if (!destType->isEqual(value->getType())) {
+    assert(destType->getOptionalObjectType());
     assert(destType->getOptionalObjectType()->isEqual(value->getType()));
     value = new (ctx) InjectIntoOptionalExpr(value, destType);
   }
@@ -1070,10 +1096,15 @@ synthesizeTrivialGetterBody(AccessorDecl *getter, TargetImpl target,
 
   Expr *result =
     createPropertyLoadOrCallSuperclassGetter(getter, storage, target, ctx);
-  ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result,
-                                            /*IsImplicit=*/true);
 
-  return { BraceStmt::create(ctx, loc, returnStmt, loc, true),
+  SmallVector<ASTNode, 2> body;
+  if (result != nullptr) {
+    ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result,
+                                              /*IsImplicit=*/true);
+    body.push_back(returnStmt);
+  }
+
+  return { BraceStmt::create(ctx, loc, body, loc, true),
            /*isTypeChecked=*/true };
 }
 
@@ -1159,9 +1190,6 @@ namespace {
 static std::pair<BraceStmt *, bool>
 synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
                          ASTContext &Ctx) {
-  // FIXME: Remove TypeChecker dependencies below.
-  auto &TC = *(TypeChecker *) Ctx.getLazyResolver();
-
   // The getter checks the optional, storing the initial value in if nil.  The
   // specific pattern we generate is:
   //   get {
@@ -1224,17 +1252,25 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   // Take the initializer from the PatternBindingDecl for VD.
   // TODO: This doesn't work with complicated patterns like:
   //   lazy var (a,b) = foo()
-  auto *InitValue = VD->getParentInitializer();
   auto PBD = VD->getParentPatternBinding();
   unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(VD);
-  PBD->setInitializerSubsumed(entryIndex);
 
-  if (!PBD->isInitializerChecked(entryIndex))
-    TC.typeCheckPatternBinding(PBD, entryIndex);
+  Expr *InitValue;
+  if (PBD->getInit(entryIndex)) {
+    PBD->setInitializerSubsumed(entryIndex);
+
+    if (!PBD->isInitializerChecked(entryIndex))
+      TypeChecker::typeCheckPatternBinding(PBD, entryIndex);
+
+    InitValue = PBD->getInit(entryIndex);
+  } else {
+    InitValue = new (Ctx) ErrorExpr(SourceRange(), Tmp2VD->getType());
+  }
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the getter function.
   Get->getImplicitSelfDecl()->setDeclContext(Get);
+
   InitValue->walk(RecontextualizeClosures(Get));
 
   // Wrap the initializer in a LazyInitializerExpr to avoid walking it twice.
@@ -1279,6 +1315,12 @@ synthesizePropertyWrapperGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 }
 
 static std::pair<BraceStmt *, bool>
+synthesizeInvalidAccessor(AccessorDecl *accessor, ASTContext &ctx) {
+  auto loc = accessor->getLoc();
+  return { BraceStmt::create(ctx, loc, ArrayRef<ASTNode>(), loc, true), true };
+}
+
+static std::pair<BraceStmt *, bool>
 synthesizeGetterBody(AccessorDecl *getter, ASTContext &ctx) {
   auto storage = getter->getStorage();
 
@@ -1309,7 +1351,7 @@ synthesizeGetterBody(AccessorDecl *getter, ASTContext &ctx) {
     return synthesizeTrivialGetterBody(getter, ctx);
 
   case ReadImplKind::Get:
-    llvm_unreachable("synthesizing getter that already exists?");
+    return synthesizeInvalidAccessor(getter, ctx);
 
   case ReadImplKind::Inherited:
     return synthesizeInheritedGetterBody(getter, ctx);
@@ -1332,7 +1374,7 @@ synthesizeTrivialSetterBodyWithStorage(AccessorDecl *setter,
                                        ASTContext &ctx) {
   SourceLoc loc = setter->getStorage()->getLoc();
 
-  VarDecl *valueParamDecl = getFirstParamDecl(setter);
+  VarDecl *valueParamDecl = setter->getParameters()->get(0);
 
   auto *valueDRE =
     new (ctx) DeclRefExpr(valueParamDecl, DeclNameLoc(), /*IsImplicit=*/true);
@@ -1417,8 +1459,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
 
   auto callObserver = [&](AccessorDecl *observer, VarDecl *arg) {
     ConcreteDeclRef ref(observer, subs);
-    auto type = observer->getInterfaceType()
-                  .subst(subs, SubstFlags::UseErrorType);
+    auto type = observer->getInterfaceType().subst(subs);
     Expr *Callee = new (Ctx) DeclRefExpr(ref, DeclNameLoc(), /*imp*/true);
     Callee->setType(type);
     auto *ValueDRE = new (Ctx) DeclRefExpr(arg, DeclNameLoc(), /*imp*/true);
@@ -1455,7 +1496,13 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   if (VD->getParsedAccessor(AccessorKind::DidSet)) {
     Expr *OldValueExpr
       = buildStorageReference(Set, VD, target, /*isLValue=*/true, Ctx);
-    OldValueExpr = new (Ctx) LoadExpr(OldValueExpr, VD->getType());
+
+    // Error recovery.
+    if (OldValueExpr == nullptr) {
+      OldValueExpr = new (Ctx) ErrorExpr(SourceRange(), VD->getType());
+    } else {
+      OldValueExpr = new (Ctx) LoadExpr(OldValueExpr, VD->getType());
+    }
 
     OldValue = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                  /*IsCaptureList*/false, SourceLoc(),
@@ -1518,7 +1565,7 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
       return synthesizePropertyWrapperSetterBody(setter, ctx);
     }
 
-    // Synthesize a getter for the storage wrapper property of a property
+    // Synthesize a setter for the storage wrapper property of a property
     // with an attached wrapper.
     if (auto original = var->getOriginalWrappedProperty(
             PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
@@ -1543,7 +1590,7 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
     return synthesizeInheritedWithObserversSetterBody(setter, ctx);
 
   case WriteImplKind::Set:
-    llvm_unreachable("synthesizing setter for unknown reason?");  
+    return synthesizeInvalidAccessor(setter, ctx);
 
   case WriteImplKind::MutableAddress:
     return synthesizeMutableAddressSetterBody(setter, ctx);
@@ -1563,6 +1610,19 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
                    ? TargetImpl::Ordinary
                    : TargetImpl::Implementation);
 
+  // If this is a variable with an attached property wrapper, then
+  // the accessors need to yield the wrappedValue or projectedValue.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (var->hasAttachedPropertyWrapper()) {
+      target = TargetImpl::Wrapper;
+    }
+
+    if (var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+      target = TargetImpl::WrapperStorage;
+    }
+  }
+
   SourceLoc loc = storage->getLoc();
   SmallVector<ASTNode, 1> body;
 
@@ -1570,13 +1630,14 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
 
   // Build a reference to the storage.
   Expr *ref = buildStorageReference(accessor, storage, target, isLValue, ctx);
+  if (ref != nullptr) {
+    // Wrap it with an `&` marker if this is a modify.
+    ref = maybeWrapInOutExpr(ref, ctx);
 
-  // Wrap it with an `&` marker if this is a modify.
-  ref = maybeWrapInOutExpr(ref, ctx);
-
-  // Yield it.
-  YieldStmt *yield = YieldStmt::create(ctx, loc, loc, ref, loc, true);
-  body.push_back(yield);
+    // Yield it.
+    YieldStmt *yield = YieldStmt::create(ctx, loc, loc, ref, loc, true);
+    body.push_back(yield);
+  }
 
   return { BraceStmt::create(ctx, loc, body, loc, true),
            /*isTypeChecked=*/true };
@@ -1593,23 +1654,23 @@ synthesizeReadCoroutineBody(AccessorDecl *read, ASTContext &ctx) {
 static std::pair<BraceStmt *, bool>
 synthesizeModifyCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
 #ifndef NDEBUG
-  auto impl = modify->getStorage()->getReadWriteImpl();
-  assert(impl != ReadWriteImplKind::Modify &&
+  auto storage = modify->getStorage();
+  auto impl = storage->getReadWriteImpl();
+  auto hasWrapper = isa<VarDecl>(storage) &&
+                    cast<VarDecl>(storage)->hasAttachedPropertyWrapper();
+  assert((hasWrapper || impl != ReadWriteImplKind::Modify) &&
          impl != ReadWriteImplKind::Immutable);
 #endif
   return synthesizeCoroutineAccessorBody(modify, ctx);
 }
 
-std::pair<BraceStmt *, bool>
+static std::pair<BraceStmt *, bool>
 synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   auto *accessor = cast<AccessorDecl>(fn);
   auto &ctx = accessor->getASTContext();
 
   if (ctx.Stats)
     ctx.Stats->getFrontendCounters().NumAccessorBodiesSynthesized++;
-
-  if (accessor->isInvalid() || ctx.hadError())
-    return { nullptr, true };
 
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
@@ -1648,20 +1709,17 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
                                            ASTContext &ctx) {
   SourceLoc loc = storage->getLoc();
 
-  GenericEnvironment *genericEnvironmentOfLazyAccessor = nullptr;
-
   ParamDecl *selfDecl = nullptr;
   if (storage->getDeclContext()->isTypeContext()) {
     if (storage->getAttrs().hasAttribute<LazyAttr>()) {
       // For lazy properties, steal the 'self' from the initializer context.
       auto *varDecl = cast<VarDecl>(storage);
       auto *bindingDecl = varDecl->getParentPatternBinding();
+      const auto i = bindingDecl->getPatternEntryIndexForVarDecl(varDecl);
       auto *bindingInit = cast<PatternBindingInitializer>(
-        bindingDecl->getPatternEntryForVarDecl(varDecl).getInitContext());
+        bindingDecl->getInitContext(i));
 
       selfDecl = bindingInit->getImplicitSelfDecl();
-      genericEnvironmentOfLazyAccessor =
-        bindingInit->getGenericEnvironmentOfContext();
     }
   }
 
@@ -1674,8 +1732,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   if (storage->isStatic())
     staticLoc = storage->getLoc();
 
-  auto storageInterfaceType = storage->getValueInterfaceType();
-
   auto getter = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc*/ loc,
       AccessorKind::Get, storage,
@@ -1683,7 +1739,7 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams,
       getterParams,
-      TypeLoc::withoutLoc(storageInterfaceType),
+      TypeLoc(),
       storage->getDeclContext());
 
   // If we're stealing the 'self' from a lazy initializer, set it now.
@@ -1692,25 +1748,10 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   if (selfDecl)
     *getter->getImplicitSelfDeclStorage() = selfDecl;
 
-  // We need to install the generic environment here because:
-  // 1) validating the getter will change the implicit self decl's DC to it,
-  // 2) it's likely that the initializer will be type-checked before the
-  //    accessor (and therefore before the normal installation happens), and
-  // 3) type-checking a reference to the self decl will map its type into
-  //    its context, which requires an environment to be installed on that
-  //    context.
-  // We can safely use the enclosing environment because properties are never
-  // differently generic.
-  if (genericEnvironmentOfLazyAccessor)
-    getter->setGenericEnvironment(genericEnvironmentOfLazyAccessor);
-
   if (storage->isGetterMutating())
     getter->setSelfAccessKind(SelfAccessKind::Mutating);
   else
     getter->setSelfAccessKind(SelfAccessKind::NonMutating);
-
-  if (storage->isStatic())
-    getter->setStatic();
 
   if (!storage->requiresOpaqueAccessor(AccessorKind::Get))
     getter->setForcedStaticDispatch(true);
@@ -1727,35 +1768,33 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   SourceLoc loc = storage->getLoc();
 
-  bool isStatic = storage->isStatic();
   bool isMutating = storage->isSetterMutating();
 
   GenericParamList *genericParams = createAccessorGenericParams(storage);
 
   // Add a "(value : T, indices...)" argument list.
-  auto storageInterfaceType = storage->getValueInterfaceType();
-  auto valueDecl = buildArgument(storage->getLoc(), storage->getDeclContext(),
-                                 "value", storageInterfaceType,
-                                 ParamDecl::Specifier::Default, ctx);
-  auto *params = buildIndexForwardingParamList(storage, valueDecl, ctx);
+  auto *param = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
+                                    Identifier(), loc,
+                                    ctx.getIdentifier("value"),
+                                    storage->getDeclContext());
+  param->setSpecifier(ParamSpecifier::Default);
+  param->setImplicit();
 
-  Type setterRetTy = TupleType::getEmpty(ctx);
+  auto *params = buildIndexForwardingParamList(storage, param, ctx);
+
   auto setter = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc*/ SourceLoc(),
       AccessorKind::Set, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams, params,
-      TypeLoc::withoutLoc(setterRetTy),
+      TypeLoc(),
       storage->getDeclContext());
 
   if (isMutating)
     setter->setSelfAccessKind(SelfAccessKind::Mutating);
   else
     setter->setSelfAccessKind(SelfAccessKind::NonMutating);
-
-  if (isStatic)
-    setter->setStatic();
 
   // All mutable storage requires a setter.
   assert(storage->requiresOpaqueAccessor(AccessorKind::Set));
@@ -1773,7 +1812,6 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
 
   SourceLoc loc = storage->getLoc();
 
-  bool isStatic = storage->isStatic();
   bool isMutating = storage->isGetterMutating();
   if (kind == AccessorKind::Modify)
     isMutating |= storage->isSetterMutating();
@@ -1799,9 +1837,6 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
     accessor->setSelfAccessKind(SelfAccessKind::Mutating);
   else
     accessor->setSelfAccessKind(SelfAccessKind::NonMutating);
-
-  if (isStatic)
-    accessor->setStatic();
 
   // If the storage does not provide this accessor as an opaque accessor,
   // we can't add a dynamically-dispatched method entry for the accessor,
@@ -1849,9 +1884,6 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
                                     AccessorKind kind) const {
   auto &ctx = storage->getASTContext();
 
-  if (!storage->hasInterfaceType())
-    ctx.getLazyResolver()->resolveDeclSignature(storage);
-
   switch (kind) {
   case AccessorKind::Get:
     return createGetterPrototype(storage, ctx);
@@ -1871,6 +1903,7 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
 #include "swift/AST/AccessorKinds.def"
     llvm_unreachable("not an opaque accessor");
   }
+  llvm_unreachable("Unhandled AccessorKind in switch");
 }
 
 llvm::Expected<bool>
@@ -2006,22 +2039,22 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
     // Getters and setters for lazy properties are not @_transparent.
     if (storage->getAttrs().hasAttribute<LazyAttr>())
       return false;
+  }
 
-    // Getters/setters for a property with a wrapper are not @_transparent if
-    // the backing variable has more-restrictive access than the original
-    // property. The same goes for its storage wrapper.
-    if (auto var = dyn_cast<VarDecl>(storage)) {
-      if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
-        if (backingVar->getFormalAccess() < var->getFormalAccess())
-          return false;
-      }
+  // Accessors for a property with a wrapper are not @_transparent if
+  // the backing variable has more-restrictive access than the original
+  // property. The same goes for its storage wrapper.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
+      if (backingVar->getFormalAccess() < var->getFormalAccess())
+        return false;
+    }
 
-      if (auto original = var->getOriginalWrappedProperty(
-              PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
-        auto backingVar = original->getPropertyWrapperBackingProperty();
-        if (backingVar->getFormalAccess() < var->getFormalAccess())
-          return false;
-      }
+    if (auto original = var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+      auto backingVar = original->getPropertyWrapperBackingProperty();
+      if (backingVar->getFormalAccess() < var->getFormalAccess())
+        return false;
     }
   }
 
@@ -2093,12 +2126,8 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
   NameBuf += "$__lazy_storage_$_";
   NameBuf += VD->getName().str();
   auto StorageName = Context.getIdentifier(NameBuf);
-
-  if (!VD->hasInterfaceType())
-    Context.getLazyResolver()->resolveDeclSignature(VD);
-
-  auto StorageTy = OptionalType::get(VD->getType());
   auto StorageInterfaceTy = OptionalType::get(VD->getInterfaceType());
+  auto StorageTy = OptionalType::get(VD->getType());
 
   auto *Storage = new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                                         /*IsCaptureList*/false, VD->getLoc(),
@@ -2142,7 +2171,7 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   // that to find the storage wrapper property.
   if (auto attr = var->getAttrs().getAttribute<ProjectedValuePropertyAttr>()){
     SmallVector<ValueDecl *, 2> declsFound;
-    auto projectionName = attr->ProjectionPropertyName;
+    DeclNameRef projectionName(attr->ProjectionPropertyName);
     auto dc = var->getDeclContext();
     if (dc->isTypeContext()) {
       dc->lookupQualified(dc->getSelfNominalTypeDecl(), projectionName,
@@ -2173,9 +2202,6 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   Identifier name = ctx.getIdentifier(nameBuf);
 
   // Determine the type of the property.
-  if (!wrapperVar->hasInterfaceType()) {
-    static_cast<TypeChecker &>(*ctx.getLazyResolver()).validateDecl(wrapperVar);
-  }
   Type propertyType = wrapperType->getTypeOfMember(
       var->getModuleContext(), wrapperVar,
       wrapperVar->getValueInterfaceType());
@@ -2235,15 +2261,13 @@ static void typeCheckSynthesizedWrapperInitializer(
   }
 
   // Type-check the initialization.
-  ASTContext &ctx = pbd->getASTContext();
-  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-  tc.typeCheckExpression(initializer, originalDC);
+  TypeChecker::typeCheckExpression(initializer, originalDC);
+  const auto i = pbd->getPatternEntryIndexForVarDecl(backingVar);
   if (auto initializerContext =
-          dyn_cast_or_null<Initializer>(
-            pbd->getPatternEntryForVarDecl(backingVar).getInitContext())) {
-    tc.contextualizeInitializer(initializerContext, initializer);
+          dyn_cast_or_null<Initializer>(pbd->getInitContext(i))) {
+    TypeChecker::contextualizeInitializer(initializerContext, initializer);
   }
-  tc.checkPropertyWrapperErrorHandling(pbd, initializer);
+  TypeChecker::checkPropertyWrapperErrorHandling(pbd, initializer);
 }
 
 static PropertyWrapperMutability::Value
@@ -2267,27 +2291,49 @@ getSetterMutatingness(VarDecl *var, DeclContext *dc) {
 llvm::Expected<Optional<PropertyWrapperMutability>>
 PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
                                            VarDecl *var) const {
-  unsigned numWrappers = var->getAttachedPropertyWrappers().size();
-  if (numWrappers < 1)
+  VarDecl *originalVar = var;
+  unsigned numWrappers = originalVar->getAttachedPropertyWrappers().size();
+  bool isProjectedValue = false;
+  if (numWrappers < 1) {
+    originalVar = var->getOriginalWrappedProperty(
+        PropertyWrapperSynthesizedPropertyKind::StorageWrapper);
+    if (!originalVar)
+      return None;
+
+    numWrappers = originalVar->getAttachedPropertyWrappers().size();
+    isProjectedValue = true;
+  }
+
+  // Make sure we don't ignore .swiftinterface files, because those will
+  // have the accessors printed
+  auto varSourceFile = var->getDeclContext()->getParentSourceFile();
+  auto isVarNotInInterfaceFile =
+      varSourceFile && varSourceFile->Kind != SourceFileKind::Interface;
+
+  if (var->getParsedAccessor(AccessorKind::Get) && isVarNotInInterfaceFile)
     return None;
-  if (var->getParsedAccessor(AccessorKind::Get))
-    return None;
-  if (var->getParsedAccessor(AccessorKind::Set))
+  if (var->getParsedAccessor(AccessorKind::Set) && isVarNotInInterfaceFile)
     return None;
 
+  // Figure out which member we're looking through.
+  auto varMember = isProjectedValue
+    ? &PropertyWrapperTypeInfo::projectedValueVar
+    : &PropertyWrapperTypeInfo::valueVar;
+
   // Start with the traits from the outermost wrapper.
-  auto firstWrapper = var->getAttachedPropertyWrapperTypeInfo(0);
-  if (!firstWrapper.valueVar)
+  auto firstWrapper = originalVar->getAttachedPropertyWrapperTypeInfo(0);
+  if (firstWrapper.*varMember == nullptr)
     return None;
   
   PropertyWrapperMutability result;
   
-  result.Getter = getGetterMutatingness(firstWrapper.valueVar);
-  result.Setter = getSetterMutatingness(firstWrapper.valueVar,
+  result.Getter = getGetterMutatingness(firstWrapper.*varMember);
+  result.Setter = getSetterMutatingness(firstWrapper.*varMember,
                                         var->getInnermostDeclContext());
   
   // Compose the traits of the following wrappers.
-  for (unsigned i = 1; i < numWrappers; ++i) {
+  for (unsigned i = 1; i < numWrappers && !isProjectedValue; ++i) {
+    assert(var == originalVar);
     auto wrapper = var->getAttachedPropertyWrapperTypeInfo(i);
     if (!wrapper.valueVar)
       return None;
@@ -2340,23 +2386,19 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   Type storageInterfaceType = wrapperType;
   Type storageType = dc->mapTypeIntoContext(storageInterfaceType);
 
-  if (!var->hasInterfaceType()) {
-    auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-    tc.validateDecl(var);
-    assert(var->hasInterfaceType());
-  }
-
   // Make sure that the property type matches the value of the
   // wrapper type.
   if (!storageInterfaceType->hasError()) {
     Type expectedPropertyType =
         computeWrappedValueType(var, storageInterfaceType);
     Type propertyType = var->getValueInterfaceType();
+    assert(propertyType);
     if (!expectedPropertyType->hasError() &&
         !propertyType->hasError() &&
         !propertyType->isEqual(expectedPropertyType)) {
       var->diagnose(diag::property_wrapper_incompatible_property,
                     propertyType, wrapperType);
+      var->setInvalid();
       if (auto nominalWrapper = wrapperType->getAnyNominal()) {
         nominalWrapper->diagnose(diag::property_wrapper_declared_here,
                                  nominalWrapper->getFullName());
@@ -2385,8 +2427,8 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   pbdPattern->setType(storageType);
   pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, storageType);
   auto pbd = PatternBindingDecl::createImplicit(
-      ctx, backingVar->getCorrectStaticSpelling(), pbdPattern,
-      /*init*/nullptr, dc, SourceLoc());
+      ctx, var->getCorrectStaticSpelling(), pbdPattern,
+      /*init*/ nullptr, dc, SourceLoc());
   addMemberToContextIfNeeded(pbd, dc, var);
   pbd->setStatic(var->isStatic());
 
@@ -2399,16 +2441,14 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (!parentPBD->isInitialized(patternNumber)
       && parentPBD->isDefaultInitializable(patternNumber)
       && !wrapperInfo.defaultInit) {
-    auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
     auto ty = parentPBD->getPattern(patternNumber)->getType();
-    if (auto defaultInit = tc.buildDefaultInitializer(ty))
+    if (auto defaultInit = TypeChecker::buildDefaultInitializer(ty))
       parentPBD->setInit(patternNumber, defaultInit);
   }
   
   if (parentPBD->isInitialized(patternNumber) &&
       !parentPBD->isInitializerChecked(patternNumber)) {
-    auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-    tc.typeCheckPatternBinding(parentPBD, patternNumber);
+    TypeChecker::typeCheckPatternBinding(parentPBD, patternNumber);
   }
 
   Expr *originalInitialValue = nullptr;
@@ -2446,7 +2486,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   // Form the initialization of the backing property from a value of the
   // original property's type.
   OpaqueValueExpr *origValue =
-      new (ctx) OpaqueValueExpr(var->getLoc(), var->getType(),
+      new (ctx) OpaqueValueExpr(var->getSourceRange(), var->getType(),
                                 /*isPlaceholder=*/true);
   Expr *initializer = buildPropertyWrapperInitialValueCall(
       var, storageType, origValue,
@@ -2463,12 +2503,16 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
 static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
                                           StorageImplInfo &info) {
   if (auto *var = dyn_cast<VarDecl>(storage)) {
+    SourceLoc typeLoc;
+    if (auto *repr = var->getTypeReprOrParentPatternTypeRepr())
+      typeLoc = repr->getLoc();
+    
     if (info.hasStorage()) {
       // Protocols cannot have stored properties.
       if (var->isLet()) {
         var->diagnose(diag::protocol_property_must_be_computed_var)
-          .fixItReplace(var->getParentPatternBinding()->getLoc(), "var")
-          .fixItInsertAfter(var->getTypeLoc().getLoc(), " { get }");
+            .fixItReplace(var->getParentPatternBinding()->getLoc(), "var")
+            .fixItInsertAfter(typeLoc, " { get }");
       } else {
         auto diag = var->diagnose(diag::protocol_property_must_be_computed);
         auto braces = var->getBracesRange();
@@ -2476,7 +2520,7 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
         if (braces.isValid())
           diag.fixItReplace(braces, "{ get <#set#> }");
         else
-          diag.fixItInsertAfter(var->getTypeLoc().getLoc(), " { get <#set#> }");
+          diag.fixItInsertAfter(typeLoc, " { get <#set#> }");
       }
     }
   }
@@ -2565,7 +2609,8 @@ static void finishPropertyWrapperImplInfo(VarDecl *var,
   }
 
   if (wrapperSetterIsUsable)
-    info = StorageImplInfo::getMutableComputed();
+    info = StorageImplInfo(ReadImplKind::Get, WriteImplKind::Set,
+                           ReadWriteImplKind::Modify);
   else
     info = StorageImplInfo::getImmutableComputed();
 }
@@ -2577,7 +2622,16 @@ static void finishNSManagedImplInfo(VarDecl *var,
   if (var->isLet())
     diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_let_property);
 
+  SourceFile *parentFile = var->getDeclContext()->getParentSourceFile();
+
   auto diagnoseNotStored = [&](unsigned kind) {
+    // Skip diagnosing @NSManaged declarations in module interfaces. They are
+    // properties that are stored, but have specially synthesized observers
+    // and we should allow them to have getters and setters in a module
+    // interface.
+    if (parentFile && parentFile->Kind == SourceFileKind::Interface)
+      return;
+
     diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_not_stored, kind);
   };
 
@@ -2607,6 +2661,8 @@ static void finishNSManagedImplInfo(VarDecl *var,
 
 static void finishStorageImplInfo(AbstractStorageDecl *storage,
                                   StorageImplInfo &info) {
+  auto dc = storage->getDeclContext();
+
   if (auto var = dyn_cast<VarDecl>(storage)) {
     if (!info.hasStorage()) {
       if (auto *init = var->getParentInitializer()) {
@@ -2625,8 +2681,28 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
     }
   }
 
-  if (isa<ProtocolDecl>(storage->getDeclContext()))
+  if (isa<ProtocolDecl>(dc))
     finishProtocolStorageImplInfo(storage, info);
+
+  // If we have a stored property in an unsupported context, diagnose
+  // and change it to computed to avoid confusing SILGen.
+
+  // Note: Stored properties in protocols are diagnosed in
+  // finishProtocolStorageImplInfo().
+
+  if (info.hasStorage() && !storage->isStatic()) {
+    if (isa<EnumDecl>(dc)) {
+      storage->diagnose(diag::enum_stored_property);
+      info = StorageImplInfo::getMutableComputed();
+    } else if (isa<ExtensionDecl>(dc) &&
+              !storage->getAttrs().getAttribute<DynamicReplacementAttr>()) {
+      storage->diagnose(diag::extension_stored_property);
+
+      info = (info.supportsMutation()
+              ? StorageImplInfo::getMutableComputed()
+              : StorageImplInfo::getImmutableComputed());
+    }
+  }
 }
 
 /// Gets the storage info of the provided storage decl if it has the
@@ -2674,6 +2750,13 @@ static StorageImplInfo classifyWithHasStorageAttr(VarDecl *var) {
 llvm::Expected<StorageImplInfo>
 StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
+  if (auto *param = dyn_cast<ParamDecl>(storage)) {
+    return StorageImplInfo::getSimpleStored(
+      param->isInOut()
+      ? StorageIsMutable
+      : StorageIsNotMutable);
+  }
+
   if (auto *var = dyn_cast<VarDecl>(storage)) {
     // Allow the @_hasStorage attribute to override all the accessors we parsed
     // when making the final classification.
@@ -2728,7 +2811,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   // Check if we have observers.
   } else if (hasWillSet || hasDidSet) {
-    if (storage->getAttrs().hasAttribute<OverrideAttr>()) {
+    if (storage->getAttrs().hasAttribute<OverrideAttr>() &&
+        storage->getDeclContext()->isTypeContext()) {
       readImpl = ReadImplKind::Inherited;
     } else {
       readImpl = ReadImplKind::Stored;

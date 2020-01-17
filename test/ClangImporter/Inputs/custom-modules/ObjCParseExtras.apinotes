@@ -1,0 +1,7 @@
+Name: ObjCParseExtras
+Classes:
+- Name: SubclassWithSwiftPrivateDesignatedInit
+  Methods:
+  - Selector: "initWithI:"
+    MethodKind: Instance
+    SwiftPrivate: true

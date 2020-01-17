@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
@@ -35,11 +36,12 @@ using namespace swift;
 using namespace namelookup;
 using namespace ast_scope;
 
+static bool isLocWithinAnInactiveClause(const SourceLoc loc, SourceFile *SF);
+
 llvm::SmallVector<const ASTScopeImpl *, 0> ASTScopeImpl::unqualifiedLookup(
-    SourceFile *sourceFile, const DeclName name, const SourceLoc loc,
+    SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc,
     const DeclContext *const startingContext, DeclConsumer consumer) {
   SmallVector<const ASTScopeImpl *, 0> history;
-
   const auto *start =
       findStartingScopeForLookup(sourceFile, name, loc, startingContext);
   if (start)
@@ -48,7 +50,7 @@ llvm::SmallVector<const ASTScopeImpl *, 0> ASTScopeImpl::unqualifiedLookup(
 }
 
 const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
-    SourceFile *sourceFile, const DeclName name, const SourceLoc loc,
+    SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc,
     const DeclContext *const startingContext) {
   // At present, use legacy code in unqualifiedLookup.cpp to handle module-level
   // lookups
@@ -58,11 +60,12 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
 
   auto *const fileScope = sourceFile->getScope().impl;
   // Parser may have added decls to source file, since previous lookup
-  sourceFile->getScope().impl->addNewDeclsToTree();
   if (name.isOperator())
     return fileScope; // operators always at file scope
 
-  const auto innermost = fileScope->findInnermostEnclosingScope(loc);
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
+  ASTScopeAssert(innermost->getWasExpanded(),
+                 "If looking in a scope, it must have been expanded.");
 
   // The legacy lookup code gets passed both a SourceLoc and a starting context.
   // However, our ultimate intent is for clients to not have to pass in a
@@ -81,36 +84,66 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   if (!startingScope) {
     llvm::errs() << "ASTScopeImpl: resorting to startingScope hack, file: "
                  << sourceFile->getFilename() << "\n";
+    // The check is costly, and inactive lookups will end up here, so don't
+    // do the check unless we can't find the startingScope.
+    const bool isInInactiveClause =
+        isLocWithinAnInactiveClause(loc, sourceFile);
+    if (isInInactiveClause)
+      llvm::errs() << "  because location is within an inactive clause\n";
     llvm::errs() << "'";
     name.print(llvm::errs());
     llvm::errs() << "' ";
     llvm::errs() << "loc: ";
-    loc.dump(sourceFile->getASTContext().SourceMgr);
+    loc.print(llvm::errs(), sourceFile->getASTContext().SourceMgr);
     llvm::errs() << "\nstarting context:\n ";
-    startingContext->dumpContext();
+    startingContext->printContext(llvm::errs());
     //    llvm::errs() << "\ninnermost: ";
     //    innermost->dump();
     //    llvm::errs() << "in: \n";
     //    fileScope->dump();
     llvm::errs() << "\n\n";
+
+    // Might distort things
+    //    if (fileScope->crossCheckWithAST())
+    //      llvm::errs() << "Tree creation missed some DeclContexts.\n";
+
+    // Crash compilation even if NDEBUG
+    if (isInInactiveClause)
+      llvm::report_fatal_error(
+          "A lookup was attempted into an inactive clause");
   }
 
-  assert(startingScope && "ASTScopeImpl: could not find startingScope");
+  ASTScopeAssert(startingScope, "ASTScopeImpl: could not find startingScope");
   return startingScope;
 }
 
-const ASTScopeImpl *
-ASTScopeImpl::findInnermostEnclosingScope(SourceLoc loc) const {
-  SourceManager &sourceMgr = getSourceManager();
-
-  const auto *s = this;
-  for (NullablePtr<const ASTScopeImpl> c;
-       (c = s->findChildContaining(loc, sourceMgr)); s = c.get()) {
-  }
-  return s;
+ASTScopeImpl *
+ASTScopeImpl::findInnermostEnclosingScope(SourceLoc loc,
+                                          NullablePtr<raw_ostream> os) {
+  return findInnermostEnclosingScopeImpl(loc, os, getSourceManager(),
+                                         getScopeCreator());
 }
 
-NullablePtr<const ASTScopeImpl>
+ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
+    SourceLoc loc, NullablePtr<raw_ostream> os, SourceManager &sourceMgr,
+    ScopeCreator &scopeCreator) {
+  expandAndBeCurrentDetectingRecursion(scopeCreator);
+  auto child = findChildContaining(loc, sourceMgr);
+  if (!child)
+    return this;
+  return child.get()->findInnermostEnclosingScopeImpl(loc, os, sourceMgr,
+                                                      scopeCreator);
+}
+
+bool ASTScopeImpl::checkSourceRangeOfThisASTNode() const {
+  const auto r = getSourceRangeOfThisASTNode();
+  (void)r;
+  ASTScopeAssert(!getSourceManager().isBeforeInBuffer(r.End, r.Start),
+                 "Range is backwards.");
+  return true;
+}
+
+NullablePtr<ASTScopeImpl>
 ASTScopeImpl::findChildContaining(SourceLoc loc,
                                   SourceManager &sourceMgr) const {
   // Use binary search to find the child that contains this location.
@@ -118,17 +151,24 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
     SourceManager &sourceMgr;
 
     bool operator()(const ASTScopeImpl *scope, SourceLoc loc) {
-      return sourceMgr.isBeforeInBuffer(scope->getSourceRange().End, loc);
+      ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
+      return -1 == ASTScopeImpl::compare(scope->getSourceRangeOfScope(), loc,
+                                         sourceMgr,
+                                         /*ensureDisjoint=*/false);
     }
     bool operator()(SourceLoc loc, const ASTScopeImpl *scope) {
-      return sourceMgr.isBeforeInBuffer(loc, scope->getSourceRange().End);
+      ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
+      // Alternatively, we could check that loc < start-of-scope
+      return 0 >= ASTScopeImpl::compare(loc, scope->getSourceRangeOfScope(),
+                                        sourceMgr,
+                                        /*ensureDisjoint=*/false);
     }
   };
   auto *const *child = std::lower_bound(
       getChildren().begin(), getChildren().end(), loc, CompareLocs{sourceMgr});
 
   if (child != getChildren().end() &&
-      sourceMgr.rangeContainsTokenLoc((*child)->getSourceRange(), loc))
+      sourceMgr.rangeContainsTokenLoc((*child)->getSourceRangeOfScope(), loc))
     return *child;
 
   return nullptr;
@@ -148,7 +188,7 @@ bool ASTScopeImpl::doesContextMatchStartingContext(
   if (auto p = getParent())
     return p.get()->doesContextMatchStartingContext(context);
   // Topmost scope always has a context, the SourceFile.
-  llvm_unreachable("topmost scope always has a context, the SourceFile");
+  ASTScope_unreachable("topmost scope always has a context, the SourceFile");
 }
 
 // For a SubscriptDecl with generic parameters, the call tries to do lookups
@@ -165,6 +205,19 @@ bool GenericParamScope::doesContextMatchStartingContext(
         return true;
     }
   }
+  return false;
+}
+
+bool DifferentiableAttributeScope::doesContextMatchStartingContext(
+    const DeclContext *context) const {
+  // Need special logic to handle case where `attributedDeclaration` is an
+  // `AbstractStorageDecl` (`SubscriptDecl` or `VarDecl`). The initial starting
+  // context in `ASTScopeImpl::findStartingScopeForLookup` will be an accessor
+  // of the `attributedDeclaration`.
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(attributedDeclaration))
+    for (auto accessor : asd->getAllAccessors())
+      if (up_cast<DeclContext>(accessor) == context)
+        return true;
   return false;
 }
 
@@ -322,8 +375,8 @@ bool GenericParamScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
   return consumer.consume({param}, DeclVisibilityKind::GenericParameter);
 }
 
-bool PatternEntryUseScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                                                 DeclConsumer consumer) const {
+bool PatternEntryDeclScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
   if (vis != DeclVisibilityKind::LocalVariable)
     return false; // look in self type will find this later
   return lookupLocalBindingsInPattern(getPattern(), vis, consumer);
@@ -362,7 +415,7 @@ bool AbstractFunctionBodyScope::lookupLocalsOrMembers(
 
 bool MethodBodyScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *> history, DeclConsumer consumer) const {
-  assert(isAMethod(decl));
+  ASTScopeAssert(isAMethod(decl), "Asking for members of a non-method.");
   if (AbstractFunctionBodyScope::lookupLocalsOrMembers(history, consumer))
     return true;
   return consumer.consume({decl->getImplicitSelfDecl()},
@@ -371,7 +424,9 @@ bool MethodBodyScope::lookupLocalsOrMembers(
 
 bool PureFunctionBodyScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *> history, DeclConsumer consumer) const {
-  assert(!isAMethod(decl));
+  ASTScopeAssert(
+      !isAMethod(decl),
+      "Should have called lookupLocalsOrMembers instead of this function.");
   if (AbstractFunctionBodyScope::lookupLocalsOrMembers(history, consumer))
     return true;
 
@@ -396,6 +451,25 @@ bool SpecializeAttributeScope::lookupLocalsOrMembers(
   return false;
 }
 
+bool DifferentiableAttributeScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
+  auto visitAbstractFunctionDecl = [&](AbstractFunctionDecl *afd) {
+    if (auto *params = afd->getGenericParams())
+      for (auto *param : params->getParams())
+        if (consumer.consume({param}, DeclVisibilityKind::GenericParameter))
+          return true;
+    return false;
+  };
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(attributedDeclaration)) {
+    return visitAbstractFunctionDecl(afd);
+  } else if (auto *asd = dyn_cast<AbstractStorageDecl>(attributedDeclaration)) {
+    for (auto *accessor : asd->getAllAccessors())
+      if (visitAbstractFunctionDecl(accessor))
+        return true;
+  }
+  return false;
+}
+
 bool BraceStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                                            DeclConsumer consumer) const {
   // All types and functions are visible anywhere within a brace statement
@@ -407,9 +481,8 @@ bool BraceStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
   SmallVector<ValueDecl *, 32> localBindings;
   for (auto braceElement : stmt->getElements()) {
     if (auto localBinding = braceElement.dyn_cast<Decl *>()) {
-      if (isa<AbstractFunctionDecl>(localBinding) ||
-          isa<TypeDecl>(localBinding))
-        localBindings.push_back(cast<ValueDecl>(localBinding));
+      if (auto *vd = dyn_cast<ValueDecl>(localBinding))
+        localBindings.push_back(vd);
     }
   }
   return consumer.consume(localBindings, DeclVisibilityKind::LocalVariable);
@@ -419,7 +492,7 @@ bool PatternEntryInitializerScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
   // 'self' is available within the pattern initializer of a 'lazy' variable.
   auto *initContext = cast_or_null<PatternBindingInitializer>(
-      decl->getPatternList()[0].getInitContext());
+      decl->getInitContext(0));
   if (initContext) {
     if (auto *selfParam = initContext->getImplicitSelfDecl()) {
       return consumer.consume({selfParam},
@@ -471,15 +544,62 @@ bool ASTScopeImpl::lookupLocalBindingsInPattern(Pattern *p,
 NullablePtr<DeclContext>
 GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC(
     ArrayRef<const ASTScopeImpl *> history) {
-  assert(history.size() != 0 && "includes current scope");
+  ASTScopeAssert(history.size() != 0, "includes current scope");
   size_t i = history.size() - 1; // skip last entry (this scope)
   while (i != 0) {
     Optional<NullablePtr<DeclContext>> maybeSelfDC =
         history[--i]->computeSelfDCForParent();
-    if (maybeSelfDC)
-      return *maybeSelfDC;
+    if (maybeSelfDC) {
+      // If we've found a selfDC, we'll definitely be returning something.
+      // However, we may have captured 'self' somewhere down the tree, so we
+      // can't return outright without checking the nested scopes.
+      NullablePtr<DeclContext> nestedCapturedSelfDC =
+          checkNestedScopesForSelfCapture(history, i);
+      return nestedCapturedSelfDC ? nestedCapturedSelfDC : *maybeSelfDC;
+    }
   }
   return nullptr;
+}
+
+#pragma mark checkNestedScopesForSelfCapture
+
+NullablePtr<DeclContext>
+GenericTypeOrExtensionWhereOrBodyPortion::checkNestedScopesForSelfCapture(
+    ArrayRef<const ASTScopeImpl *> history, size_t start) {
+  NullablePtr<DeclContext> innerCapturedSelfDC;
+  // Start with the next scope down the tree.
+  size_t j = start;
+
+  // Note: even though having this loop nested inside the while loop from
+  // GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC may appear to
+  // result in quadratic blowup, complexity actually remains linear with respect
+  // to the size of history. This relies on the fact that
+  // GenericTypeOrExtensionScope::computeSelfDCForParent returns a null pointer,
+  // which will cause this method to bail out of the search early. Thus, this
+  // method is called once per type body in the lookup history, and will not
+  // end up re-checking the bodies of nested types that have already been
+  // covered by earlier calls, so the total impact of this method across all
+  // calls in a single lookup is O(n).
+  while (j != 0) {
+      auto *entry = history[--j];
+    Optional<NullablePtr<DeclContext>> selfDCForParent =
+      entry->computeSelfDCForParent();
+
+    // If we encounter a scope that should cause us to forget the self
+    // context (such as a nested type), bail out and use whatever the
+    // the last inner captured context was.
+    if (selfDCForParent && (*selfDCForParent).isNull())
+      break;
+
+    // Otherwise, if we have a captured self context for this scope, then
+    // remember it since it is now the innermost scope we have encountered.
+    NullablePtr<DeclContext> capturedSelfDC = entry->capturedSelfDC();
+    if (!capturedSelfDC.isNull())
+      innerCapturedSelfDC = entry->capturedSelfDC();
+
+    // Continue searching in the next scope down.
+  }
+  return innerCapturedSelfDC;
 }
 
 #pragma mark compute isCascadingUse
@@ -542,7 +662,7 @@ NullablePtr<const ASTScopeImpl> ASTScopeImpl::ancestorWithDeclSatisfying(
     function_ref<bool(const Decl *)> predicate) const {
   for (NullablePtr<const ASTScopeImpl> s = getParent(); s;
        s = s.get()->getParent()) {
-    if (Decl *d = s.get()->getDecl().getPtrOrNull()) {
+    if (Decl *d = s.get()->getDeclIfAny().getPtrOrNull()) {
       if (predicate(d))
         return s;
     }
@@ -590,6 +710,23 @@ MethodBodyScope::computeSelfDCForParent() const {
   return NullablePtr<DeclContext>(decl);
 }
 
+#pragma mark capturedSelfDC
+
+// Closures may explicitly capture the self param, in which case the lookup
+// should use the closure as the context for implicit self lookups.
+
+// By default, there is no such context to return.
+NullablePtr<DeclContext> ASTScopeImpl::capturedSelfDC() const {
+  return NullablePtr<DeclContext>();
+}
+
+// Closures track this information explicitly.
+NullablePtr<DeclContext> ClosureParametersScope::capturedSelfDC() const {
+  if (closureExpr->capturesSelfEnablingImplictSelf())
+    return NullablePtr<DeclContext>(closureExpr);
+  return NullablePtr<DeclContext>();
+}
+
 #pragma mark ifUnknownIsCascadingUseAccordingTo
 
 static bool isCascadingUseAccordingTo(const DeclContext *const dc) {
@@ -612,7 +749,7 @@ Optional<bool> GenericParamScope::resolveIsCascadingUseForThisScope(
     Optional<bool> isCascadingUse) const {
   if (auto *dc = getDeclContext().getPtrOrNull())
     return ifUnknownIsCascadingUseAccordingTo(isCascadingUse, dc);
-  llvm_unreachable("generic what?");
+  ASTScope_unreachable("generic what?");
 }
 
 Optional<bool> AbstractFunctionDeclScope::resolveIsCascadingUseForThisScope(
@@ -668,4 +805,37 @@ Optional<bool> PatternEntryInitializerScope::resolveIsCascadingUseForThisScope(
     return ifUnknownIsCascadingUseAccordingTo(isCascadingUse, PBI);
 
   return isCascadingUse;
+}
+
+bool isLocWithinAnInactiveClause(const SourceLoc loc, SourceFile *SF) {
+  class InactiveClauseTester : public ASTWalker {
+    const SourceLoc loc;
+    const SourceManager &SM;
+
+  public:
+    bool wasFoundWithinInactiveClause = false;
+
+    InactiveClauseTester(const SourceLoc loc, const SourceManager &SM)
+        : loc(loc), SM(SM) {}
+
+    bool walkToDeclPre(Decl *D) override {
+      if (const auto *ifc = dyn_cast<IfConfigDecl>(D)) {
+        for (const auto &clause : ifc->getClauses()) {
+          if (clause.isActive)
+            continue;
+          for (const auto n : clause.Elements) {
+            SourceRange sr = n.getSourceRange();
+            if (sr.isValid() && SM.rangeContainsTokenLoc(sr, loc)) {
+              wasFoundWithinInactiveClause = true;
+              return false;
+            }
+          }
+        }
+      }
+      return ASTWalker::walkToDeclPre(D);
+    }
+  };
+  InactiveClauseTester tester(loc, SF->getASTContext().SourceMgr);
+  SF->walk(tester);
+  return tester.wasFoundWithinInactiveClause;
 }

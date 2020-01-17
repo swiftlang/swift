@@ -14,12 +14,10 @@
 #define SWIFT_PARSE_SYNTAXPARSINGCONTEXT_H
 
 #include "llvm/ADT/PointerUnion.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Parse/HiddenLibSyntaxAction.h"
-#include "swift/Parse/LibSyntaxGenerator.h"
 #include "swift/Parse/ParsedRawSyntaxNode.h"
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
-#include "swift/Parse/ParsedSyntaxNodes.h"
 
 namespace swift {
 
@@ -77,7 +75,6 @@ constexpr size_t SyntaxAlignInBits = 3;
 ///     // Now the context holds { '(' Expr ')' }.
 ///     // From these parts, it creates ParenExpr node and add it to the parent.
 ///   }
-// todo [gsoc]: remove when/if possible
 class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
 public:
   /// The shared data for all syntax parsing contexts with the same root.
@@ -98,15 +95,13 @@ public:
 
     ParsedRawSyntaxRecorder Recorder;
 
-    LibSyntaxGenerator LibSyntaxCreator;
-
     llvm::BumpPtrAllocator ScratchAlloc;
 
     RootContextData(SourceFile &SF, DiagnosticEngine &Diags,
                     SourceManager &SourceMgr, unsigned BufferID,
-                    const std::shared_ptr<HiddenLibSyntaxAction>& TwoActions)
+                    std::shared_ptr<SyntaxParseActions> spActions)
         : SF(SF), Diags(Diags), SourceMgr(SourceMgr), BufferID(BufferID),
-          Recorder(TwoActions), LibSyntaxCreator(TwoActions) {}
+          Recorder(std::move(spActions)) {}
   };
 
 private:
@@ -168,6 +163,13 @@ private:
   /// true if it's in backtracking context.
   bool IsBacktracking = false;
 
+  /// true if ParsedSyntaxBuilders and ParsedSyntaxRecorder should create
+  /// deferred nodes
+  bool ShouldDefer = false;
+
+  // If false, context does nothing.
+  bool Enabled;
+
   /// Create a syntax node using the tail \c N elements of collected parts and
   /// replace those parts with the single result.
   void createNodeInPlace(SyntaxKind Kind, size_t N,
@@ -176,28 +178,31 @@ private:
   ArrayRef<ParsedRawSyntaxNode> getParts() const {
     return llvm::makeArrayRef(getStorage()).drop_front(Offset);
   }
+  MutableArrayRef<ParsedRawSyntaxNode> getParts() {
+    return llvm::makeMutableArrayRef(getStorage().data(), getStorage().size()).drop_front(Offset);
+  }
 
   ParsedRawSyntaxNode makeUnknownSyntax(SyntaxKind Kind,
-                                  ArrayRef<ParsedRawSyntaxNode> Parts);
+                                  MutableArrayRef<ParsedRawSyntaxNode> Parts);
   ParsedRawSyntaxNode createSyntaxAs(SyntaxKind Kind,
-                                     ArrayRef<ParsedRawSyntaxNode> Parts,
+                                     MutableArrayRef<ParsedRawSyntaxNode> Parts,
                                      SyntaxNodeCreationKind nodeCreateK);
   Optional<ParsedRawSyntaxNode> bridgeAs(SyntaxContextKind Kind,
-                              ArrayRef<ParsedRawSyntaxNode> Parts);
-
-  ParsedRawSyntaxNode finalizeSourceFile();
+                              MutableArrayRef<ParsedRawSyntaxNode> Parts);
 
 public:
   /// Construct root context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF,
                        unsigned BufferID,
-                       std::shared_ptr<HiddenLibSyntaxAction> SPActions);
+                       std::shared_ptr<SyntaxParseActions> SPActions);
 
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
       : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
         RootData(CtxtHolder->RootData), Offset(RootData->Storage.size()),
-        IsBacktracking(CtxtHolder->IsBacktracking) {
+        IsBacktracking(CtxtHolder->IsBacktracking),
+        ShouldDefer(CtxtHolder->ShouldDefer),
+        Enabled(CtxtHolder->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&
            "SyntaxParsingContext cannot have multiple children");
     assert(CtxtHolder->Mode != AccumulationMode::SkippedForIncrementalUpdate &&
@@ -225,6 +230,8 @@ public:
   /// offset. If nothing is found \c 0 is returned.
   size_t lookupNode(size_t LexerOffset, SourceLoc Loc);
 
+  void disable() { Enabled = false; }
+  bool isEnabled() const { return Enabled; }
   bool isRoot() const { return RootDataOrParent.is<RootContextData*>(); }
   bool isTopOfContextStack() const { return this == CtxtHolder; }
 
@@ -240,10 +247,6 @@ public:
 
   const std::vector<ParsedRawSyntaxNode> &getStorage() const {
     return getRootData()->Storage;
-  }
-
-  LibSyntaxGenerator &getSyntaxCreator() {
-    return getRootData()->LibSyntaxCreator;
   }
 
   const SyntaxParsingContext *getRoot() const;
@@ -264,32 +267,16 @@ public:
   /// Add Syntax to the parts.
   void addSyntax(ParsedSyntax Node);
 
-  template <SyntaxKind Kind>
-  bool isTopNode() {
-    return getStorage().back().getKind() == Kind;
-  }
-
-  /// Returns the topmost Syntax node.
-  template <typename SyntaxNode> SyntaxNode topNode() {
-    ParsedRawSyntaxNode TopNode = getStorage().back();
-
-    if (IsBacktracking)
-      return getSyntaxCreator().createNode<SyntaxNode>(TopNode);
-
-    OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
-    return getSyntaxCreator().getLibSyntaxNodeFor<SyntaxNode>(OpaqueNode);
-  }
-
   template<typename SyntaxNode>
   llvm::Optional<SyntaxNode> popIf() {
     auto &Storage = getStorage();
-    assert(Storage.size() > Offset);
-    if (SyntaxNode::kindof(Storage.back().getKind())) {
-      auto rawNode = std::move(Storage.back());
-      Storage.pop_back();
-      return SyntaxNode(rawNode);
-    }
-    return None;
+    if (Storage.size() <= Offset)
+      return llvm::None;
+    if (!SyntaxNode::kindof(Storage.back().getKind()))
+      return llvm::None;
+    auto rawNode = std::move(Storage.back());
+    Storage.pop_back();
+    return SyntaxNode(std::move(rawNode));
   }
 
   ParsedTokenSyntax popToken();
@@ -321,11 +308,6 @@ public:
     SynKind = Kind;
   }
 
-  /// On destruction, do not attempt to finalize the root node.
-  void setDiscard() {
-    Mode = AccumulationMode::Discard;
-  }
-
   /// On destruction, if the parts size is 1 and it's kind of \c Kind, just
   /// append it to the parent context. Otherwise, create Unknown{Kind} node from
   /// the collected parts.
@@ -346,6 +328,12 @@ public:
 
   bool isBacktracking() const { return IsBacktracking; }
 
+  void setShouldDefer(bool Value = true) { ShouldDefer = Value; }
+
+  bool shouldDefer() const {
+    return ShouldDefer || IsBacktracking || Mode == AccumulationMode::Discard;
+  }
+
   /// Explicitly finalizing syntax tree creation.
   /// This function will be called during the destroying of a root syntax
   /// parsing context. However, we can explicitly call this function to get
@@ -358,8 +346,7 @@ public:
   void synthesize(tok Kind, SourceLoc Loc);
 
   /// Dump the nodes that are in the storage stack of the SyntaxParsingContext
-  LLVM_ATTRIBUTE_DEPRECATED(void dumpStorage() const LLVM_ATTRIBUTE_USED,
-                            "Only meant for use in the debugger");
+  SWIFT_DEBUG_DUMPER(dumpStorage());
 };
 
 } // namespace swift

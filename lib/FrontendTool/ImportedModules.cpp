@@ -37,8 +37,7 @@ static void findAllClangImports(const clang::Module *module,
     modules.insert(getTopLevelName(imported));
   }
 
-  for (auto sub :
-       makeIteratorRange(module->submodule_begin(), module->submodule_end())) {
+  for (auto sub : module->submodules()) {
     findAllClangImports(sub, modules);
   }
 }
@@ -69,7 +68,7 @@ bool swift::emitImportedModules(ASTContext &Context, ModuleDecl *mainModule,
 
     auto accessPath = ID->getModulePath();
     // only the top-level name is needed (i.e. A in A.B.C)
-    Modules.insert(accessPath[0].first.str());
+    Modules.insert(accessPath[0].Item.str());
   }
 
   // And now look in the C code we're possibly using.
@@ -99,8 +98,8 @@ bool swift::emitImportedModules(ASTContext &Context, ModuleDecl *mainModule,
   }
 
   if (opts.ImportUnderlyingModule) {
-    auto underlyingModule = clangImporter->loadModule(
-        SourceLoc(), std::make_pair(mainModule->getName(), SourceLoc()));
+    auto underlyingModule = clangImporter->loadModule(SourceLoc(),
+      { Located<Identifier>(mainModule->getName(), SourceLoc()) });
     if (!underlyingModule) {
       Context.Diags.diagnose(SourceLoc(),
                              diag::error_underlying_module_not_found,

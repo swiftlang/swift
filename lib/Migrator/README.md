@@ -227,7 +227,7 @@ There are two main other pieces of the Migrator's implementation, *diffing* and 
 
 For diffing, we pulled in an STL port of Google's *diff-match-patch* library to perform the final diff of the start and end `MigrationState`'s text. This is a fairly standard implementation of the Myers Difference Algorithm (see *An O(ND) Difference Algorithm and Its Variations* by Eugene W. Myers).
 
-> See include/swift/Basic/Diff.h
+> See Diff.h
 
 ### Editing
 

@@ -20,11 +20,11 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrintOptions.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"
-#include "swift/Serialization/ModuleFile.h"
 #include "swift/Subsystems.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "clang/AST/ASTContext.h"
@@ -75,8 +75,9 @@ private:
   void printTypePost(const TypeLoc &TL) override {
     return OtherPrinter.printTypePost(TL);
   }
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
-    return OtherPrinter.printTypeRef(T, TD, Name);
+  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name,
+                    PrintNameContext NameContext) override {
+    return OtherPrinter.printTypeRef(T, TD, Name, NameContext);
   }
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {
     return OtherPrinter.printModuleRef(Mod, Name);
@@ -447,7 +448,7 @@ void swift::ide::printSubmoduleInterface(
     auto RHSPath = RHS->getFullAccessPath();
     for (unsigned i = 0, e = std::min(LHSPath.size(), RHSPath.size()); i != e;
          i++) {
-      if (int Ret = LHSPath[i].first.str().compare(RHSPath[i].first.str()))
+      if (int Ret = LHSPath[i].Item.str().compare(RHSPath[i].Item.str()))
         return Ret < 0;
     }
     return false;
@@ -666,7 +667,7 @@ static SourceLoc getDeclStartPosition(SourceFile &File) {
     return false;
   };
 
-  for (auto D : File.Decls) {
+  for (auto D : File.getTopLevelDecls()) {
     if (tryUpdateStart(D->getStartLoc())) {
       tryUpdateStart(D->getAttrs().getStartLoc());
       auto RawComment = D->getRawComment();
