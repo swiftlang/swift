@@ -480,9 +480,15 @@ swift::matchWitness(
 
   /// Make sure the witness is of the same kind as the requirement.
   if (req->getKind() != witness->getKind()) {
-    // A static get-only property with Self type can be satisfied by an
-    // enum case with no associated values. If there are any discrepencies,
-    // we'll diagnose it later. For now, let's assume the match is valid.
+    // An enum case can witness:
+    // 1. A static get-only property requirement, as long as the property's
+    //    type is `Self` or it matches the type of the enum explicitly.
+    // 2. A static function requirement, if the enum case has a payload
+    //    and the payload types and labels match the function and the
+    //    function returns `Self` or the type of the enum.
+    //
+    // If there are any discrepencies, we'll diagnose it later. For now,
+    // let's assume the match is valid.
     if (!((isa<VarDecl>(req) || isa<FuncDecl>(req)) &&
           isa<EnumElementDecl>(witness)))
       return RequirementMatch(witness, MatchKind::KindConflict);
@@ -503,14 +509,15 @@ swift::matchWitness(
   // Perform basic matching of the requirement and witness.
   bool decomposeFunctionType = false;
   bool ignoreReturnType = false;
-  if (auto funcReq = dyn_cast<FuncDecl>(req)) {
-    // auto funcWitness = cast<FuncDecl>(witness);
+  if (isa<FuncDecl>(req) && isa<FuncDecl>(witness)) {
+    auto funcReq = cast<FuncDecl>(req);
+    auto funcWitness = cast<FuncDecl>(witness);
 
     // Either both must be 'static' or neither.
-    /*if (funcReq->isStatic() != funcWitness->isStatic() &&
+    if (funcReq->isStatic() != funcWitness->isStatic() &&
         !(funcReq->isOperator() &&
           !funcWitness->getDeclContext()->isTypeContext()))
-      return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);*/
+      return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
 
     // If we require a prefix operator and the witness is not a prefix operator,
     // these don't match.
@@ -525,8 +532,8 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::PostfixNonPostfixConflict);
 
     // Check that the mutating bit is ok.
-    /*if (!funcReq->isMutating() && funcWitness->isMutating())
-      return RequirementMatch(witness, MatchKind::MutatingConflict);*/
+    if (!funcReq->isMutating() && funcWitness->isMutating())
+      return RequirementMatch(witness, MatchKind::MutatingConflict);
 
     // If the requirement is rethrows, the witness must either be
     // rethrows or be non-throwing.
@@ -566,14 +573,13 @@ swift::matchWitness(
     decomposeFunctionType = true;
     ignoreReturnType = true;
   } else if (isa<EnumElementDecl>(witness)) {
-    /*auto enumCase = cast<EnumElementDecl>(witness);
-    if (enumCase->hasAssociatedValues())
-      return RequirementMatch(witness,
-    MatchKind::EnumCaseWithAssociatedValues);*/
+    auto enumCase = cast<EnumElementDecl>(witness);
+    if (enumCase->hasAssociatedValues() && isa<VarDecl>(req))
+      return RequirementMatch(witness, MatchKind::EnumCaseWithAssociatedValues);
     auto isValid = isa<VarDecl>(req) || isa<FuncDecl>(req);
     if (!isValid)
       return RequirementMatch(witness, MatchKind::KindConflict);
-    if (!dyn_cast<ValueDecl>(req)->isStatic())
+    if (!cast<ValueDecl>(req)->isStatic())
       return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
     if (isa<VarDecl>(req) &&
         cast<VarDecl>(req)->getParsedAccessor(AccessorKind::Set))
