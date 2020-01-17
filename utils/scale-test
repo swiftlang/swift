@@ -28,7 +28,7 @@ import tempfile
 from collections import namedtuple
 from operator import attrgetter
 
-from build_swift.build_swift import shell
+from build_swift import shell
 
 import gyb
 

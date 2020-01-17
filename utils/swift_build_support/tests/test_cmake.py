@@ -16,7 +16,7 @@ import platform
 import unittest
 from argparse import Namespace
 
-from build_swift.build_swift.versions import Version
+from build_swift.versions import Version
 
 from swift_build_support.cmake import CMake, CMakeOptions
 from swift_build_support.toolchain import host_toolchain

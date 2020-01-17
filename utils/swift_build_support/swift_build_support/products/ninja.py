@@ -18,7 +18,7 @@ import os.path
 import platform
 import sys
 
-from build_swift.build_swift.wrappers import xcrun
+from build_swift.wrappers import xcrun
 
 from . import product
 from .. import cache_util
