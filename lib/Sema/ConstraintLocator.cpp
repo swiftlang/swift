@@ -470,7 +470,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       auto branchElt = elt.castTo<LocatorPathElt::TernaryBranch>();
       out << (branchElt.forThen() ? "'then'" : "'else'")
           << " branch of a ternary operator";
-      break;    
+      break;
     }
   }
   out << ']';
