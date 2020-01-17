@@ -125,13 +125,17 @@ private:
   /// been validated.
   llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
 
-  /// The list of top-level declarations in the source file.
-  std::vector<Decl *> Decls;
-
   friend ASTContext;
   friend Impl;
 
 public:
+
+  //SWIFT_ENABLE_TENSORLFLOW
+  //For Tensorflow, keep this public because the SwiftCodeCompletion needs it
+  /// The list of top-level declarations in the source file.
+  std::vector<Decl *> Decls;
+  //SWIFT_ENABLE_TENSORLFLOW
+
   /// Appends the given declaration to the end of the top-level decls list.
   void addTopLevelDecl(Decl *d) {
     Decls.push_back(d);
