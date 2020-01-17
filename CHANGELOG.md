@@ -23,6 +23,33 @@ CHANGELOG
 
 </details>
 
+Swift Next
+----------
+
+* [SE-0269][]:
+
+  When an escaping closure explicitly captures `self` it its capture list, the
+  use of implicit `self` is enabled within that closure. This means that the
+  following code is now valid:
+  
+  ```
+  func doStuff(_ stuff: @escaping () -> Void) {}
+  
+  class C {
+      var x = 0
+      
+      func method() {
+          doStuff { [self] in
+              x += 1
+          }
+      }
+  }
+  ```
+  
+  This proposal also introduces new diagnostics for inserting `self` into the
+  closure's capture list in addition to the existing 'use `self.` explicitly
+  fix-it.
+
 Swift 5.2
 ---------
 
