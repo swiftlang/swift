@@ -366,14 +366,20 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
 }
 
 bool SerializedModuleLoader::maybeDiagnoseTargetMismatch(
-    SourceLoc sourceLocation, StringRef moduleName, StringRef archName,
-    StringRef directoryPath) {
+    SourceLoc sourceLocation, StringRef moduleName,
+    StringRef targetSpecificName, StringRef directoryPath) {
   llvm::vfs::FileSystem &fs = *Ctx.SourceMgr.getFileSystem();
+
+  auto target = llvm::sys::path::filename(targetSpecificName);
+
+  SmallString<256> dir = directoryPath;
+  llvm::sys::path::append(dir, targetSpecificName);
+  llvm::sys::path::remove_filename(dir);
 
   std::error_code errorCode;
   std::string foundArchs;
   for (llvm::vfs::directory_iterator directoryIterator =
-           fs.dir_begin(directoryPath, errorCode), endIterator;
+           fs.dir_begin(dir, errorCode), endIterator;
        directoryIterator != endIterator;
        directoryIterator.increment(errorCode)) {
     if (errorCode)
@@ -396,7 +402,7 @@ bool SerializedModuleLoader::maybeDiagnoseTargetMismatch(
   }
 
   Ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_target, moduleName,
-                     archName, foundArchs);
+                     target, foundArchs);
   return true;
 }
 
@@ -425,12 +431,19 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
   std::string moduleName(moduleID.Item.str());
   SerializedModuleBaseName genericBaseName(moduleName);
 
+  auto genericModuleFileName =
+      genericBaseName.getName(file_types::TY_SwiftModuleFile);
+
   SmallVector<SerializedModuleBaseName, 4> targetSpecificBaseNames;
   SmallString<32> primaryTargetSpecificName;
   forEachTargetModuleBasename(Ctx, [&](StringRef targetName) {
-    targetSpecificBaseNames.emplace_back(targetName);
+    // Construct a base name like ModuleName.swiftmodule/arch-vendor-os
+    SmallString<64> targetBaseName{genericModuleFileName};
+    llvm::sys::path::append(targetBaseName, targetName);
+
+    targetSpecificBaseNames.emplace_back(targetBaseName.str());
     if (primaryTargetSpecificName.empty())
-      primaryTargetSpecificName = targetName;
+      primaryTargetSpecificName = targetBaseName;
   });
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
@@ -466,9 +479,6 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     }
   };
 
-  auto genericModuleFileName =
-      genericBaseName.getName(file_types::TY_SwiftModuleFile);
-
   auto result = forEachModuleSearchPath(
       Ctx,
       [&](StringRef path, SearchPathKind Kind,
@@ -480,7 +490,6 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
         case SearchPathKind::Import:
         case SearchPathKind::RuntimeLibrary: {
           isFramework = false;
-          llvm::sys::path::append(currPath, genericModuleFileName);
 
           bool checkTargetSpecificModule;
           if (Kind == SearchPathKind::RuntimeLibrary) {
@@ -489,7 +498,10 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
             // always use single-architecture swiftmodules.
             checkTargetSpecificModule = Ctx.LangOpts.Target.isOSDarwin();
           } else {
-            llvm::ErrorOr<llvm::vfs::Status> statResult = fs.status(currPath);
+            auto modulePath = currPath;
+            llvm::sys::path::append(modulePath, genericModuleFileName);
+
+            llvm::ErrorOr<llvm::vfs::Status> statResult = fs.status(modulePath);
             // Even if stat fails, we can't just return the error; the path
             // we're looking for might not be "Foo.swiftmodule".
             checkTargetSpecificModule = statResult && statResult->isDirectory();
@@ -500,7 +512,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
             return findTargetSpecificModuleFiles();
 
           auto result = findModuleFilesInDirectory(
-              moduleID, path, genericBaseName, moduleInterfacePath,
+              moduleID, currPath, genericBaseName, moduleInterfacePath,
               moduleBuffer, moduleDocBuffer, moduleSourceInfoBuffer);
           if (!result)
             return true;
@@ -519,7 +531,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
           // Frameworks always use architecture-specific files within a
           // .swiftmodule directory.
-          llvm::sys::path::append(currPath, "Modules", genericModuleFileName);
+          llvm::sys::path::append(currPath, "Modules");
           return findTargetSpecificModuleFiles();
         }
         }
