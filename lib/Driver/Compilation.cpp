@@ -124,6 +124,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter,
                          bool OnlyOneDependencyFile,
                          bool EnableFineGrainedDependencies,
+                         bool EnableTypeFingerprints,
                          bool VerifyFineGrainedDependencyGraphAfterEveryImport,
                          bool EmitFineGrainedDependencyDotFileAfterEveryImport,
                          bool FineGrainedDependenciesIncludeIntrafileOnes,
@@ -153,6 +154,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     FilelistThreshold(FilelistThreshold),
     OnlyOneDependencyFile(OnlyOneDependencyFile),
     EnableFineGrainedDependencies(EnableFineGrainedDependencies),
+    EnableTypeFingerprints(EnableTypeFingerprints),
     VerifyFineGrainedDependencyGraphAfterEveryImport(
       VerifyFineGrainedDependencyGraphAfterEveryImport),
     EmitFineGrainedDependencyDotFileAfterEveryImport(
@@ -483,74 +485,122 @@ namespace driver {
         assert(FinishedCmd->getCondition() == Job::Condition::Always);
         return {};
       }
-      // If we have a dependency file /and/ the frontend task exited normally,
-      // we can be discerning about what downstream files to rebuild.
-      if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
-        // "Marked" means that everything provided by this node (i.e. Job) is
-        // dirty. Thus any file using any of these provides must be
-        // recompiled. (Only non-private entities are output as provides.) In
-        // other words, this Job "cascades"; the need to recompile it causes
-        // other recompilations. It is possible that the current code marks
-        // things that do not need to be marked. Unecessary compilation would
-        // result if that were the case.
-        bool wasKnownToCascade = isMarkedInDepGraph(FinishedCmd, forRanges);
+      const bool compileExitedNormally =
+          ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE;
+      return !compileExitedNormally
+                 ? reloadAndRemarkDepsOnAbnormalExit(FinishedCmd, forRanges)
+                 : reloadAndRemarkDepsOnNormalExit(FinishedCmd, /*cmdFailed=*/
+                                                   ReturnCode != EXIT_SUCCESS,
+                                                   forRanges, DependenciesFile);
+    }
 
-        const auto loadResult = loadDepGraphFromPath(
-            FinishedCmd, DependenciesFile, Comp.getDiags(), forRanges);
-        switch (loadResult) {
-        case CoarseGrainedDependencyGraph::LoadResult::HadError:
-          if (ReturnCode != EXIT_SUCCESS)
-            // let the next build handle it.
-            break;
-          dependencyLoadFailed(DependenciesFile);
-          // Better try compiling whatever was waiting on more info.
-          scheduleCommandsInSortedOrder(DeferredCommands);
-          DeferredCommands.clear();
-          break;
+    // If we have a dependency file /and/ the frontend task exited normally,
+    // we can be discerning about what downstream files to rebuild.
+    std::vector<const Job *>
+    reloadAndRemarkDepsOnNormalExit(const Job *FinishedCmd,
+                                    const bool cmdFailed, const bool forRanges,
+                                    StringRef DependenciesFile) {
+      return Comp.getEnableFineGrainedDependencies()
+                 ? reloadAndRemarkFineGrainedDepsOnNormalExit(
+                       FinishedCmd, cmdFailed, forRanges, DependenciesFile)
+                 : reloadAndRemarkCoarseGrainedDepsOnNormalExit(
+                       FinishedCmd, cmdFailed, forRanges, DependenciesFile);
+    }
 
-        case CoarseGrainedDependencyGraph::LoadResult::UpToDate:
-          if (!wasKnownToCascade)
-            break;
-          LLVM_FALLTHROUGH;
-        case CoarseGrainedDependencyGraph::LoadResult::AffectsDownstream:
-          return markTransitiveInDepGraph(FinishedCmd, forRanges,
-                                   IncrementalTracer);
-        }
+    std::vector<const Job *> reloadAndRemarkCoarseGrainedDepsOnNormalExit(
+        const Job *FinishedCmd, const bool cmdFailed, const bool forRanges,
+        StringRef DependenciesFile) {
+      assert(!Comp.getEnableFineGrainedDependencies() &&
+             "Only for coarse-grained");
+      // "Marked" means that everything provided by this node (i.e. Job) is
+      // dirty. Thus any file using any of these provides must be
+      // recompiled. (Only non-private entities are output as provides.) In
+      // other words, this Job "cascades"; the need to recompile it causes
+      // other recompilations. It is possible that the current code marks
+      // things that do not need to be marked. Unecessary compilation would
+      // result if that were the case.
+      bool wasMarkedBeforeReload = getDepGraph(forRanges).isMarked(FinishedCmd);
+
+      const auto loadResult = getDepGraph(forRanges).loadFromPath(
+          FinishedCmd, DependenciesFile, Comp.getDiags());
+      using LoadResult = CoarseGrainedDependencyGraph::LoadResult;
+      const bool loadFailed = loadResult == LoadResult::HadError;
+      if (loadFailed) {
+        handleDependenciesReloadFailure(cmdFailed, DependenciesFile);
         return {};
-        }
-        // If there's an abnormal exit (a crash), assume the worst.
-        switch (FinishedCmd->getCondition()) {
-        case Job::Condition::NewlyAdded:
-          // The job won't be treated as newly added next time. Conservatively
-          // mark it as affecting other jobs, because some of them may have
-          // completed already.
-          return markTransitiveInDepGraph(FinishedCmd, forRanges,
-                                   IncrementalTracer);
-        case Job::Condition::Always:
-          // Any incremental task that shows up here has already been marked;
-          // we didn't need to wait for it to finish to start downstream
-          // tasks.
-          assert(isMarkedInDepGraph(FinishedCmd, forRanges));
-          break;
-        case Job::Condition::RunWithoutCascading:
-          // If this file changed, it might have been a non-cascading change
-          // and it might not. Unfortunately, the interface hash has been
-          // updated or compromised, so we don't actually know anymore; we
-          // have to conservatively assume the changes could affect other
-          // files.
-          return markTransitiveInDepGraph(FinishedCmd, forRanges,
-                                   IncrementalTracer);
+      }
+      if (loadResult == LoadResult::UpToDate && !wasMarkedBeforeReload)
+        return {};
+      return getDepGraph(forRanges).markTransitive(FinishedCmd,
+                                                   IncrementalTracer);
+    }
 
-        case Job::Condition::CheckDependencies:
-          // If the only reason we're running this is because something else
-          // changed, then we can trust the dependency graph as to whether
-          // it's a cascading or non-cascading change. That is, if whatever
-          // /caused/ the error isn't supposed to affect other files, and
-          // whatever /fixes/ the error isn't supposed to affect other files,
-          // then there's no need to recompile any other inputs. If either of
-          // those are false, we /do/ need to recompile other inputs.
-          break;
-        }
+    std::vector<const Job *> reloadAndRemarkFineGrainedDepsOnNormalExit(
+        const Job *FinishedCmd, const bool cmdFailed, const bool forRanges,
+        StringRef DependenciesFile) {
+      assert(Comp.getEnableFineGrainedDependencies() &&
+             "Only for fine-grained");
+      const auto changedNodes = getFineGrainedDepGraph(forRanges).loadFromPath(
+          FinishedCmd, DependenciesFile, Comp.getDiags());
+      const bool loadFailed = !changedNodes;
+      if (loadFailed) {
+        handleDependenciesReloadFailure(cmdFailed, DependenciesFile);
+        return {};
+      }
+      return getFineGrainedDepGraph(forRanges)
+          .findJobsToRecompileWhenNodesChange(changedNodes.getValue());
+    }
+
+    void handleDependenciesReloadFailure(const bool cmdFailed,
+                                         const StringRef DependenciesFile) {
+      if (cmdFailed) {
+        // let the next build handle it.
+        return;
+      }
+      dependencyLoadFailed(DependenciesFile);
+      // Better try compiling whatever was waiting on more info.
+      for (const Job *Cmd : DeferredCommands)
+        scheduleCommandIfNecessaryAndPossible(Cmd);
+      DeferredCommands.clear();
+    };
+
+    std::vector<const Job *>
+    reloadAndRemarkDepsOnAbnormalExit(const Job *FinishedCmd,
+                                      const bool forRanges) {
+      // If there's an abnormal exit (a crash), assume the worst.
+      switch (FinishedCmd->getCondition()) {
+      case Job::Condition::NewlyAdded:
+        // The job won't be treated as newly added next time. Conservatively
+        // mark it as affecting other jobs, because some of them may have
+        // completed already.
+        return findJobsToRecompileWhenWholeJobChanges(FinishedCmd, forRanges,
+                                                      IncrementalTracer);
+      case Job::Condition::Always:
+        // Any incremental task that shows up here has already been marked;
+        // we didn't need to wait for it to finish to start downstream
+        // tasks.
+        if (!Comp.getEnableFineGrainedDependencies())
+          assert(getDepGraph(forRanges).isMarked(FinishedCmd));
+        break;
+      case Job::Condition::RunWithoutCascading:
+        // If this file changed, it might have been a non-cascading change
+        // and it might not. Unfortunately, the interface hash has been
+        // updated or compromised, so we don't actually know anymore; we
+        // have to conservatively assume the changes could affect other
+        // files.
+        return findJobsToRecompileWhenWholeJobChanges(FinishedCmd, forRanges,
+                                                      IncrementalTracer);
+
+      case Job::Condition::CheckDependencies:
+        // If the only reason we're running this is because something else
+        // changed, then we can trust the dependency graph as to whether
+        // it's a cascading or non-cascading change. That is, if whatever
+        // /caused/ the error isn't supposed to affect other files, and
+        // whatever /fixes/ the error isn't supposed to affect other files,
+        // then there's no need to recompile any other inputs. If either of
+        // those are false, we /do/ need to recompile other inputs.
+        break;
+      }
       return {};
     }
 
@@ -835,11 +885,13 @@ namespace driver {
           FineGrainedDepGraph(
               Comp.getVerifyFineGrainedDependencyGraphAfterEveryImport(),
               Comp.getEmitFineGrainedDependencyDotFileAfterEveryImport(),
-              Comp.getTraceDependencies(), Comp.getStatsReporter()),
+              Comp.getEnableTypeFingerprints(), Comp.getTraceDependencies(),
+              Comp.getStatsReporter()),
           FineGrainedDepGraphForRanges(
               Comp.getVerifyFineGrainedDependencyGraphAfterEveryImport(),
               Comp.getEmitFineGrainedDependencyDotFileAfterEveryImport(),
-              Comp.getTraceDependencies(), Comp.getStatsReporter()),
+              Comp.getEnableTypeFingerprints(), Comp.getTraceDependencies(),
+              Comp.getStatsReporter()),
           ActualIncrementalTracer(Comp.getStatsReporter()),
           TQ(std::move(TaskQueue)) {
       if (!Comp.getEnableFineGrainedDependencies() &&
@@ -1050,26 +1102,16 @@ namespace driver {
       if (DependenciesFile.empty())
         return std::make_pair(Job::Condition::Always, false);
       if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
-        addIndependentNodeToDepGraph(Cmd, forRanges);
+        registerJobToDepGraph(Cmd, forRanges);
         return std::make_pair(Job::Condition::NewlyAdded, true);
       }
-
-      const auto loadResult = loadDepGraphFromPath(Cmd, DependenciesFile,
-                                                   Comp.getDiags(), forRanges);
-      switch (loadResult) {
-      case CoarseGrainedDependencyGraph::LoadResult::HadError:
+      const bool depGraphLoadError =
+          loadDepGraphFromPath(Cmd, DependenciesFile, forRanges);
+      if (depGraphLoadError) {
         dependencyLoadFailed(DependenciesFile, /*Warn=*/true);
         return None;
-      case CoarseGrainedDependencyGraph::LoadResult::UpToDate:
-        return std::make_pair(Cmd->getCondition(), true);
-      case CoarseGrainedDependencyGraph::LoadResult::AffectsDownstream:
-        if (Comp.getEnableFineGrainedDependencies()) {
-          // The fine-grained graph reports a change, since it lumps new
-          // files together with new "Provides".
-          return std::make_pair(Cmd->getCondition(), true);
-        }
-        llvm_unreachable("we haven't marked anything in this graph yet");
       }
+      return std::make_pair(Cmd->getCondition(), true);
     }
 
     bool shouldScheduleCompileJobAccordingToCondition(
@@ -1084,20 +1126,24 @@ namespace driver {
       case Job::Condition::Always:
       case Job::Condition::NewlyAdded:
         if (Comp.getIncrementalBuildEnabled() && hasDependenciesFileName) {
-          // Mark this job as cascading.
-          //
-          // It would probably be safe and simpler to markTransitive on the
-          // start nodes in the "Always" condition from the start instead of
-          // using markIntransitive and having later functions call
-          // markTransitive. That way markIntransitive would be an
-          // implementation detail of CoarseGrainedDependencyGraph.
-          //
-          // As it stands, after this job finishes, this mark will tell the code
-          // that this job was known to be "cascading". That knowledge will
-          // cause any dependent jobs to be run if it hasn't already been.
-          //
-          // TODO: I think this is overly tricky
-          markIntransitiveInDepGraph(Cmd, forRanges);
+          if (Comp.getEnableFineGrainedDependencies()) {
+            // No need to do anything since after this jos is run and its
+            // dependencies reloaded, they will show up as changed nodes
+          } else {
+            // Mark this job as cascading.
+            //
+            // It would probably be safe and simpler to markTransitive on the
+            // start nodes in the "Always" condition from the start instead of
+            // using markIntransitive and having later functions call
+            // markTransitive. That way markIntransitive would be an
+            // implementation detail of CoarseGrainedDependencyGraph.
+            //
+            // As it stands, after this job finishes, this mark will tell the
+            // code that this job was known to be "cascading". That knowledge
+            // will cause any dependent jobs to be run if it hasn't already
+            // been.
+            getDepGraph(forRanges).markIntransitive(Cmd);
+          }
         }
         LLVM_FALLTHROUGH;
       case Job::Condition::RunWithoutCascading:
@@ -1145,8 +1191,8 @@ namespace driver {
       // files that haven't changed, so that they'll get built in parallel if
       // possible and after the first set of files if it's not.
       for (auto *Cmd : InitialCascadingCommands) {
-        for (const auto *transitiveCmd: markTransitiveInDepGraph(Cmd, forRanges,
-                                 IncrementalTracer))
+        for (const auto *transitiveCmd : findJobsToRecompileWhenWholeJobChanges(
+                 Cmd, forRanges, IncrementalTracer))
           CascadedJobs.insert(transitiveCmd);
       }
       noteBuildingJobs(CascadedJobs, forRanges, "because of the initial set");
@@ -1527,9 +1573,13 @@ namespace driver {
 
           // Be conservative, in case we use ranges this time but not next.
           bool mightBeCascading = true;
-          if (Comp.getIncrementalBuildEnabled())
-            mightBeCascading = isMarkedInDepGraph(
-                Cmd, /*forRanges=*/Comp.getEnableSourceRangeDependencies());
+          if (Comp.getIncrementalBuildEnabled()) {
+            const bool forRanges = Comp.getEnableSourceRangeDependencies();
+            mightBeCascading = Comp.getEnableFineGrainedDependencies()
+                                   ? getFineGrainedDepGraph(forRanges)
+                                         .haveAnyNodesBeenTraversedIn(Cmd)
+                                   : getDepGraph(forRanges).isMarked(Cmd);
+          }
           UnfinishedCommands.insert({Cmd, mightBeCascading});
         }
       }
@@ -1594,12 +1644,6 @@ namespace driver {
 
     // MARK: dependency graph interface
 
-    bool isMarkedInDepGraph(const Job *const Cmd, const bool forRanges) {
-      return Comp.getEnableFineGrainedDependencies()
-                 ? getFineGrainedDepGraph(forRanges).isMarked(Cmd)
-                 : getDepGraph(forRanges).isMarked(Cmd);
-    }
-
     std::vector<StringRef> getExternalDependencies(const bool forRanges) const {
       if (Comp.getEnableFineGrainedDependencies())
         return getFineGrainedDepGraph(forRanges).getExternalDependencies();
@@ -1614,39 +1658,39 @@ namespace driver {
     markExternalInDepGraph(StringRef externalDependency,
                                 const bool forRanges) {
       return Comp.getEnableFineGrainedDependencies()
-        ? getFineGrainedDepGraph(forRanges).markExternal(externalDependency)
-        : getDepGraph(forRanges).markExternal(externalDependency);
+                 ? getFineGrainedDepGraph(forRanges)
+                       .findExternallyDependentUntracedJobs(externalDependency)
+                 : getDepGraph(forRanges).markExternal(externalDependency);
     }
 
-    bool markIntransitiveInDepGraph(const Job *Cmd, const bool forRanges) {
-      return Comp.getEnableFineGrainedDependencies()
-                 ? getFineGrainedDepGraph(forRanges).markIntransitive(Cmd)
-                 : getDepGraph(forRanges).markIntransitive(Cmd);
-    }
-
-    CoarseGrainedDependencyGraph::LoadResult
-    loadDepGraphFromPath(const Job *Cmd, StringRef path,
-                         DiagnosticEngine &diags, const bool forRanges) {
-      return Comp.getEnableFineGrainedDependencies()
-                 ? getFineGrainedDepGraph(forRanges).loadFromPath(Cmd, path,
-                                                                  diags)
-                 : getDepGraph(forRanges).loadFromPath(Cmd, path, diags);
-    }
-
-    std::vector<const Job*> markTransitiveInDepGraph(
-        const Job *Cmd,
-        const bool forRanges,
+    std::vector<const Job *> findJobsToRecompileWhenWholeJobChanges(
+        const Job *Cmd, const bool forRanges,
         CoarseGrainedDependencyGraph::MarkTracer *tracer = nullptr) {
       return Comp.getEnableFineGrainedDependencies()
-        ? getFineGrainedDepGraph(forRanges).markTransitive(Cmd, tracer)
-        : getDepGraph(forRanges).markTransitive(Cmd, tracer);
+                 ? getFineGrainedDepGraph(forRanges)
+                       .findJobsToRecompileWhenWholeJobChanges(Cmd)
+                 : getDepGraph(forRanges).markTransitive(Cmd, tracer);
     }
 
-    void addIndependentNodeToDepGraph(const Job *Cmd, const bool forRanges) {
+    void registerJobToDepGraph(const Job *Cmd, const bool forRanges) {
       if (Comp.getEnableFineGrainedDependencies())
-        getFineGrainedDepGraph(forRanges).addIndependentNode(Cmd);
+        getFineGrainedDepGraph(forRanges).registerJob(Cmd);
       else
-        getDepGraph(forRanges).addIndependentNode(Cmd);
+        getDepGraph(forRanges).registerJob(Cmd);
+    }
+
+    /// Return hadError
+    bool loadDepGraphFromPath(const Job *Cmd, const StringRef DependenciesFile,
+                              const bool forRanges) {
+      if (Comp.getEnableFineGrainedDependencies()) {
+        const auto changes = getFineGrainedDepGraph(forRanges).loadFromPath(
+            Cmd, DependenciesFile, Comp.getDiags());
+        const bool didDependencyLoadSucceed = changes.hasValue();
+        return !didDependencyLoadSucceed;
+      }
+      auto loadResult = getDepGraph(forRanges).loadFromPath(
+          Cmd, DependenciesFile, Comp.getDiags());
+      return loadResult == CoarseGrainedDependencyGraph::LoadResult::HadError;
     }
 
     fine_grained_dependencies::ModuleDepGraph &

@@ -15,6 +15,7 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/MD5.h"
@@ -139,6 +140,11 @@ public:
     return iter2 == iter->second.end() ? None : Optional<Value>(iter2->second);
   }
 
+  NullablePtr<const InnerMap> find(const Key1 &k1) const {
+    auto iter = map.find(k1);
+    return iter == map.end() ? nullptr : &iter->second;
+  }
+
   /// The sought value must be present.
   Value findAndErase(const Key1 &k1, const Key2 &k2) {
     auto &submap = map[k1];
@@ -237,6 +243,20 @@ public:
   }
   Optional<Value> find(const Key2 &k2, Key1 &k1) const { return find(k1, k2); }
 
+  /// Return the submap for a given Key1. May create one, after the fashion of
+  /// the standard libary.
+  const Key2Map &operator[](const Key1 &k1) { return map1[k1]; }
+  /// Return the submap for a given Key2. May create one, after the fashion of
+  /// the standard libary.
+  const Key1Map &operator[](const Key2 &k2) { return map2[k2]; }
+
+  NullablePtr<const Key2Map> find(const Key1 &k1) const {
+    return map1.find(k1);
+  }
+  NullablePtr<const Key1Map> find(const Key2 &k2) const {
+    return map2.find(k2);
+  }
+
   /// Element must be present.
   /// Return the erased value.
   Value findAndErase(const Key1 &k1, const Key2 &k2) {
@@ -250,12 +270,6 @@ public:
   Value findAndErase(const Key2 &k2, const Key1 &k1) {
     return findAndErase(k1, k2);
   }
-  /// Return the submap for a given Key1. May create one, after the fashion of
-  /// the standard libary.
-  const Key2Map &operator[](const Key1 &k1) { return map1[k1]; }
-  /// Return the submap for a given Key2. May create one, after the fashion of
-  /// the standard libary.
-  const Key1Map &operator[](const Key2 &k2) { return map2[k2]; }
 
   /// Invoke \p fn on each Key2 and Value matching (\p k1, *)
   void forEachValueMatching(
@@ -500,8 +514,7 @@ public:
   template <NodeKind kind>
   static DependencyKey createDependedUponKey(StringRef);
 
-  static DependencyKey
-  createTransitiveKeyForWholeSourceFile(StringRef swiftDeps);
+  static DependencyKey createKeyForWholeSourceFile(StringRef swiftDeps);
 
   std::string humanReadableName() const;
 

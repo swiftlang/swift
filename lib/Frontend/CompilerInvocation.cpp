@@ -430,6 +430,17 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasFlag(options::OPT_enable_fine_grained_dependencies,
                    options::OPT_disable_fine_grained_dependencies,
                    Opts.EnableFineGrainedDependencies);
+  Opts.EnableTypeFingerprints =
+      Args.hasFlag(options::OPT_enable_type_fingerprints,
+                   options::OPT_disable_type_fingerprints,
+                   LangOptions().EnableTypeFingerprints);
+
+  if (!Opts.EnableFineGrainedDependencies && Opts.EnableTypeFingerprints) {
+    Diags.diagnose(
+        SourceLoc(),
+        diag::error_type_fingerprints_require_fine_grained_dependencies);
+    HadError = true;
+  }
 
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
