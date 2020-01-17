@@ -1172,70 +1172,6 @@ ConstraintGraph::computeConnectedComponents(
   return cc.getComponents();
 }
 
-
-/// For a given constraint kind, decide if we should attempt to eliminate its
-/// edge in the graph.
-static bool shouldContractEdge(ConstraintKind kind) {
-  switch (kind) {
-  case ConstraintKind::Bind:
-  case ConstraintKind::BindToPointerType:
-  case ConstraintKind::Equal:
-    return true;
-
-  default:
-    return false;
-  }
-}
-
-bool ConstraintGraph::contractEdges() {
-  SmallVector<Constraint *, 16> constraints;
-  CS.findConstraints(constraints, [&](const Constraint &constraint) {
-    // Track how many constraints did contraction algorithm iterated over.
-    incrementConstraintsPerContractionCounter();
-    return shouldContractEdge(constraint.getKind());
-  });
-
-  bool didContractEdges = false;
-  for (auto *constraint : constraints) {
-    auto kind = constraint->getKind();
-
-    // Contract binding edges between type variables.
-    assert(shouldContractEdge(kind));
-
-    auto t1 = constraint->getFirstType()->getDesugaredType();
-    auto t2 = constraint->getSecondType()->getDesugaredType();
-
-    auto tyvar1 = t1->getAs<TypeVariableType>();
-    auto tyvar2 = t2->getAs<TypeVariableType>();
-
-    if (!(tyvar1 && tyvar2))
-      continue;
-
-    auto rep1 = CS.getRepresentative(tyvar1);
-    auto rep2 = CS.getRepresentative(tyvar2);
-
-    if (rep1->getImpl().canBindToLValue() ==
-        rep2->getImpl().canBindToLValue()) {
-      if (CS.getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
-        auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
-        if (CS.solverState)
-          log.indent(CS.solverState->depth * 2);
-
-        log << "Contracting constraint ";
-        constraint->print(log, &CS.getASTContext().SourceMgr);
-        log << "\n";
-      }
-
-      // Merge the edges and remove the constraint.
-      removeEdge(constraint);
-      if (rep1 != rep2)
-        CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      didContractEdges = true;
-    }
-  }
-  return didContractEdges;
-}
-
 void ConstraintGraph::removeEdge(Constraint *constraint) {
   bool isExistingConstraint = false;
 
@@ -1263,19 +1199,6 @@ void ConstraintGraph::removeEdge(Constraint *constraint) {
   }
 
   removeConstraint(constraint);
-}
-
-void ConstraintGraph::optimize() {
-  // Merge equivalence classes until a fixed point is reached.
-  while (contractEdges()) {}
-}
-
-void ConstraintGraph::incrementConstraintsPerContractionCounter() {
-  SWIFT_FUNC_STAT;
-  auto &context = CS.getASTContext();
-  if (context.Stats)
-    context.Stats->getFrontendCounters()
-        .NumConstraintsConsideredForEdgeContraction++;
 }
 
 #pragma mark Debugging output

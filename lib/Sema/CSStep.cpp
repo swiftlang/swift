@@ -88,8 +88,6 @@ void SplitterStep::computeFollowupSteps(
   // algorithm tells us is splittable.
 
   auto &CG = CS.getConstraintGraph();
-  // Contract the edges of the constraint graph.
-  CG.optimize();
 
   // Compute the connected components of the constraint graph.
   auto components = CG.computeConnectedComponents(CS.getTypeVariables());
