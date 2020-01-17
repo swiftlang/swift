@@ -417,7 +417,20 @@ namespace {
           IGF.IGM.getMetadataLayout(TheStruct.getStructOrBoundGenericStruct());
       auto offset =
           structLayout.getFieldOffsetVectorOffset().offsetBy(IGF, Size(index));
-      return offset.getAsValue(IGF);
+
+      llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
+      Address fieldVector = emitAddressOfFieldOffsetVector(IGF, metadata,
+                                    TheStruct.getStructOrBoundGenericStruct());
+      fieldVector = IGF.Builder.CreateConstArrayGEP(fieldVector, index,
+                                                    IGF.IGM.getPointerSize());
+      auto oldRet = IGF.Builder.CreateLoad(fieldVector);
+      auto newRet = offset.getAsValue(IGF);
+
+      auto assertEq = IGF.IGM.Module.getFunction("__swift_assert_equal");
+      IGF.Builder.CreateCall(assertEq->getFunctionType(),
+                             assertEq, {oldRet, newRet});
+
+      return newRet;
     }
 
     MemberAccessStrategy getFieldAccessStrategy(IRGenModule &IGM,
