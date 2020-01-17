@@ -2,9 +2,11 @@
 
 set -e
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+UTILS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SWIFT_BUILD_SUPPORT_DIR="${UTILS_DIR}/swift_build_support"
 
-python -m unittest discover -s $DIR
+env PYTHONPATH="${UTILS_DIR}":$PYTHONPATH \
+	python -m unittest discover -s "${SWIFT_BUILD_SUPPORT_DIR}"
 
 set +e
 
