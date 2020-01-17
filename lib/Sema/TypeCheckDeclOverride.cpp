@@ -168,8 +168,8 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
 
   if (sig && declGenericCtx &&
-      declGenericCtx->getGenericSignature()->getCanonicalSignature() !=
-          sig->getCanonicalSignature()) {
+      declGenericCtx->getGenericSignature().getCanonicalSignature() !=
+          sig.getCanonicalSignature()) {
     return false;
   }
 
@@ -1298,7 +1298,6 @@ namespace  {
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(IBSegueAction)
-    UNINTERESTING_ATTR(ImplicitlySynthesizesNestedRequirement)
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)

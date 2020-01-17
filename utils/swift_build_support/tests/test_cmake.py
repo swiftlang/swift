@@ -13,7 +13,8 @@ import platform
 import unittest
 from argparse import Namespace
 
-from swift_build_support.arguments import CompilerVersion
+from build_swift.build_swift.argparse import CompilerVersion
+
 from swift_build_support.cmake import CMake, CMakeOptions
 from swift_build_support.toolchain import host_toolchain
 
@@ -250,9 +251,7 @@ class CMakeTestCase(unittest.TestCase):
 
     def test_common_options_clang_compiler_version(self):
         args = self.default_args()
-        args.clang_compiler_version = CompilerVersion(
-            string_representation="999.0.999",
-            components=("999", "0", "999", None))
+        args.clang_compiler_version = CompilerVersion("999.0.999")
         cmake = self.cmake(args)
         self.assertEqual(
             list(cmake.common_options()),
@@ -264,9 +263,7 @@ class CMakeTestCase(unittest.TestCase):
 
     def test_common_options_clang_user_visible_version(self):
         args = self.default_args()
-        args.clang_user_visible_version = CompilerVersion(
-            string_representation="9.0.0",
-            components=("9", "0", "0", None))
+        args.clang_user_visible_version = CompilerVersion("9.0.0")
         cmake = self.cmake(args)
         self.assertEqual(
             list(cmake.common_options()),
@@ -301,12 +298,8 @@ class CMakeTestCase(unittest.TestCase):
         args.export_compile_commands = True
         args.distcc = True
         args.cmake_generator = 'Xcode'
-        args.clang_user_visible_version = CompilerVersion(
-            string_representation="9.0.0",
-            components=("9", "0", "0", None))
-        args.clang_compiler_version = CompilerVersion(
-            string_representation="999.0.900",
-            components=("999", "0", "900", None))
+        args.clang_user_visible_version = CompilerVersion("9.0.0")
+        args.clang_compiler_version = CompilerVersion("999.0.900")
         args.build_ninja = True
         cmake = self.cmake(args)
         self.assertEqual(

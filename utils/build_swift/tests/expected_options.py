@@ -1,6 +1,6 @@
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -12,8 +12,8 @@ import multiprocessing
 from swift_build_support.swift_build_support import host
 from swift_build_support.swift_build_support import targets
 
-from .. import argparse
-from .. import defaults
+from ..build_swift import argparse
+from ..build_swift import defaults
 
 
 __all__ = [
@@ -91,7 +91,6 @@ EXPECTED_DEFAULTS = {
     'build_sourcekitlsp': False,
     'install_swiftpm': False,
     'install_swiftsyntax': False,
-    'skip_install_swiftsyntax_module': False,
     'swiftsyntax_verify_generated_files': False,
     'install_sourcekitlsp': False,
     'install_skstresstester': False,
@@ -484,8 +483,6 @@ EXPECTED_OPTIONS = [
     EnableOption('--indexstore-db', dest='build_indexstoredb'),
     EnableOption('--sourcekit-lsp', dest='build_sourcekitlsp'),
     EnableOption('--install-swiftsyntax', dest='install_swiftsyntax'),
-    EnableOption('--skip-install-swiftsyntax-module',
-                 dest='skip_install_swiftsyntax_module'),
     EnableOption('--swiftsyntax-verify-generated-files',
                  dest='swiftsyntax_verify_generated_files'),
     EnableOption('--install-swiftpm', dest='install_swiftpm'),

@@ -111,7 +111,7 @@ void swift::ide::typeCheckContextUntil(DeclContext *DC, SourceLoc Loc) {
     // Here, 'value' is '<error type>' unless we explicitly typecheck the
     // 'guard' statement.
     SourceFile *SF = DC->getParentSourceFile();
-    for (auto *D : SF->Decls) {
+    for (auto *D : SF->getTopLevelDecls()) {
       if (auto Code = dyn_cast<TopLevelCodeDecl>(D)) {
         typeCheckTopLevelCodeDecl(Code);
         if (Code == TLCD)
@@ -160,8 +160,6 @@ public:
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     return {isInterstingRange(S), S};
   }
-
-  bool walkToDeclPre(Decl *D) override { return isInterstingRange(D); }
 
   bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
@@ -604,9 +602,46 @@ class ExprContextAnalyzer {
       // Check context types of the array literal expression.
       ExprContextInfo arrayCtxtInfo(DC, Parent);
       for (auto arrayT : arrayCtxtInfo.getPossibleTypes()) {
-        if (auto boundGenericT = arrayT->getAs<BoundGenericType>())
+        if (auto boundGenericT = arrayT->getAs<BoundGenericType>()) {
+          // let _: [Element] = [#HERE#]
+          // In this case, 'Element' is the expected type.
           if (boundGenericT->getDecl() == Context.getArrayDecl())
             recordPossibleType(boundGenericT->getGenericArgs()[0]);
+
+          // let _: [Key : Value] = [#HERE#]
+          // In this case, 'Key' is the expected type.
+          if (boundGenericT->getDecl() == Context.getDictionaryDecl())
+            recordPossibleType(boundGenericT->getGenericArgs()[0]);
+        }
+      }
+      break;
+    }
+    case ExprKind::Dictionary: {
+      // Check context types of the dictionary literal expression.
+      ExprContextInfo dictCtxtInfo(DC, Parent);
+
+      for (auto dictT : dictCtxtInfo.getPossibleTypes()) {
+        if (auto boundGenericT = dictT->getAs<BoundGenericType>()) {
+          if (boundGenericT->getDecl() == Context.getDictionaryDecl()) {
+            if (ParsedExpr->isImplicit() && isa<TupleExpr>(ParsedExpr)) {
+              // let _: [Key : Value] = [#HERE#:]
+              // let _: [Key : Value] = [#HERE#:val]
+              // let _: [Key : Value] = [key:#HERE#]
+              // In this case, this is called by 'ExprKind::Tuple' case. Return
+              // '(Key,Value)' here, 'ExprKind::Tuple' branch can decide which
+              // type in the tuple type is the exprected type.
+              SmallVector<TupleTypeElt, 2> elts;
+              for (auto genericArg : boundGenericT->getGenericArgs())
+                elts.emplace_back(genericArg);
+              recordPossibleType(TupleType::get(elts, DC->getASTContext()));
+            } else {
+              // let _: [Key : Value] = [key: val, #HERE#]
+              // In this case, assume 'Key' is the expected type.
+              if (boundGenericT->getDecl() == Context.getDictionaryDecl())
+                recordPossibleType(boundGenericT->getGenericArgs()[0]);
+            }
+          }
+        }
       }
       break;
     }
@@ -631,13 +666,25 @@ class ExprContextAnalyzer {
       break;
     }
     case ExprKind::Tuple: {
-      if (!Parent->getType() || !Parent->getType()->is<TupleType>())
-        return;
+      TupleType *tupleT = nullptr;
+      if (Parent->getType() && Parent->getType()->is<TupleType>()) {
+        tupleT = Parent->getType()->castTo<TupleType>();
+      } else {
+        ExprContextInfo tupleCtxtInfo(DC, Parent);
+        for (auto possibleT : tupleCtxtInfo.getPossibleTypes()) {
+          if (auto possibleTupleT = possibleT->getAs<TupleType>()) {
+            tupleT = possibleTupleT;
+            break;
+          }
+        }
+        if (!tupleT)
+          return;
+      }
+
       unsigned Position = 0;
       bool HasName;
       if (getPositionInArgs(*DC, Parent, ParsedExpr, Position, HasName)) {
-        recordPossibleType(
-            Parent->getType()->castTo<TupleType>()->getElementType(Position));
+        recordPossibleType(tupleT->getElementType(Position));
       }
       break;
     }
@@ -813,6 +860,7 @@ public:
         case ExprKind::PrefixUnary:
         case ExprKind::Assign:
         case ExprKind::Array:
+        case ExprKind::Dictionary:
           return true;
         case ExprKind::UnresolvedMember:
           return true;

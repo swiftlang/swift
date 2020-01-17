@@ -14,7 +14,7 @@
 // especially performance inlining as it inlines functions such as String.+=
 // that the evaluator has special knowledge about.
 //
-// RUN: not %target-sil-opt -silgen-cleanup -diagnose-invalid-escaping-captures -diagnose-static-exclusivity -capture-promotion -access-enforcement-selection -allocbox-to-stack -noreturn-folding -mark-uninitialized-fixup -definite-init -raw-sil-inst-lowering -closure-lifetime-fixup -semantic-arc-opts -destroy-hoisting -ownership-model-eliminator -mandatory-inlining -predictable-memaccess-opts -os-log-optimization -diagnostic-constant-propagation -predictable-deadalloc-elim -guaranteed-arc-opts -diagnose-unreachable -diagnose-infinite-recursion -yield-once-check -dataflow-diagnostics -split-non-cond_br-critical-edges -constexpr-limit 3000 -test-constant-evaluable-subset %t/constant_evaluable_subset_test_silgen.sil > /dev/null 2> %t/error-output-mandatory
+// RUN: not %target-sil-opt -silgen-cleanup -diagnose-invalid-escaping-captures -diagnose-static-exclusivity -capture-promotion -access-enforcement-selection -allocbox-to-stack -noreturn-folding -definite-init -raw-sil-inst-lowering -closure-lifetime-fixup -semantic-arc-opts -destroy-hoisting -ownership-model-eliminator -mandatory-inlining -predictable-memaccess-opts -os-log-optimization -diagnostic-constant-propagation -predictable-deadalloc-elim -guaranteed-arc-opts -diagnose-unreachable -diagnose-infinite-recursion -yield-once-check -dataflow-diagnostics -split-non-cond_br-critical-edges -constexpr-limit 3000 -test-constant-evaluable-subset %t/constant_evaluable_subset_test_silgen.sil > /dev/null 2> %t/error-output-mandatory
 //
 // RUN: %FileCheck %s < %t/error-output-mandatory
 
@@ -891,4 +891,23 @@ func testArrayOfClosures(_ byte: @escaping () -> Int) -> [(Int) -> Int] {
 @_semantics("test_driver")
 func interpretArrayOfClosures() -> [(Int) -> Int] {
   return testArrayOfClosures({ 10 })
+}
+
+// Test checked casts.
+
+// CHECK-LABEL: @testMetaTypeCast
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testMetaTypeCast<T>(_ x: T.Type) -> Bool {
+  return (x is Int.Type)
+}
+
+@_semantics("test_driver")
+func interpretMetaTypeCast() -> Bool {
+  return testMetaTypeCast(Int.self)
+}
+
+// FIXME: this cast is not found to be false by the classifyDynamicCast utility.
+func interpretMetaTypeCast2() -> Bool {
+  return testMetaTypeCast(((Int) -> Int).self)
 }

@@ -20,6 +20,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -59,6 +60,8 @@ class SILGlobalOpt {
 
   typedef SmallVector<ApplyInst *, 4> GlobalInitCalls;
   typedef SmallVector<LoadInst *, 4> GlobalLoads;
+  typedef SmallVector<BeginAccessInst *, 4> GlobalAccesses;
+  typedef SmallVector<GlobalAddrInst *, 4> GlobalAddrs;
 
   /// A map from each visited global initializer call to a list of call sites.
   llvm::MapVector<SILFunction *, GlobalInitCalls> GlobalInitCallMap;
@@ -70,9 +73,19 @@ class SILGlobalOpt {
   /// A map from each visited global let variable to its set of loads.
   llvm::MapVector<SILGlobalVariable *, GlobalLoads> GlobalLoadMap;
 
+  /// A map from each visited global to its set of begin_access instructions.
+  llvm::MapVector<SILGlobalVariable *, GlobalAccesses> GlobalAccessMap;
+
+  /// A map from each visited global to all of its global address instructions.
+  llvm::MapVector<SILGlobalVariable *, GlobalAddrs> GlobalAddrMap;
+
   /// A map from each visited global let variable to the store instructions
   /// which initialize it.
   llvm::MapVector<SILGlobalVariable *, StoreInst *> GlobalVarStore;
+
+  /// A map for each visited global variable to the alloc instruction that
+  /// allocated space for it.
+  llvm::MapVector<SILGlobalVariable *, AllocGlobalInst *> AllocGlobalStore;
 
   /// A set of visited global variables that for some reason we have decided is
   /// not able to be optimized safely or for which we do not know how to
@@ -97,6 +110,10 @@ class SILGlobalOpt {
   /// A map from a globalinit_func to the number of times "once" has called the
   /// function.
   llvm::DenseMap<SILFunction *, unsigned> InitializerCount;
+
+  llvm::SmallVector<SILInstruction *, 4> InstToRemove;
+  llvm::SmallVector<SILGlobalVariable *, 4> GlobalsToRemove;
+
 public:
   SILGlobalOpt(SILOptFunctionBuilder &FunctionBuilder, SILModule *M, DominanceAnalysis *DA)
       : FunctionBuilder(FunctionBuilder), Module(M), DA(DA) {}
@@ -104,6 +121,14 @@ public:
   bool run();
 
 protected:
+  /// Reset all the maps of global variables.
+  void reset();
+
+  /// Collect all global variables.
+  void collect();
+
+  void collectUsesOfInstructionForDeletion(SILInstruction *inst);
+
   /// If this is a call to a global initializer, map it.
   void collectGlobalInitCall(ApplyInst *AI);
 
@@ -117,6 +142,11 @@ protected:
 
   /// This is the main entrypoint for collecting global accesses.
   void collectGlobalAccess(GlobalAddrInst *GAI);
+
+  /// Simple function to collect globals and their corresponding alloc
+  /// instructions.
+  void collectAllocGlobal(SILGlobalVariable *global,
+                          AllocGlobalInst *allocGlobal);
 
   /// Returns true if we think that \p CurBB is inside a loop.
   bool isInLoop(SILBasicBlock *CurBB);
@@ -138,6 +168,17 @@ protected:
   /// Set the static initializer and remove "once" from addressor if a global
   /// can be statically initialized.
   void optimizeInitializer(SILFunction *AddrF, GlobalInitCalls &Calls);
+
+  /// If possible, remove global address instructions associated with the given
+  /// global.
+  bool tryRemoveGlobalAddr(SILGlobalVariable *global);
+
+  /// If possible, remove global alloc instructions associated with the given
+  /// global.
+  bool tryRemoveGlobalAlloc(SILGlobalVariable *global, AllocGlobalInst *alloc);
+
+  /// If a global has no uses, remove it.
+  bool tryRemoveUnusedGlobal(SILGlobalVariable *global);
 
   /// Optimize access to the global variable, which is known to have a constant
   /// value. Replace all loads from the global address by invocations of a
@@ -809,6 +850,110 @@ static bool canBeChangedExternally(SILGlobalVariable *SILG) {
   return true;
 }
 
+static bool canBeUsedOrChangedExternally(SILGlobalVariable *global) {
+  if (global->isLet())
+    return isPossiblyUsedExternally(global->getLinkage(),
+                                    global->getModule().isWholeModule());
+  return canBeChangedExternally(global);
+}
+
+static bool isSafeToRemove(SILGlobalVariable *global) {
+  return global->getDecl() && !canBeUsedOrChangedExternally(global);
+}
+
+bool SILGlobalOpt::tryRemoveGlobalAlloc(SILGlobalVariable *global,
+                                        AllocGlobalInst *alloc) {
+  if (!isSafeToRemove(global))
+    return false;
+
+  // Make sure the global's address is never taken and we shouldn't skip this
+  // global.
+  if (GlobalVarSkipProcessing.count(global) ||
+      (GlobalAddrMap[global].size() &&
+       std::any_of(GlobalAddrMap[global].begin(), GlobalAddrMap[global].end(),
+                   [=](GlobalAddrInst *addr) {
+                     return std::find(InstToRemove.begin(), InstToRemove.end(),
+                                      addr) == InstToRemove.end();
+                   })))
+    return false;
+
+  InstToRemove.push_back(alloc);
+  return true;
+}
+
+/// If there are no loads or accesses of a given global, then remove its
+/// associated global addr and all asssociated instructions.
+bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
+  if (!isSafeToRemove(global))
+    return false;
+
+  if (GlobalVarSkipProcessing.count(global) || GlobalLoadMap[global].size() ||
+      GlobalAccessMap[global].size())
+    return false;
+
+  // Check if the address is used in anything but a store. If any global_addr
+  // instruction associated with a global is used in anything but a store, we
+  // can't remove ANY global_addr instruction associated with that global.
+  for (auto *addr : GlobalAddrMap[global]) {
+    for (auto *use : addr->getUses()) {
+      if (!isa<StoreInst>(use->getUser()))
+        return false;
+    }
+  }
+  
+  // Now that it's safe, remove all global addresses associated with this global
+  for (auto *addr : GlobalAddrMap[global]) {
+    InstToRemove.push_back(addr);
+  }
+
+  return true;
+}
+
+bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
+  if (!isSafeToRemove(global))
+    return false;
+
+  if (GlobalVarSkipProcessing.count(global))
+    return false;
+
+  // If this global is used, check if the user is going to be removed.
+  // Make sure none of the removed instructions are the same as this global's
+  // alloc instruction
+  if (AllocGlobalStore.count(global) &&
+      std::none_of(InstToRemove.begin(), InstToRemove.end(),
+                   [=](SILInstruction *inst) {
+                     return AllocGlobalStore[global] == inst;
+                   }))
+    return false;
+
+  if (GlobalVarStore.count(global) &&
+      std::none_of(
+          InstToRemove.begin(), InstToRemove.end(),
+          [=](SILInstruction *inst) { return GlobalVarStore[global] == inst; }))
+    return false;
+
+  // Check if any of the global_addr instructions associated with this global
+  // aren't going to be removed. In that case, we need to keep the global.
+  if (GlobalAddrMap[global].size() &&
+      std::any_of(GlobalAddrMap[global].begin(), GlobalAddrMap[global].end(),
+                  [=](GlobalAddrInst *addr) {
+                    return std::find(InstToRemove.begin(), InstToRemove.end(),
+                                     addr) == InstToRemove.end();
+                  }))
+    return false;
+
+  if (GlobalAccessMap[global].size() &&
+      std::any_of(GlobalAccessMap[global].begin(),
+                  GlobalAccessMap[global].end(), [=](BeginAccessInst *access) {
+                    return std::find(InstToRemove.begin(), InstToRemove.end(),
+                                     access) == InstToRemove.end();
+                  }))
+    return false;
+
+  GlobalsToRemove.push_back(global);
+  return true;
+}
+
 /// Check if instruction I is a load from instruction V or
 /// or a struct_element_addr from instruction V.
 /// returns instruction I if this condition holds, or nullptr otherwise.
@@ -837,6 +982,11 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   if (!SILG)
     return;
 
+  if (!SILG->getDecl())
+    return;
+
+  GlobalAddrMap[SILG].push_back(GAI);
+
   if (!SILG->isLet()) {
     // We cannot determine the value for global variables which could be
     // changed externally at run-time.
@@ -861,9 +1011,6 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   if (GlobalVar == SILG)
     return;
 
-  if (!SILG->getDecl())
-    return;
-
   for (auto *Op : getNonDebugUses(GAI)) {
     if (auto *SI = dyn_cast<StoreInst>(Op->getUser())) {
       if (SI->getDest() == GAI)
@@ -876,6 +1023,10 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
       continue;
     }
 
+    if (auto *beginAccess = dyn_cast<BeginAccessInst>(Op->getUser())) {
+      GlobalAccessMap[SILG].push_back(beginAccess);
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: has non-store, non-load use: "
                             << SILG->getName() << '\n';
                Op->getUser()->dump());
@@ -884,6 +1035,11 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
     GlobalVarSkipProcessing.insert(SILG);
     break;
   }
+}
+
+void SILGlobalOpt::collectAllocGlobal(SILGlobalVariable *global,
+                                      AllocGlobalInst *allocGlobal) {
+  AllocGlobalStore[global] = allocGlobal;
 }
 
 // Optimize access to the global variable, which is known to have a constant
@@ -906,7 +1062,7 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
     return;
   }
 
-  if (!GlobalLoadMap.count(SILG)) {
+  if (GlobalLoadMap[SILG].empty()) {
     LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: not in load map: "
                           << SILG->getName() << '\n');
     return;
@@ -938,13 +1094,17 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
 
 }
 
-bool SILGlobalOpt::run() {
+void SILGlobalOpt::reset() {
+  AllocGlobalStore.clear();
+  GlobalVarStore.clear();
+  GlobalAddrMap.clear();
+  GlobalAccessMap.clear();
+  GlobalLoadMap.clear();
+  GlobalInitCallMap.clear();
+}
+
+void SILGlobalOpt::collect() {
   for (auto &F : *Module) {
-
-    // Don't optimize functions that are marked with the opt.never attribute.
-    if (!F.shouldOptimize())
-      continue;
-
     // TODO: Add support for ownership.
     if (F.hasOwnership()) {
       continue;
@@ -967,27 +1127,92 @@ bool SILGlobalOpt::run() {
           continue;
         }
 
-        auto *GAI = dyn_cast<GlobalAddrInst>(&I);
-        if (!GAI) {
+        if (auto *GAI = dyn_cast<GlobalAddrInst>(&I)) {
+          collectGlobalAccess(GAI);
           continue;
         }
 
-        collectGlobalAccess(GAI);
+        if (auto *allocGlobal = dyn_cast<AllocGlobalInst>(&I)) {
+          collectAllocGlobal(allocGlobal->getReferencedGlobal(), allocGlobal);
+          continue;
+        }
       }
     }
   }
+}
 
+bool SILGlobalOpt::run() {
+  // Collect all the global variables and associated instructions.
+  collect();
+
+  // Optimize based on what we just collected.
   for (auto &InitCalls : GlobalInitCallMap) {
+    // Don't optimize functions that are marked with the opt.never attribute.
+    if (!InitCalls.first->shouldOptimize())
+      continue;
+
     // Optimize the addressors if possible.
     optimizeInitializer(InitCalls.first, InitCalls.second);
     placeInitializers(InitCalls.first, InitCalls.second);
   }
 
   for (auto &Init : GlobalVarStore) {
+    // Don't optimize functions that are marked with the opt.never attribute.
+    if (!Init.second->getFunction()->shouldOptimize())
+      continue;
+
     // Optimize the access to globals if possible.
     optimizeGlobalAccess(Init.first, Init.second);
   }
 
+  SmallVector<SILGlobalVariable *, 8> addrGlobals;
+  for (auto &addrPair : GlobalAddrMap) {
+    // Don't optimize functions that are marked with the opt.never attribute.
+    bool shouldOptimize = true;
+    for (auto *addr : addrPair.second) {
+      if (!addr->getFunction()->shouldOptimize()) {
+        shouldOptimize = false;
+        break;
+      }
+    }
+    if (!shouldOptimize)
+      continue;
+
+    addrGlobals.push_back(addrPair.first);
+  }
+
+  for (auto *global : addrGlobals) {
+    HasChanged |= tryRemoveGlobalAddr(global);
+  }
+
+  SmallVector<std::pair<SILGlobalVariable *, AllocGlobalInst *>, 12>
+      globalAllocPairs;
+  for (auto &alloc : AllocGlobalStore) {
+    if (!alloc.second->getFunction()->shouldOptimize())
+      continue;
+    globalAllocPairs.push_back(std::make_pair(alloc.first, alloc.second));
+  }
+
+  for (auto &allocPair : globalAllocPairs) {
+    HasChanged |= tryRemoveGlobalAlloc(allocPair.first, allocPair.second);
+  }
+
+  // Erase the instructions that we have marked for deletion.
+  for (auto *inst : InstToRemove) {
+    eraseUsesOfInstruction(inst);
+    inst->eraseFromParent();
+  }
+
+  for (auto &global : Module->getSILGlobals()) {
+    HasChanged |= tryRemoveUnusedGlobal(&global);
+  }
+
+  for (auto *global : GlobalsToRemove) {
+    Module->eraseGlobalVariable(global);
+  }
+
+  // Reset in case we re-run this function (when HasChanged is true).
+  reset();
   return HasChanged;
 }
 

@@ -1,6 +1,6 @@
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -9,9 +9,15 @@
 
 from __future__ import absolute_import, unicode_literals
 
-from .utils import TestCase, add_metaclass
-from .. import migration
+import platform
 
+from .utils import BUILD_SCRIPT_IMPL_PATH, TestCase, add_metaclass
+from ..build_swift import argparse
+from ..build_swift import migration
+
+
+# -----------------------------------------------------------------------------
+# Helpers
 
 def _get_sdk_targets(sdk_names):
     targets = []
@@ -26,6 +32,7 @@ def _get_sdk_target_names(sdk_names):
 
 
 # -----------------------------------------------------------------------------
+# Mirgrate Swift SDKs
 
 class TestMigrateSwiftSDKsMeta(type):
     """Metaclass used to dynamically generate test methods.
@@ -76,3 +83,88 @@ class TestMigrateSwiftSDKs(TestCase):
             '--stdlib-deployment-targets=',
             '--stdlib-deployment-targets={}'.format(' '.join(target_names))
         ])
+
+
+# -----------------------------------------------------------------------------
+
+class TestMigrateParseArgs(TestCase):
+
+    def test_report_unknown_args(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-R', '--release', action='store_true')
+        parser.add_argument('-T', '--validation-test', action='store_true')
+        parser.add_argument('--darwin-xcrun-toolchain')
+
+        args = migration.parse_args(parser, [
+            '-RT',
+            '--unknown', 'true',
+            '--darwin-xcrun-toolchain=foo',
+            '--',
+            '--darwin-xcrun-toolchain=bar',
+            '--other',
+        ])
+
+        expected = argparse.Namespace(
+            release=True,
+            validation_test=True,
+            darwin_xcrun_toolchain='bar',
+            build_script_impl_args=['--unknown', 'true', '--other'])
+
+        self.assertEqual(args, expected)
+
+    def test_no_unknown_args(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-R', '--release', action='store_true')
+        parser.add_argument('-T', '--validation-test', action='store_true')
+        parser.add_argument('--darwin-xcrun-toolchain')
+
+        args = migration.parse_args(
+            parser, ['-RT', '--darwin-xcrun-toolchain=bar'])
+
+        expected = argparse.Namespace(
+            release=True,
+            validation_test=True,
+            darwin_xcrun_toolchain='bar',
+            build_script_impl_args=[])
+
+        self.assertEqual(args, expected)
+
+    def test_forward_impl_args(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--skip-test-swift',
+                            dest='impl_skip_test_swift',
+                            action='store_true')
+        parser.add_argument('--install-swift',
+                            dest='impl_install_swift',
+                            action='store_true')
+
+        args = migration.parse_args(
+            parser, ['--skip-test-swift', '--install-swift'])
+
+        expected = argparse.Namespace(
+            build_script_impl_args=['--skip-test-swift', '--install-swift'])
+
+        self.assertEqual(args, expected)
+
+
+class TestMigrationCheckImplArgs(TestCase):
+
+    def test_check_impl_args(self):
+        if platform.system() == 'Windows':
+            self.skipTest("build-script-impl cannot run in Windows")
+            return
+
+        self.assertIsNone(migration.check_impl_args(
+            BUILD_SCRIPT_IMPL_PATH, ['--reconfigure']))
+
+        with self.assertRaises(ValueError) as cm:
+            migration.check_impl_args(
+                BUILD_SCRIPT_IMPL_PATH, ['foo'])
+
+        self.assertIn('foo', str(cm.exception))
+
+        with self.assertRaises(ValueError) as cm:
+            migration.check_impl_args(
+                BUILD_SCRIPT_IMPL_PATH, ['--reconfigure', '--foo=true'])
+
+        self.assertIn('foo', str(cm.exception))

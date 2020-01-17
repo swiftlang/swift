@@ -244,7 +244,7 @@ namespace driver {
     /// Dependency graphs for deciding which jobs are dirty (need running)
     /// or clean (can be skipped).
     using CoarseGrainedDependencyGraph =
-        CoarseGrainedDependencyGraph<const Job *>;
+        swift::CoarseGrainedDependencyGraph<const Job *>;
     CoarseGrainedDependencyGraph CoarseGrainedDepGraph;
     CoarseGrainedDependencyGraph CoarseGrainedDepGraphForRanges;
 
@@ -272,7 +272,7 @@ namespace driver {
 
     void noteBuilding(const Job *cmd, const bool willBeBuilding,
                       const bool isTentative, const bool forRanges,
-                      StringRef reason) {
+                      StringRef reason) const {
       if (!Comp.getShowIncrementalBuildDecisions())
         return;
       if (ScheduledCommands.count(cmd))
@@ -298,6 +298,23 @@ namespace driver {
                                      llvm::outs(), cmd, [](raw_ostream &out, const Job *base) {
                                        out << llvm::sys::path::filename(base->getOutput().getBaseInput(0));
                                      });
+    }
+
+    template <typename JobsCollection>
+    void noteBuildingJobs(const JobsCollection &unsortedJobsArg,
+                          const bool forRanges, const StringRef reason) const {
+      if (!Comp.getShowIncrementalBuildDecisions() &&
+          !Comp.getShowJobLifecycle())
+        return;
+      // Sigh, must manually convert SmallPtrSet to ArrayRef-able container
+      llvm::SmallVector<const Job *, 16> unsortedJobs;
+      for (const Job *j : unsortedJobsArg)
+        unsortedJobs.push_back(j);
+      llvm::SmallVector<const Job *, 16> sortedJobs;
+      Comp.sortJobsToMatchCompilationInputs(unsortedJobs, sortedJobs);
+      for (const Job *j : sortedJobs)
+        noteBuilding(j, /*willBeBuilding=*/true, /*isTentative=*/false,
+                     forRanges, reason);
     }
 
     const Job *findUnfinishedJob(ArrayRef<const Job *> JL) {
@@ -432,7 +449,7 @@ namespace driver {
                                  diag::warn_unable_to_load_dependencies,
                                  DependenciesFile);
       Comp.disableIncrementalBuild(
-          Twine("Malformed swift dependencies file ' ") + DependenciesFile +
+          Twine("malformed swift dependencies file ' ") + DependenciesFile +
           "'");
     }
 
@@ -468,7 +485,7 @@ namespace driver {
         // other recompilations. It is possible that the current code marks
         // things that do not need to be marked. Unecessary compilation would
         // result if that were the case.
-        bool wasCascading = isMarkedInDepGraph(FinishedCmd, forRanges);
+        bool wasKnownToNeedRunning = isMarkedInDepGraph(FinishedCmd, forRanges);
 
         switch (loadDepGraphFromPath(FinishedCmd, DependenciesFile,
                                      Comp.getDiags(), forRanges)) {
@@ -484,7 +501,7 @@ namespace driver {
           break;
 
         case CoarseGrainedDependencyGraph::LoadResult::UpToDate:
-          if (!wasCascading)
+          if (!wasKnownToNeedRunning)
             break;
           LLVM_FALLTHROUGH;
         case CoarseGrainedDependencyGraph::LoadResult::AffectsDownstream:
@@ -674,14 +691,22 @@ namespace driver {
       const CommandSet &DependentsInEffect = useRangesForScheduling
                                                  ? DependentsWithRanges
                                                  : DependentsWithoutRanges;
-      for (const Job *Cmd : DependentsInEffect) {
+
+      noteBuildingJobs(DependentsInEffect, useRangesForScheduling,
+                       "because of dependencies discovered later");
+
+      // Sort dependents for more deterministic behavior
+      llvm::SmallVector<const Job *, 16> UnsortedDependents;
+      for (const Job *j : DependentsInEffect)
+        UnsortedDependents.push_back(j);
+      llvm::SmallVector<const Job *, 16> SortedDependents;
+      Comp.sortJobsToMatchCompilationInputs(UnsortedDependents,
+                                            SortedDependents);
+
+      for (const Job *Cmd : SortedDependents) {
         DeferredCommands.erase(Cmd);
-        noteBuilding(Cmd, /*willBeBuilding=*/true, useRangesForScheduling,
-                     /*isTentative=*/false,
-                     "because of dependencies discovered later");
         scheduleCommandIfNecessaryAndPossible(Cmd);
       }
-
       return TaskFinishedResponse::ContinueExecution;
     }
 
@@ -692,6 +717,7 @@ namespace driver {
 
       // Store this task's ReturnCode as our Result if we haven't stored
       // anything yet.
+
       if (Result == EXIT_SUCCESS)
         Result = ReturnCode;
 
@@ -1007,10 +1033,6 @@ namespace driver {
 
       const bool isCascading = isCascadingJobAccordingToCondition(
           Cmd, Cond, HasDependenciesFileName);
-
-      if (Comp.getEnableFineGrainedDependencies())
-        assert(getFineGrainedDepGraph(/*forRanges=*/false)
-                   .emitDotFileAndVerify(Comp.getDiags()));
       return std::make_pair(shouldSched, isCascading);
     }
 
@@ -1055,6 +1077,10 @@ namespace driver {
         const Job *const Cmd, const Job::Condition Condition,
         const bool hasDependenciesFileName, const bool forRanges) {
 
+      // When using ranges may still decide not to schedule the job.
+      const bool isTentative =
+          Comp.getEnableSourceRangeDependencies() || forRanges;
+
       switch (Condition) {
       case Job::Condition::Always:
       case Job::Condition::NewlyAdded:
@@ -1070,11 +1096,11 @@ namespace driver {
         }
         LLVM_FALLTHROUGH;
       case Job::Condition::RunWithoutCascading:
-        noteBuilding(Cmd, /*willBeBuilding=*/true, /*isTentative=*/true,
+        noteBuilding(Cmd, /*willBeBuilding=*/true, /*isTentative=*/isTentative,
                      forRanges, "(initial)");
         return true;
       case Job::Condition::CheckDependencies:
-        noteBuilding(Cmd, /*willBeBuilding=*/false, /*isTentative=*/true,
+        noteBuilding(Cmd, /*willBeBuilding=*/false, /*isTentative=*/isTentative,
                      forRanges, "file is up-to-date and output exists");
         return false;
       }
@@ -1118,11 +1144,7 @@ namespace driver {
                                  IncrementalTracer))
           CascadedJobs.insert(transitiveCmd);
       }
-      for (auto *transitiveCmd : CascadedJobs)
-        noteBuilding(transitiveCmd, /*willBeBuilding=*/true,
-                     /*isTentative=*/false, forRanges,
-                     "because of the initial set");
-
+      noteBuildingJobs(CascadedJobs, forRanges, "because of the initial set");
       return CascadedJobs;
     }
 
@@ -1138,11 +1160,8 @@ namespace driver {
         for (const Job * marked: markExternalInDepGraph(dependency, forRanges))
           ExternallyDependentJobs.push_back(marked);
       });
-      for (auto *externalCmd : ExternallyDependentJobs) {
-        noteBuilding(externalCmd, /*willBeBuilding=*/true,
-                     /*isTentative=*/false, forRanges,
-                     "because of external dependencies");
-      }
+      noteBuildingJobs(ExternallyDependentJobs, forRanges,
+                       "because of external dependencies");
       return ExternallyDependentJobs;
     }
 
@@ -1361,11 +1380,20 @@ namespace driver {
       // subprocesses than before. And significantly: it's doing so while
       // not exceeding the RAM of a typical 2-core laptop.
 
+      // An explanation of why the partition calculation isn't integer division.
+      // Using an example, a module of 26 files exceeds the limit of 25 and must
+      // be compiled in 2 batches. Integer division yields 26/25 = 1 batch, but
+      // a single batch of 26 exceeds the limit. The calculation must round up,
+      // which can be calculated using: `(x + y - 1) / y`
+      auto DivideRoundingUp = [](size_t Num, size_t Div) -> size_t {
+        return (Num + Div - 1) / Div;
+      };
+
       size_t DefaultSizeLimit = 25;
       size_t NumTasks = TQ->getNumberOfParallelTasks();
       size_t NumFiles = PendingExecution.size();
       size_t SizeLimit = Comp.getBatchSizeLimit().getValueOr(DefaultSizeLimit);
-      return std::max(NumTasks, NumFiles / SizeLimit);
+      return std::max(NumTasks, DivideRoundingUp(NumFiles, SizeLimit));
     }
 
     /// Select jobs that are batch-combinable from \c PendingExecution, combine
@@ -1493,11 +1521,11 @@ namespace driver {
             continue;
 
           // Be conservative, in case we use ranges this time but not next.
-          bool isCascading = true;
+          bool mightBeCascading = true;
           if (Comp.getIncrementalBuildEnabled())
-            isCascading = isMarkedInDepGraph(
+            mightBeCascading = isMarkedInDepGraph(
                 Cmd, /*forRanges=*/Comp.getEnableSourceRangeDependencies());
-          UnfinishedCommands.insert({Cmd, isCascading});
+          UnfinishedCommands.insert({Cmd, mightBeCascading});
         }
       }
     }
@@ -1824,8 +1852,6 @@ int Compilation::performJobsImpl(bool &abnormalExit,
                                CompilationRecordPath + "~moduleonly");
     }
   }
-  if (getEnableFineGrainedDependencies())
-    assert(State.FineGrainedDepGraph.emitDotFileAndVerify(getDiags()));
   abnormalExit = State.hadAnyAbnormalExit();
   return State.getResult();
 }
@@ -2051,5 +2077,25 @@ void Compilation::addDependencyPathOrCreateDummy(
     // Create dummy empty file
     std::error_code EC;
     llvm::raw_fd_ostream(depPath, EC, llvm::sys::fs::F_None);
+  }
+}
+
+void Compilation::sortJobsToMatchCompilationInputs(
+    const ArrayRef<const Job *> unsortedJobs,
+    SmallVectorImpl<const Job *> &sortedJobs) const {
+  llvm::DenseMap<StringRef, const Job *> jobsByInput;
+  for (const Job *J : unsortedJobs) {
+    const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
+    const InputAction *IA = CJA->findSingleSwiftInput();
+    auto R =
+        jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
+    assert(R.second);
+    (void)R;
+  }
+  for (const InputPair &P : getInputFiles()) {
+    auto I = jobsByInput.find(P.second->getValue());
+    if (I != jobsByInput.end()) {
+      sortedJobs.push_back(I->second);
+    }
   }
 }

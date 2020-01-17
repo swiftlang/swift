@@ -700,9 +700,16 @@ public:
                                                  SourceLoc EndTypeCheckLoc);
   static bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
-  static BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
-                                                      BraceStmt *body,
-                                                      Type builderType);
+  /// Try to apply the function builder transform of the given builder type
+  /// to the body of the function.
+  ///
+  /// \returns \c None if the builder transformation cannot be applied at all,
+  /// e.g., because of a \c return statement. Otherwise, returns either the
+  /// fully type-checked body of the function (on success) or a \c nullptr
+  /// value if an error occurred while type checking the transformed body.
+  static Optional<BraceStmt *> applyFunctionBuilderBodyTransform(
+      FuncDecl *func, Type builderType);
+
   static bool typeCheckClosureBody(ClosureExpr *closure);
 
   static bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
@@ -999,27 +1006,24 @@ public:
 
   /// Type check the given pattern.
   ///
-  /// \param P The pattern to type check.
-  /// \param dc The context in which type checking occurs.
-  /// \param options Options that control type resolution.
-  ///
-  /// \returns true if any errors occurred during type checking.
-  static bool typeCheckPattern(Pattern *P, DeclContext *dc,
-                               TypeResolutionOptions options);
+  /// \returns the type of the pattern, which may be an error type if an
+  /// unrecoverable error occurred. If the options permit it, the type may
+  /// involve \c UnresolvedType (for patterns with no type information) and
+  /// unbound generic types.
+  static Type typeCheckPattern(ContextualPattern pattern);
 
   static bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
   /// Coerce a pattern to the given type.
   ///
-  /// \param P The pattern, which may be modified by this coercion.
-  /// \param resolution The type resolution.
+  /// \param pattern The contextual pattern.
   /// \param type the type to coerce the pattern to.
-  /// \param options Options describing how to perform this coercion.
+  /// \param options Options that control the coercion.
   ///
-  /// \returns true if an error occurred, false otherwise.
-  static bool coercePatternToType(Pattern *&P, TypeResolution resolution, Type type,
-                                  TypeResolutionOptions options,
-                                  TypeLoc tyLoc = TypeLoc());
+  /// \returns the coerced pattern, or nullptr if the coercion failed.
+  static Pattern *coercePatternToType(ContextualPattern pattern, Type type,
+                                      TypeResolutionOptions options,
+                                      TypeLoc tyLoc = TypeLoc());
   static bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                    Type type);
 
@@ -1029,10 +1033,15 @@ public:
                                         AnyFunctionType *FN);
   
   /// Type-check an initialized variable pattern declaration.
-  static bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
-  static bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
+  static bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC,
+                               Type patternType);
+  static bool typeCheckPatternBinding(PatternBindingDecl *PBD,
+                                      unsigned patternNumber,
+                                      Type patternType = Type());
 
   /// Type-check a for-each loop's pattern binding and sequence together.
+  ///
+  /// \returns true if a failure occurred.
   static bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
 
   /// Compute the set of captures for the given function or closure.
@@ -1100,17 +1109,6 @@ public:
   /// \returns the default type, or null if there is no default type for
   /// this protocol.
   static Type getDefaultType(ProtocolDecl *protocol, DeclContext *dc);
-
-  /// Convert the given expression to the given type.
-  ///
-  /// \param expr The expression, which will be updated in place.
-  /// \param type The type to convert to.
-  /// \param typeFromPattern Optionally, the caller can specify the pattern
-  ///   from where the toType is derived, so that we can deliver better fixit.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  static bool convertToType(Expr *&expr, Type type, DeclContext *dc,
-                            Optional<Pattern*> typeFromPattern = None);
 
   /// Coerce the given expression to materializable type, if it
   /// isn't already.
@@ -1209,17 +1207,6 @@ public:
   /// protocol.
   static Type deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
                                 AssociatedTypeDecl *assocType);
-
-  /// Derive an implicit type witness for a given "phantom" nested type
-  /// requirement that is known to the compiler but unstated as a
-  /// formal type requirement.
-  ///
-  /// This exists to support Codable and only Codable. Do not expand its
-  /// usage outside of that domain.
-  static TypeDecl *derivePhantomWitness(DeclContext *DC,
-                                        NominalTypeDecl *nominal,
-                                        ProtocolDecl *proto,
-                                        const StringRef Name);
 
   /// \name Name lookup
   ///
@@ -1589,18 +1576,19 @@ public:
   static DeclTypeCheckingSemantics
   getDeclTypeCheckingSemantics(ValueDecl *decl);
 
-  /// Creates an `IndexSubset` for the given function type, representing
-  /// all inferred differentiation parameters. Used by `@differentiable` and
-  /// `@derivative` attribute type-checking.
+  /// Infers the differentiability parameter indices for the given
+  /// original or derivative `AbstractFunctionDecl`.
   ///
-  /// The differentiation parameters are inferred to be:
-  /// - All parameters of the function type that conform to `Differentiable`.
-  /// - If the function type's result is a function type (i.e. it is a curried
-  ///   method type), then also all parameters of the function result type that
-  ///   conform to `Differentiable`.
+  /// The differentiability parameters are inferred to be:
+  /// - All parameters of the function that conform to `Differentiable`.
+  /// - If the function result type is a function type (i.e. the function has
+  ///   a curried method type), then also all parameters of the function result
+  ///   type that conform to `Differentiable`.
+  ///
+  /// Used by `@differentiable` and `@derivative` attribute type-checking.
   static IndexSubset *
-  inferDifferentiationParameters(AbstractFunctionDecl *AFD,
-                                 GenericEnvironment *derivativeGenEnv);
+  inferDifferentiabilityParameters(AbstractFunctionDecl *AFD,
+                                   GenericEnvironment *derivativeGenEnv);
 
 public:
   /// Require that the library intrinsics for working with Optional<T>

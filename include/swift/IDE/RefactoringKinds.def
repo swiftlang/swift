@@ -70,6 +70,8 @@ RANGE_REFACTORING(ConvertIfLetExprToGuardExpr, "Convert To Guard Expression", co
 
 RANGE_REFACTORING(ConvertGuardExprToIfLetExpr, "Convert To IfLet Expression", convert.to.iflet.expr)
 
+RANGE_REFACTORING(ConvertToComputedProperty, "Convert To Computed Property", convert.to.computed.property)
+
 // These internal refactorings are designed to be helpful for working on
 // the compiler/standard library, etc., but are likely to be just confusing and
 // noise for general development.

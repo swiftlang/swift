@@ -1,6 +1,6 @@
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -12,8 +12,8 @@ from __future__ import unicode_literals
 import os
 
 from .utils import TestCase, UTILS_PATH, add_metaclass
-from .. import presets
-from ..presets import Preset, PresetParser
+from ..build_swift import presets
+from ..build_swift.presets import Preset, PresetParser
 
 try:
     # Python 2
@@ -131,7 +131,7 @@ class TestPresetParserMeta(type):
         preset_parser.read(PRESET_FILES)
 
         # Generate tests for each preset
-        for preset_name in preset_parser.preset_names():
+        for preset_name in preset_parser.preset_names:
             test_name = 'test_get_preset_' + preset_name
             attrs[test_name] = cls.generate_get_preset_test(
                 preset_parser, preset_name)
@@ -165,9 +165,7 @@ class TestPresetParser(TestCase):
 
     def test_read_file(self):
         parser = PresetParser()
-
-        with self.assertNotRaises():
-            parser.read_file(PRESET_FILES[0])
+        parser.read_file(PRESET_FILES[0])
 
     def test_read_string(self):
         parser = PresetParser()
@@ -279,5 +277,5 @@ class TestPresetParser(TestCase):
         parser.read_string('[preset: bar]')
         parser.read_string('[preset: baz]')
 
-        self.assertEqual(set(parser.preset_names()),
+        self.assertEqual(set(parser.preset_names),
                          set(['foo', 'bar', 'baz']))

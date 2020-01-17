@@ -1,6 +1,6 @@
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -8,8 +8,8 @@
 
 
 from ..utils import TestCase, redirect_stderr
-from ...argparse import (ArgumentParser, BoolType, Nargs, PathType, SUPPRESS,
-                         actions)
+from ...build_swift.argparse import (
+    ArgumentParser, BoolType, Nargs, PathType, SUPPRESS, actions)
 
 
 # -----------------------------------------------------------------------------
@@ -41,10 +41,9 @@ class TestAction(TestCase):
         self.assertEqual(action.dests, ['foo', 'bar'])
 
     def test_supports_dest_argument(self):
-        with self.assertNotRaises(Exception):
-            action = actions.Action([], [], dest='foo')
+        action = actions.Action([], [], dest='foo')
 
-            self.assertEqual(action.dest, SUPPRESS)
+        self.assertEqual(action.dest, SUPPRESS)
 
     def test_call_not_implemented(self):
         action = actions.Action([], [])

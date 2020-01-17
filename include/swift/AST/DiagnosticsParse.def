@@ -933,6 +933,8 @@ ERROR(statement_same_line_without_semi,none,
       "consecutive statements on a line must be separated by ';'", ())
 ERROR(invalid_label_on_stmt,none,
       "labels are only valid on loops, if, and switch statements", ())
+ERROR(labeled_block_needs_do,none,
+      "labeled block needs 'do'", ())
 
 ERROR(snake_case_deprecated,none,
       "%0 has been replaced with %1 in Swift 3",
@@ -1037,7 +1039,11 @@ ERROR(expected_expr_repeat_while,PointsToFirstBadToken,
       "expected expression in 'repeat-while' condition", ())
 
 ERROR(do_while_now_repeat_while,none,
-      "'do-while' statement is not allowed; use 'repeat-while' instead", ())
+      "'do-while' statement is not allowed", ())
+NOTE(do_while_expected_repeat_while, none,
+      "did you mean 'repeat-while' statement?", ())
+NOTE(do_while_expected_separate_stmt, none,
+      "did you mean separate 'do' and 'while' statements?", ())
 
 // Do/Catch Statement
 ERROR(expected_lbrace_after_do,PointsToFirstBadToken,
@@ -1538,21 +1544,24 @@ ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
       "expected a member name as second parameter in '_implements' attribute", ())
 
 // differentiable
+// TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
 ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
       "expected a %0 function name", (StringRef))
 ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to", ())
+// TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
 ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
-ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
-      "missing label '%0:' in '@differentiable' attribute", (StringRef))
 ERROR(attr_differentiable_expected_label,none,
       "expected either 'wrt:' or a function specifier label, e.g. 'jvp:', "
       "or 'vjp:'", ())
-ERROR(differentiable_attribute_expected_rparen,none,
-      "expected ')' in '@differentiable' attribute", ())
-ERROR(unexpected_argument_differentiable,none,
+ERROR(attr_differentiable_unexpected_argument,none,
       "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
+// TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
+WARNING(attr_differentiable_jvp_vjp_deprecated_warning,none,
+        "'jvp:' and 'vjp:' arguments in '@differentiable' attribute are "
+        "deprecated; use '@derivative' attribute for derivative registration "
+        "instead", ())
 
 // differentiation `wrt` parameters clause
 ERROR(expected_colon_after_label,PointsToFirstBadToken,

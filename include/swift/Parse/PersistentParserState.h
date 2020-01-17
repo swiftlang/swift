@@ -71,14 +71,12 @@ public:
   // and adjust the client call 'performParseOnly'.
   bool PerformConditionEvaluation = true;
 private:
-  ScopeInfo ScopeInfo;
+  swift::ScopeInfo ScopeInfo;
 
   /// Parser sets this if it stopped parsing before the buffer ended.
   ParserPosition MarkedPos;
 
   std::unique_ptr<CodeCompletionDelayedDeclState> CodeCompletionDelayedDeclStat;
-
-  std::vector<IterableDeclContext *> DelayedDeclLists;
 
   /// The local context for all top-level code.
   TopLevelContext TopLevelCode;
@@ -111,10 +109,6 @@ public:
     assert(hasCodeCompletionDelayedDeclState());
     return std::move(CodeCompletionDelayedDeclStat);
   }
-
-  void delayDeclList(IterableDeclContext *D);
-
-  void parseAllDelayedDeclLists();
 
   TopLevelContext &getTopLevelContext() {
     return TopLevelCode;

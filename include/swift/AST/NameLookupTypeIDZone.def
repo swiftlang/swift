@@ -56,6 +56,9 @@ SWIFT_REQUEST(NameLookup, SelfBoundsFromWhereClauseRequest,
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, SuperclassDeclRequest, ClassDecl *(NominalTypeDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, HasMissingDesignatedInitializersRequest,
+              bool(ClassDecl *),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, TypeDeclsFromWhereClauseRequest,
               DirectlyReferencedTypeDecls(ExtensionDecl *), Uncached,
               NoLocationInfo)

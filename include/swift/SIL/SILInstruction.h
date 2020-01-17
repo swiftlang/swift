@@ -42,6 +42,7 @@
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <array>
 
 namespace swift {
 
@@ -318,7 +319,7 @@ class SILInstruction
 
   SILInstruction() = delete;
   void operator=(const SILInstruction &) = delete;
-  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
+  void operator delete(void *Ptr, size_t) = delete;
 
   /// Check any special state of instructions that are not represented in the
   /// instructions operands/type.
@@ -799,7 +800,7 @@ public:
   SILModule &getModule() const { return SILInstruction::getModule(); }
   SILInstructionKind getKind() const { return SILInstruction::getKind(); }
 
-  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
+  void operator delete(void *Ptr, size_t) = delete;
 
   ValueKind getValueKind() const {
     return ValueBase::getKind();
@@ -950,7 +951,7 @@ protected:
       : SILInstruction(kind, loc) {}
 
 public:
-  void operator delete(void *Ptr, size_t)SWIFT_DELETE_OPERATOR_DELETED;
+  void operator delete(void *Ptr, size_t) = delete;
 
   MultipleValueInstruction *clone(SILInstruction *insertPt = nullptr) {
     return cast<MultipleValueInstruction>(SILInstruction::clone(insertPt));
@@ -6999,7 +7000,7 @@ public:
   }
 
   using SuccessorBlockArgumentListTy =
-      TransformRange<ConstSuccessorListTy, function_ref<SILPhiArgumentArrayRef(
+      TransformRange<ConstSuccessorListTy, function_ref<ArrayRef<SILArgument *>(
                                                const SILSuccessor &)>>;
 
   /// Return the range of Argument arrays for each successor of this
@@ -7138,12 +7139,12 @@ class YieldInst final
                                                YieldInst, TermInst> {
   friend SILBuilder;
 
-  SILSuccessor DestBBs[2];
+  std::array<SILSuccessor, 2> DestBBs;
 
   YieldInst(SILDebugLocation loc, ArrayRef<SILValue> yieldedValues,
             SILBasicBlock *normalBB, SILBasicBlock *unwindBB)
     : InstructionBaseWithTrailingOperands(yieldedValues, loc),
-      DestBBs{{this, normalBB}, {this, unwindBB}} {}
+      DestBBs{{{this, normalBB}, {this, unwindBB}}} {}
 
   static YieldInst *create(SILDebugLocation loc,
                            ArrayRef<SILValue> yieldedValues,
@@ -7253,7 +7254,8 @@ public:
     FalseIdx
   };
 private:
-  SILSuccessor DestBBs[2];
+  std::array<SILSuccessor, 2> DestBBs;
+
   /// The number of arguments for the True branch.
   unsigned getNumTrueArgs() const {
     return SILInstruction::Bits.CondBranchInst.NumTrueArgs;
@@ -7638,7 +7640,7 @@ class DynamicMethodBranchInst
 
   SILDeclRef Member;
 
-  SILSuccessor DestBBs[2];
+  std::array<SILSuccessor, 2> DestBBs;
 
   /// The operand.
   FixedOperandList<1> Operands;
@@ -7686,7 +7688,7 @@ class CheckedCastBranchInst final:
   CanType DestFormalTy;
   bool IsExact;
 
-  SILSuccessor DestBBs[2];
+  std::array<SILSuccessor, 2> DestBBs;
 
   CheckedCastBranchInst(SILDebugLocation DebugLoc, bool IsExact,
                         SILValue Operand,
@@ -7698,8 +7700,8 @@ class CheckedCastBranchInst final:
                                                       TypeDependentOperands),
         DestLoweredTy(DestLoweredTy),
         DestFormalTy(DestFormalTy),
-        IsExact(IsExact), DestBBs{{this, SuccessBB, Target1Count},
-                                  {this, FailureBB, Target2Count}} {}
+        IsExact(IsExact), DestBBs{{{this, SuccessBB, Target1Count},
+                                   {this, FailureBB, Target2Count}}} {}
 
   static CheckedCastBranchInst *
   create(SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
@@ -7746,7 +7748,7 @@ class CheckedCastValueBranchInst final
   SILType DestLoweredTy;
   CanType DestFormalTy;
 
-  SILSuccessor DestBBs[2];
+  std::array<SILSuccessor, 2> DestBBs;
 
   CheckedCastValueBranchInst(SILDebugLocation DebugLoc,
                              SILValue Operand, CanType SourceFormalTy,
@@ -7757,7 +7759,7 @@ class CheckedCastValueBranchInst final
                                                       TypeDependentOperands),
         SourceFormalTy(SourceFormalTy),
         DestLoweredTy(DestLoweredTy), DestFormalTy(DestFormalTy),
-        DestBBs{{this, SuccessBB}, {this, FailureBB}} {}
+        DestBBs{{{this, SuccessBB}, {this, FailureBB}}} {}
 
   static CheckedCastValueBranchInst *
   create(SILDebugLocation DebugLoc,
@@ -7791,7 +7793,7 @@ class CheckedCastAddrBranchInst
   CastConsumptionKind ConsumptionKind;
 
   FixedOperandList<2> Operands;
-  SILSuccessor DestBBs[2];
+  std::array<SILSuccessor, 2> DestBBs;
 
   CanType SourceType;
   CanType TargetType;
@@ -7803,8 +7805,8 @@ class CheckedCastAddrBranchInst
                             ProfileCounter Target1Count,
                             ProfileCounter Target2Count)
       : InstructionBase(DebugLoc), ConsumptionKind(consumptionKind),
-        Operands{this, src, dest}, DestBBs{{this, successBB, Target1Count},
-                                           {this, failureBB, Target2Count}},
+        Operands{this, src, dest}, DestBBs{{{this, successBB, Target1Count},
+                                            {this, failureBB, Target2Count}}},
         SourceType(srcType), TargetType(targetType) {
     assert(ConsumptionKind != CastConsumptionKind::BorrowAlways &&
            "BorrowAlways is not supported on addresses");
@@ -7856,7 +7858,7 @@ public:
     ErrorIdx
   };
 private:
-  SILSuccessor DestBBs[2];
+  std::array<SILSuccessor, 2> DestBBs;
 
 protected:
   TryApplyInstBase(SILInstructionKind valueKind, SILDebugLocation Loc,

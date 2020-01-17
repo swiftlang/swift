@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "SolutionResult.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -487,44 +488,136 @@ public:
 
 } // end anonymous namespace
 
-BraceStmt *
-TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *FD,
-                                               BraceStmt *body,
-                                               Type builderType) {
-  // Try to build a single result expression.
-  auto &ctx = FD->getASTContext();
-  BuilderClosureVisitor visitor(ctx, nullptr,
-                                /*wantExpr=*/true, builderType);
-  Expr *returnExpr = visitor.visit(body);
-  if (!returnExpr)
+/// Find the return statements in the given body, which block the application
+/// of a function builder.
+static std::vector<ReturnStmt *> findReturnStatements(AnyFunctionRef fn);
+
+Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
+    FuncDecl *func, Type builderType) {
+  // Pre-check the body: pre-check any expressions in it and look
+  // for return statements.
+  //
+  // If we encountered an error or there was an explicit result type,
+  // bail out and report that to the caller.
+  auto &ctx = func->getASTContext();
+  auto request = PreCheckFunctionBuilderRequest{func};
+  switch (evaluateOrDefault(
+              ctx.evaluator, request, FunctionBuilderClosurePreCheck::Error)) {
+  case FunctionBuilderClosurePreCheck::Okay:
+    // If the pre-check was okay, apply the function-builder transform.
+    break;
+
+  case FunctionBuilderClosurePreCheck::Error:
     return nullptr;
 
-  // Make sure we have a usable result type for the body.
-  Type returnType = AnyFunctionRef(FD).getBodyResultType();
-  if (!returnType || returnType->hasError())
-    return nullptr;
+  case FunctionBuilderClosurePreCheck::HasReturnStmt: {
+    // One or more explicit 'return' statements were encountered, which
+    // disables the function builder transform. Warn when we do this.
+    auto returnStmts = findReturnStatements(func);
+    assert(!returnStmts.empty());
 
-  auto loc = returnExpr->getStartLoc();
-  auto returnStmt = new (ctx) ReturnStmt(loc, returnExpr, /*implicit*/ true);
-  return BraceStmt::create(ctx, body->getLBraceLoc(), { returnStmt },
-                           body->getRBraceLoc());
+    ctx.Diags.diagnose(
+        returnStmts.front()->getReturnLoc(),
+        diag::function_builder_disabled_by_return, builderType);
+
+    // Note that one can remove the function builder attribute.
+    auto attr = func->getAttachedFunctionBuilder();
+    if (!attr) {
+      if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+        attr = accessor->getStorage()->getAttachedFunctionBuilder();
+      }
+    }
+    
+    if (attr) {
+      ctx.Diags.diagnose(
+          attr->getLocation(), diag::function_builder_remove_attr)
+        .fixItRemove(attr->getRangeWithAt());
+      attr->setInvalid();
+    }
+
+    // Note that one can remove all of the return statements.
+    {
+      auto diag = ctx.Diags.diagnose(
+          returnStmts.front()->getReturnLoc(),
+          diag::function_builder_remove_returns);
+      for (auto returnStmt : returnStmts) {
+        diag.fixItRemove(returnStmt->getReturnLoc());
+      }
+    }
+
+    return None;
+  }
+  }
+
+  ConstraintSystemOptions options = ConstraintSystemFlags::AllowFixes;
+  auto resultInterfaceTy = func->getResultInterfaceType();
+  auto resultContextType = func->mapTypeIntoContext(resultInterfaceTy);
+
+  // Determine whether we're inferring the underlying type for the opaque
+  // result type of this function.
+  ConstraintKind resultConstraintKind = ConstraintKind::Conversion;
+  if (auto opaque = resultContextType->getAs<OpaqueTypeArchetypeType>()) {
+    if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(func)) {
+      options |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
+      resultConstraintKind = ConstraintKind::OpaqueUnderlyingType;
+    }
+  }
+
+  // Build a constraint system in which we can check the body of the function.
+  ConstraintSystem cs(func, options);
+
+  // FIXME: check the result
+  cs.matchFunctionBuilder(func, builderType, resultContextType,
+                          resultConstraintKind,
+                          /*calleeLocator=*/nullptr,
+                          /*FIXME:*/ConstraintLocatorBuilder(nullptr));
+
+  // Solve the constraint system.
+  SmallVector<Solution, 4> solutions;
+  if (cs.solve(solutions) || solutions.size() != 1) {
+    // Try to fix the system or provide a decent diagnostic.
+    auto salvagedResult = cs.salvage();
+    switch (salvagedResult.getKind()) {
+    case SolutionResult::Kind::Success:
+      solutions.clear();
+      solutions.push_back(std::move(salvagedResult).takeSolution());
+      break;
+
+    case SolutionResult::Kind::Error:
+    case SolutionResult::Kind::Ambiguous:
+      return nullptr;
+
+    case SolutionResult::Kind::UndiagnosedError:
+      cs.diagnoseFailureFor(SolutionApplicationTarget(func));
+      salvagedResult.markAsDiagnosed();
+      return nullptr;
+
+    case SolutionResult::Kind::TooComplex:
+      func->diagnose(diag::expression_too_complex)
+        .highlight(func->getBodySourceRange());
+      salvagedResult.markAsDiagnosed();
+      return nullptr;
+    }
+
+    // The system was salvaged; continue on as if nothing happened.
+  }
+
+  // Apply the solution to the function body.
+  return cast_or_null<BraceStmt>(
+     cs.applySolutionToBody(solutions.front(), func));
 }
 
-ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
-    ClosureExpr *closure, Type builderType, ConstraintLocator *calleeLocator,
-    ConstraintLocatorBuilder locator) {
+ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
+    AnyFunctionRef fn, Type builderType, Type bodyResultType,
+    ConstraintKind bodyResultConstraintKind,
+    ConstraintLocator *calleeLocator, ConstraintLocatorBuilder locator) {
   auto builder = builderType->getAnyNominal();
   assert(builder && "Bad function builder type");
   assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
 
-  // FIXME: Right now, single-expression closures suppress the function
-  // builder translation.
-  if (closure->hasSingleExpressionBody())
-    return getTypeMatchSuccess();
-
-  // Pre-check the closure body: pre-check any expressions in it and look
+  // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
-  auto request = PreCheckFunctionBuilderRequest{closure};
+  auto request = PreCheckFunctionBuilderRequest{fn};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
                             FunctionBuilderClosurePreCheck::Error)) {
   case FunctionBuilderClosurePreCheck::Okay:
@@ -547,7 +640,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
     // Check whether we can apply this specific function builder.
     BuilderClosureVisitor visitor(getASTContext(), this,
                                   /*wantExpr=*/false, builderType);
-    (void)visitor.visit(closure->getBody());
+    (void)visitor.visit(fn.getBody());
 
     // If we saw a control-flow statement or declaration that the builder
     // cannot handle, we don't have a well-formed function builder application.
@@ -585,17 +678,18 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
 
   BuilderClosureVisitor visitor(getASTContext(), this,
                                 /*wantExpr=*/true, builderType);
-  Expr *singleExpr = visitor.visit(closure->getBody());
+  Expr *singleExpr = visitor.visit(fn.getBody());
 
   // We've already pre-checked all the original expressions, but do the
   // pre-check to the generated expression just to set up any preconditions
   // that CSGen might have.
   //
   // TODO: just build the AST the way we want it in the first place.
-  if (ConstraintSystem::preCheckExpression(singleExpr, closure))
+  auto dc = fn.getAsDeclContext();
+  if (ConstraintSystem::preCheckExpression(singleExpr, dc))
     return getTypeMatchFailure(locator);
 
-  singleExpr = generateConstraints(singleExpr, closure);
+  singleExpr = generateConstraints(singleExpr, dc);
   if (!singleExpr)
     return getTypeMatchFailure(locator);
 
@@ -604,21 +698,25 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
 
   // Record the transformation.
   assert(std::find_if(
-      builderTransformedClosures.begin(),
-      builderTransformedClosures.end(),
-      [&](const std::pair<ClosureExpr *, AppliedBuilderTransform> &elt) {
-        return elt.first == closure;
-      }) == builderTransformedClosures.end() &&
+      functionBuilderTransformed.begin(),
+      functionBuilderTransformed.end(),
+      [&](const std::pair<AnyFunctionRef, AppliedBuilderTransform> &elt) {
+        return elt.first == fn;
+      }) == functionBuilderTransformed.end() &&
          "already transformed this closure along this path!?!");
-  builderTransformedClosures.push_back(
-      std::make_pair(closure,
-                     AppliedBuilderTransform{builderType, singleExpr}));
+  functionBuilderTransformed.push_back(
+      std::make_pair(
+        fn,
+        AppliedBuilderTransform{builderType, singleExpr, bodyResultType}));
 
-  // Bind the result type of the closure to the type of the transformed
-  // expression.
-  Type closureType = getType(closure);
-  auto fnType = closureType->castTo<FunctionType>();
-  addConstraint(ConstraintKind::Equal, fnType->getResult(), transformedType,
+  // If builder is applied to the closure expression then
+  // `closure body` to `closure result` matching should
+  // use special locator.
+  if (auto *closure = fn.getAbstractClosureExpr())
+    locator = getConstraintLocator(closure, ConstraintLocator::ClosureResult);
+
+  // Bind the body result type to the type of the transformed expression.
+  addConstraint(bodyResultConstraintKind, transformedType, bodyResultType,
                 locator);
   return getTypeMatchSuccess();
 }
@@ -626,28 +724,33 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
 namespace {
 
 /// Pre-check all the expressions in the closure body.
-class PreCheckFunctionBuilderClosure : public ASTWalker {
-  ClosureExpr *Closure;
-  bool HasReturnStmt = false;
+class PreCheckFunctionBuilderApplication : public ASTWalker {
+  AnyFunctionRef Fn;
+  bool SkipPrecheck = false;
+  std::vector<ReturnStmt *> ReturnStmts;
   bool HasError = false;
+
+  bool hasReturnStmt() const { return !ReturnStmts.empty(); }
+
 public:
-  PreCheckFunctionBuilderClosure(ClosureExpr *closure)
-    : Closure(closure) {}
+  PreCheckFunctionBuilderApplication(AnyFunctionRef fn, bool skipPrecheck)
+    : Fn(fn), SkipPrecheck(skipPrecheck) {}
+
+  const std::vector<ReturnStmt *> getReturnStmts() const { return ReturnStmts; }
 
   FunctionBuilderClosurePreCheck run() {
-    Stmt *oldBody = Closure->getBody();
+    Stmt *oldBody = Fn.getBody();
 
     Stmt *newBody = oldBody->walk(*this);
 
     // If the walk was aborted, it was because we had a problem of some kind.
-    assert((newBody == nullptr) == (HasError || HasReturnStmt) &&
-           "unexpected short-circuit while walking closure body");
-    if (!newBody) {
-      if (HasError)
-        return FunctionBuilderClosurePreCheck::Error;
+    assert((newBody == nullptr) == HasError &&
+           "unexpected short-circuit while walking body");
+    if (HasError)
+      return FunctionBuilderClosurePreCheck::Error;
 
+    if (hasReturnStmt())
       return FunctionBuilderClosurePreCheck::HasReturnStmt;
-    }
 
     assert(oldBody == newBody && "pre-check walk wasn't in-place?");
 
@@ -658,7 +761,8 @@ public:
     // Pre-check the expression.  If this fails, abort the walk immediately.
     // Otherwise, replace the expression with the result of pre-checking.
     // In either case, don't recurse into the expression.
-    if (ConstraintSystem::preCheckExpression(E, /*DC*/ Closure)) {
+    if (!SkipPrecheck &&
+        ConstraintSystem::preCheckExpression(E, /*DC*/ Fn.getAsDeclContext())) {
       HasError = true;
       return std::make_pair(false, nullptr);
     }
@@ -667,10 +771,12 @@ public:
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-    // If we see a return statement, abort the walk immediately.
-    if (isa<ReturnStmt>(S)) {
-      HasReturnStmt = true;
-      return std::make_pair(false, nullptr);
+    // If we see a return statement, note it..
+    if (auto returnStmt = dyn_cast<ReturnStmt>(S)) {
+      if (!returnStmt->isImplicit()) {
+        ReturnStmts.push_back(returnStmt);
+        return std::make_pair(false, S);
+      }
     }
 
     // Otherwise, recurse into the statement normally.
@@ -682,10 +788,18 @@ public:
 
 llvm::Expected<FunctionBuilderClosurePreCheck>
 PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
-                                         ClosureExpr *closure) const {
+                                         AnyFunctionRef fn) const {
   // Single-expression closures should already have been pre-checked.
-  if (closure->hasSingleExpressionBody())
-    return FunctionBuilderClosurePreCheck::Okay;
+  if (auto closure = fn.getAbstractClosureExpr()) {
+    if (closure->hasSingleExpressionBody())
+      return FunctionBuilderClosurePreCheck::Okay;
+  }
 
-  return PreCheckFunctionBuilderClosure(closure).run();
+  return PreCheckFunctionBuilderApplication(fn, false).run();
+}
+
+std::vector<ReturnStmt *> findReturnStatements(AnyFunctionRef fn) {
+  PreCheckFunctionBuilderApplication precheck(fn, true);
+  (void)precheck.run();
+  return precheck.getReturnStmts();
 }

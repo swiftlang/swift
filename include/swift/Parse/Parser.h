@@ -120,7 +120,7 @@ public:
   DeclContext *CurDeclContext;
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
-  std::vector<std::pair<SourceLoc, std::vector<ParamDecl*>>> AnonClosureVars;
+  std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
 
   bool IsParsingInterfaceTokens = false;
   
@@ -1002,12 +1002,13 @@ public:
       Optional<DeclNameRefWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
 
-  /// Parse a differentiation parameters clause, i.e. the 'wrt:' clause in
-  /// `@differentiable` and `@derivative` attributes.
+  /// Parse a differentiability parameters clause, i.e. the 'wrt:' clause in
+  /// `@differentiable`, `@derivative`, and `@transpose` attributes.
+  ///
   /// If `allowNamedParameters` is false, allow only index parameters and
-  /// 'self'.
-  bool parseDifferentiationParametersClause(
-      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName,
+  /// 'self'. Used for `@transpose` attributes.
+  bool parseDifferentiabilityParametersClause(
+      SmallVectorImpl<ParsedAutoDiffParameter> &parameters, StringRef attrName,
       bool allowNamedParameters = true);
 
   /// Parse the @derivative attribute.
@@ -1602,7 +1603,8 @@ public:
   ParserResult<Stmt> parseStmtGuard();
   ParserResult<Stmt> parseStmtWhile(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtRepeat(LabeledStmtInfo LabelInfo);
-  ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo);
+  ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo,
+                                 bool shouldSkipDoTokenConsume = false);
   ParserResult<CatchStmt> parseStmtCatch();
   ParserResult<Stmt> parseStmtForEach(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);

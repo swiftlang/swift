@@ -7,6 +7,11 @@ if(POLICY CMP0068)
   cmake_policy(SET CMP0068 OLD)
 endif()
 
+# Honour CMAKE_CXX_STANDARD in try_compile(), needed for check_cxx_native_regex.
+if(POLICY CMP0067)
+  cmake_policy(SET CMP0067 NEW)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -924,14 +929,24 @@ else()
   find_package(LibXml2)
 endif()
 
-# You need libedit linked in order to check if you have el_wgets.
-cmake_push_check_state()
-list(APPEND CMAKE_REQUIRED_LIBRARIES "edit")
-check_symbol_exists(el_wgets "histedit.h" HAVE_EL_WGETS)
-if(HAVE_EL_WGETS)
-  set(HAVE_UNICODE_LIBEDIT 1)
+if(LLVM_ENABLE_LIBEDIT)
+  find_package(LibEdit REQUIRED)
+else()
+  find_package(LibEdit)
 endif()
-cmake_pop_check_state()
+
+if(LibEdit_FOUND)
+  cmake_push_check_state()
+  list(APPEND CMAKE_REQUIRED_INCLUDES ${LibEdit_INCLUDE_DIRS})
+  list(APPEND CMAKE_REQUIRED_LIBRARIES ${LibEdit_LIBRARIES})
+  check_symbol_exists(el_wgets "histedit.h" HAVE_EL_WGETS)
+  if(HAVE_EL_WGETS)
+    set(LibEdit_HAS_UNICODE YES)
+  else()
+    set(LibEdit_HAS_UNICODE NO)
+  endif()
+  cmake_pop_check_state()
+endif()
 
 check_symbol_exists(wait4 "sys/wait.h" HAVE_WAIT4)
 

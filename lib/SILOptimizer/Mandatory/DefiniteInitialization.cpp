@@ -477,10 +477,14 @@ namespace {
     void processUninitializedRelease(SILInstruction *Release,
                                      bool consumed,
                                      SILBasicBlock::iterator InsertPt);
-    void processUninitializedReleaseOfBox(AllocBoxInst *ABI,
+
+    /// Process a mark_uninitialized of an alloc_box that is uninitialized and
+    /// needs a dealloc_box.
+    void processUninitializedReleaseOfBox(MarkUninitializedInst *MUI,
                                           SILInstruction *Release,
                                           bool consumed,
                                           SILBasicBlock::iterator InsertPt);
+
     void deleteDeadRelease(unsigned ReleaseID);
 
     void processNonTrivialRelease(unsigned ReleaseID);
@@ -791,6 +795,7 @@ void LifetimeChecker::doIt() {
   // thereof) is not initialized on some path, the bad things happen.  Process
   // releases to adjust for this.
   if (!TheMemory.hasTrivialType()) {
+    // NOTE: This array may increase in size!
     for (unsigned i = 0, e = Destroys.size(); i != e; ++i)
       processNonTrivialRelease(i);
   }
@@ -1941,12 +1946,13 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
 }
 
 void LifetimeChecker::processUninitializedReleaseOfBox(
-    AllocBoxInst *ABI, SILInstruction *Release, bool consumed,
+    MarkUninitializedInst *MUI, SILInstruction *Release, bool consumed,
     SILBasicBlock::iterator InsertPt) {
-  assert(ABI == Release->getOperand(0));
+  assert(isa<AllocBoxInst>(MUI->getOperand()));
+  assert(MUI == Release->getOperand(0));
   SILBuilderWithScope B(Release);
   B.setInsertionPoint(InsertPt);
-  Destroys.push_back(B.createDeallocBox(Release->getLoc(), ABI));
+  Destroys.push_back(B.createDeallocBox(Release->getLoc(), MUI));
 }
 
 void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
@@ -1956,8 +1962,10 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
   // dealloc_partial_ref to free the memory.  If this is a derived class, we
   // may have to do a load of the 'self' box to get the class reference.
   if (!TheMemory.isClassInitSelf()) {
-    if (auto *ABI = dyn_cast<AllocBoxInst>(Release->getOperand(0))) {
-      return processUninitializedReleaseOfBox(ABI, Release, consumed, InsertPt);
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(Release->getOperand(0))) {
+      if (isa<AllocBoxInst>(MUI->getOperand())) {
+        return processUninitializedReleaseOfBox(MUI, Release, consumed, InsertPt);
+      }
     }
     return;
   }
@@ -1972,9 +1980,14 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
   // If we see an alloc_box as the pointer, then we're deallocating a 'box' for
   // self. Make sure that the box gets deallocated (not released) since the
   // pointer it contains will be manually cleaned up.
-  auto *ABI = dyn_cast<AllocBoxInst>(Release->getOperand(0));
-  if (ABI)
-    Pointer = getOrCreateProjectBox(ABI, 0);
+  auto *MUI = dyn_cast<MarkUninitializedInst>(Release->getOperand(0));
+
+  if (MUI && isa<AllocBoxInst>(MUI->getOperand())) {
+    Pointer = MUI->getSingleUserOfType<ProjectBoxInst>();
+    assert(Pointer);
+  } else {
+    MUI = nullptr;
+  }
 
   if (!consumed) {
     if (Pointer->getType().isAddress())
@@ -1999,8 +2012,8 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
   }
 
   // dealloc_box the self box if necessary.
-  if (ABI) {
-    auto DB = B.createDeallocBox(Loc, ABI);
+  if (MUI) {
+    auto DB = B.createDeallocBox(Loc, MUI);
     Destroys.push_back(DB);
   }
 }
@@ -2290,14 +2303,26 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       B.setInsertionPoint(TrueBB->begin());
       SILValue EltPtr;
       {
-        llvm::SmallVector<std::pair<SILValue, SILValue>, 4> EndBorrowList;
-        EltPtr = TheMemory.emitElementAddress(Elt, Loc, B, EndBorrowList);
+        using EndScopeKind = DIMemoryObjectInfo::EndScopeKind;
+        SmallVector<std::pair<SILValue, EndScopeKind>, 4> EndScopeList;
+        EltPtr =
+            TheMemory.emitElementAddressForDestroy(Elt, Loc, B, EndScopeList);
         if (auto *DA = B.emitDestroyAddrAndFold(Loc, EltPtr))
           Destroys.push_back(DA);
-        while (!EndBorrowList.empty()) {
-          SILValue Borrowed, Original;
-          std::tie(Borrowed, Original) = EndBorrowList.pop_back_val();
-          B.createEndBorrow(Loc, Borrowed, Original);
+        while (!EndScopeList.empty()) {
+          SILValue value;
+          EndScopeKind kind;
+          std::tie(value, kind) = EndScopeList.pop_back_val();
+
+          switch (kind) {
+          case EndScopeKind::Borrow:
+            B.createEndBorrow(Loc, value);
+            continue;
+          case EndScopeKind::Access:
+            B.createEndAccess(Loc, value, false /*can abort*/);
+            continue;
+          }
+          llvm_unreachable("Covered switch isn't covered!");
         }
       }
       B.setInsertionPoint(ContBB->begin());
@@ -2351,15 +2376,27 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
   // Utilities.
 
   auto destroyMemoryElement = [&](SILLocation Loc, unsigned Elt) {
-    llvm::SmallVector<std::pair<SILValue, SILValue>, 4> EndBorrowList;
+    using EndScopeKind = DIMemoryObjectInfo::EndScopeKind;
+    SmallVector<std::pair<SILValue, EndScopeKind>, 4> EndScopeList;
     SILValue EltPtr =
-        TheMemory.emitElementAddress(Elt, Loc, B, EndBorrowList);
+        TheMemory.emitElementAddressForDestroy(Elt, Loc, B, EndScopeList);
     if (auto *DA = B.emitDestroyAddrAndFold(Loc, EltPtr))
       Destroys.push_back(DA);
-    while (!EndBorrowList.empty()) {
-      SILValue Borrowed, Original;
-      std::tie(Borrowed, Original) = EndBorrowList.pop_back_val();
-      B.createEndBorrow(Loc, Borrowed, Original);
+
+    while (!EndScopeList.empty()) {
+      SILValue value;
+      EndScopeKind kind;
+      std::tie(value, kind) = EndScopeList.pop_back_val();
+
+      switch (kind) {
+      case EndScopeKind::Borrow:
+        B.createEndBorrow(Loc, value);
+        continue;
+      case EndScopeKind::Access:
+        B.createEndAccess(Loc, value, false /*can abort*/);
+        continue;
+      }
+      llvm_unreachable("Covered switch isn't covered!");
     }
   };
 

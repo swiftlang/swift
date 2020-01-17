@@ -189,7 +189,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   // concretely available; we really ought to be comparing the full paths
   // to this conformance from concrete sources.
 
-  auto signature = environment->getGenericSignature()->getCanonicalSignature();
+  auto signature = environment->getGenericSignature().getCanonicalSignature();
   auto archetypeDepType = archetype->getInterfaceType();
 
   auto astPath = signature->getConformanceAccessPath(archetypeDepType,
@@ -414,21 +414,22 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
   } else {
     SmallVector<llvm::Value *, 4> args;
     SmallVector<llvm::Type *, 4> types;
-    
+
     enumerateGenericSignatureRequirements(
-      opaqueDecl->getGenericSignature()->getCanonicalSignature(),
-      [&](GenericRequirement reqt) {
-        auto ty = reqt.TypeParameter.subst(archetype->getSubstitutions())
-          ->getCanonicalType(opaqueDecl->getGenericSignature());
-        if (reqt.Protocol) {
-          auto ref = ProtocolConformanceRef(reqt.Protocol)
-            .subst(reqt.TypeParameter, archetype->getSubstitutions());
-          args.push_back(emitWitnessTableRef(IGF, ty, ref));
-        } else {
-          args.push_back(IGF.emitAbstractTypeMetadataRef(ty));
-        }
-        types.push_back(args.back()->getType());
-      });
+        opaqueDecl->getGenericSignature().getCanonicalSignature(),
+        [&](GenericRequirement reqt) {
+          auto ty = reqt.TypeParameter.subst(archetype->getSubstitutions())
+                        ->getCanonicalType(opaqueDecl->getGenericSignature());
+          if (reqt.Protocol) {
+            auto ref =
+                ProtocolConformanceRef(reqt.Protocol)
+                    .subst(reqt.TypeParameter, archetype->getSubstitutions());
+            args.push_back(emitWitnessTableRef(IGF, ty, ref));
+          } else {
+            args.push_back(IGF.emitAbstractTypeMetadataRef(ty));
+          }
+          types.push_back(args.back()->getType());
+        });
     auto bufTy = llvm::StructType::get(IGF.IGM.LLVMContext, types);
     alloca = IGF.createAlloca(bufTy, IGF.IGM.getPointerAlignment());
     allocaSize = IGF.IGM.getPointerSize() * args.size();

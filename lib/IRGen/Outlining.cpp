@@ -127,7 +127,7 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
       });
     assert(env && "has archetype but no archetype?!");
     return {loweredType->mapTypeOutOfContext()->getCanonicalType(),
-            env->getGenericSignature()->getCanonicalSignature()};
+            env->getGenericSignature().getCanonicalSignature()};
   }
   return {loweredType, nullptr};
 }

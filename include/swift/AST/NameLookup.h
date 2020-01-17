@@ -495,7 +495,7 @@ void recordLookupOfTopLevelName(DeclContext *topLevelContext, DeclName name,
 void getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
     unsigned i,
-    llvm::SmallVectorImpl<std::pair<SourceLoc, NominalTypeDecl *>> &result,
+    llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
     bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -503,7 +503,7 @@ void getDirectlyInheritedNominalTypeDecls(
 /// and splitting out the components of compositions.
 ///
 /// If we come across the AnyObject type, set \c anyObject true.
-SmallVector<std::pair<SourceLoc, NominalTypeDecl *>, 4>
+SmallVector<Located<NominalTypeDecl *>, 4>
 getDirectlyInheritedNominalTypeDecls(
                       llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
                       bool &anyObject);

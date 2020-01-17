@@ -2206,10 +2206,6 @@ public:
             // outside by the allocating initializer and we pass in the to be
             // initialized value as a SILArgument.
             || isa<SILArgument>(Src)
-            // FIXME: Once the MarkUninitializedFixup pass is eliminated,
-            // mark_uninitialized should never be applied to a project_box. So
-            // at that point, this should be eliminated.
-            || isa<ProjectBoxInst>(Src)
             // FIXME: We only support pointer to address here to not break LLDB. It is
             // important that long term we get rid of this since this is a situation
             // where LLDB is breaking SILGen/DI invariants by not creating a new
@@ -5134,7 +5130,7 @@ void SILProperty::verify(const SILModule &M) const {
     hasIndices = subscript->getIndices()->size() != 0;
   }
 
-  auto canSig = sig ? sig->getCanonicalSignature() : nullptr;
+  auto canSig = sig.getCanonicalSignature();
 
   auto require = [&](bool reqt, StringRef message) {
       if (!reqt) {

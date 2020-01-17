@@ -1759,7 +1759,7 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
   if (!decl->getDeclContext()->isTypeContext())
     return type;
 
-  GenericSignature sigWithoutReqts = GenericSignature();
+  GenericSignature sigWithoutReqts;
   if (auto genericFn = type->getAs<GenericFunctionType>()) {
     // For generic functions, build a new generic function... but strip off
     // the requirements. They don't add value.
@@ -3394,14 +3394,6 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
     return ResolveWitnessResult::Missing;
   }
 
-  // If the protocol has a phantom nested type requirement, resolve it now.
-  auto &attrs = Proto->getAttrs();
-  if (auto *IARA =
-          attrs.getAttribute<ImplicitlySynthesizesNestedRequirementAttr>()) {
-    (void)TypeChecker::derivePhantomWitness(DC, derivingTypeDecl,
-                                            Proto, IARA->Value);
-  }
-
   // Attempt to derive the witness.
   auto derived =
       TypeChecker::deriveProtocolRequirement(DC, derivingTypeDecl, requirement);
@@ -4050,8 +4042,6 @@ static void diagnoseConformanceFailure(Type T,
   // conformance to RawRepresentable was inferred.
   if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
     if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
-        DerivedConformance::derivesProtocolConformance(DC, enumDecl,
-                                                       Proto) &&
         enumDecl->hasRawType() &&
         !enumDecl->getRawType()->is<ErrorType>()) {
 
@@ -4962,8 +4952,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     auto currentSig = dc->getGenericSignatureOfContext();
     auto existingSig = diag.ExistingDC->getGenericSignatureOfContext();
     auto differentlyConditional = currentSig && existingSig &&
-                                  currentSig->getCanonicalSignature() !=
-                                      existingSig->getCanonicalSignature();
+                                  currentSig.getCanonicalSignature() !=
+                                      existingSig.getCanonicalSignature();
 
     // If we've redundantly stated a conformance for which the original
     // conformance came from the module of the type or the module of the
@@ -5409,34 +5399,6 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
     return derived.deriveRawRepresentable(AssocType);
   case KnownProtocolKind::CaseIterable:
     return derived.deriveCaseIterable(AssocType);
-  default:
-    return nullptr;
-  }
-}
-
-
-TypeDecl *TypeChecker::derivePhantomWitness(DeclContext *DC,
-                                            NominalTypeDecl *nominal,
-                                            ProtocolDecl *proto,
-                                            const StringRef Name) {
-  assert(proto->getASTContext().Id_CodingKeys.is(Name) &&
-         "CodingKeys is the only supported phantom requirement");
-
-  if (nominal->addedPhantomCodingKeys())
-    return nullptr;
-  nominal->setAddedPhantomCodingKeys();
-
-  auto knownKind = proto->getKnownProtocolKind();
-  if (!knownKind)
-    return nullptr;
-
-  auto Decl = DC->getInnermostDeclarationDeclContext();
-
-  DerivedConformance derived(nominal->getASTContext(), Decl, nominal, proto);
-  switch (*knownKind) {
-  case KnownProtocolKind::Decodable:
-  case KnownProtocolKind::Encodable:
-    return derived.derivePhantomCodingKeysRequirement();
   default:
     return nullptr;
   }

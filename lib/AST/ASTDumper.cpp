@@ -589,7 +589,7 @@ namespace {
       OS << " '";
       interleave(ID->getFullAccessPath(),
                  [&](const ImportDecl::AccessPathElement &Elem) {
-                   OS << Elem.first;
+                   OS << Elem.Item;
                  },
                  [&] { OS << '.'; });
       OS << "')";
@@ -794,7 +794,7 @@ namespace {
       PrintWithColorRAII(OS, ASTNodeColor) << "source_file ";
       PrintWithColorRAII(OS, LocationColor) << '\"' << SF.getFilename() << '\"';
       
-      for (Decl *D : SF.Decls) {
+      for (Decl *D : SF.getTopLevelDecls()) {
         if (D->isImplicit())
           continue;
 
@@ -1593,12 +1593,6 @@ public:
   }
   void visitForEachStmt(ForEachStmt *S) {
     printCommon(S, "for_each_stmt");
-    PrintWithColorRAII(OS, LiteralValueColor) << " make_generator=";
-    S->getMakeIterator().dump(
-        PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    PrintWithColorRAII(OS, LiteralValueColor) << " next=";
-    S->getIteratorNext().dump(
-        PrintWithColorRAII(OS, LiteralValueColor).getOS());
     OS << '\n';
     printRec(S->getPattern());
     OS << '\n';

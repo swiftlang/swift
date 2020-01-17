@@ -171,13 +171,13 @@ Solution ConstraintSystem::finalize() {
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
 
-  for (const auto &transformed : builderTransformedClosures) {
+  for (const auto &transformed : functionBuilderTransformed) {
     auto known =
-        solution.builderTransformedClosures.find(transformed.first);
-    if (known != solution.builderTransformedClosures.end()) {
+        solution.functionBuilderTransformed.find(transformed.first);
+    if (known != solution.functionBuilderTransformed.end()) {
       assert(known->second.singleExpr == transformed.second.singleExpr);
     }
-    solution.builderTransformedClosures.insert(transformed);
+    solution.functionBuilderTransformed.insert(transformed);
   }
 
   return solution;
@@ -241,8 +241,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (auto &conformance : solution.Conformances)
     CheckedConformances.push_back(conformance);
 
-  for (const auto &transformed : solution.builderTransformedClosures) {
-    builderTransformedClosures.push_back(transformed);
+  for (const auto &transformed : solution.functionBuilderTransformed) {
+    functionBuilderTransformed.push_back(transformed);
   }
     
   // Register any fixes produced along this path.
@@ -333,6 +333,13 @@ void truncate(llvm::SmallSetVector<T, N> &vec, unsigned newSize) {
   assert(newSize <= vec.size() && "Not a truncation!");
   for (unsigned i = 0, n = vec.size() - newSize; i != n; ++i)
     vec.pop_back();
+}
+
+template <typename K, typename V>
+void truncate(llvm::MapVector<K, V> &map, unsigned newSize) {
+  assert(newSize <= map.size() && "Not a truncation!");
+  for (unsigned i = 0, n = map.size() - newSize; i != n; ++i)
+    map.pop_back();
 }
 
 } // end anonymous namespace
@@ -436,8 +443,9 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numCheckedConformances = cs.CheckedConformances.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
-  numBuilderTransformedClosures = cs.builderTransformedClosures.size();
+  numFunctionBuilderTransformed = cs.functionBuilderTransformed.size();
   numResolvedOverloads = cs.ResolvedOverloads.size();
+  numInferredClosureTypes = cs.ClosureTypes.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -450,8 +458,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   while (cs.TypeVariables.size() > numTypeVariables)
     cs.TypeVariables.pop_back();
 
-  while (cs.ResolvedOverloads.size() > numResolvedOverloads)
-    cs.ResolvedOverloads.pop_back();
+  truncate(cs.ResolvedOverloads, numResolvedOverloads);
 
   // Restore bindings.
   cs.restoreTypeVariableBindings(cs.solverState->savedBindings.size() -
@@ -503,7 +510,10 @@ ConstraintSystem::SolverScope::~SolverScope() {
   truncate(cs.CheckedConformances, numCheckedConformances);
 
   /// Remove any builder transformed closures.
-  truncate(cs.builderTransformedClosures, numBuilderTransformedClosures);
+  truncate(cs.functionBuilderTransformed, numFunctionBuilderTransformed);
+
+  // Remove any inferred closure types (e.g. used in function builder body).
+  truncate(cs.ClosureTypes, numInferredClosureTypes);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -1127,7 +1137,7 @@ bool ConstraintSystem::solve(Expr *&expr,
       return true;
 
     case SolutionResult::Kind::UndiagnosedError:
-      diagnoseFailureForExpr(expr);
+      diagnoseFailureFor(expr);
       salvagedResult.markAsDiagnosed();
       return true;
 
@@ -1670,6 +1680,7 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
 
       case ConstraintKind::BindToPointerType:
       case ConstraintKind::ValueMember:
+      case ConstraintKind::ValueWitness:
       case ConstraintKind::UnresolvedValueMember:
       case ConstraintKind::Disjunction:
       case ConstraintKind::CheckedCast:
@@ -1683,6 +1694,7 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       case ConstraintKind::ConformsTo:
       case ConstraintKind::Defaultable:
       case ConstraintKind::OneWayEqual:
+      case ConstraintKind::DefaultClosureType:
         break;
       }
     }

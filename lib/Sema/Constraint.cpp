@@ -77,9 +77,11 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
+  case ConstraintKind::ValueWitness:
     llvm_unreachable("Wrong constructor for member constraint");
 
   case ConstraintKind::Defaultable:
+  case ConstraintKind::DefaultClosureType:
     assert(!First.isNull());
     assert(!Second.isNull());
     break;
@@ -127,6 +129,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::ValueMember:
+  case ConstraintKind::ValueWitness:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
   case ConstraintKind::BindOverload:
@@ -135,6 +138,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Wrong constructor");
 
   case ConstraintKind::KeyPath:
@@ -156,13 +160,35 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
                        ArrayRef<TypeVariableType *> typeVars)
     : Kind(kind), HasRestriction(false), IsActive(false), IsDisabled(false),
       RememberChoice(false), IsFavored(false),
-      NumTypeVariables(typeVars.size()), Member{first, second, member, useDC},
+      NumTypeVariables(typeVars.size()), Member{first, second, {member}, useDC},
       Locator(locator) {
   assert(kind == ConstraintKind::ValueMember ||
          kind == ConstraintKind::UnresolvedValueMember);
   TheFunctionRefKind = static_cast<unsigned>(functionRefKind);
   assert(getFunctionRefKind() == functionRefKind);
   assert(member && "Member constraint has no member");
+  assert(useDC && "Member constraint has no use DC");
+
+  std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
+}
+
+Constraint::Constraint(ConstraintKind kind, Type first, Type second,
+                       ValueDecl *requirement, DeclContext *useDC,
+                       FunctionRefKind functionRefKind,
+                       ConstraintLocator *locator,
+                       ArrayRef<TypeVariableType *> typeVars)
+    : Kind(kind), HasRestriction(false), IsActive(false), IsDisabled(false),
+      RememberChoice(false), IsFavored(false),
+      NumTypeVariables(typeVars.size()), Locator(locator) {
+  Member.First = first;
+  Member.Second = second;
+  Member.Member.Ref = requirement;
+  Member.UseDC = useDC;
+  TheFunctionRefKind = static_cast<unsigned>(functionRefKind);
+
+  assert(kind == ConstraintKind::ValueWitness);
+  assert(getFunctionRefKind() == functionRefKind);
+  assert(requirement && "Value witness constraint has no requirement");
   assert(useDC && "Member constraint has no use DC");
 
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
@@ -239,6 +265,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
 
   case ConstraintKind::BindOverload:
@@ -250,6 +277,11 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
     return createMember(cs, getKind(), getFirstType(), getSecondType(),
                         getMember(), getMemberUseDC(), getFunctionRefKind(),
                         getLocator());
+
+  case ConstraintKind::ValueWitness:
+    return createValueWitness(
+        cs, getKind(), getFirstType(), getSecondType(), getRequirement(),
+        getMemberUseDC(), getFunctionRefKind(), getLocator());
 
   case ConstraintKind::Disjunction:
     return createDisjunction(cs, getNestedConstraints(), getLocator());
@@ -316,6 +348,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
   case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
   case ConstraintKind::OneWayEqual: Out << " one-way bind to "; break;
+  case ConstraintKind::DefaultClosureType:
+    Out << " closure can default to ";
+    break;
   case ConstraintKind::KeyPath:
       Out << " key path from ";
       Out << getSecondType()->getString(PO);
@@ -386,11 +421,20 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   }
 
   case ConstraintKind::ValueMember:
-    Out << "[." << Member.Member << ": value] == ";
+    Out << "[." << getMember() << ": value] == ";
     break;
   case ConstraintKind::UnresolvedValueMember:
-    Out << "[(implicit) ." << Member.Member << ": value] == ";
+    Out << "[(implicit) ." << getMember() << ": value] == ";
     break;
+
+  case ConstraintKind::ValueWitness: {
+    auto requirement = getRequirement();
+    auto selfNominal = requirement->getDeclContext()->getSelfNominalTypeDecl();
+    Out << "[." << selfNominal->getName() << "::" << requirement->getFullName()
+        << ": witness] == ";
+    break;
+  }
+
   case ConstraintKind::Defaultable:
     Out << " can default to ";
     break;
@@ -510,6 +554,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::Subtype:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
+  case ConstraintKind::ValueWitness:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
@@ -522,6 +567,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     constraint->getFirstType()->getTypeVariables(typeVars);
     constraint->getSecondType()->getTypeVariables(typeVars);
     break;
@@ -562,13 +608,16 @@ bool Constraint::isExplicitConversion() const {
 
 Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind, 
                                Type first, Type second,
-                               ConstraintLocator *locator) {
+                               ConstraintLocator *locator,
+                               ArrayRef<TypeVariableType *> extraTypeVars) {
   // Collect type variables.
   SmallVector<TypeVariableType *, 4> typeVars;
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second && second->hasTypeVariable())
     second->getTypeVariables(typeVars);
+
+  typeVars.append(extraTypeVars.begin(), extraTypeVars.end());
   uniqueTypeVariables(typeVars);
 
   // Conformance constraints expect an existential on the right-hand side.
@@ -645,6 +694,27 @@ Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind,
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, first, second, member, useDC,
+                              functionRefKind, locator, typeVars);
+}
+
+Constraint *Constraint::createValueWitness(
+    ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
+    ValueDecl *requirement, DeclContext *useDC,
+    FunctionRefKind functionRefKind, ConstraintLocator *locator) {
+  assert(kind == ConstraintKind::ValueWitness);
+
+  // Collect type variables.
+  SmallVector<TypeVariableType *, 4> typeVars;
+  if (first->hasTypeVariable())
+    first->getTypeVariables(typeVars);
+  if (second->hasTypeVariable())
+    second->getTypeVariables(typeVars);
+  uniqueTypeVariables(typeVars);
+
+  // Create the constraint.
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
+  return new (mem) Constraint(kind, first, second, requirement, useDC,
                               functionRefKind, locator, typeVars);
 }
 

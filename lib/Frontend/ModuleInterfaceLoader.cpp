@@ -340,7 +340,7 @@ struct ModuleRebuildInfo {
 /// normal cache, the prebuilt cache, a module adjacent to the interface, or
 /// a module that we'll build from a module interface.
 class ModuleInterfaceLoaderImpl {
-  using AccessPathElem = std::pair<Identifier, SourceLoc>;
+  using AccessPathElem = Located<Identifier>;
   friend class swift::ModuleInterfaceLoader;
   ASTContext &ctx;
   llvm::vfs::FileSystem &fs;
@@ -950,13 +950,11 @@ class ModuleInterfaceLoaderImpl {
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
 
     // We didn't discover a module corresponding to this interface.
-
     // Diagnose that we didn't find a loadable module, if we were asked to.
-    if (remarkOnRebuildFromInterface) {
+    auto remarkRebuild = [&]() {
       rebuildInfo.diagnose(ctx, diagnosticLoc, moduleName,
                            interfacePath);
-    }
-
+    };
     // If we found an out-of-date .swiftmodule, we still want to add it as
     // a dependency of the .swiftinterface. That way if it's updated, but
     // the .swiftinterface remains the same, we invalidate the cache and
@@ -966,7 +964,9 @@ class ModuleInterfaceLoaderImpl {
       builder.addExtraDependency(modulePath);
 
     if (builder.buildSwiftModule(cachedOutputPath, /*shouldSerializeDeps*/true,
-                                 &moduleBuffer))
+                                 &moduleBuffer,
+                                 remarkOnRebuildFromInterface ? remarkRebuild:
+                                   llvm::function_ref<void()>()))
       return std::make_error_code(std::errc::invalid_argument);
 
     assert(moduleBuffer &&
@@ -1020,10 +1020,10 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   }
 
   // Create an instance of the Impl to do the heavy lifting.
-  auto ModuleName = ModuleID.first.str();
+  auto ModuleName = ModuleID.Item.str();
   ModuleInterfaceLoaderImpl Impl(
                 Ctx, ModPath, InPath, ModuleName,
-                CacheDir, PrebuiltCacheDir, ModuleID.second,
+                CacheDir, PrebuiltCacheDir, ModuleID.Loc,
                 RemarkOnRebuildFromInterface, dependencyTracker,
                 llvm::is_contained(PreferInterfaceForModules,
                                    ModuleName) ?

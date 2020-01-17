@@ -263,7 +263,7 @@ static void bindExtensions(SourceFile &SF) {
       if (!SF)
         continue;
 
-      for (auto D : SF->Decls) {
+      for (auto D : SF->getTopLevelDecls()) {
         if (auto ED = dyn_cast<ExtensionDecl>(D))
           if (!tryBindExtension(ED))
             worklist.push_back(ED);
@@ -378,7 +378,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
     ::bindExtensions(*SF);
 
     // Type check the top-level elements of the source file.
-    for (auto D : llvm::makeArrayRef(SF->Decls).slice(StartElem)) {
+    for (auto D : SF->getTopLevelDecls().slice(StartElem)) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         // Immediately perform global name-binding etc.
         TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
@@ -465,7 +465,7 @@ void swift::checkInconsistentImplementationOnlyImports(ModuleDecl *MainModule) {
     if (!SF)
       continue;
 
-    for (auto *topLevelDecl : SF->Decls) {
+    for (auto *topLevelDecl : SF->getTopLevelDecls()) {
       auto *nextImport = dyn_cast<ImportDecl>(topLevelDecl);
       if (!nextImport)
         continue;
@@ -575,6 +575,8 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
   auto &Ctx = PBD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
   (void)createTypeChecker(Ctx);
+  (void)evaluateOrDefault(
+      Ctx.evaluator, PatternBindingEntryRequest{PBD, bindingIndex}, nullptr);
   TypeChecker::typeCheckPatternBinding(PBD, bindingIndex);
 }
 

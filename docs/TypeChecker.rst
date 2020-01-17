@@ -370,12 +370,12 @@ guesswork. However, we note that the type of an enum member actually
 has a regular structure. For example, consider the ``Optional`` type::
 
   enum Optional<T> {
-    case None
-    case Some(T)
+    case none
+    case some(T)
   }
 
-The type of ``Optional<T>.None`` is ``Optional<T>``, while the type of
-``Optional<T>.Some`` is ``(T) -> Optional<T>``. In fact, the
+The type of ``Optional<T>.none`` is ``Optional<T>``, while the type of
+``Optional<T>.some`` is ``(T) -> Optional<T>``. In fact, the
 type of an enum element can have one of two forms: it can be ``T0``,
 for an enum element that has no extra data, or it can be ``T2 -> T0``,
 where ``T2`` is the data associated with the enum element.  For the
@@ -985,9 +985,6 @@ The things in the queue yet to be ported are:
   Most of the associated diagnostics have been ported and fixes are
   located in ``ConstraintSystem::simplifyMemberConstraint``.
 
-- Diagnostics related to ``if`` statement - "conditional" type mismatch
-  and, in case of ternary operator, type mismatches between branches.
-
 - Problems related to calls and operator applications e.g.
 
   - Missing explicit ``Self.`` and ``self.``
@@ -995,4 +992,3 @@ The things in the queue yet to be ported are:
   - ``diagnoseParameterErrors``
   - ``diagnoseSimpleErrors``
 
-- Diagnostics related to array/dictionary literals: ``visit{Array, Dictionary}Expr``.

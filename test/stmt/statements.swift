@@ -235,9 +235,26 @@ func DoStmt() {
   }
 }
 
-func DoWhileStmt() {
-  do { // expected-error {{'do-while' statement is not allowed; use 'repeat-while' instead}} {{3-5=repeat}}
+
+func DoWhileStmt1() {
+  do { // expected-error {{'do-while' statement is not allowed}}
+  // expected-note@-1 {{did you mean 'repeat-while' statement?}} {{3-5=repeat}}
+  // expected-note@-2 {{did you mean separate 'do' and 'while' statements?}} {{5-5=\n}}
   } while true
+}
+
+func DoWhileStmt2() {
+  do {
+
+  }
+  while true {
+
+  }
+}
+
+func LabeledDoStmt() {
+  LABEL: { // expected-error {{labeled block needs 'do'}} {{10-10=do }}
+  }
 }
 
 //===--- Repeat-while statement.

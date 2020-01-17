@@ -87,6 +87,7 @@ Solution::computeSubstitutions(GenericSignature sig,
       return ProtocolConformanceRef(protoType);
     }
 
+    // FIXME: Retrieve the conformance from the solution itself.
     return TypeChecker::conformsToProtocol(replacement, protoType,
                                            getConstraintSystem().DC,
                                            ConformanceCheckFlags::InExpression);
@@ -149,6 +150,18 @@ static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
     return false;
 
   return true;
+}
+
+ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
+                                              bool lookThroughApply) const {
+  auto &cs = getConstraintSystem();
+  return cs.getCalleeLocator(
+      locator, lookThroughApply,
+      [&](const Expr *expr) -> Type { return getType(expr); },
+      [&](Type type) -> Type { return simplifyType(type)->getRValueType(); },
+      [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
+        return getOverloadChoiceIfAvailable(locator);
+      });
 }
 
 /// Return the implicit access kind for a MemberRefExpr with the
@@ -7040,9 +7053,8 @@ namespace {
         // If this closure had a function builder applied, rewrite it to a
         // closure with a single expression body containing the builder
         // invocations.
-        auto builder =
-            Rewriter.solution.builderTransformedClosures.find(closure);
-        if (builder != Rewriter.solution.builderTransformedClosures.end()) {
+        auto builder = Rewriter.solution.functionBuilderTransformed.find(closure);
+        if (builder != Rewriter.solution.functionBuilderTransformed.end()) {
           auto singleExpr = builder->second.singleExpr;
           auto returnStmt = new (ctx) ReturnStmt(
              singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
@@ -7205,10 +7217,9 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
-Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
-                                      Type convertType,
-                                      bool discardedExpr,
-                                      bool performingDiagnostics) {
+llvm::PointerUnion<Expr *, Stmt *> ConstraintSystem::applySolutionImpl(
+    Solution &solution, SolutionApplicationTarget target, Type convertType,
+    bool discardedExpr, bool performingDiagnostics) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
@@ -7227,7 +7238,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
       // If we didn't manage to diagnose anything well, so fall back to
       // diagnosing mining the system to construct a reasonable error message.
-      diagnoseFailureForExpr(expr);
+      diagnoseFailureFor(target);
       return nullptr;
     }
   }
@@ -7235,10 +7246,39 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   ExprRewriter rewriter(*this, solution, shouldSuppressDiagnostics());
   ExprWalker walker(rewriter);
 
-  // Apply the solution to the expression.
-  auto result = expr->walk(walker);
-  if (!result)
-    return nullptr;
+  // Apply the solution to the target.
+  llvm::PointerUnion<Expr *, Stmt *> result;
+  if (auto expr = target.getAsExpr()) {
+    result = expr->walk(walker);
+  } else {
+    auto fn = *target.getAsFunction();
+
+    // Dig out the function builder transformation we applied.
+    auto transformed = solution.functionBuilderTransformed.find(fn);
+    assert(transformed != solution.functionBuilderTransformed.end());
+
+    auto singleExpr = transformed->second.singleExpr;
+    singleExpr = singleExpr->walk(walker);
+    if (!singleExpr)
+      return result;
+
+    singleExpr = rewriter.coerceToType(singleExpr,
+                                       transformed->second.bodyResultType,
+                                       getConstraintLocator(singleExpr));
+    if (!singleExpr)
+      return result;
+
+    ASTContext &ctx = getASTContext();
+    auto returnStmt = new (ctx) ReturnStmt(
+       singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
+    auto braceStmt = BraceStmt::create(
+        ctx, returnStmt->getStartLoc(), ASTNode(returnStmt),
+        returnStmt->getEndLoc(), /*implicit=*/false);
+    result = braceStmt;
+  }
+
+  if (result.isNull())
+    return result;
 
   // If we're re-typechecking an expression for diagnostics, don't
   // visit closures that have non-single expression bodies.
@@ -7260,28 +7300,36 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
       return nullptr;
   }
 
-  // We are supposed to use contextual type only if it is present and
-  // this expression doesn't represent the implicit return of the single
-  // expression function which got deduced to be `Never`.
-  auto shouldCoerceToContextualType = [&]() {
-    return convertType && !(getType(result)->isUninhabited() &&
-                            getContextualTypePurpose() == CTP_ReturnSingleExpr);
-  };
+  if (auto resultExpr = result.dyn_cast<Expr *>()) {
+    Expr *expr = target.getAsExpr();
+    assert(expr && "Can't have expression result without expression target");
+    // We are supposed to use contextual type only if it is present and
+    // this expression doesn't represent the implicit return of the single
+    // expression function which got deduced to be `Never`.
+    auto shouldCoerceToContextualType = [&]() {
+      return convertType &&
+          !(getType(resultExpr)->isUninhabited() &&
+            getContextualTypePurpose() == CTP_ReturnSingleExpr);
+    };
 
-  // If we're supposed to convert the expression to some particular type,
-  // do so now.
-  if (shouldCoerceToContextualType()) {
-    result = rewriter.coerceToType(result, convertType,
-                                   getConstraintLocator(expr));
-    if (!result)
-      return nullptr;
-  } else if (getType(result)->hasLValueType() && !discardedExpr) {
-    // We referenced an lvalue. Load it.
-    result = rewriter.coerceToType(result, getType(result)->getRValueType(),
-                                   getConstraintLocator(expr));
+    // If we're supposed to convert the expression to some particular type,
+    // do so now.
+    if (shouldCoerceToContextualType()) {
+      result = rewriter.coerceToType(resultExpr, convertType,
+                                     getConstraintLocator(expr));
+      if (!result)
+        return nullptr;
+    } else if (getType(resultExpr)->hasLValueType() && !discardedExpr) {
+      // We referenced an lvalue. Load it.
+      result = rewriter.coerceToType(resultExpr,
+                                     getType(resultExpr)->getRValueType(),
+                                     getConstraintLocator(expr));
+    }
+
+    if (resultExpr)
+      solution.setExprTypes(resultExpr);
   }
 
-  solution.setExprTypes(result);
   rewriter.finalize();
 
   return result;
@@ -7345,6 +7393,52 @@ public:
 };
 }
 
+ProtocolConformanceRef Solution::resolveConformance(
+    ConstraintLocator *locator, ProtocolDecl *proto) {
+  for (const auto &conformance : Conformances) {
+    if (conformance.first != locator)
+      continue;
+    if (conformance.second.getRequirement() != proto)
+      continue;
+
+    // If the conformance doesn't require substitution, return it immediately.
+    auto conformanceRef = conformance.second;
+    if (conformanceRef.isAbstract())
+      return conformanceRef;
+
+    auto concrete = conformanceRef.getConcrete();
+    auto conformingType = concrete->getType();
+    if (!conformingType->hasTypeVariable())
+      return conformanceRef;
+
+    // Substitute into the conformance type, then look for a conformance
+    // again.
+    // FIXME: Should be able to perform the substitution using the Solution
+    // itself rather than another conforms-to-protocol check.
+    Type substConformingType = simplifyType(conformingType);
+    return TypeChecker::conformsToProtocol(
+        substConformingType, proto, constraintSystem->DC,
+        ConformanceCheckFlags::InExpression);
+  }
+
+  return ProtocolConformanceRef::forInvalid();
+}
+
+Type Solution::getType(const Expr *expr) const {
+  auto result = llvm::find_if(
+      addedNodeTypes, [&](const std::pair<TypedNode, Type> &node) -> bool {
+        if (auto *e = node.first.dyn_cast<const Expr *>())
+          return expr == e;
+        return false;
+      });
+
+  if (result != addedNodeTypes.end())
+    return result->second;
+
+  auto &cs = getConstraintSystem();
+  return cs.getType(expr);
+}
+
 void Solution::setExprTypes(Expr *expr) const {
   if (!expr)
     return;
@@ -7398,4 +7492,15 @@ Solution &&SolutionResult::takeSolution() && {
 ArrayRef<Solution> SolutionResult::getAmbiguousSolutions() const {
   assert(getKind() == Ambiguous);
   return makeArrayRef(solutions, numSolutions);
+}
+
+llvm::PointerUnion<Expr *, Stmt *> SolutionApplicationTarget::walk(
+    ASTWalker &walker) {
+  switch (kind) {
+  case Kind::expression:
+    return getAsExpr()->walk(walker);
+
+  case Kind::function:
+    return getAsFunction()->getBody()->walk(walker);
+  }
 }

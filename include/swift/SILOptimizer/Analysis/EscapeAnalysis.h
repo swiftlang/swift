@@ -672,10 +672,10 @@ public:
     /// isInterior is always false for non-content nodes and is set for content
     /// nodes based on the type and origin of the pointer.
     CGNode *allocNode(ValueBase *V, NodeType Type, bool isInterior,
-                      bool isReference) {
+                      bool hasReferenceOnly) {
       assert((Type == NodeType::Content) || !isInterior);
       CGNode *Node = new (NodeAllocator.Allocate())
-          CGNode(V, Type, isInterior, isReference);
+          CGNode(V, Type, isInterior, hasReferenceOnly);
       Nodes.push_back(Node);
       return Node;
     }
@@ -870,10 +870,6 @@ public:
     /// Return true if the visitor did not halt traversal.
     template <typename CGNodeVisitor>
     bool forwardTraverseDefer(CGNode *startNode, CGNodeVisitor &&visitor);
-
-    /// Return true if \p pointer may indirectly point to \pointee via pointers
-    /// and object references.
-    bool mayReach(CGNode *pointer, CGNode *pointee);
 
   public:
     /// Gets or creates a node for a value \p V.
@@ -1164,16 +1160,16 @@ public:
   /// Note that if \p RI is a retain-instruction always false is returned.
   bool canEscapeTo(SILValue V, RefCountingInst *RI);
 
-  /// Returns true if the value \p V can escape to any other pointer \p To.
-  /// This means that either \p To is the same as \p V or contains a reference
-  /// to \p V.
-  bool canEscapeToValue(SILValue V, SILValue To);
+  /// Return true if \p releasedReference deinitialization may release memory
+  /// pointed to by \p accessedAddress.
+  bool mayReleaseContent(SILValue releasedReference, SILValue accessedAddress);
 
   /// Returns true if the pointers \p V1 and \p V2 can possibly point to the
   /// same memory.
   ///
-  /// If at least one of the pointers refers to a local object and the
-  /// connection-graph-nodes of both pointers do not point to the same content
+  /// First checks that the pointers are known not to alias outside this
+  /// function, then checks the connection graph to determine that their content
+  /// is not in the same points-to chain based on access inside this function.
   bool canPointToSameMemory(SILValue V1, SILValue V2);
 
   /// Invalidate all information in this analysis.

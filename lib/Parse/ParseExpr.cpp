@@ -2812,7 +2812,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
     // FIXME: We could do this all the time, and then provide Fix-Its
     // to map $i -> the appropriately-named argument. This might help
     // users who are refactoring code by adding names.
-    AnonClosureVars.push_back({ leftBrace, {}});
+    AnonClosureVars.push_back({{}, leftBrace});
   }
   
   // Add capture list variables to scope.
@@ -2836,7 +2836,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // anonymous closure arguments.
   if (!params) {
     // Create a parameter pattern containing the anonymous variables.
-    auto &anonVars = AnonClosureVars.back().second;
+    auto &anonVars = AnonClosureVars.back().Item;
     SmallVector<ParamDecl*, 4> elements;
     for (auto anonVar : anonVars)
       elements.push_back(anonVar);
@@ -2949,8 +2949,8 @@ Expr *Parser::parseExprAnonClosureArg() {
     }
   }
 
-  auto leftBraceLoc = AnonClosureVars.back().first;
-  auto &decls = AnonClosureVars.back().second;
+  auto leftBraceLoc = AnonClosureVars.back().Loc;
+  auto &decls = AnonClosureVars.back().Item;
   while (ArgNo >= decls.size()) {
     unsigned nextIdx = decls.size();
     SmallVector<char, 4> StrBuf;
@@ -3513,6 +3513,11 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
 
   // Parse the ':'.
   if (!consumeIf(tok::colon)) {
+    if (Element.hasCodeCompletion()) {
+      // Return the completion expression itself so we can analyze the type
+      // later.
+      return Element;
+    }
     diagnose(Tok, diag::expected_colon_in_dictionary_literal);
     return ParserStatus(Element) | makeParserError();
   }
@@ -3520,8 +3525,14 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
   // Parse the value.
   auto Value = parseExpr(diag::expected_value_in_dictionary_literal);
 
-  if (Value.isNull())
-    Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+  if (Value.isNull()) {
+    if (!Element.hasCodeCompletion()) {
+      Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+    } else {
+      Value = makeParserResult(Value,
+                               new (Context) CodeCompletionExpr(PreviousLoc));
+    }
+  }
 
   // Make a tuple of Key Value pair.
   return makeParserResult(

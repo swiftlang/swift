@@ -182,7 +182,7 @@ void Parser::performCodeCompletionSecondPassImpl(
                 } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
                   ED->addMember(D);
                 } else if (auto *SF = dyn_cast<SourceFile>(DC)) {
-                  SF->Decls.push_back(D);
+                  SF->addTopLevelDecl(D);
                 } else {
                   llvm_unreachable("invalid decl context kind");
                 }
@@ -1054,7 +1054,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   while (true) {
     while (Tok.is(tok::comma)) {
       diagnose(Tok, diag::unexpected_separator, ",")
-        .fixItRemove(SourceRange(Tok.getLoc()));
+        .fixItRemove(Tok.getLoc());
       consumeToken();
     }
     SourceLoc StartLoc = Tok.getLoc();
@@ -1084,7 +1084,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
         continue;
       if (!AllowSepAfterLast) {
         diagnose(Tok, diag::unexpected_separator, ",")
-          .fixItRemove(SourceRange(PreviousLoc));
+          .fixItRemove(PreviousLoc);
       }
       break;
     }

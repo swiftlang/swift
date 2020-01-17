@@ -192,6 +192,8 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_enable_library_evolution);
+  inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability);
+  inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
   inputArgs.AddLastArg(arguments, options::OPT_enable_cxx_interop);
@@ -230,6 +232,8 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_fine_grained_dependencies);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_disable_fine_grained_dependencies);
   inputArgs.AddLastArg(arguments,
                        options::OPT_fine_grained_dependency_include_intrafile);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
@@ -641,6 +645,12 @@ void ToolChain::JobContext::addFrontendCommandLineInputArguments(
     if ((!isPrimary || usePrimaryFileList) && !useFileList)
       arguments.push_back(inputName);
   }
+  if (C.getEnableFineGrainedDependencies())
+    arguments.push_back("-enable-fine-grained-dependencies");
+
+  if (Args.hasArg(
+          options::OPT_emit_fine_grained_dependency_sourcefile_dot_files))
+    arguments.push_back("-emit-fine-grained-dependency-sourcefile-dot-files");
 }
 
 void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(

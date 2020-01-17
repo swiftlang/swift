@@ -1,6 +1,6 @@
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -11,7 +11,7 @@ import os.path
 import platform
 
 from ..utils import TestCase
-from ...argparse import ArgumentTypeError, types
+from ...build_swift.argparse import ArgumentTypeError, types
 
 
 # -----------------------------------------------------------------------------
@@ -26,28 +26,25 @@ class TestCompilerVersion(TestCase):
         version = types.CompilerVersion([1, 0, 0])
         self.assertEqual(version.components, (1, 0, 0))
 
-        with self.assertNotRaises(ValueError):
-            types.CompilerVersion([1, 0])
-            types.CompilerVersion([2, 3, 4])
-            types.CompilerVersion([3, 1, 4, 1, 5, 9])
+        types.CompilerVersion([1, 0])
+        types.CompilerVersion([2, 3, 4])
+        types.CompilerVersion([3, 1, 4, 1, 5, 9])
 
     def test_init_tuple(self):
         version = types.CompilerVersion((1, 0, 0))
         self.assertEqual(version.components, (1, 0, 0))
 
-        with self.assertNotRaises(ValueError):
-            types.CompilerVersion((1, 0))
-            types.CompilerVersion((2, 3, 4))
-            types.CompilerVersion((3, 1, 4, 1, 5, 9))
+        types.CompilerVersion((1, 0))
+        types.CompilerVersion((2, 3, 4))
+        types.CompilerVersion((3, 1, 4, 1, 5, 9))
 
     def test_init_str(self):
         version = types.CompilerVersion('1.0.0')
         self.assertEqual(version.components, (1, 0, 0))
 
-        with self.assertNotRaises(ValueError):
-            types.CompilerVersion('1.0')
-            types.CompilerVersion('2.3.4')
-            types.CompilerVersion('3.1.4.1.5.9')
+        types.CompilerVersion('1.0')
+        types.CompilerVersion('2.3.4')
+        types.CompilerVersion('3.1.4.1.5.9')
 
     def test_init_invalid_value(self):
         with self.assertRaises(ValueError):
@@ -153,9 +150,7 @@ class TestPathType(TestCase):
 
     def test_assert_exists(self):
         path_type = types.PathType(assert_exists=True)
-
-        with self.assertNotRaises(ArgumentTypeError):
-            path_type(__file__)
+        path_type(__file__)
 
         with self.assertRaises(ArgumentTypeError):
             path_type('/nonsensisal/path/')
@@ -171,8 +166,7 @@ class TestPathType(TestCase):
 
         bash_path = '/bin/bash'
         if os.path.isfile(bash_path) and os.access(bash_path, os.X_OK):
-            with self.assertNotRaises(ArgumentTypeError):
-                path_type(bash_path)
+            path_type(bash_path)
 
         with self.assertRaises(ArgumentTypeError):
             path_type(__file__)
@@ -189,10 +183,9 @@ class TestRegexType(TestCase):
     def test_regex_match(self):
         regex_type = types.RegexType(r'a+b*')
 
-        with self.assertNotRaises(ArgumentTypeError):
-            regex_type('a')
-            regex_type('aab')
-            regex_type('abbbbbbb')
+        regex_type('a')
+        regex_type('aab')
+        regex_type('abbbbbbb')
 
     def test_raises_argument_error(self):
         regex_type = types.RegexType(r'a+b*')
@@ -216,11 +209,10 @@ class TestClangVersionType(TestCase):
         self.assertIsInstance(version, types.CompilerVersion)
         self.assertEqual(version.components, (1, 0, 0, 1))
 
-        with self.assertNotRaises(ArgumentTypeError):
-            clang_version_type('1.0.0')
-            clang_version_type('3.0.2.1')
-            clang_version_type('200.0.56.3')
-            clang_version_type('100000.0.0.1')
+        clang_version_type('1.0.0')
+        clang_version_type('3.0.2.1')
+        clang_version_type('200.0.56.3')
+        clang_version_type('100000.0.0.1')
 
     def test_invalid_clang_version(self):
         clang_version_type = types.ClangVersionType()
@@ -245,11 +237,10 @@ class TestSwiftVersionType(TestCase):
         self.assertIsInstance(version, types.CompilerVersion)
         self.assertEqual(version.components, (1, 0, 1))
 
-        with self.assertNotRaises(ArgumentTypeError):
-            swift_version_type('1.0')
-            swift_version_type('3.0.2')
-            swift_version_type('200.0.56')
-            swift_version_type('100000.0.1')
+        swift_version_type('1.0')
+        swift_version_type('3.0.2')
+        swift_version_type('200.0.56')
+        swift_version_type('100000.0.1')
 
     def test_invalid_swift_version(self):
         swift_version_type = types.SwiftVersionType()

@@ -26,6 +26,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/Located.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -672,9 +673,9 @@ struct TupleTypeReprElement {
 /// \endcode
 class TupleTypeRepr final : public TypeRepr,
     private llvm::TrailingObjects<TupleTypeRepr, TupleTypeReprElement,
-                                  std::pair<SourceLoc, unsigned>> {
+                                  Located<unsigned>> {
   friend TrailingObjects;
-  typedef std::pair<SourceLoc, unsigned> SourceLocAndIdx;
+  typedef Located<unsigned> SourceLocAndIdx;
 
   SourceRange Parens;
   
@@ -745,12 +746,12 @@ public:
 
   SourceLoc getEllipsisLoc() const {
     return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].first : SourceLoc();
+      getTrailingObjects<SourceLocAndIdx>()[0].Loc : SourceLoc();
   }
 
   unsigned getEllipsisIndex() const {
     return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].second :
+      getTrailingObjects<SourceLocAndIdx>()[0].Item :
         Bits.TupleTypeRepr.NumElements;
   }
 
@@ -758,8 +759,8 @@ public:
     if (hasEllipsis()) {
       Bits.TupleTypeRepr.HasEllipsis = false;
       getTrailingObjects<SourceLocAndIdx>()[0] = {
-        SourceLoc(),
-        getNumElements()
+        getNumElements(),
+        SourceLoc()
       };
     }
   }

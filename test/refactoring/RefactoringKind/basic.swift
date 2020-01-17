@@ -275,13 +275,33 @@ func testConvertToIfLetExpr(idxOpt: Int?) {
   print(idx)
 }
 
+@propertyWrapper
+struct TwelveOrLess {
+    private var number = 0
+    var wrappedValue: Int {
+        get { return number }
+        set { number = min(newValue, 12) }
+    }
+}
+
+struct S {
+  var field = 2
+  let (x, y) = (2, 4)
+  @TwelveOrLess var height: Int
+  lazy var z = 42
+  var totalSteps: Int = 0 {
+      willSet(newTotalSteps) {
+          print("About to set totalSteps to \(newTotalSteps)")
+      }
+  }
+}
 
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=5:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 
-// RUN: %refactor -source-filename %s -pos=2:1 -end-pos=2:18 | %FileCheck %s -check-prefix=CHECK2
+// RUN: %refactor -source-filename %s -pos=2:1 -end-pos=2:18 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-COMPUTED-PROPERTY
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=3:16 | %FileCheck %s -check-prefix=CHECK2
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=4:26 | %FileCheck %s -check-prefix=CHECK2
 
@@ -367,11 +387,15 @@ func testConvertToIfLetExpr(idxOpt: Int?) {
 
 // RUN: %refactor -source-filename %s -pos=251:3 -end-pos=251:24 | %FileCheck %s -check-prefix=CHECK-EXPAND-TERNARY-EXPRESSEXPRESSION
 
-// RUN: %refactor -source-filename %s -pos=257:3 -end-pos=262:4 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-TERNARY-EXPRESSEXPRESSION
-
 // RUN: %refactor -source-filename %s -pos=266:3 -end-pos=268:4 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-GUARD-EXPRESSION
 
 // RUN: %refactor -source-filename %s -pos=272:3 -end-pos=275:13 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-IFLET-EXPRESSION
+
+// RUN: %refactor -source-filename %s -pos=288:3 -end-pos=288:16 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-COMPUTED-PROPERTY
+// RUN: %refactor -source-filename %s -pos=289:3 -end-pos=289:22 | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %refactor -source-filename %s -pos=290:3 -end-pos=290:32 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-COMPUTED-PROPERTY2
+// RUN: %refactor -source-filename %s -pos=291:3 -end-pos=291:18 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-COMPUTED-PROPERTY2
+// RUN: %refactor -source-filename %s -pos=292:3 -end-pos=296:4 | %FileCheck %s -check-prefix=CHECK-NONE
 
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
@@ -423,3 +447,9 @@ func testConvertToIfLetExpr(idxOpt: Int?) {
 // CHECK-CONVERT-TO-GUARD-EXPRESSION: Convert To Guard Expression
 
 // CHECK-CONVERT-TO-IFLET-EXPRESSION: Convert To IfLet Expression
+
+// CHECK-CONVERT-TO-COMPUTED-PROPERTY: Convert To Computed Property
+
+// CHECK-CONVERT-TO-COMPUTED-PROPERTY2: Action begins
+// CHECK-CONVERT-TO-COMPUTED-PROPERTY2-NEXT: Move To Extension
+// CHECK-CONVERT-TO-COMPUTED-PROPERTY2-NEXT: Action ends

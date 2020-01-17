@@ -83,6 +83,13 @@ TypeVariableType::Implementation::getGenericParameter() const {
   return locator ? locator->getGenericParameter() : nullptr;
 }
 
+bool TypeVariableType::Implementation::isClosureType() const {
+  if (!(locator && locator->getAnchor()))
+    return false;
+
+  return isa<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
+}
+
 bool TypeVariableType::Implementation::isClosureResultType() const {
   if (!(locator && locator->getAnchor()))
     return false;
@@ -2566,7 +2573,8 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 }
 
 bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
-                                   DeclContext *DC) {
+                                   DeclContext *DC,
+                                   Type patternType) {
 
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {
@@ -2763,8 +2771,10 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   // if there's an error we can use that information to inform diagnostics.
   contextualPurpose = CTP_Initialization;
 
-  if (pattern->hasType()) {
-    contextualType = TypeLoc::withoutLoc(pattern->getType());
+  if (isa<OptionalSomePattern>(pattern)) {
+    flags |= TypeCheckExprFlags::ExpressionTypeMustBeOptional;
+  } else if (patternType && !patternType->isEqual(Context.TheUnresolvedType)) {
+    contextualType = TypeLoc::withoutLoc(patternType);
 
     // If we already had an error, don't repeat the problem.
     if (contextualType.getType()->hasError())
@@ -2772,7 +2782,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     
     // Allow the initializer expression to establish the underlying type of an
     // opaque type.
-    if (auto opaqueType = pattern->getType()->getAs<OpaqueTypeArchetypeType>()){
+    if (auto opaqueType = patternType->getAs<OpaqueTypeArchetypeType>()){
       flags |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
       flags -= TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
     }
@@ -2780,11 +2790,12 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     // Only provide a TypeLoc if it makes sense to allow diagnostics.
     if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
       const Pattern *inner = typedPattern->getSemanticsProvidingPattern();
-      if (isa<NamedPattern>(inner) || isa<AnyPattern>(inner))
+      if (isa<NamedPattern>(inner) || isa<AnyPattern>(inner)) {
         contextualType = typedPattern->getTypeLoc();
+        if (!contextualType.getType())
+          contextualType.setType(patternType);
+      }
     }
-  } else if (isa<OptionalSomePattern>(pattern)) {
-    flags |= TypeCheckExprFlags::ExpressionTypeMustBeOptional;
   }
     
   // Type-check the initializer.
@@ -2806,8 +2817,12 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       return true;
 
     // Apply the solution to the pattern as well.
-    if (coercePatternToType(pattern, TypeResolution::forContextual(DC), initTy,
-                            options, TypeLoc())) {
+    auto contextualPattern =
+        ContextualPattern::forRawPattern(pattern, DC);
+    if (auto coercedPattern = TypeChecker::coercePatternToType(
+            contextualPattern, initTy, options)) {
+      pattern = coercedPattern;
+    } else {
       return true;
     }
   }
@@ -2819,7 +2834,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   // and its variables, to prevent it from being referenced by the constraint
   // system.
   if (!resultTy &&
-      (!pattern->hasType() || pattern->getType()->hasUnboundGenericType())) {
+      (patternType->hasUnresolvedType() ||
+       patternType->hasUnboundGenericType())) {
     pattern->setType(ErrorType::get(Context));
     pattern->forEachVariable([&](VarDecl *var) {
       // Don't change the type of a variable that we've been able to
@@ -2837,7 +2853,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 }
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
-                                          unsigned patternNumber) {
+                                          unsigned patternNumber,
+                                          Type patternType) {
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
 
@@ -2851,7 +2868,22 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
       DC = initContext;
   }
 
-  bool hadError = TypeChecker::typeCheckBinding(pattern, init, DC);
+  // If we weren't given a pattern type, compute one now.
+  if (!patternType) {
+    if (pattern->hasType())
+      patternType = pattern->getType();
+    else {
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
+      patternType = typeCheckPattern(contextualPattern);
+    }
+
+    if (patternType->hasError()) {
+      PBD->setInvalid();
+      return true;
+    }
+  }
+
+  bool hadError = TypeChecker::typeCheckBinding(pattern, init, DC, patternType);
   if (!init) {
     PBD->setInvalid();
     return true;
@@ -2898,8 +2930,20 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     /// The for-each statement.
     ForEachStmt *Stmt;
 
+    /// The declaration context in which this for-each statement resides.
+    DeclContext *DC;
+
     /// The locator we're using.
     ConstraintLocator *Locator;
+
+    /// The contextual locator we're using.
+    ConstraintLocator *ContextualLocator;
+
+    /// The Sequence protocol.
+    ProtocolDecl *SequenceProto;
+
+    /// The IteratorProtocol.
+    ProtocolDecl *IteratorProto;
 
     /// The type of the initializer.
     Type InitType;
@@ -2907,39 +2951,65 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     /// The type of the sequence.
     Type SequenceType;
 
+    /// The conformance of the sequence type to the Sequence protocol.
+    ProtocolConformanceRef SequenceConformance;
+
+    /// The type of the element.
+    Type ElementType;
+
+    /// The type of the iterator.
+    Type IteratorType;
+
   public:
-    explicit BindingListener(ForEachStmt *stmt) : Stmt(stmt) { }
+    explicit BindingListener(ForEachStmt *stmt, DeclContext *dc)
+        : Stmt(stmt), DC(dc) { }
 
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
-      auto *contextualLocator =
+      ContextualLocator =
           cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
-      // The expression type must conform to the Sequence.
-      ProtocolDecl *sequenceProto = TypeChecker::getProtocol(
+      // The expression type must conform to the Sequence protocol.
+      SequenceProto = TypeChecker::getProtocol(
           cs.getASTContext(), Stmt->getForLoc(), KnownProtocolKind::Sequence);
-      if (!sequenceProto) {
+      if (!SequenceProto) {
         return true;
       }
-
-      auto elementAssocType =
-          sequenceProto->getAssociatedType(cs.getASTContext().Id_Element);
 
       SequenceType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
-                       sequenceProto->getDeclaredType(), contextualLocator);
+                       SequenceProto->getDeclaredType(), ContextualLocator);
 
       // Since we are using "contextual type" here, it has to be recorded
       // in the constraint system for diagnostics to have access to "purpose".
       cs.setContextualType(
-          expr, TypeLoc::withoutLoc(sequenceProto->getDeclaredType()),
+          expr, TypeLoc::withoutLoc(SequenceProto->getDeclaredType()),
           CTP_ForEachStmt);
 
       auto elementLocator = cs.getConstraintLocator(
-          contextualLocator, ConstraintLocator::SequenceElementType);
+          ContextualLocator, ConstraintLocator::SequenceElementType);
+
+      // Check the element pattern.
+      ASTContext &ctx = cs.getASTContext();
+      if (auto *P = TypeChecker::resolvePattern(Stmt->getPattern(), DC,
+                                                /*isStmtCondition*/false)) {
+        Stmt->setPattern(P);
+      } else {
+        Stmt->getPattern()->setType(ErrorType::get(ctx));
+        return true;
+      }
+
+      auto contextualPattern =
+          ContextualPattern::forRawPattern(Stmt->getPattern(), DC);
+      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+      if (patternType->hasError()) {
+        // FIXME: Handle errors better.
+        Stmt->getPattern()->setType(ErrorType::get(ctx));
+        return true;
+      }
 
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
@@ -2949,9 +3019,33 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       // Add a conversion constraint between the element type of the sequence
       // and the type of the element pattern.
-      auto elementType = DependentMemberType::get(SequenceType, elementAssocType);
-      cs.addConstraint(ConstraintKind::Conversion, elementType, InitType,
+      auto elementAssocType =
+          SequenceProto->getAssociatedType(cs.getASTContext().Id_Element);
+      ElementType = DependentMemberType::get(SequenceType, elementAssocType);
+      cs.addConstraint(ConstraintKind::Conversion, ElementType, InitType,
                        elementLocator);
+
+      // Determine the iterator type.
+      auto iteratorAssocType =
+          SequenceProto->getAssociatedType(cs.getASTContext().Id_Iterator);
+      IteratorType = DependentMemberType::get(SequenceType, iteratorAssocType);
+
+      // The iterator type must conform to IteratorProtocol.
+      IteratorProto = TypeChecker::getProtocol(
+          cs.getASTContext(), Stmt->getForLoc(),
+          KnownProtocolKind::IteratorProtocol);
+      if (!IteratorProto) {
+        return true;
+      }
+
+      // Reference the makeIterator witness.
+      FuncDecl *makeIterator = ctx.getSequenceMakeIterator();
+      Type makeIteratorType =
+          cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
+      cs.addValueWitnessConstraint(
+          LValueType::get(SequenceType), makeIterator,
+          makeIteratorType, DC, FunctionRefKind::Compound,
+          ContextualLocator);
 
       Stmt->setSequence(expr);
       return false;
@@ -2960,41 +3054,111 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Figure out what types the constraints decided on.
       auto &cs = solution.getConstraintSystem();
+      ASTContext &ctx = cs.getASTContext();
       InitType = solution.simplifyType(InitType);
       SequenceType = solution.simplifyType(SequenceType);
+      ElementType = solution.simplifyType(ElementType);
+      IteratorType = solution.simplifyType(IteratorType);
 
       // Perform any necessary conversions of the sequence (e.g. [T]! -> [T]).
-      expr = solution.coerceToType(expr, SequenceType, cs.getConstraintLocator(expr));
-      
+      expr = solution.coerceToType(expr, SequenceType, Locator);
       if (!expr) return nullptr;
 
       cs.cacheExprTypes(expr);
+      Stmt->setSequence(expr);
+      solution.setExprTypes(expr);
 
       // Apply the solution to the iteration pattern as well.
       Pattern *pattern = Stmt->getPattern();
       TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
       options |= TypeResolutionFlags::OverrideType;
-      if (TypeChecker::coercePatternToType(pattern,
-                                           TypeResolution::forContextual(cs.DC),
-                                           InitType, options)) {
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
+      pattern = TypeChecker::coercePatternToType(contextualPattern,
+                                                 InitType, options);
+      if (!pattern)
         return nullptr;
+      Stmt->setPattern(pattern);
+
+      // Get the conformance of the sequence type to the Sequence protocol.
+      SequenceConformance = solution.resolveConformance(
+          ContextualLocator, SequenceProto);
+      assert(!SequenceConformance.isInvalid() &&
+             "Couldn't find sequence conformance");
+      Stmt->setSequenceConformance(SequenceConformance);
+
+      // Check the filtering condition.
+      // FIXME: This should be pulled into the constraint system itself.
+      if (auto *Where = Stmt->getWhere()) {
+        if (!TypeChecker::typeCheckCondition(Where, DC))
+          Stmt->setWhere(Where);
       }
 
-      Stmt->setPattern(pattern);
-      Stmt->setSequence(expr);
+      // Invoke iterator() to get an iterator from the sequence.
+      VarDecl *iterator;
+      Type nextResultType = OptionalType::get(ElementType);
+      {
+        // Create a local variable to capture the iterator.
+        std::string name;
+        if (auto np = dyn_cast_or_null<NamedPattern>(Stmt->getPattern()))
+          name = "$"+np->getBoundName().str().str();
+        name += "$generator";
 
-      solution.setExprTypes(expr);
+        iterator = new (ctx) VarDecl(
+            /*IsStatic*/ false, VarDecl::Introducer::Var,
+            /*IsCaptureList*/ false, Stmt->getInLoc(),
+            ctx.getIdentifier(name), DC);
+        iterator->setInterfaceType(IteratorType->mapTypeOutOfContext());
+        iterator->setImplicit();
+        Stmt->setIteratorVar(iterator);
+
+        auto genPat = new (ctx) NamedPattern(iterator);
+        genPat->setImplicit();
+
+        // TODO: test/DebugInfo/iteration.swift requires this extra info to
+        // be around.
+        PatternBindingDecl::createImplicit(
+            ctx, StaticSpellingKind::None, genPat,
+            new (ctx) OpaqueValueExpr(Stmt->getInLoc(), nextResultType),
+            DC, /*VarLoc*/ Stmt->getForLoc());
+      }
+
+      // Create the iterator variable.
+      auto *varRef = TypeChecker::buildCheckedRefExpr(
+          iterator, DC, DeclNameLoc(Stmt->getInLoc()), /*implicit*/ true);
+      if (varRef)
+        Stmt->setIteratorVarRef(varRef);
+
+      // Convert that Optional<Element> value to the type of the pattern.
+      auto optPatternType = OptionalType::get(Stmt->getPattern()->getType());
+      if (!optPatternType->isEqual(nextResultType)) {
+        OpaqueValueExpr *elementExpr =
+            new (ctx) OpaqueValueExpr(Stmt->getInLoc(), nextResultType,
+                                      /*isPlaceholder=*/true);
+        Expr *convertElementExpr = elementExpr;
+        if (TypeChecker::typeCheckExpression(
+                convertElementExpr, DC,
+                TypeLoc::withoutLoc(optPatternType),
+                CTP_CoerceOperand).isNull()) {
+          return nullptr;
+        }
+        elementExpr->setIsPlaceholder(false);
+        Stmt->setElementExpr(elementExpr);
+        Stmt->setConvertElementExpr(convertElementExpr);
+      }
+
       return expr;
     }
   };
 
-  BindingListener listener(stmt);
+  BindingListener listener(stmt, dc);
   Expr *seq = stmt->getSequence();
   assert(seq && "type-checking an uninitialized for-each statement?");
 
   // Type-check the for-each loop sequence and element pattern.
   auto resultTy = TypeChecker::typeCheckExpression(seq, dc, &listener);
-  return !resultTy;
+  if (!resultTy)
+    return true;
+  return false;
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
@@ -3032,6 +3196,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
       hadAnyFalsable = true;
       continue;
     }
+    assert(elt.getKind() != StmtConditionElement::CK_Boolean);
 
     // This is cleanup goop run on the various paths where type checking of the
     // pattern binding fails.
@@ -3060,10 +3225,9 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
 
     // Check the pattern, it allows unspecified types because the pattern can
     // provide type information.
-    TypeResolutionOptions options(TypeResolverContext::InExpression);
-    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-    if (TypeChecker::typeCheckPattern(pattern, dc, options)) {
+    auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
+    Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+    if (patternType->hasError()) {
       typeCheckPatternFailed();
       continue;
     }
@@ -3071,7 +3235,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     // If the pattern didn't get a type, it's because we ran into some
     // unknown types along the way. We'll need to check the initializer.
     auto init = elt.getInitializer();
-    hadError |= TypeChecker::typeCheckBinding(pattern, init, dc);
+    hadError |= TypeChecker::typeCheckBinding(pattern, init, dc, patternType);
     elt.setPattern(pattern);
     elt.setInitializer(init);
     hadAnyFalsable |= pattern->isRefutablePattern();
@@ -3425,88 +3589,6 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
 
   // Nothing to do.
   return expr;
-}
-
-bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
-                                Optional<Pattern*> typeFromPattern) {
-  // TODO: need to add kind arg?
-  // Construct a constraint system from this expression.
-  ConstraintSystem cs(dc, ConstraintSystemFlags::AllowFixes);
-    
-  // Cache the expression type on the system to ensure it is available
-  // on diagnostics if the convertion fails.
-  cs.cacheExprTypes(expr);
-
-  // If there is a type that we're expected to convert to, add the conversion
-  // constraint.
-  cs.addConstraint(ConstraintKind::Conversion, expr->getType(), type,
-                   cs.getConstraintLocator(expr));
-
-  auto &Context = dc->getASTContext();
-  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Initial constraints for the given expression---\n";
-    expr->dump(log);
-    log << "\n";
-    cs.print(log);
-  }
-
-  // Attempt to solve the constraint system.
-  SmallVector<Solution, 4> viable;
-  if ((cs.solve(viable) || viable.size() != 1)) {
-    // Try to fix the system or provide a decent diagnostic.
-    auto salvagedResult = cs.salvage();
-    switch (salvagedResult.getKind()) {
-    case SolutionResult::Kind::Success:
-      viable.clear();
-      viable.push_back(std::move(salvagedResult).takeSolution());
-      break;
-
-    case SolutionResult::Kind::Error:
-    case SolutionResult::Kind::Ambiguous:
-      return true;
-
-    case SolutionResult::Kind::UndiagnosedError:
-      cs.diagnoseFailureForExpr(expr);
-      salvagedResult.markAsDiagnosed();
-      return true;
-
-    case SolutionResult::Kind::TooComplex:
-      Context.Diags.diagnose(expr->getLoc(), diag::expression_too_complex)
-        .highlight(expr->getSourceRange());
-      salvagedResult.markAsDiagnosed();
-      return true;
-    }
-  }
-
-  auto &solution = viable[0];
-  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Solution---\n";
-    solution.dump(log);
-  }
-
-  cs.cacheExprTypes(expr);
-
-  // Perform the conversion.
-  Expr *result = solution.coerceToType(expr, type,
-                                       cs.getConstraintLocator(expr),
-                                       typeFromPattern);
-  if (!result) {
-    return true;
-  }
-
-  solution.setExprTypes(expr);
-
-  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Type-checked expression---\n";
-    result->dump(log);
-    log << "\n";
-  }
-
-  expr = result;
-  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -4075,27 +4157,32 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
+  auto checkElementCast = [&](Type fromElt, Type toElt,
+                              CheckedCastKind castKind) -> CheckedCastKind {
+    switch (typeCheckCheckedCast(fromElt, toElt, CheckedCastContextKind::None,
+                                 dc, SourceLoc(), nullptr, SourceRange())) {
+    case CheckedCastKind::Coercion:
+      return CheckedCastKind::Coercion;
+
+    case CheckedCastKind::BridgingCoercion:
+      return CheckedCastKind::BridgingCoercion;
+
+    case CheckedCastKind::ArrayDowncast:
+    case CheckedCastKind::DictionaryDowncast:
+    case CheckedCastKind::SetDowncast:
+    case CheckedCastKind::ValueCast:
+      return castKind;
+
+    case CheckedCastKind::Unresolved:
+      return failed();
+    }
+  };
+
   // Check for casts between specific concrete types that cannot succeed.
   if (auto toElementType = ConstraintSystem::isArrayType(toType)) {
     if (auto fromElementType = ConstraintSystem::isArrayType(fromType)) {
-      switch (typeCheckCheckedCast(*fromElementType, *toElementType,
-                                   CheckedCastContextKind::None, dc,
-                                   SourceLoc(), nullptr, SourceRange())) {
-      case CheckedCastKind::Coercion:
-        return CheckedCastKind::Coercion;
-
-      case CheckedCastKind::BridgingCoercion:
-        return CheckedCastKind::BridgingCoercion;
-
-      case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::ValueCast:
-        return CheckedCastKind::ArrayDowncast;
-
-      case CheckedCastKind::Unresolved:
-        return failed();
-      }
+      return checkElementCast(*fromElementType, *toElementType,
+                              CheckedCastKind::ArrayDowncast);
     }
   }
 
@@ -4165,24 +4252,31 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   if (auto toElementType = ConstraintSystem::isSetType(toType)) {
     if (auto fromElementType = ConstraintSystem::isSetType(fromType)) {
-      switch (typeCheckCheckedCast(*fromElementType, *toElementType,
-                                   CheckedCastContextKind::None, dc,
-                                   SourceLoc(), nullptr, SourceRange())) {
-      case CheckedCastKind::Coercion:
-        return CheckedCastKind::Coercion;
+      return checkElementCast(*fromElementType, *toElementType,
+                              CheckedCastKind::SetDowncast);
+    }
+  }
 
-      case CheckedCastKind::BridgingCoercion:
-        return CheckedCastKind::BridgingCoercion;
-      
-      case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::ValueCast:
-        return CheckedCastKind::SetDowncast;
-
-      case CheckedCastKind::Unresolved:
+  if (auto toTuple = toType->getAs<TupleType>()) {
+    if (auto fromTuple = fromType->getAs<TupleType>()) {
+      if (fromTuple->getNumElements() != toTuple->getNumElements())
         return failed();
+
+      for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
+        const auto &fromElt = fromTuple->getElement(i);
+        const auto &toElt = toTuple->getElement(i);
+
+        if (fromElt.getName() != toElt.getName())
+          return failed();
+
+        auto result = checkElementCast(fromElt.getType(), toElt.getType(),
+                                       CheckedCastKind::ValueCast);
+
+        if (result == CheckedCastKind::Unresolved)
+          return result;
       }
+
+      return CheckedCastKind::ValueCast;
     }
   }
 
