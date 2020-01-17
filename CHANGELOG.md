@@ -47,7 +47,7 @@ Swift Next
   ```
   
   This proposal also introduces new diagnostics for inserting `self` into the
-  closure's capture list in addition to the existing 'use `self.` explicitly
+  closure's capture list in addition to the existing 'use `self.` explicitly'
   fix-it.
 
 Swift 5.2
