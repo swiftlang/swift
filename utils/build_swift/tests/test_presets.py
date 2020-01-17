@@ -131,7 +131,7 @@ class TestPresetParserMeta(type):
         preset_parser.read(PRESET_FILES)
 
         # Generate tests for each preset
-        for preset_name in preset_parser.preset_names():
+        for preset_name in preset_parser.preset_names:
             test_name = 'test_get_preset_' + preset_name
             attrs[test_name] = cls.generate_get_preset_test(
                 preset_parser, preset_name)
@@ -277,5 +277,5 @@ class TestPresetParser(TestCase):
         parser.read_string('[preset: bar]')
         parser.read_string('[preset: baz]')
 
-        self.assertEqual(set(parser.preset_names()),
+        self.assertEqual(set(parser.preset_names),
                          set(['foo', 'bar', 'baz']))
