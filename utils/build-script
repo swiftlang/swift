@@ -971,7 +971,7 @@ def main_preset():
         diagnostics.fatal(e.message)
 
     if args.show_presets:
-        for name in sorted(preset_parser.preset_names(),
+        for name in sorted(preset_parser.preset_names,
                            key=lambda name: name.lower()):
             print(name)
         return 0
