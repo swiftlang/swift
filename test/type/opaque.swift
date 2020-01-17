@@ -475,3 +475,8 @@ dynamic func foo<S>(_ s: S) -> some Proto {
 func foo_repl<S>(_ s: S) -> some Proto {
  return   I()
 }
+
+protocol SomeProtocolA {}
+protocol SomeProtocolB {}
+struct SomeStructC: SomeProtocolA, SomeProtocolB {}
+let someProperty: SomeProtocolA & some SomeProtocolB = SomeStructC() // expected-error {{'some' should appear at the beginning of a composition}}{{35-40=}}{{19-19=some }}
