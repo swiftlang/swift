@@ -1607,6 +1607,7 @@ public:
   const llvm::VersionTuple MovedVersion;
 
   struct ActiveVersion {
+    StringRef ModuleName;
     PlatformKind Platform;
     bool IsSimulator;
     llvm::VersionTuple Version;

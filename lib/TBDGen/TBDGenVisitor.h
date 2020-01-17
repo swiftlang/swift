@@ -78,7 +78,8 @@ private:
     parsePreviousModuleInstallNameMap();
   void addSymbolInternal(StringRef name, llvm::MachO::SymbolKind kind,
                          bool isLinkerDirective = false);
-  void addLinkerDirectiveSymbols(StringRef name, llvm::MachO::SymbolKind kind);
+  void addLinkerDirectiveSymbolsLdHide(StringRef name, llvm::MachO::SymbolKind kind);
+  void addLinkerDirectiveSymbolsLdPrevious(StringRef name, llvm::MachO::SymbolKind kind);
   void addSymbol(StringRef name, llvm::MachO::SymbolKind kind =
                                      llvm::MachO::SymbolKind::GlobalSymbol);
 

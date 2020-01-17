@@ -86,18 +86,6 @@ getAllMovedPlatformVersions(Decl *D) {
   return Results;
 }
 
-static Optional<llvm::VersionTuple>
-getIntroducedOSVersion(Decl *D, PlatformKind Kind) {
-  for (auto *attr: D->getAttrs()) {
-    if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
-      if (ava->Platform == Kind && ava->Introduced) {
-        return ava->Introduced;
-      }
-    }
-  }
-  return None;
-}
-
 static StringRef getLinkerPlatformName(uint8_t Id) {
   switch (Id) {
 #define LD_PLATFORM(Name, Id) case Id: return #Name;
@@ -245,8 +233,85 @@ TBDGenVisitor::parsePreviousModuleInstallNameMap() {
   return pResult;
 }
 
-void TBDGenVisitor::addLinkerDirectiveSymbols(StringRef name,
-                                              llvm::MachO::SymbolKind kind) {
+static LinkerPlatformId
+getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
+  switch(Ver.Platform) {
+  case swift::PlatformKind::none:
+    llvm_unreachable("cannot find platform kind");
+  case swift::PlatformKind::iOS:
+  case swift::PlatformKind::iOSApplicationExtension:
+    return Ver.IsSimulator ? LinkerPlatformId::iOS_sim:
+                             LinkerPlatformId::iOS;
+  case swift::PlatformKind::tvOS:
+  case swift::PlatformKind::tvOSApplicationExtension:
+    return Ver.IsSimulator ? LinkerPlatformId::tvOS_sim:
+                             LinkerPlatformId::tvOS;
+  case swift::PlatformKind::watchOS:
+  case swift::PlatformKind::watchOSApplicationExtension:
+    return Ver.IsSimulator ? LinkerPlatformId::watchOS_sim:
+                             LinkerPlatformId::watchOS;
+  case swift::PlatformKind::OSX:
+  case swift::PlatformKind::OSXApplicationExtension:
+    return LinkerPlatformId::macOS;
+  }
+}
+
+static StringRef
+getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver) {
+  return getLinkerPlatformName((uint8_t)getLinkerPlatformId(Ver));
+}
+
+void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
+                                                llvm::MachO::SymbolKind kind) {
+  if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
+    return;
+  if (!TopLevelDecl)
+    return;
+  auto MovedVers = getAllMovedPlatformVersions(TopLevelDecl);
+  if (MovedVers.empty())
+    return;
+  assert(!MovedVers.empty());
+  assert(previousInstallNameMap);
+  auto &Ctx = TopLevelDecl->getASTContext();
+  for (auto &Ver: MovedVers) {
+    auto IntroVer = TopLevelDecl->getIntroducedOSVersion(Ver.Platform);
+    assert(IntroVer && "cannot find OS intro version");
+    if (!IntroVer.hasValue())
+      continue;
+    auto PlatformNumber = getLinkerPlatformId(Ver);
+    auto It = previousInstallNameMap->find(Ver.ModuleName);
+    if (It == previousInstallNameMap->end()) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
+                         Ver.ModuleName, getLinkerPlatformName(Ver));
+      continue;
+    }
+    auto InstallName = It->second.getInstallName(PlatformNumber);
+    if (InstallName.empty()) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
+                         Ver.ModuleName, getLinkerPlatformName(Ver));
+      continue;
+    }
+    llvm::SmallString<64> Buffer;
+    llvm::raw_svector_ostream OS(Buffer);
+    // Empty compatible version indicates using the current compatible version.
+    StringRef ComptibleVersion = "";
+    OS << "$ld$previous$";
+    OS << InstallName << "$";
+    OS << ComptibleVersion << "$";
+    OS << std::to_string((uint8_t)PlatformNumber) << "$";
+    static auto getMinor = [](Optional<unsigned> Minor) {
+      return Minor.hasValue() ? *Minor : 0;
+    };
+    OS << IntroVer->getMajor() << "." << getMinor(IntroVer->getMinor()) << "$";
+    OS << Ver.Version.getMajor() << "." << getMinor(Ver.Version.getMinor()) << "$";
+    OS << name << "$";
+    addSymbolInternal(OS.str(), llvm::MachO::SymbolKind::GlobalSymbol,
+                      /*LinkerDirective*/true);
+  }
+}
+
+void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
+                                                    llvm::MachO::SymbolKind kind) {
   if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
     return;
   if (!TopLevelDecl)
@@ -265,7 +330,7 @@ void TBDGenVisitor::addLinkerDirectiveSymbols(StringRef name,
   unsigned Minor[2];
   Major[1] = MovedVer.getMajor();
   Minor[1] = MovedVer.getMinor().hasValue() ? *MovedVer.getMinor(): 0;
-  auto IntroVer = getIntroducedOSVersion(TopLevelDecl, Platform);
+  auto IntroVer = TopLevelDecl->getIntroducedOSVersion(Platform);
   assert(IntroVer && "cannot find the start point of availability");
   if (!IntroVer.hasValue())
     return;
@@ -296,7 +361,11 @@ void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
   SmallString<32> mangled;
   llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
   addSymbolInternal(mangled, kind);
-  addLinkerDirectiveSymbols(mangled, kind);
+  if (previousInstallNameMap) {
+    addLinkerDirectiveSymbolsLdPrevious(mangled, kind);
+  } else {
+    addLinkerDirectiveSymbolsLdHide(mangled, kind);
+  }
 }
 
 void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
