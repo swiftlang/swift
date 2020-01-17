@@ -13,6 +13,7 @@ import sys
 
 from . import expected_options as eo
 from . import utils
+from .test_presets import PRESET_DEFAULTS
 from .utils import TestCase, UTILS_PATH, redirect_stdout
 from ..build_swift import argparse
 from ..build_swift import driver_arguments
@@ -41,7 +42,7 @@ def _load_all_presets(preset_files):
 
     presets = dict()
     for name in preset_names:
-        preset = parser.get_preset(name, raw=True)
+        preset = parser.get_preset(name, vars=PRESET_DEFAULTS)
         args = migration.migrate_swift_sdks(preset.format_args())
 
         presets[name] = args
