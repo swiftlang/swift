@@ -441,6 +441,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numFunctionBuilderTransformed = cs.functionBuilderTransformed.size();
   numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
+  numModifiedSpecifiers = cs.ModifiedSpecifiers.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -509,6 +510,11 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any inferred closure types (e.g. used in function builder body).
   truncate(cs.ClosureTypes, numInferredClosureTypes);
+
+  while (cs.ModifiedSpecifiers.size() > numModifiedSpecifiers) {
+    auto PD = cs.ModifiedSpecifiers.pop_back_val();
+    PD.first->setSpecifier(PD.second);
+  }
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;

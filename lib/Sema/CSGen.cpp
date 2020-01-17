@@ -2061,11 +2061,30 @@ namespace {
     }
 
     FunctionType *inferClosureType(ClosureExpr *closure) {
-      SmallVector<AnyFunctionType::Param, 4> closureParams;
+      // First let's check whether it could be inferred from the body
+      // that some of the untyped parameters have to be `inout`.
+      if (closure->hasSingleExpressionBody()) {
+        auto *body = closure->getSingleExpressionBody();
+        body->forEachChildExpr([&](Expr *expr) -> Expr * {
+          if (auto *assignment = dyn_cast<AssignExpr>(expr)) {
+            if (auto *DRE = dyn_cast<DeclRefExpr>(assignment->getDest())) {
+              if (auto *PD = dyn_cast_or_null<ParamDecl>(DRE->getDecl())) {
+                if (!PD->getTypeRepr())
+                  PD->setSpecifier(ParamSpecifier::InOut);
+              }
+            }
 
+            return nullptr;
+          }
+
+          return expr;
+        });
+      }
+
+      llvm::SmallVector<AnyFunctionType::Param, 4> closureParams;
       if (auto *paramList = closure->getParameters()) {
         for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
-          const auto *param = paramList->get(i);
+          auto *param = paramList->get(i);
           auto *paramLoc =
               CS.getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
 

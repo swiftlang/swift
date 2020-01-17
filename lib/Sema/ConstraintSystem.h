@@ -1300,6 +1300,9 @@ private:
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
       KeyPathComponentTypes;
 
+  llvm::SmallVector<std::pair<ParamDecl *, ParamSpecifier>, 4>
+      ModifiedSpecifiers;
+
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
     OpenedParameterTypes;
@@ -1879,6 +1882,9 @@ public:
 
     /// The length of \c ClosureTypes.
     unsigned numInferredClosureTypes;
+
+    /// The length of \c ModifiedSpecifiers.
+    unsigned numModifiedSpecifiers;
 
     /// The previous score.
     Score PreviousScore;

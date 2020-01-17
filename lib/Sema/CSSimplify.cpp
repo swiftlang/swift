@@ -6565,34 +6565,49 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *closureLocator = typeVar->getImpl().getLocator();
   auto *closure = cast<ClosureExpr>(closureLocator->getAnchor());
 
-  auto *closureType = getClosureType(closure);
+  auto *inferredClosureType = getClosureType(closure);
 
-  auto *paramList = closure->getParameters();
-  for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
-    const auto &param = closureType->getParams()[i];
+  auto isContextuallyInOut = [&contextualType](unsigned index) -> bool {
+    if (!contextualType)
+      return false;
 
-    Type internalType;
-
-    if (paramList->get(i)->getTypeRepr()) {
-      // Internal type is the type used in the body of the closure,
-      // so "external" type translates to it as follows:
-      //  - `Int...` -> `[Int]`,
-      //  - `inout Int` -> `@lvalue Int`.
-      internalType = param.getParameterType();
-    } else {
-      auto *paramLoc =
-          getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
-
-      internalType = createTypeVariable(paramLoc, TVO_CanBindToLValue |
-                                                      TVO_CanBindToNoEscape);
-
-      auto externalType = param.getOldType();
-      addConstraint(ConstraintKind::BindParam, externalType, internalType,
-                    paramLoc);
+    if (auto *fnType = contextualType->getAs<FunctionType>()) {
+      if (fnType->getNumParams() > index)
+        return fnType->getParams()[index].isInOut();
     }
 
-    setType(paramList->get(i), internalType);
+    return false;
+  };
+
+  auto *paramList = closure->getParameters();
+  llvm::SmallVector<AnyFunctionType::Param, 4> parameters;
+  for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
+    auto *PD = paramList->get(i);
+    const auto &param = inferredClosureType->getParams()[i];
+
+    // If there is no explicit "external" type for a given parameter
+    // and it's supposed to be `inout` contextually - let's adjust
+    // specifier of the declaration as well as closure function type
+    // to account of contextual information.
+    if (!PD->getTypeRepr() && !param.isInOut() && isContextuallyInOut(i)) {
+      auto flags = param.getParameterFlags();
+      parameters.push_back(param.withFlags(flags.withInOut(true)));
+      ModifiedSpecifiers.push_back(std::make_pair(PD, PD->getSpecifier()));
+      PD->setSpecifier(ParamSpecifier::InOut);
+    } else {
+      parameters.push_back(std::move(param));
+    }
+
+    // Internal type is the type used in the body of the closure,
+    // so "external" type translates to it as follows:
+    //  - `Int...` -> `[Int]`,
+    //  - `inout Int` -> `@lvalue Int`.
+    setType(PD, param.getParameterType());
   }
+
+  auto closureType =
+      FunctionType::get(parameters, inferredClosureType->getResult(),
+                        inferredClosureType->getExtInfo());
 
   assignFixedType(typeVar, closureType, closureLocator);
 
