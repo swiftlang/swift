@@ -1992,6 +1992,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
   // captured functions.
   auto captureInfo = TC.getLoweredLocalCaptures(constant);
 
+  // FIXME: Why do we end up here when witness is case-with-payload?
   if (!constant.getAnyFunctionRef().hasValue()) {
     auto *vd = constant.loc.dyn_cast<ValueDecl *>();
     auto funcTy =

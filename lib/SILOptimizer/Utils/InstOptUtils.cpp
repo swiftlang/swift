@@ -1852,6 +1852,7 @@ bool swift::calleesAreStaticallyKnowable(SILModule &module,
 
 /// Are the callees that could be called through Decl statically
 /// knowable based on the Decl and the compilation mode?
+// FIXME: Merge this with calleesAreStaticallyKnowable above
 bool swift::calleesAreStaticallyKnowable(SILModule &module,
                                          EnumElementDecl *eed) {
   const DeclContext *assocDC = module.getAssociatedContext();
