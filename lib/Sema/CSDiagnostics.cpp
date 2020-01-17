@@ -6038,3 +6038,53 @@ bool UnableToInferClosureReturnType::diagnoseAsError() {
 
   return true;
 }
+
+static std::tuple<StringRef, StringRef>
+getImportModuleAndDefaultType(const ASTContext &ctx, ProtocolDecl *protocol) {
+  const auto &target = ctx.LangOpts.Target;
+  if (protocol ==
+      ctx.getProtocol(KnownProtocolKind::ExpressibleByColorLiteral)) {
+    if (target.isMacOSX()) {
+      return std::make_tuple("AppKit", "NSColor");
+    } else if (target.isiOS() || target.isTvOS()) {
+      return std::make_tuple("UIKit", "UIColor");
+    }
+  } else if (protocol ==
+             ctx.getProtocol(KnownProtocolKind::ExpressibleByImageLiteral)) {
+    if (target.isMacOSX()) {
+      return std::make_tuple("AppKit", "NSImage");
+    } else if (target.isiOS() || target.isTvOS()) {
+      return std::make_tuple("UIKit", "UIImage");
+    }
+  } else if (protocol ==
+             ctx.getProtocol(
+                 KnownProtocolKind::ExpressibleByFileReferenceLiteral)) {
+    return std::make_tuple("Foundation", "URL");
+  }
+  return std::make_tuple("", "");
+}
+
+bool UnableToInferProtocolLiteralType::diagnoseAsError() {
+  auto *locator = getLocator();
+  auto &cs = getConstraintSystem();
+  auto *expr = cast<ObjectLiteralExpr>(locator->getAnchor());
+
+  auto &ctx = cs.getASTContext();
+  auto protocol = TypeChecker::getLiteralProtocol(ctx, expr);
+  assert(protocol);
+  auto plainName = expr->getLiteralKindPlainName();
+
+  StringRef importModule;
+  StringRef importDefaultTypeName;
+  std::tie(importModule, importDefaultTypeName) =
+      getImportModuleAndDefaultType(ctx, protocol);
+
+  emitDiagnostic(expr->getLoc(), diag::object_literal_default_type_missing,
+                 plainName);
+  if (!importModule.empty()) {
+    emitDiagnostic(expr->getLoc(), diag::object_literal_resolve_import,
+                   importModule, importDefaultTypeName, plainName);
+  }
+
+  return true;
+}

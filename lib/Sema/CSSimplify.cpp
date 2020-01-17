@@ -1027,7 +1027,18 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
             argsWithLabels, params, paramInfo, argInfo->HasTrailingClosure,
             cs.shouldAttemptFixes(), listener, parameterBindings))
       return cs.getTypeMatchFailure(locator);
-
+    
+    if (!callee) {
+      // If we couldn't find a callee, diagnose and maybe suggest
+      // import a module.
+      if (cs.shouldAttemptFixes()) {
+        if (auto *fix = SpecifyObjectLiteralTypeImport::attempt(cs, loc)) {
+          if (cs.recordFix(fix))
+            return cs.getTypeMatchFailure(locator);
+        }
+      }
+    }
+    
     auto extraArguments = listener.getExtraneousArguments();
     if (!extraArguments.empty()) {
       if (RemoveExtraneousArguments::isMinMaxNameShadowing(cs, locator))
@@ -1047,6 +1058,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
           return cs.getTypeMatchFailure(locator);
       }
     }
+    
   }
 
   // If this application is part of an operator, then we allow an implicit
@@ -8739,7 +8751,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::UseValueTypeOfRawRepresentative:
   case FixKind::ExplicitlyConstructRawRepresentable:
   case FixKind::SpecifyBaseTypeForContextualMember:
-  case FixKind::CoerceToCheckedCast: {
+  case FixKind::CoerceToCheckedCast:
+  case FixKind::SpecifyObjectLiteralTypeImport: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

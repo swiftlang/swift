@@ -235,6 +235,11 @@ enum class FixKind : uint8_t {
   /// Closure return type has to be explicitly specified because it can't be
   /// inferred in current context e.g. because it's a multi-statement closure.
   SpecifyClosureReturnType,
+  
+  /// Object literal type coudn't be infered because the module where it's
+  /// protocol type was not imported.
+  SpecifyObjectLiteralTypeImport,
+
 };
 
 class ConstraintFix {
@@ -1631,6 +1636,22 @@ public:
 
   static SpecifyClosureReturnType *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
+};
+
+class SpecifyObjectLiteralTypeImport final : public ConstraintFix {
+  SpecifyObjectLiteralTypeImport(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::SpecifyObjectLiteralTypeImport, locator) {}
+
+public:
+  std::string getName() const {
+    return "specify object literal protocol type import";
+  }
+
+  bool diagnose(bool asNote = false) const;
+
+  static SpecifyObjectLiteralTypeImport *attempt(ConstraintSystem &cs,
+                                                 ConstraintLocator *locator);
+
 };
 
 } // end namespace constraints
