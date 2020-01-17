@@ -14,21 +14,15 @@ import unittest
 from contextlib import contextmanager
 from io import StringIO
 
-from swift_build_support.swift_build_support import migration
 from swift_build_support.swift_build_support.SwiftBuildSupport import (
     get_all_preset_names, get_preset_options)
 
 from . import expected_options as eo
+from .utils import BUILD_SCRIPT_IMPL_PATH, UTILS_PATH
 from ..build_swift import argparse
 from ..build_swift import driver_arguments
+from ..build_swift import migration
 
-
-FILE_PATH = os.path.abspath(__file__)
-TESTS_PATH = os.path.abspath(os.path.join(FILE_PATH, os.pardir))
-BUILD_SWIFT_PATH = os.path.abspath(os.path.join(TESTS_PATH, os.pardir))
-UTILS_PATH = os.path.abspath(os.path.join(BUILD_SWIFT_PATH, os.pardir))
-
-BUILD_SCRIPT_IMPL = os.path.join(UTILS_PATH, 'build-script-impl')
 
 PRESETS_FILES = [
     os.path.join(UTILS_PATH, 'build-presets.ini'),
@@ -394,7 +388,7 @@ class TestDriverArgumentParser(unittest.TestCase):
         assert hasattr(namespace, 'build_script_impl_args')
 
         try:
-            migration.check_impl_args(BUILD_SCRIPT_IMPL,
+            migration.check_impl_args(BUILD_SCRIPT_IMPL_PATH,
                                       namespace.build_script_impl_args)
         except (SystemExit, ValueError) as e:
             raise ParserError('failed to parse impl arguments: ' +
@@ -406,12 +400,12 @@ class TestDriverArgumentParser(unittest.TestCase):
 
         with self._quiet_output():
             try:
-                namespace, unknown_args =\
-                    super(self.parser.__class__, self.parser)\
-                    .parse_known_args(args, namespace)
-                namespace, unknown_args =\
-                    migration.process_disambiguation_arguments(namespace,
-                                                               unknown_args)
+                namespace, unknown_args = (
+                    super(self.parser.__class__, self.parser).parse_known_args(
+                        args, namespace))
+                namespace, unknown_args = (
+                    migration._process_disambiguation_arguments(
+                        namespace, unknown_args))
             except (SystemExit, argparse.ArgumentError) as e:
                 raise ParserError('failed to parse arguments: ' + str(args), e)
 
