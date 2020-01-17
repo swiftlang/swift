@@ -210,6 +210,7 @@ def _apply_default_arguments(args):
         args.test_swiftsyntax = False
         args.test_indexstoredb = False
         args.test_sourcekitlsp = False
+        args.test_swiftdriver = False
         args.test_skstresstester = False
         args.test_swiftevolve = False
         args.test_toolchainbenchmarks = False
@@ -581,6 +582,8 @@ def create_argument_parser():
            help='build IndexStoreDB')
     option(['--sourcekit-lsp'], toggle_true('build_sourcekitlsp'),
            help='build SourceKitLSP')
+    option(['--swift-driver'], toggle_true('build_swiftdriver'),
+           help='build swift-driver')
     option('--install-swiftsyntax', toggle_true('install_swiftsyntax'),
            help='install SwiftSyntax')
     option('--swiftsyntax-verify-generated-files',
@@ -589,6 +592,8 @@ def create_argument_parser():
                 'match the ones that would be generated from current master')
     option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),
            help='install SourceKitLSP')
+    option(['--install-swift-driver'], toggle_true('install_swiftdriver'),
+           help='install swift-driver')
     option(['--install-skstresstester'], toggle_true('install_skstresstester'),
            help='install the SourceKit stress tester')
     option(['--install-swiftevolve'], toggle_true('install_swiftevolve'),
@@ -989,6 +994,8 @@ def create_argument_parser():
            help='skip testing indexstore-db')
     option('--skip-test-sourcekit-lsp', toggle_false('test_sourcekitlsp'),
            help='skip testing sourcekit-lsp')
+    option('--skip-test-swift-driver', toggle_false('test_swiftdriver'),
+           help='skip testing swift-driver')
     option('--skip-test-skstresstester', toggle_false('test_skstresstester'),
            help='skip testing the SourceKit Stress tester')
     option('--skip-test-swiftevolve', toggle_false('test_swiftevolve'),

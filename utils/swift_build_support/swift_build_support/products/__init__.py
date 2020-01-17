@@ -23,6 +23,7 @@ from .llvm import LLVM
 from .ninja import Ninja
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
+from .swiftdriver import SwiftDriver
 from .swift import Swift
 from .swiftevolve import SwiftEvolve
 from .swiftpm import SwiftPM
@@ -49,6 +50,7 @@ __all__ = [
     'SwiftEvolve',
     'IndexStoreDB',
     'SourceKitLSP',
+    'SwiftDriver',
     'Benchmarks',
     'TSanLibDispatch',
 ]

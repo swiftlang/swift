@@ -120,6 +120,7 @@ class BuildScriptInvocation(object):
         targets_needing_toolchain = [
             'build_indexstoredb',
             'build_sourcekitlsp',
+            'build_swiftdriver',
             'build_toolchainbenchmarks',
             'tsan_libdispatch_test',
         ]
@@ -727,6 +728,8 @@ class BuildScriptInvocation(object):
             product_classes.append(products.IndexStoreDB)
         if self.args.build_sourcekitlsp:
             product_classes.append(products.SourceKitLSP)
+        if self.args.build_swiftdriver:
+          product_classes.append(products.SwiftDriver)
         if self.args.build_toolchainbenchmarks:
             product_classes.append(products.Benchmarks)
         if self.args.tsan_libdispatch_test:
