@@ -1750,7 +1750,7 @@ public:
   void cacheResult(Witness value) const;
 };
 
-enum class FunctionBuilderBodyPreCheck : uint8_t {
+enum class FunctionBuilderClosurePreCheck : uint8_t {
   /// There were no problems pre-checking the closure.
   Okay,
 
@@ -1763,7 +1763,7 @@ enum class FunctionBuilderBodyPreCheck : uint8_t {
 
 class PreCheckFunctionBuilderRequest
     : public SimpleRequest<PreCheckFunctionBuilderRequest,
-                           FunctionBuilderBodyPreCheck(AnyFunctionRef),
+                           FunctionBuilderClosurePreCheck(AnyFunctionRef),
                            CacheKind::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1772,7 +1772,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<FunctionBuilderBodyPreCheck>
+  llvm::Expected<FunctionBuilderClosurePreCheck>
   evaluate(Evaluator &evaluator, AnyFunctionRef fn) const;
 
 public:
@@ -2044,7 +2044,7 @@ AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
-void simple_display(llvm::raw_ostream &out, FunctionBuilderBodyPreCheck pck);
+void simple_display(llvm::raw_ostream &out, FunctionBuilderClosurePreCheck pck);
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

@@ -1122,15 +1122,15 @@ void ValueWitnessRequest::cacheResult(Witness type) const {
 //----------------------------------------------------------------------------//
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           FunctionBuilderBodyPreCheck value) {
+                           FunctionBuilderClosurePreCheck value) {
   switch (value) {
-  case FunctionBuilderBodyPreCheck::Okay:
+  case FunctionBuilderClosurePreCheck::Okay:
     out << "okay";
     break;
-  case FunctionBuilderBodyPreCheck::HasReturnStmt:
+  case FunctionBuilderClosurePreCheck::HasReturnStmt:
     out << "has return statement";
     break;
-  case FunctionBuilderBodyPreCheck::Error:
+  case FunctionBuilderClosurePreCheck::Error:
     out << "error";
     break;
   }

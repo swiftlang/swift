@@ -1323,60 +1323,17 @@ namespace {
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
-      auto locator = CS.getConstraintLocator(E);
-
-      Type knownType;
+      // If this is a ParamDecl for a closure argument that has an Unresolved
+      // type, then this is a situation where CSDiags is trying to perform
+      // error recovery within a ClosureExpr.  Just create a new type variable
+      // for the decl that isn't bound to anything.  This will ensure that it
+      // is considered ambiguous.
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
-        knownType = CS.getTypeIfAvailable(VD);
-        if (!knownType &&
-            !(isa<ParamDecl>(VD) &&
-              isa<ClosureExpr>(VD->getDeclContext()) &&
-              CS.Options.contains(
-                ConstraintSystemFlags::SubExpressionDiagnostics)))
-          knownType = VD->getInterfaceType();
-
-        if (knownType) {
-          // If this is a ParamDecl for a closure argument that is a hole,
-          // then this is a situation where CSDiags is trying to perform
-          // error recovery within a ClosureExpr.  Just create a new type
-          // variable for the decl that isn't bound to anything.
-          // This will ensure that it is considered ambiguous.
-          if (knownType && knownType->isHole()) {
-            return CS.createTypeVariable(locator,
-                                         TVO_CanBindToLValue |
-                                         TVO_CanBindToNoEscape);
-          }
-
-          // If the known type has an error, bail out.
-          if (knownType->hasError()) {
-            if (!CS.hasType(E))
-              CS.setType(E, knownType);
-            return nullptr;
-          }
-
-          // Set the favored type for this expression to the known type.
-          if (knownType->hasTypeParameter())
-            knownType = VD->getDeclContext()->mapTypeIntoContext(knownType);
-          CS.setFavoredType(E, knownType.getPointer());
-        }
-
-        // This can only happen when failure diagnostics is trying
-        // to type-check expressions inside of a single-statement
-        // closure which refer to anonymous parameters, in this case
-        // let's either use type as written or allocate a fresh type
-        // variable, just like we do for closure type.
-        // FIXME: We should eliminate this case.
-        if (auto *PD = dyn_cast<ParamDecl>(VD)) {
-          if (!CS.hasType(PD)) {
-            if (knownType && knownType->hasUnboundGenericType())
-              knownType = CS.openUnboundGenericType(knownType, locator);
-
-            CS.setType(
-                PD, knownType ? knownType
-                         : CS.createTypeVariable(locator,
-                                                 TVO_CanBindToLValue |
-                                                 TVO_CanBindToNoEscape));
-          }
+        if (VD->hasInterfaceType() &&
+            VD->getInterfaceType()->is<UnresolvedType>()) {
+          return CS.createTypeVariable(CS.getConstraintLocator(E),
+                                       TVO_CanBindToLValue |
+                                       TVO_CanBindToNoEscape);
         }
       }
 
@@ -1385,9 +1342,42 @@ namespace {
       // FIXME: If the decl is in error, we get no information from this.
       // We may, alternatively, want to use a type variable in that case,
       // and possibly infer the type of the variable that way.
-      if (!knownType && E->getDecl()->isInvalid()) {
-        CS.setType(E, E->getDecl()->getInterfaceType());
+      auto oldInterfaceTy = E->getDecl()->getInterfaceType();
+      if (E->getDecl()->isInvalid()) {
+        CS.setType(E, oldInterfaceTy);
         return nullptr;
+      }
+
+      auto locator = CS.getConstraintLocator(E);
+
+      // If this is a 'var' or 'let' declaration with already
+      // resolved type, let's favor it.
+      if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
+        Type type;
+        if (VD->hasInterfaceType()) {
+          type = VD->getInterfaceType();
+          if (type->hasTypeParameter())
+            type = VD->getDeclContext()->mapTypeIntoContext(type);
+          CS.setFavoredType(E, type.getPointer());
+        }
+
+        // This can only happen when failure diangostics is trying
+        // to type-check expressions inside of a single-statement
+        // closure which refer to anonymous parameters, in this case
+        // let's either use type as written or allocate a fresh type
+        // variable, just like we do for closure type.
+        if (auto *PD = dyn_cast<ParamDecl>(VD)) {
+          if (!CS.hasType(PD)) {
+            if (type && type->hasUnboundGenericType())
+              type = CS.openUnboundGenericType(type, locator);
+
+            CS.setType(
+                PD, type ? type
+                         : CS.createTypeVariable(locator,
+                                                 TVO_CanBindToLValue |
+                                                 TVO_CanBindToNoEscape));
+          }
+        }
       }
 
       // Create an overload choice referencing this declaration and immediately
