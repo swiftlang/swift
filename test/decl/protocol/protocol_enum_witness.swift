@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+////// WITNESS MATCHING FOR PAYLOAD-LESS ENUMS //////
+
 // Requirement is settable, so witness cannot satisfy it //
 
 protocol Foo1 {
@@ -72,4 +74,58 @@ protocol Foo8 {
 
 enum Bar8: Foo8 {
   case bar // Okay
+}
+
+////// WITNESS MATCHING FOR PAYLOAD ENUMS //////
+
+// Witness does not have argument label, but requirement does
+
+protocol Foo9 {
+  static func bar(f: Int) -> Self // expected-note {{protocol requires function 'bar(f:)' with type '(Int) -> Bar9'; do you want to add a stub?}}
+}
+
+enum Bar9: Foo9 { // expected-error {{type 'Bar9' does not conform to protocol 'Foo9'}}
+  case bar(_ f: Int) // expected-note {{candidate has non-matching type '(Bar9.Type) -> (Int) -> Bar9'}}
+}
+
+// Witness does not have any labels, but requirement does
+
+protocol Foo10 {
+  static func bar(g: Int) -> Self // expected-note {{protocol requires function 'bar(g:)' with type '(Int) -> Bar10'; do you want to add a stub?}}
+}
+
+enum Bar10: Foo10 { // expected-error {{type 'Bar10' does not conform to protocol 'Foo10'}}
+  case bar(Int) // expected-note {{candidate has non-matching type '(Bar10.Type) -> (Int) -> Bar10'}}
+}
+
+// Witness does not have a payload, but requirement is a function
+
+protocol Foo11 {
+  static func bar(h: Int) -> Self // expected-note {{protocol requires function 'bar(h:)' with type '(Int) -> Bar11'; do you want to add a stub?}}
+}
+
+enum Bar11: Foo11 { // expected-error {{type 'Bar11' does not conform to protocol 'Foo11'}}
+  case bar // expected-note {{candidate has non-matching type '(Bar11.Type) -> Bar11'}}
+}
+
+// Witness is static, but requirement is not
+
+protocol Foo12 {
+  func bar(i: Int) -> Self // expected-note {{protocol requires function 'bar(i:)' with type '(Int) -> Bar12'; do you want to add a stub?}}
+}
+
+enum Bar12: Foo12 { // expected-error {{type 'Bar12' does not conform to protocol 'Foo12'}}
+  case bar // expected-note {{candidate operates on a type, not an instance as required}}
+}
+
+// Valid cases
+
+protocol Foo13 {
+  static func bar(j: Int) -> Self
+  static func baz(_ k: String) -> Bar13
+}
+
+enum Bar13: Foo13 {
+  case bar(j: Int) // Okay
+  case baz(_ k: String) // Okay
 }
