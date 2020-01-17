@@ -192,7 +192,7 @@ extension vDSP {
 
 // MARK: Gather and Compress
 
-@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension vDSP {
     
     // MARK: vDSP_vgathr
