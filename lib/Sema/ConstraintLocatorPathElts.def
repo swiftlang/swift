@@ -135,11 +135,12 @@ CUSTOM_LOCATOR_PATH_ELT(ProtocolRequirement)
 
 /// Type parameter requirements.
 ABSTRACT_LOCATOR_PATH_ELT(AnyRequirement)
-  /// The Nth conditional requirement in the parent locator's conformance.
-  CUSTOM_LOCATOR_PATH_ELT(ConditionalRequirement)
 
-  /// A single requirement placed on the type parameters.
-  CUSTOM_LOCATOR_PATH_ELT(TypeParameterRequirement)
+/// The Nth conditional requirement in the parent locator's conformance.
+CUSTOM_LOCATOR_PATH_ELT(ConditionalRequirement)
+
+/// A single requirement placed on the type parameters.
+CUSTOM_LOCATOR_PATH_ELT(TypeParameterRequirement)
 
 /// RValue adjustment.
 SIMPLE_LOCATOR_PATH_ELT(RValueAdjustment)
@@ -155,11 +156,12 @@ CUSTOM_LOCATOR_PATH_ELT(SynthesizedArgument)
 
 /// Tuple elements.
 ABSTRACT_LOCATOR_PATH_ELT(AnyTupleElement)
-  /// A tuple element referenced by position.
-  CUSTOM_LOCATOR_PATH_ELT(TupleElement)
 
-  /// A tuple element referenced by name.
-  CUSTOM_LOCATOR_PATH_ELT(NamedTupleElement)
+/// A tuple element referenced by position.
+CUSTOM_LOCATOR_PATH_ELT(TupleElement)
+
+/// A tuple element referenced by name.
+CUSTOM_LOCATOR_PATH_ELT(NamedTupleElement)
 
 /// An unresolved member.
 SIMPLE_LOCATOR_PATH_ELT(UnresolvedMember)
