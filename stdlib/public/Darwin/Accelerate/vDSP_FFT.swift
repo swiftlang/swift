@@ -329,8 +329,11 @@ struct vDSP_FFTFunctions {
     }
 }
 
-
-@available(swift, deprecated: 5.2, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPSplitComplex` for a defined scope.")
+@available(macOS, introduced: 10.15, deprecated, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPSplitComplex` for a defined scope.")
+@available(iOS, introduced: 13.0, deprecated, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPSplitComplex` for a defined scope.")
+@available(watchOS, introduced: 6.0, deprecated, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPSplitComplex` for a defined scope.")
+@available(tvOS, introduced: 13.0, deprecated, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPSplitComplex` for a defined scope.")
+@available(*, deprecated, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPSplitComplex` for a defined scope.")
 extension DSPSplitComplex {
     
     /// Creates a new `DSPSplitComplex` structure from a real array not in even-odd split configuration.
@@ -353,7 +356,11 @@ extension DSPSplitComplex {
     }
 }
 
-@available(swift, deprecated: 5.2, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPDoubleSplitComplex` for a defined scope.")
+@available(macOS, introduced: 10.15, deprecated, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPSplitComplex` for a defined scope.")
+@available(iOS, introduced: 13.0, deprecated, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPSplitComplex` for a defined scope.")
+@available(watchOS, introduced: 6.0, deprecated, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPSplitComplex` for a defined scope.")
+@available(tvOS, introduced: 13.0, deprecated, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPSplitComplex` for a defined scope.")
+@available(*, deprecated, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPSplitComplex` for a defined scope.")
 extension DSPDoubleSplitComplex {
     
     /// Creates a new `DSPDoubleSplitComplex` structure from a real array not in even-odd split configuration.
