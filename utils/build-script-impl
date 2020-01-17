@@ -1186,48 +1186,41 @@ function is_cmake_debuginfo_build_type() {
 function common_cross_c_flags() {
     echo -n "${COMMON_C_FLAGS}"
 
-    case $1 in
-        iphonesimulator-i386)
-            echo -n " -arch i386 -mios-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+    local host=$1
+    local arch=${host##*-}
+
+    case $host in
+        iphonesimulator-*)
+            echo -n " -arch ${arch}  -mios-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
             ;;
-        iphonesimulator-x86_64)
-            echo -n " -arch x86_64 -mios-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+        iphoneos-*)
+            echo -n " -arch ${arch}  -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
             ;;
-        iphoneos-armv7)
-            echo -n " -arch armv7 -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+        appletvsimulator-*)
+            echo -n " -arch ${arch}  -mtvos-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_TVOS}"
             ;;
-        iphoneos-armv7s)
-            echo -n " -arch armv7s -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+        appletvos-*)
+            echo -n " -arch ${arch}  -mtvos-version-min=${DARWIN_DEPLOYMENT_VERSION_TVOS}"
             ;;
-        iphoneos-arm64)
-            echo -n " -arch arm64 -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+        watchsimulator-*)
+            echo -n " -arch ${arch}  -mwatchos-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
-        appletvsimulator-x86_64)
-            echo -n " -arch x86_64 -mtvos-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_TVOS}"
+        watchos-*)
+            echo -n " -arch ${arch}  -mwatchos-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
-        appletvos-arm64)
-            echo -n " -arch arm64 -mtvos-version-min=${DARWIN_DEPLOYMENT_VERSION_TVOS}"
-            ;;
-        watchsimulator-i386)
-            echo -n " -arch i386 -mwatchos-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
-            ;;
-        watchos-armv7k)
-            echo -n " -arch armv7k -mwatchos-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
-            ;;
-        android-armv7)
-            echo -n " -arch armv7"
-            ;;
-        android-aarch64)
-            echo -n " -arch aarch64"
+        android-*)
+            echo -n " -arch ${arch}"
             ;;
     esac
+
+    local build_type=$2
+    if [[ $(is_cmake_release_build_type ${build_type}) ]] ; then
+      echo -n " -fno-stack-protector"
+    fi
 }
 
 function llvm_c_flags() {
-    echo -n " $(common_cross_c_flags $1)"
-    if [[ $(is_cmake_release_build_type "${LLVM_BUILD_TYPE}") ]] ; then
-        echo -n " -fno-stack-protector"
-    fi
+    echo -n " $(common_cross_c_flags $1 ${LLVM_BUILD_TYPE})"
     if [[ $(is_cmake_debuginfo_build_type "${LLVM_BUILD_TYPE}") ]] ; then
         if [[ $(is_llvm_lto_enabled) == "TRUE" ]] ; then
             echo -n " -gline-tables-only"
@@ -1238,10 +1231,7 @@ function llvm_c_flags() {
 }
 
 function cmark_c_flags() {
-    echo -n " $(common_cross_c_flags $1)"
-    if [[ $(is_cmake_release_build_type "${CMARK_BUILD_TYPE}") ]] ; then
-        echo -n " -fno-stack-protector"
-    fi
+    echo -n " $(common_cross_c_flags $1 ${CMARK_BUILD_TYPE})"
 }
 
 function swift_c_flags() {
