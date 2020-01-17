@@ -23,8 +23,8 @@ from .llvm import LLVM
 from .ninja import Ninja
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
-from .swiftdriver import SwiftDriver
 from .swift import Swift
+from .swiftdriver import SwiftDriver
 from .swiftevolve import SwiftEvolve
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax

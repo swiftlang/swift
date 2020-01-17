@@ -46,13 +46,14 @@ class SwiftDriver(product.Product):
     def install(self, host_target):
         run_build_script_helper(
             'install', host_target, self, self.args)
-            
+
+
 def run_build_script_helper(action, host_target, product, args):
     script_path = os.path.join(
         product.source_dir, 'Utilities', 'build-script-helper.py')
 
     toolchain_path = targets.toolchain_path(args.install_destdir,
-                                                args.install_prefix)
+                                            args.install_prefix)
 
     is_release = product.is_release()
     configuration = 'release' if is_release else 'debug'
@@ -68,4 +69,3 @@ def run_build_script_helper(action, host_target, product, args):
         helper_cmd.append('--verbose')
 
     shell.call(helper_cmd)
-
