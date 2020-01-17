@@ -406,10 +406,13 @@ public:
     if (!witness)
       return asDerived().addMissingMethod(requirementRef);
 
-    // An enum case can witness a static get-only Self property requirement
+    // An enum case can witness:
+    // 1. A static get-only property requirement, as long as the property's
+    //    type is `Self` or it matches the type of the enum explicitly.
+    // 2. A static function requirement, if the enum case has a payload
+    //    and the payload types and labels match the function and the
+    //    function returns `Self` or the type of the enum.
     if (auto EED = dyn_cast<EnumElementDecl>(witness.getDecl())) {
-      // assert(!EED->hasAssociatedValues() && "cases with payload not
-      // supported");
       return addMethodImplementation(
           requirementRef,
           SILDeclRef(witness.getDecl(), SILDeclRef::Kind::EnumElement),
