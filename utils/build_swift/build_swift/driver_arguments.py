@@ -525,8 +525,10 @@ def create_argument_parser():
     option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
            default=None,
-           help='list of targets to compile or cross-compile the Swift '
-                'standard library for. %(default)s by default.')
+           help='The targets to compile or cross-compile the Swift standard '
+                'library for. %(default)s by default.'
+                ' Comma separated list: {}'.format(
+                    ' '.join(StdlibDeploymentTarget.get_target_names())))
 
     option('--build-stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
