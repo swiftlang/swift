@@ -16,6 +16,37 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+extension vImage_Buffer {
+    /// Initializes a vImage buffer of a specified size.
+    ///
+    /// - Parameter size: The size of the buffer.
+    /// - Parameter bitsPerPixel: The number of bits in a pixel of image data.
+    ///
+    /// - Returns: An initialized vImage buffer.
+    public init(size: CGSize,
+                bitsPerPixel: UInt32) throws {
+        
+        guard
+            let width = Int(exactly: size.width), width > 0,
+            let height = Int(exactly: size.height), height > 0 else {
+                throw vImage.Error.invalidParameter
+        }
+        
+        self.init()
+        
+        let error = vImageBuffer_Init(&self,
+                                      vImagePixelCount(height),
+                                      vImagePixelCount(width),
+                                      bitsPerPixel,
+                                      vImage_Flags(kvImageNoFlags))
+        
+        if error < kvImageNoError {
+            throw vImage.Error(vImageError: error)
+        }
+    }
+}
+
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vImage_Buffer {
     
@@ -69,35 +100,7 @@ extension vImage_Buffer {
     //  Initializers.
     //
     //===----------------------------------------------------------------------===//
-    
-    /// Initializes a vImage buffer of a specified size.
-    ///
-    /// - Parameter size: The size of the buffer.
-    /// - Parameter bitsPerPixel: The number of bits in a pixel of image data.
-    ///
-    /// - Returns: An initialized vImage buffer.
-    public init(size: CGSize,
-                bitsPerPixel: UInt32) throws {
         
-        guard
-            let width = Int(exactly: size.width), width > 0,
-            let height = Int(exactly: size.height), height > 0 else {
-                throw vImage.Error.invalidParameter
-        }
-        
-        self.init()
-        
-        let error = vImageBuffer_Init(&self,
-                                      vImagePixelCount(height),
-                                      vImagePixelCount(width),
-                                      bitsPerPixel,
-                                      vImage_Flags(kvImageNoFlags))
-        
-        if error < kvImageNoError {
-            throw vImage.Error(vImageError: error)
-        }
-    }
-    
     /// Initializes a vImage buffer of a specified width and height.
     ///
     /// - Parameter width: The width of the buffer.

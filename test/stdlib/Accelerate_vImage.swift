@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// REQUIRES: rdar50244151
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
 
@@ -9,6 +8,18 @@ import StdlibUnittest
 import Accelerate
 
 var Accelerate_vImageTests = TestSuite("Accelerate_vImage")
+
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    Accelerate_vImageTests.test("vImage/InitBufferFromCGSize") {
+        let buffer = try! vImage_Buffer(size: CGSize(width: 16,
+                                                     height: 32),
+                                        bitsPerPixel: 8)
+        
+        expectEqual(buffer.width, 16)
+        expectEqual(buffer.height, 32)
+        expectTrue(buffer.data != nil)
+    }
+}
 
 if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     let width = UInt(64)
@@ -222,17 +233,7 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         let buffer = try! vImage_Buffer(width: 99999999, height: 99999999,
                                         bitsPerPixel: 99999999)
     }
-    
-    Accelerate_vImageTests.test("vImage/InitBufferFromCGSize") {
-        let buffer = try! vImage_Buffer(size: CGSize(width: 16,
-                                                     height: 32),
-                                        bitsPerPixel: 8)
         
-        expectEqual(buffer.width, 16)
-        expectEqual(buffer.height, 32)
-        expectTrue(buffer.data != nil)
-    }
-    
     Accelerate_vImageTests.test("vImage/InitWithInvalidImageFormat") {
         let pixels: [UInt8] = (0 ..< width * height).map { _ in
             return UInt8.random(in: 0 ..< 255)
