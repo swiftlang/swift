@@ -7,6 +7,11 @@ if(POLICY CMP0068)
   cmake_policy(SET CMP0068 OLD)
 endif()
 
+# Honour CMAKE_CXX_STANDARD in try_compile(), needed for check_cxx_native_regex.
+if(POLICY CMP0067)
+  cmake_policy(SET CMP0067 NEW)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
