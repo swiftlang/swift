@@ -344,6 +344,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
                                     options::OPT_runtime_compatibility_version);
     if (value.equals("5.0")) {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
+    } else if (value.equals("5.1")) {
+      runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
     } else if (value.equals("none")) {
       runtimeCompatibilityVersion = None;
     } else {
@@ -355,16 +357,22 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
   }
   
   if (runtimeCompatibilityVersion) {
+    SmallString<128> BackDeployLib;
+    BackDeployLib.append(SharedResourceDirPath);
+
     if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
       // Swift 5.0 compatibility library
-      SmallString<128> BackDeployLib;
-      BackDeployLib.append(SharedResourceDirPath);
       llvm::sys::path::append(BackDeployLib, "libswiftCompatibility50.a");
-      
-      if (llvm::sys::fs::exists(BackDeployLib)) {
-        Arguments.push_back("-force_load");
-        Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
-      }
+    }
+
+    if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 1)) {
+      // Swift 5.1 compatibility library
+      llvm::sys::path::append(BackDeployLib, "libswiftCompatibility51.a");
+    }
+
+    if (llvm::sys::fs::exists(BackDeployLib)) {
+      Arguments.push_back("-force_load");
+      Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
     }
   }
     

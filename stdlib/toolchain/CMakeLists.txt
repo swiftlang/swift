@@ -56,4 +56,5 @@ endif()
 
 add_subdirectory(legacy_layouts)
 add_subdirectory(Compatibility50)
+add_subdirectory(Compatibility51)
 add_subdirectory(CompatibilityDynamicReplacements)
