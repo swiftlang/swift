@@ -1035,15 +1035,19 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
     if (ModuleInterfacePath)
       *ModuleInterfacePath = InPath;
   }
+
+  // FIXME: A test breaks if we respect IgnoreSwiftSourceInfoFile here. Why?
+  llvm::SaveAndRestore<bool> fixme(IgnoreSwiftSourceInfoFile, false);
+
   // Open .swiftsourceinfo file if it's present.
-  SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(ModuleID,
-                                                                BaseName,
-                                                       ModuleSourceInfoBuffer);
+  if (auto SourceInfoError = openModuleSourceInfoFileIfPresent(ModuleID,
+                                                               BaseName,
+                                                       ModuleSourceInfoBuffer))
+    return SourceInfoError;
+
   // Delegate back to the serialized module loader to load the module doc.
-  auto DocLoadErr =
-    SerializedModuleLoaderBase::openModuleDocFile(ModuleID, BaseName,
-                                                  ModuleDocBuffer);
-  if (DocLoadErr)
+  if (auto DocLoadErr = openModuleDocFileIfPresent(ModuleID, BaseName,
+                                                   ModuleDocBuffer))
     return DocLoadErr;
 
   return std::error_code();

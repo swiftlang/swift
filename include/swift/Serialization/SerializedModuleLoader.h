@@ -100,18 +100,18 @@ protected:
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) = 0;
 
   std::error_code
-  openModuleFiles(AccessPathElem ModuleID,
-                  const SerializedModuleBaseName &BaseName,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
+  openModuleFile(
+       AccessPathElem ModuleID,
+       const SerializedModuleBaseName &BaseName,
+       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer);
 
   std::error_code
-  openModuleDocFile(AccessPathElem ModuleID,
-                    const SerializedModuleBaseName &BaseName,
-                    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
+  openModuleDocFileIfPresent(
+      AccessPathElem ModuleID,
+      const SerializedModuleBaseName &BaseName,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
 
-  void
+  std::error_code
   openModuleSourceInfoFileIfPresent(
       AccessPathElem ModuleID,
       const SerializedModuleBaseName &BaseName,

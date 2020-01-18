@@ -242,8 +242,9 @@ void SerializedModuleLoader::collectVisibleTopLevelModuleNames(
       names, file_types::getExtension(file_types::TY_SwiftModuleFile));
 }
 
-std::error_code SerializedModuleLoaderBase::openModuleDocFile(
-  AccessPathElem ModuleID, const SerializedModuleBaseName &BaseName,
+std::error_code SerializedModuleLoaderBase::openModuleDocFileIfPresent(
+  AccessPathElem ModuleID,
+  const SerializedModuleBaseName &BaseName,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
 
   if (!ModuleDocBuffer)
@@ -268,13 +269,14 @@ std::error_code SerializedModuleLoaderBase::openModuleDocFile(
   return std::error_code();
 }
 
-void
+std::error_code
 SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(
     AccessPathElem ModuleID,
     const SerializedModuleBaseName &BaseName,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
-  if (!ModuleSourceInfoBuffer)
-    return;
+  if (IgnoreSwiftSourceInfoFile || !ModuleSourceInfoBuffer)
+    return std::error_code();
+
   llvm::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
 
   llvm::SmallString<128>
@@ -289,62 +291,55 @@ SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(
   llvm::sys::path::append(PathWithProjectDir, FileName);
 
   // Try to open the module source info file from the "Project" directory.
-  // If it does not exist, ignore the error.
-  if (auto ModuleSourceInfoOrErr = FS.getBufferForFile(PathWithProjectDir)) {
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
+  ModuleSourceInfoOrErr = FS.getBufferForFile(PathWithProjectDir);
+
+  // If it does not exist, try to open the module source info file adjacent to
+  // the .swiftmodule file.
+  if (ModuleSourceInfoOrErr.getError() == std::errc::no_such_file_or_directory)
+    ModuleSourceInfoOrErr = FS.getBufferForFile(PathWithoutProjectDir);
+
+  // If we ended up with a different file system error, return it.
+  if (ModuleSourceInfoOrErr)
     *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
-    return;
-  }
-  // Try to open the module source info file adjacent to the .swiftmodule file.
-  if (auto ModuleSourceInfoOrErr = FS.getBufferForFile(PathWithoutProjectDir)) {
-    *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
-    return;
-  }
+  else if (ModuleSourceInfoOrErr.getError() !=
+              std::errc::no_such_file_or_directory)
+    return ModuleSourceInfoOrErr.getError();
+
+  return std::error_code();
 }
 
-std::error_code SerializedModuleLoaderBase::openModuleFiles(
+std::error_code SerializedModuleLoaderBase::openModuleFile(
     AccessPathElem ModuleID, const SerializedModuleBaseName &BaseName,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
-  assert(((ModuleBuffer && ModuleDocBuffer) ||
-          (!ModuleBuffer && !ModuleDocBuffer)) &&
-         "Module and Module Doc buffer must both be initialized or NULL");
-
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer) {
   llvm::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
 
   // Try to open the module file first.  If we fail, don't even look for the
   // module documentation file.
   SmallString<256> ModulePath{BaseName.getName(file_types::TY_SwiftModuleFile)};
 
-  // If there are no buffers to load into, simply check for the existence of
+  // If there's no buffer to load into, simply check for the existence of
   // the module file.
-  if (!(ModuleBuffer || ModuleDocBuffer)) {
+  if (!ModuleBuffer) {
     llvm::ErrorOr<llvm::vfs::Status> statResult = FS.status(ModulePath);
     if (!statResult)
       return statResult.getError();
+
     if (!statResult->exists())
       return std::make_error_code(std::errc::no_such_file_or_directory);
+
     // FIXME: llvm::vfs::FileSystem doesn't give us information on whether or
     // not we can /read/ the file without actually trying to do so.
     return std::error_code();
   }
 
+  // Actually load the file and error out if necessary.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleOrErr =
       FS.getBufferForFile(ModulePath);
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
-  if (!IgnoreSwiftSourceInfoFile) {
-    // Open .swiftsourceinfo file if it's present.
-    openModuleSourceInfoFileIfPresent(ModuleID, BaseName,
-                                      ModuleSourceInfoBuffer);
-  }
-  auto ModuleDocErr =
-    openModuleDocFile(ModuleID, BaseName, ModuleDocBuffer);
-  if (ModuleDocErr)
-    return ModuleDocErr;
 
   *ModuleBuffer = std::move(ModuleOrErr.get());
-
   return std::error_code();
 }
 
@@ -355,14 +350,34 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
+  assert(((ModuleBuffer && ModuleDocBuffer) ||
+          (!ModuleBuffer && !ModuleDocBuffer)) &&
+         "Module and Module Doc buffer must both be initialized or NULL");
+
   if (LoadMode == ModuleLoadingMode::OnlyInterface)
     return std::make_error_code(std::errc::not_supported);
 
-  return SerializedModuleLoaderBase::openModuleFiles(ModuleID,
-                                                     BaseName,
-                                                     ModuleBuffer,
-                                                     ModuleDocBuffer,
-                                                     ModuleSourceInfoBuffer);
+  auto ModuleErr = openModuleFile(ModuleID, BaseName, ModuleBuffer);
+  if (ModuleErr)
+    return ModuleErr;
+
+  // If there are no buffers to load into, all we care about is whether the
+  // module file existed.
+  if (ModuleBuffer || ModuleDocBuffer || ModuleSourceInfoBuffer) {
+    auto ModuleSourceInfoError = openModuleSourceInfoFileIfPresent(
+        ModuleID, BaseName, ModuleSourceInfoBuffer
+    );
+    if (ModuleSourceInfoError)
+      return ModuleSourceInfoError;
+
+    auto ModuleDocErr = openModuleDocFileIfPresent(
+        ModuleID, BaseName, ModuleDocBuffer
+    );
+    if (ModuleDocErr)
+      return ModuleDocErr;
+  }
+
+  return std::error_code();
 }
 
 bool SerializedModuleLoader::maybeDiagnoseTargetMismatch(
