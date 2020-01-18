@@ -308,7 +308,7 @@ public:
            typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
   void cacheOutput(const Request &request,
                    typename Request::OutputType &&output) {
-    cache.insert({getCanonicalRequest(request), std::move(output)});
+    cache.insert({AnyRequest(request), std::move(output)});
   }
 
   /// Clear the cache stored within this evaluator.
@@ -324,17 +324,6 @@ public:
   }
 
 private:
-  template <typename Request>
-  const AnyRequest &getCanonicalRequest(const Request &request) {
-    // FIXME: DenseMap ought to let us do this with one hash lookup.
-    auto iter = dependencies.find_as(request);
-    if (iter != dependencies.end())
-      return iter->first;
-    auto insertResult = dependencies.insert({AnyRequest(request), {}});
-    assert(insertResult.second && "just checked if the key was already there");
-    return insertResult.first->first;
-  }
-
   /// Diagnose a cycle detected in the evaluation of the given
   /// request.
   void diagnoseCycle(const ActiveRequest &request);
@@ -423,7 +412,7 @@ private:
       return result;
 
     // Cache the result.
-    cache.insert({getCanonicalRequest(request), *result});
+    cache.insert({AnyRequest(request), *result});
     return result;
   }
 
