@@ -6,6 +6,9 @@
 // RUN: %line-directive %t/FloatingPointPrinting.swift -- %target-run %t/main.out --locale ru_RU.UTF-8
 // REQUIRES: executable_test
 
+// With a non-optimized stdlib the test takes very long.
+// REQUIRES: optimized_stdlib
+
 import StdlibUnittest
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin
