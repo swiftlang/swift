@@ -7,16 +7,13 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+from __future__ import absolute_import, unicode_literals
+
 import os
 import sys
 import unittest
 from contextlib import contextmanager
-
-
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
+from io import StringIO
 
 
 __all__ = [

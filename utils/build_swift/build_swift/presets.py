@@ -17,13 +17,8 @@ from __future__ import absolute_import, unicode_literals
 from collections import namedtuple
 from contextlib import contextmanager
 
-try:
-    # Python 2
-    import ConfigParser as configparser
-    from StringIO import StringIO
-except ImportError:
-    import configparser
-    from io import StringIO
+from six import StringIO
+from six.moves import configparser
 
 
 __all__ = [

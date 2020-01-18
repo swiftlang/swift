@@ -13,9 +13,13 @@ arguments.
 """
 
 
+from __future__ import absolute_import, unicode_literals
+
 import os.path
 import re
 import shlex
+
+import six
 
 from . import ArgumentTypeError
 
@@ -40,7 +44,7 @@ class CompilerVersion(object):
 
     def __init__(self, *components):
         if len(components) == 1:
-            if isinstance(components[0], str):
+            if isinstance(components[0], six.string_types):
                 components = components[0].split('.')
             elif isinstance(components[0], (list, tuple)):
                 components = components[0]
@@ -54,7 +58,7 @@ class CompilerVersion(object):
         return self.components == other.components
 
     def __str__(self):
-        return '.'.join([str(part) for part in self.components])
+        return '.'.join([six.text_type(part) for part in self.components])
 
 
 # -----------------------------------------------------------------------------
