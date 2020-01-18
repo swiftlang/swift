@@ -325,7 +325,7 @@
                 "tensorflow": "v2.1.0-rc1",
                 "tensorflow-swift-apis": "190cf8765b758fdcc74305e7b22aeb083c1cb9fb",
                 "tensorflow-swift-quote": "34d4112c294e9eccfb575dd8f39e6e3b0b6bc008"
-	     }
+            }
         }
     }
 }
