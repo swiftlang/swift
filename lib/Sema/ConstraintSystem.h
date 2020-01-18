@@ -685,7 +685,8 @@ struct AppliedBuilderTransform {
   };
 
   /// A mapping from expressions whose values are captured by the builder
-  /// to information about the temporary variable capturing the
+  /// to information about the temporary variable capturing that value
+  /// for use later.
   llvm::DenseMap<Expr *, RecordedExpr> capturedExprs;
 
   /// A mapping from statements to a pair containing the implicit variable
