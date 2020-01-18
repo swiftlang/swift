@@ -1291,6 +1291,7 @@ OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   OriginallyDefinedInAttr::ActiveVersion Result;
   Result.Platform = Platform;
   Result.Version = MovedVersion;
+  Result.ModuleName = OriginalModuleName;
   if (isPlatformActive(Platform, ctx.LangOpts)) {
     Result.IsSimulator = ctx.LangOpts.Target.isSimulatorEnvironment();
     return Result;
