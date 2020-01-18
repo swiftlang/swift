@@ -125,6 +125,56 @@ extension KeyValuePairs: RandomAccessCollection {
   }
 }
 
+extension KeyValuePairs: Equatable where Key: Equatable, Value: Equatable {
+    /// Returns a Boolean value indicating whether two `KeyValuePairs` instances
+    /// contain the same elements in the same order.
+    ///
+    /// You can use the equal-to operator (`==`) to compare any two `KeyValuePairs` instances
+    /// that store the same, `Equatable`-conforming `Key` and `Value` types.
+    ///
+    /// - Parameters:
+    ///   - lhs: An `KeyValuePairs` instance to compare.
+    ///   - rhs: Another `KeyValuePairs` instance to compare.
+    @inlinable
+    public static func ==(lhs: KeyValuePairs<Key, Value>, rhs: KeyValuePairs<Key, Value>) -> Bool {
+        let lhsCount = lhs.count
+        if lhsCount != rhs.count {
+          return false
+        }
+        
+        _internalInvariant(lhs.startIndex == 0 && rhs.startIndex == 0)
+        _internalInvariant(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
+        
+        // We know that lhs.count == rhs.count, compare element wise.
+        for idx in 0..<lhsCount {
+            let (lhsPairKey, lhsPairValue) = lhs[idx]
+            let (rhsPairKey, rhsPairValue) = rhs[idx]
+            
+            if lhsPairKey != rhsPairKey || lhsPairValue != rhsPairValue {
+                return false
+            }
+        }
+        
+        return true
+    }
+}
+
+extension KeyValuePairs: Hashable where Key: Hashable, Value: Hashable {
+    /// Hashes the essential components of this value by feeding them into the
+    /// given hasher.
+    ///
+    /// - Parameter hasher: The hasher to use when combining the components
+    ///   of this instance.
+    @inlinable
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(count) // discriminator
+        for (key, value) in self {
+            hasher.combine(key)
+            hasher.combine(value)
+        }
+    }
+}
+
 extension KeyValuePairs: CustomStringConvertible {
   /// A string that represents the contents of the dictionary.
   public var description: String {
