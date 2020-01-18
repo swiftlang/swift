@@ -1036,9 +1036,6 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
       *ModuleInterfacePath = InPath;
   }
 
-  // FIXME: A test breaks if we respect IgnoreSwiftSourceInfoFile here. Why?
-  llvm::SaveAndRestore<bool> fixme(IgnoreSwiftSourceInfoFile, false);
-
   // Open .swiftsourceinfo file if it's present.
   if (auto SourceInfoError = openModuleSourceInfoFileIfPresent(ModuleID,
                                                                BaseName,
