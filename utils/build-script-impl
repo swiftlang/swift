@@ -1773,8 +1773,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DClang_DIR:PATH=${llvm_build_dir}/lib/cmake/clang
                     -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
-                    -DSWIFT_PATH_TO_CMARK_SOURCE:PATH="${CMARK_SOURCE_DIR}"
-                    -DSWIFT_PATH_TO_CMARK_BUILD:PATH="$(build_directory ${host} cmark)"
+                    -Dcmark_DIR:PATH=$(build_directory ${host} cmark)/src
                     -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH="${LIBDISPATCH_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_LIBDISPATCH_BUILD:PATH="$(build_directory ${host} libdispatch)"
                 )
@@ -1789,18 +1788,6 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
                         -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
                         -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB:BOOL=TRUE
-                    )
-                fi
-
-                if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_CMARK_LIBRARY_DIR:PATH=$(build_directory ${host} cmark)/src/${CMARK_BUILD_TYPE}
-                    )
-                else
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_CMARK_LIBRARY_DIR:PATH=$(build_directory ${host} cmark)/src
                     )
                 fi
 

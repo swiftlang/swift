@@ -4,7 +4,6 @@ add_swift_host_library(swiftMarkup STATIC
   Markup.cpp)
 target_link_libraries(swiftMarkup PRIVATE
   libcmark_static)
-target_compile_definitions(swiftMarkup
-                           PRIVATE
-                             CMARK_STATIC_DEFINE)
+target_compile_definitions(swiftMarkup PRIVATE
+  CMARK_STATIC_DEFINE)
 

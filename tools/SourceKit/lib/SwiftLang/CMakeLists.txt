@@ -63,4 +63,6 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   clangAST
   clangAPINotes
   clangBasic)
+target_compile_definitions(SourceKitSwiftLang PRIVATE
+  CMARK_STATIC_DEFINE)
 add_dependencies(SourceKitSwiftLang clang-tablegen-targets)
