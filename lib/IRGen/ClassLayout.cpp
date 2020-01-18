@@ -48,7 +48,6 @@ Size ClassLayout::getInstanceStart() const {
     elements = elements.drop_front();
 
     // Ignore empty elements.
-    bool haveSeenEmpty = false;
     if (element.isEmpty()) {
       continue;
     } else if (element.hasByteOffset()) {
