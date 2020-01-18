@@ -17,22 +17,10 @@ from __future__ import absolute_import, unicode_literals
 import itertools
 import subprocess
 
+from six.moves import map
+
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
-
-
-try:
-    # Python 2
-    from itertools import imap
-except ImportError:
-    imap = map
-
-
-try:
-    # Python 2
-    unicode
-except NameError:
-    unicode = str
 
 
 __all__ = [
@@ -94,12 +82,12 @@ def migrate_swift_sdks(args):
         sdks = arg.split('=')[1]
         sdk_list = [] if sdks == '' else sdks.split(';')
 
-        targets = _flatten(imap(_swift_sdk_to_stdlib_targets, sdk_list))
+        targets = _flatten(map(_swift_sdk_to_stdlib_targets, sdk_list))
         target_names = [target.name for target in targets]
 
         return '--stdlib-deployment-targets={}'.format(' '.join(target_names))
 
-    return list(imap(_migrate_swift_sdks_arg, args))
+    return list(map(_migrate_swift_sdks_arg, args))
 
 
 # -----------------------------------------------------------------------------
