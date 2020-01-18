@@ -12,70 +12,12 @@ from __future__ import absolute_import, unicode_literals
 import os.path
 import platform
 
-import six
-
 from ..utils import TestCase
 from ...build_swift.argparse import ArgumentTypeError, types
+from ...build_swift.versions import Version
 
 
 # -----------------------------------------------------------------------------
-
-class TestCompilerVersion(TestCase):
-
-    def test_init_valid_value(self):
-        version = types.CompilerVersion(1, 0, 0, 1)
-        self.assertEqual(version.components, (1, 0, 0, 1))
-
-    def test_init_list(self):
-        version = types.CompilerVersion([1, 0, 0])
-        self.assertEqual(version.components, (1, 0, 0))
-
-        types.CompilerVersion([1, 0])
-        types.CompilerVersion([2, 3, 4])
-        types.CompilerVersion([3, 1, 4, 1, 5, 9])
-
-    def test_init_tuple(self):
-        version = types.CompilerVersion((1, 0, 0))
-        self.assertEqual(version.components, (1, 0, 0))
-
-        types.CompilerVersion((1, 0))
-        types.CompilerVersion((2, 3, 4))
-        types.CompilerVersion((3, 1, 4, 1, 5, 9))
-
-    def test_init_str(self):
-        version = types.CompilerVersion('1.0.0')
-        self.assertEqual(version.components, (1, 0, 0))
-
-        types.CompilerVersion('1.0')
-        types.CompilerVersion('2.3.4')
-        types.CompilerVersion('3.1.4.1.5.9')
-
-    def test_init_invalid_value(self):
-        with self.assertRaises(ValueError):
-            types.CompilerVersion()
-            types.CompilerVersion([])
-            types.CompilerVersion(())
-            types.CompilerVersion('')
-            types.CompilerVersion(True)
-            types.CompilerVersion('a')
-            types.CompilerVersion(dict())
-
-    def test_eq(self):
-        v1 = types.CompilerVersion('1.0.0')
-        v2 = types.CompilerVersion('1.2.4.8')
-
-        self.assertEqual(v1, v1)
-        self.assertEqual(v2, v2)
-        self.assertNotEqual(v1, v2)
-        self.assertNotEqual(v2, v1)
-
-    def test_str(self):
-        version = types.CompilerVersion('1.0.0')
-        self.assertEqual(six.text_type(version), '1.0.0')
-
-        version = types.CompilerVersion('1.0.0.1')
-        self.assertEqual(six.text_type(version), '1.0.0.1')
-
 
 class TestBoolType(TestCase):
 
@@ -206,11 +148,11 @@ class TestClangVersionType(TestCase):
         clang_version_type = types.ClangVersionType()
 
         version = clang_version_type('1.0.0')
-        self.assertIsInstance(version, types.CompilerVersion)
+        self.assertIsInstance(version, types.Version)
         self.assertEqual(version.components, (1, 0, 0))
 
         version = clang_version_type('1.0.0.1')
-        self.assertIsInstance(version, types.CompilerVersion)
+        self.assertIsInstance(version, types.Version)
         self.assertEqual(version.components, (1, 0, 0, 1))
 
         clang_version_type('1.0.0')
@@ -234,11 +176,11 @@ class TestSwiftVersionType(TestCase):
         swift_version_type = types.SwiftVersionType()
 
         version = swift_version_type('1.0')
-        self.assertIsInstance(version, types.CompilerVersion)
+        self.assertIsInstance(version, Version)
         self.assertEqual(version.components, (1, 0))
 
         version = swift_version_type('1.0.1')
-        self.assertIsInstance(version, types.CompilerVersion)
+        self.assertIsInstance(version, Version)
         self.assertEqual(version.components, (1, 0, 1))
 
         swift_version_type('1.0')
