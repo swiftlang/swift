@@ -987,7 +987,7 @@ bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
 /// cache or by converting it in a subordinate \c CompilerInstance, caching
 /// the results.
 std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
-  AccessPathElem ModuleID, StringRef DirPath,
+  AccessPathElem ModuleID,
   const SerializedModuleBaseName &BaseName,
   SmallVectorImpl<char> *ModuleInterfacePath,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -999,8 +999,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   assert(LoadMode != ModuleLoadingMode::OnlySerialized);
 
   llvm::SmallString<256>
-  ModPath{ BaseName.getName(DirPath, file_types::TY_SwiftModuleFile) },
-  InPath{  BaseName.getName(DirPath, file_types::TY_SwiftModuleInterfaceFile) };
+  ModPath{ BaseName.getName(file_types::TY_SwiftModuleFile) },
+  InPath{  BaseName.getName(file_types::TY_SwiftModuleInterfaceFile) };
 
   // First check to see if the .swiftinterface exists at all. Bail if not.
   auto &fs = *Ctx.SourceMgr.getFileSystem();
@@ -1037,13 +1037,11 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   }
   // Open .swiftsourceinfo file if it's present.
   SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(ModuleID,
-                                                                ModPath,
+                                                                BaseName,
                                                        ModuleSourceInfoBuffer);
   // Delegate back to the serialized module loader to load the module doc.
-  llvm::SmallString<256>
-  DocPath{BaseName.getName(DirPath, file_types::TY_SwiftModuleDocFile)};
   auto DocLoadErr =
-    SerializedModuleLoaderBase::openModuleDocFile(ModuleID, DocPath,
+    SerializedModuleLoaderBase::openModuleDocFile(ModuleID, BaseName,
                                                   ModuleDocBuffer);
   if (DocLoadErr)
     return DocLoadErr;

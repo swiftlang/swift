@@ -37,17 +37,18 @@ enum class ModuleLoadingMode {
 /// \c SerializedModuleLoader subclasses.
 struct SerializedModuleBaseName {
   /// The base filename, wtihout any extension.
-  std::string baseName;
+  SmallString<256> baseName;
 
   /// Creates a \c SerializedModuleBaseName.
-  SerializedModuleBaseName(std::string baseName) : baseName(baseName) { }
+  SerializedModuleBaseName(StringRef baseName) : baseName(baseName) { }
+
+  /// Creates a \c SerializedModuleBaseName by contextualizing an existing one
+  /// with a \c parentDir.
+  SerializedModuleBaseName(StringRef parentDir,
+                           const SerializedModuleBaseName &name);
 
   /// Gets the filename with a particular extension appended to it.
   std::string getName(file_types::ID fileTy) const;
-
-  /// Gets the filename in a particular directory with a particular extension
-  /// appended to it.
-  std::string getName(StringRef parentDir, file_types::ID fileTy) const;
 };
 
 /// Common functionality shared between \c SerializedModuleLoader,
@@ -91,7 +92,7 @@ protected:
   ///   modules and will defer to the remaining module loaders to look up this
   ///   module.
   virtual std::error_code findModuleFilesInDirectory(
-      AccessPathElem ModuleID, StringRef DirPath,
+      AccessPathElem ModuleID,
       const SerializedModuleBaseName &BaseName,
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -100,20 +101,20 @@ protected:
 
   std::error_code
   openModuleFiles(AccessPathElem ModuleID,
-                  StringRef ModulePath, StringRef ModuleDocPath,
+                  const SerializedModuleBaseName &BaseName,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
 
   std::error_code
   openModuleDocFile(AccessPathElem ModuleID,
-                    StringRef ModuleDocPath,
+                    const SerializedModuleBaseName &BaseName,
                     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
 
   void
   openModuleSourceInfoFileIfPresent(
       AccessPathElem ModuleID,
-      StringRef ModulePath,
+      const SerializedModuleBaseName &BaseName,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
 
   /// If the module loader subclass knows that all options have been tried for
@@ -121,10 +122,10 @@ protected:
   /// to list the architectures that \e are present.
   ///
   /// \returns true if an error diagnostic was emitted
-  virtual bool maybeDiagnoseTargetMismatch(SourceLoc sourceLocation,
-                                           StringRef moduleName,
-                                           StringRef archName,
-                                           StringRef directoryPath) {
+  virtual bool maybeDiagnoseTargetMismatch(
+      SourceLoc sourceLocation,
+      StringRef moduleName,
+      const SerializedModuleBaseName &BaseName) {
     return false;
   }
 
@@ -195,17 +196,17 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
   {}
 
   std::error_code findModuleFilesInDirectory(
-      AccessPathElem ModuleID, StringRef DirPath,
+      AccessPathElem ModuleID,
       const SerializedModuleBaseName &BaseName,
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
 
-  bool maybeDiagnoseTargetMismatch(SourceLoc sourceLocation,
-                                   StringRef moduleName,
-                                   StringRef archName,
-                                   StringRef directoryPath) override;
+  bool maybeDiagnoseTargetMismatch(
+      SourceLoc sourceLocation,
+      StringRef moduleName,
+      const SerializedModuleBaseName &BaseName) override;
 
 public:
   virtual ~SerializedModuleLoader();
@@ -240,17 +241,17 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
                                    IgnoreSwiftSourceInfo) {}
 
   std::error_code findModuleFilesInDirectory(
-      AccessPathElem ModuleID, StringRef DirPath,
+      AccessPathElem ModuleID,
       const SerializedModuleBaseName &BaseName,
       SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
 
-  bool maybeDiagnoseTargetMismatch(SourceLoc sourceLocation,
-                                   StringRef moduleName,
-                                   StringRef archName,
-                                   StringRef directoryPath) override;
+  bool maybeDiagnoseTargetMismatch(
+      SourceLoc sourceLocation,
+      StringRef moduleName,
+      const SerializedModuleBaseName &BaseName) override;
 
 public:
   virtual ~MemoryBufferSerializedModuleLoader();

@@ -148,7 +148,7 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
   ArrayRef<std::string> PreferInterfaceForModules;
 
   std::error_code findModuleFilesInDirectory(
-    AccessPathElem ModuleID, StringRef DirPath,
+    AccessPathElem ModuleID,
     const SerializedModuleBaseName &BaseName,
     SmallVectorImpl<char> *ModuleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
