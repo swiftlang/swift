@@ -52,7 +52,6 @@ KNOWN_SETTINGS=(
 
     ## Build Mode Options
     enable-asan                                   ""                "enable Address Sanitizer"
-    enable-ubsan                                  ""                "enable Undefined Behavior Sanitizer"
     clang-profile-instr-use                       ""                "If set, profile file to use for clang PGO while building llvm/clang"
     swift-profile-instr-use                       ""                "If set, profile file to use for clang PGO while building swift"
 
@@ -68,7 +67,6 @@ KNOWN_SETTINGS=(
     reconfigure                                   ""                "force a CMake configuration run even if CMakeCache.txt already exists"
     skip-reconfigure                              ""                "set to skip reconfigure"
     swift-tools-num-parallel-lto-link-jobs        ""                "The number of parallel link jobs to use when compiling swift tools"
-    use-gold-linker                               ""                "Enable using the gold linker"
     workspace                                     "${HOME}/src"     "source directory containing llvm, clang, swift"
 
     ## Build Tools
