@@ -77,7 +77,6 @@ if(SWIFT_BUILD_STDLIB)
   # dependency for `numpy.ndarray` bridging to `ShapedArray`/`Tensor`.
   if(SWIFT_ENABLE_TENSORFLOW)
     # TODO: Add TensorFlow support for iOS/Raspberry Pi.
-    add_subdirectory(CTensorFlow)
     add_subdirectory(TensorFlow)
   endif()
 endif()

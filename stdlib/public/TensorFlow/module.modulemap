@@ -1,0 +1,5 @@
+module CTensorFlow {
+  header "CTensorFlow.h"
+
+  link "tensorflow"
+}
