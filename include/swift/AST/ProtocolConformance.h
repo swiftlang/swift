@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1022,7 +1022,7 @@ public:
 };
 
 /// A builtin conformance appears when a special non-nominal type has a runtime
-/// declared conformance. E.g. the runtime implements Equatable for Void.
+/// declared conformance. E.g. the runtime implements Equatable for tuples.
 class BuiltinProtocolConformance : public RootProtocolConformance {
   friend class ASTContext;
 
