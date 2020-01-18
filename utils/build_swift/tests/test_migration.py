@@ -41,7 +41,7 @@ class TestMigrateSwiftSDKsMeta(type):
     def __new__(cls, name, bases, attrs):
         # Generate tests for migrating each Swift SDK
         for sdk_name in migration._SDK_TARGETS.keys():
-            test_name = 'test_migrate_swift_sdk_' + sdk_name
+            test_name = 'test_migrate_swift_sdk_{}'.format(sdk_name)
             attrs[test_name] = cls.generate_migrate_swift_sdks_test(sdk_name)
 
         return super(TestMigrateSwiftSDKsMeta, cls).__new__(

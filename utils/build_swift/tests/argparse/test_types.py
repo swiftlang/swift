@@ -7,8 +7,12 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+from __future__ import absolute_import, unicode_literals
+
 import os.path
 import platform
+
+import six
 
 from ..utils import TestCase
 from ...build_swift.argparse import ArgumentTypeError, types
@@ -67,10 +71,10 @@ class TestCompilerVersion(TestCase):
 
     def test_str(self):
         version = types.CompilerVersion('1.0.0')
-        self.assertEqual(str(version), '1.0.0')
+        self.assertEqual(six.text_type(version), '1.0.0')
 
         version = types.CompilerVersion('1.0.0.1')
-        self.assertEqual(str(version), '1.0.0.1')
+        self.assertEqual(six.text_type(version), '1.0.0.1')
 
 
 class TestBoolType(TestCase):

@@ -7,6 +7,10 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+from __future__ import absolute_import, unicode_literals
+
+import six
+
 from ..utils import TestCase, redirect_stderr
 from ...build_swift.argparse import (
     ArgumentParser, BoolType, Nargs, PathType, SUPPRESS, actions)
@@ -179,7 +183,7 @@ class TestStoreIntAction(TestCase):
         parser.add_argument('--foo', action=actions.StoreIntAction)
 
         for i in [0, 1, 42, -64]:
-            args = parser.parse_args(['--foo', str(i)])
+            args = parser.parse_args(['--foo', six.text_type(i)])
             self.assertEqual(args.foo, i)
 
     def test_invalid_int(self):
@@ -188,7 +192,7 @@ class TestStoreIntAction(TestCase):
 
         for i in [0.0, True, 'bar']:
             with self.quietOutput(), self.assertRaises(SystemExit):
-                parser.parse_args(['--foo', str(i)])
+                parser.parse_args(['--foo', six.text_type(i)])
 
 
 class TestStoreTrueAction(TestCase):
@@ -294,7 +298,7 @@ class TestToggleTrueAction(TestCase):
         parser.add_argument('--foo', action=actions.ToggleTrueAction)
 
         for value in BoolType.TRUE_VALUES:
-            args = parser.parse_args(['--foo', str(value)])
+            args = parser.parse_args(['--foo', six.text_type(value)])
             self.assertTrue(args.foo)
 
             args = parser.parse_args(['--foo={}'.format(value)])
@@ -305,7 +309,7 @@ class TestToggleTrueAction(TestCase):
         parser.add_argument('--foo', action=actions.ToggleTrueAction)
 
         for value in BoolType.FALSE_VALUES:
-            args = parser.parse_args(['--foo', str(value)])
+            args = parser.parse_args(['--foo', six.text_type(value)])
             self.assertFalse(args.foo)
 
             args = parser.parse_args(['--foo={}'.format(value)])
@@ -356,7 +360,7 @@ class TestToggleFalseAction(TestCase):
         parser.add_argument('--foo', action=actions.ToggleFalseAction)
 
         for value in BoolType.TRUE_VALUES:
-            args = parser.parse_args(['--foo', str(value)])
+            args = parser.parse_args(['--foo', six.text_type(value)])
             self.assertFalse(args.foo)
 
             args = parser.parse_args(['--foo={}'.format(value)])
@@ -367,7 +371,7 @@ class TestToggleFalseAction(TestCase):
         parser.add_argument('--foo', action=actions.ToggleFalseAction)
 
         for value in BoolType.FALSE_VALUES:
-            args = parser.parse_args(['--foo', str(value)])
+            args = parser.parse_args(['--foo', six.text_type(value)])
             self.assertTrue(args.foo)
 
             args = parser.parse_args(['--foo={}'.format(value)])
