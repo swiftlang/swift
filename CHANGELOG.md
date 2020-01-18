@@ -32,7 +32,7 @@ Swift Next
   use of implicit `self` is enabled within that closure. This means that the
   following code is now valid:
   
-  ```
+  ```swift
   func doStuff(_ stuff: @escaping () -> Void) {}
   
   class C {
