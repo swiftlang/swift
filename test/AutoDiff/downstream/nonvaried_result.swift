@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null 2>&1 | %FileCheck %s
 // RUN: %target-run-simple-swift
 // TODO: Test forward-mode differentiation when it supports control flow.
-// UN: %target_run_simple_swift_forward_mode_differentiation
+// UN: %target-run-simple-swift-forward-mode-differentiation
 // REQUIRES: executable_test
 
 // Test differentiation edge case: functions with non-varied results.
