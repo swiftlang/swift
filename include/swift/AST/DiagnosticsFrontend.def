@@ -282,6 +282,9 @@ REMARK(platform_previous_install_name, none,
 ERROR(unknown_platform_name, none,
       "unkown platform name %0", (StringRef))
 
+ERROR(cannot_find_install_name, none,
+      "cannot find previous install name for module %0 in %1", (StringRef, StringRef))
+
 ERROR(symbol_in_tbd_not_in_ir,none,
       "symbol '%0' (%1) is in TBD file, but not in generated IR",
       (StringRef, StringRef))
