@@ -54,6 +54,10 @@ Type DerivedConformance::getProtocolType() const {
 bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
                                                     NominalTypeDecl *Nominal,
                                                     ProtocolDecl *Protocol) {
+  // TODO: Change this to something more principled.
+  if (Protocol->getNameStr() == "Generic")
+    return true;
+
   // Only known protocols can be derived.
   auto knownProtocol = Protocol->getKnownProtocolKind();
   if (!knownProtocol)
