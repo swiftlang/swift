@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -4266,7 +4266,7 @@ PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
 
 /// If this conformance is builtin, find the builtin witness table in the
 /// runtime and return that.
-static const WitnessTable *findBuiltinWitnessTable(
+static const WitnessTable *getBuiltinWitnessTable(
                              const ProtocolConformanceDescriptor *conformance) {
   auto protocol = conformance->getProtocol();
   auto metadataKind = conformance->getMetadataKind();
@@ -4331,8 +4331,7 @@ WitnessTableCacheEntry::allocate(
   } else {
     // Put the conformance descriptor in place. Instantiation will fill in the
     // rest.
-    if (!conformance->isBuiltin())
-      assert(numPatternWitnesses == 0);
+    assert(numPatternWitnesses == 0);
 
     table[0] = (void *)conformance;
   }
@@ -4359,7 +4358,6 @@ WitnessTableCacheEntry::allocate(
 
   // Fill in any default requirements.
   initializeResilientWitnessTable(conformance, Type, genericTable, table);
-
   auto castTable = reinterpret_cast<WitnessTable*>(table);
 
   // Call the instantiation function if present.
@@ -4393,9 +4391,8 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
   // accessor directly.
   auto genericTable = conformance->getGenericWitnessTable();
   if (!genericTable || doesNotRequireInstantiation(conformance, genericTable)) {
-    if (conformance->isBuiltin()) {
-      return findBuiltinWitnessTable(conformance);
-    }
+    if (conformance->isBuiltin())
+      return getBuiltinWitnessTable(conformance);
 
     return uniqueForeignWitnessTableRef(conformance->getWitnessTablePattern());
   }

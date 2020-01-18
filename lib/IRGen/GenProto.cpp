@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1113,7 +1113,6 @@ public:
   llvm::Value *getTable(IRGenFunction &IGF,
                         llvm::Value **typeMetadataCache) const override {
     // If we're looking up a dependent type, we can't cache the result.
-    // If we have a builtin conformance, the runtime caches the witness tables.
     if (Conformance->getType()->hasArchetype() ||
         Conformance->getType()->hasDynamicSelfType()) {
       return emitWitnessTableAccessorCall(IGF, Conformance,
@@ -3440,8 +3439,8 @@ void IRGenModule::emitBuiltinProtocolConformances() {
   for (auto description : descriptions) {
     // Slight edge case: If this conformance doesn't have a valid protocol decl,
     // we're compiling some module that has asked be to compiled as the stdlib
-    // and said module hasn't declared an Equatable protocol. Tuples does not
-    // conform in those cases, so don't emit a conformance descriptor.
+    // and said module hasn't declared this protocol. Don't emit descritors for
+    // this case.
     if (!description.conformance->getProtocol())
       return;
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -2254,7 +2254,7 @@ struct TargetTypeReference {
     RelativeDirectPointer<const char>
       DirectObjCClassName;
 
-    /// A direct reference to some non-nominal Metadata access function.
+    /// A "reference" to some metadata kind, e.g. tuple.
     MetadataKind MetadataKind;
   };
 

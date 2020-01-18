@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -29,14 +29,17 @@ BUILTIN_PROTOCOL_CONFORMANCE_DESCRIPTOR_SYM(VARIADIC_TUPLE_MANGLING,
                                             SWIFT_EQUATABLE_MANGLING);
 
 SWIFT_RUNTIME_EXPORT
-const _WitnessTable1 swift::
+const _WitnessTable<1> swift::
 BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(VARIADIC_TUPLE_MANGLING,
                                    SWIFT_EQUATABLE_MANGLING) = {
   &BUILTIN_PROTOCOL_CONFORMANCE_DESCRIPTOR_SYM(VARIADIC_TUPLE_MANGLING,
                                                SWIFT_EQUATABLE_MANGLING),
-  reinterpret_cast<void *>(BUILTIN_PROTOCOL_WITNESS_SYM(VARIADIC_TUPLE_MANGLING,
-                                                       SWIFT_EQUATABLE_MANGLING,
-                                                 SWIFT_EQUAL_OPERATOR_MANGLING))
+  {
+    reinterpret_cast<void *>(
+      BUILTIN_PROTOCOL_WITNESS_SYM(VARIADIC_TUPLE_MANGLING,
+                                   SWIFT_EQUATABLE_MANGLING,
+                                   SWIFT_EQUAL_OPERATOR_MANGLING))
+  }
 };
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
