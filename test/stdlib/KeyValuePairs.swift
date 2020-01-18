@@ -37,17 +37,39 @@ func checkAssociatedTypes() {
     indicesType: CountableRange<Int>.self)
 }
 
-var strings: KeyValuePairs = ["a": "1", "b": "Foo"]
-expectType(KeyValuePairs<String, String>.self, &strings)
+var tests = TestSuite("KeyValuePairs")
 
-var stringNSStringLiteral: KeyValuePairs = [
-  "a": "1", "b": "Foo" as NSString]
-expectType(KeyValuePairs<String, NSString>.self, &stringNSStringLiteral)
+tests.test("TypeInference") {
+  var strings: KeyValuePairs = ["a": "1", "b": "Foo"]
+  expectType(KeyValuePairs<String, String>.self, &strings)
 
-let aString = "1"
-let anNSString = "Foo" as NSString
-var stringNSStringLet: KeyValuePairs = [ "a": aString as NSString, "b": anNSString]
-expectType(KeyValuePairs<String, NSString>.self, &stringNSStringLet)
+  var stringNSStringLiteral: KeyValuePairs = [
+    "a": "1", "b": "Foo" as NSString]
+  expectType(KeyValuePairs<String, NSString>.self, &stringNSStringLiteral)
 
-var hetero: KeyValuePairs = ["a": 1 as NSNumber, "b": "Foo" as NSString]
-expectType(KeyValuePairs<String, NSObject>.self, &hetero)
+  let aString = "1"
+  let anNSString = "Foo" as NSString
+  var stringNSStringLet: KeyValuePairs = [ "a": aString as NSString, "b": anNSString]
+  expectType(KeyValuePairs<String, NSString>.self, &stringNSStringLet)
+
+  var hetero: KeyValuePairs = ["a": 1 as NSNumber, "b": "Foo" as NSString]
+  expectType(KeyValuePairs<String, NSObject>.self, &hetero)
+}
+
+tests.test("EquatableConformance") {
+  let exampleOne: KeyValuePairs<String, String> = ["a": "1", "b": "2"]
+  let exampleTwo: KeyValuePairs<String, String> = ["a": "1", "b": "2"]
+  let exampleThree: KeyValuePairs<String, String> = ["b": "2", "c": "3"]
+  expectEqual(true, exampleOne == exampleTwo)
+  expectEqual(false, exampleOne == exampleThree)
+}
+
+tests.test("HashableConformance") {
+  let keyValuePairs: KeyValuePairs<String, String> = ["d": "4", "e": "5"]
+  var hasher = Hasher()
+  hasher.combine(keyValuePairs)
+  var result = hasher.finalize()
+  expectType(Int.self, &result)
+}
+
+runAllTests()
