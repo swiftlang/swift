@@ -594,27 +594,27 @@ public:
             declIsPrivate(p.getFirst().first)),
           p.getSecond()));
 
-      return SourceFileDepGraphConstructor(
-        swiftDeps,
-        includePrivateDeps,
-        hadCompilationError,
+    return SourceFileDepGraphConstructor(
+      swiftDeps,
+      includePrivateDeps,
+      hadCompilationError,
 
-        getInterfaceHash(SF),
-        topLevelDepends,
-        memberDepends,
-        dynamicLookupDepends,
-        depTracker.getDependencies(),
+      getInterfaceHash(SF),
+      topLevelDepends,
+      memberDepends,
+      dynamicLookupDepends,
+      depTracker.getDependencies(),
 
-        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.precedenceGroups),
-        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.memberOperatorDecls),
-        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.operators),
-        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.topNominals),
-        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.topValues),
-        namesForProvidersOfAGivenType<NodeKind::nominal>(declFinder.allNominals),
-        namesForProvidersOfAGivenType<NodeKind::potentialMember>(declFinder.potentialMemberHolders),
-        namesForProvidersOfAGivenType<NodeKind::member>(declFinder.valuesInExtensions),
-        namesForProvidersOfAGivenType<NodeKind::dynamicLookup>(declFinder.classMembers)
-        );
+      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.precedenceGroups),
+      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.memberOperatorDecls),
+      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.operators),
+      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.topNominals),
+      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.topValues),
+      namesForProvidersOfAGivenType<NodeKind::nominal>(declFinder.allNominals),
+      namesForProvidersOfAGivenType<NodeKind::potentialMember>(declFinder.potentialMemberHolders),
+      namesForProvidersOfAGivenType<NodeKind::member>(declFinder.valuesInExtensions),
+      namesForProvidersOfAGivenType<NodeKind::dynamicLookup>(declFinder.classMembers)
+      );
   }
   // clang-format on
 
