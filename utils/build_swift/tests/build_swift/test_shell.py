@@ -13,10 +13,12 @@ import collections
 import sys
 import unittest
 
+from build_swift import shell
+
 import six
 from six import StringIO
 
-from ..build_swift import shell
+from .. import utils
 
 
 try:
@@ -36,6 +38,9 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             pass
 
+    def _id(obj):
+        return obj
+
     def patch(*args, **kwargs):
         return _id
 
@@ -44,23 +49,6 @@ except ImportError:
 # Constants
 
 _OPEN_NAME = '{}.open'.format(six.moves.builtins.__name__)
-
-
-# -----------------------------------------------------------------------------
-# Helpers
-
-def _id(obj):
-    return obj
-
-
-def _requires_mock(func):
-    return unittest.skipIf(
-        mock is None, 'mock module is not available')(func)
-
-
-def _requires_pathlib(func):
-    return unittest.skipIf(
-        Path is None, 'pathlib module is not available')(func)
 
 
 # -----------------------------------------------------------------------------
@@ -86,15 +74,15 @@ class TestHelpers(unittest.TestCase):
     # -------------------------------------------------------------------------
     # _convert_pathlib_path
 
-    @_requires_mock
-    @_requires_pathlib
-    @patch('build_swift.build_swift.shell.Path', None)
+    @utils.requires_module('unittest.mock')
+    @utils.requires_module('pathlib')
+    @patch('build_swift.shell.Path', None)
     def test_convert_pathlib_path_pathlib_not_imported(self):
         path = Path('/path/to/file.txt')
 
         self.assertEqual(shell._convert_pathlib_path(path), path)
 
-    @_requires_pathlib
+    @utils.requires_module('pathlib')
     def test_convert_pathlib_path(self):
         path = Path('/path/to/file.txt')
 
@@ -121,7 +109,7 @@ class TestHelpers(unittest.TestCase):
     # -------------------------------------------------------------------------
     # _echo_command
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     def test_echo_command(self):
         test_command = ['sudo', 'rm', '-rf', '/tmp/*']
         mock_stream = MagicMock()
@@ -132,7 +120,7 @@ class TestHelpers(unittest.TestCase):
             '>>> {}\n'.format(shell.quote(test_command)))
         mock_stream.flush.assert_called()
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     def test_echo_command_custom_prefix(self):
         mock_stream = MagicMock()
 
@@ -175,7 +163,7 @@ class TestHelpers(unittest.TestCase):
             shell._normalize_args(command),
             ['sudo', 'rm', '-rf', '/Applications/Xcode.app'])
 
-    @_requires_pathlib
+    @utils.requires_module('pathlib')
     def test_normalize_args_accepts_single_wrapper_arg(self):
         rm_xcode = shell.wraps(['rm', '-rf', Path('/Applications/Xcode.app')])
 
@@ -183,7 +171,7 @@ class TestHelpers(unittest.TestCase):
             shell._normalize_args(rm_xcode),
             ['rm', '-rf', '/Applications/Xcode.app'])
 
-    @_requires_pathlib
+    @utils.requires_module('pathlib')
     def test_normalize_args_converts_pathlib_path(self):
         command = ['rm', '-rf', Path('/Applications/Xcode.app')]
 
@@ -191,7 +179,7 @@ class TestHelpers(unittest.TestCase):
             shell._normalize_args(command),
             ['rm', '-rf', '/Applications/Xcode.app'])
 
-    @_requires_pathlib
+    @utils.requires_module('pathlib')
     def test_normalize_args_converts_pathlib_path_in_wrapper_commands(self):
         rm_xcode = shell.wraps(['rm', '-rf', Path('/Applications/Xcode.app')])
 
@@ -208,9 +196,9 @@ class TestDecorators(unittest.TestCase):
     # -------------------------------------------------------------------------
     # _backport_devnull
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch(_OPEN_NAME, new_callable=mock_open)
-    @patch('build_swift.build_swift.shell._PY_VERSION', (3, 2))
+    @patch('build_swift.shell._PY_VERSION', (3, 2))
     def test_backport_devnull_stdout_kwarg(self, mock_open):
         mock_file = MagicMock()
         mock_open.return_value.__enter__.return_value = mock_file
@@ -223,9 +211,9 @@ class TestDecorators(unittest.TestCase):
         mock_open.return_value.__enter__.assert_called()
         mock_open.return_value.__exit__.assert_called()
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch(_OPEN_NAME, new_callable=mock_open)
-    @patch('build_swift.build_swift.shell._PY_VERSION', (3, 2))
+    @patch('build_swift.shell._PY_VERSION', (3, 2))
     def test_backport_devnull_stderr_kwarg(self, mock_open):
         mock_file = MagicMock()
         mock_open.return_value.__enter__.return_value = mock_file
@@ -238,7 +226,7 @@ class TestDecorators(unittest.TestCase):
         mock_open.return_value.__enter__.assert_called()
         mock_open.return_value.__exit__.assert_called()
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch(_OPEN_NAME, new_callable=mock_open)
     def test_backport_devnull_does_not_open(self, mock_open):
         @shell._backport_devnull
@@ -249,8 +237,8 @@ class TestDecorators(unittest.TestCase):
         mock_open.return_value.__enter__.assert_not_called()
         mock_open.return_value.__exit__.assert_not_called()
 
-    @_requires_mock
-    @patch('build_swift.build_swift.shell._PY_VERSION', (3, 3))
+    @utils.requires_module('unittest.mock')
+    @patch('build_swift.shell._PY_VERSION', (3, 3))
     def test_backport_devnull_noop_starting_with_python_3_3(self):
         def func():
             pass
@@ -269,8 +257,8 @@ class TestDecorators(unittest.TestCase):
 
         func(test_command)
 
-    @_requires_mock
-    @patch('build_swift.build_swift.shell._normalize_args')
+    @utils.requires_module('unittest.mock')
+    @patch('build_swift.shell._normalize_args')
     def test_normalize_command(self, mock_normalize_args):
         test_command = ['rm', '-rf', '/tmp/*']
 
@@ -284,8 +272,8 @@ class TestDecorators(unittest.TestCase):
     # -------------------------------------------------------------------------
     # _add_echo_kwarg
 
-    @_requires_mock
-    @patch('build_swift.build_swift.shell._echo_command')
+    @utils.requires_module('unittest.mock')
+    @patch('build_swift.shell._echo_command')
     def test_add_echo_kwarg_calls_echo_command(self, mock_echo_command):
         test_command = ['rm', '-rf', '/tmp/*']
 
@@ -298,8 +286,8 @@ class TestDecorators(unittest.TestCase):
         func(test_command, echo=True, stdout=mock_stream)
         mock_echo_command.assert_called_with(test_command, mock_stream)
 
-    @_requires_mock
-    @patch('build_swift.build_swift.shell._echo_command')
+    @utils.requires_module('unittest.mock')
+    @patch('build_swift.shell._echo_command')
     def test_add_echo_kwarg_noop_echo_false(self, mock_echo_command):
         test_command = ['rm', '-rf', '/tmp/*']
 
@@ -356,7 +344,7 @@ class TestSubprocessWrappers(unittest.TestCase):
     # -------------------------------------------------------------------------
     # call
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('subprocess.call')
     def test_call(self, mock_call):
         shell.call('ls')
@@ -366,7 +354,7 @@ class TestSubprocessWrappers(unittest.TestCase):
     # -------------------------------------------------------------------------
     # check_call
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('subprocess.check_call')
     def test_check_call(self, mock_check_call):
         shell.check_call('ls')
@@ -376,7 +364,7 @@ class TestSubprocessWrappers(unittest.TestCase):
     # -------------------------------------------------------------------------
     # check_output
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('subprocess.check_output')
     def test_check_output(self, mock_check_output):
         # Before Python 3 the subprocess.check_output function returned bytes.
@@ -401,10 +389,10 @@ class TestShellUtilities(unittest.TestCase):
     # -------------------------------------------------------------------------
     # copy
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.path.isfile', MagicMock(return_value=True))
     @patch('shutil.copyfile', MagicMock())
-    @patch('build_swift.build_swift.shell._convert_pathlib_path')
+    @patch('build_swift.shell._convert_pathlib_path')
     def test_copy_converts_pathlib_paths(self, mock_convert):
         source = Path('/source/path')
         dest = Path('/dest/path')
@@ -416,7 +404,7 @@ class TestShellUtilities(unittest.TestCase):
             mock.call(dest),
         ])
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.path.isfile', MagicMock(return_value=True))
     @patch('shutil.copyfile')
     def test_copy_files(self, mock_copyfile):
@@ -427,7 +415,7 @@ class TestShellUtilities(unittest.TestCase):
 
         mock_copyfile.assert_called_with(source, dest)
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.path.isfile', MagicMock(return_value=False))
     @patch('os.path.isdir', MagicMock(return_value=True))
     @patch('shutil.copytree')
@@ -439,7 +427,7 @@ class TestShellUtilities(unittest.TestCase):
 
         mock_copytree.assert_called_with(source, dest)
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.path.isfile', MagicMock(return_value=True))
     @patch('shutil.copyfile', MagicMock())
     @patch('sys.stdout', new_callable=StringIO)
@@ -453,7 +441,7 @@ class TestShellUtilities(unittest.TestCase):
             mock_stdout.getvalue(),
             '>>> cp {} {}\n'.format(source, dest))
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.path.isfile', MagicMock(return_value=False))
     @patch('os.path.isdir', MagicMock(return_value=True))
     @patch('shutil.copytree', MagicMock())
@@ -471,10 +459,10 @@ class TestShellUtilities(unittest.TestCase):
     # -------------------------------------------------------------------------
     # pushd
 
-    @_requires_mock
-    @_requires_pathlib
+    @utils.requires_module('unittest.mock')
+    @utils.requires_module('pathlib')
     @patch('os.getcwd', MagicMock(return_value='/start/path'))
-    @patch('build_swift.build_swift.shell._convert_pathlib_path')
+    @patch('build_swift.shell._convert_pathlib_path')
     def test_pushd_converts_pathlib_path(self, mock_convert):
         path = Path('/other/path')
         mock_convert.return_value = six.text_type(path)
@@ -483,7 +471,7 @@ class TestShellUtilities(unittest.TestCase):
 
         mock_convert.assert_called_with(path)
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.getcwd', MagicMock(return_value='/start/path'))
     @patch('os.chdir')
     def test_pushd_restores_cwd(self, mock_chdir):
@@ -492,7 +480,7 @@ class TestShellUtilities(unittest.TestCase):
 
         mock_chdir.assert_called_with('/start/path')
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.getcwd', MagicMock(return_value='/start/path'))
     @patch('os.chdir', MagicMock())
     @patch('sys.stdout', new_callable=StringIO)
@@ -508,11 +496,11 @@ class TestShellUtilities(unittest.TestCase):
     # -------------------------------------------------------------------------
     # makedirs
 
-    @_requires_mock
-    @_requires_pathlib
+    @utils.requires_module('unittest.mock')
+    @utils.requires_module('pathlib')
     @patch('os.path.exists', MagicMock(return_value=False))
     @patch('os.makedirs', MagicMock())
-    @patch('build_swift.build_swift.shell._convert_pathlib_path')
+    @patch('build_swift.shell._convert_pathlib_path')
     def test_makedirs_converts_pathlib_path(self, mock_convert):
         path = Path('/some/directory')
 
@@ -520,7 +508,7 @@ class TestShellUtilities(unittest.TestCase):
 
         mock_convert.assert_called_with(path)
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.path.exists', MagicMock(return_value=True))
     @patch('os.makedirs')
     def test_makedirs_noop_path_exists(self, mock_makedirs):
@@ -528,7 +516,7 @@ class TestShellUtilities(unittest.TestCase):
 
         mock_makedirs.assert_not_called()
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.path.exists', MagicMock(return_value=False))
     @patch('os.makedirs')
     def test_makedirs_creates_path(self, mock_makedirs):
@@ -538,7 +526,7 @@ class TestShellUtilities(unittest.TestCase):
 
         mock_makedirs.assert_called_with(path)
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.path.exists', MagicMock(return_value=False))
     @patch('os.makedirs', MagicMock())
     @patch('sys.stdout', new_callable=StringIO)
@@ -554,10 +542,10 @@ class TestShellUtilities(unittest.TestCase):
     # -------------------------------------------------------------------------
     # move
 
-    @_requires_mock
-    @_requires_pathlib
+    @utils.requires_module('unittest.mock')
+    @utils.requires_module('pathlib')
     @patch('shutil.move', MagicMock())
-    @patch('build_swift.build_swift.shell._convert_pathlib_path')
+    @patch('build_swift.shell._convert_pathlib_path')
     def test_move_converts_pathlib_paths(self, mock_convert):
         source = Path('/source/path')
         dest = Path('/dest/path')
@@ -569,7 +557,7 @@ class TestShellUtilities(unittest.TestCase):
             mock.call(dest),
         ])
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('shutil.move')
     def test_move(self, mock_move):
         source = '/source/path'
@@ -579,7 +567,7 @@ class TestShellUtilities(unittest.TestCase):
 
         mock_move.assert_called_with(source, dest)
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('shutil.move', MagicMock())
     @patch('sys.stdout', new_callable=StringIO)
     def test_move_echos_fake_mv_command(self, mock_stdout):
@@ -595,11 +583,11 @@ class TestShellUtilities(unittest.TestCase):
     # -------------------------------------------------------------------------
     # remove
 
-    @_requires_mock
-    @_requires_pathlib
+    @utils.requires_module('unittest.mock')
+    @utils.requires_module('pathlib')
     @patch('os.path.isfile', MagicMock(return_value=True))
     @patch('os.remove', MagicMock())
-    @patch('build_swift.build_swift.shell._convert_pathlib_path')
+    @patch('build_swift.shell._convert_pathlib_path')
     def test_remove_converts_pathlib_paths(self, mock_convert):
         path = Path('/path/to/remove')
 
@@ -607,7 +595,7 @@ class TestShellUtilities(unittest.TestCase):
 
         mock_convert.assert_called_with(path)
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.path.isfile', MagicMock(return_value=True))
     @patch('os.remove')
     def test_remove_files(self, mock_remove):
@@ -617,7 +605,7 @@ class TestShellUtilities(unittest.TestCase):
 
         mock_remove.assert_called_with(path)
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.path.isfile', MagicMock(return_value=False))
     @patch('os.path.isdir', MagicMock(return_value=True))
     @patch('shutil.rmtree')
@@ -628,7 +616,7 @@ class TestShellUtilities(unittest.TestCase):
 
         mock_rmtree.assert_called_with(path, ignore_errors=True)
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.path.isfile', MagicMock(return_value=True))
     @patch('os.remove', MagicMock())
     @patch('sys.stdout', new_callable=StringIO)
@@ -641,7 +629,7 @@ class TestShellUtilities(unittest.TestCase):
             mock_stdout.getvalue(),
             '>>> rm {}\n'.format(path))
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.path.isfile', MagicMock(return_value=False))
     @patch('os.path.isdir', MagicMock(return_value=True))
     @patch('shutil.rmtree', MagicMock())
@@ -658,10 +646,10 @@ class TestShellUtilities(unittest.TestCase):
     # -------------------------------------------------------------------------
     # symlink
 
-    @_requires_mock
-    @_requires_pathlib
+    @utils.requires_module('unittest.mock')
+    @utils.requires_module('pathlib')
     @patch('os.symlink', MagicMock())
-    @patch('build_swift.build_swift.shell._convert_pathlib_path')
+    @patch('build_swift.shell._convert_pathlib_path')
     def test_symlink_converts_pathlib_paths(self, mock_convert):
         source = Path('/source/path')
         dest = Path('/dest/path')
@@ -673,7 +661,7 @@ class TestShellUtilities(unittest.TestCase):
             mock.call(dest),
         ])
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.symlink')
     def test_symlink(self, mock_symlink):
         source = '/source/path'
@@ -683,7 +671,7 @@ class TestShellUtilities(unittest.TestCase):
 
         mock_symlink.assert_called_with(source, dest)
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     @patch('os.symlink', MagicMock())
     @patch('sys.stdout', new_callable=StringIO)
     def test_symlink_echos_fake_ln_command(self, mock_stdout):
@@ -737,7 +725,7 @@ class TestCommandWrapper(unittest.TestCase):
 
     # -------------------------------------------------------------------------
 
-    @_requires_pathlib
+    @utils.requires_module('pathlib')
     def test_command_normalized(self):
         wrapper = shell.CommandWrapper(['ls', '-al', Path('/tmp')])
 
@@ -748,7 +736,7 @@ class TestCommandWrapper(unittest.TestCase):
 
         self.assertEqual(git.command, ['git'])
 
-    @_requires_mock
+    @utils.requires_module('unittest.mock')
     def test_callable(self):
         ls = shell.CommandWrapper('ls')
 
@@ -760,8 +748,8 @@ class TestCommandWrapper(unittest.TestCase):
     # -------------------------------------------------------------------------
     # Subprocess Wrappers
 
-    @_requires_mock
-    @patch('build_swift.build_swift.shell.Popen')
+    @utils.requires_module('unittest.mock')
+    @patch('build_swift.shell.Popen')
     def test_Popen(self, mock_popen):
         ls = shell.CommandWrapper('ls')
 
@@ -769,8 +757,8 @@ class TestCommandWrapper(unittest.TestCase):
 
         mock_popen.assert_called_with(['ls', '-al'])
 
-    @_requires_mock
-    @patch('build_swift.build_swift.shell.call')
+    @utils.requires_module('unittest.mock')
+    @patch('build_swift.shell.call')
     def test_call(self, mock_call):
         ls = shell.CommandWrapper('ls')
 
@@ -778,8 +766,8 @@ class TestCommandWrapper(unittest.TestCase):
 
         mock_call.assert_called_with(['ls', '-al'])
 
-    @_requires_mock
-    @patch('build_swift.build_swift.shell.check_call')
+    @utils.requires_module('unittest.mock')
+    @patch('build_swift.shell.check_call')
     def test_check_call(self, mock_check_call):
         ls = shell.CommandWrapper('ls')
 
@@ -787,8 +775,8 @@ class TestCommandWrapper(unittest.TestCase):
 
         mock_check_call.assert_called_with(['ls', '-al'])
 
-    @_requires_mock
-    @patch('build_swift.build_swift.shell.check_output')
+    @utils.requires_module('unittest.mock')
+    @patch('build_swift.shell.check_output')
     def test_check_output(self, mock_check_output):
         ls = shell.CommandWrapper('ls')
 
@@ -816,7 +804,7 @@ class TestExecutableWrapper(unittest.TestCase):
         with self.assertRaises(AttributeError):
             MyWrapper()
 
-    @_requires_pathlib
+    @utils.requires_module('pathlib')
     def test_converts_pathlib_path(self):
         class MyWrapper(shell.ExecutableWrapper):
             EXECUTABLE = Path('/usr/local/bin/xbs')
@@ -833,8 +821,8 @@ class TestExecutableWrapper(unittest.TestCase):
 
         self.assertEqual(wrapper.command, ['test'])
 
-    @_requires_mock
-    @patch('build_swift.build_swift.shell.which')
+    @utils.requires_module('unittest.mock')
+    @patch('build_swift.shell.which')
     def test_path_property(self, mock_which):
         class MyWrapper(shell.ExecutableWrapper):
             EXECUTABLE = 'test'

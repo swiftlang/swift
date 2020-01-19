@@ -10,10 +10,14 @@
 from __future__ import absolute_import, unicode_literals
 
 import platform
+import unittest
 
-from .utils import BUILD_SCRIPT_IMPL_PATH, TestCase, add_metaclass
-from ..build_swift import argparse
-from ..build_swift import migration
+from build_swift import argparse
+from build_swift import migration
+
+import six
+
+from .. import utils
 
 
 # -----------------------------------------------------------------------------
@@ -61,8 +65,8 @@ class TestMigrateSwiftSDKsMeta(type):
         return test
 
 
-@add_metaclass(TestMigrateSwiftSDKsMeta)
-class TestMigrateSwiftSDKs(TestCase):
+@six.add_metaclass(TestMigrateSwiftSDKsMeta)
+class TestMigrateSwiftSDKs(unittest.TestCase):
 
     def test_empty_swift_sdks(self):
         args = migration.migrate_swift_sdks(['--swift-sdks='])
@@ -87,7 +91,7 @@ class TestMigrateSwiftSDKs(TestCase):
 
 # -----------------------------------------------------------------------------
 
-class TestMigrateParseArgs(TestCase):
+class TestMigrateParseArgs(unittest.TestCase):
 
     def test_report_unknown_args(self):
         parser = argparse.ArgumentParser()
@@ -147,7 +151,7 @@ class TestMigrateParseArgs(TestCase):
         self.assertEqual(args, expected)
 
 
-class TestMigrationCheckImplArgs(TestCase):
+class TestMigrationCheckImplArgs(unittest.TestCase):
 
     def test_check_impl_args(self):
         if platform.system() == 'Windows':
@@ -155,16 +159,16 @@ class TestMigrationCheckImplArgs(TestCase):
             return
 
         self.assertIsNone(migration.check_impl_args(
-            BUILD_SCRIPT_IMPL_PATH, ['--reconfigure']))
+            utils.BUILD_SCRIPT_IMPL_PATH, ['--reconfigure']))
 
         with self.assertRaises(ValueError) as cm:
             migration.check_impl_args(
-                BUILD_SCRIPT_IMPL_PATH, ['foo'])
+                utils.BUILD_SCRIPT_IMPL_PATH, ['foo'])
 
         self.assertIn('foo', str(cm.exception))
 
         with self.assertRaises(ValueError) as cm:
             migration.check_impl_args(
-                BUILD_SCRIPT_IMPL_PATH, ['--reconfigure', '--foo=true'])
+                utils.BUILD_SCRIPT_IMPL_PATH, ['--reconfigure', '--foo=true'])
 
         self.assertIn('foo', str(cm.exception))

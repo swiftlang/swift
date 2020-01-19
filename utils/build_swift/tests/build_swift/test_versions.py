@@ -9,13 +9,14 @@
 
 from __future__ import absolute_import, unicode_literals
 
+import unittest
+
+from build_swift.versions import Version
+
 import six
 
-from .utils import TestCase
-from ..build_swift.versions import Version
 
-
-class TestVersion(TestCase):
+class TestVersion(unittest.TestCase):
     """Unit tests for the Version class.
     """
 

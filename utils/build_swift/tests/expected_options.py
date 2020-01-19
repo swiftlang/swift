@@ -11,11 +11,11 @@ from __future__ import absolute_import, unicode_literals
 
 import multiprocessing
 
+from build_swift import argparse
+from build_swift import defaults
+
 from swift_build_support.swift_build_support import host
 from swift_build_support.swift_build_support import targets
-
-from ..build_swift import argparse
-from ..build_swift import defaults
 
 
 __all__ = [

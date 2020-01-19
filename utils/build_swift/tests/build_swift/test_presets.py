@@ -10,16 +10,19 @@
 from __future__ import unicode_literals
 
 import os
+import unittest
 
+from build_swift import presets
+from build_swift.presets import Preset, PresetParser
+
+import six
 from six.moves import configparser
 
-from .utils import TestCase, UTILS_PATH, add_metaclass
-from ..build_swift import presets
-from ..build_swift.presets import Preset, PresetParser
+from .. import utils
 
 
 PRESET_FILES = [
-    os.path.join(UTILS_PATH, 'build-presets.ini'),
+    os.path.join(utils.UTILS_PATH, 'build-presets.ini'),
 ]
 
 PRESET_DEFAULTS = {
@@ -107,7 +110,7 @@ ios
 
 # -----------------------------------------------------------------------------
 
-class TestPreset(TestCase):
+class TestPreset(unittest.TestCase):
 
     def test_format_args(self):
         preset = Preset('sample', [('--ios', None), ('--test', '1')])
@@ -143,8 +146,8 @@ class TestPresetParserMeta(type):
         return test
 
 
-@add_metaclass(TestPresetParserMeta)
-class TestPresetParser(TestCase):
+@six.add_metaclass(TestPresetParserMeta)
+class TestPresetParser(unittest.TestCase):
 
     def test_read(self):
         parser = PresetParser()
