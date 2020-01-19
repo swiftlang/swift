@@ -1515,10 +1515,12 @@ Linearity parameters are parameters with respect to which a function is linear.
 The `@transpose` attribute accepts a `wrt:` argument which specifies a set of
 linearity parameters of the original function. If `wrt:` is not specified,
 linearity parameters default to all parameters. A `wrt:` argument in
-`@derivative` attributes can be a parameter index or a tuple of multiple
-parameter indices. All linearity parameters must have a type that conforms to
-both `Differentiable` and `AdditiveArithmetic` and satisfies
-`Self == Self.TangentVector`.
+`@derivative` attributes can be a parameter index, a `self`, or a tuple of
+parameter indices and `self`. When there are more than one linearity parameters
+specified, parameter indices must be ascending, and `self` must be the first
+parameter when exists. All linearity parameters must have a type that conforms
+to both `Differentiable` and `AdditiveArithmetic` and satisfies `Self ==
+Self.TangentVector`.
 
 When linearity parameters do not include all of the original function's
 parameters, those parameters must be taken in the front of the parameter list of
