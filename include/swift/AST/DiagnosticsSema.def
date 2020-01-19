@@ -4674,9 +4674,6 @@ WARNING(non_exhaustive_switch_unknown_only,none,
         "switch covers known cases, but %0 may have additional unknown values"
         "%select{|, possibly added in future versions}1", (Type, bool))
 
-WARNING(override_nsobject_hashvalue_warning,none,
-        "override of 'NSObject.hashValue' is deprecated; "
-        "did you mean to override 'NSObject.hash'?", ())
 ERROR(override_nsobject_hashvalue_error,none,
       "'NSObject.hashValue' is not overridable; "
       "did you mean to override 'NSObject.hash'?", ())

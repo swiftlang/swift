@@ -1754,16 +1754,6 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     diagnoseOverrideForAvailability(override, base);
   }
 
-  // Overrides of NSObject.hashValue are deprecated; one should override
-  // NSObject.hash instead.
-  // FIXME: Remove this when NSObject.hashValue becomes non-open in
-  // swift-corelibs-foundation.
-  if (isNSObjectHashValue(base) &&
-      base->hasOpenAccess(override->getDeclContext())) {
-    override->diagnose(diag::override_nsobject_hashvalue_warning)
-      .fixItReplace(SourceRange(override->getNameLoc()), "hash");
-  }
-
   /// Check attributes associated with the base; some may need to merged with
   /// or checked against attributes in the overriding declaration.
   AttributeOverrideChecker attrChecker(base, override);
