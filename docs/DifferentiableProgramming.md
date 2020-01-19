@@ -1376,11 +1376,12 @@ inheritance must maintain the differentiability.
 
 The `@differentiable` attribute can be used on protocol requirements. A
 `@differentiable` protocol requirement requires that all conforming types
-implement this protocol requirement with a differentiable body with respect to
-the specified parameters.
+implement this requirement with a differentiable body with respect to the
+specified parameters. Conforming implementations are not required to be marked
+with `@differentiable` attribute unless they are `public`.
 
 ```swift
-protocol Layer: Differentiable {
+public protocol Layer: Differentiable {
     associatedtype Input: Differentiable
     associatedtype Output: Differentiable
     @differentiable // w.r.t. `input` and `self`
@@ -1389,7 +1390,7 @@ protocol Layer: Differentiable {
 struct Perceptron: @memberwise Differentiable, Layer {
     var weight: SIMD4<Float>
     var bias: Float
-    @differentiable // w.r.t. `input` and `self`
+
     func callAsFunction(_ input: SIMD4<Float>) -> Float {
         (weight * input).sum() + b
     }
@@ -1401,14 +1402,14 @@ with a `@differentiable` attribute that declares differentiability with respect
 to more parameters.
 
 ```swift
-protocol Module: Differentiable {
+public protocol Module: Differentiable {
     associatedtype Input
     associatedtype Output: Differentiable
     @differentiable(wrt: self)
     func callAsFunction(_: Input) -> Output
 }
 
-protocol Layer: Module where Input: Differentiable {
+public protocol Layer: Module where Input: Differentiable {
     @differentiable(wrt: (self, input))
     func callAsFunction(_: Input) -> Output
 }
