@@ -131,7 +131,7 @@ static bool hasOpaqueArchetypeOperand(TypeExpansionContext context,
 static bool hasOpaqueArchetypeResult(TypeExpansionContext context,
                                      SILInstruction &inst) {
   // Check the results for opaque types.
-  for (const auto &res : inst.getResults())
+  for (const auto res : inst.getResults())
     if (opaqueArchetypeWouldChange(context, res->getType().getASTType()))
       return true;
   return false;
