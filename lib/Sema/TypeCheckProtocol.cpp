@@ -303,6 +303,132 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
   return witness;
 }
 
+/// Given a witness, a requirement, and an existing `RequirementMatch` result,
+/// check if the requirement's `@differentiable` attributes are met by the
+/// witness.
+/// - If requirement's `@differentiable` attributes are met, or if `result` is
+///   not viable, returns `result`.
+/// - Otherwise, returns a `DifferentiableConflict` `RequirementMatch`.
+// Note: the `result` argument is only necessary for using
+// `RequirementMatch::WitnessSubstitutions`.
+static RequirementMatch
+matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
+                               ValueDecl *witness, RequirementMatch result) {
+  if (!result.isViable())
+    return result;
+
+  // Get the requirement and witness attributes.
+  const auto &reqAttrs = req->getAttrs();
+  const auto &witnessAttrs = witness->getAttrs();
+
+  // For all `@differentiable` attributes of the protocol requirement, check
+  // that the witness has a derivative configuration with exactly the same
+  // parameter indices, or one with "superset" parameter indices. If there
+  // exists a witness derivative configuration with "superset" parameter
+  // indices, create an implicit `@differentiable` attribute for the witness
+  // with the exact parameter indices from the requirement `@differentiable`
+  // attribute.
+  ASTContext &ctx = witness->getASTContext();
+  auto *witnessAFD = dyn_cast<AbstractFunctionDecl>(witness);
+  if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness))
+    witnessAFD = witnessASD->getAccessor(AccessorKind::Get);
+  // NOTE: Validate `@differentiable` attributes by calling
+  // `getParameterIndices`. This is important for type-checking
+  // `@differentiable` attributes in non-primary files to skip invalid
+  // attributes and to resolve derivative configurations, used below.
+  for (auto *witnessDiffAttr :
+       witnessAttrs.getAttributes<DifferentiableAttr>()) {
+    (void)witnessDiffAttr->getParameterIndices();
+  }
+  for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
+    (void)reqDiffAttr->getParameterIndices();
+  }
+  for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
+    bool foundExactConfig = false;
+    Optional<AutoDiffConfig> supersetConfig = None;
+    for (auto witnessConfig :
+         witnessAFD->getDerivativeFunctionConfigurations()) {
+      // All the witness's derivative generic requirements must be satisfied
+      // by the requirement's derivative generic requirements OR by the
+      // conditional conformance requirements.
+      if (witnessConfig.derivativeGenericSignature) {
+        bool genericRequirementsSatisfied = true;
+        auto reqDiffGenSig = reqDiffAttr->getDerivativeGenericSignature();
+        auto conformanceGenSig = dc->getGenericSignatureOfContext();
+        for (const auto &req :
+             witnessConfig.derivativeGenericSignature->getRequirements()) {
+          auto substReq = req.subst(result.WitnessSubstitutions);
+          bool reqDiffGenSigSatisfies =
+              reqDiffGenSig && substReq &&
+              reqDiffGenSig->isRequirementSatisfied(*substReq);
+          bool conformanceGenSigSatisfies =
+              conformanceGenSig &&
+              conformanceGenSig->isRequirementSatisfied(req);
+          if (!reqDiffGenSigSatisfies && !conformanceGenSigSatisfies) {
+            genericRequirementsSatisfied = false;
+            break;
+          }
+        }
+        if (!genericRequirementsSatisfied)
+          continue;
+      }
+
+      if (witnessConfig.parameterIndices ==
+          reqDiffAttr->getParameterIndices()) {
+        foundExactConfig = true;
+        break;
+      }
+      if (witnessConfig.parameterIndices->isSupersetOf(
+              reqDiffAttr->getParameterIndices()))
+        supersetConfig = witnessConfig;
+    }
+    if (!foundExactConfig) {
+      bool success = false;
+      if (supersetConfig) {
+        // If the witness has a "superset" derivative configuration, create an
+        // implicit `@differentiable` attribute with the exact requirement
+        // `@differentiable` attribute parameter indices.
+        auto *newAttr = DifferentiableAttr::create(
+            witnessAFD, /*implicit*/ true, reqDiffAttr->AtLoc,
+            reqDiffAttr->getRange(), reqDiffAttr->isLinear(),
+            reqDiffAttr->getParameterIndices(), /*jvp*/ None,
+            /*vjp*/ None, supersetConfig->derivativeGenericSignature);
+        auto insertion = ctx.DifferentiableAttrs.try_emplace(
+            {witnessAFD, newAttr->getParameterIndices()}, newAttr);
+        // Valid `@differentiable` attributes are uniqued by original function
+        // and parameter indices. Reject duplicate attributes.
+        if (!insertion.second) {
+          newAttr->setInvalid();
+        } else {
+          witness->getAttrs().add(newAttr);
+          success = true;
+        }
+      }
+      if (!success) {
+        LLVM_DEBUG({
+          llvm::dbgs() << "Protocol requirement match failure: missing "
+                          "`@differentiable` attribute for witness ";
+          witnessAFD->dumpRef(llvm::dbgs());
+          llvm::dbgs() << " from requirement ";
+          req->dumpRef(llvm::dbgs());
+          llvm::dbgs() << '\n';
+        });
+        // FIXME(TF-1014): `@differentiable` attribute diagnostic does not
+        // appear if associated type inference is involved.
+        if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
+          return RequirementMatch(
+              getStandinForAccessor(vdWitness, AccessorKind::Get),
+              MatchKind::DifferentiableConflict, reqDiffAttr);
+        } else {
+          return RequirementMatch(witness, MatchKind::DifferentiableConflict,
+                                  reqDiffAttr);
+        }
+      }
+    }
+  }
+  return result;
+}
+
 RequirementMatch
 swift::matchWitness(
              DeclContext *dc, ValueDecl *req, ValueDecl *witness,
@@ -530,7 +656,11 @@ swift::matchWitness(
   }
 
   // Now finalize the match.
-  return finalize(anyRenaming, optionalAdjustments);
+  auto result = finalize(anyRenaming, optionalAdjustments);
+  // Check if the requirement's `@differentiable` attributes are satisfied by
+  // the witness.
+  result = matchWitnessDifferentiableAttr(dc, req, witness, result);
+  return result;
 }
 
 /// Checks \p reqEnvCache for a requirement environment appropriate for
@@ -2188,6 +2318,31 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   case MatchKind::NonObjC:
     diags.diagnose(match.Witness, diag::protocol_witness_not_objc);
     break;
+  case MatchKind::DifferentiableConflict: {
+    // Emit a note showing the missing requirement `@differentiable` attribute.
+    auto *reqAttr = cast<DifferentiableAttr>(match.UnmetAttribute);
+    assert(reqAttr);
+    if (!reqAttr->getParameterIndices())
+      break;
+    // Omit printing wrt clause if attribute differentiation parameters match
+    // inferred differentiation parameters.
+    auto *original = cast<AbstractFunctionDecl>(match.Witness);
+    auto *whereClauseGenEnv =
+        reqAttr->getDerivativeGenericEnvironment(original);
+    auto *inferredParameters = TypeChecker::inferDifferentiabilityParameters(
+        original, whereClauseGenEnv);
+    bool omitWrtClause = reqAttr->getParameterIndices()->getNumIndices() ==
+                         inferredParameters->getNumIndices();
+    // Get `@differentiable` attribute description.
+    std::string reqDiffAttrString;
+    llvm::raw_string_ostream stream(reqDiffAttrString);
+    reqAttr->print(stream, req, omitWrtClause,
+                   /*omitDerivativeFunctions*/ true);
+    diags.diagnose(match.Witness,
+                   diag::protocol_witness_missing_differentiable_attr,
+                   StringRef(stream.str()).trim());
+    break;
+  }
   }
 }
 
