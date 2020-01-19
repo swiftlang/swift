@@ -1638,6 +1638,7 @@ class DifferentiableAttr final
       private llvm::TrailingObjects<DifferentiableAttr,
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
+  friend class DifferentiableAttributeTypeCheckRequest;
 
   /// The declaration on which the `@differentiable` attribute is declared.
   /// May not be a valid declaration for `@differentiable` attributes.
@@ -1658,7 +1659,12 @@ class DifferentiableAttr final
   /// specified.
   FuncDecl *VJPFunction = nullptr;
   /// The differentiability parameter indices, resolved by the type checker.
-  IndexSubset *ParameterIndices = nullptr;
+  /// The bit stores whether the parameter indices have been computed.
+  ///
+  /// Note: it is necessary to use a bit instead of `nullptr` parameter indices
+  /// to represent "parameter indices not yet type-checked" because invalid
+  /// attributes have `nullptr` parameter indices but have been type-checked.
+  llvm::PointerIntPair<IndexSubset *, 1, bool> ParameterIndicesAndBit;
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
   /// The generic signature for autodiff associated functions. Resolved by the
@@ -1714,12 +1720,14 @@ public:
   /// registered VJP.
   Optional<DeclNameRefWithLoc> getVJP() const { return VJP; }
 
-  IndexSubset *getParameterIndices() const {
-    return ParameterIndices;
-  }
-  void setParameterIndices(IndexSubset *parameterIndices) {
-    ParameterIndices = parameterIndices;
-  }
+private:
+  /// Returns true if the given `@differentiable` attribute has been
+  /// type-checked.
+  bool hasBeenTypeChecked() const;
+
+public:
+  IndexSubset *getParameterIndices() const;
+  void setParameterIndices(IndexSubset *parameterIndices);
 
   /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.

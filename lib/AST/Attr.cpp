@@ -23,6 +23,7 @@
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
@@ -1505,6 +1506,30 @@ void DifferentiableAttr::setOriginalDeclaration(Decl *originalDeclaration) {
   assert(!OriginalDeclaration &&
          "Original declaration cannot have already been set");
   OriginalDeclaration = originalDeclaration;
+}
+
+bool DifferentiableAttr::hasBeenTypeChecked() const {
+  return ParameterIndicesAndBit.getInt();
+}
+
+IndexSubset *DifferentiableAttr::getParameterIndices() const {
+  assert(getOriginalDeclaration() &&
+         "Original declaration must have been resolved");
+  auto &ctx = getOriginalDeclaration()->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           DifferentiableAttributeTypeCheckRequest{
+                               const_cast<DifferentiableAttr *>(this)},
+                           nullptr);
+}
+
+void DifferentiableAttr::setParameterIndices(IndexSubset *paramIndices) {
+  assert(getOriginalDeclaration() &&
+         "Original declaration must have been resolved");
+  auto &ctx = getOriginalDeclaration()->getASTContext();
+  ctx.evaluator.cacheOutput(
+      DifferentiableAttributeTypeCheckRequest{
+          const_cast<DifferentiableAttr *>(this)},
+      std::move(paramIndices));
 }
 
 void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {
