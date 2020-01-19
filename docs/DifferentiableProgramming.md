@@ -1932,7 +1932,7 @@ import func Glibc.sinf
 // Imported:
 //     public func sinf(Float) -> Float
 
-@derivative(of: foo)
+@derivative(of: sinf)
 public func _(_ x: Float) -> (
     value: Float, 
     differential: @differentiable(linear) (Float) -> Float
