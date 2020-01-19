@@ -159,7 +159,7 @@ def main():
     args = parser.parse_args()
 
     targets = args.targets
-    if targets is None:
+    if not targets:
         targets = [host_target]
 
     paths = []
