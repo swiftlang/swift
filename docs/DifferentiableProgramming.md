@@ -1534,13 +1534,6 @@ parameters.
 
 ###### Top-level functions
 
-The type of the transpose function under such configurations is a function that
-takes the non-linearity parameters and a parameter whose type is the original
-function's result type and returns results that correspond to each original
-function parameter that is transposed with respect to. This definition, however,
-is a rough definition because there are differences among top-level functions,
-instance methods, and static methods.
-
 _Note: Since both transpose functions and derivative functions are difficult to
 name and need not be referenced directly, we make these functions unnamed (with
 base name being an underscore). This is not yet valid in the official Swift
