@@ -1548,22 +1548,26 @@ language, but the developers of the differentiable programming feature will
 prototype and pitch this change through Swift Evolution._
 
 ```swift
-func foo<T: Differentiable & AdditiveArithmetic>(_ x: T, _ y: T, _ z: T) -> T { ... }
+func foo<T: Differentiable & AdditiveArithmetic>(_ x: T, _ y: T, _ z: T) -> T
+    where T == T.TangentVector { ... }
 
 // Transpose with respect to all parameters, making `foo(_:_:_:)` linear with
 // with respect to all parameters.
 @transpose(of: foo)
-func _<T: Differentiable & AdditiveArithmetic>(_ v: T) -> (x: T, y: T, z: T) { ... }
+func _<T: Differentiable & AdditiveArithmetic>(_ v: T) -> (x: T, y: T, z: T)
+    where T == T.TangentVector { ... }
 
 // Transpose with respect to original parameter `x`, making `foo(_:_:_:)` 
 // linear with respect to `x`.
 @transpose(of: foo, wrt: 0)
-func _<T: Differentiable & AdditiveArithmetic>(y: T, z: T, v: T) -> T { ... }
+func _<T: Differentiable & AdditiveArithmetic>(y: T, z: T, v: T) -> T
+    where T == T.TangentVector { ... }
 
 // Transpose with respect to original parameters `x` and `z`, making
 // `foo(_:_:_:)` linear with respect to `x` and `z`.
 @transpose(of: foo, wrt: (0, 2))
-func _<T: Differentiable & AdditiveArithmetic>(y: T, v: T) -> (x: T, z: T) { ... }
+func _<T: Differentiable & AdditiveArithmetic>(y: T, v: T) -> (x: T, z: T)
+    where T == T.TangentVector { ... }
 ```
 
 ###### Static methods
@@ -1575,24 +1579,28 @@ parameter cannot be a linearity parameter, because metatypes cannot conform to
 
 ```swift
 extension MyType {
-    static func foo<T: Differentiable & AdditiveArithmetic>(_ x: T, _ y: T, _ z: T) -> T { ... }
+    static func foo<T: Differentiable & AdditiveArithmetic>(_ x: T, _ y: T, _ z: T) -> T
+        where T == T.TangentVector { ... }
 }
 
 extension MyType {
     // Transpose with respect to all parameters, making `foo(_:_:_:)` linear with
     // with respect to all parameters.
     @transpose(of: foo)
-    static func _<T: Differentiable & AdditiveArithmetic>(_ v: T) -> (x: T, y: T, z: T) { ... }
+    static func _<T: Differentiable & AdditiveArithmetic>(_ v: T) -> (x: T, y: T, z: T)
+        where T == T.TangentVector { ... }
     
     // Transpose with respect to original parameter `x`, making `foo(_:_:_:)` 
     // linear with respect to `x`.
     @transpose(of: foo, wrt: 0)
-    static func _<T: Differentiable & AdditiveArithmetic>(y: T, z: T, v: T) -> T { ... }
+    static func _<T: Differentiable & AdditiveArithmetic>(y: T, z: T, v: T) -> T
+        where T == T.TangentVector { ... }
     
     // Transpose with respect to original parameters `x` and `z`, making
     // `foo(_:_:_:)` linear with respect to `x` and `z`.
     @transpose(of: foo, wrt: (0, 2))
-    static func _<T: Differentiable & AdditiveArithmetic>(y: T, v: T) -> (x: T, z: T) { ... }
+    static func _<T: Differentiable & AdditiveArithmetic>(y: T, v: T) -> (x: T, z: T)
+        where T == T.TangentVector { ... }
 }
 ```
 
@@ -1605,7 +1613,9 @@ respect to each parameter). Here's how they are made differentiable in the
 standard library.
 
 ```swift
-extension FloatingPoint where Self: Differentiable & AdditiveArithmetic {
+extension FloatingPoint 
+    where Self: Differentiable & AdditiveArithmetic, Self == TangentVector
+{
     @transpose(of: +)
     static func _(_ v: Self) -> (Self, Self) { (v, v) }
 
@@ -1657,34 +1667,40 @@ A transpose of a static method is exactly like top-level functions except:
 
 ```swift
 extension MyType {
-    func foo<T: Differentiable & AdditiveArithmetic>(_ x: T, _ y: T, _ z: T) -> T { ... }
+    func foo<T: Differentiable & AdditiveArithmetic>(_ x: T, _ y: T, _ z: T) -> T
+        where T == T.TangentVector { ... }
 }
 
 extension MyType {
     // Transpose with respect to all parameters, making `foo(_:_:_:)` linear with
     // with respect to all parameters.
     @transpose(of: foo)
-    func _<T: Differentiable & AdditiveArithmetic>(_ v: T) -> (x: T, y: T, z: T) { ... }
+    func _<T: Differentiable & AdditiveArithmetic>(_ v: T) -> (x: T, y: T, z: T)
+        where T == T.TangentVector { ... }
     
     // Transpose with respect to original parameter `x`, making `foo(_:_:_:)` 
     // linear with respect to `x`.
     @transpose(of: foo, wrt: 0)
-    func _<T: Differentiable & AdditiveArithmetic>(y: T, z: T, v: T) -> T { ... }
+    func _<T: Differentiable & AdditiveArithmetic>(y: T, z: T, v: T) -> T
+        where T == T.TangentVector { ... }
     
     // Transpose with respect to original parameters `x` and `z`, making
     // `foo(_:_:_:)` linear with respect to `x` and `z`.
     @transpose(of: foo, wrt: (0, 2))
-    func _<T: Differentiable & AdditiveArithmetic>(y: T, v: T) -> (x: T, z: T) { ... }
+    func _<T: Differentiable & AdditiveArithmetic>(y: T, v: T) -> (x: T, z: T)
+        where T == T.TangentVector { ... }
     
     // Transpose with respect to original parameters `self`, making `foo(_:_:_:)`
     // linear with respect to `self`.
     @transpose(of: foo, wrt: self)
-    static func _<T: Differentiable & AdditiveArithmetic>(x: T, y: T, z: T, v: T) -> MyType { ... }
+    static func _<T: Differentiable & AdditiveArithmetic>(x: T, y: T, z: T, v: T) -> MyType
+        where T == T.TangentVector { ... }
     
     // Transpose with respect to original parameters `self`, `x` and `z`, making
     // `foo(_:_:_:)` linear with respect to `self`, `x` and `z`.
     @transpose(of: foo, wrt: (self, 0, 2))
-    static func _<T: Differentiable & AdditiveArithmetic>(y: T, v: T) -> (self: MyType, x: T, z: T) { ... }
+    static func _<T: Differentiable & AdditiveArithmetic>(y: T, v: T) -> (self: MyType, x: T, z: T)
+        where T == T.TangentVector { ... }
 }
 ```
 
@@ -1702,13 +1718,15 @@ in `@differentiable` attributes.
 func foo<T, U, V>(_ x: T, _ y: U, _ z: V) -> W { ... }
 
 // Transpose with respect to `x` and `z`, requiring that `T` and `V` to conform
-// to `Differentiable & AdditiveArithmetic`.
+// to `Differentiable & AdditiveArithmetic` and equal their corresponding
+`TangentVector` types.
 @transpose(of: foo, wrt: (x, z))
 func _<
     T: Differentiable & AdditiveArithmetic,
     U,
     V: Differentiable & AdditiveArithmetic
 >(_ y: U, _ v: W) -> (x: T, z: V)
+    where T.TangentVector == T, V.TangentVector == V { ... }
 ```
 
 ##### Examples
@@ -1717,7 +1735,7 @@ Many floating-point operations are linear. Addition and subtraction are linear.
 Multiplication is bilinear (linear with respect to each argument).
 
 ```swift
-extension FloatingPoint {
+extension FloatingPoint where Self: Differentiable, Self == TangentVector {
     @inlinable
     @transpose(of: +)
     func _(_ v: Self) -> (Self, Self) {
