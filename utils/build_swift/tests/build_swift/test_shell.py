@@ -25,7 +25,7 @@ try:
     # Python 3.4
     from pathlib import Path
 except ImportError:
-    Path = None
+    pass
 
 try:
     # Python 3.3
@@ -368,17 +368,20 @@ class TestSubprocessWrappers(unittest.TestCase):
     @patch('subprocess.check_output')
     def test_check_output(self, mock_check_output):
         # Before Python 3 the subprocess.check_output function returned bytes.
-        if six.PY2:
-            mock_check_output.return_value = b''
-        else:
+        if six.PY3:
             mock_check_output.return_value = ''
+        else:
+            mock_check_output.return_value = b''
 
         output = shell.check_output('ls')
 
         # We always expect str (utf-8) output
         self.assertIsInstance(output, six.text_type)
 
-        mock_check_output.assert_called_with('ls')
+        if six.PY3:
+            mock_check_output.assert_called_with('ls', encoding='utf-8')
+        else:
+            mock_check_output.assert_called_with('ls')
 
 
 class TestShellUtilities(unittest.TestCase):
