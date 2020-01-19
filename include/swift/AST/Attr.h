@@ -1669,6 +1669,10 @@ class DifferentiableAttr final
   FuncDecl *VJPFunction = nullptr;
   /// The differentiability parameter indices, resolved by the type checker.
   /// The bit stores whether the parameter indices have been computed.
+  ///
+  /// Note: it is necessary to use a bit instead of `nullptr` parameter indices
+  /// to represent "parameter indices not yet type-checked" because invalid
+  /// attributes have `nullptr` parameter indices but have been type-checked.
   llvm::PointerIntPair<IndexSubset *, 1, bool> ParameterIndicesAndBit;
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
