@@ -194,8 +194,7 @@ static bool isAtStartOfSwitchCase(Parser &parser,
   return parser.Tok.isAny(tok::kw_case, tok::kw_default);
 }
 
-
-static Optional<tok> closestMatchingStmtTokenForIdentifier(StringRef identifier) {
+static Optional<tok> closestMatchingStmtToken(StringRef identifier) {
   SmallVector<std::pair<StringRef, tok>, 19> stmtKeywords;
   #define STMT_KEYWORD(kw) stmtKeywords.push_back({ #kw, tok::kw_##kw });
   #include "swift/Syntax/TokenKinds.def"
@@ -205,7 +204,10 @@ static Optional<tok> closestMatchingStmtTokenForIdentifier(StringRef identifier)
     std::pair<StringRef, tok> pair = stmtKeywords[i];
     StringRef potentialStatement = pair.first;
 
-    unsigned dist = potentialStatement.edit_distance(identifier, /*AllowReplacements=*/true, /*MaxEditDistance=*/bestScore);
+    unsigned dist =
+      potentialStatement.edit_distance(identifier,
+                                      /*AllowReplacements=*/true,
+                                      /*MaxEditDistance=*/bestScore);
 
     if (dist > (potentialStatement.size() + 1) / 3) {
       continue;
@@ -377,10 +379,13 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       Token previousToken = Lexer::getTokenAtLocation(SourceMgr, PreviousLoc);
       Optional<tok> stmtTokMatch = None;
       if (previousToken.getKind() == tok::identifier) {
-        SourceLoc startOfLineLocation = L->getLocForStartOfLine(SourceMgr, previousToken.getLoc());
-        SourceLoc locationOfTokenAtStartOfLine = Lexer::getTokenAtLocation(SourceMgr, startOfLineLocation).getLoc();
+        SourceLoc startOfLineLocation =
+          L->getLocForStartOfLine(SourceMgr, previousToken.getLoc());
+        SourceLoc locationOfTokenAtStartOfLine =
+          Lexer::getTokenAtLocation(SourceMgr, startOfLineLocation).getLoc();
+
         if (previousToken.getLoc() == locationOfTokenAtStartOfLine) {
-          stmtTokMatch = closestMatchingStmtTokenForIdentifier(previousToken.getText());
+          stmtTokMatch = closestMatchingStmtToken(previousToken.getText());
         }
       }
       if (stmtTokMatch) {
