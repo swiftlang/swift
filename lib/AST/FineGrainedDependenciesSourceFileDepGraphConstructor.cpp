@@ -577,11 +577,11 @@ public:
 
   SourceFileDeclFinder declFinder(SF, includePrivateDeps);
     std::vector<std::pair<std::string, bool>> topLevelDepends;
-    for (const auto p: SF->getReferencedNameTracker()->getTopLevelNames())
+    for (const auto &p: SF->getReferencedNameTracker()->getTopLevelNames())
       topLevelDepends.push_back(std::make_pair(p.getFirst().userFacingName(), p.getSecond()));
 
     std::vector<std::pair<std::string, bool>> dynamicLookupDepends;
-    for (const auto p: SF->getReferencedNameTracker()->getDynamicLookupNames())
+    for (const auto &p: SF->getReferencedNameTracker()->getDynamicLookupNames())
       dynamicLookupDepends.push_back(std::make_pair(p.getFirst().userFacingName(), p.getSecond()));
 
     std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>> memberDepends;
@@ -594,27 +594,27 @@ public:
             declIsPrivate(p.getFirst().first)),
           p.getSecond()));
 
-      return SourceFileDepGraphConstructor(
-        swiftDeps,
-        includePrivateDeps,
-        hadCompilationError,
+    return SourceFileDepGraphConstructor(
+      swiftDeps,
+      includePrivateDeps,
+      hadCompilationError,
 
-        getInterfaceHash(SF),
-        topLevelDepends,
-        memberDepends,
-        dynamicLookupDepends,
-        depTracker.getDependencies(),
+      getInterfaceHash(SF),
+      topLevelDepends,
+      memberDepends,
+      dynamicLookupDepends,
+      depTracker.getDependencies(),
 
-        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.precedenceGroups),
-        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.memberOperatorDecls),
-        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.operators),
-        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.topNominals),
-        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.topValues),
-        namesForProvidersOfAGivenType<NodeKind::nominal>(declFinder.allNominals),
-        namesForProvidersOfAGivenType<NodeKind::potentialMember>(declFinder.potentialMemberHolders),
-        namesForProvidersOfAGivenType<NodeKind::member>(declFinder.valuesInExtensions),
-        namesForProvidersOfAGivenType<NodeKind::dynamicLookup>(declFinder.classMembers)
-        );
+      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.precedenceGroups),
+      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.memberOperatorDecls),
+      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.operators),
+      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.topNominals),
+      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.topValues),
+      namesForProvidersOfAGivenType<NodeKind::nominal>(declFinder.allNominals),
+      namesForProvidersOfAGivenType<NodeKind::potentialMember>(declFinder.potentialMemberHolders),
+      namesForProvidersOfAGivenType<NodeKind::member>(declFinder.valuesInExtensions),
+      namesForProvidersOfAGivenType<NodeKind::dynamicLookup>(declFinder.classMembers)
+      );
   }
   // clang-format on
 
@@ -652,7 +652,7 @@ private:
   static std::vector<ContextNameFingerprint>
   namesForProvidersOfAGivenType(std::vector<ContentsT> &contentsVec) {
     std::vector<ContextNameFingerprint> result;
-    for (const auto declOrPair : contentsVec)
+    for (const auto &declOrPair : contentsVec)
       result.push_back(ContextNameFingerprint(
           DependencyKey::computeContextForProvidedEntity<kind>(declOrPair),
           DependencyKey::computeNameForProvidedEntity<kind>(declOrPair),

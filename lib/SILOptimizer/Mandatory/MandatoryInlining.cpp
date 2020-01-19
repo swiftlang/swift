@@ -598,7 +598,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
   FullArgs.clear();
 
   // First grab our basic arguments from our apply.
-  for (const auto &Arg : AI.getArguments())
+  for (const auto Arg : AI.getArguments())
     FullArgs.push_back(Arg);
 
   // Then grab a first approximation of our apply by stripping off all copy
