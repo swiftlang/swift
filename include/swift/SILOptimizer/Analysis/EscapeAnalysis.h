@@ -721,15 +721,12 @@ public:
       }
     }
 
-    // Helper for getNode and getValueContent.
-    CGNode *getOrCreateNode(ValueBase *V, PointerKind pointerKind);
-
     /// Gets or creates a node for a value \p V.
     /// If V is a projection(-path) then the base of the projection(-path) is
     /// taken. This means the node is always created for the "outermost" value
     /// where V is contained.
-    /// Returns null, if V is not a "pointer".
-    CGNode *getNode(ValueBase *V, bool createIfNeeded = true);
+    /// Returns null, if V (or its base value) is not a "pointer".
+    CGNode *getNode(SILValue V);
 
     // Helper for getValueContent to create and return a content node with the
     // given \p isInterior and \p hasReferenceOnly flags. \p addrNode
@@ -780,15 +777,6 @@ public:
       return ReturnNode;
     }
 
-    /// Returns the node of the "exact" value \p V (no projections are skipped)
-    /// if one exists.
-    CGNode *lookupNode(ValueBase *V) {
-      CGNode *Node = Values2Nodes.lookup(V);
-      if (Node)
-        return Node->getMergeTarget();
-      return nullptr;
-    }
-    
     /// Re-uses a node for another SIL value.
     void setNode(ValueBase *V, CGNode *Node) {
       assert(Values2Nodes.find(V) == Values2Nodes.end());
@@ -871,13 +859,6 @@ public:
     bool forwardTraverseDefer(CGNode *startNode, CGNodeVisitor &&visitor);
 
   public:
-    /// Gets or creates a node for a value \p V.
-    /// If V is a projection(-path) then the base of the projection(-path) is
-    /// taken. This means the node is always created for the "outermost" value
-    /// where V is contained.
-    /// Returns null, if V is not a "pointer".
-    CGNode *getNodeOrNull(ValueBase *V) { return getNode(V, false); }
-
     /// Get the content node pointed to by \p ptrVal.
     ///
     /// If \p ptrVal cannot be mapped to a node, return nullptr.

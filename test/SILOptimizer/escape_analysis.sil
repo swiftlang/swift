@@ -323,7 +323,7 @@ bb0(%0 : $Pointer):
 // CHECK-NEXT:    Val %1 Esc: , Succ: (%1.1)
 // CHECK-NEXT:    Con [ref] %1.1 Esc: G, Succ: %4
 // CHECK-NEXT:    Con [int] %3 Esc: A, Succ: (%4)
-// CHECK-NEXT:    Con %4 Esc: G, Succ:
+// CHECK-NEXT:    Con [ref] %4 Esc: G, Succ:
 // CHECK-NEXT:  End
 sil  @store_content : $@convention(thin) (@owned Pointer) -> () {
 bb0(%0 : $Pointer):
@@ -896,7 +896,7 @@ bb0:
 // CHECK-NEXT:    Val [ref] %4 Esc: , Succ: %0, %1
 // CHECK-NEXT:    Val [ref] %7 Esc: , Succ: (%7.1), %4
 // CHECK-NEXT:    Con [int] %7.1 Esc: A, Succ: (%7.2)
-// CHECK-NEXT:    Con %7.2 Esc: A, Succ: 
+// CHECK-NEXT:    Con [ref] %7.2 Esc: A, Succ: 
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %7
 // CHECK-NEXT:  End
 sil @pointer_types : $@convention(thin) (@owned Y, @owned Y) -> @owned Y {
@@ -1107,7 +1107,7 @@ bb0(%0 : $*X, %1 : $X):
 // CHECK-LABEL: CG of test_casts
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ:
 // CHECK-NEXT:    Con [int] %0.1 Esc: A, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: A, Succ: 
+// CHECK-NEXT:    Con [ref] %0.2 Esc: A, Succ: 
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %0
 // CHECK-NEXT:  End
 sil @test_casts : $@convention(thin) (@owned AnyObject) -> @owned X {
@@ -1816,4 +1816,31 @@ bb0(%0 : $IntWrapper):
   strong_release %0 : $IntWrapper
   %tuple = tuple (%bridge : $Builtin.BridgeObject, %ump : $UnsafeMutablePointer<Int64>)
   return %tuple : $(Builtin.BridgeObject, UnsafeMutablePointer<Int64>)
+}
+
+// Test undef -> struct_extract -> bbarg
+// CHECK-LABEL: CG of testMappedUndef
+// CHECK-NEXT:   Val [ref] %4 Esc: , Succ: (%4.1)
+// CHECK-NEXT:   Con [int] %4.1 Esc: G, Succ: (%4.2)
+// CHECK-NEXT:   Con %4.2 Esc: G, Succ:
+// CHECK-LABEL: End
+struct StructWithObject {
+  @_hasStorage var obj: AnyObject { get set }
+  init(obj: AnyObject)
+}
+
+sil @testMappedUndef : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(undef : $AnyObject)
+
+bb2:
+  %2 = struct_extract undef : $StructWithObject, #StructWithObject.obj
+  br bb3(%2 : $AnyObject)
+
+bb3(%4 : $AnyObject):
+  %5 = tuple ()
+  return %5 : $()
 }
