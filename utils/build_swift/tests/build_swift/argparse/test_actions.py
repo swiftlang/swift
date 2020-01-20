@@ -9,16 +9,19 @@
 
 from __future__ import absolute_import, unicode_literals
 
+import unittest
+
+from build_swift.argparse import (
+    ArgumentParser, BoolType, Nargs, PathType, SUPPRESS, actions)
+
 import six
 
-from ..utils import TestCase, redirect_stderr
-from ...build_swift.argparse import (
-    ArgumentParser, BoolType, Nargs, PathType, SUPPRESS, actions)
+from ... import utils
 
 
 # -----------------------------------------------------------------------------
 
-class TestAction(TestCase):
+class TestAction(unittest.TestCase):
 
     def test_default_attributes(self):
         action = actions.Action(['--foo'], dests=['foo'])
@@ -56,7 +59,7 @@ class TestAction(TestCase):
             action(None, None, None, None)
 
 
-class TestAppendAction(TestCase):
+class TestAppendAction(unittest.TestCase):
 
     def test_default_attributes(self):
         action = actions.AppendAction(['--foo'], dests=['foo'])
@@ -79,7 +82,7 @@ class TestAppendAction(TestCase):
         self.assertEqual(args.foo, ['bar', 'baz'])
 
 
-class TestCustomCallAction(TestCase):
+class TestCustomCallAction(unittest.TestCase):
 
     def test_non_callable(self):
         with self.assertRaises(TypeError):
@@ -102,7 +105,7 @@ class TestCustomCallAction(TestCase):
         self.assertEqual(args.foo, 'boo')
 
 
-class TestStoreAction(TestCase):
+class TestStoreAction(unittest.TestCase):
 
     def test_default_attributes(self):
         action = actions.StoreAction(['--foo'], dests=['foo'], choices=['bar'])
@@ -120,7 +123,7 @@ class TestStoreAction(TestCase):
 
         self.assertEqual(action.nargs, Nargs.OPTIONAL)
 
-        with self.quietOutput(), self.assertRaises(SystemExit):
+        with utils.quiet_output(), self.assertRaises(SystemExit):
             parser.parse_args(['--foo', 'qux'])
 
         args = parser.parse_args(['--foo', 'bar'])
@@ -169,7 +172,7 @@ class TestStoreAction(TestCase):
         self.assertEqual(args.bar, 'baz')
 
 
-class TestStoreIntAction(TestCase):
+class TestStoreIntAction(unittest.TestCase):
 
     def test_default_attributes(self):
         action = actions.StoreIntAction(['--foo'], dests=['foo'])
@@ -191,11 +194,11 @@ class TestStoreIntAction(TestCase):
         parser.add_argument('--foo', action=actions.StoreIntAction)
 
         for i in [0.0, True, 'bar']:
-            with self.quietOutput(), self.assertRaises(SystemExit):
+            with utils.quiet_output(), self.assertRaises(SystemExit):
                 parser.parse_args(['--foo', six.text_type(i)])
 
 
-class TestStoreTrueAction(TestCase):
+class TestStoreTrueAction(unittest.TestCase):
 
     def test_default_attributes(self):
         action = actions.StoreTrueAction(['--foo'], dests=['foo'])
@@ -221,7 +224,7 @@ class TestStoreTrueAction(TestCase):
         self.assertTrue(args.foo)
 
 
-class TestStoreFalseAction(TestCase):
+class TestStoreFalseAction(unittest.TestCase):
 
     def test_default_attributes(self):
         action = actions.StoreFalseAction(['--foo'], dests=['foo'])
@@ -247,7 +250,7 @@ class TestStoreFalseAction(TestCase):
         self.assertFalse(args.foo)
 
 
-class TestStorePathAction(TestCase):
+class TestStorePathAction(unittest.TestCase):
 
     def test_default_attributes(self):
         action = actions.StorePathAction(['--foo'], dests=['foo'])
@@ -267,7 +270,7 @@ class TestStorePathAction(TestCase):
         self.assertTrue(action.type._assert_executable)
 
 
-class TestToggleTrueAction(TestCase):
+class TestToggleTrueAction(unittest.TestCase):
 
     def test_default_attributes(self):
         action = actions.ToggleTrueAction(['--foo'], dests=['foo'])
@@ -329,7 +332,7 @@ class TestToggleTrueAction(TestCase):
         self.assertTrue(args.foo)
 
 
-class TestToggleFalseAction(TestCase):
+class TestToggleFalseAction(unittest.TestCase):
 
     def test_default_attributes(self):
         action = actions.ToggleFalseAction(['--foo'], dests=['foo'])
@@ -391,7 +394,7 @@ class TestToggleFalseAction(TestCase):
         self.assertFalse(args.foo)
 
 
-class TestUnuspportedAction(TestCase):
+class TestUnuspportedAction(unittest.TestCase):
 
     def test_default_attributes(self):
         action = actions.UnsupportedAction(['--foo'])
@@ -413,7 +416,7 @@ class TestUnuspportedAction(TestCase):
         parser = ArgumentParser()
         parser.add_argument('--foo', action=actions.UnsupportedAction)
 
-        with self.quietOutput(), self.assertRaises(SystemExit):
+        with utils.quiet_output(), self.assertRaises(SystemExit):
             parser.parse_args(['--foo'])
 
     def test_custom_error_message(self):
@@ -427,7 +430,7 @@ class TestUnuspportedAction(TestCase):
 
         self.assertEqual(action.message, message)
 
-        with redirect_stderr() as stderr, self.assertRaises(SystemExit):
+        with utils.redirect_stderr() as stderr, self.assertRaises(SystemExit):
             parser.parse_args(['--foo'])
 
             self.assertIn(message, stderr)
