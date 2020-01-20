@@ -309,6 +309,7 @@ public:
 
 /// Layout for struct type metadata.
 class StructMetadataLayout : public NominalMetadataLayout {
+public:
   llvm::DenseMap<VarDecl*, StoredOffset> FieldOffsets;
 
   /// The start of the field-offset vector.
@@ -323,7 +324,6 @@ class StructMetadataLayout : public NominalMetadataLayout {
   friend class IRGenModule;
   StructMetadataLayout(IRGenModule &IGM, StructDecl *theStruct);
 
-public:
   StructDecl *getDecl() const {
     return cast<StructDecl>(Nominal);
   }

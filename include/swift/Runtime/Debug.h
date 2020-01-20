@@ -114,6 +114,9 @@ swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
 SWIFT_RUNTIME_EXPORT
 void swift_reportError(uint32_t flags, const char *message);
 
+SWIFT_RUNTIME_EXPORT
+void swift_assertEqual(int64_t a, int64_t b);
+
 // Halt due to an overflow in swift_retain().
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void swift_abortRetainOverflow();

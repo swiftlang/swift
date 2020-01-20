@@ -417,19 +417,48 @@ namespace {
           IGF.IGM.getMetadataLayout(TheStruct.getStructOrBoundGenericStruct());
       auto offset =
           structLayout.getFieldOffsetVectorOffset().offsetBy(IGF, Size(index));
-
+      auto newRet = offset.getAsValue(IGF);
+//
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
       Address fieldVector = emitAddressOfFieldOffsetVector(IGF, metadata,
                                     TheStruct.getStructOrBoundGenericStruct());
       fieldVector = IGF.Builder.CreateConstArrayGEP(fieldVector, index,
                                                     IGF.IGM.getPointerSize());
       auto oldRet = IGF.Builder.CreateLoad(fieldVector);
-      auto newRet = offset.getAsValue(IGF);
+//
+//      auto offset = structLayout.getFieldOffset(
+//          IGF, structLayout.getDecl()->getStoredProperties()[index]);
+//      auto newRet = offset.getAsValue(IGF);
+//
+////      structLayout.FieldOffsetVector
+//
+////      auto cmp = IGF.Builder.CreateICmpEQ(fieldVector, <#Value *RHS#>)
+//      structLayout.getFieldOffsetVectorOffset().getAsValue(IGF)->dump();
+//
+//      newRet->dump();
+//      oldRet->dump();
+//      Offset(IGF.IGM.getPointerSize() * index).getAsValue(IGF)->dump();
+//
+////      auto assertEq = IGF.IGM.Module.getFunction("__swift_assert_equal");
+////      IGF.Builder.CreateCall(assertEq->getFunctionType(),
+////                             assertEq, {oldRet, newRet});
 
-      auto assertEq = IGF.IGM.Module.getFunction("__swift_assert_equal");
-      IGF.Builder.CreateCall(assertEq->getFunctionType(),
-                             assertEq, {oldRet, newRet});
+//      auto newRet = Offset(IGF.IGM.getPointerSize() * index).getAsValue(IGF);
+//       StructMetadataLayout layout(IGF.IGM, TheStruct.getStructOrBoundGenericStruct()); // IGF.IGM.getMetadataLayout(TheStruct.getStructOrBoundGenericStruct());
+//      auto fieldOffset = layout.getStaticFieldOffset(layout.getDecl()->getStoredProperties()[index]);
+//      auto start = layout.getFieldOffsetVectorOffset().getStatic();
+//      auto rawOffset = Size(fieldOffset - start) * IGF.IGM.getPointerSize().getValue();
+//      auto newRet = Offset(rawOffset - IGF.IGM.getOffsetOfStructTypeSpecificMetadataMembers()).getAsValue(IGF); // .offsetBy(IGF, IGF.IGM.getOffsetOfStructTypeSpecificMetadataMembers())
 
+      auto assertEqFnTy = llvm::FunctionType::get(IGF.IGM.VoidTy,
+                                                  {newRet->getType(), newRet->getType()},
+                                                  false);
+      auto assertEq = IGF.IGM.Module.getOrInsertFunction("swift_assertEqual", assertEqFnTy);
+      
+      auto a = IGF.Builder.CreateIntCast(newRet, IGF.IGM.Int64Ty, true);
+      auto b = IGF.Builder.CreateIntCast(oldRet, IGF.IGM.Int64Ty, true);
+      IGF.Builder.CreateCall(cast<llvm::Constant>(assertEq.getCallee()),
+                             {a, b});
       return newRet;
     }
 

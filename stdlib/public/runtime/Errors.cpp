@@ -343,6 +343,13 @@ bool swift::_swift_shouldReportFatalErrorsToDebugger() {
   return _swift_reportFatalErrorsToDebugger;
 }
 
+void swift::swift_assertEqual(int64_t a, int64_t b) {
+  if (a != b) {
+    printf("a: %i b: %i\n", a, b);
+  }
+  assert(a == b);
+}
+
 /// Report a fatal error to system console, stderr, and crash logs.
 /// Does not crash by itself.
 void swift::swift_reportError(uint32_t flags,
