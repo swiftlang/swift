@@ -11,15 +11,15 @@ from __future__ import absolute_import, unicode_literals
 
 import os.path
 import platform
+import unittest
 
-from ..utils import TestCase
-from ...build_swift.argparse import ArgumentTypeError, types
-from ...build_swift.versions import Version
+from build_swift.argparse import ArgumentTypeError, types
+from build_swift.versions import Version
 
 
 # -----------------------------------------------------------------------------
 
-class TestBoolType(TestCase):
+class TestBoolType(unittest.TestCase):
 
     def test_true_values(self):
         bool_type = types.BoolType()
@@ -74,7 +74,7 @@ class TestBoolType(TestCase):
         self.assertRaises(ArgumentTypeError, bool_type, 'Invalid')
 
 
-class TestPathType(TestCase):
+class TestPathType(unittest.TestCase):
 
     def setUp(self):
         self.home_dir = os.path.expanduser('~')
@@ -124,7 +124,7 @@ class TestPathType(TestCase):
             return path
 
 
-class TestRegexType(TestCase):
+class TestRegexType(unittest.TestCase):
 
     def test_regex_match(self):
         regex_type = types.RegexType(r'a+b*')
@@ -142,7 +142,7 @@ class TestRegexType(TestCase):
             regex_type('baaaa')
 
 
-class TestClangVersionType(TestCase):
+class TestClangVersionType(unittest.TestCase):
 
     def test_valid_clang_version(self):
         clang_version_type = types.ClangVersionType()
@@ -170,7 +170,7 @@ class TestClangVersionType(TestCase):
             clang_version_type('100.0.56.1')
 
 
-class TestSwiftVersionType(TestCase):
+class TestSwiftVersionType(unittest.TestCase):
 
     def test_valid_swift_version(self):
         swift_version_type = types.SwiftVersionType()
@@ -197,18 +197,18 @@ class TestSwiftVersionType(TestCase):
             swift_version_type('100.0.56.1')
 
 
-class TestShellSplitType(object):
+class TestShellSplitType(unittest.TestCase):
 
     def test_split(self):
         shell_split_type = types.ShellSplitType()
 
         split = shell_split_type('-BAR="foo bar"')
-        self.assertEqual(split, ['-BAR="foo bar"'])
+        self.assertEqual(split, ['-BAR=foo bar'])
 
         split = shell_split_type('-BAR="foo bar" -BAZ="foo,bar",-QUX 42')
         self.assertEqual(split, [
-            '-BAR="foo bar"',
-            '-BAZ="foo,bar"',
+            '-BAR=foo bar',
+            '-BAZ=foo,bar',
             '-QUX',
             '42',
         ])

@@ -12,21 +12,22 @@ from __future__ import absolute_import, unicode_literals
 import os
 import platform
 import sys
+import unittest
+
+from build_swift import argparse
+from build_swift import driver_arguments
+from build_swift import migration
+from build_swift.presets import PresetParser
 
 import six
 
-from . import expected_options as eo
-from . import utils
 from .test_presets import PRESET_DEFAULTS
-from .utils import TestCase, UTILS_PATH, redirect_stdout
-from ..build_swift import argparse
-from ..build_swift import driver_arguments
-from ..build_swift import migration
-from ..build_swift.presets import PresetParser
+from .. import expected_options as eo
+from .. import utils
 
 
 PRESETS_FILES = [
-    os.path.join(UTILS_PATH, 'build-presets.ini'),
+    os.path.join(utils.UTILS_PATH, 'build-presets.ini'),
 ]
 
 
@@ -99,9 +100,10 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_help_option_test(cls, option):
         def test(self):
-            with redirect_stdout() as output, self.assertRaises(ParserError):
-                self.parse_args([option.option_string])
-                self.assertNotEmpty(output)
+            with utils.redirect_stdout() as output:
+                with self.assertRaises(ParserError):
+                    self.parse_args([option.option_string])
+                    self.assertNotEmpty(output)
 
         return test
 
@@ -329,8 +331,8 @@ class TestDriverArgumentParserMeta(type):
         return test
 
 
-@utils.add_metaclass(TestDriverArgumentParserMeta)
-class TestDriverArgumentParser(TestCase):
+@six.add_metaclass(TestDriverArgumentParserMeta)
+class TestDriverArgumentParser(unittest.TestCase):
 
     def _parse_args(self, args):
         try:
@@ -354,7 +356,7 @@ class TestDriverArgumentParser(TestCase):
         if namespace is None:
             namespace = argparse.Namespace()
 
-        with self.quietOutput():
+        with utils.quiet_output():
             try:
                 namespace, unknown_args = (
                     super(self.parser.__class__, self.parser).parse_known_args(
@@ -379,7 +381,7 @@ class TestDriverArgumentParser(TestCase):
         return namespace
 
     def parse_default_args(self, args, check_impl_args=False):
-        with self.quietOutput():
+        with utils.quiet_output():
             namespace = self._parse_args(args)
 
             if check_impl_args:
