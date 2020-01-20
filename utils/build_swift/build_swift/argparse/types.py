@@ -19,6 +19,8 @@ import os.path
 import re
 import shlex
 
+import six
+
 from . import ArgumentTypeError
 from ..versions import Version
 
@@ -40,7 +42,7 @@ def _repr(cls, args):
     """
 
     _args = []
-    for key, value in args.viewitems():
+    for key, value in six.iteritems(args):
         _args.append('{}={}'.format(key, repr(value)))
 
     return '{}({})'.format(type(cls).__name__, ', '.join(_args))

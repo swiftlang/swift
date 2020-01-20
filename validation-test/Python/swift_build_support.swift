@@ -7,4 +7,4 @@
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: OS=watchos
 
-// RUN: env PYTHONPATH=%utils:$PYTHONPATH %{python} -m unittest discover -s %utils/swift_build_support
+// RUN: %{python} %utils/swift_build_support/run_tests.py

@@ -9,15 +9,17 @@
 
 from __future__ import absolute_import, unicode_literals
 
+import unittest
 from argparse import _ArgumentGroup, _MutuallyExclusiveGroup
 
-from ..utils import TestCase
-from ...build_swift.argparse import ArgumentParser, actions
+from build_swift.argparse import ArgumentParser, actions
+
+from ... import utils
 
 
 # -----------------------------------------------------------------------------
 
-class TestBuilder(TestCase):
+class TestBuilder(unittest.TestCase):
 
     def test_build(self):
         builder = ArgumentParser.builder()
@@ -79,7 +81,7 @@ class TestBuilder(TestCase):
         args = parser.parse_args(['--baz', '--baz=FALSE'])
         self.assertTrue(args.baz)
 
-        with self.quietOutput(), self.assertRaises(SystemExit):
+        with utils.quiet_output(), self.assertRaises(SystemExit):
             parser.parse_args(['--qux'])
 
     def test_set_defaults(self):
@@ -132,7 +134,7 @@ class TestBuilder(TestCase):
         self.assertEqual(builder._current_group, builder._parser)
 
 
-class TestArgumentParser(TestCase):
+class TestArgumentParser(unittest.TestCase):
 
     def test_builder(self):
         builder = ArgumentParser.builder(usage='Totally useless help message')

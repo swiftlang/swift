@@ -7,4 +7,4 @@
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: OS=watchos
 
-// RUN: %{python} %utils/build_swift/run_tests.py
+// RUN: %{python} %utils/python_lint.py
