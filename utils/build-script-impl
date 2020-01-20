@@ -1751,23 +1751,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${swift_cmake_options[@]}"
                 )
 
-                if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
-                    cmake_options+=(
-                    -DSWIFT_TOOL_SIL_OPT_BUILD=FALSE
-                    -DSWIFT_TOOL_SWIFT_IDE_TEST_BUILD=FALSE
-                    -DSWIFT_TOOL_SWIFT_REMOTEAST_TEST_BUILD=FALSE
-                    -DSWIFT_TOOL_LLDB_MODULEIMPORT_TEST_BUILD=FALSE
-                    -DSWIFT_TOOL_SIL_EXTRACT_BUILD=FALSE
-                    -DSWIFT_TOOL_SWIFT_LLVM_OPT_BUILD=FALSE
-                    -DSWIFT_TOOL_SWIFT_SDK_ANALYZER_BUILD=FALSE
-                    -DSWIFT_TOOL_SWIFT_SDK_DIGESTER_BUILD=FALSE
-                    -DSWIFT_TOOL_SOURCEKITD_TEST_BUILD=FALSE
-                    -DSWIFT_TOOL_SOURCEKITD_REPL_BUILD=FALSE
-                    -DSWIFT_TOOL_COMPLETE_TEST_BUILD=FALSE
-                    -DSWIFT_TOOL_SWIFT_REFLECTION_DUMP_BUILD=FALSE
-                    )
-                fi
-
                 cmake_options=(
                     "${cmake_options[@]}"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
