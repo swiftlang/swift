@@ -89,7 +89,7 @@ print(someFunc())
 // RUN:     %s
 //
 // --- Ensure module cache is populated.
-// RUN: find %t/modulecache -maxdepth 1 -name 'SomeModule-*.swiftmodule' | grep .
+// RUN: ls %t/modulecache/SomeModule-*.swiftmodule
 //
 // --- Built with indexing
 // RUN: %target-swift-frontend \
