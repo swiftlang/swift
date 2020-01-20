@@ -15,8 +15,6 @@
 #
 # ----------------------------------------------------------------------------
 
-from .which import which
-
 __all__ = [
     "cmake",
     "debug",
@@ -25,6 +23,5 @@ __all__ = [
     "tar",
     "targets",
     "toolchain",
-    "which",
     "xcrun",
 ]
