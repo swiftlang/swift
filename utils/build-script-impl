@@ -506,64 +506,47 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_SDK="OSX"
                     cmake_osx_deployment_target="${DARWIN_DEPLOYMENT_VERSION_OSX}"
                     ;;
-                iphonesimulator-i386)
-                    SWIFT_HOST_TRIPLE="i386-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                iphonesimulator-*)
+                    SWIFT_HOST_TRIPLE="${platform}-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     llvm_target_arch="X86"
 
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
-                iphonesimulator-x86_64)
-                    SWIFT_HOST_TRIPLE="x86_64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    llvm_target_arch="X86"
-
-                    SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
-                    cmake_osx_deployment_target=""
-                    ;;
-                iphoneos-armv7)
-                    SWIFT_HOST_TRIPLE="armv7-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    llvm_target_arch="ARM"
+                iphoneos-*)
+                    SWIFT_HOST_TRIPLE="${platform}-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    if [[ ${platform} == arm64 ]]  ; then
+                      llvm_target_arch="AArch64"
+                    else
+                      llvm_target_arch="ARM"
+                    fi
 
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     cmake_osx_deployment_target=""
                     ;;
-                iphoneos-armv7s)
-                    SWIFT_HOST_TRIPLE="armv7s-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    llvm_target_arch="ARM"
-
-                    SWIFT_HOST_VARIANT_SDK="IOS"
-                    cmake_osx_deployment_target=""
-                    ;;
-                iphoneos-arm64)
-                    SWIFT_HOST_TRIPLE="arm64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    llvm_target_arch="AArch64"
-
-                    SWIFT_HOST_VARIANT_SDK="IOS"
-                    cmake_osx_deployment_target=""
-                    ;;
-                appletvsimulator-x86_64)
-                    SWIFT_HOST_TRIPLE="x86_64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
+                appletvsimulator-*)
+                    SWIFT_HOST_TRIPLE="${platform}-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                     llvm_target_arch="X86"
 
                     SWIFT_HOST_VARIANT_SDK="TVOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
-                appletvos-arm64)
-                    SWIFT_HOST_TRIPLE="arm64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
+                appletvos-*)
+                    SWIFT_HOST_TRIPLE="${platform}-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                     llvm_target_arch="AArch64"
 
                     SWIFT_HOST_VARIANT_SDK="TVOS"
                     cmake_osx_deployment_target=""
                     ;;
-                watchsimulator-i386)
-                    SWIFT_HOST_TRIPLE="i386-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                watchsimulator-*)
+                    SWIFT_HOST_TRIPLE="${platform}-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
                     llvm_target_arch="X86"
 
                     SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
-                watchos-armv7k)
-                    SWIFT_HOST_TRIPLE="armv7k-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                watchos-*)
+                    SWIFT_HOST_TRIPLE="${platform}-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
                     llvm_target_arch="ARM"
 
                     SWIFT_HOST_VARIANT_SDK="WATCHOS"
