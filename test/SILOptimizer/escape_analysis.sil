@@ -1212,10 +1212,10 @@ bb0(%0 : $Array<X>):
 
 // CHECK-LABEL: CG of arraysemantics_get_element
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
-// CHECK-NEXT:    Con [ref] %0.1 Esc: A, Succ: %1.2
+// CHECK-NEXT:    Con [ref] %0.1 Esc: A, Succ:
 // CHECK-NEXT:    Arg [ref] %1 Esc: A, Succ: (%1.1)
 // CHECK-NEXT:    Con [int] %1.1 Esc: A, Succ: (%1.2)
-// CHECK-NEXT:    Con %1.2 Esc: A, Succ: 
+// CHECK-NEXT:    Con %1.2 Esc: A, Succ: %0.1
 // CHECK-NEXT:  End
 sil @arraysemantics_get_element : $@convention(thin) (Array<X>) -> @out X {
 bb0(%io : $*X, %1 : $Array<X>):
@@ -1246,9 +1246,9 @@ bb0(%0 : $*Array<X>):
 
 // CHECK-LABEL: CG of arraysemantics_get_element_address
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%0.1)
-// CHECK-NEXT:    Con [int] %0.1 Esc: A, Succ: 
+// CHECK-NEXT:    Con [int] %0.1 Esc: A, Succ: (%0.2), %4
 // CHECK-NEXT:    Con %0.2 Esc: A, Succ: 
-// CHECK-NEXT:    Val %4 Esc: , Succ: %0.1
+// CHECK-NEXT:    Val %4 Esc: A, Succ: (%0.2)
 // CHECK-NEXT:  End
 sil @arraysemantics_get_element_address : $@convention(thin) (Array<X>) -> () {
 bb0(%0 : $Array<X>):

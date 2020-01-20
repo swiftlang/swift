@@ -1891,7 +1891,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
           if (LoadedElement) {
             if (CGNode *arrayElementStorage =
                     ConGraph->getFieldContent(ArrayObjNode)) {
-              ConGraph->defer(LoadedElement, arrayElementStorage);
+              ConGraph->defer(arrayElementStorage, LoadedElement);
               return;
             }
           }
@@ -1902,7 +1902,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         // returned address point to the same element storage.
         if (CGNode *ArrayObjNode = ConGraph->getValueContent(ASC.getSelf())) {
           CGNode *arrayElementAddress = ConGraph->getNode(ASC.getCallResult());
-          ConGraph->defer(arrayElementAddress, ArrayObjNode);
+          ConGraph->defer(ArrayObjNode, arrayElementAddress);
           return;
         }
         break;
