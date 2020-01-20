@@ -337,9 +337,12 @@ def check_output(command, **kwargs):
     Output is returned as a unicode string.
     """
 
+    if six.PY3:
+        kwargs['encoding'] = 'utf-8'
+
     output = subprocess.check_output(command, **kwargs)
 
-    if _PY_VERSION >= (3, 0):
+    if six.PY3:
         return output
 
     # Return unicode string rather than bytes in Python 2.
