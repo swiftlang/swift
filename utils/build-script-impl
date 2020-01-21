@@ -1244,9 +1244,6 @@ function common_cross_c_flags() {
         watchos-*)
             echo -n " -arch ${arch}  -mwatchos-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
-        android-*)
-            echo -n " -arch ${arch}"
-            ;;
     esac
 
     local build_type=$2
