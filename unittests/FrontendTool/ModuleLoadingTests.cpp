@@ -113,8 +113,8 @@ protected:
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoBuffer;
 
     auto error =
-      loader->findModuleFilesInDirectory({moduleName, SourceLoc()}, tempDir,
-        "Library.swiftmodule", "Library.swiftdoc", "Library.swiftsourceinfo",
+      loader->findModuleFilesInDirectory({moduleName, SourceLoc()},
+        SerializedModuleBaseName(tempDir, SerializedModuleBaseName("Library")),
         /*ModuleInterfacePath*/nullptr,
         &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer);
     ASSERT_FALSE(error);
