@@ -2455,35 +2455,34 @@ namespace {
       return tryFinder.foundThrow();
     }
 
-    void collectParameterRefs(Expr *expr,
-                              llvm::SmallVectorImpl<TypeVariableType *> &refs) {
-      expr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
-        if (auto *closure = dyn_cast<ClosureExpr>(childExpr)) {
-          if (closure->hasSingleExpressionBody()) {
-            collectParameterRefs(closure->getSingleExpressionBody(), refs);
-            return childExpr;
-          }
-        }
-
-        if (auto *DRE = dyn_cast<DeclRefExpr>(childExpr)) {
-          if (auto *PD = dyn_cast<ParamDecl>(DRE->getDecl())) {
-            if (CS.hasType(PD)) {
-              if (auto *paramType = CS.getType(PD)->getAs<TypeVariableType>())
-                refs.push_back(paramType);
-            }
-          }
-        }
-
-        return childExpr;
-      });
-    }
-
     Type visitClosureExpr(ClosureExpr *closure) {
       auto *locator = CS.getConstraintLocator(closure);
       auto closureType = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
 
-      llvm::SmallVector<TypeVariableType *, 4> paramRefs;
-      collectParameterRefs(closure, paramRefs);
+      // Collect any references to closure parameters whose types involve type
+      // variables from the closure, because there will be a dependency on
+      // those type variables once we have generated constraints for the
+      // closure body.
+      struct CollectParameterRefs : public ASTWalker {
+        ConstraintSystem &cs;
+        llvm::SmallVector<TypeVariableType *, 4> paramRefs;
+
+        CollectParameterRefs(ConstraintSystem &cs) : cs(cs) { }
+
+        std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+          // Retrieve type variables from references to parameter declarations.
+          if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
+            if (auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl())) {
+              if (Type paramType = cs.getTypeIfAvailable(paramDecl)) {
+                paramType->getTypeVariables(paramRefs);
+              }
+            }
+          }
+
+          return { true, expr };
+        }
+      } collectParameterRefs(CS);
+      closure->walk(collectParameterRefs);
 
       auto inferredType = inferClosureType(closure);
       if (!inferredType || inferredType->hasError())
@@ -2491,7 +2490,8 @@ namespace {
 
       CS.addUnsolvedConstraint(
           Constraint::create(CS, ConstraintKind::DefaultClosureType,
-                             closureType, inferredType, locator, paramRefs));
+                             closureType, inferredType, locator,
+                             collectParameterRefs.paramRefs));
 
       CS.setClosureType(closure, inferredType);
       return closureType;
