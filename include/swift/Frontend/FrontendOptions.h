@@ -253,6 +253,9 @@ public:
   /// See the \ref SILOptions.EmitSortedSIL flag.
   bool EmitSortedSIL = false;
 
+  /// Should we emit the cType when printing @convention(c) or no?
+  bool PrintFullConvention = false;
+
   /// Indicates whether the dependency tracker should track system
   /// dependencies as well.
   bool TrackSystemDeps = false;
