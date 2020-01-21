@@ -9,6 +9,7 @@ module SRoA {
 
 module ObjectiveC {
   header "BridgeTestObjectiveC.h"
+  export *
 }
 
 module CoreCooling {
@@ -17,6 +18,7 @@ module CoreCooling {
 
 module Foundation {
   header "BridgeTestFoundation.h"
+  export *
 }
 
 module CoreFoundation {
