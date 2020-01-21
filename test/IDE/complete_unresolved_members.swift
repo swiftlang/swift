@@ -115,6 +115,11 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPEPARAM_IN_CONTEXTTYPE_1 | %FileCheck %s -check-prefix=TYPEPARAM_IN_CONTEXTTYPE_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_2 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_3 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_4 | %FileCheck %s -check-prefix=UNRESOLVED_3
+
 enum SomeEnum1 {
   case South
   case North
@@ -731,4 +736,14 @@ func testTypeParamInContextType() {
 // TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[Constructor]/CurrNominal:      init()[#MyStruct<MyProtocol>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: myProtocolOption[#MyStruct<ConcreteMyProtocol>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1: End completions
+}
+
+func testTernaryOperator() {
+  let _: SomeEnum1 = true ? .#^TERNARY_1^#
+  func sync(){}
+  let _: SomeEnum1 = true ? .#^TERNARY_2^# :
+  func sync(){}
+  let _: SomeEnum1 = true ? .#^TERNARY_3^# : .South
+  func sync(){}
+  let _: SomeEnum1 = true ? .South : .#^TERNARY_4^#
 }
