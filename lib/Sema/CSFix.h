@@ -1645,7 +1645,7 @@ class SpecifyObjectLiteralTypeImport final : public ConstraintFix {
 
 public:
   std::string getName() const {
-    return "specify object literal protocol type import";
+    return "import required module to gain access to a default literal type";
   }
 
   bool diagnose(bool asNote = false) const;

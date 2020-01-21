@@ -1045,13 +1045,6 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     cs.DefaultedConstraints.push_back(srcLocator);
 
     if (type->isHole()) {
-      if (auto * OLE = dyn_cast<ObjectLiteralExpr>(srcLocator->getAnchor())) {
-        auto *fix = SpecifyObjectLiteralTypeImport::create(
-            cs, TypeVar->getImpl().getLocator());
-        if (cs.recordFix(fix))
-          return true;
-      }
-      
       if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
         auto path = dstLocator->getPath();
         // Drop `generic parameter` locator element so that all missing
@@ -1063,6 +1056,12 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
           return true;
       } else if (TypeVar->getImpl().isClosureResultType()) {
         auto *fix = SpecifyClosureReturnType::create(
+            cs, TypeVar->getImpl().getLocator());
+        if (cs.recordFix(fix))
+          return true;
+      } else if (auto *OLE = dyn_cast_or_null<ObjectLiteralExpr>(
+                     srcLocator->getAnchor())) {
+        auto *fix = SpecifyObjectLiteralTypeImport::create(
             cs, TypeVar->getImpl().getLocator());
         if (cs.recordFix(fix))
           return true;
