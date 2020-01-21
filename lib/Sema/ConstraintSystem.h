@@ -669,12 +669,34 @@ struct AppliedBuilderTransform {
   /// The builder type that was applied to the closure.
   Type builderType;
 
-  /// The single expression to which the closure was transformed.
-  Expr *singleExpr;
-
   /// The result type of the body, to which the returned expression will be
   /// converted.
   Type bodyResultType;
+
+  /// An expression whose value has been recorded for later use.
+  struct RecordedExpr {
+    /// The temporary value that captures the value of the expression, if
+    /// there is one.
+    VarDecl *temporaryVar;
+
+    /// The expression that results from generating constraints with this
+    /// particular builder.
+    Expr *generatedExpr;
+  };
+
+  /// A mapping from expressions whose values are captured by the builder
+  /// to information about the temporary variable capturing the
+  llvm::DenseMap<Expr *, RecordedExpr> capturedExprs;
+
+  /// A mapping from statements to a pair containing the implicit variable
+  /// declaration that captures the result of that expression, and the
+  /// set of expressions that can be used to produce a value for that
+  /// variable.
+  llvm::DenseMap<Stmt *, std::pair<VarDecl *, llvm::TinyPtrVector<Expr *>>>
+      capturedStmts;
+
+  /// The return expression, capturing the last value to be emitted.
+  Expr *returnExpr = nullptr;
 };
 
 /// Describes the fixed score of a solution to the constraint system.
@@ -825,7 +847,7 @@ public:
   llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
 
   /// The node -> type mappings introduced by this solution.
-  llvm::SmallVector<std::pair<TypedNode, Type>, 8> addedNodeTypes;
+  llvm::MapVector<TypedNode, Type> addedNodeTypes;
 
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
@@ -916,6 +938,13 @@ public:
   Type getType(const Expr *E) const;
 
   void setExprTypes(Expr *expr) const;
+
+  /// Retrieve the type of the given node, as recorded in this solution.
+  Type getType(TypedNode node) const {
+    auto known = addedNodeTypes.find(node);
+    assert(known != addedNodeTypes.end());
+    return known->second;
+  }
 
   SWIFT_DEBUG_DUMP;
 
@@ -2028,9 +2057,7 @@ public:
     }
 
     // Record the fact that we ascribed a type to this node.
-    if (solverState && solverState->depth > 0) {
-      addedNodeTypes.push_back({node, type});
-    }
+    addedNodeTypes.push_back({node, type});
   }
 
   /// Set the type in our type map for a given expression. The side
@@ -2111,6 +2138,15 @@ public:
   Type getType(const KeyPathExpr *KP, unsigned I) const {
     assert(hasType(KP, I) && "Expected type to have been set!");
     return KeyPathComponentTypes.find(std::make_pair(KP, I))->second;
+  }
+
+  /// Retrieve the type of the variable, if known.
+  Type getTypeIfAvailable(const VarDecl *VD) const {
+    auto known = VarTypes.find(VD);
+    if (known == VarTypes.end())
+      return Type();
+
+    return known->second;
   }
 
   /// Cache the type of the expression argument and return that same
@@ -2809,6 +2845,9 @@ public:
 
   /// Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
+
+  /// Add implicit "load" expressions to the given expression.
+  Expr *addImplicitLoadExpr(Expr *expr);
 
   /// "Open" the given unbound type by introducing fresh type
   /// variables for generic parameters and constructing a bound generic
@@ -4863,6 +4902,29 @@ bool exprNeedsParensOutsideFollowingOperator(
 
 /// Determine whether this is a SIMD operator.
 bool isSIMDOperator(ValueDecl *value);
+
+/// Apply the given function builder transform within a specific solution
+/// to produce the rewritten body.
+///
+/// \param solution The solution to use during application, providing the
+/// specific types for each type variable.
+/// \param applied The applied builder transform.
+/// \param body The body to transform
+/// \param dc The context in which the transform occurs.
+/// \param rewriteExpr Rewrites expressions that show up in the transform
+/// to their final, type-checked versions.
+/// \param coerceToType Coerce the given expression to the specified type,
+/// which may introduce implicit conversions.
+///
+/// \returns the transformed body
+BraceStmt *applyFunctionBuilderTransform(
+    const constraints::Solution &solution,
+    constraints::AppliedBuilderTransform applied,
+    BraceStmt *body,
+    DeclContext *dc,
+    std::function<Expr *(Expr *)> rewriteExpr,
+    std::function<Expr *(Expr *, Type, constraints::ConstraintLocator *)>
+      coerceToType);
 
 } // end namespace swift
 
