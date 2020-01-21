@@ -14,12 +14,17 @@ public struct RangeSet<Bound: Comparable> {
     }
   }
   
-  /// Creates a range set containing the given ranges.
+  /// Creates a range set containing the values in the given ranges.
+  ///
+  /// Any empty ranges in `ranges` are ignored, and non-empty ranges are merged
+  /// to eliminate any overlaps. As such, the `ranges` collection in the
+  /// resulting range set may not be equivalent to the sequence of ranges
+  /// passed to this initializer.
   ///
   /// - Parameter ranges: The ranges to use for the new range set.
   public init<S: Sequence>(_ ranges: S) where S.Element == Range<Bound> {
     for range in ranges {
-      insert(range)
+      insert(contentsOf: range)
     }
   }
   
@@ -55,7 +60,7 @@ public struct RangeSet<Bound: Comparable> {
   /// contained by the ranges in the range set.
   ///
   /// - Parameter value: The value to look for in the range set.
-  /// - Return: `true` if `value` is contained by a range in the range set;
+  /// - Returns: `true` if `value` is contained by a range in the range set;
   ///   otherwise, `false`.
   ///
   /// - Complexity: O(log *n*), where *n* is the number of ranges in the
@@ -67,12 +72,12 @@ public struct RangeSet<Bound: Comparable> {
       : _ranges[i].lowerBound <= value
   }
   
-  /// Returns a Boolean value indicating whether the given range is
-  /// contained in the range set.
+  /// Returns a Boolean value indicating whether all the values in the specified
+  /// range are contained in the range set.
   ///
-  /// - Parameter range: The range to look for in the range set.
-  /// - Return: `true` if `element` is contained in the range set; otherwise,
-  ///   `false`.
+  /// - Parameter range: The range of values to look for in the range set.
+  /// - Returns: `true` if `range` is wholly contained by the range set;
+  ///   otherwise, `false`.
   ///
   /// - Complexity: O(log *n*), where *n* is the number of ranges in the
   ///   range set.
@@ -142,7 +147,7 @@ public struct RangeSet<Bound: Comparable> {
   ///
   /// - Complexity: O(*n*), where *n* is the number of ranges in the range
   ///   set.
-  public mutating func insert(_ range: Range<Bound>) {
+  public mutating func insert(contentsOf range: Range<Bound>) {
     // Shortcuts for the (literal) edge cases
     if range.isEmpty { return }
     guard !_ranges.isEmpty else {
@@ -184,7 +189,7 @@ public struct RangeSet<Bound: Comparable> {
   ///
   /// - Complexity: O(*n*), where *n* is the number of ranges in the range
   ///   set.
-  public mutating func remove(_ range: Range<Bound>) {
+  public mutating func remove(contentsOf range: Range<Bound>) {
     // Shortcuts for the (literal) edge cases
     if range.isEmpty
       || _ranges.isEmpty
@@ -268,7 +273,7 @@ extension RangeSet {
       self.insert(i, within: collection)
     }
   }
-    
+
   /// Inserts a range that contains only the specified index into the range
   /// set.
   ///
@@ -282,7 +287,7 @@ extension RangeSet {
   public mutating func insert<C>(_ index: Bound, within collection: C)
     where C: Collection, C.Index == Bound
   {
-    insert(index ..< collection.index(after: index))
+    insert(contentsOf: index ..< collection.index(after: index))
   }
   
   /// Removes the range that contains only the specified index from the range
@@ -298,7 +303,7 @@ extension RangeSet {
   public mutating func remove<C>(_ index: Bound, within collection: C)
     where C: Collection, C.Index == Bound
   {
-    remove(index ..< collection.index(after: index))
+    remove(contentsOf: index ..< collection.index(after: index))
   }
 
   /// Returns a range set that represents all the elements in the given
@@ -317,10 +322,10 @@ extension RangeSet {
     var result: RangeSet = []
     var low = collection.startIndex
     for range in _ranges {
-      result.insert(low..<range.lowerBound)
+      result.insert(contentsOf: low..<range.lowerBound)
       low = range.upperBound
     }
-    result.insert(low..<collection.endIndex)
+    result.insert(contentsOf: low..<collection.endIndex)
     return result
   }
 }
@@ -332,7 +337,7 @@ extension RangeSet {
 extension RangeSet {
   public mutating func formUnion(_ other: __owned RangeSet<Bound>) {
     for range in other._ranges {
-      insert(range)
+      insert(contentsOf: range)
     }
   }
   
@@ -348,7 +353,7 @@ extension RangeSet {
   
   public mutating func subtract(_ other: RangeSet<Bound>) {
     for range in other._ranges {
-      remove(range)
+      remove(contentsOf: range)
     }
   }
   

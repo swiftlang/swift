@@ -29,7 +29,7 @@ extension DiscontiguousSlice: Collection {
   public typealias SubSequence = Self
   
   public var startIndex: Index {
-    ranges.isEmpty
+    subranges.isEmpty
       ? endIndex
       : Index(_rangeOffset: 0, base: subranges._ranges[0].lowerBound)
   }
@@ -61,7 +61,7 @@ extension DiscontiguousSlice: Collection {
   public subscript(bounds: Range<Index>) -> DiscontiguousSlice<Base> {
     let baseBounds = bounds.lowerBound.base ..< bounds.upperBound.base
     let subset = subranges.intersection(RangeSet(baseBounds))
-    return DiscontiguousSlice<Base>(base: base, ranges: subset)
+    return DiscontiguousSlice<Base>(base: base, subranges: subset)
   }
 }
 
@@ -164,7 +164,7 @@ extension Collection {
   ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
   ///     let vowelIndices = str.subranges(where: { vowels.contains($0) })
   ///
-  ///     let disemvoweled = str.removingAll(in: vowelIndices)
+  ///     let disemvoweled = str.removingSubranges(vowelIndices)
   ///     print(String(disemvoweled))
   ///     // Prints "Th rn n Spn stys mnly n th pln."
   ///
@@ -173,8 +173,8 @@ extension Collection {
   /// - Returns: A collection of the elements that are not in `subranges`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  public func removingAll(
-    in subranges: RangeSet<Index>
+  public func removingSubranges(
+    _ subranges: RangeSet<Index>
   ) -> DiscontiguousSlice<Self> {
     let inversion = subranges._inverted(within: self)
     return self[inversion]

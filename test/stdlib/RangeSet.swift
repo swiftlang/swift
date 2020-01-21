@@ -17,9 +17,9 @@ func buildRandomRangeSet(iterations: Int = 100) -> RangeSet<Int> {
     var (a, b) = (Int.random(in: -100...100), Int.random(in: -100...100))
     if (a > b) { swap(&a, &b) }
     if Double.random(in: 0..<1) > 0.3 {
-      set.insert(a..<b)
+      set.insert(contentsOf: a..<b)
     } else {
-      set.remove(a..<b)
+      set.remove(contentsOf: a..<b)
     }
   }
   return set
@@ -49,8 +49,7 @@ RangeSetTests.test("contains") {
       expectTrue(set.contains(i))
     }
     
-    let inverted = set._inverted(within: parent)
-    for i in parent.indices[inverted] {
+    for i in parent.indices.removingSubranges(set) {
       expectFalse(set.contains(i))
     }
   }
@@ -67,49 +66,49 @@ RangeSetTests.test("insertions") {
   do {
     // Overlap from middle to middle
     var s = source
-    s.insert(3..<21)
+    s.insert(contentsOf: 3..<21)
     expectEqualSequence(s.ranges, [1..<22, 27..<29])
   }
   
   do {
     // insert in middle
     var s = source
-    s.insert(13..<15)
+    s.insert(contentsOf: 13..<15)
     expectEqualSequence(s.ranges, [1..<5, 8..<10, 13..<15, 20..<22, 27..<29])
   }
   
   do {
     // extend a range
     var s = source
-    s.insert(22..<25)
+    s.insert(contentsOf: 22..<25)
     expectEqualSequence(s.ranges, [1..<5, 8..<10, 20..<25, 27..<29])
   }
   
   do {
     // extend at beginning of range
     var s = source
-    s.insert(17..<20)
+    s.insert(contentsOf: 17..<20)
     expectEqualSequence(s.ranges, [1..<5, 8..<10, 17..<22, 27..<29])
   }
   
   do {
     // insert at the beginning
     var s = source
-    s.insert(-10 ..< -5)
+    s.insert(contentsOf: -10 ..< -5)
     expectEqualSequence(s.ranges, [-10 ..< -5, 1..<5, 8..<10, 20..<22, 27..<29])
   }
   
   do {
     // insert at the end
     var s = source
-    s.insert(35 ..< 40)
+    s.insert(contentsOf: 35 ..< 40)
     expectEqualSequence(s.ranges, [1..<5, 8..<10, 20..<22, 27..<29, 35..<40])
   }
   
   do {
     // Overlap multiple ranges
     var s = source
-    s.insert(0..<21)
+    s.insert(contentsOf: 0..<21)
     expectEqualSequence(s.ranges, [0..<22, 27..<29])
   }
   
@@ -130,7 +129,7 @@ RangeSetTests.test("insertions") {
 
 RangeSetTests.test("removals") {
   var s = source
-  s.remove(4..<28)
+  s.remove(contentsOf: 4..<28)
   expectEqualSequence(s.ranges, [1..<4, 28..<29])
   s.remove(3, within: parent)
   expectEqualSequence(s.ranges, [1..<3, 28..<29])
@@ -234,97 +233,35 @@ RangeSetTests.test("subranges(of:/where:)") {
   expectEqualSequence(lowerOnly, lowercaseLetters)
   expectEqualSequence(lowerOnly.reversed(), lowercaseLetters.reversed())
   
-  let upperOnly = letterString[lowerIndices._inverted(within: letterString)]
+  let upperOnly = letterString.removingSubranges(lowerIndices)
   expectEqualSequence(upperOnly, uppercaseLetters)
   expectEqualSequence(upperOnly.reversed(), uppercaseLetters.reversed())
 }
 
-RangeSetTests.test("removeAll") {
+RangeSetTests.test("removeSubranges") {
   var a = [1, 2, 3, 4, 3, 3, 4, 5, 3, 4, 3, 3, 3]
   let indices = a.subranges(of: 3)
-  a.removeAll(in: indices)
+  a.removeSubranges(indices)
   expectEqual(a, [1, 2, 4, 4, 5, 4])
   
   var numbers = Array(1...20)
-  numbers.removeAll(in: [2..<5, 10..<15, 18..<20])
+  numbers.removeSubranges(RangeSet([2..<5, 10..<15, 18..<20]))
   expectEqual(numbers, [1, 2, 6, 7, 8, 9, 10, 16, 17, 18])
   
   var str = letterString
   let lowerIndices = str.subranges(where: { $0.isLowercase })
   
-  let upperOnly = str.removingAll(in: lowerIndices)
+  let upperOnly = str.removingSubranges(lowerIndices)
   expectEqualSequence(upperOnly, uppercaseLetters)
   
-  str.removeAll(in: lowerIndices)
+  str.removeSubranges(lowerIndices)
   expectEqualSequence(str, uppercaseLetters)
 }
 
-RangeSetTests.test("shift/range") {
-  let a = ["A", "B", "C", "D", "E", "F"]
-  for lowerBound in a.indices {
-    for upperBound in lowerBound..<a.endIndex {
-      for destination in a.indices {
-        var b = a
-        let source = lowerBound..<upperBound
-        let result = b.shift(from: source, to: destination)
-        expectEqual(b[result], a[source])
-        
-        // Compare result with RangeSet-based move
-        var c = a
-        _ = c.gather(RangeSet(source), at: destination)
-        expectEqualSequence(b, c)
-        
-        // Manual comparison
-        if destination < source.lowerBound {
-          let c = [
-            a[..<destination],
-            a[source],
-            a[destination..<source.lowerBound],
-            a[source.upperBound...],
-            ].joined()
-          expectEqualSequence(b, c)
-        }
-        else if destination >= source.upperBound {
-          let c = [
-            a[..<source.lowerBound],
-            a[source.upperBound..<destination],
-            a[source],
-            a[destination...],
-            ].joined()
-          expectEqualSequence(b, c)
-        }
-        else {
-          expectEqualSequence(b, a)
-        }
-      }
-    }
-  }
-  
-  // closed range
-  var b = a
-  expectEqual(b.shift(from: 2...3, to: 1), 1..<3)
-  expectEqual(b, ["A", "C", "D", "B", "E", "F"])
-}
-
-RangeSetTests.test("shift/single") {
-  let a = ["A", "B", "C", "D", "E", "F"]
-  for source in a.indices {
-    for dest in a.startIndex...a.endIndex {
-      var b = a
-      var c = a
-      let rs = RangeSet(source, within: a)
-      let resultingIndex = b.shift(from: source, to: dest)
-      c.gather(rs, at: dest)
-      expectEqual(a[source], b[resultingIndex])
-      expectEqual(b, c)
-    }
-  }
-}
-
-RangeSetTests.test("gather/rangeset") {
+RangeSetTests.test("moveSubranges/rangeset") {
   // Move before
   var numbers = Array(1...20)
-  let range1 = numbers.gather([10..<15, 18..<20], at: 4)
+  let range1 = numbers.moveSubranges(RangeSet([10..<15, 18..<20]), to: 4)
   expectEqual(range1, 4..<11)
   expectEqual(numbers, [
     1, 2, 3, 4,
@@ -334,7 +271,7 @@ RangeSetTests.test("gather/rangeset") {
   
   // Move to start
   numbers = Array(1...20)
-  let range2 = numbers.gather([10..<15, 18..<20], at: 0)
+  let range2 = numbers.moveSubranges(RangeSet([10..<15, 18..<20]), to: 0)
   expectEqual(range2, 0..<7)
   expectEqual(numbers, [
     11, 12, 13, 14, 15,
@@ -343,7 +280,7 @@ RangeSetTests.test("gather/rangeset") {
   
   // Move to end
   numbers = Array(1...20)
-  let range3 = numbers.gather([10..<15, 18..<20], at: 20)
+  let range3 = numbers.moveSubranges(RangeSet([10..<15, 18..<20]), to: 20)
   expectEqual(range3, 13..<20)
   expectEqual(numbers, [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 16, 17, 18,
@@ -353,7 +290,7 @@ RangeSetTests.test("gather/rangeset") {
   
   // Move to middle of selected elements
   numbers = Array(1...20)
-  let range4 = numbers.gather([10..<15, 18..<20], at: 14)
+  let range4 = numbers.moveSubranges(RangeSet([10..<15, 18..<20]), to: 14)
   expectEqual(range4, 10..<17)
   expectEqual(numbers, [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
@@ -363,45 +300,18 @@ RangeSetTests.test("gather/rangeset") {
   
   // Move none
   numbers = Array(1...20)
-  let range5 = numbers.gather([], at: 10)
+  let range5 = numbers.moveSubranges(RangeSet(), to: 10)
   expectEqual(range5, 10..<10)
   expectEqual(numbers, Array(1...20))
 }
 
-RangeSetTests.test("gather/predicate") {
-  for length in 0..<11 {
-    let initial = Array(0..<length)
-    
-    for destination in 0..<length {
-      for modulus in 1...5 {
-        let f: (Int) -> Bool = { $0.isMultiple(of: modulus) }
-        let notf = { !f($0) }
-        
-        var array = initial
-        var range = array.gather(at: destination, where: f)
-        expectEqualSequence(array[range], initial.filter(f))
-        expectEqualSequence(
-          array[..<range.lowerBound] + array[range.upperBound...],
-          initial.filter(notf))
-        
-        array = initial
-        range = array.gather(at: destination, where: notf)
-        expectEqualSequence(array[range], initial.filter(notf))
-        expectEqualSequence(
-          array[..<range.lowerBound] + array[range.upperBound...],
-          initial.filter(f))
-      }
-    }
-  }
-}
-
-RangeSetTests.test("gather/noCOW") {
+RangeSetTests.test("moveSubranges/noCOW") {
   let numbers = Array(1...20)
   expectNoCopyOnWrite(numbers) { numbers in
-    numbers.gather([10..<15, 18..<20], at: 4)
+    numbers.moveSubranges(RangeSet([10..<15, 18..<20]), to: 4)
   }
   expectNoCopyOnWrite(numbers) { numbers in
-    numbers.removeAll(in: [2..<5, 10..<15, 18..<20])
+    numbers.removeSubranges(RangeSet([2..<5, 10..<15, 18..<20]))
   }
 }
 

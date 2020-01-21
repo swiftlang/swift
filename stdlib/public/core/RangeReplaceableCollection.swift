@@ -1149,18 +1149,18 @@ extension RangeReplaceableCollection {
   ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
   ///     let vowelIndices = str.subranges(where: { vowels.contains($0) })
   ///
-  ///     str.removeAll(in: vowelIndices)
+  ///     str.removeSubranges(vowelIndices)
   ///     // str == "Th rn n Spn stys mnly n th pln."
   ///
   /// - Parameter subranges: The indices of the elements to remove.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  public mutating func removeAll(in subranges: RangeSet<Index>) {
+  public mutating func removeSubranges(_ subranges: RangeSet<Index>) {
     guard !subranges.isEmpty else {
       return
     }
     
-    let inversion = subranges.inverted(within: self)
+    let inversion = subranges._inverted(within: self)
     var result = Self()
     for range in inversion.ranges {
       result.append(contentsOf: self[range])
@@ -1178,14 +1178,14 @@ extension MutableCollection where Self: RangeReplaceableCollection {
   ///     var numbers = [5, 7, -3, -8, 11, 2, -1, 6]
   ///     let negativeIndices = numbers.subranges(where: { $0 < 0 })
   ///
-  ///     numbers.removeAll(at: negativeIndices)
+  ///     numbers.removeSubranges(negativeIndices)
   ///     // numbers == [5, 7, 11, 2, 6]
   ///
   /// - Parameter subranges: The indices of the elements to remove.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  public mutating func removeAll(in subranges: RangeSet<Index>) {
-    guard let firstRange = indices.ranges.first else {
+  public mutating func removeSubranges(_ subranges: RangeSet<Index>) {
+    guard let firstRange = subranges.ranges.first else {
       return
     }
     
