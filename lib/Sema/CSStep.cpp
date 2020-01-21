@@ -330,7 +330,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   auto bestBindings = CS.determineBestBindings();
 
   if (bestBindings &&
-      (!disjunction || bestBindings->favoredOverDisjunction())) {
+      (!disjunction || bestBindings->favoredOverDisjunction(disjunction))) {
     // Produce a type variable step.
     return suspend(
         llvm::make_unique<TypeVariableStep>(CS, *bestBindings, Solutions));
