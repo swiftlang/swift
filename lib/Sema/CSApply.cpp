@@ -4596,14 +4596,6 @@ namespace {
       return result;
     }
 
-    const AppliedBuilderTransform *getAppliedBuilderTransform(
-       AnyFunctionRef fn) {
-      auto known = solution.functionBuilderTransformed.find(fn);
-      return known != solution.functionBuilderTransformed.end()
-          ? &known->second
-          : nullptr;
-    }
-
     void finalize() {
       assert(ExprStack.empty());
       assert(OpenedExistentials.empty());
@@ -5775,10 +5767,10 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
   return forceBridgeFromObjectiveC(expr, toType);
 }
 
-Expr *ConstraintSystem::addImplicitLoadExpr(Expr *expr) {
+static Expr *addImplicitLoadExpr(ConstraintSystem &cs, Expr *expr) {
   return TypeChecker::addImplicitLoadExpr(
-      getASTContext(), expr, [this](Expr *expr) { return getType(expr); },
-      [this](Expr *expr, Type type) { setType(expr, type); });
+      cs.getASTContext(), expr, [&cs](Expr *expr) { return cs.getType(expr); },
+      [&cs](Expr *expr, Type type) { cs.setType(expr, type); });
 }
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
@@ -6035,7 +6027,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto fromLValue = cast<LValueType>(desugaredFromType);
     auto toIO = toType->getAs<InOutType>();
     if (!toIO)
-      return coerceToType(cs.addImplicitLoadExpr(expr), toType, locator);
+      return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
 
     // In an 'inout' operator like "i += 1", the operand is converted from
     // an implicit lvalue to an inout argument.
@@ -7051,36 +7043,30 @@ namespace {
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         Rewriter.simplifyExprType(expr);
         auto &cs = Rewriter.getConstraintSystem();
+        auto &ctx = cs.getASTContext();
 
         // Coerce the pattern, in case we resolved something.
         auto fnType = cs.getType(closure)->castTo<FunctionType>();
         auto *params = closure->getParameters();
         TypeChecker::coerceParameterListToType(params, closure, fnType);
 
-        if (auto transform =
-                       Rewriter.getAppliedBuilderTransform(closure)) {
-          // Apply the function builder to the closure. We want to be in the
-          // context of the closure for subsequent transforms.
-          llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
-          auto newBody = applyFunctionBuilderTransform(
-              Rewriter.solution, *transform, closure->getBody(), closure,
-              [&](Expr *expr) {
-                Expr *result = expr->walk(*this);
-                if (result)
-                  Rewriter.solution.setExprTypes(result);
-                return result;
-              },
-              [&](Expr *expr, Type toType, ConstraintLocator *locator) {
-                return Rewriter.coerceToType(expr, toType, locator);
-              });
-          closure->setBody(newBody, /*isSingleExpression=*/false);
-          closure->setAppliedFunctionBuilder();
+        // If this closure had a function builder applied, rewrite it to a
+        // closure with a single expression body containing the builder
+        // invocations.
+        auto builder = Rewriter.solution.functionBuilderTransformed.find(closure);
+        if (builder != Rewriter.solution.functionBuilderTransformed.end()) {
+          auto singleExpr = builder->second.singleExpr;
+          auto returnStmt = new (ctx) ReturnStmt(
+             singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
+          auto braceStmt = BraceStmt::create(
+              ctx, returnStmt->getStartLoc(), ASTNode(returnStmt),
+              returnStmt->getEndLoc(), /*implicit=*/true);
+          closure->setBody(braceStmt, /*isSingleExpression=*/true);
+        }
 
-          Rewriter.solution.setExprTypes(closure);
-        } else if (closure->hasSingleExpressionBody()) {
-          // If this is a single-expression closure, convert the expression
-          // in the body to the result type of the closure.
-
+        // If this is a single-expression closure, convert the expression
+        // in the body to the result type of the closure.
+        if (closure->hasSingleExpressionBody()) {
           // Enter the context of the closure when type-checking the body.
           llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
           Expr *body = closure->getSingleExpressionBody()->walk(*this);
@@ -7268,25 +7254,27 @@ llvm::PointerUnion<Expr *, Stmt *> ConstraintSystem::applySolutionImpl(
     auto fn = *target.getAsFunction();
 
     // Dig out the function builder transformation we applied.
-    auto transform = rewriter.getAppliedBuilderTransform(fn);
-    assert(transform);
+    auto transformed = solution.functionBuilderTransformed.find(fn);
+    assert(transformed != solution.functionBuilderTransformed.end());
 
-    auto newBody = applyFunctionBuilderTransform(
-        solution, *transform, fn.getBody(), fn.getAsDeclContext(),
-        [&](Expr *expr) {
-          Expr *result = expr->walk(walker);
-          if (result)
-            solution.setExprTypes(result);
-          return result;
-        },
-        [&](Expr *expr, Type toType, ConstraintLocator *locator) {
-          return rewriter.coerceToType(expr, toType, locator);
-        });
-
-    if (!newBody)
+    auto singleExpr = transformed->second.singleExpr;
+    singleExpr = singleExpr->walk(walker);
+    if (!singleExpr)
       return result;
 
-    result = newBody;
+    singleExpr = rewriter.coerceToType(singleExpr,
+                                       transformed->second.bodyResultType,
+                                       getConstraintLocator(singleExpr));
+    if (!singleExpr)
+      return result;
+
+    ASTContext &ctx = getASTContext();
+    auto returnStmt = new (ctx) ReturnStmt(
+       singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
+    auto braceStmt = BraceStmt::create(
+        ctx, returnStmt->getStartLoc(), ASTNode(returnStmt),
+        returnStmt->getEndLoc(), /*implicit=*/false);
+    result = braceStmt;
   }
 
   if (result.isNull())

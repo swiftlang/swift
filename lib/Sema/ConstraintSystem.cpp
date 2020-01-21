@@ -938,8 +938,8 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
   return TypeChecker::getUnopenedTypeOfReference(
       value, baseType, UseDC,
       [&](VarDecl *var) -> Type {
-        if (Type type = getTypeIfAvailable(var))
-          return type;
+        if (auto *param = dyn_cast<ParamDecl>(var))
+          return getType(param);
 
         if (!var->hasInterfaceType()) {
           return ErrorType::get(getASTContext());
@@ -3653,14 +3653,13 @@ ConstraintSystem::getFunctionArgApplyInfo(ConstraintLocator *locator) {
       assert(!shouldHaveDirectCalleeOverload(call) &&
              "Should we have resolved a callee for this?");
       rawFnType = getType(call->getFn());
-    } else if (auto *apply = dyn_cast<ApplyExpr>(anchor)) {
+    } else {
       // FIXME: ArgumentMismatchFailure is currently used from CSDiag, meaning
       // we can end up a BinaryExpr here with an unresolved callee. It should be
       // possible to remove this once we've gotten rid of the old CSDiag logic
       // and just assert that we have a CallExpr.
+      auto *apply = cast<ApplyExpr>(anchor);
       rawFnType = getType(apply->getFn());
-    } else {
-      return None;
     }
   }
 
