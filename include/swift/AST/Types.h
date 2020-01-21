@@ -2946,7 +2946,7 @@ public:
       friend ExtInfo;
       friend class AnyFunctionType;
       friend class FunctionType;
-      friend class SILUncommonInfo;
+      friend class SILCallingConvUncommonInfo;
       // We preserve a full clang::Type *, not a clang::FunctionType * as:
       // 1. We need to keep sugar in case we need to present an error to the user.
       // 2. The actual type being stored is [ignoring sugar] either a
@@ -3917,7 +3917,7 @@ namespace Lowering {
   class TypeConverter;
 };
 
-class SILUncommonInfo {
+class SILCallingConvUncommonInfo {
   friend class SILFunctionType;
 
   // Invariant: The FunctionType is canonical.
@@ -3926,8 +3926,9 @@ class SILUncommonInfo {
   const clang::Type *ClangFunctionType;
 
   bool empty() const { return !ClangFunctionType; }
-  SILUncommonInfo(const clang::Type *type) : ClangFunctionType(type) {}
-  SILUncommonInfo(AnyFunctionType::ExtInfo::Uncommon uncommon);
+  SILCallingConvUncommonInfo(const clang::Type *type)
+    : ClangFunctionType(type) {}
+  SILCallingConvUncommonInfo(AnyFunctionType::ExtInfo::Uncommon uncommon);
 
 public:
   /// Analog of AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType.
@@ -3944,7 +3945,7 @@ public:
 class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
     private llvm::TrailingObjects<SILFunctionType, SILParameterInfo,
                                   SILResultInfo, SILYieldInfo, CanType,
-                                  SILUncommonInfo> {
+                                  SILCallingConvUncommonInfo> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<SILParameterInfo>) const {
@@ -3963,7 +3964,7 @@ class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
     return hasResultCache() ? 2 : 0;
   }
 
-  size_t numTrailingObjects(OverloadToken<SILUncommonInfo>) const {
+  size_t numTrailingObjects(OverloadToken<SILCallingConvUncommonInfo>) const {
     return Bits.SILFunctionType.HasUncommonInfo ? 1 : 0;
   }
 
@@ -3992,7 +3993,7 @@ public:
     unsigned Bits; // Naturally sized for speed.
 
     // For symmetry with AnyFunctionType::Uncommon
-    using Uncommon = SILUncommonInfo;
+    using Uncommon = SILCallingConvUncommonInfo;
 
     Uncommon Other;
 

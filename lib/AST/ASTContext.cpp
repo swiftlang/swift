@@ -3158,13 +3158,14 @@ ArrayRef<Requirement> GenericFunctionType::getRequirements() const {
   return Signature->getRequirements();
 }
 
-SILUncommonInfo::SILUncommonInfo(AnyFunctionType::ExtInfo::Uncommon uncommon) {
+SILCallingConvUncommonInfo::SILCallingConvUncommonInfo(
+    AnyFunctionType::ExtInfo::Uncommon uncommon) {
   auto *ty = uncommon.ClangFunctionType;
   ClangFunctionType = ty ? ty->getCanonicalTypeInternal().getTypePtr()
                          : nullptr;
 }
 
-void SILUncommonInfo::printClangFunctionType(
+void SILCallingConvUncommonInfo::printClangFunctionType(
     ClangModuleLoader *cml, llvm::raw_ostream &os) const {
   cml->printClangType(ClangFunctionType, os);
 }
