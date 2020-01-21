@@ -426,7 +426,7 @@ int main(int argc, char **argv) {
   if (VerifyMode) {
     verifier = std::make_unique<DiagnosticVerifier>(
         CI.getSourceMgr(), CI.getInputBufferIDs(), /*AutoApplyFixes*/ false,
-        /*IgnoreUnknown*/ false);
+        /*IgnoreUnknown*/ false, /*UseColor*/ false);
     CI.addDiagnosticConsumer(verifier.get());
     PrintDiags.setSuppressOutput(true);
   }

@@ -187,7 +187,8 @@ static void autoApplyFixes(SourceManager &SM, unsigned BufferID,
 /// diagnostics for '<unknown>:0' should be considered as unexpected.
 static bool
 verifyUnknown(SourceManager &SM,
-              std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) {
+              std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
+              bool UseColor) {
   bool HadError = false;
   for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
     if (CapturedDiagnostics[i].Loc.isValid())
@@ -201,7 +202,7 @@ verifyUnknown(SourceManager &SM,
             .str();
 
     auto diag = SM.GetMessage({}, llvm::SourceMgr::DK_Error, Message, {}, {});
-    SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), diag);
+    SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), diag, UseColor);
   }
   return HadError;
 }
@@ -721,8 +722,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
   // Emit all of the queue'd up errors.
   for (auto Err : Errors)
-    SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), Err);
-  
+    SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), Err, UseColor);
+
   // If auto-apply fixits is on, rewrite the original source file.
   if (AutoApplyFixes)
     autoApplyFixes(SM, BufferID, Errors);
@@ -767,6 +768,6 @@ bool DiagnosticVerifier::finishProcessing() {
   for (auto &BufferID : BufferIDs)
     HadError |= verifyFile(BufferID);
   if (!IgnoreUnknown)
-    HadError |= verifyUnknown(SM, CapturedDiagnostics);
+    HadError |= verifyUnknown(SM, CapturedDiagnostics, UseColor);
   return HadError;
 }

@@ -2169,7 +2169,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     verifier = llvm::make_unique<DiagnosticVerifier>(
         Instance->getSourceMgr(), Instance->getInputBufferIDs(),
         diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
-        diagOpts.VerifyIgnoreUnknown);
+        diagOpts.VerifyIgnoreUnknown, diagOpts.UseColor);
     Instance->addDiagnosticConsumer(verifier.get());
     PDC.setSuppressOutput(true);
   }

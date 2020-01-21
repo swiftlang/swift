@@ -42,12 +42,14 @@ class DiagnosticVerifier : public DiagnosticConsumer {
   ArrayRef<unsigned> BufferIDs;
   bool AutoApplyFixes;
   bool IgnoreUnknown;
+  bool UseColor;
 
 public:
   explicit DiagnosticVerifier(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
-                              bool AutoApplyFixes, bool IgnoreUnknown)
+                              bool AutoApplyFixes, bool IgnoreUnknown,
+                              bool UseColor)
       : SM(SM), BufferIDs(BufferIDs), AutoApplyFixes(AutoApplyFixes),
-        IgnoreUnknown(IgnoreUnknown) {}
+        IgnoreUnknown(IgnoreUnknown), UseColor(UseColor) {}
 
   virtual void handleDiagnostic(SourceManager &SM,
                                 const DiagnosticInfo &Info) override;
