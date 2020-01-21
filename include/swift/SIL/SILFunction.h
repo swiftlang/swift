@@ -863,6 +863,10 @@ public:
     validateSubclassScope(getClassSubclassScope(), isThunk(), Info);
     SpecializationInfo = Info;
   }
+  
+  /// If this function is a specialization, return the original function from
+  /// which this function was specialized.
+  const SILFunction *getOriginOfSpecialization() const;
 
   /// Retrieve the generic environment containing the mapping from interface
   /// types to context archetypes for this function. Only present if the
