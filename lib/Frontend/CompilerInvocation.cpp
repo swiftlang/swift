@@ -382,9 +382,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_differentiable_programming))
     Opts.EnableExperimentalDifferentiableProgramming = true;
 
-  // TODO: Ignore if enable-experimental-differentiable-programming is false
+  // TODO: Ignore differentiation-related flags if
+  // `enable-experimental-differentiable-programming` is false.
+  Opts.EnableExperimentalCrossFileDerivativeRegistration |=
+      Args.hasArg(OPT_enable_experimental_cross_file_derivative_registration);
   Opts.EnableExperimentalForwardModeDifferentiation |=
       Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
+
   if (Args.hasArg(OPT_enable_experimental_quasiquotes))
     Opts.EnableExperimentalQuasiquotes = true;
 

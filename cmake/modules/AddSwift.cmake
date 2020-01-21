@@ -1914,7 +1914,7 @@ function(add_swift_target_library name)
     # SWIFT_ENABLE_TENSORFLOW
     # NOTE(TF-1021): Enable cross-file derivative registration for stdlib.
     list(APPEND swiftlib_swift_compile_flags_all
-         -Xllvm -enable-experimental-cross-file-derivative-registration)
+         -Xfrontend -enable-experimental-cross-file-derivative-registration)
     # SWIFT_ENABLE_TENSORFLOW END
 
     # Collect architecture agnostic SDK linker flags
