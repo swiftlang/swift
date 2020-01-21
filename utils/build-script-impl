@@ -149,6 +149,8 @@ KNOWN_SETTINGS=(
     skip-build-llvm                               ""                "set to skip building LLVM/Clang"
     skip-build-osx                                ""                "set to skip building Swift stdlibs for OS X"
     skip-build-playgroundsupport                  ""                "set to skip building PlaygroundSupport"
+    skip-build-static-foundation                  ""                "set to skip building static Foundation"
+    skip-build-static-libdispatch                 ""                "set to skip building static libdispatch"
     skip-build-swift                              ""                "set to skip building Swift"
     skip-build-tvos-device                        ""                "set to skip building Swift stdlibs for tvOS devices (i.e. build simulators only)"
     skip-build-tvos-simulator                     ""                "set to skip building Swift stdlibs for tvOS simulators (i.e. build devices only)"
@@ -1082,39 +1084,19 @@ if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR
 fi
 
 PRODUCTS=(cmark llvm)
-if [[ ! "${SKIP_BUILD_LIBCXX}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" libcxx)
-fi
-if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" libicu)
-fi
-PRODUCTS=("${PRODUCTS[@]}" swift)
-if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" lldb)
-fi
-# LLBuild and XCTest are dependent on Foundation, so Foundation must
+[[ "${SKIP_BUILD_LIBCXX}" ]] || PRODUCTS+=(libcxx)
+[[ "${SKIP_BUILD_LIBICU}" ]] || PRODUCTS+=(libicu)
+PRODUCTS+=(swift)
+[[ "${SKIP_BUILD_LLDB}" ]] || PRODUCTS+=(lldb)
+[[ "${SKIP_BUILD_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch)
+[[ "${SKIP_BUILD_STATIC_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch_static)
+# llbuild and XCTest depend on Foundation, so Foundation must
 # be added to the list of build products first.
-if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" libdispatch)
-     if [[ -z "${SKIP_BUILD_SWIFT_STATIC_LIBDISPATCH}" ]] ; then
-       PRODUCTS=("${PRODUCTS[@]}" libdispatch_static)
-     fi
-fi
-if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" foundation)
-     if [[ -z "${SKIP_BUILD_STATIC_FOUNDATION}" ]] ; then
-       PRODUCTS=("${PRODUCTS[@]}" foundation_static)
-     fi
-fi
-if [[ ! "${SKIP_BUILD_LLBUILD}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" llbuild)
-fi
-if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" playgroundsupport)
-fi
-if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" xctest)
-fi
+[[ "${SKIP_BUILD_FOUNDATION}" ]] || PRODUCTS+=(foundation)
+[[ "${SKIP_BUILD_STATIC_FOUNDATION}" ]] || PRODUCTS+=(foundation_static)
+[[ "${SKIP_BUILD_LLBUILD}" ]] || PRODUCTS+=(llbuild)
+[[ "${SKIP_BUILD_XCTEST}" ]] || PRODUCTS+=(xctest)
+[[ "${SKIP_BUILD_PLAYGROUNDSUPPORT}" ]] || PRODUCTS+=(playgroundsupport)
 
 # get_host_specific_variable(host, name)
 #
