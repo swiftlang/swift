@@ -968,8 +968,8 @@ def main_preset():
     preset_parser = presets.PresetParser()
 
     try:
-        preset_parser.read(args.preset_file_names)
-    except presets.Error as e:
+        preset_parser.read_files(args.preset_file_names)
+    except presets.PresetError as e:
         diagnostics.fatal(e.message)
 
     if args.show_presets:
@@ -987,12 +987,13 @@ def main_preset():
         args.preset_substitutions[name] = value
 
     try:
-        preset = preset_parser.get_preset(args.preset,
-                                          vars=args.preset_substitutions)
-    except presets.Error as e:
+        preset = preset_parser.get_preset(
+            args.preset,
+            vars=args.preset_substitutions)
+    except presets.PresetError as e:
         diagnostics.fatal(e.message)
 
-    preset_args = migration.migrate_swift_sdks(preset.format_args())
+    preset_args = migration.migrate_swift_sdks(preset.args)
 
     if args.distcc and (args.cmake_c_launcher or args.cmake_cxx_launcher):
         diagnostics.fatal(

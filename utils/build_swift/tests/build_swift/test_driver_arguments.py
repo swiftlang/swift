@@ -37,7 +37,7 @@ class ParserError(Exception):
 
 def _load_all_presets(preset_files):
     parser = PresetParser()
-    parser.read(preset_files)
+    parser.read_files(preset_files)
 
     # Hack to filter out mixins which are not expected to be valid presets
     preset_names = [
@@ -48,7 +48,7 @@ def _load_all_presets(preset_files):
     presets = dict()
     for name in preset_names:
         preset = parser.get_preset(name, vars=PRESET_DEFAULTS)
-        args = migration.migrate_swift_sdks(preset.format_args())
+        args = migration.migrate_swift_sdks(preset.args)
 
         presets[name] = args
 
@@ -78,6 +78,9 @@ class TestDriverArgumentParserMeta(type):
         for name, args in presets.items():
             test_name = 'test_preset_{}'.format(name)
             attrs[test_name] = cls.generate_preset_test(name, args)
+
+        if six.PY2:
+            name = str(name)
 
         return super(TestDriverArgumentParserMeta, cls).__new__(
             cls, name, bases, attrs)
