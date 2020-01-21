@@ -6623,14 +6623,19 @@ ParameterList *swift::getParameterList(ValueDecl *source) {
     return AFD->getParameters();
   } else if (auto *EED = dyn_cast<EnumElementDecl>(source)) {
     return EED->getParameterList();
-  } else {
-    return cast<SubscriptDecl>(source)->getIndices();
+  } else if (auto *SD = dyn_cast<SubscriptDecl>(source)) {
+    return SD->getIndices();
   }
+
+  return nullptr;
 }
 
 const ParamDecl *swift::getParameterAt(const ValueDecl *source,
                                        unsigned index) {
-  return getParameterList(const_cast<ValueDecl *>(source))->get(index);
+  if (auto *params = getParameterList(const_cast<ValueDecl *>(source))) {
+    return params->get(index);
+  }
+  return nullptr;
 }
 
 Type AbstractFunctionDecl::getMethodInterfaceType() const {
