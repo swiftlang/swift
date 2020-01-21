@@ -80,8 +80,11 @@ bool Evaluator::checkDependency(const ActiveRequest &request) {
     dependencies.insert({req, {}});
 
     // If there is an active request, record it's dependency on this request.
-    if (!activeRequests.empty())
-      dependencies[AnyRequest(activeRequests.back())].push_back(req);
+    if (!activeRequests.empty()) {
+      auto activeDeps = dependencies.find_as(activeRequests.back());
+      assert(activeDeps != dependencies.end());
+      activeDeps->second.push_back(req);
+    }
   }
 
   // Record this as an active request.

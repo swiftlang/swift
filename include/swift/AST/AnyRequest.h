@@ -292,6 +292,19 @@ class AnyRequest final : public AnyRequestBase<AnyRequest> {
 
   const void *getRawStorage() const { return storage; }
 
+  /// Whether this wrapper is storing the same underlying request as an
+  /// \c ActiveRequest.
+  bool isStorageEqual(const ActiveRequest &other) const {
+    // If either wrapper isn't storing anything, just return false.
+    if (!hasStorage() || !other.hasStorage())
+      return false;
+
+    if (getVTable()->typeID != other.getVTable()->typeID)
+      return false;
+
+    return getVTable()->isEqual(getRawStorage(), other.getRawStorage());
+  }
+
 public:
   AnyRequest(const AnyRequest &other) : AnyRequestBase(other) {
     if (hasStorage()) {
@@ -382,6 +395,8 @@ namespace llvm {
   template<>
   struct DenseMapInfo<swift::AnyRequest> {
     using AnyRequest = swift::AnyRequest;
+    using ActiveRequest = swift::ActiveRequest;
+
     static inline AnyRequest getEmptyKey() {
       return AnyRequest(AnyRequest::StorageKind::Empty);
     }
@@ -396,6 +411,9 @@ namespace llvm {
       return AnyRequest::hashForHolder(swift::TypeID<Request>::value,
                                        hash_value(request));
     }
+    static unsigned getHashValue(const ActiveRequest &request) {
+      return hash_value(request);
+    }
     static bool isEqual(const AnyRequest &lhs, const AnyRequest &rhs) {
       return lhs == rhs;
     }
@@ -406,6 +424,9 @@ namespace llvm {
 
       auto *rhsRequest = rhs.getAs<Request>();
       return rhsRequest && lhs == *rhsRequest;
+    }
+    static bool isEqual(const ActiveRequest &lhs, const AnyRequest &rhs) {
+      return rhs.isStorageEqual(lhs);
     }
   };
 
