@@ -1049,6 +1049,20 @@ public:
   enum Kind : unsigned {
     File, FilePath, Line, Column, Function, DSOHandle
   };
+
+  static StringRef getKindString(MagicIdentifierLiteralExpr::Kind value) {
+    switch (value) {
+      case File: return "#file";
+      case FilePath: return "#filePath";
+      case Function: return "#function";
+      case Line: return "#line";
+      case Column: return "#column";
+      case DSOHandle: return "#dsohandle";
+    }
+
+    llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in getKindString.");
+  }
+
 private:
   SourceLoc Loc;
   ConcreteDeclRef BuiltinInitializer;
