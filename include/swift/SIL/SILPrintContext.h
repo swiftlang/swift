@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_PRINTCONTEXT_H
 #define SWIFT_SIL_PRINTCONTEXT_H
 
+#include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/DenseMap.h"
@@ -65,12 +66,20 @@ protected:
   /// Print debug locations and scopes.
   bool DebugInfo;
 
+  /// See \ref FrontendOptions.PrintFullConvention.
+  bool PrintFullConvention;
+
 public:
   /// Constructor with default values for options.
   ///
   /// DebugInfo will be set according to the -sil-print-debuginfo option.
   SILPrintContext(llvm::raw_ostream &OS, bool Verbose = false,
                   bool SortedSIL = false);
+
+  /// Constructor based on SILOptions.
+  ///
+  /// DebugInfo will be set according to the -sil-print-debuginfo option.
+  SILPrintContext(llvm::raw_ostream &OS, const SILOptions &Opts);
 
   SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
                   bool SortedSIL, bool DebugInfo);
@@ -93,6 +102,9 @@ public:
 
   /// Returns true if debug locations and scopes should be printed.
   bool printDebugInfo() const { return DebugInfo; }
+
+  /// Returns true if the entire @convention(c, cType: ..) should be printed.
+  bool printFullConvention() const { return PrintFullConvention; }
 
   SILPrintContext::ID getID(const SILBasicBlock *Block);
 

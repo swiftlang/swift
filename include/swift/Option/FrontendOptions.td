@@ -608,10 +608,12 @@ def module_interface_preserve_types_as_written :
   HelpText<"When emitting a module interface, preserve types as they were "
            "written in the source">;
 
+// FIXME: [clang-function-type-serialization] Make this a SIL-only option once we
+// start unconditionally emitting non-canonical Clang types in swiftinterfaces.
 def experimental_print_full_convention :
  Flag<["-"], "experimental-print-full-convention">,
- HelpText<"When emitting a module interface, emit additional @convention "
-          "arguments, regardless of whether they were written in the source">;
+ HelpText<"When emitting a module interface or SIL, emit additional @convention"
+          " arguments, regardless of whether they were written in the source">;
 
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,

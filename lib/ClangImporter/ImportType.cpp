@@ -417,12 +417,11 @@ namespace {
       
       if (pointeeQualType->isFunctionType()) {
         auto funcTy = pointeeType->castTo<FunctionType>();
-        return {
-          FunctionType::get(funcTy->getParams(), funcTy->getResult(),
-            funcTy->getExtInfo()
-              .withRepresentation(
+        auto extInfo = funcTy->getExtInfo().withRepresentation(
                 AnyFunctionType::Representation::CFunctionPointer)
-              .withClangFunctionType(type)),
+                                           .withClangFunctionType(type);
+        return {
+          FunctionType::get(funcTy->getParams(), funcTy->getResult(), extInfo),
           ImportHint::CFunctionPointer
         };
       }
