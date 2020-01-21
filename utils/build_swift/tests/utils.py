@@ -24,6 +24,7 @@ __all__ = [
     'quiet_output',
     'redirect_stderr',
     'redirect_stdout',
+    'requires_attr',
     'requires_module',
     'requires_platform',
 
@@ -121,6 +122,19 @@ class redirect_stdout():
 
     def __exit__(self, exc_type, exc_value, traceback):
         sys.stderr = self._old_stdout
+
+
+@cache_util.cached
+def requires_attr(obj, attr):
+    """
+    """
+
+    try:
+        getattr(obj, attr)
+        return lambda func: func
+    except AttributeError:
+        return unittest.skip('Required attribute "{}" not found on {}'.format(
+            attr, obj))
 
 
 @cache_util.cached
