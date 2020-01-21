@@ -39,36 +39,24 @@ namespace {
 
 /// Visitor to classify the contents of the given closure.
 class BuilderClosureVisitor
-    : private StmtVisitor<BuilderClosureVisitor, VarDecl *> {
-
-  friend StmtVisitor<BuilderClosureVisitor, VarDecl *>;
-
+    : public StmtVisitor<BuilderClosureVisitor, Expr *> {
   ConstraintSystem *cs;
-  DeclContext *dc;
   ASTContext &ctx;
+  bool wantExpr;
   Type builderType;
   NominalTypeDecl *builder = nullptr;
   llvm::SmallDenseMap<Identifier, bool> supportedOps;
 
+public:
   SkipUnhandledConstructInFunctionBuilder::UnhandledNode unhandledNode;
 
-  /// Whether an error occurred during application of the builder closure,
-  /// e.g., during constraint generation.
-  bool hadError = false;
-
-  /// Counter used to give unique names to the variables that are
-  /// created implicitly.
-  unsigned varCounter = 0;
-
-  /// The record of what happened when we applied the builder transform.
-  AppliedBuilderTransform applied;
-
-  /// Produce a builder call to the given named function with the given
-  /// arguments.
+private:
+  /// Produce a builder call to the given named function with the given arguments.
   Expr *buildCallIfWanted(SourceLoc loc,
                           Identifier fnName, ArrayRef<Expr *> args,
-                          ArrayRef<Identifier> argLabels) {
-    if (!cs)
+                          ArrayRef<Identifier> argLabels,
+                          bool oneWay) {
+    if (!wantExpr)
       return nullptr;
 
     // FIXME: Setting a TypeLoc on this expression is necessary in order
@@ -81,8 +69,10 @@ class BuilderClosureVisitor
     }
 
     auto typeExpr = new (ctx) TypeExpr(typeLoc);
-    cs->setType(typeExpr, MetatypeType::get(builderType));
-    cs->setType(&typeExpr->getTypeLoc(), builderType);
+    if (cs) {
+      cs->setType(typeExpr, MetatypeType::get(builderType));
+      cs->setType(&typeExpr->getTypeLoc(), builderType);
+    }
 
     SmallVector<SourceLoc, 4> argLabelLocs;
     for (auto i : indices(argLabels)) {
@@ -93,13 +83,17 @@ class BuilderClosureVisitor
     auto memberRef = new (ctx) UnresolvedDotExpr(
         typeExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
         /*implicit=*/true);
-    memberRef->setFunctionRefKind(FunctionRefKind::SingleApply);
     SourceLoc openLoc = args.empty() ? loc : args.front()->getStartLoc();
     SourceLoc closeLoc = args.empty() ? loc : args.back()->getEndLoc();
     Expr *result = CallExpr::create(ctx, memberRef, openLoc, args,
                                     argLabels, argLabelLocs, closeLoc,
                                     /*trailing closure*/ nullptr,
                                     /*implicit*/true);
+
+    if (oneWay) {
+      // Form a one-way constraint to prevent backward propagation.
+      result = new (ctx) OneWayExpr(result);
+    }
 
     return result;
   }
@@ -136,116 +130,31 @@ class BuilderClosureVisitor
     return supportedOps[fnName] = found;
   }
 
-  /// Build an implicit variable in this context.
-  VarDecl *buildVar(SourceLoc loc) {
-    // Create the implicit variable.
-    Identifier name = ctx.getIdentifier(
-        ("$__builder" + Twine(varCounter++)).str());
-    auto var = new (ctx) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
-                                 /*isCaptureList=*/false, loc, name, dc);
-    var->setImplicit();
-    return var;
-  }
-
-  /// Capture the given expression into an implicitly-generated variable.
-  VarDecl *captureExpr(Expr *expr, bool oneWay,
-                       llvm::PointerUnion<Stmt *, Expr *> forEntity = nullptr) {
-    if (!cs)
-      return nullptr;
-
-    Expr *origExpr = expr;
-
-    if (oneWay) {
-      // Form a one-way constraint to prevent backward propagation.
-      expr = new (ctx) OneWayExpr(expr);
-    }
-
-    // Generate constraints for this expression.
-    expr = cs->generateConstraints(expr, dc);
-    if (!expr) {
-      hadError = true;
-      return nullptr;
-    }
-
-    // Create the implicit variable.
-    auto var = buildVar(expr->getStartLoc());
-
-    // Record the new variable and its corresponding expression & statement.
-    if (auto forStmt = forEntity.dyn_cast<Stmt *>()) {
-      applied.capturedStmts.insert({forStmt, { var, { expr } }});
-    } else {
-      if (auto forExpr = forEntity.dyn_cast<Expr *>())
-        origExpr = forExpr;
-
-      applied.capturedExprs.insert({origExpr, {var, expr}});
-    }
-
-    cs->setType(var, cs->getType(expr));
-    return var;
-  }
-
-  /// Build an implicit reference to the given variable.
-  DeclRefExpr *buildVarRef(VarDecl *var, SourceLoc loc) {
-    return new (ctx) DeclRefExpr(var, DeclNameLoc(loc), /*Implicit=*/true);
-  }
-
 public:
   BuilderClosureVisitor(ASTContext &ctx, ConstraintSystem *cs,
-                        DeclContext *dc, Type builderType,
-                        Type bodyResultType)
-      : cs(cs), dc(dc), ctx(ctx), builderType(builderType) {
+                        bool wantExpr, Type builderType)
+      : cs(cs), ctx(ctx), wantExpr(wantExpr), builderType(builderType) {
     assert((cs || !builderType->hasTypeVariable()) &&
            "cannot handle builder type with type variables without "
            "constraint system");
     builder = builderType->getAnyNominal();
-    applied.builderType = builderType;
-    applied.bodyResultType = bodyResultType;
   }
 
-  /// Apply the builder transform to the given statement.
-  Optional<AppliedBuilderTransform> apply(Stmt *stmt) {
-    VarDecl *bodyVar = visit(stmt);
-    if (!bodyVar)
-      return None;
-
-    applied.returnExpr = buildVarRef(bodyVar, stmt->getEndLoc());
-    applied.returnExpr = cs->generateConstraints(applied.returnExpr, dc);
-    if (!applied.returnExpr) {
-      hadError = true;
-      return None;
-    }
-
-    return std::move(applied);
+#define CONTROL_FLOW_STMT(StmtClass)                      \
+  Expr *visit##StmtClass##Stmt(StmtClass##Stmt *stmt) { \
+    if (!unhandledNode)                                 \
+      unhandledNode = stmt;                             \
+                                                        \
+    return nullptr;                                     \
   }
 
-  /// Check whether the function builder can be applied to this statement.
-  /// \returns the node that cannot be handled by this builder on failure.
-  SkipUnhandledConstructInFunctionBuilder::UnhandledNode check(Stmt *stmt) {
-    (void)visit(stmt);
-    return unhandledNode;
-  }
-
-protected:
-#define CONTROL_FLOW_STMT(StmtClass)                       \
-  VarDecl *visit##StmtClass##Stmt(StmtClass##Stmt *stmt) { \
-    if (!unhandledNode)                                    \
-      unhandledNode = stmt;                                \
-                                                           \
-    return nullptr;                                        \
-  }
-
-  VarDecl *visitBraceStmt(BraceStmt *braceStmt) {
+  Expr *visitBraceStmt(BraceStmt *braceStmt) {
     SmallVector<Expr *, 4> expressions;
-    auto addChild = [&](VarDecl *childVar) {
-      if (!childVar)
-        return;
-
-      expressions.push_back(buildVarRef(childVar, childVar->getLoc()));
-    };
-
     for (const auto &node : braceStmt->getElements()) {
       if (auto stmt = node.dyn_cast<Stmt *>()) {
-        addChild(visit(stmt));
+        auto expr = visit(stmt);
+        if (expr)
+          expressions.push_back(expr);
         continue;
       }
 
@@ -256,8 +165,9 @@ protected:
         if (isa<IfConfigDecl>(decl))
           continue;
 
-        // Skip #warning/#error; we'll handle them when applying the builder.
+        // Emit #warning/#error but don't build anything for it.
         if (auto poundDiag = dyn_cast<PoundDiagnosticDecl>(decl)) {
+          TypeChecker::typeCheckDecl(poundDiag);
           continue;
         }
 
@@ -268,28 +178,27 @@ protected:
       }
 
       auto expr = node.get<Expr *>();
-      if (cs && builderSupports(ctx.Id_buildExpression)) {
-        expr = buildCallIfWanted(expr->getLoc(), ctx.Id_buildExpression,
-                                 { expr }, { Identifier() });
+      if (wantExpr) {
+        if (builderSupports(ctx.Id_buildExpression)) {
+          expr = buildCallIfWanted(expr->getLoc(), ctx.Id_buildExpression,
+                                   { expr }, { Identifier() },
+                                   /*oneWay=*/false);
+        }
+
+        expr = new (ctx) OneWayExpr(expr);
       }
 
-      addChild(captureExpr(expr, /*oneWay=*/true, node.get<Expr *>()));
+      expressions.push_back(expr);
     }
 
-    if (!cs)
-      return nullptr;
-
     // Call Builder.buildBlock(... args ...)
-    auto call = buildCallIfWanted(braceStmt->getStartLoc(),
-                                  ctx.Id_buildBlock, expressions,
-                                  /*argLabels=*/{ });
-    if (!call)
-      return nullptr;
-
-    return captureExpr(call, /*oneWay=*/true, braceStmt);
+    return buildCallIfWanted(braceStmt->getStartLoc(),
+                             ctx.Id_buildBlock, expressions,
+                             /*argLabels=*/{ },
+                             /*oneWay=*/true);
   }
 
-  VarDecl *visitReturnStmt(ReturnStmt *stmt) {
+  Expr *visitReturnStmt(ReturnStmt *stmt) {
     // Allow implicit returns due to 'return' elision.
     if (!stmt->isImplicit() || !stmt->hasResult()) {
       if (!unhandledNode)
@@ -297,27 +206,22 @@ protected:
       return nullptr;
     }
 
-    return captureExpr(stmt->getResult(), /*oneWay=*/true);
+    return stmt->getResult();
   }
 
-  VarDecl *visitDoStmt(DoStmt *doStmt) {
+  Expr *visitDoStmt(DoStmt *doStmt) {
     if (!builderSupports(ctx.Id_buildDo)) {
       if (!unhandledNode)
         unhandledNode = doStmt;
       return nullptr;
     }
 
-    auto childVar = visit(doStmt->getBody());
-    if (!childVar)
+    auto arg = visit(doStmt->getBody());
+    if (!arg)
       return nullptr;
 
-    auto childRef = buildVarRef(childVar, doStmt->getEndLoc());
-    auto call = buildCallIfWanted(doStmt->getStartLoc(), ctx.Id_buildDo,
-                                  childRef, /*argLabels=*/{ });
-    if (!call)
-      return nullptr;
-
-    return captureExpr(call, /*oneWay=*/true, doStmt);
+    return buildCallIfWanted(doStmt->getStartLoc(), ctx.Id_buildDo, arg,
+                             /*argLabels=*/{ }, /*oneWay=*/true);
   }
 
   CONTROL_FLOW_STMT(Yield)
@@ -379,7 +283,7 @@ protected:
     return true;
   }
 
-  VarDecl *visitIfStmt(IfStmt *ifStmt) {
+  Expr *visitIfStmt(IfStmt *ifStmt) {
     // Check whether the chain is buildable and whether it terminates
     // without an `else`.
     bool isOptional = false;
@@ -392,56 +296,74 @@ protected:
 
     // Attempt to build the chain, propagating short-circuits, which
     // might arise either do to error or not wanting an expression.
-    return buildIfChainRecursive(ifStmt, 0, numPayloads, isOptional,
-                                 /*isTopLevel=*/true);
+    auto chainExpr =
+      buildIfChainRecursive(ifStmt, 0, numPayloads, isOptional);
+    if (!chainExpr)
+      return nullptr;
+    assert(wantExpr);
+
+    // The operand should have optional type if we had optional results,
+    // so we just need to call `buildIf` now, since we're at the top level.
+    if (isOptional) {
+      chainExpr = buildCallIfWanted(ifStmt->getStartLoc(),
+                                    ctx.Id_buildIf, chainExpr,
+                                    /*argLabels=*/{ },
+                                    /*oneWay=*/true);
+    } else {
+      // Form a one-way constraint to prevent backward propagation.
+      chainExpr = new (ctx) OneWayExpr(chainExpr);
+    }
+
+    return chainExpr;
   }
 
   /// Recursively build an if-chain: build an expression which will have
   /// a value of the chain result type before any call to `buildIf`.
   /// The expression will perform any necessary calls to `buildEither`,
   /// and the result will have optional type if `isOptional` is true.
-  VarDecl *buildIfChainRecursive(IfStmt *ifStmt, unsigned payloadIndex,
-                                 unsigned numPayloads, bool isOptional,
-                                 bool isTopLevel = false) {
+  Expr *buildIfChainRecursive(IfStmt *ifStmt, unsigned payloadIndex,
+                              unsigned numPayloads, bool isOptional) {
     assert(payloadIndex < numPayloads);
     // Make sure we recursively visit both sides even if we're not
     // building expressions.
 
     // Build the then clause.  This will have the corresponding payload
     // type (i.e. not wrapped in any way).
-    VarDecl *thenVar = visit(ifStmt->getThenStmt());
+    Expr *thenArg = visit(ifStmt->getThenStmt());
 
     // Build the else clause, if present.  If this is from an else-if,
     // this will be fully wrapped; otherwise it will have the corresponding
     // payload type (at index `payloadIndex + 1`).
     assert(ifStmt->getElseStmt() || isOptional);
     bool isElseIf = false;
-    Optional<VarDecl *> elseChainVar;
+    Optional<Expr *> elseChain;
     if (auto elseStmt = ifStmt->getElseStmt()) {
       if (auto elseIfStmt = dyn_cast<IfStmt>(elseStmt)) {
         isElseIf = true;
-        elseChainVar = buildIfChainRecursive(elseIfStmt, payloadIndex + 1,
-                                             numPayloads, isOptional);
+        elseChain = buildIfChainRecursive(elseIfStmt, payloadIndex + 1,
+                                          numPayloads, isOptional);
       } else {
-        elseChainVar = visit(elseStmt);
+        elseChain = visit(elseStmt);
       }
     }
 
     // Short-circuit if appropriate.
-    if (!cs || !thenVar || (elseChainVar && !*elseChainVar))
+    if (!wantExpr || !thenArg || (elseChain && !*elseChain))
       return nullptr;
 
+    // Okay, build the conditional expression.
+
     // Prepare the `then` operand by wrapping it to produce a chain result.
-    Expr *thenExpr = buildWrappedChainPayload(
-        buildVarRef(thenVar, ifStmt->getThenStmt()->getEndLoc()),
-        payloadIndex, numPayloads, isOptional);
+    SourceLoc thenLoc = ifStmt->getThenStmt()->getStartLoc();
+    Expr *thenExpr = buildWrappedChainPayload(thenArg, payloadIndex,
+                                              numPayloads, isOptional);
 
     // Prepare the `else operand:
     Expr *elseExpr;
     SourceLoc elseLoc;
 
     // - If there's no `else` clause, use `Optional.none`.
-    if (!elseChainVar) {
+    if (!elseChain) {
       assert(isOptional);
       elseLoc = ifStmt->getEndLoc();
       elseExpr = buildNoneExpr(elseLoc);
@@ -449,75 +371,24 @@ protected:
     // - If there's an `else if`, the chain expression from that
     //   should already be producing a chain result.
     } else if (isElseIf) {
-      elseExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
+      elseExpr = *elseChain;
       elseLoc = ifStmt->getElseLoc();
 
     // - Otherwise, wrap it to produce a chain result.
     } else {
       elseLoc = ifStmt->getElseLoc();
-      elseExpr = buildWrappedChainPayload(
-          buildVarRef(*elseChainVar, ifStmt->getEndLoc()),
-          payloadIndex + 1, numPayloads, isOptional);
+      elseExpr = buildWrappedChainPayload(*elseChain,
+                                          payloadIndex + 1, numPayloads,
+                                          isOptional);
     }
 
-    // Generate constraints for the various subexpressions.
-    auto condExpr = getTrivialBooleanCondition(ifStmt->getCond());
-    assert(condExpr && "Cannot get here without a trivial Boolean condition");
-    condExpr = cs->generateConstraints(condExpr, dc);
-    if (!condExpr) {
-      hadError = true;
-      return nullptr;
-    }
+    Expr *condition = getTrivialBooleanCondition(ifStmt->getCond());
+    assert(condition && "checked by isBuildableIfChain");
 
-    // Condition must convert to Bool.
-    // FIXME: This should be folded into constraint generation for conditions.
-    auto boolDecl = ctx.getBoolDecl();
-    if (!boolDecl) {
-      hadError = true;
-      return nullptr;
-    }
-    cs->addConstraint(ConstraintKind::Conversion,
-                      cs->getType(condExpr),
-                      boolDecl->getDeclaredType(),
-                      cs->getConstraintLocator(condExpr));
-
-    // The operand should have optional type if we had optional results,
-    // so we just need to call `buildIf` now, since we're at the top level.
-    if (isOptional && isTopLevel) {
-      thenExpr = buildCallIfWanted(ifStmt->getEndLoc(), ctx.Id_buildIf,
-                                   thenExpr,  /*argLabels=*/{ });
-      elseExpr = buildCallIfWanted(ifStmt->getEndLoc(), ctx.Id_buildIf,
-                                   elseExpr,  /*argLabels=*/{ });
-    }
-
-    thenExpr = cs->generateConstraints(thenExpr, dc);
-    if (!thenExpr) {
-      hadError = true;
-      return nullptr;
-    }
-
-    elseExpr = cs->generateConstraints(elseExpr, dc);
-    if (!elseExpr) {
-      hadError = true;
-      return nullptr;
-    }
-
-    // FIXME: Need a locator for the "if" statement.
-    Type resultType = cs->addJoinConstraint(nullptr,
-        {
-          { cs->getType(thenExpr), cs->getConstraintLocator(thenExpr) },
-          { cs->getType(elseExpr), cs->getConstraintLocator(elseExpr) }
-        });
-    if (!resultType) {
-      hadError = true;
-      return nullptr;
-    }
-
-    // Create a variable to capture the result of this expression.
-    auto ifVar = buildVar(ifStmt->getStartLoc());
-    cs->setType(ifVar, resultType);
-    applied.capturedStmts.insert({ifStmt, { ifVar, { thenExpr, elseExpr }}});
-    return ifVar;
+    auto ifExpr = new (ctx) IfExpr(condition, thenLoc, thenExpr,
+                                   elseLoc, elseExpr);
+    ifExpr->setImplicit();
+    return ifExpr;
   }
 
   /// Wrap a payload value in an expression which will produce a chain
@@ -560,7 +431,8 @@ protected:
       bool isSecond = (path & 1);
       operand = buildCallIfWanted(operand->getStartLoc(),
                                   ctx.Id_buildEither, operand,
-                                  {isSecond ? ctx.Id_second : ctx.Id_first});
+                                  {isSecond ? ctx.Id_second : ctx.Id_first},
+                                  /*oneWay=*/false);
     }
 
     // Inject into Optional if required.  We'll be adding the call to
@@ -614,367 +486,7 @@ protected:
 #undef CONTROL_FLOW_STMT
 };
 
-/// Describes the target into which the result of a particular statement in
-/// a closure involving a function builder should be written.
-struct FunctionBuilderTarget {
-  enum Kind {
-    /// The resulting value is returned from the closure.
-    ReturnValue,
-    /// The temporary variable into which the result should be assigned.
-    TemporaryVar,
-  } kind;
-
-  /// Captured variable information.
-  std::pair<VarDecl *, llvm::TinyPtrVector<Expr *>> captured;
-
-  static FunctionBuilderTarget forReturn(Expr *expr) {
-    return FunctionBuilderTarget{ReturnValue, {nullptr, {expr}}};
-  }
-
-  static FunctionBuilderTarget forAssign(VarDecl *temporaryVar,
-                                         llvm::TinyPtrVector<Expr *> exprs) {
-    return FunctionBuilderTarget{TemporaryVar, {temporaryVar, exprs}};
-  }
-};
-
-/// Handles the rewrite of the body of a closure to which a function builder
-/// has been applied.
-class BuilderClosureRewriter
-    : public StmtVisitor<BuilderClosureRewriter, Stmt *, FunctionBuilderTarget> {
-  ASTContext &ctx;
-  const Solution &solution;
-  DeclContext *dc;
-  AppliedBuilderTransform builderTransform;
-  std::function<Expr *(Expr *)> rewriteExpr;
-  std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType;
-
-  /// Retrieve the temporary variable that will be used to capture the
-  /// value of the given expression.
-  AppliedBuilderTransform::RecordedExpr takeCapturedExpr(Expr *expr) {
-    auto found = builderTransform.capturedExprs.find(expr);
-    assert(found != builderTransform.capturedExprs.end());
-
-    // Set the type of the temporary variable.
-    auto recorded = found->second;
-    if (auto temporaryVar = recorded.temporaryVar) {
-      Type type = solution.simplifyType(solution.getType(temporaryVar));
-      temporaryVar->setInterfaceType(type->mapTypeOutOfContext());
-    }
-
-    // Erase the captured expression, so we're sure we never do this twice.
-    builderTransform.capturedExprs.erase(found);
-    return recorded;
-  }
-
-public:
-  /// Retrieve information about a captured statement.
-  std::pair<VarDecl *, llvm::TinyPtrVector<Expr *>>
-  takeCapturedStmt(Stmt *stmt) {
-    auto found = builderTransform.capturedStmts.find(stmt);
-    assert(found != builderTransform.capturedStmts.end());
-
-    // Set the type of the temporary variable.
-    auto temporaryVar = found->second.first;
-    Type type = solution.simplifyType(solution.getType(temporaryVar));
-    temporaryVar->setInterfaceType(type->mapTypeOutOfContext());
-
-    // Take the expressions.
-    auto exprs = std::move(found->second.second);
-
-    // Erase the statement, so we're sure we never do this twice.
-    builderTransform.capturedStmts.erase(found);
-    return std::make_pair(temporaryVar, std::move(exprs));
-  }
-
-private:
-  /// Build the statement or expression to initialize the target.
-  ASTNode initializeTarget(FunctionBuilderTarget target) {
-    assert(target.captured.second.size() == 1);
-    auto capturedExpr = target.captured.second.front();
-    auto finalCapturedExpr = rewriteExpr(capturedExpr);
-    SourceLoc implicitLoc = capturedExpr->getEndLoc();
-    switch (target.kind) {
-    case FunctionBuilderTarget::ReturnValue: {
-      // Return the expression.
-      ConstraintSystem &cs = solution.getConstraintSystem();
-      Type bodyResultType =
-          solution.simplifyType(builderTransform.bodyResultType);
-      finalCapturedExpr = coerceToType(
-          finalCapturedExpr,
-          bodyResultType,
-          cs.getConstraintLocator(capturedExpr));
-      return new (ctx) ReturnStmt(implicitLoc, finalCapturedExpr);
-    }
-
-    case FunctionBuilderTarget::TemporaryVar: {
-      // Assign the expression into a variable.
-      auto temporaryVar = target.captured.first;
-      auto declRef = new (ctx) DeclRefExpr(
-          temporaryVar, DeclNameLoc(implicitLoc), /*implicit=*/true);
-      declRef->setType(LValueType::get(temporaryVar->getType()));
-
-      // Load the right-hand side if needed.
-      if (finalCapturedExpr->getType()->is<LValueType>()) {
-        auto &cs = solution.getConstraintSystem();
-        finalCapturedExpr = cs.addImplicitLoadExpr(finalCapturedExpr);
-      }
-
-      auto assign = new (ctx) AssignExpr(
-          declRef, implicitLoc, finalCapturedExpr, /*implicit=*/true);
-      assign->setType(TupleType::getEmpty(ctx));
-      return assign;
-    }
-    }
-  }
-
-  /// Declare the given temporary variable, adding the appropriate
-  /// entries to the elements of a brace stmt.
-  void declareTemporaryVariable(VarDecl *temporaryVar,
-                                std::vector<ASTNode> &elements) {
-    if (!temporaryVar)
-      return;
-
-    // Form a new pattern binding to bind the temporary variable to the
-    // transformed expression.
-    auto pattern = new (ctx) NamedPattern(temporaryVar,/*implicit=*/true);
-    pattern->setType(temporaryVar->getType());
-
-    auto pbd = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None, pattern, nullptr, dc);
-    elements.push_back(temporaryVar);
-    elements.push_back(pbd);
-  }
-
-public:
-  BuilderClosureRewriter(
-      const Solution &solution,
-      DeclContext *dc,
-      const AppliedBuilderTransform &builderTransform,
-      std::function<Expr *(Expr *)> rewriteExpr,
-      std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType
-    ) : ctx(solution.getConstraintSystem().getASTContext()),
-        solution(solution), dc(dc), builderTransform(builderTransform),
-        rewriteExpr(rewriteExpr),
-        coerceToType(coerceToType){ }
-
-  Stmt *visitBraceStmt(BraceStmt *braceStmt, FunctionBuilderTarget target,
-                       Optional<FunctionBuilderTarget> innerTarget = None) {
-    std::vector<ASTNode> newElements;
-
-    // If there is an "inner" target corresponding to this brace, declare
-    // it's temporary variable if needed.
-    if (innerTarget) {
-      declareTemporaryVariable(innerTarget->captured.first, newElements);
-    }
-
-    for (auto node : braceStmt->getElements()) {
-      // Implicit returns in single-expression function bodies are treated
-      // as the expression.
-      if (auto returnStmt =
-              dyn_cast_or_null<ReturnStmt>(node.dyn_cast<Stmt *>())) {
-        assert(returnStmt->isImplicit());
-        node = returnStmt->getResult();
-      }
-
-      if (auto expr = node.dyn_cast<Expr *>()) {
-        // Skip error expressions.
-        if (isa<ErrorExpr>(expr))
-          continue;
-
-        // Each expression turns into a 'let' that captures the value of
-        // the expression.
-        auto recorded = takeCapturedExpr(expr);
-
-        // Rewrite the expression
-        Expr *finalExpr = rewriteExpr(recorded.generatedExpr);
-
-        // Form a new pattern binding to bind the temporary variable to the
-        // transformed expression.
-        auto pattern = new (ctx) NamedPattern(
-            recorded.temporaryVar, /*implicit=*/true);
-        pattern->setType(recorded.temporaryVar->getType());
-        newElements.push_back(recorded.temporaryVar);
-
-        auto pbd = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None, pattern, finalExpr, dc);
-        newElements.push_back(pbd);
-        continue;
-      }
-
-      if (auto stmt = node.dyn_cast<Stmt *>()) {
-        // Each statement turns into a (potential) temporary variable
-        // binding followed by the statement itself.
-        auto captured = takeCapturedStmt(stmt);
-
-        declareTemporaryVariable(captured.first, newElements);
-
-        Stmt *finalStmt = visit(
-            stmt,
-            FunctionBuilderTarget{FunctionBuilderTarget::TemporaryVar,
-                                  std::move(captured)});
-        newElements.push_back(finalStmt);
-        continue;
-      }
-
-      auto decl = node.get<Decl *>();
-
-      // Skip #if declarations.
-      if (isa<IfConfigDecl>(decl))
-        continue;
-
-      // Diagnose #warning / #error during application.
-      if (auto poundDiag = dyn_cast<PoundDiagnosticDecl>(decl)) {
-        TypeChecker::typeCheckDecl(poundDiag);
-        continue;
-      }
-
-      llvm_unreachable("Cannot yet handle declarations");
-    }
-
-    // If there is an "inner" target corresponding to this brace, initialize
-    // it.
-    if (innerTarget) {
-      newElements.push_back(initializeTarget(*innerTarget));
-    }
-
-    // Capture the result of the buildBlock() call in the manner requested
-    // by the caller.
-    newElements.push_back(initializeTarget(target));
-
-    return BraceStmt::create(ctx, braceStmt->getLBraceLoc(), newElements,
-                             braceStmt->getRBraceLoc());
-  }
-
-  Stmt *visitIfStmt(IfStmt *ifStmt, FunctionBuilderTarget target) {
-    // Rewrite the condition.
-    // FIXME: We should handle the whole condition within the type system.
-    auto cond = ifStmt->getCond();
-    auto condExpr = cond.front().getBoolean();
-    auto finalCondExpr = rewriteExpr(condExpr);
-
-    // Load the condition if needed.
-    if (finalCondExpr->getType()->is<LValueType>()) {
-      auto &cs = solution.getConstraintSystem();
-      finalCondExpr = cs.addImplicitLoadExpr(finalCondExpr);
-    }
-
-    cond.front().setBoolean(finalCondExpr);
-    ifStmt->setCond(cond);
-
-    assert(target.kind == FunctionBuilderTarget::TemporaryVar);
-    auto temporaryVar = target.captured.first;
-
-    // Translate the "then" branch.
-    auto capturedThen = takeCapturedStmt(ifStmt->getThenStmt());
-    auto newThen = visitBraceStmt(cast<BraceStmt>(ifStmt->getThenStmt()),
-          FunctionBuilderTarget::forAssign(
-            temporaryVar, {target.captured.second[0]}),
-          FunctionBuilderTarget::forAssign(
-            capturedThen.first, {capturedThen.second.front()}));
-    ifStmt->setThenStmt(newThen);
-
-    if (auto elseBraceStmt =
-            dyn_cast_or_null<BraceStmt>(ifStmt->getElseStmt())) {
-      // Translate the "else" branch when it's a stmt-brace.
-      auto capturedElse = takeCapturedStmt(elseBraceStmt);
-      Stmt *newElse = visitBraceStmt(
-          elseBraceStmt,
-          FunctionBuilderTarget::forAssign(
-            temporaryVar, {target.captured.second[1]}),
-          FunctionBuilderTarget::forAssign(
-            capturedElse.first, {capturedElse.second.front()}));
-      ifStmt->setElseStmt(newElse);
-    } else if (auto elseIfStmt = cast_or_null<IfStmt>(ifStmt->getElseStmt())){
-      // Translate the "else" branch when it's an else-if.
-      auto capturedElse = takeCapturedStmt(elseIfStmt);
-      std::vector<ASTNode> newElseElements;
-      declareTemporaryVariable(capturedElse.first, newElseElements);
-      newElseElements.push_back(
-          visitIfStmt(
-            elseIfStmt,
-            FunctionBuilderTarget::forAssign(
-              capturedElse.first, capturedElse.second)));
-      newElseElements.push_back(
-          initializeTarget(
-            FunctionBuilderTarget::forAssign(
-              temporaryVar, {target.captured.second[1]})));
-
-      Stmt *newElse = BraceStmt::create(
-          ctx, elseIfStmt->getStartLoc(), newElseElements,
-          elseIfStmt->getEndLoc());
-      ifStmt->setElseStmt(newElse);
-    } else {
-      // Form an "else" brace containing an assignment to the temporary
-      // variable.
-      auto init = initializeTarget(
-          FunctionBuilderTarget::forAssign(
-            temporaryVar, {target.captured.second[1]}));
-      auto newElse = BraceStmt::create(
-          ctx, ifStmt->getEndLoc(), { init }, ifStmt->getEndLoc());
-      ifStmt->setElseStmt(newElse);
-    }
-
-    return ifStmt;
-  }
-
-  Stmt *visitDoStmt(DoStmt *doStmt, FunctionBuilderTarget target) {
-    // Each statement turns into a (potential) temporary variable
-    // binding followed by the statement itself.
-    auto body = cast<BraceStmt>(doStmt->getBody());
-    auto captured = takeCapturedStmt(body);
-
-    auto newInnerBody = cast<BraceStmt>(
-        visitBraceStmt(
-          body,
-          target,
-          FunctionBuilderTarget::forAssign(
-            captured.first, {captured.second.front()})));
-    doStmt->setBody(newInnerBody);
-    return doStmt;
-  }
-
-#define UNHANDLED_FUNCTION_BUILDER_STMT(STMT) \
-  Stmt *visit##STMT##Stmt(STMT##Stmt *stmt, FunctionBuilderTarget target) { \
-    llvm_unreachable("Function builders do not allow statement of kind " \
-                     #STMT); \
-  }
-
-  UNHANDLED_FUNCTION_BUILDER_STMT(Return)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Yield)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Guard)
-  UNHANDLED_FUNCTION_BUILDER_STMT(While)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Defer)
-  UNHANDLED_FUNCTION_BUILDER_STMT(DoCatch)
-  UNHANDLED_FUNCTION_BUILDER_STMT(RepeatWhile)
-  UNHANDLED_FUNCTION_BUILDER_STMT(ForEach)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Switch)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Case)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Catch)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Break)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Continue)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Fallthrough)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Fail)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Throw)
-  UNHANDLED_FUNCTION_BUILDER_STMT(PoundAssert)
-#undef UNHANDLED_FUNCTION_BUILDER_STMT
-};
-
 } // end anonymous namespace
-
-BraceStmt *swift::applyFunctionBuilderTransform(
-    const Solution &solution,
-    AppliedBuilderTransform applied,
-    BraceStmt *body,
-    DeclContext *dc,
-    std::function<Expr *(Expr *)> rewriteExpr,
-    std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType) {
-  BuilderClosureRewriter rewriter(solution, dc, applied, rewriteExpr, coerceToType);
-  auto captured = rewriter.takeCapturedStmt(body);
-  return cast<BraceStmt>(
-    rewriter.visitBraceStmt(
-      body,
-      FunctionBuilderTarget::forReturn(applied.returnExpr),
-      FunctionBuilderTarget::forAssign(
-        captured.first, captured.second)));
-}
 
 /// Find the return statements in the given body, which block the application
 /// of a function builder.
@@ -990,15 +502,15 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   auto &ctx = func->getASTContext();
   auto request = PreCheckFunctionBuilderRequest{func};
   switch (evaluateOrDefault(
-              ctx.evaluator, request, FunctionBuilderBodyPreCheck::Error)) {
-  case FunctionBuilderBodyPreCheck::Okay:
+              ctx.evaluator, request, FunctionBuilderClosurePreCheck::Error)) {
+  case FunctionBuilderClosurePreCheck::Okay:
     // If the pre-check was okay, apply the function-builder transform.
     break;
 
-  case FunctionBuilderBodyPreCheck::Error:
+  case FunctionBuilderClosurePreCheck::Error:
     return nullptr;
 
-  case FunctionBuilderBodyPreCheck::HasReturnStmt: {
+  case FunctionBuilderClosurePreCheck::HasReturnStmt: {
     // One or more explicit 'return' statements were encountered, which
     // disables the function builder transform. Warn when we do this.
     auto returnStmts = findReturnStatements(func);
@@ -1015,7 +527,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
         attr = accessor->getStorage()->getAttachedFunctionBuilder();
       }
     }
-
+    
     if (attr) {
       ctx.Diags.diagnose(
           attr->getLocation(), diag::function_builder_remove_attr)
@@ -1054,33 +566,11 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // Build a constraint system in which we can check the body of the function.
   ConstraintSystem cs(func, options);
 
-  // Find an expression... any expression... to use for a locator.
-  // FIXME: This is a hack because we don't have the notion of locators that
-  // refer to statements.
-  Expr *fakeAnchor = nullptr;
-  {
-    class FindExprWalker : public ASTWalker {
-      Expr *&fakeAnchor;
-
-    public:
-      explicit FindExprWalker(Expr *&fakeAnchor) : fakeAnchor(fakeAnchor) { }
-
-      std::pair<bool, Expr *> walkToExprPre(Expr *E) {
-        if (!fakeAnchor)
-          fakeAnchor = E;
-
-        return { false, nullptr };
-      }
-    } walker(fakeAnchor);
-
-    func->getBody()->walk(walker);
-  }
-
   // FIXME: check the result
   cs.matchFunctionBuilder(func, builderType, resultContextType,
                           resultConstraintKind,
-                          /*calleeLocator=*/cs.getConstraintLocator(fakeAnchor),
-                          /*FIXME:*/cs.getConstraintLocator(fakeAnchor));
+                          /*calleeLocator=*/nullptr,
+                          /*FIXME:*/ConstraintLocatorBuilder(nullptr));
 
   // Solve the constraint system.
   SmallVector<Solution, 4> solutions;
@@ -1129,32 +619,32 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
   // for return statements.
   auto request = PreCheckFunctionBuilderRequest{fn};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
-                            FunctionBuilderBodyPreCheck::Error)) {
-  case FunctionBuilderBodyPreCheck::Okay:
+                            FunctionBuilderClosurePreCheck::Error)) {
+  case FunctionBuilderClosurePreCheck::Okay:
     // If the pre-check was okay, apply the function-builder transform.
     break;
 
-  case FunctionBuilderBodyPreCheck::Error:
+  case FunctionBuilderClosurePreCheck::Error:
     // If the pre-check had an error, flag that.
     return getTypeMatchFailure(locator);
 
-  case FunctionBuilderBodyPreCheck::HasReturnStmt:
-    // If the body has a return statement, suppress the transform but
+  case FunctionBuilderClosurePreCheck::HasReturnStmt:
+    // If the closure has a return statement, suppress the transform but
     // continue solving the constraint system.
     return getTypeMatchSuccess();
   }
 
-  // Check the form of this body to see if we can apply the
+  // Check the form of this closure to see if we can apply the
   // function-builder translation at all.
-  auto dc = fn.getAsDeclContext();
   {
     // Check whether we can apply this specific function builder.
-    BuilderClosureVisitor visitor(getASTContext(), nullptr, dc, builderType,
-                                  bodyResultType);
+    BuilderClosureVisitor visitor(getASTContext(), this,
+                                  /*wantExpr=*/false, builderType);
+    (void)visitor.visit(fn.getBody());
 
     // If we saw a control-flow statement or declaration that the builder
     // cannot handle, we don't have a well-formed function builder application.
-    if (auto unhandledNode = visitor.check(fn.getBody())) {
+    if (visitor.unhandledNode) {
       // If we aren't supposed to attempt fixes, fail.
       if (!shouldAttemptFixes()) {
         return getTypeMatchFailure(locator);
@@ -1163,7 +653,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
       // Record the first unhandled construct as a fix.
       if (recordFix(
               SkipUnhandledConstructInFunctionBuilder::create(
-                *this, unhandledNode, builder,
+                *this, visitor.unhandledNode, builder,
                 getConstraintLocator(locator)))) {
         return getTypeMatchFailure(locator);
       }
@@ -1186,14 +676,24 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
     assert(!builderType->hasTypeParameter());
   }
 
-  BuilderClosureVisitor visitor(getASTContext(), this, dc, builderType,
-                                bodyResultType);
+  BuilderClosureVisitor visitor(getASTContext(), this,
+                                /*wantExpr=*/true, builderType);
+  Expr *singleExpr = visitor.visit(fn.getBody());
 
-  auto applied = visitor.apply(fn.getBody());
-  if (!applied)
+  // We've already pre-checked all the original expressions, but do the
+  // pre-check to the generated expression just to set up any preconditions
+  // that CSGen might have.
+  //
+  // TODO: just build the AST the way we want it in the first place.
+  auto dc = fn.getAsDeclContext();
+  if (ConstraintSystem::preCheckExpression(singleExpr, dc))
     return getTypeMatchFailure(locator);
 
-  Type transformedType = getType(applied->returnExpr);
+  singleExpr = generateConstraints(singleExpr, dc);
+  if (!singleExpr)
+    return getTypeMatchFailure(locator);
+
+  Type transformedType = getType(singleExpr);
   assert(transformedType && "Missing type");
 
   // Record the transformation.
@@ -1203,9 +703,11 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
       [&](const std::pair<AnyFunctionRef, AppliedBuilderTransform> &elt) {
         return elt.first == fn;
       }) == functionBuilderTransformed.end() &&
-         "already transformed this body along this path!?!");
+         "already transformed this closure along this path!?!");
   functionBuilderTransformed.push_back(
-      std::make_pair(fn, std::move(*applied)));
+      std::make_pair(
+        fn,
+        AppliedBuilderTransform{builderType, singleExpr, bodyResultType}));
 
   // If builder is applied to the closure expression then
   // `closure body` to `closure result` matching should
@@ -1221,7 +723,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
 
 namespace {
 
-/// Pre-check all the expressions in the body.
+/// Pre-check all the expressions in the closure body.
 class PreCheckFunctionBuilderApplication : public ASTWalker {
   AnyFunctionRef Fn;
   bool SkipPrecheck = false;
@@ -1236,7 +738,7 @@ public:
 
   const std::vector<ReturnStmt *> getReturnStmts() const { return ReturnStmts; }
 
-  FunctionBuilderBodyPreCheck run() {
+  FunctionBuilderClosurePreCheck run() {
     Stmt *oldBody = Fn.getBody();
 
     Stmt *newBody = oldBody->walk(*this);
@@ -1245,14 +747,14 @@ public:
     assert((newBody == nullptr) == HasError &&
            "unexpected short-circuit while walking body");
     if (HasError)
-      return FunctionBuilderBodyPreCheck::Error;
+      return FunctionBuilderClosurePreCheck::Error;
 
     if (hasReturnStmt())
-      return FunctionBuilderBodyPreCheck::HasReturnStmt;
+      return FunctionBuilderClosurePreCheck::HasReturnStmt;
 
     assert(oldBody == newBody && "pre-check walk wasn't in-place?");
 
-    return FunctionBuilderBodyPreCheck::Okay;
+    return FunctionBuilderClosurePreCheck::Okay;
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -1284,13 +786,13 @@ public:
 
 }
 
-llvm::Expected<FunctionBuilderBodyPreCheck>
+llvm::Expected<FunctionBuilderClosurePreCheck>
 PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
                                          AnyFunctionRef fn) const {
   // Single-expression closures should already have been pre-checked.
   if (auto closure = fn.getAbstractClosureExpr()) {
     if (closure->hasSingleExpressionBody())
-      return FunctionBuilderBodyPreCheck::Okay;
+      return FunctionBuilderClosurePreCheck::Okay;
   }
 
   return PreCheckFunctionBuilderApplication(fn, false).run();

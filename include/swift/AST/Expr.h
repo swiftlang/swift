@@ -3599,10 +3599,7 @@ class ClosureExpr : public AbstractClosureExpr {
   /// the CaptureListExpr which would normally maintain this sort of
   /// information about captured variables), we need to have some way to access
   /// this information directly on the ClosureExpr.
-  ///
-  /// The bit indicates whether this closure has had a function builder
-  /// applied to it.
-  llvm::PointerIntPair<VarDecl *, 1, bool> CapturedSelfDeclAndAppliedBuilder;
+  VarDecl *CapturedSelfDecl;
   
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
@@ -3627,8 +3624,7 @@ public:
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      BracketRange(bracketRange),
-      CapturedSelfDeclAndAppliedBuilder(capturedSelfDecl, false),
+      BracketRange(bracketRange), CapturedSelfDecl(capturedSelfDecl),
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
       ExplicitResultType(explicitResultType), Body(nullptr) {
     setParameterList(params);
@@ -3730,22 +3726,12 @@ public:
   bool hasEmptyBody() const;
 
   /// VarDecl captured by this closure under the literal name \c self , if any.
-  VarDecl *getCapturedSelfDecl() const {
-    return CapturedSelfDeclAndAppliedBuilder.getPointer();
-  }
+  VarDecl *getCapturedSelfDecl() const { return CapturedSelfDecl; }
   
   /// Whether this closure captures the \c self param in its body in such a
   /// way that implicit \c self is enabled within its body (i.e. \c self is
   /// captured non-weakly).
   bool capturesSelfEnablingImplictSelf() const;
-
-  bool hasAppliedFunctionBuilder() const {
-    return CapturedSelfDeclAndAppliedBuilder.getInt();
-  }
-
-  void setAppliedFunctionBuilder(bool flag = true) {
-    CapturedSelfDeclAndAppliedBuilder.setInt(flag);
-  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
