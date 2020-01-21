@@ -236,8 +236,9 @@ enum class FixKind : uint8_t {
   /// inferred in current context e.g. because it's a multi-statement closure.
   SpecifyClosureReturnType,
   
-  /// Object literal type coudn't be infered because the module where it's
-  /// protocol type was not imported.
+  /// Object literal type coudn't be infered because the module where 
+  /// the default type that implements the associated literal protocol
+  /// is declared was not imported.
   SpecifyObjectLiteralTypeImport,
 
 };
@@ -1649,8 +1650,8 @@ public:
 
   bool diagnose(bool asNote = false) const;
 
-  static SpecifyObjectLiteralTypeImport *attempt(ConstraintSystem &cs,
-                                                 ConstraintLocator *locator);
+  static SpecifyObjectLiteralTypeImport *create(ConstraintSystem &cs,
+                                                ConstraintLocator *locator);
 
 };
 

@@ -1176,20 +1176,7 @@ bool SpecifyObjectLiteralTypeImport::diagnose(bool asNote) const {
 }
 
 SpecifyObjectLiteralTypeImport *
-SpecifyObjectLiteralTypeImport::attempt(ConstraintSystem &cs,
-                                        ConstraintLocator *locator) {
-  // FIXME: ArgumentMismatchFailure is currently used from CSDiag, meaning
-  // we could endup emiting this diagnostic duplicated.
-  if (cs.Options.contains(ConstraintSystemFlags::SubExpressionDiagnostics))
-    return nullptr;
-  
-  auto *anchor = locator->getAnchor();
-  if (!isa<ObjectLiteralExpr>(anchor))
-    return nullptr;
-
-  // * The object literal has no contextual type
-  if (cs.getContextualType())
-    return nullptr;
-  
+SpecifyObjectLiteralTypeImport::create(ConstraintSystem &cs,
+                                       ConstraintLocator *locator) {
   return new (cs.getAllocator()) SpecifyObjectLiteralTypeImport(cs, locator);
 }

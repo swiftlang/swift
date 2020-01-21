@@ -3882,7 +3882,7 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
 
   auto *anchor = getRawAnchor();
   if (!(isa<CallExpr>(anchor) || isa<SubscriptExpr>(anchor) ||
-        isa<UnresolvedMemberExpr>(anchor)))
+        isa<UnresolvedMemberExpr>(anchor) || isa<ObjectLiteralExpr>(anchor)))
     return false;
 
   if (SynthesizedArgs.size() != 1)
@@ -4219,6 +4219,9 @@ MissingArgumentsFailure::getCallInfo(Expr *anchor) const {
   } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
     return std::make_tuple(SE, SE->getIndex(), SE->getNumArguments(),
                            SE->hasTrailingClosure());
+  } else if (auto *OLE = dyn_cast<ObjectLiteralExpr>(anchor)) {
+    return std::make_tuple(OLE, OLE->getArg(), OLE->getNumArguments(),
+                           OLE->hasTrailingClosure());
   }
 
   return std::make_tuple(nullptr, nullptr, 0, false);
@@ -6039,46 +6042,48 @@ bool UnableToInferClosureReturnType::diagnoseAsError() {
   return true;
 }
 
-static std::tuple<StringRef, StringRef>
-getImportModuleAndDefaultType(const ASTContext &ctx, ProtocolDecl *protocol) {
+static std::pair<StringRef, StringRef>
+getImportModuleAndDefaultType(const ASTContext &ctx, ObjectLiteralExpr *expr) {
   const auto &target = ctx.LangOpts.Target;
-  if (protocol ==
-      ctx.getProtocol(KnownProtocolKind::ExpressibleByColorLiteral)) {
-    if (target.isMacOSX()) {
-      return std::make_tuple("AppKit", "NSColor");
-    } else if (target.isiOS() || target.isTvOS()) {
-      return std::make_tuple("UIKit", "UIColor");
+  
+  switch (expr->getLiteralKind()) {
+    case ObjectLiteralExpr::colorLiteral: {
+      if (target.isMacOSX()) {
+        return std::make_pair("AppKit", "NSColor");
+      } else if (target.isiOS() || target.isTvOS()) {
+        return std::make_pair("UIKit", "UIColor");
+      }
+      break;
     }
-  } else if (protocol ==
-             ctx.getProtocol(KnownProtocolKind::ExpressibleByImageLiteral)) {
-    if (target.isMacOSX()) {
-      return std::make_tuple("AppKit", "NSImage");
-    } else if (target.isiOS() || target.isTvOS()) {
-      return std::make_tuple("UIKit", "UIImage");
+
+    case ObjectLiteralExpr::imageLiteral: {
+      if (target.isMacOSX()) {
+        return std::make_pair("AppKit", "NSImage");
+      } else if (target.isiOS() || target.isTvOS()) {
+        return std::make_pair("UIKit", "UIImage");
+      }
+      break;
     }
-  } else if (protocol ==
-             ctx.getProtocol(
-                 KnownProtocolKind::ExpressibleByFileReferenceLiteral)) {
-    return std::make_tuple("Foundation", "URL");
+
+    case ObjectLiteralExpr::fileLiteral: {
+      return std::make_pair("Foundation", "URL");
+    }
   }
-  return std::make_tuple("", "");
+
+  return std::make_pair("", "");
 }
 
 bool UnableToInferProtocolLiteralType::diagnoseAsError() {
-  auto *locator = getLocator();
   auto &cs = getConstraintSystem();
-  auto *expr = cast<ObjectLiteralExpr>(locator->getAnchor());
-
   auto &ctx = cs.getASTContext();
-  auto protocol = TypeChecker::getLiteralProtocol(ctx, expr);
-  assert(protocol);
-  auto plainName = expr->getLiteralKindPlainName();
+  auto *expr = cast<ObjectLiteralExpr>(getLocator()->getAnchor());
 
   StringRef importModule;
   StringRef importDefaultTypeName;
   std::tie(importModule, importDefaultTypeName) =
-      getImportModuleAndDefaultType(ctx, protocol);
+      getImportModuleAndDefaultType(ctx, expr);
 
+  auto plainName = expr->getLiteralKindPlainName();
   emitDiagnostic(expr->getLoc(), diag::object_literal_default_type_missing,
                  plainName);
   if (!importModule.empty()) {
