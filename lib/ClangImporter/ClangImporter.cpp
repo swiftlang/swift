@@ -3730,27 +3730,6 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
   }
 }
 
-// Force the members of the entire inheritance hierarchy to be loaded and
-// deserialized before loading the named member of this class. This allows the
-// decl members table to be warmed up and enables the correct identification of
-// overrides.
-//
-// FIXME: Very low hanging fruit: Loading everything is extremely wasteful. We
-// should be able to just load the name lazy member loading is asking for.
-static void ensureSuperclassMembersAreLoaded(const ClassDecl *CD) {
-  if (!CD)
-    return;
-
-  CD = CD->getSuperclassDecl();
-  if (!CD || !CD->hasClangNode())
-    return;
-  
-  CD->loadAllMembers();
-
-  for (auto *ED : const_cast<ClassDecl *>(CD)->getExtensions())
-    ED->loadAllMembers();
-}
-
 Optional<TinyPtrVector<ValueDecl *>>
 ClangImporter::Implementation::loadNamedMembers(
     const IterableDeclContext *IDC, DeclBaseName N, uint64_t contextData) {
@@ -3799,7 +3778,16 @@ ClangImporter::Implementation::loadNamedMembers(
 
   assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD));
 
-  ensureSuperclassMembersAreLoaded(dyn_cast<ClassDecl>(D));
+  // Force the members of the entire inheritance hierarchy to be loaded and
+  // deserialized before loading the named member of a class. This warms up
+  // ClangImporter::Implementation::MembersForNominal, used for computing
+  // property overrides.
+  //
+  // FIXME: If getOverriddenDecl() kicked off a request for imported decls,
+  // we could postpone this until overrides are actually requested.
+  if (auto *classDecl = dyn_cast<ClassDecl>(D))
+    if (auto *superclassDecl = classDecl->getSuperclassDecl())
+      (void) const_cast<ClassDecl *>(superclassDecl)->lookupDirect(N);
 
   TinyPtrVector<ValueDecl *> Members;
   for (auto entry : table->lookup(SerializedSwiftName(N),
@@ -3829,7 +3817,7 @@ ClangImporter::Implementation::loadNamedMembers(
     auto member = entry.get<clang::NamedDecl *>();
     if (!isVisibleClangEntry(member)) continue;
 
-     // Skip Decls from different clang::DeclContexts
+    // Skip Decls from different clang::DeclContexts
     if (member->getDeclContext() != CDC) continue;
 
     SmallVector<Decl*, 4> tmp;
