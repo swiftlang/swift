@@ -730,7 +730,8 @@ private:
   /// Declare the given temporary variable, adding the appropriate
   /// entries to the elements of a brace stmt.
   void declareTemporaryVariable(VarDecl *temporaryVar,
-                                std::vector<ASTNode> &elements) {
+                                std::vector<ASTNode> &elements,
+                                Expr *initExpr = nullptr) {
     if (!temporaryVar)
       return;
 
@@ -739,7 +740,9 @@ private:
     auto pattern = new (ctx) NamedPattern(temporaryVar,/*implicit=*/true);
     pattern->setType(temporaryVar->getType());
 
-    auto pbd = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None, pattern, nullptr, dc);
+    auto pbd = PatternBindingDecl::create(
+        ctx, SourceLoc(), StaticSpellingKind::None, temporaryVar->getLoc(),
+        pattern, SourceLoc(), initExpr, dc);
     elements.push_back(temporaryVar);
     elements.push_back(pbd);
   }
@@ -789,13 +792,7 @@ public:
 
         // Form a new pattern binding to bind the temporary variable to the
         // transformed expression.
-        auto pattern = new (ctx) NamedPattern(
-            recorded.temporaryVar, /*implicit=*/true);
-        pattern->setType(recorded.temporaryVar->getType());
-        newElements.push_back(recorded.temporaryVar);
-
-        auto pbd = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None, pattern, finalExpr, dc);
-        newElements.push_back(pbd);
+        declareTemporaryVariable(recorded.temporaryVar, newElements, finalExpr);
         continue;
       }
 
