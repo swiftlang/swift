@@ -4620,9 +4620,7 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
     auto &cs = getConstraintSystem();
     auto *locator =
         cs.getConstraintLocator(baseExpr, ConstraintLocator::Member);
-    if (llvm::any_of(cs.getFixes(), [&](const ConstraintFix *fix) {
-          return fix->getLocator() == locator;
-        }))
+    if (cs.hasFixFor(locator))
       return false;
   }
 
