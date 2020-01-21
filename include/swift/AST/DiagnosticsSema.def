@@ -4678,6 +4678,17 @@ WARNING(observe_keypath_property_not_objc_dynamic, none,
         "passing reference to non-'@objc dynamic' property %0 to KVO method %1 "
         "may lead to unexpected behavior or runtime trap", (DeclName, DeclName))
 
+WARNING(default_magic_identifier_mismatch, none,
+        "parameter %0 with default argument '%1' passed to parameter %2, whose "
+        "default argument is '%3'",
+        (Identifier, StringRef, Identifier, StringRef))
+NOTE(change_caller_default_to_match_callee, none,
+     "did you mean for parameter %0 to default to '%1'?",
+     (Identifier, StringRef))
+NOTE(silence_default_magic_identifier_mismatch, none,
+     "add parentheses to silence this warning", ())
+
+
 //------------------------------------------------------------------------------
 // MARK: Debug diagnostics
 //------------------------------------------------------------------------------
