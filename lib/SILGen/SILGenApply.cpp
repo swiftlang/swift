@@ -4895,10 +4895,9 @@ std::string SILGenFunction::getMagicFileString(SourceLoc loc) {
   if (!getASTContext().LangOpts.EnableConcisePoundFile)
     return path;
 
-  auto value = llvm::sys::path::filename(path).str();
-  value += " (";
-  value += getModule().getSwiftModule()->getNameStr();
-  value += ")";
+  auto value = getModule().getSwiftModule()->getNameStr().str();
+  value += "/";
+  value += llvm::sys::path::filename(path).str();
   return value;
 }
 
