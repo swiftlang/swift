@@ -854,34 +854,19 @@ if [[ "${SKIP_RECONFIGURE}" ]]; then
     RECONFIGURE=""
 fi
 
-# WORKSPACE, BUILD_DIR and INSTALLABLE_PACKAGE must be absolute paths
-case "${WORKSPACE}" in
-    /*) ;;
-    *)
-        echo "workspace must be an absolute path (was '${WORKSPACE}')"
-        exit 1
-        ;;
-esac
-case "${BUILD_DIR}" in
-    /*) ;;
-    "")
-        echo "the --build-dir option is required"
-        usage
-        exit 1
-        ;;
-    *)
-        echo "build-dir must be an absolute path (was '${BUILD_DIR}')"
-        exit 1
-        ;;
-esac
-case "${INSTALLABLE_PACKAGE}" in
-    /*) ;;
-    "") ;;
-    *)
-        echo "installable-package must be an absolute path (was '${INSTALLABLE_PACKAGE}')"
-        exit 1
-        ;;
-esac
+# WORKSPACE, BUILD_DIR, and INSTALLABLE_PACKAGE must be absolute paths
+if ! [[ ${WORKSPACE} =~ ^/ ]] ; then
+  echo "workspace must be an absolute path (was '${WORKSPACE}')"
+  exit 1
+fi
+if ! [[ ${BUILD_DIR} =~ ^/ ]] ; then
+  echo "build-dir must be an absolute path (was '${BUILD_DIR}')"
+  exit 1
+fi
+if ! [[ ${INSTALLABLE_PACKAGE:-/} =~ ^/ ]] ; then
+  echo "installable-package must be an absolute path (was '${INSTALLABLE_PACKAGE}')"
+  exit 1
+fi
 
 # WORKSPACE must exist
 if [ ! -e "${WORKSPACE}" ] ; then
