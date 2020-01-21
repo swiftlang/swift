@@ -17,7 +17,7 @@
 
 SWIFT_TYPEID(AncestryFlags)
 SWIFT_TYPEID(CtorInitializerKind)
-SWIFT_TYPEID(FunctionBuilderClosurePreCheck)
+SWIFT_TYPEID(FunctionBuilderBodyPreCheck)
 SWIFT_TYPEID(GenericSignature)
 SWIFT_TYPEID(ImplicitMemberAction)
 SWIFT_TYPEID(ParamSpecifier)
