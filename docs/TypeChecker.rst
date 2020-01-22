@@ -986,5 +986,3 @@ The things in the queue yet to be ported are:
   - Missing explicit ``Self.`` and ``self.``
   - Logic related to overload candidate ranking (``CalleeCandidateInfo``)
   - ``diagnoseParameterErrors``
-  - ``diagnoseSimpleErrors``
-

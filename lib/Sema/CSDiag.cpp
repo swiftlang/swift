@@ -1403,10 +1403,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                               argLabels))
     return true;
 
-  // Diagnose some simple and common errors.
-  if (calleeInfo.diagnoseSimpleErrors(callExpr))
-    return true;
-
   // Force recheck of the arg expression because we allowed unresolved types
   // before, and that turned out not to help, and now we want any diagnoses
   // from disallowing them.
