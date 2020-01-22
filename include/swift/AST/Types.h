@@ -44,6 +44,7 @@
 
 namespace clang {
 class Type;
+class FunctionType;
 } // namespace clang
 
 namespace llvm {
@@ -2946,7 +2947,6 @@ public:
       friend ExtInfo;
       friend class AnyFunctionType;
       friend class FunctionType;
-      friend class SILUncommonInfo;
       // We preserve a full clang::Type *, not a clang::FunctionType * as:
       // 1. We need to keep sugar in case we need to present an error to the user.
       // 2. The actual type being stored is [ignoring sugar] either a
@@ -2969,7 +2969,7 @@ public:
     static void assertIsFunctionType(const clang::Type *);
 
     ExtInfo(unsigned Bits, Uncommon Other) : Bits(Bits), Other(Other) {
-      // TODO: [clang-function-type-serialization] Once we start serializing
+      // TODO: [store-sil-clang-function-type] Once we start serializing
       // the Clang type, we should also assert that the pointer is non-null.
       auto Rep = Representation(Bits & RepresentationMask);
       if ((Rep == Representation::CFunctionPointer) && Other.ClangFunctionType)
@@ -3917,24 +3917,6 @@ namespace Lowering {
   class TypeConverter;
 };
 
-class SILUncommonInfo {
-  friend class SILFunctionType;
-
-  // Invariant: The FunctionType is canonical.
-  // We store a clang::FunctionType * instead of a clang::CanQualType to
-  // avoid depending on the Clang AST in this header.
-  const clang::Type *ClangFunctionType;
-
-  bool empty() const { return !ClangFunctionType; }
-  SILUncommonInfo(const clang::Type *type) : ClangFunctionType(type) {}
-  SILUncommonInfo(AnyFunctionType::ExtInfo::Uncommon uncommon);
-
-public:
-  /// Analog of AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType.
-  void printClangFunctionType(ClangModuleLoader *cml,
-                              llvm::raw_ostream &os) const;
-};
-
 /// SILFunctionType - The lowered type of a function value, suitable
 /// for use by SIL.
 ///
@@ -3943,8 +3925,7 @@ public:
 /// function parameter and result types.
 class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
     private llvm::TrailingObjects<SILFunctionType, SILParameterInfo,
-                                  SILResultInfo, SILYieldInfo, CanType,
-                                  SILUncommonInfo> {
+                                  SILResultInfo, SILYieldInfo, CanType> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<SILParameterInfo>) const {
@@ -3961,10 +3942,6 @@ class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
 
   size_t numTrailingObjects(OverloadToken<CanType>) const {
     return hasResultCache() ? 2 : 0;
-  }
-
-  size_t numTrailingObjects(OverloadToken<SILUncommonInfo>) const {
-    return Bits.SILFunctionType.HasUncommonInfo ? 1 : 0;
   }
 
 public:
@@ -3991,31 +3968,27 @@ public:
 
     unsigned Bits; // Naturally sized for speed.
 
-    // For symmetry with AnyFunctionType::Uncommon
-    using Uncommon = SILUncommonInfo;
+    class Uncommon {
+      friend ExtInfo;
+      friend class SILFunctionType;
+
+      // Invariant: The FunctionType is canonical.
+      // We store a clang::FunctionType * instead of a clang::CanQualType to
+      // avoid depending on the Clang AST in this header.
+      const clang::FunctionType *ClangFunctionType;
+
+      bool empty() const { return !ClangFunctionType; }
+      Uncommon(const clang::FunctionType *type) : ClangFunctionType(type) {}
+
+    public:
+      /// Analog of AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType.
+      void printClangFunctionType(ClangModuleLoader *cml,
+                                  llvm::raw_ostream &os) const;
+    };
 
     Uncommon Other;
 
-    static void assertIsFunctionType(const clang::Type *);
-
-    ExtInfo(unsigned Bits, Uncommon Other) : Bits(Bits), Other(Other) {
-      auto Rep = Representation(Bits & RepresentationMask);
-      // TODO: [clang-function-type-serialization] Once we start serializing
-      // the Clang type, we should also assert that the pointer is non-null.
-      if ((Rep == Representation::CFunctionPointer) && Other.ClangFunctionType)
-        assertIsFunctionType(Other.ClangFunctionType);
-    }
-
-    static constexpr unsigned makeBits(Representation rep,
-                                       bool isPseudogeneric,
-                                       bool isNoEscape,
-                                       DifferentiabilityKind diffKind) {
-      return ((unsigned) rep)
-              | (isPseudogeneric ? PseudogenericMask : 0)
-              | (isNoEscape ? NoEscapeMask : 0)
-              | (((unsigned)diffKind << DifferentiabilityMaskOffset)
-                 & DifferentiabilityMask);
-    }
+    ExtInfo(unsigned Bits, Uncommon Other) : Bits(Bits), Other(Other) {}
 
     friend class SILFunctionType;
   public:
@@ -4025,19 +3998,13 @@ public:
     // Constructor for polymorphic type.
     ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape,
             DifferentiabilityKind diffKind,
-            const clang::Type *type)
-      : ExtInfo(makeBits(rep, isPseudogeneric, isNoEscape, diffKind),
+            const clang::FunctionType *type)
+      : ExtInfo(((unsigned) rep)
+                  | (isPseudogeneric ? PseudogenericMask : 0)
+                  | (isNoEscape ? NoEscapeMask : 0)
+                  | (((unsigned)diffKind << DifferentiabilityMaskOffset)
+                     & DifferentiabilityMask),
                 Uncommon(type)) {
-    }
-
-    ExtInfo(AnyFunctionType::ExtInfo info, bool isPseudogeneric)
-      : ExtInfo(makeBits(info.getSILRepresentation(),
-                         isPseudogeneric,
-                         info.isNoEscape(),
-                         info.getDifferentiabilityKind()),
-                info.getUncommonInfo().hasValue()
-                ? Uncommon(info.getUncommonInfo().getValue())
-                : Uncommon(nullptr)) {
     }
 
     static ExtInfo getThin() {
@@ -4125,9 +4092,6 @@ public:
     ExtInfo withNoEscape(bool NoEscape = true) const {
       return ExtInfo(NoEscape ? (Bits | NoEscapeMask) : (Bits & ~NoEscapeMask),
                      Other);
-    }
-    ExtInfo withClangFunctionType(const clang::Type *type) const {
-      return ExtInfo(Bits, Uncommon(type));
     }
 
     std::pair<unsigned, const void *> getFuncAttrKey() const {
@@ -4424,7 +4388,7 @@ public:
     return WitnessMethodConformance;
   }
 
-  const clang::Type *getClangFunctionType() const;
+  const clang::FunctionType *getClangFunctionType() const;
 
   ExtInfo getExtInfo() const {
     return ExtInfo(Bits.SILFunctionType.ExtInfoBits, getClangFunctionType());

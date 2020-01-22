@@ -541,16 +541,9 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
             blockInterfaceTy->getParameters().end(),
             std::back_inserter(params));
 
-  auto results = blockInterfaceTy->getResults();
-  auto incompleteExtInfo = SILFunctionType::ExtInfo();
-  auto *clangFnType = getASTContext().getCanonicalClangFunctionType(
-        params, results.empty() ? Optional<SILResultInfo>() : results[0],
-        incompleteExtInfo,
-        SILFunctionType::Representation::CFunctionPointer);
-
-  auto extInfo = incompleteExtInfo
-        .withRepresentation(SILFunctionType::Representation::CFunctionPointer)
-        .withClangFunctionType(clangFnType);
+  auto extInfo =
+      SILFunctionType::ExtInfo()
+        .withRepresentation(SILFunctionType::Representation::CFunctionPointer);
 
   CanGenericSignature genericSig;
   GenericEnvironment *genericEnv = nullptr;
@@ -575,7 +568,8 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
 
   auto invokeTy = SILFunctionType::get(
       genericSig, extInfo, SILCoroutineKind::None,
-      ParameterConvention::Direct_Unowned, params, /*yields*/ {}, results,
+      ParameterConvention::Direct_Unowned, params, 
+      /*yields*/ {}, blockInterfaceTy->getResults(),
       blockInterfaceTy->getOptionalErrorResult(), SubstitutionMap(), false,
       getASTContext());
 

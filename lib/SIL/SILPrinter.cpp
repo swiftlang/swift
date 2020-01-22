@@ -419,11 +419,12 @@ static void printSILTypeColorAndSigil(raw_ostream &OS, SILType t) {
   ::print(OS, t.getCategory());
 }
       
-void SILType::print(raw_ostream &OS, const PrintOptions &PO) const {
+void SILType::print(raw_ostream &OS) const {
   printSILTypeColorAndSigil(OS, *this);
   
   // Print other types as their Swift representation.
-  getASTType().print(OS, PO);
+  PrintOptions SubPrinter = PrintOptions::printSIL();
+  getASTType().print(OS, SubPrinter);
 }
 
 void SILType::dump() const {
@@ -492,8 +493,7 @@ public:
       SILPrintContext &PrintCtx,
       llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr)
       : Ctx(PrintCtx),
-        PrintState{{PrintCtx.OS()},
-                   PrintOptions::printSIL(PrintCtx.printFullConvention())},
+        PrintState{{PrintCtx.OS()}, PrintOptions::printSIL()},
         LastBufferID(0) {
     PrintState.ASTOptions.AlternativeTypeNames = AlternativeTypeNames;
     PrintState.ASTOptions.PrintForSIL = true;
@@ -2449,8 +2449,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
 
   {
-    PrintOptions withGenericEnvironment =
-      PrintOptions::printSIL(PrintCtx.printFullConvention());
+    PrintOptions withGenericEnvironment = PrintOptions::printSIL();
     withGenericEnvironment.GenericEnv = env;
     withGenericEnvironment.AlternativeTypeNames =
       Aliases.empty() ? nullptr : &Aliases;
@@ -2733,8 +2732,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   // Print the declarations and types from the associated context (origin module or
   // current file).
   if (M && PrintASTDecls) {
-    PrintOptions Options =
-      PrintOptions::printSIL(PrintCtx.printFullConvention());
+    PrintOptions Options = PrintOptions::printSIL();
     Options.TypeDefinitions = true;
     Options.VarInitializers = true;
     // FIXME: ExplodePatternBindingDecls is incompatible with VarInitializers!
@@ -3117,11 +3115,6 @@ SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
                 bool SortedSIL) :
   OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
   DebugInfo(SILPrintDebugInfo) { }
-
-SILPrintContext::SILPrintContext(llvm::raw_ostream &OS,
-                                 const SILOptions &Opts) :
-  OutStream(OS), Verbose(Opts.EmitVerboseSIL), SortedSIL(Opts.EmitSortedSIL),
-  DebugInfo(SILPrintDebugInfo), PrintFullConvention(Opts.PrintFullConvention) {}
 
 SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
                                  bool SortedSIL, bool DebugInfo) :

@@ -564,7 +564,7 @@ struct PrintOptions {
   static PrintOptions printDocInterface();
 
   /// Retrieve the set of options suitable for printing SIL functions.
-  static PrintOptions printSIL(bool printFullConvention = false) {
+  static PrintOptions printSIL() {
     PrintOptions result;
     result.PrintLongAttrsOnSeparateLines = true;
     result.PrintStorageRepresentationAttrs = true;
@@ -575,9 +575,6 @@ struct PrintOptions {
     result.PrintIfConfig = false;
     result.OpaqueReturnTypePrinting =
         OpaqueReturnTypePrintingMode::StableReference;
-    if (printFullConvention)
-      result.PrintFunctionRepresentationAttrs =
-        PrintOptions::FunctionRepresentationMode::Full;
     return result;
   }
 

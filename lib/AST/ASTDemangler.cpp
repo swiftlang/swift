@@ -488,6 +488,12 @@ Type ASTBuilder::createImplFunctionType(
     break;
   }
 
+  // TODO: [store-sil-clang-function-type]
+  auto einfo = SILFunctionType::ExtInfo(
+      representation, flags.isPseudogeneric(), !flags.isEscaping(),
+      DifferentiabilityKind::NonDifferentiable,
+      /*clangFunctionType*/ nullptr);
+
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;
   llvm::SmallVector<SILResultInfo, 8> funcResults;
@@ -510,26 +516,6 @@ Type ASTBuilder::createImplFunctionType(
     auto conv = getResultConvention(errorResult->getConvention());
     funcErrorResult.emplace(type, conv);
   }
-
-  const clang::Type *clangFnType = nullptr;
-  auto incompleteExtInfo = SILFunctionType::ExtInfo(
-      SILFunctionType::Representation::Thick, flags.isPseudogeneric(),
-      !flags.isEscaping(), DifferentiabilityKind::NonDifferentiable,
-      clangFnType);
-
-  if (representation == SILFunctionType::Representation::CFunctionPointer) {
-    assert(funcResults.size() <= 1 && funcYields.size() == 0
-           && "@convention(c) functions have at most 1 result and 0 yields.");
-    auto result = funcResults.empty() ? Optional<SILResultInfo>()
-                                      : funcResults[0];
-    auto &Context = getASTContext();
-    clangFnType = Context.getCanonicalClangFunctionType(funcParams, result,
-                                                        incompleteExtInfo,
-                                                        representation);
-  }
-  auto einfo = incompleteExtInfo.withRepresentation(representation)
-                                .withClangFunctionType(clangFnType);
-
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
                               funcCalleeConvention, funcParams, funcYields,
                               funcResults, funcErrorResult,

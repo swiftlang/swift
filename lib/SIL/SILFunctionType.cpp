@@ -1266,7 +1266,10 @@ static CanSILFunctionType getSILFunctionType(
 
   // NOTE: SILFunctionType::ExtInfo doesn't track everything that
   // AnyFunctionType::ExtInfo tracks. For example: 'throws' or 'auto-closure'
-  SILFunctionType::ExtInfo silExtInfo(extInfo, pseudogeneric);
+  auto silExtInfo = SILFunctionType::ExtInfo()
+    .withRepresentation(extInfo.getSILRepresentation())
+    .withIsPseudogeneric(pseudogeneric)
+    .withNoEscape(extInfo.isNoEscape());
   
   // Build the substituted generic signature we extracted.
   bool impliedSignature = false;
