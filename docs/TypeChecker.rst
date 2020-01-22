@@ -981,14 +981,8 @@ to the new diagnostic framework, which is described in detail in this
 
 The things in the queue yet to be ported are:
 
-- Diagnostics related to member references: ``diagnoseMemberFailures``.
-  Most of the associated diagnostics have been ported and fixes are
-  located in ``ConstraintSystem::simplifyMemberConstraint``.
-
 - Problems related to calls and operator applications e.g.
 
   - Missing explicit ``Self.`` and ``self.``
   - Logic related to overload candidate ranking (``CalleeCandidateInfo``)
   - ``diagnoseParameterErrors``
-  - ``diagnoseSimpleErrors``
-
