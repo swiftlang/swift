@@ -26,7 +26,7 @@ namespace swift {
 class LangOptions;
 
 /// Available platforms for the availability attribute.
-enum class PlatformKind {
+enum class PlatformKind: uint8_t {
   none,
 #define AVAILABILITY_PLATFORM(X, PrettyName) X,
 #include "swift/AST/PlatformKinds.def"
