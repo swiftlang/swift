@@ -599,12 +599,6 @@ StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
   };
 
   Scanner(IGM, decl, *this).layout();
-      
-  for (auto &field : FieldOffsets) {
-    printf("static: %llu for field: ",
-           field.getSecond().getStaticOffset().getValue());
-    field.getFirst()->dump();
-  }
 }
 
 Offset StructMetadataLayout::getFieldOffset(IRGenFunction &IGF,
