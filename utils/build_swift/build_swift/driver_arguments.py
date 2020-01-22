@@ -490,13 +490,13 @@ def create_argument_parser():
            default=default_max_lto_link_job_counts['llvm'],
            metavar='COUNT',
            help='the maximum number of parallel link jobs to use when '
-                'compiling llvm')
+                'compiling llvm with LTO')
 
     option('--swift-tools-max-parallel-lto-link-jobs', store_int,
            default=default_max_lto_link_job_counts['swift'],
            metavar='COUNT',
            help='the maximum number of parallel link jobs to use when '
-                'compiling swift tools.')
+                'compiling swift tools with LTO')
 
     option('--disable-guaranteed-normal-arguments', store_true,
            help='Disable guaranteed normal arguments')
