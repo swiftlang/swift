@@ -1074,6 +1074,9 @@ void swift::simple_display(llvm::raw_ostream &out,
   case ImplicitMemberAction::ResolveCodingKeys:
     out << "resolve CodingKeys";
     break;
+  case ImplicitMemberAction::ResolveGenericRepresentation:
+    out << "resolve GenericRepresentation";
+    break;
   }
 }
 

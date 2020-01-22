@@ -1899,11 +1899,12 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
   if (unresolvedAssocTypes.empty())
     return result;
 
+  // TODO: Figure out how to marry type witness inference with Representation synthesis.
   // Infer potential type witnesses from value witnesses.
-  inferred = inferTypeWitnessesViaValueWitnesses(checker,
-                                                 unresolvedAssocTypes);
-  LLVM_DEBUG(llvm::dbgs() << "Candidates for inference:\n";
-             dumpInferredAssociatedTypes(inferred));
+  // inferred = inferTypeWitnessesViaValueWitnesses(checker,
+  //                                                unresolvedAssocTypes);
+  // LLVM_DEBUG(llvm::dbgs() << "Candidates for inference:\n";
+  //            dumpInferredAssociatedTypes(inferred));
 
   // Compute the set of solutions.
   SmallVector<InferredTypeWitnessesSolution, 4> solutions;

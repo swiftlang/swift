@@ -1122,6 +1122,10 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     }
   }
     break;
+  case ImplicitMemberAction::ResolveGenericRepresentation: {
+    auto *genericProto = Context.getProtocol(KnownProtocolKind::Generic);
+    (void)tryToInstallCodingKeys(genericProto);
+  } break;
   }
   return true;
 }
