@@ -24,6 +24,8 @@ from build_swift.build_swift import driver_arguments
 from build_swift.build_swift import migration
 from build_swift.build_swift import presets
 
+import six
+
 from swift_build_support.swift_build_support import (
     debug,
     diagnostics,
@@ -59,11 +61,14 @@ def exit_rejecting_arguments(message, parser=None):
 
 class JSONDumper(json.JSONEncoder):
     def __init__(self, *args, **kwargs):
-        json.JSONEncoder.__init__(self, indent=2, separators=(',', ': '),
-                                  *args, **kwargs)
+        json.JSONEncoder.__init__(
+            self, indent=2, separators=(',', ': '), sort_keys=True,
+            *args, **kwargs)
 
     def default(self, o):
-        return vars(o)
+        if hasattr(o, '__dict__'):
+            return vars(o)
+        return six.text_type(o)
 
 
 class BuildScriptInvocation(object):
