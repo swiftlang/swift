@@ -64,10 +64,12 @@ KNOWN_SETTINGS=(
     build-stdlib-deployment-targets               "all"             "space-separated list that filters which of the configured targets to build the Swift standard library for, or 'all'"
     build-toolchain-only                          ""                "If set, only build the necessary tools to build an external toolchain"
     cmake-generator                               "Unix Makefiles"  "kind of build system to generate; see output of 'cmake --help' for choices"
-    llvm-num-parallel-lto-link-jobs               ""                "The number of parallel link jobs to use when compiling llvm"
+    llvm-num-parallel-link-jobs                   ""                "The number of parallel link jobs to use when compiling llvm"
+    llvm-num-parallel-lto-link-jobs               ""                "The number of parallel link jobs to use when compiling llvm with LTO enabled"
     reconfigure                                   ""                "force a CMake configuration run even if CMakeCache.txt already exists"
     skip-reconfigure                              ""                "set to skip reconfigure"
-    swift-tools-num-parallel-lto-link-jobs        ""                "The number of parallel link jobs to use when compiling swift tools"
+    swift-tools-num-parallel-link-jobs            ""                "The number of parallel link jobs to use when compiling swift tools"
+    swift-tools-num-parallel-lto-link-jobs        ""                "The number of parallel link jobs to use when compiling swift tools with LTO enabled"
     use-gold-linker                               ""                "Enable using the gold linker"
     workspace                                     "${HOME}/src"     "source directory containing llvm, clang, swift"
 
@@ -639,6 +641,18 @@ function set_build_options_for_host() {
         -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
         -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
     )
+
+    if [[ "${SWIFT_TOOLS_NUM_PARALLEL_LINK_JOBS}" != "" ]] && [[ $(is_swift_lto_enabled) == "FALSE" ]]; then
+        swift_cmake_options+=(
+            "-DSWIFT_PARALLEL_LINK_JOBS=${SWIFT_TOOLS_NUM_PARALLEL_LINK_JOBS}"
+        )
+    fi
+
+    if [[ "${LLVM_NUM_PARALLEL_LINK_JOBS}" != "" ]] && [[ $(is_llvm_lto_enabled) == "FALSE" ]]; then
+        llvm_cmake_options+=(
+            "-DLLVM_PARALLEL_LINK_JOBS=${LLVM_NUM_PARALLEL_LINK_JOBS}"
+        )
+    fi
 
     # If we are asked to not generate test targets for LLVM and or Swift,
     # disable as many LLVM tools as we can. This improves compile time when
