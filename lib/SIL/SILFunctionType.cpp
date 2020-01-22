@@ -922,6 +922,11 @@ public:
         || substTL.isAddressOnly()) {
       return true;
 
+    // SWIFT_ENABLE_TENSORFLOW
+    // Functions are always returned directly.
+    } else if (origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
+      return false;
+
     // If the substitution didn't change the type, then a negative
     // response to the above is determinative as well.
     } else if (origType.getType() == substType &&
