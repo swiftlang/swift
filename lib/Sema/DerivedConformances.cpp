@@ -215,6 +215,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_intValue))
       return getRequirement(KnownProtocolKind::CodingKey);
 
+    // Generic.representation
+    if (name.isSimpleName(ctx.Id_representation))
+      return getRequirement(KnownProtocolKind::Generic);
+
     return nullptr;
   }
 
@@ -257,6 +261,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       // Decodable.init(from: Decoder)
       if (argumentNames[0] == ctx.Id_from)
         return getRequirement(KnownProtocolKind::Decodable);
+
+      // Generic.init(representation: Representation)
+      if (argumentNames[0] == ctx.Id_representation)
+        return getRequirement(KnownProtocolKind::Generic);
     }
 
     return nullptr;

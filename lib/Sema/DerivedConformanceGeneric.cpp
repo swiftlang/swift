@@ -29,15 +29,14 @@ bool DerivedConformance::canDeriveGeneric(NominalTypeDecl *type) {
   return true;
 }
 
-Type DerivedConformance::deriveGenericRepresentation(
-    AssociatedTypeDecl *assocType) {
-  if (checkAndDiagnoseDisallowedContext(assocType))
+Type DerivedConformance::deriveGeneric(AssociatedTypeDecl *requirement) {
+  if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
 
   if (!canDeriveGeneric(Nominal))
     return nullptr;
 
-  if (assocType->getName() == Context.Id_Representation) {
+  if (requirement->getName() == Context.Id_Representation) {
     auto gpModule = Context.getLoadedModule(Context.Id_GenericProgramming);
     if (!gpModule)
       return nullptr;
@@ -79,5 +78,9 @@ Type DerivedConformance::deriveGenericRepresentation(
     }
   }
 
+  return nullptr;
+}
+
+ValueDecl *DerivedConformance::deriveGeneric(ValueDecl *requirement) {
   return nullptr;
 }

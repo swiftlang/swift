@@ -202,8 +202,14 @@ public:
   static bool canDeriveGeneric(NominalTypeDecl *type);
 
   /// Derive a Generic.Representation type witness.
+  ///
   /// \returns the derived member, which will also be added to the type.
-  Type deriveGenericRepresentation(AssociatedTypeDecl *assocType);
+  Type deriveGeneric(AssociatedTypeDecl *assocType);
+
+  /// Derive a Generic.init/rerepresentation requirement for a struct type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveGeneric(ValueDecl *requirement);
 
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>

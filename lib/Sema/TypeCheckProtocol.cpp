@@ -5383,6 +5383,9 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::Decodable:
     return derived.deriveDecodable(Requirement);
 
+  case KnownProtocolKind::Generic:
+    return derived.deriveGeneric(Requirement);
+
   default:
     return nullptr;
   }
@@ -5408,7 +5411,7 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
   case KnownProtocolKind::CaseIterable:
     return derived.deriveCaseIterable(AssocType);
   case KnownProtocolKind::Generic:
-    return derived.deriveGenericRepresentation(AssocType);
+    return derived.deriveGeneric(AssocType);
   default:
     return nullptr;
   }
