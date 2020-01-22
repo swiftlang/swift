@@ -420,8 +420,7 @@ namespace {
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
       auto field = IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.Int32Ty,
                                            IGF.IGM.getPointerAlignment());
-      auto newRet = IGF.Builder.CreateLoad(field);
-      return newRet;
+      return IGF.Builder.CreateLoad(field);
     }
 
     MemberAccessStrategy getFieldAccessStrategy(IRGenModule &IGM,
