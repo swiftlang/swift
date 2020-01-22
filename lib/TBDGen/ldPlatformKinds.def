@@ -1,0 +1,30 @@
+//===--- ldPlatformKinds.def - Compiler declaration metaprogramming --*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines platform IDs used to emit linker directives $ld$previous
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef LD_PLATFORM
+#  define LD_PLATFORM(Name, Id)
+#endif
+
+LD_PLATFORM(macOS, 1)
+LD_PLATFORM(iOS, 2)
+LD_PLATFORM(tvOS, 3)
+LD_PLATFORM(watchOS, 4)
+LD_PLATFORM(macCatalyst, 6)
+LD_PLATFORM(iOS_sim, 7)
+LD_PLATFORM(tvOS_sim, 8)
+LD_PLATFORM(watchOS_sim, 9)
+
+#undef LD_PLATFORM

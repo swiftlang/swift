@@ -1307,7 +1307,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
                                Component->getLoc() });
       if (auto Module = Context.getLoadedModule(AccessPath))
         ParsedTypeLoc.setType(ModuleType::get(Module));
-        return true;
+      return true;
     }
     return false;
   }

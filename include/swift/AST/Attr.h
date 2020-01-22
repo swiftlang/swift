@@ -686,23 +686,6 @@ public:
   }
 };
 
-/// Defines the @_implicitly_synthesizes_nested_requirement attribute.
-class ImplicitlySynthesizesNestedRequirementAttr : public DeclAttribute {
-public:
-  ImplicitlySynthesizesNestedRequirementAttr(StringRef Value, SourceLoc AtLoc,
-                                             SourceRange Range)
-    : DeclAttribute(DAK_ImplicitlySynthesizesNestedRequirement,
-                    AtLoc, Range, /*Implicit*/false),
-      Value(Value) {}
-
-  /// The name of the phantom requirement.
-  const StringRef Value;
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ImplicitlySynthesizesNestedRequirement;
-  }
-};
-
 /// Determine the result of comparing an availability attribute to a specific
 /// platform or language version.
 enum class AvailableVersionComparison {
@@ -1624,8 +1607,16 @@ public:
   /// Indicates when the symbol was moved here.
   const llvm::VersionTuple MovedVersion;
 
-  /// Returns true if this attribute is active given the current platform.
-  bool isActivePlatform(const ASTContext &ctx) const;
+  struct ActiveVersion {
+    StringRef ModuleName;
+    PlatformKind Platform;
+    bool IsSimulator;
+    llvm::VersionTuple Version;
+  };
+
+  /// Returns non-optional if this attribute is active given the current platform.
+  /// The value provides more details about the active platform.
+  Optional<ActiveVersion> isActivePlatform(const ASTContext &ctx) const;
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_OriginallyDefinedIn;
   }
@@ -1709,6 +1700,7 @@ class DifferentiableAttr final
       private llvm::TrailingObjects<DifferentiableAttr,
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
+  friend class DifferentiableAttributeTypeCheckRequest;
 
   // SWIFT_ENABLE_TENSORFLOW
   friend class DifferentiableAttributeParameterIndicesRequest;
@@ -1732,18 +1724,12 @@ class DifferentiableAttr final
   /// The VJP function (optional), resolved by the type checker if VJP name is
   /// specified.
   FuncDecl *VJPFunction = nullptr;
-
-  // SWIFT_ENABLE_TENSORFLOW
-  // NOTE: Parameter indices requestification is done on `tensorflow` branch but
-  // has not yet been upstreamed to `master` branch.
-  /// The differentiability parameter indices, resolved by the type checker.
   /// The bit stores whether the parameter indices have been computed.
+  ///
+  /// Note: it is necessary to use a bit instead of `nullptr` parameter indices
+  /// to represent "parameter indices not yet type-checked" because invalid
+  /// attributes have `nullptr` parameter indices but have been type-checked.
   llvm::PointerIntPair<IndexSubset *, 1, bool> ParameterIndicesAndBit;
-  // SWIFT_ENABLE_TENSORFLOW END
-
-  /// The differentiability parameter indices, resolved by the type checker.
-  IndexSubset *ParameterIndices = nullptr;
-
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
   /// The generic signature for autodiff associated functions. Resolved by the
@@ -1799,13 +1785,14 @@ public:
   /// registered VJP.
   Optional<DeclNameRefWithLoc> getVJP() const { return VJP; }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // NOTE: Parameter indices requestification is done on `tensorflow` branch but
-  // has not yet been upstreamed to `master` branch.
-  bool hasComputedParameterIndices() const;
+private:
+  /// Returns true if the given `@differentiable` attribute has been
+  /// type-checked.
+  bool hasBeenTypeChecked() const;
+
+public:
   IndexSubset *getParameterIndices() const;
-  void setParameterIndices(IndexSubset *paramIndices);
-  // SWIFT_ENABLE_TENSORFLOW END
+  void setParameterIndices(IndexSubset *parameterIndices);
 
   /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.

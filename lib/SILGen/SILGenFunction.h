@@ -492,7 +492,7 @@ public:
   SILFunction &getFunction() { return F; }
   SILModule &getModule() { return F.getModule(); }
   SILGenBuilder &getBuilder() { return B; }
-  SILOptions &getOptions() { return getModule().getOptions(); }
+  const SILOptions &getOptions() { return getModule().getOptions(); }
 
   // Returns the type expansion context for types in this function.
   TypeExpansionContext getTypeExpansionContext() {

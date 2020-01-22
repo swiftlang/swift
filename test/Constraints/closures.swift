@@ -186,7 +186,7 @@ func testMap() {
 }
 
 // <rdar://problem/22414757> "UnresolvedDot" "in wrong phase" assertion from verifier
-[].reduce { $0 + $1 }  // expected-error {{cannot invoke 'reduce' with an argument list of type '(@escaping (_, _) -> _)'}}
+[].reduce { $0 + $1 }  // expected-error {{cannot invoke 'reduce' with an argument list of type '(_)'}}
 
 
 
@@ -371,7 +371,7 @@ func someGeneric19997471<T>(_ x: T) {
 func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> U' expects 1 argument, but 2 were used in closure body}}
+  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '(Dictionary<String, String>) throws -> (Dictionary<String, String>, _)' expects 1 argument, but 2 were used in closure body}}
 }
 
 
@@ -915,4 +915,35 @@ func test_trailing_closure_with_defaulted_last() {
   func foo<T>(fn: () -> T, value: Int = 0) {}
   foo { 42 } // Ok
   foo(fn: { 42 }) // Ok
+}
+
+// Test that even in multi-statement closure case we still pick up `(Action) -> Void` over `Optional<(Action) -> Void>`.
+// Such behavior used to rely on ranking of partial solutions but with delayed constraint generation of closure bodies
+// it's no longer the case, so we need to make sure that even in case of complete solutions we still pick the right type.
+
+protocol Action { }
+protocol StateType { }
+
+typealias Fn = (Action) -> Void
+typealias Middleware<State> = (@escaping Fn, @escaping () -> State?) -> (@escaping Fn) -> Fn
+
+class Foo<State: StateType> {
+  var state: State!
+  var fn: Fn!
+
+  init(middleware: [Middleware<State>]) {
+    self.fn = middleware
+               .reversed()
+               .reduce({ action in },
+                       { (fun, middleware) in // Ok, to type-check result type has to be `(Action) -> Void`
+                         let dispatch: (Action) -> Void = { _ in }
+                         let getState = { [weak self] in self?.state }
+                         return middleware(dispatch, getState)(fun)
+                       })
+  }
+}
+
+// Make sure that `String...` is translated into `[String]` in the body
+func test_explicit_variadic_is_interpreted_correctly() {
+  _ = { (T: String...) -> String in T[0] + "" } // Ok
 }

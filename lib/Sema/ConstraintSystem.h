@@ -297,6 +297,9 @@ public:
   /// Retrieve the generic parameter opened by this type variable.
   GenericTypeParamType *getGenericParameter() const;
 
+  /// Determine whether this type variable represents a closure type.
+  bool isClosureType() const;
+
   /// Determine whether this type variable represents a closure result type.
   bool isClosureResultType() const;
 
@@ -666,12 +669,34 @@ struct AppliedBuilderTransform {
   /// The builder type that was applied to the closure.
   Type builderType;
 
-  /// The single expression to which the closure was transformed.
-  Expr *singleExpr;
-
   /// The result type of the body, to which the returned expression will be
   /// converted.
   Type bodyResultType;
+
+  /// An expression whose value has been recorded for later use.
+  struct RecordedExpr {
+    /// The temporary value that captures the value of the expression, if
+    /// there is one.
+    VarDecl *temporaryVar;
+
+    /// The expression that results from generating constraints with this
+    /// particular builder.
+    Expr *generatedExpr;
+  };
+
+  /// A mapping from expressions whose values are captured by the builder
+  /// to information about the temporary variable capturing the
+  llvm::DenseMap<Expr *, RecordedExpr> capturedExprs;
+
+  /// A mapping from statements to a pair containing the implicit variable
+  /// declaration that captures the result of that expression, and the
+  /// set of expressions that can be used to produce a value for that
+  /// variable.
+  llvm::DenseMap<Stmt *, std::pair<VarDecl *, llvm::TinyPtrVector<Expr *>>>
+      capturedStmts;
+
+  /// The return expression, capturing the last value to be emitted.
+  Expr *returnExpr = nullptr;
 };
 
 /// Describes the fixed score of a solution to the constraint system.
@@ -822,7 +847,7 @@ public:
   llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
 
   /// The node -> type mappings introduced by this solution.
-  llvm::SmallVector<std::pair<TypedNode, Type>, 8> addedNodeTypes;
+  llvm::MapVector<TypedNode, Type> addedNodeTypes;
 
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
@@ -907,7 +932,19 @@ public:
   ProtocolConformanceRef resolveConformance(ConstraintLocator *locator,
                                             ProtocolDecl *proto);
 
+  ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
+                                      bool lookThroughApply = true) const;
+
+  Type getType(const Expr *E) const;
+
   void setExprTypes(Expr *expr) const;
+
+  /// Retrieve the type of the given node, as recorded in this solution.
+  Type getType(TypedNode node) const {
+    auto known = addedNodeTypes.find(node);
+    assert(known != addedNodeTypes.end());
+    return known->second;
+  }
 
   SWIFT_DEBUG_DUMP;
 
@@ -928,22 +965,9 @@ public:
     SmallVector<OverloadChoice, 2> choices;
   };
 
-  /// A difference between two type variable bindings.
-  struct TypeBindingDiff {
-    /// The type variable.
-    TypeVariableType *typeVar;
-
-    /// The bindings that each solution made.
-    SmallVector<Type, 2> bindings;
-  };
-
   /// The differences between the overload choices between the
   /// solutions.
   SmallVector<OverloadDiff, 4> overloads;
-
-  /// The differences between the type variable bindings of the
-  /// solutions.
-  SmallVector<TypeBindingDiff, 4> typeBindings;
 
   /// Compute the differences between the given set of solutions.
   ///
@@ -1260,6 +1284,10 @@ private:
   /// Maps expressions to types for choosing a favored overload
   /// type in a disjunction constraint.
   llvm::DenseMap<Expr *, TypeBase *> FavoredTypes;
+
+  /// Maps discovered closures to their types inferred
+  /// from declared parameters/result and body.
+  llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
 
   /// Maps expression types used within all portions of the constraint
   /// system, instead of directly using the types on the expression
@@ -1849,6 +1877,9 @@ public:
     /// The length of \c ResolvedOverloads.
     unsigned numResolvedOverloads;
 
+    /// The length of \c ClosureTypes.
+    unsigned numInferredClosureTypes;
+
     /// The previous score.
     Score PreviousScore;
 
@@ -1985,6 +2016,19 @@ public:
     return TypeVariables.count(typeVar) > 0;
   }
 
+  void setClosureType(const ClosureExpr *closure, FunctionType *type) {
+    assert(closure);
+    assert(type && "Expected non-null type");
+    assert(ClosureTypes.count(closure) == 0 && "Cannot reset closure type");
+    ClosureTypes.insert({closure, type});
+  }
+
+  FunctionType *getClosureType(const ClosureExpr *closure) const {
+    auto result = ClosureTypes.find(closure);
+    assert(result != ClosureTypes.end());
+    return result->second;
+  }
+
   TypeBase* getFavoredType(Expr *E) {
     assert(E != nullptr);
     return this->FavoredTypes[E];
@@ -2013,9 +2057,7 @@ public:
     }
 
     // Record the fact that we ascribed a type to this node.
-    if (solverState && solverState->depth > 0) {
-      addedNodeTypes.push_back({node, type});
-    }
+    addedNodeTypes.push_back({node, type});
   }
 
   /// Set the type in our type map for a given expression. The side
@@ -2096,6 +2138,15 @@ public:
   Type getType(const KeyPathExpr *KP, unsigned I) const {
     assert(hasType(KP, I) && "Expected type to have been set!");
     return KeyPathComponentTypes.find(std::make_pair(KP, I))->second;
+  }
+
+  /// Retrieve the type of the variable, if known.
+  Type getTypeIfAvailable(const VarDecl *VD) const {
+    auto known = VarTypes.find(VD);
+    if (known == VarTypes.end())
+      return Type();
+
+    return known->second;
   }
 
   /// Cache the type of the expression argument and return that same
@@ -2241,8 +2292,28 @@ public:
   /// \param lookThroughApply Whether to look through applies. If false, a
   /// callee locator will only be returned for a direct reference such as
   /// \c x.foo rather than \c x.foo().
+  /// \param getType The callback to fetch a type for given expression.
+  /// \param simplifyType The callback to attempt to resolve any type
+  ///                     variables which appear in the given type.
+  /// \param getOverloadFor The callback to fetch overload for a given
+  ///                       locator if available.
+  ConstraintLocator *getCalleeLocator(
+      ConstraintLocator *locator, bool lookThroughApply,
+      llvm::function_ref<Type(const Expr *)> getType,
+      llvm::function_ref<Type(Type)> simplifyType,
+      llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
+          getOverloadFor);
+
   ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
-                                      bool lookThroughApply = true);
+                                      bool lookThroughApply = true) {
+    return getCalleeLocator(
+        locator, lookThroughApply,
+        [&](const Expr *expr) -> Type { return getType(expr); },
+        [&](Type type) -> Type { return simplifyType(type)->getRValueType(); },
+        [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
+          return findSelectedOverloadFor(locator);
+        });
+  }
 
 public:
 
@@ -2688,6 +2759,22 @@ public:
   static bool typeVarOccursInType(TypeVariableType *typeVar, Type type,
                                   bool *involvesOtherTypeVariables = nullptr);
 
+  /// Given the fact that contextual type is now available for the type
+  /// variable representing one of the closures, let's set pre-determined
+  /// closure type and generate constraints for its body, iff it's a
+  /// single-statement closure.
+  ///
+  /// \param typeVar The type variable representing a function type of the
+  /// closure expression.
+  /// \param contextualType The contextual type this closure would be
+  /// converted to.
+  /// \param locator The locator associated with contextual type.
+  ///
+  /// \returns `true` if it was possible to generate constraints for
+  /// the body and assign fixed type to the closure, `false` otherwise.
+  bool resolveClosure(TypeVariableType *typeVar, Type contextualType,
+                      ConstraintLocatorBuilder locator);
+
   /// Assign a fixed type to the given type variable.
   ///
   /// \param typeVar The type variable to bind.
@@ -2699,7 +2786,7 @@ public:
   /// a complete solution from partial solutions.
   void assignFixedType(TypeVariableType *typeVar, Type type,
                        bool updateState = true);
-  
+
   /// Determine if the type in question is an Array<T> and, if so, provide the
   /// element type of the array.
   static Optional<Type> isArrayType(Type type);
@@ -2758,6 +2845,9 @@ public:
 
   /// Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
+
+  /// Add implicit "load" expressions to the given expression.
+  Expr *addImplicitLoadExpr(Expr *expr);
 
   /// "Open" the given unbound type by introducing fresh type
   /// variables for generic parameters and constructing a bound generic
@@ -2958,6 +3048,11 @@ public:
   ArrayRef<T> allocateCopy(SmallVectorImpl<T> &vec) {
     return allocateCopy(vec.begin(), vec.end());
   }
+
+  /// Generate constraints for the body of the given single-statement closure.
+  ///
+  /// \returns a possibly-sanitized expression, or null if an error occurred.
+  Expr *generateConstraints(ClosureExpr *closure);
 
   /// Generate constraints for the given (unchecked) expression.
   ///
@@ -3430,6 +3525,12 @@ private:
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
 
+  /// Attempt to simplify the given defaultable closure type constraint.
+  SolutionKind simplifyDefaultClosureTypeConstraint(
+      Type closureType, Type inferredType,
+      ArrayRef<TypeVariableType *> referencedOuterParameters,
+      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
+
   /// Attempt to simplify a one-way constraint.
   SolutionKind simplifyOneWayConstraint(ConstraintKind kind,
                                         Type first, Type second,
@@ -3615,6 +3716,13 @@ private:
     /// A set of all constraints which contribute to pontential bindings.
     llvm::SmallPtrSet<Constraint *, 8> Sources;
 
+    /// A set of all not-yet-resolved type variables this type variable
+    /// is a subtype of. This is used to determine ordering inside a
+    /// chain of subtypes because binding inference algorithm can't,
+    /// at the moment, determine bindings transitively through supertype
+    /// type variables.
+    llvm::SmallPtrSet<TypeVariableType *, 4> SubtypeOf;
+
     PotentialBindings(TypeVariableType *typeVar)
         : TypeVar(typeVar), PotentiallyIncomplete(isGenericParameter()) {}
 
@@ -3650,6 +3758,20 @@ private:
       // prioritize bindings with fewer of them.
       if (x.NumDefaultableBindings != y.NumDefaultableBindings)
         return x.NumDefaultableBindings < y.NumDefaultableBindings;
+
+      // If neither type variable is a "hole" let's check whether
+      // there is a subtype relationship between them and prefer
+      // type variable which represents superclass first in order
+      // for "subtype" type variable to attempt more bindings later.
+      // This is required because algorithm can't currently infer
+      // bindings for subtype transitively through superclass ones.
+      if (!(x.IsHole && y.IsHole)) {
+        if (x.SubtypeOf.count(y.TypeVar))
+          return false;
+
+        if (y.SubtypeOf.count(x.TypeVar))
+          return true;
+      }
 
       // As a last resort, let's check if the bindings are
       // potentially incomplete, and if so, let's de-prioritize them.
@@ -3692,6 +3814,10 @@ private:
       }
       return false;
     }
+
+    /// Check if this binding is favored over a disjunction e.g.
+    /// if it has only concrete types or would resolve a closure.
+    bool favoredOverDisjunction() const;
 
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
@@ -3760,6 +3886,22 @@ private:
       bool &hasNonDependentMemberRelationalConstraints,
       bool &addOptionalSupertypeBindings) const;
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar) const;
+
+  /// Detect `subtype` relationship between two type variables and
+  /// attempt to infer supertype bindings transitively e.g.
+  ///
+  /// Given A <: T1 <: T2 transitively A <: T2
+  ///
+  /// Which gives us a new (superclass A) binding for T2 as well as T1.
+  ///
+  /// \param inferredBindings The set of all bindings inferred for type
+  /// variables in the workset.
+  /// \param bindings The type variable we aim to infer new supertype
+  /// bindings for.
+  void inferTransitiveSupertypeBindings(
+      const llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
+          &inferredBindings,
+      PotentialBindings &bindings);
 
 private:
   /// Add a constraint to the constraint system.
@@ -4760,6 +4902,29 @@ bool exprNeedsParensOutsideFollowingOperator(
 
 /// Determine whether this is a SIMD operator.
 bool isSIMDOperator(ValueDecl *value);
+
+/// Apply the given function builder transform within a specific solution
+/// to produce the rewritten body.
+///
+/// \param solution The solution to use during application, providing the
+/// specific types for each type variable.
+/// \param applied The applied builder transform.
+/// \param body The body to transform
+/// \param dc The context in which the transform occurs.
+/// \param rewriteExpr Rewrites expressions that show up in the transform
+/// to their final, type-checked versions.
+/// \param coerceToType Coerce the given expression to the specified type,
+/// which may introduce implicit conversions.
+///
+/// \returns the transformed body
+BraceStmt *applyFunctionBuilderTransform(
+    const constraints::Solution &solution,
+    constraints::AppliedBuilderTransform applied,
+    BraceStmt *body,
+    DeclContext *dc,
+    std::function<Expr *(Expr *)> rewriteExpr,
+    std::function<Expr *(Expr *, Type, constraints::ConstraintLocator *)>
+      coerceToType);
 
 } // end namespace swift
 

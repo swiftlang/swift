@@ -1,66 +1,66 @@
 {
   key.offset: 0,
-  key.length: 267,
+  key.length: 287,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
       key.kind: source.lang.swift.decl.var.global,
       key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "color",
-      key.offset: 144,
+      key.offset: 164,
       key.length: 65,
       key.typename: "S",
-      key.nameoffset: 148,
+      key.nameoffset: 168,
       key.namelength: 5
     },
     {
       key.kind: source.lang.swift.expr.object_literal,
       key.name: "colorLiteral",
-      key.offset: 159,
+      key.offset: 179,
       key.length: 50,
-      key.nameoffset: 160,
+      key.nameoffset: 180,
       key.namelength: 12,
-      key.bodyoffset: 172,
+      key.bodyoffset: 192,
       key.bodylength: 36,
       key.substructure: [
         {
           key.kind: source.lang.swift.expr.argument,
           key.name: "red",
-          key.offset: 173,
+          key.offset: 193,
           key.length: 6,
-          key.nameoffset: 173,
+          key.nameoffset: 193,
           key.namelength: 3,
-          key.bodyoffset: 178,
+          key.bodyoffset: 198,
           key.bodylength: 1
         },
         {
           key.kind: source.lang.swift.expr.argument,
           key.name: "green",
-          key.offset: 181,
+          key.offset: 201,
           key.length: 8,
-          key.nameoffset: 181,
+          key.nameoffset: 201,
           key.namelength: 5,
-          key.bodyoffset: 188,
+          key.bodyoffset: 208,
           key.bodylength: 1
         },
         {
           key.kind: source.lang.swift.expr.argument,
           key.name: "blue",
-          key.offset: 191,
+          key.offset: 211,
           key.length: 7,
-          key.nameoffset: 191,
+          key.nameoffset: 211,
           key.namelength: 4,
-          key.bodyoffset: 197,
+          key.bodyoffset: 217,
           key.bodylength: 1
         },
         {
           key.kind: source.lang.swift.expr.argument,
           key.name: "alpha",
-          key.offset: 200,
+          key.offset: 220,
           key.length: 8,
-          key.nameoffset: 200,
+          key.nameoffset: 220,
           key.namelength: 5,
-          key.bodyoffset: 207,
+          key.bodyoffset: 227,
           key.bodylength: 1
         }
       ]
@@ -69,30 +69,30 @@
       key.kind: source.lang.swift.decl.var.global,
       key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "image",
-      key.offset: 210,
+      key.offset: 230,
       key.length: 56,
       key.typename: "I?",
-      key.nameoffset: 214,
+      key.nameoffset: 234,
       key.namelength: 5
     },
     {
       key.kind: source.lang.swift.expr.object_literal,
       key.name: "imageLiteral",
-      key.offset: 226,
+      key.offset: 246,
       key.length: 40,
-      key.nameoffset: 227,
+      key.nameoffset: 247,
       key.namelength: 12,
-      key.bodyoffset: 239,
+      key.bodyoffset: 259,
       key.bodylength: 26,
       key.substructure: [
         {
           key.kind: source.lang.swift.expr.argument,
           key.name: "resourceName",
-          key.offset: 240,
+          key.offset: 260,
           key.length: 25,
-          key.nameoffset: 240,
+          key.nameoffset: 260,
           key.namelength: 12,
-          key.bodyoffset: 254,
+          key.bodyoffset: 274,
           key.bodylength: 11
         }
       ]

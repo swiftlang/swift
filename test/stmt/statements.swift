@@ -252,6 +252,11 @@ func DoWhileStmt2() {
   }
 }
 
+func LabeledDoStmt() {
+  LABEL: { // expected-error {{labeled block needs 'do'}} {{10-10=do }}
+  }
+}
+
 //===--- Repeat-while statement.
 
 func RepeatWhileStmt1() {

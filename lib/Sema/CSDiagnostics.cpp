@@ -641,6 +641,18 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     case ConstraintLocator::ContextualType: {
       auto purpose = getContextualTypePurpose();
       assert(!(purpose == CTP_Unused && purpose == CTP_CannotFail));
+
+      // If this is call to a closure e.g. `let _: A = { B() }()`
+      // let's point diagnostic to its result.
+      if (auto *call = dyn_cast<CallExpr>(anchor)) {
+        auto *fnExpr = call->getFn();
+        if (auto *closure = dyn_cast<ClosureExpr>(fnExpr)) {
+          purpose = CTP_ClosureResult;
+          if (closure->hasSingleExpressionBody())
+            anchor = closure->getSingleExpressionBody();
+        }
+      }
+
       diagnostic = getDiagnosticFor(purpose);
       break;
     }
@@ -668,6 +680,19 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
         diagnostic = getDiagnosticFor(CTP_AssignSource);
         fromType = getType(assignExpr->getSrc());
         toType = getType(assignExpr->getDest());
+      }
+      break;
+    }
+
+    case ConstraintLocator::TupleElement: {
+      auto *anchor = getRawAnchor();
+
+      if (isa<ArrayExpr>(anchor)) {
+        diagnostic = getDiagnosticFor(CTP_ArrayElement);
+      } else if (isa<DictionaryExpr>(anchor)) {
+        auto eltLoc = last.castTo<LocatorPathElt::TupleElement>();
+        diagnostic = getDiagnosticFor(
+            eltLoc.getIndex() == 0 ? CTP_DictionaryKey : CTP_DictionaryValue);
       }
       break;
     }
@@ -982,7 +1007,7 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   // If anchor is n explicit address-of, or expression which produces
   // an l-value (e.g. first argument of `+=` operator), let's not
   // suggest default value here because that would produce r-value type.
-  if (isa<InOutExpr>(anchor))
+  if (!anchor || isa<InOutExpr>(anchor))
     return;
 
   auto &cs = getConstraintSystem();
@@ -1947,6 +1972,11 @@ bool ContextualFailure::diagnoseAsError() {
       return true;
     }
 
+    if (auto *call = dyn_cast<CallExpr>(anchor)) {
+      if (isa<ClosureExpr>(call->getFn()))
+        CTP = CTP_ClosureResult;
+    }
+
     if (auto msg = getDiagnosticFor(CTP, toType->isExistentialType())) {
       diagnostic = *msg;
       break;
@@ -2610,7 +2640,15 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
       if (auto *CE = dyn_cast<CoerceExpr>(anchor)) {
         anchor = CE->getSubExpr();
       }
-      
+
+      if (auto *call = dyn_cast<CallExpr>(anchor)) {
+        auto *fnExpr = call->getFn();
+        if (auto *closure = dyn_cast<ClosureExpr>(fnExpr)) {
+          if (closure->hasSingleExpressionBody())
+            anchor = closure->getSingleExpressionBody();
+        }
+      }
+
       auto range = anchor->getSourceRange();
       diagnostic.fixItInsert(range.Start, "String(");
       diagnostic.fixItInsertAfter(range.End, ")");

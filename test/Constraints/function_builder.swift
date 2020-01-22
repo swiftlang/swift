@@ -352,14 +352,20 @@ func acceptComponentBuilder(@ComponentBuilder _ body: () -> Component) {
   print(body())
 }
 
+func colorWithAutoClosure(_ color: @autoclosure () -> Color) -> Color {
+  return color()
+}
+
+var trueValue = true
 acceptComponentBuilder {
   "hello"
-  if true {
+  if trueValue {
     3.14159
+    colorWithAutoClosure(.red)
   }
   .red
 }
-// CHECK: array([main.Component.string("hello"), main.Component.optional(Optional(main.Component.array([main.Component.floating(3.14159)]))), main.Component.color(main.Color.red)])
+// CHECK: array([main.Component.string("hello"), main.Component.optional(Optional(main.Component.array([main.Component.floating(3.14159), main.Component.color(main.Color.red)]))), main.Component.color(main.Color.red)])
 
 // rdar://53325810
 
@@ -409,3 +415,18 @@ testForEach1.show()
 
 // CHECK: ("testForEach1", main.Either<(Swift.String, Swift.Bool), (Swift.Bool, Swift.String)>.first("begin", true))
 // CHECK: ("testForEach1", main.Either<(Swift.String, Swift.Bool), (Swift.Bool, Swift.String)>.second(true, "end"))
+
+func test_single_stmt_closure_support() {
+  @_functionBuilder
+  struct MyBuilder {
+    static func buildBlock(_ numbers: Int...) -> Int {
+      return 42
+    }
+  }
+
+  func test(@MyBuilder builder: () -> Int) -> Int {
+    builder()
+  }
+
+  let _ = test { 0 } // ok
+}

@@ -208,7 +208,6 @@ bool GenericParamScope::doesContextMatchStartingContext(
   return false;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 bool DifferentiableAttributeScope::doesContextMatchStartingContext(
     const DeclContext *context) const {
   // Need special logic to handle case where `attributedDeclaration` is an
@@ -221,7 +220,6 @@ bool DifferentiableAttributeScope::doesContextMatchStartingContext(
         return true;
   return false;
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 #pragma mark lookup methods that run once per scope
 
@@ -453,7 +451,6 @@ bool SpecializeAttributeScope::lookupLocalsOrMembers(
   return false;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 bool DifferentiableAttributeScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
   auto visitAbstractFunctionDecl = [&](AbstractFunctionDecl *afd) {
@@ -472,7 +469,6 @@ bool DifferentiableAttributeScope::lookupLocalsOrMembers(
   }
   return false;
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 bool BraceStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                                            DeclConsumer consumer) const {

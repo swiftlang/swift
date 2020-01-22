@@ -64,6 +64,7 @@ namespace swift {
   class DeclContext;
   class DefaultArgumentInitializer;
   class DerivativeAttr;
+  class DifferentiableAttr;
   class ExtensionDecl;
   class ForeignRepresentationInfo;
   class FuncDecl;
@@ -304,6 +305,11 @@ public:
 
   /// Cached mapping from types to their associated tangent spaces.
   llvm::DenseMap<Type, Optional<TangentSpace>> AutoDiffTangentSpaces;
+
+  /// Cache of `@differentiable` attributes keyed by parameter indices. Used to
+  /// diagnose duplicate `@differentiable` attributes for the same key.
+  llvm::DenseMap<std::pair<Decl *, IndexSubset *>, DifferentiableAttr *>
+      DifferentiableAttrs;
 
   /// Cache of `@derivative` attributes keyed by parameter indices and
   /// derivative function kind. Used to diagnose duplicate `@derivative`

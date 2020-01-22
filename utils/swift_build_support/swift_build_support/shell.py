@@ -22,7 +22,6 @@ import shutil
 import subprocess
 import sys
 from contextlib import contextmanager
-from multiprocessing import Lock, Pool, cpu_count
 
 from . import diagnostics
 
@@ -230,37 +229,3 @@ def run(*args, **kwargs):
         eout.stderr = stderr
         raise eout
     return (stdout, 0, args)
-
-
-def init(l):
-    global lock
-    lock = l
-
-
-def run_parallel(fn, pool_args, n_processes=0):
-    if n_processes == 0:
-        n_processes = cpu_count() * 2
-
-    lk = Lock()
-    print("Running ``%s`` with up to %d processes." %
-          (fn.__name__, n_processes))
-    pool = Pool(processes=n_processes, initializer=init, initargs=(lk,))
-    results = pool.map_async(func=fn, iterable=pool_args).get(999999)
-    pool.close()
-    pool.join()
-    return results
-
-
-def check_parallel_results(results, op):
-    fail_count = 0
-    if results is None:
-        return 0
-    for r in results:
-        if r is not None:
-            if fail_count == 0:
-                print("======%s FAILURES======" % op)
-            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
-            fail_count += 1
-            if r.stderr:
-                print(r.stderr)
-    return fail_count

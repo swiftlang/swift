@@ -270,17 +270,21 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst) {
     return true;
   }
   case SILInstructionKind::ApplyInst: {
-    // Given a call to a function annotated as constant_evaluable, the call
-    // will be removed as long as the following holds:
-    // 1. If the call destroys its arguments: when removing the call, a destroy
-    // of each argument is added.
-    // 2. If the call returns a dead value i.e., a value that is only
-    // destroyed: both the call and corresponding destroy will be removed.
-    // Note that a value returned by a constant evaluable function must either
-    // contain constant pure values (trivial instances or array/string
-    // literals), or the arguments passed to the call. Given that its arguments
-    // will be destroyed explicitly, it is okay to remove the destroys of the
-    // return value of a constant evaluable function.
+    // The following property holds for constant evaluable functions:
+    // 1. they do not create objects having deinitializers with global
+    // side effects.
+    // 2. they do not use global variables and will only use objects reachable
+    // from parameters.
+    // The above two properties imply that a value returned by a constant
+    // evaluable function either does not have a deinitializer with global side
+    // effects, or if it does, the deinitializer that has the global side effect
+    // must be that of a parameter.
+    //
+    // A read-only constant evaluable call only reads and/or destroys its
+    // parameters. Therefore, if its return value is used only in destroys, the
+    // constant evaluable call can be removed provided the parameters it
+    // consumes are explicitly destroyed at the call site, which is taken care
+    // of by the function: \c deleteInstruction
     FullApplySite applySite(cast<ApplyInst>(inst));
     return isReadOnlyConstantEvaluableCall(applySite);
   }

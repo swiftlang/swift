@@ -672,7 +672,7 @@ public:
 private:
   enum : int_type {
     NumWitnessTablesMask  = 0x00FFFFFFU,
-    ClassConstraintMask   = 0x80000000U,
+    ClassConstraintMask   = 0x80000000U, // Warning: Set if NOT class-constrained!
     HasSuperclassMask     = 0x40000000U,
     SpecialProtocolMask   = 0x3F000000U,
     SpecialProtocolShift  = 24U,

@@ -8449,7 +8449,7 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 // deserialized before loading the members of this class. This allows the
 // decl members table to be warmed up and enables the correct identification of
 // overrides.
-static void loadAllMembersOfSuperclassIfNeeded(const ClassDecl *CD) {
+static void loadAllMembersOfSuperclassIfNeeded(ClassDecl *CD) {
   if (!CD)
     return;
 
@@ -8458,6 +8458,9 @@ static void loadAllMembersOfSuperclassIfNeeded(const ClassDecl *CD) {
     return;
 
   CD->loadAllMembers();
+
+  for (auto E : CD->getExtensions())
+    E->loadAllMembers();
 }
 
 void

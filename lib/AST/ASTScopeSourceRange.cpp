@@ -193,12 +193,10 @@ SourceRange SpecializeAttributeScope::getSourceRangeOfThisASTNode(
   return specializeAttr->getRange();
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 SourceRange DifferentiableAttributeScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   return differentiableAttr->getRange();
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 SourceRange AbstractFunctionBodyScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {

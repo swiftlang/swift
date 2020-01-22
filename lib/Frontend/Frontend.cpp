@@ -142,7 +142,7 @@ CompilerInvocation::getModuleInterfaceOutputPathForWholeModule() const {
 }
 
 SerializationOptions CompilerInvocation::computeSerializationOptions(
-    const SupplementaryOutputPaths &outs, bool moduleIsPublic) {
+    const SupplementaryOutputPaths &outs, bool moduleIsPublic) const {
   const FrontendOptions &opts = getFrontendOptions();
 
   SerializationOptions serializationOpts;
@@ -183,10 +183,6 @@ void CompilerInstance::createSILModule() {
   TheSILModule = SILModule::createEmptyModule(
       getMainModule(), getSILTypes(), Invocation.getSILOptions(),
       Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
-}
-
-void CompilerInstance::setSILModule(std::unique_ptr<SILModule> M) {
-  TheSILModule = std::move(M);
 }
 
 void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
@@ -618,7 +614,7 @@ std::unique_ptr<SILModule> CompilerInstance::takeSILModule() {
   return std::move(TheSILModule);
 }
 
-ModuleDecl *CompilerInstance::getMainModule() {
+ModuleDecl *CompilerInstance::getMainModule() const {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
     MainModule = ModuleDecl::create(ID, *Context);

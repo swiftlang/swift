@@ -432,9 +432,12 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, newPath);
 }
 
-ConstraintLocator *
-ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
-                                   bool lookThroughApply) {
+ConstraintLocator *ConstraintSystem::getCalleeLocator(
+    ConstraintLocator *locator, bool lookThroughApply,
+    llvm::function_ref<Type(const Expr *)> getType,
+    llvm::function_ref<Type(Type)> simplifyType,
+    llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
+        getOverloadFor) {
   auto *anchor = locator->getAnchor();
   assert(anchor && "Expected an anchor!");
 
@@ -494,7 +497,7 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
     // Unfortunately CSDiag currently calls into getCalleeLocator, so all bets
     // are off. Once we remove that legacy diagnostic logic, we should be able
     // to assert here.
-    fnTy = getFixedTypeRecursive(fnTy, /*wantRValue*/ true);
+    fnTy = simplifyType(fnTy);
 
     // For an apply of a metatype, we have a short-form constructor. Unlike
     // other locators to callees, these are anchored on the apply expression
@@ -550,7 +553,7 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
     // and clean up a bunch of other special cases. Doing so may require a bit
     // of hacking in CSGen though.
     if (UME->hasArguments()) {
-      if (auto overload = findSelectedOverloadFor(calleeLoc)) {
+      if (auto overload = getOverloadFor(calleeLoc)) {
         if (auto *loc = getSpecialFnCalleeLoc(overload->boundType))
           return loc;
       }
@@ -935,8 +938,8 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
   return TypeChecker::getUnopenedTypeOfReference(
       value, baseType, UseDC,
       [&](VarDecl *var) -> Type {
-        if (auto *param = dyn_cast<ParamDecl>(var))
-          return getType(param);
+        if (Type type = getTypeIfAvailable(var))
+          return type;
 
         if (!var->hasInterfaceType()) {
           return ErrorType::get(getASTContext());
@@ -2689,8 +2692,10 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
     auto *lhs = binaryOp->getArg()->getElement(0);
     auto *rhs = binaryOp->getArg()->getElement(1);
 
-    auto lhsType = solution.simplifyType(cs.getType(lhs))->getRValueType();
-    auto rhsType = solution.simplifyType(cs.getType(rhs))->getRValueType();
+    auto lhsType =
+        solution.simplifyType(solution.getType(lhs))->getRValueType();
+    auto rhsType =
+        solution.simplifyType(solution.getType(rhs))->getRValueType();
 
     if (lhsType->isEqual(rhsType)) {
       DE.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_same_args,
@@ -2712,7 +2717,7 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
           .highlight(rhs->getSourceRange());
     }
   } else {
-    auto argType = solution.simplifyType(cs.getType(applyExpr->getArg()));
+    auto argType = solution.simplifyType(solution.getType(applyExpr->getArg()));
     DE.diagnose(anchor->getLoc(), diag::cannot_apply_unop_to_arg,
                 operatorName.str(), argType->getRValueType());
   }
@@ -2806,7 +2811,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
           locator = getConstraintLocator(assignExpr->getSrc());
       }
 
-      auto *calleeLocator = getCalleeLocator(locator);
+      auto *calleeLocator = solution.getCalleeLocator(locator);
       if (!commonCalleeLocator)
         commonCalleeLocator = calleeLocator;
       else if (commonCalleeLocator != calleeLocator)
@@ -3402,8 +3407,12 @@ Expr *constraints::getArgumentExpr(Expr *expr, unsigned index) {
     return PE->getSubExpr();
   }
 
-  assert(isa<TupleExpr>(argExpr));
-  return cast<TupleExpr>(argExpr)->getElement(index);
+  if (auto *tuple = dyn_cast<TupleExpr>(argExpr)) {
+    return (tuple->getNumElements() > index) ? tuple->getElement(index)
+                                             : nullptr;
+  }
+
+  return nullptr;
 }
 
 bool constraints::isAutoClosureArgument(Expr *argExpr) {
@@ -3662,13 +3671,14 @@ ConstraintSystem::getFunctionArgApplyInfo(ConstraintLocator *locator) {
       assert(!shouldHaveDirectCalleeOverload(call) &&
              "Should we have resolved a callee for this?");
       rawFnType = getType(call->getFn());
-    } else {
+    } else if (auto *apply = dyn_cast<ApplyExpr>(anchor)) {
       // FIXME: ArgumentMismatchFailure is currently used from CSDiag, meaning
       // we can end up a BinaryExpr here with an unresolved callee. It should be
       // possible to remove this once we've gotten rid of the old CSDiag logic
       // and just assert that we have a CallExpr.
-      auto *apply = cast<ApplyExpr>(anchor);
       rawFnType = getType(apply->getFn());
+    } else {
+      return None;
     }
   }
 
@@ -3957,4 +3967,20 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
 
   cacheExprTypes(result);
   return result;
+}
+
+/// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
+/// constraint system, return the decl that it references.
+ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
+  // See if we have a resolution for this member.
+  auto overload = findSelectedOverloadFor(locator);
+  if (!overload)
+    return nullptr;
+
+  // We only want to handle the simplest decl binding.
+  auto choice = overload->choice;
+  if (choice.getKind() != OverloadChoiceKind::Decl)
+    return nullptr;
+
+  return choice.getDecl();
 }

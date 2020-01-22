@@ -40,238 +40,273 @@ umask 0022
 # Each variable name is re-exported into this script in uppercase, where dashes
 # are substituted by underscores. For example, `swift-install-components` is
 # referred to as `SWIFT_INSTALL_COMPONENTS` in the remainder of this script.
+
+    # name                                        default           description
 KNOWN_SETTINGS=(
-    # name                      default          description
-    dry-run                     ""               "print the commands that would be executed, but do not execute them"
-    build-args                  ""               "arguments to the build tool; defaults to -j8 when CMake generator is \"Unix Makefiles\""
-    build-dir                   ""               "out-of-tree build directory; default is in-tree. **This argument is required**"
-    host-cc                     ""               "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
-    host-cxx                    ""               "the path to CXX, the 'clang++' compiler for the host platform. **This argument is required**"
-    host-lipo                   ""               "the path to lipo for creating universal binaries on Darwin"
-    host-libtool                ""               "the path to libtool"
+    ## Debugging Options
+    dry-run                                       ""                "print the commands that would be executed, but do not execute them"
+    verbose-build                                 ""                "print the commands executed during the build"
+    check-args-only                               ""                "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
+    only-execute                                  "all"             "Only execute the named action (see implementation)"
+    check-incremental-compilation                 "0"               "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
+
+    ## Build Mode Options
+    enable-asan                                   ""                "enable Address Sanitizer"
+    enable-ubsan                                  ""                "enable Undefined Behavior Sanitizer"
+    clang-profile-instr-use                       ""                "If set, profile file to use for clang PGO while building llvm/clang"
+    swift-profile-instr-use                       ""                "If set, profile file to use for clang PGO while building swift"
+
+    ## Build Tool Settings
+    build-args                                    ""                "arguments to the build tool; defaults to -j8 when CMake generator is \"Unix Makefiles\""
+    build-dir                                     ""                "out-of-tree build directory; default is in-tree. **This argument is required**"
+    build-jobs                                    ""                "The number of parallel build jobs to use"
+    build-runtime-with-host-compiler              ""                "use the host c++ compiler to build everything"
+    build-stdlib-deployment-targets               "all"             "space-separated list that filters which of the configured targets to build the Swift standard library for, or 'all'"
+    build-toolchain-only                          ""                "If set, only build the necessary tools to build an external toolchain"
+    cmake-generator                               "Unix Makefiles"  "kind of build system to generate; see output of 'cmake --help' for choices"
+    llvm-num-parallel-lto-link-jobs               ""                "The number of parallel link jobs to use when compiling llvm"
+    reconfigure                                   ""                "force a CMake configuration run even if CMakeCache.txt already exists"
+    skip-reconfigure                              ""                "set to skip reconfigure"
+    swift-tools-num-parallel-lto-link-jobs        ""                "The number of parallel link jobs to use when compiling swift tools"
+    use-gold-linker                               ""                "Enable using the gold linker"
+    workspace                                     "${HOME}/src"     "source directory containing llvm, clang, swift"
+
+    ## Build Tools
     # SWIFT_ENABLE_TENSORFLOW
-    host-bazel                  ""               "the path to bazel, used to build TensorFlow. **This argument is required for TensorFlow support**"
-    darwin-xcrun-toolchain      "default"        "the name of the toolchain to use on Darwin"
-    ninja-bin                   ""               "the path to Ninja tool"
-    cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
-    lldb-extra-cmake-args       ""               "extra command line args to pass to lldb cmake"
-    lldb-test-cc                ""               "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
-    lldb-test-swift-only        "0"              "when running lldb tests, only include Swift-specific tests"
-    lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
-    lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
-    lldb-assertions             "1"              "build lldb with assertions enabled"
-    lldb-test-swift-compatibility     ""         "specify additional Swift compilers to test lldb with"
-    llvm-build-type             "Debug"          "the CMake build variant for LLVM and Clang (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
-    swift-build-type            "Debug"          "the CMake build variant for Swift"
-    swift-enable-assertions     "1"              "enable assertions in Swift"
-    swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
-    swift-tools-enable-lto      ""               "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime. Must be set to one of 'thin' or 'full'"
-    llvm-enable-lto             ""               "Must be set to one of 'thin' or 'full'"
-    llvm-enable-modules         "0"              "enable building llvm using modules"
-    swift-tools-num-parallel-lto-link-jobs ""    "The number of parallel link jobs to use when compiling swift tools"
-    llvm-num-parallel-lto-link-jobs ""           "The number of parallel link jobs to use when compiling llvm"
-    swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
-    swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
-    swift-stdlib-use-nonatomic-rc "0"            "build the Swift stdlib and overlays with nonatomic reference count operations enabled"
-    lldb-build-type             "Debug"          "the CMake build variant for LLDB"
-    llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
-    foundation-build-type       "Debug"          "the build variant for Foundation"
-    libdispatch-build-type      "Debug"          "the build variant for libdispatch"
-    libicu-build-type           "Debug"          "the build variant for libicu"
-    playgroundsupport-build-type "Debug"         "the build variant for PlaygroundSupport"
-    xctest-build-type           "Debug"          "the build variant for xctest"
-    llbuild-enable-assertions   "1"              "enable assertions in llbuild"
-    enable-asan                 ""               "enable Address Sanitizer"
-    enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
-    cmake                       ""               "path to the cmake binary"
-    distcc                      ""               "use distcc in pump mode"
-    distcc-pump                 ""               "the path to distcc pump executable. This argument is required if distcc is set."
-    build-runtime-with-host-compiler   ""        "use the host c++ compiler to build everything"
-    cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of 'cmake --help' for choices"
-    verbose-build               ""               "print the commands executed during the build"
-    install-prefix              ""               "installation prefix"
-    toolchain-prefix            ""               "the path to the .xctoolchain directory that houses the install prefix path"
-    install-destdir             ""               "the path to use as the filesystem root for the installation"
-    install-symroot             ""               "the path to install debug symbols into"
-    swift-install-components    ""               "a semicolon-separated list of Swift components to install"
-    llvm-install-components    ""                "a semicolon-separated list of LLVM components to install"
-    installable-package         ""               "the path to the archive of the installation directory"
-    test-installable-package    ""               "whether to run post-packaging tests on the produced package"
-    reconfigure                 ""               "force a CMake configuration run even if CMakeCache.txt already exists"
-    skip-reconfigure            ""               "set to skip reconfigure"
-    swift-primary-variant-sdk   ""               "default SDK for target binaries"
-    swift-primary-variant-arch  ""               "default arch for target binaries"
-    skip-build-cmark            ""               "set to skip building CommonMark"
-    skip-build-llvm             ""               "set to skip building LLVM/Clang"
-    skip-build-compiler-rt      ""               "set to skip building Compiler-RT"
-    skip-build-swift            ""               "set to skip building Swift"
-    skip-build-linux            ""               "set to skip building Swift stdlibs for Linux"
-    skip-build-freebsd          ""               "set to skip building Swift stdlibs for FreeBSD"
-    skip-build-cygwin           ""               "set to skip building Swift stdlibs for Cygwin"
-    skip-build-haiku            ""               "set to skip building Swift stdlibs for Haiku"
-    skip-build-osx              ""               "set to skip building Swift stdlibs for OS X"
-    skip-build-ios-device       ""               "set to skip building Swift stdlibs for iOS devices (i.e. build simulators only)"
-    skip-build-ios-simulator    ""               "set to skip building Swift stdlibs for iOS simulators (i.e. build devices only)"
-    skip-build-tvos-device      ""               "set to skip building Swift stdlibs for tvOS devices (i.e. build simulators only)"
-    skip-build-tvos-simulator   ""               "set to skip building Swift stdlibs for tvOS simulators (i.e. build devices only)"
-    skip-build-watchos-device   ""               "set to skip building Swift stdlibs for Apple watchOS devices (i.e. build simulators only)"
-    skip-build-watchos-simulator ""              "set to skip building Swift stdlibs for Apple watchOS simulators (i.e. build devices only)"
-    skip-build-android          ""               "set to skip building Swift stdlibs for Android"
-    skip-build-lldb             ""               "set to skip building LLDB"
-    skip-build-llbuild          ""               "set to skip building llbuild"
-    skip-build-libcxx           ""               "set to skip building libcxx"
-    skip-build-xctest           ""               "set to skip building xctest"
-    skip-build-foundation       ""               "set to skip building foundation"
-    skip-build-libdispatch      ""               "set to skip building libdispatch"
-    skip-build-libicu           ""               "set to skip building libicu"
+    host-bazel                                    ""                "the path to bazel, used to build TensorFlow. **This argument is required for TensorFlow support**"
+    host-cc                                       ""                "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
+    host-cxx                                      ""                "the path to CXX, the 'clang++' compiler for the host platform. **This argument is required**"
+    host-libtool                                  ""                "the path to libtool"
+    host-lipo                                     ""                "the path to lipo for creating universal binaries on Darwin"
+    cmake                                         ""                "path to the cmake binary"
+    distcc                                        ""                "use distcc in pump mode"
+    distcc-pump                                   ""                "the path to distcc pump executable. This argument is required if distcc is set."
+    ninja-bin                                     ""                "the path to Ninja tool"
+
+    ## Android Options
+    android-api-level                             ""                "The Android API level to target when building for Android. Currently only 21 or above is supported"
+    android-arch                                  "armv7"           "The Android target architecture when building for Android"
+    android-deploy-device-path                    ""                "Path on an Android device to which built Swift stdlib products will be deployed"
+    android-icu-data                              ""                "Path to libicudata.so"
+    android-icu-i18n                              ""                "Path to libicui18n.so"
+    android-icu-i18n-include                      ""                "Path to a directory containing headers libicui18n"
+    android-icu-uc                                ""                "Path to libicuuc.so"
+    android-icu-uc-include                        ""                "Path to a directory containing headers for libicuuc"
+    android-ndk                                   ""                "An absolute path to the NDK that will be used as a libc implementation for Android builds"
+    android-ndk-gcc-version                       ""                "The GCC version to use when building for Android. Currently only 4.9 is supported"
+
+    ## Darwin Options
+    darwin-crash-reporter-client                  ""                "whether to enable CrashReporter integration"
+    darwin-deployment-version-ios                 "7.0"             "minimum deployment target version for iOS"
+    darwin-deployment-version-osx                 "10.9"            "minimum deployment target version for OS X"
+    darwin-deployment-version-tvos                "9.0"             "minimum deployment target version for tvOS"
+    darwin-deployment-version-watchos             "2.0"             "minimum deployment target version for watchOS"
+    darwin-install-extract-symbols                ""                "whether to extract symbols with dsymutil during installations"
+    darwin-overlay-target                         ""                "single overlay target to build, dependencies are computed later"
+    darwin-sdk-deployment-targets                 "xctest-ios-8.0"  "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
+    darwin-stdlib-install-name-dir                ""                "the directory of the install_name for standard library dylibs"
+    darwin-toolchain-alias                        ""                "Swift alias for toolchain"
+    darwin-toolchain-application-cert             ""                "Application Cert name to codesign xctoolchain"
+    darwin-toolchain-bundle-identifier            ""                "CFBundleIdentifier for xctoolchain info plist"
+    darwin-toolchain-display-name                 ""                "Display Name for xctoolcain info plist"
+    darwin-toolchain-display-name-short           ""                "Display Name with out date for xctoolchain info plist"
+    darwin-toolchain-installer-cert               ""                "Installer Cert name to create installer pkg"
+    darwin-toolchain-installer-package            ""                "The path to installer pkg"
+    darwin-toolchain-name                         ""                "Directory name for xctoolchain"
+    darwin-toolchain-version                      ""                "Version for xctoolchain info plist and installer pkg"
+    darwin-xcrun-toolchain                        "default"         "the name of the toolchain to use on Darwin"
+
+    ## Build Types for Components
+    cmark-build-type                              "Debug"           "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
+    foundation-build-type                         "Debug"           "the build variant for Foundation"
+    libdispatch-build-type                        "Debug"           "the build variant for libdispatch"
+    libicu-build-type                             "Debug"           "the build variant for libicu"
+    llbuild-build-type                            "Debug"           "the CMake build variant for llbuild"
+    lldb-build-type                               "Debug"           "the CMake build variant for LLDB"
+    llvm-build-type                               "Debug"           "the CMake build variant for LLVM and Clang (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
+    playgroundsupport-build-type                  "Debug"           "the build variant for PlaygroundSupport"
+    swift-build-type                              "Debug"           "the CMake build variant for Swift"
+    swift-stdlib-build-type                       "Debug"           "the CMake build variant for Swift"
+    xctest-build-type                             "Debug"           "the build variant for xctest"
+
+    ## Skip Build ...
+    skip-build-android                            ""                "set to skip building Swift stdlibs for Android"
+    skip-build-benchmarks                         ""                "set to skip building Swift Benchmark Suite"
+    skip-build-clang-tools-extra                  ""                "set to skip building clang-tools-extra as part of llvm"
+    skip-build-cmark                              ""                "set to skip building CommonMark"
+    skip-build-compiler-rt                        ""                "set to skip building Compiler-RT"
+    skip-build-cygwin                             ""                "set to skip building Swift stdlibs for Cygwin"
+    skip-build-external-benchmarks                "1"               "set to skip building the external Swift Benchmark Suite. (skipped by default)"
+    skip-build-foundation                         ""                "set to skip building foundation"
+    skip-build-freebsd                            ""                "set to skip building Swift stdlibs for FreeBSD"
+    skip-build-haiku                              ""                "set to skip building Swift stdlibs for Haiku"
+    skip-build-ios-device                         ""                "set to skip building Swift stdlibs for iOS devices (i.e. build simulators only)"
+    skip-build-ios-simulator                      ""                "set to skip building Swift stdlibs for iOS simulators (i.e. build devices only)"
+    skip-build-libcxx                             ""                "set to skip building libcxx"
+    skip-build-libdispatch                        ""                "set to skip building libdispatch"
+    skip-build-libicu                             ""                "set to skip building libicu"
+    skip-build-linux                              ""                "set to skip building Swift stdlibs for Linux"
+    skip-build-llbuild                            ""                "set to skip building llbuild"
+    skip-build-lldb                               ""                "set to skip building LLDB"
+    skip-build-llvm                               ""                "set to skip building LLVM/Clang"
+    skip-build-osx                                ""                "set to skip building Swift stdlibs for OS X"
+    skip-build-playgroundsupport                  ""                "set to skip building PlaygroundSupport"
+    skip-build-swift                              ""                "set to skip building Swift"
     # SWIFT_ENABLE_TENSORFLOW
-    skip-build-tensorflow       ""               "set to skip building TensorFlow"
-    skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
-    skip-build-external-benchmarks "1"            "set to skip building the external Swift Benchmark Suite. (skipped by default)"
-    skip-build-playgroundsupport ""              "set to skip building PlaygroundSupport"
-    skip-build-clang-tools-extra ""              "set to skip building clang-tools-extra as part of llvm"
-    skip-local-build            ""               "set to skip building for the current host (useful when crosscompiling)"
-    skip-test-cmark             ""               "set to skip testing CommonMark"
-    skip-test-lldb              ""               "set to skip testing lldb"
-    skip-test-swift             ""               "set to skip testing Swift"
-    skip-test-llbuild           ""               "set to skip testing llbuild"
-    skip-test-xctest            ""               "set to skip testing xctest"
-    skip-test-foundation        ""               "set to skip testing foundation"
-    skip-test-libdispatch       ""               "set to skip testing libdispatch"
-    skip-test-libicu            ""               "set to skip testing libicu"
+    skip-build-tensorflow                         ""                "set to skip building TensorFlow"
+    skip-build-tvos-device                        ""                "set to skip building Swift stdlibs for tvOS devices (i.e. build simulators only)"
+    skip-build-tvos-simulator                     ""                "set to skip building Swift stdlibs for tvOS simulators (i.e. build devices only)"
+    skip-build-watchos-device                     ""                "set to skip building Swift stdlibs for Apple watchOS devices (i.e. build simulators only)"
+    skip-build-watchos-simulator                  ""                "set to skip building Swift stdlibs for Apple watchOS simulators (i.e. build devices only)"
+    skip-build-xctest                             ""                "set to skip building xctest"
+
+    ## Skip Test ...
+    skip-test-android                             ""                "set to skip testing Swift stdlibs for Android"
+    skip-test-android-host                        ""                "set to skip testing the host parts of the Android toolchain"
+    skip-test-cmark                               ""                "set to skip testing CommonMark"
+    skip-test-cygwin                              ""                "set to skip testing Swift stdlibs for Cygwin"
+    skip-test-foundation                          ""                "set to skip testing foundation"
+    skip-test-freebsd                             ""                "set to skip testing Swift stdlibs for FreeBSD"
+    skip-test-haiku                               ""                "set to skip testing Swift stdlibs for Haiku"
+    skip-test-ios-32bit-simulator                 ""                "set to skip testing Swift stdlibs for iOS 32bit simulators"
+    skip-test-ios-host                            ""                "set to skip testing the host parts of the iOS toolchain"
+    skip-test-ios-simulator                       ""                "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
+    skip-test-libdispatch                         ""                "set to skip testing libdispatch"
+    skip-test-libicu                              ""                "set to skip testing libicu"
+    skip-test-linux                               ""                "set to skip testing Swift stdlibs for Linux"
+    skip-test-llbuild                             ""                "set to skip testing llbuild"
+    skip-test-lldb                                ""                "set to skip testing lldb"
+    skip-test-osx                                 ""                "set to skip testing Swift stdlibs for OS X"
+    skip-test-playgroundsupport                   ""                "set to skip testing PlaygroundSupport"
+    skip-test-swift                               ""                "set to skip testing Swift"
     # SWIFT_ENABLE_TENSORFLOW
-    skip-test-tensorflow        ""               "set to skip testing TensorFlow"
-    skip-test-playgroundsupport ""               "set to skip testing PlaygroundSupport"
-    skip-test-linux             ""               "set to skip testing Swift stdlibs for Linux"
-    skip-test-freebsd           ""               "set to skip testing Swift stdlibs for FreeBSD"
-    skip-test-cygwin            ""               "set to skip testing Swift stdlibs for Cygwin"
-    skip-test-haiku             ""               "set to skip testing Swift stdlibs for Haiku"
-    skip-test-osx               ""               "set to skip testing Swift stdlibs for OS X"
-    skip-test-ios-32bit-simulator     ""         "set to skip testing Swift stdlibs for iOS 32bit simulators"
-    skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
-    skip-test-ios-host          ""               "set to skip testing the host parts of the iOS toolchain"
-    skip-test-tvos-simulator    ""               "set to skip testing Swift stdlibs for tvOS simulators (i.e. test devices only)"
-    skip-test-tvos-host         ""               "set to skip testing the host parts of the tvOS toolchain"
-    skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
-    skip-test-watchos-host      ""               "set to skip testing the host parts of the watchOS toolchain"
-    skip-test-android           ""               "set to skip testing Swift stdlibs for Android"
-    skip-test-android-host      ""               "set to skip testing the host parts of the Android toolchain"
-    validation-test             "0"              "set to run the validation test suite"
-    long-test                   "0"              "set to run the long test suite"
-    stress-test                 "0"              "set to run the stress test suite"
-    test-paths                  ""               "run tests located in specific directories and/or files"
-    skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
-    skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
-    skip-test-optimize-for-size ""               "set to skip testing the test suite in optimize for size mode"
-    skip-test-optimize-none-with-implicit-dynamic ""  "set to skip testing the test suite in optimize none with implicit dynamic mode"
-    skip-test-sourcekit         ""               "set to skip testing SourceKit"
-    stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
-    only-executable-test        ""               "only run the executable variant of the swift lit tests"
-    workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift"
-    enable-llvm-assertions      "1"              "set to enable llvm assertions"
-    build-llvm                  "1"              "set to 1 to build LLVM and Clang"
-    build-swift-tools           "1"              "set to 1 to build Swift host tools"
-    build-swift-dynamic-stdlib  ""               "set to 1 to build dynamic variants of the Swift standard library"
-    build-swift-static-stdlib   ""               "set to 1 to build static variants of the Swift standard library"
-    build-swift-stdlib-unittest-extra "0"        "set to 1 to build optional StdlibUnittest components"
-    build-swift-dynamic-sdk-overlay   ""         "set to 1 to build dynamic variants of the Swift SDK overlay"
-    build-swift-static-sdk-overlay    ""         "set to 1 to build static variants of the Swift SDK overlay"
-    build-swift-examples        "1"              "set to 1 to build examples"
-    build-swift-remote-mirror   "1"              "set to 1 to build the Swift Remote Mirror library"
-    build-sil-debugging-stdlib  "0"              "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
-    check-incremental-compilation "0"            "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
-    report-statistics           "0"              "set to 1 to generate compilation statistics files for swift libraries"
-    llvm-include-tests          "1"              "Set to true to generate testing targets for LLVM. Set to true by default."
-    swift-include-tests         "1"              "Set to true to generate testing targets for Swift. This allows the build to proceed when 'test' directory is missing (required for B&I builds)"
-    native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
-    native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
-    native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
-    embed-bitcode-section       "0"              "embed an LLVM bitcode section in stdlib/overlay binaries for supported platforms"
-    darwin-crash-reporter-client ""              "whether to enable CrashReporter integration"
-    darwin-stdlib-install-name-dir ""            "the directory of the install_name for standard library dylibs"
-    install-cmark               ""               "whether to install cmark"
-    install-swift               ""               "whether to install Swift"
-    install-lldb                ""               "whether to install LLDB"
-    install-llbuild             ""               "whether to install llbuild"
-    install-xctest              ""               "whether to install xctest"
-    install-foundation          ""               "whether to install foundation"
-    install-libcxx              ""               "whether to install libc++"
-    install-libdispatch         ""               "whether to install libdispatch"
-    install-libicu              ""               "whether to install libicu"
+    skip-test-tensorflow                          ""                "set to skip testing TensorFlow"
+    skip-test-tvos-host                           ""                "set to skip testing the host parts of the tvOS toolchain"
+    skip-test-tvos-simulator                      ""                "set to skip testing Swift stdlibs for tvOS simulators (i.e. test devices only)"
+    skip-test-watchos-host                        ""                "set to skip testing the host parts of the watchOS toolchain"
+    skip-test-watchos-simulator                   ""                "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
+    skip-test-xctest                              ""                "set to skip testing xctest"
+    skip-test-benchmarks                          ""                "set to skip running Swift Benchmark Suite"
+    skip-test-optimized                           ""                "set to skip testing the test suite in optimized mode"
+    skip-test-optimize-for-size                   ""                "set to skip testing the test suite in optimize for size mode"
+    skip-test-optimize-none-with-implicit-dynamic ""                "set to skip testing the test suite in optimize none with implicit dynamic mode"
+    skip-test-sourcekit                           ""                "set to skip testing SourceKit"
+
+    ## Extra ... CMake Options
+    cmark-cmake-options                           ""                "CMake options used for all cmark targets"
+    common-cmake-options                          ""                "CMake options used for all targets, including LLVM/Clang"
+    extra-cmake-options                           ""                "Extra options to pass to CMake for all targets"
+    foundation-cmake-options                      ""                "CMake options used for all foundation targets"
+    libdispatch-cmake-options                     ""                "CMake options used for all libdispatch targets"
+    libicu-cmake-options                          ""                "CMake options used for all libicu targets"
+    llbuild-cmake-options                         ""                "CMake options used for all llbuild targets"
+    lldb-cmake-options                            ""                "CMake options used for all lldb targets"
+    llvm-cmake-options                            ""                "CMake options used for all llvm targets"
+    ninja-cmake-options                           ""                "CMake options used for all ninja targets"
+    ninja-cmake-options                           ""                "CMake options used for all ninja targets"
+    playgroundsupport-cmake-options               ""                "CMake options used for all playgroundsupport targets"
+    swift-cmake-options                           ""                "CMake options used for all swift targets"
+    xctest-cmake-options                          ""                "CMake options used for all xctest targets"
+
+    ## Build ...
+    build-llvm                                    "1"               "set to 1 to build LLVM and Clang"
+    build-sil-debugging-stdlib                    "0"               "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
+    build-swift-dynamic-sdk-overlay               ""                "set to 1 to build dynamic variants of the Swift SDK overlay"
+    build-swift-dynamic-stdlib                    ""                "set to 1 to build dynamic variants of the Swift standard library"
+    build-swift-examples                          "1"               "set to 1 to build examples"
+    build-swift-remote-mirror                     "1"               "set to 1 to build the Swift Remote Mirror library"
+    build-swift-static-sdk-overlay                ""                "set to 1 to build static variants of the Swift SDK overlay"
+    build-swift-static-stdlib                     ""                "set to 1 to build static variants of the Swift standard library"
+    build-swift-stdlib-unittest-extra             "0"               "set to 1 to build optional StdlibUnittest components"
+    build-swift-tools                             "1"               "set to 1 to build Swift host tools"
+
+    ## Test Options
+    llvm-include-tests                            "1"               "Set to true to generate testing targets for LLVM. Set to true by default."
+    long-test                                     "0"               "set to run the long test suite"
+    only-executable-test                          ""                "only run the executable variant of the swift lit tests"
+    stress-test                                   "0"               "set to run the stress test suite"
+    stress-test-sourcekit                         ""                "set to run the stress-SourceKit target"
+    swift-include-tests                           "1"               "Set to true to generate testing targets for Swift. This allows the build to proceed when 'test' directory is missing (required for B&I builds)"
+    validation-test                               "0"               "set to run the validation test suite"
+
+    ## Install ...
+    install-cmark                                 ""                "whether to install cmark"
+    install-foundation                            ""                "whether to install foundation"
+    install-libcxx                                ""                "whether to install libc++"
+    install-libdispatch                           ""                "whether to install libdispatch"
+    install-libicu                                ""                "whether to install libicu"
+    install-llbuild                               ""                "whether to install llbuild"
+    install-lldb                                  ""                "whether to install LLDB"
+    install-playgroundsupport                     ""                "whether to install PlaygroundSupport"
+    install-swift                                 ""                "whether to install Swift"
     # SWIFT_ENABLE_TENSORFLOW
-    install-tensorflow          ""               "whether to install TensorFlow"
-    install-playgroundsupport   ""               "whether to install PlaygroundSupport"
-    darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
-    host-target                 ""               "The host target. LLVM, Clang, and Swift will be built for this target. The built LLVM and Clang will be used to compile Swift for the cross-compilation targets. **This argument is required**"
-    stdlib-deployment-targets   ""               "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
-    build-stdlib-deployment-targets "all"        "space-separated list that filters which of the configured targets to build the Swift standard library for, or 'all'"
-    cross-compile-hosts         ""               "space-separated list of targets to cross-compile host Swift tools for"
-    cross-compile-with-host-tools  ""            "set to use the clang we build for the host to then build the cross-compile hosts"
-    cross-compile-install-prefixes      ""       "semicolon-separated list of install prefixes to use for the cross-compiled hosts. The list expands, so if there are more cross-compile hosts than prefixes, unmatched hosts use the last prefix in the list"
-    skip-merge-lipo-cross-compile-tools ""       "set to skip running merge-lipo after installing cross-compiled host Swift tools"
-    darwin-deployment-version-osx     "10.9"     "minimum deployment target version for OS X"
-    darwin-deployment-version-ios     "7.0"      "minimum deployment target version for iOS"
-    darwin-deployment-version-tvos    "9.0"      "minimum deployment target version for tvOS"
-    darwin-deployment-version-watchos "2.0"      "minimum deployment target version for watchOS"
-    extra-cmake-options         ""               "Extra options to pass to CMake for all targets"
-    extra-swift-args            ""               "Extra arguments to pass to swift modules which match regex. Assumed to be a flattened cmake list consisting of [module_regexp, args, module_regexp, args, ...]"
-    sil-verify-all              "0"              "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
-    swift-enable-ast-verifier   "1"              "If enabled, and the assertions are enabled, the built Swift compiler will run the AST verifier every time it is invoked"
-    swift-runtime-enable-leak-checker   "0"              "Enable leaks checking routines in the runtime"
-    use-gold-linker             ""               "Enable using the gold linker"
-    darwin-toolchain-bundle-identifier ""        "CFBundleIdentifier for xctoolchain info plist"
-    darwin-toolchain-display-name      ""        "Display Name for xctoolcain info plist"
-    darwin-toolchain-display-name-short ""       "Display Name with out date for xctoolchain info plist"
-    darwin-toolchain-name              ""        "Directory name for xctoolchain"
-    darwin-toolchain-version           ""        "Version for xctoolchain info plist and installer pkg"
-    darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
-    darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
-    darwin-toolchain-installer-package ""        "The path to installer pkg"
-    darwin-sdk-deployment-targets      "xctest-ios-8.0"        "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
-    darwin-overlay-target              ""        "single overlay target to build, dependencies are computed later"
-    build-jobs                         ""        "The number of parallel build jobs to use"
-    darwin-toolchain-alias             ""        "Swift alias for toolchain"
-    android-ndk                        ""        "An absolute path to the NDK that will be used as a libc implementation for Android builds"
-    android-api-level                  ""        "The Android API level to target when building for Android. Currently only 21 or above is supported"
-    android-ndk-gcc-version            ""        "The GCC version to use when building for Android. Currently only 4.9 is supported"
-    android-icu-uc                     ""        "Path to libicuuc.so"
-    android-icu-uc-include             ""        "Path to a directory containing headers for libicuuc"
-    android-icu-i18n                   ""        "Path to libicui18n.so"
-    android-icu-i18n-include           ""        "Path to a directory containing headers libicui18n"
-    android-icu-data                   ""        "Path to libicudata.so"
-    android-deploy-device-path         ""        "Path on an Android device to which built Swift stdlib products will be deployed"
-    android-arch                       "armv7"   "The Android target architecture when building for Android"
-    check-args-only                    ""        "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
-    common-cmake-options               ""        "CMake options used for all targets, including LLVM/Clang"
-    cmark-cmake-options                ""        "CMake options used for all cmark targets"
-    ninja-cmake-options                ""        "CMake options used for all ninja targets"
-    foundation-cmake-options           ""        "CMake options used for all foundation targets"
-    libdispatch-cmake-options          ""        "CMake options used for all libdispatch targets"
-    libicu-cmake-options               ""        "CMake options used for all libicu targets"
+    install-tensorflow                            ""                "whether to install TensorFlow"
+    install-xctest                                ""                "whether to install xctest"
+
+    ## llbuild Options
+    llbuild-enable-assertions                     "1"               "enable assertions in llbuild"
+
+    ## LLDB Options
+    lldb-assertions                               "1"               "build lldb with assertions enabled"
+    lldb-extra-cmake-args                         ""                "extra command line args to pass to lldb cmake"
+    lldb-no-debugserver                           ""                "delete debugserver after building it, and don't try to codesign it"
+    lldb-test-cc                                  ""                "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
+    lldb-test-swift-compatibility                 ""                "specify additional Swift compilers to test lldb with"
+    lldb-test-swift-only                          "0"               "when running lldb tests, only include Swift-specific tests"
+    lldb-use-system-debugserver                   ""                "don't try to codesign debugserver, and use the system's debugserver instead"
+
+    ## LLVM Options
+    llvm-enable-lto                               ""                "Must be set to one of 'thin' or 'full'"
+    llvm-enable-modules                           "0"               "enable building llvm using modules"
+    llvm-install-components                       ""                "a semicolon-separated list of LLVM components to install"
+    llvm-lit-args                                 ""                "If set, override the lit args passed to LLVM"
+    enable-llvm-assertions                        "1"               "set to enable llvm assertions"
+
+    ## Swift Options
+    swift-analyze-code-coverage                   "not-merged"      "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
+    swift-enable-assertions                       "1"               "enable assertions in Swift"
+    swift-enable-ast-verifier                     "1"               "If enabled, and the assertions are enabled, the built Swift compiler will run the AST verifier every time it is invoked"
+    swift-install-components                      ""                "a semicolon-separated list of Swift components to install"
+    swift-primary-variant-arch                    ""                "default arch for target binaries"
+    swift-primary-variant-sdk                     ""                "default SDK for target binaries"
+    swift-runtime-enable-leak-checker             "0"               "Enable leaks checking routines in the runtime"
+    swift-stdlib-enable-assertions                "1"               "enable assertions in Swift"
+    swift-stdlib-use-nonatomic-rc                 "0"               "build the Swift stdlib and overlays with nonatomic reference count operations enabled"
+    swift-tools-enable-lto                        ""                "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime. Must be set to one of 'thin' or 'full'"
+    extra-swift-args                              ""                "Extra arguments to pass to swift modules which match regex. Assumed to be a flattened cmake list consisting of [module_regexp, args, module_regexp, args, ...]"
+    report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
+    sil-verify-all                                "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
+    stdlib-deployment-targets                     ""                "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
+
+    ## Uncategorised
+    install-prefix                                ""                "installation prefix"
+    toolchain-prefix                              ""                "the path to the .xctoolchain directory that houses the install prefix path"
+    install-destdir                               ""                "the path to use as the filesystem root for the installation"
+    install-symroot                               ""                "the path to install debug symbols into"
+    installable-package                           ""                "the path to the archive of the installation directory"
+    test-installable-package                      ""                "whether to run post-packaging tests on the produced package"
+    skip-local-build                              ""                "set to skip building for the current host (useful when crosscompiling)"
+    test-paths                                    ""                "run tests located in specific directories and/or files"
+    native-llvm-tools-path                        ""                "directory that contains LLVM tools that are executable on the build machine"
+    native-clang-tools-path                       ""                "directory that contains Clang tools that are executable on the build machine"
+    native-swift-tools-path                       ""                "directory that contains Swift tools that are executable on the build machine"
+    embed-bitcode-section                         "0"               "embed an LLVM bitcode section in stdlib/overlay binaries for supported platforms"
+    host-target                                   ""                "The host target. LLVM, Clang, and Swift will be built for this target. The built LLVM and Clang will be used to compile Swift for the cross-compilation targets. **This argument is required**"
+    cross-compile-hosts                           ""                "space-separated list of targets to cross-compile host Swift tools for"
+    cross-compile-with-host-tools                 ""                "set to use the clang we build for the host to then build the cross-compile hosts"
+    cross-compile-install-prefixes                ""                "semicolon-separated list of install prefixes to use for the cross-compiled hosts. The list expands, so if there are more cross-compile hosts than prefixes, unmatched hosts use the last prefix in the list"
+    skip-merge-lipo-cross-compile-tools           ""                "set to skip running merge-lipo after installing cross-compiled host Swift tools"
+    coverage-db                                   ""                "If set, coverage database to use when prioritizing testing"
+    skip-local-host-install                       ""                "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
     # SWIFT_ENABLE_TENSORFLOW
-    tensorflow-bazel-options           ""        "Bazel options used for all TensorFlow targets"
-    llbuild-cmake-options              ""        "CMake options used for all llbuild targets"
-    lldb-cmake-options                 ""        "CMake options used for all lldb targets"
-    llvm-cmake-options                 ""        "CMake options used for all llvm targets"
-    ninja-cmake-options                ""        "CMake options used for all ninja targets"
-    swift-cmake-options                ""        "CMake options used for all swift targets"
-    xctest-cmake-options               ""        "CMake options used for all xctest targets"
-    playgroundsupport-cmake-options    ""        "CMake options used for all playgroundsupport targets"
-    only-execute                       "all"     "Only execute the named action (see implementation)"
-    llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
-    clang-profile-instr-use            ""        "If set, profile file to use for clang PGO while building llvm/clang"
-    swift-profile-instr-use            ""        "If set, profile file to use for clang PGO while building swift"
-    coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
-    build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
-    skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
-    # SWIFT_ENABLE_TENSORFLOW
-    enable-tensorflow                  ""        "If true, enable compiling with TensorFlow support"
-    enable-tensorflow-gpu              ""        "If true, enable compiling with TensorFlow GPU support"
-    tensorflow-host-lib-dir            ""        "Path to host TensorFlow libraries"
-    tensorflow-host-include-dir        ""        "Path to host TensorFlow headers"
-    tensorflow-target-include-dir      ""        "Path to target Tensorflow headers"
-    tensorflow-target-lib-dir          ""        "Path to target TensorFlow libraries"
-    tensorflow-swift-apis              ""        "Path to TensorFlow deep learning library repository"
+    enable-tensorflow                             ""                "If true, enable compiling with TensorFlow support"
+    enable-tensorflow-gpu                         ""                "If true, enable compiling with TensorFlow GPU support"
+    tensorflow-bazel-options                      ""                "Bazel options used for all TensorFlow targets"
+    tensorflow-host-lib-dir                       ""                "Path to host TensorFlow libraries"
+    tensorflow-host-include-dir                   ""                "Path to host TensorFlow headers"
+    tensorflow-target-include-dir                 ""                "Path to target Tensorflow headers"
+    tensorflow-target-lib-dir                     ""                "Path to target TensorFlow libraries"
+    tensorflow-swift-apis                         ""                "Path to TensorFlow deep learning library repository"
 )
 
 # Centralized access point for traced command invocation.
@@ -473,67 +508,81 @@ function set_build_options_for_host() {
             SWIFT_HOST_TRIPLE="armv7-unknown-linux-gnueabihf"
             llvm_target_arch="ARM"
             ;;
-        macosx-* | iphoneos-* | iphonesimulator-* | \
-          appletvos-* | appletvsimulator-* | \
-            watchos-* | watchsimulator-*)
+        macosx-*            | \
+        iphoneos-*          | \
+        iphonesimulator-*   | \
+        appletvos-*         | \
+        appletvsimulator-*  | \
+        watchos-*           | \
+        watchsimulator-*)
             case ${host} in
                 macosx-x86_64)
-                    llvm_target_arch=""
                     SWIFT_HOST_TRIPLE="x86_64-apple-macosx${DARWIN_DEPLOYMENT_VERSION_OSX}"
+                    llvm_target_arch=""
+
                     SWIFT_HOST_VARIANT_SDK="OSX"
                     cmake_osx_deployment_target="${DARWIN_DEPLOYMENT_VERSION_OSX}"
                     ;;
                 iphonesimulator-i386)
-                    llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="i386-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    llvm_target_arch="X86"
+
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 iphonesimulator-x86_64)
-                    llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="x86_64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    llvm_target_arch="X86"
+
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 iphoneos-armv7)
-                    llvm_target_arch="ARM"
                     SWIFT_HOST_TRIPLE="armv7-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    llvm_target_arch="ARM"
+
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     cmake_osx_deployment_target=""
                     ;;
                 iphoneos-armv7s)
-                    llvm_target_arch="ARM"
                     SWIFT_HOST_TRIPLE="armv7s-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    llvm_target_arch="ARM"
+
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     cmake_osx_deployment_target=""
                     ;;
                 iphoneos-arm64)
-                    llvm_target_arch="AArch64"
                     SWIFT_HOST_TRIPLE="arm64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    llvm_target_arch="AArch64"
+
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     cmake_osx_deployment_target=""
                     ;;
                 appletvsimulator-x86_64)
-                    llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="x86_64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
+                    llvm_target_arch="X86"
+
                     SWIFT_HOST_VARIANT_SDK="TVOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 appletvos-arm64)
-                    llvm_target_arch="AArch64"
                     SWIFT_HOST_TRIPLE="arm64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
+                    llvm_target_arch="AArch64"
+
                     SWIFT_HOST_VARIANT_SDK="TVOS"
                     cmake_osx_deployment_target=""
                     ;;
                 watchsimulator-i386)
-                    llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="i386-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                    llvm_target_arch="X86"
+
                     SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 watchos-armv7k)
-                    llvm_target_arch="ARM"
                     SWIFT_HOST_TRIPLE="armv7k-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                    llvm_target_arch="ARM"
+
                     SWIFT_HOST_VARIANT_SDK="WATCHOS"
                     cmake_osx_deployment_target=""
                     ;;
@@ -1111,17 +1160,6 @@ if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" xctest)
 fi
 
-# Checks if a given product is enabled (i.e. part of $PRODUCTS array)
-function contains_product() {
-  local current_product
-  for current_product in "${PRODUCTS[@]}"; do
-    if [[ "$current_product" == "$1" ]]; then
-      return 0
-    fi
-  done
-  return 1
-}
-
 # SWIFT_ENABLE_TENSORFLOW
 function verify_tensorflow_directories() {
     # NOTE: This function must be called after TensorFlow is built from source
@@ -1275,48 +1313,41 @@ function is_cmake_debuginfo_build_type() {
 function common_cross_c_flags() {
     echo -n "${COMMON_C_FLAGS}"
 
-    case $1 in
-        iphonesimulator-i386)
-            echo -n " -arch i386 -mios-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+    local host=$1
+    local arch=${host##*-}
+
+    case $host in
+        iphonesimulator-*)
+            echo -n " -arch ${arch}  -mios-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
             ;;
-        iphonesimulator-x86_64)
-            echo -n " -arch x86_64 -mios-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+        iphoneos-*)
+            echo -n " -arch ${arch}  -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
             ;;
-        iphoneos-armv7)
-            echo -n " -arch armv7 -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+        appletvsimulator-*)
+            echo -n " -arch ${arch}  -mtvos-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_TVOS}"
             ;;
-        iphoneos-armv7s)
-            echo -n " -arch armv7s -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+        appletvos-*)
+            echo -n " -arch ${arch}  -mtvos-version-min=${DARWIN_DEPLOYMENT_VERSION_TVOS}"
             ;;
-        iphoneos-arm64)
-            echo -n " -arch arm64 -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+        watchsimulator-*)
+            echo -n " -arch ${arch}  -mwatchos-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
-        appletvsimulator-x86_64)
-            echo -n " -arch x86_64 -mtvos-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_TVOS}"
+        watchos-*)
+            echo -n " -arch ${arch}  -mwatchos-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
-        appletvos-arm64)
-            echo -n " -arch arm64 -mtvos-version-min=${DARWIN_DEPLOYMENT_VERSION_TVOS}"
-            ;;
-        watchsimulator-i386)
-            echo -n " -arch i386 -mwatchos-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
-            ;;
-        watchos-armv7k)
-            echo -n " -arch armv7k -mwatchos-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
-            ;;
-        android-armv7)
-            echo -n " -arch armv7"
-            ;;
-        android-aarch64)
-            echo -n " -arch aarch64"
+        android-*)
+            echo -n " -arch ${arch}"
             ;;
     esac
+
+    local build_type=$2
+    if [[ $(is_cmake_release_build_type ${build_type}) ]] ; then
+      echo -n " -fno-stack-protector"
+    fi
 }
 
 function llvm_c_flags() {
-    echo -n " $(common_cross_c_flags $1)"
-    if [[ $(is_cmake_release_build_type "${LLVM_BUILD_TYPE}") ]] ; then
-        echo -n " -fno-stack-protector"
-    fi
+    echo -n " $(common_cross_c_flags $1 ${LLVM_BUILD_TYPE})"
     if [[ $(is_cmake_debuginfo_build_type "${LLVM_BUILD_TYPE}") ]] ; then
         if [[ $(is_llvm_lto_enabled) == "TRUE" ]] ; then
             echo -n " -gline-tables-only"
@@ -1327,10 +1358,7 @@ function llvm_c_flags() {
 }
 
 function cmark_c_flags() {
-    echo -n " $(common_cross_c_flags $1)"
-    if [[ $(is_cmake_release_build_type "${CMARK_BUILD_TYPE}") ]] ; then
-        echo -n " -fno-stack-protector"
-    fi
+    echo -n " $(common_cross_c_flags $1 ${CMARK_BUILD_TYPE})"
 }
 
 function swift_c_flags() {
@@ -1622,7 +1650,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 llvm_enable_projects=("clang")
 
-                if [[ ! "${SKIP_BUILD_COMPILER_RT}" ]]; then
+                if [[ ! "${SKIP_BUILD_COMPILER_RT}" && ! $(is_cross_tools_host ${host}) ]]; then
                     llvm_enable_projects+=("compiler-rt")
                 fi
 
@@ -1957,7 +1985,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
                 fi
 
-                if contains_product "lldb" ; then
+                if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
                     lldb_build_dir=$(build_directory ${host} lldb)
                     cmake_options=(
                         "${cmake_options[@]}"

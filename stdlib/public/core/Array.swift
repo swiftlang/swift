@@ -766,12 +766,6 @@ extension Array: RandomAccessCollection, MutableCollection {
   public var count: Int {
     return _getCount()
   }
-  
-  @inlinable
-  @_alwaysEmitIntoClient
-  public var first: Element? {
-    _getCount() == 0 ? nil : _buffer[0]
-  }
 }
 
 extension Array: ExpressibleByArrayLiteral {
@@ -1226,7 +1220,18 @@ extension Array: RangeReplaceableCollection {
       _buffer.count += writtenCount
     }
 
-    if writtenUpTo == buf.endIndex {
+    if _slowPath(writtenUpTo == buf.endIndex) {
+
+      // A shortcut for appending an Array: If newElements is an Array then it's
+      // guaranteed that buf.initialize(from: newElements) already appended all
+      // elements. It reduces code size, because the following code
+      // can be removed by the optimizer by constant folding this check in a
+      // generic specialization.
+      if newElements is [Element] {
+        _internalInvariant(remainder.next() == nil)
+        return
+      }
+
       // there may be elements that didn't fit in the existing buffer,
       // append them in slow sequence-only mode
       var newCount = _getCount()

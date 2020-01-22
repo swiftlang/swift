@@ -18,6 +18,8 @@ import os.path
 import platform
 import sys
 
+from build_swift.build_swift.wrappers import xcrun
+
 from . import product
 from .. import cache_util
 from .. import shell
@@ -52,7 +54,6 @@ class NinjaBuilder(product.ProductBuilder):
 
         env = None
         if platform.system() == "Darwin":
-            from .. import xcrun
             sysroot = xcrun.sdk_path("macosx")
             osx_version_min = self.args.darwin_deployment_version_osx
             assert sysroot is not None

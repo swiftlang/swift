@@ -331,6 +331,18 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   llvm_unreachable("bad DescriptiveDeclKind");
 }
 
+Optional<llvm::VersionTuple>
+Decl::getIntroducedOSVersion(PlatformKind Kind) const {
+  for (auto *attr: getAttrs()) {
+    if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
+      if (ava->Platform == Kind && ava->Introduced) {
+        return ava->Introduced;
+      }
+    }
+  }
+  return None;
+}
+
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
                                      StaticSpellingKind SSK) {
   switch (SSK) {
@@ -796,6 +808,10 @@ AvailabilityContext Decl::getAvailabilityForLinkage() const {
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->getAvailabilityForLinkage();
 
+  if (auto *ext = dyn_cast<ExtensionDecl>(this))
+    if (auto *nominal = ext->getExtendedNominal())
+      return nominal->getAvailabilityForLinkage();
+
   auto *dc = getDeclContext();
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
     return ext->getAvailabilityForLinkage();
@@ -816,6 +832,10 @@ bool Decl::isAlwaysWeakImported() const {
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->isAlwaysWeakImported();
+
+  if (auto *ext = dyn_cast<ExtensionDecl>(this))
+    if (auto *nominal = ext->getExtendedNominal())
+      return nominal->isAlwaysWeakImported();
 
   auto *dc = getDeclContext();
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
@@ -4123,6 +4143,19 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
     if (baseName.getIdentifier() == getASTContext().Id_CodingKeys) {
       action.emplace(ImplicitMemberAction::ResolveCodingKeys);
     }
+  } else {
+    auto argumentNames = member.getArgumentNames();
+    if (!member.isCompoundName() || argumentNames.size() == 1) {
+      if (baseName == DeclBaseName::createConstructor() &&
+          (member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
+        action.emplace(ImplicitMemberAction::ResolveDecodable);
+      } else if (!baseName.isSpecial() &&
+                 baseName.getIdentifier() == Context.Id_encode &&
+                 (member.isSimpleName() ||
+                  argumentNames.front() == Context.Id_to)) {
+        action.emplace(ImplicitMemberAction::ResolveEncodable);
+      }
+    }
   }
 
   if (auto actionToTake = action) {
@@ -7060,7 +7093,6 @@ StringRef AbstractFunctionDecl::getInlinableBodyText(
   return extractInlinableText(getASTContext().SourceMgr, body, scratch);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 /// A uniqued list of derivative function configurations.
 struct AbstractFunctionDecl::DerivativeFunctionConfigurationList
     : public llvm::SetVector<AutoDiffConfig> {
@@ -7101,7 +7133,6 @@ void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
   prepareDerivativeFunctionConfigurations();
   DerivativeFunctionConfigs->insert(config);
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                SourceLoc StaticLoc,
