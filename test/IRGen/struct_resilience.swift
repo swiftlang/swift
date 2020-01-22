@@ -60,14 +60,20 @@ public func functionWithResilientTypesSize(_ s: __owned Size, f: (__owned Size) 
 // Make sure we use a type metadata accessor function, and load indirect
 // field offsets from it.
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience35functionWithResilientTypesRectangleyy010resilient_A00G0VF"
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience35functionWithResilientTypesRectangleyy010resilient_A00G0VF"(%T16resilient_struct9RectangleV* noalias nocapture)
 public func functionWithResilientTypesRectangle(_ r: Rectangle) {
-  // CHECK: entry:
-  // CHECK-NEXT: [[PTR:%.*]] = bitcast %T16resilient_struct9RectangleV* %0
-  // CHECK-NEXT: [[E:%.*]] = getelementptr inbounds {{.*}} [[PTR]]
-  // CHECK-NEXT: [[COLOR_PTR:%.*]] = bitcast {{.*}} [[E]]
-  // CHECK-NEXT: [[COLOR_VAL:%.*]] = getelementptr inbounds %TSi, %TSi* [[COLOR_PTR]]
-  // CHECK-NEXT: [[COLOR:%.*]] = load {{.*}} [[COLOR_VAL]]
+// CHECK: entry:
+// CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct9RectangleVMa"([[INT]] 0)
+// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i32*
+// CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds i32, i32* [[METADATA_ADDR]], [[INT]] [[IDX:2|4|6]]
+// CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_PTR]]
+// CHECK-NEXT: [[STRUCT_ADDR:%.*]] = bitcast %T16resilient_struct9RectangleV* %0 to i8*
+// CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[STRUCT_ADDR]], i32 [[FIELD_OFFSET]]
+// CHECK-NEXT: [[FIELD_PTR:%.*]] = bitcast i8* [[FIELD_ADDR]] to %TSi*
+// CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds %TSi, %TSi* [[FIELD_PTR]], i32 0, i32 0
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load [[INT]], [[INT]]* [[FIELD_PAYLOAD_PTR]]
+
   _ = r.color
 
 // CHECK-NEXT: ret void
@@ -138,13 +144,17 @@ public struct StructWithResilientStorage {
 // metadata when accessing stored properties.
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{i32|i64}} @"$s17struct_resilience26StructWithResilientStorageV1nSivg"(%T17struct_resilience26StructWithResilientStorageV* {{.*}})
-// CHECK: entry:
-// CHECK-NEXT: [[PTR:%.*]] = bitcast %T17struct_resilience26StructWithResilientStorageV* %0
-// CHECK-NEXT: [[E:%.*]] = getelementptr inbounds {{.*}} [[PTR]]
-// CHECK-NEXT: [[N:%.*]] = bitcast {{.*}} [[E]]
-// CHECK-NEXT: [[N_VAL_PTR:%.*]] = getelementptr inbounds %TSi, %TSi* [[N]]
-// CHECK-NEXT: [[N_VAL:%.*]] = load [[INT]], [[INT]]* [[N_VAL_PTR]]
-// CHECK-NEXT: ret [[INT]] [[N_VAL]]
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s17struct_resilience26StructWithResilientStorageVMa"([[INT]] 0)
+// CHECK:      [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i32*
+// CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds i32, i32* [[METADATA_ADDR]], [[INT]] [[IDX:2|4|6]]
+// CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_PTR]]
+// CHECK-NEXT: [[STRUCT_ADDR:%.*]] = bitcast %T17struct_resilience26StructWithResilientStorageV* %0 to i8*
+// CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[STRUCT_ADDR]], i32 [[FIELD_OFFSET]]
+// CHECK-NEXT: [[FIELD_PTR:%.*]] = bitcast i8* [[FIELD_ADDR]] to %TSi*
+// CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds %TSi, %TSi* [[FIELD_PTR]], i32 0, i32 0
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load [[INT]], [[INT]]* [[FIELD_PAYLOAD_PTR]]
+// CHECK-NEXT: ret [[INT]] [[FIELD_PAYLOAD]]
 
 
 // Indirect enums with resilient payloads are still fixed-size.
