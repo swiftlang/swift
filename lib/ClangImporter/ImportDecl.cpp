@@ -7175,98 +7175,16 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
 
 void SwiftDeclConverter::importInheritedConstructors(
     const ClassDecl *classDecl, SmallVectorImpl<Decl *> &newMembers) {
-  if (!classDecl->hasSuperclass())
+  auto superclassDecl = classDecl->getSuperclassDecl();
+  if (!superclassDecl)
+    return;
+
+  auto superclassClangDecl = superclassDecl->getClangDecl();
+  if (!superclassClangDecl ||
+      !isa<clang::ObjCInterfaceDecl>(superclassClangDecl))
     return;
 
   auto curObjCClass = cast<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
-
-  auto inheritConstructors = [&](TinyPtrVector<ValueDecl *> members,
-                                 Optional<CtorInitializerKind> kind) {
-    const auto &languageVersion =
-        Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
-
-    for (auto member : members) {
-      auto ctor = dyn_cast<ConstructorDecl>(member);
-      if (!ctor)
-        continue;
-
-      // Don't inherit compatibility stubs.
-      if (ctor->getAttrs().isUnavailableInSwiftVersion(languageVersion))
-        continue;
-
-      // Don't inherit (non-convenience) factory initializers.
-      // Note that convenience factories return instancetype and can be
-      // inherited.
-      switch (ctor->getInitKind()) {
-      case CtorInitializerKind::Factory:
-        continue;
-      case CtorInitializerKind::ConvenienceFactory:
-      case CtorInitializerKind::Convenience:
-      case CtorInitializerKind::Designated:
-        break;
-      }
-
-      auto objcMethod =
-          dyn_cast_or_null<clang::ObjCMethodDecl>(ctor->getClangDecl());
-      if (!objcMethod)
-        continue;
-
-      auto &clangSourceMgr = Impl.getClangASTContext().getSourceManager();
-      clang::PrettyStackTraceDecl trace(objcMethod, clang::SourceLocation(),
-                                        clangSourceMgr,
-                                        "importing (inherited)");
-
-      // If this initializer came from a factory method, inherit
-      // it as an initializer.
-      if (objcMethod->isClassMethod()) {
-        assert(ctor->getInitKind() == CtorInitializerKind::ConvenienceFactory);
-
-        Optional<ImportedName> correctSwiftName;
-        ImportedName importedName =
-            importFullName(objcMethod, correctSwiftName);
-        assert(
-            !correctSwiftName &&
-            "Import inherited initializers never references correctSwiftName");
-        importedName.setHasCustomName();
-        bool redundant;
-        if (auto newCtor =
-                importConstructor(objcMethod, classDecl,
-                                  /*implicit=*/true, ctor->getInitKind(),
-                                  /*required=*/false, ctor->getObjCSelector(),
-                                  importedName, objcMethod->parameters(),
-                                  objcMethod->isVariadic(), redundant)) {
-          // If this is a compatibility stub, mark it as such.
-          if (correctSwiftName)
-            markAsVariant(newCtor, *correctSwiftName);
-
-          Impl.importAttributes(objcMethod, newCtor, curObjCClass);
-          newMembers.push_back(newCtor);
-        }
-        continue;
-      }
-
-      // Figure out what kind of constructor this will be.
-      CtorInitializerKind myKind;
-      bool isRequired = false;
-      if (ctor->isRequired()) {
-        // Required initializers are always considered designated.
-        isRequired = true;
-        myKind = CtorInitializerKind::Designated;
-      } else if (kind) {
-        myKind = *kind;
-      } else {
-        myKind = ctor->getInitKind();
-      }
-
-      // Import the constructor into this context.
-      if (auto newCtor =
-              importConstructor(objcMethod, classDecl,
-                                /*implicit=*/true, myKind, isRequired)) {
-        Impl.importAttributes(objcMethod, newCtor, curObjCClass);
-        newMembers.push_back(newCtor);
-      }
-    }
-  };
 
   // The kind of initializer to import. If this class has designated
   // initializers, everything it inherits is a convenience initializer.
@@ -7274,13 +7192,91 @@ void SwiftDeclConverter::importInheritedConstructors(
   if (curObjCClass->hasDesignatedInitializers())
     kind = CtorInitializerKind::Convenience;
 
+  const auto &languageVersion =
+      Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
 
-  // If we have a superclass, import from it.
-  auto superclass = classDecl->getSuperclassDecl();
-  if (auto superclassClangDecl = superclass->getClangDecl()) {
-    if (isa<clang::ObjCInterfaceDecl>(superclassClangDecl)) {
-      inheritConstructors(superclass->lookupDirect(DeclBaseName::createConstructor()),
-                          kind);
+  auto members = superclassDecl->lookupDirect(
+      DeclBaseName::createConstructor());
+
+  for (auto member : members) {
+    auto ctor = dyn_cast<ConstructorDecl>(member);
+    if (!ctor)
+      continue;
+
+    // Don't inherit compatibility stubs.
+    if (ctor->getAttrs().isUnavailableInSwiftVersion(languageVersion))
+      continue;
+
+    // Don't inherit (non-convenience) factory initializers.
+    // Note that convenience factories return instancetype and can be
+    // inherited.
+    switch (ctor->getInitKind()) {
+    case CtorInitializerKind::Factory:
+      continue;
+    case CtorInitializerKind::ConvenienceFactory:
+    case CtorInitializerKind::Convenience:
+    case CtorInitializerKind::Designated:
+      break;
+    }
+
+    auto objcMethod =
+        dyn_cast_or_null<clang::ObjCMethodDecl>(ctor->getClangDecl());
+    if (!objcMethod)
+      continue;
+
+    auto &clangSourceMgr = Impl.getClangASTContext().getSourceManager();
+    clang::PrettyStackTraceDecl trace(objcMethod, clang::SourceLocation(),
+                                      clangSourceMgr,
+                                      "importing (inherited)");
+
+    // If this initializer came from a factory method, inherit
+    // it as an initializer.
+    if (objcMethod->isClassMethod()) {
+      assert(ctor->getInitKind() == CtorInitializerKind::ConvenienceFactory);
+
+      Optional<ImportedName> correctSwiftName;
+      ImportedName importedName =
+          importFullName(objcMethod, correctSwiftName);
+      assert(
+          !correctSwiftName &&
+          "Import inherited initializers never references correctSwiftName");
+      importedName.setHasCustomName();
+      bool redundant;
+      if (auto newCtor =
+              importConstructor(objcMethod, classDecl,
+                                /*implicit=*/true, ctor->getInitKind(),
+                                /*required=*/false, ctor->getObjCSelector(),
+                                importedName, objcMethod->parameters(),
+                                objcMethod->isVariadic(), redundant)) {
+        // If this is a compatibility stub, mark it as such.
+        if (correctSwiftName)
+          markAsVariant(newCtor, *correctSwiftName);
+
+        Impl.importAttributes(objcMethod, newCtor, curObjCClass);
+        newMembers.push_back(newCtor);
+      }
+      continue;
+    }
+
+    // Figure out what kind of constructor this will be.
+    CtorInitializerKind myKind;
+    bool isRequired = false;
+    if (ctor->isRequired()) {
+      // Required initializers are always considered designated.
+      isRequired = true;
+      myKind = CtorInitializerKind::Designated;
+    } else if (kind) {
+      myKind = *kind;
+    } else {
+      myKind = ctor->getInitKind();
+    }
+
+    // Import the constructor into this context.
+    if (auto newCtor =
+            importConstructor(objcMethod, classDecl,
+                              /*implicit=*/true, myKind, isRequired)) {
+      Impl.importAttributes(objcMethod, newCtor, curObjCClass);
+      newMembers.push_back(newCtor);
     }
   }
 }
@@ -8660,11 +8656,11 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
 void ClangImporter::Implementation::importInheritedConstructors(
      const clang::ObjCInterfaceDecl *curObjCClass,
      const ClassDecl *classDecl, SmallVectorImpl<Decl *> &newMembers) {
-   if (curObjCClass->getName() != "Protocol") {
-     SwiftDeclConverter converter(*this, CurrentVersion);
-     converter.importInheritedConstructors(classDecl, newMembers);
-   }
- }
+  if (curObjCClass->getName() != "Protocol") {
+    SwiftDeclConverter converter(*this, CurrentVersion);
+    converter.importInheritedConstructors(classDecl, newMembers);
+  }
+}
 
 void ClangImporter::Implementation::collectMembersToAdd(
     const clang::ObjCContainerDecl *objcContainer, Decl *D, DeclContext *DC,
