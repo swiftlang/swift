@@ -417,27 +417,10 @@ namespace {
           IGF.IGM.getMetadataLayout(TheStruct.getStructOrBoundGenericStruct());
       auto offset = layout.getFieldOffset(
           IGF, layout.getDecl()->getStoredProperties()[index]);
-
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
-      Address fieldVector = emitAddressOfFieldOffsetVector(IGF, metadata,
-                                    TheStruct.getStructOrBoundGenericStruct());
-      auto oldField = IGF.Builder.CreateConstArrayGEP(fieldVector, index,
-                                                    IGF.IGM.getPointerSize());
-      auto oldRet = IGF.Builder.CreateLoad(oldField);
-
       auto field = IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.Int32Ty,
                                            IGF.IGM.getPointerAlignment());
       auto newRet = IGF.Builder.CreateLoad(field);
-
-      auto assertEqFnTy = llvm::FunctionType::get(IGF.IGM.VoidTy,
-                                                  {IGF.IGM.Int64Ty, IGF.IGM.Int64Ty},
-                                                  false);
-      auto assertEq = IGF.IGM.Module.getOrInsertFunction("swift_assertEqual", assertEqFnTy);
-      
-      auto a = IGF.Builder.CreateIntCast(newRet, IGF.IGM.Int64Ty, true);
-      auto b = IGF.Builder.CreateIntCast(oldRet, IGF.IGM.Int64Ty, true);
-      IGF.Builder.CreateCall(cast<llvm::Constant>(assertEq.getCallee()),
-                             {a, b});
       return newRet;
     }
 
