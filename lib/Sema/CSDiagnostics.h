@@ -1926,6 +1926,15 @@ public:
   bool diagnoseAsError();
 };
 
+class UnableToInferProtocolLiteralType final : public FailureDiagnostic {
+public:
+  UnableToInferProtocolLiteralType(ConstraintSystem &cs,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator) {}
+
+  bool diagnoseAsError();
+};
+
 } // end namespace constraints
 } // end namespace swift
 

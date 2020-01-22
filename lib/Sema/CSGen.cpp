@@ -1277,7 +1277,8 @@ namespace {
 
       auto tv = CS.createTypeVariable(exprLoc,
                                       TVO_PrefersSubtypeBinding |
-                                      TVO_CanBindToNoEscape);
+                                      TVO_CanBindToNoEscape |
+                                      TVO_CanBindToHole);
       
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
                        protocol->getDeclaredType(),
