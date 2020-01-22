@@ -3613,7 +3613,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   // Get the parent type.
   Type Ty;
   DeclContext *dc = decl->getDeclContext();
-  if (dc->isTypeContext()) {
+  if (!isa<ProtocolDecl>(decl) && dc->isTypeContext()) {
     switch (kind) {
     case DeclTypeKind::DeclaredType: {
       auto *nominal = dc->getSelfNominalTypeDecl();
