@@ -160,8 +160,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   %a = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.a2
 
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i32*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 8
-  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 2
+  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 10
   // CHECK: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_ADDR]], align 8
   // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
   // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i32 [[FIELD_OFFSET]]
@@ -169,8 +168,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   %b = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.b
 
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i32*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 8
-  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 3
+  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 11
   // CHECK: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_ADDR]], align 8
   // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
   // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i32 [[FIELD_OFFSET]]
@@ -179,8 +177,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   %c = struct_element_addr %5 : $*SingleDynamic<B>, #SingleDynamic.x
 
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i32*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 8
-  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 4
+  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 12
   // CHECK: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_ADDR]], align 8
   // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
   // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i32 [[FIELD_OFFSET]]
