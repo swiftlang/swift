@@ -31,8 +31,8 @@ struct ModuleInterfaceOptions {
   /// interface, or should we fully-qualify them?
   bool PreserveTypesAsWritten = false;
 
-  /// See \ref FrontendOptions.PrintFullConvention.
-  /// FIXME: [clang-function-type-serialization] This flag should go away.
+  /// Should we emit the cType when printing @convention(c) or no?
+  /// FIXME: [clang-function-type-serialization] This check should go away.
   bool PrintFullConvention = false;
 
   /// Copy of all the command-line flags passed at .swiftinterface

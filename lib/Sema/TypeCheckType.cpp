@@ -1814,12 +1814,8 @@ namespace {
                                 TypeResolutionOptions options,
                                 SILCoroutineKind coroutineKind
                                   = SILCoroutineKind::None,
-                                SILFunctionType::ExtInfo incompleteExtInfo
+                                SILFunctionType::ExtInfo extInfo
                                   = SILFunctionType::ExtInfo(),
-                                SILFunctionType::Representation representation
-                                  = SILFunctionType::Representation::Thick,
-                                const clang::Type *parsedClangType
-                                  = nullptr,
                                 ParameterConvention calleeConvention
                                   = DefaultParameterConvention,
                                 TypeRepr *witnessmethodProtocol = nullptr);
@@ -2269,14 +2265,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                 : DifferentiabilityKind::Normal;
       }
 
-      SILFunctionType::ExtInfo incompleteExtInfo(
-        SILFunctionType::Representation::Thick,
-        attrs.has(TAK_pseudogeneric), attrs.has(TAK_noescape), diffKind,
-        /*clangFunctionType*/ nullptr);
+      // Resolve the function type directly with these attributes.
+      // TODO: [store-sil-clang-function-type]
+      SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
+                                       attrs.has(TAK_noescape), diffKind,
+                                       nullptr);
 
-      ty = resolveSILFunctionType(fnRepr, options, coroutineKind,
-                                  incompleteExtInfo, rep,
-                                  /*parsedClangType*/nullptr,
+      ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
       if (!ty || ty->hasError())
         return ty;
@@ -2777,15 +2772,12 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
   return SILBoxType::get(Context, layout, subMap);
 }
 
-Type TypeResolver::resolveSILFunctionType(
-    FunctionTypeRepr *repr,
-    TypeResolutionOptions options,
-    SILCoroutineKind coroutineKind,
-    SILFunctionType::ExtInfo incompleteExtInfo,
-    SILFunctionType::Representation representation,
-    const clang::Type *parsedClangType,
-    ParameterConvention callee,
-    TypeRepr *witnessMethodProtocol) {
+Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
+                                          TypeResolutionOptions options,
+                                          SILCoroutineKind coroutineKind,
+                                          SILFunctionType::ExtInfo extInfo,
+                                          ParameterConvention callee,
+                                          TypeRepr *witnessMethodProtocol) {
   options.setContext(None);
 
   bool hasError = false;
@@ -2929,20 +2921,6 @@ Type TypeResolver::resolveSILFunctionType(
     assert(witnessMethodConformance &&
            "found witness_method without matching conformance");
   }
-
-  const clang::Type *clangFnType = parsedClangType;
-  if ((representation == SILFunctionType::Representation::CFunctionPointer)
-      && !clangFnType) {
-    assert(results.size() <= 1 && yields.size() == 0
-           && "@convention(c) functions have at most 1 result and 0 yields.");
-    auto result = results.empty() ? Optional<SILResultInfo>() : results[0];
-    clangFnType = Context.getCanonicalClangFunctionType(interfaceParams, result,
-                                                        incompleteExtInfo,
-                                                        representation);
-  }
-
-  auto extInfo = incompleteExtInfo.withRepresentation(representation)
-                                  .withClangFunctionType(clangFnType);
 
   return SILFunctionType::get(genericSig, extInfo, coroutineKind,
                               callee,
