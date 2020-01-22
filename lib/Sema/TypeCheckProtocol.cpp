@@ -5346,11 +5346,6 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   // DerivedConformance::getDerivableRequirement.
   auto *protocol = cast<ProtocolDecl>(Requirement->getDeclContext());
 
-  // TODO: Change this to something more principled.
-  if (protocol->getNameStr() == "Generic") {
-    return nullptr;
-  }
-
   auto knownKind = protocol->getKnownProtocolKind();
   
   if (!knownKind)
@@ -5398,47 +5393,6 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
                                     AssociatedTypeDecl *AssocType) {
   auto *protocol = cast<ProtocolDecl>(AssocType->getDeclContext());
 
-  // TODO: Change this to something more principled.
-  if (protocol->getNameStr() == "Generic") {
-    auto &ctx = DC->getASTContext();
-    auto gpId = ctx.getIdentifier("GenericProgramming");
-    auto gpModule = ctx.getLoadedModule(gpId);
-    if (!gpModule) return nullptr;
-    StructDecl *productStruct = nullptr;
-    SmallVector<ValueDecl *, 1> productResults;
-    auto productId = ctx.getIdentifier("Product");
-    gpModule->lookupValue(productId, NLKind::UnqualifiedLookup, productResults);
-    for (auto productResult0 : productResults) {
-      if (auto productResult = dyn_cast<StructDecl>(productResult0)) {
-        productStruct = productResult;
-      }
-    }
-
-    // TODO: Update the doc.
-    // 0 -> Void
-    // 1 -> Int
-    // 2 -> Product<Int, Int>
-    // 3 -> Product<Int, Product<Int, Int>>
-    SmallVector<Type, 4> propTypesImpl;
-    for (auto prop : TypeDecl->getStoredProperties()) {
-      propTypesImpl.push_back(prop->getType());
-    }
-    ArrayRef<Type> propTypes = propTypesImpl;
-    if (propTypes.size() == 0) {
-      return ctx.getVoidDecl()->getUnderlyingType();
-    } else if (propTypes.size() == 1) {
-      return propTypes[0];
-    } else {
-      auto result = BoundGenericType::get(productStruct, Type(), propTypes.take_back(2));
-      propTypes = propTypes.drop_back(2);
-      while (propTypes.size() > 0) {
-        result = BoundGenericType::get(productStruct, Type(), {propTypes.back(), result});
-        propTypes = propTypes.drop_back(1);
-      }
-      return result;
-    }
-  }
-
   auto knownKind = protocol->getKnownProtocolKind();
   
   if (!knownKind)
@@ -5453,6 +5407,8 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
     return derived.deriveRawRepresentable(AssocType);
   case KnownProtocolKind::CaseIterable:
     return derived.deriveCaseIterable(AssocType);
+  case KnownProtocolKind::Generic:
+    return derived.deriveGenericRepresentation(AssocType);
   default:
     return nullptr;
   }

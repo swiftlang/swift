@@ -54,14 +54,14 @@ Type DerivedConformance::getProtocolType() const {
 bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
                                                     NominalTypeDecl *Nominal,
                                                     ProtocolDecl *Protocol) {
-  // TODO: Change this to something more principled.
-  if (Protocol->getNameStr() == "Generic")
-    return true;
-
   // Only known protocols can be derived.
   auto knownProtocol = Protocol->getKnownProtocolKind();
   if (!knownProtocol)
     return false;
+
+  if (*knownProtocol == KnownProtocolKind::Generic) {
+    return canDeriveGeneric(Nominal);
+  }
 
   if (*knownProtocol == KnownProtocolKind::Hashable) {
     // We can always complete a partial Hashable implementation, and we can
@@ -271,6 +271,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // CaseIterable.AllCases
     if (name.isSimpleName(ctx.Id_AllCases))
       return getRequirement(KnownProtocolKind::CaseIterable);
+
+    // Generic.Representation
+    if (name.isSimpleName(ctx.Id_Representation))
+      return getRequirement(KnownProtocolKind::Generic);
 
     return nullptr;
   }

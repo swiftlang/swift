@@ -198,6 +198,13 @@ public:
   /// Derive the CodingKeys requirement for a value type.
   TypeDecl *derivePhantomCodingKeysRequirement();
 
+  /// Determine if a Generic requirement can be derived for a type.
+  static bool canDeriveGeneric(NominalTypeDecl *type);
+
+  /// Derive a Generic.Representation type witness.
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveGenericRepresentation(AssociatedTypeDecl *assocType);
+
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>
   declareDerivedProperty(Identifier name, Type propertyInterfaceType,
