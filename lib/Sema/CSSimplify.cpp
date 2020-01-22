@@ -5461,22 +5461,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   auto addChoice = [&](OverloadChoice candidate) {
     auto decl = candidate.getDecl();
 
-    // In a pattern binding initializer, immediately reject all of its bound
-    // variables. These would otherwise allow circular references.
-    if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC)) {
-      if (auto *VD = dyn_cast<VarDecl>(decl)) {
-        if (PBI->getBinding() == VD->getParentPatternBinding()) {
-          // If this is a recursive reference to an instance variable,
-          // try to see if we can give a good diagnostic by adding it as
-          // an unviable candidate.
-          if (!VD->isStatic()) {
-            result.addUnviable(candidate,
-                               MemberLookupResult::UR_InstanceMemberOnType);
-          }
-          return;
-        }
-      }
-    }
+    // Reject circular references immediately.
+    if (decl->isRecursiveValidation())
+      return;
 
     // If the result is invalid, skip it.
     if (decl->isInvalid()) {
@@ -6040,10 +6027,6 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     switch (*reason) {
     case MemberLookupResult::UR_InstanceMemberOnType:
     case MemberLookupResult::UR_TypeMemberOnInstance: {
-      if (choice.getKind() == OverloadChoiceKind::DynamicMemberLookup ||
-          choice.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup)
-        return nullptr;
-
       return choice.isDecl()
                  ? AllowTypeOrInstanceMember::create(
                        cs, baseTy, choice.getDecl(), memberName, locator)
@@ -6371,14 +6354,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         }
       }
     }
-
-    // FIXME(diagnostics): Errors related to `AnyObject` could be diagnosed
-    // better in the future, relevant failure information has to be extracted
-    // from `performMemberLookup` result, in order to figure out if it was a
-    // simple labeling or # of arguments mismatch, or member with requested name
-    // really doesn't exist.
-    if (baseTy->isAnyObject())
-      return SolutionKind::Error;
 
     result = performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                                  /*includeInaccessibleMembers*/ true);
