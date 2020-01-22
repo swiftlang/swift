@@ -640,12 +640,9 @@ public:
 
   /// Pretty-print the module to the designated stream.
   ///
-  /// \param Verbose Dump SIL location information in verbose mode.
   /// \param M If present, the types and declarations from this module will be
   ///        printed. The module would usually contain the types and Decls that
   ///        the SIL module depends on.
-  /// \param ShouldSort If set to true sorts functions, vtables, sil global
-  ///        variables, and witness tables by name to ease diffing.
   /// \param PrintASTDecls If set to true print AST decls.
   void print(raw_ostream &OS,
              ModuleDecl *M = nullptr,
