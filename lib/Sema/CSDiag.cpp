@@ -239,7 +239,6 @@ private:
   bool visitTryExpr(TryExpr *E);
 
   bool visitUnresolvedDotExpr(UnresolvedDotExpr *UDE);
-  bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
 
   bool visitApplyExpr(ApplyExpr *AE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
@@ -1720,74 +1719,6 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   // Don't walk the children for this node, it leads to multiple diagnostics
   // because of how sema injects this node into the type checker.
   return false;
-}
-
-/// When an object literal fails to typecheck because its protocol's
-/// corresponding default type has not been set in the global namespace (e.g.
-/// _ColorLiteralType), suggest that the user import the appropriate module for
-/// the target.
-bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
-  // Type check the argument first.
-  auto protocol = TypeChecker::getLiteralProtocol(CS.getASTContext(), E);
-  if (!protocol)
-    return false;
-  auto constrName =
-      TypeChecker::getObjectLiteralConstructorName(CS.getASTContext(), E);
-  assert(constrName);
-  auto *constr = dyn_cast_or_null<ConstructorDecl>(
-      protocol->getSingleRequirement(constrName));
-  if (!constr)
-    return false;
-  auto paramType = TypeChecker::getObjectLiteralParameterType(E, constr);
-  if (!typeCheckChildIndependently(
-        E->getArg(), paramType, CTP_CallArgument))
-    return true;
-
-  // Conditions for showing this diagnostic:
-  // * The object literal protocol's default type is unimplemented
-  if (TypeChecker::getDefaultType(protocol, CS.DC))
-    return false;
-  // * The object literal has no contextual type
-  if (CS.getContextualType())
-    return false;
-
-  // Figure out what import to suggest.
-  auto &Ctx = CS.getASTContext();
-  const auto &target = Ctx.LangOpts.Target;
-  StringRef importModule;
-  StringRef importDefaultTypeName;
-  if (protocol == Ctx.getProtocol(KnownProtocolKind::ExpressibleByColorLiteral)) {
-    if (target.isMacOSX()) {
-      importModule = "AppKit";
-      importDefaultTypeName = "NSColor";
-    } else if (target.isiOS() || target.isTvOS()) {
-      importModule = "UIKit";
-      importDefaultTypeName = "UIColor";
-    }
-  } else if (protocol == Ctx.getProtocol(
-               KnownProtocolKind::ExpressibleByImageLiteral)) {
-    if (target.isMacOSX()) {
-      importModule = "AppKit";
-      importDefaultTypeName = "NSImage";
-    } else if (target.isiOS() || target.isTvOS()) {
-      importModule = "UIKit";
-      importDefaultTypeName = "UIImage";
-    }
-  } else if (protocol == Ctx.getProtocol( 
-               KnownProtocolKind::ExpressibleByFileReferenceLiteral)) {
-    importModule = "Foundation";
-    importDefaultTypeName = "URL";
-  }
-
-  // Emit the diagnostic.
-  const auto plainName = E->getLiteralKindPlainName();
-  Ctx.Diags.diagnose(E->getLoc(), diag::object_literal_default_type_missing,
-                     plainName);
-  if (!importModule.empty()) {
-    Ctx.Diags.diagnose(E->getLoc(), diag::object_literal_resolve_import,
-                       importModule, importDefaultTypeName, plainName);
-  }
-  return true;
 }
 
 bool FailureDiagnosis::diagnoseMemberFailures(
