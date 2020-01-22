@@ -28,7 +28,7 @@ Swift Next
 
 * [SE-0269][]:
 
-  When an escaping closure explicitly captures `self` it its capture list, the
+  When an escaping closure explicitly captures `self` in its capture list, the
   use of implicit `self` is enabled within that closure. This means that the
   following code is now valid:
   
