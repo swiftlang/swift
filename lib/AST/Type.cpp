@@ -3224,13 +3224,54 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanTypes, HasExplicitAnyObject);
 }
 
-void AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType(
-    ClangModuleLoader *cml, llvm::raw_ostream &os) {
-  cml->printClangType(ClangFunctionType, os);
+static_assert(
+  llvm::PointerLikeTypeTraits<clang::Type *>::NumLowBitsAvailable
+    >= llvm::detail::ConstantLog2<alignof(void **)>::value,
+  "We rely on this in ClangTypeWrapper's implementation");
+
+bool ClangTypeWrapper::isCanonical() const {
+  assert(!empty() && "Can't talk about canonicity without having a Clang type");
+  return isDerivableFromSwiftType() && getType()->isCanonicalUnqualified();
 }
 
-static void assertIsFunctionType(const clang::Type *type) {
+ClangTypeWrapper ClangTypeWrapper::getCanonicalType() const {
+  if (empty())
+    return nullptr;
+  // We mark "derivable" as being the canonical one because most of the
+  // @convention(c) functions we encounter will not be annotated with a cType,
+  // hence, we can avoid creating a separate canonical type if the existing
+  // type is already canonical otherwise.
+  return ClangTypeWrapper::derivableFromSwiftType(
+    getType()->getCanonicalTypeInternal().getTypePtr());
+}
+
+void ClangTypeWrapper::printType(ClangModuleLoader *cml,
+                                 llvm::raw_ostream &os) const {
+  cml->printClangType(getType(), os);
+}
+
+ClangTypeWrapper
+ClangTypeWrapper::pickForExtInfo(const clang::Type *parsed,
+                                 ClangTypeWrapper computed)  {
+  if (!parsed)
+    return computed;
+  if (computed.empty())
+    return notDerivableFromSwiftType(parsed);
+  assert(computed.isDerivableFromSwiftType());
+  auto parsedType = clang::QualType(parsed, 0);
+  auto computedType = clang::QualType(computed.getType(), 0);
+  if (parsedType == computedType)
+    return computed;
+  if (parsedType.getCanonicalType() == computedType.getCanonicalType())
+    // Preserve type with more sugar and att.
+    return ClangTypeWrapper::derivableFromSwiftType(parsed);
+  return ClangTypeWrapper::notDerivableFromSwiftType(parsed);
+}
+
+
+void ClangTypeWrapper::assertIsFunctionType() const {
 #ifndef NDEBUG
+  auto *type = getType()->getCanonicalTypeInternal().getTypePtr();
   if (!(type->isFunctionPointerType() || type->isBlockPointerType())) {
     SmallString<256> buf;
     llvm::raw_svector_ostream os(buf);
@@ -3243,11 +3284,12 @@ static void assertIsFunctionType(const clang::Type *type) {
   return;
 }
 
-void AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
-  ::assertIsFunctionType(type);
+bool ClangTypeWrapper::operator==(ClangTypeWrapper other) const {
+  return inner.getInt() == other.inner.getInt()
+      && clang::QualType(getType(), 0) == clang::QualType(other.getType(), 0);
 }
 
-const clang::Type *AnyFunctionType::getClangFunctionType() const {
+ClangTypeWrapper AnyFunctionType::getClangFunctionType() const {
   switch (getKind()) {
   case TypeKind::Function:
     return cast<FunctionType>(this)->getClangFunctionType();
@@ -3259,21 +3301,19 @@ const clang::Type *AnyFunctionType::getClangFunctionType() const {
   }
 }
 
-const clang::Type *AnyFunctionType::getCanonicalClangFunctionType() const {
-  auto *ty = getClangFunctionType();
-  return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
+ClangTypeWrapper AnyFunctionType::getCanonicalClangFunctionType() const {
+  auto cty = getClangFunctionType();
+  if (cty.empty())
+    return cty;
+  return cty.getCanonicalType();
 }
 
-void SILFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
-  ::assertIsFunctionType(type);
-}
-
-const clang::Type *SILFunctionType::getClangFunctionType() const {
-  if (!Bits.SILFunctionType.HasUncommonInfo)
+ClangTypeWrapper SILFunctionType::getClangFunctionType() const {
+  if (!Bits.SILFunctionType.HasClangType)
     return nullptr;
-  auto *type = getTrailingObjects<ExtInfo::Uncommon>()->ClangFunctionType;
-  assert(type && "If the pointer was null, we shouldn't have stored it.");
-  return type;
+  auto cty = *getTrailingObjects<ClangTypeWrapper>();
+  assert(cty.getType() && "Shouldn't have stored a null pointer.");
+  return cty;
 }
 
 FunctionType *

@@ -594,7 +594,7 @@ public:
   ///                          information, in case it is needed.
   /// \param trueRep The actual calling convention, which must be C-compatible.
   ///                The calling convention in \p incompleteExtInfo is ignored.
-  const clang::Type *
+  ClangTypeWrapper
   getClangFunctionType(ArrayRef<AnyFunctionType::Param> params, Type resultTy,
                        const FunctionType::ExtInfo incompleteExtInfo,
                        FunctionTypeRepresentation trueRep);
@@ -602,7 +602,7 @@ public:
   /// Get the canonical Clang type corresponding to a SIL function type.
   ///
   /// SIL analog of \c ASTContext::getClangFunctionType .
-  const clang::Type *
+  ClangTypeWrapper
   getCanonicalClangFunctionType(
     ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
     const SILFunctionType::ExtInfo incompleteExtInfo,

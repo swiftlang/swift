@@ -543,7 +543,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
 
   auto results = blockInterfaceTy->getResults();
   auto incompleteExtInfo = SILFunctionType::ExtInfo();
-  auto *clangFnType = getASTContext().getCanonicalClangFunctionType(
+  auto clangFnType = getASTContext().getCanonicalClangFunctionType(
         params, results.empty() ? Optional<SILResultInfo>() : results[0],
         incompleteExtInfo,
         SILFunctionType::Representation::CFunctionPointer);

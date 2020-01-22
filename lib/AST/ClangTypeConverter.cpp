@@ -617,12 +617,12 @@ clang::QualType ClangTypeConverter::visitEnumType(EnumType *type) {
 
 clang::QualType ClangTypeConverter::visitFunctionType(FunctionType *type) {
   // We must've already computed it before if applicable.
-  return clang::QualType(type->getClangFunctionType(), 0);
+  return clang::QualType(type->getClangFunctionType().getType(), 0);
 }
 
 clang::QualType ClangTypeConverter::visitSILFunctionType(SILFunctionType *type) {
   // We must've already computed it before if applicable.
-  return clang::QualType(type->getClangFunctionType(), 0);
+  return clang::QualType(type->getClangFunctionType().getType(), 0);
 }
 
 clang::QualType

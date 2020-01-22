@@ -3032,17 +3032,17 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     return funcTy;
   }
 
-  Optional<ExtInfo::Uncommon> uncommon = info.getUncommonInfo();
+  Optional<ClangTypeWrapper> clangType = info.getClangTypeWrapper();
 
   size_t allocSize =
-    totalSizeToAlloc<AnyFunctionType::Param, ExtInfo::Uncommon>(
-      params.size(), uncommon.hasValue() ? 1 : 0);
+    totalSizeToAlloc<AnyFunctionType::Param, ClangTypeWrapper>(
+      params.size(), clangType.hasValue() ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isFunctionTypeCanonical(params, result);
-  if (uncommon.hasValue()) {
+  if (clangType.hasValue()) {
     if (ctx.LangOpts.UseClangFunctionTypes)
-      isCanonical &= uncommon->ClangFunctionType->isCanonicalUnqualified();
+      isCanonical &= clangType->isCanonical();
     else
       isCanonical = false;
   }
@@ -3063,9 +3063,9 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
                       output, properties, params.size(), info) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
-  Optional<ExtInfo::Uncommon> uncommon = info.getUncommonInfo();
-  if (uncommon.hasValue())
-    *getTrailingObjects<ExtInfo::Uncommon>() = uncommon.getValue();
+  Optional<ClangTypeWrapper> clangType = info.getClangTypeWrapper();
+  if (clangType.hasValue())
+    *getTrailingObjects<ClangTypeWrapper>() = clangType.getValue();
 }
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -3158,17 +3158,6 @@ ArrayRef<Requirement> GenericFunctionType::getRequirements() const {
   return Signature->getRequirements();
 }
 
-SILUncommonInfo::SILUncommonInfo(AnyFunctionType::ExtInfo::Uncommon uncommon) {
-  auto *ty = uncommon.ClangFunctionType;
-  ClangFunctionType = ty ? ty->getCanonicalTypeInternal().getTypePtr()
-                         : nullptr;
-}
-
-void SILUncommonInfo::printClangFunctionType(
-    ClangModuleLoader *cml, llvm::raw_ostream &os) const {
-  cml->printClangType(ClangFunctionType, os);
-}
-
 void SILFunctionType::Profile(
     llvm::FoldingSetNodeID &id,
     GenericSignature genericParams,
@@ -3234,7 +3223,7 @@ SILFunctionType::SILFunctionType(
   assert(Bits.SILFunctionType.ExtInfoBits == ext.Bits && "Bits were dropped!");
   static_assert(ExtInfo::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
-  Bits.SILFunctionType.HasUncommonInfo = ext.getUncommonInfo().hasValue();
+  Bits.SILFunctionType.HasClangType = ext.getClangTypeWrapper().hasValue();
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
   if (coroutineKind == SILCoroutineKind::None) {
@@ -3267,8 +3256,8 @@ SILFunctionType::SILFunctionType(
     getMutableFormalResultsCache() = CanType();
     getMutableAllResultsCache() = CanType();
   }
-  if (auto uncommon = ext.getUncommonInfo())
-    *getTrailingObjects<ExtInfo::Uncommon>() = uncommon.getValue();
+  if (auto clangType = ext.getClangTypeWrapper())
+    *getTrailingObjects<ClangTypeWrapper>() = clangType.getValue();
 
 #ifndef NDEBUG
   if (ext.getRepresentation() == Representation::WitnessMethod)
@@ -3390,10 +3379,10 @@ CanSILFunctionType SILFunctionType::get(
   // See [SILFunctionType-layout]
   bool hasResultCache = normalResults.size() > 1;
   size_t bytes = totalSizeToAlloc<SILParameterInfo, SILResultInfo, SILYieldInfo,
-                                  CanType, SILFunctionType::ExtInfo::Uncommon>(
+                                  CanType, ClangTypeWrapper>(
       params.size(), normalResults.size() + (errorResult ? 1 : 0),
       yields.size(), hasResultCache ? 2 : 0,
-      ext.getUncommonInfo().hasValue() ? 1 : 0);
+      ext.getClangTypeWrapper().hasValue() ? 1 : 0);
 
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
@@ -4395,17 +4384,18 @@ ASTContext::initializeClangTypeConverter() {
   }
 }
 
-const clang::Type *
+ClangTypeWrapper
 ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
                                  Type resultTy,
                                  FunctionType::ExtInfo incompleteExtInfo,
                                  FunctionTypeRepresentation trueRep) {
   initializeClangTypeConverter();
-  return getImpl().Converter.getValue().getFunctionType(params, resultTy,
-                                                        trueRep);
+  auto *ty = getImpl().Converter.getValue().getFunctionType(params, resultTy,
+                                                            trueRep);
+  return ty ? ClangTypeWrapper::derivableFromSwiftType(ty) : nullptr;
 }
 
-const clang::Type *
+ClangTypeWrapper
 ASTContext::getCanonicalClangFunctionType(
     ArrayRef<SILParameterInfo> params,
     Optional<SILResultInfo> result,
@@ -4414,7 +4404,7 @@ ASTContext::getCanonicalClangFunctionType(
   initializeClangTypeConverter();
   auto *ty = getImpl().Converter.getValue().getFunctionType(params, result,
                                                             trueRep);
-  return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
+  return ty ? ClangTypeWrapper::derivableFromSwiftType(ty) : nullptr;
 }
 
 CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {

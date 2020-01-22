@@ -397,7 +397,7 @@ Type ASTBuilder::createFunctionType(
     DifferentiabilityKind::NonDifferentiable,
     /*clangFunctionType*/nullptr);
 
-  const clang::Type *clangFunctionType = nullptr;
+  ClangTypeWrapper clangFunctionType(nullptr);
   if (representation == FunctionTypeRepresentation::CFunctionPointer)
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  incompleteExtInfo,
@@ -511,7 +511,7 @@ Type ASTBuilder::createImplFunctionType(
     funcErrorResult.emplace(type, conv);
   }
 
-  const clang::Type *clangFnType = nullptr;
+  ClangTypeWrapper clangFnType(nullptr);
   auto incompleteExtInfo = SILFunctionType::ExtInfo(
       SILFunctionType::Representation::Thick, flags.isPseudogeneric(),
       !flags.isEscaping(), DifferentiabilityKind::NonDifferentiable,

@@ -4741,7 +4741,7 @@ public:
     uint8_t rawRepresentation, rawDiffKind;
     bool noescape = false, throws;
     GenericSignature genericSig;
-    clang::Type *clangFunctionType = nullptr;
+    ClangTypeWrapper clangFunctionType(nullptr);
 
     // FIXME: [clang-function-type-serialization] Deserialize a clang::Type out
     // of the record.
@@ -5101,7 +5101,7 @@ public:
     GenericSignatureID rawGenericSig;
     SubstitutionMapID rawSubs;
     ArrayRef<uint64_t> variableData;
-    clang::FunctionType *clangFunctionType = nullptr;
+    ClangTypeWrapper clangFunctionType(nullptr);
 
     // FIXME: [clang-function-type-serialization] Deserialize a
     // clang::FunctionType out of the record.

@@ -486,8 +486,8 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
 
   auto rep = SILFunctionType::Representation::CFunctionPointer;
   auto incompleteExtInfo = SILFunctionType::ExtInfo();
-  auto *clangTy = C.getCanonicalClangFunctionType(params, results[0],
-                                                  incompleteExtInfo, rep);
+  auto clangTy = C.getCanonicalClangFunctionType(params, results[0],
+                                                 incompleteExtInfo, rep);
   auto extInfo = incompleteExtInfo.withRepresentation(rep)
                                   .withClangFunctionType(clangTy);
 

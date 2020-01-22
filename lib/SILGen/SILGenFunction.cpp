@@ -583,7 +583,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
         {SILResultInfo(OptNSStringTy, ResultConvention::Autoreleased)};
     auto incompleteExtInfo = SILFunctionType::ExtInfo();
     auto repr = SILFunctionType::Representation::CFunctionPointer;
-    auto *clangFnType = ctx.getCanonicalClangFunctionType(params,
+    auto clangFnType = ctx.getCanonicalClangFunctionType(params,
         resultInfos[0], incompleteExtInfo, repr);
     auto extInfo = incompleteExtInfo.withRepresentation(repr)
                                     .withClangFunctionType(clangFnType);

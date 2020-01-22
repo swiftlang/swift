@@ -416,9 +416,12 @@ namespace {
       
       if (pointeeQualType->isFunctionType()) {
         auto funcTy = pointeeType->castTo<FunctionType>();
-        auto extInfo = funcTy->getExtInfo().withRepresentation(
-                AnyFunctionType::Representation::CFunctionPointer)
-                                           .withClangFunctionType(type);
+        auto rep = AnyFunctionType::Representation::CFunctionPointer;
+        auto computedClangTy = funcTy->getASTContext().getClangFunctionType(
+          funcTy->getParams(), funcTy->getResult(), funcTy->getExtInfo(), rep);
+        auto clangTy = ClangTypeWrapper::pickForExtInfo(type, computedClangTy);
+        auto extInfo = funcTy->getExtInfo().withRepresentation(rep)
+                                           .withClangFunctionType(clangTy);
         return {
           FunctionType::get(funcTy->getParams(), funcTy->getResult(), extInfo),
           ImportHint::CFunctionPointer

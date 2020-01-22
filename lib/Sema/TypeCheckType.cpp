@@ -2671,13 +2671,16 @@ Type TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfo incompleteExtInfo(FunctionTypeRepresentation::Swift,
                                           noescape, repr->throws(), diffKind,
                                           /*clangFunctionType*/nullptr);
-  
-  const clang::Type *clangFnType = parsedClangFunctionType;
-  if (representation == AnyFunctionType::Representation::CFunctionPointer
-      && !clangFnType)
-    clangFnType = Context.getClangFunctionType(
+
+  ClangTypeWrapper computedType(nullptr);
+  if (representation == AnyFunctionType::Representation::CFunctionPointer)
+    computedType = Context.getClangFunctionType(
       params, outputTy, incompleteExtInfo,
       AnyFunctionType::Representation::CFunctionPointer);
+
+  ClangTypeWrapper clangFnType =
+    ClangTypeWrapper::pickForExtInfo(parsedClangFunctionType,
+                                     computedType);
 
   auto extInfo = incompleteExtInfo.withRepresentation(representation)
                                   .withClangFunctionType(clangFnType);
@@ -2930,16 +2933,19 @@ Type TypeResolver::resolveSILFunctionType(
            "found witness_method without matching conformance");
   }
 
-  const clang::Type *clangFnType = parsedClangType;
-  if ((representation == SILFunctionType::Representation::CFunctionPointer)
-      && !clangFnType) {
+  ClangTypeWrapper computedType(nullptr);
+  if (representation == SILFunctionType::Representation::CFunctionPointer) {
     assert(results.size() <= 1 && yields.size() == 0
            && "@convention(c) functions have at most 1 result and 0 yields.");
     auto result = results.empty() ? Optional<SILResultInfo>() : results[0];
-    clangFnType = Context.getCanonicalClangFunctionType(interfaceParams, result,
-                                                        incompleteExtInfo,
-                                                        representation);
+    computedType =
+      Context.getCanonicalClangFunctionType(interfaceParams, result,
+                                            incompleteExtInfo,
+                                            representation);
   }
+
+  ClangTypeWrapper clangFnType =
+    ClangTypeWrapper::pickForExtInfo(parsedClangType, computedType);
 
   auto extInfo = incompleteExtInfo.withRepresentation(representation)
                                   .withClangFunctionType(clangFnType);

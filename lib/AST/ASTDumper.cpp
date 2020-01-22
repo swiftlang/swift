@@ -3633,11 +3633,13 @@ namespace {
 
       OS << "\n";
       Indent += 2;
-      if (auto *cty = T->getClangFunctionType()) {
+      auto cty = T->getClangFunctionType();
+      if (!cty.empty()) {
         std::string s;
         llvm::raw_string_ostream os(s);
-        cty->dump(os);
-        printField("clang_type", os.str());
+        cty.printType(T->getASTContext().getClangModuleLoader(), os);
+        printField("clang_type", QuotedString(os.str()));
+        printFlag(cty.isDerivableFromSwiftType(), "derivable_from_swift_type");
       }
       printAnyFunctionParams(T->getParams(), "input");
       Indent -=2;
