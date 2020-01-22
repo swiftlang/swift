@@ -314,19 +314,6 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
 static StringRef
-getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
-  switch (value) {
-    case MagicIdentifierLiteralExpr::File: return "#file";
-    case MagicIdentifierLiteralExpr::FilePath: return "#filePath";
-    case MagicIdentifierLiteralExpr::Function: return "#function";
-    case MagicIdentifierLiteralExpr::Line: return "#line";
-    case MagicIdentifierLiteralExpr::Column: return "#column";
-    case MagicIdentifierLiteralExpr::DSOHandle: return "#dsohandle";
-  }
-
-  llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
-}
-static StringRef
 getObjCSelectorExprKindString(ObjCSelectorExpr::ObjCSelectorKind value) {
   switch (value) {
     case ObjCSelectorExpr::Method: return "method";
@@ -1957,7 +1944,7 @@ public:
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E) {
     printCommon(E, "magic_identifier_literal_expr")
-      << " kind=" << getMagicIdentifierLiteralExprKindString(E->getKind());
+      << " kind=" << MagicIdentifierLiteralExpr::getKindString(E->getKind());
 
     if (E->isString()) {
       OS << " encoding="
