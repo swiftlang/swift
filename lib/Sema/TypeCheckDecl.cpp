@@ -2366,6 +2366,7 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   forceConformance(Context.getProtocol(KnownProtocolKind::Decodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Encodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
+  forceConformance(Context.getProtocol(KnownProtocolKind::Generic));
 
   return CD->getMembers();
 }

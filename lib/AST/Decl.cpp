@@ -4047,10 +4047,6 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
     if (baseName.getIdentifier() == getASTContext().Id_CodingKeys) {
       action.emplace(ImplicitMemberAction::ResolveCodingKeys);
     }
-    if (baseName.getIdentifier().str() == "Representation") {
-      // TODO: Figure out a better way to do this.
-      action.emplace(ImplicitMemberAction::ResolveCodingKeys);
-    }
   }
 
   if (auto actionToTake = action) {
