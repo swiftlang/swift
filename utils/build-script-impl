@@ -115,75 +115,43 @@ KNOWN_SETTINGS=(
     darwin-xcrun-toolchain                        "default"         "the name of the toolchain to use on Darwin"
 
     ## Build Types for Components
-    cmark-build-type                              "Debug"           "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
-    foundation-build-type                         "Debug"           "the build variant for Foundation"
-    libdispatch-build-type                        "Debug"           "the build variant for libdispatch"
-    libicu-build-type                             "Debug"           "the build variant for libicu"
-    llbuild-build-type                            "Debug"           "the CMake build variant for llbuild"
-    lldb-build-type                               "Debug"           "the CMake build variant for LLDB"
-    llvm-build-type                               "Debug"           "the CMake build variant for LLVM and Clang (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
-    playgroundsupport-build-type                  "Debug"           "the build variant for PlaygroundSupport"
-    swift-build-type                              "Debug"           "the CMake build variant for Swift"
     swift-stdlib-build-type                       "Debug"           "the CMake build variant for Swift"
-    xctest-build-type                             "Debug"           "the build variant for xctest"
 
     ## Skip Build ...
     skip-build-android                            ""                "set to skip building Swift stdlibs for Android"
     skip-build-benchmarks                         ""                "set to skip building Swift Benchmark Suite"
     skip-build-clang-tools-extra                  ""                "set to skip building clang-tools-extra as part of llvm"
-    skip-build-cmark                              ""                "set to skip building CommonMark"
     skip-build-compiler-rt                        ""                "set to skip building Compiler-RT"
     skip-build-cygwin                             ""                "set to skip building Swift stdlibs for Cygwin"
     skip-build-external-benchmarks                "1"               "set to skip building the external Swift Benchmark Suite. (skipped by default)"
-    skip-build-foundation                         ""                "set to skip building foundation"
     skip-build-freebsd                            ""                "set to skip building Swift stdlibs for FreeBSD"
     skip-build-haiku                              ""                "set to skip building Swift stdlibs for Haiku"
     skip-build-ios-device                         ""                "set to skip building Swift stdlibs for iOS devices (i.e. build simulators only)"
     skip-build-ios-simulator                      ""                "set to skip building Swift stdlibs for iOS simulators (i.e. build devices only)"
-    skip-build-libcxx                             ""                "set to skip building libcxx"
-    skip-build-libdispatch                        ""                "set to skip building libdispatch"
-    skip-build-libicu                             ""                "set to skip building libicu"
     skip-build-linux                              ""                "set to skip building Swift stdlibs for Linux"
-    skip-build-llbuild                            ""                "set to skip building llbuild"
-    skip-build-lldb                               ""                "set to skip building LLDB"
-    skip-build-llvm                               ""                "set to skip building LLVM/Clang"
     skip-build-maccatalyst                        ""                "set to skip building Swift stdlibs for macCatalyst"
     skip-build-osx                                ""                "set to skip building Swift stdlibs for OS X"
-    skip-build-playgroundsupport                  ""                "set to skip building PlaygroundSupport"
-    skip-build-static-foundation                  ""                "set to skip building static Foundation"
-    skip-build-static-libdispatch                 ""                "set to skip building static libdispatch"
-    skip-build-swift                              ""                "set to skip building Swift"
     skip-build-tvos-device                        ""                "set to skip building Swift stdlibs for tvOS devices (i.e. build simulators only)"
     skip-build-tvos-simulator                     ""                "set to skip building Swift stdlibs for tvOS simulators (i.e. build devices only)"
     skip-build-watchos-device                     ""                "set to skip building Swift stdlibs for Apple watchOS devices (i.e. build simulators only)"
     skip-build-watchos-simulator                  ""                "set to skip building Swift stdlibs for Apple watchOS simulators (i.e. build devices only)"
-    skip-build-xctest                             ""                "set to skip building xctest"
 
     ## Skip Test ...
     skip-test-android                             ""                "set to skip testing Swift stdlibs for Android"
     skip-test-android-host                        ""                "set to skip testing the host parts of the Android toolchain"
-    skip-test-cmark                               ""                "set to skip testing CommonMark"
     skip-test-cygwin                              ""                "set to skip testing Swift stdlibs for Cygwin"
-    skip-test-foundation                          ""                "set to skip testing foundation"
     skip-test-freebsd                             ""                "set to skip testing Swift stdlibs for FreeBSD"
     skip-test-haiku                               ""                "set to skip testing Swift stdlibs for Haiku"
     skip-test-ios-32bit-simulator                 ""                "set to skip testing Swift stdlibs for iOS 32bit simulators"
     skip-test-ios-host                            ""                "set to skip testing the host parts of the iOS toolchain"
     skip-test-ios-simulator                       ""                "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
-    skip-test-libdispatch                         ""                "set to skip testing libdispatch"
-    skip-test-libicu                              ""                "set to skip testing libicu"
     skip-test-linux                               ""                "set to skip testing Swift stdlibs for Linux"
-    skip-test-llbuild                             ""                "set to skip testing llbuild"
-    skip-test-lldb                                ""                "set to skip testing lldb"
     skip-test-maccatalyst                         ""                "set to skip testing Swift stdlibs for macCatalyst"
     skip-test-osx                                 ""                "set to skip testing Swift stdlibs for OS X"
-    skip-test-playgroundsupport                   ""                "set to skip testing PlaygroundSupport"
-    skip-test-swift                               ""                "set to skip testing Swift"
     skip-test-tvos-host                           ""                "set to skip testing the host parts of the tvOS toolchain"
     skip-test-tvos-simulator                      ""                "set to skip testing Swift stdlibs for tvOS simulators (i.e. test devices only)"
     skip-test-watchos-host                        ""                "set to skip testing the host parts of the watchOS toolchain"
     skip-test-watchos-simulator                   ""                "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
-    skip-test-xctest                              ""                "set to skip testing xctest"
     skip-test-benchmarks                          ""                "set to skip running Swift Benchmark Suite"
     skip-test-optimized                           ""                "set to skip testing the test suite in optimized mode"
     skip-test-optimize-for-size                   ""                "set to skip testing the test suite in optimize for size mode"
@@ -191,20 +159,10 @@ KNOWN_SETTINGS=(
     skip-test-sourcekit                           ""                "set to skip testing SourceKit"
 
     ## Extra ... CMake Options
-    cmark-cmake-options                           ""                "CMake options used for all cmark targets"
     common-cmake-options                          ""                "CMake options used for all targets, including LLVM/Clang"
     extra-cmake-options                           ""                "Extra options to pass to CMake for all targets"
-    foundation-cmake-options                      ""                "CMake options used for all foundation targets"
-    libdispatch-cmake-options                     ""                "CMake options used for all libdispatch targets"
-    libicu-cmake-options                          ""                "CMake options used for all libicu targets"
-    llbuild-cmake-options                         ""                "CMake options used for all llbuild targets"
-    lldb-cmake-options                            ""                "CMake options used for all lldb targets"
-    llvm-cmake-options                            ""                "CMake options used for all llvm targets"
     ninja-cmake-options                           ""                "CMake options used for all ninja targets"
     ninja-cmake-options                           ""                "CMake options used for all ninja targets"
-    playgroundsupport-cmake-options               ""                "CMake options used for all playgroundsupport targets"
-    swift-cmake-options                           ""                "CMake options used for all swift targets"
-    xctest-cmake-options                          ""                "CMake options used for all xctest targets"
 
     ## Build ...
     build-llvm                                    "1"               "set to 1 to build LLVM and Clang"
@@ -226,18 +184,6 @@ KNOWN_SETTINGS=(
     stress-test-sourcekit                         ""                "set to run the stress-SourceKit target"
     swift-include-tests                           "1"               "Set to true to generate testing targets for Swift. This allows the build to proceed when 'test' directory is missing (required for B&I builds)"
     validation-test                               "0"               "set to run the validation test suite"
-
-    ## Install ...
-    install-cmark                                 ""                "whether to install cmark"
-    install-foundation                            ""                "whether to install foundation"
-    install-libcxx                                ""                "whether to install libc++"
-    install-libdispatch                           ""                "whether to install libdispatch"
-    install-libicu                                ""                "whether to install libicu"
-    install-llbuild                               ""                "whether to install llbuild"
-    install-lldb                                  ""                "whether to install LLDB"
-    install-playgroundsupport                     ""                "whether to install PlaygroundSupport"
-    install-swift                                 ""                "whether to install Swift"
-    install-xctest                                ""                "whether to install xctest"
 
     ## llbuild Options
     llbuild-enable-assertions                     "1"               "enable assertions in llbuild"
@@ -295,6 +241,31 @@ KNOWN_SETTINGS=(
     coverage-db                                   ""                "If set, coverage database to use when prioritizing testing"
     skip-local-host-install                       ""                "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
 )
+
+components=(
+  cmark
+  foundation
+  libcxx
+  libdispatch
+  libicu
+  llbuild
+  lldb
+  llvm
+  playgroundsupport
+  static-foundation
+  static-libdispatch
+  swift
+  xctest
+)
+for component in ${components[@]} ; do
+  KNOWN_SETTINGS+=(
+    ${component}-build-type                       "Debug"           "the build variant for ${component}"
+    ${component}-cmake-options                    ""                "CMake options used for ${component}"
+    skip-build-${component}                       ""                "set to skip building ${component}"
+    skip-test-${component}                        ""                "set to skip testing ${component}"
+    install-${component}                          ""                "whether to install ${component}"
+  )
+done
 
 # Centralized access point for traced command invocation.
 # Every operation that might mutates file system should be called via
