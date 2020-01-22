@@ -253,6 +253,9 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
   case swift::PlatformKind::OSX:
   case swift::PlatformKind::OSXApplicationExtension:
     return LinkerPlatformId::macOS;
+  case swift::PlatformKind::macCatalyst:
+  case swift::PlatformKind::macCatalystApplicationExtension:
+    return LinkerPlatformId::macCatalyst;
   }
 }
 

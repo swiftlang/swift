@@ -133,7 +133,7 @@ macro(configure_sdk_darwin
   endif()
 
   if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/Frameworks/module.map")
-    message(FATAL_ERROR "${name} SDK not found at ${SWIFT_SDK_${prefix}_PATH}.")
+    message(FATAL_ERROR "${name} SDK not found at SWIFT_SDK_${prefix}_PATH.")
   endif()
 
   # Determine the SDK version we found.
@@ -183,6 +183,20 @@ macro(configure_sdk_darwin
 
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
         "${arch}-apple-${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
+
+    if(SWIFT_ENABLE_MACCATALYST AND "${prefix}" STREQUAL "OSX")
+      # For macCatalyst append the '-macabi' environment to the target triple.
+      set(SWIFT_SDK_MACCATALYST_ARCH_${arch}_TRIPLE
+        "${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}-macabi")
+
+      # macCatalyst triple
+      set(SWIFT_MACCATALYST_TRIPLE
+        "x86_64-apple-ios${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}-macabi")
+
+      # For macCatalyst, the xcrun_name is "macosx" since it uses that sdk.
+      # Hard code the library subdirectory to "maccatalyst" in that case.
+      set(SWIFT_SDK_MACCATALYST_LIB_SUBDIR "maccatalyst")
+    endif()
   endforeach()
 
   # Add this to the list of known SDKs.

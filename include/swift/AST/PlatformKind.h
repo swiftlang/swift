@@ -51,11 +51,20 @@ StringRef prettyPlatformString(PlatformKind platform);
 /// restrictions are enabled, but OSXApplicationExtension is not considered
 /// active when the target platform is OS X and app extension restrictions are
 /// disabled. PlatformKind::none is always considered active.
-bool isPlatformActive(PlatformKind Platform, LangOptions &LangOpts);
-  
+/// If ForTargetVariant is true then for zippered builds the target-variant
+/// triple will be used rather than the target to determine whether the
+/// platform is active.
+bool isPlatformActive(PlatformKind Platform, LangOptions &LangOpts,
+                      bool ForTargetVariant = false);
+
 /// Returns the target platform for the given language options.
 PlatformKind targetPlatform(LangOptions &LangOpts);
-  
+
+/// Returns true when availability attributes from the "parent" platform
+/// should also apply to the "child" platform for declarations without
+/// an explicit attribute for the child.
+bool inheritsAvailabilityFromPlatform(PlatformKind Child, PlatformKind Parent);
+
 } // end namespace swift
 
 #endif
