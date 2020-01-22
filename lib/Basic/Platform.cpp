@@ -21,6 +21,7 @@ using namespace swift;
 bool swift::tripleIsiOSSimulator(const llvm::Triple &triple) {
   llvm::Triple::ArchType arch = triple.getArch();
   return (triple.isiOS() &&
+          !tripleIsMacCatalystEnvironment(triple) &&
           // FIXME: transitional, this should eventually stop testing arch, and
           // switch to only checking the -environment field.
           (triple.isSimulatorEnvironment() ||
@@ -52,6 +53,38 @@ bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
     tripleIsiOSSimulator(triple) ||
     tripleIsWatchSimulator(triple) ||
     tripleIsAppleTVSimulator(triple);
+}
+
+bool swift::tripleIsMacCatalystEnvironment(const llvm::Triple &triple) {
+  return triple.isiOS() && !triple.isTvOS() &&
+      triple.getEnvironment() == llvm::Triple::MacABI;
+}
+
+bool swift::triplesAreValidForZippering(const llvm::Triple &target,
+                                        const llvm::Triple &targetVariant) {
+  // The arch and vendor must match.
+  if (target.getArchName() != targetVariant.getArchName() ||
+      target.getArch() != targetVariant.getArch() ||
+      target.getSubArch() != targetVariant.getSubArch() ||
+      target.getVendor() != targetVariant.getVendor()) {
+    return false;
+  }
+
+  // Allow a macOS target and an iOS-macabi target variant
+  // This is typically the case when zippering a library originally
+  // developed for macOS.
+  if (target.isMacOSX() && tripleIsMacCatalystEnvironment(targetVariant)) {
+    return true;
+  }
+
+  // Allow an iOS-macabi target and a macOS target variant. This would
+  // be the case when zippering a library originally developed for
+  // iOS.
+  if (targetVariant.isMacOSX() && tripleIsMacCatalystEnvironment(target)) {
+    return true;
+  }
+
+  return false;
 }
 
 bool swift::tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple) {
@@ -304,6 +337,7 @@ getEnvironmentForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
               .Cases("unknown", "", None)
   // These values are also supported, but are handled by the default case below:
   //          .Case ("simulator", StringRef("simulator"))
+  //          .Case ("macabi", StringRef("macabi"))
               .Default(tripleEnvironment);
 }
 

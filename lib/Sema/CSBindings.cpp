@@ -1075,6 +1075,12 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
             cs, TypeVar->getImpl().getLocator());
         if (cs.recordFix(fix))
           return true;
+      } else if (auto *OLE = dyn_cast_or_null<ObjectLiteralExpr>(
+                     srcLocator->getAnchor())) {
+        auto *fix = SpecifyObjectLiteralTypeImport::create(
+            cs, TypeVar->getImpl().getLocator());
+        if (cs.recordFix(fix))
+          return true;
       }
     }
   }

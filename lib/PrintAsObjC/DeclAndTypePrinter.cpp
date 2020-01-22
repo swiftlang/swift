@@ -827,6 +827,9 @@ private:
       case PlatformKind::iOS:
         plat = "ios";
         break;
+      case PlatformKind::macCatalyst:
+        plat = "maccatalyst";
+        break;
       case PlatformKind::tvOS:
         plat = "tvos";
         break;
@@ -838,6 +841,9 @@ private:
         break;
       case PlatformKind::iOSApplicationExtension:
         plat = "ios_app_extension";
+        break;
+      case PlatformKind::macCatalystApplicationExtension:
+        plat = "maccatalyst_app_extension";
         break;
       case PlatformKind::tvOSApplicationExtension:
         plat = "tvos_app_extension";

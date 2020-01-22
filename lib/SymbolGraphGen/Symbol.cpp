@@ -292,6 +292,8 @@ Symbol::getDomain(PlatformAgnosticAvailabilityKind AgnosticKind,
   switch (Kind) {
     case swift::PlatformKind::iOS:
       return { "iOS" };
+    case swift::PlatformKind::macCatalyst:
+      return { "macCatalyst" };
     case swift::PlatformKind::OSX:
       return { "macOS" };
     case swift::PlatformKind::tvOS:
@@ -300,6 +302,8 @@ Symbol::getDomain(PlatformAgnosticAvailabilityKind AgnosticKind,
       return { "watchOS" };
     case swift::PlatformKind::iOSApplicationExtension:
       return { "iOSAppExtension" };
+    case swift::PlatformKind::macCatalystApplicationExtension:
+      return { "macCatalystAppExtension" };
     case swift::PlatformKind::OSXApplicationExtension:
       return { "macOSAppExtension" };
     case swift::PlatformKind::tvOSApplicationExtension:
