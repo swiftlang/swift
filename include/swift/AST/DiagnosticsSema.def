@@ -1583,8 +1583,12 @@ WARNING(optional_ambiguous_case_ref,none,
         (StringRef, StringRef, StringRef))
 NOTE(optional_fixit_ambiguous_case_ref,none,
      "explicitly specify 'Optional' to silence this warning", ())
+NOTE(optional_fixit_ambiguous_case_ref_switch,none,
+     "use 'nil' to silence this warning", ())
 NOTE(type_fixit_optional_ambiguous_case_ref,none,
      "use '%0.%1' instead", (StringRef, StringRef))
+NOTE(type_fixit_optional_ambiguous_case_ref_switch,none,
+     "use '%0' instead", (StringRef))
 
 ERROR(nscoding_unstable_mangled_name,none,
       "%select{private|fileprivate|nested|local}0 class %1 has an "
