@@ -161,7 +161,7 @@ extension _NativeDictionary { // Low-level lookup operations
   @inlinable
   @inline(__always)
   internal func find(_ key: Key) -> (bucket: Bucket, found: Bool) {
-    return find(key, hashValue: self.hashValue(for: key))
+    return _storage.find(key)
   }
 
   /// Search for a given element, assuming it has the specified hash value.
@@ -174,15 +174,7 @@ extension _NativeDictionary { // Low-level lookup operations
     _ key: Key,
     hashValue: Int
   ) -> (bucket: Bucket, found: Bool) {
-    let hashTable = self.hashTable
-    var bucket = hashTable.idealBucket(forHashValue: hashValue)
-    while hashTable._isOccupied(bucket) {
-      if uncheckedKey(at: bucket) == key {
-        return (bucket, true)
-      }
-      bucket = hashTable.bucket(wrappedAfter: bucket)
-    }
-    return (bucket, false)
+    return _storage.find(key, hashValue: hashValue)
   }
 }
 
