@@ -189,8 +189,13 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       if (CodeCompletion)
         CodeCompletion->setLeadingSequenceExprs(SequencedExprs);
     }
-    if (Primary.isNull())
+    if (Primary.isNull()) {
+      if (HasCodeCompletion) {
+        SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
+        break;
+      }
       return Primary;
+    }
 
     SequencedExprs.push_back(Primary.get());
 
@@ -242,16 +247,23 @@ parse_operator:
         HasCodeCompletion = true;
       if (middle.isNull())
         return nullptr;
-      
+
       // Make sure there's a matching ':' after the middle expr.
       if (!Tok.is(tok::colon)) {
+        if (middle.hasCodeCompletion()) {
+          SequencedExprs.push_back(new (Context) IfExpr(questionLoc,
+                                                        middle.get(),
+                                                        PreviousLoc));
+          SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
+          goto done;
+        }
+        
         diagnose(questionLoc, diag::expected_colon_after_if_question);
-
-      Status.setIsParseError();
-      return makeParserResult(Status, new (Context) ErrorExpr(
-          {startLoc, middle.get()->getSourceRange().End}));
+        Status.setIsParseError();
+        return makeParserResult(Status, new (Context) ErrorExpr(
+            {startLoc, middle.get()->getSourceRange().End}));
       }
-      
+
       SourceLoc colonLoc = consumeToken();
       
       auto *unresolvedIf
