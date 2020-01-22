@@ -499,19 +499,20 @@ static bool emitSyntax(SourceFile *SF, StringRef OutputFilename) {
 }
 
 /// Writes SIL out to the given file.
-static bool writeSIL(SILModule &SM, ModuleDecl *M, const SILOptions &Opts,
-                     StringRef OutputFilename) {
+static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
+                     StringRef OutputFilename, bool SortSIL) {
   auto OS = getFileOutputStream(OutputFilename, M->getASTContext());
   if (!OS) return true;
-  SM.print(*OS, M, Opts);
+  SM.print(*OS, EmitVerboseSIL, M, SortSIL);
 
   return M->getASTContext().hadError();
 }
 
 static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
                      const CompilerInstance &Instance,
-                     const SILOptions &Opts) {
-  return writeSIL(SM, Instance.getMainModule(), Opts, PSPs.OutputFilename);
+                     const SILOptions &opts) {
+  return writeSIL(SM, Instance.getMainModule(), opts.EmitVerboseSIL,
+                  PSPs.OutputFilename, opts.EmitSortedSIL);
 }
 
 /// Prints the Objective-C "generated header" interface for \p M to \p
