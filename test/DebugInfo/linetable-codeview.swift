@@ -81,7 +81,7 @@ func foo() {
 // FIXME: The location of ``@llvm.trap`` should be in Integers.swift.gyb
 //        instead of being artificial.
 // CHECK: ![[INLINEDADD]] = !DILocation(line: 0, scope: ![[FAILURE_FUNC:[0-9]+]], inlinedAt: ![[INLINELOC:[0-9]+]]
-// CHECK-DAG: !{{.*}} = distinct !DISubprogram(linkageName: "Swift runtime failure: arithmetic overflow", scope: {{.*}}, flags: DIFlagArtificial, spFlags: DISPFlagDefinition, {{.*}})
+// CHECK-DAG: !{{.*}} = distinct !DISubprogram(name: "Swift runtime failure: arithmetic overflow", scope: {{.*}}, flags: DIFlagArtificial, spFlags: DISPFlagDefinition, {{.*}})
 // CHECK-DAG: ![[INLINELOC]] = !DILocation(line: 0, scope: !{{[0-9]+}}, inlinedAt: ![[ADD]]
 
 // NOTE: These prologue instructions are given artificial line locations for
