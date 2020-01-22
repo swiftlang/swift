@@ -31,7 +31,7 @@ class Foo {
   // arm64-ios: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(%T8abitypes3FooC* swiftself %0) {{.*}} {
   // arm64-ios: define hidden [[ARM64_MYRECT]] @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1) {{[#0-9]*}} {
   // x86_64-tvos: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(%T8abitypes3FooC* swiftself %0) {{.*}} {
-  // x86_64-tvos: define hidden { <2 x float>, <2 x float> } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %0) {{[#0-9]*}} {
+  // x86_64-tvos: define hidden { <2 x float>, <2 x float> } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1) {{[#0-9]*}} {
   // arm64-tvos: define hidden swiftcc { float, float, float, float }  @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(%T8abitypes3FooC* swiftself %0) {{.*}} {
   // arm64-tvos: define hidden [[ARM64_MYRECT]] @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1) {{[#0-9]*}} {
   // i386-watchos: define hidden swiftcc void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(%TSo6MyRectV* noalias nocapture sret %0, %T8abitypes3FooC* swiftself %1) {{.*}} {
