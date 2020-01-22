@@ -101,10 +101,10 @@ static llvm::cl::opt<std::string> Triple("target",
                                          llvm::cl::desc("target triple"));
 
 static llvm::cl::opt<bool>
-EmitSortedSIL("emit-sorted-sil", llvm::cl::Hidden,
-              llvm::cl::init(false),
-              llvm::cl::desc("Sort Functions, VTables, Globals, "
-                             "WitnessTables by name to ease diffing."));
+EnableSILSortOutput("emit-sorted-sil", llvm::cl::Hidden,
+                    llvm::cl::init(false),
+                    llvm::cl::desc("Sort Functions, VTables, Globals, "
+                                   "WitnessTables by name to ease diffing."));
 
 static llvm::cl::opt<bool>
 DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
@@ -250,10 +250,6 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
 
-  SILOptions &Opts = Invocation.getSILOptions();
-  Opts.EmitVerboseSIL = EmitVerboseSIL;
-  Opts.EmitSortedSIL = EmitSortedSIL;
-
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
       Invocation.setUpInputForSILTool(InputFilename, ModuleName,
@@ -359,9 +355,13 @@ int main(int argc, char **argv) {
     const StringRef OutputFile =
         OutputFilename.size() ? StringRef(OutputFilename) : "-";
 
+    auto SILOpts = SILOptions();
+    SILOpts.EmitVerboseSIL = EmitVerboseSIL;
+    SILOpts.EmitSortedSIL = EnableSILSortOutput;
+
     if (OutputFile == "-") {
-      CI.getSILModule()->print(llvm::outs(), CI.getMainModule(),
-                               Invocation.getSILOptions(), !DisableASTDump);
+      CI.getSILModule()->print(llvm::outs(), CI.getMainModule(), SILOpts,
+                               !DisableASTDump);
     } else {
       std::error_code EC;
       llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
@@ -370,8 +370,8 @@ int main(int argc, char **argv) {
                      << '\n';
         return 1;
       }
-      CI.getSILModule()->print(OS, CI.getMainModule(),
-                               Invocation.getSILOptions(), !DisableASTDump);
+      CI.getSILModule()->print(OS, CI.getMainModule(), SILOpts,
+                               !DisableASTDump);
     }
   }
 }

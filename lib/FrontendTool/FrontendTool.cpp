@@ -511,7 +511,8 @@ static bool writeSIL(SILModule &SM, ModuleDecl *M, const SILOptions &Opts,
 static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
                      const CompilerInstance &Instance,
                      const SILOptions &Opts) {
-  return writeSIL(SM, Instance.getMainModule(), Opts, PSPs.OutputFilename);
+  return writeSIL(SM, Instance.getMainModule(), Opts,
+                  PSPs.OutputFilename);
 }
 
 /// Prints the Objective-C "generated header" interface for \p M to \p
