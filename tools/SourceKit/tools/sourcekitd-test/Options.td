@@ -146,6 +146,9 @@ def optimize_for_ide : Joined<["-"], "for-ide=">,
 def suppress_config_request : Flag<["-"], "suppress-config-request">,
   HelpText<"Suppress the default global configuration request, that is otherwise sent before any other request (except for the global-config request itself)">;
 
+def module_cache_path: Separate<["-"], "module-cache-path">, HelpText<"module cache path">;
+def module_cache_path_EQ : Joined<["-"], "module-cache-path=">, Alias<module_cache_path>;
+
 def help : Flag<["-", "--"], "help">,
   HelpText<"Display available options">;
 

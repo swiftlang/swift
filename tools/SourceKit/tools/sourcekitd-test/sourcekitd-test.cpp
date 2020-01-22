@@ -403,6 +403,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (Opts.parseArgs(Args.slice(0, Optargc)))
     return 1;
 
+  if (!Opts.ModuleCachePath.empty())
+    InitOpts.ModuleCachePath = Opts.ModuleCachePath;
+
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
 
@@ -514,6 +517,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     Opts.Length = resolveFromLineCol(Opts.EndLine, Opts.EndCol, SourceBuf.get()) -
       ByteOffset;
   }
+
+  bool compilerArgsAreClang = false;
 
   sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
                                                                  nullptr, 0);
@@ -883,6 +888,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     } else {
       if (Opts.UsingSwiftArgs)
           sourcekitd_request_dictionary_set_int64(Req, KeyUsingSwiftArgs, true);
+      else
+        compilerArgsAreClang = true;
       sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                             RequestEditorOpenHeaderInterface);
     }
@@ -978,6 +985,15 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   if (!Opts.CompilerArgs.empty()) {
     sourcekitd_object_t Args = sourcekitd_request_array_create(nullptr, 0);
+    if (!Opts.ModuleCachePath.empty()) {
+      if (compilerArgsAreClang) {
+        std::string opt = "-fmodules-cache-path=" + Opts.ModuleCachePath;
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, opt.c_str());
+      } else {
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, "-module-cache-path");
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Opts.ModuleCachePath.c_str());
+      }
+    }
     for (auto Arg : Opts.CompilerArgs)
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Arg);
     sourcekitd_request_dictionary_set_value(Req, KeyCompilerArgs, Args);
