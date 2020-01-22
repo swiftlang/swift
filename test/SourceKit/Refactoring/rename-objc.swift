@@ -5,10 +5,10 @@ func foo1() {
 }
 
 // REQUIRES: objc_interop
-// RUN: %sourcekitd-test -req=cursor -pos=4:30 -cursor-action %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK1
-// RUN: %sourcekitd-test -req=cursor -pos=4:30 -length=3 -cursor-action %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK1
-// RUN: %sourcekitd-test -req=cursor -pos=4:20 -length=15 -cursor-action %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK1
-// RUN: %sourcekitd-test -req=cursor -pos=4:20 -length=16 -cursor-action %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK2
+// RUN: %sourcekitd-test -req=cursor -pos=4:30 -cursor-action %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck %s -check-prefix=CHECK1
+// RUN: %sourcekitd-test -req=cursor -pos=4:30 -length=3 -cursor-action %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck %s -check-prefix=CHECK1
+// RUN: %sourcekitd-test -req=cursor -pos=4:20 -length=15 -cursor-action %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck %s -check-prefix=CHECK1
+// RUN: %sourcekitd-test -req=cursor -pos=4:20 -length=16 -cursor-action %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck %s -check-prefix=CHECK2
 
 // CHECK1: ACTIONS BEGIN
 // CHECK1-NEXT: source.refactoring.kind.rename.global
