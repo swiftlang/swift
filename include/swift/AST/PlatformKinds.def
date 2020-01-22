@@ -30,5 +30,7 @@ AVAILABILITY_PLATFORM(iOSApplicationExtension, "application extensions for iOS")
 AVAILABILITY_PLATFORM(tvOSApplicationExtension, "application extensions for tvOS")
 AVAILABILITY_PLATFORM(watchOSApplicationExtension, "application extensions for watchOS")
 AVAILABILITY_PLATFORM(OSXApplicationExtension, "application extensions for macOS")
+AVAILABILITY_PLATFORM(macCatalyst, "Mac Catalyst")
+AVAILABILITY_PLATFORM(macCatalystApplicationExtension, "application extensions for Mac Catalyst")
 
 #undef AVAILABILITY_PLATFORM

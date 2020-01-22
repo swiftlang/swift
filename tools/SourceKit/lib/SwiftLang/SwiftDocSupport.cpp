@@ -584,10 +584,12 @@ static void reportAttributes(ASTContext &Ctx,
                              DocInfoConsumer &Consumer) {
   static UIdent AvailableAttrKind("source.lang.swift.attribute.availability");
   static UIdent PlatformIOS("source.availability.platform.ios");
+  static UIdent PlatformMacCatalyst("source.availability.platform.maccatalyst");
   static UIdent PlatformOSX("source.availability.platform.osx");
   static UIdent PlatformtvOS("source.availability.platform.tvos");
   static UIdent PlatformWatchOS("source.availability.platform.watchos");
   static UIdent PlatformIOSAppExt("source.availability.platform.ios_app_extension");
+  static UIdent PlatformMacCatalystAppExt("source.availability.platform.maccatalyst_app_extension");
   static UIdent PlatformOSXAppExt("source.availability.platform.osx_app_extension");
   static UIdent PlatformtvOSAppExt("source.availability.platform.tvos_app_extension");
   static UIdent PlatformWatchOSAppExt("source.availability.platform.watchos_app_extension");
@@ -601,6 +603,8 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = UIdent(); break;
       case PlatformKind::iOS:
         PlatformUID = PlatformIOS; break;
+      case PlatformKind::macCatalyst:
+        PlatformUID = PlatformIOS; break;
       case PlatformKind::OSX:
         PlatformUID = PlatformOSX; break;
       case PlatformKind::tvOS:
@@ -609,6 +613,8 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = PlatformWatchOS; break;
       case PlatformKind::iOSApplicationExtension:
         PlatformUID = PlatformIOSAppExt; break;
+      case PlatformKind::macCatalystApplicationExtension:
+        PlatformUID = PlatformMacCatalystAppExt; break;
       case PlatformKind::OSXApplicationExtension:
         PlatformUID = PlatformOSXAppExt; break;
       case PlatformKind::tvOSApplicationExtension:

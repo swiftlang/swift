@@ -1861,6 +1861,8 @@ PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
   switch (platformKind) {
   case PlatformKind::iOS:
   case PlatformKind::iOSApplicationExtension:
+  case PlatformKind::macCatalyst:
+  case PlatformKind::macCatalystApplicationExtension:
   case PlatformKind::tvOS:
   case PlatformKind::tvOSApplicationExtension:
     deprecatedAsUnavailableMessage =
@@ -1894,6 +1896,11 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
     return name == "ios";
   case PlatformKind::iOSApplicationExtension:
     return name == "ios" || name == "ios_app_extension";
+
+  case PlatformKind::macCatalyst:
+  case PlatformKind::macCatalystApplicationExtension:
+    // ClangImporter does not yet support macCatalyst.
+    return false;
 
   case PlatformKind::tvOS:
     return name == "tvos";
@@ -1934,6 +1941,11 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::tvOSApplicationExtension:
     // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
     return major <= 7;
+
+  case PlatformKind::macCatalyst:
+  case PlatformKind::macCatalystApplicationExtension:
+    // ClangImporter does not yet support macCatalyst.
+    return false;
 
   case PlatformKind::watchOS:
   case PlatformKind::watchOSApplicationExtension:

@@ -616,6 +616,8 @@ class ToolchainTestCase(unittest.TestCase):
             build_tvos_simulator=False,
             build_watchos_device=False,
             build_watchos_simulator=False,
+            maccatalyst=False,
+            maccatalyst_ios_tests=False,
             long_test=False,
             only_executable_test=False,
             stress_test=False,
