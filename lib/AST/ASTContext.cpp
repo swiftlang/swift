@@ -3158,13 +3158,7 @@ ArrayRef<Requirement> GenericFunctionType::getRequirements() const {
   return Signature->getRequirements();
 }
 
-SILUncommonInfo::SILUncommonInfo(AnyFunctionType::ExtInfo::Uncommon uncommon) {
-  auto *ty = uncommon.ClangFunctionType;
-  ClangFunctionType = ty ? ty->getCanonicalTypeInternal().getTypePtr()
-                         : nullptr;
-}
-
-void SILUncommonInfo::printClangFunctionType(
+void SILFunctionType::ExtInfo::Uncommon::printClangFunctionType(
     ClangModuleLoader *cml, llvm::raw_ostream &os) const {
   cml->printClangType(ClangFunctionType, os);
 }
@@ -3230,11 +3224,11 @@ SILFunctionType::SILFunctionType(
 
   Bits.SILFunctionType.HasErrorResult = errorResult.hasValue();
   Bits.SILFunctionType.ExtInfoBits = ext.Bits;
+  Bits.SILFunctionType.HasUncommonInfo = false;
   // The use of both assert() and static_assert() below is intentional.
   assert(Bits.SILFunctionType.ExtInfoBits == ext.Bits && "Bits were dropped!");
   static_assert(ExtInfo::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
-  Bits.SILFunctionType.HasUncommonInfo = ext.getUncommonInfo().hasValue();
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
   if (coroutineKind == SILCoroutineKind::None) {
@@ -3267,9 +3261,6 @@ SILFunctionType::SILFunctionType(
     getMutableFormalResultsCache() = CanType();
     getMutableAllResultsCache() = CanType();
   }
-  if (auto uncommon = ext.getUncommonInfo())
-    *getTrailingObjects<ExtInfo::Uncommon>() = uncommon.getValue();
-
 #ifndef NDEBUG
   if (ext.getRepresentation() == Representation::WitnessMethod)
     assert(!WitnessMethodConformance.isInvalid() &&
@@ -3369,10 +3360,6 @@ CanSILFunctionType SILFunctionType::get(
   assert(coroutineKind != SILCoroutineKind::None || yields.empty());
   assert(!ext.isPseudogeneric() || genericSig);
 
-  // FIXME: [clang-function-type-serialization] Don't drop the Clang type...
-  if (!ctx.LangOpts.UseClangFunctionTypes)
-    ext = ext.withClangFunctionType(nullptr);
-
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,
                            yields, normalResults, errorResult,
@@ -3389,11 +3376,10 @@ CanSILFunctionType SILFunctionType::get(
 
   // See [SILFunctionType-layout]
   bool hasResultCache = normalResults.size() > 1;
-  size_t bytes = totalSizeToAlloc<SILParameterInfo, SILResultInfo, SILYieldInfo,
-                                  CanType, SILFunctionType::ExtInfo::Uncommon>(
+  size_t bytes =
+    totalSizeToAlloc<SILParameterInfo, SILResultInfo, SILYieldInfo, CanType>(
       params.size(), normalResults.size() + (errorResult ? 1 : 0),
-      yields.size(), hasResultCache ? 2 : 0,
-      ext.getUncommonInfo().hasValue() ? 1 : 0);
+      yields.size(), hasResultCache ? 2 : 0);
 
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
@@ -4386,35 +4372,17 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   return Type();
 }
 
-void
-ASTContext::initializeClangTypeConverter() {
-  auto &impl = getImpl();
-  if (!impl.Converter) {
-    auto *cml = getClangModuleLoader();
-    impl.Converter.emplace(*this, cml->getClangASTContext(), LangOpts.Target);
-  }
-}
-
 const clang::Type *
 ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
                                  Type resultTy,
                                  FunctionType::ExtInfo incompleteExtInfo,
                                  FunctionTypeRepresentation trueRep) {
-  initializeClangTypeConverter();
-  return getImpl().Converter.getValue().getFunctionType(params, resultTy,
-                                                        trueRep);
-}
-
-const clang::Type *
-ASTContext::getCanonicalClangFunctionType(
-    ArrayRef<SILParameterInfo> params,
-    Optional<SILResultInfo> result,
-    SILFunctionType::ExtInfo incompleteExtInfo,
-    SILFunctionType::Representation trueRep) {
-  initializeClangTypeConverter();
-  auto *ty = getImpl().Converter.getValue().getFunctionType(params, result,
-                                                            trueRep);
-  return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
+  auto &impl = getImpl();
+  if (!impl.Converter) {
+    auto *cml = getClangModuleLoader();
+    impl.Converter.emplace(*this, cml->getClangASTContext(), LangOpts.Target);
+  }
+  return impl.Converter.getValue().getFunctionType(params, resultTy, trueRep);
 }
 
 CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
