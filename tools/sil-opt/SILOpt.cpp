@@ -479,10 +479,12 @@ int main(int argc, char **argv) {
   } else {
     const StringRef OutputFile = OutputFilename.size() ?
                                    StringRef(OutputFilename) : "-";
-
+    auto SILOpts = SILOptions();
+    SILOpts.EmitVerboseSIL = EmitVerboseSIL;
+    SILOpts.EmitSortedSIL = EnableSILSortOutput;
     if (OutputFile == "-") {
-      CI.getSILModule()->print(llvm::outs(), EmitVerboseSIL, CI.getMainModule(),
-                               EnableSILSortOutput, !DisableASTDump);
+      CI.getSILModule()->print(llvm::outs(), CI.getMainModule(),
+                               SILOpts, !DisableASTDump);
     } else {
       std::error_code EC;
       llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
@@ -491,8 +493,8 @@ int main(int argc, char **argv) {
                      << EC.message() << '\n';
         return 1;
       }
-      CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
-                               EnableSILSortOutput, !DisableASTDump);
+      CI.getSILModule()->print(OS, CI.getMainModule(), SILOpts,
+                               !DisableASTDump);
     }
   }
 
