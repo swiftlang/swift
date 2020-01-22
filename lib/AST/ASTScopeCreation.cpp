@@ -1725,12 +1725,6 @@ NullablePtr<AbstractStorageDecl>
 SpecializeAttributeScope::getEnclosingAbstractStorageDecl() const {
   return getParent().get()->getEnclosingAbstractStorageDecl();
 }
-// SWIFT_ENABLE_TENSORFLOW
-NullablePtr<AbstractStorageDecl>
-DifferentiableAttributeScope::getEnclosingAbstractStorageDecl() const {
-  return getParent().get()->getEnclosingAbstractStorageDecl();
-}
-// SWIFT_ENABLE_TENSORFLOW END
 NullablePtr<AbstractStorageDecl>
 DifferentiableAttributeScope::getEnclosingAbstractStorageDecl() const {
   return getParent().get()->getEnclosingAbstractStorageDecl();

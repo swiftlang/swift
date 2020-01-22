@@ -121,10 +121,6 @@ public:
   IGNORED_ATTR(ProjectedValueProperty)
   IGNORED_ATTR(ReferenceOwnership)
   IGNORED_ATTR(OriginallyDefinedIn)
-  // TODO(TF-830): Upstream `@transpose` attribute type-checking from tensorflow
-  // branch.
-  IGNORED_ATTR(Transpose)
-
   // SWIFT_ENABLE_TENSORFLOW
   // TODO(TF-715): Allow @quoted on more decls.
   IGNORED_ATTR(Quoted)
@@ -265,7 +261,6 @@ public:
   void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitDerivativeAttr(DerivativeAttr *attr);
   // SWIFT_ENABLE_TENSORFLOW
-  void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitTransposeAttr(TransposeAttr *attr);
   // TODO(TF-999): Remove deprecated `@differentiating` attribute.
   void visitDifferentiatingAttr(DerivativeAttr *attr);
@@ -4450,121 +4445,6 @@ static bool tangentVectorEqualsSelf(Type type, DeclContext *DC) {
 };
 
 // SWIFT_ENABLE_TENSORFLOW
-// Finds a derivative function declaration using the given function specifier,
-// original function declaration, expected type, and "is valid" predicate. If no
-// valid derivative function is found, emits diagnostics and returns false.
-static FuncDecl *findAutoDiffDerivativeFunction(
-    DeclNameRefWithLoc specifier, AbstractFunctionDecl *original, Type expectedTy,
-    std::function<bool(AbstractFunctionDecl *)> isValid) {
-  auto &ctx = original->getASTContext();
-  auto &diags = ctx.Diags;
-  auto noneValidDiagnostic = [&]() {
-    diags.diagnose(specifier.Loc,
-                   diag::differentiable_attr_overload_not_found, specifier.Name,
-                   expectedTy);
-  };
-  auto ambiguousDiagnostic = [&]() {
-    diags.diagnose(specifier.Loc, diag::attr_ambiguous_reference_to_decl,
-                   specifier.Name, "differentiable");
-  };
-  auto notFunctionDiagnostic = [&]() {
-    diags.diagnose(specifier.Loc,
-                   diag::differentiable_attr_derivative_not_function,
-                   specifier.Name);
-  };
-  std::function<void()> invalidTypeContextDiagnostic = [&]() {
-    diags.diagnose(specifier.Loc,
-                   diag::differentiable_attr_function_not_same_type_context,
-                   specifier.Name);
-  };
-
-  // Returns true if the original function and derivative function candidate are
-  // defined in compatible type contexts. If the original function and the
-  // derivative function have different parents, or if they both have no type
-  // context and are in different modules, return false.
-  std::function<bool(AbstractFunctionDecl *)> hasValidTypeContext =
-      [&](AbstractFunctionDecl *func) {
-        // Check if both functions are top-level.
-        if (!original->getInnermostTypeContext() &&
-            !func->getInnermostTypeContext() &&
-            original->getParentModule() == func->getParentModule())
-          return true;
-        // Check if both functions are defined in the same type context.
-        if (auto typeCtx1 = original->getInnermostTypeContext())
-          if (auto typeCtx2 = func->getInnermostTypeContext())
-            return typeCtx1->getSelfNominalTypeDecl() ==
-                   typeCtx2->getSelfNominalTypeDecl();
-        return original->getParent() == func->getParent();
-      };
-
-  auto isABIPublic = [&](AbstractFunctionDecl *func) {
-    return func->getFormalAccess() >= AccessLevel::Public ||
-           func->getAttrs().hasAttribute<InlinableAttr>() ||
-           func->getAttrs().hasAttribute<UsableFromInlineAttr>();
-  };
-
-  // If the original function is exported (i.e. it is public or
-  // `@usableFromInline`), then the derivative functions must also be exported.
-  // Returns true on error.
-  auto checkAccessControl = [&](AbstractFunctionDecl *func) {
-    if (!isABIPublic(original))
-      return false;
-    if (isABIPublic(func))
-      return false;
-    diags.diagnose(specifier.Loc, diag::differentiable_attr_invalid_access,
-                   specifier.Name, original->getFullName());
-    return true;
-  };
-
-  auto originalTypeCtx = original->getInnermostTypeContext();
-  if (!originalTypeCtx) originalTypeCtx = original->getParent();
-  assert(originalTypeCtx);
-
-  // Set lookup options.
-  auto lookupOptions = defaultMemberLookupOptions
-      | NameLookupFlags::IgnoreAccessControl;
-
-  auto *candidate = findAbstractFunctionDecl(
-      specifier.Name, specifier.Loc.getBaseNameLoc(), /*baseType*/ Type(),
-      originalTypeCtx, isValid, noneValidDiagnostic, ambiguousDiagnostic,
-      notFunctionDiagnostic, lookupOptions, hasValidTypeContext,
-      invalidTypeContextDiagnostic);
-  if (!candidate)
-    return nullptr;
-  // Reject non-`func` registered derivatives. JVPs and VJPs must be `func`
-  // declarations.
-  if (isa<AccessorDecl>(candidate)) {
-    diags.diagnose(specifier.Loc,
-                   diag::differentiable_attr_derivative_not_function,
-                   specifier.Name);
-    return nullptr;
-  }
-  if (checkAccessControl(candidate))
-    return nullptr;
-  // Derivatives of class members must be final.
-  if (original->getDeclContext()->getSelfClassDecl() &&
-      !candidate->isFinal()) {
-    diags.diagnose(specifier.Loc,
-                   diag::differentiable_attr_class_derivative_not_final);
-    return nullptr;
-  }
-  assert(isa<FuncDecl>(candidate));
-  auto *funcDecl = cast<FuncDecl>(candidate);
-  return funcDecl;
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
-  // Call `getParameterIndices` to trigger a
-  // `DifferentiableAttributeParameterIndicesRequest`, which currently performs
-  // full `@differentiable` type-checking.
-  // TODO: Consider creating separate requests for the following functionality:
-  // - `DifferentiableAttr::getJVPFunction`
-  // - `DifferentiableAttr::getVJPFunction`
-  // - `DifferentiableAttr::getDerivativeGenericSignature`
-  (void)attr->getParameterIndices();
-}
-
 llvm::Expected<IndexSubset *>
 DifferentiableAttributeParameterIndicesRequest::evaluate(
     Evaluator &evaluator, DifferentiableAttr *attr, Decl *D) const {

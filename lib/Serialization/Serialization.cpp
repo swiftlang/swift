@@ -2425,13 +2425,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
     // SWIFT_ENABLE_TENSORFLOW END
 
-    case DAK_ImplicitlySynthesizesNestedRequirement: {
-      auto *theAttr = cast<ImplicitlySynthesizesNestedRequirementAttr>(DA);
-      auto abbrCode = S.DeclTypeAbbrCodes[ImplicitlySynthesizesNestedRequirementDeclAttrLayout::Code];
-      ImplicitlySynthesizesNestedRequirementDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                                          theAttr->Value);
-      return;
-    }
     }
   }
 

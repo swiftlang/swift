@@ -1522,33 +1522,6 @@ DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
                                       std::move(vjp), derivativeGenSig);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-bool DifferentiableAttr::hasComputedParameterIndices() const {
-  return ParameterIndicesAndBit.getInt();
-}
-
-IndexSubset *DifferentiableAttr::getParameterIndices() const {
-  assert(getOriginalDeclaration() &&
-         "Original declaration must have been resolved");
-  auto &ctx = getOriginalDeclaration()->getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator,
-      DifferentiableAttributeParameterIndicesRequest{
-          const_cast<DifferentiableAttr *>(this), getOriginalDeclaration()},
-      nullptr);
-}
-
-void DifferentiableAttr::setParameterIndices(IndexSubset *paramIndices) {
-  assert(getOriginalDeclaration() &&
-         "Original declaration must have been resolved");
-  auto &ctx = getOriginalDeclaration()->getASTContext();
-  ctx.evaluator.cacheOutput(
-      DifferentiableAttributeParameterIndicesRequest{
-          const_cast<DifferentiableAttr *>(this), getOriginalDeclaration()},
-      std::move(paramIndices));
-}
-// SWIFT_ENABLE_TENSORFLOW END
-
 void DifferentiableAttr::setOriginalDeclaration(Decl *originalDeclaration) {
   assert(originalDeclaration && "Original declaration must be non-null");
   assert(!OriginalDeclaration &&

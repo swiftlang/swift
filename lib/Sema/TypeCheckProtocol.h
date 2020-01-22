@@ -358,15 +358,6 @@ struct RequirementMatch {
     assert(!hasWitnessType() && "Should have witness type");
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  RequirementMatch(ValueDecl *witness, MatchKind kind,
-                   const DeclAttribute *attr)
-    : Witness(witness), Kind(kind), WitnessType(), UnmetAttribute(attr),
-      ReqEnv(None) {
-    assert(!hasWitnessType() && "Should have witness type");
-    assert(UnmetAttribute);
-  }
-
   RequirementMatch(ValueDecl *witness, MatchKind kind,
                    const DeclAttribute *attr)
       : Witness(witness), Kind(kind), WitnessType(), UnmetAttribute(attr),

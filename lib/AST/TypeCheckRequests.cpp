@@ -1062,7 +1062,7 @@ void swift::simple_display(llvm::raw_ostream &out,
 Optional<IndexSubset *>
 DifferentiableAttributeParameterIndicesRequest::getCachedResult() const {
   auto *attr = std::get<0>(getStorage());
-  if (attr->hasComputedParameterIndices())
+  if (attr->hasBeenTypeChecked())
     return attr->ParameterIndicesAndBit.getPointer();
   return None;
 }
