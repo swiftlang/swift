@@ -577,21 +577,20 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);
 
-    auto paramConvention = ParameterConvention::Direct_Unowned;
-    auto params = {SILParameterInfo(anyObjectMetaTy, paramConvention)};
-    ArrayRef<SILResultInfo> resultInfos =
-        {SILResultInfo(OptNSStringTy, ResultConvention::Autoreleased)};
-    auto incompleteExtInfo = SILFunctionType::ExtInfo();
-    auto repr = SILFunctionType::Representation::CFunctionPointer;
-    auto *clangFnType = ctx.getCanonicalClangFunctionType(params,
-        resultInfos[0], incompleteExtInfo, repr);
-    auto extInfo = incompleteExtInfo.withRepresentation(repr)
-                                    .withClangFunctionType(clangFnType);
-
-    auto NSStringFromClassType = SILFunctionType::get(
-        nullptr, extInfo, SILCoroutineKind::None, paramConvention, params,
-        /*yields*/ {}, resultInfos, /*error result*/ None, SubstitutionMap(),
-        false, ctx);
+    auto NSStringFromClassType = SILFunctionType::get(nullptr,
+                  SILFunctionType::ExtInfo()
+                    .withRepresentation(SILFunctionType::Representation::
+                                        CFunctionPointer),
+                  SILCoroutineKind::None,
+                  ParameterConvention::Direct_Unowned,
+                  SILParameterInfo(anyObjectMetaTy,
+                                   ParameterConvention::Direct_Unowned),
+                  /*yields*/ {},
+                  SILResultInfo(OptNSStringTy,
+                                ResultConvention::Autoreleased),
+                  /*error result*/ None,
+                  SubstitutionMap(), false,
+                  ctx);
     auto NSStringFromClassFn = builder.getOrCreateFunction(
         mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
         NSStringFromClassType, IsBare, IsTransparent, IsNotSerialized,
