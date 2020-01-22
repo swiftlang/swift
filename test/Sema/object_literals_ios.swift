@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 // REQUIRES: OS=ios
 
+// REQUIRES: rdar58794200
+
 struct S: _ExpressibleByColorLiteral {
   init(_colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}
 }
