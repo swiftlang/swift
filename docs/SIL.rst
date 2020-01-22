@@ -3495,46 +3495,8 @@ partial_apply
   // %r will be of the substituted thick function type $(Z'...) -> R'
 
 Creates a closure by partially applying the function ``%0`` to a partial
-sequence of its arguments. In the instruction syntax, the type of the callee is
-specified after the argument list; the types of the argument and of the defined
-value are derived from the function type of the callee. If the ``partial_apply``
-has an escaping function type (not ``[on_stack]``) the closure context will be
-allocated with retain count 1 and initialized to contain the values ``%1``,
-``%2``, etc.  The closed-over values will not be retained; that must be done
-separately before the ``partial_apply``. The closure does however take ownership
-of the partially applied arguments (except for ``@inout_aliasable`` parameters);
-when the closure reference count reaches zero, the contained values will be
-destroyed. If the ``partial_apply`` has a ``@noescape`` function type
-(``partial_apply [on_stack]``) the closure context is allocated on the stack and
-initialized to contain the closed-over values. The closed-over values are not
-retained, lifetime of the closed-over values must be managed separately. The
-lifetime of the stack context of a ``partial_apply [on_stack]`` must be
-terminated with a ``dealloc_stack``.
-
-If the callee is generic, all of its generic parameters must be bound by the
-given substitution list. The arguments are given with these generic
-substitutions applied, and the resulting closure is of concrete function
-type with the given substitutions applied. The generic parameters themselves
-cannot be partially applied; all of them must be bound. The result is always
-a concrete function.
-
-If an address argument has ``@inout_aliasable`` convention, the closure
-obtained from ``partial_apply`` will not own its underlying value.
-The ``@inout_aliasable`` parameter convention is used when a ``@noescape``
-closure captures an ``inout`` argument.
-
-TODO: The instruction, when applied to a generic function,
-currently implicitly performs abstraction difference transformations enabled
-by the given substitutions, such as promoting address-only arguments and returns
-to register arguments. This should be fixed.
-
-By default, ``partial_apply`` creates a closure whose invocation takes ownership
-of the context, meaning that a call implicitly releases the closure. The
-``[callee_guaranteed]`` change this to a caller-guaranteed model, where the
-caller promises not to release the closure while the function is being called.
-
-This instruction is used to implement both curry thunks and closures. A
-curried function in Swift::
+sequence of its arguments. This instruction is used to implement both curry
+thunks and closures. A curried function in Swift::
 
   func foo(_ a:A)(b:B)(c:C)(d:D) -> E { /* body of foo */ }
 
@@ -3606,6 +3568,54 @@ lowers to an uncurried entry point and is curried in the enclosing function::
     release %bar : $(Int) -> Int
     return %ret : $Int
   }
+
+**Ownership Semantics of Closure Context during Invocation**: By default, an
+escaping ``partial_apply`` (``partial_apply`` without ``[on_stack]]`` creates a
+closure whose invocation takes ownership of the context, meaning that a call
+implicitly releases the closure. If the ``partial_apply`` is marked with the
+flag ``[callee_guaranteed]`` the invocation instead uses a caller-guaranteed
+model, where the caller promises not to release the closure while the function
+is being called.
+
+**Captured Value Ownership Semantics**: In the instruction syntax, the type of
+the callee is specified after the argument list; the types of the argument and
+of the defined value are derived from the function type of the callee. Even so,
+the ownership requirements of the partial apply are not the same as that of the
+callee function (and thus said signature). Instead:
+
+1. If the ``partial_apply`` has a ``@noescape`` function type (``partial_apply
+   [on_stack]``) the closure context is allocated on the stack and is
+   initialized to contain the closed-over values without taking ownership of
+   those values. The closed-over values are not retained and the lifetime of the
+   closed-over values must be managed by other instruction independently of the
+   ``partial_apply``. The lifetime of the stack context of a ``partial_apply
+   [on_stack]`` must be terminated with a ``dealloc_stack``.
+
+2. If the ``partial_apply`` has an escaping function type (not ``[on_stack]``)
+   then the closure context will be heap allocated with a retain count of 1. Any
+   closed over parameters (except for ``@inout`` parameters) will be consumed by
+   the partial_apply. This ensures that no matter when the ``partial_apply`` is
+   called, the captured arguments are alive. When the closure context's
+   reference count reaches zero, the contained values are destroyed. If the
+   callee requires an owned parameter, then the implicit partial_apply forwarder
+   created by IRGen will copy the underlying argument and pass it to the callee.
+
+3. If an address argument has ``@inout_aliasable`` convention, the closure
+   obtained from ``partial_apply`` will not own its underlying value.  The
+   ``@inout_aliasable`` parameter convention is used when a ``@noescape``
+   closure captures an ``inout`` argument.
+
+**NOTE:** If the callee is generic, all of its generic parameters must be bound
+by the given substitution list. The arguments are given with these generic
+substitutions applied, and the resulting closure is of concrete function type
+with the given substitutions applied. The generic parameters themselves cannot
+be partially applied; all of them must be bound. The result is always a concrete
+function.
+
+**TODO:** The instruction, when applied to a generic function, currently
+implicitly performs abstraction difference transformations enabled by the given
+substitutions, such as promoting address-only arguments and returns to register
+arguments. This should be fixed.
 
 builtin
 ```````
