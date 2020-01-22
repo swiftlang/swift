@@ -5346,6 +5346,11 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   // DerivedConformance::getDerivableRequirement.
   auto *protocol = cast<ProtocolDecl>(Requirement->getDeclContext());
 
+  // TODO: Change this to something more principled.
+  if (protocol->getNameStr() == "Generic") {
+    return nullptr;
+  }
+
   auto knownKind = protocol->getKnownProtocolKind();
   
   if (!knownKind)
