@@ -2,7 +2,8 @@
 // REQUIRES: asan_runtime
 // UNSUPPORTED: windows
 
-// REQUIRES: rdar58640751
+// TODO(rdar://problem/58702902) Re-enable on Linux once rdar://problem/58640751 is fixed.
+// UNSUPPORTED: OS=linux-gnu
 
 // Check with recovery instrumentation and runtime option to continue execution.
 // RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=address -sanitize-recover=address -import-objc-header %S/asan_interface.h -emit-ir -o %t.asan_recover.ll
