@@ -597,9 +597,6 @@ namespace {
 
       auto &CurFn = *getFunction();
 
-      if (!CurFn.getModule().getOptions().EnableSpeculativeDevirtualization)
-        return;
-
       // Don't perform speculative devirtualization at -Os.
       if (CurFn.optimizeForSize())
         return;
