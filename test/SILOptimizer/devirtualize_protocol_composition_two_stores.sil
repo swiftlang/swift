@@ -31,6 +31,51 @@ func imp(x: A & P, y: A & P) -> Int
 
 public func test(x: B, y: C) -> Int
 
+// protocol witness for P.foo() in conformance B
+sil shared [transparent] [serialized] [thunk] @Pfoo : $@convention(witness_method: P) (@in_guaranteed B) -> Int {
+// %0                                             // user: %1
+bb0(%0 : $*B):
+  %1 = load %0 : $*B                              // users: %2, %3
+  %2 = class_method %1 : $B, #B.foo!1 : (B) -> () -> Int, $@convention(method) (@guaranteed B) -> Int // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed B) -> Int // user: %4
+  return %3 : $Int                                // id: %4
+} // end sil function 'Pfoo'
+
+// B.foo()
+sil [noinline] @foo : $@convention(method) (@guaranteed B) -> Int {
+// %0                                             // user: %1
+bb0(%0 : $B):
+  debug_value %0 : $B, let, name "self", argno 1  // id: %1
+  %2 = integer_literal $Builtin.Int64, 1          // user: %3
+  %3 = struct $Int (%2 : $Builtin.Int64)          // user: %4
+  return %3 : $Int                                // id: %4
+} // end sil function 'foo'
+
+
+// This function calls @impl. The optimizer generates a specialization of impl
+// based on the arguments passed to it here. Even though this function isn't
+// directly checked, it is essentail for the optimization.
+// test(x:y:)
+sil @test :$@convention(thin) (@guaranteed B, @guaranteed C) -> Int {
+// %0                                             // users: %5, %4, %2
+// %1                                             // users: %7, %6, %3
+bb0(%0 : $B, %1 : $C):
+  debug_value %0 : $B, let, name "x", argno 1     // id: %2
+  debug_value %1 : $C, let, name "y", argno 2     // id: %3
+  strong_retain %0 : $B                           // id: %4
+  %5 = init_existential_ref %0 : $B : $B, $A & P  // users: %11, %9
+  strong_retain %1 : $C                           // id: %6
+  %7 = init_existential_ref %1 : $C : $C, $A & P  // users: %10, %9
+  // function_ref imp(x:y:)
+  %8 = function_ref @impl : $@convention(thin) (@guaranteed A & P, @guaranteed A & P) -> Int // user: %9
+  %9 = apply %8(%5, %7) : $@convention(thin) (@guaranteed A & P, @guaranteed A & P) -> Int // user: %12
+  strong_release %7 : $A & P                      // id: %10
+  strong_release %5 : $A & P                      // id: %11
+  return %9 : $Int                                // id: %12
+} // end sil function 'test'
+
+// We're looking of an optimized spcialization of @impl, not @impl itself.
+// CHECK-NOT: @impl
 // CHECK-LABEL: sil shared [noinline] @{{.*}}impl{{.*}}
 // In the optimization pass we look for uses of alloc_stack (aka %5).
 // This test makes sure that we look at the correct uses with the
@@ -57,46 +102,8 @@ bb0(%0 : $A & P, %1 : $A & P):
   store %3 to %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
   dealloc_stack %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
   return %8 : $Int
+// CHECK-LABEL: end sil function {{.*}}impl{{.*}}
 } // end sil function 'impl'
-
-// protocol witness for P.foo() in conformance B
-sil shared [transparent] [serialized] [thunk] @Pfoo : $@convention(witness_method: P) (@in_guaranteed B) -> Int {
-// %0                                             // user: %1
-bb0(%0 : $*B):
-  %1 = load %0 : $*B                              // users: %2, %3
-  %2 = class_method %1 : $B, #B.foo!1 : (B) -> () -> Int, $@convention(method) (@guaranteed B) -> Int // user: %3
-  %3 = apply %2(%1) : $@convention(method) (@guaranteed B) -> Int // user: %4
-  return %3 : $Int                                // id: %4
-} // end sil function 'Pfoo'
-
-// B.foo()
-sil [noinline] @foo : $@convention(method) (@guaranteed B) -> Int {
-// %0                                             // user: %1
-bb0(%0 : $B):
-  debug_value %0 : $B, let, name "self", argno 1  // id: %1
-  %2 = integer_literal $Builtin.Int64, 1          // user: %3
-  %3 = struct $Int (%2 : $Builtin.Int64)          // user: %4
-  return %3 : $Int                                // id: %4
-} // end sil function 'foo'
-
-// test(x:y:)
-sil @test :$@convention(thin) (@guaranteed B, @guaranteed C) -> Int {
-// %0                                             // users: %5, %4, %2
-// %1                                             // users: %7, %6, %3
-bb0(%0 : $B, %1 : $C):
-  debug_value %0 : $B, let, name "x", argno 1     // id: %2
-  debug_value %1 : $C, let, name "y", argno 2     // id: %3
-  strong_retain %0 : $B                           // id: %4
-  %5 = init_existential_ref %0 : $B : $B, $A & P  // users: %11, %9
-  strong_retain %1 : $C                           // id: %6
-  %7 = init_existential_ref %1 : $C : $C, $A & P  // users: %10, %9
-  // function_ref imp(x:y:)
-  %8 = function_ref @impl : $@convention(thin) (@guaranteed A & P, @guaranteed A & P) -> Int // user: %9
-  %9 = apply %8(%5, %7) : $@convention(thin) (@guaranteed A & P, @guaranteed A & P) -> Int // user: %12
-  strong_release %7 : $A & P                      // id: %10
-  strong_release %5 : $A & P                      // id: %11
-  return %9 : $Int                                // id: %12
-} // end sil function 'test'
 
 // C.foo()
 sil @bar : $@convention(method) (@guaranteed C) -> Int
