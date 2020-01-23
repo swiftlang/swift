@@ -1094,7 +1094,7 @@ namespace driver {
           //
           // As it stands, after this job finishes, this mark will tell the code
           // that this job was known to be "cascading". That knowledge will
-          // cause any dependent jobs to be run if they haven't already been.
+          // cause any dependent jobs to be run if it hasn't already been.
           //
           // TODO: I think this is overly tricky
           markIntransitiveInDepGraph(Cmd, forRanges);
