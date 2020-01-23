@@ -17,10 +17,11 @@ target_include_directories(sourcekitd-repl PRIVATE
 target_link_libraries(sourcekitd-repl PRIVATE
   ${LibEdit_LIBRARIES})
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  set_target_properties(sourcekitd-repl
-    PROPERTIES
-    LINK_FLAGS "-Wl,-rpath -Wl,@executable_path/../lib")
+if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
+  set_target_properties(sourcekitd-repl PROPERTIES
+    INSTALL_RPATH "@executable_path/../lib")
+  target_link_options(sourcekitd-repl PRIVATE
+    "LINKER:-exported_symbol,_main")
 endif()
 if(SWIFT_ANALYZE_CODE_COVERAGE)
   set_property(TARGET sourcekitd-repl APPEND_STRING PROPERTY
@@ -29,6 +30,4 @@ endif()
 
 add_dependencies(tools sourcekitd-repl)
 swift_install_in_component(TARGETS sourcekitd-repl
-                           RUNTIME
-                             DESTINATION bin
-                             COMPONENT tools)
+  RUNTIME DESTINATION bin COMPONENT tools)
