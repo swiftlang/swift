@@ -799,6 +799,21 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     if (sameOverloadChoice(choice1, choice2))
       continue;
 
+    // If choices are not of the same kind it means that we can't really
+    // compare the solutions e.g.
+    //
+    // func foo(_: Int) -> (count: Int) {}
+    // func foo(_: String) -> [Int] {}
+    //
+    // _ = foo(#^placeholder^#).count
+    //
+    // Here (for the same locator) one choice would be an array `[Int]`,
+    // and another one would be a tuple `(count: Int)`, both have `.count`
+    // which is referenced completely differently - a property in case of
+    // an array and `element with label 'count:'` in case of a tuple.
+    if (choice1.getKind() != choice2.getKind())
+      return SolutionCompareResult::Incomparable;
+
     auto decl1 = choice1.getDecl();
     auto dc1 = decl1->getDeclContext();
     auto decl2 = choice2.getDecl();

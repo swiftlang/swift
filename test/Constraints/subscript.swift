@@ -203,3 +203,9 @@ func test_generic_subscript_requirements_mismatch_diagnostics() {
 
   s[number: ["hello"]] // expected-error {{subscript 'subscript(number:)' requires that 'String' conform to 'BinaryInteger'}}
 }
+
+// rdar://problem/49712598 - cannot compare solutions with different overload choice kinds
+func rdar49712598(pairs: [(rank: Int, count: Int)]) -> Bool {
+  return pairs[<#test#>].count == 2 // expected-error {{ambiguous use of 'subscript(_:)'}}
+  // expected-error@-1 {{editor placeholder in source file}}
+}
