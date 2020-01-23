@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-escape"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -362,7 +363,10 @@ bool EscapeAnalysis::CGNode::visitSuccessors(Visitor &&visitor) const {
 
 template <typename Visitor>
 bool EscapeAnalysis::CGNode::visitDefers(Visitor &&visitor) const {
-  for (Predecessor pred : Preds) {
+  // Save predecessors before calling `visitor` which may assign pointsTo edges
+  // which invalidates the predecessor iterator.
+  SmallVector<Predecessor, 4> predVector(Preds.begin(), Preds.end());
+  for (Predecessor pred : predVector) {
     if (!pred.is(EdgeType::Defer))
       continue;
     if (!visitor(pred.getPredNode(), false))
@@ -385,34 +389,24 @@ void EscapeAnalysis::ConnectionGraph::clear() {
   assert(ToMerge.empty());
 }
 
+// This never returns an interior node. It should never be called directly on an
+// address projection of a reference. To get the interior node for an address
+// projection, always ask for the content of the projection's base instead using
+// getValueContent() or getReferenceContent().
+//
+// Address phis are not allowed, so merging an unknown address with a reference
+// address projection is rare. If that happens, then the projection's node loses
+// it's interior property.
 EscapeAnalysis::CGNode *
-EscapeAnalysis::ConnectionGraph::getOrCreateNode(ValueBase *V,
-                                                 PointerKind pointerKind) {
-  assert(pointerKind != EscapeAnalysis::NoPointer);
-
+EscapeAnalysis::ConnectionGraph::getNode(SILValue V) {
+  // Early filter obvious non-pointer opcodes.
   if (isa<FunctionRefInst>(V) || isa<DynamicFunctionRefInst>(V) ||
       isa<PreviousDynamicFunctionRefInst>(V))
     return nullptr;
 
-  CGNode * &Node = Values2Nodes[V];
-  // Nodes mapped to values must have an indirect pointsTo. Nodes that don't
-  // have an indirect pointsTo are imaginary nodes that don't directly represnt
-  // a SIL value.
-  bool hasReferenceOnly = canOnlyContainReferences(pointerKind);
-  if (!Node) {
-    if (isa<SILFunctionArgument>(V)) {
-      Node = allocNode(V, NodeType::Argument, false, hasReferenceOnly);
-      if (!isSummaryGraph)
-        Node->mergeEscapeState(EscapeState::Arguments);
-    } else {
-      Node = allocNode(V, NodeType::Value, false, hasReferenceOnly);
-    }
-  }
-  return Node->getMergeTarget();
-}
-
-EscapeAnalysis::CGNode *
-EscapeAnalysis::ConnectionGraph::getNode(ValueBase *V, bool createIfNeeded) {
+  // Create the node flags based on the derived value's kind. If the pointer
+  // base type has non-reference pointers but they are never accessed in the
+  // current function, then ignore them.
   PointerKind pointerKind = EA->getPointerKind(V);
   if (pointerKind == EscapeAnalysis::NoPointer)
     return nullptr;
@@ -420,12 +414,30 @@ EscapeAnalysis::ConnectionGraph::getNode(ValueBase *V, bool createIfNeeded) {
   // Look past address projections, pointer casts, and the like within the same
   // object. Does not look past a dereference such as ref_element_addr, or
   // project_box.
-  V = EA->getPointerRoot(V);
+  SILValue ptrBase = EA->getPointerRoot(V);
+  // Do not create a node for undef values so we can verify that node values
+  // have the correct pointer kind.
+  if (!ptrBase->getFunction())
+    return nullptr;
 
-  if (!createIfNeeded)
-    return lookupNode(V);
+  assert(EA->isPointer(ptrBase) &&
+         "The base for derived pointer must also be a pointer type");
 
-  return getOrCreateNode(V, pointerKind);
+  bool hasReferenceOnly = canOnlyContainReferences(pointerKind);
+  // Update the value-to-node map.
+  CGNode *&Node = Values2Nodes[ptrBase];
+  if (Node) {
+    CGNode *targetNode = Node->getMergeTarget();
+    targetNode->mergeFlags(false /*isInterior*/, hasReferenceOnly);
+    return targetNode;
+  }
+  if (isa<SILFunctionArgument>(ptrBase)) {
+    Node = allocNode(ptrBase, NodeType::Argument, false, hasReferenceOnly);
+    if (!isSummaryGraph)
+      Node->mergeEscapeState(EscapeState::Arguments);
+  } else
+    Node = allocNode(ptrBase, NodeType::Value, false, hasReferenceOnly);
+  return Node;
 }
 
 /// Adds an argument/instruction in which the node's memory is released.
@@ -557,7 +569,8 @@ void EscapeAnalysis::ConnectionGraph::initializePointsTo(CGNode *initialNode,
 
         CGNode *predNode = pred.getPredNode();
         if (predNode->pointsTo) {
-          assert(predNode->pointsTo->getMergeTarget() == newPointsTo);
+          assert(predNode->pointsTo->getMergeTarget()
+                 == newPointsTo->getMergeTarget());
           return Traversal::Backtrack;
         }
         predNode->pointsTo = newPointsTo;
@@ -760,6 +773,11 @@ void EscapeAnalysis::ConnectionGraph::mergePointsTo(CGNode *initialNode,
                                                     CGNode *newPointsTo) {
   CGNode *oldPointsTo = initialNode->pointsTo;
   assert(oldPointsTo && "merging content should not initialize any pointsTo");
+
+  // newPointsTo may already be scheduled for a merge. Only create new edges to
+  // unmerged nodes. This may create a temporary pointsTo mismatch in the defer
+  // web, but Graph verification takes merged nodes into consideration.
+  newPointsTo = newPointsTo->getMergeTarget();
   if (oldPointsTo == newPointsTo)
     return;
 
@@ -869,8 +887,6 @@ CGNode *EscapeAnalysis::ConnectionGraph::createContentNode(
   CGNode *newContent =
       allocNode(nullptr, NodeType::Content, isInterior, hasReferenceOnly);
   initializePointsToEdge(addrNode, newContent);
-  assert(ToMerge.empty()
-         && "Initially setting pointsTo should not require any node merges");
   return newContent;
 }
 
@@ -908,8 +924,8 @@ EscapeAnalysis::ConnectionGraph::getOrCreateAddressContent(SILValue addrVal,
 
   bool contentHasReferenceOnly =
       EA->hasReferenceOnly(addrVal->getType().getObjectType(), *F);
-  // Address content always has an indirect pointsTo (only reference content can
-  // have a non-indirect pointsTo).
+  // Address content is never an interior node (only reference content can
+  // be an interior node).
   return getOrCreateContentNode(addrNode, false, contentHasReferenceOnly);
 }
 
@@ -918,12 +934,14 @@ EscapeAnalysis::ConnectionGraph::getOrCreateAddressContent(SILValue addrVal,
 CGNode *
 EscapeAnalysis::ConnectionGraph::getOrCreateReferenceContent(SILValue refVal,
                                                              CGNode *refNode) {
-  // The object node points to internal fields. It neither has indirect pointsTo
-  // nor reference-only pointsTo.
+  // The object node created here points to internal fields. It neither has
+  // indirect pointsTo nor reference-only pointsTo.
   CGNode *objNode = getOrCreateContentNode(refNode, true, false);
   if (!objNode->isInterior())
     return objNode;
 
+  // Determine whether the object that refVal refers to only contains
+  // references.
   bool contentHasReferenceOnly = false;
   if (refVal) {
     SILType refType = refVal->getType();
@@ -964,24 +982,19 @@ EscapeAnalysis::ConnectionGraph::getOrCreateUnknownContent(CGNode *addrNode) {
 // on-the-fly.
 EscapeAnalysis::CGNode *
 EscapeAnalysis::ConnectionGraph::getValueContent(SILValue ptrVal) {
-  // Look past address projections, pointer casts, and the like within the same
-  // object. Does not look past a dereference such as ref_element_addr, or
-  // project_box.
-  SILValue ptrBase = EA->getPointerRoot(ptrVal);
-
-  PointerKind pointerKind = EA->getPointerKind(ptrBase);
-  if (pointerKind == EscapeAnalysis::NoPointer)
-    return nullptr;
-
-  CGNode *addrNode = getOrCreateNode(ptrBase, pointerKind);
+  CGNode *addrNode = getNode(ptrVal);
   if (!addrNode)
     return nullptr;
 
-  if (ptrBase->getType().isAddress())
-    return getOrCreateAddressContent(ptrBase, addrNode);
+  // Create content based on the derived pointer. If the base pointer contains
+  // other types of references, then the content node will be merged when those
+  // references are accessed. If the other references types are never accessed
+  // in this function, then they are ignored.
+  if (ptrVal->getType().isAddress())
+    return getOrCreateAddressContent(ptrVal, addrNode);
 
-  if (canOnlyContainReferences(pointerKind))
-    return getOrCreateReferenceContent(ptrBase, addrNode);
+  if (addrNode->hasReferenceOnly())
+    return getOrCreateReferenceContent(ptrVal, addrNode);
 
   // The pointer value may contain raw pointers.
   return getOrCreateUnknownContent(addrNode);
@@ -1001,57 +1014,58 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
                                                 CGNodeMap &Mapping) {
   // The main point of the merging algorithm is to map each content node in the
   // source graph to a content node in this (destination) graph. This may
-  // require to create new nodes or to merge existing nodes in this graph.
+  // require creating new nodes or merging existing nodes in this graph.
 
   // First step: replicate the points-to edges and the content nodes of the
   // source graph in this graph.
   bool Changed = false;
-  bool NodesMerged;
-  do {
-    NodesMerged = false;
-    for (unsigned Idx = 0; Idx < Mapping.getMappedNodes().size(); ++Idx) {
-      CGNode *SourceNd = Mapping.getMappedNodes()[Idx];
-      CGNode *DestNd = Mapping.get(SourceNd);
-      assert(DestNd);
-      
-      if (SourceNd->getEscapeState() >= EscapeState::Global) {
-        // We don't need to merge the source subgraph of nodes which have the
-        // global escaping state set.
-        // Just set global escaping in the caller node and that's it.
-        Changed |= DestNd->mergeEscapeState(EscapeState::Global);
-        // If DestNd is an interior node, its content still needs to be created.
-        if (!DestNd->isInterior())
-          continue;
-      }
+  for (unsigned Idx = 0; Idx < Mapping.getMappedNodes().size(); ++Idx) {
+    CGNode *SourceNd = Mapping.getMappedNodes()[Idx];
+    CGNode *DestNd = Mapping.get(SourceNd);
+    assert(DestNd);
 
-      CGNode *SourcePT = SourceNd->pointsTo;
-      if (!SourcePT)
+    if (SourceNd->getEscapeState() >= EscapeState::Global) {
+      // We don't need to merge the source subgraph of nodes which have the
+      // global escaping state set.
+      // Just set global escaping in the caller node and that's it.
+      Changed |= DestNd->mergeEscapeState(EscapeState::Global);
+      // If DestNd is an interior node, its content still needs to be created.
+      if (!DestNd->isInterior() || DestNd->pointsTo)
         continue;
+    }
 
-      CGNode *DestPT = DestNd->pointsTo;
+    CGNode *SourcePT = SourceNd->pointsTo;
+    if (!SourcePT)
+      continue;
+
+    CGNode *MappedDestPT = Mapping.get(SourcePT);
+    CGNode *DestPT = DestNd->pointsTo;
+    if (!MappedDestPT) {
       if (!DestPT) {
         DestPT = createMergedContent(DestNd, SourcePT);
         Changed = true;
       }
-      CGNode *MappedDestPT = Mapping.get(SourcePT);
-      if (!MappedDestPT) {
-        // This is the first time the dest node is seen; just add the mapping.
-        Mapping.add(SourcePT, DestPT);
-        continue;
-      }
-      // We already found the destination node through another path.
-      assert(Mapping.getMappedNodes().contains(SourcePT));
-      if (DestPT == MappedDestPT)
-        continue;
-
-      // There are two content nodes in this graph which map to the same
-      // content node in the source graph -> we have to merge them.
-      scheduleToMerge(DestPT, MappedDestPT);
-      mergeAllScheduledNodes();
-      Changed = true;
-      NodesMerged = true;
+      // This is the first time the dest node is seen; just add the mapping.
+      Mapping.add(SourcePT, DestPT);
+      continue;
     }
-  } while (NodesMerged);
+    if (DestPT == MappedDestPT)
+      continue;
+
+    // We already found the destination node through another path.
+    assert(Mapping.getMappedNodes().contains(SourcePT));
+    Changed = true;
+    if (!DestPT) {
+      initializePointsToEdge(DestNd, MappedDestPT);
+      continue;
+    }
+    // There are two content nodes in this graph which map to the same
+    // content node in the source graph -> we have to merge them.
+    // Defer merging the nodes until all mapped nodes are created so that the
+    // graph is structurally valid before merging.
+    scheduleToMerge(DestPT, MappedDestPT);
+  }
+  mergeAllScheduledNodes();
   Mapping.getMappedNodes().reset(); // Make way for a different worklist.
 
   // Second step: add the source graph's defer edges to this graph.
@@ -1882,7 +1896,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
           if (LoadedElement) {
             if (CGNode *arrayElementStorage =
                     ConGraph->getFieldContent(ArrayObjNode)) {
-              ConGraph->defer(LoadedElement, arrayElementStorage);
+              ConGraph->defer(arrayElementStorage, LoadedElement);
               return;
             }
           }
@@ -1893,7 +1907,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         // returned address point to the same element storage.
         if (CGNode *ArrayObjNode = ConGraph->getValueContent(ASC.getSelf())) {
           CGNode *arrayElementAddress = ConGraph->getNode(ASC.getCallResult());
-          ConGraph->defer(arrayElementAddress, ArrayObjNode);
+          ConGraph->defer(ArrayObjNode, arrayElementAddress);
           return;
         }
         break;
@@ -2066,10 +2080,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       // that may eventually be associated with 'fieldContent', so we must
       // assume here that 'fieldContent2' could hold raw pointers. This is
       // implied by passing in invalid SILValue.
-      CGNode *objNode2 =
+      CGNode *escapingNode =
           ConGraph->getOrCreateReferenceContent(SILValue(), fieldNode);
-      CGNode *fieldNode2 = objNode2->getContentNodeOrNull();
-      ConGraph->getOrCreateUnknownContent(fieldNode2)->markEscaping();
+      if (CGNode *indirectFieldNode = escapingNode->getContentNodeOrNull())
+        escapingNode = indirectFieldNode;
+
+      ConGraph->getOrCreateUnknownContent(escapingNode)->markEscaping();
       return;
     }
     case SILInstructionKind::DestroyAddrInst: {
@@ -2345,6 +2361,8 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
         LLVM_DEBUG(llvm::dbgs() << "  create summary graph for "
                                 << FInfo->Graph.F->getName() << '\n');
 
+        PrettyStackTraceSILFunction
+          callerTraceRAII("merging escape summary", FInfo->Graph.F);
         FInfo->Graph.propagateEscapeStates();
 
         // Derive the summary graph of the current function. Even if the
@@ -2365,7 +2383,11 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
 
             // Only include callers which we are actually recomputing.
             if (BottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller)) {
-              LLVM_DEBUG(llvm::dbgs() << "  merge  "
+              PrettyStackTraceSILFunction
+                calleeTraceRAII("merging escape graph", FInfo->Graph.F);
+              PrettyStackTraceSILFunction
+                callerTraceRAII("...into", E.Caller->Graph.F);
+              LLVM_DEBUG(llvm::dbgs() << "  merge "
                                       << FInfo->Graph.F->getName()
                                       << " into "
                                       << E.Caller->Graph.F->getName() << '\n');
