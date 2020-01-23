@@ -91,7 +91,7 @@ Solution ConstraintSystem::finalize() {
         
     case FreeTypeVariableBinding::UnresolvedType:
       assignFixedType(tv, ctx.TheUnresolvedType,
-                      tv->getImpl().getLocator());
+                      /*locator*/nullptr);
       break;
     }
   }
@@ -206,8 +206,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
     if (!getFixedType(binding.first) && !binding.second->hasTypeVariable()) {
-      auto typeVar = binding.first;
-      assignFixedType(typeVar, binding.second, typeVar->getImpl().getLocator(),
+      assignFixedType(binding.first, binding.second, /*locator*/nullptr,
                       /*updateState=*/false);
     }
   }

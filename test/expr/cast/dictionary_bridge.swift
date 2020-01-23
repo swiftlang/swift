@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-redundant-coercion-warning
 
 // REQUIRES: objc_interop
 

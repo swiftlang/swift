@@ -198,9 +198,11 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
       }
     }
   }
-
-  // Recording fixed type source locator for type variable.
-  recordTypeVariableBindingLocator(typeVar, locator);
+  
+  if (locator) {
+    // Recording fixed type source locator for type variable.
+    recordTypeVariableBindingLocator(typeVar, locator);
+  }
   
   // Notify the constraint graph.
   CG.bindTypeVariable(typeVar, type);

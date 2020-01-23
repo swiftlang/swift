@@ -1165,12 +1165,12 @@ bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
   
   // Check to ensure the from and to types are equal the cast type.
   // This is required to handle cases where the conversion is done
-  // using compiler intrinsics e.g. _HasCustomAnyHashableRepresentation
+  // using compiler intrinsics of _HasCustomAnyHashableRepresentation
   // to AnyHashable where if we coerce a generic type that conforms to
   // this protocol to AnyHashable we match equal types here, but the
   // explicit coercion is still required.
   auto castType = cs.getType(expr->getCastTypeLoc());
-  if (!fromType->isEqual(castType) && !castType->hasTypeVariable())
+  if (!fromType->isEqual(castType) && cs.isAnyHashableType(castType))
     return false;
 
   auto toTypeRepr = expr->getCastTypeLoc().getTypeRepr();
@@ -1196,21 +1196,12 @@ bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
   
   auto coercedType = cs.getType(expr->getSubExpr());
   if (auto *typeVariable = coercedType->getAs<TypeVariableType>()) {
-    // Only diagnose if we have all type variables resolved in the system.
-    if (cs.hasFreeTypeVariables())
-      return false;
-
     auto representative = cs.getRepresentative(typeVariable);
     if (auto *typeSourceLocator =
             cs.getTypeVariableBindingLocator(representative)) {
       // If the type variable binding source locator is the same the
       // contextual type equality is coming from this coercion.
       if (typeSourceLocator == cs.getConstraintLocator(locator))
-        return false;
-
-      // Not warn if locator points to a TupleElement to avoid
-      // incorrect warnings.
-      if (typeSourceLocator->isLastElement<LocatorPathElt::TupleElement>())
         return false;
     }
   }

@@ -81,7 +81,7 @@ c3 as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to us
 // <rdar://problem/19495142> Various incorrect diagnostics for explicit type conversions
 1 as Double as Float // expected-error{{cannot convert value of type 'Double' to type 'Float' in coercion}}
 1 as Int as String // expected-error{{cannot convert value of type 'Int' to type 'String' in coercion}}
-Double(1) as Double as String // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}}
+Double(1) as Double as String // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}} expected-warning {{redundant cast to 'Double' has no effect}} {{11-21=}}
 ["awd"] as [Int] // expected-error{{cannot convert value of type 'String' to expected element type 'Int'}}
 ([1, 2, 1.0], 1) as ([String], Int)
 // expected-error@-1 2 {{cannot convert value of type 'Int' to expected element type 'String'}}

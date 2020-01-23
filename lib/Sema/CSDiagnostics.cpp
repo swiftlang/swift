@@ -753,6 +753,11 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::ExplicitTypeCoercion: {
+      diagnostic = diag::cannot_convert_coerce;
+      break;
+    }
+
     default:
       break;
     }
@@ -2069,7 +2074,8 @@ bool ContextualFailure::diagnoseAsError() {
     diagnostic = diag::cannot_convert_condition_value;
     break;
   }
-      
+  
+  case ConstraintLocator::ExplicitTypeCoercion:
   case ConstraintLocator::InstanceType: {
     if (diagnoseCoercionToUnrelatedType())
       return true;
@@ -5556,16 +5562,13 @@ bool UnnecessaryCoercionFailure::diagnoseAsError() {
                      diag::unnecessary_same_typealias_type_coercion,
                      getFromType(), castType)
           .fixItRemove(sourceRange);
-    } else {
-      emitDiagnostic(expr->getLoc(), diag::unnecessary_same_type_coercion,
-                     castType)
-          .fixItRemove(sourceRange);
+      return true;
     }
-  } else {
-    emitDiagnostic(expr->getLoc(), diag::unnecessary_same_type_coercion,
-                   castType)
-        .fixItRemove(sourceRange);
   }
+  
+  emitDiagnostic(expr->getLoc(), diag::unnecessary_same_type_coercion,
+                 castType)
+      .fixItRemove(sourceRange);
   return true;
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-redundant-coercion-warning
 
 class C : Hashable {
 	var x = 0
