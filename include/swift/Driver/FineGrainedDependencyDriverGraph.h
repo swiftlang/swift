@@ -164,10 +164,12 @@ class ModuleDepGraph {
   std::unordered_set<std::string> externalDependencies;
 
   /// The new version of "Marked."
-  /// Aka "isMarked". Holds the swiftDeps paths for jobs the driver has or will
-  /// schedule.
-  /// TODO: Move scheduledJobs out of the graph, ultimately.
-  std::unordered_set<std::string> swiftDepsOfJobsThatNeedRunning;
+  /// Aka "isMarked".
+  /// If  job is in here, all of its dependent jobs have already been searched
+  /// for jobs that depend on them, OR the job is about to be scheduled and
+  /// we'll need to run all dependent jobs after it completes. (See the call to
+  /// \c markIntransitive in \c shouldScheduleCompileJobAccordingToCondition.)
+  std::unordered_set<std::string> swiftDepsOfMarkedJobs;
 
   /// Keyed by swiftdeps filename, so we can get back to Jobs.
   std::unordered_map<std::string, const driver::Job *> jobsBySwiftDeps;
@@ -307,6 +309,10 @@ public:
   /// For the dot file.
   std::string getGraphID() const { return "driver"; }
 
+  void forCorrespondingImplementationOfProvidedInterface(
+      const ModuleDepGraphNode *,
+      function_ref<void(ModuleDepGraphNode *)>) const;
+
   void forEachUseOf(const ModuleDepGraphNode *def,
                     function_ref<void(const ModuleDepGraphNode *use)>);
 
@@ -326,6 +332,8 @@ public:
   /// Interface to status quo code in the driver.
   bool isMarked(const driver::Job *) const;
 
+  bool isSwiftDepsMarked(StringRef swiftDeps) const;
+
   /// Given a "cascading" job, that is a job whose dependents must be recompiled
   /// when this job is recompiled, Compute two sets of jobs:
   /// 1. Return value (via visited) is the set of jobs needing recompilation
@@ -334,9 +342,9 @@ public:
   /// are recompiled. Such jobs are added to the \ref scheduledJobs set, and
   /// accessed via \ref isMarked.
   ///
-  /// Only return jobs marked that were previously unmarked. Not required for
-  /// the driver because it won't run a job twice, but required for the unit
-  /// test.
+  /// Returns jobs to be run because of changes to any/ever node in the
+  /// argument. Only return jobs marked that were previously unmarked, assuming
+  /// previously marked jobs are already scheduled.
   std::vector<const driver::Job*> markTransitive(
       const driver::Job *jobToBeRecompiled, const void *ignored = nullptr);
 
@@ -413,7 +421,7 @@ private:
   /// Integrate a SourceFileDepGraph into the receiver.
   /// Integration happens when the driver needs to read SourceFileDepGraph.
   CoarseGrainedDependencyGraphImpl::LoadResult
-  integrate(const SourceFileDepGraph &);
+  integrate(const SourceFileDepGraph &, StringRef swiftDepsOfJob);
 
   enum class LocationOfPreexistingNode { nowhere, here, elsewhere };
 
@@ -431,7 +439,8 @@ private:
   bool
   integrateSourceFileDepGraphNode(const SourceFileDepGraph &g,
                                   const SourceFileDepGraphNode *integrand,
-                                  const PreexistingNodeIfAny preexistingMatch);
+                                  const PreexistingNodeIfAny preexistingMatch,
+                                  StringRef swiftDepsOfJob);
 
   /// Integrate the \p integrand, a node that represents a Decl in the swiftDeps
   /// file being integrated. \p preexistingNodeInPlace holds the node
@@ -442,7 +451,7 @@ private:
   /// ModuleDepGraphNode.
   std::pair<bool, ModuleDepGraphNode *>
   integrateSourceFileDeclNode(const SourceFileDepGraphNode *integrand,
-                              StringRef swiftDepsOfSourceFileGraph,
+                              StringRef swiftDepsOfJob,
                               const PreexistingNodeIfAny preexistingMatch);
 
   /// Create a brand-new ModuleDepGraphNode to integrate \p integrand.
@@ -463,14 +472,25 @@ private:
   /// Given a definition node, and a list of already found dependents,
   /// recursively add transitive closure of dependents of the definition
   /// into the already found dependents.
+  ///
+  /// \param foundDependents gets filled out with all dependent nodes found
+  /// \param definition the starting definition
+  /// \param shouldConsiderUse returns true if a use should be considered
   void findDependentNodes(
       std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
-      const ModuleDepGraphNode *definition);
+      const ModuleDepGraphNode *definition,
+      function_ref<bool(const ModuleDepGraphNode *use)> shouldConsiderUse);
 
   /// Givien a set of nodes, return the set of swiftDeps for the jobs those
   /// nodes are in.
-  llvm::StringSet<> computeSwiftDepsFromInterfaceNodes(
-      ArrayRef<const ModuleDepGraphNode *> nodes);
+  std::vector<std::string>
+  computeSwiftDepsFromNodes(ArrayRef<const ModuleDepGraphNode *> nodes) const;
+
+  std::vector<const driver::Job *>
+  getUnmarkedJobsFrom(const ArrayRef<const ModuleDepGraphNode *> nodes) const;
+
+  /// Mark any jobs for these nodes
+  void markJobsFrom(ArrayRef<const ModuleDepGraphNode *>);
 
   /// Record a visit to this node for later dependency printing
   size_t traceArrival(const ModuleDepGraphNode *visitedNode);
@@ -483,8 +503,8 @@ private:
       const driver::Job *dependentJob);
 
   /// Return true if job was not scheduled before
-  bool recordJobNeedsRunning(StringRef swiftDeps) {
-    return swiftDepsOfJobsThatNeedRunning.insert(swiftDeps).second;
+  bool markJobViaSwiftDeps(StringRef swiftDeps) {
+    return swiftDepsOfMarkedJobs.insert(swiftDeps).second;
   }
 
   /// For debugging and visualization, write out the graph to a dot file.
