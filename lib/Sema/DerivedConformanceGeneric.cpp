@@ -120,9 +120,11 @@ ValueDecl *DerivedConformance::deriveGeneric(ValueDecl *requirement) {
                         /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), paramList,
                         /*GenericParams=*/nullptr, Nominal);
     ctor->setImplicit();
-    ctor->setAccess(AccessLevel::Public);
+    ctor->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
     ctor->setBody(body);
     // ctor->setBodySynthesizer(body);
+
+    addMembersToConformanceContext({ctor});
     return ctor;
   }
 
