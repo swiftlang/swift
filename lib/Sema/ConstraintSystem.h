@@ -2178,22 +2178,16 @@ public:
     assert(E != nullptr && "Expected non-null expression!");
     return E == contextualTypeNode ? contextualType.getType() : Type();
   }
-  Type getContextualType() const {
-    return contextualType.getType();
+
+  TypeLoc getContextualTypeLoc(Expr *expr) const {
+    return expr == contextualTypeNode ? contextualType : TypeLoc();
   }
 
-  TypeLoc getContextualTypeLoc() const {
-    return contextualType;
+  ContextualTypePurpose getContextualTypePurpose(Expr *expr) const {
+    return (expr && expr == contextualTypeNode) ? contextualTypePurpose
+                                                : CTP_Unused;
   }
 
-  const Expr *getContextualTypeNode() const {
-    return contextualTypeNode;
-  }
-
-  ContextualTypePurpose getContextualTypePurpose() const {
-    return contextualTypePurpose;
-  }
-  
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued.
   ConstraintLocator *

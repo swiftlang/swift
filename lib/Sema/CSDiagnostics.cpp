@@ -232,7 +232,8 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   };
 
   if (isFromContextualType())
-    return getAffectedDeclFromType(cs.getContextualType());
+    return getAffectedDeclFromType(
+        cs.getContextualType(getLocator()->getAnchor()));
 
   if (auto overload = getChoiceFor(getLocator())) {
     // If there is a declaration associated with this
@@ -1207,7 +1208,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   // Assignment is not allowed inside of a condition,
   // so let's not diagnose immutability, because
   // most likely the problem is related to use of `=` itself.
-  if (cs.getContextualTypePurpose() == CTP_Condition)
+  if (cs.getContextualTypePurpose(diagExpr) == CTP_Condition)
     return false;
 
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
@@ -2200,7 +2201,8 @@ bool ContextualFailure::diagnoseConversionToNil() const {
   emitDiagnostic(anchor->getLoc(), *diagnostic, getToType());
 
   if (CTP == CTP_Initialization) {
-    auto *patternTR = cs.getContextualTypeLoc().getTypeRepr();
+    auto *patternTR =
+      cs.getContextualTypeLoc(locator->getAnchor()).getTypeRepr();
     if (!patternTR)
       return true;
 
@@ -2902,7 +2904,8 @@ bool TupleContextualFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   if (isNumElementsMismatch())
     diagnostic = diag::tuple_types_not_convertible_nelts;
-  else if ((purpose == CTP_Initialization) && !cs.getContextualType())
+  else if ((purpose == CTP_Initialization) &&
+           !cs.getContextualType(getAnchor()))
     diagnostic = diag::tuple_types_not_convertible;
   else if (auto diag = getDiagnosticFor(purpose, /*forProtocol=*/false))
     diagnostic = *diag;
@@ -3437,12 +3440,18 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         return true;
       };
 
+      auto getRootExpr = [&cs](Expr *expr) {
+        while (auto parent = cs.getParentExpr(expr))
+          expr = parent;
+        return expr;
+      };
+
       auto *baseLoc = cs.getConstraintLocator(ctorRef->getBase());
       if (auto selection = getChoiceFor(baseLoc)) {
         OverloadChoice choice = selection->choice;
         if (choice.isDecl() && isMutable(choice.getDecl()) &&
             !isCallArgument(initCall) &&
-            cs.getContextualTypePurpose() == CTP_Unused) {
+            cs.getContextualTypePurpose(getRootExpr(ctorRef)) == CTP_Unused) {
           auto fixItLoc = ctorRef->getBase()->getSourceRange().End;
           emitDiagnostic(loc, diag::init_not_instance_member_use_assignment)
               .fixItInsertAfter(fixItLoc, " = ");
@@ -3628,7 +3637,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     Type contextualType;
     for (auto iterateCS = &cs; contextualType.isNull() && iterateCS;
          iterateCS = iterateCS->baseCS) {
-      contextualType = iterateCS->getContextualType();
+      contextualType = iterateCS->getContextualType(expr);
     }
     
     // Try to provide a fix-it that only contains a '.'
@@ -3639,11 +3648,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
     // Check if the expression is the matching operator ~=, most often used in
     // case statements. If so, try to provide a single dot fix-it
-    const Expr *contextualTypeNode = nullptr;
+    const Expr *contextualTypeNode = getAnchor();
     ConstraintSystem *lastCS = nullptr;
     for (auto iterateCS = &cs; iterateCS; iterateCS = iterateCS->baseCS) {
       lastCS = iterateCS;
-      contextualTypeNode = iterateCS->getContextualTypeNode();
     }
     
     // The '~=' operator is an overloaded decl ref inside a binaryExpr
@@ -3791,7 +3799,8 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   if (locator->isLastElement<LocatorPathElt::ContextualType>()) {
     auto &cs = getConstraintSystem();
     emitDiagnostic(anchor->getLoc(), diag::cannot_convert_initializer_value,
-                   getType(anchor), resolveType(cs.getContextualType()));
+                   getType(anchor),
+                   resolveType(cs.getContextualType(getAnchor())));
     // TODO: It would be great so somehow point out which arguments are missing.
     return true;
   }
@@ -4003,7 +4012,7 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
 
   auto *locator = getLocator();
   if (locator->isForContextualType()) {
-    funcType = cs.getContextualType()->getAs<FunctionType>();
+    funcType = cs.getContextualType(locator->getAnchor())->getAs<FunctionType>();
   } else if (auto info = cs.getFunctionArgApplyInfo(locator)) {
     funcType = info->getParamType()->getAs<FunctionType>();
   } else if (locator->isLastElement<LocatorPathElt::ClosureResult>()) {
@@ -5251,7 +5260,7 @@ bool InOutConversionFailure::diagnoseAsError() {
           argApplyInfo->getArgType(), argApplyInfo->getParamType());
     } else {
       assert(locator->findLast<LocatorPathElt::ContextualType>());
-      auto contextualType = cs.getContextualType();
+      auto contextualType = cs.getContextualType(anchor);
       auto purpose = getContextualTypePurpose();
       auto diagnostic = getDiagnosticFor(purpose, /*forProtocol=*/false);
 

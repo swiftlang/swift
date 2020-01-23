@@ -2217,7 +2217,12 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
 
   // Tell the constraint system what the contextual type is.  This informs
   // diagnostics and is a hint for various performance optimizations.
-  cs.setContextualType(expr, convertType, convertTypePurpose);
+  // FIXME: Look through LoadExpr. This is an egregious hack due to the
+  // way typeCheckExprIndependently works.
+  Expr *contextualTypeExpr = expr;
+  if (auto loadExpr = dyn_cast_or_null<LoadExpr>(contextualTypeExpr))
+    contextualTypeExpr = loadExpr->getSubExpr();
+  cs.setContextualType(contextualTypeExpr, convertType, convertTypePurpose);
 
   // If the convertType is *only* provided for that hint, then null it out so
   // that we don't later treat it as an actual conversion constraint.
