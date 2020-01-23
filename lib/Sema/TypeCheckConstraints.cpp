@@ -2988,12 +2988,6 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
                        SequenceProto->getDeclaredType(), ContextualLocator);
 
-      // Since we are using "contextual type" here, it has to be recorded
-      // in the constraint system for diagnostics to have access to "purpose".
-      cs.setContextualType(
-          expr, TypeLoc::withoutLoc(SequenceProto->getDeclaredType()),
-          CTP_ForEachStmt);
-
       auto elementLocator = cs.getConstraintLocator(
           ContextualLocator, ConstraintLocator::SequenceElementType);
 
@@ -3064,10 +3058,6 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       SequenceType = solution.simplifyType(SequenceType);
       ElementType = solution.simplifyType(ElementType);
       IteratorType = solution.simplifyType(IteratorType);
-
-      // Perform any necessary conversions of the sequence (e.g. [T]! -> [T]).
-      expr = solution.coerceToType(expr, SequenceType, Locator);
-      if (!expr) return nullptr;
 
       cs.cacheExprTypes(expr);
       Stmt->setSequence(expr);
@@ -3159,8 +3149,15 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   Expr *seq = stmt->getSequence();
   assert(seq && "type-checking an uninitialized for-each statement?");
 
+  auto sequenceProto = TypeChecker::getProtocol(
+      dc->getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
+  if (!sequenceProto)
+    return true;
+
   // Type-check the for-each loop sequence and element pattern.
-  auto resultTy = TypeChecker::typeCheckExpression(seq, dc, &listener);
+  auto resultTy = TypeChecker::typeCheckExpression(
+      seq, dc, TypeLoc::withoutLoc(sequenceProto->getDeclaredType()),
+      CTP_ForEachStmt, TypeCheckExprFlags::ConvertTypeIsOnlyAHint, &listener);
   if (!resultTy)
     return true;
   return false;
