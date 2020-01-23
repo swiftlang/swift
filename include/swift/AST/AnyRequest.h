@@ -154,13 +154,15 @@ private:
     return *static_cast<const Derived *>(this);
   }
 
+  const void *getRawStorage() const { return asDerived().getRawStorage(); }
+
 public:
   /// Cast to a specific (known) type.
   template<typename Request>
   const Request &castTo() const {
     assert(getVTable()->typeID == TypeID<Request>::value &&
            "Wrong type in cast");
-    return *static_cast<const Request *>(asDerived().getRawStorage());
+    return *static_cast<const Request *>(getRawStorage());
   }
 
   /// Try casting to a specific (known) type, returning \c nullptr on
@@ -170,26 +172,27 @@ public:
     if (getVTable()->typeID != TypeID<Request>::value)
       return nullptr;
 
-    return static_cast<const Request *>(asDerived().getRawStorage());
+    return static_cast<const Request *>(getRawStorage());
   }
 
   /// Diagnose a cycle detected for this request.
   void diagnoseCycle(DiagnosticEngine &diags) const {
-    getVTable()->diagnoseCycle(asDerived().getRawStorage(), diags);
+    getVTable()->diagnoseCycle(getRawStorage(), diags);
   }
 
   /// Note that this request is part of a cycle.
   void noteCycleStep(DiagnosticEngine &diags) const {
-    getVTable()->noteCycleStep(asDerived().getRawStorage(), diags);
+    getVTable()->noteCycleStep(getRawStorage(), diags);
   }
 
   /// Retrieve the nearest source location to which this request applies.
   SourceLoc getNearestLoc() const {
-    return getVTable()->getNearestLoc(asDerived().getRawStorage());
+    return getVTable()->getNearestLoc(getRawStorage());
   }
 
   /// Compare two instances for equality.
-  friend bool operator==(const Derived &lhs, const Derived &rhs) {
+  friend bool operator==(const AnyRequestBase<Derived> &lhs,
+                         const AnyRequestBase<Derived> &rhs) {
     // If the storage kinds don't match, we're done.
     if (lhs.getStorageKind() != rhs.getStorageKind())
       return false;
@@ -210,7 +213,7 @@ public:
     return !(lhs == rhs);
   }
 
-  friend hash_code hash_value(const Derived &req) {
+  friend hash_code hash_value(const AnyRequestBase<Derived> &req) {
     // If there's no storage, return a trivial hash value.
     if (!req.hasStorage())
       return 1;
@@ -240,7 +243,9 @@ public:
 ///       void noteCycleStep(DiagnosticEngine &diags) const;
 ///
 class ActiveRequest final : public AnyRequestBase<ActiveRequest> {
+  template <typename T>
   friend class AnyRequestBase;
+
   friend class AnyRequest;
   friend llvm::DenseMapInfo<ActiveRequest>;
 
@@ -280,7 +285,9 @@ public:
 ///       void noteCycleStep(DiagnosticEngine &diags) const;
 ///
 class AnyRequest final : public AnyRequestBase<AnyRequest> {
+  template <typename T>
   friend class AnyRequestBase;
+
   friend llvm::DenseMapInfo<AnyRequest>;
 
   /// Pointer to the request on the heap.
