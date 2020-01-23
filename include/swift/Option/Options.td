@@ -470,12 +470,12 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
 
 // Experimental feature options
 def enable_experimental_differentiable_programming : Flag<["-"], "enable-experimental-differentiable-programming">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental differentiable programming features">;
 
 // SWIFT_ENABLE_TENSORFLOW
 def enable_experimental_cross_file_derivative_registration : Flag<["-"], "enable-experimental-cross-file-derivative-registration">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental cross-file derivative registration">;
 
 // NOTE: This flag will be removed when JVP/differential generation is robust.
