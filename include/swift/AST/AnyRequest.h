@@ -240,7 +240,9 @@ public:
 ///       void noteCycleStep(DiagnosticEngine &diags) const;
 ///
 class ActiveRequest final : public AnyRequestBase<ActiveRequest> {
+  template <typename T>
   friend class AnyRequestBase;
+
   friend class AnyRequest;
   friend llvm::DenseMapInfo<ActiveRequest>;
 
@@ -280,7 +282,9 @@ public:
 ///       void noteCycleStep(DiagnosticEngine &diags) const;
 ///
 class AnyRequest final : public AnyRequestBase<AnyRequest> {
+  template <typename T>
   friend class AnyRequestBase;
+
   friend llvm::DenseMapInfo<AnyRequest>;
 
   /// Pointer to the request on the heap.
