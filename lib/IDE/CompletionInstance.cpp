@@ -56,6 +56,8 @@ template <typename Range>
 unsigned findIndexInRange(Decl *D, const Range &Decls) {
   unsigned N = 0;
   for (auto I = Decls.begin(), E = Decls.end(); I != E; ++I) {
+    if ((*I)->isImplicit())
+      continue;
     if (*I == D)
       return N;
     ++N;
@@ -66,6 +68,8 @@ unsigned findIndexInRange(Decl *D, const Range &Decls) {
 /// Return the element at \p N in \p Decls .
 template <typename Range> Decl *getElementAt(const Range &Decls, unsigned N) {
   for (auto I = Decls.begin(), E = Decls.end(); I != E; ++I) {
+    if ((*I)->isImplicit())
+      continue;
     if (N == 0)
       return *I;
     --N;
@@ -140,6 +144,8 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       llvm_unreachable("invalid DC kind for finding equivalent DC (query)");
 
     if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
+      if (IndexStack.empty())
+        return nullptr;
       auto accessorN = IndexStack.pop_back_val();
       D = getElementAt(storage->getAllAccessors(), accessorN);
     }
