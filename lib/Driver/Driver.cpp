@@ -1757,17 +1757,13 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
     return Inputs.empty() ? OutputInfo::Mode::REPL
                           : OutputInfo::Mode::Immediate;
 
-  bool HasWMO = Args.hasFlag(options::OPT_whole_module_optimization,
+  bool UseWMO = Args.hasFlag(options::OPT_whole_module_optimization,
                              options::OPT_no_whole_module_optimization,
                              false);
 
-  Arg *ArgRequiringSingleCompile = nullptr;
-  if (HasWMO) {
-    ArgRequiringSingleCompile = Args.getLastArg(options::OPT_index_file,
-                                                options::OPT_whole_module_optimization);
-  } else {
-    ArgRequiringSingleCompile = Args.getLastArg(options::OPT_index_file);
-  }
+  const Arg *ArgRequiringSingleCompile = Args.getLastArg(
+      options::OPT_index_file,
+      UseWMO ? options::OPT_whole_module_optimization : llvm::opt::OptSpecifier());
 
   BatchModeOut = Args.hasFlag(options::OPT_enable_batch_mode,
                               options::OPT_disable_batch_mode,
@@ -1782,7 +1778,7 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
   // user about this decision.
   // FIXME: AST dump also doesn't work with `-index-file`, but that fix is a bit
   // more complicated than this.
-  if (HasWMO && Args.hasArg(options::OPT_dump_ast)) {
+  if (UseWMO && Args.hasArg(options::OPT_dump_ast)) {
     Diags.diagnose(SourceLoc(), diag::warn_ignoring_wmo);
     return OutputInfo::Mode::StandardCompile;
   }
@@ -1798,7 +1794,7 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
     }
     if (ArgRequiringSinglePrimaryCompile)
       Diags.diagnose(SourceLoc(), diag::warn_ignoring_source_range_dependencies,
-                     ArgRequiringSinglePrimaryCompile->getOption().getPrefixedName());
+                     ArgRequiringSingleCompile->getOption().getPrefixedName());
     return OutputInfo::Mode::SingleCompile;
   }
 
