@@ -1404,18 +1404,7 @@ for host in "${ALL_HOSTS[@]}"; do
     fi
 
     for product in "${PRODUCTS[@]}"; do
-        # Check if we should perform this action.
-        tmp_product=${product}
-        if [[ ${tmp_product} == "libdispatch_static" ]]; then
-            tmp_product=libdispatch
-            LIBDISPATCH_STATIC_CMAKE_OPTIONS=${LIBDISPATCH_CMAKE_OPTIONS[@]}
-        fi
-        if [[ ${tmp_product} == "foundation_static" ]]; then
-            tmp_product=foundation
-        fi
-        if ! [[ $(should_execute_action "${host}-${tmp_product}-build") ]]; then
-            continue
-        fi
+        [[ $(should_execute_action "${host}-${product/_static}-build") ]] || continue
 
         unset skip_build
         source_dir_var="$(toupper ${product})_SOURCE_DIR"
@@ -2632,17 +2621,7 @@ for host in "${ALL_HOSTS[@]}"; do
     set_build_options_for_host $host
 
     for product in "${PRODUCTS[@]}"; do
-        # Check if we should perform this action.
-        tmp_product=${product}
-        if [[ ${tmp_product} == "libdispatch_static" ]]; then
-            tmp_product=libdispatch
-        fi
-        if [[ ${tmp_product} == "foundation_static" ]]; then
-            tmp_product=foundation
-        fi
-        if ! [[ $(should_execute_action "${host}-${tmp_product}-install") ]]; then
-            continue
-        fi
+        [[ $(should_execute_action "${host}-${product/_static}-install") ]] || continue
         if [[ -z "${INSTALL_DESTDIR}" ]] ; then
             echo "--install-destdir is required to install products."
             exit 1
