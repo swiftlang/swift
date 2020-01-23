@@ -390,6 +390,77 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   return false;
 }
 
+/// Returns a generated guard statement that checks whether the given lhs and
+/// rhs expressions are equal. If not equal, the else block for the guard
+/// returns `guardReturnValue`.
+/// \p C The AST context.
+/// \p lhsExpr The first expression to compare for equality.
+/// \p rhsExpr The second expression to compare for equality.
+/// \p guardReturnValue The expression to return if the two sides are not equal 
+GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
+                                        Expr *lhsExpr,
+                                        Expr *rhsExpr, 
+                                        Expr *guardReturnValue) {
+  SmallVector<StmtConditionElement, 1> conditions;
+  SmallVector<ASTNode, 1> statements;
+  
+  auto returnStmt = new (C) ReturnStmt(SourceLoc(), guardReturnValue);
+  statements.emplace_back(ASTNode(returnStmt));
+
+  // Next, generate the condition being checked.
+  // lhs == rhs
+  auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
+    DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
+    DeclNameLoc());
+  auto cmpArgsTuple = TupleExpr::create(C, SourceLoc(),
+                                        { lhsExpr, rhsExpr },
+                                        { }, { }, SourceLoc(),
+                                        /*HasTrailingClosure*/false,
+                                        /*Implicit*/true);
+  auto cmpExpr = new (C) BinaryExpr(cmpFuncExpr, cmpArgsTuple,
+                                    /*Implicit*/true);
+  conditions.emplace_back(cmpExpr);
+
+  // Build and return the complete guard statement.
+  // guard lhs == rhs else { return lhs < rhs }
+  auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
+  return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
+}
+/// Returns a generated guard statement that checks whether the given lhs and
+/// rhs expressions are equal. If not equal, the else block for the guard
+/// returns `false`.
+/// \p C The AST context.
+/// \p lhsExpr The first expression to compare for equality.
+/// \p rhsExpr The second expression to compare for equality. 
+GuardStmt *DerivedConformance::returnFalseIfNotEqualGuard(ASTContext &C,
+                                        Expr *lhsExpr,
+                                        Expr *rhsExpr) {
+  // return false
+  auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(), true);
+  return returnIfNotEqualGuard(C, lhsExpr, rhsExpr, falseExpr);
+}
+/// Returns a generated guard statement that checks whether the given lhs and
+/// rhs expressions are equal. If not equal, the else block for the guard
+/// returns lhs < rhs.
+/// \p C The AST context.
+/// \p lhsExpr The first expression to compare for equality.
+/// \p rhsExpr The second expression to compare for equality. 
+GuardStmt *DerivedConformance::returnComparisonIfNotEqualGuard(ASTContext &C,
+                                        Expr *lhsExpr,
+                                        Expr *rhsExpr) {
+  // return lhs < rhs
+  auto ltFuncExpr = new (C) UnresolvedDeclRefExpr(
+    DeclNameRef(C.Id_LessThanOperator), DeclRefKind::BinaryOperator,
+    DeclNameLoc());
+  auto ltArgsTuple = TupleExpr::create(C, SourceLoc(),
+                                        { lhsExpr, rhsExpr },
+                                        { }, { }, SourceLoc(),
+                                        /*HasTrailingClosure*/false,
+                                        /*Implicit*/true);
+  auto ltExpr = new (C) BinaryExpr(ltFuncExpr, ltArgsTuple, /*Implicit*/true);
+  return returnIfNotEqualGuard(C, lhsExpr, rhsExpr, ltExpr);
+}
+
 /// Build a type-checked integer literal.
 static IntegerLiteralExpr *buildIntegerLiteral(ASTContext &C, unsigned index) {
   Type intType = C.getIntDecl()->getDeclaredType();
@@ -409,7 +480,7 @@ static IntegerLiteralExpr *buildIntegerLiteral(ASTContext &C, unsigned index) {
 /// \p funcDecl The parent function.
 /// \p indexName The name of the output variable.
 /// \return A DeclRefExpr of the output variable (of type Int).
-DeclRefExpr *swift::convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
+DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                                        DeclContext *parentDC,
                                        EnumDecl *enumDecl,
                                        VarDecl *enumVarDecl,
@@ -484,7 +555,7 @@ DeclRefExpr *swift::convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
 /// \p protocol The protocol being requested.
 /// \return The ParamDecl of each associated value whose type does not conform.
 SmallVector<ParamDecl *, 3>
-swift::associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
+DerivedConformance::associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
                                         ProtocolDecl *protocol) {
   SmallVector<ParamDecl *, 3> nonconformingAssociatedValues;
   for (auto elt : theEnum->getAllElements()) {
@@ -509,7 +580,7 @@ swift::associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnu
 /// \p theEnum The enum whose elements and associated values should be checked.
 /// \p protocol The protocol being requested.
 /// \return True if all associated values of all elements of the enum conform.
-bool swift::allAssociatedValuesConformToProtocol(DeclContext *DC,
+bool DerivedConformance::allAssociatedValuesConformToProtocol(DeclContext *DC,
                                                  EnumDecl *theEnum,
                                                  ProtocolDecl *protocol) {
   return associatedValuesNotConformingToProtocol(DC, theEnum, protocol).empty();
@@ -522,7 +593,7 @@ bool swift::allAssociatedValuesConformToProtocol(DeclContext *DC,
 /// \p varContext The context into which payload variables should be declared.
 /// \p boundVars The array to which the pattern's variables will be appended.
 Pattern*
-swift::enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
+DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
                              char varPrefix, DeclContext *varContext,
                              SmallVectorImpl<VarDecl*> &boundVars) {
   auto parentDC = enumElementDecl->getDeclContext();
@@ -583,7 +654,7 @@ swift::enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
 /// \p type The type of the variable.
 /// \p varContext The context of the variable.
 /// \return A VarDecl named with the prefix and number.
-VarDecl *swift::indexedVarDecl(char prefixChar, int index, Type type,
+VarDecl *DerivedConformance::indexedVarDecl(char prefixChar, int index, Type type,
                                DeclContext *varContext) {
   ASTContext &C = varContext->getASTContext();
 

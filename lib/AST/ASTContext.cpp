@@ -1086,35 +1086,36 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   return witness;
 }
 
-FuncDecl *ASTContext::getBinaryComparisonOperatorIntDecl(StringRef op, FuncDecl **cached) const {
-  if (*cached)
-    return *cached;
+static 
+FuncDecl *getBinaryComparisonOperatorIntDecl(const ASTContext &C, StringRef op, FuncDecl *&cached) {
+  if (cached)
+    return cached;
 
-  if (!getIntDecl() || !getBoolDecl())
+  if (!C.getIntDecl() || !C.getBoolDecl())
     return nullptr;
 
-  auto intType = getIntDecl()->getDeclaredType();
+  auto intType = C.getIntDecl()->getDeclaredType();
   auto isIntParam = [&](AnyFunctionType::Param param) {
     return (!param.isVariadic() && !param.isInOut() &&
             param.getPlainType()->isEqual(intType));
   };
-  auto boolType = getBoolDecl()->getDeclaredType();
-  auto decl = lookupOperatorFunc(*this, op,
-                                 intType, [=](FunctionType *type) {
+  auto boolType = C.getBoolDecl()->getDeclaredType();
+  auto decl = lookupOperatorFunc(C, op, intType, 
+      [=](FunctionType *type) {
     // Check for the signature: (Int, Int) -> Bool
     if (type->getParams().size() != 2) return false;
     if (!isIntParam(type->getParams()[0]) ||
         !isIntParam(type->getParams()[1])) return false;
     return type->getResult()->isEqual(boolType);
   });
-  *cached = decl;
+  cached = decl;
   return decl;
 }
 FuncDecl *ASTContext::getLessThanIntDecl() const {
-  return getBinaryComparisonOperatorIntDecl("<", &getImpl().LessThanIntDecl);
+  return getBinaryComparisonOperatorIntDecl(*this, "<", getImpl().LessThanIntDecl);
 }
 FuncDecl *ASTContext::getEqualIntDecl() const {
-  return getBinaryComparisonOperatorIntDecl("==", &getImpl().EqualIntDecl);
+  return getBinaryComparisonOperatorIntDecl(*this, "==", getImpl().EqualIntDecl);
 }
 
 FuncDecl *ASTContext::getHashValueForDecl() const {

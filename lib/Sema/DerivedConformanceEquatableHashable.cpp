@@ -82,7 +82,7 @@ static bool canDeriveConformance(DeclContext *DC,
   if (auto enumDecl = dyn_cast<EnumDecl>(target)) {
     // The cases must not have associated values, or all associated values must
     // conform to the protocol.
-    return allAssociatedValuesConformToProtocol(DC, enumDecl, protocol);
+    return DerivedConformance::allAssociatedValuesConformToProtocol(DC, enumDecl, protocol);
   }
 
   if (auto structDecl = dyn_cast<StructDecl>(target)) {
@@ -101,7 +101,7 @@ void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
     auto nonconformingAssociatedTypes =
-        associatedValuesNotConformingToProtocol(DC, enumDecl, protocol);
+        DerivedConformance::associatedValuesNotConformingToProtocol(DC, enumDecl, protocol);
     for (auto *typeToDiagnose : nonconformingAssociatedTypes) {
       SourceLoc reprLoc;
       if (auto *repr = typeToDiagnose->getTypeRepr())
@@ -133,45 +133,6 @@ void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
                        diag::classes_automatic_protocol_synthesis,
                        protocol->getName().str());
   }
-}
-
-/// Returns a generated guard statement that checks whether the given lhs and
-/// rhs expressions are equal. If not equal, the else block for the guard
-/// returns false.
-/// \p C The AST context.
-/// \p lhsExpr The first expression to compare for equality.
-/// \p rhsExpr The second expression to compare for equality.
-static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
-                                        Expr *lhsExpr,
-                                        Expr *rhsExpr) {
-  SmallVector<StmtConditionElement, 1> conditions;
-  SmallVector<ASTNode, 1> statements;
-
-  // First, generate the statement for the body of the guard.
-  // return false
-  auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
-                                              /*Implicit*/true);
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
-  statements.emplace_back(ASTNode(returnStmt));
-
-  // Next, generate the condition being checked.
-  // lhs == rhs
-  auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
-    DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
-    DeclNameLoc());
-  auto cmpArgsTuple = TupleExpr::create(C, SourceLoc(),
-                                        { lhsExpr, rhsExpr },
-                                        { }, { }, SourceLoc(),
-                                        /*HasTrailingClosure*/false,
-                                        /*Implicit*/true);
-  auto cmpExpr = new (C) BinaryExpr(cmpFuncExpr, cmpArgsTuple,
-                                    /*Implicit*/true);
-  conditions.emplace_back(cmpExpr);
-
-  // Build and return the complete guard statement.
-  // guard lhs == rhs else { return false }
-  auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
 }
 
 static std::pair<BraceStmt *, bool>
@@ -225,9 +186,9 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
 
   // Generate the conversion from the enums to integer indices.
   SmallVector<ASTNode, 6> statements;
-  DeclRefExpr *aIndex = convertEnumToIndex(statements, parentDC, enumDecl,
+  DeclRefExpr *aIndex = DerivedConformance::convertEnumToIndex(statements, parentDC, enumDecl,
                                            aParam, eqDecl, "index_a");
-  DeclRefExpr *bIndex = convertEnumToIndex(statements, parentDC, enumDecl,
+  DeclRefExpr *bIndex = DerivedConformance::convertEnumToIndex(statements, parentDC, enumDecl,
                                            bParam, eqDecl, "index_b");
 
   // Generate the compare of the indices.
@@ -296,7 +257,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
 
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 3> lhsPayloadVars;
-    auto lhsSubpattern = enumElementPayloadSubpattern(elt, 'l', eqDecl,
+    auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', eqDecl,
                                                       lhsPayloadVars);
     auto lhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                                  SourceLoc(), DeclNameLoc(),
@@ -306,7 +267,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
 
     // .<elt>(let r0, let r1, ...)
     SmallVector<VarDecl*, 3> rhsPayloadVars;
-    auto rhsSubpattern = enumElementPayloadSubpattern(elt, 'r', eqDecl,
+    auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', eqDecl,
                                                       rhsPayloadVars);
     auto rhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                                  SourceLoc(), DeclNameLoc(),
@@ -352,7 +313,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
       auto rhsVar = rhsPayloadVars[varIdx];
       auto rhsExpr = new (C) DeclRefExpr(rhsVar, DeclNameLoc(),
                                          /*Implicit*/true);
-      auto guardStmt = returnIfNotEqualGuard(C, lhsExpr, rhsExpr);
+      auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C, 
+          lhsExpr, rhsExpr);
       statementsInCase.emplace_back(guardStmt);
     }
 
@@ -438,7 +400,8 @@ deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
     auto bPropertyExpr = new (C) DotSyntaxCallExpr(bPropertyRef, SourceLoc(),
                                                    bParamRef);
 
-    auto guardStmt = returnIfNotEqualGuard(C, aPropertyExpr, bPropertyExpr);
+    auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C,
+      aPropertyExpr, bPropertyExpr);
     statements.emplace_back(guardStmt);
   }
 
@@ -763,7 +726,7 @@ deriveBodyHashable_enum_noAssociatedValues_hashInto(
 
   // generate: switch self {...}
   SmallVector<ASTNode, 3> stmts;
-  auto discriminatorExpr = convertEnumToIndex(stmts, parentDC, enumDecl,
+  auto discriminatorExpr = DerivedConformance::convertEnumToIndex(stmts, parentDC, enumDecl,
                                               selfDecl, hashIntoDecl,
                                               "discriminator");
   // generate: hasher.combine(discriminator)
@@ -818,7 +781,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
     SmallVector<VarDecl*, 3> payloadVars;
     SmallVector<ASTNode, 3> statements;
 
-    auto payloadPattern = enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
+    auto payloadPattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
                                                        payloadVars);
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                           SourceLoc(), DeclNameLoc(),

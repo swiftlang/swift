@@ -437,9 +437,6 @@ public:
   void setStatsReporter(UnifiedStatsReporter *stats);
 
 private:
-  // get `<` or `==`
-  FuncDecl *getBinaryComparisonOperatorIntDecl(StringRef op, FuncDecl **cached) const;
-  
   friend class TypeChecker;
 
   void installGlobalTypeChecker(TypeChecker *TC);

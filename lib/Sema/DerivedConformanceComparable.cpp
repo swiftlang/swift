@@ -31,52 +31,6 @@
 
 using namespace swift;
 
-/// Returns a generated guard statement that checks whether the given lhs and
-/// rhs expressions are equal. If not equal, the else block for the guard
-/// returns lhs < rhs.
-/// \p C The AST context.
-/// \p lhsExpr The first expression to compare for equality.
-/// \p rhsExpr The second expression to compare for equality.
-static GuardStmt *returnComparisonIfNotEqualGuard(ASTContext &C,
-                                        Expr *lhsExpr,
-                                        Expr *rhsExpr) {
-  SmallVector<StmtConditionElement, 1> conditions;
-  SmallVector<ASTNode, 1> statements;
-
-  // First, generate the statement for the body of the guard.
-  // return lhs < rhs
-  auto ltFuncExpr = new (C) UnresolvedDeclRefExpr(
-    DeclNameRef(C.Id_LessThanOperator), DeclRefKind::BinaryOperator,
-    DeclNameLoc());
-  auto ltArgsTuple = TupleExpr::create(C, SourceLoc(),
-                                        { lhsExpr, rhsExpr },
-                                        { }, { }, SourceLoc(),
-                                        /*HasTrailingClosure*/false,
-                                        /*Implicit*/true);
-  auto ltExpr = new (C) BinaryExpr(ltFuncExpr, ltArgsTuple, /*Implicit*/true);
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), ltExpr);
-  statements.emplace_back(ASTNode(returnStmt));
-
-  // Next, generate the condition being checked.
-  // lhs == rhs
-  auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
-    DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
-    DeclNameLoc());
-  auto cmpArgsTuple = TupleExpr::create(C, SourceLoc(),
-                                        { lhsExpr, rhsExpr },
-                                        { }, { }, SourceLoc(),
-                                        /*HasTrailingClosure*/false,
-                                        /*Implicit*/true);
-  auto cmpExpr = new (C) BinaryExpr(cmpFuncExpr, cmpArgsTuple,
-                                    /*Implicit*/true);
-  conditions.emplace_back(cmpExpr);
-
-  // Build and return the complete guard statement.
-  // guard lhs == rhs else { return lhs < rhs }
-  auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
-}
-
 // how does this code ever even get invoked? you can’t compare uninhabited enums...
 static std::pair<BraceStmt *, bool>
 deriveBodyComparable_enum_uninhabited_lt(AbstractFunctionDecl *ltDecl, void *) {
@@ -129,9 +83,9 @@ deriveBodyComparable_enum_noAssociatedValues_lt(AbstractFunctionDecl *ltDecl,
 
   // Generate the conversion from the enums to integer indices.
   SmallVector<ASTNode, 6> statements;
-  DeclRefExpr *aIndex = convertEnumToIndex(statements, parentDC, enumDecl,
+  DeclRefExpr *aIndex = DerivedConformance::convertEnumToIndex(statements, parentDC, enumDecl,
                                            aParam, ltDecl, "index_a");
-  DeclRefExpr *bIndex = convertEnumToIndex(statements, parentDC, enumDecl,
+  DeclRefExpr *bIndex = DerivedConformance::convertEnumToIndex(statements, parentDC, enumDecl,
                                            bParam, ltDecl, "index_b");
 
   // Generate the compare of the indices.
@@ -199,7 +153,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
 
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 3> lhsPayloadVars;
-    auto lhsSubpattern = enumElementPayloadSubpattern(elt, 'l', ltDecl,
+    auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', ltDecl,
                                                       lhsPayloadVars);
     auto lhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                                  SourceLoc(), DeclNameLoc(),
@@ -209,7 +163,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
 
     // .<elt>(let r0, let r1, ...)
     SmallVector<VarDecl*, 3> rhsPayloadVars;
-    auto rhsSubpattern = enumElementPayloadSubpattern(elt, 'r', ltDecl,
+    auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', ltDecl,
                                                       rhsPayloadVars);
     auto rhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                                  SourceLoc(), DeclNameLoc(),
@@ -254,7 +208,8 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
       auto rhsVar = rhsPayloadVars[varIdx];
       auto rhsExpr = new (C) DeclRefExpr(rhsVar, DeclNameLoc(),
                                          /*Implicit*/true);
-      auto guardStmt = returnComparisonIfNotEqualGuard(C, lhsExpr, rhsExpr);
+      auto guardStmt = DerivedConformance::returnComparisonIfNotEqualGuard(C, 
+          lhsExpr, rhsExpr);
       statementsInCase.emplace_back(guardStmt);
     }
 
@@ -380,14 +335,17 @@ deriveComparable_lt(
 
 bool 
 DerivedConformance::canDeriveComparable(DeclContext *context, NominalTypeDecl *declaration) {
+  auto enumeration = dyn_cast<EnumDecl>(declaration);
   // The type must be an enum.
-  if (EnumDecl *const enumeration = dyn_cast<EnumDecl>(declaration)) {
-    // The cases must not have non-comparable associated values or raw backing
-    auto comparable = context->getASTContext().getProtocol(KnownProtocolKind::Comparable);
-    return allAssociatedValuesConformToProtocol(context, enumeration, comparable) && !enumeration->hasRawType();
-  } else {
-    return false;
+  if (!enumeration) {
+      return false;
   }
+  auto comparable = context->getASTContext().getProtocol(KnownProtocolKind::Comparable);
+  if (!comparable) {
+      return false; // not sure what should be done here instead
+  }
+  // The cases must not have non-comparable associated values or raw backing
+  return allAssociatedValuesConformToProtocol(context, enumeration, comparable) && !enumeration->hasRawType();
 }
 
 ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
@@ -396,12 +354,17 @@ ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
   // Build the necessary decl.
   if (requirement->getBaseName() == "<") {
     if (EnumDecl const *const enumeration = dyn_cast<EnumDecl>(this->Nominal)) {
-      auto bodySynthesizer = !enumeration->hasCases() 
-        ? &deriveBodyComparable_enum_uninhabited_lt 
-        : enumeration->hasOnlyCasesWithoutAssociatedValues()
-            ? &deriveBodyComparable_enum_noAssociatedValues_lt
-            : &deriveBodyComparable_enum_hasAssociatedValues_lt; 
-      return deriveComparable_lt(*this, bodySynthesizer);
+      std::pair<BraceStmt *, bool> (*synthesizer)(AbstractFunctionDecl *, void *);
+      if (enumeration->hasCases()) {
+        if (enumeration->hasOnlyCasesWithoutAssociatedValues()) {
+            synthesizer = &deriveBodyComparable_enum_noAssociatedValues_lt;
+        } else {
+            synthesizer = &deriveBodyComparable_enum_hasAssociatedValues_lt;
+        }
+      } else {
+        synthesizer = &deriveBodyComparable_enum_uninhabited_lt;
+      }
+      return deriveComparable_lt(*this, synthesizer);
     } else {
       llvm_unreachable("todo");
     }
