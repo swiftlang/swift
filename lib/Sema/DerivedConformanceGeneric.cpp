@@ -28,7 +28,8 @@ using namespace swift;
 
 namespace {
 
-Type deriveGeneric_Representation(ASTContext &ctx, NominalTypeDecl *type) {
+Type deriveGeneric_Representation(DerivedConformance &derived) {
+  auto &ctx = derived.Context;
   auto gpModule = ctx.getLoadedModule(ctx.Id_GenericProgramming);
   if (!gpModule)
     return nullptr;
@@ -49,7 +50,7 @@ Type deriveGeneric_Representation(ASTContext &ctx, NominalTypeDecl *type) {
   // 2 -> Product<Int, Int>
   // 3 -> Product<Int, Product<Int, Int>>
   SmallVector<Type, 4> propTypesImpl;
-  for (auto prop : type->getStoredProperties()) {
+  for (auto prop : derived.Nominal->getStoredProperties()) {
     propTypesImpl.push_back(prop->getType());
   }
   ArrayRef<Type> propTypes = propTypesImpl;
@@ -70,29 +71,35 @@ Type deriveGeneric_Representation(ASTContext &ctx, NominalTypeDecl *type) {
   }
 }
 
-ValueDecl *deriveGeneric_init(ASTContext &ctx, NominalTypeDecl *type) {
+ValueDecl *deriveGeneric_init(DerivedConformance &derived) {
+  auto &ctx = derived.Context;
+  auto type = derived.Nominal;
+
   auto param =
       new (ctx) ParamDecl(SourceLoc(), SourceLoc(), ctx.Id_representation,
                           SourceLoc(), ctx.Id_representation, type);
   param->setSpecifier(ParamSpecifier::Default);
-  param->setInterfaceType(deriveGeneric_Representation(ctx, type));
+  param->setInterfaceType(deriveGeneric_Representation(derived));
   auto paramList = ParameterList::create(ctx, param);
 
+  auto props = type->getStoredProperties();
   SmallVector<ASTNode, 4> stmts;
-  Expr *base = new (ctx)
-      DeclRefExpr(ConcreteDeclRef(param), DeclNameLoc(), /*Implicit=*/true);
-  for (auto prop : type->getStoredProperties()) {
-    auto lhs = UnresolvedDeclRefExpr::createImplicit(ctx, prop->getName());
-    Expr *rhs;
-    if (prop != type->getStoredProperties().back()) {
-      rhs = UnresolvedDotExpr::createImplicit(ctx, base, ctx.Id_first);
-      base = UnresolvedDotExpr::createImplicit(ctx, base, ctx.Id_second);
-    } else {
-      rhs = base;
+  if (props.size() > 0) {
+    Expr *base = new (ctx)
+        DeclRefExpr(ConcreteDeclRef(param), DeclNameLoc(), /*Implicit=*/true);
+    for (auto prop : props) {
+      auto lhs = UnresolvedDeclRefExpr::createImplicit(ctx, prop->getName());
+      Expr *rhs;
+      if (prop != type->getStoredProperties().back()) {
+        rhs = UnresolvedDotExpr::createImplicit(ctx, base, ctx.Id_first);
+        base = UnresolvedDotExpr::createImplicit(ctx, base, ctx.Id_second);
+      } else {
+        rhs = base;
+      }
+      auto assign =
+          new (ctx) AssignExpr(lhs, SourceLoc(), rhs, /*Implicit=*/true);
+      stmts.push_back(assign);
     }
-    auto assign =
-        new (ctx) AssignExpr(lhs, SourceLoc(), rhs, /*Implicit=*/true);
-    stmts.push_back(assign);
   }
   auto body = BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc(),
                                 /*implicit=*/true);
@@ -106,7 +113,65 @@ ValueDecl *deriveGeneric_init(ASTContext &ctx, NominalTypeDecl *type) {
   ctor->setImplicit();
   ctor->copyFormalAccessFrom(type, /*sourceIsParentContext*/ true);
   ctor->setBody(body);
+
+  derived.addMembersToConformanceContext({ctor});
   return ctor;
+}
+
+ValueDecl *deriveGeneric_representation(DerivedConformance &derived) {
+  auto &ctx = derived.Context;
+  auto type = derived.Nominal;
+  auto ret = deriveGeneric_Representation(derived);
+
+  auto props = type->getStoredProperties();
+  Expr *result;
+  SmallVector<ASTNode, 4> stmts;
+  if (props.size() == 0) {
+    result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                    /*Implicit=*/true);
+  } else {
+    result =
+        UnresolvedDeclRefExpr::createImplicit(ctx, props.back()->getName());
+    for (auto prop : reverse(props.drop_back(1))) {
+      auto product = UnresolvedDeclRefExpr::createImplicit(ctx, ctx.Id_Product);
+      auto value = UnresolvedDeclRefExpr::createImplicit(ctx, prop->getName());
+      result = CallExpr::createImplicit(ctx, product, {value, result}, {});
+    }
+  }
+  auto stmt = new (ctx) ReturnStmt(SourceLoc(), result, /*implicit=*/true);
+  auto body = BraceStmt::create(ctx, SourceLoc(), {stmt}, SourceLoc(),
+                                /*implicit=*/true);
+
+  VarDecl *var = new (ctx) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Var,
+                                   /*IsCaptureList*/ false, SourceLoc(),
+                                   ctx.Id_representation, type);
+  var->setInterfaceType(ret);
+
+  AccessorDecl *getter = AccessorDecl::create(
+      ctx, /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
+      AccessorKind::Get, var,
+      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*GenericParams=*/nullptr, ParameterList::createEmpty(ctx),
+      TypeLoc::withoutLoc(ret), type);
+  getter->setImplicit();
+  getter->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
+  getter->setBody(body);
+
+  var->setImplicit();
+  var->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
+  var->setImplInfo(StorageImplInfo::getImmutableComputed());
+  var->setAccessors(SourceLoc(), {getter}, SourceLoc());
+
+  Pattern *internalPat = new (ctx) NamedPattern(var, /*implicit*/ true);
+  internalPat->setType(ret);
+  internalPat = TypedPattern::createImplicit(ctx, internalPat, ret);
+  internalPat->setType(ret);
+  auto *pat = PatternBindingDecl::createImplicit(
+      ctx, StaticSpellingKind::None, internalPat, /*InitExpr*/ nullptr, type);
+
+  derived.addMembersToConformanceContext({var, pat});
+  return var;
 }
 
 } // namespace
@@ -123,7 +188,7 @@ Type DerivedConformance::deriveGeneric(AssociatedTypeDecl *requirement) {
     return nullptr;
 
   if (requirement->getName() == Context.Id_Representation) {
-    return deriveGeneric_Representation(Context, Nominal);
+    return deriveGeneric_Representation(*this);
   }
 
   return nullptr;
@@ -137,11 +202,11 @@ ValueDecl *DerivedConformance::deriveGeneric(ValueDecl *requirement) {
     return nullptr;
 
   if (isa<ConstructorDecl>(requirement)) {
-    auto derived = deriveGeneric_init(Context, Nominal);
-    if (derived) {
-      addMembersToConformanceContext({derived});
-    }
-    return derived;
+    return deriveGeneric_init(*this);
+  }
+
+  if (requirement->getBaseName() == Context.Id_representation) {
+    return deriveGeneric_representation(*this);
   }
 
   return nullptr;
