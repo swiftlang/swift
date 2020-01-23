@@ -1702,10 +1702,6 @@ class DifferentiableAttr final
   friend TrailingObjects;
   friend class DifferentiableAttributeTypeCheckRequest;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  friend class DifferentiableAttributeParameterIndicesRequest;
-  // SWIFT_ENABLE_TENSORFLOW END
-
   /// The declaration on which the `@differentiable` attribute is declared.
   /// May not be a valid declaration for `@differentiable` attributes.
   /// Resolved during parsing and deserialization.

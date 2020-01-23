@@ -1660,30 +1660,6 @@ public:
   bool isCached() const { return true; }
 };
 
-// SWIFT_ENABLE_TENSORFLOW
-class DifferentiableAttributeParameterIndicesRequest :
-    public SimpleRequest<DifferentiableAttributeParameterIndicesRequest,
-                         IndexSubset *(DifferentiableAttr *, Decl *),
-                         CacheKind::SeparatelyCached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  llvm::Expected<IndexSubset *>
-  evaluate(Evaluator &evaluator, DifferentiableAttr *attr, Decl *decl) const;
-
-public:
-  // Separate caching.
-  bool isCached() const { return true; }
-  Optional<IndexSubset *> getCachedResult() const;
-  void cacheResult(IndexSubset *value) const;
-};
-// SWIFT_ENABLE_TENSORFLOW END
-
-
 /// Checks whether this declaration inherits its superclass' designated and
 /// convenience initializers.
 class InheritsSuperclassInitializersRequest
