@@ -202,7 +202,7 @@ function(_add_variant_c_compile_flags)
     RESULT_VAR_NAME ENABLE_LTO
     MACCATALYST_BUILD_FLAVOR)
   cmake_parse_arguments(CFLAGS
-    "FORCE_BUILD_OPTIMIZED"
+    ""
     "${oneValueArgs}"
     ""
     ${ARGN})
@@ -225,7 +225,7 @@ function(_add_variant_c_compile_flags)
     MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
   is_build_type_optimized("${CFLAGS_BUILD_TYPE}" optimized)
-  if(optimized OR CFLAGS_FORCE_BUILD_OPTIMIZED)
+  if(optimized)
     list(APPEND result "-O2")
 
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
@@ -732,7 +732,6 @@ endfunction()
 #     [FILE_DEPENDS target1 ...]
 #     [DONT_EMBED_BITCODE]
 #     [IS_STDLIB]
-#     [FORCE_BUILD_OPTIMIZED]
 #     [IS_STDLIB_CORE]
 #     [IS_SDK_OVERLAY]
 #     INSTALL_IN_COMPONENT comp
@@ -810,7 +809,6 @@ endfunction()
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
         DONT_EMBED_BITCODE
-        FORCE_BUILD_OPTIMIZED
         IS_SDK_OVERLAY
         IS_STDLIB
         IS_STDLIB_CORE
@@ -1384,7 +1382,6 @@ function(_add_swift_library_single target name)
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
-    "${SWIFTLIB_SINGLE_FORCE_BUILD_OPTIMIZED_keyword}"
     RESULT_VAR_NAME c_compile_flags
     MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
     )
@@ -1581,6 +1578,9 @@ function(add_swift_host_library name)
                         ${ARGN})
   set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
 
+  if(ASHL_FORCE_BUILD_OPTIMIZED)
+    message(SEND_ERROR "library ${name} is using FORCE_BUILD_OPTIMIZED flag which is deprecated.  Please use target_compile_options instead")
+  endif()
   if(ASHL_C_COMPILE_FLAGS)
     message(SEND_ERROR "library ${name} is using C_COMPILE_FLAGS parameter which is deprecated.  Please use target_compile_definitions, target_compile_options, or target_include_directories instead")
   endif()
@@ -1603,7 +1603,6 @@ function(add_swift_host_library name)
     ${ASHL_SHARED_keyword}
     ${ASHL_STATIC_keyword}
     ${ASHL_SOURCES}
-    ${ASHL_FORCE_BUILD_OPTIMIZED_keyword}
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     LLVM_LINK_COMPONENTS ${ASHL_LLVM_LINK_COMPONENTS}
@@ -1779,7 +1778,6 @@ endfunction()
 function(add_swift_target_library name)
   set(SWIFTLIB_options
         DONT_EMBED_BITCODE
-        FORCE_BUILD_OPTIMIZED
         HAS_SWIFT_CONTENT
         IS_SDK_OVERLAY
         IS_STDLIB
@@ -2233,7 +2231,6 @@ function(add_swift_target_library name)
         ${SWIFTLIB_IS_STDLIB_keyword}
         ${SWIFTLIB_IS_STDLIB_CORE_keyword}
         ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
-        ${SWIFTLIB_FORCE_BUILD_OPTIMIZED_keyword}
         ${SWIFTLIB_NOSWIFTRT_keyword}
         DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
         INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
