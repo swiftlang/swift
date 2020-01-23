@@ -2020,12 +2020,9 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       ConGraph->getNode(cast<SingleValueInstruction>(I));
       return;
 
-#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   case SILInstructionKind::Name##RetainInst:                                   \
-  case SILInstructionKind::StrongRetain##Name##Inst:                           \
-  case SILInstructionKind::StrongCopy##Name##ValueInst:
+  case SILInstructionKind::StrongRetain##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::DeallocStackInst:
     case SILInstructionKind::StrongRetainInst:
@@ -2043,8 +2040,11 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::SetDeallocatingInst:
     case SILInstructionKind::FixLifetimeInst:
     case SILInstructionKind::ClassifyBridgeObjectInst:
-    case SILInstructionKind::ValueToBridgeObjectInst:
-      // These instructions don't have any effect on escaping.
+      // Early bailout: These instructions never produce a pointer value and
+      // have no escaping effect on their operands.
+      assert(!llvm::any_of(I->getResults(), [this](SILValue result) {
+        return isPointer(result);
+      }));
       return;
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
