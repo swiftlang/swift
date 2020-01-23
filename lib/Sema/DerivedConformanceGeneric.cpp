@@ -116,10 +116,8 @@ ValueDecl *DerivedConformance::deriveGeneric(ValueDecl *requirement) {
       } else {
         rhs = base;
       }
-      auto assign = new (Context) AssignExpr(nullptr, SourceLoc(), nullptr, /*Implicit=*/true);
-      auto seq = SequenceExpr::create(Context, {lhs, assign, rhs});
-      seq->setImplicit(true);
-      stmts.push_back(seq);
+      auto assign = new (Context) AssignExpr(lhs, SourceLoc(), rhs, /*Implicit=*/true);
+      stmts.push_back(assign);
     }
     auto body = BraceStmt::create(Context, SourceLoc(), stmts, SourceLoc(),
                                   /*implicit=*/true);
