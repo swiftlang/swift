@@ -3637,13 +3637,35 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
+/// The differentiability of a SIL function type parameter.
+enum class SILParameterDifferentiability : unsigned {
+  /// Either differentiable or not applicable.
+  ///
+  /// - If the function type is not `@differentiable`, parameter
+  ///   differentiability is not applicable. This case is the default value.
+  /// - If the function type is `@differentiable`, the function is
+  ///   differentiable with respect to this parameter.
+  DifferentiableOrNotApplicable,
+
+  /// Not differentiable: a `@noDerivative` parameter.
+  ///
+  /// May be applied only to parameters of `@differentiable` function types.
+  /// The function type is not differentiable with respect to this parameter.
+  NotDifferentiable,
+};
+
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
   llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
+  SILParameterDifferentiability Differentiability : 1;
+
 public:
   SILParameterInfo() = default;//: Ty(), Convention((ParameterConvention)0) {}
-  SILParameterInfo(CanType type, ParameterConvention conv)
-    : TypeAndConvention(type, conv) {
+  SILParameterInfo(
+      CanType type, ParameterConvention conv,
+      SILParameterDifferentiability differentiability =
+          SILParameterDifferentiability::DifferentiableOrNotApplicable)
+      : TypeAndConvention(type, conv), Differentiability(differentiability) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
@@ -3698,6 +3720,16 @@ public:
     return isGuaranteedParameter(getConvention());
   }
 
+  SILParameterDifferentiability getDifferentiability() const {
+    return Differentiability;
+  }
+
+  SILParameterInfo getWithDifferentiability(
+      SILParameterDifferentiability differentiability) const {
+    return SILParameterInfo(getInterfaceType(), getConvention(),
+                            differentiability);
+  }
+
   /// The SIL storage type determines the ABI for arguments based purely on the
   /// formal parameter conventions. The actual SIL type for the argument values
   /// may differ in canonical SIL. In particular, opaque values require indirect
@@ -3726,6 +3758,7 @@ public:
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(getInterfaceType().getPointer());
     id.AddInteger((unsigned)getConvention());
+    id.AddInteger((unsigned)getDifferentiability());
   }
 
   SWIFT_DEBUG_DUMP;
@@ -3739,8 +3772,9 @@ public:
   }
 
   bool operator==(SILParameterInfo rhs) const {
-    return getInterfaceType() == rhs.getInterfaceType()
-      && getConvention() == rhs.getConvention();
+    return getInterfaceType() == rhs.getInterfaceType() &&
+           getConvention() == rhs.getConvention() &&
+           getDifferentiability() == rhs.getDifferentiability();
   }
   bool operator!=(SILParameterInfo rhs) const {
     return !(*this == rhs);

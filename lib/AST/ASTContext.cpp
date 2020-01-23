@@ -3327,6 +3327,15 @@ SILFunctionType::SILFunctionType(
              "Cannot return an @noescape function type");
     }
   }
+
+  // Check that `@noDerivative` parameters only exist on `@differentiable`
+  // functions.
+  if (!ext.isDifferentiable())
+    for (auto param : getParameters())
+      assert(param.getDifferentiability() ==
+                 SILParameterDifferentiability::DifferentiableOrNotApplicable &&
+             "non-`@differentiable` function should not have NotDifferentiable "
+             "parameter");
 #endif
 }
 
