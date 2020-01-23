@@ -3390,6 +3390,12 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     return true;
   }
 
+  auto getRootExpr = [&cs](Expr *expr) {
+    while (auto parent = cs.getParentExpr(expr))
+      expr = parent;
+    return expr;
+  };
+
   Expr *expr = findParentExpr(getAnchor());
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
 
@@ -3438,12 +3444,6 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
           return storage->isSettable(DC) && storage->isSetterAccessibleFrom(DC);
 
         return true;
-      };
-
-      auto getRootExpr = [&cs](Expr *expr) {
-        while (auto parent = cs.getParentExpr(expr))
-          expr = parent;
-        return expr;
       };
 
       auto *baseLoc = cs.getConstraintLocator(ctorRef->getBase());
@@ -3637,7 +3637,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     Type contextualType;
     for (auto iterateCS = &cs; contextualType.isNull() && iterateCS;
          iterateCS = iterateCS->baseCS) {
-      contextualType = iterateCS->getContextualType(expr);
+      contextualType = iterateCS->getContextualType(getRawAnchor());
     }
     
     // Try to provide a fix-it that only contains a '.'
@@ -3648,7 +3648,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
     // Check if the expression is the matching operator ~=, most often used in
     // case statements. If so, try to provide a single dot fix-it
-    const Expr *contextualTypeNode = getAnchor();
+    const Expr *contextualTypeNode = getRootExpr(getAnchor());
     ConstraintSystem *lastCS = nullptr;
     for (auto iterateCS = &cs; iterateCS; iterateCS = iterateCS->baseCS) {
       lastCS = iterateCS;
