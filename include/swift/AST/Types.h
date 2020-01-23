@@ -4127,6 +4127,13 @@ public:
       return ExtInfo(NoEscape ? (Bits | NoEscapeMask) : (Bits & ~NoEscapeMask),
                      Other);
     }
+    ExtInfo
+    withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
+      return ExtInfo(
+          (Bits & ~DifferentiabilityMask) |
+              ((unsigned)differentiability << DifferentiabilityMaskOffset),
+          Other);
+    }
 
     std::pair<unsigned, const void *> getFuncAttrKey() const {
       return std::make_pair(Bits, Other.ClangFunctionType);
