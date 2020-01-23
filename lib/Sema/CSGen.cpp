@@ -2827,7 +2827,8 @@ namespace {
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
       auto locator = CS.getConstraintLocator(expr);
-      auto typeVar = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+      auto typeVar = CS.createTypeVariable(locator, TVO_CanBindToNoEscape |
+                                                    TVO_CanBindToHole);
       return LValueType::get(typeVar);
     }
 

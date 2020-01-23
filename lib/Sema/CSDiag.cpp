@@ -1447,29 +1447,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     auto lhsType = CS.getType(lhsExpr)->getRValueType();
     auto rhsType = CS.getType(rhsExpr)->getRValueType();
 
-    // TODO(diagnostics): There are still cases not yet handled by new
-    // diagnostics framework e.g.
-    //
-    // var tuple = (1, 2, 3)
-    // switch tuple {
-    //   case (let (_, _, _)) + 1: break
-    // }
-    if (callExpr->isImplicit() && overloadName == "~=") {
-      auto flags = ParameterTypeFlags();
-      if (calleeInfo.candidates.size() == 1)
-        if (auto fnType = calleeInfo.candidates[0].getFunctionType())
-          flags = fnType->getParams()[0].getParameterFlags();
-
-      auto *locator = CS.getConstraintLocator(
-          callExpr,
-          {ConstraintLocator::ApplyArgument,
-           LocatorPathElt::ApplyArgToParam(0, 0, flags)},
-          /*summaryFlags=*/0);
-
-      ArgumentMismatchFailure failure(CS, lhsType, rhsType, locator);
-      return failure.diagnosePatternMatchingMismatch();
-    }
-
     if (isContextualConversionFailure(argTuple))
       return false;
 
@@ -1754,22 +1731,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   if (auto *assignment = dyn_cast<AssignExpr>(E)) {
     if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
       auto *srcExpr = assignment->getSrc();
-
-      bool diagnosedInvalidUseOfDiscardExpr = false;
-      srcExpr->forEachChildExpr([&](Expr *expr) -> Expr * {
-        if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(expr)) {
-          diagnose(DAE->getLoc(), diag::discard_expr_outside_of_assignment)
-              .highlight(srcExpr->getSourceRange());
-          diagnosedInvalidUseOfDiscardExpr = true;
-          return nullptr;
-        }
-
-        return expr;
-      });
-
-      if (diagnosedInvalidUseOfDiscardExpr)
-        return;
-
       diagnoseAmbiguity(srcExpr);
       return;
     }
@@ -1783,15 +1744,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     return;
   }
 
-  // A DiscardAssignmentExpr (spelled "_") needs contextual type information to
-  // infer its type. If we see one at top level, diagnose that it must be part
-  // of an assignment so we don't get a generic "expression is ambiguous" error.
-  if (isa<DiscardAssignmentExpr>(E)) {
-    diagnose(E->getLoc(), diag::discard_expr_outside_of_assignment)
-      .highlight(E->getSourceRange());
-    return;
-  }
-  
   // Diagnose ".foo" expressions that lack context specifically.
   if (auto UME =
         dyn_cast<UnresolvedMemberExpr>(E->getSemanticsProvidingExpr())) {
