@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "MiscDiagnostics.h"
 #include "SolutionResult.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -645,7 +646,7 @@ class BuilderClosureRewriter
   const Solution &solution;
   DeclContext *dc;
   AppliedBuilderTransform builderTransform;
-  std::function<Expr *(Expr *)> rewriteExpr;
+  std::function<Expr *(Expr *)> rewriteExprFn;
   std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType;
 
   /// Retrieve the temporary variable that will be used to capture the
@@ -747,6 +748,13 @@ private:
     elements.push_back(pbd);
   }
 
+  Expr *rewriteExpr(Expr *expr) {
+    Expr *result = rewriteExprFn(expr);
+    if (result)
+      performSyntacticExprDiagnostics(expr, dc, /*isExprStmt=*/false);
+    return result;
+  }
+
 public:
   BuilderClosureRewriter(
       const Solution &solution,
@@ -756,7 +764,7 @@ public:
       std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType
     ) : ctx(solution.getConstraintSystem().getASTContext()),
         solution(solution), dc(dc), builderTransform(builderTransform),
-        rewriteExpr(rewriteExpr),
+        rewriteExprFn(rewriteExpr),
         coerceToType(coerceToType){ }
 
   Stmt *visitBraceStmt(BraceStmt *braceStmt, FunctionBuilderTarget target,

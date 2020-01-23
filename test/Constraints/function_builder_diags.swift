@@ -256,3 +256,16 @@ struct MyTuplifiedStruct {
     }
   }
 }
+
+// Check that we're performing syntactic use diagnostics/
+func acceptMetatype<T>(_: T.Type) -> Bool { true }
+
+func syntacticUses<T>(_: T) {
+  tuplify(true) { x in
+    if x && acceptMetatype(T) { // expected-error{{expected member name or constructor call after type name}}
+      // expected-note@-1{{use '.self' to reference the type object}}
+      acceptMetatype(T) // expected-error{{expected member name or constructor call after type name}}
+      // expected-note@-1{{use '.self' to reference the type object}}
+    }
+  }
+}
