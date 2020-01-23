@@ -28,7 +28,7 @@ using namespace swift;
 
 namespace {
 
-Type computeRepresentation(ASTContext &ctx, NominalTypeDecl *type) {
+Type deriveGeneric_Representation(ASTContext &ctx, NominalTypeDecl *type) {
   auto gpModule = ctx.getLoadedModule(ctx.Id_GenericProgramming);
   if (!gpModule)
     return nullptr;
@@ -70,6 +70,45 @@ Type computeRepresentation(ASTContext &ctx, NominalTypeDecl *type) {
   }
 }
 
+ValueDecl *deriveGeneric_init(ASTContext &ctx, NominalTypeDecl *type) {
+  auto param =
+      new (ctx) ParamDecl(SourceLoc(), SourceLoc(), ctx.Id_representation,
+                          SourceLoc(), ctx.Id_representation, type);
+  param->setSpecifier(ParamSpecifier::Default);
+  param->setInterfaceType(deriveGeneric_Representation(ctx, type));
+  auto paramList = ParameterList::create(ctx, param);
+
+  SmallVector<ASTNode, 4> stmts;
+  Expr *base = new (ctx)
+      DeclRefExpr(ConcreteDeclRef(param), DeclNameLoc(), /*Implicit=*/true);
+  for (auto prop : type->getStoredProperties()) {
+    auto lhs = UnresolvedDeclRefExpr::createImplicit(ctx, prop->getName());
+    Expr *rhs;
+    if (prop != type->getStoredProperties().back()) {
+      rhs = UnresolvedDotExpr::createImplicit(ctx, base, ctx.Id_first);
+      base = UnresolvedDotExpr::createImplicit(ctx, base, ctx.Id_second);
+    } else {
+      rhs = base;
+    }
+    auto assign =
+        new (ctx) AssignExpr(lhs, SourceLoc(), rhs, /*Implicit=*/true);
+    stmts.push_back(assign);
+  }
+  auto body = BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc(),
+                                /*implicit=*/true);
+
+  DeclName name(ctx, DeclBaseName::createConstructor(), paramList);
+  auto *ctor = new (ctx)
+      ConstructorDecl(name, type->getLoc(),
+                      /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
+                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), paramList,
+                      /*GenericParams=*/nullptr, type);
+  ctor->setImplicit();
+  ctor->copyFormalAccessFrom(type, /*sourceIsParentContext*/ true);
+  ctor->setBody(body);
+  return ctor;
+}
+
 } // namespace
 
 bool DerivedConformance::canDeriveGeneric(NominalTypeDecl *type) {
@@ -84,7 +123,7 @@ Type DerivedConformance::deriveGeneric(AssociatedTypeDecl *requirement) {
     return nullptr;
 
   if (requirement->getName() == Context.Id_Representation) {
-    return computeRepresentation(Context, Nominal);
+    return deriveGeneric_Representation(Context, Nominal);
   }
 
   return nullptr;
@@ -98,48 +137,11 @@ ValueDecl *DerivedConformance::deriveGeneric(ValueDecl *requirement) {
     return nullptr;
 
   if (isa<ConstructorDecl>(requirement)) {
-    auto param = new (Context)
-        ParamDecl(SourceLoc(), SourceLoc(), Context.Id_representation,
-                  SourceLoc(), Context.Id_representation, Nominal);
-    param->setSpecifier(ParamSpecifier::Default);
-    param->setInterfaceType(computeRepresentation(Context, Nominal));
-    auto paramList = ParameterList::create(Context, param);
-
-    SmallVector<ASTNode, 4> stmts;
-    Expr *base = new (Context) DeclRefExpr(ConcreteDeclRef(param), DeclNameLoc(), /*Implicit=*/true);
-    for (auto prop : Nominal->getStoredProperties()) {
-      auto lhs = UnresolvedDeclRefExpr::createImplicit(Context, prop->getName());
-      Expr* rhs;
-      if (prop != Nominal->getStoredProperties().back()) {
-        rhs = UnresolvedDotExpr::createImplicit(Context, base, Context.Id_first);
-        base = UnresolvedDotExpr::createImplicit(Context, base, Context.Id_second);
-      } else {
-        rhs = base;
-      }
-      auto assign = new (Context) AssignExpr(lhs, SourceLoc(), rhs, /*Implicit=*/true);
-      stmts.push_back(assign);
+    auto derived = deriveGeneric_init(Context, Nominal);
+    if (derived) {
+      addMembersToConformanceContext({derived});
     }
-    auto body = BraceStmt::create(Context, SourceLoc(), stmts, SourceLoc(),
-                                  /*implicit=*/true);
-    // auto body = [](AbstractFunctionDecl *decl,
-    //                void *context) -> std::pair<BraceStmt *, bool> {
-    //   ASTContext &ctx = decl->getASTContext();
-    //   return {..., /*isTypeChecked=*/true};
-    // };
-
-    DeclName name(Context, DeclBaseName::createConstructor(), paramList);
-    auto *ctor = new (Context)
-        ConstructorDecl(name, Nominal->getLoc(),
-                        /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
-                        /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), paramList,
-                        /*GenericParams=*/nullptr, Nominal);
-    ctor->setImplicit();
-    ctor->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
-    ctor->setBody(body);
-    // ctor->setBodySynthesizer(body);
-
-    addMembersToConformanceContext({ctor});
-    return ctor;
+    return derived;
   }
 
   return nullptr;
