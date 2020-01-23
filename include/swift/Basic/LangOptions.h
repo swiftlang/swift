@@ -298,6 +298,7 @@ namespace swift {
 
     /// Emit the newer, finer-grained swiftdeps file. Eventually will support
     /// faster rebuilds.
+    /// The initializer here sets the default for the frontend and driver.
     bool EnableFineGrainedDependencies = false;
 
     /// When using fine-grained dependencies, emit dot files for every swiftdeps

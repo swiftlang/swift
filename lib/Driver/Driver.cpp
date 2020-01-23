@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -964,9 +965,11 @@ Driver::buildCompilation(const ToolChain &TC,
                          options::OPT_disable_only_one_dependency_file, true);
 
     // relies on the new dependency graph
+    // Get the default from the initializer in LangOptions.
     const bool EnableFineGrainedDependencies =
         ArgList->hasFlag(options::OPT_enable_fine_grained_dependencies,
-                         options::OPT_disable_fine_grained_dependencies, false);
+                         options::OPT_disable_fine_grained_dependencies,
+                         LangOptions().EnableFineGrainedDependencies);
 
     const bool VerifyFineGrainedDependencyGraphAfterEveryImport = ArgList->hasArg(
         options::
