@@ -1709,18 +1709,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_CMARK_LIBRARY_DIR:PATH=$(build_directory ${host} cmark)/src/${CMARK_BUILD_TYPE}
-                    )
-                else
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_CMARK_LIBRARY_DIR:PATH=$(build_directory ${host} cmark)/src
-                    )
-                fi
-
                 if [[ "${SWIFT_SDKS}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
