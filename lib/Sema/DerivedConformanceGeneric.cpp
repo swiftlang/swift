@@ -105,7 +105,25 @@ ValueDecl *DerivedConformance::deriveGeneric(ValueDecl *requirement) {
     param->setInterfaceType(computeRepresentation(Context, Nominal));
     auto paramList = ParameterList::create(Context, param);
 
-    auto body = BraceStmt::create(Context, SourceLoc(), {}, SourceLoc(),
+    SmallVector<ASTNode, 4> stmts;
+    Expr *base = UnresolvedDeclRefExpr::createImplicit(
+        Context, Context.Id_representation);
+    for (auto prop : Nominal->getStoredProperties()) {
+      auto self =
+          UnresolvedDeclRefExpr::createImplicit(Context, Context.Id_self);
+      auto lhs =
+          UnresolvedDotExpr::createImplicit(Context, self, prop->getName());
+      auto rhsName = prop == Nominal->getStoredProperties().back()
+                         ? Context.Id_second
+                         : Context.Id_first;
+      auto rhs = UnresolvedDotExpr::createImplicit(Context, base, rhsName);
+      auto assign =
+          new (Context) AssignExpr(lhs, SourceLoc(), rhs, /*Implicit=*/true);
+      stmts.push_back(assign);
+      base =
+          UnresolvedDotExpr::createImplicit(Context, base, Context.Id_second);
+    }
+    auto body = BraceStmt::create(Context, SourceLoc(), stmts, SourceLoc(),
                                   /*implicit=*/true);
     // auto body = [](AbstractFunctionDecl *decl,
     //                void *context) -> std::pair<BraceStmt *, bool> {
