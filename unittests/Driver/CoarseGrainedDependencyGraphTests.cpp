@@ -165,9 +165,9 @@ TEST(CoarseGrainedDependencyGraph, SimpleDependent) {
   EXPECT_EQ(loadFromString(graph, 1, dependsTopLevel, "x, b, z"),
             LoadResult::UpToDate);
   {
-    auto marked = graph.markTransitive(0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(1u, marked.front());
+    auto found = graph.markTransitive(0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_EQ(1u, found.front());
   }
     EXPECT_TRUE(graph.isMarked(0));
     EXPECT_TRUE(graph.isMarked(1));
@@ -186,9 +186,9 @@ TEST(CoarseGrainedDependencyGraph, SimpleDependentReverse) {
             LoadResult::UpToDate);
 
   {
-  auto marked = graph.markTransitive(1);
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(0u, marked.front());
+    auto found = graph.markTransitive(1);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_EQ(0u, found.front());
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -208,9 +208,9 @@ TEST(CoarseGrainedDependencyGraph, SimpleDependent2) {
 
 
   {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(1u, marked.front());
+    auto found = graph.markTransitive(0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_EQ(1u, found.front());
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -231,9 +231,9 @@ TEST(CoarseGrainedDependencyGraph, SimpleDependent3) {
             LoadResult::UpToDate);
 
 {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(1u, marked.front());
+  auto found = graph.markTransitive(0);
+  EXPECT_EQ(1u, found.size());
+  EXPECT_EQ(1u, found.front());
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -254,9 +254,9 @@ TEST(CoarseGrainedDependencyGraph, SimpleDependent4) {
             LoadResult::UpToDate);
 
 {
-  auto marked = graph.markTransitive( 0);
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(1u, marked.front());
+  auto found = graph.markTransitive(0);
+  EXPECT_EQ(1u, found.size());
+  EXPECT_EQ(1u, found.front());
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -280,14 +280,14 @@ TEST(CoarseGrainedDependencyGraph, SimpleDependent5) {
 
 
 {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(1u, marked.front());
+  auto found = graph.markTransitive(0);
+  EXPECT_EQ(1u, found.size());
+  EXPECT_EQ(1u, found.front());
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
 
-  auto marked = graph.markTransitive(0);
+  auto found = graph.markTransitive(0);
   EXPECT_EQ(0u, graph.markTransitive(0).size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -302,9 +302,9 @@ TEST(CoarseGrainedDependencyGraph, SimpleDependent6) {
             LoadResult::UpToDate);
 
   {
-    auto marked = graph.markTransitive(0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(1u, marked.front());
+    auto found = graph.markTransitive(0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_EQ(1u, found.front());
     }
     EXPECT_TRUE(graph.isMarked(0));
     EXPECT_TRUE(graph.isMarked(1));
@@ -326,9 +326,9 @@ TEST(CoarseGrainedDependencyGraph, SimpleDependentMember) {
             LoadResult::UpToDate);
 
 {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(1u, marked.front());
+  auto found = graph.markTransitive(0);
+  EXPECT_EQ(1u, found.size());
+  EXPECT_EQ(1u, found.front());
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -355,10 +355,10 @@ TEST(CoarseGrainedDependencyGraph, MultipleDependentsSame) {
             LoadResult::UpToDate);
 
 {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(2u, marked.size());
-  EXPECT_TRUE(contains(marked, 1));
-  EXPECT_TRUE(contains(marked, 2));
+  auto found = graph.markTransitive(0);
+  EXPECT_EQ(2u, found.size());
+  EXPECT_TRUE(contains(found, 1));
+  EXPECT_TRUE(contains(found, 2));
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -381,10 +381,10 @@ TEST(CoarseGrainedDependencyGraph, MultipleDependentsDifferent) {
             LoadResult::UpToDate);
 
 {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(2u, marked.size());
-  EXPECT_TRUE(contains(marked, 1));
-  EXPECT_TRUE(contains(marked, 2));
+  auto found = graph.markTransitive(0);
+  EXPECT_EQ(2u, found.size());
+  EXPECT_TRUE(contains(found, 1));
+  EXPECT_TRUE(contains(found, 2));
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -410,10 +410,10 @@ TEST(CoarseGrainedDependencyGraph, ChainedDependents) {
 
 
 {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(2u, marked.size());
-  EXPECT_TRUE(contains(marked, 1));
-  EXPECT_TRUE(contains(marked, 2));
+  auto found = graph.markTransitive(0);
+  EXPECT_EQ(2u, found.size());
+  EXPECT_TRUE(contains(found, 1));
+  EXPECT_TRUE(contains(found, 2));
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -423,6 +423,52 @@ TEST(CoarseGrainedDependencyGraph, ChainedDependents) {
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_TRUE(graph.isMarked(2));
+}
+
+TEST(CoarseGrainedDependencyGraph, ChainedNoncascadingDependents) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(loadFromString(graph, 0, providesNominal, "a, b, c"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(
+      loadFromString(graph, 1, dependsNominal, "x, b", providesNominal, "z"),
+      LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 2, dependsNominal, "!private z"),
+            LoadResult::UpToDate);
+  {
+    auto found = graph.markTransitive(0);
+    EXPECT_EQ(2u, found.size());
+    EXPECT_TRUE(contains(found, 1));
+    EXPECT_TRUE(contains(found, 2));
+  }
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+  EXPECT_FALSE(graph.isMarked(2));
+
+  EXPECT_EQ(0u, graph.markTransitive(0).size());
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+  EXPECT_FALSE(graph.isMarked(2));
+}
+
+TEST(CoarseGrainedDependencyGraph, ChainedNoncascadingDependents2) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(loadFromString(graph, 0, providesTopLevel, "a, b, c"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 1, dependsTopLevel, "x, !private b",
+                           providesNominal, "z"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 2, dependsNominal, "z"),
+            LoadResult::UpToDate);
+  {
+    auto found = graph.markTransitive(0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, 1));
+  }
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_FALSE(graph.isMarked(1));
+  EXPECT_FALSE(graph.isMarked(2));
 }
 
 TEST(CoarseGrainedDependencyGraph, MarkTwoNodes) {
@@ -448,10 +494,10 @@ TEST(CoarseGrainedDependencyGraph, MarkTwoNodes) {
       LoadResult::UpToDate);
 
 {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(2u, marked.size());
-  EXPECT_TRUE(contains(marked, 1));
-  EXPECT_TRUE(contains(marked, 2));
+  auto found = graph.markTransitive(0);
+  EXPECT_EQ(2u, found.size());
+  EXPECT_TRUE(contains(found, 1));
+  EXPECT_TRUE(contains(found, 2));
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -461,9 +507,9 @@ TEST(CoarseGrainedDependencyGraph, MarkTwoNodes) {
   EXPECT_FALSE(graph.isMarked(12));
 
 {
-  auto marked = graph.markTransitive(10);
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(11u, marked.front());
+  auto found = graph.markTransitive(10);
+  EXPECT_EQ(1u, found.size());
+  EXPECT_EQ(11u, found.front());
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -485,9 +531,9 @@ TEST(CoarseGrainedDependencyGraph, MarkOneNodeTwice) {
 
 
 {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(1u, marked.front());
+  auto found = graph.markTransitive(0);
+  EXPECT_EQ(1u, found.size());
+  EXPECT_EQ(1u, found.front());
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -498,9 +544,9 @@ TEST(CoarseGrainedDependencyGraph, MarkOneNodeTwice) {
             LoadResult::UpToDate);
 
  {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(2u, marked.front());
+   auto found = graph.markTransitive(0);
+   EXPECT_EQ(1u, found.size());
+   EXPECT_EQ(2u, found.front());
 }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -518,9 +564,9 @@ TEST(CoarseGrainedDependencyGraph, MarkOneNodeTwice2) {
             LoadResult::UpToDate);
 
 {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(1u, marked.front());
+  auto found = graph.markTransitive(0);
+  EXPECT_EQ(1u, found.size());
+  EXPECT_EQ(1u, found.front());
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -531,10 +577,52 @@ TEST(CoarseGrainedDependencyGraph, MarkOneNodeTwice2) {
             LoadResult::UpToDate);
 
  {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(2u, marked.front());
+   auto found = graph.markTransitive(0);
+   EXPECT_EQ(1u, found.size());
+   EXPECT_EQ(2u, found.front());
   }
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+  EXPECT_TRUE(graph.isMarked(2));
+}
+
+TEST(CoarseGrainedDependencyGraph, ReloadDetectsChange) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(loadFromString(graph, 0, providesNominal, "a"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 1, dependsNominal, "a"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 2, dependsNominal, "b"),
+            LoadResult::UpToDate);
+
+  {
+    const auto found = graph.markTransitive(1);
+    EXPECT_EQ(0u, found.size());
+  }
+  EXPECT_FALSE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+  EXPECT_FALSE(graph.isMarked(2));
+
+  // Reload 1.
+  EXPECT_EQ(loadFromString(graph, 1, dependsNominal, "a", providesNominal, "b"),
+            LoadResult::UpToDate);
+
+  {
+    auto found = graph.markTransitive(0);
+    EXPECT_EQ(0u, found.size());
+  }
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+  EXPECT_FALSE(graph.isMarked(2));
+
+  // Re-mark 1.
+  {
+    auto found = graph.markTransitive(1);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, 2));
+  }
+
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_TRUE(graph.isMarked(2));
@@ -569,9 +657,9 @@ TEST(CoarseGrainedDependencyGraph, NotTransitiveOnceMarked) {
 
   // Re-mark 1.
   {
-  auto marked = graph.markTransitive(1);
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(2u, marked.front());
+    auto found = graph.markTransitive(1);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_EQ(2u, found.front());
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -594,10 +682,10 @@ TEST(CoarseGrainedDependencyGraph, DependencyLoops) {
             LoadResult::UpToDate);
 
   {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(2u, marked.size());
-  EXPECT_TRUE(contains(marked, 1));
-  EXPECT_TRUE(contains(marked, 2));
+    auto found = graph.markTransitive(0);
+    EXPECT_EQ(2u, found.size());
+    EXPECT_TRUE(contains(found, 1));
+    EXPECT_TRUE(contains(found, 2));
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -622,9 +710,9 @@ TEST(CoarseGrainedDependencyGraph, MarkIntransitive) {
   EXPECT_FALSE(graph.isMarked(1));
 
   {
-  auto marked = graph.markTransitive(0);
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(1u, marked.front());
+    auto found = graph.markTransitive(0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_EQ(1u, found.front());
   }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -730,9 +818,9 @@ TEST(CoarseGrainedDependencyGraph, ChainedExternalReverse) {
       LoadResult::UpToDate);
 
   {
-  auto marked = graph.markExternal("/bar");
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(1u, marked.front());
+    auto found = graph.markExternal("/bar");
+    EXPECT_EQ(1u, found.size());
+    EXPECT_EQ(1u, found.front());
   }
   EXPECT_FALSE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -742,9 +830,9 @@ TEST(CoarseGrainedDependencyGraph, ChainedExternalReverse) {
   EXPECT_TRUE(graph.isMarked(1));
 
 {
-  auto marked = graph.markExternal("/foo");
-  EXPECT_EQ(1u, marked.size());
-  EXPECT_EQ(0u, marked.front());
+  auto found = graph.markExternal("/foo");
+  EXPECT_EQ(1u, found.size());
+  EXPECT_EQ(0u, found.front());
 }
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
@@ -767,4 +855,58 @@ TEST(CoarseGrainedDependencyGraph, ChainedExternalPreMarked) {
   EXPECT_EQ(0u, graph.markExternal("/foo").size());
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_FALSE(graph.isMarked(1));
+}
+
+TEST(CoarseGrainedDependencyGraph, ChainedPrivateDoesNotCascade) {
+ CoarseGrainedDependencyGraph<uintptr_t> graph;
+  EXPECT_EQ(loadFromString(graph, 0,
+                           providesNominal, "z",
+                           dependsTopLevel, "!private a"),
+                           LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 1,
+                           providesTopLevel, "a"),
+                           LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 2,
+                           dependsNominal, "z"),
+                           LoadResult::UpToDate);
+
+  const auto nodes = graph.markTransitive(1); // compiled 1
+  EXPECT_EQ(nodes.size(), 1u); // need to compile 0 but not 2
+  EXPECT_TRUE(contains(nodes, 0));
+  EXPECT_FALSE(graph.isMarked(0));
+}
+
+TEST(CoarseGrainedDependencyGraph, CrashSimple) {
+ CoarseGrainedDependencyGraph<uintptr_t> graph;
+  EXPECT_EQ(loadFromString(graph, 0,
+                           providesTopLevel, "a"),
+                           LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 1,
+                           dependsTopLevel, "a"),
+                           LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 2,
+                           dependsTopLevel, "!private a"),
+                           LoadResult::UpToDate);
+
+  const auto nodes = graph.markTransitive(0);
+  EXPECT_EQ(nodes.size(), 2u); // need to compile 0 but not 2
+  EXPECT_TRUE(contains(nodes, 1));
+  EXPECT_TRUE(contains(nodes, 2));
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+  EXPECT_FALSE(graph.isMarked(2));
+}
+
+
+TEST(CoarseGrainedDependencyGraph, MutualInterfaceHash) {
+ CoarseGrainedDependencyGraph<uintptr_t> graph;
+  loadFromString(graph, 0,
+                 providesTopLevel, "a",
+                 dependsTopLevel, "b");
+  loadFromString(graph, 1,
+                 dependsTopLevel, "a",
+                 providesTopLevel, "b");
+
+  const auto nodes = graph.markTransitive(0);
+  EXPECT_TRUE(contains(nodes, 1));
 }

@@ -585,14 +585,17 @@ public:
       dynamicLookupDepends.push_back(std::make_pair(p.getFirst().userFacingName(), p.getSecond()));
 
     std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>> memberDepends;
-    for (const auto &p: SF->getReferencedNameTracker()->getUsedMembers())
+    for (const auto &p: SF->getReferencedNameTracker()->getUsedMembers()) {
+      const auto &member = p.getFirst().second;
+      StringRef emptyOrUserFacingName = member.empty() ? "" : member.userFacingName();
       memberDepends.push_back(
         std::make_pair(
           std::make_tuple(
             mangleTypeAsContext(p.getFirst().first),
-            p.getFirst().second.userFacingName(),
+            emptyOrUserFacingName,
             declIsPrivate(p.getFirst().first)),
           p.getSecond()));
+    }
 
     return SourceFileDepGraphConstructor(
       swiftDeps,
@@ -810,7 +813,8 @@ bool swift::fine_grained_dependencies::emitReferenceDependencies(
         return false;
       });
 
-  assert(g.verifyReadsWhatIsWritten(outputPath));
+  // If path is stdout, cannot read it back, so check for "-"
+  assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
 
   if (alsoEmitDotFile) {
     std::string dotFileName = outputPath.str() + ".dot";
@@ -825,12 +829,15 @@ bool swift::fine_grained_dependencies::emitReferenceDependencies(
 //==============================================================================
 // Entry point from the unit tests
 //==============================================================================
+static StringRef stripPrefix(const StringRef name) {
+  return name.ltrim(SourceFileDepGraph::noncascadingOrPrivatePrefix);
+}
 
 static std::vector<ContextNameFingerprint>
 getBaseNameProvides(ArrayRef<std::string> simpleNames) {
   std::vector<ContextNameFingerprint> result;
   for (StringRef n : simpleNames)
-    result.push_back(ContextNameFingerprint("", n.str(), None));
+    result.push_back(ContextNameFingerprint("", stripPrefix(n).str(), None));
   return result;
 }
 
@@ -838,7 +845,7 @@ static std::vector<ContextNameFingerprint>
 getMangledHolderProvides(ArrayRef<std::string> simpleNames) {
   std::vector<ContextNameFingerprint> result;
   for (StringRef n : simpleNames)
-    result.push_back(ContextNameFingerprint(n.str(), "", None));
+    result.push_back(ContextNameFingerprint(stripPrefix(n).str(), "", None));
   return result;
 }
 
@@ -846,23 +853,23 @@ static std::vector<ContextNameFingerprint> getCompoundProvides(
     ArrayRef<std::pair<std::string, std::string>> compoundNames) {
   std::vector<ContextNameFingerprint> result;
   for (const auto &p : compoundNames)
-    result.push_back(ContextNameFingerprint(p.first, p.second, None));
+    result.push_back(ContextNameFingerprint(stripPrefix(p.first),
+                                            stripPrefix(p.second), None));
   return result;
 }
 
-// Use '_' as a prefix indicating non-cascading
-static bool cascades(const std::string &s) { return s.empty() || s[0] != '_'; }
+static bool cascades(const std::string &s) { return s.empty() || s[0] != SourceFileDepGraph::noncascadingOrPrivatePrefix; }
 
 // Use '_' as a prefix for a file-private member
 static bool isPrivate(const std::string &s) {
-  return !s.empty() && s[0] == '_';
+  return !s.empty() && s[0] == SourceFileDepGraph::noncascadingOrPrivatePrefix;
 }
 
 static std::vector<std::pair<std::string, bool>>
 getSimpleDepends(ArrayRef<std::string> simpleNames) {
   std::vector<std::pair<std::string, bool>> result;
   for (std::string n : simpleNames)
-    result.push_back({n, cascades((n))});
+    result.push_back({stripPrefix(n), cascades((n))});
   return result;
 }
 
@@ -881,14 +888,16 @@ getCompoundDepends(
     // (On Linux, the compiler needs more verbosity than:
     //  result.push_back({{n, "", false}, cascades(n)});
     result.push_back(
-        std::make_pair(std::make_tuple(n, std::string(), false), cascades(n)));
+        std::make_pair(std::make_tuple(stripPrefix(n), std::string(), false), cascades(n)));
   }
   for (auto &p : compoundNames) {
     // Likewise, for Linux expand the following out:
     //    result.push_back(
     //        {{p.first, p.second, isPrivate(p.second)}, cascades(p.first)});
     result.push_back(
-        std::make_pair(std::make_tuple(p.first, p.second, isPrivate(p.second)),
+        std::make_pair(std::make_tuple(stripPrefix(p.first),
+                                       stripPrefix(p.second),
+                                       isPrivate(p.second)),
                        cascades(p.first)));
   }
   return result;
