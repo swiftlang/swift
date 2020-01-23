@@ -3407,22 +3407,19 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
 // Builtin Protocol Conformances
 //==-----------------------------------------------------------------------===//
 
-static void addTupleEquatableConformance(IRGenModule &IGM,
+static void addTupleBuiltinConformance(ASTContext &ctx, KnownProtocolKind kind,
                         SmallVectorImpl<ConformanceDescription> &descriptions) {
-  // For now, the only builtin conformance is Equatable for tuples.
   // (Just grab Void's conformance, we emit a single conformance descriptor for
   //  all tuples.)
-  auto tuple = IGM.Context.TheEmptyTupleType;
-  auto equatable = IGM.Context.getProtocol(KnownProtocolKind::Equatable);
-  auto conformance = IGM.Context.getBuiltinConformance(tuple, equatable);
-
+  auto tuple = ctx.TheEmptyTupleType;
+  auto protocol = ctx.getProtocol(kind);
+  auto conformance = ctx.getBuiltinConformance(tuple, protocol);
   auto description = ConformanceDescription(conformance,
                                             /* witness table */ nullptr,
                                             /* pattern */ nullptr,
                                             /* table size */ 0,
                                             /* private size */ 0,
                                             /* requires specialization */ false);
-
   descriptions.push_back(description);
 }
 
@@ -3434,7 +3431,10 @@ void IRGenModule::emitBuiltinProtocolConformances() {
   // Collect all builtin conformances.
   SmallVector<ConformanceDescription, 4> descriptions;
 
-  addTupleEquatableConformance(*this, descriptions);
+  addTupleBuiltinConformance(Context, KnownProtocolKind::Equatable,
+                             descriptions);
+  addTupleBuiltinConformance(Context, KnownProtocolKind::Comparable,
+                             descriptions);
 
   for (auto description : descriptions) {
     // Slight edge case: If this conformance doesn't have a valid protocol decl,

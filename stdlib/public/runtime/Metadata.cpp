@@ -4264,6 +4264,9 @@ static void initializeResilientWitnessTable(
 extern const ProtocolDescriptor
 PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
 
+extern const ProtocolDescriptor
+PROTOCOL_DESCRIPTOR_SYM(SWIFT_COMPARABLE_MANGLING);
+
 /// If this conformance is builtin, find the builtin witness table in the
 /// runtime and return that.
 static const WitnessTable *getBuiltinWitnessTable(
@@ -4273,10 +4276,17 @@ static const WitnessTable *getBuiltinWitnessTable(
 
   switch (metadataKind) {
     case MetadataKind::Tuple: {
-      if (protocol == &PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING)) {
+      auto equatable = &PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
+      auto comparable = &PROTOCOL_DESCRIPTOR_SYM(SWIFT_COMPARABLE_MANGLING);
+      if (protocol == equatable) {
         auto table = &BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(
                                                       VARIADIC_TUPLE_MANGLING,
                                                       SWIFT_EQUATABLE_MANGLING);
+        return reinterpret_cast<const WitnessTable *>(table);
+      } else if (protocol == comparable) {
+        auto table = &BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(
+                                                      VARIADIC_TUPLE_MANGLING,
+                                                      SWIFT_COMPARABLE_MANGLING);
         return reinterpret_cast<const WitnessTable *>(table);
       } else {
         swift_runtime_unreachable(

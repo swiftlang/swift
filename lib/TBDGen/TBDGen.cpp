@@ -474,6 +474,40 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
   }
 }
 
+static void addTupleBuiltinConformance(ASTContext &ctx, KnownProtocolKind kind,
+                  SmallVectorImpl<BuiltinProtocolConformance *> &conformances) {
+  // (Just grab Void's conformance, we emit a single descriptor for all tuples
+  //  so mangling is the same.)
+  auto tuple = ctx.TheEmptyTupleType;
+  auto protocol = ctx.getProtocol(kind);
+
+  // If this conformance is coming from a minimal stdlib with no protocol,
+  // don't add it.
+  if (!protocol)
+    return;
+
+  auto conformance = ctx.getBuiltinConformance(tuple, protocol);
+  conformances.push_back(conformance);
+}
+
+void TBDGenVisitor::addBuiltinProtocolConformances() {
+  // Hack: We emit builtin conformance descriptors in IRGen for the stdlib
+  // module. Add them here too.
+
+  // Collect builtin conformances;
+  SmallVector<BuiltinProtocolConformance *, 4> conformances;
+
+  addTupleBuiltinConformance(SwiftModule->getASTContext(),
+                             KnownProtocolKind::Equatable, conformances);
+  addTupleBuiltinConformance(SwiftModule->getASTContext(),
+                             KnownProtocolKind::Comparable, conformances);
+
+  for (auto conformance : conformances) {
+    auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
+    addSymbol(entity);
+  }
+}
+
 /// Determine whether dynamic replacement should be emitted for the allocator or
 /// the initializer given a decl.
 /// The rule is that structs and convenience init of classes emit a

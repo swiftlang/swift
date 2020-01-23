@@ -20,9 +20,15 @@ namespace swift {
 
 // public protocol Equatable {}
 #define SWIFT_EQUATABLE_MANGLING SQ
+// public protocol Comparable: Equatable {}
+#define SWIFT_COMPARABLE_MANGLING SL
+// public protocol Hashable: Equatable {}
+#define SWIFT_HASHABLE_MANGLING SH
 
 // == infix(T, T) -> Swift.Bool
 #define SWIFT_EQUAL_OPERATOR_MANGLING 2eeoiySbx_xtFZ
+// < infix(T, T) -> Swift.Bool
+#define SWIFT_LT_OPERATOR_MANGLING 1loiySbx_xtFZ
 
 // (A...)
 #define VARIADIC_TUPLE_MANGLING xd_t
@@ -64,11 +70,19 @@ struct _WitnessTable {
   const void *Witnesses[NumWitnesses];
 };
 
+template<unsigned int NumTables, unsigned int NumWitnesses>
+struct _DependentWitnessTable {
+  const ProtocolConformanceDescriptor *Conformance;
+  const WitnessTable *Tables[NumTables];
+  const void *Witnesses[NumWitnesses];
+};
+
 /// The builtin protocol conformance witness table for (A...) : Swift.Equatable
 // in Swift.
 SWIFT_RUNTIME_EXPORT
-const _WitnessTable<1> BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(VARIADIC_TUPLE_MANGLING,
-                                                      SWIFT_EQUATABLE_MANGLING);
+const _WitnessTable<1>
+BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(VARIADIC_TUPLE_MANGLING,
+                                   SWIFT_EQUATABLE_MANGLING);
 
 /// The protocol witness for static Swift.Equatable.== infix(A, A) -> Swift.Bool
 /// in conformance (A...): Swift.Equatable in Swift.
@@ -76,6 +90,22 @@ SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 bool BUILTIN_PROTOCOL_WITNESS_SYM(VARIADIC_TUPLE_MANGLING,
                                   SWIFT_EQUATABLE_MANGLING,
                                   SWIFT_EQUAL_OPERATOR_MANGLING)
+(OpaqueValue *tuple1, OpaqueValue *tuple2, SWIFT_CONTEXT Metadata *swiftSelf,
+ Metadata *Self, void *witnessTable);
+
+/// The builtin protocol conformance witness table for (A...) : Swift.Comparable
+/// in Swift.
+SWIFT_RUNTIME_EXPORT
+const _DependentWitnessTable<1, 4>
+BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(VARIADIC_TUPLE_MANGLING,
+                                   SWIFT_COMPARABLE_MANGLING);
+
+/// The protocol witness for static Swift.Comparable.< infix(A, A) -> Swift.Bool
+/// in conformance (A...): Swift.Comparable in Swift.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+bool BUILTIN_PROTOCOL_WITNESS_SYM(VARIADIC_TUPLE_MANGLING,
+                                  SWIFT_COMPARABLE_MANGLING,
+                                  SWIFT_LT_OPERATOR_MANGLING)
 (OpaqueValue *tuple1, OpaqueValue *tuple2, SWIFT_CONTEXT Metadata *swiftSelf,
  Metadata *Self, void *witnessTable);
 

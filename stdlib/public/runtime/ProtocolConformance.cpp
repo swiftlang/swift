@@ -490,14 +490,18 @@ recur:
 extern const ProtocolDescriptor
 PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
 
+extern const ProtocolDescriptor
+PROTOCOL_DESCRIPTOR_SYM(SWIFT_COMPARABLE_MANGLING);
+
 static bool tupleConformsToProtocol(const Metadata *type,
                                     const ProtocolDescriptor *protocol) {
   auto tuple = cast<TupleTypeMetadata>(type);
 
-  // At the moment, tuples can only conform to Equatable, so reject all other
-  // protocols.
+  // At the moment, tuples can only conform to Equatable & Comparable, so
+  // reject all other protocols.
   auto equatable = &PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
-  if (protocol != equatable)
+  auto comparable = &PROTOCOL_DESCRIPTOR_SYM(SWIFT_COMPARABLE_MANGLING);
+  if (protocol != equatable && protocol != comparable)
     return false;
 
   for (size_t i = 0; i != tuple->NumElements; i += 1) {
