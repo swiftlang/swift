@@ -4091,8 +4091,8 @@ namespace {
 
     /// Check whether we have already imported a method with the given
     /// selector in the given context.
-    bool isMethodAlreadyImported(ObjCSelector selector, bool isInstance,
-                                 const DeclContext *dc,
+    bool isMethodAlreadyImported(ObjCSelector selector, ImportedName importedName,
+                                 bool isInstance, const DeclContext *dc,
                     llvm::function_ref<bool(AbstractFunctionDecl *fn)> filter) {
       // We only need to perform this check for classes.
       auto classDecl
@@ -4108,6 +4108,7 @@ namespace {
       for (auto decl : classDecl->lookupDirect(selector, isInstance)) {
         if ((decl->getClangDecl()
              || !decl->getDeclContext()->getParentSourceFile())
+            && importedName.getDeclName() == decl->getFullName()
             && filter(decl)) {
           result = true;
           break;
@@ -4175,24 +4176,24 @@ namespace {
         }
       }
 
+      ImportedName importedName;
+      Optional<ImportedName> correctSwiftName;
+      importedName = importFullName(decl, correctSwiftName);
+      if (!importedName)
+        return nullptr;
+
       // Check whether another method with the same selector has already been
       // imported into this context.
       ObjCSelector selector = Impl.importSelector(decl->getSelector());
       bool isInstance = decl->isInstanceMethod() && !forceClassMethod;
       if (isActiveSwiftVersion()) {
-        if (isMethodAlreadyImported(selector, isInstance, dc,
+        if (isMethodAlreadyImported(selector, importedName, isInstance, dc,
                                     [&](AbstractFunctionDecl *fn) {
               return isAcceptableResult(fn, accessorInfo);
             })) {
           return nullptr;
         }
       }
-
-      ImportedName importedName;
-      Optional<ImportedName> correctSwiftName;
-      importedName = importFullName(decl, correctSwiftName);
-      if (!importedName)
-        return nullptr;
 
       // Normal case applies when we're importing an older name, or when we're
       // not an init
@@ -6096,10 +6097,15 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   if (known != Impl.Constructors.end())
     return known->second;
 
+  Optional<ImportedName> correctSwiftName;
+  auto importedName = importFullName(objcMethod, correctSwiftName);
+  if (!importedName)
+    return nullptr;
+
   // Check whether there is already a method with this selector.
   auto selector = Impl.importSelector(objcMethod->getSelector());
   if (isActiveSwiftVersion() &&
-      isMethodAlreadyImported(selector, /*isInstance=*/true, dc,
+      isMethodAlreadyImported(selector, importedName, /*isInstance=*/true, dc,
                               [](AbstractFunctionDecl *fn) {
         return true;
       }))
@@ -6110,10 +6116,6 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
                                               objcMethod->param_end()};
 
   bool variadic = objcMethod->isVariadic();
-  Optional<ImportedName> correctSwiftName;
-  auto importedName = importFullName(objcMethod, correctSwiftName);
-  if (!importedName)
-    return nullptr;
 
   // If we dropped the variadic, handle it now.
   if (importedName.droppedVariadic()) {
