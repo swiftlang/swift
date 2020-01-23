@@ -19,6 +19,7 @@
 
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Statistic.h"
@@ -327,7 +328,8 @@ public:
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
               bool OnlyOneDependencyFile = false,
-              bool EnableFineGrainedDependencies = false,
+              bool EnableFineGrainedDependencies =
+                LangOptions().EnableFineGrainedDependencies,
               bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
               bool EmitFineGrainedDependencyDotFileAfterEveryImport = false,
               bool FineGrainedDependenciesIncludeIntrafileOnes = false,
