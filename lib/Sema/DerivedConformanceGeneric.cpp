@@ -19,11 +19,58 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/ParameterList.h"
 #include "llvm/Support/raw_ostream.h"
 #include "DerivedConformances.h"
 // clang-format on
 
 using namespace swift;
+
+namespace {
+
+Type computeRepresentation(ASTContext &ctx, NominalTypeDecl *type) {
+  auto gpModule = ctx.getLoadedModule(ctx.Id_GenericProgramming);
+  if (!gpModule)
+    return nullptr;
+
+  StructDecl *productStruct = nullptr;
+  SmallVector<ValueDecl *, 1> productResults;
+  gpModule->lookupValue(ctx.Id_Product, NLKind::UnqualifiedLookup,
+                        productResults);
+  for (auto productResult0 : productResults) {
+    if (auto productResult = dyn_cast<StructDecl>(productResult0)) {
+      productStruct = productResult;
+    }
+  }
+
+  // TODO: Update the doc.
+  // 0 -> Void
+  // 1 -> Int
+  // 2 -> Product<Int, Int>
+  // 3 -> Product<Int, Product<Int, Int>>
+  SmallVector<Type, 4> propTypesImpl;
+  for (auto prop : type->getStoredProperties()) {
+    propTypesImpl.push_back(prop->getType());
+  }
+  ArrayRef<Type> propTypes = propTypesImpl;
+  if (propTypes.size() == 0) {
+    return ctx.getVoidDecl()->getDeclaredInterfaceType();
+  } else if (propTypes.size() == 1) {
+    return propTypes[0];
+  } else {
+    auto result =
+        BoundGenericType::get(productStruct, Type(), propTypes.take_back(2));
+    propTypes = propTypes.drop_back(2);
+    while (propTypes.size() > 0) {
+      result = BoundGenericType::get(productStruct, Type(),
+                                     {propTypes.back(), result});
+      propTypes = propTypes.drop_back(1);
+    }
+    return result;
+  }
+}
+
+} // namespace
 
 bool DerivedConformance::canDeriveGeneric(NominalTypeDecl *type) {
   return true;
@@ -37,50 +84,47 @@ Type DerivedConformance::deriveGeneric(AssociatedTypeDecl *requirement) {
     return nullptr;
 
   if (requirement->getName() == Context.Id_Representation) {
-    auto gpModule = Context.getLoadedModule(Context.Id_GenericProgramming);
-    if (!gpModule)
-      return nullptr;
-
-    StructDecl *productStruct = nullptr;
-    SmallVector<ValueDecl *, 1> productResults;
-    gpModule->lookupValue(Context.Id_Product, NLKind::UnqualifiedLookup,
-                          productResults);
-    for (auto productResult0 : productResults) {
-      if (auto productResult = dyn_cast<StructDecl>(productResult0)) {
-        productStruct = productResult;
-      }
-    }
-
-    // TODO: Update the doc.
-    // 0 -> Void
-    // 1 -> Int
-    // 2 -> Product<Int, Int>
-    // 3 -> Product<Int, Product<Int, Int>>
-    SmallVector<Type, 4> propTypesImpl;
-    for (auto prop : Nominal->getStoredProperties()) {
-      propTypesImpl.push_back(prop->getType());
-    }
-    ArrayRef<Type> propTypes = propTypesImpl;
-    if (propTypes.size() == 0) {
-      return Context.getVoidDecl()->getDeclaredInterfaceType();
-    } else if (propTypes.size() == 1) {
-      return propTypes[0];
-    } else {
-      auto result =
-          BoundGenericType::get(productStruct, Type(), propTypes.take_back(2));
-      propTypes = propTypes.drop_back(2);
-      while (propTypes.size() > 0) {
-        result = BoundGenericType::get(productStruct, Type(),
-                                       {propTypes.back(), result});
-        propTypes = propTypes.drop_back(1);
-      }
-      return result;
-    }
+    return computeRepresentation(Context, Nominal);
   }
 
   return nullptr;
 }
 
 ValueDecl *DerivedConformance::deriveGeneric(ValueDecl *requirement) {
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
+
+  if (!canDeriveGeneric(Nominal))
+    return nullptr;
+
+  if (isa<ConstructorDecl>(requirement)) {
+    auto param = new (Context)
+        ParamDecl(SourceLoc(), SourceLoc(), Context.Id_representation,
+                  SourceLoc(), Context.Id_representation, Nominal);
+    param->setSpecifier(ParamSpecifier::Default);
+    param->setInterfaceType(computeRepresentation(Context, Nominal));
+    auto paramList = ParameterList::create(Context, param);
+
+    auto body = BraceStmt::create(Context, SourceLoc(), {}, SourceLoc(),
+                                  /*implicit=*/true);
+    // auto body = [](AbstractFunctionDecl *decl,
+    //                void *context) -> std::pair<BraceStmt *, bool> {
+    //   ASTContext &ctx = decl->getASTContext();
+    //   return {..., /*isTypeChecked=*/true};
+    // };
+
+    DeclName name(Context, DeclBaseName::createConstructor(), paramList);
+    auto *ctor = new (Context)
+        ConstructorDecl(name, Nominal->getLoc(),
+                        /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
+                        /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), paramList,
+                        /*GenericParams=*/nullptr, Nominal);
+    ctor->setImplicit();
+    ctor->setAccess(AccessLevel::Public);
+    ctor->setBody(body);
+    // ctor->setBodySynthesizer(body);
+    return ctor;
+  }
+
   return nullptr;
 }
