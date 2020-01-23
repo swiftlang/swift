@@ -106,22 +106,20 @@ ValueDecl *DerivedConformance::deriveGeneric(ValueDecl *requirement) {
     auto paramList = ParameterList::create(Context, param);
 
     SmallVector<ASTNode, 4> stmts;
-    Expr *base = UnresolvedDeclRefExpr::createImplicit(
-        Context, Context.Id_representation);
+    Expr *base = new (Context) DeclRefExpr(ConcreteDeclRef(param), DeclNameLoc(), /*Implicit=*/true);
     for (auto prop : Nominal->getStoredProperties()) {
-      auto self =
-          UnresolvedDeclRefExpr::createImplicit(Context, Context.Id_self);
-      auto lhs =
-          UnresolvedDotExpr::createImplicit(Context, self, prop->getName());
-      auto rhsName = prop == Nominal->getStoredProperties().back()
-                         ? Context.Id_second
-                         : Context.Id_first;
-      auto rhs = UnresolvedDotExpr::createImplicit(Context, base, rhsName);
-      auto assign =
-          new (Context) AssignExpr(lhs, SourceLoc(), rhs, /*Implicit=*/true);
-      stmts.push_back(assign);
-      base =
-          UnresolvedDotExpr::createImplicit(Context, base, Context.Id_second);
+      auto lhs = UnresolvedDeclRefExpr::createImplicit(Context, prop->getName());
+      Expr* rhs;
+      if (prop != Nominal->getStoredProperties().back()) {
+        rhs = UnresolvedDotExpr::createImplicit(Context, base, Context.Id_first);
+        base = UnresolvedDotExpr::createImplicit(Context, base, Context.Id_second);
+      } else {
+        rhs = base;
+      }
+      auto assign = new (Context) AssignExpr(nullptr, SourceLoc(), nullptr, /*Implicit=*/true);
+      auto seq = SequenceExpr::create(Context, {lhs, assign, rhs});
+      seq->setImplicit(true);
+      stmts.push_back(seq);
     }
     auto body = BraceStmt::create(Context, SourceLoc(), stmts, SourceLoc(),
                                   /*implicit=*/true);
