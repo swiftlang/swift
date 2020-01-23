@@ -867,6 +867,10 @@ def whole_module_optimization : Flag<["-"], "whole-module-optimization">,
   HelpText<"Optimize input files together instead of individually">,
   Flags<[FrontendOption, NoInteractiveOption]>;
 
+def no_whole_module_optimization : Flag<["-"], "no-whole-module-optimization">,
+  HelpText<"Disable optimizing input files together instead of individually">,
+  Flags<[FrontendOption, NoInteractiveOption]>;
+
 def enable_batch_mode : Flag<["-"], "enable-batch-mode">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Enable combining frontend jobs into batches">;
