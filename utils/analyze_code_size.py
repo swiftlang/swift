@@ -87,8 +87,10 @@ class Categories(object):
         self.category_matching = [
             ['Objective-C function', re.compile(r'.*[+-]\[')],
             ['C++', re.compile(r'_+swift')],
-            ['Generic specialization of stdlib', re.compile(r'.*generic specialization.* of Swift\.')],
-            ['Generic specialization', re.compile(r'.*generic specialization')],
+            ['Generic specialization of stdlib', 
+                re.compile(r'.*generic specialization.* of Swift\.')],
+            ['Generic specialization', 
+                re.compile(r'.*generic specialization')],
             ['Merged function', re.compile(r'merged ')],
             ['Key path', re.compile(r'key path')],
             ['Function signature specialization',

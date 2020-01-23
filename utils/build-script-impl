@@ -1041,10 +1041,14 @@ if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR
     exit 1
 fi
 
-PRODUCTS=(cmark llvm)
+# We cannot currently apply the normal rules of skipping here for LLVM. Even if
+# we are skipping building LLVM, we still need to at least build several tools
+# that swift relies on for building and testing. See the LLVM configure rules.
+PRODUCTS=(llvm)
+[[ "${SKIP_BUILD_CMARK}" ]] || PRODUCTS+=(cmark)
 [[ "${SKIP_BUILD_LIBCXX}" ]] || PRODUCTS+=(libcxx)
 [[ "${SKIP_BUILD_LIBICU}" ]] || PRODUCTS+=(libicu)
-PRODUCTS+=(swift)
+[[ "${SKIP_BUILD_SWIFT}" ]] || PRODUCTS+=(swift)
 [[ "${SKIP_BUILD_LLDB}" ]] || PRODUCTS+=(lldb)
 [[ "${SKIP_BUILD_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch)
 [[ "${SKIP_BUILD_STATIC_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch_static)
@@ -1436,7 +1440,6 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_BUILD_TYPE:STRING="${CMARK_BUILD_TYPE}"
                   "${cmark_cmake_options[@]}"
                 )
-                skip_build=${SKIP_BUILD_CMARK}
                 build_targets=(all)
                 ;;
 
@@ -1749,7 +1752,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_targets=("${build_targets[@]}"
                                    "${SWIFT_BENCHMARK_TARGETS[@]}")
                 fi
-                skip_build=${SKIP_BUILD_SWIFT}
                 ;;
             lldb)
                 if [ ! -d "${LLDB_SOURCE_DIR}" ]; then
@@ -2221,48 +2223,46 @@ for host in "${ALL_HOSTS[@]}"; do
         fi
 
         # Build.
-        if [[ ! "${skip_build}" ]]; then
-            if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
-                # Xcode generator uses "ALL_BUILD" instead of "all".
-                # Also, xcodebuild uses -target instead of bare names.
-                build_targets=("${build_targets[@]/all/ALL_BUILD}")
-                build_targets=("${build_targets[@]/#/${BUILD_TARGET_FLAG} }")
+        if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
+            # Xcode generator uses "ALL_BUILD" instead of "all".
+            # Also, xcodebuild uses -target instead of bare names.
+            build_targets=("${build_targets[@]/all/ALL_BUILD}")
+            build_targets=("${build_targets[@]/#/${BUILD_TARGET_FLAG} }")
 
-                # Xcode can't restart itself if it turns out we need to reconfigure.
-                # Do an advance build to handle that.
-                call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product})
-            fi
+            # Xcode can't restart itself if it turns out we need to reconfigure.
+            # Do an advance build to handle that.
+            call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product})
+        fi
 
-            call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
+        call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
 
-            # When we are building LLVM copy over the compiler-rt
-            # builtins for iOS/tvOS/watchOS to ensure that Swift's
-            # stdlib can use compiler-rt builtins when targetting iOS/tvOS/watchOS.
-            if [[ "${product}" = "llvm" ]] && [[ "${BUILD_LLVM}" = "1" ]] && [[ "$(uname -s)" = "Darwin" ]]; then
-                HOST_CXX_DIR=$(dirname "${HOST_CXX}")
-                HOST_LIB_CLANG_DIR="${HOST_CXX_DIR}/../lib/clang"
-                DEST_LIB_CLANG_DIR="$(build_directory_bin ${host} llvm)/../lib/clang"
+        # When we are building LLVM copy over the compiler-rt
+        # builtins for iOS/tvOS/watchOS to ensure that Swift's
+        # stdlib can use compiler-rt builtins when targetting iOS/tvOS/watchOS.
+        if [[ "${product}" = "llvm" ]] && [[ "${BUILD_LLVM}" = "1" ]] && [[ "$(uname -s)" = "Darwin" ]]; then
+            HOST_CXX_DIR=$(dirname "${HOST_CXX}")
+            HOST_LIB_CLANG_DIR="${HOST_CXX_DIR}/../lib/clang"
+            DEST_LIB_CLANG_DIR="$(build_directory_bin ${host} llvm)/../lib/clang"
 
-                if [[ -d "${HOST_LIB_CLANG_DIR}" ]] && [[ -d "${DEST_LIB_CLANG_DIR}" ]]; then
-                    DEST_CXX_BUILTINS_VERSION=$(ls "${DEST_LIB_CLANG_DIR}" | awk '{print $0}')
-                    DEST_BUILTINS_DIR="$(build_directory_bin ${host} llvm)/../lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
+            if [[ -d "${HOST_LIB_CLANG_DIR}" ]] && [[ -d "${DEST_LIB_CLANG_DIR}" ]]; then
+                DEST_CXX_BUILTINS_VERSION=$(ls "${DEST_LIB_CLANG_DIR}" | awk '{print $0}')
+                DEST_BUILTINS_DIR="$(build_directory_bin ${host} llvm)/../lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
 
-                    if [[ -d "${DEST_BUILTINS_DIR}" ]]; then
-                        for HOST_CXX_BUILTINS_PATH in "${HOST_LIB_CLANG_DIR}"/*; do
-                            HOST_CXX_BUILTINS_DIR="${HOST_CXX_BUILTINS_PATH}/lib/darwin"
-                            echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
+                if [[ -d "${DEST_BUILTINS_DIR}" ]]; then
+                    for HOST_CXX_BUILTINS_PATH in "${HOST_LIB_CLANG_DIR}"/*; do
+                        HOST_CXX_BUILTINS_DIR="${HOST_CXX_BUILTINS_PATH}/lib/darwin"
+                        echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
 
-                            for OS in ios watchos tvos; do
-                                LIB_NAME="libclang_rt.$OS.a"
-                                HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
-                                if [[ -f "${HOST_LIB_PATH}" ]]; then
-                                    call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${LIB_NAME}"
-                                elif [[ "${VERBOSE_BUILD}" ]]; then
-                                    echo "no file exists at ${HOST_LIB_PATH}"
-                                fi
-                            done
+                        for OS in ios watchos tvos; do
+                            LIB_NAME="libclang_rt.$OS.a"
+                            HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
+                            if [[ -f "${HOST_LIB_PATH}" ]]; then
+                                call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${LIB_NAME}"
+                            elif [[ "${VERBOSE_BUILD}" ]]; then
+                                echo "no file exists at ${HOST_LIB_PATH}"
+                            fi
                         done
-                    fi
+                    done
                 fi
             fi
         fi
