@@ -720,7 +720,9 @@ static bool computeIncremental(const llvm::opt::InputArgList *ArgList,
     return false;
 
   const char *ReasonToDisable =
-      ArgList->hasArg(options::OPT_whole_module_optimization)
+      ArgList->hasFlag(options::OPT_whole_module_optimization,
+                       options::OPT_no_whole_module_optimization,
+                       false)
           ? "is not compatible with whole module optimization."
           : ArgList->hasArg(options::OPT_embed_bitcode)
                 ? "is not currently compatible with embedding LLVM IR bitcode."
@@ -1761,8 +1763,13 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
     return Inputs.empty() ? OutputInfo::Mode::REPL
                           : OutputInfo::Mode::Immediate;
 
+  bool UseWMO = Args.hasFlag(options::OPT_whole_module_optimization,
+                             options::OPT_no_whole_module_optimization,
+                             false);
+
   const Arg *ArgRequiringSingleCompile = Args.getLastArg(
-      options::OPT_whole_module_optimization, options::OPT_index_file);
+      options::OPT_index_file,
+      UseWMO ? options::OPT_whole_module_optimization : llvm::opt::OptSpecifier());
 
   BatchModeOut = Args.hasFlag(options::OPT_enable_batch_mode,
                               options::OPT_disable_batch_mode,
@@ -1777,8 +1784,7 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
   // user about this decision.
   // FIXME: AST dump also doesn't work with `-index-file`, but that fix is a bit
   // more complicated than this.
-  if (Args.hasArg(options::OPT_whole_module_optimization) &&
-      Args.hasArg(options::OPT_dump_ast)) {
+  if (UseWMO && Args.hasArg(options::OPT_dump_ast)) {
     Diags.diagnose(SourceLoc(), diag::warn_ignoring_wmo);
     return OutputInfo::Mode::StandardCompile;
   }
