@@ -72,7 +72,8 @@ EscapeAnalysis::findRecursivePointerKind(SILType Ty,
   };
   if (auto *Str = Ty.getStructOrBoundGenericStruct()) {
     for (auto *Field : Str->getStoredProperties()) {
-      SILType fieldTy = Ty.getFieldType(Field, M, F.getTypeExpansionContext());
+      SILType fieldTy = Ty.getFieldType(Field, M, F.getTypeExpansionContext())
+                            .getObjectType();
       meetAggregateKind(findCachedPointerKind(fieldTy, F));
     }
     return aggregateKind;
@@ -731,9 +732,13 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
     From->isMerged = true;
 
     if (From->mappedValue) {
-      if (To->mappedValue)
-        Values2Nodes.erase(From->mappedValue);
-      else {
+      // If possible, transfer 'From's mappedValue to 'To' for clarity. Any
+      // values previously mapped to 'From' but not transferred to 'To's
+      // mappedValue must remain mapped to 'From'. Lookups on those values will
+      // find 'To' via the mergeTarget. Dropping a value's mapping is illegal
+      // because it could cause a node to be recreated without the edges that
+      // have already been discovered.
+      if (!To->mappedValue) {
         To->mappedValue = From->mappedValue;
         Values2Nodes[To->mappedValue] = To;
       }
@@ -925,8 +930,10 @@ EscapeAnalysis::ConnectionGraph::getOrCreateReferenceContent(SILValue refVal,
     if (auto *C = refType.getClassOrBoundGenericClass()) {
       PointerKind aggregateKind = NoPointer;
       for (auto *field : C->getStoredProperties()) {
-        SILType fieldType = refType.getFieldType(field, F->getModule(),
-                                                 F->getTypeExpansionContext());
+        SILType fieldType = refType
+                                .getFieldType(field, F->getModule(),
+                                              F->getTypeExpansionContext())
+                                .getObjectType();
         PointerKind fieldKind = EA->findCachedPointerKind(fieldType, *F);
         if (fieldKind > aggregateKind)
           aggregateKind = fieldKind;
@@ -1161,19 +1168,6 @@ bool EscapeAnalysis::ConnectionGraph::forwardTraverseDefer(
   return true;
 }
 
-bool EscapeAnalysis::ConnectionGraph::mayReach(CGNode *pointer,
-                                               CGNode *pointee) {
-  if (pointer == pointee)
-    return true;
-
-  // This query is successful when the traversal halts and returns false.
-  return !backwardTraverse(pointee, [pointer](Predecessor pred) {
-    if (pred.getPredNode() == pointer)
-      return Traversal::Halt;
-    return Traversal::Follow;
-  });
-}
-
 void EscapeAnalysis::ConnectionGraph::removeFromGraph(ValueBase *V) {
   CGNode *node = Values2Nodes.lookup(V);
   if (!node)
@@ -1193,10 +1187,7 @@ void EscapeAnalysis::ConnectionGraph::removeFromGraph(ValueBase *V) {
 /// This makes iterating over the edges easier.
 struct CGForDotView {
 
-  enum EdgeTypes {
-    PointsTo,
-    Deferred
-  };
+  enum EdgeTypes { PointsTo, Reference, Deferred };
 
   struct Node {
     EscapeAnalysis::CGNode *OrigNode;
@@ -1248,7 +1239,10 @@ CGForDotView::CGForDotView(const EscapeAnalysis::ConnectionGraph *CG) :
     Nd.OrigNode = OrigNode;
     if (auto *PT = OrigNode->getPointsToEdge()) {
       Nd.Children.push_back(Orig2Node[PT]);
-      Nd.ChildrenTypes.push_back(PointsTo);
+      if (OrigNode->hasReferenceOnly())
+        Nd.ChildrenTypes.push_back(Reference);
+      else
+        Nd.ChildrenTypes.push_back(PointsTo);
     }
     for (auto *Def : OrigNode->defersTo) {
       Nd.Children.push_back(Orig2Node[Def]);
@@ -1396,8 +1390,12 @@ namespace llvm {
                                          const CGForDotView *Graph) {
       unsigned ChildIdx = I - Node->Children.begin();
       switch (Node->ChildrenTypes[ChildIdx]) {
-        case CGForDotView::PointsTo: return "";
-        case CGForDotView::Deferred: return "color=\"gray\"";
+      case CGForDotView::PointsTo:
+        return "";
+      case CGForDotView::Reference:
+        return "color=\"green\"";
+      case CGForDotView::Deferred:
+        return "color=\"gray\"";
       }
 
       llvm_unreachable("Unhandled CGForDotView in switch.");
@@ -2570,24 +2568,6 @@ static SILFunction *getCommonFunction(SILValue V1, SILValue V2) {
   return F;
 }
 
-bool EscapeAnalysis::canEscapeToValue(SILValue V, SILValue To) {
-  if (!isUniquelyIdentified(V))
-    return true;
-
-  SILFunction *F = getCommonFunction(V, To);
-  if (!F)
-    return true;
-  auto *ConGraph = getConnectionGraph(F);
-
-  CGNode *valueContent = ConGraph->getValueContent(V);
-  if (!valueContent)
-    return true;
-  CGNode *userContent = ConGraph->getValueContent(To);
-  if (!userContent)
-    return true;
-  return ConGraph->mayReach(userContent, valueContent);
-}
-
 bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
   // At least one of the values must be a non-escaping local object.
   bool isUniq1 = isUniquelyIdentified(V1);
@@ -2640,6 +2620,99 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
     return Content1 == Content2;
   }
   return true;
+}
+
+// Return true if deinitialization of \p releasedReference may release memory
+// directly pointed to by \p accessAddress.
+//
+// Note that \p accessedAddress could be a reference itself, an address of a
+// local/argument that contains a reference, or even a pointer to the middle of
+// an object (even if it is an exclusive argument).
+//
+// This is almost the same as asking "is the content node for accessedAddress
+// reachable via releasedReference", with three subtle differences:
+//
+// (1) A locally referenced object can only be freed when deinitializing
+// releasedReference if it is the same object. Indirect references will be kept
+// alive by their distinct local references--ARC can't remove those without
+// inserting a mark_dependence/end_dependence scope.
+//
+// (2) the content of exclusive arguments may be indirectly reachable via
+// releasedReference, but the exclusive argument must have it's own reference
+// count, so cannot be freed via the locally released reference.
+//
+// (3) Objects may contain raw pointers into themselves or into other
+// objects. Any access to the raw pointer is not considered a use of the object
+// because that access must be "guarded" by a fix_lifetime or
+// mark_dependence/end_dependence that acts as a placeholder.
+//
+// There are two interesting cases in which a connection graph query can
+// determine that the accessed memory cannot be released:
+//
+// Case #1: accessedAddress points to a uniquely identified object that does not
+// escape within this function.
+//
+// Note: A "uniquely identified object" is either a locally allocated object,
+// which is obviously not reachable outside this function, or an exclusive
+// address argument, which *is* reachable outside this function, but must
+// have its own reference count so cannot be released locally.
+//
+// Case #2: The released reference points to a local object and no connection
+// graph path exists from the referenced object to a global-escaping or
+// argument-escaping node without traversing a non-interior edge.
+//
+// In both cases, the connection graph is sufficient to determine if the
+// accessed content may be released. To prove that the accessed memory is
+// distinct from any released memory it is now sufficient to check that no
+// connection graph path exists from the released object's node to the accessed
+// content node without traversing a non-interior edge.
+bool EscapeAnalysis::mayReleaseContent(SILValue releasedReference,
+                                       SILValue accessedAddress) {
+  assert(!releasedReference->getType().isAddress()
+         && "an address is never a reference");
+
+  SILFunction *f = getCommonFunction(releasedReference, accessedAddress);
+  if (!f)
+    return true;
+
+  auto *conGraph = getConnectionGraph(f);
+
+  CGNode *addrContentNode = conGraph->getValueContent(accessedAddress);
+  if (!addrContentNode)
+    return true;
+
+  // Case #1: Unique accessedAddress whose content does not escape.
+  bool isAccessUniq =
+      isUniquelyIdentified(accessedAddress)
+      && !addrContentNode->valueEscapesInsideFunction(accessedAddress);
+
+  // Case #2: releasedReference points to a local object.
+  if (!isAccessUniq && !pointsToLocalObject(releasedReference))
+    return true;
+
+  CGNode *releasedObjNode = conGraph->getValueContent(releasedReference);
+  // Make sure we have at least one value CGNode for releasedReference.
+  if (!releasedObjNode)
+    return true;
+
+  // Check for reachability from releasedObjNode to addrContentNode.
+  // A pointsTo cycle is equivalent to a null pointsTo.
+  CGNodeWorklist worklist(conGraph);
+  for (CGNode *releasedNode = releasedObjNode;
+       releasedNode && worklist.tryPush(releasedNode);
+       releasedNode = releasedNode->getContentNodeOrNull()) {
+    // A path exists from released content to accessed content.
+    if (releasedNode == addrContentNode)
+      return true;
+
+    // A path exists to an escaping node.
+    if (!isAccessUniq && releasedNode->escapesInsideFunction())
+      return true;
+
+    if (!releasedNode->isInterior())
+      break;
+  }
+  return false; // no path to escaping memory that may be freed.
 }
 
 void EscapeAnalysis::invalidate() {

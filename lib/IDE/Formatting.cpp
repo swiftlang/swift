@@ -564,6 +564,10 @@ class FormatWalker : public SourceEntityWalker {
     public:
       SourceLocIterator(TokenIt It) :It(It) {}
       SourceLocIterator(const SourceLocIterator& mit) : It(mit.It) {}
+      const SourceLocIterator &operator=(const SourceLocIterator &mit) {
+        It = mit.It;
+        return *this;
+      }
       SourceLocIterator& operator++() {++It; return *this;}
       SourceLocIterator operator++(int) {
         SourceLocIterator tmp(*this);

@@ -305,8 +305,6 @@ PASS(OwnershipDumper, "ownership-dumper",
      "Print Ownership information for Testing")
 PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
-PASS(MarkUninitializedFixup, "mark-uninitialized-fixup",
-     "Temporary pass for staging in mark_uninitialized changes.")
 PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-blocks",
      "Utility pass. Removes all non-term insts from blocks with unreachable terms")
 PASS(SerializeSILPass, "serialize-sil",

@@ -151,6 +151,12 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
     break;
   }
 
+  if (const Arg *variant = inputArgs.getLastArg(options::OPT_target_variant)) {
+    arguments.push_back("-target-variant");
+    std::string normalized = llvm::Triple::normalize(variant->getValue());
+    arguments.push_back(inputArgs.MakeArgString(normalized));
+  }
+
   // Enable address top-byte ignored in the ARM64 backend.
   if (Triple.getArch() == llvm::Triple::aarch64) {
     arguments.push_back("-Xllvm");
@@ -192,6 +198,8 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_enable_library_evolution);
+  inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability);
+  inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
   inputArgs.AddLastArg(arguments, options::OPT_enable_cxx_interop);
@@ -230,6 +238,8 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_fine_grained_dependencies);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_disable_fine_grained_dependencies);
   inputArgs.AddLastArg(arguments,
                        options::OPT_fine_grained_dependency_include_intrafile);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
@@ -641,6 +651,12 @@ void ToolChain::JobContext::addFrontendCommandLineInputArguments(
     if ((!isPrimary || usePrimaryFileList) && !useFileList)
       arguments.push_back(inputName);
   }
+  if (C.getEnableFineGrainedDependencies())
+    arguments.push_back("-enable-fine-grained-dependencies");
+
+  if (Args.hasArg(
+          options::OPT_emit_fine_grained_dependency_sourcefile_dot_files))
+    arguments.push_back("-emit-fine-grained-dependency-sourcefile-dot-files");
 }
 
 void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
@@ -1213,8 +1229,28 @@ void ToolChain::getResourceDirPath(SmallVectorImpl<char> &resourceDirPath,
     llvm::sys::path::append(resourceDirPath, "lib",
                             shared ? "swift" : "swift_static");
   }
-  llvm::sys::path::append(resourceDirPath,
-                          getPlatformNameForTriple(getTriple()));
+
+  StringRef libSubDir = getPlatformNameForTriple(getTriple());
+  if (tripleIsMacCatalystEnvironment(getTriple()))
+    libSubDir = "maccatalyst";
+  llvm::sys::path::append(resourceDirPath, libSubDir);
+}
+
+// Get the secondary runtime library link path given the primary path.
+// The compiler will look for runtime libraries in the secondary path if they
+// can't be found in the primary path.
+void ToolChain::getSecondaryResourceDirPath(
+    SmallVectorImpl<char> &secondaryResourceDirPath,
+    StringRef primaryPath) const {
+  if (!tripleIsMacCatalystEnvironment(getTriple()))
+    return;
+
+  // For macCatalyst, the secondary runtime library path is the macOS library
+  // path. The compiler will find zippered libraries here.
+  secondaryResourceDirPath.append(primaryPath.begin(), primaryPath.end());
+  // Remove '/maccatalyst' and replace with 'macosx'.
+  llvm::sys::path::remove_filename(secondaryResourceDirPath);
+  llvm::sys::path::append(secondaryResourceDirPath, "macosx");
 }
 
 void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibPaths,
@@ -1224,7 +1260,22 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
   getResourceDirPath(scratchPath, args, shared);
   runtimeLibPaths.push_back(scratchPath.str());
 
+  // If there's a secondary resource dir, add it too.
+  scratchPath.clear();
+  getSecondaryResourceDirPath(scratchPath, runtimeLibPaths[0]);
+  if (!scratchPath.empty())
+    runtimeLibPaths.push_back(scratchPath.str());
+
   if (!SDKPath.empty()) {
+    if (!scratchPath.empty()) {
+      // If we added the secondary resource dir, we also need the iOSSupport
+      // directory.
+      scratchPath = SDKPath;
+      llvm::sys::path::append(scratchPath, "System", "iOSSupport");
+      llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
+      runtimeLibPaths.push_back(scratchPath.str());
+    }
+
     scratchPath = SDKPath;
     llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
     runtimeLibPaths.push_back(scratchPath.str());

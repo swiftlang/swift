@@ -697,6 +697,8 @@ public:
 
   bool satisfiesClassConstraint() const;
 
+  bool isCanonicalStaticallySpecializedGenericMetadata() const;
+
 #if SWIFT_OBJC_INTEROP
   /// Get the ObjC class object for this type if it has one, or return null if
   /// the type is not a class (or not a class with a class object).
@@ -1346,6 +1348,34 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
       return nullptr;
     auto asWords = reinterpret_cast<const void * const*>(this);
     return reinterpret_cast<const uint32_t *>(asWords + offset);
+  }
+
+  bool isCanonicalStaticallySpecializedGenericMetadata() const {
+    auto *description = getDescription();
+    if (!description->isGeneric())
+      return false;
+
+    auto *trailingFlags = getTrailingFlags();
+    if (trailingFlags == nullptr)
+      return false;
+
+    return trailingFlags->isCanonicalStaticSpecialization();
+  }
+
+  const MetadataTrailingFlags *getTrailingFlags() const {
+    auto description = getDescription();
+    auto flags = description->getFullGenericContextHeader()
+                     .DefaultInstantiationPattern->PatternFlags;
+    if (!flags.hasTrailingFlags())
+      return nullptr;
+    auto fieldOffset = description->FieldOffsetVectorOffset;
+    auto offset =
+        fieldOffset +
+        // Pad to the nearest pointer.
+        ((description->NumFields * sizeof(uint32_t) + sizeof(void *) - 1) /
+         sizeof(void *));
+    auto asWords = reinterpret_cast<const void *const *>(this);
+    return reinterpret_cast<const MetadataTrailingFlags *>(asWords + offset);
   }
 
   static constexpr int32_t getGenericArgumentOffset() {
@@ -3575,7 +3605,7 @@ struct TargetSingletonMetadataInitialization {
   }
 
   /// This method can only be called from the runtime itself. It is defined
-  /// in MetadataCache.h.
+  /// in Metadata.cpp.
   TargetMetadata<Runtime> *allocate(
       const TargetTypeContextDescriptor<Runtime> *description) const;
 };

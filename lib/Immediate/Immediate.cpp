@@ -220,7 +220,7 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
 }
 
 bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
-                                               IRGenOptions &IRGenOpts) {
+                                               const IRGenOptions &IRGenOpts) {
   // Perform autolinking.
   SmallVector<LinkLibrary, 4> AllLinkLibraries(IRGenOpts.LinkLibraries);
   auto addLinkLibrary = [&](LinkLibrary linkLib) {
@@ -234,8 +234,11 @@ bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
   return false;
 }
 
-int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                          IRGenOptions &IRGenOpts, const SILOptions &SILOpts) {
+int swift::RunImmediately(CompilerInstance &CI,
+                          const ProcessCmdLine &CmdLine,
+                          const IRGenOptions &IRGenOpts,
+                          const SILOptions &SILOpts,
+                          std::unique_ptr<SILModule> &&SM) {
   ASTContext &Context = CI.getASTContext();
   
   // IRGen the main module.
@@ -244,7 +247,7 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
   auto ModuleOwner = performIRGeneration(
-      IRGenOpts, swiftModule, CI.takeSILModule(), swiftModule->getName().str(),
+      IRGenOpts, swiftModule, std::move(SM), swiftModule->getName().str(),
       PSPs, getGlobalLLVMContext(), ArrayRef<std::string>());
   auto *Module = ModuleOwner.get();
 

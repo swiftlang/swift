@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OutputFileMap.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaskQueue.h"
@@ -98,6 +99,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   .Case("swiftc", DriverKind::Batch)
   .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
   .Case("swift-indent", DriverKind::SwiftIndent)
+  .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
   .Default(None);
   
   if (Kind.hasValue())
@@ -251,8 +253,13 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   case llvm::Triple::MacOSX:
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
-  case llvm::Triple::WatchOS:
-    return llvm::make_unique<toolchains::Darwin>(*this, target);
+  case llvm::Triple::WatchOS: {
+    Optional<llvm::Triple> targetVariant;
+    if (const Arg *A = ArgList.getLastArg(options::OPT_target_variant))
+      targetVariant = llvm::Triple(llvm::Triple::normalize(A->getValue()));
+
+    return llvm::make_unique<toolchains::Darwin>(*this, target, targetVariant);
+  }
   case llvm::Triple::Linux:
     if (target.isAndroid())
       return llvm::make_unique<toolchains::Android>(*this, target);
@@ -823,7 +830,7 @@ Driver::buildCompilation(const ToolChain &TC,
   validateArgs(Diags, *TranslatedArgList, TC.getTriple());
     
   // Perform toolchain specific args validation.
-  TC.validateArguments(Diags, *TranslatedArgList);
+  TC.validateArguments(Diags, *TranslatedArgList, DefaultTargetTriple);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -958,7 +965,8 @@ Driver::buildCompilation(const ToolChain &TC,
 
     // relies on the new dependency graph
     const bool EnableFineGrainedDependencies =
-        ArgList->hasArg(options::OPT_enable_fine_grained_dependencies);
+        ArgList->hasFlag(options::OPT_enable_fine_grained_dependencies,
+                         options::OPT_disable_fine_grained_dependencies, false);
 
     const bool VerifyFineGrainedDependencyGraphAfterEveryImport = ArgList->hasArg(
         options::
@@ -3252,6 +3260,7 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::Batch:
   case DriverKind::AutolinkExtract:
   case DriverKind::SwiftIndent:
+  case DriverKind::SymbolGraph:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

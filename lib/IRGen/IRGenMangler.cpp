@@ -91,7 +91,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
     CanSymbolicReferenceLocally(CanSymbolicReference);
 
   AllowSymbolicReferences = true;
-  CanSymbolicReference = [&IGM](SymbolicReferent s) -> bool {
+  CanSymbolicReference = [](SymbolicReferent s) -> bool {
     if (auto type = s.dyn_cast<const NominalTypeDecl *>()) {
       // The short-substitution types in the standard library have compact
       // manglings already, and the runtime ought to have a lookup table for

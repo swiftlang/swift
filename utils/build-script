@@ -11,7 +11,6 @@
 
 from __future__ import print_function
 
-import argparse
 import json
 import os
 import pipes
@@ -19,16 +18,17 @@ import platform
 import sys
 import time
 
-from build_swift import defaults
-from build_swift import driver_arguments
-from build_swift import presets
-from build_swift.migration import migrate_swift_sdks
+from build_swift.build_swift import argparse
+from build_swift.build_swift import defaults
+from build_swift.build_swift import driver_arguments
+from build_swift.build_swift import migration
+from build_swift.build_swift import presets
+
+import six
 
 from swift_build_support.swift_build_support import (
-    arguments,
     debug,
     diagnostics,
-    migration,
     products,
     shell,
     tar,
@@ -61,11 +61,14 @@ def exit_rejecting_arguments(message, parser=None):
 
 class JSONDumper(json.JSONEncoder):
     def __init__(self, *args, **kwargs):
-        json.JSONEncoder.__init__(self, indent=2, separators=(',', ': '),
-                                  *args, **kwargs)
+        json.JSONEncoder.__init__(
+            self, indent=2, separators=(',', ': '), sort_keys=True,
+            *args, **kwargs)
 
     def default(self, o):
-        return vars(o)
+        if hasattr(o, '__dict__'):
+            return vars(o)
+        return six.text_type(o)
 
 
 class BuildScriptInvocation(object):
@@ -598,6 +601,13 @@ class BuildScriptInvocation(object):
                 "--extra-swift-args=%s" % ';'.join(args.extra_swift_args)
             ]
 
+        # Enable macCatalyst
+        if args.maccatalyst:
+            (args.extra_cmake_options
+             .append('-DSWIFT_ENABLE_MACCATALYST:BOOL=TRUE'))
+        if args.maccatalyst_ios_tests:
+            impl_args += ["--darwin-test-maccatalyst-ios-like=1"]
+
         # If we have extra_cmake_options, combine all of them together and then
         # add them as one command.
         if args.extra_cmake_options:
@@ -907,11 +917,13 @@ def main_preset():
     parser.add_argument(
         "--show-presets",
         help="list all presets and exit",
-        action=arguments.action.optional_bool)
+        action=argparse.actions.StoreTrueAction,
+        nargs=argparse.Nargs.OPTIONAL)
     parser.add_argument(
         "--distcc",
         help="use distcc",
-        action=arguments.action.optional_bool)
+        action=argparse.actions.StoreTrueAction,
+        nargs=argparse.Nargs.OPTIONAL)
     parser.add_argument(
         "--cmake-c-launcher",
         help="the absolute path to set CMAKE_C_COMPILER_LAUNCHER",
@@ -934,7 +946,8 @@ def main_preset():
         "--expand-invocation", "--expand-build-script-invocation",
         help="Print the expanded build-script invocation generated "
              "by the preset, but do not run the preset",
-        action=arguments.action.optional_bool)
+        action=argparse.actions.StoreTrueAction,
+        nargs=argparse.Nargs.OPTIONAL)
     parser.add_argument(
         "--swiftsyntax-install-prefix",
         help="specify the directory to where SwiftSyntax should be installed")
@@ -967,12 +980,12 @@ def main_preset():
     preset_parser = presets.PresetParser()
 
     try:
-        preset_parser.read(args.preset_file_names)
-    except presets.Error as e:
+        preset_parser.read_files(args.preset_file_names)
+    except presets.PresetError as e:
         diagnostics.fatal(e.message)
 
     if args.show_presets:
-        for name in sorted(preset_parser.preset_names(),
+        for name in sorted(preset_parser.preset_names,
                            key=lambda name: name.lower()):
             print(name)
         return 0
@@ -986,12 +999,13 @@ def main_preset():
         args.preset_substitutions[name] = value
 
     try:
-        preset = preset_parser.get_preset(args.preset,
-                                          vars=args.preset_substitutions)
-    except presets.Error as e:
+        preset = preset_parser.get_preset(
+            args.preset,
+            vars=args.preset_substitutions)
+    except presets.PresetError as e:
         diagnostics.fatal(e.message)
 
-    preset_args = migrate_swift_sdks(preset.format_args())
+    preset_args = migration.migrate_swift_sdks(preset.args)
 
     if args.distcc and (args.cmake_c_launcher or args.cmake_cxx_launcher):
         diagnostics.fatal(

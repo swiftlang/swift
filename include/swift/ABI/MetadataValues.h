@@ -672,7 +672,7 @@ public:
 private:
   enum : int_type {
     NumWitnessTablesMask  = 0x00FFFFFFU,
-    ClassConstraintMask   = 0x80000000U,
+    ClassConstraintMask   = 0x80000000U, // Warning: Set if NOT class-constrained!
     HasSuperclassMask     = 0x40000000U,
     SpecialProtocolMask   = 0x3F000000U,
     SpecialProtocolShift  = 24U,
@@ -1511,6 +1511,10 @@ class GenericMetadataPatternFlags : public FlagSet<uint32_t> {
     /// Does this pattern have an extra-data pattern?
     HasExtraDataPattern = 0,
 
+    /// Do instances of this pattern have a bitset of flags that occur at the
+    /// end of the metadata, after the extra data if there is any?
+    HasTrailingFlags = 1,
+
     // Class-specific flags.
 
     /// Does this pattern have an immediate-members pattern?
@@ -1534,6 +1538,10 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasExtraDataPattern,
                                 hasExtraDataPattern,
                                 setHasExtraDataPattern)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasTrailingFlags,
+                                hasTrailingFlags,
+                                setHasTrailingFlags)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Value_MetadataKind,
                                  Value_MetadataKind_width,
@@ -1665,6 +1673,30 @@ public:
   bool isSatisfiedBy(MetadataState state) const {
     return isAtLeast(state, getState());
   }
+};
+
+struct MetadataTrailingFlags : public FlagSet<uint64_t> {
+  enum {
+    /// Whether this metadata is a specialization of a generic metadata pattern
+    /// which was created during compilation.
+    IsStaticSpecialization = 0,
+
+    /// Whether this metadata is a specialization of a generic metadata pattern
+    /// which was created during compilation and made to be canonical by
+    /// modifying the metadata accessor.
+    IsCanonicalStaticSpecialization = 1,
+  };
+
+  explicit MetadataTrailingFlags(uint64_t bits) : FlagSet(bits) {}
+  constexpr MetadataTrailingFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsStaticSpecialization,
+                                isStaticSpecialization,
+                                setIsStaticSpecialization)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCanonicalStaticSpecialization,
+                                isCanonicalStaticSpecialization,
+                                setIsCanonicalStaticSpecialization)
 };
 
 /// Flags for Builtin.IntegerLiteral values.

@@ -639,6 +639,18 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     case ConstraintLocator::ContextualType: {
       auto purpose = getContextualTypePurpose();
       assert(!(purpose == CTP_Unused && purpose == CTP_CannotFail));
+
+      // If this is call to a closure e.g. `let _: A = { B() }()`
+      // let's point diagnostic to its result.
+      if (auto *call = dyn_cast<CallExpr>(anchor)) {
+        auto *fnExpr = call->getFn();
+        if (auto *closure = dyn_cast<ClosureExpr>(fnExpr)) {
+          purpose = CTP_ClosureResult;
+          if (closure->hasSingleExpressionBody())
+            anchor = closure->getSingleExpressionBody();
+        }
+      }
+
       diagnostic = getDiagnosticFor(purpose);
       break;
     }
@@ -666,6 +678,19 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
         diagnostic = getDiagnosticFor(CTP_AssignSource);
         fromType = getType(assignExpr->getSrc());
         toType = getType(assignExpr->getDest());
+      }
+      break;
+    }
+
+    case ConstraintLocator::TupleElement: {
+      auto *anchor = getRawAnchor();
+
+      if (isa<ArrayExpr>(anchor)) {
+        diagnostic = getDiagnosticFor(CTP_ArrayElement);
+      } else if (isa<DictionaryExpr>(anchor)) {
+        auto eltLoc = last.castTo<LocatorPathElt::TupleElement>();
+        diagnostic = getDiagnosticFor(
+            eltLoc.getIndex() == 0 ? CTP_DictionaryKey : CTP_DictionaryValue);
       }
       break;
     }
@@ -980,7 +1005,7 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   // If anchor is n explicit address-of, or expression which produces
   // an l-value (e.g. first argument of `+=` operator), let's not
   // suggest default value here because that would produce r-value type.
-  if (isa<InOutExpr>(anchor))
+  if (!anchor || isa<InOutExpr>(anchor))
     return;
 
   auto &cs = getConstraintSystem();
@@ -1853,6 +1878,9 @@ bool ContextualFailure::diagnoseAsError() {
                      getFromType(), getToType());
       return true;
     }
+    
+    if (diagnoseCoercionToUnrelatedType())
+      return true;
 
     return false;
   }
@@ -1902,6 +1930,20 @@ bool ContextualFailure::diagnoseAsError() {
     diagnostic = diag::cannot_convert_condition_value;
     break;
   }
+      
+  case ConstraintLocator::InstanceType: {
+    if (diagnoseCoercionToUnrelatedType())
+      return true;
+    break;
+  }
+
+  case ConstraintLocator::TernaryBranch: {
+    auto *ifExpr = cast<IfExpr>(getRawAnchor());
+    fromType = getType(ifExpr->getThenExpr());
+    toType = getType(ifExpr->getElseExpr());
+    diagnostic = diag::if_expr_cases_mismatch;
+    break;
+  }
 
   case ConstraintLocator::ContextualType: {
     if (diagnoseConversionToBool())
@@ -1926,6 +1968,11 @@ bool ContextualFailure::diagnoseAsError() {
           fromType, toType, bool(fromType->getOptionalObjectType()))
           .highlight(anchor->getSourceRange());
       return true;
+    }
+
+    if (auto *call = dyn_cast<CallExpr>(anchor)) {
+      if (isa<ClosureExpr>(call->getFn()))
+        CTP = CTP_ClosureResult;
     }
 
     if (auto msg = getDiagnosticFor(CTP, toType->isExistentialType())) {
@@ -2218,6 +2265,29 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
   tryComputedPropertyFixIts(anchor);
 
   return true;
+}
+
+bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
+  auto *anchor = getAnchor();
+  
+  if (auto *coerceExpr = dyn_cast<CoerceExpr>(anchor)) {
+    auto fromType = getType(coerceExpr->getSubExpr());
+    auto toType = getType(coerceExpr->getCastTypeLoc());
+    
+    auto diagnostic =
+        getDiagnosticFor(CTP_CoerceOperand,
+                         /*forProtocol=*/toType->isExistentialType());
+    
+    auto diag =
+        emitDiagnostic(anchor->getLoc(), *diagnostic, fromType, toType);
+    diag.highlight(anchor->getSourceRange());
+
+    (void)tryFixIts(diag);
+    
+    return true;
+  }
+
+  return false;
 }
 
 bool ContextualFailure::diagnoseConversionToBool() const {
@@ -2565,6 +2635,18 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
   if (getFromType()->isEqual(Substring)) {
     if (getToType()->isEqual(String)) {
       auto *anchor = getAnchor()->getSemanticsProvidingExpr();
+      if (auto *CE = dyn_cast<CoerceExpr>(anchor)) {
+        anchor = CE->getSubExpr();
+      }
+
+      if (auto *call = dyn_cast<CallExpr>(anchor)) {
+        auto *fnExpr = call->getFn();
+        if (auto *closure = dyn_cast<ClosureExpr>(fnExpr)) {
+          if (closure->hasSingleExpressionBody())
+            anchor = closure->getSingleExpressionBody();
+        }
+      }
+
       auto range = anchor->getSourceRange();
       diagnostic.fixItInsert(range.Start, "String(");
       diagnostic.fixItInsertAfter(range.End, ")");
@@ -3780,12 +3862,27 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   return true;
 }
 
+bool MissingArgumentsFailure::diagnoseAsNote() {
+  auto *locator = getLocator();
+  if (auto overload = getChoiceFor(locator)) {
+    auto *fn = resolveType(overload->openedType)->getAs<AnyFunctionType>();
+    auto loc = overload->choice.getDecl()->getLoc();
+    if (loc.isInvalid())
+      loc = getAnchor()->getLoc();
+    emitDiagnostic(loc, diag::candidate_partial_match,
+                   fn->getParamListAsString(fn->getParams()));
+    return true;
+  }
+
+  return false;
+}
+
 bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   auto &ctx = getASTContext();
 
   auto *anchor = getRawAnchor();
   if (!(isa<CallExpr>(anchor) || isa<SubscriptExpr>(anchor) ||
-        isa<UnresolvedMemberExpr>(anchor)))
+        isa<UnresolvedMemberExpr>(anchor) || isa<ObjectLiteralExpr>(anchor)))
     return false;
 
   if (SynthesizedArgs.size() != 1)
@@ -4122,6 +4219,9 @@ MissingArgumentsFailure::getCallInfo(Expr *anchor) const {
   } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
     return std::make_tuple(SE, SE->getIndex(), SE->getNumArguments(),
                            SE->hasTrailingClosure());
+  } else if (auto *OLE = dyn_cast<ObjectLiteralExpr>(anchor)) {
+    return std::make_tuple(OLE, OLE->getArg(), OLE->getNumArguments(),
+                           OLE->hasTrailingClosure());
   }
 
   return std::make_tuple(nullptr, nullptr, 0, false);
@@ -4523,9 +4623,7 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
     auto &cs = getConstraintSystem();
     auto *locator =
         cs.getConstraintLocator(baseExpr, ConstraintLocator::Member);
-    if (llvm::any_of(cs.getFixes(), [&](const ConstraintFix *fix) {
-          return fix->getLocator() == locator;
-        }))
+    if (cs.hasFixFor(locator))
       return false;
   }
 
@@ -5939,6 +6037,58 @@ bool UnableToInferClosureReturnType::diagnoseAsError() {
     diagnostic.fixItInsertAfter(closure->getBody()->getLBraceLoc(),
                                 diag::insert_closure_return_type_placeholder,
                                 /*argListSpecified=*/true);
+  }
+
+  return true;
+}
+
+static std::pair<StringRef, StringRef>
+getImportModuleAndDefaultType(const ASTContext &ctx, ObjectLiteralExpr *expr) {
+  const auto &target = ctx.LangOpts.Target;
+  
+  switch (expr->getLiteralKind()) {
+    case ObjectLiteralExpr::colorLiteral: {
+      if (target.isMacOSX()) {
+        return std::make_pair("AppKit", "NSColor");
+      } else if (target.isiOS() || target.isTvOS()) {
+        return std::make_pair("UIKit", "UIColor");
+      }
+      break;
+    }
+
+    case ObjectLiteralExpr::imageLiteral: {
+      if (target.isMacOSX()) {
+        return std::make_pair("AppKit", "NSImage");
+      } else if (target.isiOS() || target.isTvOS()) {
+        return std::make_pair("UIKit", "UIImage");
+      }
+      break;
+    }
+
+    case ObjectLiteralExpr::fileLiteral: {
+      return std::make_pair("Foundation", "URL");
+    }
+  }
+
+  return std::make_pair("", "");
+}
+
+bool UnableToInferProtocolLiteralType::diagnoseAsError() {
+  auto &cs = getConstraintSystem();
+  auto &ctx = cs.getASTContext();
+  auto *expr = cast<ObjectLiteralExpr>(getLocator()->getAnchor());
+
+  StringRef importModule;
+  StringRef importDefaultTypeName;
+  std::tie(importModule, importDefaultTypeName) =
+      getImportModuleAndDefaultType(ctx, expr);
+
+  auto plainName = expr->getLiteralKindPlainName();
+  emitDiagnostic(expr->getLoc(), diag::object_literal_default_type_missing,
+                 plainName);
+  if (!importModule.empty()) {
+    emitDiagnostic(expr->getLoc(), diag::object_literal_resolve_import,
+                   importModule, importDefaultTypeName, plainName);
   }
 
   return true;

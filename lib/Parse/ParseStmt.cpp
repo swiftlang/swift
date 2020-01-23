@@ -93,6 +93,12 @@ bool Parser::isStartOfStmt() {
     Parser::BacktrackingScope backtrack(*this);
     consumeToken(tok::identifier);
     consumeToken(tok::colon);
+
+    // We treating IDENTIIFIER: { as start of statement to provide missed 'do'
+    // diagnostics. This case will be handled in parseStmt().
+    if (Tok.is(tok::l_brace)) {
+      return true;
+    }
     // For better recovery, we just accept a label on any statement.  We reject
     // putting a label on something inappropriate in parseStmt().
     return isStartOfStmt();
@@ -637,6 +643,12 @@ ParserResult<Stmt> Parser::parseStmt() {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtPoundAssert();
+  case tok::l_brace:
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+    SourceLoc colonLoc = Tok.getLoc();
+    diagnose(colonLoc, diag::labeled_block_needs_do)
+      .fixItInsert(colonLoc, "do ");
+    return parseStmtDo(LabelInfo, /*shouldSkipDoTokenConsume*/ true);
   }
 }
 
@@ -1875,9 +1887,16 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
 ///   stmt-do:
 ///     (identifier ':')? 'do' stmt-brace
 ///     (identifier ':')? 'do' stmt-brace stmt-catch+
-ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
+ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo,
+                                       bool shouldSkipDoTokenConsume) {
   SyntaxContext->setCreateSyntax(SyntaxKind::DoStmt);
-  SourceLoc doLoc = consumeToken(tok::kw_do);
+  SourceLoc doLoc;
+
+  if (shouldSkipDoTokenConsume) {
+    doLoc = Tok.getLoc();
+  } else {
+    doLoc = consumeToken(tok::kw_do);
+  }
 
   ParserStatus status;
 
@@ -1917,18 +1936,21 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
       DoCatchStmt::create(Context, labelInfo, doLoc, body.get(), allClauses));
   }
 
-  SourceLoc whileLoc;
-
-  // If we don't see a 'while', this is just the bare 'do' scoping
-  // statement.
-  if (!consumeIf(tok::kw_while, whileLoc)) {
+  // If we dont see a 'while' or see a 'while' that starts
+  // from new line. This is just the bare `do` scoping statement.
+  if (Tok.getKind() != tok::kw_while || Tok.isAtStartOfLine()) {
     return makeParserResult(status,
-                         new (Context) DoStmt(labelInfo, doLoc, body.get()));
+                            new (Context) DoStmt(labelInfo, doLoc, body.get()));
   }
-
+  SourceLoc whileLoc = Tok.getLoc();
   // But if we do, advise the programmer that it's 'repeat' now.
-  diagnose(doLoc, diag::do_while_now_repeat_while)
+  diagnose(doLoc, diag::do_while_now_repeat_while);
+  diagnose(doLoc, diag::do_while_expected_repeat_while)
     .fixItReplace(doLoc, "repeat");
+  diagnose(doLoc, diag::do_while_expected_separate_stmt)
+    .fixItInsert(whileLoc, "\n");
+
+  consumeToken(tok::kw_while);
   status.setIsParseError();
   ParserResult<Expr> condition;
   if (Tok.is(tok::l_brace)) {

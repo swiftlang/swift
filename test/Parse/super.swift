@@ -4,8 +4,8 @@ class B {
   var foo: Int
   func bar() {}
 
-  init() {}
-  init(x: Int) {}
+  init() {} // expected-note {{found this candidate}}
+  init(x: Int) {} // expected-note {{found this candidate}}
 
   subscript(x: Int) -> Int {
     get {}
@@ -38,7 +38,8 @@ class D : B {
     super.foo.bar    // expected-error {{value of type 'Int' has no member 'bar'}}
     super.bar        // expected-error {{expression resolves to an unused function}}
     super.bar()
-    super.init // expected-error{{'super.init' cannot be called outside of an initializer}}
+    // FIXME: should also say "'super.init' cannot be referenced outside of an initializer"
+    super.init // expected-error{{no exact matches in call to initializer}}
     super.init() // expected-error{{'super.init' cannot be called outside of an initializer}}
     super.init(0) // expected-error{{'super.init' cannot be called outside of an initializer}} // expected-error {{missing argument label 'x:' in call}}
     super[0]        // expected-error {{expression resolves to an unused subscript}}

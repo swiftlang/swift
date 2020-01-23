@@ -157,10 +157,13 @@
 // RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output6
 
 
-// RUN: %FileCheck -match-full-lines -check-prefix=CHECK-EXERNAL-CHANGE  %s < %t/output6
-// CHECK-EXERNAL-CHANGE: Queuing <With ranges> changed at [4:18--4:18): {compile: fileB.o <= fileB.swift}
-// CHECK-EXERNAL-CHANGE-NEXT:   - Will immediately schedule dependents of {compile: fileB.o <= fileB.swift} because changed outside a function body at: [4:18--4:18)
-// CHECK-EXERNAL-CHANGE: Queuing <With ranges> because of the initial set: {compile: fileA.o <= fileA.swift}
-// CHECK-EXERNAL-CHANGE-NEXT:   fileB.swift provides type 'main.Struct1InB'
-// CHECK-EXERNAL-CHANGE: Skipping <With ranges> : {compile: main.o <= main.swift}
-// CHECK-EXERNAL-CHANGE: *** Range benefit: 0 compilations, 1 stages, without ranges: 2, with ranges: 2, used ranges, total: 3 ***
+// RUN: %FileCheck -match-full-lines -check-prefix=CHECK-EXTERNAL-CHANGE-1  %s < %t/output6
+// RUN: %FileCheck -match-full-lines -check-prefix=CHECK-EXTERNAL-CHANGE-2  %s < %t/output6
+// RUN: %FileCheck -match-full-lines -check-prefix=CHECK-EXTERNAL-CHANGE-3  %s < %t/output6
+
+// CHECK-EXTERNAL-CHANGE-1: Queuing <With ranges> changed at [4:18--4:18): {compile: fileB.o <= fileB.swift}
+// CHECK-EXTERNAL-CHANGE-NEXT-1:   - Will immediately schedule dependents of {compile: fileB.o <= fileB.swift} because changed outside a function body at: [4:18--4:18)
+// CHECK-EXTERNAL-CHANGE-2: Queuing <With ranges> because of the initial set: {compile: fileA.o <= fileA.swift}
+// CHECK-EXTERNAL-CHANGE-NEXT-2:   fileB.swift provides type 'main.Struct1InB'
+// CHECK-EXTERNAL-CHANGE-3: Skipping <With ranges> : {compile: main.o <= main.swift}
+// CHECK-EXTERNAL-CHANGE-3: *** Range benefit: 0 compilations, 1 stages, without ranges: 2, with ranges: 2, used ranges, total: 3 ***

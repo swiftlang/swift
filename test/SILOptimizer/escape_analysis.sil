@@ -100,7 +100,7 @@ bb0(%0 : $Int):
 // CHECK-NEXT:    Con %1.1 Esc: G, Succ:
 // CHECK-NEXT:    Val [ref] %2 Esc: A, Succ: (%3)
 // CHECK-NEXT:    Con [int] %3 Esc: A, Succ: (%3.1)
-// CHECK-NEXT:    Con %3.1 Esc: A, Succ: %1
+// CHECK-NEXT:    Con [ref] %3.1 Esc: A, Succ: %1
 // CHECK-NEXT:    Con [ref] %5 Esc: A, Succ: %2
 // CHECK-NEXT:  End
 sil @test_simple : $@convention(thin) (@inout Y, @owned X) -> () {
@@ -122,7 +122,7 @@ bb0(%0 : $*Y, %1 : $X):
 // CHECK-NEXT:    Arg [ref] %1 Esc: A, Succ:
 // CHECK-NEXT:    Val [ref] %3 Esc: , Succ: (%4), %0
 // CHECK-NEXT:    Con [int] %4 Esc: A, Succ: (%4.1)
-// CHECK-NEXT:    Con %4.1 Esc: A, Succ: %1
+// CHECK-NEXT:    Con [ref] %4.1 Esc: A, Succ: %1
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %0
 // CHECK-NEXT:  End
 sil @deferringEdge : $@convention(thin) (@owned LinkedNode, @owned LinkedNode) -> @owned LinkedNode {
@@ -158,7 +158,7 @@ bb0:
 // CHECK-NEXT:    Val [ref] %4 Esc: A, Succ: (%2)
 // CHECK-NEXT:    Val [ref] %7 Esc: , Succ: (%2)
 // CHECK-NEXT:    Val [ref] %11 Esc: , Succ: (%2), %7, %13
-// CHECK-NEXT:    Con %13 Esc: A, Succ: %0, %1, %4
+// CHECK-NEXT:    Con [ref] %13 Esc: A, Succ: %0, %1, %4
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %13
 // CHECK-NEXT:  End
 sil @test_linked_list : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
@@ -192,7 +192,7 @@ bb2:
 // CHECK-NEXT:    Val [ref] %4 Esc: A, Succ: (%8)
 // CHECK-NEXT:    Val [ref] %7 Esc: , Succ: (%8)
 // CHECK-NEXT:    Con [int] %8 Esc: A, Succ: (%8.1)
-// CHECK-NEXT:    Con %8.1 Esc: A, Succ: %0, %1, %4
+// CHECK-NEXT:    Con [ref] %8.1 Esc: A, Succ: %0, %1, %4
 // CHECK-NEXT:    Val [ref] %11 Esc: , Succ: (%8), %8.1
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %11
 // CHECK-NEXT:  End
@@ -217,7 +217,7 @@ bb0(%0 : $LinkedNode):
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%3)
 // CHECK-NEXT:    Val [ref] %2 Esc: , Succ: (%3), %0, %4
 // CHECK-NEXT:    Con [int] %3 Esc: A, Succ: (%4)
-// CHECK-NEXT:    Con %4 Esc: A, Succ: (%3)
+// CHECK-NEXT:    Con [ref] %4 Esc: A, Succ: (%3)
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %4
 // CHECK-NEXT:  End
 sil @loadNext : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
@@ -238,14 +238,14 @@ bb2:
 // CHECK-LABEL: CG of call_load_next3
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%0.1)
 // CHECK-NEXT:    Con [int] %0.1 Esc: A, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:    Con [ref] %0.2 Esc: A, Succ: (%0.3)
 // CHECK-NEXT:    Con [int] %0.3 Esc: A, Succ: (%0.4)
-// CHECK-NEXT:    Con %0.4 Esc: A, Succ: (%0.5)
+// CHECK-NEXT:    Con [ref] %0.4 Esc: A, Succ: (%0.5)
 // CHECK-NEXT:    Con [int] %0.5 Esc: A, Succ: (%0.6)
-// CHECK-NEXT:    Con %0.6 Esc: A, Succ:
+// CHECK-NEXT:    Con [ref] %0.6 Esc: A, Succ:
 // CHECK-NEXT:    Val [ref] %2 Esc: , Succ: (%2.1), %0.6
 // CHECK-NEXT:    Con [int] %2.1 Esc: A, Succ: (%2.2)
-// CHECK-NEXT:    Con %2.2 Esc: A, Succ: 
+// CHECK-NEXT:    Con [ref] %2.2 Esc: A, Succ: 
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %2
 // CHECK-NEXT:  End
 sil @call_load_next3 : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
@@ -258,13 +258,13 @@ bb0(%0 : $LinkedNode):
 // CHECK-LABEL: CG of load_next3
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%1)
 // CHECK-NEXT:    Con [int] %1 Esc: A, Succ: (%2)
-// CHECK-NEXT:    Con %2 Esc: A, Succ: (%3)
+// CHECK-NEXT:    Con [ref] %2 Esc: A, Succ: (%3)
 // CHECK-NEXT:    Con [int] %3 Esc: A, Succ: (%4)
-// CHECK-NEXT:    Con %4 Esc: A, Succ: (%5)
+// CHECK-NEXT:    Con [ref] %4 Esc: A, Succ: (%5)
 // CHECK-NEXT:    Con [int] %5 Esc: A, Succ: (%6)
-// CHECK-NEXT:    Con %6 Esc: A, Succ:
+// CHECK-NEXT:    Con [ref] %6 Esc: A, Succ:
 // CHECK-NEXT:    Con [int] %6.1 Esc: A, Succ: (%6.2)
-// CHECK-NEXT:    Con %6.2 Esc: A, Succ:
+// CHECK-NEXT:    Con [ref] %6.2 Esc: A, Succ:
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %6
 // CHECK-NEXT:  End
 sil @load_next3 : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
@@ -593,10 +593,10 @@ sil_global @global_ln : $LinkedNode
 // CHECK-LABEL: CG of load_next_recursive
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%1)
 // CHECK-NEXT:    Con [int] %1 Esc: A, Succ: (%2)
-// CHECK-NEXT:    Con %2 Esc: G, Succ:
+// CHECK-NEXT:    Con [ref] %2 Esc: G, Succ:
 // CHECK-NEXT:    Val [ref] %4 Esc: , Succ: (%4.1), %2
 // CHECK-NEXT:    Con [int] %4.1 Esc: G, Succ: (%4.2)
-// CHECK-NEXT:    Con %4.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con [ref] %4.2 Esc: G, Succ: 
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %4
 // CHECK-NEXT:  End
 sil @load_next_recursive : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
@@ -611,7 +611,7 @@ bb0(%0 : $LinkedNode):
 // CHECK-LABEL: CG of let_escape
 // CHECK-NEXT:    Arg [ref] %0 Esc: G, Succ: (%0.1)
 // CHECK-NEXT:    Con [int] %0.1 Esc: G, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: G, Succ:
+// CHECK-NEXT:    Con [ref] %0.2 Esc: G, Succ:
 // CHECK-NEXT:    Val %1 Esc: , Succ: (%1.1)
 // CHECK-NEXT:    Con [ref] %1.1 Esc: G, Succ: %0
 // CHECK-NEXT:    Val [ref] %4 Esc: , Succ: (%0.1), %0
@@ -631,7 +631,7 @@ bb0(%0 : $LinkedNode):
 // CHECK-NEXT:    Val [ref] %3 Esc: , Succ: (%5.1), %5.2
 // CHECK-NEXT:    Val [ref] %5 Esc: , Succ: (%5.1), %0, %3
 // CHECK-NEXT:    Con [int] %5.1 Esc: G, Succ: (%5.2)
-// CHECK-NEXT:    Con %5.2 Esc: G, Succ: (%5.1)
+// CHECK-NEXT:    Con [ref] %5.2 Esc: G, Succ: (%5.1)
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %5
 // CHECK-NEXT:  End
 sil @return_same : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
@@ -652,12 +652,12 @@ bb2(%5 : $LinkedNode):
 // CHECK-LABEL: CG of loadNext2
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%1)
 // CHECK-NEXT:    Con [int] %1 Esc: A, Succ: (%2)
-// CHECK-NEXT:    Con %2 Esc: A, Succ: (%2.1)
+// CHECK-NEXT:    Con [ref] %2 Esc: A, Succ: (%2.1)
 // CHECK-NEXT:    Con [int] %2.1 Esc: A, Succ: (%2.2)
-// CHECK-NEXT:    Con %2.2 Esc: A, Succ: (%4.1)
+// CHECK-NEXT:    Con [ref] %2.2 Esc: A, Succ: (%4.1)
 // CHECK-NEXT:    Val [ref] %4 Esc: , Succ: (%4.1), %2.2, %4.2
 // CHECK-NEXT:    Con [int] %4.1 Esc: A, Succ: (%4.2)
-// CHECK-NEXT:    Con %4.2 Esc: A, Succ: (%4.1)
+// CHECK-NEXT:    Con [ref] %4.2 Esc: A, Succ: (%4.1)
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %4
 // CHECK-NEXT:  End
 sil @loadNext2 : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
@@ -673,10 +673,10 @@ bb0(%0 : $LinkedNode):
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%5)
 // CHECK-NEXT:    Val [ref] %3 Esc: , Succ: (%8.1), %8.2
 // CHECK-NEXT:    Con [int] %5 Esc: A, Succ: (%6)
-// CHECK-NEXT:    Con %6 Esc: A, Succ: (%8.1)
+// CHECK-NEXT:    Con [ref] %6 Esc: A, Succ: (%8.1)
 // CHECK-NEXT:    Val [ref] %8 Esc: , Succ: (%8.1), %3, %6
 // CHECK-NEXT:    Con [int] %8.1 Esc: A, Succ: (%8.2)
-// CHECK-NEXT:    Con %8.2 Esc: A, Succ: (%8.1)
+// CHECK-NEXT:    Con [ref] %8.2 Esc: A, Succ: (%8.1)
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %8
 // CHECK-NEXT:  End
 sil @returnNext2 : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
@@ -702,7 +702,7 @@ bb3(%8 : $LinkedNode):
 // CHECK-LABEL: CG of single_cycle_recursion
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%2)
 // CHECK-NEXT:    Con [int] %2 Esc: A, Succ: (%3)
-// CHECK-NEXT:    Con %3 Esc: A, Succ: (%2)
+// CHECK-NEXT:    Con [ref] %3 Esc: A, Succ: (%2)
 // CHECK-NEXT:    Val [ref] %5 Esc: , Succ: (%2), %3
 // CHECK-NEXT:    Val [ref] %7 Esc: , Succ: (%2), %0, %5
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %7
@@ -823,7 +823,7 @@ sil @take_y_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Y>) -> ()
 // CHECK-NEXT:    Arg [ref] %0 Esc: G, Succ:
 // CHECK-NEXT:    Val [ref] %2 Esc: , Succ: (%3)
 // CHECK-NEXT:    Con [int] %3 Esc: G, Succ: (%3.1)
-// CHECK-NEXT:    Con %3.1 Esc: G, Succ: %0
+// CHECK-NEXT:    Con [ref] %3.1 Esc: G, Succ: %0
 // CHECK-NEXT:  End
 sil @store_to_unknown_reference : $@convention(thin) (@owned X) -> () {
 bb0(%0 : $X):
@@ -838,7 +838,7 @@ bb0(%0 : $X):
 // CHECK-LABEL: CG of get_reference
 // CHECK-NEXT:    Val [ref] %1 Esc: , Succ: (%1.1)
 // CHECK-NEXT:    Con [int] %1.1 Esc: G, Succ: (%1.2)
-// CHECK-NEXT:    Con %1.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con [ref] %1.2 Esc: G, Succ: 
  // CHECK-NEXT:   Ret [ref] return Esc: , Succ: %1
 // CHECK-NEXT:  End
 sil @get_reference : $@convention(thin) () -> @owned Y {
@@ -858,7 +858,7 @@ sil @unknown_set_y : $@convention(thin) () -> @out Y
 // CHECK-NEXT:    Val %0 Esc: , Succ: (%3)
 // CHECK-NEXT:    Con [ref] %3 Esc: G, Succ:
 // CHECK-NEXT:    Con [int] %3.1 Esc: G, Succ: (%3.2)
-// CHECK-NEXT:    Con %3.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con [ref] %3.2 Esc: G, Succ: 
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %3
 // CHECK-NEXT:  End
 sil @get_y : $@convention(thin) () -> @owned Y {
@@ -875,7 +875,7 @@ bb0:
 // CHECK-NEXT:    Val [ref] %0 Esc: G, Succ: 
 // CHECK-NEXT:    Val [ref] %2 Esc: G, Succ: (%3)
 // CHECK-NEXT:    Con [int] %3 Esc: G, Succ: (%3.1)
-// CHECK-NEXT:    Con %3.1 Esc: G, Succ: %0
+// CHECK-NEXT:    Con [ref] %3.1 Esc: G, Succ: %0
 // CHECK-NEXT:  End
 sil @create_and_store_x : $@convention(thin) () -> () {
 bb0:
@@ -919,7 +919,7 @@ bb1(%7 : $(Pointer, Pointer)):
 // CHECK-NEXT:    Con [ref] %2 Esc: A, Succ: (%6), %4
 // CHECK-NEXT:    Con [ref] %4 Esc: A, Succ: %2
 // CHECK-NEXT:    Con [int] %6 Esc: A, Succ: (%7)
-// CHECK-NEXT:    Con %7 Esc: A, Succ: 
+// CHECK-NEXT:    Con [ref] %7 Esc: A, Succ: 
 // CHECK-NEXT:  End
 sil @defer_edge_cycle : $@convention(thin) (@inout Y, @inout Y) -> () {
 entry(%0 : $*Y, %1 : $*Y):
@@ -1457,7 +1457,7 @@ bb0:
 // CHECK-LABEL: CG of check_escaping_implicit_destructor_invocation_via_strong_release
 // CHECK-NEXT:    Val [ref] %0 Esc: , Succ: (%0.1)
 // CHECK-NEXT:    Con [int] %0.1 Esc: %1, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con [ref] %0.2 Esc: G, Succ: 
 // CHECK-NEXT:  End
 sil @check_escaping_implicit_destructor_invocation_via_strong_release : $@convention(thin) () -> () {
 bb0:
@@ -1474,7 +1474,7 @@ bb0:
 // CHECK-LABEL: CG of check_escaping_implicit_destructor_invocation_via_release_value
 // CHECK-NEXT:    Val [ref] %0 Esc: , Succ: (%0.1)
 // CHECK-NEXT:    Con [int] %0.1 Esc: %1, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con [ref] %0.2 Esc: G, Succ: 
 // CHECK-NEXT:  End
 sil @check_escaping_implicit_destructor_invocation_via_release_value : $@convention(thin) () -> () {
 bb0:
@@ -1544,7 +1544,7 @@ bb0(%0 : $X):
 // CHECK-LABEL: CG of $s4main1ZCfD
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%1)
 // CHECK-NEXT:    Con [int] %1 Esc: A, Succ: (%2)
-// CHECK-NEXT:    Con %2 Esc: G, Succ: 
+// CHECK-NEXT:    Con [ref] %2 Esc: G, Succ: 
 // CHECK-NEXT:    Val %3 Esc: , Succ: (%3.1)
 // CHECK-NEXT:    Con [ref] %3.1 Esc: G, Succ: %2
 // CHECK-NEXT:  End
@@ -1608,7 +1608,7 @@ bb2:
 // CHECK-LABEL: CG of call_coroutine
 // CHECK-NEXT:    Val [ref] %0 Esc: , Succ: (%0.1)
 // CHECK-NEXT:    Con [int] %0.1 Esc: G, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con [ref] %0.2 Esc: G, Succ: 
 // CHECK-NEXT:    Con %0.3 Esc: G, Succ: 
 // CHECK-NEXT:    Val %2 Esc: , Succ: (%2.1)
 // CHECK-NEXT:    Con [ref] %2.1 Esc: G, Succ: %4
@@ -1631,13 +1631,13 @@ bb0:
 // CHECK-LABEL: CG of testInitializePointsToLeaf
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%0.1)
 // CHECK-NEXT:    Con [int] %0.1 Esc: A, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%13)
+// CHECK-NEXT:    Con [ref] %0.2 Esc: A, Succ: (%13)
 // CHECK-NEXT:    Val [ref] %2 Esc: , Succ: (%13), %0.2
 // CHECK-NEXT:    Val [ref] %4 Esc: , Succ: %2
 // CHECK-NEXT:    Val [ref] %7 Esc: , Succ: (%13), %0.2
 // CHECK-NEXT:    Val [ref] %12 Esc: , Succ: (%13), %7
 // CHECK-NEXT:    Con [int] %13 Esc: A, Succ: (%14)
-// CHECK-NEXT:    Con %14 Esc: A, Succ: 
+// CHECK-NEXT:    Con [ref] %14 Esc: A, Succ: 
 // CHECK-LABEL: End
 class C {
   var c: C
@@ -1688,7 +1688,7 @@ bb10(%arg2 : $LinkedNode):
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%2)
 // CHECK-NEXT:    Arg [ref] %1 Esc: A, Succ: (%2)
 // CHECK-NEXT:    Con [int] %2 Esc: A, Succ: (%3)
-// CHECK-NEXT:    Con %3 Esc: A, Succ: 
+// CHECK-NEXT:    Con [ref] %3 Esc: A, Succ: 
 // CHECK-NEXT:    Val [ref] %7 Esc: , Succ: %0
 // CHECK-NEXT:    Val [ref] %12 Esc: , Succ: %1
 // CHECK-NEXT:    Val [ref] %14 Esc: , Succ: (%2), %1, %12
@@ -1816,48 +1816,4 @@ bb0(%0 : $IntWrapper):
   strong_release %0 : $IntWrapper
   %tuple = tuple (%bridge : $Builtin.BridgeObject, %ump : $UnsafeMutablePointer<Int64>)
   return %tuple : $(Builtin.BridgeObject, UnsafeMutablePointer<Int64>)
-}
-
-// =============================================================================
-// Test call to array.uninitialized that has extra release_value uses
-
-class DummyArrayStorage<Element> {
-  @_hasStorage var count: Int { get }
-  @_hasStorage var capacity: Int { get }
-  init()
-}
-
-// init_any_array_with_buffer
-sil [_semantics "array.uninitialized"] @init_any_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<AnyObject>, Int32, @thin Array<AnyObject>.Type) -> (@owned Array<AnyObject>, UnsafeMutablePointer<AnyObject>)
-
-// CHECK-LABEL: CG of testBadArrayUninit
-// CHECK-NEXT:  Val [ref] %2 Esc: , Succ: (%2.1)
-// CHECK-NEXT:  Con [int] %2.1 Esc: G, Succ: (%2.2)
-// CHECK-NEXT:  Con %2.2 Esc: G, Succ:
-// CHECK-NEXT:  Val %5 Esc: , Succ: (%5.1)
-// CHECK-NEXT:  Con %5.1 Esc: G, Succ: %10
-// CHECK-NEXT:  Val [ref] %10 Esc: G, Succ: (%10.1)
-// CHECK-NEXT:  Con %10.1 Esc: G, Succ:
-// CHECK-LABEL: End
-sil hidden @testBadArrayUninit : $@convention(thin) (Builtin.Word, Int32) -> () {
-bb0(%0 : $Builtin.Word, %1 : $Int32):
-  // create an array
-  %2 = alloc_ref [tail_elems $AnyObject * %0 : $Builtin.Word] $DummyArrayStorage<AnyObject>
-  %3 = metatype $@thin Array<AnyObject>.Type
-  %4 = function_ref @init_any_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<AnyObject>, Int32, @thin Array<AnyObject>.Type) -> (@owned Array<AnyObject>, UnsafeMutablePointer<AnyObject>)
-  %5 = apply %4(%2, %1, %3) : $@convention(thin) (@owned DummyArrayStorage<AnyObject>, Int32, @thin Array<AnyObject>.Type) -> (@owned Array<AnyObject>, UnsafeMutablePointer<AnyObject>)
-  %6 = tuple_extract %5 : $(Array<AnyObject>, UnsafeMutablePointer<AnyObject>), 0
-  %7 = tuple_extract %5 : $(Array<AnyObject>, UnsafeMutablePointer<AnyObject>), 1
-  %8 = struct_extract %7 : $UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
-  %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*AnyObject
-
-  // store an elt
-  %10 = alloc_ref $C
-  %11 = init_existential_ref %10 : $C : $C, $AnyObject
-  store %11 to %9 : $*AnyObject
-
-  // extra use of the call
-  release_value %5 : $(Array<AnyObject>, UnsafeMutablePointer<AnyObject>) // id: %228
-  %13 = tuple ()
-  return %13 : $()
 }

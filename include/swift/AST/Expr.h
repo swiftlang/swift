@@ -503,7 +503,7 @@ public:
 
   /// Retrieves the declaration that is being referenced by this
   /// expression, if any.
-  ConcreteDeclRef getReferencedDecl() const;
+  ConcreteDeclRef getReferencedDecl(bool stopAtParenExpr = false) const;
 
   /// Determine whether this expression is 'super', possibly converted to
   /// a base class.
@@ -1049,6 +1049,20 @@ public:
   enum Kind : unsigned {
     File, FilePath, Line, Column, Function, DSOHandle
   };
+
+  static StringRef getKindString(MagicIdentifierLiteralExpr::Kind value) {
+    switch (value) {
+      case File: return "#file";
+      case FilePath: return "#filePath";
+      case Function: return "#function";
+      case Line: return "#line";
+      case Column: return "#column";
+      case DSOHandle: return "#dsohandle";
+    }
+
+    llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in getKindString.");
+  }
+
 private:
   SourceLoc Loc;
   ConcreteDeclRef BuiltinInitializer;
@@ -3599,7 +3613,10 @@ class ClosureExpr : public AbstractClosureExpr {
   /// the CaptureListExpr which would normally maintain this sort of
   /// information about captured variables), we need to have some way to access
   /// this information directly on the ClosureExpr.
-  VarDecl *CapturedSelfDecl;
+  ///
+  /// The bit indicates whether this closure has had a function builder
+  /// applied to it.
+  llvm::PointerIntPair<VarDecl *, 1, bool> CapturedSelfDeclAndAppliedBuilder;
   
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
@@ -3624,7 +3641,8 @@ public:
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      BracketRange(bracketRange), CapturedSelfDecl(capturedSelfDecl),
+      BracketRange(bracketRange),
+      CapturedSelfDeclAndAppliedBuilder(capturedSelfDecl, false),
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
       ExplicitResultType(explicitResultType), Body(nullptr) {
     setParameterList(params);
@@ -3726,12 +3744,22 @@ public:
   bool hasEmptyBody() const;
 
   /// VarDecl captured by this closure under the literal name \c self , if any.
-  VarDecl *getCapturedSelfDecl() const { return CapturedSelfDecl; }
+  VarDecl *getCapturedSelfDecl() const {
+    return CapturedSelfDeclAndAppliedBuilder.getPointer();
+  }
   
   /// Whether this closure captures the \c self param in its body in such a
   /// way that implicit \c self is enabled within its body (i.e. \c self is
   /// captured non-weakly).
   bool capturesSelfEnablingImplictSelf() const;
+
+  bool hasAppliedFunctionBuilder() const {
+    return CapturedSelfDeclAndAppliedBuilder.getInt();
+  }
+
+  void setAppliedFunctionBuilder(bool flag = true) {
+    CapturedSelfDeclAndAppliedBuilder.setInt(flag);
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
@@ -3923,6 +3951,10 @@ public:
   /// is injected before type checking to act as a placeholder for some
   /// value to be specified later.
   bool isPlaceholder() const { return Bits.OpaqueValueExpr.IsPlaceholder; }
+
+  void setIsPlaceholder(bool value) {
+    Bits.OpaqueValueExpr.IsPlaceholder = value;
+  }
 
   SourceRange getSourceRange() const { return Range; }
 

@@ -68,6 +68,47 @@ void SuperclassDeclRequest::cacheResult(ClassDecl *value) const {
 }
 
 //----------------------------------------------------------------------------//
+// Missing designated initializers computation
+//----------------------------------------------------------------------------//
+
+Optional<bool> HasMissingDesignatedInitializersRequest::getCachedResult() const {
+  auto classDecl = std::get<0>(getStorage());
+  return classDecl->getCachedHasMissingDesignatedInitializers();
+}
+
+void HasMissingDesignatedInitializersRequest::cacheResult(bool result) const {
+  auto classDecl = std::get<0>(getStorage());
+  classDecl->setHasMissingDesignatedInitializers(result);
+}
+
+llvm::Expected<bool>
+HasMissingDesignatedInitializersRequest::evaluate(Evaluator &evaluator,
+                                           ClassDecl *subject) const {
+  // Short-circuit and check for the attribute here.
+  if (subject->getAttrs().hasAttribute<HasMissingDesignatedInitializersAttr>())
+    return true;
+
+  AccessScope scope =
+    subject->getFormalAccessScope(/*useDC*/nullptr,
+                                  /*treatUsableFromInlineAsPublic*/true);
+  // This flag only makes sense for public types that will be written in the
+  // module.
+  if (!scope.isPublic())
+    return false;
+
+  auto constructors = subject->lookupDirect(DeclBaseName::createConstructor());
+  return llvm::any_of(constructors, [&](ValueDecl *decl) {
+    auto init = cast<ConstructorDecl>(decl);
+    if (!init->isDesignatedInit())
+      return false;
+    AccessScope scope =
+        init->getFormalAccessScope(/*useDC*/nullptr,
+                                   /*treatUsableFromInlineAsPublic*/true);
+    return !scope.isPublic();
+  });
+}
+
+//----------------------------------------------------------------------------//
 // Extended nominal computation.
 //----------------------------------------------------------------------------//
 Optional<NominalTypeDecl *> ExtendedNominalRequest::getCachedResult() const {

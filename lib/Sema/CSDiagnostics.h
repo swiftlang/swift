@@ -554,9 +554,12 @@ public:
 
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
+  
+  /// Diagnose failed conversion in a `CoerceExpr`.
+  bool diagnoseCoercionToUnrelatedType() const;
 
-  // If we're trying to convert something of type "() -> T" to T,
-  // then we probably meant to call the value.
+  /// If we're trying to convert something of type "() -> T" to T,
+  /// then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
 
   /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
@@ -1207,6 +1210,8 @@ public:
 
   bool diagnoseAsError() override;
 
+  bool diagnoseAsNote() override;
+
   bool diagnoseSingleMissingArgument() const;
 
 private:
@@ -1371,11 +1376,11 @@ public:
   bool diagnoseAsError() override;
 };
 
-// Diagnose an attempt to use AnyObject as the root type of a KeyPath
-//
-// ```swift
-// let keyPath = \AnyObject.bar
-// ```
+/// Diagnose an attempt to use AnyObject as the root type of a KeyPath
+///
+/// ```swift
+/// let keyPath = \AnyObject.bar
+/// ```
 class AnyObjectKeyPathRootFailure final : public FailureDiagnostic {
 
 public:
@@ -1916,6 +1921,15 @@ class UnableToInferClosureReturnType final : public FailureDiagnostic {
 public:
   UnableToInferClosureReturnType(ConstraintSystem &cs,
                                  ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator) {}
+
+  bool diagnoseAsError();
+};
+
+class UnableToInferProtocolLiteralType final : public FailureDiagnostic {
+public:
+  UnableToInferProtocolLiteralType(ConstraintSystem &cs,
+                                   ConstraintLocator *locator)
       : FailureDiagnostic(cs, locator) {}
 
   bool diagnoseAsError();

@@ -201,6 +201,11 @@ protected:
   void getResourceDirPath(SmallVectorImpl<char> &runtimeLibPath,
                           const llvm::opt::ArgList &args, bool shared) const;
 
+  /// Get the secondary runtime library link path given the primary path.
+  void getSecondaryResourceDirPath(
+      SmallVectorImpl<char> &secondaryResourceDirPath,
+      StringRef primaryPath) const;
+
   /// Get the runtime library link paths, which typically include the resource
   /// dir path and the SDK.
   void getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibPaths,
@@ -310,7 +315,8 @@ public:
   /// An override point for platform-specific subclasses to customize the
   /// validations that should be performed.
   virtual void validateArguments(DiagnosticEngine &diags,
-                                 const llvm::opt::ArgList &args) const {}
+                                 const llvm::opt::ArgList &args,
+                                 StringRef defaultTarget) const {}
 };
 } // end namespace driver
 } // end namespace swift

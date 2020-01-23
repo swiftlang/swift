@@ -19,6 +19,7 @@
 
 #include <cstdint>
 
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Type.h"
@@ -28,6 +29,7 @@
 namespace swift {
 
 class AnyFunctionType;
+class TupleType;
 
 /// A function type differentiability kind.
 enum class DifferentiabilityKind : uint8_t {
@@ -68,6 +70,25 @@ struct AutoDiffDerivativeFunctionKind {
   AutoDiffLinearMapKind getLinearMapKind() {
     return (AutoDiffLinearMapKind::innerty)rawValue;
   }
+};
+
+/// Identifies an autodiff derivative function configuration:
+/// - Parameter indices.
+/// - Result indices.
+/// - Derivative generic signature (optional).
+struct AutoDiffConfig {
+  IndexSubset *parameterIndices;
+  IndexSubset *resultIndices;
+  GenericSignature derivativeGenericSignature;
+
+  /*implicit*/ AutoDiffConfig(IndexSubset *parameterIndices,
+                              IndexSubset *resultIndices,
+                              GenericSignature derivativeGenericSignature)
+      : parameterIndices(parameterIndices), resultIndices(resultIndices),
+        derivativeGenericSignature(derivativeGenericSignature) {}
+
+  void print(llvm::raw_ostream &s = llvm::outs()) const;
+  SWIFT_DEBUG_DUMP;
 };
 
 class ParsedAutoDiffParameter {
@@ -133,6 +154,74 @@ public:
   }
 };
 
+/// The tangent space of a type.
+///
+/// For `Differentiable`-conforming types:
+/// - The tangent space is the `TangentVector` associated type.
+///
+/// For tuple types:
+/// - The tangent space is a tuple of the elements' tangent space types, for the
+///   elements that have a tangent space.
+///
+/// Other types have no tangent space.
+class TangentSpace {
+public:
+  /// A tangent space kind.
+  enum class Kind {
+    /// The `TangentVector` associated type of a `Differentiable`-conforming
+    /// type.
+    TangentVector,
+    /// A product of tangent spaces as a tuple.
+    Tuple
+  };
+
+private:
+  Kind kind;
+  union Value {
+    // TangentVector
+    Type tangentVectorType;
+    // Tuple
+    TupleType *tupleType;
+
+    Value(Type tangentVectorType) : tangentVectorType(tangentVectorType) {}
+    Value(TupleType *tupleType) : tupleType(tupleType) {}
+  } value;
+
+  TangentSpace(Kind kind, Value value) : kind(kind), value(value) {}
+
+public:
+  TangentSpace() = delete;
+
+  static TangentSpace getTangentVector(Type tangentVectorType) {
+    return {Kind::TangentVector, tangentVectorType};
+  }
+  static TangentSpace getTuple(TupleType *tupleTy) {
+    return {Kind::Tuple, tupleTy};
+  }
+
+  bool isTangentVector() const { return kind == Kind::TangentVector; }
+  bool isTuple() const { return kind == Kind::Tuple; }
+
+  Kind getKind() const { return kind; }
+  Type getTangentVector() const {
+    assert(kind == Kind::TangentVector);
+    return value.tangentVectorType;
+  }
+  TupleType *getTuple() const {
+    assert(kind == Kind::Tuple);
+    return value.tupleType;
+  }
+
+  /// Get the tangent space type.
+  Type getType() const;
+
+  /// Get the tangent space canonical type.
+  CanType getCanonicalType() const;
+
+  /// Get the underlying nominal type declaration of the tangent space type.
+  NominalTypeDecl *getNominal() const;
+};
+
 /// Automatic differentiation utility namespace.
 namespace autodiff {
 
@@ -148,9 +237,58 @@ void getSubsetParameterTypes(IndexSubset *indices, AnyFunctionType *type,
 
 namespace llvm {
 
+using swift::AutoDiffConfig;
 using swift::AutoDiffDerivativeFunctionKind;
+using swift::GenericSignature;
+using swift::IndexSubset;
 
 template <typename T> struct DenseMapInfo;
+
+template <> struct DenseMapInfo<AutoDiffConfig> {
+  static AutoDiffConfig getEmptyKey() {
+    auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
+    // The `derivativeGenericSignature` component must be `nullptr` so that
+    // `getHashValue` and `isEqual` do not try to call
+    // `GenericSignatureImpl::getCanonicalSignature()` on an invalid pointer.
+    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
+            nullptr};
+  }
+
+  static AutoDiffConfig getTombstoneKey() {
+    auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
+    // The `derivativeGenericSignature` component must be `nullptr` so that
+    // `getHashValue` and `isEqual` do not try to call
+    // `GenericSignatureImpl::getCanonicalSignature()` on an invalid pointer.
+    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
+            nullptr};
+  }
+
+  static unsigned getHashValue(const AutoDiffConfig &Val) {
+    auto canGenSig =
+        Val.derivativeGenericSignature
+            ? Val.derivativeGenericSignature->getCanonicalSignature()
+            : nullptr;
+    unsigned combinedHash = hash_combine(
+        ~1U, DenseMapInfo<void *>::getHashValue(Val.parameterIndices),
+        DenseMapInfo<void *>::getHashValue(Val.resultIndices),
+        DenseMapInfo<GenericSignature>::getHashValue(canGenSig));
+    return combinedHash;
+  }
+
+  static bool isEqual(const AutoDiffConfig &LHS, const AutoDiffConfig &RHS) {
+    auto lhsCanGenSig =
+        LHS.derivativeGenericSignature
+            ? LHS.derivativeGenericSignature->getCanonicalSignature()
+            : nullptr;
+    auto rhsCanGenSig =
+        RHS.derivativeGenericSignature
+            ? RHS.derivativeGenericSignature->getCanonicalSignature()
+            : nullptr;
+    return LHS.parameterIndices == RHS.parameterIndices &&
+           LHS.resultIndices == RHS.resultIndices &&
+           DenseMapInfo<GenericSignature>::isEqual(lhsCanGenSig, rhsCanGenSig);
+  }
+};
 
 template <> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
   static AutoDiffDerivativeFunctionKind getEmptyKey() {

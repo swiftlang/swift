@@ -932,6 +932,45 @@ static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
   llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
+/// Create a fix-it string for the 'decodable_suggest_overriding_init_here' and
+/// optionally, the 'codable_suggest_overriding_init_here' diagnostics.
+static std::string getFixItStringForDecodable(ClassDecl *CD,
+                                              bool includeEncodeTo) {
+  auto &ctx = CD->getASTContext();
+  SourceLoc indentationLoc = CD->getBraces().End;
+  StringRef extraIndentation;
+  StringRef indentation = Lexer::getIndentationForLine(
+      ctx.SourceMgr, indentationLoc, &extraIndentation);
+  std::string fixItStringToReturn;
+  {
+    llvm::raw_string_ostream out(fixItStringToReturn);
+    ExtraIndentStreamPrinter printer(out, indentation);
+
+    printer.printNewline();
+    printer << "override init(from decoder: Decoder) throws";
+
+    // Add a dummy body.
+    auto printDummyBody = [&]() {
+      printer << " {";
+      printer.printNewline();
+      printer << extraIndentation << getCodePlaceholder();
+      printer.printNewline();
+      printer << "}";
+    };
+
+    printDummyBody();
+
+    if (includeEncodeTo) {
+      printer.printNewline();
+      printer.printNewline();
+      printer << "override func encode(to encoder: Encoder) throws";
+      printDummyBody();
+    }
+  }
+
+  return fixItStringToReturn;
+}
+
 /// Diagnose a class that does not have any initializers.
 static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   ASTContext &C = classDecl->getASTContext();
@@ -950,7 +989,6 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   // It is helpful to suggest here that the user may have forgotten to override
   // init(from:) (and encode(to:), if applicable) in a note, before we start
   // listing the members that prevented initializer synthesis.
-  // TODO: Add a fixit along with this suggestion.
   if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
@@ -975,6 +1013,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
         diagDest = result.front().getValueDecl();
 
       auto diagName = diag::decodable_suggest_overriding_init_here;
+      auto shouldEmitFixItForEncodeTo = false;
 
       // This is also a bit of a hack, but the best place we've got at the
       // moment to suggest this.
@@ -992,11 +1031,18 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
         // The direct lookup here won't see an encode(to:) if it is inherited
         // from the superclass.
         auto encodeTo = DeclName(C, C.Id_encode, C.Id_to);
-        if (classDecl->lookupDirect(encodeTo).empty())
+        if (classDecl->lookupDirect(encodeTo).empty()) {
           diagName = diag::codable_suggest_overriding_init_here;
+          shouldEmitFixItForEncodeTo = true;
+        }
       }
 
-      C.Diags.diagnose(diagDest, diagName);
+      auto insertionLoc =
+          Lexer::getLocForEndOfLine(C.SourceMgr, classDecl->getBraces().Start);
+      auto fixItString =
+          getFixItStringForDecodable(classDecl, shouldEmitFixItForEncodeTo);
+      C.Diags.diagnose(diagDest, diagName)
+          .fixItInsert(insertionLoc, fixItString);
     }
   }
 
@@ -1103,6 +1149,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
 
   auto *superclassDecl = classDecl->getSuperclassDecl();
   if (superclassDecl &&
+      superclassDecl->getModuleContext() != classDecl->getModuleContext() &&
       superclassDecl->hasMissingDesignatedInitializers())
     return;
 

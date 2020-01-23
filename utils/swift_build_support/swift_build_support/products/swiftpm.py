@@ -58,7 +58,7 @@ class SwiftPM(product.Product):
         shell.call(helper_cmd)
 
     def build(self, host_target):
-        self.run_bootstrap_script('build', host_target)
+        self.run_bootstrap_script('build', host_target, ["--reconfigure"])
 
     def should_test(self, host_target):
         return self.args.test_swiftpm

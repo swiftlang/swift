@@ -62,8 +62,12 @@ void Evaluator::registerRequestFunctions(
   requestFunctionsByZone.push_back({zoneID, functions});
 }
 
-Evaluator::Evaluator(DiagnosticEngine &diags, bool debugDumpCycles)
-  : diags(diags), debugDumpCycles(debugDumpCycles) { }
+Evaluator::Evaluator(DiagnosticEngine &diags,
+                     bool debugDumpCycles,
+                     bool buildDependencyGraph)
+  : diags(diags),
+    debugDumpCycles(debugDumpCycles),
+    buildDependencyGraph(buildDependencyGraph) { }
 
 void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   std::error_code error;
@@ -72,9 +76,11 @@ void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
 }
 
 bool Evaluator::checkDependency(const AnyRequest &request) {
-  // If there is an active request, record it's dependency on this request.
-  if (!activeRequests.empty())
-    dependencies[activeRequests.back()].push_back(request);
+  if (buildDependencyGraph) {
+    // If there is an active request, record it's dependency on this request.
+    if (!activeRequests.empty())
+      dependencies[activeRequests.back()].push_back(request);
+  }
 
   // Record this as an active request.
   if (activeRequests.insert(request)) {

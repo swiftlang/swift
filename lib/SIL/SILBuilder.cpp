@@ -110,19 +110,6 @@ ProjectBoxInst *SILBuilder::createProjectBox(SILLocation Loc,
       getSILDebugLocation(Loc), boxOperand, index, fieldTy));
 }
 
-// If legal, create an unchecked_ref_cast from the given operand and result
-// type, otherwise return null.
-SingleValueInstruction *
-SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc, SILValue Op,
-                                      SILType ResultTy) {
-  if (!SILType::canRefCast(Op->getType(), ResultTy, getModule()))
-    return nullptr;
-
-  return insert(UncheckedRefCastInst::create(getSILDebugLocation(Loc), Op,
-                                             ResultTy, getFunction(),
-                                             C.OpenedArchetypes));
-}
-
 ClassifyBridgeObjectInst *
 SILBuilder::createClassifyBridgeObject(SILLocation Loc, SILValue value) {
   auto &ctx = getASTContext();
@@ -142,8 +129,8 @@ SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
     return insert(UncheckedTrivialBitCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
 
-  if (auto refCast = tryCreateUncheckedRefCast(Loc, Op, Ty))
-    return refCast;
+  if (SILType::canRefCast(Op->getType(), Ty, getModule()))
+    return createUncheckedRefCast(Loc, Op, Ty);
 
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.

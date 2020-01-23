@@ -1534,7 +1534,7 @@ class infer_instanceVar2<
 }
 
 class infer_instanceVar3 : Class_ObjC1 {
-// CHECK-LABEL: @objc class infer_instanceVar3 : Class_ObjC1 {
+// CHECK-LABEL: @objc @_inheritsConvenienceInitializers class infer_instanceVar3 : Class_ObjC1 {
 
   var v1: Int = 0
 // CHECK-LABEL: @objc @_hasInitialValue var v1: Int
@@ -1599,13 +1599,13 @@ protocol infer_throughConformanceProto1 {
 }
 
 class infer_class1 : PlainClass {}
-// CHECK-LABEL: {{^}}class infer_class1 : PlainClass {
+// CHECK-LABEL: {{^}}@_inheritsConvenienceInitializers class infer_class1 : PlainClass {
 
 class infer_class2 : Class_ObjC1 {}
-// CHECK-LABEL: @objc class infer_class2 : Class_ObjC1 {
+// CHECK-LABEL: @objc @_inheritsConvenienceInitializers class infer_class2 : Class_ObjC1 {
 
 class infer_class3 : infer_class2 {}
-// CHECK-LABEL: @objc class infer_class3 : infer_class2 {
+// CHECK-LABEL: @objc @_inheritsConvenienceInitializers class infer_class3 : infer_class2 {
 
 class infer_class4 : Protocol_Class1 {}
 // CHECK-LABEL: {{^}}class infer_class4 : Protocol_Class1 {

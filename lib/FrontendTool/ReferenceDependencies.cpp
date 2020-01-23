@@ -252,7 +252,7 @@ ProvidesEmitter::emitTopLevelNames() const {
   out << providesTopLevel << ":\n";
 
   CollectedDeclarations cpd;
-  for (const Decl *D : SF->Decls)
+  for (const Decl *D : SF->getTopLevelDecls())
     emitTopLevelDecl(D, cpd);
   for (auto *operatorFunction : cpd.memberOperatorDecls)
     out << "- \"" << escape(operatorFunction->getName()) << "\"\n";

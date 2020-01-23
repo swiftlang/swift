@@ -472,14 +472,15 @@ UseSubscriptOperator *UseSubscriptOperator::create(ConstraintSystem &cs,
 bool DefineMemberBasedOnUse::diagnose(bool asNote) const {
   auto failure = MissingMemberFailure(getConstraintSystem(), BaseType,
                                       Name, getLocator());
-  return failure.diagnose(asNote);
+  return AlreadyDiagnosed || failure.diagnose(asNote);
 }
 
 DefineMemberBasedOnUse *
 DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
-                               DeclNameRef member, ConstraintLocator *locator) {
+                               DeclNameRef member, bool alreadyDiagnosed,
+                               ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      DefineMemberBasedOnUse(cs, baseType, member, locator);
+      DefineMemberBasedOnUse(cs, baseType, member, alreadyDiagnosed, locator);
 }
 
 AllowMemberRefOnExistential *
@@ -1166,4 +1167,16 @@ SpecifyClosureReturnType *
 SpecifyClosureReturnType::create(ConstraintSystem &cs,
                                  ConstraintLocator *locator) {
   return new (cs.getAllocator()) SpecifyClosureReturnType(cs, locator);
+}
+
+bool SpecifyObjectLiteralTypeImport::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+  UnableToInferProtocolLiteralType failure(cs, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyObjectLiteralTypeImport *
+SpecifyObjectLiteralTypeImport::create(ConstraintSystem &cs,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SpecifyObjectLiteralTypeImport(cs, locator);
 }

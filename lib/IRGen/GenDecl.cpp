@@ -431,7 +431,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   llvm::SaveAndRestore<SourceFile *> SetCurSourceFile(CurSourceFile, &SF);
 
   // Emit types and other global decls.
-  for (auto *decl : SF.Decls)
+  for (auto *decl : SF.getTopLevelDecls())
     emitGlobalDecl(decl);
   for (auto *localDecl : SF.LocalTypeDecls)
     emitGlobalDecl(localDecl);
@@ -1091,7 +1091,7 @@ void IRGenModule::finishEmitAfterTopLevel() {
   if (DebugInfo) {
     if (ModuleDecl *TheStdlib = Context.getStdlibModule()) {
       if (TheStdlib != getSwiftModule()) {
-        std::pair<swift::Identifier, swift::SourceLoc> AccessPath[] = {
+        Located<swift::Identifier> AccessPath[] = {
           { Context.StdlibModuleName, swift::SourceLoc() }
         };
 
@@ -1129,6 +1129,7 @@ void IRGenerator::emitTypeMetadataRecords() {
 /// else) that we require.
 void IRGenerator::emitLazyDefinitions() {
   while (!LazyTypeMetadata.empty() ||
+         !LazySpecializedTypeMetadataRecords.empty() ||
          !LazyTypeContextDescriptors.empty() ||
          !LazyOpaqueTypeDescriptors.empty() ||
          !LazyFieldDescriptors.empty() ||
@@ -1144,6 +1145,12 @@ void IRGenerator::emitLazyDefinitions() {
       entry.IsMetadataEmitted = true;
       CurrentIGMPtr IGM = getGenModule(type->getDeclContext());
       emitLazyTypeMetadata(*IGM.get(), type);
+    }
+    while (!LazySpecializedTypeMetadataRecords.empty()) {
+      CanType type = LazySpecializedTypeMetadataRecords.pop_back_val();
+      auto *nominal = type->getNominalOrBoundGenericNominal();
+      CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
+      emitLazySpecializedGenericTypeMetadata(*IGM.get(), type);
     }
     while (!LazyTypeContextDescriptors.empty()) {
       NominalTypeDecl *type = LazyTypeContextDescriptors.pop_back_val();
@@ -1185,6 +1192,12 @@ void IRGenerator::emitLazyDefinitions() {
     }
   }
 
+  while (!LazyMetadataAccessors.empty()) {
+    NominalTypeDecl *nominal = LazyMetadataAccessors.pop_back_val();
+    CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
+    emitLazyMetadataAccessor(*IGM.get(), nominal);
+  }
+
   FinishedEmittingLazyDefinitions = true;
 }
 
@@ -1195,6 +1208,16 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
 
   assert(!FinishedEmittingLazyDefinitions);
   LazyFunctionDefinitions.push_back(f);
+
+  if (const SILFunction *orig = f->getOriginOfSpecialization()) {
+    // f is a specialization. Try to emit all specializations of the same
+    // original function into the same IGM. This increases the chances that
+    // specializations are merged by LLVM's function merging.
+    auto iter =
+      IGMForSpecializations.insert(std::make_pair(orig, CurrentIGM)).first;
+    DefaultIGMForFunction.insert(std::make_pair(f, iter->second));
+    return;
+  }
 
   if (auto *dc = f->getDeclContext())
     if (dc->getParentSourceFile())
@@ -1264,27 +1287,6 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
   if (auto proto = dyn_cast<ProtocolDecl>(type)) {
     if (proto->isObjC()) {
       PrimaryIGM->getAddrOfObjCProtocolRecord(proto, NotForDefinition);
-      return;
-    }
-  }
-
-  // Force emission of ObjC class refs used by type refs.
-  //
-  // Otherwise, autolinking can fail if we try to load the class decl from the
-  // name of the class.
-  if (auto *classDecl = dyn_cast<ClassDecl>(type)) {
-    // The logic behind this predicate is that:
-    //
-    // 1. We need to check if a class decl is foreign to exclude CF classes.
-    //
-    // 2. We want to check that the class decl is objc to exclude c++ classes in
-    //    the future.
-    //
-    // 3. We check that we have a clang node since we want to ensure we have
-    //    something coming from clang, rather than from swift which does not
-    //    have this issue.
-    if (classDecl->hasClangNode() && classDecl->isObjC() && !classDecl->isForeign()) {
-      PrimaryIGM->getAddrOfObjCClassRef(classDecl);
       return;
     }
   }
@@ -1360,6 +1362,18 @@ void IRGenerator::noteUseOfFieldDescriptor(NominalTypeDecl *type) {
 
   assert(!FinishedEmittingLazyDefinitions);
   LazyFieldDescriptors.push_back(type);
+}
+
+void IRGenerator::noteUseOfSpecializedGenericTypeMetadata(CanType type) {
+  auto key = type->getAnyNominal();
+  assert(key);
+  auto &enqueuedSpecializedTypes = this->SpecializationsForGenericTypes[key];
+  if (llvm::all_of(enqueuedSpecializedTypes,
+                   [&](CanType enqueued) { return enqueued != type; })) {
+    assert(!FinishedEmittingLazyDefinitions);
+    this->LazySpecializedTypeMetadataRecords.push_back(type);
+    enqueuedSpecializedTypes.push_back(type);
+  }
 }
 
 void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
@@ -3646,8 +3660,11 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   if (nominal)
     addRuntimeResolvableType(nominal);
 
-  // Don't define the alias for foreign type metadata, since it's not ABI.
-  if (nominal && requiresForeignTypeMetadata(nominal))
+  // Don't define the alias for foreign type metadata or prespecialized generic
+  // metadata, since neither is ABI.
+  if ((nominal && requiresForeignTypeMetadata(nominal)) ||
+      (concreteType->getAnyGeneric() &&
+       concreteType->getAnyGeneric()->isGenericContext()))
     return var;
 
   // For concrete metadata, declare the alias to its address point.
@@ -3682,9 +3699,13 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-  
+
+  bool fullMetadata = (nominal && requiresForeignTypeMetadata(nominal)) ||
+                      (concreteType->getAnyGeneric() &&
+                       concreteType->getAnyGeneric()->isGenericContext());
+
   // Foreign classes reference the full metadata with a GEP.
-  if (nominal && requiresForeignTypeMetadata(nominal)) {
+  if (fullMetadata) {
     defaultVarTy = FullTypeMetadataStructTy;
     adjustmentIndex = MetadataAdjustmentIndex::ValueType;
   // The symbol for other nominal type metadata is generated at the address
@@ -3709,10 +3730,18 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     IRGen.noteUseOfTypeMetadata(nominal);
   }
 
+  if (shouldPrespecializeGenericMetadata()) {
+    if (auto nominal = concreteType->getAnyNominal()) {
+      if (nominal->isGenericContext()) {
+        IRGen.noteUseOfSpecializedGenericTypeMetadata(concreteType);
+      }
+    }
+  }
+
   Optional<LinkEntity> entity;
   DebugTypeInfo DbgTy;
 
-  if (nominal && requiresForeignTypeMetadata(nominal)) {
+  if (fullMetadata) {
     entity = LinkEntity::forTypeMetadata(concreteType,
                                          TypeMetadataAddress::FullMetadata);
     DbgTy = DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
@@ -4029,10 +4058,6 @@ Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
 llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
                                                    ValueWitness index,
                                                 ForDefinition_t forDefinition) {
-  // We shouldn't emit value witness symbols for generic type instances.
-  assert(!isa<BoundGenericType>(abstractType) &&
-         "emitting value witness for generic type instance?!");
-  
   LinkEntity entity = LinkEntity::forValueWitness(abstractType, index);
 
   llvm::Function *&entry = GlobalFuncs[entity];

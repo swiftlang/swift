@@ -160,9 +160,9 @@ struct Text : P {
   init(_: T) {}
 }
 
-struct Label<L> : P where L : P { // expected-note {{'L' declared as parameter to type 'Label'}}
+struct Label<L> : P where L : P { // expected-note 2 {{'L' declared as parameter to type 'Label'}}
   typealias T = L
-  init(@Builder _: () -> L) {}
+  init(@Builder _: () -> L) {} // expected-note {{'init(_:)' declared here}}
 }
 
 func test_51167632() -> some P {
@@ -170,6 +170,15 @@ func test_51167632() -> some P {
     Text("hello")
     Label  // expected-error {{generic parameter 'L' could not be inferred}}
     // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
+  })
+}
+
+func test_56221372() -> some P {
+  AnyP(G {
+    Text("hello")
+    Label() // expected-error {{generic parameter 'L' could not be inferred}}
+    // expected-error@-1 {{missing argument for parameter #1 in call}}
+    // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
   })
 }
 
@@ -211,7 +220,7 @@ func erroneousSR11350(x: Int) {
       if b {
         acceptInt(0) { }
       }
-    }).domap(0) // expected-error{{value of type 'Optional<()>' has no member 'domap'}}
+    }).domap(0) // expected-error{{value of type '()?' has no member 'domap'}}
   }
 }
 
@@ -233,4 +242,17 @@ tuplify(true) { x in
   "hello"
   #warning("oops")  // expected-warning{{oops}}
   3.14159
+}
+
+struct MyTuplifiedStruct {
+  var condition: Bool
+
+  @TupleBuilder var computed: some Any { // expected-note{{remove the attribute to explicitly disable the function builder}}{{3-17=}}
+    if condition {
+      return 17 // expected-warning{{application of function builder 'TupleBuilder' disabled by explicit 'return' statement}}
+      // expected-note@-1{{remove 'return' statements to apply the function builder}}{{7-14=}}{{12-19=}}
+    } else {
+           return 42
+    }
+  }
 }

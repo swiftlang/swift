@@ -419,6 +419,11 @@ NOTE(constexpr_untracked_sil_value_use_found, none,
 NOTE(constexpr_untracked_sil_value_used_here, none,
     "untracked variable used %select{here|by this call}0", (bool))
 
+NOTE(constexpr_unevaluable_cast_found, none,
+    "encountered an unevaluable cast", ())
+NOTE(constexpr_unevaluable_cast_used_here, none,
+    "unevaluable cast encountered %select{here|by this call}0", (bool))
+
 NOTE(constexpr_unresolvable_witness_call, none,
     "encountered unresolvable witness method call: '%0'", (StringRef))
 NOTE(constexpr_no_witness_table_entry, none, "cannot find witness table entry "

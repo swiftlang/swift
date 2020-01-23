@@ -161,6 +161,29 @@ public:
   void cacheResult(ClassDecl *value) const;
 };
 
+/// Requests whether or not this class has designated initializers that are
+/// not public or @usableFromInline.
+class HasMissingDesignatedInitializersRequest :
+    public SimpleRequest<HasMissingDesignatedInitializersRequest,
+                         bool(ClassDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, ClassDecl *subject) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool) const;
+};
+
 /// Request the nominal declaration extended by a given extension declaration.
 class ExtendedNominalRequest :
     public SimpleRequest<ExtendedNominalRequest,

@@ -49,15 +49,15 @@ using namespace Lowering;
 
 SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
     : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr) {
-  SILOptions &Opts = M.getOptions();
+  const SILOptions &Opts = M.getOptions();
   if (!Opts.UseProfile.empty()) {
     auto ReaderOrErr = llvm::IndexedInstrProfReader::create(Opts.UseProfile);
     if (auto E = ReaderOrErr.takeError()) {
       diagnose(SourceLoc(), diag::profile_read_error, Opts.UseProfile,
                llvm::toString(std::move(E)));
-      Opts.UseProfile.erase();
+    } else {
+      M.setPGOReader(std::move(ReaderOrErr.get()));
     }
-    M.setPGOReader(std::move(ReaderOrErr.get()));
   }
 }
 
@@ -1670,7 +1670,7 @@ public:
 void SILGenModule::emitSourceFile(SourceFile *sf) {
   SourceFileScope scope(*this, sf);
   FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-file", sf);
-  for (Decl *D : sf->Decls) {
+  for (Decl *D : sf->getTopLevelDecls()) {
     FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-decl", D);
     visit(D);
   }
@@ -1691,7 +1691,7 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
 
 std::unique_ptr<SILModule>
 SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
-                        SILOptions &options, FileUnit *SF) {
+                        const SILOptions &options, FileUnit *SF) {
   FrontendStatsTracer tracer(mod->getASTContext().Stats, "SILGen");
   const DeclContext *DC;
   if (SF) {
@@ -1751,12 +1751,12 @@ SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(ModuleDecl *mod, Lowering::TypeConverter &tc,
-                            SILOptions &options) {
+                            const SILOptions &options) {
   return SILModule::constructSIL(mod, tc, options, nullptr);
 }
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(FileUnit &sf, Lowering::TypeConverter &tc,
-                            SILOptions &options) {
+                            const SILOptions &options) {
   return SILModule::constructSIL(sf.getParentModule(), tc, options, &sf);
 }

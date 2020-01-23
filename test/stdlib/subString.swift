@@ -12,6 +12,29 @@ func checkMatch<S: Collection, T: Collection>(_ x: S, _ y: T, _ i: S.Index)
   expectEqual(x[i], y[i])
 }
 
+func checkMatchContiguousStorage<S: Collection, T: Collection>(_ x: S, _ y: T, expected: Bool)
+  where S.Element == T.Element, S.Element: Equatable
+{
+  let xElement = x.withContiguousStorageIfAvailable { $0.first }
+  let yElement = y.withContiguousStorageIfAvailable { $0.first }
+
+  if expected {
+    expectEqual(xElement, yElement)
+  } else {
+    expectNotEqual(xElement, yElement)
+  }
+}
+
+func checkHasContiguousStorage<S: Collection>(_ x: S, expected: Bool) {
+  let hasStorage = x.withContiguousStorageIfAvailable { _ in true } ?? false
+  expectEqual(hasStorage, expected)
+}
+
+func checkHasContiguousStorageSubstring(_ x: Substring.UTF8View) {
+  let hasStorage = x.withContiguousStorageIfAvailable { _ in true } ?? false
+  expectTrue(hasStorage)
+}
+
 SubstringTests.test("Equality") {
   let s = "abcdefg"
   let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
@@ -228,6 +251,24 @@ SubstringTests.test("UTF8View") {
     expectEqual("", String(t.dropLast(100))!)
     expectEqual("", String(u.dropFirst(100))!)
     expectEqual("", String(u.dropLast(100))!)
+
+    let expectSubstringWCSIA: Bool
+    // This availability guard should refer to a concrete OS version in
+    // future.
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+      expectSubstringWCSIA = true 
+    } else {
+      expectSubstringWCSIA = false
+    }
+
+    checkHasContiguousStorage(s.utf8, expected: true) // Strings always do
+    checkHasContiguousStorage(t, expected: expectSubstringWCSIA)
+    checkHasContiguousStorage(u, expected: expectSubstringWCSIA)
+    checkHasContiguousStorageSubstring(t)
+    checkHasContiguousStorageSubstring(u)
+    checkMatchContiguousStorage(Array(s.utf8), s.utf8, expected: true)
+    checkMatchContiguousStorage(Array(t), t, expected: expectSubstringWCSIA)
+    checkMatchContiguousStorage(Array(u), u, expected: expectSubstringWCSIA)
   }
 }
 

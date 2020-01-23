@@ -7000,7 +7000,7 @@ public:
   }
 
   using SuccessorBlockArgumentListTy =
-      TransformRange<ConstSuccessorListTy, function_ref<SILPhiArgumentArrayRef(
+      TransformRange<ConstSuccessorListTy, function_ref<ArrayRef<SILArgument *>(
                                                const SILSuccessor &)>>;
 
   /// Return the range of Argument arrays for each successor of this

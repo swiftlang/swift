@@ -28,7 +28,7 @@ class ConstructorDecl;
 class CustomAttr;
 class Decl;
 class EnumDecl;
-enum class FunctionBuilderClosurePreCheck : uint8_t;
+enum class FunctionBuilderBodyPreCheck : uint8_t;
 class GenericParamList;
 class GenericSignature;
 class GenericTypeParamType;

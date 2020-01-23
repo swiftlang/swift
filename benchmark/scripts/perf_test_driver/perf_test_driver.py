@@ -21,7 +21,7 @@ import re
 import subprocess
 
 
-BENCHMARK_OUTPUT_RE = re.compile('([^,]+),')
+BENCHMARK_OUTPUT_RE = re.compile(r'\d+,([^,]+)')
 
 
 class Result(object):

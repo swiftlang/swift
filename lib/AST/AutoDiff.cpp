@@ -66,3 +66,21 @@ void autodiff::getSubsetParameterTypes(IndexSubset *subset,
         results.push_back(curryLevel->getParams()[paramIndex].getOldType());
   }
 }
+
+Type TangentSpace::getType() const {
+  switch (kind) {
+  case Kind::TangentVector:
+    return value.tangentVectorType;
+  case Kind::Tuple:
+    return value.tupleType;
+  }
+}
+
+CanType TangentSpace::getCanonicalType() const {
+  return getType()->getCanonicalType();
+}
+
+NominalTypeDecl *TangentSpace::getNominal() const {
+  assert(isTangentVector());
+  return getTangentVector()->getNominalOrBoundGenericNominal();
+}

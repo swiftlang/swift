@@ -48,9 +48,9 @@ namespace fine_grained_dependencies {
 /// Keep separate type from Node for type-checking.
 class ModuleDepGraphNode : public DepGraphNode {
 
-  /// The swiftDeps file that holds this entity.
+  /// The swiftDeps file that holds this entity iff this is a provides node.
   /// If more than one source file has the same DependencyKey, then there
-  /// will be one node for each in the driver.
+  /// will be one node for each in the driver, distinguished by this field.
   Optional<std::string> swiftDeps;
 
 public:
@@ -76,26 +76,18 @@ public:
 
   const Optional<std::string> &getSwiftDeps() const { return swiftDeps; }
 
-  bool assertImplementationMustBeInAFile() const {
-    assert((getSwiftDeps().hasValue() || !getKey().isImplementation()) &&
-           "Implementations must be in some file.");
-    return true;
+  std::string getSwiftDepsOrEmpty() const {
+    return getSwiftDeps().getValueOr(std::string());
   }
 
-  std::string humanReadableName() const {
-    StringRef where =
-        !getSwiftDeps().hasValue()
-            ? ""
-            : llvm::sys::path::filename(getSwiftDeps().getValue());
-    return DepGraphNode::humanReadableName(where);
+  std::string getSwiftDepsForMapKey() const {
+    // Use the empty string for nodes whose source file is unknown,
+    // i.e. depends. (Known depends are represented by arcs, not nodes.)
+    return getSwiftDepsOrEmpty();
   }
 
-  SWIFT_DEBUG_DUMP;
-
-  bool assertProvidedEntityMustBeInAFile() const {
-    assert((getSwiftDeps().hasValue() || !getKey().isImplementation()) &&
-           "Implementations must be in some file.");
-    return true;
+  const std::string &getSwiftDepsOfProvides() const {
+    return getSwiftDeps().getValue();
   }
 
   /// Nodes can move from file to file when the driver reads the result of a
@@ -103,15 +95,28 @@ public:
   void setSwiftDeps(Optional<std::string> s) { swiftDeps = s; }
 
   bool getIsProvides() const { return getSwiftDeps().hasValue(); }
-};
 
-/// A placeholder allowing the experimental system to fit into the driver
-/// without changing as much code.
-class CoarseGrainedDependencyGraphImpl {
-public:
-  /// Use the status quo LoadResult for now.
-  using LoadResult =
-      typename swift::CoarseGrainedDependencyGraphImpl::LoadResult;
+  /// Return true if this node describes a definition for which the job is known
+  bool isDefinedInAKnownFile() const { return getIsProvides(); }
+
+  bool doesNodeProvideAnInterface() const {
+    return getKey().isInterface() && getIsProvides();
+  }
+
+  bool assertImplementationMustBeInAFile() const {
+    assert((isDefinedInAKnownFile() || !getKey().isImplementation()) &&
+           "Implementations must be in some file.");
+    return true;
+  }
+
+  std::string humanReadableName() const {
+    StringRef where = !getIsProvides()
+                          ? ""
+                          : llvm::sys::path::filename(getSwiftDepsOfProvides());
+    return DepGraphNode::humanReadableName(where);
+  }
+
+  SWIFT_DEBUG_DUMP;
 };
 
 //==============================================================================
@@ -159,18 +164,10 @@ class ModuleDepGraph {
   std::unordered_set<std::string> externalDependencies;
 
   /// The new version of "Marked."
-  /// Record cascading jobs by swiftDepsFilename because that's what
-  /// nodes store directly.
-  ///
-  /// The status quo system uses "cascade" for the following:
-  /// Def1 -> def2 -> def3, where arrows are uses, so 3 depends on 2 which
-  /// depends on 1. The first use is said to "cascade" if when def1 changes,
-  /// def3 is dirtied.
-  /// TODO: Move cascadingJobs out of the graph, ultimately.
-  /// If marked, any Job that depends on me must be rebuilt after compiling me
-  /// if I have changed.
-
-  std::unordered_set<std::string> cascadingJobs;
+  /// Aka "isMarked". Holds the swiftDeps paths for jobs the driver has or will
+  /// schedule.
+  /// TODO: Move scheduledJobs out of the graph, ultimately.
+  std::unordered_set<std::string> swiftDepsOfJobsThatNeedRunning;
 
   /// Keyed by swiftdeps filename, so we can get back to Jobs.
   std::unordered_map<std::string, const driver::Job *> jobsBySwiftDeps;
@@ -190,10 +187,12 @@ class ModuleDepGraph {
   const bool verifyFineGrainedDependencyGraphAfterEveryImport;
   const bool emitFineGrainedDependencyDotFileAfterEveryImport;
 
-  /// If tracing dependencies, holds the current node traversal path
+  /// If tracing dependencies, holds a vector used to hold the current path
+  /// def - use/def - use/def - ...
   Optional<std::vector<const ModuleDepGraphNode *>> currentPathIfTracing;
 
-  /// If tracing dependencies, record the node sequence
+  /// If tracing dependencies, holds the sequence of defs used to get to the job
+  /// that is the key
   std::unordered_multimap<const driver::Job *,
                           std::vector<const ModuleDepGraphNode *>>
       dependencyPathsToJobs;
@@ -204,7 +203,7 @@ class ModuleDepGraph {
   /// Encapsulate the invariant between where the node resides in
   /// nodesBySwiftDepsFile and the swiftDeps node instance variable here.
   void addToMap(ModuleDepGraphNode *n) {
-    nodeMap.insert(n->getSwiftDeps().getValueOr(std::string()), n->getKey(), n);
+    nodeMap.insert(n->getSwiftDepsForMapKey(), n->getKey(), n);
   }
 
   /// When integrating a SourceFileDepGraph, there might be a node representing
@@ -223,13 +222,34 @@ class ModuleDepGraph {
   /// Remove node from nodeMap, check invariants.
   ModuleDepGraphNode *eraseNodeFromMap(ModuleDepGraphNode *nodeToErase) {
     ModuleDepGraphNode *nodeActuallyErased = nodeMap.findAndErase(
-        nodeToErase->getSwiftDeps().getValueOr(std::string()),
-        nodeToErase->getKey());
+        nodeToErase->getSwiftDepsForMapKey(), nodeToErase->getKey());
     (void)nodeActuallyErased;
     assert(
         nodeToErase == nodeActuallyErased ||
         mapCorruption("Node found from key must be same as node holding key."));
     return nodeToErase;
+  }
+
+  void eraseNodeFromUsesByDef(ModuleDepGraphNode *nodeToErase) {
+    for (auto &defAndUses : usesByDef)
+      defAndUses.second.erase(nodeToErase);
+  }
+
+  void eraseNodeFromCurrentPathIfTracing(ModuleDepGraphNode *nodeToErase) {
+    if (currentPathIfTracing)
+      eraseNodeFromVector(currentPathIfTracing.getValue(), nodeToErase);
+  }
+
+  void eraseNodeFromDependencyPathToJobs(ModuleDepGraphNode *nodeToErase) {
+    for (auto &jobAndPath : dependencyPathsToJobs)
+      eraseNodeFromVector(jobAndPath.second, nodeToErase);
+  }
+
+  static void eraseNodeFromVector(std::vector<const ModuleDepGraphNode *> &v,
+                                  const ModuleDepGraphNode *n) {
+    const auto where = std::find(v.begin(), v.end(), n);
+    if (where != v.end())
+      v.erase(where);
   }
 
   static StringRef getSwiftDeps(const driver::Job *cmd) {
@@ -268,12 +288,21 @@ public:
     assert(verify() && "ModuleDepGraph should be fine when created");
   }
 
+  ModuleDepGraph() : ModuleDepGraph(false, false, false, nullptr) {}
+
   /// Unlike the standard \c CoarseGrainedDependencyGraph, returns \c
   /// CoarseGrainedDependencyGraphImpl::LoadResult::AffectsDownstream when
   /// loading a new file, i.e. when determining the initial set. Caller
   /// compensates.
   CoarseGrainedDependencyGraphImpl::LoadResult
   loadFromPath(const driver::Job *, StringRef, DiagnosticEngine &);
+
+  CoarseGrainedDependencyGraphImpl::LoadResult
+  loadFromString(const driver::Job *cmd, StringRef data);
+
+  CoarseGrainedDependencyGraphImpl::LoadResult
+  loadFromSourceFileDepGraph(const driver::Job *cmd,
+                             const SourceFileDepGraph &);
 
   /// For the dot file.
   std::string getGraphID() const { return "driver"; }
@@ -302,8 +331,12 @@ public:
   /// 1. Return value (via visited) is the set of jobs needing recompilation
   /// after this one, and
   /// 2. Jobs not previously known to need dependencies reexamined after they
-  /// are recompiled. Such jobs are added to the \ref cascadingJobs set, and
+  /// are recompiled. Such jobs are added to the \ref scheduledJobs set, and
   /// accessed via \ref isMarked.
+  ///
+  /// Only return jobs marked that were previously unmarked. Not required for
+  /// the driver because it won't run a job twice, but required for the unit
+  /// test.
   std::vector<const driver::Job*> markTransitive(
       const driver::Job *jobToBeRecompiled, const void *ignored = nullptr);
 
@@ -315,6 +348,8 @@ public:
 
   std::vector<StringRef> getExternalDependencies() const;
 
+  /// Find jobs that were previously not known to need compilation but that
+  /// depend on \c externalDependency.
   std::vector<const driver::Job*> markExternal(StringRef externalDependency);
 
   void forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
@@ -428,14 +463,14 @@ private:
   /// Given a definition node, and a list of already found dependents,
   /// recursively add transitive closure of dependents of the definition
   /// into the already found dependents.
-  /// Also record any dependents that "cascade", i.e. whose dependencies must be
-  /// recomputed after recompilation so that its dependents can be recompiled.
-  void findDependentNodesAndRecordCascadingOnes(
+  void findDependentNodes(
       std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
       const ModuleDepGraphNode *definition);
 
-  std::vector<const driver::Job*> computeUniqueJobsFromNodes(
-      const std::unordered_set<const ModuleDepGraphNode *> &nodes);
+  /// Givien a set of nodes, return the set of swiftDeps for the jobs those
+  /// nodes are in.
+  llvm::StringSet<> computeSwiftDepsFromInterfaceNodes(
+      ArrayRef<const ModuleDepGraphNode *> nodes);
 
   /// Record a visit to this node for later dependency printing
   size_t traceArrival(const ModuleDepGraphNode *visitedNode);
@@ -447,12 +482,12 @@ private:
       const std::vector<const ModuleDepGraphNode *> &pathToJob,
       const driver::Job *dependentJob);
 
-  /// Return true if job did not cascade before
-  bool rememberThatJobCascades(StringRef swiftDeps) {
-    return cascadingJobs.insert(swiftDeps).second;
+  /// Return true if job was not scheduled before
+  bool recordJobNeedsRunning(StringRef swiftDeps) {
+    return swiftDepsOfJobsThatNeedRunning.insert(swiftDeps).second;
   }
 
-  /// For debugging, write out the graph to a dot file.
+  /// For debugging and visualization, write out the graph to a dot file.
   /// \p diags may be null if no diagnostics are needed.
   void emitDotFileForJob(DiagnosticEngine &, const driver::Job *);
   void emitDotFile(DiagnosticEngine &, StringRef baseName);
@@ -469,6 +504,13 @@ public:
   void printPath(raw_ostream &out, const driver::Job *node) const;
 
 private:
+  /// Get a printable filename, given a node's swiftDeps.
+  StringRef getProvidingFilename(Optional<std::string> swiftDeps) const;
+
+  /// Print one node on the dependency path.
+  static void printOneNodeOfPath(raw_ostream &out, const DependencyKey &key,
+                                 const StringRef filename);
+
   bool isCurrentPathForTracingEmpty() const {
     return !currentPathIfTracing.hasValue() || currentPathIfTracing->empty();
   }

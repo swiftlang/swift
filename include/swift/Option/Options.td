@@ -137,7 +137,11 @@ def driver_always_rebuild_dependents :
 
 def enable_fine_grained_dependencies :
 Flag<["-"], "enable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
+HelpText<"Be more selective about incremental recompilation">;
+
+def disable_fine_grained_dependencies :
+Flag<["-"], "disable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Don't be more selective about incremental recompilation">;
 
 
 def enable_only_one_dependency_file :
@@ -182,6 +186,11 @@ def fine_grained_dependency_include_intrafile :
 Flag<["-"], "fine-grained-dependency-include-intrafile">,
 InternalDebugOpt,
 HelpText<"Include within-file dependencies.">;
+
+def emit_fine_grained_dependency_sourcefile_dot_files :
+Flag<["-"], "emit-fine-grained-dependency-sourcefile-dot-files">,
+InternalDebugOpt,
+HelpText<"Emit dot files for every source file.">;
 
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
@@ -909,6 +918,11 @@ def print_target_info : Flag<["-"], "print-target-info">,
 
 def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Generate code for a particular CPU variant">;
+
+def target_variant : Separate<["-"], "target-variant">,
+  Flags<[FrontendOption]>,
+  HelpText<"Generate 'zippered' code for macCatalyst that can run on the specified"
+           " variant target triple in addition to the main -target triple">;
 
 def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
