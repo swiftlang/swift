@@ -3770,9 +3770,9 @@ void ConstraintSystem::print(raw_ostream &out) const {
   
   out << "Score: " << CurrentScore << "\n";
 
-  if (auto ty = contextualType.getType()) {
-    out << "Contextual Type: " << ty.getString(PO);
-    if (TypeRepr *TR = contextualType.getTypeRepr()) {
+  for (const auto &contextualType : contextualTypes) {
+    out << "Contextual Type: " << contextualType.second.getType().getString(PO);
+    if (TypeRepr *TR = contextualType.second.typeLoc.getTypeRepr()) {
       out << " at ";
       TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
     }

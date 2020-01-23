@@ -441,6 +441,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numFunctionBuilderTransformed = cs.functionBuilderTransformed.size();
   numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
+  numContextualTypes = cs.contextualTypes.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -509,6 +510,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any inferred closure types (e.g. used in function builder body).
   truncate(cs.ClosureTypes, numInferredClosureTypes);
+
+  // Remove any contextual types.
+  truncate(cs.contextualTypes, numContextualTypes);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;

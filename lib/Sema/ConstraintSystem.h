@@ -1300,17 +1300,21 @@ private:
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
       KeyPathComponentTypes;
 
+  struct ContextualTypeInfo  {
+    TypeLoc typeLoc;
+    ContextualTypePurpose purpose;
+
+    Type getType() const { return typeLoc.getType(); }
+  };
+
+  /// Contextual type information for expressions that are part of this
+  /// constraint system.
+  llvm::MapVector<const Expr *, ContextualTypeInfo> contextualTypes;
+
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
     OpenedParameterTypes;
 
-  /// There can only be a single contextual type on the root of the expression
-  /// being checked.  If specified, this holds its type along with the base
-  /// expression, and the purpose of it.
-  TypeLoc contextualType;
-  Expr *contextualTypeNode = nullptr;
-  ContextualTypePurpose contextualTypePurpose = CTP_Unused;
-  
   /// The set of constraint restrictions used to reach the
   /// current constraint system.
   ///
@@ -1880,6 +1884,9 @@ public:
     /// The length of \c ClosureTypes.
     unsigned numInferredClosureTypes;
 
+    /// The length of \c contextualTypes.
+    unsigned numContextualTypes;
+
     /// The previous score.
     Score PreviousScore;
 
@@ -2167,25 +2174,39 @@ public:
     return E;
   }
 
-  void setContextualType(Expr *E, TypeLoc T, ContextualTypePurpose purpose) {
-    assert(E != nullptr && "Expected non-null expression!");
-    contextualTypeNode = E;
-    contextualType = T;
-    contextualTypePurpose = purpose;
+  void setContextualType(Expr *expr, TypeLoc T, ContextualTypePurpose purpose) {
+    assert(expr != nullptr && "Expected non-null expression!");
+    assert(contextualTypes.count(expr) == 0 &&
+           "Already set this contextual type");
+    contextualTypes[expr] = { T, purpose };
   }
 
-  Type getContextualType(Expr *E) const {
-    assert(E != nullptr && "Expected non-null expression!");
-    return E == contextualTypeNode ? contextualType.getType() : Type();
+  Optional<ContextualTypeInfo> getContextualTypeInfo(Expr *expr) const {
+    auto known = contextualTypes.find(expr);
+    if (known == contextualTypes.end())
+      return None;
+    return known->second;
+  }
+
+  Type getContextualType(Expr *expr) const {
+    auto result = getContextualTypeInfo(expr);
+    if (result)
+      return result->typeLoc.getType();
+    return Type();
   }
 
   TypeLoc getContextualTypeLoc(Expr *expr) const {
-    return expr == contextualTypeNode ? contextualType : TypeLoc();
+    auto result = getContextualTypeInfo(expr);
+    if (result)
+      return result->typeLoc;
+    return TypeLoc();
   }
 
   ContextualTypePurpose getContextualTypePurpose(Expr *expr) const {
-    return (expr && expr == contextualTypeNode) ? contextualTypePurpose
-                                                : CTP_Unused;
+    auto result = getContextualTypeInfo(expr);
+    if (result)
+      return result->purpose;
+    return CTP_Unused;
   }
 
   /// Retrieve the constraint locator for the given anchor and
