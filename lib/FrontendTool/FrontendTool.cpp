@@ -1609,6 +1609,9 @@ static bool performCompileStepsPostSILGen(
 
   llvm::StringSet<> LinkerDirectives;
   collectLinkerDirectives(Invocation, MSF, LinkerDirectives);
+  // Don't proceed to IRGen if collecting linker directives failed.
+  if (Context.hadError())
+    return true;
   StringRef OutputFilename = PSPs.OutputFilename;
   std::vector<std::string> ParallelOutputFilenames =
     Invocation.getFrontendOptions().InputsAndOutputs.copyOutputFilenames();
