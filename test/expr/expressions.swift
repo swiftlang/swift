@@ -708,7 +708,7 @@ func test() {
 func unusedExpressionResults() {
   // Unused l-value
   _ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
-
+  // expected-error@-1 {{expression resolves to an unused variable}}
 
   // <rdar://problem/20749592> Conditional Optional binding hides compiler error
   let optionalc:C? = nil

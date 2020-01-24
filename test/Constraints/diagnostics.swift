@@ -1271,7 +1271,7 @@ func badTypes() {
 // rdar://34357545
 func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
-  // expected-error@-1 {{expression type 'Bool' is ambiguous without more context}}
+  // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
 }
 
 func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
