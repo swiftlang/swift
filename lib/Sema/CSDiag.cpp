@@ -1447,29 +1447,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     auto lhsType = CS.getType(lhsExpr)->getRValueType();
     auto rhsType = CS.getType(rhsExpr)->getRValueType();
 
-    // TODO(diagnostics): There are still cases not yet handled by new
-    // diagnostics framework e.g.
-    //
-    // var tuple = (1, 2, 3)
-    // switch tuple {
-    //   case (let (_, _, _)) + 1: break
-    // }
-    if (callExpr->isImplicit() && overloadName == "~=") {
-      auto flags = ParameterTypeFlags();
-      if (calleeInfo.candidates.size() == 1)
-        if (auto fnType = calleeInfo.candidates[0].getFunctionType())
-          flags = fnType->getParams()[0].getParameterFlags();
-
-      auto *locator = CS.getConstraintLocator(
-          callExpr,
-          {ConstraintLocator::ApplyArgument,
-           LocatorPathElt::ApplyArgToParam(0, 0, flags)},
-          /*summaryFlags=*/0);
-
-      ArgumentMismatchFailure failure(CS, lhsType, rhsType, locator);
-      return failure.diagnosePatternMatchingMismatch();
-    }
-
     if (isContextualConversionFailure(argTuple))
       return false;
 
@@ -1516,41 +1493,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   SmallVector<AnyFunctionType::Param, 8> params;
   AnyFunctionType::decomposeInput(CS.getType(argExpr), params);
   auto argString = AnyFunctionType::getParamListAsString(params);
-
-  // If we couldn't get the name of the callee, then it must be something of a
-  // more complex "value of function type".
-  if (overloadName.empty()) {
-    // If we couldn't infer the result type of the closure expr, then we have
-    // some sort of ambiguity, let the ambiguity diagnostic stuff handle this.
-    if (auto ffty = fnType->getAs<AnyFunctionType>())
-      if (ffty->getResult()->hasTypeVariable()) {
-        diagnoseAmbiguity(fnExpr);
-        return true;
-      }
-    
-    // The most common unnamed value of closure type is a ClosureExpr, so
-    // special case it.
-    if (isa<ClosureExpr>(fnExpr->getValueProvidingExpr())) {
-      if (fnType->hasTypeVariable())
-        diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure, argString)
-          .highlight(fnExpr->getSourceRange());
-      else
-        diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure_type,
-                 fnType, argString)
-          .highlight(fnExpr->getSourceRange());
-      
-    } else if (fnType->hasTypeVariable()) {
-      diagnose(argExpr->getStartLoc(), diag::cannot_call_function_value,
-               argString)
-        .highlight(fnExpr->getSourceRange());
-    } else {
-      diagnose(argExpr->getStartLoc(), diag::cannot_call_value_of_function_type,
-                fnType, argString)
-        .highlight(fnExpr->getSourceRange());
-    }
-    
-    return true;
-  }
 
   if (auto MTT = fnType->getAs<MetatypeType>()) {
     if (MTT->getInstanceType()->isExistentialType()) {
@@ -1756,22 +1698,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   if (auto *assignment = dyn_cast<AssignExpr>(E)) {
     if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
       auto *srcExpr = assignment->getSrc();
-
-      bool diagnosedInvalidUseOfDiscardExpr = false;
-      srcExpr->forEachChildExpr([&](Expr *expr) -> Expr * {
-        if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(expr)) {
-          diagnose(DAE->getLoc(), diag::discard_expr_outside_of_assignment)
-              .highlight(srcExpr->getSourceRange());
-          diagnosedInvalidUseOfDiscardExpr = true;
-          return nullptr;
-        }
-
-        return expr;
-      });
-
-      if (diagnosedInvalidUseOfDiscardExpr)
-        return;
-
       diagnoseAmbiguity(srcExpr);
       return;
     }
@@ -1785,15 +1711,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     return;
   }
 
-  // A DiscardAssignmentExpr (spelled "_") needs contextual type information to
-  // infer its type. If we see one at top level, diagnose that it must be part
-  // of an assignment so we don't get a generic "expression is ambiguous" error.
-  if (isa<DiscardAssignmentExpr>(E)) {
-    diagnose(E->getLoc(), diag::discard_expr_outside_of_assignment)
-      .highlight(E->getSourceRange());
-    return;
-  }
-  
   // Diagnose ".foo" expressions that lack context specifically.
   if (auto UME =
         dyn_cast<UnresolvedMemberExpr>(E->getSemanticsProvidingExpr())) {
@@ -1803,22 +1720,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
                                UME->getNameLoc().getSourceRange().End));
       return;
     }
-  }
-
-  // Diagnose empty collection literals that lack context specifically.
-  if (auto CE = dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
-    if (CE->getNumElements() == 0) {
-      diagnose(E->getLoc(), diag::unresolved_collection_literal)
-        .highlight(E->getSourceRange());
-      return;
-    }
-  }
-
-  // Diagnose 'nil' without a contextual type.
-  if (isa<NilLiteralExpr>(E->getSemanticsProvidingExpr())) {
-    diagnose(E->getLoc(), diag::unresolved_nil_literal)
-      .highlight(E->getSourceRange());
-    return;
   }
 
   // Attempt to re-type-check the entire expression, allowing ambiguity, but
