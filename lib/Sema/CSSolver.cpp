@@ -591,7 +591,7 @@ bool ConstraintSystem::Candidate::solve(
   cs.Timer.emplace(E, cs);
 
   // Generate constraints for the new system.
-  if (auto generatedExpr = cs.generateConstraints(E)) {
+  if (auto generatedExpr = cs.generateConstraints(E, DC)) {
     E = generatedExpr;
   } else {
     // Failure to generate constraint system for sub-expression
@@ -1215,7 +1215,7 @@ ConstraintSystem::solveImpl(Expr *&expr,
   shrink(expr);
 
   // Generate constraints for the main system.
-  if (auto generatedExpr = generateConstraints(expr))
+  if (auto generatedExpr = generateConstraints(expr, DC))
     expr = generatedExpr;
   else {
     if (listener)

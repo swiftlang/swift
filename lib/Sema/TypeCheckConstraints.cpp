@@ -2466,7 +2466,7 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
 
   // Construct a constraint system from this expression.
   ConstraintSystem CS(DC, options);
-  expr = CS.generateConstraints(expr);
+  expr = CS.generateConstraints(expr, DC);
   if (!expr)
     return nullptr;
 
