@@ -321,6 +321,12 @@ public:
   /// forwarded on to IRGen.
   ASTStage_t ASTStage = Unprocessed;
 
+  /// Virtual filenames declared by #sourceLocation(file:) directives in this
+  /// file.
+  llvm::SmallVector<Located<StringRef>, 0> VirtualFilenames;
+
+  llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
+
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
              bool KeepSyntaxTree = false, ParsingOptions parsingOpts = {});

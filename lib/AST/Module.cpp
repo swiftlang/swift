@@ -1955,6 +1955,110 @@ static void performAutoImport(
   SF.addImports(Imports);
 }
 
+llvm::StringMap<SourceFilePathInfo>
+SourceFile::getInfoForUsedFilePaths() const {
+  llvm::StringMap<SourceFilePathInfo> result;
+
+  if (BufferID != -1) {
+    result[getFilename()].physicalFileLoc =
+        getASTContext().SourceMgr.getLocForBufferStart(BufferID);
+  }
+
+  for (auto &vpath : VirtualFilenames) {
+    result[vpath.Item].virtualFileLocs.insert(vpath.Loc);
+  }
+
+  return result;
+}
+
+/// Returns a map of filenames to a map of file paths to SourceFilePathInfo
+/// instances, for all SourceFiles in the module.
+static llvm::StringMap<llvm::StringMap<SourceFilePathInfo>>
+getInfoForUsedFileNames(const ModuleDecl *module) {
+  llvm::StringMap<llvm::StringMap<SourceFilePathInfo>> result;
+
+  for (auto *file : module->getFiles()) {
+    auto *sourceFile = dyn_cast<SourceFile>(file);
+    if (!sourceFile) continue;
+
+    for (auto &pair : sourceFile->getInfoForUsedFilePaths()) {
+      StringRef fullPath = pair.first();
+      StringRef fileName = llvm::sys::path::filename(fullPath);
+      auto &info = pair.second;
+
+      result[fileName][fullPath].merge(info);
+    }
+  }
+
+  return result;
+}
+
+static void
+computeMagicFileString(const ModuleDecl *module, StringRef name,
+                       SmallVectorImpl<char> &result) {
+  result.assign(module->getNameStr().begin(), module->getNameStr().end());
+  result.push_back('/');
+  result.append(name.begin(), name.end());
+}
+
+static StringRef
+resolveMagicNameConflicts(const ModuleDecl *module, StringRef fileString,
+                          const llvm::StringMap<SourceFilePathInfo> &paths) {
+  assert(paths.size() > 1);
+  assert(module->getASTContext().LangOpts.EnableConcisePoundFile);
+
+  /// The path we consider to be "correct"; we will emit fix-its changing the
+  /// other paths to match this one.
+  StringRef winner = "";
+
+  // First, select a winner.
+  for (const auto &pathPair : paths) {
+    // If there is a physical file with this name, we use its path and stop
+    // looking.
+    if (pathPair.second.physicalFileLoc.isValid()) {
+      winner = pathPair.first();
+      break;
+    }
+
+    // Otherwise, we favor the lexicographically "smaller" path.
+    if (winner.empty() || winner > pathPair.first()) {
+      winner = pathPair.first();
+    }
+  }
+
+  return winner;
+}
+
+llvm::StringMap<std::pair<std::string, bool>>
+ModuleDecl::computeMagicFileStringMap() const {
+  llvm::StringMap<std::pair<std::string, bool>> result;
+  SmallString<64> scratch;
+
+  if (!getASTContext().LangOpts.EnableConcisePoundFile)
+    return result;
+
+  for (auto &namePair : getInfoForUsedFileNames(this)) {
+    computeMagicFileString(this, namePair.first(), scratch);
+    auto &infoForPaths = namePair.second;
+
+    assert(!infoForPaths.empty());
+
+    // TODO: In the future, we'd like to handle these conflicts gracefully by
+    // generating a unique `#file` string for each conflicting name. For now, we
+    // will simply warn about conflicts.
+    StringRef winner = infoForPaths.begin()->first();
+    if (infoForPaths.size() > 1)
+      winner = resolveMagicNameConflicts(this, scratch, infoForPaths);
+
+    for (auto &pathPair : infoForPaths) {
+      result[pathPair.first()] =
+          std::make_pair(scratch.str().str(), pathPair.first() == winner);
+    }
+  }
+
+  return result;
+}
+
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
                        ImplicitModuleImportKind ModImpKind,
