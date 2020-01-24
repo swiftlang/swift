@@ -1494,41 +1494,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   AnyFunctionType::decomposeInput(CS.getType(argExpr), params);
   auto argString = AnyFunctionType::getParamListAsString(params);
 
-  // If we couldn't get the name of the callee, then it must be something of a
-  // more complex "value of function type".
-  if (overloadName.empty()) {
-    // If we couldn't infer the result type of the closure expr, then we have
-    // some sort of ambiguity, let the ambiguity diagnostic stuff handle this.
-    if (auto ffty = fnType->getAs<AnyFunctionType>())
-      if (ffty->getResult()->hasTypeVariable()) {
-        diagnoseAmbiguity(fnExpr);
-        return true;
-      }
-    
-    // The most common unnamed value of closure type is a ClosureExpr, so
-    // special case it.
-    if (isa<ClosureExpr>(fnExpr->getValueProvidingExpr())) {
-      if (fnType->hasTypeVariable())
-        diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure, argString)
-          .highlight(fnExpr->getSourceRange());
-      else
-        diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure_type,
-                 fnType, argString)
-          .highlight(fnExpr->getSourceRange());
-      
-    } else if (fnType->hasTypeVariable()) {
-      diagnose(argExpr->getStartLoc(), diag::cannot_call_function_value,
-               argString)
-        .highlight(fnExpr->getSourceRange());
-    } else {
-      diagnose(argExpr->getStartLoc(), diag::cannot_call_value_of_function_type,
-                fnType, argString)
-        .highlight(fnExpr->getSourceRange());
-    }
-    
-    return true;
-  }
-
   if (auto MTT = fnType->getAs<MetatypeType>()) {
     if (MTT->getInstanceType()->isExistentialType()) {
       diagnose(fnExpr->getLoc(), diag::construct_protocol_value, fnType);
@@ -1753,22 +1718,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
                                UME->getNameLoc().getSourceRange().End));
       return;
     }
-  }
-
-  // Diagnose empty collection literals that lack context specifically.
-  if (auto CE = dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
-    if (CE->getNumElements() == 0) {
-      diagnose(E->getLoc(), diag::unresolved_collection_literal)
-        .highlight(E->getSourceRange());
-      return;
-    }
-  }
-
-  // Diagnose 'nil' without a contextual type.
-  if (isa<NilLiteralExpr>(E->getSemanticsProvidingExpr())) {
-    diagnose(E->getLoc(), diag::unresolved_nil_literal)
-      .highlight(E->getSourceRange());
-    return;
   }
 
   // Attempt to re-type-check the entire expression, allowing ambiguity, but
