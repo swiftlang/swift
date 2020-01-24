@@ -72,7 +72,7 @@ add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_
 
 
 swift_install_in_component(DIRECTORY ${TF_INCLUDE_DIR}/tensorflow/c/
-  DESTINATION lib/swift/tensorflow/tensorflow/c
+  DESTINATION lib/swift/tensorflow/c
   COMPONENT stdlib
   FILES_MATCHING
     PATTERN c_api.h
