@@ -221,7 +221,6 @@ private:
   validateContextualType(Type contextualType, ContextualTypePurpose CTP);
 
   bool visitExpr(Expr *E);
-  bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
 
   bool visitApplyExpr(ApplyExpr *AE);
@@ -1579,21 +1578,6 @@ bool FailureDiagnosis::
 visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   // Don't walk the children for this node, it leads to multiple diagnostics
   // because of how sema injects this node into the type checker.
-  return false;
-}
-
-/// An IdentityExpr doesn't change its argument, but it *can* propagate its
-/// contextual type information down.
-bool FailureDiagnosis::visitIdentityExpr(IdentityExpr *E) {
-  auto contextualType = CS.getContextualType(E);
-
-  // If we have a paren expr and our contextual type is a ParenType, remove the
-  // paren expr sugar.
-  if (contextualType)
-    contextualType = contextualType->getWithoutParens();
-  if (!typeCheckChildIndependently(E->getSubExpr(), contextualType,
-                                   CS.getContextualTypePurpose(E)))
-    return true;
   return false;
 }
 
