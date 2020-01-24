@@ -3065,6 +3065,16 @@ public:
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator);
 
+  /// Determines whether we can generate constraints for this statement
+  /// condition.
+  static bool canGenerateConstraints(StmtCondition condition);
+
+  /// Generate constraints for a statement condition.
+  ///
+  /// \returns true if there was an error in constraint generation, false
+  /// if generation succeeded.
+  bool generateConstraints(StmtCondition condition, DeclContext *dc);
+
   /// Generate constraints for a given set of overload choices.
   ///
   /// \param constraints The container of generated constraint choices.
