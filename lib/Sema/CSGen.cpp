@@ -3801,11 +3801,11 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
 bool ConstraintSystem::canGenerateConstraints(StmtCondition condition) {
   for (const auto &element : condition) {
     switch (element.getKind()) {
+    case StmtConditionElement::CK_Availability:
     case StmtConditionElement::CK_Boolean:
       continue;
 
     case StmtConditionElement::CK_PatternBinding:
-    case StmtConditionElement::CK_Availability:
       return false;
     }
   }
@@ -3823,6 +3823,10 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
 
   for (const auto &condElement : condition) {
     switch (condElement.getKind()) {
+    case StmtConditionElement::CK_Availability:
+      // Nothing to do here.
+      continue;
+
     case StmtConditionElement::CK_Boolean: {
       Expr *condExpr = condElement.getBoolean();
       condExpr = generateConstraints(condExpr, dc);
@@ -3838,7 +3842,6 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
     }
 
     case StmtConditionElement::CK_PatternBinding:
-    case StmtConditionElement::CK_Availability:
       llvm_unreachable("unhandled statement condition");
     }
   }

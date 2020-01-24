@@ -831,6 +831,9 @@ public:
     auto condition = ifStmt->getCond();
     for (auto &condElement : condition) {
       switch (condElement.getKind()) {
+      case StmtConditionElement::CK_Availability:
+        continue;
+
       case StmtConditionElement::CK_Boolean: {
         auto condExpr = condElement.getBoolean();
         auto finalCondExpr = rewriteExpr(condExpr);
@@ -846,7 +849,6 @@ public:
       }
 
       case StmtConditionElement::CK_PatternBinding:
-      case StmtConditionElement::CK_Availability:
         llvm_unreachable("unhandled statement condition");
       }
     }
