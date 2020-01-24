@@ -260,9 +260,11 @@ _Block_release(void) { }\n")
         # doesn't need to be build for macCatalyst.
         list(APPEND test_dependencies
             "swift-reflection-test${DEFAULT_OSX_VARIANT_SUFFIX}")
-      if("${SDK}" STREQUAL "WASI")
+
+      endif()
+
+      if(NOT "${SDK}" STREQUAL "WASI")
         # wasm: Avoid to build swift-reflection-test because it uses unsupported linker flags for wasm-ld
-      elseif()
         list(APPEND test_dependencies
             "swift-reflection-test${VARIANT_SUFFIX}_signed")
       endif()
