@@ -488,7 +488,9 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.addStackPromotion();
 
   // Speculate virtual call targets.
-  P.addSpeculativeDevirtualization();
+  if (P.getOptions().EnableSpeculativeDevirtualization) {
+    P.addSpeculativeDevirtualization();
+  }
 
   // There should be at least one SILCombine+SimplifyCFG between the
   // ClosureSpecializer, etc. and the last inliner. Cleaning up after these
