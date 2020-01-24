@@ -744,6 +744,12 @@ SILFunction *SILGenModule::emitProtocolWitness(
   if (witnessRef.isAlwaysInline())
     InlineStrategy = AlwaysInline;
 
+  // If the witness is an enum case, we need to emit the constructor
+  // unconditionally.
+  if (isa<EnumElementDecl>(witness.getDecl())) {
+    emitEnumConstructor(cast<EnumElementDecl>(witness.getDecl()));
+  }
+
   SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(
       linkage, nameBuffer, witnessSILFnType, genericEnv,
