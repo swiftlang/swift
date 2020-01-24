@@ -1207,25 +1207,21 @@ void NominalTypeDecl::prepareLookupTable() {
 
   if (hasLazyMembers()) {
     assert(!hasUnparsedMembers());
-
-    // Lazy members: if the table needs population, populate the table _only
-    // from those members already in the IDC member list_ such as implicits or
-    // globals-as-members.
     LookupTable->addMembers(getCurrentMembersWithoutLoading());
-    for (auto e : getExtensions()) {
-      // If we can lazy-load this extension, only take the members we've loaded
-      // so far.
-      if (e->wasDeserialized() || e->hasClangNode()) {
-        LookupTable->addMembers(e->getCurrentMembersWithoutLoading());
-        continue;
-      }
-
-      // Else, load all the members into the table.
-      LookupTable->addMembers(e->getMembers());
-    }
   } else {
     LookupTable->addMembers(getMembers());
-    LookupTable->updateLookupTable(this);
+  }
+
+  for (auto e : getExtensions()) {
+    // If we can lazy-load this extension, only take the members we've loaded
+    // so far.
+    if (e->wasDeserialized() || e->hasClangNode()) {
+      LookupTable->addMembers(e->getCurrentMembersWithoutLoading());
+      continue;
+    }
+
+    // Else, load all the members into the table.
+    LookupTable->addMembers(e->getMembers());
   }
 }
 
