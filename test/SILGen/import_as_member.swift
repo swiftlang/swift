@@ -2,6 +2,7 @@
 // REQUIRES: objc_interop
 import ImportAsMember.A
 import ImportAsMember.Class
+import Foundation
 
 public func returnGlobalVar() -> Double {
 	return Struct1.globalVar

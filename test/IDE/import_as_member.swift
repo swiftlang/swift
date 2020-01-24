@@ -106,6 +106,9 @@
 // PRINT-APINOTES-4:      @available(swift, obsoleted: 3, renamed: "Struct1.NewApiNoteType")
 // PRINT-APINOTES-4-NEXT: typealias IAMStruct1APINoteType = Struct1.NewApiNoteType
 
+#if canImport(Foundation)
+import Foundation
+#endif
 import ImportAsMember.A
 import ImportAsMember.B
 import ImportAsMember.APINotes
