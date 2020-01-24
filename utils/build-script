@@ -923,7 +923,8 @@ def main_preset():
         "--distcc",
         help="use distcc",
         action=argparse.actions.StoreTrueAction,
-        nargs=argparse.Nargs.OPTIONAL)
+        nargs=argparse.Nargs.OPTIONAL,
+        default=os.environ.get('USE_DISTCC') == '1')
     parser.add_argument(
         "--cmake-c-launcher",
         help="the absolute path to set CMAKE_C_COMPILER_LAUNCHER",
