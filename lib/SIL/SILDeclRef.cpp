@@ -335,11 +335,6 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     }
   }
 
-  // Enum constructors are emitted on-demand
-  if (isa<EnumElementDecl>(d)) {
-    limit = Limit::OnDemand;
-  }
-
   auto effectiveAccess = d->getEffectiveAccess();
   
   // Private setter implementations for an internal storage declaration should

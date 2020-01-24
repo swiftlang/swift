@@ -1992,17 +1992,6 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
   // captured functions.
   auto captureInfo = TC.getLoweredLocalCaptures(constant);
 
-  // FIXME: Why do we end up here when witness is case-with-payload?
-  if (!constant.getAnyFunctionRef().hasValue()) {
-    auto *vd = constant.loc.dyn_cast<ValueDecl *>();
-    auto funcTy =
-        cast<AnyFunctionType>(vd->getInterfaceType()->getCanonicalType());
-    auto sig = vd->getDeclContext()->getGenericSignatureOfContext();
-    return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                   funcTy->getParams(), funcTy.getResult(),
-                                   funcTy->getExtInfo());
-  }
-
   // Capture generic parameters from the enclosing context if necessary.
   auto closure = *constant.getAnyFunctionRef();
   auto genericSig = getEffectiveGenericSignature(closure, captureInfo);

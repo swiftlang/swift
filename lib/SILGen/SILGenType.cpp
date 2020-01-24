@@ -387,11 +387,25 @@ template<typename T> class SILGenWitnessTable : public SILWitnessVisitor<T> {
 
 public:
   void addMethod(SILDeclRef requirementRef) {
-    auto reqAccessor = dyn_cast<AccessorDecl>(requirementRef.getDecl());
+    auto reqDecl = requirementRef.getDecl();
+
+    // Static functions can be witnessed by enum cases with payload
+    if (!(isa<AccessorDecl>(reqDecl) || isa<ConstructorDecl>(reqDecl))) {
+      auto FD = cast<FuncDecl>(reqDecl);
+      if (auto witness = asDerived().getWitness(FD)) {
+        if (auto EED = dyn_cast<EnumElementDecl>(witness.getDecl())) {
+          return addMethodImplementation(
+              requirementRef, SILDeclRef(EED, SILDeclRef::Kind::EnumElement),
+              witness);
+        }
+      }
+    }
+
+    auto reqAccessor = dyn_cast<AccessorDecl>(reqDecl);
 
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
-      if (auto witness = asDerived().getWitness(requirementRef.getDecl())) {
+      if (auto witness = asDerived().getWitness(reqDecl)) {
         return addMethodImplementation(
             requirementRef, requirementRef.withDecl(witness.getDecl()),
             witness);
@@ -406,16 +420,10 @@ public:
     if (!witness)
       return asDerived().addMissingMethod(requirementRef);
 
-    // An enum case can witness:
-    // 1. A static get-only property requirement, as long as the property's
-    //    type is `Self` or it matches the type of the enum explicitly.
-    // 2. A static function requirement, if the enum case has a payload
-    //    and the payload types and labels match the function and the
-    //    function returns `Self` or the type of the enum.
+    // Static properties can be witnessed by enum cases without payload
     if (auto EED = dyn_cast<EnumElementDecl>(witness.getDecl())) {
       return addMethodImplementation(
-          requirementRef,
-          SILDeclRef(witness.getDecl(), SILDeclRef::Kind::EnumElement),
+          requirementRef, SILDeclRef(EED, SILDeclRef::Kind::EnumElement),
           witness);
     }
 
@@ -577,6 +585,10 @@ public:
       // conformance in which case it can be emitted multiple times.
       if (Linkage == SILLinkage::Shared)
         witnessLinkage = SILLinkage::Shared;
+    }
+
+    if (isa<EnumElementDecl>(witnessRef.getDecl())) {
+      assert(witnessRef.isEnumElement() && "Witness decl, but different kind?");
     }
 
     SILFunction *witnessFn = SGM.emitProtocolWitness(
@@ -743,12 +755,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
   Inline_t InlineStrategy = InlineDefault;
   if (witnessRef.isAlwaysInline())
     InlineStrategy = AlwaysInline;
-
-  // If the witness is an enum case, we need to emit the constructor
-  // unconditionally.
-  if (isa<EnumElementDecl>(witness.getDecl())) {
-    emitEnumConstructor(cast<EnumElementDecl>(witness.getDecl()));
-  }
 
   SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(
