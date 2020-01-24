@@ -1,8 +1,10 @@
 #/bin/bash
 
+set -ex
+
 sudo apt update
 sudo apt install \
-  git ninja-build clang python \
+  git ninja-build clang python python-six \
   uuid-dev libicu-dev icu-devtools libbsd-dev \
   libedit-dev libxml2-dev libsqlite3-dev swig \
   libpython-dev libncurses5-dev pkg-config \
@@ -14,15 +16,13 @@ SWIFT_PATH=$SOURCE_PATH/swift
 BUILD_SCRIPT=$SWIFT_PATH/utils/webassembly/build-linux.sh
 cd $SWIFT_PATH
 
-export current_sha=`git rev-parse HEAD`
-./utils/update-checkout --clone --scheme wasm
-git checkout $current_sha
+./utils/update-checkout --clone --scheme wasm --skip-repository swift
 
 # Install wasmtime
 
 sudo mkdir /opt/wasmtime && cd /opt/wasmtime
 wget -O - "https://github.com/bytecodealliance/wasmtime/releases/download/v0.8.0/wasmtime-v0.8.0-x86_64-linux.tar.xz" | \
-  sudo tar x --strip-components 1
+  sudo tar Jx --strip-components 1
 sudo ln -sf /opt/wasmtime/* /usr/local/bin
 
 cd $SOURCE_PATH
@@ -35,8 +35,8 @@ sudo ln -sf /opt/cmake/bin/* /usr/local/bin
 cmake --version
 
 wget -O dist-wasi-sdk.tgz https://github.com/swiftwasm/wasi-sdk/suites/370986556/artifacts/809002
-unzip dist-wasi-sdk.tgz
-WASI_SDK_TAR_PATH=$(find dist-ubuntu-latest.tgz -type f -name "wasi-sdk-*")
+unzip dist-wasi-sdk.tgz -d .
+WASI_SDK_TAR_PATH=$(find . -type f -name "wasi-sdk-*")
 WASI_SDK_FULL_NAME=$(basename $WASI_SDK_TAR_PATH -linux.tar.gz)
 tar xfz $WASI_SDK_TAR_PATH
 mv $WASI_SDK_FULL_NAME ./wasi-sdk
