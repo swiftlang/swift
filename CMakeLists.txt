@@ -449,12 +449,6 @@ execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} --version
 message(STATUS "CMake Make Program (${CMAKE_MAKE_PROGRAM}) Version: ${_CMAKE_MAKE_PROGRAM_VERSION}")
 message(STATUS "C Compiler (${CMAKE_C_COMPILER}) Version: ${CMAKE_C_COMPILER_VERSION}")
 message(STATUS "C++ Compiler (${CMAKE_CXX_COMPILER}) Version: ${CMAKE_CXX_COMPILER_VERSION}")
-if(SWIFT_PATH_TO_CMARK_BUILD)
-  execute_process(COMMAND ${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark --version
-    OUTPUT_VARIABLE _CMARK_VERSION
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  message(STATUS "CMark Version: ${_CMARK_VERSION}")
-endif()
 message(STATUS "")
 
 include(SwiftSharedCMakeConfig)
