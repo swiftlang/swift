@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -31,7 +31,6 @@
 
 using namespace swift;
 
-// how does this code ever even get invoked? you can’t compare uninhabited enums...
 static std::pair<BraceStmt *, bool>
 deriveBodyComparable_enum_uninhabited_lt(AbstractFunctionDecl *ltDecl, void *) {
   auto parentDC = ltDecl->getDeclContext();
@@ -42,26 +41,9 @@ deriveBodyComparable_enum_uninhabited_lt(AbstractFunctionDecl *ltDecl, void *) {
   auto bParam = args->get(1);
 
   assert(!cast<EnumDecl>(aParam->getType()->getAnyNominal())->hasCases());
+  assert(!cast<EnumDecl>(bParam->getType()->getAnyNominal())->hasCases());
 
-  SmallVector<ASTNode, 1> statements;
-  SmallVector<ASTNode, 0> cases;
-
-  // switch (a, b) { }
-  auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true,
-                                  AccessSemantics::Ordinary,
-                                  aParam->getType());
-  auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/ true,
-                                  AccessSemantics::Ordinary,
-                                  bParam->getType());
-  TupleTypeElt abTupleElts[2] = { aParam->getType(), bParam->getType() };
-  auto abExpr = TupleExpr::create(C, SourceLoc(), {aRef, bRef}, {}, {},
-                                  SourceLoc(), /*HasTrailingClosure*/ false,
-                                  /*implicit*/ true,
-                                  TupleType::get(abTupleElts, C));
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
-                                       SourceLoc(), cases, SourceLoc(), C);
-  statements.push_back(switchStmt);
-
+  SmallVector<ASTNode, 0> statements;
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
   return { body, /*isTypeChecked=*/true };
 }
@@ -143,7 +125,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
 
   SmallVector<ASTNode, 6> statements;
   SmallVector<ASTNode, 4> cases;
-  unsigned elementCount = 0;
+  unsigned elementCount = 0; // need this as `getAllElements` returns a generator
 
   // For each enum element, generate a case statement matching a pair containing
   // the same case, binding variables for the left- and right-hand associated
@@ -333,9 +315,10 @@ deriveComparable_lt(
   return comparableDecl;
 }
 
+// for now, only enums can synthesize `Comparable`, so this function can take 
+// an `EnumDecl` instead of a `NominalTypeDecl`
 bool 
-DerivedConformance::canDeriveComparable(DeclContext *context, NominalTypeDecl *declaration) {
-  auto enumeration = dyn_cast<EnumDecl>(declaration);
+DerivedConformance::canDeriveComparable(DeclContext *context, EnumDecl *enumeration) {
   // The type must be an enum.
   if (!enumeration) {
       return false;
@@ -349,26 +332,27 @@ DerivedConformance::canDeriveComparable(DeclContext *context, NominalTypeDecl *d
 }
 
 ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
-  if (checkAndDiagnoseDisallowedContext(requirement))
+  if (checkAndDiagnoseDisallowedContext(requirement)) {
     return nullptr;
-  // Build the necessary decl.
-  if (requirement->getBaseName() == "<") {
-    if (EnumDecl const *const enumeration = dyn_cast<EnumDecl>(this->Nominal)) {
-      std::pair<BraceStmt *, bool> (*synthesizer)(AbstractFunctionDecl *, void *);
-      if (enumeration->hasCases()) {
-        if (enumeration->hasOnlyCasesWithoutAssociatedValues()) {
-            synthesizer = &deriveBodyComparable_enum_noAssociatedValues_lt;
-        } else {
-            synthesizer = &deriveBodyComparable_enum_hasAssociatedValues_lt;
-        }
-      } else {
-        synthesizer = &deriveBodyComparable_enum_uninhabited_lt;
-      }
-      return deriveComparable_lt(*this, synthesizer);
-    } else {
-      llvm_unreachable("todo");
-    }
   }
-  requirement->diagnose(diag::broken_comparable_requirement);
-  return nullptr;
+  if (requirement->getBaseName() != "<") {
+    requirement->diagnose(diag::broken_comparable_requirement);
+    return nullptr;
+  }
+  
+  // Build the necessary decl.
+  auto enumeration = dyn_cast<EnumDecl>(this->Nominal);
+  assert(enumeration);
+  
+  std::pair<BraceStmt *, bool> (*synthesizer)(AbstractFunctionDecl *, void *);
+  if (enumeration->hasCases()) {
+    if (enumeration->hasOnlyCasesWithoutAssociatedValues()) {
+      synthesizer = &deriveBodyComparable_enum_noAssociatedValues_lt;
+    } else {
+      synthesizer = &deriveBodyComparable_enum_hasAssociatedValues_lt;
+    }
+  } else {
+    synthesizer = &deriveBodyComparable_enum_uninhabited_lt;
+  }
+  return deriveComparable_lt(*this, synthesizer);
 }

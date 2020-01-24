@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -80,7 +80,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
       
       case KnownProtocolKind::Comparable:
         return !enumDecl->hasPotentiallyUnavailableCaseValue()
-            && canDeriveComparable(DC, Nominal); // why do y’all pass wide `NominalTypeDecl*` value when u could pass downcast `EnumDecl*` value?
+            && canDeriveComparable(DC, enumDecl); 
 
         // "Simple" enums without availability attributes can explicitly derive
         // a CaseIterable conformance.
@@ -405,7 +405,7 @@ GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
   SmallVector<ASTNode, 1> statements;
   
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), guardReturnValue);
-  statements.emplace_back(ASTNode(returnStmt));
+  statements.push_back(returnStmt);
 
   // Next, generate the condition being checked.
   // lhs == rhs
