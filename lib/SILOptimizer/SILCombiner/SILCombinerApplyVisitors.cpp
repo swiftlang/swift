@@ -791,9 +791,6 @@ struct ConcreteArgumentCopy {
     assert(!paramInfo.isIndirectMutating()
            && "A mutated opened existential value can't be replaced");
 
-//    if (!paramInfo.isConsumed())
-//      return None;
-
     SILValue origArg = apply.getArgument(argIdx);
     // FIXME_opaque: With SIL opaque values, a formally indirect argument may be
     // passed as a SIL object. In this case, generate a copy_value for the new
@@ -817,11 +814,13 @@ struct ConcreteArgumentCopy {
     SILBuilderWithScope B(apply.getInstruction(), BuilderCtx);
     auto loc = apply.getLoc();
     auto *ASI = B.createAllocStack(loc, CEI.ConcreteValue->getType());
-
+    // If the type is an address, simple copy it.
     if (CEI.ConcreteValue->getType().isAddress()) {
       B.createCopyAddr(loc, CEI.ConcreteValue, ASI, IsNotTake,
                        IsInitialization_t::IsInitialization);
     } else {
+      // Otherwise, we probably got the value from the source of a store
+      // instruction so, create a store into the temporary argument.
       B.createStore(loc, CEI.ConcreteValue, ASI,
                     StoreOwnershipQualifier::Unqualified);
     }
@@ -863,7 +862,6 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
   // Create the new set of arguments to apply including their substitutions.
   SubstitutionMap NewCallSubs = Apply.getSubstitutionMap();
   SmallVector<SILValue, 8> NewArgs;
-  bool UpdatedArgs = false;
   unsigned ArgIdx = 0;
   // Push the indirect result arguments.
   for (unsigned EndIdx = Apply.getSubstCalleeConv().getSILArgIndexOfFirstParam();
@@ -891,18 +889,19 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
 
     // Ensure that we have a concrete value to propagate.
     assert(CEI.ConcreteValue);
-    
+
+    // If the parameter is expecting a pointer, then we need to create a
+    // alloc_stack to store the temporary value.
     if (Apply.getArgument(ArgIdx)->getType().isAddress()) {
       auto argSub =
           ConcreteArgumentCopy::generate(CEI, Apply, ArgIdx, BuilderCtx);
       if (argSub) {
-        UpdatedArgs = true;
         concreteArgCopies.push_back(*argSub);
         NewArgs.push_back(argSub->tempArg);
       }
     } else {
+      // Otherwise, we can just use the value itself.
       NewArgs.push_back(CEI.ConcreteValue);
-      UpdatedArgs = true;
     }
 
     // Form a new set of substitutions where the argument is
@@ -926,7 +925,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
         });
   }
 
-  if (!UpdatedArgs) {
+  if (NewArgs.empty()) {
     // Remove any new instructions created while attempting to optimize this
     // apply. Since the apply was never rewritten, if they aren't removed here,
     // they will be removed later as dead when visited by SILCombine, causing

@@ -69,9 +69,9 @@ findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI, SILInstruction *Insn) {
 
 /// Returns the instruction that initializes the given stack address. This is
 /// currently either a init_existential_addr, unconditional_checked_cast_addr,
-/// store, or copy_addr (if the instruction initializing the source of the copy cannot
-/// be determined). Returns nullptr if the initializer does not dominate the
-/// alloc_stack user \p ASIUser.  If the value is copied from another stack
+/// store, or copy_addr (if the instruction initializing the source of the copy
+/// cannot be determined). Returns nullptr if the initializer does not dominate
+/// the alloc_stack user \p ASIUser.  If the value is copied from another stack
 /// location, \p isCopied is set to true.
 ///
 /// allocStackAddr may either itself be an AllocStackInst or an
@@ -208,9 +208,10 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     //   <copy|store> %opened to %stack
     //   <opened_use> %instance
     if (auto *initI = getStackInitInst(instance, user, isOpenedValueCopied)) {
-      if (auto *IEA = dyn_cast<InitExistentialAddrInst>(initI))
-        // TODO: this case doesn't need to exist beacuse openedVal will never be used
-        openedVal = IEA;
+      // init_existential_addr isn't handled here because it isn't considered an
+      // "opened" archtype. init_existential_addr should be handled by
+      // ConcreteExistentialInfo.
+
       if (auto *CAI = dyn_cast<CopyAddrInst>(initI))
         openedVal = CAI->getSrc();
       if (auto *store = dyn_cast<StoreInst>(initI))
