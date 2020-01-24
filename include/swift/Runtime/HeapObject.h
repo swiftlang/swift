@@ -1094,7 +1094,7 @@ swift_getTypeName(const Metadata *type, bool qualified);
   swift_retain(SELF); \
   return self; \
 } \
-- (void)release { \
+- (oneway void)release { \
   auto SELF = reinterpret_cast<HeapObject *>(self); \
   swift_release(SELF); \
 } \
