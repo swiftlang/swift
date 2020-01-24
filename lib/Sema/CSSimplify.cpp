@@ -2995,7 +2995,7 @@ bool ConstraintSystem::repairFailures(
   auto elt = path.back();
   switch (elt.getKind()) {
   case ConstraintLocator::LValueConversion: {
-    auto CTP = getContextualTypePurpose();
+    auto CTP = getContextualTypePurpose(anchor);
     // Special case for `CTP_CallArgument` set by CSDiag
     // while type-checking each argument because we yet
     // to cover argument-to-parameter conversions in the
@@ -3368,7 +3368,7 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isHole() || rhs->isHole())
       return true;
 
-    auto purpose = getContextualTypePurpose();
+    auto purpose = getContextualTypePurpose(anchor);
     if (rhs->isVoid() &&
         (purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr)) {
       conversionsOrFixes.push_back(
