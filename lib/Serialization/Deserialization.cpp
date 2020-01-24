@@ -4503,6 +4503,21 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   return None;
 }
 
+/// Translate from the serialization SILParameterDifferentiability enumerators,
+/// which are guaranteed to be stable, to the AST ones.
+static Optional<swift::SILParameterDifferentiability>
+getActualSILParameterDifferentiability(uint8_t raw) {
+  switch (serialization::SILParameterDifferentiability(raw)) {
+#define CASE(ID)                                                               \
+  case serialization::SILParameterDifferentiability::ID:                       \
+    return swift::SILParameterDifferentiability::ID;
+  CASE(DifferentiableOrNotApplicable)
+  CASE(NotDifferentiable)
+#undef CASE
+  }
+  return None;
+}
+
 /// Translate from the serialization ResultConvention enumerators,
 /// which are guaranteed to be stable, to the AST ones.
 static
@@ -5144,15 +5159,26 @@ public:
     if (!calleeConvention.hasValue())
       MF.fatal();
 
-    auto processParameter = [&](TypeID typeID, uint64_t rawConvention)
-                                  -> llvm::Expected<SILParameterInfo> {
+    auto processParameter =
+        [&](TypeID typeID, uint64_t rawConvention,
+            uint64_t ramDifferentiability) -> llvm::Expected<SILParameterInfo> {
       auto convention = getActualParameterConvention(rawConvention);
       if (!convention)
         MF.fatal();
       auto type = MF.getTypeChecked(typeID);
       if (!type)
         return type.takeError();
-      return SILParameterInfo(type.get()->getCanonicalType(), *convention);
+      auto differentiability =
+          swift::SILParameterDifferentiability::DifferentiableOrNotApplicable;
+      if (diffKind != DifferentiabilityKind::NonDifferentiable) {
+        auto differentiabilityOpt =
+            getActualSILParameterDifferentiability(ramDifferentiability);
+        if (!differentiabilityOpt)
+          MF.fatal();
+        differentiability = *differentiabilityOpt;
+      }
+      return SILParameterInfo(type.get()->getCanonicalType(), *convention,
+                              differentiability);
     };
 
     auto processYield = [&](TypeID typeID, uint64_t rawConvention)
@@ -5191,7 +5217,10 @@ public:
     for (unsigned i = 0; i != numParams; ++i) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
-      auto param = processParameter(typeID, rawConvention);
+      uint64_t differentiability = 0;
+      if (diffKind != DifferentiabilityKind::NonDifferentiable)
+        differentiability = variableData[nextVariableDataIndex++];
+      auto param = processParameter(typeID, rawConvention, differentiability);
       if (!param)
         return param.takeError();
       allParams.push_back(param.get());
