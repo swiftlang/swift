@@ -660,7 +660,7 @@ public:
         : F(F), EA(EA), isSummaryGraph(isSummaryGraph) {}
 
     /// Returns true if the connection graph is empty.
-    bool isEmpty() {
+    bool isEmpty() const {
       return Values2Nodes.empty() && Nodes.empty() && UsePoints.empty();
     }
 
@@ -906,11 +906,10 @@ public:
     /// Dump the connection graph to a DOT file for remote debugging.
     void dumpCG() const;
 
-    /// Checks if the graph is OK.
-    void verify(bool allowMerge = false) const;
+    /// Checks if the graph is valid and complete.
+    void verify() const;
 
-    /// Just verifies the graph structure. This function can also be called
-    /// during the graph is modified, e.g. in mergeAllScheduledNodes().
+    /// Just verifies the graph nodes.
     void verifyStructure(bool allowMerge = false) const;
 
     friend struct ::CGForDotView;
@@ -1045,8 +1044,9 @@ private:
 
   /// If \p ai is an optimizable @_semantics("array.uninitialized") call, return
   /// valid call information.
-  ArrayUninitCall canOptimizeArrayUninitializedCall(ApplyInst *ai,
-                                                    ConnectionGraph *conGraph);
+  ArrayUninitCall
+  canOptimizeArrayUninitializedCall(ApplyInst *ai,
+                                    const ConnectionGraph *conGraph);
 
   /// Return true of this tuple_extract is the result of an optimizable
   /// @_semantics("array.uninitialized") call.
@@ -1174,25 +1174,9 @@ public:
 
   virtual bool needsNotifications() override { return true; }
 
-  virtual void verify() const override {
-#ifndef NDEBUG
-    for (auto Iter : Function2Info) {
-      FunctionInfo *FInfo = Iter.second;
-      FInfo->Graph.verify();
-      FInfo->SummaryGraph.verify();
-    }
-#endif
-  }
+  virtual void verify() const override;
 
-  virtual void verify(SILFunction *F) const override {
-#ifndef NDEBUG
-    if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
-      FInfo->Graph.verify();
-      FInfo->SummaryGraph.verify();
-    }
-#endif
-  }
-
+  virtual void verify(SILFunction *F) const override;
 };
 
 } // end namespace swift
