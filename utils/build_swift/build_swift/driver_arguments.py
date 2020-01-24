@@ -400,6 +400,7 @@ def create_argument_parser():
     option('--host-libtool', store_path(executable=True),
            help='the absolute path to libtool. Default is auto detected.')
     option('--distcc', toggle_true,
+           default=os.environ.get('USE_DISTCC') == '1',
            help='use distcc in pump mode')
     option('--enable-asan', toggle_true,
            help='enable Address Sanitizer')
