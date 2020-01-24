@@ -44,7 +44,7 @@ set(all_overlays
   MetalKit
   ModelIO
   NaturalLanguage
-#  Network
+  Network
   ObjectiveC
   OpenCL
   os
