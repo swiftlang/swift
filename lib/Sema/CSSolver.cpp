@@ -168,6 +168,10 @@ Solution ConstraintSystem::finalize() {
     solution.addedNodeTypes.insert(nodeType);
   }
 
+  // Remember contextual types.
+  solution.contextualTypes.assign(
+      contextualTypes.begin(), contextualTypes.end());
+
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
 
@@ -230,6 +234,14 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (auto &nodeType : solution.addedNodeTypes) {
     if (!hasType(nodeType.first))
       setType(nodeType.first, nodeType.second);
+  }
+
+  // Add the contextual types.
+  for (const auto &contextualType : solution.contextualTypes) {
+    if (!getContextualTypeInfo(contextualType.first)) {
+      setContextualType(contextualType.first, contextualType.second.typeLoc,
+                        contextualType.second.purpose);
+    }
   }
 
   // Register the conformances checked along the way to arrive to solution.

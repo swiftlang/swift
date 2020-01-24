@@ -787,6 +787,15 @@ using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
 using OpenedTypeMap =
     llvm::DenseMap<GenericTypeParamType *, TypeVariableType *>;
 
+/// Describes contextual type information about a particular expression
+/// within a constraint system.
+struct ContextualTypeInfo  {
+  TypeLoc typeLoc;
+  ContextualTypePurpose purpose;
+
+  Type getType() const { return typeLoc.getType(); }
+};
+
 /// A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -848,6 +857,9 @@ public:
 
   /// The node -> type mappings introduced by this solution.
   llvm::MapVector<TypedNode, Type> addedNodeTypes;
+
+  /// Contextual types introduced by this solution.
+  std::vector<std::pair<const Expr *, ContextualTypeInfo>> contextualTypes;
 
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
@@ -1299,13 +1311,6 @@ private:
   llvm::DenseMap<const VarDecl *, TypeBase *> VarTypes;
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
       KeyPathComponentTypes;
-
-  struct ContextualTypeInfo  {
-    TypeLoc typeLoc;
-    ContextualTypePurpose purpose;
-
-    Type getType() const { return typeLoc.getType(); }
-  };
 
   /// Contextual type information for expressions that are part of this
   /// constraint system.
@@ -2174,35 +2179,36 @@ public:
     return E;
   }
 
-  void setContextualType(Expr *expr, TypeLoc T, ContextualTypePurpose purpose) {
+  void setContextualType(
+      const Expr *expr, TypeLoc T, ContextualTypePurpose purpose) {
     assert(expr != nullptr && "Expected non-null expression!");
     assert(contextualTypes.count(expr) == 0 &&
            "Already set this contextual type");
     contextualTypes[expr] = { T, purpose };
   }
 
-  Optional<ContextualTypeInfo> getContextualTypeInfo(Expr *expr) const {
+  Optional<ContextualTypeInfo> getContextualTypeInfo(const Expr *expr) const {
     auto known = contextualTypes.find(expr);
     if (known == contextualTypes.end())
       return None;
     return known->second;
   }
 
-  Type getContextualType(Expr *expr) const {
+  Type getContextualType(const Expr *expr) const {
     auto result = getContextualTypeInfo(expr);
     if (result)
       return result->typeLoc.getType();
     return Type();
   }
 
-  TypeLoc getContextualTypeLoc(Expr *expr) const {
+  TypeLoc getContextualTypeLoc(const Expr *expr) const {
     auto result = getContextualTypeInfo(expr);
     if (result)
       return result->typeLoc;
     return TypeLoc();
   }
 
-  ContextualTypePurpose getContextualTypePurpose(Expr *expr) const {
+  ContextualTypePurpose getContextualTypePurpose(const Expr *expr) const {
     auto result = getContextualTypeInfo(expr);
     if (result)
       return result->purpose;
