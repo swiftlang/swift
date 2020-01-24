@@ -987,6 +987,13 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_object_t Args = sourcekitd_request_array_create(nullptr, 0);
     if (!Opts.ModuleCachePath.empty()) {
       if (compilerArgsAreClang) {
+        // We need -fmodules or else the clang argument parsing does not honour
+        // -fmodules-cache-path. In reality, the swift ClangImporter will always
+        // enable modules when importing, so this should only impact the
+        // clang argument parsing. This is needed even if the header doesn't
+        // use modules, since Swift itself will import its shims module, and
+        // that needs to honour the -module-cache-path option when testing.
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, "-fmodules");
         std::string opt = "-fmodules-cache-path=" + Opts.ModuleCachePath;
         sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, opt.c_str());
       } else {
