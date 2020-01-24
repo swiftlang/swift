@@ -696,7 +696,7 @@ public protocol BinaryInteger :
   /// A type that represents the words of a binary integer.
   ///
   /// The `Words` type must conform to the `RandomAccessCollection` protocol
-  /// with an `Element` type of `UInt` and `Index` type of `Int.
+  /// with an `Element` type of `UInt` and `Index` type of `Int`.
   associatedtype Words: RandomAccessCollection
       where Words.Element == UInt, Words.Index == Int
 
