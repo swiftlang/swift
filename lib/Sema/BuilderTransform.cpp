@@ -324,27 +324,11 @@ protected:
   CONTROL_FLOW_STMT(Yield)
   CONTROL_FLOW_STMT(Defer)
 
-  /// Whether we can handle all of the conditions for this statement.
-  static bool canHandleStmtConditions(StmtCondition condition) {
-    for (const auto &element : condition) {
-      switch (element.getKind()) {
-      case StmtConditionElement::CK_Boolean:
-        continue;
-
-      case StmtConditionElement::CK_PatternBinding:
-      case StmtConditionElement::CK_Availability:
-        return false;
-      }
-    }
-
-    return true;
-  }
-
   static bool isBuildableIfChainRecursive(IfStmt *ifStmt,
                                           unsigned &numPayloads,
                                           bool &isOptional) {
     // Check whether we can handle the conditional.
-    if (!canHandleStmtConditions(ifStmt->getCond()))
+    if (!ConstraintSystem::canGenerateConstraints(ifStmt->getCond()))
       return false;
 
     // The 'then' clause contributes a payload.
@@ -470,36 +454,10 @@ protected:
           payloadIndex + 1, numPayloads, isOptional);
     }
 
-    // Condition must convert to Bool.
-    // FIXME: This should be folded into constraint generation for conditions.
-    auto boolDecl = ctx.getBoolDecl();
-    if (!boolDecl) {
+    // Generate constraints for the conditions.
+    if (cs->generateConstraints(ifStmt->getCond(), dc)) {
       hadError = true;
       return nullptr;
-    }
-
-    // Generate constraints for the conditions.
-    for (const auto &condElement : ifStmt->getCond()) {
-      switch (condElement.getKind()) {
-      case StmtConditionElement::CK_Boolean: {
-        Expr *condExpr = condElement.getBoolean();
-        condExpr = cs->generateConstraints(condExpr, dc);
-        if (!condExpr) {
-          hadError = true;
-          return nullptr;
-        }
-
-        cs->addConstraint(ConstraintKind::Conversion,
-                          cs->getType(condExpr),
-                          boolDecl->getDeclaredType(),
-                          cs->getConstraintLocator(condExpr));
-        continue;
-      }
-
-      case StmtConditionElement::CK_PatternBinding:
-      case StmtConditionElement::CK_Availability:
-        llvm_unreachable("unhandled statement condition");
-      }
     }
 
     // The operand should have optional type if we had optional results,
@@ -873,6 +831,9 @@ public:
     auto condition = ifStmt->getCond();
     for (auto &condElement : condition) {
       switch (condElement.getKind()) {
+      case StmtConditionElement::CK_Availability:
+        continue;
+
       case StmtConditionElement::CK_Boolean: {
         auto condExpr = condElement.getBoolean();
         auto finalCondExpr = rewriteExpr(condExpr);
@@ -888,7 +849,6 @@ public:
       }
 
       case StmtConditionElement::CK_PatternBinding:
-      case StmtConditionElement::CK_Availability:
         llvm_unreachable("unhandled statement condition");
       }
     }

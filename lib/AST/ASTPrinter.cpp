@@ -4649,6 +4649,13 @@ void SILParameterInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
 }
 void SILParameterInfo::print(ASTPrinter &Printer,
                              const PrintOptions &Opts) const {
+  switch (getDifferentiability()) {
+  case SILParameterDifferentiability::NotDifferentiable:
+    Printer << "@noDerivative ";
+    break;
+  default:
+    break;
+  }
   Printer << getStringForParameterConvention(getConvention());
   getInterfaceType().print(Printer, Opts);
 }
