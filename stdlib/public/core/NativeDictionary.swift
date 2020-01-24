@@ -189,7 +189,6 @@ extension _NativeDictionary { // Low-level lookup operations
 extension _NativeDictionary { // ensureUnique
   @inlinable
   internal mutating func resize(capacity: Int) {
-    let capacity = Swift.max(capacity, self.capacity)
     let newStorage = _DictionaryStorage<Key, Value>.resize(
       original: _storage,
       capacity: capacity,
@@ -207,6 +206,13 @@ extension _NativeDictionary { // ensureUnique
       _storage._count = 0
     }
     _storage = result._storage
+  }
+
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @usableFromInline
+  internal var isShrinkable: Bool {
+      _storage._reservedScale < _storage._scale
+      && count < _HashTable.minimumCapacity(forScale: _storage._scale)
   }
 
   @inlinable
@@ -270,6 +276,8 @@ extension _NativeDictionary { // ensureUnique
 
   internal mutating func reserveCapacity(_ capacity: Int, isUnique: Bool) {
     _ = ensureUnique(isUnique: isUnique, capacity: capacity)
+    _internalInvariant(self._storage !== __RawDictionaryStorage.empty)
+    self._storage._reservedScale = _HashTable.scale(forCapacity: capacity)
   }
 }
 
@@ -429,6 +437,10 @@ extension _NativeDictionary {
             // the key too and register the removal.
             (_keys + bucket.offset).deinitialize(count: 1)
             _delete(at: bucket)
+            if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *),
+               isShrinkable {
+              resize(capacity: count)
+            }
           } else {
             // Noop
           }
@@ -687,6 +699,10 @@ extension _NativeDictionary { // Deletion
     let oldKey = (_keys + bucket.offset).move()
     let oldValue = (_values + bucket.offset).move()
     _delete(at: bucket)
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *),
+       isShrinkable {
+      resize(capacity: count)
+    }
     return (oldKey, oldValue)
   }
 

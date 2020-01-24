@@ -55,7 +55,7 @@ internal struct _HashTable {
 }
 
 extension _HashTable {
-  /// The inverse of the maximum hash table load factor.
+  /// The maximum hash table load factor.
   private static var maxLoadFactor: Double {
     @inline(__always) get { return 3 / 4 }
   }
@@ -63,6 +63,19 @@ extension _HashTable {
   internal static func capacity(forScale scale: Int8) -> Int {
     let bucketCount = (1 as Int) &<< scale
     return Int(Double(bucketCount) * maxLoadFactor)
+  }
+
+  internal static func minimumCapacity(forScale scale: Int8) -> Int {
+    // For scales less than 4, set no minimum.
+    if scale < 4 { return 0 }
+    // Otherwise, set a minimum load factor of 25% plus one. (The plus one is
+    // necessary to ensure we don't shrink down by two scales after a removal,
+    // ending up with a table at full capacity. It's better to jump down a
+    // single step, so that the resulting table is half full and it won't get
+    // immediately resized again if an insertion follows the removal that
+    // triggered the shrinking.)
+    let capacity = (1 as Int) &<< (scale - 2)
+    return capacity + 1
   }
 
   internal static func scale(forCapacity capacity: Int) -> Int8 {

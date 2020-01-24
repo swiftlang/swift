@@ -113,8 +113,13 @@ extension Dictionary._Variant {
 #if _runtime(_ObjC)
     guard isNative else {
       let cocoa = asCocoa
-      let capacity = Swift.max(cocoa.count, capacity)
-      self = .init(native: _NativeDictionary(cocoa, capacity: capacity))
+      var native = _NativeDictionary<Key, Value>(
+        cocoa,
+        capacity: Swift.max(cocoa.count, capacity))
+      if capacity > 0 {
+        native.reserveCapacity(capacity, isUnique: true)
+      }
+      self = .init(native: native)
       return
     }
 #endif
