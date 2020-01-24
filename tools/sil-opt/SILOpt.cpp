@@ -102,6 +102,10 @@ static llvm::cl::opt<bool>
 VerifyExclusivity("enable-verify-exclusivity",
                   llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
 
+static llvm::cl::opt<bool>
+EnableSpeculativeDevirtualization("enable-spec-devirt",
+                  llvm::cl::desc("Enable Speculative Devirtualization pass."));
+
 namespace {
 enum EnforceExclusivityMode {
   Unchecked, // static only
@@ -375,6 +379,8 @@ int main(int argc, char **argv) {
       break;
     }
   }
+
+  SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

@@ -2948,6 +2948,8 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   auto convention = DefaultParameterConvention;
   Type type;
   bool hadError = false;
+  auto differentiability =
+      SILParameterDifferentiability::DifferentiableOrNotApplicable;
 
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
     auto attrs = attrRepr->getAttrs();
@@ -2973,6 +2975,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     checkFor(TypeAttrKind::TAK_owned, ParameterConvention::Direct_Owned);
     checkFor(TypeAttrKind::TAK_guaranteed,
              ParameterConvention::Direct_Guaranteed);
+    if (attrs.has(TAK_noDerivative)) {
+      attrs.clearAttribute(TAK_noDerivative);
+      differentiability = SILParameterDifferentiability::NotDifferentiable;
+    }
 
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
   } else {
@@ -2989,7 +2995,8 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   }
 
   if (hadError) type = ErrorType::get(Context);
-  return SILParameterInfo(type->getCanonicalType(), convention);
+  return SILParameterInfo(type->getCanonicalType(), convention,
+                          differentiability);
 }
 
 bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
