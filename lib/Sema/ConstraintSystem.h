@@ -2413,6 +2413,10 @@ public:
   void addConstraint(Requirement req, ConstraintLocatorBuilder locator,
                      bool isFavored = false);
 
+  /// Add the appropriate constraint for a contextual conversion.
+  void addContextualConversionConstraint(
+      Expr *expr, ContextualTypeInfo contextualType);
+
   /// Add a "join" constraint between a set of types, producing the common
   /// supertype.
   ///

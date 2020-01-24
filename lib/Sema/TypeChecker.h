@@ -47,7 +47,6 @@ enum class TypeResolutionStage : uint8_t;
 
 namespace constraints {
   enum class ConstraintKind : char;
-  enum class SolutionKind : char;
   class ConstraintSystem;
   class Solution;
   class SolutionResult;

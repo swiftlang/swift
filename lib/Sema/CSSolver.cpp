@@ -1226,28 +1226,14 @@ ConstraintSystem::solveImpl(Expr *&expr,
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
   if (convertType) {
-    auto constraintKind = ConstraintKind::Conversion;
-
     auto ctp = getContextualTypePurpose(origExpr);
-    if ((ctp == CTP_ReturnStmt ||
-         ctp == CTP_ReturnSingleExpr ||
-         ctp == CTP_Initialization)
-        && Options.contains(ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType))
-      constraintKind = ConstraintKind::OpaqueUnderlyingType;
-    
-    if (ctp == CTP_CallArgument)
-      constraintKind = ConstraintKind::ArgumentConversion;
 
-    // In a by-reference yield, we expect the contextual type to be an
-    // l-value type, so the result must be bound to that.
-    if (ctp == CTP_YieldByReference)
-      constraintKind = ConstraintKind::Bind;
-
-    bool isForSingleExprFunction = ctp == CTP_ReturnSingleExpr;
-    auto *convertTypeLocator = getConstraintLocator(
-        expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
-
+    // Substitute type variables in for unresolved types.
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
+      bool isForSingleExprFunction = (ctp == CTP_ReturnSingleExpr);
+      auto *convertTypeLocator = getConstraintLocator(
+          expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
+
       convertType = convertType.transform([&](Type type) -> Type {
         if (type->is<UnresolvedType>())
           return createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
@@ -1255,8 +1241,8 @@ ConstraintSystem::solveImpl(Expr *&expr,
       });
     }
 
-    addConstraint(constraintKind, getType(expr), convertType,
-                  convertTypeLocator, /*isFavored*/ true);
+    ContextualTypeInfo info{TypeLoc::withoutLoc(convertType), ctp};
+    addContextualConversionConstraint(expr, info);
   }
 
   // Notify the listener that we've built the constraint system.
