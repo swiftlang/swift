@@ -532,8 +532,9 @@ class ContextualFailure : public FailureDiagnostic {
 public:
   ContextualFailure(ConstraintSystem &cs, Type lhs, Type rhs,
                     ConstraintLocator *locator)
-      : ContextualFailure(cs, cs.getContextualTypePurpose(), lhs, rhs,
-                          locator) {}
+      : ContextualFailure(cs,
+                          cs.getContextualTypePurpose(locator->getAnchor()),
+                          lhs, rhs, locator) {}
 
   ContextualFailure(ConstraintSystem &cs, ContextualTypePurpose purpose,
                     Type lhs, Type rhs, ConstraintLocator *locator)

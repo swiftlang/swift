@@ -24,11 +24,6 @@ function(add_swift_target_executable name)
   # All Swift executables depend on the swiftSwiftOnoneSupport library.
   list(APPEND SWIFTEXE_TARGET_DEPENDS swiftSwiftOnoneSupport)
 
-  if(NOT "${SWIFT_BUILD_STDLIB}")
-    list(REMOVE_ITEM SWIFTEXE_TARGET_LINK_LIBRARIES
-        swiftCore)
-  endif()
-
   foreach(sdk ${SWIFT_SDKS})
     foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
       set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")

@@ -1423,7 +1423,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     if (calleeInfo.closeness == CC_ExactMatch)
       return true;
 
-    if (!CS.getContextualType() ||
+    if (!CS.getContextualType(callExpr) ||
         (calleeInfo.closeness != CC_ArgumentMismatch &&
          calleeInfo.closeness != CC_OneGenericArgumentMismatch))
       return false;
@@ -1585,14 +1585,14 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
 /// An IdentityExpr doesn't change its argument, but it *can* propagate its
 /// contextual type information down.
 bool FailureDiagnosis::visitIdentityExpr(IdentityExpr *E) {
-  auto contextualType = CS.getContextualType();
+  auto contextualType = CS.getContextualType(E);
 
   // If we have a paren expr and our contextual type is a ParenType, remove the
   // paren expr sugar.
   if (contextualType)
     contextualType = contextualType->getWithoutParens();
   if (!typeCheckChildIndependently(E->getSubExpr(), contextualType,
-                                   CS.getContextualTypePurpose()))
+                                   CS.getContextualTypePurpose(E)))
     return true;
   return false;
 }
@@ -1666,8 +1666,10 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
       return;
 
     // If this is a contextual conversion problem, dig out some information.
-    if (diagnosis.diagnoseContextualConversionError(expr, getContextualType(),
-                                                    getContextualTypePurpose()))
+    if (diagnosis.diagnoseContextualConversionError(
+            expr,
+            getContextualType(expr),
+            getContextualTypePurpose(expr)))
       return;
 
     // If no one could find a problem with this expression or constraint system,
@@ -1795,7 +1797,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   // Diagnose ".foo" expressions that lack context specifically.
   if (auto UME =
         dyn_cast<UnresolvedMemberExpr>(E->getSemanticsProvidingExpr())) {
-    if (!CS.getContextualType()) {
+    if (!CS.getContextualType(E)) {
       diagnose(E->getLoc(), diag::unresolved_member_no_inference,UME->getName())
         .highlight(SourceRange(UME->getDotLoc(),
                                UME->getNameLoc().getSourceRange().End));

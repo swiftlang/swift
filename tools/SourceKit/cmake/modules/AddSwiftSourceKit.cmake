@@ -213,21 +213,16 @@ endmacro()
 #   add_sourcekit_executable(name        # Name of the executable
 #     [LLVM_LINK_COMPONENTS comp1 ...] # LLVM components this executable
 #                                        # depends on
-#     [EXCLUDE_FROM_ALL]              # Whether to exclude this executable from
-#                                     # the ALL_BUILD target
 #     source1 [source2 source3 ...])  # Sources to add into this executable
 macro(add_sourcekit_executable name)
-  cmake_parse_arguments(SOURCEKITEXE
-    "EXCLUDE_FROM_ALL"
-    ""
-    "LLVM_LINK_COMPONENTS"
-    ${ARGN})
+  set(SOURCEKIT_EXECUTABLE_options)
+  set(SOURCEKIT_EXECUTABLE_single_parameter_options)
+  set(SOURCEKIT_EXECUTABLE_multiple_parameter_options LLVM_LINK_COMPONENTS)
+  cmake_parse_arguments(SOURCEKITEXE "${SOURCEKIT_EXECUTABLE_options}"
+    "${SOURCEKIT_EXECUTABLE_single_parameter_options}"
+    "${SOURCEKIT_EXECUTABLE_multiple_parameter_options}" ${ARGN})
 
-  if (${SOURCEKITEXE_EXCLUDE_FROM_ALL})
-    add_executable(${name} EXCLUDE_FROM_ALL ${SOURCEKITEXE_UNPARSED_ARGUMENTS})
-  else()
-    add_executable(${name} ${SOURCEKITEXE_UNPARSED_ARGUMENTS})
-  endif()
+  add_executable(${name} ${SOURCEKITEXE_UNPARSED_ARGUMENTS})
   if(NOT SWIFT_BUILT_STANDALONE AND NOT CMAKE_C_COMPILER_ID MATCHES Clang)
     add_dependencies(${name} clang)
   endif()
@@ -245,17 +240,6 @@ macro(add_sourcekit_executable name)
   target_link_libraries(${name} PRIVATE ${LLVM_COMMON_LIBS})
 
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit executables")
-  if (NOT SWIFT_ASAN_BUILD)
-    if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-      set_target_properties(${name}
-        PROPERTIES
-        LINK_FLAGS "-Wl,-exported_symbol,_main")
-    endif()
-    if(SWIFT_ANALYZE_CODE_COVERAGE)
-      set_property(TARGET "${name}" APPEND_STRING PROPERTY
-        LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
-    endif()
-  endif()
   add_sourcekit_default_compiler_flags("${name}")
 endmacro()
 

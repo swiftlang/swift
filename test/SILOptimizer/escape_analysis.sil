@@ -1844,3 +1844,47 @@ bb3(%4 : $AnyObject):
   %5 = tuple ()
   return %5 : $()
 }
+
+// Test value_to_bridge_object merged with a local reference. A graph node
+// must be created for all values involved, and they must point to an
+// escaping content node.
+// CHECK-LABEL: CG of testValueToBridgeObject
+// CHECK-NEXT:   Val [ref] %1 Esc: , Succ: (%5.1)
+// CHECK-NEXT:   Val [ref] %5 Esc: , Succ: (%5.1)
+// CHECK-NEXT:   Con [int] %5.1 Esc: G, Succ: (%5.2)
+// CHECK-NEXT:   Con %5.2 Esc: G, Succ:
+// CHECK-NEXT:   Val [ref] %7 Esc: , Succ: (%5.1), %1, %5
+// CHECK-NEXT:   Ret [ref] return Esc: , Succ: %7
+// CHECK-LABEL: End
+sil @testValueToBridgeObject : $@convention(thin) (Builtin.Word) -> C {
+bb0(%0 : $Builtin.Word):
+  %1 = alloc_ref $C
+  cond_br undef, bb1, bb2
+
+bb1:
+  %derived = ref_to_bridge_object %1 : $C, %0 : $Builtin.Word
+  br bb3(%derived : $Builtin.BridgeObject)
+
+bb2:
+  %5 = value_to_bridge_object %0 : $Builtin.Word
+  br bb3(%5 : $Builtin.BridgeObject)
+
+bb3(%7 : $Builtin.BridgeObject):
+  %result = bridge_object_to_ref %7 : $Builtin.BridgeObject to $C
+  return %result : $C
+}
+
+// Test strong_copy_unowned_value returned. It must be marked escaping,
+// not simply "returned", because it's reference is formed from a
+// function argument.
+// CHECK-LABEL: CG of testStrongCopyUnowned
+// CHECK-NEXT:   Val [ref] %1 Esc: , Succ: (%1.1)
+// CHECK-NEXT:   Con [int] %1.1 Esc: G, Succ: (%1.2)
+// CHECK-NEXT:   Con %1.2 Esc: G, Succ:
+// CHECK-NEXT:   Ret [ref] return Esc: , Succ: %1
+// CHECK-LABEL: End
+sil [ossa] @testStrongCopyUnowned : $@convention(thin) (@guaranteed @sil_unowned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @guaranteed $@sil_unowned Builtin.NativeObject):
+  %1 = strong_copy_unowned_value %0 : $@sil_unowned Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
+}
