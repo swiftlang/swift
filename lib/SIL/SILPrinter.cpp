@@ -2918,7 +2918,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
 
   if (M)
     printMagicFileStringMap(
-        PrintCtx, M->computeMagicFileStringMap());
+        PrintCtx, M->computeMagicFileStringMap(/*shouldDiagnose=*/false));
 
   OS << "\n\n";
 }

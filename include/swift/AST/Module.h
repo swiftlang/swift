@@ -305,7 +305,7 @@ public:
   /// Note that this returns an empty StringMap if concise \c #file strings are
   /// disabled. Users should fall back to using the file path in this case.
   llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>
-  computeMagicFileStringMap() const;
+  computeMagicFileStringMap(bool shouldDiagnose) const;
 
   /// Add a file declaring a cross-import overlay.
   void addCrossImportOverlayFile(StringRef file);

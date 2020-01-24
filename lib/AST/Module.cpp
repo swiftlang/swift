@@ -2003,7 +2003,8 @@ computeMagicFileString(const ModuleDecl *module, StringRef name,
 
 static StringRef
 resolveMagicNameConflicts(const ModuleDecl *module, StringRef fileString,
-                          const llvm::StringMap<SourceFilePathInfo> &paths) {
+                          const llvm::StringMap<SourceFilePathInfo> &paths,
+                          bool shouldDiagnose) {
   assert(paths.size() > 1);
   assert(module->getASTContext().LangOpts.EnableConcisePoundFile);
 
@@ -2026,11 +2027,43 @@ resolveMagicNameConflicts(const ModuleDecl *module, StringRef fileString,
     }
   }
 
+  // If we're not diagnosing, that's all we need to do.
+  if (!shouldDiagnose)
+    return winner;
+
+  SmallString<64> winnerLiteral;
+  llvm::raw_svector_ostream winnerLiteralStream{winnerLiteral};
+  swift::printAsQuotedString(winnerLiteralStream, winner);
+
+  auto &diags = module->getASTContext().Diags;
+
+  // Diagnose the conflict at each #sourceLocation that specifies it.
+  for (const auto &pathPair : paths) {
+    bool isWinner = (pathPair.first() == winner);
+
+    // Don't diagnose #sourceLocations that match the physical file.
+    if (pathPair.second.physicalFileLoc.isValid()) {
+      assert(isWinner && "physical files should always win; duplicate name?");
+      continue;
+    }
+
+    for (auto loc : pathPair.second.virtualFileLocs) {
+      diags.diagnose(loc,
+                     diag::pound_source_location_creates_pound_file_conflicts,
+                     fileString);
+
+      // Offer a fix-it unless it would be tautological.
+      if (!isWinner)
+        diags.diagnose(loc, diag::fixit_correct_source_location_file, winner)
+          .fixItReplace(loc, winnerLiteral);
+    }
+  }
+
   return winner;
 }
 
 llvm::StringMap<std::pair<std::string, bool>>
-ModuleDecl::computeMagicFileStringMap() const {
+ModuleDecl::computeMagicFileStringMap(bool shouldDiagnose) const {
   llvm::StringMap<std::pair<std::string, bool>> result;
   SmallString<64> scratch;
 
@@ -2048,7 +2081,8 @@ ModuleDecl::computeMagicFileStringMap() const {
     // will simply warn about conflicts.
     StringRef winner = infoForPaths.begin()->first();
     if (infoForPaths.size() > 1)
-      winner = resolveMagicNameConflicts(this, scratch, infoForPaths);
+      winner = resolveMagicNameConflicts(this, scratch, infoForPaths,
+                                         shouldDiagnose);
 
     for (auto &pathPair : infoForPaths) {
       result[pathPair.first()] =

@@ -51,7 +51,8 @@ using namespace Lowering;
 
 SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
     : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
-      MagicFileStringsByFilePath(SM->computeMagicFileStringMap()) {
+      MagicFileStringsByFilePath(
+          SM->computeMagicFileStringMap(/*shouldDiagnose=*/true)) {
   const SILOptions &Opts = M.getOptions();
   if (!Opts.UseProfile.empty()) {
     auto ReaderOrErr = llvm::IndexedInstrProfReader::create(Opts.UseProfile);
