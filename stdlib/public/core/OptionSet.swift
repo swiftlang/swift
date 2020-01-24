@@ -278,7 +278,7 @@ extension OptionSet where Element == Self {
   ///     print(expressOption == .express)
   ///     // Prints "false"
   ///     print(expressOption == .secondDay)
-  ///     // Prints "true"
+  ///     // Prints "false"
   ///
   /// - Parameter member: The element of the set to remove.
   /// - Returns: The intersection of `[member]` and the set, if the
