@@ -40,7 +40,7 @@ bb0(%0 : $*ClassProtocol):
   // CHECK-NEXT: %7 = witness_method $C, #ClassProtocol.method
   %f = witness_method $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol, #ClassProtocol.method!1 : <Self: ClassProtocol> (Self) -> () -> (), %2 : $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
   // CHECK-NEXT: %8 = unchecked_ref_cast %6
-  // CHECK-NEXT: %9 = apply %7<C>(%8)
+  // CHECK-NEXT: %9 = apply %7<C>(%6)
   apply %f<@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol>(%2) : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
   // CHECK-NEXT: dealloc_stack %3
   // CHECK-NEXT: return undef

@@ -213,8 +213,8 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
         openedVal = IEA;
       if (auto *CAI = dyn_cast<CopyAddrInst>(initI))
         openedVal = CAI->getSrc();
-      if (auto *store = dyn_cast<StoreInst>(initI))
-        openedVal = store->getSrc();
+//      if (auto *store = dyn_cast<StoreInst>(initI))
+//        openedVal = store->getSrc();
     }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {

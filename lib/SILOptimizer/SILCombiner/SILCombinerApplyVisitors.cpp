@@ -814,6 +814,10 @@ struct ConcreteArgumentCopy {
     if (!paramInfo.isFormalIndirect())
       return None;
 
+    // TODO: Support non-address values (e.g. from stores).
+    if (!CEI.ConcreteValue->getType().isAddress())
+      return None;
+
     SILBuilderWithScope B(apply.getInstruction(), BuilderCtx);
     auto loc = apply.getLoc();
     auto *ASI = B.createAllocStack(loc, CEI.ConcreteValue->getType());
@@ -882,12 +886,13 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
       NewArgs.push_back(Apply.getArgument(ArgIdx));
       continue;
     }
-    UpdatedArgs = true;
+
     // Ensure that we have a concrete value to propagate.
     assert(CEI.ConcreteValue);
     auto argSub =
         ConcreteArgumentCopy::generate(CEI, Apply, ArgIdx, BuilderCtx);
     if (argSub) {
+      UpdatedArgs = true;
       concreteArgCopies.push_back(*argSub);
       NewArgs.push_back(argSub->tempArgCopy->getDest());
     } else
