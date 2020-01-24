@@ -1,4 +1,4 @@
-// RUN: %target-build-swift %s -O -wmo -emit-sil | %FileCheck %s
+// RUN: %target-sil-opt -O -wmo -enable-sil-verify-all %s | %FileCheck %s
 
 sil_stage canonical
 
