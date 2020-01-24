@@ -596,6 +596,7 @@ namespace {
     void run() override {
 
       auto &CurFn = *getFunction();
+
       // Don't perform speculative devirtualization at -Os.
       if (CurFn.optimizeForSize())
         return;
