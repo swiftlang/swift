@@ -257,7 +257,7 @@ struct MyTuplifiedStruct {
   }
 }
 
-// Check that we're performing syntactic use diagnostics/
+// Check that we're performing syntactic use diagnostics.
 func acceptMetatype<T>(_: T.Type) -> Bool { true }
 
 func syntacticUses<T>(_: T) {
@@ -266,6 +266,21 @@ func syntacticUses<T>(_: T) {
       // expected-note@-1{{use '.self' to reference the type object}}
       acceptMetatype(T) // expected-error{{expected member name or constructor call after type name}}
       // expected-note@-1{{use '.self' to reference the type object}}
+    }
+  }
+}
+
+// Check custom diagnostics within "if" conditions.
+struct HasProperty {
+  var property: Bool = false
+}
+
+func checkConditions(cond: Bool) {
+  var x = HasProperty()
+
+  tuplify(cond) { value in
+    if x.property = value { // expected-error{{use of '=' in a boolean context, did you mean '=='?}}
+      "matched it"
     }
   }
 }

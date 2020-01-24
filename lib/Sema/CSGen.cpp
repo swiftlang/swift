@@ -3821,6 +3821,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
     return true;
   }
 
+  Type boolTy = boolDecl->getDeclaredType();
   for (const auto &condElement : condition) {
     switch (condElement.getKind()) {
     case StmtConditionElement::CK_Availability:
@@ -3829,6 +3830,8 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
 
     case StmtConditionElement::CK_Boolean: {
       Expr *condExpr = condElement.getBoolean();
+      setContextualType(condExpr, TypeLoc::withoutLoc(boolTy), CTP_Condition);
+
       condExpr = generateConstraints(condExpr, dc);
       if (!condExpr) {
         return true;
@@ -3836,8 +3839,9 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
 
       addConstraint(ConstraintKind::Conversion,
                     getType(condExpr),
-                    boolDecl->getDeclaredType(),
-                    getConstraintLocator(condExpr));
+                    boolTy,
+                    getConstraintLocator(condExpr,
+                                         LocatorPathElt::ContextualType()));
       continue;
     }
 
