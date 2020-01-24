@@ -609,7 +609,7 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
   //   To    pointsTo-> NodeB (but still has a pointsTo edge to NodeB)
   while (!ToMerge.empty()) {
     if (EnableInternalVerify)
-      verify(/*allowMerge=*/true);
+      verifyStructure(true /*allowMerge*/);
 
     CGNode *From = ToMerge.pop_back_val();
     CGNode *To = From->getMergeTarget();
@@ -745,7 +745,6 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
     From->isMerged = true;
 
     if (From->mappedValue) {
-      // If possible, transfer 'From's mappedValue to 'To' for clarity. Any
       // values previously mapped to 'From' but not transferred to 'To's
       // mappedValue must remain mapped to 'From'. Lookups on those values will
       // find 'To' via the mergeTarget. Dropping a value's mapping is illegal
@@ -762,7 +761,7 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
     From->pointsTo = nullptr;
   }
   if (EnableInternalVerify)
-    verify(/*allowMerge=*/true);
+    verifyStructure(true /*allowMerge*/);
 }
 
 // As a result of a merge, update the pointsTo field of initialNode and
@@ -1574,21 +1573,40 @@ bool CGNode::matchPointToOfDefers(bool allowMerge) const {
   return true;
 }
 
-void EscapeAnalysis::ConnectionGraph::verify(bool allowMerge) const {
+void EscapeAnalysis::ConnectionGraph::verify() const {
 #ifndef NDEBUG
-  verifyStructure(allowMerge);
+  // Invalidating EscapeAnalysis clears the connection graph.
+  if (isEmpty())
+    return;
 
-  // Check graph invariants
-  for (CGNode *Nd : Nodes) {
-    // ConnectionGraph invariant #4: For any node N, all paths starting at N
-    // which consist of only defer-edges and a single trailing points-to edge
-    // must lead to the same
-    assert(Nd->matchPointToOfDefers(allowMerge));
-    if (Nd->mappedValue && !(allowMerge && Nd->isMerged)) {
-      assert(Nd == Values2Nodes.lookup(Nd->mappedValue));
-      assert(EA->isPointer(Nd->mappedValue));
-      // Nodes must always be mapped from the pointer root value.
-      assert(Nd->mappedValue == EA->getPointerRoot(Nd->mappedValue));
+  verifyStructure();
+
+  // Verify that all pointer nodes are still mapped, otherwise the process of
+  // merging nodes may have lost information.
+  for (SILBasicBlock &BB : *F) {
+    for (auto &I : BB) {
+      if (isNonWritableMemoryAddress(&I))
+        continue;
+
+      if (auto ai = dyn_cast<ApplyInst>(&I)) {
+        if (EA->canOptimizeArrayUninitializedCall(ai, this).isValid())
+          continue;
+      }
+      for (auto result : I.getResults()) {
+        if (EA->getPointerBase(result))
+          continue;
+
+        if (!EA->isPointer(result))
+          continue;
+
+        if (!Values2Nodes.lookup(result)) {
+          llvm::dbgs() << "No CG mapping for ";
+          result->dumpInContext();
+          llvm::dbgs() << " in:\n";
+          F->dump();
+          llvm_unreachable("Missing escape connection graph mapping");
+        }
+      }
     }
   }
 #endif
@@ -1597,6 +1615,7 @@ void EscapeAnalysis::ConnectionGraph::verify(bool allowMerge) const {
 void EscapeAnalysis::ConnectionGraph::verifyStructure(bool allowMerge) const {
 #ifndef NDEBUG
   for (CGNode *Nd : Nodes) {
+    // Verify the graph structure...
     if (Nd->isMerged) {
       assert(Nd->mergeTo);
       assert(!Nd->pointsTo);
@@ -1625,6 +1644,19 @@ void EscapeAnalysis::ConnectionGraph::verifyStructure(bool allowMerge) const {
     }
     if (Nd->isInterior())
       assert(Nd->pointsTo && "Interior content node requires a pointsTo node");
+
+    // ConnectionGraph invariant #4: For any node N, all paths starting at N
+    // which consist of only defer-edges and a single trailing points-to edge
+    // must lead to the same
+    assert(Nd->matchPointToOfDefers(allowMerge));
+
+    // Verify the node to value mapping...
+    if (Nd->mappedValue && !(allowMerge && Nd->isMerged)) {
+      assert(Nd == Values2Nodes.lookup(Nd->mappedValue));
+      assert(EA->isPointer(Nd->mappedValue));
+      // Nodes must always be mapped from the pointer root value.
+      assert(Nd->mappedValue == EA->getPointerRoot(Nd->mappedValue));
+    }
   }
 #endif
 }
@@ -1780,8 +1812,8 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
 }
 
 EscapeAnalysis::ArrayUninitCall
-EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai,
-                                                  ConnectionGraph *conGraph) {
+EscapeAnalysis::canOptimizeArrayUninitializedCall(
+    ApplyInst *ai, const ConnectionGraph *conGraph) {
   ArrayUninitCall call;
   // This must be an exact match so we don't accidentally optimize
   // "array.uninitialized_intrinsic".
@@ -2020,12 +2052,9 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       ConGraph->getNode(cast<SingleValueInstruction>(I));
       return;
 
-#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   case SILInstructionKind::Name##RetainInst:                                   \
-  case SILInstructionKind::StrongRetain##Name##Inst:                           \
-  case SILInstructionKind::StrongCopy##Name##ValueInst:
+  case SILInstructionKind::StrongRetain##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::DeallocStackInst:
     case SILInstructionKind::StrongRetainInst:
@@ -2043,8 +2072,11 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::SetDeallocatingInst:
     case SILInstructionKind::FixLifetimeInst:
     case SILInstructionKind::ClassifyBridgeObjectInst:
-    case SILInstructionKind::ValueToBridgeObjectInst:
-      // These instructions don't have any effect on escaping.
+      // Early bailout: These instructions never produce a pointer value and
+      // have no escaping effect on their operands.
+      assert(!llvm::any_of(I->getResults(), [this](SILValue result) {
+        return isPointer(result);
+      }));
       return;
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -2425,7 +2457,7 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
     if (BottomUpOrder.wasRecomputedWithCurrentUpdateID(FInfo)) {
       FInfo->Graph.computeUsePoints();
       FInfo->Graph.verify();
-      FInfo->SummaryGraph.verify();
+      FInfo->SummaryGraph.verifyStructure();
     }
   }
 }
@@ -2764,6 +2796,25 @@ void EscapeAnalysis::handleDeleteNotification(SILNode *node) {
       }
     }
   }
+}
+
+void EscapeAnalysis::verify() const {
+#ifndef NDEBUG
+  for (auto Iter : Function2Info) {
+    FunctionInfo *FInfo = Iter.second;
+    FInfo->Graph.verify();
+    FInfo->SummaryGraph.verifyStructure();
+  }
+#endif
+}
+
+void EscapeAnalysis::verify(SILFunction *F) const {
+#ifndef NDEBUG
+  if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
+    FInfo->Graph.verify();
+    FInfo->SummaryGraph.verifyStructure();
+  }
+#endif
 }
 
 SILAnalysis *swift::createEscapeAnalysis(SILModule *M) {

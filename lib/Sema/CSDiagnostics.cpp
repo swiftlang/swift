@@ -337,8 +337,9 @@ bool RequirementFailure::diagnoseAsError() {
     return true;
   }
 
-  if (genericCtx != reqDC && (genericCtx->isChildContextOf(reqDC) ||
-                              isStaticOrInstanceMember(AffectedDecl))) {
+  if (reqDC->isTypeContext() && genericCtx != reqDC &&
+      (genericCtx->isChildContextOf(reqDC) ||
+       isStaticOrInstanceMember(AffectedDecl))) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();
     emitDiagnostic(anchor->getLoc(), getDiagnosticInRereference(),
                    AffectedDecl->getDescriptiveKind(),
