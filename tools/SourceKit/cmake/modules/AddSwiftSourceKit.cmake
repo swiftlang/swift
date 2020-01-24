@@ -240,17 +240,6 @@ macro(add_sourcekit_executable name)
   target_link_libraries(${name} PRIVATE ${LLVM_COMMON_LIBS})
 
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit executables")
-  if (NOT SWIFT_ASAN_BUILD)
-    if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-      set_target_properties(${name}
-        PROPERTIES
-        LINK_FLAGS "-Wl,-exported_symbol,_main")
-    endif()
-    if(SWIFT_ANALYZE_CODE_COVERAGE)
-      set_property(TARGET "${name}" APPEND_STRING PROPERTY
-        LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
-    endif()
-  endif()
   add_sourcekit_default_compiler_flags("${name}")
 endmacro()
 
