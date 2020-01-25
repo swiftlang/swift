@@ -1571,18 +1571,44 @@ namespace driver {
           if (!ScheduledCommands.count(Cmd))
             continue;
 
-          // Be conservative, in case we use ranges this time but not next.
-          bool mightBeCascading = true;
-          if (Comp.getIncrementalBuildEnabled()) {
-            const bool forRanges = Comp.getEnableSourceRangeDependencies();
-            mightBeCascading = Comp.getEnableFineGrainedDependencies()
-                                   ? getFineGrainedDepGraph(forRanges)
-                                         .haveAnyNodesBeenTraversedIn(Cmd)
-                                   : getDepGraph(forRanges).isMarked(Cmd);
-          }
-          UnfinishedCommands.insert({Cmd, mightBeCascading});
+          const bool needsCascadingBuild =
+              computeNeedsCascadingBuildForUnfinishedCommand(Cmd);
+          UnfinishedCommands.insert({Cmd, needsCascadingBuild});
         }
       }
+    }
+
+    /// When the driver next runs, it will read the build record, and the
+    /// unfinished job status will be set to either \c NeedsCascading... or
+    /// \c NeedsNonCascading...
+    /// Decide which it will be.
+    /// As far as I can tell, the only difference the result of this function
+    /// makes is how soon
+    /// required dependents are recompiled. Here's my reasoning:
+    ///
+    /// When the driver next runs, the condition will be filtered through
+    /// \c loadDependenciesAndComputeCondition .
+    /// Then, the cascading predicate is returned from
+    /// \c isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation
+    /// and \c computeShouldInitiallyScheduleJobAndDependendents Then, in \c
+    /// computeDependenciesAndGetNeededCompileJobs if the job needs a cascading
+    /// build, it's dependents will be scheduled immediately.
+    /// After the job finishes, it's dependencies will be processed again.
+    /// If a non-cascading job failed, the driver will schedule all  of its
+    /// dependents. (All of its dependents are assumed to have already been
+    /// scheduled.) If the job succeeds, the revised dependencies are consulted
+    /// to schedule any needed jobs.
+
+    bool computeNeedsCascadingBuildForUnfinishedCommand(const Job *Cmd) {
+      if (!Comp.getIncrementalBuildEnabled())
+        return true;
+      const bool forRanges = Comp.getEnableSourceRangeDependencies();
+      if (!Comp.getEnableFineGrainedDependencies()) {
+        // Mysterious legacy code
+        return getDepGraph(forRanges).isMarked(Cmd);
+      }
+      // See the comment on the whole function above
+      return false;
     }
 
   public:
