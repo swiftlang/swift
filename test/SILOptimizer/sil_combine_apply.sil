@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 
+import Swift
 import Builtin
 
 //////////////////
@@ -7,7 +8,10 @@ import Builtin
 //////////////////
 
 sil @unknown : $@convention(thin) () -> ()
-sil @generic_callee : $@convention(thin) <T, U> (@in T, @in U) -> ()
+sil @generic_callee_in : $@convention(thin) <T, U> (@in T, @in U) -> ()
+sil @generic_callee_inguaranteed : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
+sil @callee : $@convention(thin) (Double, @in_guaranteed Int) -> ()
+sil @noreturn_func : $@convention(thin) () -> Never
 
 protocol Error {}
 
@@ -16,6 +20,10 @@ protocol SwiftP {
 }
 
 class Klass {}
+
+protocol FakeProtocol {
+  func requirement()
+}
 
 /////////////////////////////////
 // Tests for SILCombinerApply. //
@@ -259,33 +267,39 @@ bb0:
   return %9999 : $()
 }
 
-// This is a version of a test in sil_combine.sil that tests ignoring the
-// trivial alloc stack elimination optimization. Said optimization can make
-// testing ownership more difficult since the optimization does not care about
-// ownership correctness (i.e. it can hide leaks).
+// First make sure we do not handle this specific partial_apply case since we
+// are using @in parameters.
 //
-// This test first transforms (apply (partial_apply)) -> apply and then lets the
-// dead partial apply code eliminate the partial apply.
-//
-// CHECK-LABEL: sil @test_generic_partial_apply_apply
-// CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
-// CHECK-NEXT: [[PA_TMP:%.*]] = alloc_stack $T
-// CHECK-NEXT: [[APPLY_TMP:%.*]] = alloc_stack $T
-// CHECK: [[FN:%.*]] = function_ref @generic_callee
-// CHECK-NEXT: copy_addr [[ARG1]] to [initialization] [[APPLY_TMP]]
-// CHECK-NEXT: copy_addr [take] [[ARG1]] to [initialization] [[PA_TMP]]
-// CHECK-NEXT: apply [[FN]]<T, T>([[ARG0]], [[APPLY_TMP]])
-// CHECK-NEXT: destroy_addr [[PA_TMP]]
-// CHECK-NEXT: destroy_addr [[APPLY_TMP]]
-// CHECK-NEXT: tuple
-// CHECK-NEXT: dealloc_stack [[APPLY_TMP]]
-// CHECK-NEXT: dealloc_stack [[PA_TMP]]
-// CHECK-NEXT: return
-sil @test_generic_partial_apply_apply : $@convention(thin) <T> (@in T, @in T) -> () {
+// CHECK-LABEL: sil @test_generic_partial_apply_apply_in :
+// CHECK: partial_apply
+// CHECK: } // end sil function 'test_generic_partial_apply_apply_in'
+sil @test_generic_partial_apply_apply_in : $@convention(thin) <T> (@in T, @in T) -> () {
 bb0(%0 : $*T, %1 : $*T):
-  %f1 = function_ref @generic_callee : $@convention(thin) <T, U> (@in T, @in U) -> ()
+  %f1 = function_ref @generic_callee_in : $@convention(thin) <T, U> (@in T, @in U) -> ()
   %pa = partial_apply %f1<T, T>(%1) : $@convention(thin) <T, U> (@in T, @in U) -> ()
   %a1 = apply %pa(%0) : $@callee_owned (@in T) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Now check that we /do/ handle the in_guaranteed case.
+// CHECK-LABEL: sil @test_generic_partial_apply_apply_inguaranteed : $@convention(thin) <T> (@in T, @in T) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
+// CHECK:   [[STACK1:%.*]] = alloc_stack $T
+// CHECK:   [[STACK2:%.*]] = alloc_stack $T
+// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK2]]
+// CHECK:   copy_addr [take] [[ARG1]] to [initialization] [[STACK1]]
+// CHECK:   apply {{%.*}}<T, T>([[ARG0]], [[STACK2]])
+// CHECK:   destroy_addr [[STACK1]]
+// CHECK:   destroy_addr [[STACK2]]
+// CHECK:   destroy_addr [[ARG0]]
+// CHECK: } // end sil function 'test_generic_partial_apply_apply_inguaranteed'
+sil @test_generic_partial_apply_apply_inguaranteed : $@convention(thin) <T> (@in T, @in T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %f1 = function_ref @generic_callee_inguaranteed : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
+  %pa = partial_apply %f1<T, T>(%1) : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
+  %a1 = apply %pa(%0) : $@callee_owned (@in_guaranteed T) -> ()
+  destroy_addr %0 : $*T
   %r = tuple ()
   return %r : $()
 }
@@ -685,4 +699,263 @@ bb0(%0 : $Klass):
 
   %9999 = tuple()
   return %9999 : $()
+}
+
+///////////////////////////////////
+// (apply partial_apply()) tests //
+///////////////////////////////////
+
+class CC1 {
+   deinit
+  init()
+}
+
+class CC2 {
+   deinit
+  init()
+}
+
+class CC3 {
+   deinit
+  init()
+}
+
+class CC4 {
+   deinit
+  init()
+}
+
+sil @closure_with_in_args : $@convention(method) (@in CC1) -> ()
+sil @closure_with_inguaranteed_args : $@convention(method) (@in_guaranteed CC1) -> ()
+sil @closure_with_owned_args : $@convention(method) (@owned CC1) -> ()
+sil @closure_with_guaranteed_args : $@convention(method) (@guaranteed CC1) -> ()
+
+// Test the peephole performing apply{partial_apply(x, y, z)}(a) -> apply(a, x, y, z)
+//
+// We need to check the following:
+//
+// - All arguments of a partial_apply, which are either results of a stack_alloc
+//   or consumed indirect arguments should be copied into temporaries. This should
+//   happen just before that partial_apply instruction.
+//
+// - The temporaries are allocated at the beginning of the function and
+//   deallocated at the end.
+//
+// - Before each apply of the partial_apply, we retain values of any arguments
+//   which are of non-address type.  This is required because they could be
+//   consumed (i.e. released by the callee).
+//
+// - After each apply of the partial_apply, we release values of any arguments
+//   which are non-consumed by the callee (e.g. @guaranteed ones)
+//
+// We do this separately for each type of argument.
+
+// We do not handle this today.
+//
+// CHECK-LABEL: sil @test_apply_of_partial_apply_in : $@convention(thin) (@in CC1) -> () {
+// CHECK: [[PA:%.*]] = partial_apply
+// CHECK: apply [[PA]](
+// CHECK: } // end sil function 'test_apply_of_partial_apply_in'
+sil @test_apply_of_partial_apply_in : $@convention(thin) (@in CC1) -> () {
+bb0(%0 : $*CC1):
+  %1 = function_ref @closure_with_in_args : $@convention(method) (@in CC1) -> ()
+  %2 = alloc_stack $CC1
+  copy_addr [take] %0 to [initialization] %2 : $*CC1
+  %3 = partial_apply %1(%2) : $@convention(method) (@in CC1) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %3 : $@callee_owned () -> ()
+  br bb3
+
+bb2:
+  apply %3() : $@callee_owned () -> ()
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*CC1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test_apply_of_partial_apply_inguaranteed : $@convention(thin) (@in CC1) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[STACK1:%.*]] = alloc_stack $CC1
+// CHECK:   [[STACK2:%.*]] = alloc_stack $CC1
+// CHECK:   [[STACK3:%.*]] = alloc_stack $CC1
+// CHECK:   copy_addr [take] [[ARG]] to [initialization] [[STACK3]]
+// CHECK:   copy_addr [[STACK3]] to [initialization] [[STACK2]] : $*CC1
+// CHECK:   copy_addr [take] [[STACK3]] to [initialization] [[STACK1]]
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   destroy_addr [[STACK1]]
+// CHECK:   [[STACK2_VAL:%.*]] = load [[STACK2]]
+// CHECK:   strong_release [[STACK2_VAL]]
+// CHECK:   br bb3
+//
+// CHECK: bb2:
+// CHECK:   apply {{%.*}}([[STACK2]]) : $@convention(method) (@in_guaranteed CC1) -> ()
+// CHECK:   destroy_addr [[STACK1]]
+// CHECK:   [[STACK2_VAL:%.*]] = load [[STACK2]]
+// CHECK:   strong_release [[STACK2_VAL]]
+// CHECK:   br bb3
+//
+// CHECK: bb3:
+// CHECK:   dealloc_stack [[STACK3]]
+// CHECK:   dealloc_stack [[STACK2]]
+// CHECK:   dealloc_stack [[STACK1]]
+// CHECK: } // end sil function 'test_apply_of_partial_apply_inguaranteed'
+sil @test_apply_of_partial_apply_inguaranteed : $@convention(thin) (@in CC1) -> () {
+bb0(%0 : $*CC1):
+  %1 = function_ref @closure_with_inguaranteed_args : $@convention(method) (@in_guaranteed CC1) -> ()
+  %2 = alloc_stack $CC1
+  copy_addr [take] %0 to [initialization] %2 : $*CC1
+  %3 = partial_apply %1(%2) : $@convention(method) (@in_guaranteed CC1) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %3 : $@callee_owned () -> ()
+  br bb3
+
+bb2:
+  apply %3() : $@callee_owned () -> ()
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*CC1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test_apply_of_partial_apply_owned : $@convention(thin) (@in CC1) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[LOAD_ARG:%.*]] = load [[ARG]]
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   strong_release [[LOAD_ARG]]
+// CHECK:   br bb3
+//
+// CHECK: bb2:
+// CHECK:   strong_retain [[LOAD_ARG]]
+// CHECK:   apply {{%.*}}([[STACK2]]) : $@convention(method) (@owned CC1) -> ()
+// CHECK:   strong_release [[LOAD_ARG]]
+// CHECK:   br bb3
+//
+// CHECK: bb3:
+// CHECK: } // end sil function 'test_apply_of_partial_apply_owned'
+sil @test_apply_of_partial_apply_owned : $@convention(thin) (@in CC1) -> () {
+bb0(%0 : $*CC1):
+  %1 = function_ref @closure_with_owned_args : $@convention(method) (@owned CC1) -> ()
+  %2 = load %0 : $*CC1
+  %3 = partial_apply %1(%2) : $@convention(method) (@owned CC1) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %3 : $@callee_owned () -> ()
+  br bb3
+
+bb2:
+  apply %3() : $@callee_owned () -> ()
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test_apply_of_partial_apply_guaranteed : $@convention(thin) (@in CC1) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[LOAD_ARG:%.*]] = load [[ARG]]
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   strong_release [[LOAD_ARG]]
+// CHECK:   br bb3
+//
+// CHECK: bb2:
+// CHECK:   strong_retain [[LOAD_ARG]]
+// CHECK:   apply {{%.*}}([[STACK2]]) : $@convention(method) (@guaranteed CC1) -> ()
+// CHECK:   strong_release [[LOAD_ARG]]
+// CHECK:   strong_release [[LOAD_ARG]]
+// CHECK:   br bb3
+//
+// CHECK: bb3:
+// CHECK: } // end sil function 'test_apply_of_partial_apply_guaranteed'
+sil @test_apply_of_partial_apply_guaranteed : $@convention(thin) (@in CC1) -> () {
+bb0(%0 : $*CC1):
+  %1 = function_ref @closure_with_guaranteed_args : $@convention(method) (@guaranteed CC1) -> ()
+  %2 = load %0 : $*CC1
+  %3 = partial_apply %1(%2) : $@convention(method) (@guaranteed CC1) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %3 : $@callee_owned () -> ()
+  br bb3
+
+bb2:
+  apply %3() : $@callee_owned () -> ()
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
+// Test if we insert the right stack/dealloc-stack when converting apply{partial_apply}.
+
+// CHECK-LABEL: sil @test_stack_insertion_for_partial_apply_apply
+// CHECK:     bb0({{.*}}):
+// CHECK-NEXT:  [[T:%[0-9]+]] = alloc_stack $Int
+// CHECK-NEXT:  alloc_stack $Bool
+// CHECK-NEXT:  [[S2:%[0-9]+]] = alloc_stack $Int
+// CHECK:       copy_addr [[S2]] to [initialization] [[T]]
+// CHECK:       dealloc_stack [[S2]] : $*Int
+// CHECK:       apply
+// CHECK:     bb1:
+// CHECK-NOT:   dealloc_stack
+// CHECK:     bb2:
+// CHECK:       dealloc_stack {{.*}} : $*Bool
+// CHECK:       dealloc_stack [[T]] : $*Int
+// CHECK:       return
+sil @test_stack_insertion_for_partial_apply_apply : $@convention(thin) (Int, Double) -> () {
+bb0(%0 : $Int, %1 : $Double):
+  %s1 = alloc_stack $Bool
+  %s2 = alloc_stack $Int
+  store %0 to %s2 : $*Int
+  %f1 = function_ref @callee : $@convention(thin) (Double, @in_guaranteed Int) -> ()
+  %pa = partial_apply %f1(%s2) : $@convention(thin) (Double, @in_guaranteed Int) -> ()
+  dealloc_stack %s2 : $*Int
+  %a1 = apply %pa(%1) : $@callee_owned (Double) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f2 = function_ref @noreturn_func : $@convention(thin) () -> Never
+  %a2 = apply %f2() : $@convention(thin) () -> Never
+  unreachable
+
+bb2:
+  dealloc_stack %s1 : $*Bool
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_existential_partial_apply_apply
+// CHECK: bb0(%0 : $*FakeProtocol):
+// CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr immutable_access
+// CHECK-NEXT: [[FN:%.*]] = witness_method
+// CHECK-NEXT: apply [[FN]]<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>([[OPEN]])
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @test_existential_partial_apply_apply : $@convention(thin) (@in FakeProtocol) -> () {
+bb0(%0: $*FakeProtocol):
+  %o = open_existential_addr immutable_access %0 : $*FakeProtocol to $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol
+  %f1 = witness_method $@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol, #FakeProtocol.requirement!1, %o : $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol : $@convention(witness_method: FakeProtocol) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
+  %pa = partial_apply %f1<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>() : $@convention(witness_method: FakeProtocol) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
+  %a1 = apply %pa(%o) : $@callee_owned (@in_guaranteed @opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol) -> ()
+
+  %r = tuple ()
+  return %r : $()
 }
