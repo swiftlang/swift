@@ -252,23 +252,21 @@ SubstringTests.test("UTF8View") {
     expectEqual("", String(u.dropFirst(100))!)
     expectEqual("", String(u.dropLast(100))!)
 
-    let expectSubstringWCSIA: Bool
-    // This availability guard should refer to a concrete OS version in
-    // future.
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
-      expectSubstringWCSIA = true 
-    } else {
-      expectSubstringWCSIA = false
-    }
-
     checkHasContiguousStorage(s.utf8, expected: true) // Strings always do
-    checkHasContiguousStorage(t, expected: expectSubstringWCSIA)
-    checkHasContiguousStorage(u, expected: expectSubstringWCSIA)
     checkHasContiguousStorageSubstring(t)
     checkHasContiguousStorageSubstring(u)
     checkMatchContiguousStorage(Array(s.utf8), s.utf8, expected: true)
-    checkMatchContiguousStorage(Array(t), t, expected: expectSubstringWCSIA)
-    checkMatchContiguousStorage(Array(u), u, expected: expectSubstringWCSIA)
+
+    // The specialization for Substring.withContiguousStorageIfAvailable was
+    // added in https://github.com/apple/swift/pull/29146.
+    guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+      return
+    }
+
+    checkHasContiguousStorage(t, expected: true)
+    checkHasContiguousStorage(u, expected: true)
+    checkMatchContiguousStorage(Array(t), t, expected: true)
+    checkMatchContiguousStorage(Array(u), u, expected: true)
   }
 }
 
