@@ -64,7 +64,7 @@ deriveBodyComparable_enum_noAssociatedValues_lt(AbstractFunctionDecl *ltDecl,
   auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
 
   // Generate the conversion from the enums to integer indices.
-  SmallVector<ASTNode, 6> statements;
+  SmallVector<ASTNode, 8> statements;
   DeclRefExpr *aIndex = DerivedConformance::convertEnumToIndex(statements, parentDC, enumDecl,
                                            aParam, ltDecl, "index_a");
   DeclRefExpr *bIndex = DerivedConformance::convertEnumToIndex(statements, parentDC, enumDecl,
@@ -123,7 +123,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
   Type enumType = aParam->getType();
   auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
 
-  SmallVector<ASTNode, 6> statements;
+  SmallVector<ASTNode, 8> statements;
   SmallVector<ASTNode, 4> cases;
   unsigned elementCount = 0; // need this as `getAllElements` returns a generator
 
@@ -134,7 +134,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     elementCount++;
 
     // .<elt>(let l0, let l1, ...)
-    SmallVector<VarDecl*, 3> lhsPayloadVars;
+    SmallVector<VarDecl*, 4> lhsPayloadVars;
     auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', ltDecl,
                                                       lhsPayloadVars);
     auto lhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
@@ -144,7 +144,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     lhsElemPat->setImplicit();
 
     // .<elt>(let r0, let r1, ...)
-    SmallVector<VarDecl*, 3> rhsPayloadVars;
+    SmallVector<VarDecl*, 4> rhsPayloadVars;
     auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', ltDecl,
                                                       rhsPayloadVars);
     auto rhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
@@ -182,7 +182,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     // Generate a guard statement for each associated value in the payload,
     // breaking out early if any pair is unequal. (same as Equatable synthesis.)
     // the else statement performs the lexicographic comparison.
-    SmallVector<ASTNode, 6> statementsInCase;
+    SmallVector<ASTNode, 8> statementsInCase;
     for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); varIdx++) {
       auto lhsVar = lhsPayloadVars[varIdx];
       auto lhsExpr = new (C) DeclRefExpr(lhsVar, DeclNameLoc(),

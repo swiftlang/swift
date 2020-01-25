@@ -554,10 +554,10 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
 /// \p theEnum The enum whose elements and associated values should be checked.
 /// \p protocol The protocol being requested.
 /// \return The ParamDecl of each associated value whose type does not conform.
-SmallVector<ParamDecl *, 3>
+SmallVector<ParamDecl *, 4>
 DerivedConformance::associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
                                         ProtocolDecl *protocol) {
-  SmallVector<ParamDecl *, 3> nonconformingAssociatedValues;
+  SmallVector<ParamDecl *, 4> nonconformingAssociatedValues;
   for (auto elt : theEnum->getAllElements()) {
     auto PL = elt->getParameterList();
     if (!PL)
@@ -610,7 +610,7 @@ DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDec
     // types, and labels. For example:
     // case a(x: Int) => (x: let a0)
     // case b(Int, String) => (let a0, let a1)
-    SmallVector<TuplePatternElt, 3> elementPatterns;
+    SmallVector<TuplePatternElt, 4> elementPatterns;
     int index = 0;
     for (auto tupleElement : tupleType->getElements()) {
       auto payloadVar = indexedVarDecl(varPrefix, index++,

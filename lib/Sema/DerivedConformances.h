@@ -256,7 +256,7 @@ public:
   /// associated values should be checked. \p protocol The protocol being
   /// requested. \return The ParamDecl of each associated value whose type does
   /// not conform.
-  static SmallVector<ParamDecl *, 3>
+  static SmallVector<ParamDecl *, 4>
   associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
                                           ProtocolDecl *protocol);
 
