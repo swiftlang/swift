@@ -35,6 +35,9 @@
             "remote": { "id": "KitWare/CMake" },
             "platforms": [ "Linux" ]
         },
+        "pythonkit": {
+            "remote": { "id": "pvieito/PythonKit" }
+        },
        "indexstore-db": {
             "remote": { "id": "apple/indexstore-db" } },
         "sourcekit-lsp": {
@@ -90,7 +93,8 @@
                 "cmake": "v3.15.1",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
-                "swift-format": "master"
+                "swift-format": "master",
+                "pythonkit": "master"
             }
         },
         "next" : {

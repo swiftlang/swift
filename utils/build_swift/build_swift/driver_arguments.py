@@ -153,6 +153,7 @@ def _apply_default_arguments(args):
         args.build_libdispatch = False
         args.build_libicu = False
         args.build_playgroundsupport = False
+        args.build_pythonkit = False
 
     # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
     # merely shorthands for --skip-build-{**os}-{device,simulator}
@@ -611,6 +612,8 @@ def create_argument_parser():
            toggle_true('swiftsyntax_verify_generated_files'),
            help='set to verify that the generated files in the source tree '
                 'match the ones that would be generated from current master')
+    option(['--install-pythonkit'], toggle_true('install_pythonkit'),
+           help='install PythonKit')
     option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),
            help='install SourceKitLSP')
     option(['--install-skstresstester'], toggle_true('install_skstresstester'),
@@ -636,6 +639,9 @@ def create_argument_parser():
 
     option('--playgroundsupport', store_true('build_playgroundsupport'),
            help='build PlaygroundSupport')
+
+    option('--pythonkit', store_true('build_pythonkit'),
+           help='build PythonKit')
 
     option('--build-ninja', toggle_true,
            help='build the Ninja tool')
@@ -885,6 +891,9 @@ def create_argument_parser():
            help='skip testing Swift stdlibs for FreeBSD')
     option('--skip-test-cygwin', toggle_false('test_cygwin'),
            help='skip testing Swift stdlibs for Cygwin')
+
+    option('--test-pythonkit', toggle_true('test_pythonkit'),
+           help='skip testing PythonKit')
 
     # -------------------------------------------------------------------------
     in_group('Run build')
