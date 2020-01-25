@@ -696,36 +696,33 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
   auto substitutions =
       type->getContextSubstitutionMap(IGM.getSwiftModule(), &nominal);
 
-  return llvm::all_of(environment->getGenericParams(), [&](auto parameter) {
-    auto conformances =
-        environment->getGenericSignature()->getConformsTo(parameter);
-    auto witnessTablesAreReferenceable =
-        llvm::all_of(conformances, [&](ProtocolDecl *conformance) {
-          return conformance->getModuleContext() == IGM.getSwiftModule() &&
-                 !conformance->isResilient(IGM.getSwiftModule(),
-                                           ResilienceExpansion::Minimal);
-        });
+  auto allWitnessTablesAreReferenceable = llvm::all_of(environment->getGenericParams(), [&](auto parameter) {
+    auto signature = environment->getGenericSignature();
+    auto protocols = signature->getConformsTo(parameter);
     auto argument = ((Type *)parameter)->subst(substitutions);
-    auto genericArgument = argument->getAnyGeneric();
-    // For now, to avoid statically specializing generic protocol witness
-    // tables, don't statically specialize metadata for types any of whose
-    // arguments are generic.
-    //
-    // TODO: This is more pessimistic than necessary.  Specialize even in
-    //       the face of generic arguments so long as those arguments
-    //       aren't required to conform to any protocols.
-    //
-    // TODO: Once witness tables are statically specialized, check whether the
-    //       ConformanceInfo returns nullptr from tryGetConstantTable.
-    //       early return.
-    auto isGeneric = genericArgument && genericArgument->isGenericContext();
-    auto isNominal = argument->getNominalOrBoundGenericNominal();
-    auto isExistential = argument->isExistentialType();
-    return isNominal && !isGeneric && !isExistential &&
-           witnessTablesAreReferenceable &&
-           irgen::isTypeMetadataAccessTrivial(IGM,
-                                              argument->getCanonicalType());
-  }) && IGM.getTypeInfoForUnlowered(type).isFixedSize(ResilienceExpansion::Maximal);
+    auto canonicalType = argument->getCanonicalType();
+    auto witnessTablesAreReferenceable = [&]() {
+      return llvm::all_of(protocols, [&](ProtocolDecl *protocol) {
+        auto conformance =
+            signature->lookupConformance(canonicalType, protocol);
+        if (!conformance.isConcrete()) {
+          return false;
+        }
+        auto rootConformance = conformance.getConcrete()->getRootConformance();
+        return !IGM.isDependentConformance(rootConformance) &&
+               !IGM.isResilientConformance(rootConformance);
+      });
+    };
+    auto isExistential = [&]() { return argument->isExistentialType(); };
+    auto metadataAccessIsTrivial = [&]() {
+      return irgen::isTypeMetadataAccessTrivial(IGM,
+                                                argument->getCanonicalType());
+    };
+    return !isExistential() && metadataAccessIsTrivial() &&
+           witnessTablesAreReferenceable();
+  });
+  return allWitnessTablesAreReferenceable
+  && IGM.getTypeInfoForUnlowered(type).isFixedSize(ResilienceExpansion::Maximal);
 }
 
 /// Is it basically trivial to access the given metadata?  If so, we don't
