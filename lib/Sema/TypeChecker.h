@@ -153,7 +153,7 @@ enum ContextualTypePurpose {
 
 
 
-/// Flags that can be used to control name lookup.
+/// Flags that can be used to control type checking.
 enum class TypeCheckExprFlags {
   /// Whether we know that the result of the expression is discarded.  This
   /// disables constraints forcing an lvalue result to be loadable.

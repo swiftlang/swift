@@ -4040,18 +4040,13 @@ private:
   /// \param expr The expression to generate constraints from.
   /// \param convertType The expected type of the expression.
   /// \param listener The callback to check solving progress.
-  /// \param solutions The set of solutions to the system of constraints.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
-  ///
-  /// \returns Error is an error occurred, Solved is system is consistent
-  /// and solutions were found, Unsolved otherwise.
-  SolutionKind solveImpl(Expr *&expr,
-                         Type convertType,
-                         ExprTypeCheckListener *listener,
-                         SmallVectorImpl<Solution> &solutions,
-                         FreeTypeVariableBinding allowFreeTypeVariables
-                          = FreeTypeVariableBinding::Disallow);
+  SolutionResult solveImpl(Expr *&expr,
+                           Type convertType,
+                           ExprTypeCheckListener *listener,
+                           FreeTypeVariableBinding allowFreeTypeVariables
+                             = FreeTypeVariableBinding::Disallow);
 
 public:
   /// Pre-check the expression, validating any types that occur in the
