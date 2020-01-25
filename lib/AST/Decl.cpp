@@ -4648,7 +4648,8 @@ ValueDecl *ProtocolDecl::getSingleRequirement(DeclName name) const {
 }
 
 AssociatedTypeDecl *ProtocolDecl::getAssociatedType(Identifier name) const {
-  auto results = const_cast<ProtocolDecl *>(this)->lookupDirect(name);
+  const auto flags = NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  auto results = const_cast<ProtocolDecl *>(this)->lookupDirect(name, flags);
   for (auto candidate : results) {
     if (candidate->getDeclContext() == this &&
         isa<AssociatedTypeDecl>(candidate)) {
@@ -7915,6 +7916,15 @@ void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
   } else {
     out << "(unknown decl)";
   }
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           OptionSet<NominalTypeDecl::LookupDirectFlags> opts) {
+  out << "{ ";
+  using LookupFlags = NominalTypeDecl::LookupDirectFlags;
+  if (opts.contains(LookupFlags::IncludeAttrImplements))
+    out << "IncludeAttrImplements";
+  out << " }";
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
