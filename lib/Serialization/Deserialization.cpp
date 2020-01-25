@@ -1207,6 +1207,21 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
   values.erase(newEnd, values.end());
 }
 
+static TypeDecl *
+findNestedTypeDeclInModule(FileUnit *thisFile, ModuleDecl *extensionModule,
+                           Identifier name, NominalTypeDecl *parent)  {
+  assert(extensionModule && "NULL is not a valid module");
+  for (FileUnit *file : extensionModule->getFiles()) {
+    if (file == thisFile)
+      continue;
+
+    if (auto nestedType = file->lookupNestedType(name, parent)) {
+      return nestedType;
+    }
+  }
+  return nullptr;
+}
+
 Expected<Decl *>
 ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   using namespace decls_block;
@@ -1442,13 +1457,19 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
 
         // Fault in extensions, then ask every file in the module.
         (void)baseType->getExtensions();
-        TypeDecl *nestedType = nullptr;
-        for (FileUnit *file : extensionModule->getFiles()) {
-          if (file == getFile())
-            continue;
-          nestedType = file->lookupNestedType(memberName, baseType);
-          if (nestedType)
-            break;
+        auto *nestedType =
+            findNestedTypeDeclInModule(getFile(), extensionModule,
+                                       memberName, baseType);
+
+        // For clang module units, also search tables in the overlays.
+        if (!nestedType) {
+          if (auto LF =
+                  dyn_cast<LoadedFile>(baseType->getModuleScopeContext())) {
+            if (auto overlayModule = LF->getOverlayModule()) {
+              nestedType = findNestedTypeDeclInModule(getFile(), overlayModule,
+                                                      memberName, baseType);
+            }
+          }
         }
 
         if (nestedType) {
