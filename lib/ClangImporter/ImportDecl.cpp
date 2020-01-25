@@ -8670,7 +8670,8 @@ void ClangImporter::Implementation::collectMembersToAdd(
   for (const clang::Decl *m : objcContainer->decls()) {
     auto nd = dyn_cast<clang::NamedDecl>(m);
     if (nd && nd == nd->getCanonicalDecl() &&
-        nd->getDeclContext() == objcContainer)
+        nd->getDeclContext() == objcContainer &&
+        isVisibleClangEntry(nd))
       insertMembersAndAlternates(nd, members);
   }
 

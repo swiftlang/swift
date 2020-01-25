@@ -165,6 +165,7 @@ module SubclassExistentialsExtra {
 
 module SwiftPrivateAttr {
   header "SwiftPrivateAttr.h"
+  export *
 }
 
 module TestProtocols { header "Protocols.h" }
