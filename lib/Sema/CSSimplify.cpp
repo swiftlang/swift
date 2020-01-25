@@ -2249,8 +2249,17 @@ ConstraintSystem::matchTypesBindTypeVar(
   // Simplify the right-hand type and perform the "occurs" check.
   typeVar = getRepresentative(typeVar);
   type = simplifyType(type, flags);
-  if (!isBindable(typeVar, type))
+  if (!isBindable(typeVar, type)) {
+    if (shouldAttemptFixes()) {
+      // If type variable is allowed to be a hole and it can't be bound to
+      // a particular (full resolved) type, just ignore this binding
+      // instead of re-trying it and failing later.
+      if (typeVar->getImpl().canBindToHole() && !type->hasTypeVariable())
+        return getTypeMatchSuccess();
+    }
+
     return formUnsolvedResult();
+  }
 
   // Since member lookup doesn't check requirements
   // it might sometimes return types which are not
