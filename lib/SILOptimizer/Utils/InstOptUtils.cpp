@@ -189,21 +189,53 @@ static bool hasOnlyEndOfScopeOrDestroyUses(SILInstruction *inst) {
   return true;
 }
 
-/// Return true iff the \p applySite calls a constant evaluable function and if
-/// it is read-only which implies the following:
-///   (1) The call does not write into any memory location.
+unsigned swift::getNumInOutArguments(FullApplySite applySite) {
+  assert(applySite);
+  auto substConv = applySite.getSubstCalleeConv();
+  unsigned numIndirectResults = substConv.getNumIndirectSILResults();
+  unsigned numInOutArguments = 0;
+  for (unsigned argIndex = 0; argIndex < applySite.getNumArguments();
+       argIndex++) {
+    // Skip indirect results.
+    if (argIndex < numIndirectResults) {
+      continue;
+    }
+    auto paramNumber = argIndex - numIndirectResults;
+    auto ParamConvention =
+        substConv.getParameters()[paramNumber].getConvention();
+    switch (ParamConvention) {
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable: {
+      numInOutArguments++;
+      break;
+    default:
+      break;
+    }
+    }
+  }
+  return numInOutArguments;
+}
+
+/// Return true iff the \p applySite calls a constant-evaluable function and
+/// it is non-generic and read/destroy only, which means that the call can do
+/// only the following and nothing else:
+///   (1) The call may read any memory location.
 ///   (2) The call may destroy owned parameters i.e., consume them.
-///   (3) The call does not throw or exit the program.
-static bool isReadOnlyConstantEvaluableCall(FullApplySite applySite) {
+///   (3) The call may write into memory locations newly created by the call.
+///   (4) The call may use assertions, which traps at runtime on failure.
+///   (5) The call may return a non-generic value.
+/// Essentially, these are calls whose "effect" is visible only in their return
+/// value or through the parameters that are destroyed. The return value
+/// is also guaranteed to have value semantics as it is non-generic and
+/// reference semantics is not constant evaluable.
+static bool isNonGenericReadOnlyConstantEvaluableCall(FullApplySite applySite) {
   assert(applySite);
   SILFunction *callee = applySite.getCalleeFunction();
   if (!callee || !isConstantEvaluable(callee)) {
     return false;
   }
-  // Here all effects of the call is restricted to its indirect results, which
-  // must have value semantics. If there are no indirect results, the call must
-  // be read-only, except for consuming its operands.
-  return applySite.getNumIndirectSILResults() == 0;
+  return !applySite.hasSubstitutions() && !getNumInOutArguments(applySite) &&
+         !applySite.getNumIndirectSILResults();
 }
 
 /// A scope-affecting instruction is an instruction which may end the scope of
@@ -270,23 +302,25 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst) {
     return true;
   }
   case SILInstructionKind::ApplyInst: {
-    // The following property holds for constant evaluable functions:
+    // The following property holds for constant-evaluable functions that do
+    // not take arguments of generic type:
     // 1. they do not create objects having deinitializers with global
+    // side effects, as they can only create objects consisting of trivial
+    // values, (non-generic) arrays and strings.
+    // 2. they do not use global variables or call arbitrary functions with
     // side effects.
-    // 2. they do not use global variables and will only use objects reachable
-    // from parameters.
     // The above two properties imply that a value returned by a constant
-    // evaluable function either does not have a deinitializer with global side
-    // effects, or if it does, the deinitializer that has the global side effect
-    // must be that of a parameter.
+    // evaluable function does not have a deinitializer with global side
+    // effects. Therefore, the deinitializer can be sinked.
     //
-    // A read-only constant evaluable call only reads and/or destroys its
-    // parameters. Therefore, if its return value is used only in destroys, the
-    // constant evaluable call can be removed provided the parameters it
-    // consumes are explicitly destroyed at the call site, which is taken care
-    // of by the function: \c deleteInstruction
+    // A generic, read-only constant evaluable call only reads and/or
+    // destroys its (non-generic) parameters. It therefore cannot have any
+    // side effects (note that parameters being non-generic have value
+    // semantics). Therefore, the constant evaluable call can be removed
+    // provided the parameter lifetimes are handled correctly, which is taken
+    // care of by the function: \c deleteInstruction.
     FullApplySite applySite(cast<ApplyInst>(inst));
-    return isReadOnlyConstantEvaluableCall(applySite);
+    return isNonGenericReadOnlyConstantEvaluableCall(applySite);
   }
   default: {
     return false;
@@ -318,9 +352,14 @@ static void destroyConsumedOperandOfDeadInst(Operand &operand) {
   SILValue operandValue = operand.get();
   if (operandValue->getType().isTrivial(*fun))
     return;
+  // Ignore type-dependent operands which are not real operands but are just
+  // there to create use-def dependencies.
+  if (deadInst->isTypeDependentOperand(operand))
+    return;
   // A scope ending instruction cannot be deleted in isolation without removing
   // the instruction defining its operand as well.
   assert(!isEndOfScopeMarker(deadInst) && !isa<DestroyValueInst>(deadInst) &&
+         !isa<DestroyAddrInst>(deadInst) &&
          "lifetime ending instruction is deleted without its operand");
   ValueOwnershipKind operandOwnershipKind = operandValue.getOwnershipKind();
   UseLifetimeConstraint lifetimeConstraint =
@@ -379,7 +418,10 @@ void InstructionDeleter::deleteInstruction(SILInstruction *inst,
   // First drop all references from all instructions to be deleted and then
   // erase the instruction. Note that this is done in this order so that when an
   // instruction is deleted, its uses would have dropped their references.
+  // Note that the toDeleteInsts must also be removed from the tracked
+  // deadInstructions.
   for (SILInstruction *inst : toDeleteInsts) {
+    deadInstructions.remove(inst);
     inst->dropAllReferences();
   }
   for (SILInstruction *inst : toDeleteInsts) {
@@ -428,6 +470,14 @@ static bool hasOnlyIncidentalUses(SILInstruction *inst,
   return true;
 }
 
+void InstructionDeleter::deleteIfDead(SILInstruction *inst,
+                                      CallbackTy callback) {
+  if (isInstructionTriviallyDead(inst) ||
+      isScopeAffectingInstructionDead(inst)) {
+    deleteInstruction(inst, callback, /*Fix lifetime of operands*/ true);
+  }
+}
+
 void InstructionDeleter::forceDeleteAndFixLifetimes(SILInstruction *inst,
                                                     CallbackTy callback) {
   SILFunction *fun = inst->getFunction();
@@ -445,6 +495,18 @@ void InstructionDeleter::forceDelete(SILInstruction *inst,
       OptimizationMode::NoOptimization;
   assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
   deleteInstruction(inst, callback, /*Fix lifetime of operands*/ false);
+}
+
+void InstructionDeleter::recursivelyDeleteUsersIfDead(SILInstruction *inst,
+                                                      CallbackTy callback) {
+  SmallVector<SILInstruction *, 8> users;
+  for (SILValue result : inst->getResults())
+    for (Operand *use : result->getUses())
+      users.push_back(use->getUser());
+
+  for (SILInstruction *user : users)
+    recursivelyDeleteUsersIfDead(user, callback);
+  deleteIfDead(inst, callback);
 }
 
 void swift::eliminateDeadInstruction(SILInstruction *inst,
