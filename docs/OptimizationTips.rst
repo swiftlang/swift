@@ -33,7 +33,10 @@ three different optimization levels:
 
 In the Xcode UI, one can modify the current optimization level as follows:
 
-...
+For the whole project,
+Select project in `project and targets list`, then add `-Ounchecked` in `Other Swift Flags` under `Swift Compiler - Custom Flags`.
+
+For a single target, process is the same except you select desired target in `project and targets list`.
 
 
 Whole Module Optimizations (WMO)
