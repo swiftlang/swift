@@ -487,6 +487,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     let concatString = string + ":" + String(number)
     h.log("\(concatString)")
       // CHECK-NOT: OSLogMessage
+      // CHECK-NOT: OSLogInterpolation
       // CHECK-LABEL: end sil function '$s25OSLogPrototypeCompileTest23testDeadCodeEliminationL_1h6number8num32bit6stringy0aB06LoggerV_Sis5Int32VSStF'
   }
 }
