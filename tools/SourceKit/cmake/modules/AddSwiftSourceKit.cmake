@@ -70,17 +70,15 @@ function(add_sourcekit_default_compiler_flags target)
     LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
 
-  # Convert variables to space-separated strings.
-  _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
-  _list_escape_for_shell("${link_flags}" link_flags)
-
   # Set compilation and link flags.
-  set_property(TARGET "${target}" APPEND_STRING PROPERTY
-      COMPILE_FLAGS " ${c_compile_flags} -fblocks")
-  set_property(TARGET "${target}" APPEND_STRING PROPERTY
-      LINK_FLAGS " ${link_flags}")
-  set_property(TARGET "${target}" APPEND PROPERTY LINK_LIBRARIES ${link_libraries})
-  swift_target_link_search_directories("${target}" "${library_search_directories}")
+  target_compile_options(${target} PRIVATE
+    -fblocks)
+  target_link_options(${target} PRIVATE
+    ${link_flags})
+  target_link_directories(${target} PRIVATE
+    ${library_search_directories})
+  target_link_libraries(${target} PRIVATE
+    ${link_libraries})
 endfunction()
 
 # Add a new SourceKit library.

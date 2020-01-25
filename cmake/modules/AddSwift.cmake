@@ -702,14 +702,6 @@ function(_add_swift_lipo_target)
   endif()
 endfunction()
 
-function(swift_target_link_search_directories target directories)
-  set(STLD_FLAGS "")
-  foreach(directory ${directories})
-    set(STLD_FLAGS "${STLD_FLAGS} \"${CMAKE_LIBRARY_PATH_FLAG}${directory}\"")
-  endforeach()
-  set_property(TARGET ${target} APPEND_STRING PROPERTY LINK_FLAGS ${STLD_FLAGS})
-endfunction()
-
 # Add a single variant of a new Swift library.
 #
 # Usage:
@@ -886,19 +878,7 @@ function(_add_swift_library_single target name)
   if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
     if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
       list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
-      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_bundle" "-Xlinker" "-lto_library" "-Xlinker" "${LLVM_LIBRARY_DIR}/libLTO.dylib")
-      # If we are asked to hide symbols, pass the obfuscation flag to libLTO.
-      if (SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
-        list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_hide_symbols")
-      endif()
       set(embed_bitcode_arg EMBED_BITCODE)
-    endif()
-  endif()
-
-  if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
-    list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-compatibility_version" "-Xlinker" "1")
-    if (SWIFT_COMPILER_VERSION)
-      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-current_version" "-Xlinker" "${SWIFT_COMPILER_VERSION}" )
     endif()
   endif()
 
@@ -1450,17 +1430,32 @@ function(_add_swift_library_single target name)
     set(PLIST_INFO_BUILD_VERSION)
   endif()
 
-  # Convert variables to space-separated strings.
-  _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
-  _list_escape_for_shell("${link_flags}" link_flags)
-
   # Set compilation and link flags.
-  set_property(TARGET "${target}" APPEND_STRING PROPERTY
-      COMPILE_FLAGS " ${c_compile_flags}")
-  set_property(TARGET "${target}" APPEND_STRING PROPERTY
-      LINK_FLAGS " ${link_flags}")
-  set_property(TARGET "${target}" APPEND PROPERTY LINK_LIBRARIES ${link_libraries})
-  swift_target_link_search_directories("${target}" "${library_search_directories}")
+  target_compile_options(${target} PRIVATE
+    ${c_compile_flags})
+  target_link_options(${target} PRIVATE
+    ${link_flags})
+  if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+    target_link_options(${target} PRIVATE
+      "LINKER:-compatibility_version,1")
+    if(SWIFT_COMPILER_VERSION)
+      target_link_options(${target} PRIVATE
+        "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
+    endif()
+    # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
+    if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
+      if(${SWIFTLIB_SINGLE_SDK} MATCHES "(I|TV|WATCH)OS")
+        target_link_options(${target} PRIVATE
+          "LINKER:-bitcode_bundle"
+          $<$<BOOL:SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS>:"LINKER:-bitcode_hide_symbols">
+          "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
+      endif()
+    endif()
+  endif()
+  target_link_libraries(${target} PRIVATE
+    ${link_libraries})
+  target_link_directories(${target} PRIVATE
+    ${library_search_directories})
 
   # Adjust the linked libraries for windows targets.  On Windows, the link is
   # performed against the import library, and the runtime uses the dll.  Not
@@ -1510,8 +1505,8 @@ function(_add_swift_library_single target name)
   endif()
 
   if(target_static)
-    set_property(TARGET "${target_static}" APPEND_STRING PROPERTY
-        COMPILE_FLAGS " ${c_compile_flags}")
+    target_link_options(${target_static} PRIVATE
+      ${c_compile_flags})
     # FIXME: The fallback paths here are going to be dynamic libraries.
 
     if(SWIFTLIB_INSTALL_WITH_SHARED)
@@ -1523,7 +1518,8 @@ function(_add_swift_library_single target name)
         "${search_base_dir}/${SWIFTLIB_SINGLE_SUBDIR}"
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
-    swift_target_link_search_directories("${target_static}" "${library_search_directories}")
+    target_link_directories(${target_static} PRIVATE
+      ${library_search_directories})
     target_link_libraries("${target_static}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
@@ -2624,16 +2620,14 @@ function(_add_swift_executable_single name)
         ${SWIFTEXE_SINGLE_DEPENDS})
   llvm_update_compile_flags("${name}")
 
-  # Convert variables to space-separated strings.
-  _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
-  _list_escape_for_shell("${link_flags}" link_flags)
-
-  set_property(TARGET ${name} APPEND_STRING PROPERTY
-      COMPILE_FLAGS " ${c_compile_flags}")
-  swift_target_link_search_directories("${name}" "${library_search_directories}")
-  set_property(TARGET ${name} APPEND_STRING PROPERTY
-      LINK_FLAGS " ${link_flags}")
-  set_property(TARGET ${name} APPEND PROPERTY LINK_LIBRARIES ${link_libraries})
+  target_compile_options(${name} PRIVATE
+    ${c_compile_flags})
+  target_link_directories(${name} PRIVATE
+    ${library_search_directories})
+  target_link_options(${name} PRIVATE
+    ${link_flags})
+  target_link_libraries(${name} PRIVATE
+    ${link_libraries})
   if (SWIFT_PARALLEL_LINK_JOBS)
     set_property(TARGET ${name} PROPERTY JOB_POOL_LINK swift_link_job_pool)
   endif()
