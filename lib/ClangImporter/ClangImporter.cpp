@@ -2869,22 +2869,23 @@ void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
   }
 }
 
-/// Determine whether the given Clang entry is visible.
-///
-/// FIXME: this is an elaborate hack to badly reflect Clang's
-/// submodule visibility into Swift.
-static bool isVisibleClangEntry(clang::ASTContext &ctx,
-                                SwiftLookupTable::SingleEntry entry) {
+bool ClangImporter::Implementation::isVisibleClangEntry(
+    const clang::NamedDecl *clangDecl) {
+  // For a declaration, check whether the declaration is hidden.
+  if (!clangDecl->isHidden()) return true;
+
+  // Is any redeclaration visible?
+  for (auto redecl : clangDecl->redecls()) {
+    if (!cast<clang::NamedDecl>(redecl)->isHidden()) return true;
+  }
+
+  return false;
+}
+
+bool ClangImporter::Implementation::isVisibleClangEntry(
+  SwiftLookupTable::SingleEntry entry) {
   if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
-    // For a declaration, check whether the declaration is hidden.
-    if (!clangDecl->isHidden()) return true;
-
-    // Is any redeclaration visible?
-    for (auto redecl : clangDecl->redecls()) {
-      if (!cast<clang::NamedDecl>(redecl)->isHidden()) return true;
-    }
-
-    return false;
+    return isVisibleClangEntry(clangDecl);
   }
 
   // If it's a macro from a module, check whether the module has been imported.
@@ -2919,15 +2920,13 @@ ClangModuleUnit::lookupNestedType(Identifier name,
   if (!baseTypeContext)
     return nullptr;
 
-  auto &clangCtx = owner.getClangASTContext();
-
   // FIXME: This is very similar to what's in Implementation::lookupValue and
   // Implementation::loadAllMembers.
   SmallVector<TypeDecl *, 2> results;
   for (auto entry : lookupTable->lookup(SerializedSwiftName(name.str()),
                                         baseTypeContext)) {
     // If the entry is not visible, skip it.
-    if (!isVisibleClangEntry(clangCtx, entry)) continue;
+    if (!owner.isVisibleClangEntry(entry)) continue;
 
     auto *clangDecl = entry.dyn_cast<clang::NamedDecl *>();
     if (!clangDecl)
@@ -2995,14 +2994,13 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
 
   // Dig through each of the Swift lookup tables, creating extensions
   // where needed.
-  auto &clangCtx = Impl.getClangASTContext();
   (void)Impl.forEachLookupTable([&](SwiftLookupTable &table) -> bool {
       // FIXME: If we already looked at this for this generation,
       // skip.
 
       for (auto entry : table.allGlobalsAsMembersInContext(effectiveClangContext)) {
         // If the entry is not visible, skip it.
-        if (!isVisibleClangEntry(clangCtx, entry)) continue;
+        if (!Impl.isVisibleClangEntry(entry)) continue;
 
         if (auto decl = entry.dyn_cast<clang::NamedDecl *>()) {
           // Import the context of this declaration, which has the
@@ -3583,7 +3581,7 @@ void ClangImporter::Implementation::lookupValue(
 
   for (auto entry : table.lookup(name.getBaseName(), clangTU)) {
     // If the entry is not visible, skip it.
-    if (!isVisibleClangEntry(clangCtx, entry)) continue;
+    if (!isVisibleClangEntry(entry)) continue;
 
     ValueDecl *decl;
     // If it's a Clang declaration, try to import it.
@@ -3687,11 +3685,9 @@ void ClangImporter::Implementation::lookupObjCMembers(
        SwiftLookupTable &table,
        DeclName name,
        VisibleDeclConsumer &consumer) {
-  auto &clangCtx = getClangASTContext();
-
   for (auto clangDecl : table.lookupObjCMembers(name.getBaseName())) {
     // If the entry is not visible, skip it.
-    if (!isVisibleClangEntry(clangCtx, clangDecl)) continue;
+    if (!isVisibleClangEntry(clangDecl)) continue;
 
     forEachDistinctName(clangDecl,
                         [&](ImportedName importedName,
@@ -3803,8 +3799,6 @@ ClangImporter::Implementation::loadNamedMembers(
   auto table = findLookupTable(*CMO);
   assert(table && "clang module without lookup table");
 
-  clang::ASTContext &clangCtx = getClangASTContext();
-
   assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD));
 
   ensureSuperclassMembersAreLoaded(dyn_cast<ClassDecl>(D));
@@ -3814,7 +3808,7 @@ ClangImporter::Implementation::loadNamedMembers(
                                   effectiveClangContext)) {
     if (!entry.is<clang::NamedDecl *>()) continue;
     auto member = entry.get<clang::NamedDecl *>();
-    if (!isVisibleClangEntry(clangCtx, member)) continue;
+    if (!isVisibleClangEntry(member)) continue;
 
     // Skip Decls from different clang::DeclContexts
     if (member->getDeclContext() != CDC) continue;
@@ -3835,7 +3829,7 @@ ClangImporter::Implementation::loadNamedMembers(
                                                   effectiveClangContext)) {
     if (!entry.is<clang::NamedDecl *>()) continue;
     auto member = entry.get<clang::NamedDecl *>();
-    if (!isVisibleClangEntry(clangCtx, member)) continue;
+    if (!isVisibleClangEntry(member)) continue;
 
      // Skip Decls from different clang::DeclContexts
     if (member->getDeclContext() != CDC) continue;

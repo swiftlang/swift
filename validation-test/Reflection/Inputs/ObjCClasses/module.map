@@ -1,3 +1,4 @@
 module ObjCClasses {
   header "ObjCClasses.h"
+  export *
 }
