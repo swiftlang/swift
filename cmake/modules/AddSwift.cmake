@@ -2566,9 +2566,9 @@ function(_add_swift_executable_single name)
 
   set(SWIFTEXE_SINGLE_SOURCES ${SWIFTEXE_SINGLE_UNPARSED_ARGUMENTS})
 
-  translate_flag(${SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL}
-      "EXCLUDE_FROM_ALL"
-      SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL_FLAG)
+  if(SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL)
+    message(SEND_ERROR "${name} is using EXCLUDE_FROM_ALL option which is deprecated.")
+  endif()
 
   # Check arguments.
   precondition(SWIFTEXE_SINGLE_SDK MESSAGE "Should specify an SDK")
@@ -2603,12 +2603,6 @@ function(_add_swift_executable_single name)
     LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
 
-  if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
-    list(APPEND link_flags
-        "-Xlinker" "-rpath"
-        "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
-  endif()
-
   _list_add_string_suffix(
       "${SWIFTEXE_SINGLE_LINK_LIBRARIES}"
       "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
@@ -2632,7 +2626,6 @@ function(_add_swift_executable_single name)
   add_swift_source_group("${SWIFTEXE_SINGLE_EXTERNAL_SOURCES}")
 
   add_executable(${name}
-      ${SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL_FLAG}
       ${SWIFTEXE_SINGLE_SOURCES}
       ${SWIFTEXE_SINGLE_EXTERNAL_SOURCES})
 
@@ -2656,6 +2649,11 @@ function(_add_swift_executable_single name)
   set_property(TARGET ${name} APPEND PROPERTY LINK_LIBRARIES ${link_libraries})
   if (SWIFT_PARALLEL_LINK_JOBS)
     set_property(TARGET ${name} PROPERTY JOB_POOL_LINK swift_link_job_pool)
+  endif()
+  if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+    set_target_properties(${name} PROPERTIES
+      BUILD_WITH_INSTALL_RPATH YES
+      INSTALL_RPATH "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
   endif()
   set_output_directory(${name}
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
