@@ -312,8 +312,10 @@ public:
   }
 
   /// For unit tests.
-  ModuleDepGraph(const bool EnableTypeFingerprints = false)
+  ModuleDepGraph(const bool EnableTypeFingerprints)
       : ModuleDepGraph(true, false, EnableTypeFingerprints, false, nullptr) {}
+
+
   //============================================================================
   // MARK: ModuleDepGraph - updating from a switdeps file
   //============================================================================
@@ -329,6 +331,16 @@ public:
 
   Changes loadFromSourceFileDepGraph(const driver::Job *cmd,
                                      const SourceFileDepGraph &);
+
+    /// Also for unit tests
+    Changes
+    simulateLoad(const driver::Job *cmd,
+                                llvm::StringMap<std::vector<std::string>> simpleNames,
+                                llvm::StringMap<std::vector<std::pair<std::string, std::string>>>
+                                compoundNames = {},
+                                const bool includePrivateDeps = false,
+                                const bool hadCompilationError = false);
+
 
 private:
   /// Read a SourceFileDepGraph belonging to \p job from \p buffer
@@ -515,7 +527,7 @@ public:
   void forEachUntracedJobDirectlyDependentOnExternalSwiftDeps(
       StringRef externalDependency, function_ref<void(const driver::Job *)> fn);
   //============================================================================
-  // MARK: ModuleDepGraph - verifyication
+  // MARK: ModuleDepGraph - verification
   //============================================================================
 
 private:
@@ -563,6 +575,9 @@ private:
     assert(swiftDeps.empty() || getJob(swiftDeps));
     return true;
   }
+
+  static std::vector<const driver::Job *>
+  printJobsForDebugging(const std::vector<const driver::Job *> &jobs);
 };
 } // namespace fine_grained_dependencies
 } // namespace swift

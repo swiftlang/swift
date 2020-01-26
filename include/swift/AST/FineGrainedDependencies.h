@@ -800,6 +800,12 @@ public:
 
   static constexpr char noncascadingOrPrivatePrefix = '#';
 
+  static std::string noncascading(std::string name);
+
+  LLVM_ATTRIBUTE_UNUSED
+  static std::string privatize(std::string name);
+
+
   /// Nodes are owned by the graph.
   ~SourceFileDepGraph() {
     forEachNode([&](SourceFileDepGraphNode *n) { delete n; });
