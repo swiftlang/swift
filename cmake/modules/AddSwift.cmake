@@ -729,7 +729,6 @@ endfunction()
 #     [C_COMPILE_FLAGS flag1...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
-#     [FILE_DEPENDS target1 ...]
 #     [DONT_EMBED_BITCODE]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
@@ -783,9 +782,6 @@ endfunction()
 # LINK_FLAGS
 #   Extra linker flags.
 #
-# FILE_DEPENDS
-#   Additional files this library depends on.
-#
 # DONT_EMBED_BITCODE
 #   Don't embed LLVM bitcode in this target, even if it is enabled globally.
 #
@@ -832,7 +828,6 @@ function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
-        FILE_DEPENDS
         FRAMEWORK_DEPENDS
         FRAMEWORK_DEPENDS_WEAK
         GYB_SOURCES
@@ -984,7 +979,6 @@ function(_add_swift_library_single target name)
       DEPENDS
         ${gyb_dependency_targets}
         ${SWIFTLIB_SINGLE_DEPENDS}
-        ${SWIFTLIB_SINGLE_FILE_DEPENDS}
         ${SWIFTLIB_SINGLE_LINK_LIBRARIES}
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
@@ -1538,7 +1532,6 @@ endfunction()
 #     [SHARED]
 #     [STATIC]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
-#     [FILE_DEPENDS target1 ...]
 #     source1 [source2 source3 ...])
 #
 # name
@@ -1553,9 +1546,6 @@ endfunction()
 # LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
-# FILE_DEPENDS
-#   Additional files this library depends on.
-#
 # source1 ...
 #   Sources to add into this library.
 function(add_swift_host_library name)
@@ -1567,7 +1557,6 @@ function(add_swift_host_library name)
   set(multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
-        FILE_DEPENDS
         LINK_LIBRARIES
         LLVM_LINK_COMPONENTS)
 
@@ -1586,9 +1575,6 @@ function(add_swift_host_library name)
   endif()
   if(ASHL_DEPENDS)
     message(SEND_ERROR "library ${name} is using DEPENDS parameter which is deprecated.  Please use add_dependencies instead")
-  endif()
-  if(ASHL_FILE_DEPENDS)
-    message(SEND_ERROR "library ${name} is using FILE_DEPENDS parameter which is deprecated.")
   endif()
   if(ASHL_LINK_LIBRARIES)
     message(SEND_ERROR "library ${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
@@ -1643,7 +1629,6 @@ endfunction()
 #     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
-#     [FILE_DEPENDS target1 ...]
 #     [TARGET_SDKS sdk1...]
 #     [C_COMPILE_FLAGS flag1...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
@@ -1720,9 +1705,6 @@ endfunction()
 #
 # LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
-#
-# FILE_DEPENDS
-#   Additional files this library depends on.
 #
 # TARGET_SDKS
 #   The set of SDKs in which this library is included. If empty, the library
@@ -1801,7 +1783,6 @@ function(add_swift_target_library name)
   set(SWIFTLIB_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
-        FILE_DEPENDS
         FRAMEWORK_DEPENDS
         FRAMEWORK_DEPENDS_IOS_TVOS
         FRAMEWORK_DEPENDS_OSX
@@ -2222,7 +2203,6 @@ function(add_swift_target_library name)
         FRAMEWORK_DEPENDS ${swiftlib_framework_depends_flattened}
         FRAMEWORK_DEPENDS_WEAK ${SWIFTLIB_FRAMEWORK_DEPENDS_WEAK}
         LLVM_LINK_COMPONENTS ${SWIFTLIB_LLVM_LINK_COMPONENTS}
-        FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
         C_COMPILE_FLAGS ${swiftlib_c_compile_flags_all}
         SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all} ${swiftlib_swift_compile_flags_arch} ${swiftlib_swift_compile_private_frameworks_flag}
         LINK_FLAGS ${swiftlib_link_flags_all}
@@ -2245,6 +2225,9 @@ function(add_swift_target_library name)
 
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
       )
+    if(swiftlib_module_dependency_targets)
+      add_dependencies(${variant_name} ${swiftlib_module_dependency_targets})
+    endif()
     if(NOT SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
       add_dependencies(${VARIANT_NAME} clang)
     endif()
