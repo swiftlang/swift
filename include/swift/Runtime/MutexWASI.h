@@ -10,9 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Stub implementation of Mutex, ConditionVariable, Read/Write lock, and Scoped 
-// lock for WASI. No concrete implementation is provided as WebAssembly doesn't 
-// currently support threading.
+// No-op implementation of locks for the WebAssembly System Interface. The 
+// implementation does not need to perform locking, because as of January 2020 
+// WebAssembly does not support threads.
+// See the current status at https://github.com/WebAssembly/proposals and 
+// https://github.com/webassembly/threads
 //
 //===----------------------------------------------------------------------===//
 
