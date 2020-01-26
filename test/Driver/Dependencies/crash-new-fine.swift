@@ -62,7 +62,7 @@
 // Touch all files earlier than last compiled date in the build record.
 
 // RUN: touch -t 201401240005 %t/*
-// RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./crash.swift ./other.swift -module-name main -j1 -v 2>&1 -driver-show-incremental |tee /tmp/out1 | %FileCheck -check-prefix=CHECK-CURRENT-WITH-CRASH %s
+// RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./crash.swift ./other.swift -module-name main -j1 -v 2>&1 -driver-show-incremental | %FileCheck -check-prefix=CHECK-CURRENT-WITH-CRASH %s
 
 // CHECK-CURRENT-WITH-CRASH: Handled main.swift
 // CHECK-CURRENT-WITH-CRASH: Handled crash.swift
