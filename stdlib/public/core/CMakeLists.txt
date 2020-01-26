@@ -297,26 +297,32 @@ if(SWIFT_CHECK_ESSENTIAL_STDLIB)
 endif()
 
 add_swift_target_library(swiftCore
-                  ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
-                    ${SWIFTLIB_SOURCES}
-                  GYB_SOURCES
-                    ${SWIFTLIB_GYB_SOURCES}
-                  # The copy_shim_headers target dependency is required to let the
-                  # build system know that there's a rule to produce the shims
-                  # directory, but is not sufficient to cause the object file to be rebuilt
-                  # when the shim header changes.  Therefore, we pass both the target
-                  # and the generated directory as dependencies.
-                  FILE_DEPENDS
-                    copy_shim_headers "${SWIFTLIB_DIR}/shims" ${GROUP_INFO_JSON_FILE}
-                  SWIFT_COMPILE_FLAGS
-                    ${swift_stdlib_compile_flags} -Xcc -DswiftCore_EXPORTS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-                  LINK_FLAGS
-                    ${swift_core_link_flags}
-                  PRIVATE_LINK_LIBRARIES
-                    ${swift_core_private_link_libraries}
-                  INCORPORATE_OBJECT_LIBRARIES
-                    swiftRuntime swiftStdlibStubs
-                  FRAMEWORK_DEPENDS
-                    ${swift_core_framework_depends}
-                  INSTALL_IN_COMPONENT
-                    stdlib)
+  ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
+  ${SWIFTLIB_SOURCES}
+  GYB_SOURCES
+    ${SWIFTLIB_GYB_SOURCES}
+  SWIFT_COMPILE_FLAGS
+    ${swift_stdlib_compile_flags}
+    -Xcc -DswiftCore_EXPORTS
+    ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+  LINK_FLAGS
+    ${swift_core_link_flags}
+  PRIVATE_LINK_LIBRARIES
+    ${swift_core_private_link_libraries}
+  INCORPORATE_OBJECT_LIBRARIES
+    swiftRuntime
+    swiftStdlibStubs
+  FRAMEWORK_DEPENDS
+    ${swift_core_framework_depends}
+  INSTALL_IN_COMPONENT
+    stdlib)
+foreach(sdk ${SWIFTLIB_TARGET_SDKS})
+  set(sdk_supported_archs
+    ${SWIFT_SDK_${sdk}_ARCHITECTURES}
+    ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
+  list(REMOVE_DUPLICATES sdk_supported_archs)
+  foreach(arch ${sdk_supported_archs})
+    add_dependencies(swiftCore-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}
+      copy_shim_headers)
+  endforeach()
+endforeach()
