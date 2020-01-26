@@ -36,53 +36,6 @@ function(add_sourcekit_symbol_exports target_name export_file)
   endif()
 endfunction()
 
-# Add default compiler and linker flags to 'target'.
-#
-# FIXME: this is a HACK.  All SourceKit CMake code using this function should be
-# rewritten to use 'add_swift_host_library' or 'add_swift_target_library'.
-function(add_sourcekit_default_compiler_flags target)
-  set(sdk "${SWIFT_HOST_VARIANT_SDK}")
-  set(arch "${SWIFT_HOST_VARIANT_ARCH}")
-  set(c_compile_flags)
-  set(link_flags)
-
-  # Add variant-specific flags.
-  set(build_type "${CMAKE_BUILD_TYPE}")
-  set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
-  set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
-  _add_variant_c_compile_flags(
-    SDK "${sdk}"
-    ARCH "${arch}"
-    BUILD_TYPE "${build_type}"
-    ENABLE_ASSERTIONS "${enable_assertions}"
-    ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
-    RESULT_VAR_NAME c_compile_flags)
-  _add_variant_link_flags(
-    SDK "${sdk}"
-    ARCH "${arch}"
-    BUILD_TYPE "${build_type}"
-    ENABLE_ASSERTIONS "${enable_assertions}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
-    LTO_OBJECT_NAME "${target}-${sdk}-${arch}"
-    ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
-    RESULT_VAR_NAME link_flags
-    LINK_LIBRARIES_VAR_NAME link_libraries
-    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
-
-  # Convert variables to space-separated strings.
-  _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
-  _list_escape_for_shell("${link_flags}" link_flags)
-
-  # Set compilation and link flags.
-  set_property(TARGET "${target}" APPEND_STRING PROPERTY
-      COMPILE_FLAGS " ${c_compile_flags} -fblocks")
-  set_property(TARGET "${target}" APPEND_STRING PROPERTY
-      LINK_FLAGS " ${link_flags}")
-  set_property(TARGET "${target}" APPEND PROPERTY LINK_LIBRARIES ${link_libraries})
-  swift_target_link_search_directories("${target}" "${library_search_directories}")
-endfunction()
-
 # Add a new SourceKit library.
 #
 # Usage:
@@ -197,7 +150,6 @@ macro(add_sourcekit_library name)
                              DESTINATION "include/SourceKit"
                              COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit libraries")
-  add_sourcekit_default_compiler_flags("${name}")
 
   swift_is_installing_component("${SOURCEKITLIB_INSTALL_IN_COMPONENT}" is_installing)
   if(NOT is_installing)
@@ -240,7 +192,6 @@ macro(add_sourcekit_executable name)
   target_link_libraries(${name} PRIVATE ${LLVM_COMMON_LIBS})
 
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit executables")
-  add_sourcekit_default_compiler_flags("${name}")
 endmacro()
 
 # Add a new SourceKit framework.
@@ -371,8 +322,6 @@ macro(add_sourcekit_framework name)
   else()
     set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
   endif()
-
-  add_sourcekit_default_compiler_flags("${name}")
 endmacro(add_sourcekit_framework)
 
 # Add a new SourceKit XPC service to a framework.
@@ -449,5 +398,4 @@ macro(add_sourcekit_xpc_service name framework_target)
         LINK_FLAGS "-Wl,-exported_symbol,_main")
     endif()
   endif()
-  add_sourcekit_default_compiler_flags("${name}")
 endmacro()
