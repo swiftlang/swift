@@ -15,5 +15,5 @@
 //===----------------------------------------------------------------------===//
 
 SWIFT_REQUEST(SILGen, GenerateSILRequest,
-              SILModule *(SILGenDescriptor),
+              std::unique_ptr<SILModule>(SILGenDescriptor),
               Uncached, NoLocationInfo)

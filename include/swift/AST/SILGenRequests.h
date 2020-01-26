@@ -76,7 +76,7 @@ public:
 
 class GenerateSILRequest :
     public SimpleRequest<GenerateSILRequest,
-                         SILModule *(SILGenDescriptor),
+                         std::unique_ptr<SILModule>(SILGenDescriptor),
                          CacheKind::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -85,7 +85,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<SILModule *>
+  llvm::Expected<std::unique_ptr<SILModule>>
   evaluate(Evaluator &evaluator, SILGenDescriptor desc) const;
 
 public:

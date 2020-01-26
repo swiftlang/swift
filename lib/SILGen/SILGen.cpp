@@ -1755,29 +1755,23 @@ std::unique_ptr<SILModule>
 swift::performSILGeneration(ModuleDecl *mod, Lowering::TypeConverter &tc,
                             const SILOptions &options) {
   auto desc = SILGenDescriptor::forWholeModule(mod, tc, options);
-  return std::unique_ptr<SILModule>(
-             evaluateOrDefault(mod->getASTContext().evaluator,
-                               GenerateSILRequest{desc},
-                               nullptr));
+  return llvm::cantFail(mod->getASTContext().evaluator(GenerateSILRequest{desc}));
 }
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(FileUnit &sf, Lowering::TypeConverter &tc,
                             const SILOptions &options) {
   auto desc = SILGenDescriptor::forFile(sf, tc, options);
-  return std::unique_ptr<SILModule>(
-             evaluateOrDefault(sf.getASTContext().evaluator,
-                               GenerateSILRequest{desc},
-                               nullptr));
+  return llvm::cantFail(sf.getASTContext().evaluator(GenerateSILRequest{desc}));
 }
 
-llvm::Expected<SILModule *>
+llvm::Expected<std::unique_ptr<SILModule>>
 GenerateSILRequest::evaluate(Evaluator &evaluator, SILGenDescriptor sgd) const {
   if (auto *MD = sgd.context.dyn_cast<ModuleDecl *>()) {
-    return SILModule::constructSIL(MD, sgd.conv, sgd.opts, nullptr).release();
+    return SILModule::constructSIL(MD, sgd.conv, sgd.opts, nullptr);
   } else {
     auto *SF = sgd.context.get<FileUnit *>();
     return SILModule::constructSIL(SF->getParentModule(),
-                                   sgd.conv, sgd.opts, SF).release();
+                                   sgd.conv, sgd.opts, SF);
   }
 }
