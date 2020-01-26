@@ -36,13 +36,13 @@ Swift Next
   func doStuff(_ stuff: @escaping () -> Void) {}
   
   class C {
-      var x = 0
-      
-      func method() {
-          doStuff { [self] in
-              x += 1
-          }
+    var x = 0
+
+    func method() {
+      doStuff { [self] in
+        x += 1
       }
+    }
   }
   ```
   
@@ -199,7 +199,7 @@ Swift 5.2
   A method override is no longer allowed to have a generic signature with
   requirements not imposed by the base method. For example:
 
-  ```
+  ```swift
   protocol P {}
   
   class Base {
