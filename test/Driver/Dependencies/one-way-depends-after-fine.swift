@@ -11,7 +11,7 @@
 // ...then reset the .swiftdeps files.
 // RUN: cp -r %S/Inputs/one-way-depends-after-fine/*.swiftdeps %t
 
-// RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | tee /tmp/1|%FileCheck -check-prefix=CHECK-FIRST %s
+// RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
 
 // CHECK-FIRST-NOT: warning
 // CHECK-FIRST-NOT: Handled
