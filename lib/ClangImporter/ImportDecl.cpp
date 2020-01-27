@@ -6759,7 +6759,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // - There is no setter.
   bool associateWithSetter = !getterAndSetterInSameType && setter == decl;
   DeclContext *dc =
-      associateWithSetter ? setter->getDeclContext() : getter->getDeclContext();
+      associateWithSetter ? setter && setter->getDeclContext() : getter->getDeclContext();
 
   // Build the subscript declaration.
   auto &C = Impl.SwiftContext;
