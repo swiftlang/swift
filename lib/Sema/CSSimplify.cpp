@@ -7518,6 +7518,18 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // following: $T1 -> $T2.
   auto func1 = type1->castTo<FunctionType>();
 
+  // If a type variable representing "function type" is a hole
+  // or it could be bound to some concrete type with a help of
+  // a fix, let's propagate holes to the "input" type. Doing so
+  // provides more information to upcoming argument and result matching.
+  if (shouldAttemptFixes()) {
+    if (auto *typeVar = type2->getAs<TypeVariableType>()) {
+      auto *locator = typeVar->getImpl().getLocator();
+      if (typeVar->isHole() || hasFixFor(locator))
+        recordPotentialHole(func1);
+    }
+  }
+
   // Before stripping lvalue-ness and optional types, save the original second
   // type for handling `func callAsFunction` and `@dynamicCallable`
   // applications. This supports the following cases:
@@ -7730,10 +7742,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     // If there are any type variables associated with arguments/result
     // they have to be marked as "holes".
-    type1.visit([&](Type subType) {
-      if (auto *typeVar = subType->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-    });
+    recordPotentialHole(func1);
 
     if (desugar2->isHole())
       return SolutionKind::Solved;
@@ -8007,11 +8016,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
       return SolutionKind::Error;
 
     recordPotentialHole(tv);
-
-    Type(func1).visit([&](Type type) {
-      if (auto *typeVar = type->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-    });
+    recordPotentialHole(func1);
 
     return SolutionKind::Solved;
   }
@@ -8570,6 +8575,14 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 void ConstraintSystem::recordPotentialHole(TypeVariableType *typeVar) {
   assert(typeVar);
   typeVar->getImpl().enableCanBindToHole(getSavedBindings());
+}
+
+void ConstraintSystem::recordPotentialHole(FunctionType *fnType) {
+  assert(fnType);
+  Type(fnType).visit([&](Type type) {
+    if (auto *typeVar = type->getAs<TypeVariableType>())
+      recordPotentialHole(typeVar);
+  });
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
