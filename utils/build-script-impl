@@ -2374,7 +2374,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Configure TensorFlow and build using bazel.
                 (cd "${source_dir}"; echo yes "" | ./configure)
                 with_pushd "${source_dir}" \
-                    call bazel build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" --define framework_shared_object=false //tensorflow:libtensorflow.so
+                    call ${HOST_BAZEL} build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" --define framework_shared_object=false //tensorflow:libtensorflow.so
 
                 # TensorFlow builds itself and doesn't use CMake.
                 continue
