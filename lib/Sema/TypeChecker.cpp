@@ -559,12 +559,14 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
     auto genericParams = nestedList[i];
     genericParams->setDepth(i);
   }
-
+  llvm::errs() << "Checking generic sig...";
   auto sig =
       TypeChecker::checkGenericSignature(nestedList.back(), DC,
                                          /*parentSig=*/nullptr,
                                          /*allowConcreteGenericParams=*/true);
-  return (sig ? sig->getGenericEnvironment() : nullptr);
+  auto out = (sig ? sig->getGenericEnvironment() : nullptr);
+  llvm::errs() << "done.\n";
+  return out;
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,

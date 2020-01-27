@@ -791,6 +791,9 @@ struct ConcreteArgumentCopy {
     assert(!paramInfo.isIndirectMutating()
            && "A mutated opened existential value can't be replaced");
 
+    if (!paramInfo.isConsumed())
+       return None;
+
     SILValue origArg = apply.getArgument(argIdx);
     // FIXME_opaque: With SIL opaque values, a formally indirect argument may be
     // passed as a SIL object. In this case, generate a copy_value for the new
@@ -821,6 +824,7 @@ struct ConcreteArgumentCopy {
     } else {
       // Otherwise, we probably got the value from the source of a store
       // instruction so, create a store into the temporary argument.
+      B.createStrongRetain(loc, CEI.ConcreteValue, B.getDefaultAtomicity());
       B.createStore(loc, CEI.ConcreteValue, ASI,
                     StoreOwnershipQualifier::Unqualified);
     }
@@ -856,6 +860,11 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     const llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COAIs,
     SILBuilderContext &BuilderCtx) {
 
+  // Bail on try_apply.
+  // TODO: support try_apply.
+  if (isa<TryApplyInst>(Apply))
+    return nullptr;
+  
   // Ensure that the callee is polymorphic.
   assert(Apply.getOrigCalleeType()->isPolymorphic());
 
@@ -898,6 +907,8 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
       if (argSub) {
         concreteArgCopies.push_back(*argSub);
         NewArgs.push_back(argSub->tempArg);
+      } else {
+        NewArgs.clear();
       }
     } else {
       // Otherwise, we can just use the value itself.
@@ -936,15 +947,9 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
   }
   // Now create the new apply instruction.
   SILBuilderWithScope ApplyBuilder(Apply.getInstruction(), BuilderCtx);
-  FullApplySite NewApply;
-  if (auto *TAI = dyn_cast<TryApplyInst>(Apply))
-    NewApply = ApplyBuilder.createTryApply(
-        Apply.getLoc(), Apply.getCallee(), NewCallSubs, NewArgs,
-        TAI->getNormalBB(), TAI->getErrorBB());
-  else
-    NewApply = ApplyBuilder.createApply(
-        Apply.getLoc(), Apply.getCallee(), NewCallSubs, NewArgs,
-        cast<ApplyInst>(Apply)->isNonThrowing());
+  FullApplySite NewApply = ApplyBuilder.createApply(
+    Apply.getLoc(), Apply.getCallee(), NewCallSubs, NewArgs,
+    cast<ApplyInst>(Apply)->isNonThrowing());
 
   if (auto NewAI = dyn_cast<ApplyInst>(NewApply))
     replaceInstUsesWith(*cast<ApplyInst>(Apply.getInstruction()), NewAI);
