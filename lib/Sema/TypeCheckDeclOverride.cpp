@@ -595,9 +595,10 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
   return true;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
-                                             ValueDecl *baseDecl) {
+/// Returns true if `derivedDecl` has a `@differentiable` attribute that
+/// overrides one from `baseDecl`.
+static bool hasOverridingDifferentiableAttribute(ValueDecl *derivedDecl,
+                                                 ValueDecl *baseDecl) {
   ASTContext &ctx = derivedDecl->getASTContext();
   auto &diags = ctx.Diags;
 
@@ -607,8 +608,9 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
   if (!derivedAFD || !baseAFD)
     return false;
 
-  auto derivedDAs = derivedAFD->getAttrs()
-      .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
+  auto derivedDAs =
+      derivedAFD->getAttrs()
+          .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
   auto baseDAs = baseAFD->getAttrs().getAttributes<DifferentiableAttr>();
 
   // Make sure all the `@differentiable` attributes in `baseDecl` are
@@ -642,16 +644,17 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
     // inferred differentiation parameters.
     auto *inferredParameters =
         TypeChecker::inferDifferentiabilityParameters(derivedAFD, nullptr);
-    bool omitWrtClause = !baseParameters ||
+    bool omitWrtClause =
+        !baseParameters ||
         baseParameters->getNumIndices() == inferredParameters->getNumIndices();
     // Get `@differentiable` attribute description.
     std::string baseDAString;
     llvm::raw_string_ostream stream(baseDAString);
     baseDA->print(stream, derivedDecl, omitWrtClause,
                   /*omitDerivativeFunctions*/ true);
-    diags.diagnose(
-        derivedDecl, diag::overriding_decl_missing_differentiable_attr,
-        StringRef(stream.str()).trim());
+    diags.diagnose(derivedDecl,
+                   diag::overriding_decl_missing_differentiable_attr,
+                   StringRef(stream.str()).trim());
     diags.diagnose(baseDecl, diag::overridden_here);
   }
   // If a diagnostic was produced, return false.
@@ -691,7 +694,6 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
 
   return false;
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 /// Returns true if the given declaration is for the `NSObject.hashValue`
 /// property.
@@ -855,11 +857,10 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     if (!areOverrideCompatibleSimple(decl, parentDecl))
       continue;
 
-    // SWIFT_ENABLE_TENSORFLOW
-    // Check whether the `@differentiable` attribute allows overriding.
-    if (overridesDifferentiableAttribute(decl, parentDecl))
+    // Check whether the derived declaration has a `@differentiable` attribute
+    // that overrides one from the parent declaration.
+    if (hasOverridingDifferentiableAttribute(decl, parentDecl))
       continue;
-    // SWIFT_ENABLE_TENSORFLOW END
 
     auto parentMethod = dyn_cast<AbstractFunctionDecl>(parentDecl);
     auto parentStorage = dyn_cast<AbstractStorageDecl>(parentDecl);
@@ -1402,7 +1403,6 @@ namespace  {
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(IBSegueAction)
-    UNINTERESTING_ATTR(ImplicitlySynthesizesNestedRequirement)
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)

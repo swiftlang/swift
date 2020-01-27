@@ -1284,9 +1284,9 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
       X->getType() ==
           SILType::getBuiltinIntegerType(1, CBI->getModule().getASTContext())) {
     SmallVector<SILValue, 4> OrigTrueArgs, OrigFalseArgs;
-    for (const auto &Op : CBI->getTrueArgs())
+    for (const auto Op : CBI->getTrueArgs())
       OrigTrueArgs.push_back(Op);
-    for (const auto &Op : CBI->getFalseArgs())
+    for (const auto Op : CBI->getFalseArgs())
       OrigFalseArgs.push_back(Op);
     return Builder.createCondBranch(CBI->getLoc(), X,
                                     CBI->getFalseBB(), OrigFalseArgs,

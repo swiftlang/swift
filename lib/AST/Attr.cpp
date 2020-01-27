@@ -26,6 +26,7 @@
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/TypeCheckRequests.h"
@@ -964,11 +965,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DAK_ImplicitlySynthesizesNestedRequirement:
-    Printer.printAttrName("@_implicitly_synthesizes_nested_requirement");
-    Printer << "(\"" << cast<ImplicitlySynthesizesNestedRequirementAttr>(this)->Value << "\")";
-    break;
-
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -1030,8 +1026,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "_swift_native_objc_runtime_base";
   case DAK_Semantics:
     return "_semantics";
-  case DAK_ImplicitlySynthesizesNestedRequirement:
-    return "_implicitly_synthesizes_nested_requirement";
   case DAK_Available:
     return "availability";
   case DAK_ObjC:
@@ -1305,8 +1299,17 @@ bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
   return isPlatformActive(Platform, ctx.LangOpts);
 }
 
-bool OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
-  return isPlatformActive(Platform, ctx.LangOpts);
+Optional<OriginallyDefinedInAttr::ActiveVersion>
+OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
+  OriginallyDefinedInAttr::ActiveVersion Result;
+  Result.Platform = Platform;
+  Result.Version = MovedVersion;
+  Result.ModuleName = OriginalModuleName;
+  if (isPlatformActive(Platform, ctx.LangOpts)) {
+    Result.IsSimulator = ctx.LangOpts.Target.isSimulatorEnvironment();
+    return Result;
+  }
+  return None;
 }
 
 bool AvailableAttr::isLanguageVersionSpecific() const {
@@ -1519,8 +1522,14 @@ DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
                                       std::move(vjp), derivativeGenSig);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-bool DifferentiableAttr::hasComputedParameterIndices() const {
+void DifferentiableAttr::setOriginalDeclaration(Decl *originalDeclaration) {
+  assert(originalDeclaration && "Original declaration must be non-null");
+  assert(!OriginalDeclaration &&
+         "Original declaration cannot have already been set");
+  OriginalDeclaration = originalDeclaration;
+}
+
+bool DifferentiableAttr::hasBeenTypeChecked() const {
   return ParameterIndicesAndBit.getInt();
 }
 
@@ -1528,11 +1537,10 @@ IndexSubset *DifferentiableAttr::getParameterIndices() const {
   assert(getOriginalDeclaration() &&
          "Original declaration must have been resolved");
   auto &ctx = getOriginalDeclaration()->getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator,
-      DifferentiableAttributeParameterIndicesRequest{
-          const_cast<DifferentiableAttr *>(this), getOriginalDeclaration()},
-      nullptr);
+  return evaluateOrDefault(ctx.evaluator,
+                           DifferentiableAttributeTypeCheckRequest{
+                               const_cast<DifferentiableAttr *>(this)},
+                           nullptr);
 }
 
 void DifferentiableAttr::setParameterIndices(IndexSubset *paramIndices) {
@@ -1540,17 +1548,9 @@ void DifferentiableAttr::setParameterIndices(IndexSubset *paramIndices) {
          "Original declaration must have been resolved");
   auto &ctx = getOriginalDeclaration()->getASTContext();
   ctx.evaluator.cacheOutput(
-      DifferentiableAttributeParameterIndicesRequest{
-          const_cast<DifferentiableAttr *>(this), getOriginalDeclaration()},
+      DifferentiableAttributeTypeCheckRequest{
+          const_cast<DifferentiableAttr *>(this)},
       std::move(paramIndices));
-}
-// SWIFT_ENABLE_TENSORFLOW END
-
-void DifferentiableAttr::setOriginalDeclaration(Decl *originalDeclaration) {
-  assert(originalDeclaration && "Original declaration must be non-null");
-  assert(!OriginalDeclaration &&
-         "Original declaration cannot have already been set");
-  OriginalDeclaration = originalDeclaration;
 }
 
 void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {

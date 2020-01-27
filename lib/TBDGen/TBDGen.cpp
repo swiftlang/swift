@@ -36,10 +36,12 @@
 #include "swift/SIL/TypeLowering.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/YAMLParser.h"
 #include "llvm/TextAPI/MachO/InterfaceFile.h"
 #include "llvm/TextAPI/MachO/TextAPIReader.h"
 #include "llvm/TextAPI/MachO/TextAPIWriter.h"
@@ -49,6 +51,7 @@
 using namespace swift;
 using namespace swift::irgen;
 using namespace swift::tbdgen;
+using namespace llvm::yaml;
 using StringSet = llvm::StringSet<>;
 using SymbolKind = llvm::MachO::SymbolKind;
 
@@ -69,42 +72,273 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
   }
 }
 
-static Optional<llvm::VersionTuple> getDeclMoveOSVersion(Decl *D) {
+static std::vector<OriginallyDefinedInAttr::ActiveVersion>
+getAllMovedPlatformVersions(Decl *D) {
+  std::vector<OriginallyDefinedInAttr::ActiveVersion> Results;
   for (auto *attr: D->getAttrs()) {
     if (auto *ODA = dyn_cast<OriginallyDefinedInAttr>(attr)) {
-      if (ODA->isActivePlatform(D->getASTContext()))
-        return ODA->MovedVersion;
+      auto Active = ODA->isActivePlatform(D->getASTContext());
+      if (Active.hasValue()) {
+        Results.push_back(*Active);
+      }
     }
   }
-  return None;
+  return Results;
 }
 
-void TBDGenVisitor::addLinkerDirectiveSymbols(StringRef name,
-                                              llvm::MachO::SymbolKind kind) {
+static StringRef getLinkerPlatformName(uint8_t Id) {
+  switch (Id) {
+#define LD_PLATFORM(Name, Id) case Id: return #Name;
+#include "ldPlatformKinds.def"
+  default:
+    llvm_unreachable("unrecognized platform id");
+  }
+}
+
+static Optional<uint8_t> getLinkerPlatformId(StringRef Platform) {
+  return llvm::StringSwitch<Optional<uint8_t>>(Platform)
+#define LD_PLATFORM(Name, Id) .Case(#Name, Id)
+#include "ldPlatformKinds.def"
+    .Default(None);
+}
+
+StringRef InstallNameStore::getInstallName(LinkerPlatformId Id) const {
+  auto It = PlatformInstallName.find((uint8_t)Id);
+  if (It == PlatformInstallName.end())
+    return InstallName;
+  else
+    return It->second;
+}
+
+void InstallNameStore::remark(ASTContext &Ctx, StringRef ModuleName) const {
+  Ctx.Diags.diagnose(SourceLoc(), diag::default_previous_install_name,
+                     ModuleName, InstallName);
+  for (auto Pair: PlatformInstallName) {
+    Ctx.Diags.diagnose(SourceLoc(), diag::platform_previous_install_name,
+                       ModuleName, getLinkerPlatformName(Pair.first),
+                       Pair.second);
+  }
+}
+
+static std::string getScalaNodeText(Node *N) {
+  SmallString<32> Buffer;
+  return cast<ScalarNode>(N)->getValue(Buffer).str();
+}
+
+static std::set<int8_t> getSequenceNodePlatformList(ASTContext &Ctx, Node *N) {
+  std::set<int8_t> Results;
+  for (auto &E: *cast<SequenceNode>(N)) {
+    auto Platform = getScalaNodeText(&E);
+    auto Id = getLinkerPlatformId(Platform);
+    if (Id.hasValue()) {
+      Results.insert(*Id);
+    } else {
+      // Diagnose unrecognized platform name.
+      Ctx.Diags.diagnose(SourceLoc(), diag::unknown_platform_name, Platform);
+    }
+  }
+  return Results;
+}
+
+/// Parse an entry like this, where the "platforms" key-value pair is optional:
+///  {
+///     "module": "Foo",
+///     "platforms": ["macOS"],
+///     "install_name": "/System/MacOS"
+///  },
+static int
+parseEntry(ASTContext &Ctx,
+           Node *Node, std::map<std::string, InstallNameStore> &Stores) {
+  if (auto *SN = cast<SequenceNode>(Node)) {
+    for (auto It = SN->begin(); It != SN->end(); ++It) {
+      auto *MN = cast<MappingNode>(&*It);
+      std::string ModuleName;
+      std::string InstallName;
+      Optional<std::set<int8_t>> Platforms;
+      for (auto &Pair: *MN) {
+        auto Key = getScalaNodeText(Pair.getKey());
+        auto* Value = Pair.getValue();
+        if (Key == "module") {
+          ModuleName = getScalaNodeText(Value);
+        } else if (Key == "platforms") {
+          Platforms = getSequenceNodePlatformList(Ctx, Value);
+        } else if (Key == "install_name") {
+          InstallName = getScalaNodeText(Value);
+        } else {
+          return 1;
+        }
+      }
+      if (ModuleName.empty() || InstallName.empty())
+        return 1;
+      auto &Store = Stores.insert(std::make_pair(ModuleName,
+        InstallNameStore())).first->second;
+      if (Platforms.hasValue()) {
+        // This install name is platform-specific.
+        for (auto Id: Platforms.getValue()) {
+          Store.PlatformInstallName[Id] = InstallName;
+        }
+      } else {
+        // The install name is the default one.
+        Store.InstallName = InstallName;
+      }
+    }
+  } else {
+    return 1;
+  }
+  return 0;
+}
+
+std::unique_ptr<std::map<std::string, InstallNameStore>>
+TBDGenVisitor::parsePreviousModuleInstallNameMap() {
+  StringRef FileName = Opts.ModuleInstallNameMapPath;
+  // Nothing to parse.
+  if (FileName.empty())
+    return nullptr;
+  namespace yaml = llvm::yaml;
+  ASTContext &Ctx = SwiftModule->getASTContext();
+  std::unique_ptr<std::map<std::string, InstallNameStore>> pResult(
+    new std::map<std::string, InstallNameStore>());
+  auto &AllInstallNames = *pResult;
+  SWIFT_DEFER {
+    for (auto Pair: AllInstallNames) {
+      Pair.second.remark(Ctx, Pair.first);
+    }
+  };
+
+  // Load the input file.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+    llvm::MemoryBuffer::getFile(FileName);
+  if (!FileBufOrErr) {
+    Ctx.Diags.diagnose(SourceLoc(), diag::previous_installname_map_missing,
+                       FileName);
+    return nullptr;
+  }
+  StringRef Buffer = FileBufOrErr->get()->getBuffer();
+
+  // Use a new source manager instead of the one from ASTContext because we
+  // don't want the Json file to be persistent.
+  SourceManager SM;
+  yaml::Stream Stream(llvm::MemoryBufferRef(Buffer, FileName),
+                      SM.getLLVMSourceMgr());
+  for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
+    assert(DI != Stream.end() && "Failed to read a document");
+    yaml::Node *N = DI->getRoot();
+    assert(N && "Failed to find a root");
+    if (parseEntry(Ctx, N, AllInstallNames)) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::previous_installname_map_corrupted,
+                         FileName);
+      return nullptr;
+    }
+  }
+  return pResult;
+}
+
+static LinkerPlatformId
+getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
+  switch(Ver.Platform) {
+  case swift::PlatformKind::none:
+    llvm_unreachable("cannot find platform kind");
+  case swift::PlatformKind::iOS:
+  case swift::PlatformKind::iOSApplicationExtension:
+    return Ver.IsSimulator ? LinkerPlatformId::iOS_sim:
+                             LinkerPlatformId::iOS;
+  case swift::PlatformKind::tvOS:
+  case swift::PlatformKind::tvOSApplicationExtension:
+    return Ver.IsSimulator ? LinkerPlatformId::tvOS_sim:
+                             LinkerPlatformId::tvOS;
+  case swift::PlatformKind::watchOS:
+  case swift::PlatformKind::watchOSApplicationExtension:
+    return Ver.IsSimulator ? LinkerPlatformId::watchOS_sim:
+                             LinkerPlatformId::watchOS;
+  case swift::PlatformKind::OSX:
+  case swift::PlatformKind::OSXApplicationExtension:
+    return LinkerPlatformId::macOS;
+  }
+}
+
+static StringRef
+getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver) {
+  return getLinkerPlatformName((uint8_t)getLinkerPlatformId(Ver));
+}
+
+void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
+                                                llvm::MachO::SymbolKind kind) {
   if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
     return;
   if (!TopLevelDecl)
     return;
-  auto MovedVer = getDeclMoveOSVersion(TopLevelDecl);
-  if (!MovedVer.hasValue())
+  auto MovedVers = getAllMovedPlatformVersions(TopLevelDecl);
+  if (MovedVers.empty())
     return;
-  assert(MovedVer.hasValue());
+  assert(!MovedVers.empty());
+  assert(previousInstallNameMap);
+  auto &Ctx = TopLevelDecl->getASTContext();
+  for (auto &Ver: MovedVers) {
+    auto IntroVer = TopLevelDecl->getIntroducedOSVersion(Ver.Platform);
+    assert(IntroVer && "cannot find OS intro version");
+    if (!IntroVer.hasValue())
+      continue;
+    auto PlatformNumber = getLinkerPlatformId(Ver);
+    auto It = previousInstallNameMap->find(Ver.ModuleName);
+    if (It == previousInstallNameMap->end()) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
+                         Ver.ModuleName, getLinkerPlatformName(Ver));
+      continue;
+    }
+    auto InstallName = It->second.getInstallName(PlatformNumber);
+    if (InstallName.empty()) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
+                         Ver.ModuleName, getLinkerPlatformName(Ver));
+      continue;
+    }
+    llvm::SmallString<64> Buffer;
+    llvm::raw_svector_ostream OS(Buffer);
+    // Empty compatible version indicates using the current compatible version.
+    StringRef ComptibleVersion = "";
+    OS << "$ld$previous$";
+    OS << InstallName << "$";
+    OS << ComptibleVersion << "$";
+    OS << std::to_string((uint8_t)PlatformNumber) << "$";
+    static auto getMinor = [](Optional<unsigned> Minor) {
+      return Minor.hasValue() ? *Minor : 0;
+    };
+    OS << IntroVer->getMajor() << "." << getMinor(IntroVer->getMinor()) << "$";
+    OS << Ver.Version.getMajor() << "." << getMinor(Ver.Version.getMinor()) << "$";
+    OS << name << "$";
+    addSymbolInternal(OS.str(), llvm::MachO::SymbolKind::GlobalSymbol,
+                      /*LinkerDirective*/true);
+  }
+}
+
+void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
+                                                    llvm::MachO::SymbolKind kind) {
+  if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
+    return;
+  if (!TopLevelDecl)
+    return;
+  auto MovedVers = getAllMovedPlatformVersions(TopLevelDecl);
+  if (MovedVers.empty())
+    return;
+  assert(!MovedVers.empty());
+
+  // Using $ld$add and $ld$hide cannot encode platform name in the version number,
+  // so we can only handle one version.
+  // FIXME: use $ld$previous instead
+  auto MovedVer = MovedVers.front().Version;
+  auto Platform = MovedVers.front().Platform;
   unsigned Major[2];
   unsigned Minor[2];
-  Major[1] = MovedVer->getMajor();
-  Minor[1] = MovedVer->getMinor().hasValue() ? *MovedVer->getMinor(): 0;
-  auto AvailRange = AvailabilityInference::availableRange(TopLevelDecl,
-                                TopLevelDecl->getASTContext()).getOSVersion();
-  assert(AvailRange.hasLowerEndpoint() &&
-         "cannot find the start point of availability");
-  if (!AvailRange.hasLowerEndpoint())
+  Major[1] = MovedVer.getMajor();
+  Minor[1] = MovedVer.getMinor().hasValue() ? *MovedVer.getMinor(): 0;
+  auto IntroVer = TopLevelDecl->getIntroducedOSVersion(Platform);
+  assert(IntroVer && "cannot find the start point of availability");
+  if (!IntroVer.hasValue())
     return;
-  assert(AvailRange.getLowerEndpoint() < *MovedVer);
-  if (AvailRange.getLowerEndpoint() >= *MovedVer)
+  assert(*IntroVer < MovedVer);
+  if (*IntroVer >= MovedVer)
     return;
-  Major[0] = AvailRange.getLowerEndpoint().getMajor();
-  Minor[0] = AvailRange.getLowerEndpoint().getMinor().hasValue() ?
-    AvailRange.getLowerEndpoint().getMinor().getValue() : 0;
+  Major[0] = IntroVer->getMajor();
+  Minor[0] = IntroVer->getMinor().hasValue() ? IntroVer->getMinor().getValue() : 0;
   for (auto CurMaj = Major[0]; CurMaj <= Major[1]; ++ CurMaj) {
     unsigned MinRange[2] = {0, 31};
     if (CurMaj == Major[0])
@@ -127,7 +361,11 @@ void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
   SmallString<32> mangled;
   llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
   addSymbolInternal(mangled, kind);
-  addLinkerDirectiveSymbols(mangled, kind);
+  if (previousInstallNameMap) {
+    addLinkerDirectiveSymbolsLdPrevious(mangled, kind);
+  } else {
+    addLinkerDirectiveSymbolsLdHide(mangled, kind);
+  }
 }
 
 void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
@@ -818,7 +1056,7 @@ static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
 }
 
 static bool hasLinkerDirective(Decl *D) {
-  return getDeclMoveOSVersion(D).hasValue();
+  return !getAllMovedPlatformVersions(D).empty();
 }
 
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,

@@ -2157,10 +2157,7 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
   if (auto nom = dyn_cast<NominalType>(type)) {
     if (!isa<ProtocolDecl>(nom->getDecl())
         && (!nom->getDecl()->isGenericContext()
-            || nom->getDecl()->getGenericSignature()->areAllParamsConcrete())
-        && (!nom->getClassOrBoundGenericClass()
-            || !nom->getClassOrBoundGenericClass()->hasClangNode()
-            || nom->getClassOrBoundGenericClass()->isForeign())) {
+            || nom->getDecl()->getGenericSignature()->areAllParamsConcrete())) {
       return false;
     }
   }

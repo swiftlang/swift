@@ -1161,9 +1161,9 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
     if (!objectType.isAnyClassReferenceType())
       return false;
     
-      auto super = archetype->getSuperclass();
-      if (super.isNull())
-        return false;
+    auto super = archetype->getSuperclass();
+    if (super.isNull())
+      return false;
 
     // A base class constraint that isn't NSError rules out the archetype being
     // bound to NSError.

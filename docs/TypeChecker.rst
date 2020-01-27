@@ -992,4 +992,3 @@ The things in the queue yet to be ported are:
   - ``diagnoseParameterErrors``
   - ``diagnoseSimpleErrors``
 
-- Diagnostics related to array/dictionary literals: ``visit{Array, Dictionary}Expr``.

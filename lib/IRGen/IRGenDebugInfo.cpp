@@ -143,7 +143,8 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
 public:
   IRGenDebugInfoImpl(const IRGenOptions &Opts, ClangImporter &CI,
                      IRGenModule &IGM, llvm::Module &M,
-                     StringRef MainOutputFilenameForDebugInfo);
+                     StringRef MainOutputFilenameForDebugInfo,
+                     StringRef PrivateDiscriminator);
   void finalize();
 
   void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
@@ -1664,7 +1665,8 @@ private:
 IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        ClangImporter &CI, IRGenModule &IGM,
                                        llvm::Module &M,
-                                       StringRef MainOutputFilenameForDebugInfo)
+                                       StringRef MainOutputFilenameForDebugInfo,
+                                       StringRef PD)
     : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), M(M), DBuilder(M),
       IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap) {
   assert(Opts.DebugInfoLevel > IRGenDebugInfoLevel::None &&
@@ -1678,7 +1680,6 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   unsigned Lang = llvm::dwarf::DW_LANG_Swift;
   std::string Producer = version::getSwiftFullVersion(
       IGM.Context.LangOpts.EffectiveLanguageVersion);
-  StringRef Flags = Opts.DebugFlags;
   unsigned Major, Minor;
   std::tie(Major, Minor) = version::getSwiftNumericVersion();
   unsigned MajorRuntimeVersion = Major;
@@ -1693,7 +1694,8 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
 
   TheCU = DBuilder.createCompileUnit(
       Lang, MainFile,
-      Producer, Opts.shouldOptimize(), Flags, MajorRuntimeVersion, SplitName,
+      Producer, Opts.shouldOptimize(), Opts.getDebugFlags(PD),
+      MajorRuntimeVersion, SplitName,
       Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly);
@@ -2355,9 +2357,11 @@ SILLocation::DebugLoc IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
 
 std::unique_ptr<IRGenDebugInfo> IRGenDebugInfo::createIRGenDebugInfo(
     const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
-    llvm::Module &M, StringRef MainOutputFilenameForDebugInfo) {
+    llvm::Module &M, StringRef MainOutputFilenameForDebugInfo,
+    StringRef PrivateDiscriminator) {
   return llvm::make_unique<IRGenDebugInfoImpl>(Opts, CI, IGM, M,
-                                               MainOutputFilenameForDebugInfo);
+                                               MainOutputFilenameForDebugInfo,
+                                               PrivateDiscriminator);
 }
 
 

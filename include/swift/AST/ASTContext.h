@@ -64,6 +64,7 @@ namespace swift {
   class DeclContext;
   class DefaultArgumentInitializer;
   class DerivativeAttr;
+  class DifferentiableAttr;
   class ExtensionDecl;
   class ForeignRepresentationInfo;
   class FuncDecl;
@@ -290,20 +291,13 @@ public:
   /// across invocations of both the parser and the type-checker.
   unsigned NextAutoClosureDiscriminator = 0;
 
-  // SWIFT_ENABLE_TENSORFLOW
+  /// Cached mapping from types to their associated tangent spaces.
+  llvm::DenseMap<Type, Optional<TangentSpace>> AutoDiffTangentSpaces;
 
   /// Cache of `@differentiable` attributes keyed by parameter indices. Used to
   /// diagnose duplicate `@differentiable` attributes for the same key.
-  // NOTE(TF-680): relaxing the uniqueness condition to use derivative generic
-  // signature as a key is possible. It requires derivative generic signature
-  // mangling to avoid name collisions for SIL derivative functions with the
-  // same parameter indices but different derivative generic signatures.
   llvm::DenseMap<std::pair<Decl *, IndexSubset *>, DifferentiableAttr *>
       DifferentiableAttrs;
-  // SWIFT_ENABLE_TENSORFLOW END
-
-  /// Cached mapping from types to their associated tangent spaces.
-  llvm::DenseMap<Type, Optional<TangentSpace>> AutoDiffTangentSpaces;
 
   /// Cache of `@derivative` attributes keyed by parameter indices and
   /// derivative function kind. Used to diagnose duplicate `@derivative`

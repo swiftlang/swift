@@ -124,9 +124,9 @@ func testClassLetProperty(c: C) -> Int {
 // CHECK-LABEL: sil hidden [ossa] @$s17access_marker_gen20testClassLetProperty1cSiAA1CC_tF : $@convention(thin) (@guaranteed C) -> Int {
 // CHECK: bb0(%0 : @guaranteed $C):
 // CHECK:   [[ADR:%.*]] = ref_element_addr %{{.*}} : $C, #C.z
-// CHECK:   [[ADR_ACCESS:%.*]] = begin_access [read] [unsafe] [[ADR]]
-// CHECK:   %{{.*}} = load [trivial] [[ADR_ACCESS]] : $*Int
-// CHECK:   end_access [[ADR_ACCESS]]
+// CHECK-NOT: begin_access
+// CHECK:   %{{.*}} = load [trivial] [[ADR]] : $*Int
+// CHECK-NOT: end_access
 // CHECK-NOT:   destroy_value %0 : $C
 // CHECK:   return %{{.*}} : $Int
 // CHECK-LABEL: } // end sil function '$s17access_marker_gen20testClassLetProperty1cSiAA1CC_tF'

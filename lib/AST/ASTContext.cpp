@@ -3573,13 +3573,13 @@ CanSILFunctionType SILFunctionType::get(
 
   // All SILFunctionTypes are canonical.
 
-  // Allocate storage for the object.
-  size_t bytes = sizeof(SILFunctionType)
-                 + sizeof(SILParameterInfo) * params.size()
-                 + sizeof(SILYieldInfo) * yields.size()
-                 + sizeof(SILResultInfo) * normalResults.size()
-                 + (errorResult ? sizeof(SILResultInfo) : 0)
-                 + (normalResults.size() > 1 ? sizeof(CanType) * 2 : 0);
+  // See [SILFunctionType-layout]
+  bool hasResultCache = normalResults.size() > 1;
+  size_t bytes =
+    totalSizeToAlloc<SILParameterInfo, SILResultInfo, SILYieldInfo, CanType>(
+      params.size(), normalResults.size() + (errorResult ? 1 : 0),
+      yields.size(), hasResultCache ? 2 : 0);
+
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
@@ -3610,6 +3610,8 @@ CanSILFunctionType SILFunctionType::get(
                                 params, yields, normalResults, errorResult,
                                 substitutions, genericSigIsImplied,
                                 ctx, properties, witnessMethodConformance);
+  assert(fnType->hasResultCache() == hasResultCache);
+
   ctx.getImpl().SILFunctionTypes.InsertNode(fnType, insertPos);
   return CanSILFunctionType(fnType);
 }

@@ -210,8 +210,8 @@ enum class MatchKind : uint8_t {
   /// The witness is explicitly @nonobjc but the requirement is @objc.
   NonObjC,
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// The @differentiable attribute does not match.
+  /// The witness does not have a `@differentiable` attribute satisfying one
+  /// from the requirement.
   DifferentiableConflict,
 };
 
@@ -358,11 +358,10 @@ struct RequirementMatch {
     assert(!hasWitnessType() && "Should have witness type");
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   RequirementMatch(ValueDecl *witness, MatchKind kind,
                    const DeclAttribute *attr)
-    : Witness(witness), Kind(kind), WitnessType(), UnmetAttribute(attr),
-      ReqEnv(None) {
+      : Witness(witness), Kind(kind), WitnessType(), UnmetAttribute(attr),
+        ReqEnv(None) {
     assert(!hasWitnessType() && "Should have witness type");
     assert(UnmetAttribute);
   }
@@ -403,8 +402,7 @@ struct RequirementMatch {
   /// Requirement not met.
   Optional<Requirement> MissingRequirement;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Attribute not met.
+  /// Unmet attribute from the requirement.
   const DeclAttribute *UnmetAttribute = nullptr;
 
   /// The requirement environment to use for the witness thunk.
@@ -440,7 +438,6 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
-      // SWIFT_ENABLE_TENSORFLOW
     case MatchKind::DifferentiableConflict:
       return false;
     }
@@ -471,7 +468,6 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
-      // SWIFT_ENABLE_TENSORFLOW
     case MatchKind::DifferentiableConflict:
       return false;
     }
@@ -482,7 +478,6 @@ struct RequirementMatch {
   /// Determine whether this requirement match has a requirement.
   bool hasRequirement() { return Kind == MatchKind::MissingRequirement; }
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Determine whether this requirement match has an unmet attribute.
   bool hasUnmetAttribute() { return Kind == MatchKind::DifferentiableConflict; }
 

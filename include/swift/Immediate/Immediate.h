@@ -18,6 +18,7 @@
 #ifndef SWIFT_IMMEDIATE_IMMEDIATE_H
 #define SWIFT_IMMEDIATE_IMMEDIATE_H
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -25,6 +26,7 @@ namespace swift {
   class CompilerInstance;
   class IRGenOptions;
   class SILOptions;
+  class SILModule;
 
   // Using LLVM containers to store command-line arguments turns out
   // to be a lose, because LLVM's execution engine demands this vector
@@ -37,7 +39,8 @@ namespace swift {
   ///
   /// \return the result returned from main(), if execution succeeded
   int RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                     IRGenOptions &IRGenOpts, const SILOptions &SILOpts);
+                     const IRGenOptions &IRGenOpts, const SILOptions &SILOpts,
+                     std::unique_ptr<SILModule> &&SM);
 
   void runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                bool ParseStdlib);

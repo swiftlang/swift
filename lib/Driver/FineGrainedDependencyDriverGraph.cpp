@@ -543,7 +543,7 @@ void ModuleDepGraph::verifyExternalDependencyUniqueness(
 void ModuleDepGraph::verifyCanFindEachJob() const {
   FrontendStatsTracer tracer(stats,
                              "fine-grained-dependencies-verifyCanFindEachJob");
-  for (const auto p : jobsBySwiftDeps) {
+  for (const auto &p : jobsBySwiftDeps) {
     getJob(p.first);
   }
 }

@@ -81,6 +81,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
     llvm_unreachable("Wrong constructor for member constraint");
 
   case ConstraintKind::Defaultable:
+  case ConstraintKind::DefaultClosureType:
     assert(!First.isNull());
     assert(!Second.isNull());
     break;
@@ -137,6 +138,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Wrong constructor");
 
   case ConstraintKind::KeyPath:
@@ -263,6 +265,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
 
   case ConstraintKind::BindOverload:
@@ -345,6 +348,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
   case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
   case ConstraintKind::OneWayEqual: Out << " one-way bind to "; break;
+  case ConstraintKind::DefaultClosureType:
+    Out << " closure can default to ";
+    break;
   case ConstraintKind::KeyPath:
       Out << " key path from ";
       Out << getSecondType()->getString(PO);
@@ -561,6 +567,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     constraint->getFirstType()->getTypeVariables(typeVars);
     constraint->getSecondType()->getTypeVariables(typeVars);
     break;
@@ -601,13 +608,16 @@ bool Constraint::isExplicitConversion() const {
 
 Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind, 
                                Type first, Type second,
-                               ConstraintLocator *locator) {
+                               ConstraintLocator *locator,
+                               ArrayRef<TypeVariableType *> extraTypeVars) {
   // Collect type variables.
   SmallVector<TypeVariableType *, 4> typeVars;
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second && second->hasTypeVariable())
     second->getTypeVariables(typeVars);
+
+  typeVars.append(extraTypeVars.begin(), extraTypeVars.end());
   uniqueTypeVariables(typeVars);
 
   // Conformance constraints expect an existential on the right-hand side.

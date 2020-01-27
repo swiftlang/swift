@@ -944,6 +944,8 @@ ERROR(statement_same_line_without_semi,none,
       "consecutive statements on a line must be separated by ';'", ())
 ERROR(invalid_label_on_stmt,none,
       "labels are only valid on loops, if, and switch statements", ())
+ERROR(labeled_block_needs_do,none,
+      "labeled block needs 'do'", ())
 
 ERROR(snake_case_deprecated,none,
       "%0 has been replaced with %1 in Swift 3",

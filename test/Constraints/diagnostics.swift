@@ -251,8 +251,7 @@ struct Toe {
   let toenail: Nail // expected-error {{use of undeclared type 'Nail'}}
 
   func clip() {
-    // FIXME: We shouldn't report this because toenail.inspect is a hole
-    toenail.inspect { x in // expected-error {{unable to infer closure return type; add explicit type to disambiguate}}
+    toenail.inspect { x in
       toenail.inspect { y in }
     }
   }
@@ -290,7 +289,6 @@ func r18800223(_ i : Int) {
   
   var buttonTextColor: String?
   _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '(_) -> _'}}
-  // expected-error@-1 {{unable to infer closure return type; add explicit type to disambiguate}}
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back

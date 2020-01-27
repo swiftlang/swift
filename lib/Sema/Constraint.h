@@ -161,6 +161,15 @@ enum class ConstraintKind : char {
   /// type). At that point, this constraint will be treated like an `Equal`
   /// constraint.
   OneWayEqual,
+  /// If there is no contextual info e.g. `_ = { 42 }` default first type
+  /// to a second type (inferred closure type). This is effectively a
+  /// `Defaultable` constraint which a couple of differences:
+  ///
+  /// - References inferred closure type and all of the outer parameters
+  ///   referenced by closure body.
+  /// - Handled specially by binding inference, specifically contributes
+  ///   to the bindings only if there are no contextual types available.
+  DefaultClosureType,
 };
 
 /// Classification of the different kinds of constraints.
@@ -406,9 +415,9 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
 public:
   /// Create a new constraint.
-  static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
-                            Type First, Type Second,
-                            ConstraintLocator *locator);
+  static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind,
+                            Type First, Type Second, ConstraintLocator *locator,
+                            ArrayRef<TypeVariableType *> extraTypeVars = {});
 
   /// Create a new constraint.
   static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
@@ -540,6 +549,7 @@ public:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::OpaqueUnderlyingType:
     case ConstraintKind::OneWayEqual:
+    case ConstraintKind::DefaultClosureType:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:

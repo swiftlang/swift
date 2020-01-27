@@ -258,7 +258,6 @@ SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
             // If we have a class, we can use a borrow directly and avoid ref
             // count traffic.
             if (isa<ClassDecl>(NTD) && Ptr->getType().isAddress()) {
-              SILValue Original = Ptr;
               SILValue Borrowed = Ptr = B.createLoadBorrow(Loc, Ptr);
               EndScopeList.emplace_back(Borrowed, EndScopeKind::Borrow);
             }

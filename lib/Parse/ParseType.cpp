@@ -841,10 +841,11 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     // Diagnose invalid `some` after an ampersand.
     if (Tok.is(tok::identifier) && Tok.getRawText() == "some") {
       auto badLoc = consumeToken();
-      
-      // TODO: Fixit to move to beginning of composition.
-      diagnose(badLoc, diag::opaque_mid_composition);
-      
+
+      diagnose(badLoc, diag::opaque_mid_composition)
+          .fixItRemove(badLoc)
+          .fixItInsert(FirstTypeLoc, "some ");
+
       if (opaqueLoc.isInvalid())
         opaqueLoc = badLoc;
     }

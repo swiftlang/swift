@@ -3,7 +3,7 @@ var x = 10
 // REQUIRES: objc_interop
 
 // FIXME: the test output we're comparing to is specific to macOS.
-// REQUIRES-ANY: OS=macosx
+// REQUIRES: OS=macosx
 
 // RUN: %empty-directory(%t.overlays)
 // RUN: %empty-directory(%t)

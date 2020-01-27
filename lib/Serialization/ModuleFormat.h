@@ -1833,11 +1833,6 @@ namespace decls_block {
     TypeIDField // type referenced by this custom attribute
   >;
 
-  using ImplicitlySynthesizesNestedRequirementDeclAttrLayout = BCRecordLayout<
-    ImplicitlySynthesizesNestedRequirement_DECL_ATTR,
-    BCBlob      // member name
-  >;
-
   // SWIFT_ENABLE_TENSORFLOW
   using QuotedDeclAttrLayout = BCRecordLayout<Quoted_DECL_ATTR,
                                               BCFixed<1>, // implicit flag

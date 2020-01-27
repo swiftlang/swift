@@ -18,10 +18,12 @@ from __future__ import absolute_import
 
 import platform
 
+from build_swift.build_swift.shell import which
+from build_swift.build_swift.wrappers import xcrun
+
 from . import cache_util
 from . import shell
-from . import xcrun
-from .which import which
+
 
 __all__ = [
     'host_toolchain',

@@ -239,8 +239,6 @@ private:
   bool visitTryExpr(TryExpr *E);
 
   bool visitUnresolvedDotExpr(UnresolvedDotExpr *UDE);
-  bool visitArrayExpr(ArrayExpr *E);
-  bool visitDictionaryExpr(DictionaryExpr *E);
   bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
   bool visitQuoteLiteralExpr(QuoteLiteralExpr *E);
   bool visitUnquoteExpr(UnquoteExpr *E);
@@ -1727,125 +1725,6 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   return false;
 }
 
-bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
-  // If we had a contextual type, then it either conforms to
-  // ExpressibleByArrayLiteral or it is an invalid contextual type.
-  auto contextualType = CS.getContextualType();
-  if (!contextualType) {
-    return false;
-  }
-
-  // If our contextual type is an optional, look through them, because we're
-  // surely initializing whatever is inside.
-  contextualType = contextualType->lookThroughAllOptionalTypes();
-
-  // Validate that the contextual type conforms to ExpressibleByArrayLiteral and
-  // figure out what the contextual element type is in place.
-  auto ALC =
-      TypeChecker::getProtocol(CS.getASTContext(), E->getLoc(),
-                               KnownProtocolKind::ExpressibleByArrayLiteral);
-  if (!ALC)
-    return visitExpr(E);
-
-  // Check to see if the contextual type conforms.
-  auto Conformance = TypeChecker::conformsToProtocol(
-      contextualType, ALC, CS.DC, ConformanceCheckFlags::InExpression);
-  if (Conformance) {
-    Type contextualElementType =
-        Conformance
-            .getTypeWitnessByName(contextualType,
-                                  CS.getASTContext().Id_ArrayLiteralElement)
-            ->getDesugaredType();
-
-    // Type check each of the subexpressions in place, passing down the contextual
-    // type information if we have it.
-    for (auto elt : E->getElements()) {
-      if (typeCheckChildIndependently(elt, contextualElementType,
-                                      CTP_ArrayElement) == nullptr) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  ContextualFailure failure(CS, CS.getType(E), contextualType,
-                            CS.getConstraintLocator(E));
-  if (failure.diagnoseConversionToDictionary())
-    return true;
-
-  // If that didn't turn up an issue, then we don't know what to do.
-  // TODO: When a contextual type is missing, we could try to diagnose cases
-  // where the element types mismatch... but theoretically they should type
-  // unify to Any, so that could never happen?
-  return false;
-}
-
-bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
-  Type contextualKeyType, contextualValueType;
-  auto keyTypePurpose = CTP_Unused, valueTypePurpose = CTP_Unused;
-
-  // If we had a contextual type, then it either conforms to
-  // ExpressibleByDictionaryLiteral or it is an invalid contextual type.
-  if (auto contextualType = CS.getContextualType()) {
-    // If our contextual type is an optional, look through them, because we're
-    // surely initializing whatever is inside.
-    contextualType = contextualType->lookThroughAllOptionalTypes();
-
-    auto DLC = TypeChecker::getProtocol(
-        CS.getASTContext(), E->getLoc(),
-        KnownProtocolKind::ExpressibleByDictionaryLiteral);
-    if (!DLC) return visitExpr(E);
-
-    // Validate the contextual type conforms to ExpressibleByDictionaryLiteral
-    // and figure out what the contextual Key/Value types are in place.
-    auto Conformance = TypeChecker::conformsToProtocol(
-        contextualType, DLC, CS.DC, ConformanceCheckFlags::InExpression);
-    if (Conformance.isInvalid()) {
-      diagnose(E->getStartLoc(), diag::type_is_not_dictionary, contextualType)
-        .highlight(E->getSourceRange());
-      return true;
-    }
-
-    contextualKeyType =
-        Conformance
-            .getTypeWitnessByName(contextualType, CS.getASTContext().Id_Key)
-            ->getDesugaredType();
-
-    contextualValueType =
-        Conformance
-            .getTypeWitnessByName(contextualType, CS.getASTContext().Id_Value)
-            ->getDesugaredType();
-
-    assert(contextualKeyType && contextualValueType &&
-           "Could not find Key/Value DictionaryLiteral associated types from"
-           " contextual type conformance");
-    
-    keyTypePurpose = CTP_DictionaryKey;
-    valueTypePurpose = CTP_DictionaryValue;
-  }
-  
-  // Type check each of the subexpressions in place, passing down the contextual
-  // type information if we have it.
-  for (auto elt : E->getElements()) {
-    auto TE = dyn_cast<TupleExpr>(elt);
-    if (!TE || TE->getNumElements() != 2) continue;
-
-    if (!typeCheckChildIndependently(TE->getElement(0),
-                                     contextualKeyType, keyTypePurpose))
-      return true;
-    if (!typeCheckChildIndependently(TE->getElement(1),
-                                     contextualValueType, valueTypePurpose))
-      return true;
-  }
-
-  // If that didn't turn up an issue, then we don't know what to do.
-  // TODO: When a contextual type is missing, we could try to diagnose cases
-  // where the element types mismatch.  There is no Any equivalent since they
-  // keys need to be hashable.
-  return false;
-}
-
 /// When an object literal fails to typecheck because its protocol's
 /// corresponding default type has not been set in the global namespace (e.g.
 /// _ColorLiteralType), suggest that the user import the appropriate module for
@@ -2437,20 +2316,4 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   // expression.
   diagnose(E->getLoc(), diag::type_of_expression_is_ambiguous)
     .highlight(E->getSourceRange());
-}
-
-/// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
-/// constraint system, return the decl that it references.
-ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
-  // See if we have a resolution for this member.
-  auto overload = findSelectedOverloadFor(locator);
-  if (!overload)
-    return nullptr;
-
-  // We only want to handle the simplest decl binding.
-  auto choice = overload->choice;
-  if (choice.getKind() != OverloadChoiceKind::Decl)
-    return nullptr;
-
-  return choice.getDecl();
 }

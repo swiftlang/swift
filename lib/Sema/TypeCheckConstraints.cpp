@@ -83,6 +83,13 @@ TypeVariableType::Implementation::getGenericParameter() const {
   return locator ? locator->getGenericParameter() : nullptr;
 }
 
+bool TypeVariableType::Implementation::isClosureType() const {
+  if (!(locator && locator->getAnchor()))
+    return false;
+
+  return isa<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
+}
+
 bool TypeVariableType::Implementation::isClosureResultType() const {
   if (!(locator && locator->getAnchor()))
     return false;

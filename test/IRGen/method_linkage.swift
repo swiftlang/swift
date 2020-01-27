@@ -118,6 +118,10 @@ open class OpenSubclass : OpenClass {
   fileprivate final override var prop: () {
     return ()
   }
+
+  // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s14method_linkage12OpenSubclassC4pbazyyF"
+  // RESILIENT: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s14method_linkage12OpenSubclassC4pbazyyF"
+  public final override func pbaz() {}
 }
 
 // Just in case anyone wants to delete unused methods...

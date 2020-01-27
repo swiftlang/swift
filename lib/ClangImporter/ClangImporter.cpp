@@ -3000,32 +3000,8 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
     SmallVector<clang::NamedDecl *, 4> DelayedCategories;
 
     // Simply importing the categories adds them to the list of extensions.
-    for (auto I = objcClass->visible_categories_begin(),
-           E = objcClass->visible_categories_end();
-         I != E; ++I) {
-      // Delay installing categories that don't have an owning module.
-      if (!I->hasOwningModule()) {
-        DelayedCategories.push_back(*I);
-        continue;
-      }
-
-      Impl.importDeclReal(*I, Impl.CurrentVersion);
-    }
-
-    // Install all the delayed categories.
-    //
-    // The very notion of a delayed category is a result of an emergent behavior
-    // of the visible categories list and the order we import modules. The list
-    // appears in deserialization order rather than some "source order", so it's
-    // possible for, say, a bridging header to import a module that defines an
-    // interface and some categories, but for the categories in the bridging
-    // header to appear *before* the categories in the module - the imported
-    // module will be deserialized on demand. We take it on faith that if there
-    // is no owning module for a given category, that it was created in such a
-    // way, and thus we install it last to try to emulate what we want
-    // "source order" to mean.
-    for (const auto *DelayedCat : DelayedCategories) {
-      Impl.importDeclReal(DelayedCat, Impl.CurrentVersion);
+    for (const auto *Cat : objcClass->visible_categories()) {
+      Impl.importDeclReal(Cat, Impl.CurrentVersion);
     }
   }
 
@@ -3776,6 +3752,9 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
 // deserialized before loading the named member of this class. This allows the
 // decl members table to be warmed up and enables the correct identification of
 // overrides.
+//
+// FIXME: Very low hanging fruit: Loading everything is extremely wasteful. We
+// should be able to just load the name lazy member loading is asking for.
 static void ensureSuperclassMembersAreLoaded(const ClassDecl *CD) {
   if (!CD)
     return;
@@ -3785,6 +3764,9 @@ static void ensureSuperclassMembersAreLoaded(const ClassDecl *CD) {
     return;
   
   CD->loadAllMembers();
+
+  for (auto *ED : const_cast<ClassDecl *>(CD)->getExtensions())
+    ED->loadAllMembers();
 }
 
 Optional<TinyPtrVector<ValueDecl *>>

@@ -921,17 +921,27 @@ public:
     if (!CS.shouldAttemptFixes())
       return true;
 
-    auto argType = Arguments[argIdx].getPlainType();
-    argType.visit([&](Type type) {
-      if (auto *typeVar = type->getAs<TypeVariableType>())
-        CS.recordPotentialHole(typeVar);
-    });
-
     const auto &param = Parameters[paramIdx];
 
     auto *argLoc = CS.getConstraintLocator(
         Locator.withPathElement(LocatorPathElt::ApplyArgToParam(
             argIdx, paramIdx, param.getParameterFlags())));
+
+    // TODO(diagnostics): This fix should be attempted later
+    // when the argument is matched to a parameter. Doing that
+    // would not require special handling of the closure type.
+    Type argType;
+    if (auto *closure =
+            dyn_cast<ClosureExpr>(simplifyLocatorToAnchor(argLoc))) {
+      argType = CS.getClosureType(closure);
+    } else {
+      argType = Arguments[argIdx].getPlainType();
+    }
+
+    argType.visit([&](Type type) {
+      if (auto *typeVar = type->getAs<TypeVariableType>())
+        CS.recordPotentialHole(typeVar);
+    });
 
     auto *fix = AllowInvalidUseOfTrailingClosure::create(
         CS, argType, param.getPlainType(), argLoc);
@@ -1094,22 +1104,6 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
         }
       }
 
-      // If the parameter has a function builder type and the argument is a
-      // closure, apply the function builder transformation.
-      if (Type functionBuilderType
-              = paramInfo.getFunctionBuilderType(paramIdx)) {
-        Expr *arg = getArgumentExpr(locator.getAnchor(), argIdx);
-        if (auto closure = dyn_cast_or_null<ClosureExpr>(arg)) {
-          auto closureType = cs.getType(closure);
-          auto result = cs.matchFunctionBuilder(
-              closure, functionBuilderType,
-              closureType->castTo<FunctionType>()->getResult(),
-              ConstraintKind::Conversion, calleeLocator, loc);
-          if (result.isFailure())
-            return result;
-        }
-      }
-
       // If argument comes for declaration it should loose
       // `@autoclosure` flag, because in context it's used
       // as a function type represented by autoclosure.
@@ -1214,6 +1208,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Not a conversion");
   }
 
@@ -1278,6 +1273,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     return false;
   }
 
@@ -1558,6 +1554,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -2369,6 +2366,12 @@ ConstraintSystem::matchTypesBindTypeVar(
         }
       }
     });
+  }
+
+  if (typeVar->getImpl().isClosureType()) {
+    return resolveClosure(typeVar, type, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
   }
 
   assignFixedType(typeVar, type);
@@ -3893,6 +3896,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::FunctionInput:
     case ConstraintKind::FunctionResult:
     case ConstraintKind::OneWayEqual:
+    case ConstraintKind::DefaultClosureType:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -6459,18 +6463,38 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   return SolutionKind::Solved;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyDefaultableConstraint(
-                                            Type first, Type second,
-                                            TypeMatchOptions flags,
-                                            ConstraintLocatorBuilder locator) {
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyDefaultableConstraint(
+    Type first, Type second, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
   first = getFixedTypeRecursive(first, flags, true);
 
   if (first->isTypeVariableOrMember()) {
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
-        Constraint::create(*this, ConstraintKind::Defaultable, first, second,
-                           getConstraintLocator(locator)));
+          Constraint::create(*this, ConstraintKind::Defaultable, first, second,
+                             getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  }
+
+  // Otherwise, any type is fine.
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyDefaultClosureTypeConstraint(
+    Type closureType, Type inferredType,
+    ArrayRef<TypeVariableType *> referencedOuterParameters,
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+  closureType = getFixedTypeRecursive(closureType, flags, /*wantRValue=*/true);
+
+  if (closureType->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(Constraint::create(
+          *this, ConstraintKind::DefaultClosureType, closureType, inferredType,
+          getConstraintLocator(locator), referencedOuterParameters));
       return SolutionKind::Solved;
     }
 
@@ -6513,6 +6537,94 @@ ConstraintSystem::simplifyOneWayConstraint(
   // Translate this constraint into a one-way binding constraint.
   return matchTypes(first, secondSimplified, ConstraintKind::Equal, flags,
                     locator);
+}
+
+static Type getFunctionBuilderTypeFor(ConstraintSystem &cs, unsigned paramIdx,
+                                      ConstraintLocator *calleeLocator) {
+  auto selectedOverload = cs.findSelectedOverloadFor(calleeLocator);
+  if (!(selectedOverload &&
+        selectedOverload->choice.getKind() == OverloadChoiceKind::Decl))
+    return Type();
+
+  auto *choice = selectedOverload->choice.getDecl();
+  bool skipCurriedSelf = hasAppliedSelf(cs, selectedOverload->choice);
+
+  if (choice->hasCurriedSelf() && !skipCurriedSelf)
+    return Type();
+
+  if (!choice->hasParameterList())
+    return Type();
+
+  auto *PD = getParameterAt(choice, paramIdx);
+  return PD->getFunctionBuilderType();
+}
+
+bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
+                                      Type contextualType,
+                                      ConstraintLocatorBuilder locator) {
+  auto *closureLocator = typeVar->getImpl().getLocator();
+  auto *closure = cast<ClosureExpr>(closureLocator->getAnchor());
+
+  auto *closureType = getClosureType(closure);
+
+  auto *paramList = closure->getParameters();
+  for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
+    const auto &param = closureType->getParams()[i];
+
+    Type internalType;
+
+    if (paramList->get(i)->getTypeRepr()) {
+      // Internal type is the type used in the body of the closure,
+      // so "external" type translates to it as follows:
+      //  - `Int...` -> `[Int]`,
+      //  - `inout Int` -> `@lvalue Int`.
+      internalType = param.getParameterType();
+    } else {
+      auto *paramLoc =
+          getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
+
+      internalType = createTypeVariable(paramLoc, TVO_CanBindToLValue |
+                                                      TVO_CanBindToNoEscape);
+
+      auto externalType = param.getOldType();
+      addConstraint(ConstraintKind::BindParam, externalType, internalType,
+                    paramLoc);
+    }
+
+    setType(paramList->get(i), internalType);
+  }
+
+  assignFixedType(typeVar, closureType, closureLocator);
+
+  if (auto last = locator.last()) {
+    if (auto argToParam = last->getAs<LocatorPathElt::ApplyArgToParam>()) {
+      auto *calleeLocator = getCalleeLocator(getConstraintLocator(locator));
+      if (auto functionBuilderType = getFunctionBuilderTypeFor(
+              *this, argToParam->getParamIdx(), calleeLocator)) {
+        auto result = matchFunctionBuilder(
+            closure, functionBuilderType, closureType->getResult(),
+            ConstraintKind::Conversion, calleeLocator, locator);
+        return result.isSuccess();
+      }
+    }
+  }
+
+  // If this is a multi-statement closure its body doesn't participate
+  // in type-checking.
+  if (closure->hasSingleExpressionBody()) {
+    auto *closureBody = generateConstraints(closure);
+    if (!closureBody)
+      return false;
+
+    // Since result of the closure type has to be r-value type, we have
+    // to use equality here.
+    addConstraint(
+        ConstraintKind::Conversion, getType(closureBody),
+        closureType->getResult(),
+        getConstraintLocator(closure, ConstraintLocator::ClosureResult));
+  }
+
+  return true;
 }
 
 ConstraintSystem::SolutionKind
@@ -8809,6 +8921,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::Disjunction:
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
+  case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Use the correct addConstraint()");
   }
 
@@ -9207,6 +9320,13 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                          constraint.getSecondType(),
                                          TMF_GenerateConstraints,
                                          constraint.getLocator());
+
+  case ConstraintKind::DefaultClosureType:
+    return simplifyDefaultClosureTypeConstraint(constraint.getFirstType(),
+                                                constraint.getSecondType(),
+                                                constraint.getTypeVariables(),
+                                                TMF_GenerateConstraints,
+                                                constraint.getLocator());
 
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:

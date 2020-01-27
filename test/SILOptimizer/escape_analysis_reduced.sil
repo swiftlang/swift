@@ -1,0 +1,216 @@
+// RUN: %target-sil-opt %s -escapes-dump -o /dev/null | %FileCheck %s
+
+// REQUIRES: asserts
+// REQUIRES: OS=macosx
+// REQUIRES: PTRSIZE=64
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// =============================================================================
+// Test call to array.uninitialized that has extra release_value uses
+
+class C {
+  var c: C
+}
+
+class DummyArrayStorage<Element> {
+  @_hasStorage var count: Int { get }
+  @_hasStorage var capacity: Int { get }
+  init()
+}
+
+// init_any_array_with_buffer
+sil [_semantics "array.uninitialized"] @init_any_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<AnyObject>, Int32, @thin Array<AnyObject>.Type) -> (@owned Array<AnyObject>, UnsafeMutablePointer<AnyObject>)
+
+// CHECK-LABEL: CG of testBadArrayUninit
+// CHECK-NEXT:  Val [ref] %2 Esc: , Succ: (%2.1)
+// CHECK-NEXT:  Con [int] %2.1 Esc: G, Succ: (%2.2)
+// CHECK-NEXT:  Con [ref] %2.2 Esc: G, Succ:
+// CHECK-NEXT:  Val %5 Esc: , Succ: (%5.1)
+// CHECK-NEXT:  Con %5.1 Esc: G, Succ: %10
+// CHECK-NEXT:  Val [ref] %10 Esc: G, Succ: (%10.1)
+// CHECK-NEXT:  Con %10.1 Esc: G, Succ:
+// CHECK-LABEL: End
+sil hidden @testBadArrayUninit : $@convention(thin) (Builtin.Word, Int32) -> () {
+bb0(%0 : $Builtin.Word, %1 : $Int32):
+  // create an array
+  %2 = alloc_ref [tail_elems $AnyObject * %0 : $Builtin.Word] $DummyArrayStorage<AnyObject>
+  %3 = metatype $@thin Array<AnyObject>.Type
+  %4 = function_ref @init_any_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<AnyObject>, Int32, @thin Array<AnyObject>.Type) -> (@owned Array<AnyObject>, UnsafeMutablePointer<AnyObject>)
+  %5 = apply %4(%2, %1, %3) : $@convention(thin) (@owned DummyArrayStorage<AnyObject>, Int32, @thin Array<AnyObject>.Type) -> (@owned Array<AnyObject>, UnsafeMutablePointer<AnyObject>)
+  %6 = tuple_extract %5 : $(Array<AnyObject>, UnsafeMutablePointer<AnyObject>), 0
+  %7 = tuple_extract %5 : $(Array<AnyObject>, UnsafeMutablePointer<AnyObject>), 1
+  %8 = struct_extract %7 : $UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
+  %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*AnyObject
+
+  // store an elt
+  %10 = alloc_ref $C
+  %11 = init_existential_ref %10 : $C : $C, $AnyObject
+  store %11 to %9 : $*AnyObject
+
+  // extra use of the call
+  release_value %5 : $(Array<AnyObject>, UnsafeMutablePointer<AnyObject>) // id: %228
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// =============================================================================
+// testArrayEscapeToBox: test that an array is marked escaping when
+// assigned to a box. When multiple arrays are merged into the same
+// box, ensure that a previous mapping from the project_box address to
+// the box's content is not lost during the merge.
+
+class ElementClass {
+  init()
+}
+
+class StagedContext {
+  init()
+}
+
+class VFSStagedContext : StagedContext {
+  override init()
+}
+
+// specialized Array.init()
+sil @$sS2ayxGycfCSo12ElementClassC_Tg5 : $@convention(method) (@thin Array<ElementClass>.Type) -> @owned Array<ElementClass>
+
+// specialized Array._getCount()
+sil @$sSa9_getCountSiyFSo12ElementClassC_Tg5 : $@convention(method) (@guaranteed Array<ElementClass>) -> Int
+
+// specialized static Array._adoptStorage(_:count:)
+sil shared [_semantics "array.uninitialized"] @$sSa13_adoptStorage_5countSayxG_SpyxGts016_ContiguousArrayB0CyxGn_SitFZSo12ElementClassC_Tg5 : $@convention(method) (@owned _ContiguousArrayStorage<ElementClass>, Int, @thin Array<ElementClass>.Type) -> (@owned Array<ElementClass>, UnsafeMutablePointer<ElementClass>) {
+// %0                                             // users: %13, %3
+// %1                                             // users: %9, %4
+bb0(%0 : $_ContiguousArrayStorage<ElementClass>, %1 : $Int, %2 : $@thin Array<ElementClass>.Type):
+  %3 = upcast %0 : $_ContiguousArrayStorage<ElementClass> to $__ContiguousArrayStorageBase // users: %17, %11
+  %4 = struct_extract %1 : $Int, #Int._value      // user: %6
+  %5 = integer_literal $Builtin.Int64, 1          // users: %7, %6
+  %6 = builtin "shl_Int64"(%4 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int64 // user: %7
+  %7 = builtin "or_Int64"(%6 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int64 // user: %8
+  %8 = struct $UInt (%7 : $Builtin.Int64)         // user: %9
+  %9 = struct $_SwiftArrayBodyStorage (%1 : $Int, %8 : $UInt) // user: %10
+  %10 = struct $_ArrayBody (%9 : $_SwiftArrayBodyStorage) // user: %12
+  %11 = ref_element_addr %3 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity // user: %12
+  store %10 to %11 : $*_ArrayBody                 // id: %12
+  %13 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<ElementClass> to $Builtin.BridgeObject // user: %14
+  %14 = struct $_BridgeStorage<__ContiguousArrayStorageBase> (%13 : $Builtin.BridgeObject) // user: %15
+  %15 = struct $_ArrayBuffer<ElementClass> (%14 : $_BridgeStorage<__ContiguousArrayStorageBase>) // user: %16
+  %16 = struct $Array<ElementClass> (%15 : $_ArrayBuffer<ElementClass>) // user: %20
+  %17 = ref_tail_addr %3 : $__ContiguousArrayStorageBase, $ElementClass // user: %18
+  %18 = address_to_pointer %17 : $*ElementClass to $Builtin.RawPointer // user: %19
+  %19 = struct $UnsafeMutablePointer<ElementClass> (%18 : $Builtin.RawPointer) // user: %20
+  %20 = tuple (%16 : $Array<ElementClass>, %19 : $UnsafeMutablePointer<ElementClass>) // user: %21
+  return %20 : $(Array<ElementClass>, UnsafeMutablePointer<ElementClass>) // id: %21
+}
+
+// testArrayUsePointsClosure1
+sil @testArrayUsePointsClosure1 : $@convention(thin) (@guaranteed { var Optional<VFSStagedContext> }, @guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> ()) -> ()
+
+// testArrayUsePointsClosure2
+sil @testArrayUsePointsClosure2 : $@convention(thin) (@guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> (), @guaranteed Optional<VFSStagedContext>, @guaranteed { var Array<ElementClass> }) -> ()
+
+// Make sure both locally allocated array's are globally escaping.
+//
+// CHECK-LABEL: CG of testArrayEscapeToBox
+// CHECK-NEXT:   Arg [ref] %0 Esc: A, Succ: (%21)
+// CHECK-NEXT:   Val [ref] %1 Esc: , Succ: (%21)
+// CHECK-NEXT:   Val [ref] %4 Esc: , Succ: %0, %1
+// CHECK-NEXT:   Val [ref] %8 Esc: , Succ: (%21)
+// CHECK-NEXT:   Val [ref] %12 Esc: G, Succ: (%21)
+// CHECK-NEXT:   Val [ref] %17 Esc: G, Succ: (%21)
+// CHECK-NEXT:   Val [ref] %20 Esc: G, Succ: %17
+// CHECK-NEXT:   Con [int] %21 Esc: G, Succ: (%39)
+// CHECK-NEXT:   Val [ref] %31 Esc: G, Succ: (%21)
+// CHECK-NEXT:   Val [ref] %34 Esc: G, Succ: %31
+// CHECK-NEXT:   Con %39 Esc: G, Succ: (%21), %12, %20, %34
+// CHECK-NEXT:   Val [ref] %45 Esc: , Succ: %0, %8, %39
+// CHECK-NEXT: End
+sil private @testArrayEscapeToBox : $@convention(thin) (@guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> ()) -> () {
+// %0                                             // users: %54, %51, %47, %45, %5, %4
+bb0(%0 : $@callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> ()):
+  %1 = alloc_box ${ var Optional<VFSStagedContext> }, var, name "context" // users: %59, %6, %4, %2
+  %2 = project_box %1 : ${ var Optional<VFSStagedContext> }, 0 // user: %44
+  // function_ref testArrayUsePointsClosure1
+  %3 = function_ref @testArrayUsePointsClosure1 : $@convention(thin) (@guaranteed { var Optional<VFSStagedContext> }, @guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> ()) -> () // user: %4
+  %4 = partial_apply [callee_guaranteed] %3(%1, %0) : $@convention(thin) (@guaranteed { var Optional<VFSStagedContext> }, @guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> ()) -> ()
+  strong_retain %0 : $@callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> () // id: %5
+  strong_retain %1 : ${ var Optional<VFSStagedContext> } // id: %6
+  br bb1                                          // id: %7
+
+bb1:                                              // Preds: bb0
+  %8 = alloc_box ${ var Array<ElementClass> }, var, name "intents" // users: %58, %56, %52, %48, %45, %9
+  %9 = project_box %8 : ${ var Array<ElementClass> }, 0 // users: %41, %36, %27, %22, %13
+  %10 = metatype $@thin Array<ElementClass>.Type  // users: %33, %19, %12
+  // function_ref specialized Array.init()
+  %11 = function_ref @$sS2ayxGycfCSo12ElementClassC_Tg5 : $@convention(method) (@thin Array<ElementClass>.Type) -> @owned Array<ElementClass> // user: %12
+  %12 = apply %11(%10) : $@convention(method) (@thin Array<ElementClass>.Type) -> @owned Array<ElementClass> // user: %13
+  store %12 to %9 : $*Array<ElementClass>         // id: %13
+  cond_br undef, bb2, bb3                         // id: %14
+
+bb2:                                              // Preds: bb1
+  %15 = integer_literal $Builtin.Int64, 1         // user: %16
+  %16 = struct $Int (%15 : $Builtin.Int64)        // user: %19
+  %17 = alloc_ref [tail_elems $ElementClass * undef : $Builtin.Word] $_ContiguousArrayStorage<ElementClass> // user: %19
+  // function_ref specialized static Array._adoptStorage(_:count:)
+  %18 = function_ref @$sSa13_adoptStorage_5countSayxG_SpyxGts016_ContiguousArrayB0CyxGn_SitFZSo12ElementClassC_Tg5 : $@convention(method) (@owned _ContiguousArrayStorage<ElementClass>, Int, @thin Array<ElementClass>.Type) -> (@owned Array<ElementClass>, UnsafeMutablePointer<ElementClass>) // user: %19
+  %19 = apply %18(%17, %16, %10) : $@convention(method) (@owned _ContiguousArrayStorage<ElementClass>, Int, @thin Array<ElementClass>.Type) -> (@owned Array<ElementClass>, UnsafeMutablePointer<ElementClass>) // users: %21, %20
+  %20 = tuple_extract %19 : $(Array<ElementClass>, UnsafeMutablePointer<ElementClass>), 0 // user: %27
+  %21 = tuple_extract %19 : $(Array<ElementClass>, UnsafeMutablePointer<ElementClass>), 1
+  %22 = struct_element_addr %9 : $*Array<ElementClass>, #Array._buffer // user: %23
+  %23 = struct_element_addr %22 : $*_ArrayBuffer<ElementClass>, #_ArrayBuffer._storage // user: %24
+  %24 = struct_element_addr %23 : $*_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue // user: %25
+  %25 = load %24 : $*Builtin.BridgeObject         // user: %26
+  strong_release %25 : $Builtin.BridgeObject      // id: %26
+  store %20 to %9 : $*Array<ElementClass>         // id: %27
+  br bb4                                          // id: %28
+
+bb3:                                              // Preds: bb1
+  %29 = integer_literal $Builtin.Int64, 1         // user: %30
+  %30 = struct $Int (%29 : $Builtin.Int64)        // user: %33
+  %31 = alloc_ref [tail_elems $ElementClass * undef : $Builtin.Word] $_ContiguousArrayStorage<ElementClass> // user: %33
+  // function_ref specialized static Array._adoptStorage(_:count:)
+  %32 = function_ref @$sSa13_adoptStorage_5countSayxG_SpyxGts016_ContiguousArrayB0CyxGn_SitFZSo12ElementClassC_Tg5 : $@convention(method) (@owned _ContiguousArrayStorage<ElementClass>, Int, @thin Array<ElementClass>.Type) -> (@owned Array<ElementClass>, UnsafeMutablePointer<ElementClass>) // user: %33
+  %33 = apply %32(%31, %30, %10) : $@convention(method) (@owned _ContiguousArrayStorage<ElementClass>, Int, @thin Array<ElementClass>.Type) -> (@owned Array<ElementClass>, UnsafeMutablePointer<ElementClass>) // users: %35, %34
+  %34 = tuple_extract %33 : $(Array<ElementClass>, UnsafeMutablePointer<ElementClass>), 0 // user: %41
+  %35 = tuple_extract %33 : $(Array<ElementClass>, UnsafeMutablePointer<ElementClass>), 1
+  %36 = struct_element_addr %9 : $*Array<ElementClass>, #Array._buffer // user: %37
+  %37 = struct_element_addr %36 : $*_ArrayBuffer<ElementClass>, #_ArrayBuffer._storage // user: %38
+  %38 = struct_element_addr %37 : $*_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue // user: %39
+  %39 = load %38 : $*Builtin.BridgeObject         // user: %40
+  strong_release %39 : $Builtin.BridgeObject      // id: %40
+  store %34 to %9 : $*Array<ElementClass>         // id: %41
+  br bb4                                          // id: %42
+
+bb4:                                              // Preds: bb3 bb2
+  // function_ref testArrayUsePointsClosure2
+  %43 = function_ref @testArrayUsePointsClosure2 : $@convention(thin) (@guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> (), @guaranteed Optional<VFSStagedContext>, @guaranteed { var Array<ElementClass> }) -> () // user: %45
+  %44 = load %2 : $*Optional<VFSStagedContext>    // users: %55, %53, %49, %45
+  %45 = partial_apply [callee_guaranteed] %43(%0, %44, %8) : $@convention(thin) (@guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> (), @guaranteed Optional<VFSStagedContext>, @guaranteed { var Array<ElementClass> }) -> () // user: %57
+  // function_ref specialized Array._getCount()
+  %46 = function_ref @$sSa9_getCountSiyFSo12ElementClassC_Tg5 : $@convention(method) (@guaranteed Array<ElementClass>) -> Int
+  strong_retain %0 : $@callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> () // id: %47
+  strong_retain %8 : ${ var Array<ElementClass> } // id: %48
+  retain_value %44 : $Optional<VFSStagedContext>  // id: %49
+  br bb5                                          // id: %50
+
+bb5:                                              // Preds: bb4
+  strong_retain %0 : $@callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> () // id: %51
+  strong_retain %8 : ${ var Array<ElementClass> } // id: %52
+  retain_value %44 : $Optional<VFSStagedContext>  // id: %53
+  strong_release %0 : $@callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> () // id: %54
+  release_value %44 : $Optional<VFSStagedContext> // id: %55
+  strong_release %8 : ${ var Array<ElementClass> } // id: %56
+  strong_release %45 : $@callee_guaranteed () -> () // id: %57
+  strong_release %8 : ${ var Array<ElementClass> } // id: %58
+  strong_release %1 : ${ var Optional<VFSStagedContext> } // id: %59
+  br bb6                                          // id: %60
+
+bb6:                                              // Preds: bb5
+  %61 = tuple ()                                  // user: %62
+  return %61 : $()                                // id: %62
+}

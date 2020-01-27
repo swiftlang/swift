@@ -839,9 +839,10 @@ namespace {
 //   1b. pat
 // type ~ ((T1, ..., Tn)) (n >= 2)
 //   2. pat ~ (P1, ..., Pm) (m >= 2)
-void implicitlyUntuplePatternIfApplicable(DiagnosticEngine &DE,
+void implicitlyUntuplePatternIfApplicable(ASTContext &Ctx,
                                           Pattern *&enumElementInnerPat,
                                           Type enumPayloadType) {
+  auto &DE = Ctx.Diags;
   if (auto *tupleType = dyn_cast<TupleType>(enumPayloadType.getPointer())) {
     if (tupleType->getNumElements() >= 2
         && enumElementInnerPat->getKind() == PatternKind::Paren) {
@@ -859,9 +860,14 @@ void implicitlyUntuplePatternIfApplicable(DiagnosticEngine &DE,
     }
   } else if (auto *tupleType = enumPayloadType->getAs<TupleType>()) {
     if (tupleType->getNumElements() >= 2
-        && enumElementInnerPat->getKind() == PatternKind::Tuple)
+        && enumElementInnerPat->getKind() == PatternKind::Tuple) {
       DE.diagnose(enumElementInnerPat->getLoc(),
                   diag::matching_many_patterns_with_tupled_assoc_value);
+      enumElementInnerPat =
+        new (Ctx) ParenPattern(enumElementInnerPat->getStartLoc(),
+                               enumElementInnerPat,
+                               enumElementInnerPat->getEndLoc());
+    }
   }
 }
 }
@@ -1406,7 +1412,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
 
-      ::implicitlyUntuplePatternIfApplicable(Context.Diags, sub, elementType);
+      ::implicitlyUntuplePatternIfApplicable(Context, sub, elementType);
 
       sub = coercePatternToType(
           pattern.forSubPattern(sub, /*retainTopLevel=*/false), elementType,
