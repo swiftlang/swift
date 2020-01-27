@@ -551,7 +551,7 @@ static bool haveProfiledAssociatedFunction(SILDeclRef constant) {
 /// Set up the function for profiling instrumentation.
 static void setUpForProfiling(SILDeclRef constant, SILFunction *F,
                               ForDefinition_t forDefinition) {
-  if (!forDefinition)
+  if (!forDefinition || F->getProfiler())
     return;
 
   ASTNode profiledNode;
