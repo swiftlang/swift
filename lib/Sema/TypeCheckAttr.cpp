@@ -200,6 +200,7 @@ public:
   void visitOptionalAttr(OptionalAttr *attr);
 
   void visitAvailableAttr(AvailableAttr *attr);
+  void visitAvailableRefAttr(AvailableRefAttr *attr);
 
   void visitCDeclAttr(CDeclAttr *attr);
 
@@ -1397,6 +1398,79 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     diagnose(EnclosingDecl->getLoc(),
              diag::availability_decl_more_than_enclosing_enclosing_here);
   }
+}
+
+void AttributeChecker::visitAvailableRefAttr(AvailableRefAttr *attr) {
+  DeclContext *DC = D->getDeclContext();
+  TypeLoc &targetLoc = attr->TargetType;
+
+  if (auto avAttr = D->getAttrs().getAttribute<AvailableAttr>()) {
+    diagnose(avAttr->getLocation(),
+             diag::availableRef_conflicting_available_attribute);
+    diagnose(attr->getLocation(),
+             diag::availableRef_here);
+    return;
+  }
+
+  Type target = targetLoc.getType();
+  if (!target && targetLoc.getTypeRepr()) {
+    TypeResolutionOptions options = None;
+    options |= TypeResolutionFlags::AllowUnavailable;
+    options |= TypeResolutionFlags::AllowUnavailableProtocol;
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+
+    auto resolution = TypeResolution::forContextual(DC);
+    target = resolution.resolveType(targetLoc.getTypeRepr(), options);
+    targetLoc.setType(target);
+  }
+
+  // Definite error-types were already diagnosed in resolveType.
+  if (target->hasError())
+    return;
+
+  TypeDecl *decl;
+  if (auto aliasType = dyn_cast<TypeAliasType>(target.getPointer())) {
+    decl = aliasType->getDecl();
+  } else if (auto nominal = target->getAnyNominal()) {
+    decl = nominal;
+  } else {
+    // FIXME: Diagnose
+    return;
+  }
+
+  const DeclAttributes &targetAttrs = decl->getAttrs();
+  if (targetAttrs.hasAttribute<AvailableRefAttr>()) {
+    // FIXME: Diagnose
+    return;
+  }
+  if (!targetAttrs.hasAttribute<AvailableAttr>()) {
+    // FIXME: Diagnose
+    return;
+  }
+
+  llvm::SmallVector<AvailableAttr*, 4> newAttrs;
+
+  for (auto targetAttr : targetAttrs) {
+    auto *avAttr = dyn_cast<AvailableAttr>(targetAttr);
+    if (!avAttr)
+      continue;
+    auto clone = avAttr->clone(D->getASTContext(),
+                               attr->AtLoc, targetLoc.getSourceRange(),
+                               /*implicit*/true);
+    newAttrs.push_back(clone);
+  }
+  for (auto it = newAttrs.rbegin(); it != newAttrs.rend(); ++it) {
+    D->getAttrs().add(*it);
+  }
+  // for (auto newAttr : newAttrs) {
+  //   visitAvailableAttr(newAttr);
+  //   if (newAttr->isInvalid()) {
+  //     diagnose(attr->getLocation(),
+  //              diag::availableRef_hello);
+  //   }
+  // }
+  diagnose(attr->getLocation(),
+           diag::availableRef_here);
 }
 
 void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {

@@ -609,6 +609,7 @@ struct PrintOptions {
       PrintOptions::FunctionRepresentationMode::None;
     PO.PrintDocumentationComments = false;
     PO.ExcludeAttrList.push_back(DAK_Available);
+    PO.ExcludeAttrList.push_back(DAK_AvailableRef);
     PO.SkipPrivateStdlibDecls = true;
     PO.ExplodeEnumCaseDecls = true;
     PO.ShouldQualifyNestedDeclarations = QualifyNestedDeclarations::TypesOnly;

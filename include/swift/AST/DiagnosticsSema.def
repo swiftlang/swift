@@ -4517,6 +4517,15 @@ ERROR(availabilty_string_subscript_migration, none,
       "construct a String from subscripted result", ())
 
 //------------------------------------------------------------------------------
+// MARK: @_availableRef
+//------------------------------------------------------------------------------
+
+ERROR(availableRef_conflicting_available_attribute, none,
+      "@available and @_availableRef cannot appear on the same declaration", ())
+NOTE(availableRef_here, none,
+     "@_availableRef here", ())
+
+//------------------------------------------------------------------------------
 // MARK: @discardableResult
 //------------------------------------------------------------------------------
 

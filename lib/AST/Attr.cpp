@@ -855,6 +855,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_AvailableRef: {
+    Printer << "@_availableRef(";
+    auto *attr = cast<AvailableRefAttr>(this);
+    attr->TargetType.getType().print(Printer, Options);
+    Printer << ")";
+    break;
+  }
+
   case DAK_CDecl:
     Printer << "@_cdecl(\"" << cast<CDeclAttr>(this)->Name << "\")";
     break;
@@ -1089,6 +1097,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_semantics";
   case DAK_Available:
     return "availability";
+  case DAK_AvailableRef:
+    return "_availableRef";
   case DAK_ObjC:
   case DAK_ObjCRuntimeName:
     return "objc";
@@ -1482,6 +1492,18 @@ const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
         return AvailableAttr::isUnavailable(ext);
 
   return nullptr;
+}
+
+AvailableAttr *AvailableAttr::clone(ASTContext &context, SourceLoc atLoc,
+                                    SourceRange range, bool implicit) const {
+  auto attr = new (context) AvailableAttr(
+    atLoc, range, Platform, Message, Rename,
+    Introduced.hasValue() ? Introduced.getValue() : llvm::VersionTuple(), range,
+    Deprecated.hasValue() ? Deprecated.getValue() : llvm::VersionTuple(), range,
+    Obsoleted.hasValue() ? Obsoleted.getValue() : llvm::VersionTuple(), range,
+    PlatformAgnostic,
+    implicit);
+  return attr;
 }
 
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,

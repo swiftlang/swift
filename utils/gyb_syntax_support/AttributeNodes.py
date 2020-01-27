@@ -35,6 +35,7 @@ ATTRIBUTE_NODES = [
     #                | specialize-attr-spec-list
     #                | implements-attr-arguments
     #                | named-attribute-string-argument
+    #                | simple-type-identifier
     #              )? ')'?
     Node('Attribute', kind='Syntax',
          description='''
@@ -66,6 +67,7 @@ ATTRIBUTE_NODES = [
                              kind='DerivativeRegistrationAttributeArguments'),
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
+                       Child('AvailableRefAttributeArgument', kind='Type'),
                    ], description='''
                    The arguments of the attribute. In case the attribute
                    takes multiple arguments, they are gather in the

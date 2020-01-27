@@ -2236,6 +2236,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_AvailableRef: {
+      auto *theAttr = cast<AvailableRefAttr>(DA);
+      // FIXME: Do we want to serialize this?
+      return;      
+    }
+
     case DAK_ObjC: {
       auto *theAttr = cast<ObjCAttr>(DA);
       SmallVector<IdentifierID, 4> pieces;

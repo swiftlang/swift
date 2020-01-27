@@ -1158,7 +1158,7 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
                                                 ArrayRef<Token> Toks) {
   if (!D)
     return false;
-  if (isa<CustomAttr>(D) || isa<AvailableAttr>(D)) {
+  if (isa<CustomAttr>(D) || isa<AvailableAttr>(D) || isa<AvailableRefAttr>(D)) {
     if (!passTokenNodesUntil(D->getRangeWithAt().Start,
                              ExcludeNodeAtLocation).shouldContinue)
       return false;
