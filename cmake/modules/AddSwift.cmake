@@ -1274,23 +1274,6 @@ function(_add_swift_library_single target name)
         "${swift_module_dependency_target}"
         ${LLVM_COMMON_DEPENDS})
 
-  # HACK: On some systems or build directory setups, CMake will not find static
-  # archives of Clang libraries in the Clang build directory, and it will pass
-  # them as '-lclangFoo'.  Some other logic in CMake would reorder libraries
-  # specified with this syntax, which breaks linking.
-  set(prefixed_link_libraries)
-  foreach(dep ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
-    if("${dep}" MATCHES "^clang")
-      if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
-        set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/${dep}.lib")
-      else()
-        set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
-      endif()
-    endif()
-    list(APPEND prefixed_link_libraries "${dep}")
-  endforeach()
-  set(SWIFTLIB_SINGLE_LINK_LIBRARIES "${prefixed_link_libraries}")
-
   if("${libkind}" STREQUAL "SHARED")
     target_link_libraries("${target}" PRIVATE ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
   elseif("${libkind}" STREQUAL "OBJECT")
