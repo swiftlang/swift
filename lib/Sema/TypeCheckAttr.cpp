@@ -40,11 +40,6 @@
 
 using namespace swift;
 
-// SWIFT_ENABLE_TENSORFLOW
-static llvm::cl::opt<bool> EnableExperimentalCrossFileDerivativeRegistration(
-    "enable-experimental-cross-file-derivative-registration",
-    llvm::cl::init(false), llvm::cl::ZeroOrMore);
-
 namespace {
   /// This emits a diagnostic with a fixit to remove the attribute.
   template<typename ...ArgTypes>
@@ -4389,7 +4384,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   // Reject different-file derivative registration.
   // TODO(TF-1021): Lift same-file derivative registration restriction.
-  if (!EnableExperimentalCrossFileDerivativeRegistration &&
+  if (!ctx.LangOpts.EnableExperimentalCrossFileDerivativeRegistration &&
       originalAFD->getParentSourceFile() != derivative->getParentSourceFile()) {
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_not_in_same_file_as_original);
