@@ -19,7 +19,7 @@
  */
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -emit-library -sanitize=scudo -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=SCUDO_LIBRARY_LINUX %s
 
-// SCUDO_LINUX: bin/clang
+// SCUDO_LINUX: bin{{/|\\\\}}clang
 // SCUDO_LINUX-SAME: -pie
 // SCUDO_LINUX-SAME: -fsanitize=scudo
 // SCUDO_OSX_32: unsupported option '-sanitize=scudo' for target 'i386-apple-macosx10.9'
@@ -35,6 +35,6 @@
 // SCUDO_ASAN: argument '-sanitize=scudo' is not allowed with '-sanitize=address'
 // SCUDO_TSAN: argument '-sanitize=scudo' is not allowed with '-sanitize=thread'
 // SCUDO_UBSAN_LINUX: -fsanitize=undefined,scudo
-// SCUDO_LIBRARY_LINUX: bin/clang
+// SCUDO_LIBRARY_LINUX: bin{{/|\\\\}}clang
 // SCUDO_LIBRARY_LINUX-NOT: -fsanitize=scudo
 
