@@ -1822,13 +1822,16 @@ EscapeAnalysis::canOptimizeArrayUninitializedCall(
 
   // Check if the result is used in the usual way: extracting the
   // array and the element pointer with tuple_extract.
+  //
+  // Do not ignore any uses, even redundant tuple_extract, because all apply
+  // uses must be mapped to ConnectionGraph nodes by the client of this API.
   for (Operand *use : getNonDebugUses(ai)) {
     if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser())) {
-      if (tei->getFieldNo() == 0) {
+      if (tei->getFieldNo() == 0 && !call.arrayStruct) {
         call.arrayStruct = tei;
         continue;
       }
-      if (tei->getFieldNo() == 1) {
+      if (tei->getFieldNo() == 1 && !call.arrayElementPtr) {
         call.arrayElementPtr = tei;
         continue;
       }
