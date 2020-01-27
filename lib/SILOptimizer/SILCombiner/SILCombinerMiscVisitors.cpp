@@ -594,6 +594,62 @@ SILInstruction *SILCombiner::optimizeLoadFromStringLiteral(LoadInst *LI) {
   return Builder.createIntegerLiteral(LI->getLoc(), LI->getType(), str[index]);
 }
 
+/// Returns true if \p LI loads a zero integer from the empty Array, Dictionary
+/// or Set singleton.
+static bool isZeroLoadFromEmptyCollection(LoadInst *LI) {
+  auto intTy = LI->getType().getAs<BuiltinIntegerType>();
+  if (!intTy)
+    return false;
+  
+  SILValue addr = LI->getOperand();
+
+  // Find the root object of the load-address.
+  for (;;) {
+    switch (addr->getKind()) {
+      case ValueKind::GlobalAddrInst: {
+        StringRef gName =
+          cast<GlobalAddrInst>(addr)->getReferencedGlobal()->getName();
+        return gName == "_swiftEmptyArrayStorage" ||
+               gName == "_swiftEmptyDictionarySingleton" ||
+               gName == "_swiftEmptySetSingleton";
+      }
+      case ValueKind::StructElementAddrInst: {
+        auto *SEA = cast<StructElementAddrInst>(addr);
+        // For Array, we only support "count". The value of "capacityAndFlags"
+        // is not defined in the ABI and could change in another version of the
+        // runtime (the capacity must be 0, but the flags may be not 0).
+        if (SEA->getStructDecl()->getName().is("_SwiftArrayBodyStorage") &&
+            !SEA->getField()->getName().is("count")) {
+          return false;
+        }
+        addr = SEA->getOperand();
+        break;
+      }
+      case ValueKind::RefElementAddrInst: {
+        auto *REA = cast<RefElementAddrInst>(addr);
+        Identifier className = REA->getClassDecl()->getName();
+        // For Dictionary and Set we support "count" and "capacity".
+        if (className.is("__RawDictionaryStorage") ||
+            className.is("__RawSetStorage")) {
+          Identifier fieldName = REA->getField()->getName();
+          if (!fieldName.is("_count") && !fieldName.is("_capacity"))
+            return false;
+        }
+        addr = REA->getOperand();
+        break;
+      }
+      case ValueKind::UncheckedRefCastInst:
+      case ValueKind::UpcastInst:
+      case ValueKind::RawPointerToRefInst:
+      case ValueKind::AddressToPointerInst:
+        addr = cast<SingleValueInstruction>(addr)->getOperand(0);
+        break;
+      default:
+        return false;
+    }
+  }
+}
+
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // (load (upcast-ptr %x)) -> (upcast-ref (load %x))
   Builder.setCurrentDebugScope(LI->getDebugScope());
@@ -605,6 +661,17 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
 
   if (SILInstruction *I = optimizeLoadFromStringLiteral(LI))
     return I;
+
+  // Constant-propagate the 0 value when loading "count" or "capacity" from the
+  // empty Array, Set or Dictionary storage.
+  // On high-level SIL this optimization is also done by the
+  // ArrayCountPropagation pass, but only for Array. And even for Array it's
+  // sometimes needed to propagate the empty-array count when high-level
+  // semantics function are already inlined.
+  // Note that for non-empty arrays/sets/dictionaries, the count can be
+  // propagated by redundant load elimination.
+  if (isZeroLoadFromEmptyCollection(LI))
+    return Builder.createIntegerLiteral(LI->getLoc(), LI->getType(), 0);
 
   return nullptr;
 }
