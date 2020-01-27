@@ -9076,9 +9076,7 @@ void ConstraintSystem::addContextualConversionConstraint(
     case CTP_ReturnStmt:
     case CTP_ReturnSingleExpr:
     case CTP_Initialization:
-      // FIXME: This option should not be global!
-      if (Options.contains(
-            ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType))
+      if (contextualType.isOpaqueReturnType)
         constraintKind = ConstraintKind::OpaqueUnderlyingType;
       break;
 

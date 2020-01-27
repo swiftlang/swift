@@ -240,7 +240,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (const auto &contextualType : solution.contextualTypes) {
     if (!getContextualTypeInfo(contextualType.first)) {
       setContextualType(contextualType.first, contextualType.second.typeLoc,
-                        contextualType.second.purpose);
+                        contextualType.second.purpose,
+                        contextualType.second.isOpaqueReturnType);
     }
   }
 
@@ -1239,7 +1240,13 @@ ConstraintSystem::solveImpl(Expr *&expr,
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
   if (convertType) {
-    auto ctp = getContextualTypePurpose(origExpr);
+    // Determine whether we know more about the contextual type.
+    ContextualTypePurpose ctp = CTP_Unused;
+    bool isOpaqueReturnType = false;
+    if (auto contextualInfo = getContextualTypeInfo(origExpr)) {
+      ctp = contextualInfo->purpose;
+      isOpaqueReturnType = contextualInfo->isOpaqueReturnType;
+    }
 
     // Substitute type variables in for unresolved types.
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
@@ -1254,7 +1261,8 @@ ConstraintSystem::solveImpl(Expr *&expr,
       });
     }
 
-    ContextualTypeInfo info{TypeLoc::withoutLoc(convertType), ctp};
+    ContextualTypeInfo info{
+        TypeLoc::withoutLoc(convertType), ctp, isOpaqueReturnType};
     addContextualConversionConstraint(expr, info);
   }
 

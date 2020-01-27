@@ -792,6 +792,7 @@ using OpenedTypeMap =
 struct ContextualTypeInfo  {
   TypeLoc typeLoc;
   ContextualTypePurpose purpose;
+  bool isOpaqueReturnType = false;
 
   Type getType() const { return typeLoc.getType(); }
 };
@@ -1012,10 +1013,6 @@ enum class ConstraintSystemFlags {
   /// expression, and doesn't dig into its subexpressions.
   ReusePrecheckedType = 0x20,
   
-  /// If set, the top-level expression may be able to provide an underlying
-  /// type for the contextual opaque archetype.
-  UnderlyingTypeForOpaqueReturnType = 0x40,
-
   /// FIXME(diagnostics): Once diagnostics are completely switched to new
   /// framework, this flag could be removed as obsolete.
   ///
@@ -2180,11 +2177,12 @@ public:
   }
 
   void setContextualType(
-      const Expr *expr, TypeLoc T, ContextualTypePurpose purpose) {
+      const Expr *expr, TypeLoc T, ContextualTypePurpose purpose,
+       bool isOpaqueReturnType) {
     assert(expr != nullptr && "Expected non-null expression!");
     assert(contextualTypes.count(expr) == 0 &&
            "Already set this contextual type");
-    contextualTypes[expr] = { T, purpose };
+    contextualTypes[expr] = { T, purpose, isOpaqueReturnType };
   }
 
   Optional<ContextualTypeInfo> getContextualTypeInfo(const Expr *expr) const {
