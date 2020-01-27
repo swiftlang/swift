@@ -1,15 +1,20 @@
 #!/usr/bin/env python
-# utils/build-script - The ultimate tool for building Swift -*- python -*-
-#
+
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-from __future__ import print_function
+
+"""
+The ultimate tool for building Swift.
+"""
+
+
+from __future__ import absolute_import, print_function, unicode_literals
 
 import json
 import os
@@ -26,13 +31,11 @@ from build_swift.build_swift import presets
 
 import six
 
-from swift_build_support.swift_build_support import (
-    diagnostics,
-    products,
-    shell,
-    targets,
-    workspace
-)
+from swift_build_support.swift_build_support import diagnostics
+from swift_build_support.swift_build_support import products
+from swift_build_support.swift_build_support import shell
+from swift_build_support.swift_build_support import targets
+from swift_build_support.swift_build_support import workspace
 from swift_build_support.swift_build_support.SwiftBuildSupport import (
     HOME,
     SWIFT_BUILD_ROOT,
@@ -46,8 +49,28 @@ from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
 from swift_build_support.swift_build_support.toolchain import host_toolchain
 
-build_script_impl = os.path.join(
+
+# -----------------------------------------------------------------------------
+# Constants
+
+BUILD_SCRIPT_IMPL = os.path.join(
     SWIFT_SOURCE_ROOT, SWIFT_REPO_NAME, "utils", "build-script-impl")
+
+
+# -----------------------------------------------------------------------------
+# Helpers
+
+def clean_delay():
+    """Provide a short delay so accidentally invoked clean builds can be
+    canceled.
+    """
+
+    sys.stdout.write('Starting clean build in  ')
+    for i in range(3, 0, -1):
+        sys.stdout.write('\b%d' % i)
+        sys.stdout.flush()
+        time.sleep(1)
+    print('\b\b\b\bnow.')
 
 
 def exit_rejecting_arguments(message, parser=None):
@@ -107,9 +130,12 @@ def tar(source, destination):
     shell.call(args + [source], stderr=shell.DEVNULL)
 
 
-class BuildScriptInvocation(object):
+# -----------------------------------------------------------------------------
+# Build Script Impl Wrapping
 
-    """Represent a single build script invocation."""
+class BuildScriptInvocation(object):
+    """Represent a single build script invocation.
+    """
 
     @staticmethod
     def validate_arguments(toolchain, args):
@@ -290,7 +316,7 @@ class BuildScriptInvocation(object):
                 '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
                     args.swift_darwin_module_archs))
 
-# ---
+    # -------------------------------------------------------------------------
 
     def __init__(self, toolchain, args):
         self.toolchain = toolchain
@@ -795,7 +821,7 @@ class BuildScriptInvocation(object):
         # `build-script-impl`.
         if self.args.legacy_impl:
             # Execute the underlying build script implementation.
-            shell.call_without_sleeping([build_script_impl] + self.impl_args,
+            shell.call_without_sleeping([BUILD_SCRIPT_IMPL] + self.impl_args,
                                         env=self.impl_env, echo=True)
             return
 
@@ -917,23 +943,15 @@ class BuildScriptInvocation(object):
 
     def _execute_action(self, action_name):
         shell.call_without_sleeping(
-            [build_script_impl] + self.impl_args +
+            [BUILD_SCRIPT_IMPL] + self.impl_args +
             ["--only-execute", action_name],
             env=self.impl_env, echo=self.args.verbose_build)
 
 
-# Provide a short delay so accidentally invoked clean builds can be canceled.
-def clean_delay():
-    sys.stdout.write('Starting clean build in  ')
-    for i in range(3, 0, -1):
-        sys.stdout.write('\b%d' % i)
-        sys.stdout.flush()
-        time.sleep(1)
-    print('\b\b\b\bnow.')
+# -----------------------------------------------------------------------------
+# Main (preset)
 
-
-# Main entry point for the preset mode.
-def main_preset():
+def parse_preset_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""Builds Swift using a preset.""")
@@ -1006,7 +1024,13 @@ def main_preset():
         help="Reconfigure all projects as we build",
         action="store_true",
         default=False)
-    args = parser.parse_args()
+
+    return parser.parse_args()
+
+
+def main_preset():
+    args = parse_preset_args()
+
     if len(args.preset_file_names) == 0:
         args.preset_file_names = [
             os.path.join(
@@ -1088,7 +1112,9 @@ def main_preset():
     return 0
 
 
-# Main entry point for the normal mode.
+# -----------------------------------------------------------------------------
+# Main (normal)
+
 def main_normal():
     parser = driver_arguments.create_argument_parser()
 
@@ -1098,7 +1124,7 @@ def main_normal():
         # If we received any impl args, check if `build-script-impl` would
         # accept them or not before any further processing.
         try:
-            migration.check_impl_args(build_script_impl,
+            migration.check_impl_args(BUILD_SCRIPT_IMPL,
                                       args.build_script_impl_args)
         except ValueError as e:
             exit_rejecting_arguments(e, parser)
@@ -1192,6 +1218,8 @@ def main_normal():
 
     return 0
 
+
+# -----------------------------------------------------------------------------
 
 def main():
     if not SWIFT_SOURCE_ROOT:
