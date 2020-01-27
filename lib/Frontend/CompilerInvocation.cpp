@@ -438,8 +438,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (!Opts.EnableFineGrainedDependencies && Opts.EnableTypeFingerprints) {
     Diags.diagnose(
         SourceLoc(),
-        diag::error_type_fingerprints_require_fine_grained_dependencies);
-    HadError = true;
+        diag::warning_type_fingerprints_require_fine_grained_dependencies);
+    Opts.EnableTypeFingerprints = false;
   }
 
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
