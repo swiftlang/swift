@@ -16,6 +16,8 @@
 
 find_package(TensorFlow REQUIRED)
 message(STATUS "Building TensorFlow.")
+message(STATUS "Using TensorFlow high-level APIs library.")
+
 
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
@@ -29,17 +31,13 @@ list(APPEND swift_stdlib_compile_flags "-DCOMPILING_TENSORFLOW_STDLIB_MODULE")
 
 set(SOURCES "")
 
-# Copy TensorFlow high-level API sources, if they exist.
-if (TENSORFLOW_SWIFT_APIS)
-  message(STATUS "Using TensorFlow high-level APIs library.")
-
-  file(GLOB_RECURSE TENSORFLOW_SWIFT_API_SOURCES
-    "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift")
-  foreach(_TENSORFLOW_SWIFT_APIS_SOURCE ${TENSORFLOW_SWIFT_API_SOURCES})
-    file(TO_CMAKE_PATH ${_TENSORFLOW_SWIFT_APIS_SOURCE} _TENSORFLOW_SWIFT_APIS_SOURCE)
-    list(APPEND SOURCES ${_TENSORFLOW_SWIFT_APIS_SOURCE})
-  endforeach()
-endif()
+# Copy TensorFlow high-level API sources.
+file(GLOB_RECURSE TENSORFLOW_SWIFT_API_SOURCES
+  "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift")
+foreach(_TENSORFLOW_SWIFT_APIS_SOURCE ${TENSORFLOW_SWIFT_API_SOURCES})
+  file(TO_CMAKE_PATH ${_TENSORFLOW_SWIFT_APIS_SOURCE} _TENSORFLOW_SWIFT_APIS_SOURCE)
+  list(APPEND SOURCES ${_TENSORFLOW_SWIFT_APIS_SOURCE})
+endforeach()
 
 add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${SOURCES}"
