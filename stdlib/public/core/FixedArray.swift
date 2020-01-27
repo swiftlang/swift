@@ -24,7 +24,7 @@ internal struct _FixedArray16<T> {
     T, T, T, T, T, T, T, T
   )
 
-  var _count: Int8
+//  var _count: Int8
 }
 
 extension _FixedArray16 {
@@ -37,8 +37,8 @@ extension _FixedArray16 {
   }
 
   internal var count: Int {
-    @inline(__always) get { return Int(truncatingIfNeeded: _count) }
-    @inline(__always) set { _count = Int8(newValue) }
+    @inline(__always) get { return 16 } // Int(truncatingIfNeeded: _count) }
+//    @inline(__always) set { _count = Int8(newValue) }
   }
 }
 
@@ -90,11 +90,11 @@ extension _FixedArray16: RandomAccessCollection, MutableCollection {
 }
 
 extension _FixedArray16 {
-  internal mutating func append(_ newElement: T) {
-    _internalInvariant(count < capacity)
-    _count += 1
-    self[count-1] = newElement
-  }
+  // internal mutating func append(_ newElement: T) {
+  //   _internalInvariant(count < capacity)
+  //   _count += 1
+  //   self[count-1] = newElement
+  // }
 }
 
 extension _FixedArray16 where T: ExpressibleByIntegerLiteral {
@@ -105,7 +105,7 @@ extension _FixedArray16 where T: ExpressibleByIntegerLiteral {
       0, 0, 0, 0, 0, 0, 0, 0,
       0, 0, 0, 0, 0, 0, 0, 0
     )
-    self._count = Int8(truncatingIfNeeded: count)
+    // self._count = Int8(truncatingIfNeeded: count)
   }
 
   @inline(__always)
