@@ -802,9 +802,9 @@ public:
   // Some Decls are IterableDeclContexts, but not all.
   static bool classof(const Decl *D);
 
-  /// Return a hash of all tokens in the body for dependency analysis.
-  /// Empty string means no hash available.
-  StringRef getBodyFingerprint() const;
+  /// Return a hash of all tokens in the body for dependency analysis, if
+  /// available.
+  Optional<std::string> getBodyFingerprint() const;
 
   bool areDependenciesUsingTokenHashesForTypeBodies() const;
 

@@ -28,8 +28,8 @@ void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request);
 
 struct FingerprintAndMembers {
-  std::string fingerprint;
-  ArrayRef<Decl *> members;
+  Optional<std::string> fingerprint = None;
+  ArrayRef<Decl *> members = {};
   bool operator==(const FingerprintAndMembers &x) const {
     return fingerprint == x.fingerprint && members == x.members;
   }

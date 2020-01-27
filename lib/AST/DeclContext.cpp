@@ -901,10 +901,10 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
   }
 }
 
-StringRef IterableDeclContext::getBodyFingerprint() const {
+Optional<std::string> IterableDeclContext::getBodyFingerprint() const {
   // Only makes sense for contexts in a source file
   if (!getDecl()->getDeclContext()->getParentSourceFile())
-    return "";
+    return None;
   auto mutableThis = const_cast<IterableDeclContext *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            ParseMembersRequest{mutableThis},

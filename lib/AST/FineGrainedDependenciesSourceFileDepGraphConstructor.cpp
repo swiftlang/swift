@@ -669,11 +669,8 @@ private:
     return None;
   }
   static Optional<std::string> getFingerprintIfAny(const Decl *d) {
-    if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
-      StringRef fp = idc->getBodyFingerprint();
-      if (!fp.empty())
-        return fp.str();
-    }
+    if (const auto *idc = dyn_cast<IterableDeclContext>(d))
+      return idc->getBodyFingerprint();
     return None;
   }
 

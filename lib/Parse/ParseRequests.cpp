@@ -35,7 +35,10 @@ namespace swift {
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const FingerprintAndMembers &value) {
-  simple_display(out, value.fingerprint);
+  if (value.fingerprint)
+    simple_display(out, value.fingerprint.getValue());
+  else
+    out << "<no fingerprint>";
   out << ", ";
   simple_display(out, value.members);
 }
@@ -53,8 +56,8 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
   parser.SyntaxContext->disable();
   ASTContext &ctx = idc->getDecl()->getASTContext();
   auto declsAndHash = parser.parseDeclListDelayed(idc);
-  FingerprintAndMembers fingerprintAndMembers = {
-      declsAndHash.second.str().str(), declsAndHash.first};
+  FingerprintAndMembers fingerprintAndMembers = {declsAndHash.second,
+                                                 declsAndHash.first};
   return FingerprintAndMembers{
       fingerprintAndMembers.fingerprint,
       ctx.AllocateCopy(llvm::makeArrayRef(fingerprintAndMembers.members))};
