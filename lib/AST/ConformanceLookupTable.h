@@ -464,7 +464,7 @@ public:
 
   /// Add conformances implied by an inheriting protocol extension
   void addExtendedConformances(const ExtensionDecl *ext,
-                       SmallVectorImpl<ProtocolConformance *> &conformances);
+                          SmallVectorImpl<ProtocolConformance *> &conformances);
 
   /// Retrieve the complete set of protocols to which this nominal
   /// type conforms.
@@ -489,10 +489,6 @@ public:
   getSatisfiedProtocolRequirementsForMember(const ValueDecl *member,
                                             NominalTypeDecl *nominal,
                                             bool sorted);
-
-  /// Enumate conformances inferred from protocol extensions with new conformances
-  static void forEachExtendedConformance(ASTContext &ctx,
-                 std::function<void (NormalProtocolConformance *)> emitWitness);
 
   // Only allow allocation of conformance lookup tables using the
   // allocator in ASTContext or by doing a placement new.

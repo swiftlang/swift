@@ -88,7 +88,7 @@ static void checkInheritanceClause(
         // Force recalculation conformance table
         ext->setInherited(inheritedClause);
 
-        // Warning(eventaully error?) here is now gated
+        // Warning (eventually error?) here is now gated
         if (!ext->getASTContext().LangOpts.EnableConformingExtensions)
           ext->diagnose(diag::extension_protocol_inheritance, proto->getName())
             .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,

@@ -78,7 +78,6 @@ namespace swift {
   class EnumElementDecl;
   class ParameterList;
   class ParameterTypeFlags;
-  class ConformanceLookupTable;
   class Pattern;
   struct PrintOptions;
   struct PropertyWrapperBackingPropertyInfo;

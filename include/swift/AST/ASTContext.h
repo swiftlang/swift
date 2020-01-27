@@ -309,7 +309,7 @@ public:
       DerivativeAttrs;
 
   /// Track protocol extensions that inherit to determine witness tables to emit.
-  mutable SmallVector<ExtensionDecl *, 2> ProtocolExtsWithConformances;
+  mutable SmallVector<ExtensionDecl *, 2> ExtensionsWithConformances;
 
 private:
   /// The current generation number, which reflects the number of
@@ -719,10 +719,9 @@ public:
   /// one.
   void loadExtensions(NominalTypeDecl *nominal, unsigned previousGeneration);
 
-  /// Returns the current list of protocol extensions with conformances
-  SmallVector<ExtensionDecl *, 2> &getProtocolExtsWithConformances() const {
-    return ProtocolExtsWithConformances;
-  }
+  /// Iterate over conformances arising from protocol extensions
+  void forEachExtendedConformance(
+                std::function<void (NormalProtocolConformance *)> emitWitness);
 
   /// Load the methods within the given class that produce
   /// Objective-C class or instance methods with the given selector.

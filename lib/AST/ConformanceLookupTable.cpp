@@ -1279,7 +1279,7 @@ void ProtocolDecl::inheritedProtocolsChanged() {
 void ExtensionDecl::setInherited(MutableArrayRef<TypeLoc> i) {
   Inherited = i;
   if (!Inherited.empty()) {
-    getASTContext().ProtocolExtsWithConformances.emplace_back(this);
+    getASTContext().ExtensionsWithConformances.emplace_back(this);
 
     if (hasBeenBound())
       if (auto *proto = getExtendedProtocolDecl())
@@ -1287,17 +1287,17 @@ void ExtensionDecl::setInherited(MutableArrayRef<TypeLoc> i) {
   }
 }
 
-void ConformanceLookupTable::forEachExtendedConformance(ASTContext &ctx,
+void ASTContext::forEachExtendedConformance(
                 std::function<void (NormalProtocolConformance *)> emitWitness) {
-  for (ExtensionDecl *ext : ctx.getProtocolExtsWithConformances())
+  for (ExtensionDecl *ext : ExtensionsWithConformances)
     if (ext->hasBeenBound())
       if (ProtocolDecl *proto = ext->getExtendedProtocolDecl()) {
         SmallVector<ProtocolConformance *, 2> result;
         proto->prepareConformanceTable()->addExtendedConformances(ext, result);
         for (auto conformance : result)
-            if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
-              if (!conformance->getType()->getCanonicalType()
-                    ->getAnyNominal()->getSelfProtocolDecl())
-                emitWitness(normal);
+          if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
+            if (!conformance->getType()->getCanonicalType()
+                  ->getAnyNominal()->getSelfProtocolDecl())
+              emitWitness(normal);
       }
 }

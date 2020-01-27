@@ -39,7 +39,6 @@
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeWalker.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -1433,7 +1432,7 @@ bool MultiConformanceChecker::checkAllConformances() {
   }
   // If all missing witnesses are issued with fixits, we are done.
   if (MissingWitnesses.empty())
-    return false;
+    return anyInvalid;
 
   // Otherwise, backtrack to the last checker that has missing witnesses
   // and diagnose missing witnesses from there.

@@ -4456,17 +4456,16 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         anyErrors = true;
     }
 
-    // Protocol extensions with inheritance.
+    // Protocol extensions with conformances.
     if (auto *protoTy = dyn_cast_or_null<ProtocolDecl>(constraintType->getAnyNominal()))
       for (auto *ext : protoTy->getExtensions())
         for (auto inheritedTy : ext->getInherited())
           if (auto ty = inheritedTy.getType())
-            if (auto protoDecl = dyn_cast<ProtocolDecl>(ty->getAnyNominal())) {
-              if (isErrorResult(addConformanceRequirement(resolvedSubject,
-                                                          protoDecl,
-                                                          source)))
-                anyErrors = true;
-            }
+            if (auto *nomial = ty->getAnyNominal())
+              if (auto *protoDecl = dyn_cast<ProtocolDecl>(nomial))
+                if (isErrorResult(addConformanceRequirement(resolvedSubject,
+                                                            protoDecl, source)))
+                  anyErrors = true;
 
     return anyErrors ? ConstraintResult::Conflicting
                      : ConstraintResult::Resolved;

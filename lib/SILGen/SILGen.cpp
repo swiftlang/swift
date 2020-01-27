@@ -42,9 +42,6 @@
 #include "swift/Subsystems.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Debug.h"
-
-#include "../AST/ConformanceLookupTable.h"
-
 using namespace swift;
 using namespace Lowering;
 
@@ -1835,8 +1832,8 @@ public:
       SGM.visit(TD);
     }
 
-    ConformanceLookupTable::forEachExtendedConformance(getASTContext(),
-                                   [&](NormalProtocolConformance *normal) {
+    SGM.getASTContext()
+      .forEachExtendedConformance([&](NormalProtocolConformance *normal) {
       getWitnessTable(normal, /*emitAsPrivate*/true);
     });
   }
