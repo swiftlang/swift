@@ -145,6 +145,10 @@ protected:
   AnyRequestBase(const AnyRequestBase &other) {
     vtableAndKind = other.vtableAndKind;
   }
+  AnyRequestBase &operator=(const AnyRequestBase &other) {
+    vtableAndKind = other.vtableAndKind;
+    return *this;
+  }
 
 private:
   Derived &asDerived() {
