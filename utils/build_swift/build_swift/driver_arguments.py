@@ -596,6 +596,13 @@ def create_argument_parser():
            toggle_true('swiftsyntax_verify_generated_files'),
            help='set to verify that the generated files in the source tree '
                 'match the ones that would be generated from current master')
+    option('--swiftsyntax-degyb-only',
+           toggle_true('swiftsyntax_degyb_only'),
+           help='only generate the Swift files from gyb in SwiftSyntax and '
+                'skip the rest of the SwiftSyntax build; useful in '
+                'conjunction with --swiftsyntax-verify-generated-files to '
+                'just verify the generated files without paying the build '
+                'time overhead')
     option(['--install-pythonkit'], toggle_true('install_pythonkit'),
            help='install PythonKit')
     option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),

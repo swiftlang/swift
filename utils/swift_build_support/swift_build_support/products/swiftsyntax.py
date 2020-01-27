@@ -55,6 +55,9 @@ class SwiftSyntax(product.Product):
         if self.args.swiftsyntax_verify_generated_files:
             build_cmd.append('--verify-generated-files')
 
+        if self.args.swiftsyntax_degyb_only:
+            build_cmd.append('--degyb-only')
+
         build_cmd.extend(additional_params)
 
         if self.args.verbose_build:
