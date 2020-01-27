@@ -628,7 +628,7 @@ public:
       if (SILPrintSourceInfo) {
         auto CurSourceLoc = I.getLoc().getSourceLoc();
         if (CurSourceLoc.isValid()) {
-          if (!PrevLoc || SM.getLineNumber(CurSourceLoc) != SM.getLineNumber(PrevLoc->getSourceLoc())) {
+          if (!PrevLoc || SM.getLineNumber(CurSourceLoc) > SM.getLineNumber(PrevLoc->getSourceLoc())) {
               auto Buffer = SM.findBufferContainingLoc(CurSourceLoc);
               auto Line = SM.getLineNumber(CurSourceLoc);
               auto LineLength = SM.getLineLength(Buffer, Line);
