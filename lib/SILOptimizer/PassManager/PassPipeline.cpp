@@ -522,7 +522,9 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("LateLoopOpt");
 
   // Delete dead code and drop the bodies of shared functions.
-  P.addDeadFunctionElimination();
+  // Also, remove externally available witness tables. They are not needed
+  // anymore after the last devirtualizer run.
+  P.addLateDeadFunctionElimination();
 
   // Perform the final lowering transformations.
   P.addCodeSinking();
