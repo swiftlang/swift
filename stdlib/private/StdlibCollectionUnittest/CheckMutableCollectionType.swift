@@ -274,7 +274,7 @@ self.test("\(testNamePrefix).subscript(_: Range)/Set/semantics") {
 
     do {
       // Call setter implicitly through an inout mutation.
-      var c = makeWrappedCollection(test.collection)
+      let c = makeWrappedCollection(test.collection)
 
       var s = c[test.bounds(in: c)]
       _mapInPlace(&s) {
@@ -520,7 +520,7 @@ self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPoi
     }
   let c = makeWrappedCollectionWithComparableElement(elements)
 
-  var lc = LoggingMutableCollection(wrapping: c)
+  let lc = LoggingMutableCollection(wrapping: c)
 
   let result = lc.sorted()
   let extractedResult = result.map(extractValueFromComparable)
@@ -639,7 +639,7 @@ self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPoi
     }
   let c = makeWrappedCollection(elements)
 
-  var lc = LoggingMutableCollection(wrapping: c)
+  let lc = LoggingMutableCollection(wrapping: c)
 
   let result = lc.sorted { extractValue($0).value < extractValue($1).value }
   let extractedResult = result.map(extractValue)
