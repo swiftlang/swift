@@ -1,3 +1,9 @@
+
+project(SourceKit
+  LANGUAGES CXX)
+
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fblocks>)
+
 include(CheckSymbolExists)
 
 # Append our own modules to the module path.
