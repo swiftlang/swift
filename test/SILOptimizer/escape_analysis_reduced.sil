@@ -559,3 +559,36 @@ bb65(%614 : $Error):
 bb72(%681 : $Error):
   throw %681 : $Error
 }
+
+//=============================================================================
+// Test an "array.uninitialized" with multiple tuple_extract's but no
+// other unusual uses. Make sure canOptimizeArrayUninitializedCall
+// returns false; otherwise graph verification can fail because only
+// one of the tuple_extracts is mapped to a node.
+
+// specialized static Array._adoptStorage(_:count:)
+sil [_semantics "array.uninitialized"] @$sSa13_adoptStorage_5countSayxG_SpyxGts016_ContiguousArrayB0CyxGn_SitFZSo5Int64V_Tg5 : $@convention(method) (@owned _ContiguousArrayStorage<Int64>, Int, @thin Array<Int64>.Type) -> (@owned Array<Int64>, UnsafeMutablePointer<Int64>)
+
+// CHECK-LABEL: CG of testArrayUninitResultMapping
+// CHECK-NEXT:   [ref] %0 Esc: , Succ: (%0.1)
+// CHECK-NEXT:   Con [int] %0.1 Esc: G, Succ: (%0.2)
+// CHECK-NEXT:   Con [ref] %0.2 Esc: G, Succ:
+// CHECK-NEXT:   Val %2 Esc: , Succ: (%2.1)
+// CHECK-NEXT:   Con %2.1 Esc: G, Succ:
+// CHECK-LABEL: End
+sil hidden @testArrayUninitResultMapping : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [tail_elems $Int64 * undef : $Builtin.Word] $_ContiguousArrayStorage<Int64>
+  // function_ref specialized static Array._adoptStorage(_:count:)
+  %1 = function_ref @$sSa13_adoptStorage_5countSayxG_SpyxGts016_ContiguousArrayB0CyxGn_SitFZSo5Int64V_Tg5 : $@convention(method) (@owned _ContiguousArrayStorage<Int64>, Int, @thin Array<Int64>.Type) -> (@owned Array<Int64>, UnsafeMutablePointer<Int64>)
+  %2 = apply %1(%0, undef, undef) : $@convention(method) (@owned _ContiguousArrayStorage<Int64>, Int, @thin Array<Int64>.Type) -> (@owned Array<Int64>, UnsafeMutablePointer<Int64>)
+  %3 = tuple_extract %2 : $(Array<Int64>, UnsafeMutablePointer<Int64>), 0
+  %4 = tuple_extract %2 : $(Array<Int64>, UnsafeMutablePointer<Int64>), 1
+  %5 = tuple_extract %2 : $(Array<Int64>, UnsafeMutablePointer<Int64>), 0
+  %6 = struct_extract %5 : $Array<Int64>, #Array._buffer
+  %7 = struct_extract %6 : $_ArrayBuffer<Int64>, #_ArrayBuffer._storage
+  %8 = struct_extract %7 : $_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue
+  strong_retain %8 : $Builtin.BridgeObject
+  %10 = tuple ()
+  return %10 : $()
+}
