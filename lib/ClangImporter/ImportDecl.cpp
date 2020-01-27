@@ -6757,9 +6757,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // - A getter is redeclared in a subclass, but not the setter.
   // - The getter and setter are part of the same type.
   // - There is no setter.
-  bool associateWithSetter = !getterAndSetterInSameType && setter == decl;
   DeclContext *dc =
-      associateWithSetter ? setter && setter->getDeclContext() : getter->getDeclContext();
+      !getterAndSetterInSameType && setter == decl ? setter->getDeclContext() : getter->getDeclContext();
 
   // Build the subscript declaration.
   auto &C = Impl.SwiftContext;
