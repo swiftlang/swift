@@ -73,7 +73,7 @@ if(SWIFT_BUILD_STDLIB)
 
   # Note: Python should be built before TensorFlow because Python is a
   # dependency for `numpy.ndarray` bridging to `ShapedArray`/`Tensor`.
-  if(SWIFT_ENABLE_TENSORFLOW)
+  if(SWIFT_ENABLE_TENSORFLOW AND TENSORFLOW_SWIFT_APIS)
     # TODO: Add TensorFlow support for iOS/Raspberry Pi.
     add_subdirectory(TensorFlow)
   endif()
