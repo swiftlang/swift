@@ -4,6 +4,8 @@
 // WMO-NOT: -primary-file
 // RUN: %swiftc_driver -whole-module-optimization -no-whole-module-optimization %S/../Inputs/empty.swift -### 2>&1 | %FileCheck -check-prefix NO-WMO %s
 // NO-WMO: -primary-file
+// RUN: %swiftc_driver -wmo -no-wmo %S/../Inputs/empty.swift -### 2>&1 | %FileCheck -check-prefix NO-WMO-SHORT %s
+// NO-WMO-SHORT: -primary-file
 
 // RUN: %swiftc_driver -enable-batch-mode -whole-module-optimization -no-whole-module-optimization %S/../Inputs/empty.swift -### 2>&1 | %FileCheck -check-prefix BATCH %s
 // BATCH: -primary-file

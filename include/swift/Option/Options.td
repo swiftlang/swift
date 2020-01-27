@@ -882,6 +882,9 @@ def disable_batch_mode : Flag<["-"], "disable-batch-mode">,
 def wmo : Flag<["-"], "wmo">, Alias<whole_module_optimization>,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>;
 
+def no_wmo : Flag<["-"], "no-wmo">, Alias<no_whole_module_optimization>,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>;
+
 def force_single_frontend_invocation :
   Flag<["-"], "force-single-frontend-invocation">,
   Alias<whole_module_optimization>,
