@@ -1467,7 +1467,7 @@ function(_add_swift_library_single target name)
   endif()
 
   if(target_static)
-    target_link_options(${target_static} PRIVATE
+    target_compile_options(${target_static} PRIVATE
       ${c_compile_flags})
     # FIXME: The fallback paths here are going to be dynamic libraries.
 
