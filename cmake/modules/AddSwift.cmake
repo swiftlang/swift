@@ -28,16 +28,6 @@ function(add_dependencies_multiple_targets)
   endif()
 endfunction()
 
-# Compute the library subdirectory to use for the given sdk and
-# architecture, placing the result in 'result_var_name'.
-function(compute_library_subdir result_var_name sdk arch)
-  if(sdk IN_LIST SWIFT_APPLE_PLATFORMS OR sdk STREQUAL "MACCATALYST")
-    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}" PARENT_SCOPE)
-  else()
-    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
-  endif()
-endfunction()
-
 function(_compute_lto_flag option out_var)
   string(TOLOWER "${option}" lowercase_option)
   if (lowercase_option STREQUAL "full")
