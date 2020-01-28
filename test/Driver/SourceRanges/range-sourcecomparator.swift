@@ -1,6 +1,9 @@
 // Tests the diff algorithm (the SourceComparator) used for range-based
 // incremental compilation.
 //
+// Disable fine-grained-dependencies because this test copies over dummy
+// swiftdeps.
+//
 // If you try to add inputs, be sure to update output.json and add a swiftranges
 // input.
 
