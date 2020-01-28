@@ -321,10 +321,6 @@ public:
   virtual Expr *appliedSolution(constraints::Solution &solution,
                                 Expr *expr);
 
-  /// Callback invoked if expression is structurally unsound and can't
-  /// be correctly processed by the constraint solver.
-  virtual void preCheckFailed(Expr *expr);
-
   /// Callback invoked if application of chosen solution to
   /// expression has failed.
   virtual void applySolutionFailed(constraints::Solution &solution, Expr *expr);

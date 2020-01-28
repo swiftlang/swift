@@ -2035,7 +2035,6 @@ Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
   return expr;
 }
 
-void ExprTypeCheckListener::preCheckFailed(Expr *expr) {}
 void ExprTypeCheckListener::applySolutionFailed(Solution &solution,
                                                 Expr *expr) {}
 
@@ -2095,12 +2094,6 @@ public:
 
   Expr *appliedSolution(Solution &solution, Expr *expr) override {
     return BaseListener ? BaseListener->appliedSolution(solution, expr) : expr;
-  }
-
-  void preCheckFailed(Expr *expr) override {
-    if (BaseListener)
-      BaseListener->preCheckFailed(expr);
-    maybeProduceFallbackDiagnostic(expr);
   }
 
   void applySolutionFailed(Solution &solution, Expr *expr) override {
@@ -2169,7 +2162,6 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckExpression(expr, dc, baseCS)) {
-    listener.preCheckFailed(expr);
     return Type();
   }
 
