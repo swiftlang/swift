@@ -320,10 +320,6 @@ public:
   /// failure.
   virtual Expr *appliedSolution(constraints::Solution &solution,
                                 Expr *expr);
-
-  /// Callback invoked if application of chosen solution to
-  /// expression has failed.
-  virtual void applySolutionFailed(constraints::Solution &solution, Expr *expr);
 };
 
 /// A conditional conformance that implied some other requirements. That is, \c

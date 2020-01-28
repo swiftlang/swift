@@ -2035,9 +2035,6 @@ Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
   return expr;
 }
 
-void ExprTypeCheckListener::applySolutionFailed(Solution &solution,
-                                                Expr *expr) {}
-
 void ParentConditionalConformance::diagnoseConformanceStack(
     DiagnosticEngine &diags, SourceLoc loc,
     ArrayRef<ParentConditionalConformance> conformances) {
@@ -2094,45 +2091,6 @@ public:
 
   Expr *appliedSolution(Solution &solution, Expr *expr) override {
     return BaseListener ? BaseListener->appliedSolution(solution, expr) : expr;
-  }
-
-  void applySolutionFailed(Solution &solution, Expr *expr) override {
-    if (BaseListener)
-      BaseListener->applySolutionFailed(solution, expr);
-
-    if (hadAnyErrors())
-      return;
-
-    // If solution involves invalid or incomplete conformances that's
-    // a probable cause of failure to apply it without producing an error,
-    // which is going to be diagnosed later, so let's not produce
-    // fallback diagnostic in this case.
-    if (llvm::any_of(
-            solution.Conformances,
-            [](const std::pair<ConstraintLocator *, ProtocolConformanceRef>
-                   &conformance) -> bool {
-              auto &ref = conformance.second;
-              return ref.isConcrete() && ref.getConcrete()->isInvalid();
-            }))
-      return;
-
-    maybeProduceFallbackDiagnostic(expr);
-  }
-
-private:
-  bool hadAnyErrors() const { return Context.Diags.hadAnyError(); }
-
-  void maybeProduceFallbackDiagnostic(Expr *expr) const {
-    if (Options.contains(TypeCheckExprFlags::SubExpressionDiagnostics) ||
-        DiagnosticSuppression::isEnabled(Context.Diags))
-      return;
-
-    // Before producing fatal error here, let's check if there are any "error"
-    // diagnostics already emitted or waiting to be emitted. Because they are
-    // a better indication of the problem.
-    if (!(hadAnyErrors() || Context.hasDelayedConformanceErrors()))
-      Context.Diags.diagnose(expr->getLoc(),
-                             diag::failed_to_produce_diagnostic);
   }
 };
 
@@ -2259,8 +2217,6 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
       options.contains(TypeCheckExprFlags::SubExpressionDiagnostics);
   auto resultTarget = cs.applySolution(solution, target, performingDiagnostics);
   if (!resultTarget) {
-    listener.applySolutionFailed(solution, expr);
-
     // Failure already diagnosed, above, as part of applying the solution.
     return Type();
   }
