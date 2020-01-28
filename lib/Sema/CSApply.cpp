@@ -7511,6 +7511,7 @@ ArrayRef<Solution> SolutionResult::getAmbiguousSolutions() const {
 
 MutableArrayRef<Solution> SolutionResult::takeAmbiguousSolutions() && {
   assert(getKind() == Ambiguous);
+  markAsDiagnosed();
   return MutableArrayRef<Solution>(solutions, numSolutions);
 }
 

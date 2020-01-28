@@ -1172,7 +1172,6 @@ bool ConstraintSystem::solve(Expr *&expr,
         solutions.assign(std::make_move_iterator(ambiguousSolutions.begin()),
                          std::make_move_iterator(ambiguousSolutions.end()));
         dumpSolutions();
-        solution.markAsDiagnosed();
         return false;
       }
 
