@@ -42,9 +42,7 @@
 #include "swift/Runtime/Mutex.h"
 #include "../SwiftShims/Random.h"
 
-#if defined(__wasi__)
 #include <algorithm> // required for std::min
-#endif
 
 #if defined(__APPLE__)
 
