@@ -1136,9 +1136,10 @@ bool ConstraintSystem::solve(Expr *&expr,
   // Take up to two attempts at solving the system. The first attempts to
   // solve a system that is expected to be well-formed, the second kicks in
   // when there is an error and attempts to salvage an ill-formed expression.
+  SolutionApplicationTarget target(expr, convertType, /*isDiscarded=*/false);
   for (unsigned stage = 0; stage != 2; ++stage) {
     auto solution = (stage == 0)
-        ? solveImpl(expr, convertType, listener, allowFreeTypeVariables)
+        ? solveImpl(target, listener, allowFreeTypeVariables)
         : salvage();
 
     switch (solution.getKind()) {
@@ -1201,14 +1202,13 @@ bool ConstraintSystem::solve(Expr *&expr,
 }
 
 SolutionResult
-ConstraintSystem::solveImpl(Expr *&expr,
-                            Type convertType,
+ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
                             ExprTypeCheckListener *listener,
                             FreeTypeVariableBinding allowFreeTypeVariables) {
   if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
-    log << "---Constraint solving for the expression at ";
-    auto R = expr->getSourceRange();
+    log << "---Constraint solving at ";
+    auto R = target.getSourceRange();
     if (R.isValid()) {
       R.print(log, getASTContext().SourceMgr, /*PrintText=*/ false);
     } else {
@@ -1220,6 +1220,7 @@ ConstraintSystem::solveImpl(Expr *&expr,
   assert(!solverState && "cannot be used directly");
 
   // Set up the expression type checker timer.
+  Expr *expr = target.getAsExpr();
   Timer.emplace(expr, *this);
 
   Expr *origExpr = expr;
@@ -1240,7 +1241,7 @@ ConstraintSystem::solveImpl(Expr *&expr,
 
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
-  if (convertType) {
+  if (Type convertType = target.getExprConversionType()) {
     // Determine whether we know more about the contextual type.
     ContextualTypePurpose ctp = CTP_Unused;
     bool isOpaqueReturnType = false;
@@ -1286,6 +1287,8 @@ ConstraintSystem::solveImpl(Expr *&expr,
 
   if (getExpressionTooComplex(solutions))
     return SolutionResult::forTooComplex();
+
+  target.setExpr(expr);
 
   switch (solutions.size()) {
   case 0:

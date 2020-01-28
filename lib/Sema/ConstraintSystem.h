@@ -1223,6 +1223,17 @@ public:
     assert(kind == Kind::function);
     function.body = stmt;
   }
+
+  /// Retrieve the source range of the target.
+  SourceRange getSourceRange() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression.expression->getSourceRange();
+
+    case Kind::function:
+      return function.body->getSourceRange();
+    }
+  }
   /// Walk the contents of the application target.
   SolutionApplicationTarget walk(ASTWalker &walker);
 };
@@ -4078,13 +4089,11 @@ private:
 
   /// Solve the system of constraints generated from provided expression.
   ///
-  /// \param expr The expression to generate constraints from.
-  /// \param convertType The expected type of the expression.
+  /// \param target The target to generate constraints from.
   /// \param listener The callback to check solving progress.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
-  SolutionResult solveImpl(Expr *&expr,
-                           Type convertType,
+  SolutionResult solveImpl(SolutionApplicationTarget &target,
                            ExprTypeCheckListener *listener,
                            FreeTypeVariableBinding allowFreeTypeVariables
                              = FreeTypeVariableBinding::Disallow);
