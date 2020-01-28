@@ -1147,7 +1147,11 @@ class SolutionApplicationTarget {
 
   union {
     Expr *expression;
-    AnyFunctionRef function;
+
+    struct {
+      AnyFunctionRef function;
+      BraceStmt *body;
+    } function;
   };
 
 public:
@@ -1156,9 +1160,13 @@ public:
     expression = expr;
   }
 
-  SolutionApplicationTarget(AnyFunctionRef fn) {
+  SolutionApplicationTarget(AnyFunctionRef fn)
+      : SolutionApplicationTarget(fn, fn.getBody()) { }
+
+  SolutionApplicationTarget(AnyFunctionRef fn, BraceStmt *body) {
     kind = Kind::function;
-    function = fn;
+    function.function = fn;
+    function.body = body;
   }
 
   Expr *getAsExpr() const {
@@ -1171,18 +1179,32 @@ public:
     }
   }
 
+  void setExpr(Expr *expr) {
+    assert(kind == Kind::expression);
+    expression = expr;
+  }
+
   Optional<AnyFunctionRef> getAsFunction() const {
     switch (kind) {
     case Kind::expression:
       return None;
 
     case Kind::function:
-      return function;
+      return function.function;
     }
   }
 
+  BraceStmt *getFunctionBody() const {
+    assert(kind == Kind::function);
+    return function.body;
+  }
+
+  void setFunctionBody(BraceStmt *stmt) {
+    assert(kind == Kind::function);
+    function.body = stmt;
+  }
   /// Walk the contents of the application target.
-  llvm::PointerUnion<Expr *, Stmt *> walk(ASTWalker &walker);
+  SolutionApplicationTarget walk(ASTWalker &walker);
 };
 
 enum class ConstraintSystemPhase {
@@ -4147,7 +4169,7 @@ public:
                    bool minimize);
 
 private:
-  llvm::PointerUnion<Expr *, Stmt *> applySolutionImpl(
+  Optional<SolutionApplicationTarget> applySolutionImpl(
       Solution &solution, SolutionApplicationTarget target,
       Type convertType, bool discardedExpr, bool performingDiagnostics);
 
@@ -4165,15 +4187,19 @@ public:
                       Type convertType,
                       bool discardedExpr,
                       bool performingDiagnostics) {
-    return applySolutionImpl(solution, expr, convertType, discardedExpr,
-                             performingDiagnostics).get<Expr *>();
+    auto result = applySolutionImpl(
+        solution, expr, convertType, discardedExpr, performingDiagnostics);
+    if (result)
+      return result->getAsExpr();
+    return nullptr;
   }
 
   /// Apply a given solution to the body of the given function.
   BraceStmt *applySolutionToBody(Solution &solution, AnyFunctionRef fn) {
-    return cast_or_null<BraceStmt>(
-        applySolutionImpl(solution, fn, Type(), false, false)
-      .dyn_cast<Stmt *>());
+    auto result = applySolutionImpl(solution, fn, Type(), false, false);
+    if (result)
+      return result->getFunctionBody();
+    return nullptr;
   }
 
   /// Reorder the disjunctive clauses for a given expression to
