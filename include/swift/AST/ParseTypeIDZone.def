@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 SWIFT_REQUEST(Parse, ParseMembersRequest,
-              FingerprintAndMembers(IterableDeclContext *), Cached, NoLocationInfo)
+              ArrayRef<Decl *>(IterableDeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(Parse, ParseAbstractFunctionBodyRequest,
               BraceStmt *(AbstractFunctionDecl *), SeparatelyCached,
               NoLocationInfo)

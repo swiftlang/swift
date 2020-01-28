@@ -122,14 +122,8 @@ public:
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
 
-  NullablePtr<llvm::MD5> CurrentTokenHash;
-  void recordTokenHash(const Token Tok) {
-    if (!Tok.getText().empty())
-      recordTokenHash(Tok.getText());
-  }
-
-  void recordTokenHash(StringRef token);
-
+  bool IsParsingInterfaceTokens = false;
+  
   /// DisabledVars is a list of variables for whom local name lookup is
   /// disabled.  This is used when parsing a PatternBindingDecl to reject self
   /// uses and to disable uses of the bound variables in a let/else block.  The
@@ -927,8 +921,7 @@ public:
                                bool IsAtStartOfLineOrPreviousHadSemi,
                                llvm::function_ref<void(Decl*)> Handler);
 
-  std::pair<std::vector<Decl *>, Optional<std::string>>
-  parseDeclListDelayed(IterableDeclContext *IDC);
+  std::vector<Decl *> parseDeclListDelayed(IterableDeclContext *IDC);
 
   bool parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                            SourceLoc PosBeforeLB,
@@ -1066,10 +1059,10 @@ public:
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
                              Parser::ParseDeclOptions Options,
                              llvm::function_ref<void(Decl*)> handler);
-  std::pair<std::vector<Decl *>, Optional<std::string>>
-  parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
-                ParseDeclOptions Options, IterableDeclContext *IDC,
-                bool &hadError);
+  std::vector<Decl *> parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
+                                    Diag<> ErrorDiag, ParseDeclOptions Options,
+                                    IterableDeclContext *IDC,
+                                    bool &hadError);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
   ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,

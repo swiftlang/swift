@@ -838,10 +838,8 @@ void IterableDeclContext::loadAllMembers() const {
     // members to this context, this call is important for recording the
     // dependency edge.
     auto mutableThis = const_cast<IterableDeclContext *>(this);
-    auto members =
-        evaluateOrDefault(ctx.evaluator, ParseMembersRequest{mutableThis},
-                          FingerprintAndMembers())
-            .members;
+    auto members = evaluateOrDefault(
+        ctx.evaluator, ParseMembersRequest{mutableThis}, ArrayRef<Decl*>());
 
     // If we haven't already done so, add these members to this context.
     if (!AddedParsedMembers) {
@@ -899,21 +897,6 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
         static_cast<const IterableDeclContext*>(cast<ID##Decl>(D)));
 #include "swift/AST/DeclNodes.def"
   }
-}
-
-Optional<std::string> IterableDeclContext::getBodyFingerprint() const {
-  // Only makes sense for contexts in a source file
-  if (!getDecl()->getDeclContext()->getParentSourceFile())
-    return None;
-  auto mutableThis = const_cast<IterableDeclContext *>(this);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           ParseMembersRequest{mutableThis},
-                           FingerprintAndMembers())
-      .fingerprint;
-}
-
-bool IterableDeclContext::areDependenciesUsingTokenHashesForTypeBodies() const {
-  return getASTContext().LangOpts.EnableTypeFingerprints;
 }
 
 /// Return the DeclContext to compare when checking private access in

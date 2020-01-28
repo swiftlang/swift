@@ -69,7 +69,6 @@ class SourceFile;
 class SourceManager;
 class Stmt;
 class TypeRepr;
-struct FingerprintAndMembers;
 
 // There are a handful of cases where the swift compiler can introduce
 // counter-measurement noise via nondeterminism, especially via

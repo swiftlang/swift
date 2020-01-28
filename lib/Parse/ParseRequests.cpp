@@ -33,17 +33,7 @@ namespace swift {
 #undef SWIFT_TYPEID_HEADER
 }
 
-void swift::simple_display(llvm::raw_ostream &out,
-                           const FingerprintAndMembers &value) {
-  if (value.fingerprint)
-    simple_display(out, value.fingerprint.getValue());
-  else
-    out << "<no fingerprint>";
-  out << ", ";
-  simple_display(out, value.members);
-}
-
-FingerprintAndMembers
+ArrayRef<Decl *>
 ParseMembersRequest::evaluate(Evaluator &evaluator,
                               IterableDeclContext *idc) const {
   SourceFile &sf = *idc->getDecl()->getDeclContext()->getParentSourceFile();
@@ -55,12 +45,8 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
   // Disable libSyntax creation in the delayed parsing.
   parser.SyntaxContext->disable();
   ASTContext &ctx = idc->getDecl()->getASTContext();
-  auto declsAndHash = parser.parseDeclListDelayed(idc);
-  FingerprintAndMembers fingerprintAndMembers = {declsAndHash.second,
-                                                 declsAndHash.first};
-  return FingerprintAndMembers{
-      fingerprintAndMembers.fingerprint,
-      ctx.AllocateCopy(llvm::makeArrayRef(fingerprintAndMembers.members))};
+  return ctx.AllocateCopy(
+      llvm::makeArrayRef(parser.parseDeclListDelayed(idc)));
 }
 
 BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
