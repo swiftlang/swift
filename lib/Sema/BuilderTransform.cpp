@@ -1041,7 +1041,6 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   ConstraintKind resultConstraintKind = ConstraintKind::Conversion;
   if (auto opaque = resultContextType->getAs<OpaqueTypeArchetypeType>()) {
     if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(func)) {
-      options |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
       resultConstraintKind = ConstraintKind::OpaqueUnderlyingType;
     }
   }
