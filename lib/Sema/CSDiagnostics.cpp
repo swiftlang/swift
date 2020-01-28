@@ -4561,7 +4561,21 @@ bool ExtraneousArgumentsFailure::diagnoseAsNote() {
 }
 
 bool ExtraneousArgumentsFailure::diagnoseSingleExtraArgument() const {
-  auto *arguments = getArgumentListExprFor(getLocator());
+  auto *locator = getLocator();
+
+  // This specifically handles a case of `Void(...)` which generates
+  // constraints differently from other constructor invocations and
+  // wouldn't have `ApplyArgument` as a last element in the locator.
+  if (auto *call = dyn_cast<CallExpr>(getRawAnchor())) {
+    auto *TE = dyn_cast<TypeExpr>(call->getFn());
+    if (TE && getType(TE)->getMetatypeInstanceType()->isVoid()) {
+      emitDiagnostic(call->getLoc(), diag::extra_argument_to_nullary_call)
+          .highlight(call->getArg()->getSourceRange());
+      return true;
+    }
+  }
+
+  auto *arguments = getArgumentListExprFor(locator);
   if (!arguments)
     return false;
 
