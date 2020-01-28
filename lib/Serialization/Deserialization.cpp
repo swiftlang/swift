@@ -2657,6 +2657,7 @@ public:
     uint8_t rawIntroducer;
     bool isGetterMutating, isSetterMutating;
     bool isLazyStorageProperty;
+    bool isTopLevelGlobal;
     DeclID lazyStorageID;
     unsigned numAccessors, numBackingProperties;
     uint8_t readImpl, writeImpl, readWriteImpl, opaqueReadOwnership;
@@ -2673,6 +2674,7 @@ public:
                                        hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
                                        isLazyStorageProperty,
+                                       isTopLevelGlobal,
                                        lazyStorageID,
                                        opaqueReadOwnership,
                                        readImpl, writeImpl, readWriteImpl,
@@ -2804,6 +2806,7 @@ public:
     }
 
     var->setLazyStorageProperty(isLazyStorageProperty);
+    var->setTopLevelGlobal(isTopLevelGlobal);
 
     // If there are any backing properties, record them.
     if (numBackingProperties > 0) {
