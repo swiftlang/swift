@@ -12,22 +12,6 @@ set(SWIFTLIB_DIR
 set(SWIFTSTATICLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift_static")
 
-function(add_dependencies_multiple_targets)
-  cmake_parse_arguments(
-      ADMT # prefix
-      "" # options
-      "" # single-value args
-      "TARGETS;DEPENDS" # multi-value args
-      ${ARGN})
-  precondition(ADMT_UNPARSED_ARGUMENTS NEGATE MESSAGE "unrecognized arguments: ${ADMT_UNPARSED_ARGUMENTS}")
-
-  if(NOT "${ADMT_DEPENDS}" STREQUAL "")
-    foreach(target ${ADMT_TARGETS})
-      add_dependencies("${target}" ${ADMT_DEPENDS})
-    endforeach()
-  endif()
-endfunction()
-
 function(_compute_lto_flag option out_var)
   string(TOLOWER "${option}" lowercase_option)
   if (lowercase_option STREQUAL "full")
@@ -1198,14 +1182,24 @@ function(_add_swift_library_single target name)
   endif()
 
   # Handle linking and dependencies.
-  add_dependencies_multiple_targets(
-      TARGETS "${target}" ${target_static}
-      DEPENDS
-        ${SWIFTLIB_SINGLE_DEPENDS}
-        ${gyb_dependency_targets}
-        "${swift_object_dependency_target}"
-        "${swift_module_dependency_target}"
-        ${LLVM_COMMON_DEPENDS})
+  if(SWIFTLIB_SINGLE_DEPENDS OR
+     gyb_dependency_targets OR
+     swift_object_dependency_target OR
+     swift_module_dependency_target OR
+     LLVM_COMMON_DEPENDS)
+    add_dependencies(${target}
+      ${SWIFTLIB_SINGLE_DEPENDS}
+      ${gyb_dependency_targets}
+      ${swift_object_dependency_target}
+      ${swift_module_dependency_target}
+      ${LLVM_COMMON_DEPENDS})
+    add_dependencies(${target_static}
+      ${SWIFTLIB_SINGLE_DEPENDS}
+      ${gyb_dependency_targets}
+      ${swift_object_dependency_target}
+      ${swift_module_dependency_target}
+      ${LLVM_COMMON_DEPENDS})
+  endif()
 
   if("${libkind}" STREQUAL "SHARED")
     target_link_libraries("${target}" PRIVATE ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
@@ -1231,9 +1225,10 @@ function(_add_swift_library_single target name)
         "-static"
         target_static_depends)
     # FIXME: should this be target_link_libraries?
-    add_dependencies_multiple_targets(
-        TARGETS "${target_static}"
-        DEPENDS ${target_static_depends})
+    if(target_static_depends)
+      add_dependencies(${target_static}
+        ${target_static_depends})
+    endif()
   endif()
 
   # Link against system frameworks.
@@ -2563,12 +2558,12 @@ function(_add_swift_executable_single name)
       ${SWIFTEXE_SINGLE_SOURCES}
       ${SWIFTEXE_SINGLE_EXTERNAL_SOURCES})
 
-  add_dependencies_multiple_targets(
-      TARGETS "${name}"
-      DEPENDS
-        ${dependency_target}
-        ${LLVM_COMMON_DEPENDS}
-        ${SWIFTEXE_SINGLE_DEPENDS})
+  if(dependency_target OR LLVM_COMMON_DEPENDS OR SWIFTEXE_SINGLE_DEPENDS)
+    add_dependencies(${name}
+      ${dependency_target}
+      ${LLVM_COMMON_DEPENDS}
+      ${SWIFTEXE_SINGLE_DEPENDS})
+  endif()
   llvm_update_compile_flags("${name}")
 
   if(SWIFTEXE_SINGLE_SDK STREQUAL WINDOWS)
