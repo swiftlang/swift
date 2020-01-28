@@ -680,12 +680,10 @@ private:
     for (const auto &contextNameFingerprint : contextNameFingerprints) {
       auto p = g.findExistingNodePairOrCreateAndAddIfNew(
           kind, contextNameFingerprint);
-      // When we don't have a fingerprint yet, must rebuild every provider when
-      // interfaceHash changes. So when interface (i.e. interface hash) of
-      // sourceFile changes, every provides is dirty. And since we don't know
-      // what happened, dirtyness might affect the interface.
-      if (!p.getInterface()->getFingerprint().hasValue())
-        g.addArc(g.getSourceFileNodePair().getInterface(), p.getInterface());
+      // Since the current type fingerprints only include tokens in the body,
+      // when the interface hash changes, it is possible that the type in the
+      // file has changed.
+      g.addArc(g.getSourceFileNodePair().getInterface(), p.getInterface());
     }
   }
 
