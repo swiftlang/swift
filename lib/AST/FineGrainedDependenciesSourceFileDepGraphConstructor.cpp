@@ -809,8 +809,15 @@ bool swift::fine_grained_dependencies::emitReferenceDependencies(
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
   llvm::sys::fs::rename(outputPath, outputPath + "~");
+  // Since, when fingerprints are enabled,
+  // the parser diverts token hashing into per-body fingerprints
+  // before it can know if a difference is in a private type,
+  // in order to be able to test the changed  fingerprints
+  // we force the inclusion of private declarations when fingerprints
+  // are enabled.
   const bool includeIntrafileDeps =
-      SF->getASTContext().LangOpts.FineGrainedDependenciesIncludeIntrafileOnes;
+    SF->getASTContext().LangOpts.FineGrainedDependenciesIncludeIntrafileOnes ||
+    SF->getASTContext().LangOpts.EnableTypeFingerprints;
   const bool hadCompilationError = SF->getASTContext().hadError();
   auto gc = SourceFileDepGraphConstructor::forSourceFile(
       SF, depTracker, outputPath, includeIntrafileDeps, hadCompilationError);
