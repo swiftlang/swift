@@ -3350,6 +3350,35 @@ bool Parser::isStartOfSwiftDecl() {
     return isStartOfSwiftDecl();
   }
 
+  // If we have a decl modifying keyword, check if the next token is a valid
+  // decl start. This is necessary to correctly handle Swift keywords that are
+  // shared by SIL, e.g 'private' in 'sil private @foo :'. We need to make sure
+  // this isn't considered a valid Swift decl start.
+  if (Tok.isKeyword()) {
+    auto DAK = DeclAttribute::getAttrKindFromString(Tok.getText());
+    if (DAK != DAK_Count && DeclAttribute::isDeclModifier(DAK)) {
+      BacktrackingScope backtrack(*this);
+      consumeToken();
+
+      // Eat paren after modifier name; e.g. private(set)
+      if (consumeIf(tok::l_paren)) {
+        while (Tok.isNot(tok::r_brace, tok::eof, tok::pound_endif)) {
+          if (consumeIf(tok::r_paren))
+            break;
+
+          // If we found the start of a decl while trying to skip over the
+          // paren, then we have something incomplete like 'private('. Return
+          // true for better recovery.
+          if (isStartOfSwiftDecl())
+            return true;
+
+          skipSingle();
+        }
+      }
+      return isStartOfSwiftDecl();
+    }
+  }
+
   // Otherwise, the only hard case left is the identifier case.
   if (Tok.isNot(tok::identifier)) return true;
 
