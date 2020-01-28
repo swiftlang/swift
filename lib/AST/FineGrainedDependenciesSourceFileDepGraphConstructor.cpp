@@ -680,12 +680,10 @@ private:
     for (const auto &contextNameFingerprint : contextNameFingerprints) {
       auto p = g.findExistingNodePairOrCreateAndAddIfNew(
           kind, contextNameFingerprint);
-      // When we don't have a fingerprint yet, must rebuild every provider when
-      // interfaceHash changes. So when interface (i.e. interface hash) of
-      // sourceFile changes, every provides is dirty. And since we don't know
-      // what happened, dirtyness might affect the interface.
-      if (!p.getInterface()->getFingerprint().hasValue())
-        g.addArc(g.getSourceFileNodePair().getInterface(), p.getInterface());
+      // Since the current type fingerprints only include tokens in the body,
+      // when the interface hash changes, it is possible that the type in the
+      // file has changed.
+      g.addArc(g.getSourceFileNodePair().getInterface(), p.getInterface());
     }
   }
 
@@ -809,8 +807,15 @@ bool swift::fine_grained_dependencies::emitReferenceDependencies(
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
   llvm::sys::fs::rename(outputPath, outputPath + "~");
+  // Since, when fingerprints are enabled,
+  // the parser diverts token hashing into per-body fingerprints
+  // before it can know if a difference is in a private type,
+  // in order to be able to test the changed  fingerprints
+  // we force the inclusion of private declarations when fingerprints
+  // are enabled.
   const bool includeIntrafileDeps =
-      SF->getASTContext().LangOpts.FineGrainedDependenciesIncludeIntrafileOnes;
+    SF->getASTContext().LangOpts.FineGrainedDependenciesIncludeIntrafileOnes ||
+    SF->getASTContext().LangOpts.EnableTypeFingerprints;
   const bool hadCompilationError = SF->getASTContext().hadError();
   auto gc = SourceFileDepGraphConstructor::forSourceFile(
       SF, depTracker, outputPath, includeIntrafileDeps, hadCompilationError);
