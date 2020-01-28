@@ -2359,6 +2359,7 @@ public:
   bool recordFix(ConstraintFix *fix, unsigned impact = 1);
 
   void recordPotentialHole(TypeVariableType *typeVar);
+  void recordPotentialHole(FunctionType *fnType);
 
   /// Determine whether constraint system already has a fix recorded
   /// for a particular location.
