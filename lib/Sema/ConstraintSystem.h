@@ -792,6 +792,7 @@ using OpenedTypeMap =
 struct ContextualTypeInfo  {
   TypeLoc typeLoc;
   ContextualTypePurpose purpose;
+  bool isOpaqueReturnType = false;
 
   Type getType() const { return typeLoc.getType(); }
 };
@@ -1012,10 +1013,6 @@ enum class ConstraintSystemFlags {
   /// expression, and doesn't dig into its subexpressions.
   ReusePrecheckedType = 0x20,
   
-  /// If set, the top-level expression may be able to provide an underlying
-  /// type for the contextual opaque archetype.
-  UnderlyingTypeForOpaqueReturnType = 0x40,
-
   /// FIXME(diagnostics): Once diagnostics are completely switched to new
   /// framework, this flag could be removed as obsolete.
   ///
@@ -2180,11 +2177,12 @@ public:
   }
 
   void setContextualType(
-      const Expr *expr, TypeLoc T, ContextualTypePurpose purpose) {
+      const Expr *expr, TypeLoc T, ContextualTypePurpose purpose,
+       bool isOpaqueReturnType) {
     assert(expr != nullptr && "Expected non-null expression!");
     assert(contextualTypes.count(expr) == 0 &&
            "Already set this contextual type");
-    contextualTypes[expr] = { T, purpose };
+    contextualTypes[expr] = { T, purpose, isOpaqueReturnType };
   }
 
   Optional<ContextualTypeInfo> getContextualTypeInfo(const Expr *expr) const {
@@ -2412,6 +2410,10 @@ public:
   /// Add a requirement as a constraint to the constraint system.
   void addConstraint(Requirement req, ConstraintLocatorBuilder locator,
                      bool isFavored = false);
+
+  /// Add the appropriate constraint for a contextual conversion.
+  void addContextualConversionConstraint(
+      Expr *expr, ContextualTypeInfo contextualType);
 
   /// Add a "join" constraint between a set of types, producing the common
   /// supertype.
@@ -3078,7 +3080,7 @@ public:
   /// Generate constraints for the given (unchecked) expression.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraints(Expr *E, DeclContext *dc = nullptr);
+  Expr *generateConstraints(Expr *E, DeclContext *dc);
 
   /// Generate constraints for binding the given pattern to the
   /// value of the given expression.
@@ -4036,18 +4038,13 @@ private:
   /// \param expr The expression to generate constraints from.
   /// \param convertType The expected type of the expression.
   /// \param listener The callback to check solving progress.
-  /// \param solutions The set of solutions to the system of constraints.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
-  ///
-  /// \returns Error is an error occurred, Solved is system is consistent
-  /// and solutions were found, Unsolved otherwise.
-  SolutionKind solveImpl(Expr *&expr,
-                         Type convertType,
-                         ExprTypeCheckListener *listener,
-                         SmallVectorImpl<Solution> &solutions,
-                         FreeTypeVariableBinding allowFreeTypeVariables
-                          = FreeTypeVariableBinding::Disallow);
+  SolutionResult solveImpl(Expr *&expr,
+                           Type convertType,
+                           ExprTypeCheckListener *listener,
+                           FreeTypeVariableBinding allowFreeTypeVariables
+                             = FreeTypeVariableBinding::Disallow);
 
 public:
   /// Pre-check the expression, validating any types that occur in the

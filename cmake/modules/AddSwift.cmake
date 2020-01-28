@@ -375,30 +375,6 @@ function(_add_variant_c_compile_flags)
     endforeach()
   endif()
 
-  set(ICU_UC_INCLUDE_DIR ${SWIFT_${CFLAGS_SDK}_${CFLAGS_ARCH}_ICU_UC_INCLUDE})
-  if(NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "" AND
-     NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "/usr/include" AND
-     NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}/include" AND
-     NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
-   if(SWIFT_COMPILER_IS_MSVC_LIKE)
-     list(APPEND result -I;${ICU_UC_INCLUDE_DIR})
-   else()
-     list(APPEND result -isystem;${ICU_UC_INCLUDE_DIR})
-   endif()
-  endif()
-
-  set(ICU_I18N_INCLUDE_DIR ${SWIFT_${CFLAGS_SDK}_${CFLAGS_ARCH}_ICU_I18N_INCLUDE})
-  if(NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "" AND
-     NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "/usr/include" AND
-     NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}/include" AND
-     NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
-   if(SWIFT_COMPILER_IS_MSVC_LIKE)
-     list(APPEND result -I;${ICU_I18N_INCLUDE_DIR})
-   else()
-     list(APPEND result -isystem;${ICU_I18N_INCLUDE_DIR})
-   endif()
-  endif()
-
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -1427,6 +1403,9 @@ function(_add_swift_library_single target name)
   endif()
 
   # Set compilation and link flags.
+  target_include_directories(${target} SYSTEM PRIVATE
+    ${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}
+    ${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE})
   target_compile_options(${target} PRIVATE
     ${c_compile_flags})
   target_link_options(${target} PRIVATE
@@ -1501,7 +1480,7 @@ function(_add_swift_library_single target name)
   endif()
 
   if(target_static)
-    target_link_options(${target_static} PRIVATE
+    target_compile_options(${target_static} PRIVATE
       ${c_compile_flags})
     # FIXME: The fallback paths here are going to be dynamic libraries.
 

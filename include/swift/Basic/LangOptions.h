@@ -298,8 +298,13 @@ namespace swift {
 
     /// Emit the newer, finer-grained swiftdeps file. Eventually will support
     /// faster rebuilds.
-    /// The initializer here sets the default for the frontend and driver.
     bool EnableFineGrainedDependencies = true;
+
+    /// Instead of hashing tokens inside of NominalType and ExtensionBodies into
+    /// the interface hash, hash them into per-iterable-decl-context
+    /// fingerprints. Fine-grained dependency types won't dirty every provides
+    /// in a file when the user adds a member to, e.g., a struct.
+    bool EnableTypeFingerprints = false;
 
     /// When using fine-grained dependencies, emit dot files for every swiftdeps
     /// file.

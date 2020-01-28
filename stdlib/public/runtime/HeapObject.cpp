@@ -618,9 +618,7 @@ void swift::swift_rootObjCDealloc(HeapObject *self) {
 
 #if SWIFT_OBJC_INTEROP
 static bool _check_fast_dealloc() {
-  //This will always be in libobjc, so RTLD_DEFAULT won't have to do an
-  //expensive search in practice
-  return dlsym(RTLD_DEFAULT, "_objc_has_weak_formation_callout") != nullptr;
+  return dlsym(RTLD_NEXT, "_objc_has_weak_formation_callout") != nullptr;
 }
 #endif
 

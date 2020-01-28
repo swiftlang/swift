@@ -120,6 +120,9 @@ public:
   /// Retrieve the set of solutions when there is an ambiguity.
   ArrayRef<Solution> getAmbiguousSolutions() const;
 
+  /// Take the set of solutions when there is an ambiguity.
+  MutableArrayRef<Solution> takeAmbiguousSolutions() &&;
+
   /// Whether this solution requires the client to produce a diagnostic.
   bool requiresDiagnostic() const {
     switch (kind) {

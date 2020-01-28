@@ -150,7 +150,7 @@
 // RUN: %FileCheck -check-prefix=CHECK-NO-FILEA %s < %t/output5
 
 // =============================================================================
-// Make an external change, should  recompile dependents right away with ranges
+// Make an external change, should recompile dependents right away with ranges
 // =============================================================================
 
 // RUN: cp %t/fileB{2-external-change,}.swift

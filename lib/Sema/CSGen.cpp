@@ -3831,7 +3831,8 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
 
     case StmtConditionElement::CK_Boolean: {
       Expr *condExpr = condElement.getBoolean();
-      setContextualType(condExpr, TypeLoc::withoutLoc(boolTy), CTP_Condition);
+      setContextualType(condExpr, TypeLoc::withoutLoc(boolTy), CTP_Condition,
+                        /*isOpaqueReturnType=*/false);
 
       condExpr = generateConstraints(condExpr, dc);
       if (!condExpr) {

@@ -12,7 +12,7 @@
 // CHECK-FIRST: Handled other.swift
 
 // RUN: touch -t 201401240006 %t/crash.swift
-// RUN: cd %t && not %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies-bad.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./crash.swift  ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-SECOND %s
+// RUN: cd %t && not %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies-bad.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./crash.swift  ./main.swift ./other.swift -module-name main -j1 -v 2>&1 |  %FileCheck -check-prefix=CHECK-SECOND %s
 
 // CHECK-SECOND: Handled crash.swift
 // CHECK-SECOND-NOT: Handled main.swift
@@ -20,6 +20,12 @@
 
 // RUN: %FileCheck -check-prefix=CHECK-RECORD %s < %t/main~buildrecord.swiftdeps
 
-// CHECK-RECORD-DAG: "./crash.swift": !dirty [
-// CHECK-RECORD-DAG: "./main.swift": !dirty [
+// CHECK-RECORD-DAG: "./crash.swift": !private [
+// CHECK-RECORD-DAG: "./main.swift": !private [
 // CHECK-RECORD-DAG: "./other.swift": !private [
+
+// RUN: cd %t &&  %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./crash.swift  ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-THIRD %s
+
+// CHECK-THIRD-DAG: Handled main.swift
+// CHECK-THIRD-DAG: Handled crash.swift
+// CHECK-THIRD-DAG: Handled other.swift
