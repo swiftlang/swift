@@ -1107,8 +1107,14 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   }
 
   // Apply the solution to the function body.
-  return cast_or_null<BraceStmt>(
-     cs.applySolutionToBody(solutions.front(), func));
+  if (auto result = cs.applySolution(
+          solutions.front(),
+          SolutionApplicationTarget(func),
+          /*performingDiagnostics=*/false)) {
+    return result->getFunctionBody();
+  }
+
+  return nullptr;
 }
 
 ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(

@@ -2267,16 +2267,19 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   cs.applySolution(solution);
 
   // Apply the solution to the expression.
-  result = cs.applySolution(
-      solution, result, convertType.getType(),
-      options.contains(TypeCheckExprFlags::IsDiscarded),
-      options.contains(TypeCheckExprFlags::SubExpressionDiagnostics));
-
-  if (!result) {
+  SolutionApplicationTarget target(
+      result, convertType.getType(),
+      options.contains(TypeCheckExprFlags::IsDiscarded));
+  bool performingDiagnostics =
+      options.contains(TypeCheckExprFlags::SubExpressionDiagnostics);
+  auto resultTarget = cs.applySolution(solution, target, performingDiagnostics);
+  if (!resultTarget) {
     listener.applySolutionFailed(solution, expr);
+
     // Failure already diagnosed, above, as part of applying the solution.
     return Type();
   }
+  result = resultTarget->getAsExpr();
 
   // Notify listener that we've applied the solution.
   result = listener.appliedSolution(solution, result);

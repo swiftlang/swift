@@ -4188,40 +4188,16 @@ public:
   findBestSolution(SmallVectorImpl<Solution> &solutions,
                    bool minimize);
 
-private:
-  Optional<SolutionApplicationTarget> applySolutionImpl(
-      Solution &solution, SolutionApplicationTarget target,
-      bool performingDiagnostics);
-
 public:
-  /// Apply a given solution to the expression, producing a fully
-  /// type-checked expression.
+  /// Apply a given solution to the target, producing a fully
+  /// type-checked target or \c None if an error occurred.
   ///
-  /// \param convertType the contextual type to which the
-  /// expression should be converted, if any.
-  /// \param discardedExpr if true, the result of the expression
-  /// is contextually ignored.
+  /// \param target the target to which the solution will be applied.
   /// \param performingDiagnostics if true, don't descend into bodies of
   /// non-single expression closures, or build curry thunks.
-  Expr *applySolution(Solution &solution, Expr *expr,
-                      Type convertType,
-                      bool discardedExpr,
-                      bool performingDiagnostics) {
-    auto result = applySolutionImpl(
-        solution, SolutionApplicationTarget(expr, convertType, discardedExpr),
-        performingDiagnostics);
-    if (result)
-      return result->getAsExpr();
-    return nullptr;
-  }
-
-  /// Apply a given solution to the body of the given function.
-  BraceStmt *applySolutionToBody(Solution &solution, AnyFunctionRef fn) {
-    auto result = applySolutionImpl(solution, fn, false);
-    if (result)
-      return result->getFunctionBody();
-    return nullptr;
-  }
+  Optional<SolutionApplicationTarget> applySolution(
+      Solution &solution, SolutionApplicationTarget target,
+      bool performingDiagnostics);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully

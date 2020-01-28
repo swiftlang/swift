@@ -7231,7 +7231,7 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
-Optional<SolutionApplicationTarget> ConstraintSystem::applySolutionImpl(
+Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     Solution &solution, SolutionApplicationTarget target,
     bool performingDiagnostics) {
   // If any fixes needed to be applied to arrive at this solution, resolve
