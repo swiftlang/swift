@@ -163,9 +163,12 @@ function(_add_variant_c_compile_link_flags)
   endif()
 
   if(IS_DARWIN)
+    # We collate -F with the framework path to avoid unwanted deduplication
+    # of options by target_compile_options -- this way no undesired
+    # side effects are introduced should a new search path be added.
     list(APPEND result
       "-arch" "${CFLAGS_ARCH}"
-      "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks")
+      "-F${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks")
 
     set(add_explicit_version TRUE)
 
@@ -422,8 +425,11 @@ function(_add_variant_swift_compile_flags
   endif()
 
   if(IS_DARWIN)
+    # We collate -F with the framework path to avoid unwanted deduplication
+    # of options by target_compile_options -- this way no undesired
+    # side effects are introduced should a new search path be added.
     list(APPEND result
-      "-F" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/../../../Developer/Library/Frameworks")
+      "-F${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/../../../Developer/Library/Frameworks")
   endif()
 
   is_build_type_optimized("${build_type}" optimized)
