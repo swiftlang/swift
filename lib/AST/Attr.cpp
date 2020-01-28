@@ -1360,8 +1360,17 @@ OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   Result.Platform = Platform;
   Result.Version = MovedVersion;
   Result.ModuleName = OriginalModuleName;
-  if (isPlatformActive(Platform, ctx.LangOpts)) {
+  if (isPlatformActive(Platform, ctx.LangOpts, /*TargetVariant*/false)) {
     Result.IsSimulator = ctx.LangOpts.Target.isSimulatorEnvironment();
+    return Result;
+  }
+
+  // Also check if the platform is active by using target variant. This ensures
+  // we emit linker directives for multiple platforms when building zippered
+  // libraries.
+  if (ctx.LangOpts.TargetVariant.hasValue() &&
+      isPlatformActive(Platform, ctx.LangOpts, /*TargetVariant*/true)) {
+    Result.IsSimulator = ctx.LangOpts.TargetVariant->isSimulatorEnvironment();
     return Result;
   }
   return None;
