@@ -681,7 +681,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByLazyVariableInitializer(
     finishLookingInContext(
       AddGenericParameters::Yes,
       patternContainer,
-      Loc,
+      PBI->getLocForLookupInParent(Loc),
       ResultFinderForTypeContext(this, PBI, patternContainer),
       resolveIsCascadingUse(PBI, isCascadingUse,
                            /*onlyCareAboutFunctionBody=*/false),
@@ -701,7 +701,7 @@ void UnqualifiedLookupFactory::
   finishLookingInContext(
     AddGenericParameters::Yes,
     storedPropertyContainer,
-    Loc,
+    PBI->getLocForLookupInParent(Loc),
     ResultFinderForTypeContext(
       this, storedPropertyContainer, storedPropertyContainer),
     resolveIsCascadingUse(storedPropertyContainer, None,
@@ -778,7 +778,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMemberFunction(
       finishLookingInContext(
         AddGenericParameters::Yes,
         AFD->getParent(),
-        Loc,
+        AFD->getLocForLookupInParent(Loc),
         ResultFinderForTypeContext(this, BaseDC, fnDeclContext),
         isCascadingUse,
         NULL);
@@ -789,6 +789,9 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMemberFunction(
 void UnqualifiedLookupFactory::lookupNamesIntroducedByPureFunction(
     AbstractFunctionDecl *AFD, SourceLoc Loc, bool isCascadingUse,
     DeclContext *capturedSelfContext) {
+//  llvm::errs() << "- lookupNamesIntroducedByPureFunction: ";
+//  AFD->dumpRef(llvm::errs());
+//  llvm::errs() << "\n";
   lookForLocalVariablesIn(AFD, Loc, isCascadingUse);
   ifNotDoneYet([&] {
     // clang-format off
@@ -798,6 +801,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByPureFunction(
                            None,
                            isCascadingUse,
                            capturedSelfContext);
+    // clang-format on
   });
 }
 
@@ -854,8 +858,9 @@ void UnqualifiedLookupFactory::
         Optional<bool> isCascadingUse, DeclContext *capturedSelfContext) {
   // In a default argument, skip immediately out of both the
   // initializer and the function.
-  finishLookingInContext(AddGenericParameters::No, I->getParent(), Loc, None,
-                         false, capturedSelfContext);
+  finishLookingInContext(AddGenericParameters::No, I->getParent(),
+                         I->getLocForLookupInParent(Loc),
+                         None, false, capturedSelfContext);
 }
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByMiscContext(
@@ -904,7 +909,8 @@ void UnqualifiedLookupFactory::finishLookingInContext(
     [&] {
       lookupNamesIntroducedBy(ContextAndUnresolvedIsCascadingUse{
         lookupContextForThisContext->getParentForLookup(), isCascadingUse},
-        Loc, capturedSelfContext);
+        lookupContextForThisContext->getLocForLookupInParent(Loc),
+        capturedSelfContext);
     });
 }
 

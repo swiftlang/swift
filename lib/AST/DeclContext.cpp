@@ -258,6 +258,23 @@ DeclContext *DeclContext::getParentForLookup() const {
   return getParent();
 }
 
+SourceLoc DeclContext::getLocForLookupInParent(SourceLoc loc) const {
+  if (auto *D = getAsDecl()) {
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      // (In code completions,) the body of the AFD might be parsed from another
+      // source buffer. To avoid comparing SourceLocs between different buffers,
+      // use the location of the decl itself for lookup in parent context.
+      auto &SM = getASTContext().SourceMgr;
+      if (SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), loc))
+        return AFD->getLoc();
+    }
+  }
+
+  // Otherwise, we don't need to adjust the location.
+  return loc;
+}
+
+
 ModuleDecl *DeclContext::getParentModule() const {
   const DeclContext *DC = this;
   while (!DC->isModuleContext())

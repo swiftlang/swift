@@ -430,6 +430,12 @@ public:
   /// Returns the semantic parent for purposes of name lookup.
   DeclContext *getParentForLookup() const;
 
+  /// Returns the semantic location for the purposes of name lookup in the
+  /// parent context.
+  ///
+  /// \param loc is the location used for lookup inside *this* context.
+  SourceLoc getLocForLookupInParent(SourceLoc loc) const;
+
   /// Return true if this is a child of the specified other decl context.
   bool isChildContextOf(const DeclContext *Other) const {
     if (this == Other) return false;
