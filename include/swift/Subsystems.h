@@ -383,6 +383,12 @@ namespace swift {
   /// ASTContext.
   void registerTypeCheckerRequestFunctions(Evaluator &evaluator);
 
+  /// Register SILGen-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any SIL generation
+  /// should call this functions after forming the ASTContext.
+  void registerSILGenRequestFunctions(Evaluator &evaluator);
+
   /// Register IDE-level request functions with the evaluator.
   ///
   /// The ASTContext will automatically call these upon construction.

@@ -208,6 +208,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
       ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
   registerIDERequestFunctions(Ctx->evaluator);
   registerTypeCheckerRequestFunctions(Ctx->evaluator);
+  registerSILGenRequestFunctions(Ctx->evaluator);
   ModuleDecl *M = ModuleDecl::create(Identifier(), *Ctx);
   PersistentParserState newState;
   SourceFile *newSF =
