@@ -6527,7 +6527,6 @@ bool SILParserTUState::parseSILCoverageMap(Parser &P) {
           State.parseInteger(StartCol, diag::sil_coverage_expected_loc) ||
           P.parseToken(tok::arrow, diag::sil_coverage_expected_arrow) ||
           State.parseInteger(EndLine, diag::sil_coverage_expected_loc) ||
-          P.parseToken(tok::colon, diag::sil_coverage_expected_loc) ||
           State.parseInteger(EndCol, diag::sil_coverage_expected_loc)) {
         BodyHasError = true;
         break;
