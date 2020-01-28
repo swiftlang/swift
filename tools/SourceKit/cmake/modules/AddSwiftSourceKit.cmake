@@ -71,6 +71,12 @@ function(add_sourcekit_default_compiler_flags target)
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
 
   # Set compilation and link flags.
+  if(${SWIFT_HOST_VARIANT_SDK} STREQUAL WINDOWS)
+    swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH}
+      ${SWIFT_HOST_VARIANT_ARCH}_INCLUDE)
+    target_include_directories(${target} SYSTEM PRIVATE
+      ${${SWIFT_HOST_VARIANT_ARCH}_INCLUDE})
+  endif()
   target_compile_options(${target} PRIVATE
     -fblocks)
   target_link_options(${target} PRIVATE
