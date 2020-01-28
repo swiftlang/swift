@@ -911,3 +911,17 @@ func interpretMetaTypeCast() -> Bool {
 func interpretMetaTypeCast2() -> Bool {
   return testMetaTypeCast(((Int) -> Int).self)
 }
+
+// CHECK-LABEL: @testBinaryIntegerDescription
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testBinaryIntegerDescription<T: BinaryInteger>(_ x: T) -> String {
+  return x.description
+}
+
+@_semantics("test_driver")
+func interpretBinaryIntegerDescription() -> String {
+  var str = testBinaryIntegerDescription(-10)
+  str += testBinaryIntegerDescription(UInt(20))
+  return str
+}
