@@ -1936,6 +1936,29 @@ public:
   bool diagnoseAsError();
 };
 
+/// Diagnose an attempt to reference a top-level name shadowed by a local
+/// member e.g.
+///
+/// ```swift
+/// extension Sequence {
+///   func test() -> Int {
+///     return max(1, 2)
+///   }
+/// }
+/// ```
+///
+/// Here `max` refers to a global function `max<T>(_: T, _: T)` in `Swift`
+/// module and can only be accessed by adding `Swift.` to it, because `Sequence`
+/// has a member named `max` which accepts a single argument.
+class MissingQuialifierInMemberRefFailure final : public FailureDiagnostic {
+public:
+  MissingQuialifierInMemberRefFailure(ConstraintSystem &cs,
+                                      ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator) {}
+
+  bool diagnoseAsError();
+};
+
 } // end namespace constraints
 } // end namespace swift
 

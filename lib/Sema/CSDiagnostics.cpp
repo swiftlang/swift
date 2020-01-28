@@ -6117,3 +6117,45 @@ bool UnableToInferProtocolLiteralType::diagnoseAsError() {
 
   return true;
 }
+
+bool MissingQuialifierInMemberRefFailure::diagnoseAsError() {
+  auto selectedOverload = getOverloadChoiceIfAvailable(getLocator());
+  if (!selectedOverload)
+    return false;
+
+  auto *UDE = cast<UnresolvedDotExpr>(getRawAnchor());
+
+  auto baseType = getType(UDE->getBase());
+
+  auto methodKind = baseType->isAnyExistentialType()
+                        ? DescriptiveDeclKind::StaticMethod
+                        : DescriptiveDeclKind::Method;
+
+  auto choice = selectedOverload->choice.getDeclOrNull();
+  if (!choice)
+    return false;
+
+  auto *DC = choice->getDeclContext();
+  if (!(DC->isModuleContext() || DC->isModuleScopeContext())) {
+    emitDiagnostic(UDE->getLoc(), diag::member_shadows_function, UDE->getName(),
+                   methodKind, choice->getDescriptiveKind(),
+                   choice->getFullName());
+    return true;
+  }
+
+  auto qualifier = DC->getParentModule()->getName();
+
+  emitDiagnostic(UDE->getLoc(), diag::member_shadows_global_function,
+                 UDE->getName(), methodKind, choice->getDescriptiveKind(),
+                 choice->getFullName(), qualifier);
+
+  SmallString<32> namePlusDot = qualifier.str();
+  namePlusDot.push_back('.');
+
+  emitDiagnostic(UDE->getLoc(), diag::fix_unqualified_access_top_level_multi,
+                 namePlusDot, choice->getDescriptiveKind(), qualifier)
+      .fixItInsert(UDE->getStartLoc(), namePlusDot);
+
+  emitDiagnostic(choice, diag::decl_declared_here, choice->getFullName());
+  return true;
+}
