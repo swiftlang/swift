@@ -1234,8 +1234,6 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
   if (auto generatedExpr = generateConstraints(expr, DC))
     expr = generatedExpr;
   else {
-    if (listener)
-      listener->constraintGenerationFailed(expr);
     return SolutionResult::forError();
   }
 

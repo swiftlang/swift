@@ -2036,7 +2036,6 @@ Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
 }
 
 void ExprTypeCheckListener::preCheckFailed(Expr *expr) {}
-void ExprTypeCheckListener::constraintGenerationFailed(Expr *expr) {}
 void ExprTypeCheckListener::applySolutionFailed(Solution &solution,
                                                 Expr *expr) {}
 
@@ -2101,12 +2100,6 @@ public:
   void preCheckFailed(Expr *expr) override {
     if (BaseListener)
       BaseListener->preCheckFailed(expr);
-    maybeProduceFallbackDiagnostic(expr);
-  }
-
-  void constraintGenerationFailed(Expr *expr) override {
-    if (BaseListener)
-      BaseListener->constraintGenerationFailed(expr);
     maybeProduceFallbackDiagnostic(expr);
   }
 

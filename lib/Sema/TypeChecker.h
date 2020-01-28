@@ -325,10 +325,6 @@ public:
   /// be correctly processed by the constraint solver.
   virtual void preCheckFailed(Expr *expr);
 
-  /// Callback invoked if constraint system failed to generate
-  /// constraints for a given expression.
-  virtual void constraintGenerationFailed(Expr *expr);
-
   /// Callback invoked if application of chosen solution to
   /// expression has failed.
   virtual void applySolutionFailed(constraints::Solution &solution, Expr *expr);
