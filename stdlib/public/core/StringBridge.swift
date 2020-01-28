@@ -482,10 +482,7 @@ extension String {
   }
 }
 
-@available(macOS, introduced: 9999, deprecated)
-@available(iOS, introduced: 9999, deprecated)
-@available(watchOS, introduced: 9999, deprecated)
-@available(tvOS, introduced: 9999, deprecated)
+@_availableRef(_Stdlib_Dev)
 @available(*, deprecated)
 @_cdecl("_SwiftCreateBridgedString")
 @usableFromInline
@@ -528,7 +525,7 @@ public func _getDescription<T>(_ x: T) -> AnyObject {
 
 @_silgen_name("swift_stdlib_NSStringFromUTF8")
 @usableFromInline //this makes the symbol available to the runtime :(
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@_availableRef(_Stdlib_Dev)
 internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
   -> AnyObject {
   return String(

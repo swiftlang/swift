@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A class of types whose instances hold the value of an entity with stable identity.
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@_availableRef(_Stdlib_5_1)
 public protocol Identifiable {
 
   /// A type representing the stable identity of the entity associated with `self`.
@@ -21,7 +21,7 @@ public protocol Identifiable {
   var id: ID { get }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@_availableRef(_Stdlib_5_1)
 extension Identifiable where Self: AnyObject {
   public var id: ObjectIdentifier {
     return ObjectIdentifier(self)
