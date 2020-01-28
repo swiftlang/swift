@@ -2062,38 +2062,6 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
   return false;
 }
 
-/// Sometimes constraint solver fails without producing any diagnostics,
-/// that leads to crashes down the line in AST Verifier or SILGen
-/// which, as a result, are much harder to figure out.
-///
-/// This class is intended to guard against situations like that by
-/// keeping track of failures of different type-check phases, and
-/// emitting fallback fatal error if any of them fail without producing
-/// error diagnostic, and there were no errors emitted or scheduled to be
-/// emitted previously.
-class FallbackDiagnosticListener : public ExprTypeCheckListener {
-  ASTContext &Context;
-  TypeCheckExprOptions Options;
-  ExprTypeCheckListener *BaseListener;
-
-public:
-  FallbackDiagnosticListener(ASTContext &ctx, TypeCheckExprOptions options,
-                             ExprTypeCheckListener *base)
-      : Context(ctx), Options(options), BaseListener(base) {}
-
-  bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
-    return BaseListener ? BaseListener->builtConstraints(cs, expr) : false;
-  }
-
-  Expr *foundSolution(Solution &solution, Expr *expr) override {
-    return BaseListener ? BaseListener->foundSolution(solution, expr) : expr;
-  }
-
-  Expr *appliedSolution(Solution &solution, Expr *expr) override {
-    return BaseListener ? BaseListener->appliedSolution(solution, expr) : expr;
-  }
-};
-
 #pragma mark High-level entry points
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,
@@ -2101,18 +2069,6 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeCheckExprOptions options,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
-  auto &Context = dc->getASTContext();
-  FallbackDiagnosticListener diagListener(Context, options, listener);
-  return typeCheckExpressionImpl(expr, dc, convertType, convertTypePurpose,
-                                 options, diagListener, baseCS);
-}
-
-Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
-                                          TypeLoc convertType,
-                                          ContextualTypePurpose convertTypePurpose,
-                                          TypeCheckExprOptions options,
-                                          ExprTypeCheckListener &listener,
-                                          ConstraintSystem *baseCS) {
   auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
@@ -2188,7 +2144,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
 
   SmallVector<Solution, 4> viable;
   // Attempt to solve the constraint system.
-  if (cs.solve(expr, convertTo, &listener, viable, allowFreeTypeVariables))
+  if (cs.solve(expr, convertTo, listener, viable, allowFreeTypeVariables))
     return Type();
 
   // If the client allows the solution to have unresolved type expressions,
@@ -2202,7 +2158,8 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
 
   auto result = expr;
   auto &solution = viable[0];
-  result = listener.foundSolution(solution, result);
+  if (listener)
+    result = listener->foundSolution(solution, result);
   if (!result)
     return Type();
 
@@ -2223,7 +2180,8 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   result = resultTarget->getAsExpr();
 
   // Notify listener that we've applied the solution.
-  result = listener.appliedSolution(solution, result);
+  if (listener)
+    result = listener->appliedSolution(solution, result);
   if (!result)
     return Type();
 

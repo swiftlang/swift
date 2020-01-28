@@ -856,15 +856,6 @@ public:
                                             TypeCheckExprOptions(), listener);
   }
 
-private:
-  static Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
-                                      TypeLoc convertType,
-                                      ContextualTypePurpose convertTypePurpose,
-                                      TypeCheckExprOptions options,
-                                      ExprTypeCheckListener &listener,
-                                      constraints::ConstraintSystem *baseCS);
-
-public:
   /// Type check the given expression and return its type without
   /// applying the solution.
   ///
