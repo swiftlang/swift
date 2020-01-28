@@ -1184,7 +1184,9 @@ bool ConstraintSystem::solve(Expr *&expr,
       }
 
       if (stage == 1) {
-        diagnoseFailureFor(expr);
+        diagnoseFailureFor(
+            SolutionApplicationTarget(expr, convertType,
+                                      /*isDiscarded=*/false));
         solution.markAsDiagnosed();
         return true;
       }

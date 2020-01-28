@@ -1146,7 +1146,15 @@ class SolutionApplicationTarget {
   } kind;
 
   union {
-    Expr *expression;
+    struct {
+      Expr *expression;
+
+      /// The type to which the expression should be converted.
+      Type convertType;
+
+      /// Whether the expression result will be discarded at the end.
+      bool isDiscarded;
+    } expression;
 
     struct {
       AnyFunctionRef function;
@@ -1155,9 +1163,11 @@ class SolutionApplicationTarget {
   };
 
 public:
-  SolutionApplicationTarget(Expr *expr) {
+  SolutionApplicationTarget(Expr *expr, Type convertType, bool isDiscarded) {
     kind = Kind::expression;
-    expression = expr;
+    expression.expression = expr;
+    expression.convertType = convertType;
+    expression.isDiscarded = isDiscarded;
   }
 
   SolutionApplicationTarget(AnyFunctionRef fn)
@@ -1172,16 +1182,26 @@ public:
   Expr *getAsExpr() const {
     switch (kind) {
     case Kind::expression:
-      return expression;
+      return expression.expression;
 
     case Kind::function:
       return nullptr;
     }
   }
 
+  Type getExprConversionType() const {
+    assert(kind == Kind::expression);
+    return expression.convertType;
+  }
+
+  bool isDiscardedExpr() const {
+    assert(kind == Kind::expression);
+    return expression.isDiscarded;
+  }
+
   void setExpr(Expr *expr) {
     assert(kind == Kind::expression);
-    expression = expr;
+    expression.expression = expr;
   }
 
   Optional<AnyFunctionRef> getAsFunction() const {
@@ -4171,7 +4191,7 @@ public:
 private:
   Optional<SolutionApplicationTarget> applySolutionImpl(
       Solution &solution, SolutionApplicationTarget target,
-      Type convertType, bool discardedExpr, bool performingDiagnostics);
+      bool performingDiagnostics);
 
 public:
   /// Apply a given solution to the expression, producing a fully
@@ -4188,7 +4208,8 @@ public:
                       bool discardedExpr,
                       bool performingDiagnostics) {
     auto result = applySolutionImpl(
-        solution, expr, convertType, discardedExpr, performingDiagnostics);
+        solution, SolutionApplicationTarget(expr, convertType, discardedExpr),
+        performingDiagnostics);
     if (result)
       return result->getAsExpr();
     return nullptr;
@@ -4196,7 +4217,7 @@ public:
 
   /// Apply a given solution to the body of the given function.
   BraceStmt *applySolutionToBody(Solution &solution, AnyFunctionRef fn) {
-    auto result = applySolutionImpl(solution, fn, Type(), false, false);
+    auto result = applySolutionImpl(solution, fn, false);
     if (result)
       return result->getFunctionBody();
     return nullptr;

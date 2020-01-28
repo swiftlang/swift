@@ -7232,8 +7232,8 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
 Optional<SolutionApplicationTarget> ConstraintSystem::applySolutionImpl(
-    Solution &solution, SolutionApplicationTarget target, Type convertType,
-    bool discardedExpr, bool performingDiagnostics) {
+    Solution &solution, SolutionApplicationTarget target,
+    bool performingDiagnostics) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
@@ -7316,9 +7316,11 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolutionImpl(
   if (auto resultExpr = result.getAsExpr()) {
     Expr *expr = target.getAsExpr();
     assert(expr && "Can't have expression result without expression target");
+
     // We are supposed to use contextual type only if it is present and
     // this expression doesn't represent the implicit return of the single
     // expression function which got deduced to be `Never`.
+    Type convertType = target.getExprConversionType();
     auto shouldCoerceToContextualType = [&]() {
       return convertType &&
           !(getType(resultExpr)->isUninhabited() &&
@@ -7331,7 +7333,8 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolutionImpl(
     if (shouldCoerceToContextualType()) {
       resultExpr = rewriter.coerceToType(resultExpr, convertType,
                                          getConstraintLocator(expr));
-    } else if (getType(resultExpr)->hasLValueType() && !discardedExpr) {
+    } else if (getType(resultExpr)->hasLValueType() &&
+               !target.isDiscardedExpr()) {
       // We referenced an lvalue. Load it.
       resultExpr = rewriter.coerceToType(resultExpr,
                                          getType(resultExpr)->getRValueType(),
@@ -7517,8 +7520,11 @@ MutableArrayRef<Solution> SolutionResult::takeAmbiguousSolutions() && {
 
 SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
   switch (kind) {
-  case Kind::expression:
-    return getAsExpr()->walk(walker);
+  case Kind::expression: {
+    SolutionApplicationTarget result = *this;
+    result.setExpr(getAsExpr()->walk(walker));
+    return result;
+  }
 
   case Kind::function:
     return SolutionApplicationTarget(
