@@ -107,22 +107,33 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
 /// A type-erased hashable value.
 ///
 /// The `AnyHashable` type forwards equality comparisons and hashing operations
-/// to an underlying hashable value, hiding its specific underlying type.
+/// to an underlying hashable value, hiding the type of the wrapped value.
 ///
 /// You can store mixed-type keys in dictionaries and other collections that
 /// require `Hashable` conformance by wrapping mixed-type keys in
 /// `AnyHashable` instances:
 ///
 ///     let descriptions: [AnyHashable: Any] = [
-///         AnyHashable("😄"): "emoji",
 ///         AnyHashable(42): "an Int",
 ///         AnyHashable(Int8(43)): "an Int8",
 ///         AnyHashable(Set(["a", "b"])): "a set of strings"
 ///     ]
-///     print(descriptions[AnyHashable(42)]!)      // prints "an Int"
-///     print(descriptions[AnyHashable(45)])       // prints "nil"
+///     print(descriptions[AnyHashable(42)]!)       // prints "an Int"
+///     print(descriptions[AnyHashable(Int8(42))]!) // prints "an Int"
 ///     print(descriptions[AnyHashable(Int8(43))]!) // prints "an Int8"
+///     print(descriptions[AnyHashable(44)])        // prints "nil"
 ///     print(descriptions[AnyHashable(Set(["a", "b"]))]!) // prints "a set of strings"
+///
+/// If the wrapped value is of a type that can be bridged using `as` to a
+/// different but compatible class defined in Foundation, or vice versa, then
+/// the underlying hashable value to which operations are forwarded might not be
+/// of the wrapped type itself but of a transitively bridged type:
+///
+///     let x: AnyHashable = [1, 2, 3] as NSArray
+///     let y: AnyHashable = [1, 2, 3] as [Double]
+///     let z: AnyHashable = [1, 2, 3] as [Int8]
+///     print(x == y, x.hashValue == y.hashValue) // prints "true true"
+///     print(y == z, y.hashValue == z.hashValue) // prints "true true"
 @frozen
 public struct AnyHashable {
   internal var _box: _AnyHashableBox
@@ -189,11 +200,21 @@ public struct AnyHashable {
 
 extension AnyHashable: Equatable {
   /// Returns a Boolean value indicating whether two type-erased hashable
-  /// instances wrap the same type and value.
+  /// instances wrap the same value.
   ///
   /// Two instances of `AnyHashable` compare as equal if and only if the
   /// underlying types have the same conformance to the `Equatable` protocol
   /// and the underlying values compare as equal.
+  ///
+  /// If the wrapped values are of a type that can be bridged using `as` to a
+  /// different but compatible class defined in Foundation, or vice versa, then
+  /// the underlying values compared might not be of the wrapped type itself but
+  /// of a transitively bridged type:
+  ///
+  ///     let a = (42 as NSNumber as AnyHashable)
+  ///     let b = (42 as Double as AnyHashable)
+  ///     let c = (42 as Int8 as AnyHashable)
+  ///     print(a == b, b == c, a == c) // prints "true true true"
   ///
   /// - Parameters:
   ///   - lhs: A type-erased hashable value.
