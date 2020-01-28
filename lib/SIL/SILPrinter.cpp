@@ -632,7 +632,8 @@ public:
               auto Buffer = SM.findBufferContainingLoc(CurSourceLoc);
               auto Line = SM.getLineNumber(CurSourceLoc);
               auto LineLength = SM.getLineLength(Buffer, Line);
-              PrintState.OS << "  // " << SM.extractText({SM.getLocForLineCol(Buffer, Line, 0), LineLength.getValueOr(0)}) << "\n";
+              PrintState.OS << "  // " << SM.extractText({SM.getLocForLineCol(Buffer, Line, 0), LineLength.getValueOr(0)}) <<
+              "\tSourceLoc: " << SM.getDisplayNameForLoc(CurSourceLoc) << ":" << Line << "\n";
               PrevLoc = I.getLoc();
           }
         }
