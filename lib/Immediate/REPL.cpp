@@ -187,11 +187,7 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
     REPLInputFile.addImports(ImportsWithOptions);
   }
 
-  bool Done;
-  do {
-    parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
-                        &PersistentState);
-  } while (!Done);
+  parseIntoSourceFile(REPLInputFile, BufferID, &PersistentState);
   performTypeChecking(REPLInputFile);
   return REPLModule;
 }

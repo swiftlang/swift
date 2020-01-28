@@ -198,53 +198,33 @@ void Parser::parseTopLevel() {
 
   // Parse the body of the file.
   SmallVector<ASTNode, 128> Items;
+  while (!Tok.is(tok::eof)) {
+    // If we run into a SIL decl, skip over until the next Swift decl. We need
+    // to delay parsing these, as SIL parsing currently requires type checking
+    // Swift decls.
+    if (isStartOfSILDecl()) {
+      assert(!isStartOfSwiftDecl() && "Start of both a Swift and SIL decl?");
+      skipSILUntilSwiftDecl();
+      continue;
+    }
 
-  // If we are in SIL mode, and if the first token is the start of a sil
-  // declaration, parse that one SIL function and return to the top level.  This
-  // allows type declarations and other things to be parsed, name bound, and
-  // type checked in batches, similar to immediate mode.  This also enforces
-  // that SIL bodies can only be at the top level.
-  switch (Tok.getKind()) {
-  default:
     parseBraceItems(Items, allowTopLevelCode()
                                ? BraceItemListKind::TopLevelCode
                                : BraceItemListKind::TopLevelLibrary);
-    break;
 
-// For now, create 'UnknownDecl' for all SIL declarations.
-#define CASE_SIL(KW, NAME)                                                     \
-  case tok::kw_##KW: {                                                         \
-    assert(isInSILMode() && "'" #KW "' should only be a keyword in SIL mode"); \
-    SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);   \
-    SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);     \
-    SIL->parse##NAME(*this);                                                   \
-    break;                                                                     \
-  }
-    CASE_SIL(sil, DeclSIL)
-    CASE_SIL(sil_stage, DeclSILStage)
-    CASE_SIL(sil_vtable, SILVTable)
-    CASE_SIL(sil_global, SILGlobal)
-    CASE_SIL(sil_witness_table, SILWitnessTable)
-    CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
-    CASE_SIL(sil_differentiability_witness, SILDifferentiabilityWitness)
-    CASE_SIL(sil_coverage_map, SILCoverageMap)
-    CASE_SIL(sil_property, SILProperty)
-    CASE_SIL(sil_scope, SILScope)
-#undef CASE_SIL
-  }
-  
-  // In the case of a catastrophic parse error, consume any trailing
-  // #else, #elseif, or #endif and move on to the next statement or declaration
-  // block.
-  if (Tok.is(tok::pound_else) || Tok.is(tok::pound_elseif) ||
-      Tok.is(tok::pound_endif)) {
-    diagnose(Tok.getLoc(),
-             diag::unexpected_conditional_compilation_block_terminator);
-    // Create 'UnknownDecl' for orphan directives.
-    SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
-    SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);
+    // In the case of a catastrophic parse error, consume any trailing
+    // #else, #elseif, or #endif and move on to the next statement or
+    // declaration block.
+    if (Tok.is(tok::pound_else) || Tok.is(tok::pound_elseif) ||
+        Tok.is(tok::pound_endif)) {
+      diagnose(Tok.getLoc(),
+               diag::unexpected_conditional_compilation_block_terminator);
+      // Create 'UnknownDecl' for orphan directives.
+      SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
+      SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);
 
-    consumeToken();
+      consumeToken();
+    }
   }
 
   // Add newly parsed decls to the module.
@@ -264,10 +244,60 @@ void Parser::parseTopLevel() {
   State->markParserPosition(getParserPosition(),
                             InPoundLineEnvironment);
 
-  // If we are done parsing the whole file, finalize the token receiver.
-  if (Tok.is(tok::eof)) {
-    SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
-    TokReceiver->finalize();
+  // Finalize the token receiver.
+  SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
+  TokReceiver->finalize();
+}
+
+void Parser::parseTopLevelSIL() {
+  assert(SIL && isInSILMode());
+
+  // Prime the lexer.
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeTokenWithoutFeedingReceiver();
+
+  auto skipToNextSILDecl = [&]() {
+    while (!Tok.is(tok::eof) && !isStartOfSILDecl())
+      skipSingle();
+  };
+
+  while (!Tok.is(tok::eof)) {
+    // If we run into a Swift decl, skip over until we find the next SIL decl.
+    if (isStartOfSwiftDecl()) {
+      assert(!isStartOfSILDecl() && "Start of both a Swift and SIL decl?");
+      skipToNextSILDecl();
+      continue;
+    }
+
+    switch (Tok.getKind()) {
+#define CASE_SIL(KW, NAME)                                                     \
+    case tok::kw_##KW: {                                                       \
+      /* If we failed to parse a SIL decl, move onto the next SIL decl to      \
+         better help recovery. */                                              \
+      if (SIL->parse##NAME(*this)) {                                           \
+        Lexer::SILBodyRAII sbr(*L);                                            \
+        skipToNextSILDecl();                                                   \
+      }                                                                        \
+      break;                                                                   \
+    }
+    CASE_SIL(sil, DeclSIL)
+    CASE_SIL(sil_stage, DeclSILStage)
+    CASE_SIL(sil_vtable, SILVTable)
+    CASE_SIL(sil_global, SILGlobal)
+    CASE_SIL(sil_witness_table, SILWitnessTable)
+    CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
+    CASE_SIL(sil_differentiability_witness, SILDifferentiabilityWitness)
+    CASE_SIL(sil_coverage_map, SILCoverageMap)
+    CASE_SIL(sil_property, SILProperty)
+    CASE_SIL(sil_scope, SILScope)
+#undef CASE_SIL
+    default:
+      // If we reached here, we have something malformed that isn't a Swift decl
+      // or a SIL decl. Emit an error and skip ahead to the next SIL decl.
+      diagnose(Tok, diag::expected_sil_keyword);
+      skipToNextSILDecl();
+      break;
+    }
   }
 }
 
@@ -3415,6 +3445,30 @@ bool Parser::isStartOfSwiftDecl() {
   return isStartOfSwiftDecl();
 }
 
+bool Parser::isStartOfSILDecl() {
+  switch (Tok.getKind()) {
+  case tok::kw_sil:
+  case tok::kw_sil_stage:
+  case tok::kw_sil_property:
+  case tok::kw_sil_vtable:
+  case tok::kw_sil_global:
+  case tok::kw_sil_witness_table:
+  case tok::kw_sil_default_witness_table:
+  case tok::kw_sil_differentiability_witness:
+  case tok::kw_sil_coverage_map:
+  case tok::kw_sil_scope:
+    // SIL decls must start on a new line.
+    return Tok.isAtStartOfLine();
+  case tok::kw_undef:
+  case tok::NUM_TOKENS:
+    return false;
+#define SIL_KEYWORD(Name)
+#define TOKEN(Name) case tok:: Name: return false;
+#include "swift/Syntax/TokenKinds.def"
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
 void Parser::consumeDecl(ParserPosition BeginParserPosition,
                          ParseDeclOptions Flags,
                          bool IsTopLevel) {
@@ -5160,6 +5214,41 @@ bool Parser::skipBracedBlock() {
   if (consumeIf(tok::r_brace))
     OpenBraces--;
   return OpenBraces != 0;
+}
+
+void Parser::skipSILUntilSwiftDecl() {
+  // For now, create 'UnknownDecl' for all SIL declarations.
+  SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
+  SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);
+
+  // Tell the lexer we're about to start lexing SIL.
+  Lexer::SILBodyRAII sbr(*L);
+
+  // Enter a top-level scope. This is necessary as parseType may need to setup
+  // child scopes for generic params.
+  Scope topLevel(this, ScopeKind::TopLevel);
+
+  while (!Tok.is(tok::eof) && !isStartOfSwiftDecl()) {
+    // SIL pound dotted paths need to be skipped specially as they can contain
+    // decl keywords like 'subscript'.
+    if (consumeIf(tok::pound)) {
+      do {
+        consumeToken();
+      } while (consumeIf(tok::period));
+      continue;
+    }
+
+    // SIL types need to be skipped specially as they can contain attributes on
+    // tuples which can look like decl attributes.
+    if (consumeIf(tok::sil_dollar)) {
+      if (Tok.isAnyOperator() && Tok.getText().startswith("*")) {
+        consumeStartingCharacterOfCurrentToken();
+      }
+      (void)parseType();
+      continue;
+    }
+    skipSingle();
+  }
 }
 
 /// Returns a descriptive name for the given accessor/addressor kind.

@@ -558,6 +558,8 @@ Parser::~Parser() {
   delete SyntaxContext;
 }
 
+bool Parser::isInSILMode() const { return SF.Kind == SourceFileKind::SIL; }
+
 bool Parser::allowTopLevelCode() const {
   return SF.isScriptMode();
 }
@@ -1238,11 +1240,7 @@ ParserUnit::~ParserUnit() {
 
 OpaqueSyntaxNode ParserUnit::parse() {
   auto &P = getParser();
-  bool Done = false;
-  while (!Done) {
-    P.parseTopLevel();
-    Done = P.Tok.is(tok::eof);
-  }
+  P.parseTopLevel();
   return P.finalizeSyntaxTree();
 }
 
