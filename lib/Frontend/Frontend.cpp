@@ -212,6 +212,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
       Invocation.getSearchPathOptions(), SourceMgr, Diagnostics));
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
+  registerSILGenRequestFunctions(Context->evaluator);
 
   // Migrator, indexing and typo correction need some IDE requests.
   // The integrated REPL needs IDE requests for completion.
