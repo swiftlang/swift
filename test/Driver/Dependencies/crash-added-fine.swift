@@ -17,7 +17,7 @@
 // CHECK-ADDED: Handled crash.swift
 // CHECK-ADDED-NOT: Handled
 
-// CHECK-RECORD-ADDED-DAG: "./crash.swift": !dirty [
+// CHECK-RECORD-ADDED-DAG: "./crash.swift": !private [
 // CHECK-RECORD-ADDED-DAG: "./main.swift": [
 // CHECK-RECORD-ADDED-DAG: "./other.swift": [
 
@@ -30,3 +30,10 @@
 
 // RUN: cd %t && not %swiftc_driver -c -enable-fine-grained-dependencies -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies-bad.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./crash.swift ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-ADDED %s
 // RUN: %FileCheck -check-prefix=CHECK-RECORD-ADDED %s < %t/main~buildrecord.swiftdeps
+
+
+// RUN: cd %t &&  %swiftc_driver -c -enable-fine-grained-dependencies -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./crash.swift ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-FIXED %s
+
+// CHECK-FIXED-DAG: Handled crash.swift
+// CHECK-FIXED-DAG: Handled main.swift
+// CHECK-FIXED-DAG: Handled other.swift

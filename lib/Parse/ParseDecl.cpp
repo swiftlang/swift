@@ -3912,7 +3912,8 @@ static ScopeKind getMemberParseScopeKind(IterableDeclContext *idc) {
   }
 }
 
-std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
+std::pair<std::vector<Decl *>, Optional<std::string>>
+Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   Decl *D = const_cast<Decl*>(IDC->getDecl());
   DeclContext *DC = cast<DeclContext>(D);
   SourceRange BodyRange;
@@ -3925,7 +3926,7 @@ std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
 
   if (BodyRange.isInvalid()) {
     assert(D->isImplicit());
-    return { };
+    return {std::vector<Decl *>(), None};
   }
 
   auto BeginParserPosition = getParserPosition({BodyRange.Start, SourceLoc()});
@@ -3951,7 +3952,7 @@ std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   // If there is no left brace, then return an empty list of declarations;
   // we will have already diagnosed this.
   if (!Tok.is(tok::l_brace))
-    return { };
+    return {std::vector<Decl *>(), None};
 
   // Re-enter the lexical scope. The top-level scope is needed because
   // delayed parsing of members happens with a fresh parser, where there is
@@ -4329,13 +4330,15 @@ bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
     // evaluator.
     bool hadError = false;
     ParseDeclOptions Options = getMemberParseDeclOptions(IDC);
-    auto members = parseDeclList(
-        LBLoc, RBLoc, ErrorDiag, Options, IDC, hadError);
+    auto membersAndHash =
+        parseDeclList(LBLoc, RBLoc, ErrorDiag, Options, IDC, hadError);
     IDC->setMaybeHasOperatorDeclarations();
     IDC->setMaybeHasNestedClassDeclarations();
     Context.evaluator.cacheOutput(
         ParseMembersRequest{IDC},
-        Context.AllocateCopy(llvm::makeArrayRef(members)));
+        FingerprintAndMembers{
+            membersAndHash.second,
+            Context.AllocateCopy(llvm::makeArrayRef(membersAndHash.first))});
 
     if (hadError)
       return true;
@@ -4349,10 +4352,22 @@ bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
 /// \verbatim
 ///    decl* '}'
 /// \endverbatim
-std::vector<Decl *> Parser::parseDeclList(
-    SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
-    ParseDeclOptions Options, IterableDeclContext *IDC,
-    bool &hadError) {
+std::pair<std::vector<Decl *>, Optional<std::string>>
+Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
+                      ParseDeclOptions Options, IterableDeclContext *IDC,
+                      bool &hadError) {
+
+  // Record the curly braces but nothing inside.
+  if (IDC->areDependenciesUsingTokenHashesForTypeBodies()) {
+    recordTokenHash("{");
+    recordTokenHash("}");
+  }
+  llvm::MD5 tokenHashForThisDeclList;
+  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(
+      CurrentTokenHash, IDC->areDependenciesUsingTokenHashesForTypeBodies()
+                            ? &tokenHashForThisDeclList
+                            : CurrentTokenHash);
+
   std::vector<Decl *> decls;
   ParserStatus Status;
   bool PreviousHadSemi = true;
@@ -4381,7 +4396,15 @@ std::vector<Decl *> Parser::parseDeclList(
   // were errors while parsing inner decls, because we recovered.
   if (RBLoc.isInvalid())
     hadError = true;
-  return decls;
+
+  if (!Context.LangOpts.EnableTypeFingerprints)
+    return std::make_pair(decls, None);
+
+  llvm::MD5::MD5Result result;
+  tokenHashForThisDeclList.final(result);
+  llvm::SmallString<32> tokenHashString;
+  llvm::MD5::stringifyResult(result, tokenHashString);
+  return std::make_pair(decls, tokenHashString.str().str());
 }
 
 bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
@@ -6197,12 +6220,11 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     return;
   }
 
-  if (IsParsingInterfaceTokens) {
-    // Record the curly braces but nothing inside.
-    SF.recordInterfaceToken("{");
-    SF.recordInterfaceToken("}");
-  }
-  llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
+  // Record the curly braces but nothing inside.
+  recordTokenHash("{");
+  recordTokenHash("}");
+
+  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(CurrentTokenHash, nullptr);
 
   if (isDelayedParsingEnabled()) {
     consumeAbstractFunctionBody(AFD, AFD->getAttrs());
