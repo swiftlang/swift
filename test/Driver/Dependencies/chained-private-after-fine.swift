@@ -1,6 +1,5 @@
 /// other --> main ==> yet-another
 /// other ==>+ main ==> yet-another
-/// Coarse and fine
 
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/chained-private-after-fine/* %t

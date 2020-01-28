@@ -655,12 +655,23 @@ private:
   static std::vector<ContextNameFingerprint>
   namesForProvidersOfAGivenType(std::vector<ContentsT> &contentsVec) {
     std::vector<ContextNameFingerprint> result;
-    for (const auto &declOrPair : contentsVec)
-      result.push_back(ContextNameFingerprint(
+    for (const auto declOrPair : contentsVec)
+      result.push_back(
+        std::make_tuple(
           DependencyKey::computeContextForProvidedEntity<kind>(declOrPair),
           DependencyKey::computeNameForProvidedEntity<kind>(declOrPair),
-          Optional<std::string>()));
+          getFingerprintIfAny(declOrPair)));
     return result;
+  }
+
+  static Optional<std::string>
+  getFingerprintIfAny(std::pair<const NominalTypeDecl *, const ValueDecl *>) {
+    return None;
+  }
+  static Optional<std::string> getFingerprintIfAny(const Decl *d) {
+    if (const auto *idc = dyn_cast<IterableDeclContext>(d))
+      return idc->getBodyFingerprint();
+    return None;
   }
 
   template <NodeKind kind>

@@ -30,5 +30,11 @@
 // NEGATIVE-A-NOT: Handled c.swift
 
 // CHECK-RECORD-A-DAG: "./a.swift": [
-// CHECK-RECORD-A-DAG: "./bad.swift": !dirty [
-// CHECK-RECORD-A-DAG: "./c.swift": !dirty [
+// CHECK-RECORD-A-DAG: "./bad.swift": !private [
+// CHECK-RECORD-A-DAG: "./c.swift": !private [
+
+// RUN: cd %t &&   %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./bad.swift ./c.swift  -module-name main -j1 -v  -driver-show-incremental 2>&1 | %FileCheck -check-prefix CHECK-BC %s
+
+// CHECK-BC-NOT: Handled a.swift
+// CHECK-BC-DAG: Handled bad.swift
+// CHECK-BC-DAG: Handled c.swift

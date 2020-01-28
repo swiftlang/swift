@@ -973,6 +973,11 @@ Driver::buildCompilation(const ToolChain &TC,
                          options::OPT_disable_fine_grained_dependencies,
                          LangOptions().EnableFineGrainedDependencies);
 
+    const bool EnableTypeFingerprints =
+        ArgList->hasFlag(options::OPT_enable_type_fingerprints,
+                         options::OPT_disable_type_fingerprints,
+                         LangOptions().EnableTypeFingerprints);
+
     const bool VerifyFineGrainedDependencyGraphAfterEveryImport = ArgList->hasArg(
         options::
             OPT_driver_verify_fine_grained_dependency_graph_after_every_import);
@@ -1004,6 +1009,7 @@ Driver::buildCompilation(const ToolChain &TC,
         std::move(StatsReporter),
         OnlyOneDependencyFile,
         EnableFineGrainedDependencies,
+        EnableTypeFingerprints,
         VerifyFineGrainedDependencyGraphAfterEveryImport,
         EmitFineGrainedDependencyDotFileAfterEveryImport,
         FineGrainedDependenciesIncludeIntrafileOnes,

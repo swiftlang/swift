@@ -41,11 +41,11 @@
 
 // CHECK-RECORD-A-DAG: "./a.swift": [
 // CHECK-RECORD-A-DAG: "./b.swift": [
-// CHECK-RECORD-A-DAG: "./c.swift": !dirty [
-// CHECK-RECORD-A-DAG: "./d.swift": !dirty [
+// CHECK-RECORD-A-DAG: "./c.swift": !private [
+// CHECK-RECORD-A-DAG: "./d.swift": !private [
 // CHECK-RECORD-A-DAG: "./e.swift": !private [
 // CHECK-RECORD-A-DAG: "./f.swift": [
-// CHECK-RECORD-A-DAG: "./bad.swift": !dirty [
+// CHECK-RECORD-A-DAG: "./bad.swift": !private [
 
 // RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/a2.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-A2 %s < %t/a2.txt
