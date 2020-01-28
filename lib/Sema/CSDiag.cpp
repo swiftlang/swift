@@ -1202,32 +1202,6 @@ static Expr *getFailedArgumentExpr(CalleeCandidateInfo CCI, Expr *argExpr) {
 bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
                                                Expr *fnExpr, Expr *argExpr,
                                                ArrayRef<Identifier> argLabels) {
-  if (auto *MTT = CS.getType(fnExpr)->getAs<MetatypeType>()) {
-    auto instTy = MTT->getInstanceType();
-    auto &DE = CS.getASTContext().Diags;
-    if (instTy->getAnyNominal()) {
-      // If we are invoking a constructor on a nominal type and there are
-      // absolutely no candidates, then they must all be private.
-      if (CCI.empty() || (CCI.size() == 1 && CCI.candidates[0].getDecl() &&
-                              isa<ProtocolDecl>(CCI.candidates[0].getDecl()))) {
-        DE.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
-                    instTy);
-        return true;
-      }
-      // continue below
-    } else if (!instTy->is<TupleType>()) {
-      // If we are invoking a constructor on a non-nominal type, the expression
-      // is malformed.
-      SourceRange initExprRange(fnExpr->getSourceRange().Start,
-                                argExpr->getSourceRange().End);
-      DE.diagnose(fnExpr->getLoc(), instTy->isExistentialType() ?
-                  diag::construct_protocol_by_name :
-                  diag::non_nominal_no_initializers, instTy)
-          .highlight(initExprRange);
-      return true;
-    }
-  }
-
   // Try to diagnose errors related to the use of implicit self reference.
   if (diagnoseImplicitSelfErrors(fnExpr, argExpr, CCI, argLabels))
     return true;
@@ -1268,59 +1242,9 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
   return false;
 }
 
-// Check if there is a structural problem in the function expression
-// by performing type checking with the option to allow unresolved
-// type variables. If that is going to produce a function type with
-// unresolved result let's not re-typecheck the function expression,
-// because it might produce unrelated diagnostics due to lack of
-// contextual information.
-static bool shouldTypeCheckFunctionExpr(FailureDiagnosis &FD, DeclContext *DC,
-                                        Expr *fnExpr) {
-  if (!isa<UnresolvedDotExpr>(fnExpr))
-    return true;
-
-  SmallPtrSet<TypeBase *, 4> fnTypes;
-  FD.getPossibleTypesOfExpressionWithoutApplying(
-      fnExpr, DC, fnTypes, FreeTypeVariableBinding::UnresolvedType);
-
-  if (fnTypes.size() == 1) {
-    // Some member types depend on the arguments to produce a result type,
-    // type-checking such expressions without associated arguments is
-    // going to produce unrelated diagnostics.
-    if (auto fn = (*fnTypes.begin())->getAs<AnyFunctionType>()) {
-      auto resultType = fn->getResult();
-      if (resultType->hasUnresolvedType() || resultType->hasTypeVariable())
-        return false;
-    }
-  }
-
-  // Might be a structural problem related to the member itself.
-  return true;
-}
-
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   auto *fnExpr = callExpr->getFn();
-
-  if (shouldTypeCheckFunctionExpr(*this, CS.DC, fnExpr)) {
-    // Type check the function subexpression to resolve a type for it if
-    // possible.
-    fnExpr = typeCheckChildIndependently(callExpr->getFn());
-    if (!fnExpr) {
-      return CS.getASTContext().Diags.hadAnyError();
-    }
-  }
-
-  SWIFT_DEFER {
-    if (!fnExpr) return;
-
-    // If it's a member operator reference, put the operator back.
-    if (auto operatorRef = fnExpr->getMemberOperatorRef())
-      callExpr->setFn(operatorRef);
-  };
-
-  auto getFuncType = [](Type type) -> Type { return type->getRValueType(); };
-
-  auto fnType = getFuncType(CS.getType(fnExpr));
+  auto fnType = CS.getType(fnExpr)->getRValueType();
 
   bool hasTrailingClosure = callArgHasTrailingClosure(callExpr->getArg());
   
@@ -1489,17 +1413,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (CS.getType(argExpr)->hasUnresolvedType())
     return false;
 
-  SmallVector<AnyFunctionType::Param, 8> params;
-  AnyFunctionType::decomposeInput(CS.getType(argExpr), params);
-  auto argString = AnyFunctionType::getParamListAsString(params);
-
-  if (auto MTT = fnType->getAs<MetatypeType>()) {
-    if (MTT->getInstanceType()->isExistentialType()) {
-      diagnose(fnExpr->getLoc(), diag::construct_protocol_value, fnType);
-      return true;
-    }
-  }
-  
   bool isInitializer = isa<TypeExpr>(fnExpr);
   if (isa<TupleExpr>(argExpr) &&
       cast<TupleExpr>(argExpr)->getNumElements() == 0) {
@@ -1507,6 +1420,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     diagnose(fnExpr->getLoc(), diag::cannot_call_with_no_params,
              overloadName, isInitializer);
   } else {
+    SmallVector<AnyFunctionType::Param, 8> params;
+    AnyFunctionType::decomposeInput(CS.getType(argExpr), params);
+    auto argString = AnyFunctionType::getParamListAsString(params);
+
     diagnose(fnExpr->getLoc(), diag::cannot_call_with_params,
              overloadName, argString, isInitializer);
   }
