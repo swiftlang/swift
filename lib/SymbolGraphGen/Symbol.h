@@ -24,46 +24,6 @@ namespace symbolgraphgen {
 struct AvailabilityDomain;
 struct SymbolGraphASTWalker;
 
-/**
- An identifier for a symbol that provides a globally unique identifier suitable for
- internal lookups and a locally unique path for human use, such as a URL.
- */
-struct SymbolIdentifier {
-  /**
-   A string that uniquely identifies a symbol within a module in the event of
-   ambiguities. A precise identifier need not be human readable.
-   */
-  StringRef PreciseIdentifier;
-  
-  /**
-   The components for a "fully qualified" identifier.
-   */
-  ArrayRef<StringRef> SimpleComponents;
-
-  SymbolIdentifier(llvm::StringRef PreciseIdentifier,
-                   ArrayRef<StringRef> SimpleComponents)
-    : PreciseIdentifier(PreciseIdentifier),
-    SimpleComponents(SimpleComponents) {
-      assert(!PreciseIdentifier.empty());
-    }
-
-  void serialize(llvm::json::OStream &OS) const {
-    OS.object([&](){
-      OS.attribute("precise", PreciseIdentifier);
-      OS.attributeArray("simpleComponents", [&](){
-        for (auto Component : SimpleComponents) {
-          OS.value(Component);
-        }
-      });
-    });
-  }
-  
-  bool operator==(const SymbolIdentifier &Other) const {
-    return PreciseIdentifier == Other.PreciseIdentifier &&
-      SimpleComponents == Other.SimpleComponents;
-  }
-};
-
 /// A symbol from a module: a node in a graph.
 struct Symbol {
   const ValueDecl *VD;
@@ -75,6 +35,9 @@ struct Symbol {
 
   void serializeIdentifier(SymbolGraphASTWalker &Walker,
                            llvm::json::OStream &OS) const;
+
+  void serializePathComponents(SymbolGraphASTWalker &Walker,
+                               llvm::json::OStream &OS) const;
 
   void serializeNames(SymbolGraphASTWalker &Walker,
                       llvm::json::OStream &OS) const;
