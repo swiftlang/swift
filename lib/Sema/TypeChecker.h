@@ -305,13 +305,6 @@ public:
   /// constraint system, or false otherwise.
   virtual bool builtConstraints(constraints::ConstraintSystem &cs, Expr *expr);
 
-  /// Callback invoked once a solution has been found.
-  ///
-  /// The callback may further alter the expression, returning either a
-  /// new expression (to replace the result) or a null pointer to indicate
-  /// failure.
-  virtual Expr *foundSolution(constraints::Solution &solution, Expr *expr);
-
   /// Callback invokes once the chosen solution has been applied to the
   /// expression.
   ///

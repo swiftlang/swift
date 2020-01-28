@@ -2027,10 +2027,6 @@ bool ExprTypeCheckListener::builtConstraints(ConstraintSystem &cs, Expr *expr) {
   return false;
 }
 
-Expr *ExprTypeCheckListener::foundSolution(Solution &solution, Expr *expr) {
-  return expr;
-}
-
 Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
   return expr;
 }
@@ -2158,8 +2154,6 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   auto result = expr;
   auto &solution = viable[0];
-  if (listener)
-    result = listener->foundSolution(solution, result);
   if (!result)
     return Type();
 
@@ -2578,16 +2572,13 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       return false;
     }
 
-    Expr *foundSolution(Solution &solution, Expr *expr) override {
-      // Figure out what type the constraints decided on.
-      auto ty = solution.simplifyType(initType);
-      initType = ty->getRValueType()->reconstituteSugar(/*recursive =*/false);
-
-      // Just keep going.
-      return expr;
-    }
-
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
+      {
+        // Figure out what type the constraints decided on.
+        auto ty = solution.simplifyType(initType);
+        initType = ty->getRValueType()->reconstituteSugar(/*recursive =*/false);
+      }
+
       // Convert the initializer to the type of the pattern.
       expr = solution.coerceToType(expr, initType, Locator);
       if (!expr)
