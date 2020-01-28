@@ -214,6 +214,8 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
       new (*Ctx) SourceFile(*M, SourceFileKind::Library, tmpBufferID,
                             SourceFile::ImplicitModuleImportKind::None);
   newSF->enableInterfaceHash();
+  // Ensure all non-function-body tokens are hashed into the interface hash
+  Ctx->LangOpts.EnableTypeFingerprints = false;
   parseIntoSourceFileFull(*newSF, tmpBufferID, &newState);
   // Couldn't find any completion token?
   if (!newState.hasCodeCompletionDelayedDeclState())
@@ -358,6 +360,10 @@ bool swift::ide::CompletionInstance::performOperation(
   // Disable to build syntax tree because code-completion skips some portion of
   // source text. That breaks an invariant of syntax tree building.
   Invocation.getLangOptions().BuildSyntaxTree = false;
+
+  // Since caching uses the interface hash, and since per type fingerprints
+  // weaken that hash, disable them here:
+  Invocation.getLangOptions().EnableTypeFingerprints = false;
 
   // FIXME: ASTScopeLookup doesn't support code completion yet.
   Invocation.disableASTScopeLookup();
