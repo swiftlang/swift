@@ -1120,13 +1120,9 @@ swift_getTypeName(const Metadata *type, bool qualified);
   auto heapObj = reinterpret_cast<HeapObject *>(self); \
   heapObj->refCounts.setPureSwiftDeallocation(false); \
 } \
-- (bool)_setAssociatedObject:(id)obj \
-                      forKey:(const void *)key \
-           associationPolicy:(objc_AssociationPolicy)policy { \
+- (void)_noteAssociatedObjects { \
   auto heapObj = reinterpret_cast<HeapObject *>(self); \
   heapObj->refCounts.setPureSwiftDeallocation(false); \
-  /* false to let libobjc know it still needs to associate the object */ \
-  return false; \
 } \
 - (void)dealloc { \
   swift_rootObjCDealloc(reinterpret_cast<HeapObject *>(self)); \
