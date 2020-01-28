@@ -9064,6 +9064,59 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
   }
 }
 
+void ConstraintSystem::addContextualConversionConstraint(
+    Expr *expr, ContextualTypeInfo contextualType) {
+  Type convertType = contextualType.getType();
+  if (convertType.isNull())
+    return;
+
+  // Determine the type of the constraint.
+  auto constraintKind = ConstraintKind::Conversion;
+  switch (contextualType.purpose) {
+    case CTP_ReturnStmt:
+    case CTP_ReturnSingleExpr:
+    case CTP_Initialization:
+      if (contextualType.isOpaqueReturnType)
+        constraintKind = ConstraintKind::OpaqueUnderlyingType;
+      break;
+
+    case CTP_CallArgument:
+      constraintKind = ConstraintKind::ArgumentConversion;
+      break;
+
+    case CTP_YieldByReference:
+      // In a by-reference yield, we expect the contextual type to be an
+      // l-value type, so the result must be bound to that.
+      constraintKind = ConstraintKind::Bind;
+      break;
+
+    case CTP_ArrayElement:
+    case CTP_AssignSource:
+    case CTP_CalleeResult:
+    case CTP_CannotFail:
+    case CTP_Condition:
+    case CTP_Unused:
+    case CTP_YieldByValue:
+    case CTP_ThrowStmt:
+    case CTP_EnumCaseRawValue:
+    case CTP_DefaultParameter:
+    case CTP_ClosureResult:
+    case CTP_DictionaryKey:
+    case CTP_DictionaryValue:
+    case CTP_CoerceOperand:
+    case CTP_SubscriptAssignSource:
+    case CTP_ForEachStmt:
+      break;
+  }
+
+  // Add the constraint.
+  bool isForSingleExprFunction = (contextualType.purpose == CTP_ReturnSingleExpr);
+  auto *convertTypeLocator = getConstraintLocator(
+      expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
+  addConstraint(constraintKind, getType(expr), convertType,
+               convertTypeLocator, /*isFavored*/ true);
+}
+
 Type ConstraintSystem::addJoinConstraint(
     ConstraintLocator *locator,
     ArrayRef<std::pair<Type, ConstraintLocator *>> inputs) {

@@ -2189,9 +2189,6 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
 
-  if (options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType))
-    csOptions |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
-
   if (options.contains(TypeCheckExprFlags::SubExpressionDiagnostics))
     csOptions |= ConstraintSystemFlags::SubExpressionDiagnostics;
 
@@ -2222,7 +2219,9 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   Expr *contextualTypeExpr = expr;
   if (auto loadExpr = dyn_cast_or_null<LoadExpr>(contextualTypeExpr))
     contextualTypeExpr = loadExpr->getSubExpr();
-  cs.setContextualType(contextualTypeExpr, convertType, convertTypePurpose);
+  cs.setContextualType(
+      contextualTypeExpr, convertType, convertTypePurpose,
+      options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType));
 
   // If the convertType is *only* provided for that hint, then null it out so
   // that we don't later treat it as an actual conversion constraint.
@@ -2466,7 +2465,7 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
 
   // Construct a constraint system from this expression.
   ConstraintSystem CS(DC, options);
-  expr = CS.generateConstraints(expr);
+  expr = CS.generateConstraints(expr, DC);
   if (!expr)
     return nullptr;
 
@@ -2666,8 +2665,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         initType = patternType;
 
         // Add a conversion constraint between the types.
-        if (!cs.Options.contains(
-                   ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType)) {
+        if (!initType->is<OpaqueTypeArchetypeType>()) {
           cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                            patternType, Locator, /*isFavored*/true);
         }

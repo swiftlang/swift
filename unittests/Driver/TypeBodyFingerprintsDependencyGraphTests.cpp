@@ -41,8 +41,8 @@ static bool contains(const Range &range, const T &value) {
          std::end(range);
 }
 
-TEST(ModuleDepGraph, BasicLoad) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, BasicLoad) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad( &job0, {{dependsTopLevel, {"a", "b"}}}));
   EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"c", "d"}}}));
@@ -65,8 +65,8 @@ TEST(ModuleDepGraph, BasicLoad) {
                             {dependsTopLevel, {"d", "a"}}}));
 }
 
-TEST(ModuleDepGraph, IndependentNodes) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, IndependentNodes) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad(
       &job0, {{dependsTopLevel, {"a"}}, {providesTopLevel, {"a0"}}}));
@@ -97,8 +97,8 @@ TEST(ModuleDepGraph, IndependentNodes) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job2));
 }
 
-TEST(ModuleDepGraph, IndependentDepKinds) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, IndependentDepKinds) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad(
       &job0, {{dependsNominal, {"a"}}, {providesNominal, {"b"}}}));
@@ -110,8 +110,8 @@ TEST(ModuleDepGraph, IndependentDepKinds) {
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, IndependentDepKinds2) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, IndependentDepKinds2) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad(
       &job0, {{dependsNominal, {"a"}}, {providesNominal, {"b"}}}));
@@ -123,8 +123,8 @@ TEST(ModuleDepGraph, IndependentDepKinds2) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, IndependentMembers) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, IndependentMembers) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(
       graph.simulateLoad( &job0, {}, {{providesMember, {{"a", "aa"}}}}));
@@ -141,8 +141,8 @@ TEST(ModuleDepGraph, IndependentMembers) {
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job4));
 }
 
-TEST(ModuleDepGraph, SimpleDependent) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, SimpleDependent) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(
       graph.simulateLoad( &job0, {{providesTopLevel, {"a", "b", "c"}}}));
@@ -160,8 +160,8 @@ TEST(ModuleDepGraph, SimpleDependent) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, SimpleDependentReverse) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, SimpleDependentReverse) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad( &job0, {{dependsTopLevel, {"a", "b", "c"}}}));
   EXPECT_TRUE(
@@ -184,8 +184,8 @@ TEST(ModuleDepGraph, SimpleDependentReverse) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, SimpleDependent2) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, SimpleDependent2) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a", "b", "c"}}}));
   EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"x", "b", "z"}}}));
@@ -203,8 +203,8 @@ TEST(ModuleDepGraph, SimpleDependent2) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, SimpleDependent3) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, SimpleDependent3) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad(
       &job0, {{providesNominal, {"a"}}, {providesTopLevel, {"a"}}}));
@@ -223,8 +223,8 @@ TEST(ModuleDepGraph, SimpleDependent3) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, SimpleDependent4) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, SimpleDependent4) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a"}}}));
   EXPECT_TRUE(graph.simulateLoad(
@@ -243,8 +243,8 @@ TEST(ModuleDepGraph, SimpleDependent4) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, SimpleDependent5) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, SimpleDependent5) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad(
       &job0, {{providesNominal, {"a"}}, {providesTopLevel, {"a"}}}));
@@ -265,8 +265,8 @@ TEST(ModuleDepGraph, SimpleDependent5) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, SimpleDependent6) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, SimpleDependent6) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(
       graph.simulateLoad( &job0, {{providesDynamicLookup, {"a", "b", "c"}}}));
@@ -285,8 +285,8 @@ TEST(ModuleDepGraph, SimpleDependent6) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, SimpleDependentMember) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, SimpleDependentMember) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad(
       &job0, {},
@@ -308,8 +308,8 @@ TEST(ModuleDepGraph, SimpleDependentMember) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, MultipleDependentsSame) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, MultipleDependentsSame) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a", "b", "c"}}}));
   EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"x", "b", "z"}}}));
@@ -331,8 +331,8 @@ TEST(ModuleDepGraph, MultipleDependentsSame) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job2));
 }
 
-TEST(ModuleDepGraph, MultipleDependentsDifferent) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, MultipleDependentsDifferent) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a", "b", "c"}}}));
   EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"x", "b", "z"}}}));
@@ -354,8 +354,8 @@ TEST(ModuleDepGraph, MultipleDependentsDifferent) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job2));
 }
 
-TEST(ModuleDepGraph, ChainedDependents) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, ChainedDependents) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a", "b", "c"}}}));
   EXPECT_TRUE(graph.simulateLoad(
@@ -378,8 +378,8 @@ TEST(ModuleDepGraph, ChainedDependents) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job2));
 }
 
-TEST(ModuleDepGraph, ChainedNoncascadingDependents) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, ChainedNoncascadingDependents) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a", "b", "c"}}}));
   EXPECT_TRUE(graph.simulateLoad(
@@ -402,8 +402,8 @@ TEST(ModuleDepGraph, ChainedNoncascadingDependents) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job2));
 }
 
-TEST(ModuleDepGraph, ChainedNoncascadingDependents2) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, ChainedNoncascadingDependents2) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(
       graph.simulateLoad( &job0, {{providesTopLevel, {"a", SourceFileDepGraph::noncascading("b"), "c"}}}));
@@ -422,8 +422,8 @@ TEST(ModuleDepGraph, ChainedNoncascadingDependents2) {
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job2));
 }
 
-TEST(ModuleDepGraph, MarkTwoNodes) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, MarkTwoNodes) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad( &job0, {{providesTopLevel, {"a", "b"}}}));
   EXPECT_TRUE(graph.simulateLoad(
@@ -464,8 +464,8 @@ TEST(ModuleDepGraph, MarkTwoNodes) {
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job12));
 }
 
-TEST(ModuleDepGraph, MarkOneNodeTwice) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, MarkOneNodeTwice) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a"}}}));
   EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"a"}}}));
@@ -493,8 +493,8 @@ TEST(ModuleDepGraph, MarkOneNodeTwice) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job2));
 }
 
-TEST(ModuleDepGraph, MarkOneNodeTwice2) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, MarkOneNodeTwice2) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a"}}}));
   EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"a"}}}));
@@ -522,8 +522,8 @@ TEST(ModuleDepGraph, MarkOneNodeTwice2) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job2));
 }
 
-TEST(ModuleDepGraph, ReloadDetectsChange) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, ReloadDetectsChange) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a"}}}));
   EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"a"}}}));
@@ -563,8 +563,8 @@ TEST(ModuleDepGraph, ReloadDetectsChange) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job2));
 }
 
-TEST(ModuleDepGraph, NotTransitiveOnceMarked) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, NotTransitiveOnceMarked) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a"}}}));
   EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"a"}}}));
@@ -604,8 +604,8 @@ TEST(ModuleDepGraph, NotTransitiveOnceMarked) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job2));
 }
 
-TEST(ModuleDepGraph, DependencyLoops) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, DependencyLoops) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad(
       &job0,
@@ -634,8 +634,8 @@ TEST(ModuleDepGraph, DependencyLoops) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job2));
 }
 
-TEST(ModuleDepGraph, MarkIntransitive) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, MarkIntransitive) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(
       graph.simulateLoad( &job0, {{providesTopLevel, {"a", "b", "c"}}}));
@@ -653,8 +653,8 @@ TEST(ModuleDepGraph, MarkIntransitive) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, MarkIntransitiveTwice) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, MarkIntransitiveTwice) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(
       graph.simulateLoad( &job0, {{providesTopLevel, {"a", "b", "c"}}}));
@@ -664,8 +664,8 @@ TEST(ModuleDepGraph, MarkIntransitiveTwice) {
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, MarkIntransitiveThenIndirect) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, MarkIntransitiveThenIndirect) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(
       graph.simulateLoad( &job0, {{providesTopLevel, {"a", "b", "c"}}}));
@@ -684,8 +684,8 @@ TEST(ModuleDepGraph, MarkIntransitiveThenIndirect) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, SimpleExternal) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, SimpleExternal) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(
       graph.simulateLoad( &job0, {{dependsExternal, {"/foo", "/bar"}}}));
@@ -705,8 +705,8 @@ TEST(ModuleDepGraph, SimpleExternal) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job0));
 }
 
-TEST(ModuleDepGraph, SimpleExternal2) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, SimpleExternal2) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(
       graph.simulateLoad( &job0, {{dependsExternal, {"/foo", "/bar"}}}));
@@ -718,8 +718,8 @@ TEST(ModuleDepGraph, SimpleExternal2) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job0));
 }
 
-TEST(ModuleDepGraph, ChainedExternal) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, ChainedExternal) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad(
       &job0, {{dependsExternal, {"/foo"}}, {providesTopLevel, {"a"}}}));
@@ -746,8 +746,8 @@ TEST(ModuleDepGraph, ChainedExternal) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, ChainedExternalReverse) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, ChainedExternalReverse) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad(
       &job0, {{dependsExternal, {"/foo"}}, {providesTopLevel, {"a"}}}));
@@ -775,8 +775,8 @@ TEST(ModuleDepGraph, ChainedExternalReverse) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
 }
 
-TEST(ModuleDepGraph, ChainedExternalPreMarked) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, ChainedExternalPreMarked) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
 
   EXPECT_TRUE(graph.simulateLoad(
       &job0, {{dependsExternal, {"/foo"}}, {providesTopLevel, {"a"}}}));
@@ -794,8 +794,8 @@ TEST(ModuleDepGraph, ChainedExternalPreMarked) {
 }
 
 
-TEST(ModuleDepGraph, MutualInterfaceHash) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+TEST(ModuleDepGraphWithTypeBodyFingerprints, MutualInterfaceHash) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
   graph.simulateLoad( &job0, {
     {providesTopLevel, {"a"}},
     {dependsTopLevel, {"b"}}
