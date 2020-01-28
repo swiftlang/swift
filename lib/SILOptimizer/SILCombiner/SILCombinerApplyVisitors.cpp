@@ -907,8 +907,6 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
       if (argSub) {
         concreteArgCopies.push_back(*argSub);
         NewArgs.push_back(argSub->tempArg);
-      } else {
-        NewArgs.clear();
       }
     } else {
       // Otherwise, we can just use the value itself.
@@ -936,7 +934,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
         });
   }
 
-  if (NewArgs.empty()) {
+  if (NewArgs.size() != Apply.getNumArguments()) {
     // Remove any new instructions created while attempting to optimize this
     // apply. Since the apply was never rewritten, if they aren't removed here,
     // they will be removed later as dead when visited by SILCombine, causing

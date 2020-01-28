@@ -407,11 +407,6 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   Mod->registerDeleteNotificationHandler(SFT);
   if (breakBeforeRunning(F->getName(), SFT))
     LLVM_BUILTIN_DEBUGTRAP;
-  llvm::errs() << "Running SIL pass: " << SFT->getID() << "\n";
-  llvm::errs() << "Function named: " << F->getName() << "\n";
-  F->getLocation().dump(F->getModule().getSourceManager());
-  llvm::errs() << "***** \n";
-  
   SFT->run();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   Mod->removeDeleteNotificationHandler(SFT);

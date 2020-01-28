@@ -421,8 +421,6 @@ void HoistAllocStack::hoist() {
 /// Try to hoist generic alloc_stack instructions to the entry block.
 /// Returns true if the function was changed.
 bool HoistAllocStack::run() {
-  llvm::errs() << "Running hoist alloc stack on: " << F->getName() << "\n";
-  
   collectHoistableInstructions();
 
   // Nothing to hoist?
@@ -443,7 +441,6 @@ class AllocStackHoisting : public SILFunctionTransform {
     if (Changed) {
       PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Instructions);
     }
-    llvm::errs() << "Completed alloc stack hoisting pass.\n";
   }
 };
 } // end anonymous namespace
