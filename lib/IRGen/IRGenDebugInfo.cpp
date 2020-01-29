@@ -660,8 +660,8 @@ private:
     }
 
     StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
-    llvm::DIModule *M =
-        DBuilder.createModule(Parent, Name, ConfigMacros, RemappedIncludePath);
+    llvm::DIModule *M = DBuilder.createModule(Parent, Name, ConfigMacros,
+                                              RemappedIncludePath, Sysroot);
     DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
     return M;
   }
