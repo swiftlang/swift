@@ -859,12 +859,6 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     FullApplySite Apply,
     const llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COAIs,
     SILBuilderContext &BuilderCtx) {
-
-  // Bail on try_apply.
-  // TODO: support try_apply.
-  if (isa<TryApplyInst>(Apply))
-    return nullptr;
-  
   // Ensure that the callee is polymorphic.
   assert(Apply.getOrigCalleeType()->isPolymorphic());
 
@@ -945,9 +939,15 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
   }
   // Now create the new apply instruction.
   SILBuilderWithScope ApplyBuilder(Apply.getInstruction(), BuilderCtx);
-  FullApplySite NewApply = ApplyBuilder.createApply(
-    Apply.getLoc(), Apply.getCallee(), NewCallSubs, NewArgs,
-    cast<ApplyInst>(Apply)->isNonThrowing());
+  FullApplySite NewApply;
+  if (auto *TAI = dyn_cast<TryApplyInst>(Apply))
+    NewApply = ApplyBuilder.createTryApply(
+        Apply.getLoc(), Apply.getCallee(), NewCallSubs, NewArgs,
+        TAI->getNormalBB(), TAI->getErrorBB());
+  else
+    NewApply = ApplyBuilder.createApply(
+        Apply.getLoc(), Apply.getCallee(), NewCallSubs, NewArgs,
+        cast<ApplyInst>(Apply)->isNonThrowing());
 
   if (auto NewAI = dyn_cast<ApplyInst>(NewApply))
     replaceInstUsesWith(*cast<ApplyInst>(Apply.getInstruction()), NewAI);
