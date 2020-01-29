@@ -784,6 +784,13 @@ extractStaticStringValue(SymbolicValue staticString) {
   return staticStringProps[0].getStringValue();
 }
 
+static Optional<StringRef>
+extractStringOrStaticStringValue(SymbolicValue stringValue) {
+  if (stringValue.getKind() == SymbolicValue::String)
+    return stringValue.getStringValue();
+  return extractStaticStringValue(stringValue);
+}
+
 /// If the specified type is a Swift.Array of some element type, then return the
 /// element type.  Otherwise, return a null Type.
 static Type getArrayElementType(Type ty) {
@@ -829,8 +836,8 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     for (unsigned i = 0; i < apply->getNumArguments(); i++) {
       SILValue argument = apply->getArgument(i);
       SymbolicValue argValue = getConstantValue(argument);
-      Optional<StringRef> stringOpt = extractStaticStringValue(argValue);
-
+      Optional<StringRef> stringOpt =
+          extractStringOrStaticStringValue(argValue);
       // The first argument is a prefix that specifies the kind of failure
       // this is.
       if (i == 0) {
@@ -842,7 +849,6 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
         }
         continue;
       }
-
       if (stringOpt) {
         message += ": ";
         message += stringOpt.getValue();
