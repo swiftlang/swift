@@ -1180,3 +1180,40 @@ SpecifyObjectLiteralTypeImport::create(ConstraintSystem &cs,
                                        ConstraintLocator *locator) {
   return new (cs.getAllocator()) SpecifyObjectLiteralTypeImport(cs, locator);
 }
+
+AllowNonClassTypeToConvertToAnyObject::AllowNonClassTypeToConvertToAnyObject(
+    ConstraintSystem &cs, Type type, ConstraintLocator *locator)
+    : ContextualMismatch(cs, FixKind::AllowNonClassTypeToConvertToAnyObject,
+                         type, cs.getASTContext().getAnyObjectType(), locator) {
+}
+
+bool AllowNonClassTypeToConvertToAnyObject::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+
+  auto *locator = getLocator();
+  if (locator->getPath().empty())
+    return false;
+
+  const auto &last = locator->getPath().back();
+  switch (last.getKind()) {
+  case ConstraintLocator::ContextualType: {
+    ContextualFailure failure(cs, getFromType(), getToType(), locator);
+    return failure.diagnose(asNote);
+  }
+
+  case ConstraintLocator::ApplyArgToParam: {
+    ArgumentMismatchFailure failure(cs, getFromType(), getToType(), locator);
+    return failure.diagnose(asNote);
+  }
+
+  default:
+    return false;
+  }
+}
+
+AllowNonClassTypeToConvertToAnyObject *
+AllowNonClassTypeToConvertToAnyObject::create(ConstraintSystem &cs, Type type,
+                                              ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowNonClassTypeToConvertToAnyObject(cs, type, locator);
+}
