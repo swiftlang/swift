@@ -76,15 +76,30 @@ void Symbol::serializeKind(llvm::json::OStream &OS) const {
 
 void Symbol::serializeIdentifier(SymbolGraphASTWalker &Walker,
                                  llvm::json::OStream &OS) const {
-  AttributeRAII A("identifier", OS);
-  Walker.getSymbolIdentifier(VD).serialize(OS);
+  OS.attributeObject("identifier", [&](){
+    OS.attribute("precise", Walker.getUSR(VD));
+    OS.attribute("interfaceLanguage", "swift");
+  });
+}
+
+void Symbol::serializePathComponents(SymbolGraphASTWalker &Walker,
+                                     llvm::json::OStream &OS) const {
+  OS.attributeArray("pathComponents", [&](){
+    SmallVector<SmallString<32>, 8> PathComponents;
+    Walker.getPathComponents(VD, PathComponents);
+    for (auto Component : PathComponents) {
+      OS.value(Component);
+    }
+  });
 }
 
 void Symbol::serializeNames(SymbolGraphASTWalker &Walker,
                             llvm::json::OStream &OS) const {
   OS.attributeObject("names", [&](){
-    auto Identifier = Walker.getSymbolIdentifier(VD);
-    OS.attribute("title", Identifier.SimpleComponents.back());
+    SmallVector<SmallString<32>, 8> PathComponents;
+    Walker.getPathComponents(VD, PathComponents);
+    
+    OS.attribute("title", PathComponents.back());
     // "navigator": null
     Walker.serializeSubheadingDeclarationFragments("subheading", VD, OS);
     // "prose": null
@@ -370,6 +385,7 @@ void Symbol::serialize(SymbolGraphASTWalker &Walker,
   OS.object([&](){
     serializeKind(OS);
     serializeIdentifier(Walker, OS);
+    serializePathComponents(Walker, OS);
     serializeNames(Walker, OS);
     serializeDocComment(Walker, OS);
 
