@@ -1977,7 +1977,7 @@ bool ContextualFailure::diagnoseAsError() {
         CTP = CTP_ClosureResult;
     }
 
-    if (auto msg = getDiagnosticFor(CTP, toType->isExistentialType())) {
+    if (auto msg = getDiagnosticFor(CTP, toType)) {
       diagnostic = *msg;
       break;
     }
@@ -2276,11 +2276,9 @@ bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
   if (auto *coerceExpr = dyn_cast<CoerceExpr>(anchor)) {
     auto fromType = getType(coerceExpr->getSubExpr());
     auto toType = getType(coerceExpr->getCastTypeLoc());
-    
-    auto diagnostic =
-        getDiagnosticFor(CTP_CoerceOperand,
-                         /*forProtocol=*/toType->isExistentialType());
-    
+
+    auto diagnostic = getDiagnosticFor(CTP_CoerceOperand, toType);
+
     auto diag =
         emitDiagnostic(anchor->getLoc(), *diagnostic, fromType, toType);
     diag.highlight(anchor->getSourceRange());
@@ -2844,15 +2842,24 @@ bool ContextualFailure::isIntegerToStringIndexConversion() const {
 
 Optional<Diag<Type, Type>>
 ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
-                                    bool forProtocol) {
+                                    Type contextualType) {
+  auto forProtocol = contextualType->isExistentialType();
   switch (context) {
-  case CTP_Initialization:
+  case CTP_Initialization: {
+    if (contextualType->isAnyObject())
+      return diag::cannot_convert_initializer_value_anyobject;
+
     return forProtocol ? diag::cannot_convert_initializer_value_protocol
                        : diag::cannot_convert_initializer_value;
+  }
   case CTP_ReturnStmt:
-  case CTP_ReturnSingleExpr:
+  case CTP_ReturnSingleExpr: {
+    if (contextualType->isAnyObject())
+      return diag::cannot_convert_return_type_to_anyobject;
+
     return forProtocol ? diag::cannot_convert_to_return_type_protocol
                        : diag::cannot_convert_to_return_type;
+  }
   case CTP_EnumCaseRawValue:
     return diag::cannot_convert_raw_initializer_value;
   case CTP_DefaultParameter:
@@ -2861,9 +2868,13 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_YieldByValue:
     return forProtocol ? diag::cannot_convert_yield_value_protocol
                        : diag::cannot_convert_yield_value;
-  case CTP_CallArgument:
+  case CTP_CallArgument: {
+    if (contextualType->isAnyObject())
+      return diag::cannot_convert_argument_value_anyobject;
+
     return forProtocol ? diag::cannot_convert_argument_value_protocol
                        : diag::cannot_convert_argument_value;
+  }
   case CTP_ClosureResult:
     return forProtocol ? diag::cannot_convert_closure_result_protocol
                        : diag::cannot_convert_closure_result;
@@ -2879,9 +2890,13 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_CoerceOperand:
     return forProtocol ? diag::cannot_convert_coerce_protocol
                        : diag::cannot_convert_coerce;
-  case CTP_AssignSource:
+  case CTP_AssignSource: {
+    if (contextualType->isAnyObject())
+      return diag::cannot_convert_assign_anyobject;
+
     return forProtocol ? diag::cannot_convert_assign_protocol
                        : diag::cannot_convert_assign;
+  }
   case CTP_SubscriptAssignSource:
     return forProtocol ? diag::cannot_convert_subscript_assign_protocol
                        : diag::cannot_convert_subscript_assign;
@@ -2908,7 +2923,7 @@ bool TupleContextualFailure::diagnoseAsError() {
   else if ((purpose == CTP_Initialization) &&
            !cs.getContextualType(getAnchor()))
     diagnostic = diag::tuple_types_not_convertible;
-  else if (auto diag = getDiagnosticFor(purpose, /*forProtocol=*/false))
+  else if (auto diag = getDiagnosticFor(purpose, getToType()))
     diagnostic = *diag;
   else
     return false;
@@ -2919,7 +2934,7 @@ bool TupleContextualFailure::diagnoseAsError() {
 
 bool FunctionTypeMismatch::diagnoseAsError() {
   auto purpose = getContextualTypePurpose();
-  auto diagnostic = getDiagnosticFor(purpose, /*forProtocol=*/false);
+  auto diagnostic = getDiagnosticFor(purpose, getToType());
   if (!diagnostic)
     return false;
 
@@ -4839,17 +4854,16 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
   if (path.empty()) {
     assert(isa<AssignExpr>(anchor));
     if (isa<SubscriptExpr>(cast<AssignExpr>(anchor)->getDest())) {
-      diagnostic =
-          getDiagnosticFor(CTP_SubscriptAssignSource, /*forProtocol=*/true);
+      diagnostic = getDiagnosticFor(CTP_SubscriptAssignSource, getToType());
     } else {
-      diagnostic = getDiagnosticFor(CTP_AssignSource, /*forProtocol=*/true);
+      diagnostic = getDiagnosticFor(CTP_AssignSource, getToType());
     }
   } else {
     const auto &last = path.back();
     switch (last.getKind()) {
     case ConstraintLocator::ContextualType:
       assert(Context != CTP_Unused);
-      diagnostic = getDiagnosticFor(Context, /*forProtocol=*/true);
+      diagnostic = getDiagnosticFor(Context, getToType());
       break;
 
     case ConstraintLocator::SequenceElementType: {
@@ -5277,7 +5291,7 @@ bool InOutConversionFailure::diagnoseAsError() {
       assert(locator->findLast<LocatorPathElt::ContextualType>());
       auto contextualType = cs.getContextualType(anchor);
       auto purpose = getContextualTypePurpose();
-      auto diagnostic = getDiagnosticFor(purpose, /*forProtocol=*/false);
+      auto diagnostic = getDiagnosticFor(purpose, contextualType);
 
       if (!diagnostic)
         return false;
@@ -5384,6 +5398,12 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 
   auto argType = getFromType();
   auto paramType = getToType();
+
+  if (paramType->isAnyObject()) {
+    emitDiagnostic(getLoc(), diag::cannot_convert_argument_value_anyobject,
+                   argType, paramType);
+    return true;
+  }
 
   Diag<Type, Type> diagnostic = diag::cannot_convert_argument_value;
 
