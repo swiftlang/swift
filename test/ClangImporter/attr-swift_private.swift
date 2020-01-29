@@ -121,7 +121,7 @@ func testCF(_ a: __PrivCFType, b: __PrivCFSub, c: __PrivInt) {
   makeSureAnyObject(a)
   makeSureAnyObject(b)
 #if !IRGEN
-  makeSureAnyObject(c) // expected-error {{argument type '__PrivInt' (aka 'Int32') does not conform to expected type 'AnyObject'}}
+  makeSureAnyObject(c) // expected-error {{argument type '__PrivInt' (aka 'Int32') expected to be an instance of a class or class-constrained type}}
 #endif
 }
 

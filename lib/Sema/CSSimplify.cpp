@@ -2095,9 +2095,17 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
         // Subtype relation to AnyObject also allows class-bound
         // existentials that are not @objc and therefore carry
         // witness tables.
-        if (!type1->isClassExistentialType() &&
-            !type1->mayHaveSuperclass())
+        if (!type1->isClassExistentialType() && !type1->mayHaveSuperclass()) {
+          if (shouldAttemptFixes()) {
+            auto *fix = AllowNonClassTypeToConvertToAnyObject::create(
+                *this, type1, getConstraintLocator(locator));
+
+            return recordFix(fix) ? getTypeMatchFailure(locator)
+                                  : getTypeMatchSuccess();
+          }
+
           return getTypeMatchFailure(locator);
+        }
       }
 
       // Keep going.
@@ -8842,6 +8850,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowMutatingMemberOnRValueBase:
   case FixKind::AllowTupleSplatForSingleParameter:
   case FixKind::AllowInvalidUseOfTrailingClosure:
+  case FixKind::AllowNonClassTypeToConvertToAnyObject:
   case FixKind::SpecifyClosureReturnType:
     llvm_unreachable("handled elsewhere");
   }
