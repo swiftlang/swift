@@ -1283,13 +1283,13 @@ public:
     }
 
     if (VD->getDeclContext()->getSelfClassDecl()) {
-      checkDynamicSelfType(VD, VD->getValueInterfaceType());
-
       if (VD->getValueInterfaceType()->hasDynamicSelfType()) {
         if (VD->hasStorage())
           VD->diagnose(diag::dynamic_self_in_stored_property);
         else if (VD->isSettable(nullptr))
           VD->diagnose(diag::dynamic_self_in_mutable_property);
+        else
+          checkDynamicSelfType(VD, VD->getValueInterfaceType());
       }
     }
     
@@ -2098,8 +2098,11 @@ public:
 
     checkExplicitAvailability(FD);
 
-    if (FD->getDeclContext()->getSelfClassDecl())
-      checkDynamicSelfType(FD, FD->getResultInterfaceType());
+    // Skip this for accessors, since we should have diagnosed the
+    // storage itself.
+    if (!isa<AccessorDecl>(FD))
+      if (FD->getDeclContext()->getSelfClassDecl())
+        checkDynamicSelfType(FD, FD->getResultInterfaceType());
 
     checkDefaultArguments(FD->getParameters());
 
