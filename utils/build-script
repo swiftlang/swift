@@ -524,9 +524,7 @@ class BuildScriptInvocation(object):
             ]
 
         if args.skip_build:
-            impl_args += ["--skip-build-cmark",
-                          "--skip-build-llvm",
-                          "--skip-build-swift"]
+            impl_args += ["--skip-build"]
         if not args.build_benchmarks:
             impl_args += ["--skip-build-benchmarks"]
         # Currently we do not build external benchmarks by default.

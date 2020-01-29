@@ -56,6 +56,8 @@ enum class WellKnownFunction {
   StringEquals,
   // String.percentEscapedString.getter
   StringEscapePercent,
+  // BinaryInteger.description.getter
+  BinaryIntegerDescription,
   // _assertionFailure(_: StaticString, _: StaticString, file: StaticString,...)
   AssertionFailure,
   // A function taking one argument that prints the symbolic value of the
@@ -83,6 +85,8 @@ static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
     return WellKnownFunction::StringEquals;
   if (fn->hasSemanticsAttr(semantics::STRING_ESCAPE_PERCENT_GET))
     return WellKnownFunction::StringEscapePercent;
+  if (fn->hasSemanticsAttr(semantics::BINARY_INTEGER_DESCRIPTION))
+    return WellKnownFunction::BinaryIntegerDescription;
   if (fn->hasSemanticsAttrThatStartsWith("programtermination_point"))
     return WellKnownFunction::AssertionFailure;
   // A call to a function with the following semantics annotation will be
@@ -780,6 +784,13 @@ extractStaticStringValue(SymbolicValue staticString) {
   return staticStringProps[0].getStringValue();
 }
 
+static Optional<StringRef>
+extractStringOrStaticStringValue(SymbolicValue stringValue) {
+  if (stringValue.getKind() == SymbolicValue::String)
+    return stringValue.getStringValue();
+  return extractStaticStringValue(stringValue);
+}
+
 /// If the specified type is a Swift.Array of some element type, then return the
 /// element type.  Otherwise, return a null Type.
 static Type getArrayElementType(Type ty) {
@@ -787,6 +798,28 @@ static Type getArrayElementType(Type ty) {
     if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
       return bgst->getGenericArgs()[0];
   return Type();
+}
+
+/// Check if the given type \p ty is a stdlib integer type and if so return
+/// whether the type is signed. Returns \c None if \p ty is not a stdlib integer
+/// type, \c true if it is a signed integer type and \c false if it is an
+/// unsigned integer type.
+static Optional<bool> getSignIfStdlibIntegerType(Type ty) {
+  StructDecl *decl = ty->getStructOrBoundGenericStruct();
+  if (!decl)
+    return None;
+  ASTContext &astCtx = ty->getASTContext();
+  if (decl == astCtx.getIntDecl() || decl == astCtx.getInt8Decl() ||
+      decl == astCtx.getInt16Decl() || decl == astCtx.getInt32Decl() ||
+      decl == astCtx.getInt64Decl()) {
+    return true;
+  }
+  if (decl == astCtx.getUIntDecl() || decl == astCtx.getUInt8Decl() ||
+      decl == astCtx.getUInt16Decl() || decl == astCtx.getUInt32Decl() ||
+      decl == astCtx.getUInt64Decl()) {
+    return false;
+  }
+  return None;
 }
 
 /// Given a call to a well known function, collect its arguments as constants,
@@ -803,8 +836,8 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     for (unsigned i = 0; i < apply->getNumArguments(); i++) {
       SILValue argument = apply->getArgument(i);
       SymbolicValue argValue = getConstantValue(argument);
-      Optional<StringRef> stringOpt = extractStaticStringValue(argValue);
-
+      Optional<StringRef> stringOpt =
+          extractStringOrStaticStringValue(argValue);
       // The first argument is a prefix that specifies the kind of failure
       // this is.
       if (i == 0) {
@@ -816,7 +849,6 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
         }
         continue;
       }
-
       if (stringOpt) {
         message += ": ";
         message += stringOpt.getValue();
@@ -1061,6 +1093,42 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
 
     auto resultVal = SymbolicValue::getString(percentEscapedString.str(),
                                               evaluator.getAllocator());
+    setValue(apply, resultVal);
+    return None;
+  }
+  case WellKnownFunction::BinaryIntegerDescription: {
+    // BinaryInteger.description.getter
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           conventions.getNumParameters() == 1 && apply->hasSubstitutions() &&
+           "unexpected BinaryInteger.description.getter signature");
+    // Get the type of the argument and check if it is a signed or
+    // unsigned integer.
+    SILValue integerArgument = apply->getOperand(1);
+    CanType argumentType = substituteGenericParamsAndSimpify(
+        integerArgument->getType().getASTType());
+    Optional<bool> isSignedIntegerType =
+        getSignIfStdlibIntegerType(argumentType);
+    if (!isSignedIntegerType.hasValue()) {
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::InvalidOperandValue);
+    }
+    // Load the stdlib integer's value and convert it to a string.
+    SymbolicValue stdlibIntegerValue =
+        getConstAddrAndLoadResult(integerArgument);
+    if (!stdlibIntegerValue.isConstant()) {
+      return stdlibIntegerValue;
+    }
+    SymbolicValue builtinIntegerValue =
+        stdlibIntegerValue.lookThroughSingleElementAggregates();
+    assert(builtinIntegerValue.getKind() == SymbolicValue::Integer &&
+           "stdlib integer type must store only a builtin integer");
+    APInt integer = builtinIntegerValue.getIntegerValue();
+    SmallString<8> integerString;
+    isSignedIntegerType.getValue() ? integer.toStringSigned(integerString)
+                                   : integer.toStringUnsigned(integerString);
+    SymbolicValue resultVal =
+        SymbolicValue::getString(integerString.str(), evaluator.getAllocator());
     setValue(apply, resultVal);
     return None;
   }
