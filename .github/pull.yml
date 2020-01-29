@@ -1,0 +1,6 @@
+version: "1"
+rules:
+  - base: swiftwasm
+    upstream: apple:master
+    mergeMethod: merge
+label: ":arrow_heading_down: Upstream Tracking"
