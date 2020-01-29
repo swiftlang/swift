@@ -1888,3 +1888,25 @@ bb0(%0 : @guaranteed $@sil_unowned Builtin.NativeObject):
   %1 = strong_copy_unowned_value %0 : $@sil_unowned Builtin.NativeObject
   return %1 : $Builtin.NativeObject
 }
+
+// Test begin_access. It should look like a derived pointer.
+// CHECK-LABEL: CG of testAccessMarkerHelper
+sil hidden @testAccessMarkerHelper : $@convention(thin) (@inout SomeData) -> () {
+bb0(%0 : $*SomeData):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: CG of testAccessMarker
+// CHECK-NEXT:   Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:   Con [ref] %0.1 Esc: G, Succ:
+// CHECK-LABEL: End
+sil hidden @testAccessMarker : $@convention(thin) (@inout SomeData) -> () {
+bb0(%0 : $*SomeData):
+  %1 = begin_access [modify] [static] %0 : $*SomeData
+  %2 = function_ref @testAccessMarkerHelper : $@convention(thin) (@inout SomeData) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@inout SomeData) -> ()
+  end_access %1 : $*SomeData
+  %5 = tuple ()
+  return %5 : $()
+}
