@@ -4068,16 +4068,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto result =
           matchTypes(instanceType1, instanceType2, subKind, subflags,
                      locator.withPathElement(ConstraintLocator::InstanceType));
-      if (shouldAttemptFixes() && result.isFailure()) {
-        auto *anchor = locator.getAnchor();
-        if (anchor && isa<CoerceExpr>(anchor)) {
-          auto *fix =
-              ContextualMismatch::create(*this, instanceType1, instanceType2,
-                                         getConstraintLocator(locator));
-          conversionsOrFixes.push_back(fix);
-          break;
-        }
-      }
+
+      // If matching of the instance types resulted in the failure make sure
+      // to give `repairFailure` a chance to run to attempt to fix the issue.
+      if (shouldAttemptFixes() && result.isFailure())
+        break;
+
       return result;
     }
 
