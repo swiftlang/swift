@@ -338,6 +338,10 @@ ERROR(cannot_convert_initializer_value,none,
       "cannot convert value of type %0 to specified type %1", (Type,Type))
 ERROR(cannot_convert_initializer_value_protocol,none,
       "value of type %0 does not conform to specified type %1", (Type,Type))
+ERROR(cannot_convert_initializer_value_anyobject,none,
+      "value of type %0 expected to be instance of class or "
+      "class-constrained type",
+      (Type, Type))
 ERROR(cannot_convert_initializer_value_nil,none,
       "'nil' cannot initialize specified type %0", (Type))
 
@@ -346,6 +350,10 @@ ERROR(cannot_convert_to_return_type,none,
       (Type,Type))
 ERROR(cannot_convert_to_return_type_protocol,none,
       "return expression of type %0 does not conform to %1", (Type,Type))
+ERROR(cannot_convert_return_type_to_anyobject,none,
+      "return expression of type %0 expected to be an instance of "
+      "a class or class-constrained type",
+      (Type, Type))
 ERROR(cannot_convert_to_return_type_nil,none,
       "'nil' is incompatible with return type %0", (Type))
 
@@ -440,7 +448,10 @@ NOTE(candidate_performs_illegal_ephemeral_conv,none,
 
 ERROR(cannot_convert_argument_value_protocol,none,
       "argument type %0 does not conform to expected type %1", (Type, Type))
-
+ERROR(cannot_convert_argument_value_anyobject,none,
+      "argument type %0 expected to be an instance of "
+      "a class or class-constrained type",
+      (Type, Type))
 ERROR(cannot_convert_argument_value_nil,none,
       "'nil' is not compatible with expected argument type %0", (Type))
 
@@ -535,6 +546,10 @@ NOTE(assign_protocol_conformance_fix_it,none,
      (Type, DescriptiveDeclKind, Type))
 ERROR(cannot_convert_assign_protocol,none,
       "value of type %0 does not conform to %1 in assignment",
+      (Type, Type))
+ERROR(cannot_convert_assign_anyobject,none,
+      "value of type %0 expected to be an instance of "
+      "a class or class-constrained type in assignment",
       (Type, Type))
 ERROR(cannot_convert_assign_nil,none,
       "'nil' cannot be assigned to type %0", (Type))

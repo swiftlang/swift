@@ -653,7 +653,7 @@ protected:
   ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
 
   static Optional<Diag<Type, Type>>
-  getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+  getDiagnosticFor(ContextualTypePurpose context, Type contextualType);
 };
 
 /// Diagnose errors related to converting function type which
