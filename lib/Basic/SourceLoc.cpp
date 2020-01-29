@@ -331,10 +331,20 @@ SourceManager::resolveOffsetForEndOfLine(unsigned BufferId,
   return resolveFromLineCol(BufferId, Line, ~0u);
 }
 
+llvm::Optional<unsigned>
+SourceManager::getLineLength(unsigned BufferId, unsigned Line) const {
+  auto BegOffset = resolveFromLineCol(BufferId, Line, 0);
+  auto EndOffset = resolveFromLineCol(BufferId, Line, ~0u);
+  if (BegOffset && EndOffset) {
+     return EndOffset.getValue() - BegOffset.getValue();
+  }
+  return None;
+}
+
 llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
                                                            unsigned Line,
                                                            unsigned Col) const {
-  if (Line == 0 || Col == 0) {
+  if (Line == 0) {
     return None;
   }
   const bool LineEnd = Col == ~0u;
@@ -353,6 +363,9 @@ llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
     return None;
   }
   Ptr = LineStart;
+  if (Col == 0)   {
+      return Ptr - InputBuf->getBufferStart();
+  }
   // The <= here is to allow for non-inclusive range end positions at EOF
   for (; ; ++Ptr) {
     --Col;
