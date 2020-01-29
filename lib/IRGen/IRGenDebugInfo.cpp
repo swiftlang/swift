@@ -1847,7 +1847,7 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
   auto DL = llvm::DebugLoc::get(L.Line, L.Column, Scope, InlinedAt);
   Builder.SetCurrentDebugLocation(DL);
 }
-  
+
 void IRGenDebugInfoImpl::addFailureMessageToCurrentLoc(IRBuilder &Builder,
                                                        StringRef failureMsg) {
   auto TrapLoc = Builder.getCurrentDebugLocation();
@@ -1864,7 +1864,7 @@ void IRGenDebugInfoImpl::addFailureMessageToCurrentLoc(IRBuilder &Builder,
   FuncName += failureMsg;
 
   llvm::DISubprogram *TrapSP = DBuilder.createFunction(
-     MainModule, StringRef(), FuncName, TrapLoc->getFile(), 0, DIFnTy, 0,
+     MainModule, FuncName, StringRef(), TrapLoc->getFile(), 0, DIFnTy, 0,
      llvm::DINode::FlagArtificial, llvm::DISubprogram::SPFlagDefinition,
      nullptr, nullptr, nullptr);
 

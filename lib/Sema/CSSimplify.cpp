@@ -3331,10 +3331,13 @@ bool ConstraintSystem::repairFailures(
     if (lhs->hasHole() || rhs->hasHole())
       return true;
 
-    // If dependent members are present here it's because
-    // base doesn't conform to associated type's protocol.
-    if (lhs->hasDependentMember() || rhs->hasDependentMember())
-      break;
+    // If dependent members are present here it's because the base doesn't
+    // conform to the associated type's protocol. We can only get here if we
+    // already applied a fix for the conformance failure.
+    if (lhs->hasDependentMember() || rhs->hasDependentMember()) {
+      increaseScore(SK_Fix);
+      return true;
+    }
 
     // If requirement is something like `T == [Int]` let's let
     // type matcher a chance to match generic parameters before
@@ -3949,12 +3952,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       llvm_unreachable("type variables should have already been handled by now");
 
     case TypeKind::DependentMember: {
-      // If one of the dependent member types has no type variables,
-      // this comparison is effectively illformed, because dependent
-      // member couldn't be simplified down to the actual type, and
-      // we wouldn't be able to solve this constraint, so let's just fail.
-      if (!desugar1->hasTypeVariable() || !desugar2->hasTypeVariable())
-        return getTypeMatchFailure(locator);
+      // If one of the dependent member types has no type variables, the
+      // dependent member can't be simplified because the base doesn't conform
+      // to the associated type's protocol. We can only get here if we already
+      // applied a fix for the conformance failure.
+      if (!desugar1->hasTypeVariable() || !desugar2->hasTypeVariable()) {
+        increaseScore(SK_Fix);
+        return getTypeMatchSuccess();
+      }
 
       // Nothing we can solve yet, since we need to wait until
       // type variables will get resolved.
