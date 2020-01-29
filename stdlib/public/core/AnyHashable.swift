@@ -109,6 +109,11 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
 /// The `AnyHashable` type forwards equality comparisons and hashing operations
 /// to an underlying hashable value, hiding the type of the wrapped value.
 ///
+/// For types that support conversions between each other using `as` or `as?`
+/// (such as `Int` and `NSNumber`), `AnyHashable` treats their values as
+/// equivalent when type-erased by forwarding operations to canonical
+/// representations of the wrapped values.
+///
 /// You can store mixed-type keys in dictionaries and other collections that
 /// require `Hashable` conformance by wrapping mixed-type keys in
 /// `AnyHashable` instances:
@@ -124,16 +129,9 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
 ///     print(descriptions[AnyHashable(44)])        // prints "nil"
 ///     print(descriptions[AnyHashable(Set(["a", "b"]))]!) // prints "a set of strings"
 ///
-/// If the wrapped value is of a type that can be bridged using `as` to a
-/// different but compatible class defined in Foundation, or vice versa, then
-/// the underlying hashable value to which operations are forwarded might not be
-/// of the wrapped type itself but of a transitively bridged type:
-///
-///     let x: AnyHashable = [1, 2, 3] as NSArray
-///     let y: AnyHashable = [1, 2, 3] as [Double]
-///     let z: AnyHashable = [1, 2, 3] as [Int8]
-///     print(x == y, x.hashValue == y.hashValue) // prints "true true"
-///     print(y == z, y.hashValue == z.hashValue) // prints "true true"
+/// Note that `AnyHashable` instances are not guaranteed to preserve the hash
+/// encoding of their wrapped values, even in cases where hash values appear to
+/// match in a particular release of the standard library.
 @frozen
 public struct AnyHashable {
   internal var _box: _AnyHashableBox
@@ -165,7 +163,7 @@ public struct AnyHashable {
   /// The value wrapped by this instance.
   ///
   /// The `base` property can be cast back to its original type using one of
-  /// the casting operators (`as?`, `as!`, or `as`).
+  /// the type casting operators (`as?`, `as!`, or `as`).
   ///
   ///     let anyMessage = AnyHashable("Hello world!")
   ///     if let unwrappedMessage = anyMessage.base as? String {
@@ -200,21 +198,23 @@ public struct AnyHashable {
 
 extension AnyHashable: Equatable {
   /// Returns a Boolean value indicating whether two type-erased hashable
-  /// instances wrap the same value.
+  /// instances wrap the same value of equivalent type.
   ///
-  /// Two instances of `AnyHashable` compare as equal if and only if the
-  /// underlying types have the same conformance to the `Equatable` protocol
-  /// and the underlying values compare as equal.
+  /// `AnyHashable` considers bridged counterparts (such as a `String` and an
+  /// `NSString`) of the same value to be equivalent when type-erased. Where
+  /// those compatible types have different definitions of equality comparisons,
+  /// values that originally compare as not equal may then compare as equal when
+  /// they are type-erased by conversion to `AnyHashable`:
   ///
-  /// If the wrapped values are of a type that can be bridged using `as` to a
-  /// different but compatible class defined in Foundation, or vice versa, then
-  /// the underlying values compared might not be of the wrapped type itself but
-  /// of a transitively bridged type:
-  ///
-  ///     let a = (42 as NSNumber as AnyHashable)
-  ///     let b = (42 as Double as AnyHashable)
-  ///     let c = (42 as Int8 as AnyHashable)
-  ///     print(a == b, b == c, a == c) // prints "true true true"
+  ///     let string1 = "café"
+  ///     let string2 = "cafe\u{301}" // U+301 COMBINING ACUTE ACCENT
+  ///     let nsString1 = string1 as NSString
+  ///     let nsString2 = string2 as NSString
+  ///     let typeErased1 = nsString1 as AnyHashable
+  ///     let typeErased2 = nsString2 as AnyHashable
+  ///     print(string1 == string2)         // prints "true"
+  ///     print(nsString1 == nsString2)     // prints "false"
+  ///     print(typeErased1 == typeErased2) // prints "true"
   ///
   /// - Parameters:
   ///   - lhs: A type-erased hashable value.
@@ -225,16 +225,10 @@ extension AnyHashable: Equatable {
 }
 
 extension AnyHashable: Hashable {
-  /// The hash value.
   public var hashValue: Int {
     return _box._canonicalBox._hashValue
   }
 
-  /// Hashes the essential components of this value by feeding them into the
-  /// given hasher.
-  ///
-  /// - Parameter hasher: The hasher to use when combining the components
-  ///   of this instance.
   public func hash(into hasher: inout Hasher) {
     _box._canonicalBox._hash(into: &hasher)
   }
