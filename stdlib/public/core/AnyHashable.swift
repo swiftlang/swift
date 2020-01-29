@@ -110,8 +110,8 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
 /// to an underlying hashable value, hiding the type of the wrapped value.
 ///
 /// For types that support conversions between each other using `as` or `as?`
-/// (such as `Int` and `NSNumber`), `AnyHashable` treats their values as
-/// equivalent when type-erased by forwarding operations to canonical
+/// (such as `Int` and `NSNumber`), `AnyHashable` treats their values
+/// equivalently when type-erased by forwarding operations to canonical
 /// representations of the wrapped values.
 ///
 /// You can store mixed-type keys in dictionaries and other collections that
