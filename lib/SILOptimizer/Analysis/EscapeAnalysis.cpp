@@ -122,6 +122,7 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) {
   case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst:
   case ValueKind::TupleElementAddrInst:
+  case ValueKind::BeginAccessInst:
   case ValueKind::UncheckedTakeEnumDataAddrInst:
   case ValueKind::UncheckedEnumDataInst:
   case ValueKind::MarkDependenceInst:
