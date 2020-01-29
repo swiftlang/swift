@@ -449,7 +449,7 @@ public:
 
     /// Sets the outgoing points-to edge. The \p To node must be a Content node.
     void setPointsToEdge(CGNode *To) {
-      assert(!To->mergeTo);
+      assert(!To->isMerged);
       assert(To->Type == NodeType::Content &&
              "Wrong node type for points-to edge");
       pointsToIsEdge = true;
