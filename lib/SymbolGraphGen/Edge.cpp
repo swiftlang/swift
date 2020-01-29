@@ -25,12 +25,14 @@ void Edge::serialize(llvm::json::OStream &OS) const {
 
     // In case a dependent module isn't available, serialize a fallback name.
     auto TargetModuleName = Target->getModuleContext()->getName().str();
+
     if (TargetModuleName != Walker->M.getName().str()) {
-      auto TargetSymbolIdentifier = Walker->getSymbolIdentifier(Target);
-      auto TargetComponents = TargetSymbolIdentifier.SimpleComponents;
+      SmallVector<SmallString<32>, 8> TargetPathComponents;
+      Walker->getPathComponents(Target, TargetPathComponents);
+
       SmallString<128> Scratch(TargetModuleName);
-      for (auto it = TargetComponents.begin();
-           it != TargetComponents.end(); ++it) {
+      for (auto it = TargetPathComponents.begin();
+           it != TargetPathComponents.end(); ++it) {
         Scratch.push_back('.');
         Scratch.append(*it);
       }
