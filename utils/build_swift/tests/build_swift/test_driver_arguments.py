@@ -540,30 +540,6 @@ class TestDriverArgumentParser(unittest.TestCase):
         self.assertEqual(namespace.swift_build_variant, 'Debug')
         self.assertEqual(namespace.swift_stdlib_build_variant, 'Debug')
 
-    def test_implied_defaults_skip_build(self):
-        namespace = self.parse_default_args(['--skip-build'])
-
-        self.assertFalse(namespace.build_benchmarks)
-
-        self.assertFalse(namespace.build_linux)
-        self.assertFalse(namespace.build_android)
-        self.assertFalse(namespace.build_freebsd)
-        self.assertFalse(namespace.build_cygwin)
-        self.assertFalse(namespace.build_osx)
-        self.assertFalse(namespace.build_ios)
-        self.assertFalse(namespace.build_tvos)
-        self.assertFalse(namespace.build_watchos)
-
-        self.assertFalse(namespace.build_foundation)
-        self.assertFalse(namespace.build_libdispatch)
-        self.assertFalse(namespace.build_libicu)
-        self.assertFalse(namespace.build_lldb)
-        self.assertFalse(namespace.build_llbuild)
-        self.assertFalse(namespace.build_libcxx)
-        self.assertFalse(namespace.build_playgroundsupport)
-        self.assertFalse(namespace.build_swiftpm)
-        self.assertFalse(namespace.build_xctest)
-
     def test_implied_defaults_skip_build_ios(self):
         namespace = self.parse_default_args(['--skip-build-ios'])
         self.assertFalse(namespace.build_ios_device)

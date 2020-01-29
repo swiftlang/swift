@@ -1,8 +1,8 @@
-//===--- MutexWin32.h - -----------------------------------------*- C++ -*-===//
+//===--- MutexWASI.h - -----------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,8 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Mutex, ConditionVariable, Read/Write lock, and Scoped lock implementations
-// using Windows Slim Reader/Writer Locks and Conditional Variables.
+// No-op implementation of locks for the WebAssembly System Interface. The 
+// implementation does not need to perform locking, because as of January 2020 
+// WebAssembly does not support threads.
+// See the current status at https://github.com/WebAssembly/proposals and 
+// https://github.com/webassembly/threads
 //
 //===----------------------------------------------------------------------===//
 

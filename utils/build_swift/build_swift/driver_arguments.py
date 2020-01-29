@@ -131,30 +131,6 @@ def _apply_default_arguments(args):
         raise ValueError('error: --watchos-all is unavailable in open-source '
                          'Swift.\nUse --watchos to skip watchOS device tests.')
 
-    # Propagate global --skip-build
-    if args.skip_build:
-        args.build_linux = False
-        args.build_freebsd = False
-        args.build_cygwin = False
-        args.build_osx = False
-        args.build_ios = False
-        args.build_tvos = False
-        args.build_watchos = False
-        args.build_android = False
-        args.build_wasm = False
-        args.build_benchmarks = False
-        args.build_external_benchmarks = False
-        args.build_lldb = False
-        args.build_llbuild = False
-        args.build_libcxx = False
-        args.build_swiftpm = False
-        args.build_xctest = False
-        args.build_foundation = False
-        args.build_libdispatch = False
-        args.build_libicu = False
-        args.build_playgroundsupport = False
-        args.build_pythonkit = False
-
     # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
     # merely shorthands for --skip-build-{**os}-{device,simulator}
     if not args.ios or not args.build_ios:
