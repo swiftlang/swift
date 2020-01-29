@@ -2133,7 +2133,10 @@ function(add_swift_target_library name)
 
         list(APPEND swiftlib_swift_compile_flags_all "-Fsystem" "${ios_support_frameworks_path}")
         list(APPEND swiftlib_c_compile_flags_all "-iframework" "${ios_support_frameworks_path}")
-        list(APPEND swiftlib_link_flags_all "-F" "${ios_support_frameworks_path}")
+        # We collate -F with the framework path to avoid unwanted deduplication
+        # of options by target_compile_options -- this way no undesired
+        # side effects are introduced should a new search path be added.
+        list(APPEND swiftlib_link_flags_all "-F${ios_support_frameworks_path}")
       endif()
 
       if(sdk IN_LIST SWIFT_APPLE_PLATFORMS AND SWIFTLIB_IS_SDK_OVERLAY)
