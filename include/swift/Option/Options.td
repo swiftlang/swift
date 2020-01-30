@@ -191,7 +191,7 @@ HelpText<"Emit dot files every time driver imports an fine-grained swiftdeps fil
 
 def fine_grained_dependency_include_intrafile :
 Flag<["-"], "fine-grained-dependency-include-intrafile">,
-InternalDebugOpt,
+Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Include within-file dependencies.">;
 
 def emit_fine_grained_dependency_sourcefile_dot_files :
