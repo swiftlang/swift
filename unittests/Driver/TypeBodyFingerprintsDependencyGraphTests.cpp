@@ -808,3 +808,24 @@ TEST(ModuleDepGraphWithTypeBodyFingerprints, MutualInterfaceHash) {
   const auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
   EXPECT_TRUE(contains(jobs, &job1));
 }
+
+TEST(ModuleDepGraph, EnabledTypeBodyFingerprints) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ true);
+
+  graph.simulateLoad(&job0, {{dependsNominal, {"B2"}}});
+  graph.simulateLoad(&job1, {{providesNominal, {"B1", "B2"}}});
+  graph.simulateLoad(&job2, {{dependsNominal, {"B1"}}});
+
+
+  const DependencyKey k = DependencyKey(NodeKind::nominal,
+                                        DeclAspect::interface, "B1", "");
+  std::vector<ModuleDepGraphNode *> changedNodes;
+  graph.forEachMatchingNode(
+          k,
+          [&](ModuleDepGraphNode* n) {changedNodes.push_back(n);});
+  {
+    const auto jobs = graph.findJobsToRecompileWhenNodesChange(changedNodes);
+    EXPECT_TRUE(contains(jobs, &job2));
+    EXPECT_FALSE(contains(jobs, &job0));
+    }
+}
