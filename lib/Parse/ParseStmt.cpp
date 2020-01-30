@@ -401,7 +401,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ParserStatus Status = parseLineDirective(false);
       BraceItemsStatus |= Status;
       NeedParseErrorRecovery = Status.isError();
-    } else if (isStartOfDecl()) {
+    } else if (isStartOfSwiftDecl()) {
       SmallVector<Decl*, 8> TmpDecls;
       ParserResult<Decl> DeclResult = 
           parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
@@ -703,7 +703,7 @@ ParserResult<Stmt> Parser::parseStmtBreak() {
   // since the expression after the break is dead, we don't feel bad eagerly
   // parsing this.
   if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
-      !isStartOfStmt() && !isStartOfDecl())
+      !isStartOfStmt() && !isStartOfSwiftDecl())
     TargetLoc = consumeIdentifier(&Target);
 
   return makeParserResult(new (Context) BreakStmt(Loc, Target, TargetLoc));
@@ -726,7 +726,7 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
   // since the expression after the continue is dead, we don't feel bad eagerly
   // parsing this.
   if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
-      !isStartOfStmt() && !isStartOfDecl())
+      !isStartOfStmt() && !isStartOfSwiftDecl())
     TargetLoc = consumeIdentifier(&Target);
 
   return makeParserResult(new (Context) ContinueStmt(Loc, Target, TargetLoc));
@@ -759,7 +759,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
   if (Tok.isNot(tok::r_brace, tok::semi, tok::eof, tok::pound_if, 
                 tok::pound_error, tok::pound_warning, tok::pound_endif,
                 tok::pound_else, tok::pound_elseif) &&
-      !isStartOfStmt() && !isStartOfDecl()) {
+      !isStartOfStmt() && !isStartOfSwiftDecl()) {
     SourceLoc ExprLoc = Tok.getLoc();
 
     // Issue a warning when the returned expression is on a different line than

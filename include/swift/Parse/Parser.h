@@ -880,8 +880,8 @@ public:
   //===--------------------------------------------------------------------===//
   // Decl Parsing
 
-  /// Return true if parser is at the start of a decl or decl-import.
-  bool isStartOfDecl();
+  /// Return true if parser is at the start of a Swift decl or decl-import.
+  bool isStartOfSwiftDecl();
 
   void parseTopLevel();
 

@@ -3047,9 +3047,9 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
         // treat 'class' as a modifier; in the case of a following CC
         // token, we cannot be sure there is no intention to override
         // or witness something static.
-        if (isStartOfDecl() || (isa<ClassDecl>(CurDeclContext) &&
-                                (Tok.is(tok::code_complete) ||
-                                 Tok.getRawText().equals("override")))) {
+        if (isStartOfSwiftDecl() || (isa<ClassDecl>(CurDeclContext) &&
+                                     (Tok.is(tok::code_complete) ||
+                                      Tok.getRawText().equals("override")))) {
           /* We're OK */
         } else {
           // This 'class' is a real ClassDecl introducer.
@@ -3296,8 +3296,7 @@ static bool isParenthesizedUnowned(Parser &P) {
           (P.Tok.getText() == "safe" || P.Tok.getText() == "unsafe");
 }
 
-  
-bool Parser::isStartOfDecl() {
+bool Parser::isStartOfSwiftDecl() {
   // If this is obviously not the start of a decl, then we're done.
   if (!isKeywordPossibleDeclStart(Tok)) return false;
 
@@ -3348,7 +3347,7 @@ bool Parser::isStartOfDecl() {
     if (Tok.isAny(tok::r_brace, tok::eof, tok::pound_endif))
       return true;
 
-    return isStartOfDecl();
+    return isStartOfSwiftDecl();
   }
 
   // Otherwise, the only hard case left is the identifier case.
@@ -3374,7 +3373,7 @@ bool Parser::isStartOfDecl() {
     consumeToken(tok::l_paren);
     consumeToken(tok::identifier);
     consumeToken(tok::r_paren);
-    return isStartOfDecl();
+    return isStartOfSwiftDecl();
   }
 
   // If the next token is obviously not the start of a decl, bail early.
@@ -3384,7 +3383,7 @@ bool Parser::isStartOfDecl() {
   // Otherwise, do a recursive parse.
   Parser::BacktrackingScope Backtrack(*this);
   consumeToken(tok::identifier);
-  return isStartOfDecl();
+  return isStartOfSwiftDecl();
 }
 
 void Parser::consumeDecl(ParserPosition BeginParserPosition,
