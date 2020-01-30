@@ -232,6 +232,9 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
           FrontendOptions::ActionType::REPL) {
     registerIDERequestFunctions(Context->evaluator);
   }
+
+  registerIRGenSILTransforms(*Context);
+
   if (setUpModuleLoaders())
     return true;
 

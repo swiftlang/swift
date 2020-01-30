@@ -854,17 +854,6 @@ void swift::irgen::deleteIRGenModule(
 static void runIRGenPreparePasses(SILModule &Module,
                                   irgen::IRGenModule &IRModule) {
   SILPassManager PM(&Module, &IRModule, "irgen", /*isMandatoryPipeline=*/ true);
-  bool largeLoadable = Module.getOptions().EnableLargeLoadableTypes;
-#define PASS(ID, Tag, Name)
-#define IRGEN_PASS(ID, Tag, Name)                                              \
-  if (swift::PassKind::ID == swift::PassKind::LoadableByAddress) {             \
-    if (largeLoadable) {                                                       \
-      PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());          \
-    }                                                                          \
-  } else {                                                                     \
-    PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());            \
-  }
-#include "swift/SILOptimizer/PassManager/Passes.def"
   PM.executePassPipelinePlan(
       SILPassPipelinePlan::getIRGenPreparePassPipeline(Module.getOptions()));
 }

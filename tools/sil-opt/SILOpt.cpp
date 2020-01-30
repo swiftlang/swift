@@ -274,14 +274,6 @@ static cl::opt<std::string> RemarksFormat(
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
   SILPassManager PM(Module, IRGenMod);
-  for (auto P : Passes) {
-#define PASS(ID, Tag, Name)
-#define IRGEN_PASS(ID, Tag, Name)                                              \
-  if (P == PassKind::ID)                                                       \
-    PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());
-#include "swift/SILOptimizer/PassManager/Passes.def"
-  }
-
   PM.executePassPipelinePlan(SILPassPipelinePlan::getPassPipelineForKinds(
       Module->getOptions(), Passes));
 
