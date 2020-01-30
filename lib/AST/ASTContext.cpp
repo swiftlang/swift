@@ -472,6 +472,9 @@ struct ASTContext::Implementation {
   llvm::DenseMap<OverrideSignatureKey, GenericSignature> overrideSigCache;
 
   Optional<ClangTypeConverter> Converter;
+
+  /// The IRGen specific SIL transforms that have been registered.
+  SILTransformCtors IRGenSILPasses;
 };
 
 ASTContext::Implementation::Implementation()
@@ -4572,6 +4575,17 @@ bool ASTContext::overrideGenericSignatureReqsSatisfied(
     return derivedSig->requirementsNotSatisfiedBy(sig).empty();
   }
   llvm_unreachable("Unhandled OverrideGenericSignatureReqCheck in switch");
+}
+
+void ASTContext::registerIRGenSILTransforms(SILTransformCtors ctors) {
+  assert(getImpl().IRGenSILPasses.empty() && "Already registered");
+  getImpl().IRGenSILPasses = ctors;
+}
+
+ASTContext::SILTransformCtors ASTContext::getIRGenSILTransforms() const {
+  auto passes = getImpl().IRGenSILPasses;
+  assert(!passes.empty() && "Didn't register the necessary passes");
+  return passes;
 }
 
 SILLayout *SILLayout::get(ASTContext &C,

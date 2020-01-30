@@ -99,9 +99,6 @@ class SILPassManager {
   /// OptimizationMode::NoOptimization.
   bool isMandatory = false;
 
-  /// The IRGen SIL passes. These have to be dynamically added by IRGen.
-  llvm::DenseMap<unsigned, SILTransform *> IRGenPasses;
-
   /// The notification handler for this specific SILPassManager.
   ///
   /// This is not owned by the pass manager, it is owned by the SILModule which
@@ -267,15 +264,6 @@ public:
       }
       execute();
     }
-  }
-
-  void registerIRGenPass(PassKind Kind, SILTransform *Transform) {
-    assert(IRGenPasses.find(unsigned(Kind)) == IRGenPasses.end() &&
-           "Pass already registered");
-    assert(
-        IRMod &&
-        "Attempting to register an IRGen pass with a non-IRGen pass manager");
-    IRGenPasses[unsigned(Kind)] = Transform;
   }
 
 private:

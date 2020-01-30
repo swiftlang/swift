@@ -633,8 +633,6 @@ void SILPassManager::execute() {
 
 /// D'tor.
 SILPassManager::~SILPassManager() {
-  assert(IRGenPasses.empty() && "Must add IRGen SIL passes that were "
-                                "registered to the list of transformations");
   // Before we do anything further, verify the module and our analyses. These
   // are natural points with which to verify.
   //
@@ -749,6 +747,14 @@ const SILOptions &SILPassManager::getOptions() const {
   return Mod->getOptions();
 }
 
+namespace {
+enum class IRGenPasses : uint8_t {
+#define PASS(ID, TAG, NAME)
+#define IRGEN_PASS(ID, TAG, NAME) ID,
+#include "swift/SILOptimizer/PassManager/Passes.def"
+};
+} // end anonymous namespace
+
 void SILPassManager::addPass(PassKind Kind) {
   assert(unsigned(PassKind::AllPasses_Last) >= unsigned(Kind) &&
          "Invalid pass kind");
@@ -762,11 +768,12 @@ void SILPassManager::addPass(PassKind Kind) {
   }
 #define IRGEN_PASS(ID, TAG, NAME)                                              \
   case PassKind::ID: {                                                         \
-    SILTransform *T = IRGenPasses[unsigned(Kind)];                             \
+    auto &ctx = Mod->getASTContext();                                          \
+    auto irPasses = ctx.getIRGenSILTransforms();                               \
+    SILTransform *T = irPasses[static_cast<unsigned>(IRGenPasses::ID)]();      \
     assert(T && "Missing IRGen pass?");                                        \
     T->setPassKind(PassKind::ID);                                              \
     Transformations.push_back(T);                                              \
-    IRGenPasses.erase(unsigned(Kind));                                         \
     break;                                                                     \
   }
 #include "swift/SILOptimizer/PassManager/Passes.def"

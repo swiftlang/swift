@@ -110,6 +110,7 @@ namespace swift {
   struct RawComment;
   class DocComment;
   class SILBoxType;
+  class SILTransform;
   class TypeAliasDecl;
   class VarDecl;
   class UnifiedStatsReporter;
@@ -972,6 +973,15 @@ public:
 
   /// Each kind and SourceFile has its own cache for a Type.
   Type &getDefaultTypeRequestCache(SourceFile *, KnownProtocolKind);
+
+  using SILTransformCtors = ArrayRef<SILTransform *(*)(void)>;
+
+  /// Register IRGen specific SIL passes such that the SILOptimizer can access
+  /// and execute them without directly depending on IRGen.
+  void registerIRGenSILTransforms(SILTransformCtors fns);
+
+  /// Retrieve the IRGen specific SIL passes.
+  SILTransformCtors getIRGenSILTransforms() const;
 
 private:
   friend Decl;

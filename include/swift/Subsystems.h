@@ -392,6 +392,9 @@ namespace swift {
   /// Calling registerIDERequestFunctions will invoke this function as well.
   void registerIDETypeCheckRequestFunctions(Evaluator &evaluator);
 
+  /// Register SILOptimizer passes necessary for IRGen.
+  void registerIRGenSILTransforms(ASTContext &ctx);
+
 } // end namespace swift
 
 #endif // SWIFT_SUBSYSTEMS_H
