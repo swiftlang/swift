@@ -853,9 +853,9 @@ void swift::irgen::deleteIRGenModule(
 /// IRGenModule.
 static void runIRGenPreparePasses(SILModule &Module,
                                   irgen::IRGenModule &IRModule) {
-  SILPassManager PM(&Module, &IRModule, /*isMandatoryPipeline=*/ true);
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getIRGenPreparePassPipeline(Module.getOptions()));
+  auto &opts = Module.getOptions();
+  auto plan = SILPassPipelinePlan::getIRGenPreparePassPipeline(opts);
+  executePassPipelinePlan(&Module, plan, /*isMandatory*/ true, &IRModule);
 }
 
 /// Generates LLVM IR, runs the LLVM passes and produces the output file.

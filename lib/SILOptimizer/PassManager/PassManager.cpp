@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-passmanager"
 
 #include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/AST/SILOptimizerRequests.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILFunction.h"
@@ -275,8 +276,25 @@ public:
 
 } // end anonymous namespace
 
-SILPassManager::SILPassManager(SILModule *M, bool isMandatory)
-    : Mod(M), isMandatory(isMandatory),
+llvm::Expected<bool> ExecuteSILPipelineRequest::evaluate(
+    Evaluator &evaluator, SILPipelineExecutionDescriptor desc) const {
+  SILPassManager PM(desc.SM, desc.IsMandatory, desc.IRMod);
+  PM.executePassPipelinePlan(desc.Plan);
+  return false;
+}
+
+void swift::executePassPipelinePlan(SILModule *SM,
+                                    const SILPassPipelinePlan &plan,
+                                    bool isMandatory,
+                                    irgen::IRGenModule *IRMod) {
+  auto &evaluator = SM->getASTContext().evaluator;
+  SILPipelineExecutionDescriptor desc{SM, plan, isMandatory, IRMod};
+  (void)llvm::cantFail(evaluator(ExecuteSILPipelineRequest{desc}));
+}
+
+SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
+                               irgen::IRGenModule *IRMod)
+    : Mod(M), IRMod(IRMod), isMandatory(isMandatory),
       deserializationNotificationHandler(nullptr) {
 #define ANALYSIS(NAME) \
   Analyses.push_back(create##NAME##Analysis(Mod));
@@ -291,12 +309,6 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory)
       new PassManagerDeserializationNotificationHandler(this));
   deserializationNotificationHandler = handler.get();
   M->registerDeserializationNotificationHandler(std::move(handler));
-}
-
-SILPassManager::SILPassManager(SILModule *M, irgen::IRGenModule *IRMod,
-                               bool isMandatory)
-    : SILPassManager(M, isMandatory) {
-  this->IRMod = IRMod;
 }
 
 bool SILPassManager::continueTransforming() {
