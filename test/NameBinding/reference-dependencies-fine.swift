@@ -4,10 +4,11 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -enable-fine-grained-dependencies -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
 
+// Need -fine-grained-dependency-include-intrafile to be invarient wrt type-body-fingerprints enabled/disabled
+// RUN: %target-swift-frontend -enable-fine-grained-dependencies -fine-grained-dependency-include-intrafile -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
 // Check that the output is deterministic.
-// RUN: %target-swift-frontend -enable-fine-grained-dependencies -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
+// RUN: %target-swift-frontend -enable-fine-grained-dependencies  -fine-grained-dependency-include-intrafile -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
 
 // Merge each entry onto one line and sort to overcome order differences
 // RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh <%t.swiftdeps >%t-processed.swiftdeps
@@ -339,7 +340,8 @@ struct Outer {
   }
 }
 
-// CHECK-TOPLEVEL-DAG: topLevel interface  '' privateFunc false
+// CHECK-TOPLEVEL-DAG: topLevel interface  '' privateFunc true
+// CHECK-TOPLEVEL-DAG: topLevel implementation  '' privateFunc true
 private func privateFunc() {}
 
 // CHECK-TOPLEVEL-DAG: topLevel interface  '' topLevel1 false
@@ -498,7 +500,8 @@ struct Sentinel2 {}
 // CHECK-POTENTIALMEMBER-DAG: potentialMember interface  4main13PrivateProto3P '' false
 
 // CHECK-NOMINAL-2-DAG: nominal interface  Sa '' false
-// CHECK-NOMINAL-2-DAG: nominal interface  Sb '' false
+// CHECK-NOMINAL-2-DAG: nominal interface  Sb '' true
+// CHECK-NOMINAL-2-DAG: nominal implementation  Sb '' true
 // CHECK-NOMINAL-2-DAG: nominal interface  4main18ClassFromOtherFileC '' false
 // CHECK-NOMINAL-2-DAG: nominal interface  SL '' false
 // CHECK-NOMINAL-2-DAG: nominal interface  s25ExpressibleByFloatLiteralP '' false
