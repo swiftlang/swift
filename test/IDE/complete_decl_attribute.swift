@@ -70,6 +70,7 @@ struct MyStruct {}
 // KEYWORD2-NEXT:             Keyword/None:                       quoted[#Func Attribute#]; name=quoted
 // KEYWORD2-NEXT:             Keyword/None:                       differentiating[#Func Attribute#]; name=differentiating
 // KEYWORD2-NEXT:             Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
+// KEYWORD2-NEXT:             Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // SWIFT_ENABLE_TENSORFLOW END
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2:                  Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -193,6 +194,7 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       quoted[#Func Attribute#]; name=quoted
 // ON_METHOD-DAG: Keyword/None:                       differentiating[#Func Attribute#]; name=differentiating
 // ON_METHOD-DAG: Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
+// ON_METHOD-DAG: Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // SWIFT_ENABLE_TENSORFLOW END
 // ON_METHOD-NOT: Keyword
 // ON_METHOD: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
