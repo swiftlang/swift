@@ -375,6 +375,12 @@ namespace swift {
   /// should call this functions after forming the ASTContext.
   void registerSILGenRequestFunctions(Evaluator &evaluator);
 
+  /// Register SILOptimizer-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any SIL optimization
+  /// should call this functions after forming the ASTContext.
+  void registerSILOptimizerRequestFunctions(Evaluator &evaluator);
+
   /// Register TBDGen-level request functions with the evaluator.
   ///
   /// Clients that form an ASTContext and will perform any TBD generation

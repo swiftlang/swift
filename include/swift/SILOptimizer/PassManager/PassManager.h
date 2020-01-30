@@ -37,8 +37,15 @@ namespace irgen {
 class IRGenModule;
 }
 
+/// The main entrypoint for executing a pipeline pass on a SIL module.
+void executePassPipelinePlan(SILModule *SM, const SILPassPipelinePlan &plan,
+                             bool isMandatory = false,
+                             irgen::IRGenModule *IRMod = nullptr);
+
 /// The SIL pass manager.
 class SILPassManager {
+  friend class ExecuteSILPipelineRequest;
+
   /// The module that the pass manager will transform.
   SILModule *Mod;
 
@@ -107,19 +114,12 @@ class SILPassManager {
   /// pass manager is destroyed.
   DeserializationNotificationHandler *deserializationNotificationHandler;
 
-public:
   /// C'tor. It creates and registers all analysis passes, which are defined
-  /// in Analysis.def.
-  ///
-  /// If \p isMandatory is true, passes are also run for functions
-  /// which have OptimizationMode::NoOptimization.
-  SILPassManager(SILModule *M, bool isMandatory = false);
+  /// in Analysis.def. This is private as it should only be used by
+  /// ExecuteSILPipelineRequest.
+  SILPassManager(SILModule *M, bool isMandatory, irgen::IRGenModule *IRMod);
 
-  /// C'tor. It creates an IRGen pass manager. Passes can query for the
-  /// IRGenModule.
-  SILPassManager(SILModule *M, irgen::IRGenModule *IRMod,
-                 bool isMandatory = false);
-
+public:
   const SILOptions &getOptions() const;
 
   /// Searches for an analysis of type T in the list of registered

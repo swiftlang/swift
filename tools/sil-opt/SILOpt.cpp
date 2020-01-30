@@ -258,9 +258,10 @@ static cl::opt<std::string>
 
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
-  SILPassManager PM(Module, IRGenMod);
-  PM.executePassPipelinePlan(SILPassPipelinePlan::getPassPipelineForKinds(
-      Module->getOptions(), Passes));
+  auto &opts = Module->getOptions();
+  executePassPipelinePlan(
+      Module, SILPassPipelinePlan::getPassPipelineForKinds(opts, Passes),
+      /*isMandatory*/ false, IRGenMod);
 
   if (Module->getOptions().VerifyAll)
     Module->verify();
