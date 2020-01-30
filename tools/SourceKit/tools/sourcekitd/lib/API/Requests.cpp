@@ -3106,6 +3106,13 @@ static bool isSemanticEditorDisabled() {
                                            NSEC_PER_SEC * Seconds);
       dispatch_after(When, dispatch_get_main_queue(), ^{
         Toggle = SemaInfoToggle::Enable;
+
+        static UIdent SemaEnabledNotificationUID(
+            "source.notification.sema_enabled");
+        ResponseBuilder RespBuilder;
+        auto Dict = RespBuilder.getDictionary();
+        Dict.set(KeyNotification, SemaEnabledNotificationUID);
+        sourcekitd::postNotification(RespBuilder.createResponse());
       });
     });
   }
