@@ -1468,6 +1468,10 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
             if (auto overlayModule = LF->getOverlayModule()) {
               nestedType = findNestedTypeDeclInModule(getFile(), overlayModule,
                                                       memberName, baseType);
+            } else if (LF->getParentModule() != extensionModule) {
+              nestedType = findNestedTypeDeclInModule(getFile(),
+                                                      LF->getParentModule(),
+                                                      memberName, baseType);
             }
           }
         }
