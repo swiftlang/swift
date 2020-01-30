@@ -2160,6 +2160,17 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
             break;
           }
+
+          // TODO(diagnostics): If there are any requirement failures associated
+          // with result types which are part of a function type conversion,
+          // let's record general conversion mismatch in order for it to capture
+          // and display complete function types.
+          //
+          // Once either reacher locators or better diagnostic presentation for
+          // nested type failures is available this check could be removed.
+          if (last->is<LocatorPathElt::FunctionResult>())
+            return getTypeMatchFailure(locator);
+
         } else { // There are no elements in the path
           auto *anchor = locator.getAnchor();
           if (!(anchor &&
