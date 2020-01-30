@@ -799,6 +799,7 @@ public:
                    compoundNamesByRDK);
 
   static constexpr char noncascadingOrPrivatePrefix = '#';
+  static constexpr char nameFingerprintSeparator = ',';
 
   static std::string noncascading(std::string name);
 

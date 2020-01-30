@@ -848,12 +848,29 @@ bool swift::fine_grained_dependencies::emitReferenceDependencies(
 static StringRef stripPrefix(const StringRef name) {
   return name.ltrim(SourceFileDepGraph::noncascadingOrPrivatePrefix);
 }
+static StringRef stripFingerprint(const StringRef nameAndFingerprint) {
+  return nameAndFingerprint.split(SourceFileDepGraph::nameFingerprintSeparator)
+           .first;
+}
+static StringRef stripName(const StringRef nameAndFingerprint) {
+  return nameAndFingerprint.split(SourceFileDepGraph::nameFingerprintSeparator)
+           .second;
+}
+static std::string extractName(const StringRef prefixNameFingerprint) {
+  return stripFingerprint(stripPrefix(prefixNameFingerprint)).str();
+}
+static Optional<std::string> extractFingerprint(
+         const StringRef prefixNameFingerprint) {
+  const auto fp = stripName(stripPrefix(prefixNameFingerprint));
+  return fp.empty() ? None : Optional<std::string>(fp.str());
+}
 
 static std::vector<ContextNameFingerprint>
 getBaseNameProvides(ArrayRef<std::string> simpleNames) {
   std::vector<ContextNameFingerprint> result;
   for (StringRef n : simpleNames)
-    result.push_back(ContextNameFingerprint("", stripPrefix(n).str(), None));
+    result.push_back(ContextNameFingerprint("", extractName(n),
+                     extractFingerprint(n)));
   return result;
 }
 
@@ -861,7 +878,8 @@ static std::vector<ContextNameFingerprint>
 getMangledHolderProvides(ArrayRef<std::string> simpleNames) {
   std::vector<ContextNameFingerprint> result;
   for (StringRef n : simpleNames)
-    result.push_back(ContextNameFingerprint(stripPrefix(n).str(), "", None));
+    result.push_back(ContextNameFingerprint(extractName(n), "",
+                     extractFingerprint(n)));
   return result;
 }
 
@@ -869,12 +887,15 @@ static std::vector<ContextNameFingerprint> getCompoundProvides(
     ArrayRef<std::pair<std::string, std::string>> compoundNames) {
   std::vector<ContextNameFingerprint> result;
   for (const auto &p : compoundNames)
-    result.push_back(ContextNameFingerprint(stripPrefix(p.first),
-                                            stripPrefix(p.second), None));
+    result.push_back(ContextNameFingerprint(extractName(p.first),
+                                            extractName(p.second),
+                                            extractFingerprint(p.second)));
   return result;
 }
 
-static bool cascades(const std::string &s) { return s.empty() || s[0] != SourceFileDepGraph::noncascadingOrPrivatePrefix; }
+static bool cascades(const std::string &s) {
+  return s.empty() || s[0] != SourceFileDepGraph::noncascadingOrPrivatePrefix;
+}
 
 // Use '_' as a prefix for a file-private member
 static bool isPrivate(const std::string &s) {
@@ -904,7 +925,8 @@ getCompoundDepends(
     // (On Linux, the compiler needs more verbosity than:
     //  result.push_back({{n, "", false}, cascades(n)});
     result.push_back(
-        std::make_pair(std::make_tuple(stripPrefix(n), std::string(), false), cascades(n)));
+        std::make_pair(std::make_tuple(stripPrefix(n), std::string(), false),
+                       cascades(n)));
   }
   for (auto &p : compoundNames) {
     // Likewise, for Linux expand the following out:
@@ -932,7 +954,8 @@ SourceFileDepGraph SourceFileDepGraph::simulateLoad(
   SourceFileDepGraphConstructor c(
     swiftDepsFilename, includePrivateDeps, hadCompilationError, interfaceHash,
     getSimpleDepends(simpleNamesByRDK[dependsTopLevel]),
-    getCompoundDepends(simpleNamesByRDK[dependsNominal], compoundNamesByRDK[dependsMember]),
+    getCompoundDepends(simpleNamesByRDK[dependsNominal],
+                       compoundNamesByRDK[dependsMember]),
     getSimpleDepends(simpleNamesByRDK[dependsDynamicLookup]),
     getExternalDepends(simpleNamesByRDK[dependsExternal]),
     {}, // precedence groups
