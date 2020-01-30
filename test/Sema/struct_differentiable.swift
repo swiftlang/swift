@@ -343,7 +343,7 @@ struct VectorSpaceCustomStruct : AdditiveArithmetic, Differentiable {
 }
 
 struct StaticNoDerivative : Differentiable {
-  @noDerivative static var s: Bool = true // expected-error {{'@noDerivative' is only allowed on stored properties in structure or class types that declare a conformance to 'Differentiable'}}
+  @noDerivative static var s: Bool = true
 }
 
 struct StaticMembersShouldNotAffectAnything : AdditiveArithmetic, Differentiable {

@@ -42,7 +42,7 @@ struct TestNoDerivative : EuclideanDifferentiable {
 
 // CHECK-AST-LABEL: internal struct TestNoDerivative : EuclideanDifferentiable {
 // CHECK-AST:         var w: Float
-// CHECK-AST:         @noDerivative internal var technicallyDifferentiable: Float
+// CHECK-AST:         @noDerivative @_semantics("autodiff.nonvarying") internal var technicallyDifferentiable: Float
 // CHECK-AST:         internal init(w: Float, technicallyDifferentiable: Float)
 // CHECK-AST:         internal struct TangentVector : Differentiable, AdditiveArithmetic, ElementaryFunctions
 // CHECK-AST:           internal typealias TangentVector = TestNoDerivative.TangentVector
@@ -55,7 +55,7 @@ struct TestPointwiseMultiplicative : Differentiable {
 
 // CHECK-AST-LABEL: internal struct TestPointwiseMultiplicative : Differentiable {
 // CHECK-AST:         var w: PointwiseMultiplicativeDummy
-// CHECK-AST:         @noDerivative internal var technicallyDifferentiable: PointwiseMultiplicativeDummy
+// CHECK-AST:         @noDerivative @_semantics("autodiff.nonvarying") internal var technicallyDifferentiable: PointwiseMultiplicativeDummy
 // CHECK-AST:         internal init(w: PointwiseMultiplicativeDummy, technicallyDifferentiable: PointwiseMultiplicativeDummy)
 // CHECK-AST:         internal struct TangentVector : Differentiable, AdditiveArithmetic, PointwiseMultiplicative
 // CHECK-AST:           internal typealias TangentVector = TestPointwiseMultiplicative.TangentVector
@@ -68,7 +68,7 @@ struct TestKeyPathIterable : Differentiable, KeyPathIterable {
 
 // CHECK-AST-LABEL: internal struct TestKeyPathIterable : Differentiable, KeyPathIterable {
 // CHECK-AST:         var w: Float
-// CHECK-AST:         @noDerivative internal var technicallyDifferentiable: Float
+// CHECK-AST:         @noDerivative @_semantics("autodiff.nonvarying") internal var technicallyDifferentiable: Float
 // CHECK-AST:         internal init(w: Float, technicallyDifferentiable: Float)
 // CHECK-AST:         internal struct TangentVector : Differentiable, AdditiveArithmetic, ElementaryFunctions, VectorProtocol, KeyPathIterable
 // CHECK-AST:           internal typealias TangentVector = TestKeyPathIterable.TangentVector
