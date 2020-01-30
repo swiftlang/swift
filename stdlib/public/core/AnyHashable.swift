@@ -198,7 +198,7 @@ public struct AnyHashable {
 
 extension AnyHashable: Equatable {
   /// Returns a Boolean value indicating whether two type-erased hashable
-  /// instances wrap the same value of equivalent type.
+  /// instances wrap the same underlying value.
   ///
   /// `AnyHashable` considers bridged counterparts (such as a `String` and an
   /// `NSString`) of the same value to be equivalent when type-erased. Where
