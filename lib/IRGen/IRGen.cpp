@@ -854,7 +854,7 @@ void swift::irgen::deleteIRGenModule(
 /// IRGenModule.
 static void runIRGenPreparePasses(SILModule &Module,
                                   irgen::IRGenModule &IRModule) {
-  SILPassManager PM(&Module, &IRModule, "irgen", /*isMandatoryPipeline=*/ true);
+  SILPassManager PM(&Module, &IRModule, /*isMandatoryPipeline=*/ true);
   PM.executePassPipelinePlan(
       SILPassPipelinePlan::getIRGenPreparePassPipeline(Module.getOptions()));
 }

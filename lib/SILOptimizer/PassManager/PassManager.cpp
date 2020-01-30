@@ -275,9 +275,8 @@ public:
 
 } // end anonymous namespace
 
-SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage,
-                               bool isMandatory)
-    : Mod(M), StageName(Stage), isMandatory(isMandatory),
+SILPassManager::SILPassManager(SILModule *M, bool isMandatory)
+    : Mod(M), isMandatory(isMandatory),
       deserializationNotificationHandler(nullptr) {
 #define ANALYSIS(NAME) \
   Analyses.push_back(create##NAME##Analysis(Mod));
@@ -295,8 +294,8 @@ SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage,
 }
 
 SILPassManager::SILPassManager(SILModule *M, irgen::IRGenModule *IRMod,
-                               llvm::StringRef Stage, bool isMandatory)
-    : SILPassManager(M, Stage, isMandatory) {
+                               bool isMandatory)
+    : SILPassManager(M, isMandatory) {
   this->IRMod = IRMod;
 }
 
