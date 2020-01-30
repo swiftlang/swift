@@ -221,7 +221,6 @@ private:
   validateContextualType(Type contextualType, ContextualTypePurpose CTP);
 
   bool visitExpr(Expr *E);
-  bool visitTryExpr(TryExpr *E);
 
   bool visitApplyExpr(ApplyExpr *AE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
@@ -1423,12 +1422,6 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   // Don't walk the children for this node, it leads to multiple diagnostics
   // because of how sema injects this node into the type checker.
   return false;
-}
-
-/// A TryExpr doesn't change it's argument, nor does it change the contextual
-/// type.
-bool FailureDiagnosis::visitTryExpr(TryExpr *E) {
-  return visit(E->getSubExpr());
 }
 
 bool FailureDiagnosis::visitExpr(Expr *E) {
