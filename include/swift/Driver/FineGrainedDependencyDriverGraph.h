@@ -437,7 +437,7 @@ public:
   /// Call \p fn for each node whose key matches \p key.
   void
   forEachMatchingNode(const DependencyKey &key,
-                      function_ref<void(const ModuleDepGraphNode *)>) const;
+                      function_ref<void(ModuleDepGraphNode *)>) const;
 
   void forEachNodeInJob(StringRef swiftDeps,
                         function_ref<void(ModuleDepGraphNode *)>) const;
