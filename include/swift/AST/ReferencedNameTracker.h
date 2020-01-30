@@ -14,31 +14,44 @@
 #define SWIFT_REFERENCEDNAMETRACKER_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 
+class Decl;
 class NominalTypeDecl;
 
 class ReferencedNameTracker {
-#define TRACKED_SET(KIND, NAME) \
-private: \
-  llvm::DenseMap<KIND, bool> NAME##s; \
-public: \
-  void add##NAME(KIND new##NAME, bool isCascadingUse) { \
-    NAME##s[new##NAME] |= isCascadingUse; \
-  } \
-  const decltype(NAME##s) &get##NAME##s() const { \
-    return NAME##s; \
+
+public:
+  using MemberPair = std::pair<const NominalTypeDecl *, DeclBaseName>;
+private:
+  llvm::DenseMap<DeclBaseName, bool> TopLevelNames;
+  llvm::DenseMap<DeclBaseName, bool> DynamicLookupNames;
+  llvm::DenseMap<MemberPair, bool> UsedMembers;
+
+public:
+  const decltype(TopLevelNames) &getTopLevelNames() const {
+    return TopLevelNames;
+  }
+  const decltype(DynamicLookupNames) &getDynamicLookupNames() const {
+    return DynamicLookupNames;
+  }
+  const decltype(UsedMembers) &getUsedMembers() const {
+    return UsedMembers;
   }
 
-  TRACKED_SET(DeclBaseName, TopLevelName)
-  TRACKED_SET(DeclBaseName, DynamicLookupName)
+  void addTopLevelName(DeclBaseName name, bool isCascadingUse) {
+    TopLevelNames[name] |= isCascadingUse;
+  }
+  void addDynamicLookupName(DeclBaseName name, bool isCascadingUse) {
+    DynamicLookupNames[name] |= isCascadingUse;
+  }
+  void addUsedMember(MemberPair member, bool isCascadingUse) {
+    UsedMembers[member] |= isCascadingUse;
+  }
 
-  using MemberPair = std::pair<const NominalTypeDecl *, DeclBaseName>;
-  TRACKED_SET(MemberPair, UsedMember)
-
-#undef TRACKED_SET
 };
 
 } // end namespace swift
