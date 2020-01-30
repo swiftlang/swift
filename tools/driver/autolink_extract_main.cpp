@@ -80,7 +80,7 @@ public:
     }
 
     if (ParsedArgs.getLastArg(OPT_help)) {
-      std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
+      std::string ExecutableName(llvm::sys::path::stem(MainExecutablePath));
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift Autolink Extract", options::AutolinkExtractOption,
                        0, /*ShowAllAliases*/false);
@@ -138,7 +138,7 @@ extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
       SectionData->split(SplitFlags, llvm::StringRef("\0", 1), -1,
                          /*KeepEmpty=*/false);
       for (const auto &Flag : SplitFlags)
-        LinkerFlags.push_back(Flag);
+        LinkerFlags.push_back(std::string(Flag));
     }
   }
   return false;

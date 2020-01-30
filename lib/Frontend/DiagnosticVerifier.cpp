@@ -350,7 +350,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     llvm::SmallString<256> Buf;
     Expected.MessageRange = MatchStart.slice(2, End);
     Expected.MessageStr =
-      Lexer::getEncodedStringSegment(Expected.MessageRange, Buf);
+        std::string(Lexer::getEncodedStringSegment(Expected.MessageRange, Buf));
     if (PrevExpectedContinuationLine)
       Expected.LineNo = PrevExpectedContinuationLine;
     else
@@ -787,4 +787,3 @@ bool swift::verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
 
   return HadError;
 }
-

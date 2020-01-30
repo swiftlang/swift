@@ -405,7 +405,7 @@ std::string LinkEntity::mangleAsString() const {
   }
 
   case Kind::SILGlobalVariable:
-    return getSILGlobalVariable()->getName();
+    return std::string(getSILGlobalVariable()->getName());
 
   case Kind::ReflectionBuiltinDescriptor:
     return mangler.mangleReflectionBuiltinDescriptor(getType());

@@ -1434,7 +1434,7 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
   if (isFramework)
     SearchPathOpts.FrameworkSearchPaths.push_back({searchPath, isSystem});
   else
-    SearchPathOpts.ImportSearchPaths.push_back(searchPath);
+    SearchPathOpts.ImportSearchPaths.push_back(std::string(searchPath));
 
   if (auto *clangLoader = getClangModuleLoader())
     clangLoader->addSearchPath(searchPath, isFramework, isSystem);

@@ -222,7 +222,7 @@ OutputFilesComputer::deriveOutputFileFromParts(StringRef dir,
   llvm::SmallString<128> path(dir);
   llvm::sys::path::append(path, base);
   llvm::sys::path::replace_extension(path, Suffix);
-  return path.str();
+  return std::string(path);
 }
 
 SupplementaryOutputPathsComputer::SupplementaryOutputPathsComputer(
@@ -502,11 +502,12 @@ void SupplementaryOutputPathsComputer::deriveModulePathParameters(
       RequestedAction == FrontendOptions::ActionType::MergeModules ||
       RequestedAction == FrontendOptions::ActionType::EmitModuleOnly || isSIB;
 
-  extension = file_types::getExtension(
-      isSIB ? file_types::TY_SIB : file_types::TY_SwiftModuleFile);
+  extension = std::string(file_types::getExtension(
+      isSIB ? file_types::TY_SIB : file_types::TY_SwiftModuleFile));
 
-  mainOutputIfUsable =
-      canUseMainOutputForModule && !OutputFiles.empty() ? mainOutputFile : "";
+  mainOutputIfUsable = canUseMainOutputForModule && !OutputFiles.empty()
+                           ? std::string(mainOutputFile)
+                           : "";
 }
 
 static SupplementaryOutputPaths

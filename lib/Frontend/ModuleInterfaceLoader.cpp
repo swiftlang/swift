@@ -46,14 +46,13 @@ std::string
 swift::getModuleCachePathFromClang(const clang::CompilerInstance &Clang) {
   if (!Clang.hasPreprocessor())
     return "";
-  std::string SpecificModuleCachePath = Clang.getPreprocessor()
-    .getHeaderSearchInfo()
-    .getModuleCachePath();
+  auto SpecificModuleCachePath =
+      Clang.getPreprocessor().getHeaderSearchInfo().getModuleCachePath();
 
   // The returned-from-clang module cache path includes a suffix directory
   // that is specific to the clang version and invocation; we want the
   // directory above that.
-  return llvm::sys::path::parent_path(SpecificModuleCachePath);
+  return std::string(llvm::sys::path::parent_path(SpecificModuleCachePath));
 }
 
 #pragma mark - Forwarding Modules
@@ -241,7 +240,8 @@ struct ModuleRebuildInfo {
     for (auto &mod : outOfDateModules) {
       if (mod.path == path) return mod;
     }
-    outOfDateModules.push_back({path, None, ModuleKind::Normal, {}, {}});
+    outOfDateModules.push_back(
+        {std::string(path), None, ModuleKind::Normal, {}, {}});
     return outOfDateModules.back();
   }
 
@@ -261,14 +261,14 @@ struct ModuleRebuildInfo {
   /// at \c modulePath.
   void addOutOfDateDependency(StringRef modulePath, StringRef depPath) {
     getOrInsertOutOfDateModule(modulePath)
-      .outOfDateDependencies.push_back(depPath);
+        .outOfDateDependencies.push_back(std::string(depPath));
   }
 
   /// Registers a missing dependency at \c depPath for the module
   /// at \c modulePath.
   void addMissingDependency(StringRef modulePath, StringRef depPath) {
     getOrInsertOutOfDateModule(modulePath)
-      .missingDependencies.push_back(depPath);
+        .missingDependencies.push_back(std::string(depPath));
   }
 
   /// Determines if we saw the given module path and registered is as out of

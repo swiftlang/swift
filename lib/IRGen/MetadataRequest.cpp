@@ -300,7 +300,8 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
 
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str,
                                                        MangledTypeRefRole role){
-  return getAddrOfStringForTypeRef(SymbolicMangling{str, {}}, role);
+  return getAddrOfStringForTypeRef(SymbolicMangling{std::string(str), {}},
+                                   role);
 }
 
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(

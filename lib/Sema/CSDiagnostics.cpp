@@ -5473,7 +5473,7 @@ bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
   // comparison with nil is illegal, albeit for different reasons spelled
   // out by the diagnosis.
   if (isa<NilLiteralExpr>(lhs) || isa<NilLiteralExpr>(rhs)) {
-    std::string revisedName = name.str();
+    std::string revisedName(name.str());
     revisedName.pop_back();
 
     auto loc = binaryOp->getLoc();
@@ -5600,7 +5600,7 @@ bool ArgumentMismatchFailure::diagnoseArchetypeMismatch() const {
         OS << " '" << decl->getFullName() << "'";
     }
 
-    return OS.str();
+    return std::string(OS.str());
   };
 
   emitDiagnostic(

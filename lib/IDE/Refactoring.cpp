@@ -2986,8 +2986,9 @@ static std::string insertUnderscore(StringRef Text) {
 
 static void insertUnderscoreInDigits(StringRef Digits,
                                      llvm::raw_ostream &OS) {
-  std::string BeforePoint, AfterPoint;
-  std::tie(BeforePoint, AfterPoint) = Digits.split('.');
+  StringRef BeforePointRef, AfterPointRef;
+  std::tie(BeforePointRef, AfterPointRef) = Digits.split('.');
+  std::string BeforePoint(BeforePointRef), AfterPoint(AfterPointRef);
 
   // Insert '_' for the part before the decimal point.
   std::reverse(BeforePoint.begin(), BeforePoint.end());
@@ -3486,7 +3487,7 @@ refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
 
   // Use the default name if not specified.
   if (Opts.PreferredName.empty()) {
-    Opts.PreferredName = getDefaultPreferredName(Opts.Kind);
+    Opts.PreferredName = std::string(getDefaultPreferredName(Opts.Kind));
   }
 
   switch (Opts.Kind) {

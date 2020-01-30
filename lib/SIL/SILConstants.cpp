@@ -131,7 +131,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   case RK_Closure: {
     SymbolicClosure *clo = getClosure();
     SILFunction *target = clo->getTarget();
-    std::string targetName = target->getName();
+    std::string targetName(target->getName());
     os << "closure: target: " << targetName;
     ArrayRef<SymbolicClosureArgument> args = clo->getCaptures();
     os << " captures [\n";

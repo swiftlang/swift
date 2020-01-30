@@ -698,7 +698,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
             mangleClangDecl(SS, namedClangDecl, getDecl()->getASTContext());
             return SS.str();
           }
-          return namedClangDecl->getName();
+          return std::string(namedClangDecl->getName());
         }
       }
     }
@@ -732,13 +732,13 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
       if (!NameA->Name.empty() &&
           !isForeignToNativeThunk() && !isNativeToForeignThunk()
           && !isCurried) {
-        return NameA->Name;
+        return std::string(NameA->Name);
       }
       
     // Use a given cdecl name for native-to-foreign thunks.
     if (auto CDeclA = getDecl()->getAttrs().getAttribute<CDeclAttr>())
       if (isNativeToForeignThunk()) {
-        return CDeclA->Name;
+        return std::string(CDeclA->Name);
       }
 
     // Otherwise, fall through into the 'other decl' case.

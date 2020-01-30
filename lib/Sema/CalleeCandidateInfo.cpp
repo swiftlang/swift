@@ -568,7 +568,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
     auto decl = declRefExpr->getDecl();
     candidates.push_back({ decl, skipCurriedSelf(decl) });
-    declName = decl->getBaseName().userFacingName();
+    declName = std::string(decl->getBaseName().userFacingName());
     return;
   }
   
@@ -589,7 +589,8 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     }
     
     if (!candidates.empty())
-      declName = candidates[0].getDecl()->getBaseName().userFacingName();
+      declName =
+          std::string(candidates[0].getDecl()->getBaseName().userFacingName());
     return;
   }
   
@@ -677,7 +678,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   // base uncurried by one level, and we refer to the name of the member, not to
   // the name of any base.
   if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn)) {
-    declName = UDE->getName().getBaseName().userFacingName();
+    declName = std::string(UDE->getName().getBaseName().userFacingName());
     hasCurriedSelf = true;
 
     // If base is a module or metatype, this is just a simple
@@ -738,7 +739,8 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     if (candidates.empty()) continue;
     
     if (declName.empty())
-      declName = candidates[0].getDecl()->getBaseName().userFacingName();
+      declName =
+          std::string(candidates[0].getDecl()->getBaseName().userFacingName());
     return;
   }
   
@@ -873,7 +875,8 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
   }
   
   if (!candidates.empty())
-    declName = candidates[0].getDecl()->getBaseName().userFacingName();
+    declName =
+        std::string(candidates[0].getDecl()->getBaseName().userFacingName());
 }
 
 CalleeCandidateInfo &CalleeCandidateInfo::

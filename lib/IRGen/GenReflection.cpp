@@ -1193,7 +1193,7 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
     OS << "__TEXT,__swift5_" << LongName << ", regular, no_dead_strip";
     break;
   }
-  return OS.str();
+  return std::string(OS.str());
 }
 
 const char *IRGenModule::getFieldTypeMetadataSectionName() {

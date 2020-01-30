@@ -1101,7 +1101,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
       }
   
       // Drop the double quotes.
-      StringRef rawString = SP.P.Tok.getText().drop_front().drop_back();
+      std::string rawString(SP.P.Tok.getText().drop_front().drop_back());
       Semantics->push_back(rawString);
       SP.P.consumeToken(tok::string_literal);
 

@@ -96,7 +96,7 @@
 using namespace swift;
 
 static std::string displayName(StringRef MainExecutablePath) {
-  std::string Name = llvm::sys::path::stem(MainExecutablePath);
+  std::string Name(llvm::sys::path::stem(MainExecutablePath));
   Name += " -frontend";
   return Name;
 }
@@ -307,11 +307,11 @@ static void computeSwiftModuleTraceInfo(
       }
 
       // FIXME: Better error handling
-      StringRef realDepPath
-        = fs::real_path(depPath, buffer, /*expand_tile*/true)
-        ? StringRef(depPath) // Couldn't find the canonical path, assume
-                             // this is good enough.
-        : buffer.str();
+      std::string realDepPath(
+          fs::real_path(depPath, buffer, /*expand_tile*/ true)
+              ? StringRef(depPath) // Couldn't find the canonical path, assume
+                                   // this is good enough.
+              : buffer.str());
 
       traceInfo.push_back({
         /*Name=*/
@@ -434,9 +434,7 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   LoadedModuleTraceFormat trace = {
       /*version=*/LoadedModuleTraceFormat::CurrentVersion,
       /*name=*/mainModule->getName(),
-      /*arch=*/ctxt.LangOpts.Target.getArchName(),
-      swiftModules
-  };
+      /*arch=*/std::string(ctxt.LangOpts.Target.getArchName()), swiftModules};
 
   // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
   // so first write to memory and then dump the buffer to the trace file.
@@ -590,7 +588,7 @@ private:
     if (!(FixitAll || shouldTakeFixit(Info)))
       return;
     for (const auto &Fix : Info.FixIts) {
-      AllEdits.push_back({SM, Fix.getRange(), Fix.getText()});
+      AllEdits.push_back({SM, Fix.getRange(), std::string(Fix.getText())});
     }
   }
 
@@ -1703,7 +1701,7 @@ static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
     SmallString<256> Path = OutDir;
     StringRef Filename = SF->getFilename();
     path::append(Path, path::filename(Filename));
-    return Path.str();
+    return std::string(Path);
   };
 
   std::unordered_set<std::string> Filenames;

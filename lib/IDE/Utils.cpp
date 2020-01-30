@@ -345,7 +345,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
     llvm::SmallString<64> Str;
     Str += "-fmodule-name=";
     Str += ClangInvok->getLangOpts()->CurrentModule;
-    CCArgs.push_back(Str.str());
+    CCArgs.push_back(std::string(Str.str()));
   }
 
   if (PPOpts.DetailedRecord) {
@@ -354,7 +354,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
 
   if (!ClangInvok->getFrontendOpts().Inputs.empty()) {
     Invok.getFrontendOptions().ImplicitObjCHeaderPath =
-      ClangInvok->getFrontendOpts().Inputs[0].getFile();
+        std::string(ClangInvok->getFrontendOpts().Inputs[0].getFile());
   }
 
   return false;
@@ -497,7 +497,7 @@ static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
       std::tie(CurLine, Lines) = Lines.split('\n');
       unsigned Begin = CurLine.find("<string>") + strlen("<string>");
       unsigned End = CurLine.find("</string>");
-      return CurLine.substr(Begin, End-Begin);
+      return std::string(CurLine.substr(Begin, End - Begin));
     }
   }
 
@@ -508,7 +508,8 @@ std::string ide::getSDKName(StringRef Path) {
   std::string Name = getPlistEntry(llvm::Twine(Path)+"/SDKSettings.plist",
                                    "CanonicalName");
   if (Name.empty() && Path.endswith(".sdk")) {
-    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk"));
+    Name =
+        std::string(llvm::sys::path::filename(Path).drop_back(strlen(".sdk")));
   }
   return Name;
 }
@@ -850,7 +851,7 @@ struct swift::ide::SourceEditJsonConsumer::Implementation {
   }
   void accept(SourceManager &SM, CharSourceRange Range,
               llvm::StringRef Text) {
-    AllEdits.push_back({SM, Range, Text});
+    AllEdits.push_back({SM, Range, std::string(Text)});
   }
 };
 

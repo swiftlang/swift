@@ -82,7 +82,7 @@ InstrumenterBase::InstrumenterBase(ASTContext &C, DeclContext *DC)
   const std::string filePrefix = "_pg_file_";
 
   // Setup Module identifier
-  std::string moduleName = TypeCheckDC->getParentModule()->getName().str();
+  std::string moduleName(TypeCheckDC->getParentModule()->getName().str());
   Identifier moduleIdentifier =
       Context.getIdentifier(builtinPrefix + modulePrefix + moduleName);
 
@@ -139,4 +139,3 @@ Expr *InstrumenterBase::buildIDArgumentExpr(Optional<DeclNameRef> name,
   return new (Context) UnresolvedDeclRefExpr(*name, DeclRefKind::Ordinary,
                                              DeclNameLoc(SR.End));
 }
-

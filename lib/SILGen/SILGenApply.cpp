@@ -4884,7 +4884,7 @@ std::string SILGenFunction::getMagicFileString(SourceLoc loc) {
   auto path = getMagicFilePathString(loc);
 
   if (!getASTContext().LangOpts.EnableConcisePoundFile)
-    return path;
+    return std::string(path);
 
   auto value = llvm::sys::path::filename(path).str();
   value += " (";

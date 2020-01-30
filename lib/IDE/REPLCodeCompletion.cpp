@@ -248,7 +248,7 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
   if (!Tokens.empty()) {
     Token &LastToken = Tokens.back();
     if (LastToken.is(tok::identifier) || LastToken.isKeyword()) {
-      Prefix = LastToken.getText();
+      Prefix = std::string(LastToken.getText());
 
       unsigned Offset = Ctx.SourceMgr.getLocOffsetInBuffer(LastToken.getLoc(),
                                                            BufferID);
@@ -275,7 +275,7 @@ StringRef REPLCompletions::getRoot() const {
     return Root.getValue();
   }
 
-  std::string RootStr = CookedResults[0].InsertableString;
+  std::string RootStr(CookedResults[0].InsertableString);
   for (auto R : CookedResults) {
     if (R.NumBytesToErase != 0) {
       RootStr.resize(0);
@@ -312,4 +312,3 @@ REPLCompletions::CookedResult REPLCompletions::getNextStem() {
 }
 
 void REPLCompletions::reset() { State = CompletionState::Invalid; }
-

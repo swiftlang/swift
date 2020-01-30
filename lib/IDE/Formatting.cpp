@@ -902,7 +902,8 @@ public:
 
     if (FC.IsInStringLiteral()) {
       return std::make_pair(LineRange(LineIndex, 1),
-        swift::ide::getTextForLine(LineIndex, Text, /*Trim*/false));
+                            std::string(swift::ide::getTextForLine(
+                                LineIndex, Text, /*Trim*/ false)));
     }
 
     // Take the current indent position of the outer context, then add another
@@ -944,7 +945,8 @@ public:
     }
 
     // Reformat the specified line with the calculated indent.
-    StringRef Line = swift::ide::getTextForLine(LineIndex, Text, /*Trim*/true);
+    std::string Line(
+        swift::ide::getTextForLine(LineIndex, Text, /*Trim*/ true));
     std::string IndentedLine;
     if (FmtOptions.UseTabs)
       IndentedLine.assign(ExpandedIndent / FmtOptions.TabWidth, '\t');
@@ -1082,4 +1084,3 @@ std::pair<LineRange, std::string> swift::ide::reformat(LineRange Range,
                                                       walker.getTokens(),
                                                       Line).collect());
 }
-

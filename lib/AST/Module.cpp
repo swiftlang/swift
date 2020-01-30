@@ -1914,7 +1914,7 @@ StringRef ModuleEntity::getName() const {
 std::string ModuleEntity::getFullName() const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const ModuleDecl*>())
-    return SwiftMod->getName().str();
+    return std::string(SwiftMod->getName().str());
   return getClangModule(Mod)->getFullModuleName();
 }
 
