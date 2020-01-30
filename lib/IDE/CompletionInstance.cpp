@@ -362,6 +362,11 @@ bool swift::ide::CompletionInstance::performOperation(
   // source text. That breaks an invariant of syntax tree building.
   Invocation.getLangOptions().BuildSyntaxTree = false;
 
+  // This validation may call stat(2) many times. Disable it to prevent
+  // performance regression.
+  Invocation.getSearchPathOptions().DisableModulesValidateSystemDependencies =
+      true;
+
   // Since caching uses the interface hash, and since per type fingerprints
   // weaken that hash, disable them here:
   Invocation.getLangOptions().EnableTypeFingerprints = false;
