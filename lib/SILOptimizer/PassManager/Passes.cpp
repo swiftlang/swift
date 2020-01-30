@@ -51,7 +51,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 
   auto &Ctx = Module.getASTContext();
 
-  SILPassManager PM(&Module, "", /*isMandatoryPipeline=*/ true);
+  SILPassManager PM(&Module, /*isMandatoryPipeline=*/ true);
   PM.executePassPipelinePlan(
       SILPassPipelinePlan::getDiagnosticPassPipeline(Module.getOptions()));
 
@@ -99,7 +99,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   if (Module.getOptions().DisableSILPerfOptimizations) {
     // If we are not supposed to run SIL perf optzns, we may still need to
     // serialize. So serialize now.
-    SILPassManager PM(&Module, "" /*stage*/, true /*isMandatory*/);
+    SILPassManager PM(&Module, true /*isMandatory*/);
     PM.executePassPipelinePlan(
         SILPassPipelinePlan::getSerializeSILPassPipeline(Module.getOptions()));
     return;
@@ -113,7 +113,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   // Check if we actually serialized our module. If we did not, serialize now.
   if (!Module.isSerialized()) {
-    SILPassManager PM(&Module, "" /*stage*/, true /*isMandatory*/);
+    SILPassManager PM(&Module, true /*isMandatory*/);
     PM.executePassPipelinePlan(
         SILPassPipelinePlan::getSerializeSILPassPipeline(Module.getOptions()));
   }
@@ -137,7 +137,7 @@ void swift::runSILPassesForOnone(SILModule &Module) {
 
   // We want to run the Onone passes also for function which have an explicit
   // Onone attribute.
-  SILPassManager PM(&Module, "Onone", /*isMandatoryPipeline=*/ true);
+  SILPassManager PM(&Module, /*isMandatoryPipeline=*/ true);
   PM.executePassPipelinePlan(
       SILPassPipelinePlan::getOnonePassPipeline(Module.getOptions()));
 
@@ -203,7 +203,7 @@ StringRef swift::PassKindTag(PassKind Kind) {
 // convert it to a module pass to ensure that the SIL input is always at the
 // same stage of lowering.
 void swift::runSILLoweringPasses(SILModule &Module) {
-  SILPassManager PM(&Module, "LoweringPasses", /*isMandatoryPipeline=*/ true);
+  SILPassManager PM(&Module, /*isMandatoryPipeline=*/ true);
   PM.executePassPipelinePlan(
       SILPassPipelinePlan::getLoweringPassPipeline(Module.getOptions()));
 
