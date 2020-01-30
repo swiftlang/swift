@@ -185,12 +185,9 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
     // this to CCP and trigger another round of copy propagation.
     SILArgument *Arg = *AI;
 
-    // If this argument is guaranteed and Args[Idx] is a SILFunctionArgument,
-    // delete the end_borrow.
-    if (Arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
-        isa<SILFunctionArgument>(Args[Idx])) {
+    // If this argument is guaranteed and Args[Idx], delete the end_borrow.
+    if (Arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed)
       deleteEndBorrows(Arg);
-    }
 
     // We were able to fold, so all users should use the new folded value.
     Arg->replaceAllUsesWith(Args[Idx]);
