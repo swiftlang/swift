@@ -1463,10 +1463,6 @@ static Type resolveNestedIdentTypeComponent(
                                      inferredAssocType);
     }
 
-    // At this point, we need to have resolved the type of the member.
-    if (memberType->hasError())
-      return memberType;
-
     // If there are generic arguments, apply them now.
     return applyGenericArguments(memberType, resolution, comp, options);
   };
