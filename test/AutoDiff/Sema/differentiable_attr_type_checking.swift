@@ -706,7 +706,7 @@ protocol ProtocolRequirements: Differentiable {
 }
 
 protocol ProtocolRequirementsRefined: ProtocolRequirements {
-  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable'}}
+  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable'}} {{3-3=@differentiable }}
   func f1(_ x: Float) -> Float
 }
 
@@ -719,7 +719,7 @@ struct DiffAttrConformanceErrors: ProtocolRequirements {
   var y: Float
 
   // FIXME(TF-284): Fix unexpected diagnostic.
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+2 {{candidate is missing attribute '@differentiable'}} {{3-3=@differentiable }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Float)'}}
   init(x: Float, y: Float) {
     self.x = x
@@ -727,31 +727,31 @@ struct DiffAttrConformanceErrors: ProtocolRequirements {
   }
 
   // FIXME(TF-284): Fix unexpected diagnostic.
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+2 {{candidate is missing attribute '@differentiable'}} {{3-3=@differentiable }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Int)'}}
   init(x: Float, y: Int) {
     self.x = x
     self.y = Float(y)
   }
 
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+2 {{candidate is missing attribute '@differentiable'}} {{3-3=@differentiable }}
   // expected-note @+1 {{candidate has non-matching type '(Float, Float) -> Float'}}
   func amb(x: Float, y: Float) -> Float {
     return x
   }
 
-  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: x)'}}
+  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: x)'}} {{3-3=@differentiable(wrt: x) }}
   // expected-note @+1 {{candidate has non-matching type '(Float, Int) -> Float'}}
   func amb(x: Float, y: Int) -> Float {
     return x
   }
 
-  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable'}} {{3-3=@differentiable }}
   func f1(_ x: Float) -> Float {
     return x
   }
 
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+2 {{candidate is missing attribute '@differentiable'}} {{3-3=@differentiable }}
   @differentiable(wrt: (self, x))
   func f2(_ x: Float, _ y: Float) -> Float {
     return x + y
@@ -774,7 +774,7 @@ protocol ProtocolRequirementsWithDefault {
   func f1(_ x: Float) -> Float
 }
 extension ProtocolRequirementsWithDefault {
-  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable'}} {{3-3=@differentiable }}
   func f1(_ x: Float) -> Float { x }
 }
 // expected-error @+1 {{type 'DiffAttrConformanceErrors2' does not conform to protocol 'ProtocolRequirementsWithDefault'}}
@@ -782,7 +782,7 @@ struct DiffAttrConformanceErrors2: ProtocolRequirementsWithDefault {
   typealias TangentVector = DummyTangentVector
   mutating func move(along _: TangentVector) {}
 
-  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable'}} {{3-3=@differentiable }}
   func f1(_ x: Float) -> Float { x }
 }
 
@@ -794,7 +794,7 @@ protocol NotRefiningDiffable {
 
 // expected-error @+1 {{type 'CertainlyNotDiffableWrtSelf' does not conform to protocol 'NotRefiningDiffable'}}
 struct CertainlyNotDiffableWrtSelf: NotRefiningDiffable {
-  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable'}} {{3-3=@differentiable }}
   func a(_ x: Float) -> Float { return x * 5.0 }
 }
 
@@ -813,7 +813,7 @@ struct TF285MissingOneDiffAttr: TF285 {
 
   // Requirement is missing an attribute.
   @differentiable(wrt: x)
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x, y))}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x, y))}} {{3-3=@differentiable(wrt: (x, y)) }}
   func foo(x: Float, y: Float) -> Float {
     return x
   }
@@ -1048,7 +1048,7 @@ public protocol DifferentiableDistribution: Differentiable, Distribution {
 // Adding a more general `@differentiable` attribute.
 public protocol DoubleDifferentiableDistribution: DifferentiableDistribution
   where Value: Differentiable {
-  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable(wrt: self)'}}
+  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable(wrt: self)'}} {{3-3=@differentiable(wrt: self) }}
   func logProbability(of value: Value) -> Float
 }
 
@@ -1138,8 +1138,8 @@ class Super: Differentiable {
 }
 
 class Sub: Super {
-  // expected-error @+2 {{overriding declaration is missing attribute '@differentiable(wrt: x)'}}
-  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable'}}
+  // expected-error @+2 {{overriding declaration is missing attribute '@differentiable(wrt: x)'}} {{12-12=@differentiable(wrt: x) }}
+  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable'}} {{12-12=@differentiable }}
   override func testMissingAttributes(_ x: Float) -> Float { x }
 
   // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}

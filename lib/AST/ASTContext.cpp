@@ -3518,14 +3518,14 @@ SILFunctionType::SILFunctionType(
     }
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Make sure that NotDifferentiable parameters only exist on differentiable
+  // Check that `@noDerivative` parameters only exist on `@differentiable`
   // functions.
   if (!ext.isDifferentiable())
     for (auto param : getParameters())
       assert(param.getDifferentiability() ==
                  SILParameterDifferentiability::DifferentiableOrNotApplicable &&
-             "non-differentiable function has NotDifferentiable parameter");
+             "non-`@differentiable` function should not have NotDifferentiable "
+             "parameter");
 #endif
 }
 

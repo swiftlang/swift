@@ -7515,7 +7515,8 @@ llvm::PointerUnion<Expr *, Stmt *> ConstraintSystem::applySolutionImpl(
     auto shouldCoerceToContextualType = [&]() {
       return convertType &&
           !(getType(resultExpr)->isUninhabited() &&
-            getContextualTypePurpose() == CTP_ReturnSingleExpr);
+            getContextualTypePurpose(target.getAsExpr())
+              == CTP_ReturnSingleExpr);
     };
 
     // If we're supposed to convert the expression to some particular type,

@@ -23,6 +23,33 @@ CHANGELOG
 
 </details>
 
+Swift Next
+----------
+
+* [SE-0269][]:
+
+  When an escaping closure explicitly captures `self` in its capture list, the
+  use of implicit `self` is enabled within that closure. This means that the
+  following code is now valid:
+  
+  ```swift
+  func doStuff(_ stuff: @escaping () -> Void) {}
+  
+  class C {
+    var x = 0
+
+    func method() {
+      doStuff { [self] in
+        x += 1
+      }
+    }
+  }
+  ```
+  
+  This proposal also introduces new diagnostics for inserting `self` into the
+  closure's capture list in addition to the existing 'use `self.` explicitly'
+  fix-it.
+
 Swift 5.2
 ---------
 
@@ -172,7 +199,7 @@ Swift 5.2
   A method override is no longer allowed to have a generic signature with
   requirements not imposed by the base method. For example:
 
-  ```
+  ```swift
   protocol P {}
   
   class Base {
@@ -7856,6 +7883,7 @@ Swift 1.0
 [SE-0252]: <https://github.com/apple/swift-evolution/blob/master/proposals/0252-keypath-dynamic-member-lookup.md>
 [SE-0253]: <https://github.com/apple/swift-evolution/blob/master/proposals/0253-callable.md>
 [SE-0254]: <https://github.com/apple/swift-evolution/blob/master/proposals/0254-static-subscripts.md>
+[SE-0269]: <https://github.com/apple/swift-evolution/blob/master/proposals/0269-implicit-self-explicit-capture.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>

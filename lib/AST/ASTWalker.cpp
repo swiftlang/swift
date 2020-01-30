@@ -223,9 +223,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    if (TAD->getGenericParams() &&
-        Walker.shouldWalkIntoGenericParams()) {
-
+    if (Walker.shouldWalkIntoGenericParams() && TAD->getGenericParams()) {
       if (visitGenericParamList(TAD->getGenericParams()))
         return true;
     }
@@ -237,8 +235,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   bool visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
-    if (OTD->getGenericParams() &&
-        Walker.shouldWalkIntoGenericParams()) {
+    if (Walker.shouldWalkIntoGenericParams() && OTD->getGenericParams()) {
       if (visitGenericParamList(OTD->getGenericParams()))
         return true;
     }
@@ -272,16 +269,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     // Visit requirements
-    if (auto *Protocol = dyn_cast<ProtocolDecl>(NTD)) {
-      if (auto *WhereClause = Protocol->getTrailingWhereClause()) {
-        for (auto &Req: WhereClause->getRequirements()) {
-          if (doIt(Req))
-            return true;
-        }
-      }
-    }
     if (WalkGenerics) {
-      for (auto Req: NTD->getGenericParams()->getTrailingRequirements()) {
+      ArrayRef<swift::RequirementRepr> Reqs = None;
+      if (auto *Protocol = dyn_cast<ProtocolDecl>(NTD)) {
+        if (auto *WhereClause = Protocol->getTrailingWhereClause())
+          Reqs = WhereClause->getRequirements();
+      } else {
+        Reqs = NTD->getGenericParams()->getTrailingRequirements();
+      }
+      for (auto Req: Reqs) {
         if (doIt(Req))
           return true;
       }
@@ -1358,7 +1354,6 @@ public:
 
 private:
   bool visitGenericParamListIfNeeded(GenericContext *gc) {
-    // Must check this first in case extensions have not been bound yet
     if (Walker.shouldWalkIntoGenericParams()) {
       if (auto *params = gc->getGenericParams()) {
         visitGenericParamList(params);

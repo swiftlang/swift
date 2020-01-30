@@ -191,7 +191,7 @@ bool MissingConformance::diagnose(bool asNote) const {
   auto *locator = getLocator();
 
   if (IsContextual) {
-    auto context = cs.getContextualTypePurpose();
+    auto context = cs.getContextualTypePurpose(locator->getAnchor());
     MissingContextualConformanceFailure failure(
         cs, context, NonConformingType, ProtocolType, locator);
     return failure.diagnose(asNote);
@@ -262,9 +262,9 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
 /// and the contextual type.
 static Optional<std::tuple<ContextualTypePurpose, Type, Type>>
 getStructuralTypeContext(ConstraintSystem &cs, ConstraintLocator *locator) {
-  if (auto contextualType = cs.getContextualType()) {
+  if (auto contextualType = cs.getContextualType(locator->getAnchor())) {
     if (auto *anchor = simplifyLocatorToAnchor(locator))
-      return std::make_tuple(cs.getContextualTypePurpose(),
+      return std::make_tuple(cs.getContextualTypePurpose(locator->getAnchor()),
                              cs.getType(anchor),
                              contextualType);
   } else if (auto argApplyInfo = cs.getFunctionArgApplyInfo(locator)) {
@@ -304,7 +304,7 @@ bool AllowTupleTypeMismatch::coalesceAndDiagnose(
   Type toType;
 
   if (getFromType()->is<TupleType>() && getToType()->is<TupleType>()) {
-    purpose = cs.getContextualTypePurpose();
+    purpose = cs.getContextualTypePurpose(locator->getAnchor());
     fromType = getFromType();
     toType = getToType();
   } else if (auto contextualTypeInfo = getStructuralTypeContext(cs, locator)) {
@@ -1167,4 +1167,16 @@ SpecifyClosureReturnType *
 SpecifyClosureReturnType::create(ConstraintSystem &cs,
                                  ConstraintLocator *locator) {
   return new (cs.getAllocator()) SpecifyClosureReturnType(cs, locator);
+}
+
+bool SpecifyObjectLiteralTypeImport::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+  UnableToInferProtocolLiteralType failure(cs, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyObjectLiteralTypeImport *
+SpecifyObjectLiteralTypeImport::create(ConstraintSystem &cs,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SpecifyObjectLiteralTypeImport(cs, locator);
 }

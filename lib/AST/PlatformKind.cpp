@@ -16,6 +16,7 @@
 
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/Platform.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -63,7 +64,8 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
     return true;
   
   if (Platform == PlatformKind::OSXApplicationExtension ||
-      Platform == PlatformKind::iOSApplicationExtension)
+      Platform == PlatformKind::iOSApplicationExtension ||
+      Platform == PlatformKind::macCatalystApplicationExtension)
     if (!EnableAppExtensionRestrictions)
       return false;
   
@@ -75,6 +77,9 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
     case PlatformKind::iOS:
     case PlatformKind::iOSApplicationExtension:
       return Target.isiOS() && !Target.isTvOS();
+    case PlatformKind::macCatalyst:
+    case PlatformKind::macCatalystApplicationExtension:
+      return tripleIsMacCatalystEnvironment(Target);
     case PlatformKind::tvOS:
     case PlatformKind::tvOSApplicationExtension:
       return Target.isTvOS();
@@ -87,8 +92,15 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
   llvm_unreachable("bad PlatformKind");
 }
 
-bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts) {
+bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts,
+                             bool ForTargetVariant) {
   llvm::Triple TT = LangOpts.Target;
+
+  if (ForTargetVariant) {
+    assert(LangOpts.TargetVariant && "Must have target variant triple");
+    TT = *LangOpts.TargetVariant;
+  }
+
   return isPlatformActiveForTarget(Platform, TT,
                                    LangOpts.EnableAppExtensionRestrictions);
 }
@@ -113,10 +125,33 @@ PlatformKind swift::targetPlatform(LangOptions &LangOpts) {
   }
 
   if (LangOpts.Target.isiOS()) {
+    if (tripleIsMacCatalystEnvironment(LangOpts.Target))
+      return (LangOpts.EnableAppExtensionRestrictions
+                  ? PlatformKind::macCatalystApplicationExtension
+                  : PlatformKind::macCatalyst);
     return (LangOpts.EnableAppExtensionRestrictions
                 ? PlatformKind::iOSApplicationExtension
                 : PlatformKind::iOS);
   }
 
   return PlatformKind::none;
+}
+
+bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
+                                             PlatformKind Parent) {
+  if (Child == PlatformKind::macCatalyst && Parent == PlatformKind::iOS)
+    return true;
+
+  if (Child == PlatformKind::macCatalystApplicationExtension) {
+    if (Parent == PlatformKind::iOS ||
+        Parent == PlatformKind::iOSApplicationExtension ||
+        Parent == PlatformKind::macCatalyst) {
+      return true;
+    }
+  }
+
+  // Ideally we would have all ApplicationExtension platforms
+  // inherit from their non-extension platform.
+
+  return false;
 }

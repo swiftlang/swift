@@ -3660,15 +3660,19 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
-/// Determines whether a differentiable function type is differentiable with
-/// respect to this parameter.
+/// The differentiability of a SIL function type parameter.
 enum class SILParameterDifferentiability : unsigned {
-  /// The function type is differentiable with respect to this parameter, or
-  /// differentiability is not applicable because the function is not
-  /// differentiable.
+  /// Either differentiable or not applicable.
+  ///
+  /// - If the function type is not `@differentiable`, parameter
+  ///   differentiability is not applicable. This case is the default value.
+  /// - If the function type is `@differentiable`, the function is
+  ///   differentiable with respect to this parameter.
   DifferentiableOrNotApplicable,
 
+  /// Not differentiable: a `@noDerivative` parameter.
+  ///
+  /// May be applied only to parameters of `@differentiable` function types.
   /// The function type is not differentiable with respect to this parameter.
   NotDifferentiable,
 };
@@ -3676,17 +3680,15 @@ enum class SILParameterDifferentiability : unsigned {
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
   llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
-
-  // SWIFT_ENABLE_TENSORFLOW
   SILParameterDifferentiability Differentiability : 1;
+
 public:
   SILParameterInfo() = default;//: Ty(), Convention((ParameterConvention)0) {}
-  // SWIFT_ENABLE_TENSORFLOW
   SILParameterInfo(
       CanType type, ParameterConvention conv,
       SILParameterDifferentiability differentiability =
           SILParameterDifferentiability::DifferentiableOrNotApplicable)
-    : TypeAndConvention(type, conv), Differentiability(differentiability) {
+      : TypeAndConvention(type, conv), Differentiability(differentiability) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
@@ -3741,14 +3743,14 @@ public:
     return isGuaranteedParameter(getConvention());
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   SILParameterDifferentiability getDifferentiability() const {
     return Differentiability;
   }
 
   SILParameterInfo getWithDifferentiability(
       SILParameterDifferentiability differentiability) const {
-    return SILParameterInfo(getInterfaceType(), getConvention(), differentiability);
+    return SILParameterInfo(getInterfaceType(), getConvention(),
+                            differentiability);
   }
 
   /// The SIL storage type determines the ABI for arguments based purely on the
@@ -3780,7 +3782,6 @@ public:
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(getInterfaceType().getPointer());
     id.AddInteger((unsigned)getConvention());
-    // SWIFT_ENABLE_TENSORFLOW
     id.AddInteger((unsigned)getDifferentiability());
   }
 
@@ -3795,7 +3796,6 @@ public:
   }
 
   bool operator==(SILParameterInfo rhs) const {
-    // SWIFT_ENABLE_TENSORFLOW
     return getInterfaceType() == rhs.getInterfaceType() &&
            getConvention() == rhs.getConvention() &&
            getDifferentiability() == rhs.getDifferentiability();
@@ -4153,12 +4153,12 @@ public:
       return ExtInfo(NoEscape ? (Bits | NoEscapeMask) : (Bits & ~NoEscapeMask),
                      Other);
     }
-    // SWIFT_ENABLE_TENSORFLOW
-    ExtInfo withDifferentiabilityKind(
-        DifferentiabilityKind differentiability) const {
-      return ExtInfo((Bits & ~DifferentiabilityMask) |
-                     ((unsigned)differentiability <<
-                      DifferentiabilityMaskOffset), Other);
+    ExtInfo
+    withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
+      return ExtInfo(
+          (Bits & ~DifferentiabilityMask) |
+              ((unsigned)differentiability << DifferentiabilityMaskOffset),
+          Other);
     }
 
     std::pair<unsigned, const void *> getFuncAttrKey() const {
@@ -4557,6 +4557,89 @@ public:
   }
 
   const clang::FunctionType *getClangFunctionType() const;
+
+  /// Returns the type of the derivative function for the given parameter
+  /// indices, result index, derivative function kind, derivative function
+  /// generic signature (optional), and other auxiliary parameters.
+  ///
+  /// Preconditions:
+  /// - Parameters corresponding to parameter indices must conform to
+  ///   `Differentiable`.
+  /// - The result corresponding to the result index must conform to
+  ///   `Differentiable`.
+  ///
+  /// Typing rules, given:
+  /// - Original function type: $(T0, T1, ...) -> (R0, R1, ...)
+  ///
+  /// Terminology:
+  /// - The derivative of a `Differentiable`-conforming type has the
+  ///   `TangentVector` associated type. `TangentVector` is abbreviated as `Tan`
+  ///   below.
+  /// - "wrt" parameters refers to parameters indicated by the parameter
+  ///   indices.
+  /// - "wrt" result refers to the result indicated by the result index.
+  ///
+  /// JVP derivative type:
+  /// - Takes original parameters.
+  /// - Returns original results, followed by a differential function, which
+  ///   takes "wrt" parameter derivatives and returns a "wrt" result derivative.
+  ///
+  ///     $(T0, ...) -> (R0, ...,  (T0.Tan, T1.Tan, ...) -> R0.Tan)
+  ///                    ^~~~~~~    ^~~~~~~~~~~~~~~~~~~     ^~~~~~
+  ///          original results | derivatives wrt params | derivative wrt result
+  ///
+  /// VJP derivative type:
+  /// - Takes original parameters.
+  /// - Returns original results, followed by a pullback function, which
+  ///   takes a "wrt" result derivative and returns "wrt" parameter derivatives.
+  ///
+  ///     $(T0, ...) -> (R0, ...,       (R0.Tan)  ->     (T0.Tan, T1.Tan, ...))
+  ///                    ^~~~~~~         ^~~~~~            ^~~~~~~~~~~~~~~~~~~
+  ///          original results | derivative wrt result | derivatives wrt params
+  ///
+  /// A "constrained derivative generic signature" is computed from
+  /// `derivativeFunctionGenericSignature`, if specified. Otherwise, it is
+  /// computed from the original generic signature. A "constrained derivative
+  /// generic signature" requires all "wrt" parameters to conform to
+  /// `Differentiable`; this is important for correctness.
+  ///
+  /// This "constrained derivative generic signature" is used for
+  /// parameter/result type lowering. It is used as the actual generic signature
+  /// of the derivative function type iff the original function type has a
+  /// generic signature and not all generic parameters are bound to concrete
+  /// types. Otherwise, no derivative generic signature is used.
+  ///
+  /// Other properties of the original function type are copied exactly:
+  /// `ExtInfo`, coroutine kind, callee convention, yields, optional error
+  /// result, witness method conformance, etc.
+  ///
+  /// Special cases:
+  /// - Reabstraction thunks have special derivative type calculation. The
+  ///   original function-typed last parameter is transformed into a
+  ///   `@differentiable` function-typed parameter in the derivative type. This
+  ///   is necessary for the differentiation transform to support reabstraction
+  ///   thunk differentiation because the function argument is opaque and cannot
+  ///   be differentiated. Instead, the argument is made `@differentiable` and
+  ///   reabstraction thunk JVP/VJP callers are responsible for passing a
+  ///   `@differentiable` function.
+  ///   - TODO(TF-1036): Investigate more efficient reabstraction thunk
+  ///     derivative approaches. The last argument can simply be a
+  ///     corresponding derivative function, instead of a `@differentiable`
+  ///     function - this is more direct. It may be possible to implement
+  ///     reabstraction thunk derivatives using "reabstraction thunks for
+  ///     the original function's derivative", avoiding extra code generation.
+  ///
+  /// Caveats:
+  /// - We may support multiple result indices instead of a single result index
+  ///   eventually. At the SIL level, this enables differentiating wrt multiple
+  ///   function results. At the Swift level, this enables differentiating wrt
+  ///   multiple tuple elements for tuple-returning functions.
+  CanSILFunctionType getAutoDiffDerivativeFunctionType(
+      IndexSubset *parameterIndices, unsigned resultIndex,
+      AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
+      LookupConformanceFn lookupConformance,
+      CanGenericSignature derivativeFunctionGenericSignature = nullptr,
+      bool isReabstractionThunk = false);
 
   ExtInfo getExtInfo() const {
     return ExtInfo(Bits.SILFunctionType.ExtInfoBits, getClangFunctionType());

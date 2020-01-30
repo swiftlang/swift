@@ -282,6 +282,9 @@ def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
 
+def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
+  HelpText<"Enable speculative devirtualization pass.">;
+
 def enable_ownership_stripping_after_serialization
   : Flag<["-"], "enable-ownership-stripping-after-serialization">,
   HelpText<"Strip ownership after serialization">;

@@ -59,6 +59,12 @@ else()
                                       LibEdit_LIBRARIES
                                     VERSION_VAR
                                       LibEdit_VERSION_STRING)
-  mark_as_advanced(LibEdit_INCLUDE_DIRS LibEdit_LIBRARIES)
 endif()
 
+if(LibEdit_FOUND AND NOT TARGET libedit)
+  add_library(libedit UNKNOWN IMPORTED)
+  set_target_properties(libedit PROPERTIES
+    IMPORTED_LOCATION ${LibEdit_LIBRARIES}
+    INTERFACE_INCLUDE_DIRECTORIES ${LibEdit_INCLUDE_DIRS})
+endif()
+mark_as_advanced(LibEdit_INCLUDE_DIRS LibEdit_LIBRARIES)

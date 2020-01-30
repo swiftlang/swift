@@ -4126,7 +4126,6 @@ public:
       variableData.push_back(S.addTypeRef(param.getInterfaceType()));
       unsigned conv = getRawStableParameterConvention(param.getConvention());
       variableData.push_back(TypeID(conv));
-      // SWIFT_ENABLE_TENSORFLOW
       if (fnTy->isDifferentiable())
         variableData.push_back(TypeID(
             getRawSILParameterDifferentiability(param.getDifferentiability())));

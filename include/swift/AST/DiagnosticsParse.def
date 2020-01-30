@@ -1733,6 +1733,8 @@ ERROR(empty_version_string,none,
 WARNING(unknown_platform_condition_argument,none,
       "unknown %0 for build configuration '%1'",
       (StringRef, StringRef))
+WARNING(renamed_platform_condition_argument,none,
+      "'%0' has been renamed to '%1'", (StringRef, StringRef))
 WARNING(likely_simulator_platform_condition,none,
       "platform condition appears to be testing for simulator environment; "
       "use 'targetEnvironment(simulator)' instead",

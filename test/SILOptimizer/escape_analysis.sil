@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -escapes-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -escapes-dump -escapes-internal-verify -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -323,7 +323,7 @@ bb0(%0 : $Pointer):
 // CHECK-NEXT:    Val %1 Esc: , Succ: (%1.1)
 // CHECK-NEXT:    Con [ref] %1.1 Esc: G, Succ: %4
 // CHECK-NEXT:    Con [int] %3 Esc: A, Succ: (%4)
-// CHECK-NEXT:    Con %4 Esc: G, Succ:
+// CHECK-NEXT:    Con [ref] %4 Esc: G, Succ:
 // CHECK-NEXT:  End
 sil  @store_content : $@convention(thin) (@owned Pointer) -> () {
 bb0(%0 : $Pointer):
@@ -594,7 +594,7 @@ sil_global @global_ln : $LinkedNode
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%1)
 // CHECK-NEXT:    Con [int] %1 Esc: A, Succ: (%2)
 // CHECK-NEXT:    Con [ref] %2 Esc: G, Succ:
-// CHECK-NEXT:    Val [ref] %4 Esc: , Succ: (%4.1), %2
+// CHECK-NEXT:    Val [ref] %4 Esc: G, Succ: (%4.1), %2
 // CHECK-NEXT:    Con [int] %4.1 Esc: G, Succ: (%4.2)
 // CHECK-NEXT:    Con [ref] %4.2 Esc: G, Succ: 
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %4
@@ -614,7 +614,7 @@ bb0(%0 : $LinkedNode):
 // CHECK-NEXT:    Con [ref] %0.2 Esc: G, Succ:
 // CHECK-NEXT:    Val %1 Esc: , Succ: (%1.1)
 // CHECK-NEXT:    Con [ref] %1.1 Esc: G, Succ: %0
-// CHECK-NEXT:    Val [ref] %4 Esc: , Succ: (%0.1), %0
+// CHECK-NEXT:    Val [ref] %4 Esc: G, Succ: (%0.1), %0
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %4
 // CHECK-NEXT:  End
 sil @let_escape : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
@@ -628,7 +628,7 @@ bb0(%0 : $LinkedNode):
 
 // CHECK-LABEL: CG of return_same
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%5.1)
-// CHECK-NEXT:    Val [ref] %3 Esc: , Succ: (%5.1), %5.2
+// CHECK-NEXT:    Val [ref] %3 Esc: G, Succ: (%5.1), %5.2
 // CHECK-NEXT:    Val [ref] %5 Esc: , Succ: (%5.1), %0, %3
 // CHECK-NEXT:    Con [int] %5.1 Esc: G, Succ: (%5.2)
 // CHECK-NEXT:    Con [ref] %5.2 Esc: G, Succ: (%5.1)
@@ -896,7 +896,7 @@ bb0:
 // CHECK-NEXT:    Val [ref] %4 Esc: , Succ: %0, %1
 // CHECK-NEXT:    Val [ref] %7 Esc: , Succ: (%7.1), %4
 // CHECK-NEXT:    Con [int] %7.1 Esc: A, Succ: (%7.2)
-// CHECK-NEXT:    Con %7.2 Esc: A, Succ: 
+// CHECK-NEXT:    Con [ref] %7.2 Esc: A, Succ: 
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %7
 // CHECK-NEXT:  End
 sil @pointer_types : $@convention(thin) (@owned Y, @owned Y) -> @owned Y {
@@ -1107,7 +1107,7 @@ bb0(%0 : $*X, %1 : $X):
 // CHECK-LABEL: CG of test_casts
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ:
 // CHECK-NEXT:    Con [int] %0.1 Esc: A, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: A, Succ: 
+// CHECK-NEXT:    Con [ref] %0.2 Esc: A, Succ: 
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %0
 // CHECK-NEXT:  End
 sil @test_casts : $@convention(thin) (@owned AnyObject) -> @owned X {
@@ -1212,10 +1212,10 @@ bb0(%0 : $Array<X>):
 
 // CHECK-LABEL: CG of arraysemantics_get_element
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
-// CHECK-NEXT:    Con [ref] %0.1 Esc: A, Succ: %1.2
+// CHECK-NEXT:    Con [ref] %0.1 Esc: A, Succ:
 // CHECK-NEXT:    Arg [ref] %1 Esc: A, Succ: (%1.1)
 // CHECK-NEXT:    Con [int] %1.1 Esc: A, Succ: (%1.2)
-// CHECK-NEXT:    Con %1.2 Esc: A, Succ: 
+// CHECK-NEXT:    Con %1.2 Esc: A, Succ: %0.1
 // CHECK-NEXT:  End
 sil @arraysemantics_get_element : $@convention(thin) (Array<X>) -> @out X {
 bb0(%io : $*X, %1 : $Array<X>):
@@ -1246,9 +1246,9 @@ bb0(%0 : $*Array<X>):
 
 // CHECK-LABEL: CG of arraysemantics_get_element_address
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: (%0.1)
-// CHECK-NEXT:    Con [int] %0.1 Esc: A, Succ: 
+// CHECK-NEXT:    Con [int] %0.1 Esc: A, Succ: (%0.2), %4
 // CHECK-NEXT:    Con %0.2 Esc: A, Succ: 
-// CHECK-NEXT:    Val %4 Esc: , Succ: %0.1
+// CHECK-NEXT:    Val %4 Esc: A, Succ: (%0.2)
 // CHECK-NEXT:  End
 sil @arraysemantics_get_element_address : $@convention(thin) (Array<X>) -> () {
 bb0(%0 : $Array<X>):
@@ -1816,4 +1816,75 @@ bb0(%0 : $IntWrapper):
   strong_release %0 : $IntWrapper
   %tuple = tuple (%bridge : $Builtin.BridgeObject, %ump : $UnsafeMutablePointer<Int64>)
   return %tuple : $(Builtin.BridgeObject, UnsafeMutablePointer<Int64>)
+}
+
+// Test undef -> struct_extract -> bbarg
+// CHECK-LABEL: CG of testMappedUndef
+// CHECK-NEXT:   Val [ref] %4 Esc: , Succ: (%4.1)
+// CHECK-NEXT:   Con [int] %4.1 Esc: G, Succ: (%4.2)
+// CHECK-NEXT:   Con %4.2 Esc: G, Succ:
+// CHECK-LABEL: End
+struct StructWithObject {
+  @_hasStorage var obj: AnyObject { get set }
+  init(obj: AnyObject)
+}
+
+sil @testMappedUndef : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(undef : $AnyObject)
+
+bb2:
+  %2 = struct_extract undef : $StructWithObject, #StructWithObject.obj
+  br bb3(%2 : $AnyObject)
+
+bb3(%4 : $AnyObject):
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Test value_to_bridge_object merged with a local reference. A graph node
+// must be created for all values involved, and they must point to an
+// escaping content node.
+// CHECK-LABEL: CG of testValueToBridgeObject
+// CHECK-NEXT:   Val [ref] %1 Esc: , Succ: (%5.1)
+// CHECK-NEXT:   Val [ref] %5 Esc: , Succ: (%5.1)
+// CHECK-NEXT:   Con [int] %5.1 Esc: G, Succ: (%5.2)
+// CHECK-NEXT:   Con %5.2 Esc: G, Succ:
+// CHECK-NEXT:   Val [ref] %7 Esc: , Succ: (%5.1), %1, %5
+// CHECK-NEXT:   Ret [ref] return Esc: , Succ: %7
+// CHECK-LABEL: End
+sil @testValueToBridgeObject : $@convention(thin) (Builtin.Word) -> C {
+bb0(%0 : $Builtin.Word):
+  %1 = alloc_ref $C
+  cond_br undef, bb1, bb2
+
+bb1:
+  %derived = ref_to_bridge_object %1 : $C, %0 : $Builtin.Word
+  br bb3(%derived : $Builtin.BridgeObject)
+
+bb2:
+  %5 = value_to_bridge_object %0 : $Builtin.Word
+  br bb3(%5 : $Builtin.BridgeObject)
+
+bb3(%7 : $Builtin.BridgeObject):
+  %result = bridge_object_to_ref %7 : $Builtin.BridgeObject to $C
+  return %result : $C
+}
+
+// Test strong_copy_unowned_value returned. It must be marked escaping,
+// not simply "returned", because it's reference is formed from a
+// function argument.
+// CHECK-LABEL: CG of testStrongCopyUnowned
+// CHECK-NEXT:   Val [ref] %1 Esc: , Succ: (%1.1)
+// CHECK-NEXT:   Con [int] %1.1 Esc: G, Succ: (%1.2)
+// CHECK-NEXT:   Con %1.2 Esc: G, Succ:
+// CHECK-NEXT:   Ret [ref] return Esc: , Succ: %1
+// CHECK-LABEL: End
+sil [ossa] @testStrongCopyUnowned : $@convention(thin) (@guaranteed @sil_unowned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @guaranteed $@sil_unowned Builtin.NativeObject):
+  %1 = strong_copy_unowned_value %0 : $@sil_unowned Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
 }

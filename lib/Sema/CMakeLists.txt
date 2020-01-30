@@ -1,8 +1,4 @@
 
-if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
-  set(EXTRA_TYPECHECKER_FLAGS "FORCE_BUILD_OPTIMIZED")
-endif()
-
 add_swift_host_library(swiftSema STATIC
   BuilderTransform.cpp
   CSApply.cpp
@@ -75,9 +71,14 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp
   TypeChecker.cpp
-  IDETypeCheckingRequests.cpp
-
-  ${EXTRA_TYPECHECKER_FLAGS})
+  IDETypeCheckingRequests.cpp)
+if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL MSVC)
+    target_compile_options(swiftSema PRIVATE /O2 /Ob2)
+  else()
+    target_compile_options(swiftSema PRIVATE -O3)
+  endif()
+endif()
 target_link_libraries(swiftSema PRIVATE
   swiftAST
   swiftParse

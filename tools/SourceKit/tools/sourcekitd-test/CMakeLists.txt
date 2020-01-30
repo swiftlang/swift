@@ -34,12 +34,12 @@ endif()
 
 add_dependencies(sourcekitd-test sourcekitdTestOptionsTableGen)
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  set_target_properties(sourcekitd-test
-    PROPERTIES
-    LINK_FLAGS "-Wl,-rpath -Wl,@executable_path/../lib")
+if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
+  set_target_properties(sourcekitd-test PROPERTIES
+    INSTALL_RPATH "@executable_path/../lib")
+  target_link_options(sourcekitd-test PRIVATE
+    "LINKER:-exported_symbol,_main")
 endif()
-
 if(SWIFT_ANALYZE_CODE_COVERAGE)
   set_property(TARGET sourcekitd-test APPEND_STRING PROPERTY
     LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
@@ -47,6 +47,4 @@ endif()
 
 add_dependencies(tools sourcekitd-test)
 swift_install_in_component(TARGETS sourcekitd-test
-                           RUNTIME
-                             DESTINATION bin
-                             COMPONENT tools)
+  RUNTIME DESTINATION bin COMPONENT tools)

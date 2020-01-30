@@ -70,7 +70,7 @@ class DarwinPlatform(Platform):
     @property
     def is_embedded(self):
         """Check if this is a Darwin platform for embedded devices."""
-        return self.name != "macosx"
+        return self.name != "macosx" and self.name != "maccatalyst"
 
     @property
     def supports_benchmark(self):

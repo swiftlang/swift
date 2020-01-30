@@ -401,6 +401,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       SuppressDefaultConfigRequest = true;
       break;
 
+    case OPT_module_cache_path:
+      ModuleCachePath = InputArg->getValue();
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'

@@ -613,8 +613,8 @@ static bool hasOverridingDifferentiableAttribute(ValueDecl *derivedDecl,
           .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
   auto baseDAs = baseAFD->getAttrs().getAttributes<DifferentiableAttr>();
 
-  // Make sure all the `@differentiable` attributes in `baseDecl` are
-  // also declared in `derivedDecl`.
+  // Make sure all the `@differentiable` attributes on `baseDecl` are
+  // also declared on `derivedDecl`.
   bool diagnosed = false;
   for (auto *baseDA : baseDAs) {
     auto baseParameters = baseDA->getParameterIndices();
@@ -640,21 +640,26 @@ static bool hasOverridingDifferentiableAttribute(ValueDecl *derivedDecl,
     if (defined)
       continue;
     diagnosed = true;
-    // Omit printing wrt clause if attribute differentiation parameters match
-    // inferred differentiation parameters.
+    // Emit an error and fix-it showing the missing base declaration's
+    // `@differentiable` attribute.
+    // Omit printing `wrt:` clause if attribute's differentiability parameters
+    // match inferred differentiability parameters.
     auto *inferredParameters =
         TypeChecker::inferDifferentiabilityParameters(derivedAFD, nullptr);
     bool omitWrtClause =
         !baseParameters ||
         baseParameters->getNumIndices() == inferredParameters->getNumIndices();
     // Get `@differentiable` attribute description.
-    std::string baseDAString;
-    llvm::raw_string_ostream stream(baseDAString);
-    baseDA->print(stream, derivedDecl, omitWrtClause,
+    std::string baseDiffAttrString;
+    llvm::raw_string_ostream os(baseDiffAttrString);
+    baseDA->print(os, derivedDecl, omitWrtClause,
                   /*omitDerivativeFunctions*/ true);
-    diags.diagnose(derivedDecl,
-                   diag::overriding_decl_missing_differentiable_attr,
-                   StringRef(stream.str()).trim());
+    os.flush();
+    diags
+        .diagnose(derivedDecl,
+                  diag::overriding_decl_missing_differentiable_attr,
+                  baseDiffAttrString)
+        .fixItInsert(derivedDecl->getStartLoc(), baseDiffAttrString + ' ');
     diags.diagnose(baseDecl, diag::overridden_here);
   }
   // If a diagnostic was produced, return false.
@@ -1864,16 +1869,6 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
     diagnoseOverrideForAvailability(override, base);
-  }
-
-  // Overrides of NSObject.hashValue are deprecated; one should override
-  // NSObject.hash instead.
-  // FIXME: Remove this when NSObject.hashValue becomes non-open in
-  // swift-corelibs-foundation.
-  if (isNSObjectHashValue(base) &&
-      base->hasOpenAccess(override->getDeclContext())) {
-    override->diagnose(diag::override_nsobject_hashvalue_warning)
-      .fixItReplace(SourceRange(override->getNameLoc()), "hash");
   }
 
   /// Check attributes associated with the base; some may need to merged with

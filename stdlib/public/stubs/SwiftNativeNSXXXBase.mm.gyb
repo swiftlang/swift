@@ -65,36 +65,6 @@ SWIFT_RUNTIME_STDLIB_API
 - (id)initWithCoder: (NSCoder *)coder {
   return [super init];
 }
-- (id)retain {
-  auto SELF = reinterpret_cast<HeapObject *>(self);
-  swift_retain(SELF);
-  return self;
-}
-- (oneway void)release {
-  auto SELF = reinterpret_cast<HeapObject *>(self);
-  swift_release(SELF);
-}
-- (id)autorelease {
-  return _objc_rootAutorelease(self);
-}
-- (NSUInteger)retainCount {
-  auto SELF = reinterpret_cast<HeapObject *>(self);
-  return swift_retainCount(SELF);
-}
-
-- (BOOL)_tryRetain {
-  auto SELF = reinterpret_cast<HeapObject *>(self);
-  return (bool)swift_tryRetain(SELF);
-}
-- (BOOL)_isDeallocating {
-  return swift_isDeallocating(reinterpret_cast<HeapObject *>(self));
-}
-- (BOOL)allowsWeakReference {
-  return !swift_isDeallocating(reinterpret_cast<HeapObject *>(self));
-}
-- (BOOL)retainWeakReference {
-  return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr;
-}
 
 + (BOOL)automaticallyNotifiesObserversForKey:(NSString *)key {
   return NO;
@@ -102,9 +72,9 @@ SWIFT_RUNTIME_STDLIB_API
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
-- (void)dealloc {
-  swift_rootObjCDealloc(reinterpret_cast<HeapObject *>(self));
-}
+
+STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
+
 #pragma clang diagnostic pop
 
 @end

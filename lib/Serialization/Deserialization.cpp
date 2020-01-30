@@ -1207,6 +1207,21 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
   values.erase(newEnd, values.end());
 }
 
+static TypeDecl *
+findNestedTypeDeclInModule(FileUnit *thisFile, ModuleDecl *extensionModule,
+                           Identifier name, NominalTypeDecl *parent)  {
+  assert(extensionModule && "NULL is not a valid module");
+  for (FileUnit *file : extensionModule->getFiles()) {
+    if (file == thisFile)
+      continue;
+
+    if (auto nestedType = file->lookupNestedType(name, parent)) {
+      return nestedType;
+    }
+  }
+  return nullptr;
+}
+
 Expected<Decl *>
 ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   using namespace decls_block;
@@ -1442,13 +1457,19 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
 
         // Fault in extensions, then ask every file in the module.
         (void)baseType->getExtensions();
-        TypeDecl *nestedType = nullptr;
-        for (FileUnit *file : extensionModule->getFiles()) {
-          if (file == getFile())
-            continue;
-          nestedType = file->lookupNestedType(memberName, baseType);
-          if (nestedType)
-            break;
+        auto *nestedType =
+            findNestedTypeDeclInModule(getFile(), extensionModule,
+                                       memberName, baseType);
+
+        // For clang module units, also search tables in the overlays.
+        if (!nestedType) {
+          if (auto LF =
+                  dyn_cast<LoadedFile>(baseType->getModuleScopeContext())) {
+            if (auto overlayModule = LF->getOverlayModule()) {
+              nestedType = findNestedTypeDeclInModule(getFile(), overlayModule,
+                                                      memberName, baseType);
+            }
+          }
         }
 
         if (nestedType) {
@@ -5285,30 +5306,26 @@ public:
     if (!calleeConvention.hasValue())
       MF.fatal();
 
-    // SWIFT_ENABLE_TENSORFLOW
     auto processParameter =
         [&](TypeID typeID, uint64_t rawConvention,
-            uint64_t rawParamDiff) -> llvm::Expected<SILParameterInfo> {
+            uint64_t ramDifferentiability) -> llvm::Expected<SILParameterInfo> {
       auto convention = getActualParameterConvention(rawConvention);
       if (!convention)
         MF.fatal();
       auto type = MF.getTypeChecked(typeID);
       if (!type)
         return type.takeError();
-      // SWIFT_ENABLE_TENSORFLOW
-      auto paramDiff =
+      auto differentiability =
           swift::SILParameterDifferentiability::DifferentiableOrNotApplicable;
       if (diffKind != DifferentiabilityKind::NonDifferentiable) {
-        auto paramDiffOpt =
-            getActualSILParameterDifferentiability(rawParamDiff);
-        if (!paramDiffOpt) {
+        auto differentiabilityOpt =
+            getActualSILParameterDifferentiability(ramDifferentiability);
+        if (!differentiabilityOpt)
           MF.fatal();
-          llvm_unreachable("an error is a fatal exit at this point");
-        }
-        paramDiff = *paramDiffOpt;
+        differentiability = *differentiabilityOpt;
       }
       return SILParameterInfo(type.get()->getCanonicalType(), *convention,
-                              paramDiff);
+                              differentiability);
     };
 
     auto processYield = [&](TypeID typeID, uint64_t rawConvention)
@@ -5351,11 +5368,10 @@ public:
     for (unsigned i = 0; i != numParams; ++i) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
-      // SWIFT_ENABLE_TENSORFLOW
-      uint64_t paramDiff = 0;
+      uint64_t differentiability = 0;
       if (diffKind != DifferentiabilityKind::NonDifferentiable)
-        paramDiff = variableData[nextVariableDataIndex++];
-      auto param = processParameter(typeID, rawConvention, paramDiff);
+        differentiability = variableData[nextVariableDataIndex++];
+      auto param = processParameter(typeID, rawConvention, differentiability);
       if (!param)
         return param.takeError();
       allParams.push_back(param.get());

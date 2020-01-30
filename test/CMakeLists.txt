@@ -167,10 +167,28 @@ endif()
 
 foreach(SDK ${SWIFT_SDKS})
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
+    # macCatalyst needs to run two sets of tests: one with the normal macosx target triple
+    # and one with the the macCatalyst ios-macabi triple.  The build_flavors list will
+    # have have only the "default" flavor for all SDKs and architectures except
+    # OSX when macCatalyst support is enabled.
+    set(build_flavors "default")
+    if(SWIFT_ENABLE_MACCATALYST AND "${SDK}" STREQUAL "OSX")
+      list(APPEND build_flavors "ios-like" )
+    endif()
+
+    foreach(BUILD_FLAVOR ${build_flavors})
     # Configure variables for this subdirectory.
     set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
     set(VARIANT_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE}${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
     set(VARIANT_SDK "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_PATH}")
+    set(DEFAULT_OSX_VARIANT_SUFFIX "")
+
+    if(BUILD_FLAVOR STREQUAL "ios-like")
+      set(DEFAULT_OSX_VARIANT_SUFFIX "${VARIANT_SUFFIX}")
+      # Use the macCatalyst target triple and compiler resources for the iOS-like build flavor.
+      set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-maccatalyst-${ARCH}")
+      set(VARIANT_TRIPLE "${ARCH}-apple-ios13.0-macabi")
+    endif()
 
     # A directory where to put the xUnit-style XML test results.
     set(SWIFT_TEST_RESULTS_DIR
@@ -236,8 +254,17 @@ _Block_release(void) { }\n")
     if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
       list(APPEND test_dependencies
           "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
-      list(APPEND test_dependencies
-          "swift-reflection-test${VARIANT_SUFFIX}_signed")
+
+      if(BUILD_FLAVOR STREQUAL "ios-like")
+        # When testing the iOS-like build flavor, use the the normal macOS
+        # swift-reflection-test-tool. That tool runs out of process so it
+        # doesn't need to be build for macCatalyst.
+        list(APPEND test_dependencies
+            "swift-reflection-test${DEFAULT_OSX_VARIANT_SUFFIX}")
+      else()
+        list(APPEND test_dependencies
+            "swift-reflection-test${VARIANT_SUFFIX}_signed")
+      endif()
     endif()
 
     if(NOT "${COVERAGE_DB}" STREQUAL "")
@@ -403,6 +430,7 @@ _Block_release(void) { }\n")
             PROPERTY FOLDER "Tests/check-swift")
       endforeach()
     endforeach()
+  endforeach()
   endforeach()
 endforeach()
 

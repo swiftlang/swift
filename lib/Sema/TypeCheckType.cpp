@@ -3052,6 +3052,8 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   auto convention = DefaultParameterConvention;
   Type type;
   bool hadError = false;
+  auto differentiability =
+      SILParameterDifferentiability::DifferentiableOrNotApplicable;
 
   // SWIFT_ENABLE_TENSORFLOW
   auto differentiability =
@@ -3081,6 +3083,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     checkFor(TypeAttrKind::TAK_owned, ParameterConvention::Direct_Owned);
     checkFor(TypeAttrKind::TAK_guaranteed,
              ParameterConvention::Direct_Guaranteed);
+    if (attrs.has(TAK_noDerivative)) {
+      attrs.clearAttribute(TAK_noDerivative);
+      differentiability = SILParameterDifferentiability::NotDifferentiable;
+    }
 
     // SWIFT_ENABLE_TENSORFLOW
     if (attrs.has(TAK_noDerivative)) {
@@ -3107,7 +3113,6 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   }
 
   if (hadError) type = ErrorType::get(Context);
-  // SWIFT_ENABLE_TENSORFLOW
   return SILParameterInfo(type->getCanonicalType(), convention,
                           differentiability);
 }

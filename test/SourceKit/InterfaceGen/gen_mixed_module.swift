@@ -10,6 +10,6 @@ var x = 10
 // RUN: %build-clang-importer-objc-overlays
 
 // RUN: %target-swift-frontend -emit-module -o %t.overlays -F %S/../Inputs/libIDE-mock-sdk %S/../Inputs/libIDE-mock-sdk/Mixed.swift -import-underlying-module -module-name Mixed -disable-objc-attr-requires-foundation-module
-// RUN: %sourcekitd-test -req=interface-gen -module Mixed -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk %mcp_opt -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK1 %s
+// RUN: %sourcekitd-test -req=interface-gen -module Mixed -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK1 %s
 
 // CHECK1: PureSwiftClass

@@ -7,5 +7,4 @@ target_link_libraries(SwiftClangImporterTests
     swiftClangImporter
     swiftParse
     swiftAST
-    LLVMBitstreamReader
 )

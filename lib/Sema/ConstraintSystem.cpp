@@ -2936,9 +2936,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
                      return locator
                          ->isLastElement<LocatorPathElt::ContextualType>();
                    })) {
+      auto anchor =
+          viableSolutions.front()->Fixes.front()->getLocator()->getAnchor();
       auto baseName = name.getBaseName();
       DE.diagnose(commonAnchor->getLoc(), diag::no_candidates_match_result_type,
-                  baseName.userFacingName(), getContextualType());
+                  baseName.userFacingName(), getContextualType(anchor));
     } else {
       emitGeneralAmbiguityFailure();
     }

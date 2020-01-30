@@ -102,6 +102,10 @@ static llvm::cl::opt<bool>
 VerifyExclusivity("enable-verify-exclusivity",
                   llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
 
+static llvm::cl::opt<bool>
+EnableSpeculativeDevirtualization("enable-spec-devirt",
+                  llvm::cl::desc("Enable Speculative Devirtualization pass."));
+
 namespace {
 enum EnforceExclusivityMode {
   Unchecked, // static only
@@ -389,6 +393,8 @@ int main(int argc, char **argv) {
     }
   }
 
+  SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
+
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
       Invocation.setUpInputForSILTool(InputFilename, ModuleName,
@@ -492,10 +498,12 @@ int main(int argc, char **argv) {
   } else {
     const StringRef OutputFile = OutputFilename.size() ?
                                    StringRef(OutputFilename) : "-";
-
+    auto SILOpts = SILOptions();
+    SILOpts.EmitVerboseSIL = EmitVerboseSIL;
+    SILOpts.EmitSortedSIL = EnableSILSortOutput;
     if (OutputFile == "-") {
-      CI.getSILModule()->print(llvm::outs(), EmitVerboseSIL, CI.getMainModule(),
-                               EnableSILSortOutput, !DisableASTDump);
+      CI.getSILModule()->print(llvm::outs(), CI.getMainModule(),
+                               SILOpts, !DisableASTDump);
     } else {
       std::error_code EC;
       llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
@@ -504,8 +512,8 @@ int main(int argc, char **argv) {
                      << EC.message() << '\n';
         return 1;
       }
-      CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
-                               EnableSILSortOutput, !DisableASTDump);
+      CI.getSILModule()->print(OS, CI.getMainModule(), SILOpts,
+                               !DisableASTDump);
     }
   }
 
