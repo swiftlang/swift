@@ -1753,28 +1753,33 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
     SmallVector<std::pair<llvm::BasicBlock *, llvm::Value *>, 4>
         specializationBlocks;
     auto switchDestination = llvm::BasicBlock::Create(IGM.getLLVMContext());
-    unsigned long index = 0;
+    unsigned long blockIndex = 0;
     for (auto specialization : specializations) {
-      auto conditionBlock = conditionBlocks[index];
+      auto conditionBlock = conditionBlocks[blockIndex];
       IGF.Builder.emitBlock(conditionBlock);
-      auto successorBlock = index < conditionBlocks.size() - 1
-                                ? conditionBlocks[index + 1]
+      auto successorBlock = blockIndex < conditionBlocks.size() - 1
+                                ? conditionBlocks[blockIndex + 1]
                                 : switchDestination;
       auto specializationBlock = llvm::BasicBlock::Create(IGM.getLLVMContext());
       auto substitutions = specialization->getContextSubstitutionMap(
           IGM.getSwiftModule(), nominal);
 
       llvm::Value *condition = llvm::ConstantInt::get(IGM.Int1Ty, 1);
-      auto generic = specialization->getAnyGeneric();
-      auto parameters = generic->getGenericEnvironment()->getGenericParams();
-      for (size_t index = 0; index < parameters.size(); ++index) {
-        auto parameter = parameters[index];
-        auto argument = ((Type *)parameter)->subst(substitutions);
+      auto nominal = specialization->getAnyNominal();
+      auto requirements = GenericTypeRequirements(IGF.IGM, nominal);
+      int requirementIndex = 0;
+      for (auto requirement : requirements.getRequirements()) {
+        if (requirement.Protocol) {
+          continue;
+        }
+        auto parameter = requirement.TypeParameter;
+        auto argument = parameter.subst(substitutions);
         llvm::Constant *addr =
             IGM.getAddrOfTypeMetadata(argument->getCanonicalType());
         auto addrInt = IGF.Builder.CreateBitCast(addr, IGM.Int8PtrTy);
         condition = IGF.Builder.CreateAnd(
-            condition, IGF.Builder.CreateICmpEQ(addrInt, valueAtIndex(index)));
+            condition, IGF.Builder.CreateICmpEQ(addrInt, valueAtIndex(requirementIndex)));
+        ++requirementIndex;
       }
       IGF.Builder.CreateCondBr(condition, specializationBlock, successorBlock);
 
@@ -1793,7 +1798,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
       response = IGF.Builder.CreateInsertValue(
           response, state, 1, "insert metadata state into response");
       specializationBlocks.push_back({specializationBlock, response});
-      ++index;
+      ++blockIndex;
     }
 
     for (auto pair : specializationBlocks) {
