@@ -3798,7 +3798,7 @@ static void recordConformanceDependency(DeclContext *DC,
   // FIXME: 'deinit' is being used as a dummy identifier here. Really we
   // don't care about /any/ of the type's members, only that it conforms to
   // the protocol.
-  tracker->addUsedMember({Adoptee, DeclBaseName::createDestructor()},
+  tracker->addUsedMember(Adoptee, DeclBaseName::createDestructor(),
                          DC->isCascadingContextForLookup(InExpression));
 }
 
@@ -5053,7 +5053,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     }
 
     if (tracker)
-      tracker->addUsedMember({conformance->getProtocol(), Identifier()},
+      tracker->addUsedMember(conformance->getProtocol(), Identifier(),
                              defaultAccess > AccessLevel::FilePrivate);
 
     // Diagnose @NSCoding on file/fileprivate/nested/generic classes, which

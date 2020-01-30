@@ -1613,7 +1613,7 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     stack.pop_back();
 
     if (tracker)
-      tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
+      tracker->addUsedMember(current, member.getBaseName(), isLookupCascading);
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);

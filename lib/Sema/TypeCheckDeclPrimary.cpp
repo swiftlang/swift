@@ -449,7 +449,7 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
       auto found = nominal->lookupDirect(current->getBaseName());
       otherDefinitions.append(found.begin(), found.end());
       if (tracker)
-        tracker->addUsedMember({nominal, current->getBaseName()}, isCascading);
+        tracker->addUsedMember(nominal, current->getBaseName(), isCascading);
     }
   } else {
     // Look within a module context.
@@ -1889,7 +1889,7 @@ public:
         if (auto *tracker = SF->getReferencedNameTracker()) {
           bool isPrivate =
               CD->getFormalAccess() <= AccessLevel::FilePrivate;
-          tracker->addUsedMember({Super, Identifier()}, !isPrivate);
+          tracker->addUsedMember(Super, Identifier(), !isPrivate);
         }
       }
 
@@ -1995,7 +1995,7 @@ public:
       if (auto *tracker = SF->getReferencedNameTracker()) {
         bool isNonPrivate = (PD->getFormalAccess() > AccessLevel::FilePrivate);
         for (auto *parentProto : PD->getInheritedProtocols())
-          tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
+          tracker->addUsedMember(parentProto, Identifier(), isNonPrivate);
       }
     }
 

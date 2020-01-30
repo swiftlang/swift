@@ -574,28 +574,28 @@ public:
                                 StringRef swiftDeps,
                                 const bool includePrivateDeps,
                                 const bool hadCompilationError) {
-
   SourceFileDeclFinder declFinder(SF, includePrivateDeps);
     std::vector<std::pair<std::string, bool>> topLevelDepends;
-    for (const auto &p: SF->getReferencedNameTracker()->getTopLevelNames())
-      topLevelDepends.push_back(std::make_pair(p.getFirst().userFacingName(), p.getSecond()));
+    SF->getReferencedNameTracker()->forEachTopLevelName(
+      [&](const DeclBaseName& name, bool isCascading, NullablePtr<const Decl>) {
+        topLevelDepends.push_back({name.userFacingName(), isCascading});
+      });
 
     std::vector<std::pair<std::string, bool>> dynamicLookupDepends;
-    for (const auto &p: SF->getReferencedNameTracker()->getDynamicLookupNames())
-      dynamicLookupDepends.push_back(std::make_pair(p.getFirst().userFacingName(), p.getSecond()));
+   SF->getReferencedNameTracker()->forEachDynamicLookupName(
+      [&](const DeclBaseName& name, bool isCascading, NullablePtr<const Decl>) {
+        dynamicLookupDepends.push_back({name.userFacingName(), isCascading});
+      });
 
     std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>> memberDepends;
-    for (const auto &p: SF->getReferencedNameTracker()->getUsedMembers()) {
-      const auto &member = p.getFirst().second;
+ SF->getReferencedNameTracker()->forEachUsedMember(
+      [&](const NominalTypeDecl* holder, const DeclBaseName& member, bool isCascading, NullablePtr<const Decl>) {
       StringRef emptyOrUserFacingName = member.empty() ? "" : member.userFacingName();
       memberDepends.push_back(
         std::make_pair(
-          std::make_tuple(
-            mangleTypeAsContext(p.getFirst().first),
-            emptyOrUserFacingName,
-            declIsPrivate(p.getFirst().first)),
-          p.getSecond()));
-    }
+          std::make_tuple(mangleTypeAsContext(holder), emptyOrUserFacingName, declIsPrivate(holder)),
+            isCascading));
+    });
 
     return SourceFileDepGraphConstructor(
       swiftDeps,

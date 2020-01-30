@@ -677,9 +677,9 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
 
   for (auto SF : Instance.getPrimarySourceFiles()) {
     if (auto *R = SF->getReferencedNameTracker()) {
-      C.NumReferencedTopLevelNames += R->getTopLevelNames().size();
-      C.NumReferencedDynamicNames += R->getDynamicLookupNames().size();
-      C.NumReferencedMemberNames += R->getUsedMembers().size();
+      C.NumReferencedTopLevelNames += R->getNumReferencedTopLevelNames();
+      C.NumReferencedDynamicNames += R->getNumReferencedDynamicNames();
+      C.NumReferencedMemberNames += R->getNumReferencedMemberNames();
     }
   }
 

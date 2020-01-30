@@ -141,8 +141,17 @@ class DependsEmitter {
       : SF(SF), depTracker(depTracker), out(out) {}
 
 public:
-  /// A NominalTypeDecl, its DeclBaseName, and whether it is externally-visible.
-  using MemberTableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
+  struct SimpleUseTableEntry {
+    DeclBaseName name;
+    bool isCascadingUse;
+  };
+
+  /// Convenient packet of information on a use of a member.
+  struct MemberTableEntry {
+    const NominalTypeDecl *holder;
+    DeclBaseName member;
+    bool isCascadingUse;
+  };
 
   /// Emit the dependencies
   ///
@@ -157,13 +166,12 @@ private:
   void emit() const;
 
   void emitTopLevelNames(const ReferencedNameTracker *const tracker) const;
-  void emitMembers(const ArrayRef<MemberTableEntryTy> sortedMembers) const;
-  void emitNominalTypes(const ArrayRef<MemberTableEntryTy> sortedMembers) const;
+  void emitMembers(const ArrayRef<MemberTableEntry> sortedMembers) const;
+  void emitNominalTypes(const ArrayRef<MemberTableEntry> sortedMembers) const;
   void emitDynamicLookup(const ReferencedNameTracker *const tracker) const;
   void emitExternal(const DependencyTracker &depTracker) const;
 
-  static SmallVector<std::pair<DeclBaseName, bool>, 16>
-  sortedByName(const llvm::DenseMap<DeclBaseName, bool> map);
+  static void sortByName(SmallVectorImpl<SimpleUseTableEntry> &);
 };
 } // namespace
 
@@ -519,29 +527,31 @@ void DependsEmitter::emit() const {
 
   emitTopLevelNames(tracker);
 
-  auto &memberLookupTable = tracker->getUsedMembers();
-  std::vector<MemberTableEntryTy> sortedMembers{
-    memberLookupTable.begin(), memberLookupTable.end()
-  };
-  llvm::array_pod_sort(sortedMembers.begin(), sortedMembers.end(),
-                       [](const MemberTableEntryTy *lhs,
-                          const MemberTableEntryTy *rhs) -> int {
-    if (auto cmp = lhs->first.first->getName().compare(rhs->first.first->getName()))
-      return cmp;
-
-    if (auto cmp = lhs->first.second.compare(rhs->first.second))
-      return cmp;
-
-    // We can have two entries with the same member name if one of them
-    // was the special 'init' name and the other is the plain 'init' token.
-    if (lhs->second != rhs->second)
-      return lhs->second ? -1 : 1;
-
-    // Break type name ties by mangled name.
-    auto lhsMangledName = mangleTypeAsContext(lhs->first.first);
-    auto rhsMangledName = mangleTypeAsContext(rhs->first.first);
-    return lhsMangledName.compare(rhsMangledName);
+  std::vector<MemberTableEntry> sortedMembers;
+  tracker->forEachUsedMember([&](const NominalTypeDecl *holder,
+                                 const DeclBaseName &member,
+                                 bool isCascadingUse, NullablePtr<const Decl>) {
+    sortedMembers.push_back(MemberTableEntry{holder, member, isCascadingUse});
   });
+  llvm::array_pod_sort(
+      sortedMembers.begin(), sortedMembers.end(),
+      [](const MemberTableEntry *lhs, const MemberTableEntry *rhs) -> int {
+        if (auto cmp = lhs->holder->getName().compare(rhs->holder->getName()))
+          return cmp;
+
+        if (auto cmp = lhs->member.compare(rhs->member))
+          return cmp;
+
+        // We can have two entries with the same member name if one of them
+        // was the special 'init' name and the other is the plain 'init' token.
+        if (lhs->isCascadingUse != rhs->isCascadingUse)
+          return lhs->isCascadingUse ? -1 : 1;
+
+        // Break type name ties by mangled name.
+        auto lhsMangledName = mangleTypeAsContext(lhs->holder);
+        auto rhsMangledName = mangleTypeAsContext(rhs->holder);
+        return lhsMangledName.compare(rhsMangledName);
+      });
 
   emitMembers(sortedMembers);
   emitNominalTypes(sortedMembers);
@@ -552,53 +562,60 @@ void DependsEmitter::emit() const {
 void DependsEmitter::emitTopLevelNames(
     const ReferencedNameTracker *const tracker) const {
   out << dependsTopLevel << ":\n";
-  for (auto &entry : sortedByName(tracker->getTopLevelNames())) {
-    assert(!entry.first.empty());
+  SmallVector<SimpleUseTableEntry, 16> topLevelNamesToSort;
+  SF->getReferencedNameTracker()->forEachTopLevelName(
+      [&](const DeclBaseName &name, bool isCascadingUse,
+          NullablePtr<const Decl>) {
+        topLevelNamesToSort.push_back({name, isCascadingUse});
+      });
+  sortByName(topLevelNamesToSort);
+  for (auto &entry : topLevelNamesToSort) {
+    assert(!entry.name.empty());
     out << "- ";
-    if (!entry.second)
+    if (!entry.isCascadingUse)
       out << "!private ";
-    out << "\"" << escape(entry.first) << "\"\n";
+    out << "\"" << escape(entry.name) << "\"\n";
   }
 }
 
 void DependsEmitter::emitMembers(
-    ArrayRef<MemberTableEntryTy> sortedMembers) const {
+    ArrayRef<MemberTableEntry> sortedMembers) const {
   out << dependsMember << ":\n";
   for (auto &entry : sortedMembers) {
-    assert(entry.first.first != nullptr);
-    if (entry.first.first->getFormalAccess() <= AccessLevel::FilePrivate)
+    assert(entry.holder != nullptr);
+    if (entry.holder->getFormalAccess() <= AccessLevel::FilePrivate)
       continue;
 
     out << "- ";
-    if (!entry.second)
+    if (!entry.isCascadingUse)
       out << "!private ";
     out << "[\"";
-    out << mangleTypeAsContext(entry.first.first);
+    out << mangleTypeAsContext(entry.holder);
     out << "\", \"";
-    if (!entry.first.second.empty())
-      out << escape(entry.first.second);
+    if (!entry.member.empty())
+      out << escape(entry.member);
     out << "\"]\n";
   }
 }
 
 void DependsEmitter::emitNominalTypes(
-    ArrayRef<MemberTableEntryTy> sortedMembers) const {
+    ArrayRef<MemberTableEntry> sortedMembers) const {
   out << dependsNominal << ":\n";
   for (auto i = sortedMembers.begin(), e = sortedMembers.end(); i != e; ++i) {
-    bool isCascading = i->second;
-    while (i+1 != e && i[0].first.first == i[1].first.first) {
+    bool isCascading = i->isCascadingUse;
+    while (i + 1 != e && i[0].holder == i[1].holder) {
       ++i;
-      isCascading |= i->second;
+      isCascading |= i->isCascadingUse;
     }
 
-    if (i->first.first->getFormalAccess() <= AccessLevel::FilePrivate)
+    if (i->holder->getFormalAccess() <= AccessLevel::FilePrivate)
       continue;
 
     out << "- ";
     if (!isCascading)
       out << "!private ";
     out << "\"";
-    out <<  mangleTypeAsContext(i->first.first);
+    out << mangleTypeAsContext(i->holder);
     out << "\"\n";
   }
 }
@@ -606,12 +623,19 @@ void DependsEmitter::emitNominalTypes(
 void DependsEmitter::emitDynamicLookup(
     const ReferencedNameTracker *const tracker) const {
   out << dependsDynamicLookup << ":\n";
-  for (auto &entry : sortedByName(tracker->getDynamicLookupNames())) {
-    assert(!entry.first.empty());
+  SmallVector<SimpleUseTableEntry, 16> dynamicLookupNamesToSort;
+  SF->getReferencedNameTracker()->forEachDynamicLookupName(
+      [&](const DeclBaseName &name, bool isCascadingUse,
+          NullablePtr<const Decl>) {
+        dynamicLookupNamesToSort.push_back({name, isCascadingUse});
+      });
+  sortByName(dynamicLookupNamesToSort);
+  for (auto &entry : dynamicLookupNamesToSort) {
+    assert(!entry.name.empty());
     out << "- ";
-    if (!entry.second)
+    if (!entry.isCascadingUse)
       out << "!private ";
-    out << "\"" << escape(entry.first) << "\"\n";
+    out << "\"" << escape(entry.name) << "\"\n";
   }
 }
 
@@ -622,13 +646,10 @@ void DependsEmitter::emitExternal(const DependencyTracker &depTracker) const {
   }
 }
 
-SmallVector<std::pair<DeclBaseName, bool>, 16>
-DependsEmitter::sortedByName(const llvm::DenseMap<DeclBaseName, bool> map) {
-  SmallVector<std::pair<DeclBaseName, bool>, 16> pairs{map.begin(), map.end()};
-  llvm::array_pod_sort(pairs.begin(), pairs.end(),
-                       [](const std::pair<DeclBaseName, bool> *first,
-                          const std::pair<DeclBaseName, bool> *second) -> int {
-                         return first->first.compare(second->first);
+void DependsEmitter::sortByName(SmallVectorImpl<SimpleUseTableEntry> &names) {
+  llvm::array_pod_sort(names.begin(), names.end(),
+                       [](const SimpleUseTableEntry *first,
+                          const SimpleUseTableEntry *second) -> int {
+                         return first->name.compare(second->name);
                        });
-  return pairs;
 }
