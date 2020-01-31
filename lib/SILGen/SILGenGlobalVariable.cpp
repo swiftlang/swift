@@ -29,7 +29,7 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   {
     auto SILGenName = gDecl->getAttrs().getAttribute<SILGenNameAttr>();
     if (SILGenName && !SILGenName->Name.empty()) {
-      mangledName = SILGenName->Name;
+      mangledName = SILGenName->Name.str();
     } else {
       Mangle::ASTMangler NewMangler;
       mangledName = NewMangler.mangleGlobalVariableFull(gDecl);

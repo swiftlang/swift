@@ -204,7 +204,7 @@ std::string sourcekitd::getRuntimeLibPath() {
   StringRef Path = MainExePath;
   for (unsigned i = 0; i < MainExeLibNestingLevel; ++i)
     Path = llvm::sys::path::parent_path(Path);
-  return Path;
+  return Path.str();
 }
 
 static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,

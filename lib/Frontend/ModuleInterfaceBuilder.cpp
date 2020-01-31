@@ -77,7 +77,7 @@ void ModuleInterfaceBuilder::configureSubInvocationInputsAndOutputs(
   SOPs.ModuleOutputPath = OutPath.str();
 
   // Pick a primary output path that will cause problems to use.
-  StringRef MainOut = "/<unused>";
+  std::string MainOut = "/<unused>";
   SubFEOpts.InputsAndOutputs
   .setMainAndSupplementaryOutputs({MainOut}, {SOPs});
 }
@@ -98,7 +98,7 @@ void ModuleInterfaceBuilder::configureSubInvocation(
   subInvocation.setModuleName(moduleName);
   subInvocation.setClangModuleCachePath(moduleCachePath);
   subInvocation.getFrontendOptions().PrebuiltModuleCachePath =
-  prebuiltCachePath;
+      prebuiltCachePath.str();
   subInvocation.getFrontendOptions().TrackSystemDeps = trackSystemDependencies;
 
   // Respect the detailed-record preprocessor setting of the parent context.
@@ -356,7 +356,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     // Setup the callbacks for serialization, which can occur during the
     // optimization pipeline.
     SerializationOptions SerializationOpts;
-    std::string OutPathStr = OutPath;
+    std::string OutPathStr = OutPath.str();
     SerializationOpts.OutputPath = OutPathStr.c_str();
     SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
     SerializationOpts.AutolinkForceLoad =

@@ -217,7 +217,7 @@ static void initTraceInfoImpl(trace::SwiftInvocation &SwiftArgs,
                               ArrayRef<Str> Args) {
   llvm::raw_string_ostream OS(SwiftArgs.Args.Arguments);
   interleave(Args, [&OS](StringRef arg) { OS << arg; }, [&OS] { OS << ' '; });
-  SwiftArgs.Args.PrimaryFile = InputFile;
+  SwiftArgs.Args.PrimaryFile = InputFile.str();
 }
 
 void trace::initTraceInfo(trace::SwiftInvocation &SwiftArgs,

@@ -286,7 +286,7 @@ int main(int argc, char *argv[]) {
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
   unsigned BufferID = SF->getBufferID().getValue();
-  std::string Buffer = SM.getRangeForBuffer(BufferID).str();
+  std::string Buffer = SM.getRangeForBuffer(BufferID).str().str();
 
   auto Start = getLocsByLabelOrPosition(options::LineColumnPair, Buffer);
   if (Start.empty()) {

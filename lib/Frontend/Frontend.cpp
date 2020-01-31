@@ -784,7 +784,7 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   }
   if (shouldImplicityImportSwiftOnoneSupportModule(Invocation)) {
     Invocation.getFrontendOptions().ImplicitImportModuleNames.push_back(
-        SWIFT_ONONE_SUPPORT);
+        SWIFT_ONONE_SUPPORT.str());
   }
 
   const ImplicitImports implicitImports(*this);

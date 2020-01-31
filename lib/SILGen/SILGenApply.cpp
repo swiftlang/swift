@@ -4900,7 +4900,7 @@ std::string SILGenFunction::getMagicFileString(SourceLoc loc) {
   if (result != SGM.MagicFileStringsByFilePath.end())
     return std::get<0>(result->second);
 
-  return path;
+  return path.str();
 }
 
 /// Emit an application of the given allocating initializer.
