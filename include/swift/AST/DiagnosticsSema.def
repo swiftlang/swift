@@ -2660,6 +2660,10 @@ ERROR(assoc_conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
       "%4); %2 has been imported as implementation-only",
       (Type, DeclName, Identifier, Type, Type))
+ERROR(unexportable_clang_function_type,none,
+      "cannot export the underlying C type of the function type %0; "
+      "it may use anonymous types or types defined outside of a module",
+      (Type))
 
 WARNING(warn_implementation_only_conflict,none,
         "%0 inconsistently imported as implementation-only",
