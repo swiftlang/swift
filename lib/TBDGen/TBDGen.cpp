@@ -950,10 +950,9 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            llvm::raw_ostream *os,
                                            const TBDGenOptions &opts) {
   auto &ctx = M->getASTContext();
-  auto isWholeModule = singleFile == nullptr;
   const auto &triple = ctx.LangOpts.Target;
-  UniversalLinkageInfo linkInfo(triple, opts.HasMultipleIGMs, false,
-                                isWholeModule);
+  UniversalLinkageInfo linkInfo(triple, opts.HasMultipleIGMs,
+                                /*forcePublicDecls*/ false);
 
   llvm::MachO::InterfaceFile file;
   file.setFileType(llvm::MachO::FileType::TBD_V3);

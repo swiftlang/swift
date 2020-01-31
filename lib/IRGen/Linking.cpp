@@ -74,16 +74,14 @@ bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
 
 UniversalLinkageInfo::UniversalLinkageInfo(IRGenModule &IGM)
     : UniversalLinkageInfo(IGM.Triple, IGM.IRGen.hasMultipleIGMs(),
-                           IGM.IRGen.Opts.ForcePublicLinkage,
-                           IGM.getSILModule().isWholeModule()) {}
+                           IGM.IRGen.Opts.ForcePublicLinkage) {}
 
 UniversalLinkageInfo::UniversalLinkageInfo(const llvm::Triple &triple,
                                            bool hasMultipleIGMs,
-                                           bool forcePublicDecls,
-                                           bool isWholeModule)
+                                           bool forcePublicDecls)
     : IsELFObject(triple.isOSBinFormatELF()),
       UseDLLStorage(useDllStorage(triple)), HasMultipleIGMs(hasMultipleIGMs),
-      ForcePublicDecls(forcePublicDecls), IsWholeModule(isWholeModule) {}
+      ForcePublicDecls(forcePublicDecls) {}
 
 /// Mangle this entity into the given buffer.
 void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
