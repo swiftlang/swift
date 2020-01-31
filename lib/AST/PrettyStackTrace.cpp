@@ -27,6 +27,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/SourceManager.h"
+#include "clang/AST/Type.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -207,6 +208,15 @@ void swift::printTypeDescription(llvm::raw_ostream &out, Type type,
     }
   }
   if (addNewline) out << '\n';
+}
+
+void PrettyStackTraceClangType::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << ' ';
+  if (TheType == nullptr) {
+    out << "NULL clang type!\n";
+    return;
+  }
+  TheType->dump(out);
 }
 
 void PrettyStackTraceTypeRepr::print(llvm::raw_ostream &out) const {

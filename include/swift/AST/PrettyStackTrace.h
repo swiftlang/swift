@@ -24,6 +24,10 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 
+namespace clang {
+  class Type;
+}
+
 namespace swift {
   class ASTContext;
   class Decl;
@@ -129,6 +133,17 @@ class PrettyStackTraceType : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceType(ASTContext &C, const char *action, Type type)
     : Context(C), TheType(type), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
+/// PrettyStackTraceClangType - Observe that we are processing a
+/// specific Clang type.
+class PrettyStackTraceClangType : public llvm::PrettyStackTraceEntry {
+  const clang::Type *TheType;
+  const char *Action;
+public:
+  PrettyStackTraceClangType(const char *action, const clang::Type *type)
+    : TheType(type), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const;
 };
 
