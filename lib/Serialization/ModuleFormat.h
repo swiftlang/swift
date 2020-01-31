@@ -1191,6 +1191,7 @@ namespace decls_block {
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
     BCFixed<1>,   // is this the backing storage for a lazy property?
+    BCFixed<1>,   // top level global?
     DeclIDField,  // if this is a lazy property, this is the backing storage
     OpaqueReadOwnershipField,   // opaque read ownership
     ReadImplKindField,   // read implementation

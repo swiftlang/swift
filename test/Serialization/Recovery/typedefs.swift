@@ -26,9 +26,9 @@ import Lib
 // CHECK-SIL-LABEL: sil hidden [ossa] @$s8typedefs11testSymbolsyyF
 func testSymbols() {
   // Check that the symbols are not using 'Bool'.
-  // CHECK-SIL: function_ref @$s3Lib1xs5Int32Vvau
+  // CHECK-SIL: global_addr @$s3Lib9usesAssocs5Int32VSgvp
   _ = Lib.x
-  // CHECK-SIL: function_ref @$s3Lib9usesAssocs5Int32VSgvau
+  // CHECK-SIL: global_addr @$s3Lib1xs5Int32Vvp
   _ = Lib.usesAssoc
 } // CHECK-SIL: end sil function '$s8typedefs11testSymbolsyyF'
 
