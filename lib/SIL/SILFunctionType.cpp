@@ -179,7 +179,7 @@ CanType SILFunctionType::getSelfInstanceType(SILModule &M) const {
 // SWIFT_ENABLE_TENSORFLOW
 IndexSubset *
 SILFunctionType::getDifferentiationParameterIndices() {
-  assert(isDifferentiable());
+  assert(isDifferentiable() && "Must be a differentiable function");
   SmallVector<unsigned, 8> result;
   for (auto valueAndIndex : enumerate(getParameters()))
     if (valueAndIndex.value().getDifferentiability() !=
@@ -190,6 +190,8 @@ SILFunctionType::getDifferentiationParameterIndices() {
 
 CanSILFunctionType SILFunctionType::getWithDifferentiability(
     DifferentiabilityKind kind, IndexSubset *parameterIndices) {
+  assert(kind != DifferentiabilityKind::NonDifferentiable &&
+         "Differentiability kind must be normal or linear");
   SmallVector<SILParameterInfo, 8> newParameters;
   for (auto paramAndIndex : enumerate(getParameters())) {
     auto &param = paramAndIndex.value();
