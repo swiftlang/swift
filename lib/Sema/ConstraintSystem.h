@@ -1146,29 +1146,67 @@ class SolutionApplicationTarget {
   } kind;
 
   union {
-    Expr *expression;
-    AnyFunctionRef function;
+    struct {
+      Expr *expression;
+
+      /// The type to which the expression should be converted.
+      Type convertType;
+
+      /// Whether the expression result will be discarded at the end.
+      bool isDiscarded;
+    } expression;
+
+    struct {
+      AnyFunctionRef function;
+      BraceStmt *body;
+    } function;
   };
 
 public:
-  SolutionApplicationTarget(Expr *expr) {
+  SolutionApplicationTarget(Expr *expr, Type convertType, bool isDiscarded) {
     kind = Kind::expression;
-    expression = expr;
+    expression.expression = expr;
+    expression.convertType = convertType;
+    expression.isDiscarded = isDiscarded;
   }
 
-  SolutionApplicationTarget(AnyFunctionRef fn) {
+  SolutionApplicationTarget(AnyFunctionRef fn)
+      : SolutionApplicationTarget(fn, fn.getBody()) { }
+
+  SolutionApplicationTarget(AnyFunctionRef fn, BraceStmt *body) {
     kind = Kind::function;
-    function = fn;
+    function.function = fn;
+    function.body = body;
   }
 
   Expr *getAsExpr() const {
     switch (kind) {
     case Kind::expression:
-      return expression;
+      return expression.expression;
 
     case Kind::function:
       return nullptr;
     }
+  }
+
+  Type getExprConversionType() const {
+    assert(kind == Kind::expression);
+    return expression.convertType;
+  }
+
+  void setExprConversionType(Type type) {
+    assert(kind == Kind::expression);
+    expression.convertType = type;
+  }
+  
+  bool isDiscardedExpr() const {
+    assert(kind == Kind::expression);
+    return expression.isDiscarded;
+  }
+
+  void setExpr(Expr *expr) {
+    assert(kind == Kind::expression);
+    expression.expression = expr;
   }
 
   Optional<AnyFunctionRef> getAsFunction() const {
@@ -1177,12 +1215,44 @@ public:
       return None;
 
     case Kind::function:
-      return function;
+      return function.function;
+    }
+  }
+
+  BraceStmt *getFunctionBody() const {
+    assert(kind == Kind::function);
+    return function.body;
+  }
+
+  void setFunctionBody(BraceStmt *stmt) {
+    assert(kind == Kind::function);
+    function.body = stmt;
+  }
+
+  /// Retrieve the source range of the target.
+  SourceRange getSourceRange() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression.expression->getSourceRange();
+
+    case Kind::function:
+      return function.body->getSourceRange();
+    }
+  }
+
+  /// Retrieve the source location for the target.
+  SourceLoc getLoc() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression.expression->getLoc();
+
+    case Kind::function:
+      return function.function.getLoc();
     }
   }
 
   /// Walk the contents of the application target.
-  llvm::PointerUnion<Expr *, Stmt *> walk(ASTWalker &walker);
+  SolutionApplicationTarget walk(ASTWalker &walker);
 };
 
 enum class ConstraintSystemPhase {
@@ -4036,13 +4106,11 @@ private:
 
   /// Solve the system of constraints generated from provided expression.
   ///
-  /// \param expr The expression to generate constraints from.
-  /// \param convertType The expected type of the expression.
+  /// \param target The target to generate constraints from.
   /// \param listener The callback to check solving progress.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
-  SolutionResult solveImpl(Expr *&expr,
-                           Type convertType,
+  SolutionResult solveImpl(SolutionApplicationTarget &target,
                            ExprTypeCheckListener *listener,
                            FreeTypeVariableBinding allowFreeTypeVariables
                              = FreeTypeVariableBinding::Disallow);
@@ -4053,26 +4121,21 @@ public:
   static bool preCheckExpression(Expr *&expr, DeclContext *dc,
                                  ConstraintSystem *baseCS = nullptr);
         
-  /// Solve the system of constraints generated from provided expression.
+  /// Solve the system of constraints generated from provided target.
   ///
-  /// The expression should have already been pre-checked with
-  /// preCheckExpression().
-  ///
-  /// \param expr The expression to generate constraints from.
-  /// \param convertType The expected type of the expression.
+  /// \param target The target that we'll generate constraints from, which
+  /// may be updated by the solving process.
   /// \param listener The callback to check solving progress.
-  /// \param solutions The set of solutions to the system of constraints.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
-  /// \returns true is an error occurred, false is system is consistent
-  /// and solutions were found.
-  bool solve(Expr *&expr,
-             Type convertType,
-             ExprTypeCheckListener *listener,
-             SmallVectorImpl<Solution> &solutions,
-             FreeTypeVariableBinding allowFreeTypeVariables
-             = FreeTypeVariableBinding::Disallow);
+  /// \returns the set of solutions, if any were found, or \c None if an
+  /// error occurred. When \c None, an error has been emitted.
+  Optional<std::vector<Solution>> solve(
+      SolutionApplicationTarget &target,
+      ExprTypeCheckListener *listener,
+      FreeTypeVariableBinding allowFreeTypeVariables
+        = FreeTypeVariableBinding::Disallow);
 
   /// Solve the system of constraints.
   ///
@@ -4146,35 +4209,16 @@ public:
   findBestSolution(SmallVectorImpl<Solution> &solutions,
                    bool minimize);
 
-private:
-  llvm::PointerUnion<Expr *, Stmt *> applySolutionImpl(
-      Solution &solution, SolutionApplicationTarget target,
-      Type convertType, bool discardedExpr, bool performingDiagnostics);
-
 public:
-  /// Apply a given solution to the expression, producing a fully
-  /// type-checked expression.
+  /// Apply a given solution to the target, producing a fully
+  /// type-checked target or \c None if an error occurred.
   ///
-  /// \param convertType the contextual type to which the
-  /// expression should be converted, if any.
-  /// \param discardedExpr if true, the result of the expression
-  /// is contextually ignored.
+  /// \param target the target to which the solution will be applied.
   /// \param performingDiagnostics if true, don't descend into bodies of
   /// non-single expression closures, or build curry thunks.
-  Expr *applySolution(Solution &solution, Expr *expr,
-                      Type convertType,
-                      bool discardedExpr,
-                      bool performingDiagnostics) {
-    return applySolutionImpl(solution, expr, convertType, discardedExpr,
-                             performingDiagnostics).get<Expr *>();
-  }
-
-  /// Apply a given solution to the body of the given function.
-  BraceStmt *applySolutionToBody(Solution &solution, AnyFunctionRef fn) {
-    return cast_or_null<BraceStmt>(
-        applySolutionImpl(solution, fn, Type(), false, false)
-      .dyn_cast<Stmt *>());
-  }
+  Optional<SolutionApplicationTarget> applySolution(
+      Solution &solution, SolutionApplicationTarget target,
+      bool performingDiagnostics);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully

@@ -2027,18 +2027,9 @@ bool ExprTypeCheckListener::builtConstraints(ConstraintSystem &cs, Expr *expr) {
   return false;
 }
 
-Expr *ExprTypeCheckListener::foundSolution(Solution &solution, Expr *expr) {
-  return expr;
-}
-
 Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
   return expr;
 }
-
-void ExprTypeCheckListener::preCheckFailed(Expr *expr) {}
-void ExprTypeCheckListener::constraintGenerationFailed(Expr *expr) {}
-void ExprTypeCheckListener::applySolutionFailed(Solution &solution,
-                                                Expr *expr) {}
 
 void ParentConditionalConformance::diagnoseConformanceStack(
     DiagnosticEngine &diags, SourceLoc loc,
@@ -2067,89 +2058,6 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
   return false;
 }
 
-/// Sometimes constraint solver fails without producing any diagnostics,
-/// that leads to crashes down the line in AST Verifier or SILGen
-/// which, as a result, are much harder to figure out.
-///
-/// This class is intended to guard against situations like that by
-/// keeping track of failures of different type-check phases, and
-/// emitting fallback fatal error if any of them fail without producing
-/// error diagnostic, and there were no errors emitted or scheduled to be
-/// emitted previously.
-class FallbackDiagnosticListener : public ExprTypeCheckListener {
-  ASTContext &Context;
-  TypeCheckExprOptions Options;
-  ExprTypeCheckListener *BaseListener;
-
-public:
-  FallbackDiagnosticListener(ASTContext &ctx, TypeCheckExprOptions options,
-                             ExprTypeCheckListener *base)
-      : Context(ctx), Options(options), BaseListener(base) {}
-
-  bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
-    return BaseListener ? BaseListener->builtConstraints(cs, expr) : false;
-  }
-
-  Expr *foundSolution(Solution &solution, Expr *expr) override {
-    return BaseListener ? BaseListener->foundSolution(solution, expr) : expr;
-  }
-
-  Expr *appliedSolution(Solution &solution, Expr *expr) override {
-    return BaseListener ? BaseListener->appliedSolution(solution, expr) : expr;
-  }
-
-  void preCheckFailed(Expr *expr) override {
-    if (BaseListener)
-      BaseListener->preCheckFailed(expr);
-    maybeProduceFallbackDiagnostic(expr);
-  }
-
-  void constraintGenerationFailed(Expr *expr) override {
-    if (BaseListener)
-      BaseListener->constraintGenerationFailed(expr);
-    maybeProduceFallbackDiagnostic(expr);
-  }
-
-  void applySolutionFailed(Solution &solution, Expr *expr) override {
-    if (BaseListener)
-      BaseListener->applySolutionFailed(solution, expr);
-
-    if (hadAnyErrors())
-      return;
-
-    // If solution involves invalid or incomplete conformances that's
-    // a probable cause of failure to apply it without producing an error,
-    // which is going to be diagnosed later, so let's not produce
-    // fallback diagnostic in this case.
-    if (llvm::any_of(
-            solution.Conformances,
-            [](const std::pair<ConstraintLocator *, ProtocolConformanceRef>
-                   &conformance) -> bool {
-              auto &ref = conformance.second;
-              return ref.isConcrete() && ref.getConcrete()->isInvalid();
-            }))
-      return;
-
-    maybeProduceFallbackDiagnostic(expr);
-  }
-
-private:
-  bool hadAnyErrors() const { return Context.Diags.hadAnyError(); }
-
-  void maybeProduceFallbackDiagnostic(Expr *expr) const {
-    if (Options.contains(TypeCheckExprFlags::SubExpressionDiagnostics) ||
-        DiagnosticSuppression::isEnabled(Context.Diags))
-      return;
-
-    // Before producing fatal error here, let's check if there are any "error"
-    // diagnostics already emitted or waiting to be emitted. Because they are
-    // a better indication of the problem.
-    if (!(hadAnyErrors() || Context.hasDelayedConformanceErrors()))
-      Context.Diags.diagnose(expr->getLoc(),
-                             diag::failed_to_produce_diagnostic);
-  }
-};
-
 #pragma mark High-level entry points
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,
@@ -2158,25 +2066,12 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
   auto &Context = dc->getASTContext();
-  FallbackDiagnosticListener diagListener(Context, options, listener);
-  return typeCheckExpressionImpl(expr, dc, convertType, convertTypePurpose,
-                                 options, diagListener, baseCS);
-}
-
-Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
-                                          TypeLoc convertType,
-                                          ContextualTypePurpose convertTypePurpose,
-                                          TypeCheckExprOptions options,
-                                          ExprTypeCheckListener &listener,
-                                          ConstraintSystem *baseCS) {
-  auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckExpression(expr, dc, baseCS)) {
-    listener.preCheckFailed(expr);
     return Type();
   }
 
@@ -2243,23 +2138,25 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
     convertTo = getOptionalType(expr->getLoc(), var);
   }
 
-  SmallVector<Solution, 4> viable;
   // Attempt to solve the constraint system.
-  if (cs.solve(expr, convertTo, &listener, viable, allowFreeTypeVariables))
+  SolutionApplicationTarget target(
+      expr, convertTo,
+      options.contains(TypeCheckExprFlags::IsDiscarded));
+  auto viable = cs.solve(target, listener, allowFreeTypeVariables);
+  if (!viable)
     return Type();
 
   // If the client allows the solution to have unresolved type expressions,
   // check for them now.  We cannot apply the solution with unresolved TypeVars,
   // because they will leak out into arbitrary places in the resultant AST.
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
-      (viable.size() != 1 ||
+       (viable->size() != 1 ||
        (convertType.getType() && convertType.getType()->hasUnresolvedType()))) {
     return ErrorType::get(Context);
   }
 
-  auto result = expr;
-  auto &solution = viable[0];
-  result = listener.foundSolution(solution, result);
+  auto result = target.getAsExpr();
+  auto &solution = (*viable)[0];
   if (!result)
     return Type();
 
@@ -2267,19 +2164,20 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   cs.applySolution(solution);
 
   // Apply the solution to the expression.
-  result = cs.applySolution(
-      solution, result, convertType.getType(),
-      options.contains(TypeCheckExprFlags::IsDiscarded),
-      options.contains(TypeCheckExprFlags::SubExpressionDiagnostics));
-
-  if (!result) {
-    listener.applySolutionFailed(solution, expr);
+  bool performingDiagnostics =
+      options.contains(TypeCheckExprFlags::SubExpressionDiagnostics);
+  // FIXME: HACK!
+  target.setExprConversionType(convertType.getType());
+  auto resultTarget = cs.applySolution(solution, target, performingDiagnostics);
+  if (!resultTarget) {
     // Failure already diagnosed, above, as part of applying the solution.
     return Type();
   }
+  result = resultTarget->getAsExpr();
 
   // Notify listener that we've applied the solution.
-  result = listener.appliedSolution(solution, result);
+  if (listener)
+    result = listener->appliedSolution(solution, result);
   if (!result)
     return Type();
 
@@ -2348,7 +2246,6 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   ConstraintSystem cs(dc, ConstraintSystemFlags::SuppressDiagnostics);
 
   // Attempt to solve the constraint system.
-  SmallVector<Solution, 4> viable;
   const Type originalType = expr->getType();
   const bool needClearType = originalType && originalType->hasError();
   const auto recoverOriginalType = [&] () {
@@ -2360,14 +2257,16 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   // re-check.
   if (needClearType)
     expr->setType(Type());
-  if (cs.solve(expr, /*convertType*/Type(), listener, viable,
-               allowFreeTypeVariables)) {
+  SolutionApplicationTarget target(expr, Type(), /*isDiscarded=*/false);
+  auto viable = cs.solve(target, listener, allowFreeTypeVariables);
+  if (!viable) {
     recoverOriginalType();
     return Type();
   }
 
   // Get the expression's simplified type.
-  auto &solution = viable[0];
+  expr = target.getAsExpr();
+  auto &solution = (*viable)[0];
   auto &solutionCS = solution.getConstraintSystem();
   Type exprType = solution.simplifyType(solutionCS.getType(expr));
 
@@ -2434,19 +2333,18 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
   ConstraintSystem cs(dc, options);
 
   // Attempt to solve the constraint system.
-  SmallVector<Solution, 4> viable;
-
   const Type originalType = expr->getType();
   if (originalType && originalType->hasError())
     expr->setType(Type());
 
-  cs.solve(expr, /*convertType*/ Type(), listener, viable,
-           allowFreeTypeVariables);
-
-  for (auto &solution : viable) {
-    auto exprType = solution.simplifyType(cs.getType(expr));
-    assert(exprType && !exprType->hasTypeVariable());
-    types.insert(exprType.getPointer());
+  SolutionApplicationTarget target(expr, Type(), /*isDiscarded=*/false);
+  if (auto viable = cs.solve(target, listener, allowFreeTypeVariables)) {
+    expr = target.getAsExpr();
+    for (auto &solution : *viable) {
+      auto exprType = solution.simplifyType(cs.getType(expr));
+      assert(exprType && !exprType->hasTypeVariable());
+      types.insert(exprType.getPointer());
+    }
   }
 }
 
@@ -2676,16 +2574,13 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       return false;
     }
 
-    Expr *foundSolution(Solution &solution, Expr *expr) override {
-      // Figure out what type the constraints decided on.
-      auto ty = solution.simplifyType(initType);
-      initType = ty->getRValueType()->reconstituteSugar(/*recursive =*/false);
-
-      // Just keep going.
-      return expr;
-    }
-
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
+      {
+        // Figure out what type the constraints decided on.
+        auto ty = solution.simplifyType(initType);
+        initType = ty->getRValueType()->reconstituteSugar(/*recursive =*/false);
+      }
+
       // Convert the initializer to the type of the pattern.
       expr = solution.coerceToType(expr, initType, Locator);
       if (!expr)
