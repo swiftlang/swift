@@ -2138,22 +2138,25 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
     convertTo = getOptionalType(expr->getLoc(), var);
   }
 
-  SmallVector<Solution, 4> viable;
   // Attempt to solve the constraint system.
-  if (cs.solve(expr, convertTo, listener, viable, allowFreeTypeVariables))
+  SolutionApplicationTarget target(
+      expr, convertTo,
+      options.contains(TypeCheckExprFlags::IsDiscarded));
+  auto viable = cs.solve(target, listener, allowFreeTypeVariables);
+  if (!viable)
     return Type();
 
   // If the client allows the solution to have unresolved type expressions,
   // check for them now.  We cannot apply the solution with unresolved TypeVars,
   // because they will leak out into arbitrary places in the resultant AST.
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
-      (viable.size() != 1 ||
+       (viable->size() != 1 ||
        (convertType.getType() && convertType.getType()->hasUnresolvedType()))) {
     return ErrorType::get(Context);
   }
 
-  auto result = expr;
-  auto &solution = viable[0];
+  auto result = target.getAsExpr();
+  auto &solution = (*viable)[0];
   if (!result)
     return Type();
 
@@ -2161,11 +2164,10 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   cs.applySolution(solution);
 
   // Apply the solution to the expression.
-  SolutionApplicationTarget target(
-      result, convertType.getType(),
-      options.contains(TypeCheckExprFlags::IsDiscarded));
   bool performingDiagnostics =
       options.contains(TypeCheckExprFlags::SubExpressionDiagnostics);
+  // FIXME: HACK!
+  target.setExprConversionType(convertType.getType());
   auto resultTarget = cs.applySolution(solution, target, performingDiagnostics);
   if (!resultTarget) {
     // Failure already diagnosed, above, as part of applying the solution.
@@ -2244,7 +2246,6 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   ConstraintSystem cs(dc, ConstraintSystemFlags::SuppressDiagnostics);
 
   // Attempt to solve the constraint system.
-  SmallVector<Solution, 4> viable;
   const Type originalType = expr->getType();
   const bool needClearType = originalType && originalType->hasError();
   const auto recoverOriginalType = [&] () {
@@ -2256,14 +2257,16 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   // re-check.
   if (needClearType)
     expr->setType(Type());
-  if (cs.solve(expr, /*convertType*/Type(), listener, viable,
-               allowFreeTypeVariables)) {
+  SolutionApplicationTarget target(expr, Type(), /*isDiscarded=*/false);
+  auto viable = cs.solve(target, listener, allowFreeTypeVariables);
+  if (!viable) {
     recoverOriginalType();
     return Type();
   }
 
   // Get the expression's simplified type.
-  auto &solution = viable[0];
+  expr = target.getAsExpr();
+  auto &solution = (*viable)[0];
   auto &solutionCS = solution.getConstraintSystem();
   Type exprType = solution.simplifyType(solutionCS.getType(expr));
 
@@ -2330,19 +2333,18 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
   ConstraintSystem cs(dc, options);
 
   // Attempt to solve the constraint system.
-  SmallVector<Solution, 4> viable;
-
   const Type originalType = expr->getType();
   if (originalType && originalType->hasError())
     expr->setType(Type());
 
-  cs.solve(expr, /*convertType*/ Type(), listener, viable,
-           allowFreeTypeVariables);
-
-  for (auto &solution : viable) {
-    auto exprType = solution.simplifyType(cs.getType(expr));
-    assert(exprType && !exprType->hasTypeVariable());
-    types.insert(exprType.getPointer());
+  SolutionApplicationTarget target(expr, Type(), /*isDiscarded=*/false);
+  if (auto viable = cs.solve(target, listener, allowFreeTypeVariables)) {
+    expr = target.getAsExpr();
+    for (auto &solution : *viable) {
+      auto exprType = solution.simplifyType(cs.getType(expr));
+      assert(exprType && !exprType->hasTypeVariable());
+      types.insert(exprType.getPointer());
+    }
   }
 }
 

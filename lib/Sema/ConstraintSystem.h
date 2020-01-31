@@ -1194,6 +1194,11 @@ public:
     return expression.convertType;
   }
 
+  void setExprConversionType(Type type) {
+    assert(kind == Kind::expression);
+    expression.convertType = type;
+  }
+  
   bool isDiscardedExpr() const {
     assert(kind == Kind::expression);
     return expression.isDiscarded;
@@ -1234,6 +1239,18 @@ public:
       return function.body->getSourceRange();
     }
   }
+
+  /// Retrieve the source location for the target.
+  SourceLoc getLoc() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression.expression->getLoc();
+
+    case Kind::function:
+      return function.function.getLoc();
+    }
+  }
+
   /// Walk the contents of the application target.
   SolutionApplicationTarget walk(ASTWalker &walker);
 };
@@ -4104,26 +4121,21 @@ public:
   static bool preCheckExpression(Expr *&expr, DeclContext *dc,
                                  ConstraintSystem *baseCS = nullptr);
         
-  /// Solve the system of constraints generated from provided expression.
+  /// Solve the system of constraints generated from provided target.
   ///
-  /// The expression should have already been pre-checked with
-  /// preCheckExpression().
-  ///
-  /// \param expr The expression to generate constraints from.
-  /// \param convertType The expected type of the expression.
+  /// \param target The target that we'll generate constraints from, which
+  /// may be updated by the solving process.
   /// \param listener The callback to check solving progress.
-  /// \param solutions The set of solutions to the system of constraints.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
-  /// \returns true is an error occurred, false is system is consistent
-  /// and solutions were found.
-  bool solve(Expr *&expr,
-             Type convertType,
-             ExprTypeCheckListener *listener,
-             SmallVectorImpl<Solution> &solutions,
-             FreeTypeVariableBinding allowFreeTypeVariables
-             = FreeTypeVariableBinding::Disallow);
+  /// \returns the set of solutions, if any were found, or \c None if an
+  /// error occurred. When \c None, an error has been emitted.
+  Optional<std::vector<Solution>> solve(
+      SolutionApplicationTarget &target,
+      ExprTypeCheckListener *listener,
+      FreeTypeVariableBinding allowFreeTypeVariables
+        = FreeTypeVariableBinding::Disallow);
 
   /// Solve the system of constraints.
   ///

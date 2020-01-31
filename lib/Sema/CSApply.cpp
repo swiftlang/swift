@@ -7331,7 +7331,8 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     // If we're supposed to convert the expression to some particular type,
     // do so now.
     if (shouldCoerceToContextualType()) {
-      resultExpr = rewriter.coerceToType(resultExpr, convertType,
+      resultExpr = rewriter.coerceToType(resultExpr,
+                                         simplifyType(convertType),
                                          getConstraintLocator(expr));
     } else if (getType(resultExpr)->hasLValueType() &&
                !target.isDiscardedExpr()) {

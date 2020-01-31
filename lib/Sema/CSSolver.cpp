@@ -1074,7 +1074,8 @@ void ConstraintSystem::shrink(Expr *expr) {
   }
 }
 
-static bool debugConstraintSolverForExpr(ASTContext &C, Expr *expr) {
+static bool debugConstraintSolverForTarget(
+   ASTContext &C, SolutionApplicationTarget target) {
   if (C.TypeCheckerOpts.DebugConstraintSolver)
     return true;
 
@@ -1082,14 +1083,13 @@ static bool debugConstraintSolverForExpr(ASTContext &C, Expr *expr) {
     // No need to compute the line number to find out it's not present.
     return false;
 
-  // Get the lines on which the expression starts and ends.
+  // Get the lines on which the target starts and ends.
   unsigned startLine = 0, endLine = 0;
-  if (expr->getSourceRange().isValid()) {
-    auto range =
-      Lexer::getCharSourceRangeFromSourceRange(C.SourceMgr,
-                                               expr->getSourceRange());
-    startLine = C.SourceMgr.getLineNumber(range.getStart());
-    endLine = C.SourceMgr.getLineNumber(range.getEnd());
+  SourceRange range = target.getSourceRange();
+  if (range.isValid()) {
+    auto charRange = Lexer::getCharSourceRangeFromSourceRange(C.SourceMgr, range);
+    startLine = C.SourceMgr.getLineNumber(charRange.getStart());
+    endLine = C.SourceMgr.getLineNumber(charRange.getEnd());
   }
 
   assert(startLine <= endLine && "expr ends before it starts?");
@@ -1107,25 +1107,26 @@ static bool debugConstraintSolverForExpr(ASTContext &C, Expr *expr) {
   return startBound != endBound;
 }
 
-bool ConstraintSystem::solve(Expr *&expr,
-                             Type convertType,
-                             ExprTypeCheckListener *listener,
-                             SmallVectorImpl<Solution> &solutions,
-                             FreeTypeVariableBinding allowFreeTypeVariables) {
+Optional<std::vector<Solution>> ConstraintSystem::solve(
+    SolutionApplicationTarget &target,
+    ExprTypeCheckListener *listener,
+    FreeTypeVariableBinding allowFreeTypeVariables
+) {
   llvm::SaveAndRestore<bool> debugForExpr(
       getASTContext().TypeCheckerOpts.DebugConstraintSolver,
-      debugConstraintSolverForExpr(getASTContext(), expr));
+      debugConstraintSolverForTarget(getASTContext(), target));
 
   /// Dump solutions for debugging purposes.
-  auto dumpSolutions = [&] {
+  auto dumpSolutions = [&](const SolutionResult &result) {
     // Debug-print the set of solutions.
     if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
-      if (solutions.size() == 1) {
+      if (result.getKind() == SolutionResult::Success) {
         log << "---Solution---\n";
-        solutions[0].dump(log);
-      } else {
-        for (unsigned i = 0, e = solutions.size(); i != e; ++i) {
+        result.getSolution().dump(log);
+      } else if (result.getKind() == SolutionResult::Ambiguous) {
+        auto solutions = result.getAmbiguousSolutions();
+        for (unsigned i : indices(solutions)) {
           log << "--- Solution #" << i << " ---\n";
           solutions[i].dump(log);
         }
@@ -1135,45 +1136,47 @@ bool ConstraintSystem::solve(Expr *&expr,
 
   // Take up to two attempts at solving the system. The first attempts to
   // solve a system that is expected to be well-formed, the second kicks in
-  // when there is an error and attempts to salvage an ill-formed expression.
-  SolutionApplicationTarget target(expr, convertType, /*isDiscarded=*/false);
+  // when there is an error and attempts to salvage an ill-formed program.
   for (unsigned stage = 0; stage != 2; ++stage) {
     auto solution = (stage == 0)
         ? solveImpl(target, listener, allowFreeTypeVariables)
         : salvage();
 
     switch (solution.getKind()) {
-    case SolutionResult::Success:
+    case SolutionResult::Success: {
       // Return the successful solution.
-      solutions.clear();
-      solutions.push_back(std::move(solution).takeSolution());
-      dumpSolutions();
-      return false;
+      dumpSolutions(solution);
+      std::vector<Solution> result;
+      result.push_back(std::move(solution).takeSolution());
+      return std::move(result);
+    }
 
     case SolutionResult::Error:
-      return true;
+      return None;
 
     case SolutionResult::TooComplex:
-      getASTContext().Diags.diagnose(expr->getLoc(), diag::expression_too_complex)
-          .highlight(expr->getSourceRange());
+      getASTContext().Diags.diagnose(
+          target.getLoc(), diag::expression_too_complex)
+            .highlight(target.getSourceRange());
       solution.markAsDiagnosed();
-      return true;
+      return None;
 
     case SolutionResult::Ambiguous:
       // If salvaging produced an ambiguous result, it has already been
       // diagnosed.
       if (stage == 1) {
         solution.markAsDiagnosed();
-        return true;
+        return None;
       }
 
       if (Options.contains(
             ConstraintSystemFlags::AllowUnresolvedTypeVariables)) {
+        dumpSolutions(solution);
         auto ambiguousSolutions = std::move(solution).takeAmbiguousSolutions();
-        solutions.assign(std::make_move_iterator(ambiguousSolutions.begin()),
-                         std::make_move_iterator(ambiguousSolutions.end()));
-        dumpSolutions();
-        return false;
+        std::vector<Solution> result(
+            std::make_move_iterator(ambiguousSolutions.begin()),
+            std::make_move_iterator(ambiguousSolutions.end()));
+        return std::move(result);
       }
 
       LLVM_FALLTHROUGH;
@@ -1181,15 +1184,13 @@ bool ConstraintSystem::solve(Expr *&expr,
     case SolutionResult::UndiagnosedError:
       if (shouldSuppressDiagnostics()) {
         solution.markAsDiagnosed();
-        return true;
+        return None;
       }
 
       if (stage == 1) {
-        diagnoseFailureFor(
-            SolutionApplicationTarget(expr, convertType,
-                                      /*isDiscarded=*/false));
+        diagnoseFailureFor(target);
         solution.markAsDiagnosed();
-        return true;
+        return None;
       }
 
       // Loop again to try to salvage.
