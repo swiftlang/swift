@@ -305,13 +305,6 @@ public:
   /// constraint system, or false otherwise.
   virtual bool builtConstraints(constraints::ConstraintSystem &cs, Expr *expr);
 
-  /// Callback invoked once a solution has been found.
-  ///
-  /// The callback may further alter the expression, returning either a
-  /// new expression (to replace the result) or a null pointer to indicate
-  /// failure.
-  virtual Expr *foundSolution(constraints::Solution &solution, Expr *expr);
-
   /// Callback invokes once the chosen solution has been applied to the
   /// expression.
   ///
@@ -320,18 +313,6 @@ public:
   /// failure.
   virtual Expr *appliedSolution(constraints::Solution &solution,
                                 Expr *expr);
-
-  /// Callback invoked if expression is structurally unsound and can't
-  /// be correctly processed by the constraint solver.
-  virtual void preCheckFailed(Expr *expr);
-
-  /// Callback invoked if constraint system failed to generate
-  /// constraints for a given expression.
-  virtual void constraintGenerationFailed(Expr *expr);
-
-  /// Callback invoked if application of chosen solution to
-  /// expression has failed.
-  virtual void applySolutionFailed(constraints::Solution &solution, Expr *expr);
 };
 
 /// A conditional conformance that implied some other requirements. That is, \c
@@ -868,15 +849,6 @@ public:
                                             TypeCheckExprOptions(), listener);
   }
 
-private:
-  static Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
-                                      TypeLoc convertType,
-                                      ContextualTypePurpose convertTypePurpose,
-                                      TypeCheckExprOptions options,
-                                      ExprTypeCheckListener &listener,
-                                      constraints::ConstraintSystem *baseCS);
-
-public:
   /// Type check the given expression and return its type without
   /// applying the solution.
   ///
