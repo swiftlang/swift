@@ -3284,6 +3284,57 @@ void ClangImporter::printClangType(const clang::Type *type,
   clang::QualType(type, 0).print(os, policy);
 }
 
+StableSerializationPath
+ClangImporter::getStableSerializationPath(const clang::Decl *decl) const {
+  return Impl.getStableSerializationPath(decl);
+}
+
+StableSerializationPath
+ClangImporter::Implementation::getStableSerializationPath(
+                                                    const clang::Decl *decl) {
+  // We can't do anything with non-NamedDecl declarations.
+  auto named = dyn_cast<clang::NamedDecl>(decl);
+  if (!named) return StableSerializationPath();
+
+  if (decl->isFromASTFile()) {
+    // We've almost certainly imported this declaration, look for it.
+    if (auto swiftDecl = importDeclCached(named, CurrentVersion)) {
+      // Only accept this declaration if it round-trips.
+      if (auto swiftClangDecl = swiftDecl->getClangDecl())
+        if (swiftClangDecl == decl ||
+            swiftClangDecl->getCanonicalDecl() == decl->getCanonicalDecl())
+        return swiftDecl;
+    }
+
+    // Otherwise, check to see if it's something we can easily find.
+    // TODO: look for a stable external path.
+
+    // Otherwise we have no way to find it.
+    return StableSerializationPath();
+  }
+
+  // If the declaration isn't from an AST file, it might be something that
+  // we built automatically when exporting a Swift type.
+  if (auto swiftDecl = SwiftContext.getSwiftDeclForExportedClangDecl(decl))
+    return swiftDecl;
+
+  // Otherwise we have no way to find it.
+  return StableSerializationPath();
+}
+
+const clang::Decl *
+ClangImporter::lookupStableSerializationPath(
+                                  const StableSerializationPath &path) const {
+  if (!path) return nullptr;
+
+  if (path.isSwiftDecl()) {
+    return path.getSwiftDecl()->getClangDecl();
+  }
+
+  // TODO: follow a stable external path.
+  return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 // ClangModule Implementation
 //===----------------------------------------------------------------------===//

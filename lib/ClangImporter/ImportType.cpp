@@ -30,6 +30,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
 #include "swift/Parse/Token.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
@@ -58,6 +59,43 @@ bool ClangImporter::Implementation::isOverAligned(const clang::TypeDecl *decl) {
 bool ClangImporter::Implementation::isOverAligned(clang::QualType type) {
   auto align = getClangASTContext().getTypeAlignInChars(type);
   return align > clang::CharUnits::fromQuantity(MaximumAlignment);
+}
+
+namespace {
+  struct ClangTypeSerializationChecker :
+      DataStreamBasicWriter<ClangTypeSerializationChecker> {
+    ClangImporter::Implementation &Impl;
+    bool IsSerializable = true;
+
+    ClangTypeSerializationChecker(ClangImporter::Implementation &impl)
+      : Impl(impl) {}
+
+    void writeUInt64(uint64_t value) {}
+    void writeIdentifier(const clang::IdentifierInfo *ident) {}
+    void writeStmtRef(const clang::Stmt *stmt) {
+      if (stmt != nullptr)
+        IsSerializable = false;
+    }
+    void writeDeclRef(const clang::Decl *decl) {
+      if (decl && !Impl.getStableSerializationPath(decl))
+        IsSerializable = false;
+    }
+    void writeSourceLocation(clang::SourceLocation loc) {
+      // If a source location is written into a type, it's likely to be
+      // something like the location of a VLA which we shouldn't simply
+      // replace with a meaningless location.
+      if (loc.isValid())
+        IsSerializable = false;
+    }
+  };
+}
+
+bool ClangImporter::Implementation::isSerializable(clang::QualType type) {
+  // Make a pass over the type as if we were serializing it, flagging
+  // anything that we can't stably serialize.
+  ClangTypeSerializationChecker checker(*this);
+  checker.writeQualType(type);
+  return checker.IsSerializable;
 }
 
 namespace {
@@ -176,6 +214,28 @@ namespace {
     ImportResult Visit(clang::QualType type) {
       auto IR = Visit(type.getTypePtr());
       return IR;
+    }
+
+    clang::QualType findSerializableType(clang::QualType type) {
+      // TODO: should we bypass this check when serialization is not
+      // required, or would that be too confusing for users?
+
+      // Always require the canonical type to be serializable.
+      clang::QualType canonicalType =
+        Impl.getClangASTContext().getCanonicalType(type);
+      if (!Impl.isSerializable(canonicalType))
+        return clang::QualType();
+
+      // Prefer the non-canonical type if it's also serializable.
+      if (Impl.isSerializable(type))
+        return type;
+      return canonicalType;
+    }
+
+    const clang::Type *findSerializableType(const clang::Type *type) {
+      // Qualifier differences shouldn't affect serializability.
+      return findSerializableType(clang::QualType(type, 0))
+               .getTypePtrOrNull();
     }
 
     ImportResult VisitType(const Type*) = delete;
@@ -403,25 +463,34 @@ namespace {
           pointeeQualType, ImportTypeKind::Value, AllowNSUIntegerAsInt,
           Bridgeability::None);
 
-      // If the pointed-to type is unrepresentable in Swift, or its C
-      // alignment is greater than the maximum Swift alignment, import as
-      // OpaquePointer.
-      if (!pointeeType || Impl.isOverAligned(pointeeQualType)) {
+      auto getOpaquePointerType = [&]() -> ImportResult {
         auto opaquePointer = Impl.SwiftContext.getOpaquePointerDecl();
         if (!opaquePointer)
           return Type();
         return {opaquePointer->getDeclaredType(),
                 ImportHint::OtherPointer};
-      }
+      };
+
+      // If the pointed-to type is unrepresentable in Swift, or its C
+      // alignment is greater than the maximum Swift alignment, import as
+      // OpaquePointer.
+      if (!pointeeType || Impl.isOverAligned(pointeeQualType))
+        return getOpaquePointerType();
       
       if (pointeeQualType->isFunctionType()) {
+        // If we need the type to be serializable, and this type isn't,
+        // use an opaque pointer type.
+        auto serializableType = findSerializableType(type);
+        if (!serializableType)
+          return getOpaquePointerType();
+
         auto funcTy = pointeeType->castTo<FunctionType>();
         return {
           FunctionType::get(funcTy->getParams(), funcTy->getResult(),
             funcTy->getExtInfo()
               .withRepresentation(
                 AnyFunctionType::Representation::CFunctionPointer)
-              .withClangFunctionType(type)),
+              .withClangFunctionType(serializableType)),
           ImportHint::CFunctionPointer
         };
       }

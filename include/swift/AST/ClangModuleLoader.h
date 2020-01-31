@@ -14,10 +14,12 @@
 #define SWIFT_AST_CLANG_MODULE_LOADER_H
 
 #include "swift/AST/ModuleLoader.h"
+#include "swift/Basic/TaggedUnion.h"
 
 namespace clang {
 class ASTContext;
 class CompilerInstance;
+class Decl;
 class Preprocessor;
 class Sema;
 class TargetInfo;
@@ -26,6 +28,7 @@ class Type;
 
 namespace swift {
 
+class Decl;
 class DeclContext;
 class VisibleDeclConsumer;
 
@@ -38,6 +41,47 @@ enum class ClangTypeKind {
   /// Structs, enums, and unions.
   Tag,
   ObjCProtocol,
+};
+
+/// A path for serializing a declaration.
+class StableSerializationPath {
+public:
+  struct ExternalPath {
+    enum IdentifierNamespace {
+      /// A tag identifier
+      Tag,
+
+      /// An ordinary name
+      Ordinary,
+
+      /// A C++ namespace
+      Namespace
+    };
+
+    ModuleDecl *M;
+    SmallVector<std::pair<IdentifierNamespace, Identifier>, 2> Path;
+  };
+private:
+  TaggedUnion<void, const Decl *, ExternalPath> Union;
+
+public:
+  StableSerializationPath() {}
+  StableSerializationPath(const Decl *d) : Union(d) {}
+  StableSerializationPath(ExternalPath ext) : Union(ext) {}
+
+  explicit operator bool() const { return !Union.empty(); }
+
+  bool isSwiftDecl() const { return Union.isa<const Decl*>(); }
+  const Decl *getSwiftDecl() const {
+    assert(isSwiftDecl());
+    return Union.get<const Decl*>();
+  }
+
+  bool isExternalPath() const { return Union.isa<ExternalPath>(); }
+  const ExternalPath &getExternalPath() const {
+    assert(isExternalPath());
+    return Union.get<ExternalPath>();
+  }
 };
 
 class ClangModuleLoader : public ModuleLoader {
@@ -111,6 +155,15 @@ public:
   /// Print the Clang type.
   virtual void printClangType(const clang::Type *type,
                               llvm::raw_ostream &os) const = 0;
+
+  /// Return the stable serialization path for the given declaration,
+  /// if there is one.
+  virtual StableSerializationPath
+  getStableSerializationPath(const clang::Decl *decl) const = 0;
+
+  /// Follow a stable serialization path.
+  virtual const clang::Decl *
+  lookupStableSerializationPath(const StableSerializationPath &path) const = 0;
 };
 
 } // namespace swift

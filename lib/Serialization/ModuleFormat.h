@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 534; // add SIL parameter differentiability
+const uint16_t SWIFTMODULE_VERSION_MINOR = 535; // Clang function types
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -70,6 +70,10 @@ using TypeID = DeclID;
 using TypeIDField = DeclIDField;
 
 using TypeIDWithBitField = BCFixed<32>;
+
+// ClangTypeID must be the same as DeclID because it is stored in the same way.
+using ClangTypeID = TypeID;
+using ClangTypeIDField = TypeIDField;
 
 // IdentifierID must be the same as DeclID because it is stored in the same way.
 using IdentifierID = DeclID;
@@ -852,6 +856,11 @@ namespace decls_block {
 #include "DeclTypeRecordNodes.def"
   };
 
+  using ClangTypeLayout = BCRecordLayout<
+    CLANG_TYPE,
+    BCArray<BCVBR<6>>
+  >;
+
   using BuiltinAliasTypeLayout = BCRecordLayout<
     BUILTIN_ALIAS_TYPE,
     DeclIDField, // typealias decl
@@ -903,6 +912,7 @@ namespace decls_block {
     FUNCTION_TYPE,
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
+    ClangTypeIDField, // type
     BCFixed<1>,  // noescape?
     BCFixed<1>,   // throws?
     DifferentiabilityKindField // differentiability kind
@@ -1913,7 +1923,8 @@ namespace index_block {
     ORDERED_TOP_LEVEL_DECLS,
 
     SUBSTITUTION_MAP_OFFSETS,
-    LastRecordKind = SUBSTITUTION_MAP_OFFSETS,
+    CLANG_TYPE_OFFSETS,
+    LastRecordKind = CLANG_TYPE_OFFSETS,
   };
   
   constexpr const unsigned RecordIDFieldWidth = 5;

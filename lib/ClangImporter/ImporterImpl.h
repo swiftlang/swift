@@ -960,6 +960,22 @@ public:
   bool isOverAligned(const clang::TypeDecl *typeDecl);
   bool isOverAligned(clang::QualType type);
 
+  /// Determines whether the given Clang type is serializable in a
+  /// Swift AST.  This should only be called after successfully importing
+  /// the type, because it will look for a stable serialization path for any
+  /// referenced declarations, which may depend on whether there's a known
+  /// import of it.  (It will not try to import the declaration to avoid
+  /// circularity problems.)
+  ///
+  /// Note that this will only check the specific sugaring of the given
+  /// type; the canonical type may be serializable even if the non-canonical
+  /// type is not, or vice-versa.
+  bool isSerializable(clang::QualType type);
+
+  /// Try to find a stable Swift serialization path for the given Clang
+  /// declaration.
+  StableSerializationPath getStableSerializationPath(const clang::Decl *decl);
+
   /// Look up and attempt to import a Clang declaration with
   /// the given name.
   Decl *importDeclByName(StringRef name);

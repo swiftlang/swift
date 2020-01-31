@@ -41,6 +41,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
@@ -68,6 +69,10 @@ using namespace swift::serialization;
 using namespace llvm::support;
 using swift::version::Version;
 using llvm::BCBlockRAII;
+
+ASTContext &SerializerBase::getASTContext() {
+  return M->getASTContext();
+}
 
 /// Used for static_assert.
 static constexpr bool declIDFitsIn32Bits() {
@@ -585,6 +590,10 @@ serialization::TypeID Serializer::addTypeRef(Type ty) {
   return TypesToSerialize.addRef(ty);
 }
 
+serialization::ClangTypeID Serializer::addClangTypeRef(const clang::Type *ty) {
+  return ClangTypesToSerialize.addRef(ty);
+}
+
 IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
   switch (ident.getKind()) {
   case DeclBaseName::Kind::Normal: {
@@ -745,6 +754,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, LOCAL_DECL_CONTEXT_OFFSETS);
   BLOCK_RECORD(index_block, GENERIC_SIGNATURE_OFFSETS);
   BLOCK_RECORD(index_block, SUBSTITUTION_MAP_OFFSETS);
+  BLOCK_RECORD(index_block, CLANG_TYPE_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
   BLOCK_RECORD(index_block, NORMAL_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
@@ -4031,11 +4041,15 @@ public:
   void visitFunctionType(const FunctionType *fnTy) {
     using namespace decls_block;
 
+    auto resultType = S.addTypeRef(fnTy->getResult());
+    auto clangType = S.addClangTypeRef(fnTy->getClangFunctionType());
+
     // FIXME: [clang-function-type-serialization] Serialize the clang type here
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-        S.addTypeRef(fnTy->getResult()),
+        resultType,
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
+        clangType,
         fnTy->isNoEscape(),
         fnTy->throws(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()));
@@ -4220,6 +4234,90 @@ void Serializer::writeASTBlockEntity(Type ty) {
   TypeSerializer(*this).visit(ty);
 }
 
+namespace {
+class ClangToSwiftBasicWriter :
+    public swift::DataStreamBasicWriter<ClangToSwiftBasicWriter> {
+
+  Serializer &S;
+  SmallVectorImpl<uint64_t> &Record;
+  using TypeWriter = 
+    clang::serialization::AbstractTypeWriter<ClangToSwiftBasicWriter>;
+  TypeWriter Types;
+
+  ClangModuleLoader *getClangLoader() {
+    return S.getASTContext().getClangModuleLoader();
+  }
+
+public:
+  ClangToSwiftBasicWriter(Serializer &S, SmallVectorImpl<uint64_t> &record)
+    : S(S), Record(record), Types(*this) {}
+
+  void writeUInt64(uint64_t value) {
+    Record.push_back(value);
+  }
+
+  void writeIdentifier(const clang::IdentifierInfo *value) {
+    IdentifierID id = 0;
+    if (value) {
+      id = S.addDeclBaseNameRef(
+               S.getASTContext().getIdentifier(value->getName()));
+    }
+    Record.push_back(id);
+  }
+
+  void writeStmtRef(const clang::Stmt *stmt) {
+    // Always read null; the checker should prevent this from being
+    // called with non-null statements.
+  }
+
+  void writeDeclRef(const clang::Decl *decl) {
+    if (!decl) {
+      Record.push_back(/*no declaration*/ 0);
+      return;
+    }
+
+    auto path = getClangLoader()->getStableSerializationPath(decl);
+    if (!path) {
+      decl->dump(llvm::errs());
+      llvm::report_fatal_error("failed to find a stable Swift serialization"
+                               " path for the above Clang declaration");
+    }
+
+    if (path.isSwiftDecl()) {
+      Record.push_back(/*swift declaration*/ 1);
+      Record.push_back(S.addDeclRef(path.getSwiftDecl()));
+      return;
+    }
+
+    assert(path.isExternalPath());
+    auto &ext = path.getExternalPath();
+    Record.push_back(/*external path*/ 2);
+    Record.push_back(S.addDeclRef(ext.M));
+    Record.push_back(ext.Path.size());
+    for (auto &elt : ext.Path) {
+      Record.push_back(unsigned(elt.first));
+      Record.push_back(S.addDeclBaseNameRef(elt.second));
+    }
+  }
+};
+
+}
+
+void Serializer::writeASTBlockEntity(const clang::Type *ty) {
+  using namespace decls_block;
+  PrettyStackTraceClangType traceRAII("serializing clang type", ty);
+  assert(ClangTypesToSerialize.hasRef(ty));
+
+  // Serialize the type as an opaque sequence of data.
+  SmallVector<uint64_t, 16> typeData;
+  ClangToSwiftBasicWriter(*this, typeData).writeTypeRef(ty);
+
+  // Write that in an opaque record.
+  unsigned abbrCode = DeclTypeAbbrCodes[ClangTypeLayout::Code];
+  ClangTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                              typeData);
+}
+
 template <typename SpecificASTBlockRecordKeeper>
 bool Serializer::writeASTBlockEntitiesIfNeeded(
     SpecificASTBlockRecordKeeper &entities) {
@@ -4261,6 +4359,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
+
+  registerDeclTypeAbbr<ClangTypeLayout>();
 
   registerDeclTypeAbbr<TypeAliasLayout>();
   registerDeclTypeAbbr<GenericTypeParamTypeLayout>();
@@ -4346,6 +4446,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
     wroteSomething |= writeASTBlockEntitiesIfNeeded(DeclsToSerialize);
     wroteSomething |= writeASTBlockEntitiesIfNeeded(TypesToSerialize);
+    wroteSomething |= writeASTBlockEntitiesIfNeeded(ClangTypesToSerialize);
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(LocalDeclContextsToSerialize);
     wroteSomething |=
@@ -4808,6 +4909,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     writeOffsets(Offsets, SubstitutionMapsToSerialize);
     writeOffsets(Offsets, NormalConformancesToSerialize);
     writeOffsets(Offsets, SILLayoutsToSerialize);
+    writeOffsets(Offsets, ClangTypesToSerialize);
 
     Offsets.emit(ScratchRecord, index_block::IDENTIFIER_OFFSETS,
                  identifierOffsets);

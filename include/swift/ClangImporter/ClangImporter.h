@@ -422,6 +422,13 @@ public:
                                             SourceLoc loc) const override;
   void printClangType(const clang::Type *type,
                       llvm::raw_ostream &os) const override;
+
+  StableSerializationPath
+  getStableSerializationPath(const clang::Decl *decl) const override;
+
+  const clang::Decl *
+  lookupStableSerializationPath(
+                            const StableSerializationPath &path) const override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
