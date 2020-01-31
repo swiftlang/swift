@@ -38,19 +38,7 @@ void swift::simple_display(llvm::raw_ostream &out,
   } else {
     assert(unit);
     out << "SIL Generation for file ";
-    switch (unit->getKind()) {
-    case FileUnitKind::Source:
-      out << '\"' << cast<SourceFile>(unit)->getFilename() << '\"';
-      break;
-    case FileUnitKind::Builtin:
-      out << "(Builtin)";
-      break;
-    case FileUnitKind::DWARFModule:
-    case FileUnitKind::ClangModule:
-    case FileUnitKind::SerializedAST:
-      out << '\"' << cast<LoadedFile>(unit)->getFilename() << '\"';
-      break;
-    }
+    simple_display(out, unit);
   }
 }
 
