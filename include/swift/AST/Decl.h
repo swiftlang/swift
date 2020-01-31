@@ -335,7 +335,7 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+1+1+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
     Introducer : 1,
 
@@ -358,7 +358,10 @@ protected:
     IsLazyStorageProperty : 1,
 
     /// Whether this is the backing storage for a property wrapper.
-    IsPropertyWrapperBackingProperty : 1
+    IsPropertyWrapperBackingProperty : 1,
+
+    /// Whether this is a lazily top-level global variable from the main file.
+    IsTopLevelGlobal : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1+2+NumDefaultArgumentKindBits,
@@ -5084,6 +5087,10 @@ public:
     Bits.VarDecl.IsLazyStorageProperty = IsLazyStorage;
   }
 
+  /// True if this is a top-level global variable from the main source file.
+  bool isTopLevelGlobal() const { return Bits.VarDecl.IsTopLevelGlobal; }
+  void setTopLevelGlobal(bool b) { Bits.VarDecl.IsTopLevelGlobal = b; }
+  
   /// Retrieve the custom attributes that attach property wrappers to this
   /// property. The returned list contains all of the attached property wrapper attributes in source order,
   /// which means the outermost wrapper attribute is provided first.

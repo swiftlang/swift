@@ -3255,6 +3255,7 @@ public:
                           var->isGetterMutating(),
                           var->isSetterMutating(),
                           var->isLazyStorageProperty(),
+                          var->isTopLevelGlobal(),
                           S.addDeclRef(lazyStorage),
                           accessors.OpaqueReadOwnership,
                           accessors.ReadImpl,

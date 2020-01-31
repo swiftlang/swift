@@ -244,6 +244,10 @@ enum class FixKind : uint8_t {
   /// Allow any type (and not just class or class-constrained type) to
   /// be convertible to AnyObject.
   AllowNonClassTypeToConvertToAnyObject,
+
+  /// Member shadows a top-level name, such a name could only be accessed by
+  /// prefixing it with a module name.
+  AddQualifierToAccessTopLevelName,
 };
 
 class ConstraintFix {
@@ -1655,7 +1659,22 @@ public:
 
   static SpecifyObjectLiteralTypeImport *create(ConstraintSystem &cs,
                                                 ConstraintLocator *locator);
+};
 
+class AddQualifierToAccessTopLevelName final : public ConstraintFix {
+  AddQualifierToAccessTopLevelName(ConstraintSystem &cs,
+                                   ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AddQualifierToAccessTopLevelName, locator) {}
+
+public:
+  std::string getName() const {
+    return "qualify reference to access top-level function";
+  }
+
+  bool diagnose(bool asNote = false) const;
+
+  static AddQualifierToAccessTopLevelName *create(ConstraintSystem &cs,
+                                                  ConstraintLocator *locator);
 };
 
 class AllowNonClassTypeToConvertToAnyObject final : public ContextualMismatch {

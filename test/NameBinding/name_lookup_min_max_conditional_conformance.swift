@@ -16,7 +16,7 @@ extension ContainsMinMax {
     func min() {}
 }
 
-func foo(_: Int, _: Int) {}
+func foo(_: Int, _: Int) {} // expected-note 2 {{'foo' declared here}}
 
 protocol ContainsFoo {}
 extension ContainsFoo {
@@ -34,15 +34,14 @@ extension NonConditional {
         // expected-error@-1{{use of 'min' refers to instance method}}
         // expected-note@-2{{use 'Swift.' to reference the global function}}
 
-        // FIXME(diagnostics): Better diagnostic in this case would be to suggest to add `name_lookup_min_max_conditional_conformance.`
-        // to call because name `foo` is shadowed by instance method without arguments. Would be fixed by `resolveDeclRefExpr` refactoring.
-        _ = foo(5, 6) // expected-error {{argument passed to call that takes no arguments}}
+        _ = foo(5, 6) // expected-error {{use of 'foo' refers to instance method rather than global function 'foo' in module 'name_lookup_min_max_conditional_conformance'}}
+       // expected-note@-1 {{use 'name_lookup_min_max_conditional_conformance.' to reference the global function in module 'name_lookup_min_max_conditional_conformance'}} {{13-13=name_lookup_min_max_conditional_conformance.}}
     }
 }
 
 struct Conditional<T> {}
 extension Conditional: ContainsMinMax where T: ContainsMinMax {}
-extension Conditional: ContainsFoo where T: ContainsFoo {} // expected-note {{requirement from conditional conformance of 'Conditional<T>' to 'ContainsFoo'}}
+extension Conditional: ContainsFoo where T: ContainsFoo {}
 
 extension Conditional {
     func f() {
@@ -53,9 +52,8 @@ extension Conditional {
         // expected-warning@-1{{use of 'min' as reference to global function in module 'Swift' will change in future versions of Swift to reference instance method in generic struct 'Conditional' which comes via a conditional conformance}}
         // expected-note@-2{{use 'Swift.' to continue to reference the global function}}
 
-        // FIXME(diagnostics): Same as line 39, there should be only one error here about shadowing.
         _ = foo(5, 6)
-        // expected-error@-1 {{referencing instance method 'foo()' on 'Conditional' requires that 'T' conform to 'ContainsFoo'}}
-        // expected-error@-2 {{argument passed to call that takes no arguments}}
+        // expected-error@-1 {{use of 'foo' refers to instance method rather than global function 'foo' in module 'name_lookup_min_max_conditional_conformance'}}
+        // expected-note@-2 {{use 'name_lookup_min_max_conditional_conformance.' to reference the global function in module 'name_lookup_min_max_conditional_conformance'}} {{13-13=name_lookup_min_max_conditional_conformance.}}
     }
 }
