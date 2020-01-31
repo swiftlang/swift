@@ -3284,6 +3284,30 @@ bool ConstraintSystem::repairFailures(
                                 locator))
       break;
 
+    {
+      auto *calleeLocator = getCalleeLocator(loc);
+      if (hasFixFor(calleeLocator, FixKind::AddQualifierToAccessTopLevelName)) {
+        if (auto overload = findSelectedOverloadFor(calleeLocator)) {
+          if (auto choice = overload->choice.getDeclOrNull()) {
+            // If this is an argument of a symetric function/operator let's
+            // not fix any position rather than first because we'd just end
+            // up with ambiguity instead of reporting an actual problem with
+            // mismatched type since each argument can have district bindings.
+            if (auto *AFD = dyn_cast<AbstractFunctionDecl>(choice)) {
+              auto *paramList = AFD->getParameters();
+              auto firstParamType = paramList->get(0)->getInterfaceType();
+              if (elt.castTo<LocatorPathElt::ApplyArgToParam>().getParamIdx() >
+                      0 &&
+                  llvm::all_of(*paramList, [&](const ParamDecl *param) -> bool {
+                    return param->getInterfaceType()->isEqual(firstParamType);
+                  }))
+                return true;
+            }
+          }
+        }
+      }
+    }
+
     conversionsOrFixes.push_back(
         AllowArgumentMismatch::create(*this, lhs, rhs, loc));
     break;
@@ -6195,8 +6219,27 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       if (candidates.size() == 1)
         candidates.front()->setFavored();
 
-      generateConstraints(candidates, memberTy, outerAlternatives,
-                          useDC, locator);
+      // We *might* include any non-members that we found in outer contexts in
+      // some special cases, for backwards compatibility: first, we have to be
+      // looking for one of the special names ('min' or 'max'), and second, all
+      // of the inner (viable) results need to come from conditional
+      // conformances. The second condition is how the problem here was
+      // encountered: a type ('Range') was made to conditionally conform to a
+      // new protocol ('Sequence'), which introduced some extra methods
+      // ('min' and 'max') that shadowed global functions that people regularly
+      // called within extensions to that type (usually adding 'clamp').
+      bool treatAsViable =
+          (member.isSimpleName("min") || member.isSimpleName("max")) &&
+          allFromConditionalConformances(DC, baseTy, result.ViableCandidates);
+
+      generateConstraints(
+          candidates, memberTy, outerAlternatives, useDC, locator, None,
+          /*requiresFix=*/!treatAsViable,
+          [&](unsigned, const OverloadChoice &) {
+            return treatAsViable ? nullptr
+                                 : AddQualifierToAccessTopLevelName::create(
+                                       *this, locator);
+          });
     }
   }
 
@@ -8846,6 +8889,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidUseOfTrailingClosure:
   case FixKind::AllowNonClassTypeToConvertToAnyObject:
   case FixKind::SpecifyClosureReturnType:
+  case FixKind::AddQualifierToAccessTopLevelName:
     llvm_unreachable("handled elsewhere");
   }
 
@@ -9309,7 +9353,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::BindOverload:
     if (auto *fix = constraint.getFix()) {
-      if (recordFix(fix))
+      // TODO(diagnostics): Impact should be associated with a fix unless
+      // it's a contextual problem, then only solver can decide what the impact
+      // would be in each particular situation.
+      auto impact =
+          fix->getKind() == FixKind::AddQualifierToAccessTopLevelName ? 10 : 1;
+      if (recordFix(fix, impact))
         return SolutionKind::Error;
     }
 

@@ -452,20 +452,6 @@ static bool findNonMembers(ArrayRef<LookupResultEntry> lookupResults,
   return AllDeclRefs;
 }
 
-/// Whether we should be looking at the outer results for a function called \c
-/// name.
-///
-/// This is very restrictive because it's a source compatibility issue (see the
-/// if (AllConditionalConformances) { (void)findNonMembers(...); } below).
-static bool shouldConsiderOuterResultsFor(DeclNameRef name) {
-  const StringRef specialNames[] = {"min", "max"};
-  for (auto specialName : specialNames)
-    if (name.isSimpleName(specialName))
-      return true;
-
-  return false;
-}
-
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
@@ -479,8 +465,11 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(DC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  if (shouldConsiderOuterResultsFor(Name))
-    lookupOptions |= NameLookupFlags::IncludeOuterResults;
+
+  // TODO: Include all of the possible members to give a solver a
+  //       chance to diagnose name shadowing which requires explicit
+  //       name/module qualifier to access top-level name.
+  lookupOptions |= NameLookupFlags::IncludeOuterResults;
 
   auto Lookup = TypeChecker::lookupUnqualified(DC, Name, Loc, lookupOptions);
 
@@ -625,14 +614,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   // better matching candidates.
   if (localDeclAfterUse) {
     auto innerDecl = localDeclAfterUse;
-
-    // Perform a thorough lookup if outer results was not included before.
-    if (!lookupOptions.contains(NameLookupFlags::IncludeOuterResults)) {
-      auto option = lookupOptions;
-      option |= NameLookupFlags::IncludeOuterResults;
-      Lookup = lookupUnqualified(DC, Name, Loc, option);
-    }
-
     while (localDeclAfterUse) {
       if (Lookup.outerResults().empty()) {
         Context.Diags.diagnose(Loc, diag::use_local_before_declaration, Name);
@@ -648,13 +629,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       AllDeclRefs =
           findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
                          /*breakOnMember=*/true, ResultValues, isValid);
-    }
-
-    // Drop outer results if they are not supposed to be included.
-    if (!lookupOptions.contains(NameLookupFlags::IncludeOuterResults)) {
-      Lookup.filter([&](LookupResultEntry Result, bool isOuter) {
-          return !isOuter;
-      });
     }
   }
 
@@ -715,7 +689,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
   ResultValues.clear();
   bool AllMemberRefs = true;
-  bool AllConditionalConformances = true;
   ValueDecl *Base = nullptr;
   DeclContext *BaseDC = nullptr;
   for (auto Result : Lookup) {
@@ -732,26 +705,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
       Base = ThisBase;
       BaseDC = Result.getDeclContext();
-
-      // Check if this result is derived through a conditional conformance,
-      // meaning it comes from a protocol (or extension) where there's a
-      // conditional conformance for the type with the method in question
-      // (NB. that type may not be the type associated with DC, for tested types
-      // with static methods).
-      if (auto Proto = Value->getDeclContext()->getSelfProtocolDecl()) {
-        auto contextSelfType =
-            BaseDC->getInnermostTypeContext()->getDeclaredInterfaceType();
-        auto conformance = conformsToProtocol(
-            contextSelfType, Proto, DC,
-            ConformanceCheckFlags::InExpression |
-                ConformanceCheckFlags::SkipConditionalRequirements);
-
-        if (conformance.isInvalid() ||
-            conformance.getConditionalRequirements().empty()) {
-          AllConditionalConformances = false;
-        }
-      }
-
       continue;
     }
 
@@ -774,22 +727,12 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                            /*Implicit=*/true);
     }
 
-    // We *might* include any non-members that we found in outer contexts in
-    // some special cases, for backwards compatibility: first, we have to be
-    // looking for one of the special names
-    // ('shouldConsiderOuterResultsFor(Name)'), and second, all of the inner
-    // results need to come from conditional conformances. The second condition
-    // is how the problem here was encountered: a type ('Range') was made to
-    // conditionally conform to a new protocol ('Sequence'), which introduced
-    // some extra methods ('min' and 'max') that shadowed global functions that
-    // people regularly called within extensions to that type (usually adding
-    // 'clamp').
     llvm::SmallVector<ValueDecl *, 4> outerAlternatives;
-    if (AllConditionalConformances) {
-      (void)findNonMembers(Lookup.outerResults(), UDRE->getRefKind(),
-                           /*breakOnMember=*/false, outerAlternatives,
-                           /*isValid=*/[&](ValueDecl *) { return true; });
-    }
+    (void)findNonMembers(Lookup.outerResults(), UDRE->getRefKind(),
+                         /*breakOnMember=*/false, outerAlternatives,
+                         /*isValid=*/[](ValueDecl *choice) -> bool {
+                           return !choice->isInvalid();
+                         });
 
     // Otherwise, form an UnresolvedDotExpr and sema will resolve it based on
     // type information.
