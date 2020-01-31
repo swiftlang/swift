@@ -22,5 +22,6 @@ target_link_libraries(swiftFrontend PRIVATE
   swiftSILGen
   swiftSILOptimizer
   swiftSema
-  swiftSerialization)
+  swiftSerialization
+  swiftTBDGen)
 
