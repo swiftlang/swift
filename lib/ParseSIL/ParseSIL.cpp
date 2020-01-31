@@ -1102,7 +1102,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
   
       // Drop the double quotes.
       StringRef rawString = SP.P.Tok.getText().drop_front().drop_back();
-      Semantics->push_back(rawString);
+      Semantics->push_back(rawString.str());
       SP.P.consumeToken(tok::string_literal);
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);

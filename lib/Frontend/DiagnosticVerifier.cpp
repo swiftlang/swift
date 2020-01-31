@@ -350,7 +350,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     llvm::SmallString<256> Buf;
     Expected.MessageRange = MatchStart.slice(2, End);
     Expected.MessageStr =
-      Lexer::getEncodedStringSegment(Expected.MessageRange, Buf);
+        Lexer::getEncodedStringSegment(Expected.MessageRange, Buf).str();
     if (PrevExpectedContinuationLine)
       Expected.LineNo = PrevExpectedContinuationLine;
     else

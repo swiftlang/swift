@@ -1048,7 +1048,7 @@ static std::string getDeclNameFromContext(DeclContext *dc,
     }
     return result;
   } else {
-    return nominal->getName().str();
+    return std::string(nominal->getName());
   }
 }
 

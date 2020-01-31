@@ -691,7 +691,7 @@ private:
       auto Label = LabelList->getChild(Index);
       assert(Label && (Label->getKind() == Node::Kind::Identifier ||
                        Label->getKind() == Node::Kind::FirstElementMarker));
-      return Label->getKind() == Node::Kind::Identifier ? Label->getText()
+      return Label->getKind() == Node::Kind::Identifier ? Label->getText().str()
                                                         : "_";
     };
 
@@ -1121,7 +1121,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::Suffix:
     if (Options.DisplayUnmangledSuffix) {
-      Printer << " with unmangled suffix " << QuotedString(Node->getText());
+      Printer << " with unmangled suffix "
+              << QuotedString(Node->getText().str());
     }
     return nullptr;
   case Node::Kind::Initializer:

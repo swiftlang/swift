@@ -384,7 +384,7 @@ class TypeDecoder {
     }
     case NodeKind::BuiltinTypeName: {
       auto mangledName = Demangle::mangleNode(Node);
-      return Builder.createBuiltinType(Node->getText(), mangledName);
+      return Builder.createBuiltinType(Node->getText().str(), mangledName);
     }
     case NodeKind::Metatype:
     case NodeKind::ExistentialMetatype: {
@@ -683,12 +683,12 @@ class TypeDecoder {
       auto assocTypeChild = Node->getChild(1);
       auto member = assocTypeChild->getFirstChild()->getText();
       if (assocTypeChild->getNumChildren() < 2)
-        return Builder.createDependentMemberType(member, base);
+        return Builder.createDependentMemberType(member.str(), base);
 
       auto protocol = decodeMangledProtocolType(assocTypeChild->getChild(1));
       if (!protocol)
         return BuiltType();
-      return Builder.createDependentMemberType(member, base, protocol);
+      return Builder.createDependentMemberType(member.str(), base, protocol);
     }
     case NodeKind::DependentAssociatedTypeRef: {
       if (Node->getNumChildren() < 2)

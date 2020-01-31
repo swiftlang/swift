@@ -101,7 +101,7 @@ std::string sourcekitd::getRuntimeLibPath() {
     llvm_unreachable("Call to dladdr() failed");
 
   // We now have the path to the shared lib, move to the parent 'lib' path.
-  return llvm::sys::path::parent_path(info.dli_fname);
+  return llvm::sys::path::parent_path(info.dli_fname).str();
 #endif
 }
 

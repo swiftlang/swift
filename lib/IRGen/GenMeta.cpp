@@ -992,10 +992,10 @@ namespace {
         abiName = synthesizedTypeAttr->originalTypeName;
 
         getMutableImportInfo().RelatedEntityName =
-          synthesizedTypeAttr->getManglingName();
+            std::string(synthesizedTypeAttr->getManglingName());
 
-      // Otherwise, if this was imported from a Clang declaration, use that
-      // declaration's name as the ABI name.
+        // Otherwise, if this was imported from a Clang declaration, use that
+        // declaration's name as the ABI name.
       } else if (auto clangDecl =
                             Mangle::ASTMangler::getClangDeclForMangling(Type)) {
         abiName = clangDecl->getName();
@@ -1012,7 +1012,7 @@ namespace {
       // If the ABI name differs from the user-facing name, add it as
       // an override.
       if (!abiName.empty() && abiName != UserFacingName) {
-        getMutableImportInfo().ABIName = abiName;
+        getMutableImportInfo().ABIName = std::string(abiName);
       }
     }
 

@@ -108,7 +108,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
                                            Info.FormatArgs);
   }
-  SKInfo.Description = Text.str();
+  SKInfo.Description = std::string(Text);
 
   Optional<unsigned> BufferIDOpt;
   if (Info.Loc.isValid()) {
@@ -148,7 +148,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     SKInfo.Offset = SM.getLocOffsetInBuffer(Info.Loc, BufferID);
     std::tie(SKInfo.Line, SKInfo.Column) =
         SM.getLineAndColumn(Info.Loc, BufferID);
-    SKInfo.Filename = SM.getDisplayNameForLoc(Info.Loc);
+    SKInfo.Filename = SM.getDisplayNameForLoc(Info.Loc).str();
 
     for (auto R : Info.Ranges) {
       if (R.isInvalid() || SM.findBufferContainingLoc(R.getStart()) != BufferID)
@@ -165,7 +165,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
       unsigned Offset =
           SM.getLocOffsetInBuffer(F.getRange().getStart(), BufferID);
       unsigned Length = F.getRange().getByteLength();
-      SKInfo.Fixits.push_back({Offset, Length, F.getText()});
+      SKInfo.Fixits.push_back({Offset, Length, F.getText().str()});
     }
   } else {
     SKInfo.Filename = "<unknown>";

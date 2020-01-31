@@ -125,7 +125,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       // the old mangling scheme.
       // This makes it easier to share the same database between the
       // mangling and demangling tests.
-      remangled = name;
+      remangled = name.str();
     } else {
       remangled = swift::Demangle::mangleNode(pointer);
       unsigned prefixLen = swift::Demangle::getManglingPrefixLength(remangled);
@@ -148,7 +148,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     llvm::outs() << remangled;
     return;
   } else if (RemangleRtMode) {
-    std::string remangled = name;
+    std::string remangled = name.str();
     if (pointer) {
       remangled = swift::Demangle::mangleNodeOld(pointer);
     }

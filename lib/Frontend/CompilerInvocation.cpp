@@ -56,7 +56,7 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   llvm::sys::path::remove_filename(DiagnosticDocsPath); // Remove /bin
   llvm::sys::path::append(DiagnosticDocsPath, "share", "doc", "swift",
                           "diagnostics");
-  DiagnosticOpts.DiagnosticDocumentationPath = DiagnosticDocsPath.str();
+  DiagnosticOpts.DiagnosticDocumentationPath = std::string(DiagnosticDocsPath);
 }
 
 /// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
@@ -82,7 +82,7 @@ static void setDefaultPrebuiltCacheIfNecessary(
     platform = getPlatformNameForTriple(triple);
   }
   llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
-  frontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPath.str();
+  frontendOpts.PrebuiltModuleCachePath = std::string(defaultPrebuiltPath);
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
@@ -95,7 +95,7 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
 
   llvm::sys::path::append(LibPath, LibSubDir);
   SearchPathOpts.RuntimeLibraryPaths.clear();
-  SearchPathOpts.RuntimeLibraryPaths.push_back(LibPath.str());
+  SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(LibPath));
   if (Triple.isOSDarwin())
     SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
 
@@ -109,14 +109,14 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
 
   if (!Triple.isOSDarwin())
     llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
-  SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
+  SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath));
 
   if (!SearchPathOpts.SDKPath.empty()) {
     if (tripleIsMacCatalystEnvironment(Triple)) {
       LibPath = SearchPathOpts.SDKPath;
       llvm::sys::path::append(LibPath, "System", "iOSSupport");
       llvm::sys::path::append(LibPath, "usr", "lib", "swift");
-      SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
+      SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath));
     }
 
     LibPath = SearchPathOpts.SDKPath;
@@ -125,7 +125,7 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
       llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
       llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
     }
-    SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
+    SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath));
   }
 }
 
@@ -178,7 +178,7 @@ setBridgingHeaderFromFrontendOptions(ClangImporterOptions &ImporterOpts,
 }
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
-  SearchPathOpts.RuntimeResourcePath = Path;
+  SearchPathOpts.RuntimeResourcePath = Path.str();
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 }
 
@@ -703,9 +703,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     // Provide a working directory to Clang as well if there are any -Xcc
     // options, in case some of them are search-related. But do it at the
     // beginning, so that an explicit -Xcc -working-directory will win.
-    Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(), {
-      "-working-directory", workingDirectory
-    });
+    Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(),
+                          {"-working-directory", workingDirectory.str()});
   }
 
   Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
@@ -748,10 +747,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   auto resolveSearchPath =
       [workingDirectory](StringRef searchPath) -> std::string {
     if (workingDirectory.empty() || path::is_absolute(searchPath))
-      return searchPath;
+      return searchPath.str();
     SmallString<64> fullPath{workingDirectory};
     path::append(fullPath, searchPath);
-    return fullPath.str();
+    return std::string(fullPath);
   };
 
   for (const Arg *A : Args.filtered(OPT_I)) {
@@ -1142,7 +1141,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     // TODO: Should we support -fdebug-compilation-dir?
     llvm::SmallString<256> cwd;
     llvm::sys::fs::current_path(cwd);
-    Opts.DebugCompilationDir = cwd.str();
+    Opts.DebugCompilationDir = std::string(cwd);
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
@@ -1182,7 +1181,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
     StringRef Opt = A->getValue();
     if (Opt.startswith("-D") || Opt.startswith("-U"))
-      Opts.ClangDefines.push_back(Opt);
+      Opts.ClangDefines.push_back(Opt.str());
   }
 
   for (const Arg *A : Args.filtered(OPT_l, OPT_framework)) {
@@ -1226,7 +1225,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.FunctionSections = Args.hasArg(OPT_function_sections);
 
   if (Args.hasArg(OPT_autolink_force_load))
-    Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);
+    Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name).str();
 
   Opts.ModuleName = FrontendOpts.ModuleName;
 
@@ -1459,8 +1458,8 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
       llvm::SmallString<128> authoredDataPath(basePath);
       llvm::sys::path::append(authoredDataPath, getScriptFileName("overlay", langVer));
       // Add authored list first to take higher priority.
-      Opts.APIDigesterDataStorePaths.push_back(authoredDataPath.str());
-      Opts.APIDigesterDataStorePaths.push_back(dataPath.str());
+      Opts.APIDigesterDataStorePaths.push_back(std::string(authoredDataPath));
+      Opts.APIDigesterDataStorePaths.push_back(std::string(dataPath));
     }
   }
 
@@ -1589,12 +1588,12 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
   LangOpts.EffectiveLanguageVersion = info.compatibilityVersion;
   setTargetTriple(info.targetTriple);
   if (!extendedInfo.getSDKPath().empty())
-    setSDKPath(extendedInfo.getSDKPath());
+    setSDKPath(extendedInfo.getSDKPath().str());
 
   auto &extraClangArgs = getClangImporterOptions().ExtraArgs;
-  extraClangArgs.insert(extraClangArgs.end(),
-                        extendedInfo.getExtraClangImporterOptions().begin(),
-                        extendedInfo.getExtraClangImporterOptions().end());
+  for (StringRef Arg : extendedInfo.getExtraClangImporterOptions())
+    extraClangArgs.push_back(Arg.str());
+
   return info.status;
 }
 

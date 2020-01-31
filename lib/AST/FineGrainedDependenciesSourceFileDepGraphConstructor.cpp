@@ -77,11 +77,11 @@ SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer) {
 //==============================================================================
 
 template <typename DeclT> static std::string getBaseName(const DeclT *decl) {
-  return decl->getBaseName().userFacingName();
+  return decl->getBaseName().userFacingName().str();
 }
 
 template <typename DeclT> static std::string getName(const DeclT *decl) {
-  return DeclBaseName(decl->getName()).userFacingName();
+  return DeclBaseName(decl->getName()).userFacingName().str();
 }
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *NTD) {
@@ -376,7 +376,7 @@ std::string
 DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide,
                                             StringRef>(StringRef swiftDeps) {
   assert(!swiftDeps.empty());
-  return swiftDeps;
+  return swiftDeps.str();
 }
 
 template <>
@@ -438,28 +438,29 @@ std::string DependencyKey::computeNameForProvidedEntity<
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::topLevel>(StringRef name) {
-  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "", name);
+  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "",
+                       name.str());
 }
 
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::dynamicLookup>(StringRef name) {
   return DependencyKey(NodeKind::dynamicLookup, DeclAspect::interface, "",
-                       name);
+                       name.str());
 }
 
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::externalDepend>(StringRef name) {
   return DependencyKey(NodeKind::externalDepend, DeclAspect::interface, "",
-                       name);
+                       name.str());
 }
 
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::nominal>(StringRef mangledName) {
-  return DependencyKey(NodeKind::nominal, DeclAspect::interface, mangledName,
-                       "");
+  return DependencyKey(NodeKind::nominal, DeclAspect::interface,
+                       mangledName.str(), "");
 }
 
 DependencyKey DependencyKey::createDependedUponKey(StringRef mangledHolderName,
@@ -467,8 +468,8 @@ DependencyKey DependencyKey::createDependedUponKey(StringRef mangledHolderName,
   const bool isMemberBlank = memberBaseName.empty();
   const auto kind =
       isMemberBlank ? NodeKind::potentialMember : NodeKind::member;
-  return DependencyKey(kind, DeclAspect::interface, mangledHolderName,
-                       isMemberBlank ? "" : memberBaseName);
+  return DependencyKey(kind, DeclAspect::interface, mangledHolderName.str(),
+                       isMemberBlank ? "" : memberBaseName.str());
 }
 
 //==============================================================================
@@ -578,11 +579,11 @@ public:
   SourceFileDeclFinder declFinder(SF, includePrivateDeps);
     std::vector<std::pair<std::string, bool>> topLevelDepends;
     for (const auto &p: SF->getReferencedNameTracker()->getTopLevelNames())
-      topLevelDepends.push_back(std::make_pair(p.getFirst().userFacingName(), p.getSecond()));
+      topLevelDepends.push_back(std::make_pair(p.getFirst().userFacingName().str(), p.getSecond()));
 
     std::vector<std::pair<std::string, bool>> dynamicLookupDepends;
     for (const auto &p: SF->getReferencedNameTracker()->getDynamicLookupNames())
-      dynamicLookupDepends.push_back(std::make_pair(p.getFirst().userFacingName(), p.getSecond()));
+      dynamicLookupDepends.push_back(std::make_pair(p.getFirst().userFacingName().str(), p.getSecond()));
 
     std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>> memberDepends;
     for (const auto &p: SF->getReferencedNameTracker()->getUsedMembers()) {
@@ -592,7 +593,7 @@ public:
         std::make_pair(
           std::make_tuple(
             mangleTypeAsContext(p.getFirst().first),
-            emptyOrUserFacingName,
+            emptyOrUserFacingName.str(),
             declIsPrivate(p.getFirst().first)),
           p.getSecond()));
     }
@@ -906,7 +907,7 @@ static std::vector<std::pair<std::string, bool>>
 getSimpleDepends(ArrayRef<std::string> simpleNames) {
   std::vector<std::pair<std::string, bool>> result;
   for (std::string n : simpleNames)
-    result.push_back({stripPrefix(n), cascades((n))});
+    result.push_back({stripPrefix(n).str(), cascades((n))});
   return result;
 }
 
@@ -924,19 +925,18 @@ getCompoundDepends(
   for (std::string n : simpleNames) {
     // (On Linux, the compiler needs more verbosity than:
     //  result.push_back({{n, "", false}, cascades(n)});
-    result.push_back(
-        std::make_pair(std::make_tuple(stripPrefix(n), std::string(), false),
-                       cascades(n)));
+    result.push_back(std::make_pair(
+        std::make_tuple(stripPrefix(n).str(), std::string(), false),
+        cascades(n)));
   }
   for (auto &p : compoundNames) {
     // Likewise, for Linux expand the following out:
     //    result.push_back(
     //        {{p.first, p.second, isPrivate(p.second)}, cascades(p.first)});
-    result.push_back(
-        std::make_pair(std::make_tuple(stripPrefix(p.first),
-                                       stripPrefix(p.second),
-                                       isPrivate(p.second)),
-                       cascades(p.first)));
+    result.push_back(std::make_pair(std::make_tuple(stripPrefix(p.first).str(),
+                                                    stripPrefix(p.second).str(),
+                                                    isPrivate(p.second)),
+                                    cascades(p.first)));
   }
   return result;
 }

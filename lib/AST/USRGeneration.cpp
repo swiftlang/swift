@@ -214,7 +214,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
     if (auto ClangD = ClangN.getAsDecl()) {
       bool Ignore = clang::index::generateUSRForDecl(ClangD, Buffer);
       if (!Ignore) {
-        return Buffer.str();
+        return std::string(Buffer);
       } else {
         return std::string();
       }
@@ -228,7 +228,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
         ClangMacroInfo->getDefinitionLoc(),
         Importer.getClangASTContext().getSourceManager(), Buffer);
     if (!Ignore)
-      return Buffer.str();
+      return std::string(Buffer);
     else
       return std::string();
   }
@@ -237,7 +237,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
     if (printObjCUSR(D, OS)) {
       return std::string();
     } else {
-      return OS.str();
+      return std::string(OS.str());
     }
   }
 

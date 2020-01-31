@@ -282,7 +282,7 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
     if (!IntroVer.hasValue())
       continue;
     auto PlatformNumber = getLinkerPlatformId(Ver);
-    auto It = previousInstallNameMap->find(Ver.ModuleName);
+    auto It = previousInstallNameMap->find(Ver.ModuleName.str());
     if (It == previousInstallNameMap->end()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
                          Ver.ModuleName, getLinkerPlatformName(Ver));

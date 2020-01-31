@@ -799,7 +799,7 @@ public:
 
 #if SWIFT_OBJC_INTEROP
         BuiltProtocolDecl objcProtocol(StringRef name) {
-          return builder.createObjCProtocolDecl(name);
+          return builder.createObjCProtocolDecl(name.str());
         }
 #endif
       } resolver{Builder};

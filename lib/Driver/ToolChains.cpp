@@ -1256,13 +1256,13 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
                                        StringRef SDKPath, bool shared) const {
   SmallString<128> scratchPath;
   getResourceDirPath(scratchPath, args, shared);
-  runtimeLibPaths.push_back(scratchPath.str());
+  runtimeLibPaths.push_back(std::string(scratchPath));
 
   // If there's a secondary resource dir, add it too.
   scratchPath.clear();
   getSecondaryResourceDirPath(scratchPath, runtimeLibPaths[0]);
   if (!scratchPath.empty())
-    runtimeLibPaths.push_back(scratchPath.str());
+    runtimeLibPaths.push_back(std::string(scratchPath));
 
   if (!SDKPath.empty()) {
     if (!scratchPath.empty()) {
@@ -1271,12 +1271,12 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
       scratchPath = SDKPath;
       llvm::sys::path::append(scratchPath, "System", "iOSSupport");
       llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
-      runtimeLibPaths.push_back(scratchPath.str());
+      runtimeLibPaths.push_back(std::string(scratchPath));
     }
 
     scratchPath = SDKPath;
     llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
-    runtimeLibPaths.push_back(scratchPath.str());
+    runtimeLibPaths.push_back(std::string(scratchPath));
   }
 }
 

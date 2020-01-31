@@ -989,7 +989,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
       while (associatedNotes && *associatedNotes) {
         SmallString<128> notePath(getDiagnosticDocumentationPath());
         llvm::sys::path::append(notePath, *associatedNotes);
-        educationalNotePaths.push_back(notePath.str());
+        educationalNotePaths.push_back(notePath.str().str());
         associatedNotes++;
       }
       info->EducationalNotePaths = educationalNotePaths;

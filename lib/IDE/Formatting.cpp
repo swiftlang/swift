@@ -901,8 +901,9 @@ public:
     }
 
     if (FC.IsInStringLiteral()) {
-      return std::make_pair(LineRange(LineIndex, 1),
-        swift::ide::getTextForLine(LineIndex, Text, /*Trim*/false));
+      return std::make_pair(
+          LineRange(LineIndex, 1),
+          swift::ide::getTextForLine(LineIndex, Text, /*Trim*/ false).str());
     }
 
     // Take the current indent position of the outer context, then add another
@@ -950,7 +951,7 @@ public:
       IndentedLine.assign(ExpandedIndent / FmtOptions.TabWidth, '\t');
     else
       IndentedLine.assign(ExpandedIndent, ' ');
-    IndentedLine.append(Line);
+    IndentedLine.append(Line.str());
 
     // Return affected line range, which can later be more than one line.
     LineRange range = LineRange(LineIndex, 1);

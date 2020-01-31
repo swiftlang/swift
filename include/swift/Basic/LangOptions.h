@@ -363,7 +363,7 @@ namespace swift {
     /// compiler flag.
     void addCustomConditionalCompilationFlag(StringRef Name) {
       assert(!Name.empty());
-      CustomConditionalCompilationFlags.push_back(Name);
+      CustomConditionalCompilationFlags.push_back(Name.str());
     }
 
     /// Determines if a given conditional compilation flag has been set.
