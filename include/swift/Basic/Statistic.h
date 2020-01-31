@@ -162,6 +162,10 @@ private:
   std::unique_ptr<StatsProfilers> EventProfilers;
   std::unique_ptr<StatsProfilers> EntityProfilers;
 
+  /// Whether we are currently flushing statistics and should not therefore
+  /// record any additional stats until we've finished.
+  bool IsFlushingTracesAndProfiles;
+
   void publishAlwaysOnStatsToLLVM();
   void printAlwaysOnStatsAndTimers(raw_ostream &OS);
 

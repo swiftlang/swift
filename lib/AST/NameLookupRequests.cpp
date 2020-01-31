@@ -188,6 +188,24 @@ swift::extractNearestSourceLoc(const UnqualifiedLookupDescriptor &desc) {
   return extractNearestSourceLoc(desc.DC);
 }
 
+//----------------------------------------------------------------------------//
+// DirectLookupRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const DirectLookupDescriptor &desc) {
+  out << "directly looking up ";
+  simple_display(out, desc.Name);
+  out << " on ";
+  simple_display(out, desc.DC);
+  out << " with options ";
+  simple_display(out, desc.Options);
+}
+
+SourceLoc swift::extractNearestSourceLoc(const DirectLookupDescriptor &desc) {
+  return extractNearestSourceLoc(desc.DC);
+}
+
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \

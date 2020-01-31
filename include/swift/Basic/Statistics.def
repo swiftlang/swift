@@ -240,9 +240,6 @@ FRONTEND_STATISTIC(Sema, NumLazyRequirementSignaturesLoaded)
 /// Number of lazy iterable declaration contexts constructed.
 FRONTEND_STATISTIC(Sema, NumLazyIterableDeclContexts)
 
-/// Number of direct member-name lookups performed on nominal types.
-FRONTEND_STATISTIC(Sema, NominalTypeLookupDirectCount)
-
 /// Number of member-name lookups that avoided loading all members.
 FRONTEND_STATISTIC(Sema, NamedLazyMemberLoadSuccessCount)
 

@@ -168,6 +168,10 @@ Solution ConstraintSystem::finalize() {
     solution.addedNodeTypes.insert(nodeType);
   }
 
+  // Remember contextual types.
+  solution.contextualTypes.assign(
+      contextualTypes.begin(), contextualTypes.end());
+
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
 
@@ -230,6 +234,14 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (auto &nodeType : solution.addedNodeTypes) {
     if (!hasType(nodeType.first))
       setType(nodeType.first, nodeType.second);
+  }
+
+  // Add the contextual types.
+  for (const auto &contextualType : solution.contextualTypes) {
+    if (!getContextualTypeInfo(contextualType.first)) {
+      setContextualType(contextualType.first, contextualType.second.typeLoc,
+                        contextualType.second.purpose);
+    }
   }
 
   // Register the conformances checked along the way to arrive to solution.
@@ -441,6 +453,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numFunctionBuilderTransformed = cs.functionBuilderTransformed.size();
   numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
+  numContextualTypes = cs.contextualTypes.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -509,6 +522,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any inferred closure types (e.g. used in function builder body).
   truncate(cs.ClosureTypes, numInferredClosureTypes);
+
+  // Remove any contextual types.
+  truncate(cs.contextualTypes, numContextualTypes);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -747,7 +763,7 @@ void ConstraintSystem::shrink(Expr *expr) {
       // that have overload sets.
       if (auto collectionExpr = dyn_cast<CollectionExpr>(expr)) {
         visitCollectionExpr(collectionExpr, CS.getContextualType(expr),
-                            CS.getContextualTypePurpose());
+                            CS.getContextualTypePurpose(expr));
         // Don't try to walk into the dictionary.
         return {false, expr};
       }
@@ -813,11 +829,11 @@ void ConstraintSystem::shrink(Expr *expr) {
         if (Candidates.empty())
           return expr;
 
-        auto contextualType = CS.getContextualType();
+        auto contextualType = CS.getContextualType(expr);
         // If there is a contextual type set for this expression.
         if (!contextualType.isNull()) {
           Candidates.push_back(Candidate(CS, PrimaryExpr, contextualType,
-                                         CS.getContextualTypePurpose()));
+                                         CS.getContextualTypePurpose(expr)));
           return expr;
         }
 
@@ -1191,6 +1207,8 @@ ConstraintSystem::solveImpl(Expr *&expr,
   // Set up the expression type checker timer.
   Timer.emplace(expr, *this);
 
+  Expr *origExpr = expr;
+
   // Try to shrink the system by reducing disjunction domains. This
   // goes through every sub-expression and generate its own sub-system, to
   // try to reduce the domains of those subexpressions.
@@ -1209,23 +1227,23 @@ ConstraintSystem::solveImpl(Expr *&expr,
   // constraint.
   if (convertType) {
     auto constraintKind = ConstraintKind::Conversion;
-    
-    if ((getContextualTypePurpose() == CTP_ReturnStmt ||
-         getContextualTypePurpose() == CTP_ReturnSingleExpr ||
-         getContextualTypePurpose() == CTP_Initialization)
+
+    auto ctp = getContextualTypePurpose(origExpr);
+    if ((ctp == CTP_ReturnStmt ||
+         ctp == CTP_ReturnSingleExpr ||
+         ctp == CTP_Initialization)
         && Options.contains(ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType))
       constraintKind = ConstraintKind::OpaqueUnderlyingType;
     
-    if (getContextualTypePurpose() == CTP_CallArgument)
+    if (ctp == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
 
     // In a by-reference yield, we expect the contextual type to be an
     // l-value type, so the result must be bound to that.
-    if (getContextualTypePurpose() == CTP_YieldByReference)
+    if (ctp == CTP_YieldByReference)
       constraintKind = ConstraintKind::Bind;
 
-    bool isForSingleExprFunction =
-        getContextualTypePurpose() == CTP_ReturnSingleExpr;
+    bool isForSingleExprFunction = ctp == CTP_ReturnSingleExpr;
     auto *convertTypeLocator = getConstraintLocator(
         expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
 

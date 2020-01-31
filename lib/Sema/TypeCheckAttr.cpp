@@ -1361,6 +1361,16 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     return;
   }
 
+  // Make sure there isn't a more specific attribute we should be using instead.
+  // findMostSpecificActivePlatform() is O(N), so only do this if we're checking
+  // an iOS attribute while building for macCatalyst.
+  if (attr->Platform == PlatformKind::iOS &&
+      isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
+    if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
+      return;
+    }
+  }
+
   SourceLoc attrLoc = attr->getLocation();
 
   Optional<Diag<>> MaybeNotAllowed =
@@ -2662,42 +2672,40 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
   if (Attrs.empty())
     return;
   auto &Ctx = D->getASTContext();
-  OriginallyDefinedInAttr* theAttr = nullptr;
+  std::map<PlatformKind, SourceLoc> seenPlatforms;
+
   // Attrs are in the reverse order of the source order. We need to visit them
   // in source order to diagnose the later attribute.
   for (auto *Attr: Attrs) {
     if (!Attr->isActivePlatform(Ctx))
       continue;
-    if (theAttr) {
-      // Only one version number is allowed for one platform name.
-      diagnose(theAttr->AtLoc, diag::originally_defined_in_dupe_platform,
-               platformString(Attr->Platform));
+    auto AtLoc = Attr->AtLoc;
+    auto Platform = Attr->Platform;
+    if (!seenPlatforms.insert({Platform, AtLoc}).second) {
+      // We've seen the platform before, emit error to the previous one which
+      // comes later in the source order.
+      diagnose(seenPlatforms[Platform],
+               diag::originally_defined_in_dupe_platform,
+               platformString(Platform));
       return;
-    } else {
-      theAttr = Attr;
     }
-  }
-  if (!theAttr)
-    return;
-  assert(theAttr);
-  static StringRef AttrName = "_originallyDefinedIn";
-  auto AtLoc = theAttr->AtLoc;
-  if (!D->getDeclContext()->isModuleScopeContext()) {
-    diagnose(AtLoc, diag::originally_definedin_topleve_decl, AttrName);
-    return;
-  }
-  auto AvailRange = AvailabilityInference::availableRange(D, Ctx);
-  if (!AvailRange.getOSVersion().hasLowerEndpoint()) {
-    diagnose(AtLoc, diag::originally_definedin_need_available,
-             AttrName);
-    return;
-  }
-  auto AvailBegin = AvailRange.getOSVersion().getLowerEndpoint();
-  if (AvailBegin >= theAttr->MovedVersion) {
-    diagnose(AtLoc,
-             diag::originally_definedin_must_after_available_version,
-             AttrName);
-    return;
+    static StringRef AttrName = "_originallyDefinedIn";
+    if (!D->getDeclContext()->isModuleScopeContext()) {
+      diagnose(AtLoc, diag::originally_definedin_topleve_decl, AttrName);
+      return;
+    }
+    auto IntroVer = D->getIntroducedOSVersion(Platform);
+    if (!IntroVer.hasValue()) {
+      diagnose(AtLoc, diag::originally_definedin_need_available,
+               AttrName);
+      return;
+    }
+    if (IntroVer.getValue() >= Attr->MovedVersion) {
+      diagnose(AtLoc,
+               diag::originally_definedin_must_after_available_version,
+               AttrName);
+      return;
+    }
   }
 }
 

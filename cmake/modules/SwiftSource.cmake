@@ -1,3 +1,4 @@
+include(macCatalystUtils)
 include(SwiftUtils)
 
 # Process the sources within the given variable, pulling out any Swift
@@ -7,6 +8,9 @@ include(SwiftUtils)
 #
 # Usage:
 #   handle_swift_sources(sourcesvar externalvar)
+#
+# MACCATALYST_BUILD_FLAVOR
+#   Possible values are 'ios-like', 'macos-like', 'zippered', 'unzippered-twin'
 function(handle_swift_sources
     dependency_target_out_var_name
     dependency_module_target_out_var_name
@@ -16,7 +20,7 @@ function(handle_swift_sources
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
       "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE"
-      "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT"
+      "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR"
       "DEPENDS;COMPILE_FLAGS;MODULE_NAME"
       ${ARGN})
   translate_flag(${SWIFTSOURCES_IS_MAIN} "IS_MAIN" IS_MAIN_arg)
@@ -63,6 +67,12 @@ function(handle_swift_sources
   if(swift_sources)
     set(objsubdir "/${SWIFTSOURCES_SDK}/${SWIFTSOURCES_ARCHITECTURE}")
 
+    get_maccatalyst_build_flavor(maccatalyst_build_flavor
+      "${SWIFTSOURCES_SDK}" "${SWIFTSOURCES_MACCATALYST_BUILD_FLAVOR}")
+    if(maccatalyst_build_flavor STREQUAL "ios-like")
+      set(objsubdir "/MACCATALYST/${SWIFTSOURCES_ARCHITECTURE}")
+    endif()
+
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}")
 
     set(swift_obj
@@ -91,7 +101,8 @@ function(handle_swift_sources
         ${IS_SDK_OVERLAY_arg}
         ${EMBED_BITCODE_arg}
         ${STATIC_arg}
-        INSTALL_IN_COMPONENT "${SWIFTSOURCES_INSTALL_IN_COMPONENT}")
+        INSTALL_IN_COMPONENT "${SWIFTSOURCES_INSTALL_IN_COMPONENT}"
+        MACCATALYST_BUILD_FLAVOR "${SWIFTSOURCES_MACCATALYST_BUILD_FLAVOR}")
     set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
     set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)
     set("${dependency_sib_target_out_var_name}" "${sib_dependency_target}" PARENT_SCOPE)
@@ -131,6 +142,7 @@ endfunction()
 #     OUTPUT objfile                    # Name of the resulting object file
 #     SOURCES swift_src [swift_src...]  # Swift source files to compile
 #     FLAGS -module-name foo            # Flags to add to the compilation
+#     MACCATALYST_BUILD_FLAVOR flavor        # macCatalyst flavor
 #     [SDK sdk]                         # SDK to build for
 #     [ARCHITECTURE architecture]       # Architecture to build for
 #     [DEPENDS cmake_target...]         # CMake targets on which the object
@@ -151,7 +163,7 @@ function(_compile_swift_files
     dependency_sibgen_target_out_var_name)
   cmake_parse_arguments(SWIFTFILE
     "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE"
-    "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT"
+    "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR"
     "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS;MODULE_DIR"
     ${ARGN})
 
@@ -174,6 +186,27 @@ function(_compile_swift_files
   precondition(SWIFTFILE_SDK MESSAGE "Should specify an SDK")
   precondition(SWIFTFILE_ARCHITECTURE MESSAGE "Should specify an architecture")
   precondition(SWIFTFILE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
+
+  # Determine if/what macCatalyst build variant we are
+  get_maccatalyst_build_flavor(maccatalyst_build_flavor
+    "${SWIFTFILE_SDK}" "${SWIFTFILE_MACCATALYST_BUILD_FLAVOR}")
+
+  # Determine target triples
+  get_target_triple(target_triple ignored_target_variant_triple
+    "${SWIFTFILE_SDK}"
+    "${SWIFTFILE_ARCHITECTURE}"
+    DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFTFILE_SDK}_DEPLOYMENT_VERSION}")
+
+  get_target_triple(maccatalyst_target_triple ignored_target_variant_triple
+    "${SWIFTFILE_SDK}"
+    "${SWIFTFILE_ARCHITECTURE}"
+    DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFTFILE_SDK}_DEPLOYMENT_VERSION}"
+    MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}")
+
+  # macCatalyst ios-like target triple
+  if(maccatalyst_build_flavor STREQUAL "ios-like")
+    set(target_triple "${maccatalyst_target_triple}")
+  endif()
 
   if ("${SWIFTFILE_MODULE_NAME}" STREQUAL "")
     get_filename_component(SWIFTFILE_MODULE_NAME "${first_output}" NAME_WE)
@@ -202,17 +235,18 @@ function(_compile_swift_files
       "${SWIFTFILE_ARCHITECTURE}"
       "${SWIFT_STDLIB_BUILD_TYPE}"
       "${SWIFT_STDLIB_ASSERTIONS}"
-      swift_flags)
+      swift_flags
+      MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
+      )
 
   # Determine the subdirectory where the binary should be placed.
   compute_library_subdir(library_subdir
       "${SWIFTFILE_SDK}" "${SWIFTFILE_ARCHITECTURE}")
 
-  # Allow import of other Swift modules we just built.
-  list(APPEND swift_flags
-      "-I" "${SWIFTLIB_DIR}/${library_subdir}")
-  # FIXME: should we use '-resource-dir' here?  Seems like it has no advantage
-  # over '-I' in this case.
+  if(maccatalyst_build_flavor STREQUAL "ios-like")
+  	compute_library_subdir(library_subdir
+      "MACCATALYST" "${SWIFTFILE_ARCHITECTURE}")
+  endif()
 
   # If we have a custom module cache path, use it.
   if (SWIFT_MODULE_CACHE_PATH)
@@ -317,7 +351,8 @@ function(_compile_swift_files
     list(APPEND swift_flags "-parse-as-library")
 
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
-    if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
+    if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS OR
+       SWIFTFILE_SDK STREQUAL "MACCATALYST")
       set(specific_module_dir "${module_base}.swiftmodule")
       set(specific_module_project_dir "${specific_module_dir}/Project")
       set(source_info_file "${specific_module_project_dir}/${SWIFTFILE_ARCHITECTURE}.swiftsourceinfo")
@@ -345,6 +380,57 @@ function(_compile_swift_files
     if (NOT SWIFTFILE_IS_STDLIB_CORE)
       #      list(APPEND swift_module_flags
       #       "-Xfrontend" "-experimental-skip-non-inlinable-function-bodies")
+    endif()
+
+    set(module_outputs "${module_file}" "${module_doc_file}")
+
+    if(interface_file)
+      list(APPEND module_outputs "${interface_file}")
+    endif()
+
+    set(optional_arg)
+    if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS OR
+       SWIFTFILE_SDK STREQUAL "MACCATALYST")
+      # Allow installation of stdlib without building all variants on Darwin.
+      set(optional_arg "OPTIONAL")
+    endif()
+
+    if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS OR
+       SWIFTFILE_SDK STREQUAL "MACCATALYST")
+      swift_install_in_component(DIRECTORY "${specific_module_dir}"
+                                 DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+                                 COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
+    else()
+      swift_install_in_component(FILES ${module_outputs}
+                                 DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+                                 COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
+    endif()
+
+    # macCatalyst zippered module setup
+    if(maccatalyst_build_flavor STREQUAL "zippered")
+      compute_library_subdir(maccatalyst_library_subdir
+        "MACCATALYST" "${SWIFTFILE_ARCHITECTURE}")
+
+      if(SWIFTFILE_MODULE_DIR)
+        set(maccatalyst_module_dir "${SWIFTFILE_MODULE_DIR}")
+      elseif(SWIFTFILE_IS_STDLIB)
+        set(maccatalyst_module_dir "${SWIFTLIB_DIR}/${maccatalyst_library_subdir}")
+      else()
+        message(FATAL_ERROR "Don't know where to put the module files")
+      endif()
+
+      set(maccatalyst_specific_module_dir
+          "${maccatalyst_module_dir}/${SWIFTFILE_MODULE_NAME}.swiftmodule")
+      set(maccatalyst_module_base "${maccatalyst_specific_module_dir}/${SWIFTFILE_ARCHITECTURE}")
+      set(maccatalyst_module_file "${maccatalyst_module_base}.swiftmodule")
+      set(maccatalyst_module_doc_file "${maccatalyst_module_base}.swiftdoc")
+
+      set(maccatalyst_module_outputs "${maccatalyst_module_file}" "${maccatalyst_module_doc_file}")
+
+      swift_install_in_component(DIRECTORY ${maccatalyst_specific_module_dir}
+                                 DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${maccatalyst_library_subdir}"
+                                 COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
+                                 "${optional_arg}")
     endif()
 
     # If we have extra regexp flags, check if we match any of the regexps. If so
@@ -410,6 +496,26 @@ function(_compile_swift_files
   set(sibopt_outputs "${sibopt_file}")
   set(sibgen_outputs "${sibgen_file}")
 
+  # macCatalyst zippered swiftmodule
+  if(maccatalyst_build_flavor STREQUAL "zippered")
+    set(maccatalyst_swift_flags "${swift_flags}")
+    list(APPEND maccatalyst_swift_flags
+      "-I" "${SWIFTLIB_DIR}/${maccatalyst_library_subdir}")
+    set(maccatalyst_swift_module_flags ${swift_module_flags})
+  elseif(maccatalyst_build_flavor STREQUAL "ios-like")
+    compute_library_subdir(maccatalyst_library_subdir
+      "MACCATALYST" "${SWIFTFILE_ARCHITECTURE}")
+    list(APPEND swift_flags
+      "-I" "${SWIFTLIB_DIR}/${maccatalyst_library_subdir}")
+  else()
+    # Allow import of other Swift modules we just built.
+    list(APPEND swift_flags
+      "-I" "${SWIFTLIB_DIR}/${library_subdir}")
+
+    # FIXME: should we use '-resource-dir' here?  Seems like it has no advantage
+    # over '-I' in this case.
+  endif()
+
   if(XCODE)
     # HACK: work around an issue with CMake Xcode generator and the Swift
     # driver.
@@ -433,6 +539,12 @@ function(_compile_swift_files
       COMMAND "${CMAKE_COMMAND}" -E touch ${sibopt_outputs})
     set(command_touch_sibgen_outputs
       COMMAND "${CMAKE_COMMAND}" -E touch ${sibgen_outputs})
+
+    # macCatalyst zippered outputs
+    if(maccatalyst_build_flavor STREQUAL "zippered")
+      set(command_touch_maccatalyst_module_outputs
+        COMMAND "${CMAKE_COMMAND}" -E touch ${maccatalyst_module_outputs})
+    endif()
   endif()
 
   # First generate the obj dirs
@@ -524,6 +636,49 @@ function(_compile_swift_files
           ${create_dirs_dependency_target}
         COMMENT "Generating ${module_file}")
     set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)
+
+    # macCatalyst zippered swiftmodule
+    if(maccatalyst_build_flavor STREQUAL "zippered")
+      get_target_triple(ios_like_target_triple ignored_target_variant
+        "${SWIFTFILE_SDK}"
+        "${SWIFTFILE_ARCHITECTURE}"
+        MACCATALYST_BUILD_FLAVOR "ios-like")
+
+      # Remove previous -target <triple> and -target-variant flags from
+      # the zippered Swift flags and add an ios-like target.
+      remove_given_flag(maccatalyst_swift_flags "target")
+      remove_given_flag(maccatalyst_swift_flags "target-variant")
+      list(APPEND maccatalyst_swift_flags
+        "-target" "${ios_like_target_triple}")
+
+      add_custom_command_target(
+        maccatalyst_module_dependency_target
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "remove" "-f" ${maccatalyst_module_outputs}
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "make_directory" ${maccatalyst_specific_module_dir}
+        COMMAND
+          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+          "${swift_compiler_tool}" "-emit-module" "-o" "${maccatalyst_module_file}"
+          ${maccatalyst_swift_flags} ${maccatalyst_swift_module_flags} "@${file_path}"
+        ${command_touch_maccatalyst_module_outputs}
+        OUTPUT
+          ${maccatalyst_module_outputs}
+        DEPENDS
+          ${swift_compiler_tool_dep}
+          ${source_files}
+          ${SWIFTFILE_DEPENDS}
+          ${swift_ide_test_dependency}
+          ${obj_dirs_dependency_target}
+        COMMENT
+          "Generating ${maccatalyst_module_file}")
+
+      # Piggy-back on the same out-var as the regular swiftmodule
+      set("${dependency_module_target_out_var_name}"
+        "${module_dependency_target}"
+        "${maccatalyst_module_dependency_target}"
+        PARENT_SCOPE)
+    endif()
 
     # This is the target to generate the .sib files. It is not built by default.
     add_custom_command_target(

@@ -1277,7 +1277,8 @@ namespace {
 
       auto tv = CS.createTypeVariable(exprLoc,
                                       TVO_PrefersSubtypeBinding |
-                                      TVO_CanBindToNoEscape);
+                                      TVO_CanBindToNoEscape |
+                                      TVO_CanBindToHole);
       
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
                        protocol->getDeclaredType(),
@@ -2469,35 +2470,34 @@ namespace {
       return tryFinder.foundThrow();
     }
 
-    void collectParameterRefs(Expr *expr,
-                              llvm::SmallVectorImpl<TypeVariableType *> &refs) {
-      expr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
-        if (auto *closure = dyn_cast<ClosureExpr>(childExpr)) {
-          if (closure->hasSingleExpressionBody()) {
-            collectParameterRefs(closure->getSingleExpressionBody(), refs);
-            return childExpr;
-          }
-        }
-
-        if (auto *DRE = dyn_cast<DeclRefExpr>(childExpr)) {
-          if (auto *PD = dyn_cast<ParamDecl>(DRE->getDecl())) {
-            if (CS.hasType(PD)) {
-              if (auto *paramType = CS.getType(PD)->getAs<TypeVariableType>())
-                refs.push_back(paramType);
-            }
-          }
-        }
-
-        return childExpr;
-      });
-    }
-
     Type visitClosureExpr(ClosureExpr *closure) {
       auto *locator = CS.getConstraintLocator(closure);
       auto closureType = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
 
-      llvm::SmallVector<TypeVariableType *, 4> paramRefs;
-      collectParameterRefs(closure, paramRefs);
+      // Collect any references to closure parameters whose types involve type
+      // variables from the closure, because there will be a dependency on
+      // those type variables once we have generated constraints for the
+      // closure body.
+      struct CollectParameterRefs : public ASTWalker {
+        ConstraintSystem &cs;
+        llvm::SmallVector<TypeVariableType *, 4> paramRefs;
+
+        CollectParameterRefs(ConstraintSystem &cs) : cs(cs) { }
+
+        std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+          // Retrieve type variables from references to parameter declarations.
+          if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
+            if (auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl())) {
+              if (Type paramType = cs.getTypeIfAvailable(paramDecl)) {
+                paramType->getTypeVariables(paramRefs);
+              }
+            }
+          }
+
+          return { true, expr };
+        }
+      } collectParameterRefs(CS);
+      closure->walk(collectParameterRefs);
 
       auto inferredType = inferClosureType(closure);
       if (!inferredType || inferredType->hasError())
@@ -2505,7 +2505,8 @@ namespace {
 
       CS.addUnsolvedConstraint(
           Constraint::create(CS, ConstraintKind::DefaultClosureType,
-                             closureType, inferredType, locator, paramRefs));
+                             closureType, inferredType, locator,
+                             collectParameterRefs.paramRefs));
 
       CS.setClosureType(closure, inferredType);
       return closureType;
@@ -2840,7 +2841,8 @@ namespace {
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
       auto locator = CS.getConstraintLocator(expr);
-      auto typeVar = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+      auto typeVar = CS.createTypeVariable(locator, TVO_CanBindToNoEscape |
+                                                    TVO_CanBindToHole);
       return LValueType::get(typeVar);
     }
 
@@ -3809,6 +3811,61 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
                                            ConstraintLocatorBuilder locator) {
   ConstraintGenerator cg(*this, nullptr);
   return cg.getTypeForPattern(pattern, locator);
+}
+
+bool ConstraintSystem::canGenerateConstraints(StmtCondition condition) {
+  for (const auto &element : condition) {
+    switch (element.getKind()) {
+    case StmtConditionElement::CK_Availability:
+    case StmtConditionElement::CK_Boolean:
+      continue;
+
+    case StmtConditionElement::CK_PatternBinding:
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool ConstraintSystem::generateConstraints(StmtCondition condition,
+                                           DeclContext *dc) {
+  // FIXME: This should be folded into constraint generation for conditions.
+  auto boolDecl = getASTContext().getBoolDecl();
+  if (!boolDecl) {
+    return true;
+  }
+
+  Type boolTy = boolDecl->getDeclaredType();
+  for (const auto &condElement : condition) {
+    switch (condElement.getKind()) {
+    case StmtConditionElement::CK_Availability:
+      // Nothing to do here.
+      continue;
+
+    case StmtConditionElement::CK_Boolean: {
+      Expr *condExpr = condElement.getBoolean();
+      setContextualType(condExpr, TypeLoc::withoutLoc(boolTy), CTP_Condition);
+
+      condExpr = generateConstraints(condExpr, dc);
+      if (!condExpr) {
+        return true;
+      }
+
+      addConstraint(ConstraintKind::Conversion,
+                    getType(condExpr),
+                    boolTy,
+                    getConstraintLocator(condExpr,
+                                         LocatorPathElt::ContextualType()));
+      continue;
+    }
+
+    case StmtConditionElement::CK_PatternBinding:
+      llvm_unreachable("unhandled statement condition");
+    }
+  }
+
+  return false;
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {

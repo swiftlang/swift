@@ -456,6 +456,18 @@ private:
       AvailabilityContext NewConstraint = contextForSpec(Spec);
       Query->setAvailableRange(NewConstraint.getOSVersion());
 
+      // When compiling zippered for macCatalyst, we need to collect both
+      // a macOS version (the target version) and an iOS/macCatalyst version
+      // (the target-variant). These versions will both be passed to a runtime
+      // entrypoint that will check either the macOS version or the iOS
+      // version depending on the kind of process this code is loaded into.
+      if (Context.LangOpts.TargetVariant) {
+        AvailabilitySpec *VariantSpec =
+            bestActiveSpecForQuery(Query, /*ForTargetVariant*/ true);
+        VersionRange VariantRange = contextForSpec(VariantSpec).getOSVersion();
+        Query->setVariantAvailableRange(VariantRange);
+      }
+
       if (Spec->getKind() == AvailabilitySpecKind::OtherPlatform) {
         // The wildcard spec '*' represents the minimum deployment target, so
         // there is no need to create a refinement context for this query.
@@ -480,9 +492,18 @@ private:
         // required compatibility version is different than the deployment
         // target).
         if (CurrentTRC->getReason() != TypeRefinementContext::Reason::Root) {
+          PlatformKind BestPlatform = targetPlatform(Context.LangOpts);
+          auto *PlatformSpec =
+              dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
+          // If possible, try to report the diagnostic in terms for the
+          // platform the user uttered in the '#available()'. For a platform
+          // that inherits availability from another platform it may be
+          // different from the platform specified in the target triple.
+          if (PlatformSpec)
+            BestPlatform = PlatformSpec->getPlatform();
           Diags.diagnose(Query->getLoc(),
                          diag::availability_query_useless_enclosing_scope,
-                         platformString(targetPlatform(Context.LangOpts)));
+                         platformString(BestPlatform));
           Diags.diagnose(CurrentTRC->getIntroductionLoc(),
                          diag::availability_query_useless_enclosing_scope_here);
         }
@@ -535,8 +556,11 @@ private:
 
   /// Return the best active spec for the target platform or nullptr if no
   /// such spec exists.
-  AvailabilitySpec *bestActiveSpecForQuery(PoundAvailableInfo *available) {
+  AvailabilitySpec *bestActiveSpecForQuery(PoundAvailableInfo *available,
+                                           bool forTargetVariant = false) {
     OtherPlatformAvailabilitySpec *FoundOtherSpec = nullptr;
+    PlatformVersionConstraintAvailabilitySpec *BestSpec = nullptr;
+
     for (auto *Spec : available->getQueries()) {
       if (auto *OtherSpec = dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
         FoundOtherSpec = OtherSpec;
@@ -551,10 +575,18 @@ private:
       // properly. For example, on the OSXApplicationExtension platform
       // we want to chose the OS X spec unless there is an explicit
       // OSXApplicationExtension spec.
-      if (isPlatformActive(VersionSpec->getPlatform(), Context.LangOpts)) {
-        return VersionSpec;
+      if (isPlatformActive(VersionSpec->getPlatform(), Context.LangOpts,
+                           forTargetVariant)) {
+        if (!BestSpec ||
+            inheritsAvailabilityFromPlatform(VersionSpec->getPlatform(),
+                                             BestSpec->getPlatform())) {
+          BestSpec = VersionSpec;
+        }
       }
     }
+
+    if (BestSpec)
+      return BestSpec;
 
     // If we have reached this point, we found no spec for our target, so
     // we return the other spec ('*'), if we found it, or nullptr, if not.

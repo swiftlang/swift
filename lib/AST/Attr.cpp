@@ -179,6 +179,35 @@ DeclAttributes::isUnavailableInSwiftVersion(
 }
 
 const AvailableAttr *
+DeclAttributes::findMostSpecificActivePlatform(const ASTContext &ctx) const{
+  const AvailableAttr *bestAttr = nullptr;
+
+  for (auto attr : *this) {
+    auto *avAttr = dyn_cast<AvailableAttr>(attr);
+    if (!avAttr)
+      continue;
+
+    if (avAttr->isInvalid())
+      continue;
+
+    if (!avAttr->hasPlatform())
+      continue;
+
+    if (!avAttr->isActivePlatform(ctx))
+      continue;
+
+    // We have an attribute that is active for the platform, but
+    // is it more specific than our curent best?
+    if (!bestAttr || inheritsAvailabilityFromPlatform(avAttr->Platform,
+                                                      bestAttr->Platform)) {
+      bestAttr = avAttr;
+    }
+  }
+
+  return bestAttr;
+}
+
+const AvailableAttr *
 DeclAttributes::getPotentiallyUnavailable(const ASTContext &ctx) const {
   const AvailableAttr *potential = nullptr;
   const AvailableAttr *conditional = nullptr;
@@ -223,10 +252,17 @@ DeclAttributes::getPotentiallyUnavailable(const ASTContext &ctx) const {
 const AvailableAttr *DeclAttributes::getUnavailable(
                           const ASTContext &ctx) const {
   const AvailableAttr *conditional = nullptr;
+  const AvailableAttr *bestActive = findMostSpecificActivePlatform(ctx);
 
   for (auto Attr : *this)
     if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
       if (AvAttr->isInvalid())
+        continue;
+
+      // If this is a platform-specific attribute and it isn't the most
+      // specific attribute for the current platform, we're done.
+      if (AvAttr->hasPlatform() &&
+          (!bestActive || AvAttr != bestActive))
         continue;
 
       // If this attribute doesn't apply to the active platform, we're done.
@@ -256,9 +292,14 @@ const AvailableAttr *DeclAttributes::getUnavailable(
 const AvailableAttr *
 DeclAttributes::getDeprecated(const ASTContext &ctx) const {
   const AvailableAttr *conditional = nullptr;
+  const AvailableAttr *bestActive = findMostSpecificActivePlatform(ctx);
   for (auto Attr : *this) {
     if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
       if (AvAttr->isInvalid())
+        continue;
+
+      if (AvAttr->hasPlatform() &&
+          (!bestActive || AvAttr != bestActive))
         continue;
 
       if (!AvAttr->isActivePlatform(ctx) &&
@@ -335,6 +376,30 @@ static bool isShortAvailable(const DeclAttribute *DA) {
   return true;
 }
 
+/// Return true when another availability attribute implies the same availability as this
+/// attribute and so printing the attribute can be skipped to de-clutter the declaration
+/// when printing the short form.
+/// For example, iOS availability implies macCatalyst availability so if attributes for
+/// both are present and they have the same 'introduced' version, we can skip printing an
+/// explicit availability for macCatalyst.
+static bool isShortFormAvailabilityImpliedByOther(const AvailableAttr *Attr,
+    ArrayRef<const DeclAttribute *> Others) {
+  assert(isShortAvailable(Attr));
+
+  for (auto *DA : Others) {
+    auto *Other = cast<AvailableAttr>(DA);
+    if (Attr->Platform == Other->Platform)
+      continue;
+
+    if (!inheritsAvailabilityFromPlatform(Attr->Platform, Other->Platform))
+      continue;
+
+    if (Attr->Introduced == Other->Introduced)
+      return true;
+  }
+  return false;
+}
+
 /// Print the short-form @available() attribute for an array of long-form
 /// AvailableAttrs that can be represented in the short form.
 /// For example, for:
@@ -365,6 +430,8 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
     for (auto *DA : Attrs) {
       auto *AvailAttr = cast<AvailableAttr>(DA);
       assert(AvailAttr->Introduced.hasValue());
+      if (isShortFormAvailabilityImpliedByOther(AvailAttr, Attrs))
+        continue;
       Printer << platformString(AvailAttr->Platform) << " "
               << AvailAttr->Introduced.getValue().getAsString() << ", ";
     }

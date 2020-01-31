@@ -149,8 +149,18 @@ class HostSpecificConfiguration(object):
                     subset_suffix = "-only_stress"
                 else:
                     subset_suffix = ""
-                self.swift_test_run_targets.append("check-swift{}{}-{}".format(
-                    subset_suffix, suffix, name))
+
+                # Support for running the macCatalyst tests with
+                # the iOS-like target triple.
+                if name == "macosx-x86_64" and args.maccatalyst \
+                   and args.maccatalyst_ios_tests:
+                    (self.swift_test_run_targets
+                     .append("check-swift{}{}-{}".format(
+                         subset_suffix, suffix, "macosx-maccatalyst-x86_64")))
+                else:
+                    (self.swift_test_run_targets
+                     .append("check-swift{}{}-{}".format(
+                         subset_suffix, suffix, name)))
                 if args.test_optimized and not test_host_only:
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize-{}".format(

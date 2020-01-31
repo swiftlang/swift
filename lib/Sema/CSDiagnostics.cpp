@@ -232,7 +232,8 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   };
 
   if (isFromContextualType())
-    return getAffectedDeclFromType(cs.getContextualType());
+    return getAffectedDeclFromType(
+        cs.getContextualType(getLocator()->getAnchor()));
 
   if (auto overload = getChoiceFor(getLocator())) {
     // If there is a declaration associated with this
@@ -338,8 +339,9 @@ bool RequirementFailure::diagnoseAsError() {
     return true;
   }
 
-  if (genericCtx != reqDC && (genericCtx->isChildContextOf(reqDC) ||
-                              isStaticOrInstanceMember(AffectedDecl))) {
+  if (reqDC->isTypeContext() && genericCtx != reqDC &&
+      (genericCtx->isChildContextOf(reqDC) ||
+       isStaticOrInstanceMember(AffectedDecl))) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();
     emitDiagnostic(anchor->getLoc(), getDiagnosticInRereference(),
                    AffectedDecl->getDescriptiveKind(),
@@ -1209,7 +1211,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   // Assignment is not allowed inside of a condition,
   // so let's not diagnose immutability, because
   // most likely the problem is related to use of `=` itself.
-  if (cs.getContextualTypePurpose() == CTP_Condition)
+  if (cs.getContextualTypePurpose(diagExpr) == CTP_Condition)
     return false;
 
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
@@ -2202,7 +2204,8 @@ bool ContextualFailure::diagnoseConversionToNil() const {
   emitDiagnostic(anchor->getLoc(), *diagnostic, getToType());
 
   if (CTP == CTP_Initialization) {
-    auto *patternTR = cs.getContextualTypeLoc().getTypeRepr();
+    auto *patternTR =
+      cs.getContextualTypeLoc(locator->getAnchor()).getTypeRepr();
     if (!patternTR)
       return true;
 
@@ -2904,7 +2907,8 @@ bool TupleContextualFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   if (isNumElementsMismatch())
     diagnostic = diag::tuple_types_not_convertible_nelts;
-  else if ((purpose == CTP_Initialization) && !cs.getContextualType())
+  else if ((purpose == CTP_Initialization) &&
+           !cs.getContextualType(getAnchor()))
     diagnostic = diag::tuple_types_not_convertible;
   else if (auto diag = getDiagnosticFor(purpose, /*forProtocol=*/false))
     diagnostic = *diag;
@@ -3389,6 +3393,12 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     return true;
   }
 
+  auto getRootExpr = [&cs](Expr *expr) {
+    while (auto parent = cs.getParentExpr(expr))
+      expr = parent;
+    return expr;
+  };
+
   Expr *expr = findParentExpr(getAnchor());
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
 
@@ -3444,7 +3454,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         OverloadChoice choice = selection->choice;
         if (choice.isDecl() && isMutable(choice.getDecl()) &&
             !isCallArgument(initCall) &&
-            cs.getContextualTypePurpose() == CTP_Unused) {
+            cs.getContextualTypePurpose(getRootExpr(ctorRef)) == CTP_Unused) {
           auto fixItLoc = ctorRef->getBase()->getSourceRange().End;
           emitDiagnostic(loc, diag::init_not_instance_member_use_assignment)
               .fixItInsertAfter(fixItLoc, " = ");
@@ -3630,7 +3640,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     Type contextualType;
     for (auto iterateCS = &cs; contextualType.isNull() && iterateCS;
          iterateCS = iterateCS->baseCS) {
-      contextualType = iterateCS->getContextualType();
+      contextualType = iterateCS->getContextualType(getRawAnchor());
     }
     
     // Try to provide a fix-it that only contains a '.'
@@ -3641,11 +3651,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
     // Check if the expression is the matching operator ~=, most often used in
     // case statements. If so, try to provide a single dot fix-it
-    const Expr *contextualTypeNode = nullptr;
+    const Expr *contextualTypeNode = getRootExpr(getAnchor());
     ConstraintSystem *lastCS = nullptr;
     for (auto iterateCS = &cs; iterateCS; iterateCS = iterateCS->baseCS) {
       lastCS = iterateCS;
-      contextualTypeNode = iterateCS->getContextualTypeNode();
     }
     
     // The '~=' operator is an overloaded decl ref inside a binaryExpr
@@ -3793,7 +3802,8 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   if (locator->isLastElement<LocatorPathElt::ContextualType>()) {
     auto &cs = getConstraintSystem();
     emitDiagnostic(anchor->getLoc(), diag::cannot_convert_initializer_value,
-                   getType(anchor), resolveType(cs.getContextualType()));
+                   getType(anchor),
+                   resolveType(cs.getContextualType(getAnchor())));
     // TODO: It would be great so somehow point out which arguments are missing.
     return true;
   }
@@ -3884,7 +3894,7 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
 
   auto *anchor = getRawAnchor();
   if (!(isa<CallExpr>(anchor) || isa<SubscriptExpr>(anchor) ||
-        isa<UnresolvedMemberExpr>(anchor)))
+        isa<UnresolvedMemberExpr>(anchor) || isa<ObjectLiteralExpr>(anchor)))
     return false;
 
   if (SynthesizedArgs.size() != 1)
@@ -4005,7 +4015,7 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
 
   auto *locator = getLocator();
   if (locator->isForContextualType()) {
-    funcType = cs.getContextualType()->getAs<FunctionType>();
+    funcType = cs.getContextualType(locator->getAnchor())->getAs<FunctionType>();
   } else if (auto info = cs.getFunctionArgApplyInfo(locator)) {
     funcType = info->getParamType()->getAs<FunctionType>();
   } else if (locator->isLastElement<LocatorPathElt::ClosureResult>()) {
@@ -4221,6 +4231,9 @@ MissingArgumentsFailure::getCallInfo(Expr *anchor) const {
   } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
     return std::make_tuple(SE, SE->getIndex(), SE->getNumArguments(),
                            SE->hasTrailingClosure());
+  } else if (auto *OLE = dyn_cast<ObjectLiteralExpr>(anchor)) {
+    return std::make_tuple(OLE, OLE->getArg(), OLE->getNumArguments(),
+                           OLE->hasTrailingClosure());
   }
 
   return std::make_tuple(nullptr, nullptr, 0, false);
@@ -4622,9 +4635,7 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
     auto &cs = getConstraintSystem();
     auto *locator =
         cs.getConstraintLocator(baseExpr, ConstraintLocator::Member);
-    if (llvm::any_of(cs.getFixes(), [&](const ConstraintFix *fix) {
-          return fix->getLocator() == locator;
-        }))
+    if (cs.hasFixFor(locator))
       return false;
   }
 
@@ -5252,7 +5263,7 @@ bool InOutConversionFailure::diagnoseAsError() {
           argApplyInfo->getArgType(), argApplyInfo->getParamType());
     } else {
       assert(locator->findLast<LocatorPathElt::ContextualType>());
-      auto contextualType = cs.getContextualType();
+      auto contextualType = cs.getContextualType(anchor);
       auto purpose = getContextualTypePurpose();
       auto diagnostic = getDiagnosticFor(purpose, /*forProtocol=*/false);
 
@@ -6038,6 +6049,58 @@ bool UnableToInferClosureReturnType::diagnoseAsError() {
     diagnostic.fixItInsertAfter(closure->getBody()->getLBraceLoc(),
                                 diag::insert_closure_return_type_placeholder,
                                 /*argListSpecified=*/true);
+  }
+
+  return true;
+}
+
+static std::pair<StringRef, StringRef>
+getImportModuleAndDefaultType(const ASTContext &ctx, ObjectLiteralExpr *expr) {
+  const auto &target = ctx.LangOpts.Target;
+  
+  switch (expr->getLiteralKind()) {
+    case ObjectLiteralExpr::colorLiteral: {
+      if (target.isMacOSX()) {
+        return std::make_pair("AppKit", "NSColor");
+      } else if (target.isiOS() || target.isTvOS()) {
+        return std::make_pair("UIKit", "UIColor");
+      }
+      break;
+    }
+
+    case ObjectLiteralExpr::imageLiteral: {
+      if (target.isMacOSX()) {
+        return std::make_pair("AppKit", "NSImage");
+      } else if (target.isiOS() || target.isTvOS()) {
+        return std::make_pair("UIKit", "UIImage");
+      }
+      break;
+    }
+
+    case ObjectLiteralExpr::fileLiteral: {
+      return std::make_pair("Foundation", "URL");
+    }
+  }
+
+  return std::make_pair("", "");
+}
+
+bool UnableToInferProtocolLiteralType::diagnoseAsError() {
+  auto &cs = getConstraintSystem();
+  auto &ctx = cs.getASTContext();
+  auto *expr = cast<ObjectLiteralExpr>(getLocator()->getAnchor());
+
+  StringRef importModule;
+  StringRef importDefaultTypeName;
+  std::tie(importModule, importDefaultTypeName) =
+      getImportModuleAndDefaultType(ctx, expr);
+
+  auto plainName = expr->getLiteralKindPlainName();
+  emitDiagnostic(expr->getLoc(), diag::object_literal_default_type_missing,
+                 plainName);
+  if (!importModule.empty()) {
+    emitDiagnostic(expr->getLoc(), diag::object_literal_resolve_import,
+                   importModule, importDefaultTypeName, plainName);
   }
 
   return true;

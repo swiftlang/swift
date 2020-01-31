@@ -115,6 +115,14 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPEPARAM_IN_CONTEXTTYPE_1 | %FileCheck %s -check-prefix=TYPEPARAM_IN_CONTEXTTYPE_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_2 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_3 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_4 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_5 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_6 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_CONDITION | %FileCheck %s -check-prefix=TERNARY_CONDITION
+
 enum SomeEnum1 {
   case South
   case North
@@ -731,4 +739,25 @@ func testTypeParamInContextType() {
 // TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[Constructor]/CurrNominal:      init()[#MyStruct<MyProtocol>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: myProtocolOption[#MyStruct<ConcreteMyProtocol>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1: End completions
+}
+
+func testTernaryOperator(cond: Bool) {
+  let _: SomeEnum1 = cond ? .#^TERNARY_1^#
+  func sync(){}
+  let _: SomeEnum1 = cond ? .#^TERNARY_2^# :
+  func sync(){}
+  let _: SomeEnum1 = cond ? .#^TERNARY_3^# : .South
+  func sync(){}
+  let _: SomeEnum1 = cond ? .South : .#^TERNARY_4^#
+}
+
+func testTernaryOperator2(cond: Bool) {
+  let _: SomeEnum1 = cond ? .#^TERNARY_5^# : .bogus
+  func sync(){}
+  let _: SomeEnum1 = cond ? .bogus : .#^TERNARY_6^#
+  func sync(){}
+  let _: SomeEnum1 = .#^TERNARY_CONDITION^# ? .bogus : .bogus
+// TERNARY_CONDITION: Begin completions
+// TERNARY_CONDITION-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#Bool#]; name=init()
+// TERNARY_CONDITION: End completions
 }

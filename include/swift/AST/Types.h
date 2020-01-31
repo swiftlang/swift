@@ -3660,15 +3660,19 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
-/// Determines whether a differentiable function type is differentiable with
-/// respect to this parameter.
+/// The differentiability of a SIL function type parameter.
 enum class SILParameterDifferentiability : unsigned {
-  /// The function type is differentiable with respect to this parameter, or
-  /// differentiability is not applicable because the function is not
-  /// differentiable.
+  /// Either differentiable or not applicable.
+  ///
+  /// - If the function type is not `@differentiable`, parameter
+  ///   differentiability is not applicable. This case is the default value.
+  /// - If the function type is `@differentiable`, the function is
+  ///   differentiable with respect to this parameter.
   DifferentiableOrNotApplicable,
 
+  /// Not differentiable: a `@noDerivative` parameter.
+  ///
+  /// May be applied only to parameters of `@differentiable` function types.
   /// The function type is not differentiable with respect to this parameter.
   NotDifferentiable,
 };
@@ -3676,17 +3680,15 @@ enum class SILParameterDifferentiability : unsigned {
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
   llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
-
-  // SWIFT_ENABLE_TENSORFLOW
   SILParameterDifferentiability Differentiability : 1;
+
 public:
   SILParameterInfo() = default;//: Ty(), Convention((ParameterConvention)0) {}
-  // SWIFT_ENABLE_TENSORFLOW
   SILParameterInfo(
       CanType type, ParameterConvention conv,
       SILParameterDifferentiability differentiability =
           SILParameterDifferentiability::DifferentiableOrNotApplicable)
-    : TypeAndConvention(type, conv), Differentiability(differentiability) {
+      : TypeAndConvention(type, conv), Differentiability(differentiability) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
@@ -3741,14 +3743,14 @@ public:
     return isGuaranteedParameter(getConvention());
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   SILParameterDifferentiability getDifferentiability() const {
     return Differentiability;
   }
 
   SILParameterInfo getWithDifferentiability(
       SILParameterDifferentiability differentiability) const {
-    return SILParameterInfo(getInterfaceType(), getConvention(), differentiability);
+    return SILParameterInfo(getInterfaceType(), getConvention(),
+                            differentiability);
   }
 
   /// The SIL storage type determines the ABI for arguments based purely on the
@@ -3780,7 +3782,6 @@ public:
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(getInterfaceType().getPointer());
     id.AddInteger((unsigned)getConvention());
-    // SWIFT_ENABLE_TENSORFLOW
     id.AddInteger((unsigned)getDifferentiability());
   }
 
@@ -3795,7 +3796,6 @@ public:
   }
 
   bool operator==(SILParameterInfo rhs) const {
-    // SWIFT_ENABLE_TENSORFLOW
     return getInterfaceType() == rhs.getInterfaceType() &&
            getConvention() == rhs.getConvention() &&
            getDifferentiability() == rhs.getDifferentiability();
@@ -4153,12 +4153,12 @@ public:
       return ExtInfo(NoEscape ? (Bits | NoEscapeMask) : (Bits & ~NoEscapeMask),
                      Other);
     }
-    // SWIFT_ENABLE_TENSORFLOW
-    ExtInfo withDifferentiabilityKind(
-        DifferentiabilityKind differentiability) const {
-      return ExtInfo((Bits & ~DifferentiabilityMask) |
-                     ((unsigned)differentiability <<
-                      DifferentiabilityMaskOffset), Other);
+    ExtInfo
+    withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
+      return ExtInfo(
+          (Bits & ~DifferentiabilityMask) |
+              ((unsigned)differentiability << DifferentiabilityMaskOffset),
+          Other);
     }
 
     std::pair<unsigned, const void *> getFuncAttrKey() const {

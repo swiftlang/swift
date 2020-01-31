@@ -3369,6 +3369,11 @@ SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
   OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
   DebugInfo(SILPrintDebugInfo) { }
 
+SILPrintContext::SILPrintContext(llvm::raw_ostream &OS,
+                                 const SILOptions &Opts) :
+  OutStream(OS), Verbose(Opts.EmitVerboseSIL), SortedSIL(Opts.EmitSortedSIL),
+  DebugInfo(SILPrintDebugInfo) {}
+
 SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
                                  bool SortedSIL, bool DebugInfo) :
   OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),

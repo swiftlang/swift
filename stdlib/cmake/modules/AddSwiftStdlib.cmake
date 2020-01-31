@@ -15,32 +15,19 @@ function(add_swift_target_executable name)
 
   set(SWIFTEXE_TARGET_SOURCES ${SWIFTEXE_TARGET_UNPARSED_ARGUMENTS})
 
-  translate_flag(${SWIFTEXE_TARGET_EXCLUDE_FROM_ALL}
-      "EXCLUDE_FROM_ALL"
-      SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG)
+  if(SWIFTEXE_TARGET_EXCLUDE_FROM_ALL)
+    message(SEND_ERROR "${name} is using EXCLUDE_FROM_ALL which is deprecated.")
+  endif()
 
   # All Swift executables depend on the standard library.
   list(APPEND SWIFTEXE_TARGET_LINK_LIBRARIES swiftCore)
   # All Swift executables depend on the swiftSwiftOnoneSupport library.
   list(APPEND SWIFTEXE_TARGET_DEPENDS swiftSwiftOnoneSupport)
 
-  if(NOT "${SWIFT_BUILD_STDLIB}")
-    list(REMOVE_ITEM SWIFTEXE_TARGET_LINK_LIBRARIES
-        swiftCore)
-  endif()
-
   foreach(sdk ${SWIFT_SDKS})
     foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
       set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
       set(VARIANT_NAME "${name}${VARIANT_SUFFIX}")
-
-      set(SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT
-          ${SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG})
-      if(NOT "${VARIANT_SUFFIX}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SUFFIX}")
-        # By default, don't build executables for target SDKs to avoid building
-        # target stdlibs.
-        set(SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT "EXCLUDE_FROM_ALL")
-      endif()
 
       if(SWIFTEXE_TARGET_BUILD_WITH_STDLIB)
         add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}" ${VARIANT_NAME})
@@ -59,8 +46,14 @@ function(add_swift_target_executable name)
           LLVM_LINK_COMPONENTS ${SWIFTEXE_TARGET_LLVM_LINK_COMPONENTS}
           SDK "${sdk}"
           ARCHITECTURE "${arch}"
-          LINK_LIBRARIES ${SWIFTEXE_TARGET_LINK_LIBRARIES}
-          ${SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT})
+          LINK_LIBRARIES ${SWIFTEXE_TARGET_LINK_LIBRARIES})
+
+      if(NOT "${VARIANT_SUFFIX}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SUFFIX}")
+        # By default, don't build executables for target SDKs to avoid building
+        # target stdlibs.
+        set_target_properties(${VARIANT_NAME} PROPERTIES
+          EXCLUDE_FROM_ALL TRUE)
+      endif()
 
       if(${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)
         add_custom_command_target(unused_var2

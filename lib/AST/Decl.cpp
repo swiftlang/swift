@@ -3624,7 +3624,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   // Get the parent type.
   Type Ty;
   DeclContext *dc = decl->getDeclContext();
-  if (dc->isTypeContext()) {
+  if (!isa<ProtocolDecl>(decl) && dc->isTypeContext()) {
     switch (kind) {
     case DeclTypeKind::DeclaredType: {
       auto *nominal = dc->getSelfNominalTypeDecl();
@@ -4732,7 +4732,8 @@ ValueDecl *ProtocolDecl::getSingleRequirement(DeclName name) const {
 }
 
 AssociatedTypeDecl *ProtocolDecl::getAssociatedType(Identifier name) const {
-  auto results = const_cast<ProtocolDecl *>(this)->lookupDirect(name);
+  const auto flags = NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  auto results = const_cast<ProtocolDecl *>(this)->lookupDirect(name, flags);
   for (auto candidate : results) {
     if (candidate->getDeclContext() == this &&
         isa<AssociatedTypeDecl>(candidate)) {
@@ -6709,14 +6710,19 @@ ParameterList *swift::getParameterList(ValueDecl *source) {
     return AFD->getParameters();
   } else if (auto *EED = dyn_cast<EnumElementDecl>(source)) {
     return EED->getParameterList();
-  } else {
-    return cast<SubscriptDecl>(source)->getIndices();
+  } else if (auto *SD = dyn_cast<SubscriptDecl>(source)) {
+    return SD->getIndices();
   }
+
+  return nullptr;
 }
 
 const ParamDecl *swift::getParameterAt(const ValueDecl *source,
                                        unsigned index) {
-  return getParameterList(const_cast<ValueDecl *>(source))->get(index);
+  if (auto *params = getParameterList(const_cast<ValueDecl *>(source))) {
+    return params->get(index);
+  }
+  return nullptr;
 }
 
 Type AbstractFunctionDecl::getMethodInterfaceType() const {
@@ -7998,6 +8004,15 @@ void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
   } else {
     out << "(unknown decl)";
   }
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           OptionSet<NominalTypeDecl::LookupDirectFlags> opts) {
+  out << "{ ";
+  using LookupFlags = NominalTypeDecl::LookupDirectFlags;
+  if (opts.contains(LookupFlags::IncludeAttrImplements))
+    out << "IncludeAttrImplements";
+  out << " }";
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {

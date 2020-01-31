@@ -148,7 +148,7 @@ undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'
 #if _endian(arm64) // expected-warning {{unknown endianness for build configuration '_endian'}} expected-note {{did you mean 'arch'}} {{5-12=arch}}
 #endif
 
-#if targetEnvironment(_ObjC) // expected-warning {{unknown target environment for build configuration 'targetEnvironment'}} expected-note {{did you mean 'simulator'}} {{23-28=simulator}}
+#if targetEnvironment(_ObjC) // expected-warning {{unknown target environment for build configuration 'targetEnvironment'}} expected-note {{did you mean 'macabi'}} {{23-28=macabi}}
 #endif
 
 #if os(iOS) || os(simulator) // expected-warning {{unknown operating system for build configuration 'os'}} expected-note {{did you mean 'targetEnvironment'}} {{16-18=targetEnvironment}}

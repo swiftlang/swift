@@ -117,75 +117,43 @@ KNOWN_SETTINGS=(
     darwin-xcrun-toolchain                        "default"         "the name of the toolchain to use on Darwin"
 
     ## Build Types for Components
-    cmark-build-type                              "Debug"           "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
-    foundation-build-type                         "Debug"           "the build variant for Foundation"
-    libdispatch-build-type                        "Debug"           "the build variant for libdispatch"
-    libicu-build-type                             "Debug"           "the build variant for libicu"
-    llbuild-build-type                            "Debug"           "the CMake build variant for llbuild"
-    lldb-build-type                               "Debug"           "the CMake build variant for LLDB"
-    llvm-build-type                               "Debug"           "the CMake build variant for LLVM and Clang (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
-    playgroundsupport-build-type                  "Debug"           "the build variant for PlaygroundSupport"
-    swift-build-type                              "Debug"           "the CMake build variant for Swift"
     swift-stdlib-build-type                       "Debug"           "the CMake build variant for Swift"
-    xctest-build-type                             "Debug"           "the build variant for xctest"
 
     ## Skip Build ...
     skip-build-android                            ""                "set to skip building Swift stdlibs for Android"
     skip-build-benchmarks                         ""                "set to skip building Swift Benchmark Suite"
     skip-build-clang-tools-extra                  ""                "set to skip building clang-tools-extra as part of llvm"
-    skip-build-cmark                              ""                "set to skip building CommonMark"
     skip-build-compiler-rt                        ""                "set to skip building Compiler-RT"
     skip-build-cygwin                             ""                "set to skip building Swift stdlibs for Cygwin"
     skip-build-external-benchmarks                "1"               "set to skip building the external Swift Benchmark Suite. (skipped by default)"
-    skip-build-foundation                         ""                "set to skip building foundation"
     skip-build-freebsd                            ""                "set to skip building Swift stdlibs for FreeBSD"
     skip-build-haiku                              ""                "set to skip building Swift stdlibs for Haiku"
     skip-build-ios-device                         ""                "set to skip building Swift stdlibs for iOS devices (i.e. build simulators only)"
     skip-build-ios-simulator                      ""                "set to skip building Swift stdlibs for iOS simulators (i.e. build devices only)"
-    skip-build-libcxx                             ""                "set to skip building libcxx"
-    skip-build-libdispatch                        ""                "set to skip building libdispatch"
-    skip-build-libicu                             ""                "set to skip building libicu"
     skip-build-linux                              ""                "set to skip building Swift stdlibs for Linux"
-    skip-build-llbuild                            ""                "set to skip building llbuild"
-    skip-build-lldb                               ""                "set to skip building LLDB"
-    skip-build-llvm                               ""                "set to skip building LLVM/Clang"
+    skip-build-maccatalyst                        ""                "set to skip building Swift stdlibs for macCatalyst"
     skip-build-osx                                ""                "set to skip building Swift stdlibs for OS X"
-    skip-build-playgroundsupport                  ""                "set to skip building PlaygroundSupport"
-    skip-build-swift                              ""                "set to skip building Swift"
-    # SWIFT_ENABLE_TENSORFLOW
-    skip-build-tensorflow                         ""                "set to skip building TensorFlow"
     skip-build-tvos-device                        ""                "set to skip building Swift stdlibs for tvOS devices (i.e. build simulators only)"
     skip-build-tvos-simulator                     ""                "set to skip building Swift stdlibs for tvOS simulators (i.e. build devices only)"
     skip-build-watchos-device                     ""                "set to skip building Swift stdlibs for Apple watchOS devices (i.e. build simulators only)"
     skip-build-watchos-simulator                  ""                "set to skip building Swift stdlibs for Apple watchOS simulators (i.e. build devices only)"
-    skip-build-xctest                             ""                "set to skip building xctest"
 
     ## Skip Test ...
     skip-test-android                             ""                "set to skip testing Swift stdlibs for Android"
     skip-test-android-host                        ""                "set to skip testing the host parts of the Android toolchain"
-    skip-test-cmark                               ""                "set to skip testing CommonMark"
     skip-test-cygwin                              ""                "set to skip testing Swift stdlibs for Cygwin"
-    skip-test-foundation                          ""                "set to skip testing foundation"
     skip-test-freebsd                             ""                "set to skip testing Swift stdlibs for FreeBSD"
     skip-test-haiku                               ""                "set to skip testing Swift stdlibs for Haiku"
     skip-test-ios-32bit-simulator                 ""                "set to skip testing Swift stdlibs for iOS 32bit simulators"
     skip-test-ios-host                            ""                "set to skip testing the host parts of the iOS toolchain"
     skip-test-ios-simulator                       ""                "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
-    skip-test-libdispatch                         ""                "set to skip testing libdispatch"
-    skip-test-libicu                              ""                "set to skip testing libicu"
     skip-test-linux                               ""                "set to skip testing Swift stdlibs for Linux"
-    skip-test-llbuild                             ""                "set to skip testing llbuild"
-    skip-test-lldb                                ""                "set to skip testing lldb"
+    skip-test-maccatalyst                         ""                "set to skip testing Swift stdlibs for macCatalyst"
     skip-test-osx                                 ""                "set to skip testing Swift stdlibs for OS X"
-    skip-test-playgroundsupport                   ""                "set to skip testing PlaygroundSupport"
-    skip-test-swift                               ""                "set to skip testing Swift"
-    # SWIFT_ENABLE_TENSORFLOW
-    skip-test-tensorflow                          ""                "set to skip testing TensorFlow"
     skip-test-tvos-host                           ""                "set to skip testing the host parts of the tvOS toolchain"
     skip-test-tvos-simulator                      ""                "set to skip testing Swift stdlibs for tvOS simulators (i.e. test devices only)"
     skip-test-watchos-host                        ""                "set to skip testing the host parts of the watchOS toolchain"
     skip-test-watchos-simulator                   ""                "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
-    skip-test-xctest                              ""                "set to skip testing xctest"
     skip-test-benchmarks                          ""                "set to skip running Swift Benchmark Suite"
     skip-test-optimized                           ""                "set to skip testing the test suite in optimized mode"
     skip-test-optimize-for-size                   ""                "set to skip testing the test suite in optimize for size mode"
@@ -193,20 +161,10 @@ KNOWN_SETTINGS=(
     skip-test-sourcekit                           ""                "set to skip testing SourceKit"
 
     ## Extra ... CMake Options
-    cmark-cmake-options                           ""                "CMake options used for all cmark targets"
     common-cmake-options                          ""                "CMake options used for all targets, including LLVM/Clang"
     extra-cmake-options                           ""                "Extra options to pass to CMake for all targets"
-    foundation-cmake-options                      ""                "CMake options used for all foundation targets"
-    libdispatch-cmake-options                     ""                "CMake options used for all libdispatch targets"
-    libicu-cmake-options                          ""                "CMake options used for all libicu targets"
-    llbuild-cmake-options                         ""                "CMake options used for all llbuild targets"
-    lldb-cmake-options                            ""                "CMake options used for all lldb targets"
-    llvm-cmake-options                            ""                "CMake options used for all llvm targets"
     ninja-cmake-options                           ""                "CMake options used for all ninja targets"
     ninja-cmake-options                           ""                "CMake options used for all ninja targets"
-    playgroundsupport-cmake-options               ""                "CMake options used for all playgroundsupport targets"
-    swift-cmake-options                           ""                "CMake options used for all swift targets"
-    xctest-cmake-options                          ""                "CMake options used for all xctest targets"
 
     ## Build ...
     build-llvm                                    "1"               "set to 1 to build LLVM and Clang"
@@ -228,20 +186,6 @@ KNOWN_SETTINGS=(
     stress-test-sourcekit                         ""                "set to run the stress-SourceKit target"
     swift-include-tests                           "1"               "Set to true to generate testing targets for Swift. This allows the build to proceed when 'test' directory is missing (required for B&I builds)"
     validation-test                               "0"               "set to run the validation test suite"
-
-    ## Install ...
-    install-cmark                                 ""                "whether to install cmark"
-    install-foundation                            ""                "whether to install foundation"
-    install-libcxx                                ""                "whether to install libc++"
-    install-libdispatch                           ""                "whether to install libdispatch"
-    install-libicu                                ""                "whether to install libicu"
-    install-llbuild                               ""                "whether to install llbuild"
-    install-lldb                                  ""                "whether to install LLDB"
-    install-playgroundsupport                     ""                "whether to install PlaygroundSupport"
-    install-swift                                 ""                "whether to install Swift"
-    # SWIFT_ENABLE_TENSORFLOW
-    install-tensorflow                            ""                "whether to install TensorFlow"
-    install-xctest                                ""                "whether to install xctest"
 
     ## llbuild Options
     llbuild-enable-assertions                     "1"               "enable assertions in llbuild"
@@ -308,6 +252,33 @@ KNOWN_SETTINGS=(
     tensorflow-target-lib-dir                     ""                "Path to target TensorFlow libraries"
     tensorflow-swift-apis                         ""                "Path to TensorFlow deep learning library repository"
 )
+
+components=(
+  cmark
+  foundation
+  libcxx
+  libdispatch
+  libicu
+  llbuild
+  lldb
+  llvm
+  playgroundsupport
+  static-foundation
+  static-libdispatch
+  swift
+  xctest
+  # SWIFT_ENABLE_TENSORFLOW
+  tensorflow
+)
+for component in ${components[@]} ; do
+  KNOWN_SETTINGS+=(
+    ${component}-build-type                       "Debug"           "the build variant for ${component}"
+    ${component}-cmake-options                    ""                "CMake options used for ${component}"
+    skip-build-${component}                       ""                "set to skip building ${component}"
+    skip-test-${component}                        ""                "set to skip testing ${component}"
+    install-${component}                          ""                "whether to install ${component}"
+  )
+done
 
 # Centralized access point for traced command invocation.
 # Every operation that might mutates file system should be called via
@@ -869,34 +840,19 @@ if [[ "${SKIP_RECONFIGURE}" ]]; then
     RECONFIGURE=""
 fi
 
-# WORKSPACE, BUILD_DIR and INSTALLABLE_PACKAGE must be absolute paths
-case "${WORKSPACE}" in
-    /*) ;;
-    *)
-        echo "workspace must be an absolute path (was '${WORKSPACE}')"
-        exit 1
-        ;;
-esac
-case "${BUILD_DIR}" in
-    /*) ;;
-    "")
-        echo "the --build-dir option is required"
-        usage
-        exit 1
-        ;;
-    *)
-        echo "build-dir must be an absolute path (was '${BUILD_DIR}')"
-        exit 1
-        ;;
-esac
-case "${INSTALLABLE_PACKAGE}" in
-    /*) ;;
-    "") ;;
-    *)
-        echo "installable-package must be an absolute path (was '${INSTALLABLE_PACKAGE}')"
-        exit 1
-        ;;
-esac
+# WORKSPACE, BUILD_DIR, and INSTALLABLE_PACKAGE must be absolute paths
+if ! [[ ${WORKSPACE} =~ ^/ ]] ; then
+  echo "workspace must be an absolute path (was '${WORKSPACE}')"
+  exit 1
+fi
+if ! [[ ${BUILD_DIR} =~ ^/ ]] ; then
+  echo "build-dir must be an absolute path (was '${BUILD_DIR}')"
+  exit 1
+fi
+if ! [[ ${INSTALLABLE_PACKAGE:-/} =~ ^/ ]] ; then
+  echo "installable-package must be an absolute path (was '${INSTALLABLE_PACKAGE}')"
+  exit 1
+fi
 
 # WORKSPACE must exist
 if [ ! -e "${WORKSPACE}" ] ; then
@@ -1119,46 +1075,28 @@ if [[ "${ENABLE_TENSORFLOW}" ]]; then
     fi
 fi
 
-PRODUCTS=(cmark llvm)
-if [[ ! "${SKIP_BUILD_LIBCXX}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" libcxx)
-fi
-if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" libicu)
-fi
-# SWIFT_ENABLE_TENSORFLOW
-if [[ ! "${SKIP_BUILD_TENSORFLOW}" ]] ; then
-    PRODUCTS=("${PRODUCTS[@]}" tensorflow)
-fi
-PRODUCTS=("${PRODUCTS[@]}" swift)
-if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" lldb)
-fi
-# LLBuild and XCTest are dependent on Foundation, so Foundation must
+# We cannot currently apply the normal rules of skipping here for LLVM. Even if
+# we are skipping building LLVM, we still need to at least build several tools
+# that swift relies on for building and testing. See the LLVM configure rules.
+PRODUCTS=(llvm)
+[[ "${SKIP_BUILD_CMARK}" ]] || PRODUCTS+=(cmark)
+[[ "${SKIP_BUILD_LIBCXX}" ]] || PRODUCTS+=(libcxx)
+[[ "${SKIP_BUILD_LIBICU}" ]] || PRODUCTS+=(libicu)
+[[ "${SKIP_BUILD_SWIFT}" ]] || PRODUCTS+=(swift)
+[[ "${SKIP_BUILD_LLDB}" ]] || PRODUCTS+=(lldb)
+[[ "${SKIP_BUILD_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch)
+[[ "${SKIP_BUILD_STATIC_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch_static)
+# llbuild and XCTest depend on Foundation, so Foundation must
 # be added to the list of build products first.
-if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" libdispatch)
-     if [[ -z "${SKIP_BUILD_SWIFT_STATIC_LIBDISPATCH}" ]] ; then
-       PRODUCTS=("${PRODUCTS[@]}" libdispatch_static)
-     fi
-fi
-if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" foundation)
-     # SWIFT_ENABLE_TENSORFLOW
-     # TODO(TF-490): Reenable this.
-     # if [[ -z "${SKIP_BUILD_STATIC_FOUNDATION}" ]] ; then
-     #   PRODUCTS=("${PRODUCTS[@]}" foundation_static)
-     # fi
-fi
-if [[ ! "${SKIP_BUILD_LLBUILD}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" llbuild)
-fi
-if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" playgroundsupport)
-fi
-if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" xctest)
-fi
+[[ "${SKIP_BUILD_FOUNDATION}" ]] || PRODUCTS+=(foundation)
+# SWIFT_ENABLE_TENSORFLOW
+# TODO(TF-490): Reenable this.
+# [[ "${SKIP_BUILD_STATIC_FOUNDATION}" ]] || PRODUCTS+=(foundation_static)
+[[ "${SKIP_BUILD_LLBUILD}" ]] || PRODUCTS+=(llbuild)
+[[ "${SKIP_BUILD_XCTEST}" ]] || PRODUCTS+=(xctest)
+[[ "${SKIP_BUILD_PLAYGROUNDSUPPORT}" ]] || PRODUCTS+=(playgroundsupport)
+# SWIFT_ENABLE_TENSORFLOW
+[[ "${SKIP_BUILD_TENSORFLOW}" ]] || PRODUCTS+=(tensorflow)
 
 # SWIFT_ENABLE_TENSORFLOW
 function verify_tensorflow_directories() {
@@ -1335,9 +1273,6 @@ function common_cross_c_flags() {
         watchos-*)
             echo -n " -arch ${arch}  -mwatchos-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
-        android-*)
-            echo -n " -arch ${arch}"
-            ;;
     esac
 
     local build_type=$2
@@ -1368,9 +1303,6 @@ function swift_c_flags() {
     echo -n "${COMMON_C_FLAGS}"
     if [[ $(is_cmake_release_build_type "${SWIFT_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
-    fi
-    if [[ "$(true_false "${SWIFT_STDLIB_USE_NONATOMIC_RC}")" == "TRUE" ]]; then
-        echo -n " -DSWIFT_STDLIB_USE_NONATOMIC_RC"
     fi
 }
 
@@ -1560,18 +1492,7 @@ for host in "${ALL_HOSTS[@]}"; do
     fi
 
     for product in "${PRODUCTS[@]}"; do
-        # Check if we should perform this action.
-        tmp_product=${product}
-        if [[ ${tmp_product} == "libdispatch_static" ]]; then
-            tmp_product=libdispatch
-            LIBDISPATCH_STATIC_CMAKE_OPTIONS=${LIBDISPATCH_CMAKE_OPTIONS[@]}
-        fi
-        if [[ ${tmp_product} == "foundation_static" ]]; then
-            tmp_product=foundation
-        fi
-        if ! [[ $(should_execute_action "${host}-${tmp_product}-build") ]]; then
-            continue
-        fi
+        [[ $(should_execute_action "${host}-${product/_static}-build") ]] || continue
 
         unset skip_build
         source_dir_var="$(toupper ${product})_SOURCE_DIR"
@@ -1596,7 +1517,6 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_BUILD_TYPE:STRING="${CMARK_BUILD_TYPE}"
                   "${cmark_cmake_options[@]}"
                 )
-                skip_build=${SKIP_BUILD_CMARK}
                 build_targets=(all)
                 ;;
 
@@ -1845,23 +1765,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${swift_cmake_options[@]}"
                 )
 
-                if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
-                    cmake_options+=(
-                    -DSWIFT_TOOL_SIL_OPT_BUILD=FALSE
-                    -DSWIFT_TOOL_SWIFT_IDE_TEST_BUILD=FALSE
-                    -DSWIFT_TOOL_SWIFT_REMOTEAST_TEST_BUILD=FALSE
-                    -DSWIFT_TOOL_LLDB_MODULEIMPORT_TEST_BUILD=FALSE
-                    -DSWIFT_TOOL_SIL_EXTRACT_BUILD=FALSE
-                    -DSWIFT_TOOL_SWIFT_LLVM_OPT_BUILD=FALSE
-                    -DSWIFT_TOOL_SWIFT_SDK_ANALYZER_BUILD=FALSE
-                    -DSWIFT_TOOL_SWIFT_SDK_DIGESTER_BUILD=FALSE
-                    -DSWIFT_TOOL_SOURCEKITD_TEST_BUILD=FALSE
-                    -DSWIFT_TOOL_SOURCEKITD_REPL_BUILD=FALSE
-                    -DSWIFT_TOOL_COMPLETE_TEST_BUILD=FALSE
-                    -DSWIFT_TOOL_SWIFT_REFLECTION_DUMP_BUILD=FALSE
-                    )
-                fi
-
                 cmake_options=(
                     "${cmake_options[@]}"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
@@ -1883,18 +1786,6 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
                         -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
                         -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB:BOOL=TRUE
-                    )
-                fi
-
-                if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_CMARK_LIBRARY_DIR:PATH=$(build_directory ${host} cmark)/src/${CMARK_BUILD_TYPE}
-                    )
-                else
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_CMARK_LIBRARY_DIR:PATH=$(build_directory ${host} cmark)/src
                     )
                 fi
 
@@ -2014,7 +1905,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_targets=("${build_targets[@]}"
                                    "${SWIFT_BENCHMARK_TARGETS[@]}")
                 fi
-                skip_build=${SKIP_BUILD_SWIFT}
                 ;;
             lldb)
                 if [ ! -d "${LLDB_SOURCE_DIR}" ]; then
@@ -2498,48 +2388,46 @@ for host in "${ALL_HOSTS[@]}"; do
         fi
 
         # Build.
-        if [[ ! "${skip_build}" ]]; then
-            if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
-                # Xcode generator uses "ALL_BUILD" instead of "all".
-                # Also, xcodebuild uses -target instead of bare names.
-                build_targets=("${build_targets[@]/all/ALL_BUILD}")
-                build_targets=("${build_targets[@]/#/${BUILD_TARGET_FLAG} }")
+        if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
+            # Xcode generator uses "ALL_BUILD" instead of "all".
+            # Also, xcodebuild uses -target instead of bare names.
+            build_targets=("${build_targets[@]/all/ALL_BUILD}")
+            build_targets=("${build_targets[@]/#/${BUILD_TARGET_FLAG} }")
 
-                # Xcode can't restart itself if it turns out we need to reconfigure.
-                # Do an advance build to handle that.
-                call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product})
-            fi
+            # Xcode can't restart itself if it turns out we need to reconfigure.
+            # Do an advance build to handle that.
+            call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product})
+        fi
 
-            call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
+        call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
 
-            # When we are building LLVM copy over the compiler-rt
-            # builtins for iOS/tvOS/watchOS to ensure that Swift's
-            # stdlib can use compiler-rt builtins when targetting iOS/tvOS/watchOS.
-            if [[ "${product}" = "llvm" ]] && [[ "${BUILD_LLVM}" = "1" ]] && [[ "$(uname -s)" = "Darwin" ]]; then
-                HOST_CXX_DIR=$(dirname "${HOST_CXX}")
-                HOST_LIB_CLANG_DIR="${HOST_CXX_DIR}/../lib/clang"
-                DEST_LIB_CLANG_DIR="$(build_directory_bin ${host} llvm)/../lib/clang"
+        # When we are building LLVM copy over the compiler-rt
+        # builtins for iOS/tvOS/watchOS to ensure that Swift's
+        # stdlib can use compiler-rt builtins when targetting iOS/tvOS/watchOS.
+        if [[ "${product}" = "llvm" ]] && [[ "${BUILD_LLVM}" = "1" ]] && [[ "$(uname -s)" = "Darwin" ]]; then
+            HOST_CXX_DIR=$(dirname "${HOST_CXX}")
+            HOST_LIB_CLANG_DIR="${HOST_CXX_DIR}/../lib/clang"
+            DEST_LIB_CLANG_DIR="$(build_directory_bin ${host} llvm)/../lib/clang"
 
-                if [[ -d "${HOST_LIB_CLANG_DIR}" ]] && [[ -d "${DEST_LIB_CLANG_DIR}" ]]; then
-                    DEST_CXX_BUILTINS_VERSION=$(ls "${DEST_LIB_CLANG_DIR}" | awk '{print $0}')
-                    DEST_BUILTINS_DIR="$(build_directory_bin ${host} llvm)/../lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
+            if [[ -d "${HOST_LIB_CLANG_DIR}" ]] && [[ -d "${DEST_LIB_CLANG_DIR}" ]]; then
+                DEST_CXX_BUILTINS_VERSION=$(ls "${DEST_LIB_CLANG_DIR}" | awk '{print $0}')
+                DEST_BUILTINS_DIR="$(build_directory_bin ${host} llvm)/../lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
 
-                    if [[ -d "${DEST_BUILTINS_DIR}" ]]; then
-                        for HOST_CXX_BUILTINS_PATH in "${HOST_LIB_CLANG_DIR}"/*; do
-                            HOST_CXX_BUILTINS_DIR="${HOST_CXX_BUILTINS_PATH}/lib/darwin"
-                            echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
+                if [[ -d "${DEST_BUILTINS_DIR}" ]]; then
+                    for HOST_CXX_BUILTINS_PATH in "${HOST_LIB_CLANG_DIR}"/*; do
+                        HOST_CXX_BUILTINS_DIR="${HOST_CXX_BUILTINS_PATH}/lib/darwin"
+                        echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
 
-                            for OS in ios watchos tvos; do
-                                LIB_NAME="libclang_rt.$OS.a"
-                                HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
-                                if [[ -f "${HOST_LIB_PATH}" ]]; then
-                                    call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${LIB_NAME}"
-                                elif [[ "${VERBOSE_BUILD}" ]]; then
-                                    echo "no file exists at ${HOST_LIB_PATH}"
-                                fi
-                            done
+                        for OS in ios watchos tvos; do
+                            LIB_NAME="libclang_rt.$OS.a"
+                            HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
+                            if [[ -f "${HOST_LIB_PATH}" ]]; then
+                                call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${LIB_NAME}"
+                            elif [[ "${VERBOSE_BUILD}" ]]; then
+                                echo "no file exists at ${HOST_LIB_PATH}"
+                            fi
                         done
-                    fi
+                    done
                 fi
             fi
         fi
@@ -2926,16 +2814,10 @@ for host in "${ALL_HOSTS[@]}"; do
     set_build_options_for_host $host
 
     for product in "${PRODUCTS[@]}"; do
-        # Check if we should perform this action.
-        tmp_product=${product}
-        if [[ ${tmp_product} == "libdispatch_static" ]]; then
-            tmp_product=libdispatch
-        fi
-        if [[ ${tmp_product} == "foundation_static" ]]; then
-            tmp_product=foundation
-        fi
-        if ! [[ $(should_execute_action "${host}-${tmp_product}-install") ]]; then
-            continue
+        [[ $(should_execute_action "${host}-${product/_static}-install") ]] || continue
+        if [[ -z "${INSTALL_DESTDIR}" ]] ; then
+            echo "--install-destdir is required to install products."
+            exit 1
         fi
 
         INSTALL_TARGETS="install"
@@ -2979,19 +2861,11 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ -z "${INSTALL_LLDB}" ]] ; then
                     continue
                 fi
-                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
-                    echo "--install-destdir is required to install products."
-                    exit 1
-                fi
                 INSTALL_TARGETS="install-distribution"
                 ;;
             xctest)
                 if [[ -z "${INSTALL_XCTEST}" ]] ; then
                     continue
-                fi
-                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
-                    echo "--install-destdir is required to install products."
-                    exit 1
                 fi
 
                 case ${host} in
@@ -3012,11 +2886,6 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ -z "${INSTALL_FOUNDATION}" ]] ; then
                     continue
-                fi
-
-                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
-                    echo "--install-destdir is required to install products."
-                    exit 1
                 fi
 
                 ;;
@@ -3051,10 +2920,6 @@ for host in "${ALL_HOSTS[@]}"; do
             libicu)
                 if [[ -z "${INSTALL_LIBICU}" ]]; then
                     continue
-                fi
-                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
-                    echo "--install-destdir is required to install products."
-                    exit 1
                 fi
                 echo "--- Installing ${product} ---"
                 ICU_BUILD_DIR=$(build_directory ${host} ${product})
@@ -3117,10 +2982,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ -z "${INSTALL_PLAYGROUNDSUPPORT}" ]] ; then
                     continue
                 fi
-                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
-                    echo "--install-destdir is required to install products."
-                    exit 1
-                fi
 
                 echo "--- Installing ${product} ---"
 
@@ -3155,11 +3016,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 exit 1
                 ;;
         esac
-
-        if [[ -z "${INSTALL_DESTDIR}" ]] ; then
-            echo "--install-destdir is required to install products."
-            exit 1
-        fi
 
         echo "--- Installing ${product} ---"
         build_dir=$(build_directory ${host} ${product})

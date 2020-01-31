@@ -21,6 +21,9 @@ from six.moves import configparser
 from .. import utils
 
 
+# -----------------------------------------------------------------------------
+# Constants
+
 PRESET_FILES = [
     os.path.join(utils.UTILS_PATH, 'build-presets.ini'),
 ]
@@ -116,10 +119,10 @@ ios
 
 class TestPreset(unittest.TestCase):
 
-    def test_format_args(self):
-        preset = Preset('sample', [('--ios', None), ('--test', '1')])
+    def test_args(self):
+        preset = Preset('sample', [('ios', None), ('test', '1')])
 
-        self.assertEqual(preset.format_args(), ['--ios', '--test=1'])
+        self.assertEqual(preset.args, ['--ios', '--test=1'])
 
 
 # -----------------------------------------------------------------------------
@@ -131,7 +134,7 @@ class TestPresetParserMeta(type):
 
     def __new__(cls, name, bases, attrs):
         preset_parser = PresetParser()
-        preset_parser.read(PRESET_FILES)
+        preset_parser.read_files(PRESET_FILES)
 
         # Generate tests for each preset
         for preset_name in preset_parser.preset_names:
@@ -153,18 +156,21 @@ class TestPresetParserMeta(type):
 @six.add_metaclass(TestPresetParserMeta)
 class TestPresetParser(unittest.TestCase):
 
-    def test_read(self):
+    def test_read_files(self):
         parser = PresetParser()
-        parser.read(PRESET_FILES)
+        parser.read_files(PRESET_FILES)
 
     def test_read_invalid_files(self):
         parser = PresetParser()
 
         with self.assertRaises(presets.UnparsedFilesError) as cm:
-            parser.read(['nonsense-presets.ini'])
+            parser.read_files(['nonsense-presets.ini'])
 
         e = cm.exception
-        self.assertListEqual(e.filenames, ['nonsense-presets.ini'])
+        unparsed = e.unparsed_files
+        self.assertEqual(len(unparsed), 1)
+        self.assertEqual(unparsed[0].filename, 'nonsense-presets.ini')
+        self.assertIsInstance(unparsed[0].reason, IOError)
 
     def test_read_file(self):
         parser = PresetParser()
@@ -177,17 +183,17 @@ class TestPresetParser(unittest.TestCase):
         preset = parser.get_preset('sample', vars={'install_symroot': '/tmp'})
         self.assertIsNotNone(preset)
         self.assertEqual(preset.name, 'sample')
-        self.assertListEqual(preset.args, [
-            ('--ios', None),
-            ('--tvos', None),
-            ('--watchos', None),
-            ('--test', None),
-            ('--validation-test', None),
-            ('--lit-args', '-v'),
-            ('--compiler-vendor', 'apple'),
-            ('--verbose-build', None),
-            ('--build-ninja', None),
-            ('--install-symroot', '/tmp')
+        self.assertListEqual(preset.options, [
+            ('ios', None),
+            ('tvos', None),
+            ('watchos', None),
+            ('test', None),
+            ('validation-test', None),
+            ('lit-args', '-v'),
+            ('compiler-vendor', 'apple'),
+            ('verbose-build', None),
+            ('build-ninja', None),
+            ('install-symroot', '/tmp')
         ])
 
     def test_parser_ignores_non_preset_sections(self):
@@ -205,7 +211,7 @@ class TestPresetParser(unittest.TestCase):
         parser.read_string(MIXIN_ORDER_PRESETS)
 
         preset = parser.get_preset('test')
-        self.assertListEqual(preset.format_args(), [
+        self.assertListEqual(preset.args, [
             '--first-opt=1',
 
             # Mixin arguments
@@ -224,15 +230,12 @@ class TestPresetParser(unittest.TestCase):
 
         e = cm.exception
         self.assertEqual(e.preset_name, 'test')
-        self.assertEqual(e.option, '--install-symroot')
+        self.assertEqual(e.option, 'install-symroot')
         self.assertEqual(e.rawval, '%(install_symroot)s')
         self.assertEqual(e.reference, 'install_symroot')
 
+    @utils.requires_attr(configparser, 'DuplicateOptionError')
     def test_duplicate_option_error(self):
-        # Skip test if using the Python 2 ConfigParser module
-        if not hasattr(configparser, 'DuplicateOptionError'):
-            return
-
         parser = PresetParser()
 
         with self.assertRaises(presets.DuplicateOptionError) as cm:
@@ -242,11 +245,8 @@ class TestPresetParser(unittest.TestCase):
         self.assertEqual(e.preset_name, 'test')
         self.assertEqual(e.option, 'ios')
 
+    @utils.requires_attr(configparser, 'DuplicateOptionError')
     def test_duplicate_preset_error(self):
-        # Skip test if using the Python 2 ConfigParser module
-        if not hasattr(configparser, 'DuplicateOptionError'):
-            return
-
         parser = PresetParser()
 
         with self.assertRaises(presets.DuplicatePresetError) as cm:
@@ -260,8 +260,8 @@ class TestPresetParser(unittest.TestCase):
         parser.read_string(INTERPOLATED_PRESET)
 
         preset = parser.get_preset('test', raw=True)
-        self.assertEqual(preset.args, [
-            ('--install-symroot', '%(install_symroot)s')
+        self.assertEqual(preset.options, [
+            ('install-symroot', '%(install_symroot)s')
         ])
 
     def test_get_missing_preset(self):

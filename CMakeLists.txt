@@ -407,63 +407,6 @@ option(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING
 # End of user-configurable options.
 #
 
-# Look for either a program in execute_process()'s path or for a hardcoded path.
-# Find a program's version and set it in the parent scope.
-# Replace newlines with spaces so it prints on one line.
-function(find_version cmd flag find_in_path)
-  if(find_in_path)
-    message(STATUS "Finding installed version for: ${cmd}")
-  else()
-    message(STATUS "Finding version for: ${cmd}")
-  endif()
-  execute_process(
-    COMMAND ${cmd} ${flag}
-    OUTPUT_VARIABLE out
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(NOT out)
-    if(find_in_path)
-      message(STATUS "tried to find version for ${cmd}, but ${cmd} not found in path, continuing")
-    else()
-      message(FATAL_ERROR "tried to find version for ${cmd}, but ${cmd} not found")
-    endif()
-  else()
-    string(REPLACE "\n" " " out2 ${out})
-    message(STATUS "Found version: ${out2}")
-  endif()
-  message(STATUS "")
-endfunction()
-
-# Print out path and version of any installed commands.
-# We migth be using the wrong version of a command, so record them all.
-function(print_versions)
-  find_version("${CMAKE_COMMAND}" "--version" TRUE)
-
-  message(STATUS "Finding version for: ${CMAKE_COMMAND}")
-  message(STATUS "Found version: ${CMAKE_VERSION}")
-  message(STATUS "")
-
-  get_filename_component(CMAKE_MAKE_PROGRAM_BN "${CMAKE_MAKE_PROGRAM}" NAME_WE)
-  if(${CMAKE_MAKE_PROGRAM_BN} STREQUAL "ninja" OR
-     ${CMAKE_MAKE_PROGRAM_BN} STREQUAL "make")
-    find_version(${CMAKE_MAKE_PROGRAM_BN} "--version" TRUE)
-    find_version(${CMAKE_MAKE_PROGRAM} "--version" FALSE)
-  endif()
-
-  if(${SWIFT_PATH_TO_CMARK_BUILD})
-    find_version("cmark" "--version" TRUE)
-    find_version("${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark" "--version" FALSE)
-  endif()
-
-  message(STATUS "Finding version for: ${CMAKE_C_COMPILER}")
-  message(STATUS "Found version: ${CMAKE_C_COMPILER_VERSION}")
-  message(STATUS "")
-
-  message(STATUS "Finding version for: ${CMAKE_CXX_COMPILER}")
-  message(STATUS "Found version: ${CMAKE_CXX_COMPILER_VERSION}")
-  message(STATUS "")
-endfunction()
-
-
 set(SWIFT_BUILT_STANDALONE FALSE)
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
   set(SWIFT_BUILT_STANDALONE TRUE)
@@ -515,7 +458,21 @@ include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
 include(CMakePushCheckState)
 
-print_versions()
+# Print out path and version of any installed commands
+message(STATUS "CMake (${CMAKE_COMMAND}) Version: ${CMAKE_VERSION}")
+execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} --version
+  OUTPUT_VARIABLE _CMAKE_MAKE_PROGRAM_VERSION
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+message(STATUS "CMake Make Program (${CMAKE_MAKE_PROGRAM}) Version: ${_CMAKE_MAKE_PROGRAM_VERSION}")
+message(STATUS "C Compiler (${CMAKE_C_COMPILER}) Version: ${CMAKE_C_COMPILER_VERSION}")
+message(STATUS "C++ Compiler (${CMAKE_CXX_COMPILER}) Version: ${CMAKE_CXX_COMPILER_VERSION}")
+if(SWIFT_PATH_TO_CMARK_BUILD)
+  execute_process(COMMAND ${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark --version
+    OUTPUT_VARIABLE _CMARK_VERSION
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "CMark Version: ${_CMARK_VERSION}")
+endif()
+message(STATUS "")
 
 include(SwiftSharedCMakeConfig)
 

@@ -60,6 +60,10 @@ public:
   /// purposes.
   bool EnableOSSAOptimizations = true;
 
+  /// Controls whether to turn on speculative devirtualization.
+  /// It is turned off by default.
+  bool EnableSpeculativeDevirtualization = false;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.

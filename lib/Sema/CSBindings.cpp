@@ -228,7 +228,8 @@ bool ConstraintSystem::PotentialBindings::isViable(
   return true;
 }
 
-bool ConstraintSystem::PotentialBindings::favoredOverDisjunction() const {
+bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
+    Constraint *disjunction) const {
   if (IsHole || FullyBound)
     return false;
 
@@ -238,8 +239,15 @@ bool ConstraintSystem::PotentialBindings::favoredOverDisjunction() const {
   // but we still want to resolve closure body early (instead of
   // attempting any disjunction) to gain additional contextual
   // information.
-  if (TypeVar->getImpl().isClosureType())
-    return true;
+  if (TypeVar->getImpl().isClosureType()) {
+    auto boundType = disjunction->getNestedConstraints()[0]->getFirstType();
+    // If disjunction is attempting to bind a type variable, let's
+    // favor closure because it would add additional context, otherwise
+    // if it's something like a collection (where it has to pick
+    // between a conversion and bridging conversion) or concrete
+    // type let's prefer the disjunction.
+    return boundType->is<TypeVariableType>();
+  }
 
   return !InvolvesTypeVariables;
 }
@@ -559,6 +567,14 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       // FIXME: Recurse into these constraints to see whether this
       // type variable is fully bound by any of them.
       result.InvolvesTypeVariables = true;
+
+      // If there is additional context available via disjunction
+      // associated with closure literal (e.g. coercion to some other
+      // type) let's delay resolving the closure until the disjunction
+      // is attempted.
+      if (typeVar->getImpl().isClosureType())
+        return {typeVar};
+
       break;
 
     case ConstraintKind::ConformsTo:
@@ -1056,6 +1072,12 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
           return true;
       } else if (TypeVar->getImpl().isClosureResultType()) {
         auto *fix = SpecifyClosureReturnType::create(
+            cs, TypeVar->getImpl().getLocator());
+        if (cs.recordFix(fix))
+          return true;
+      } else if (auto *OLE = dyn_cast_or_null<ObjectLiteralExpr>(
+                     srcLocator->getAnchor())) {
+        auto *fix = SpecifyObjectLiteralTypeImport::create(
             cs, TypeVar->getImpl().getLocator());
         if (cs.recordFix(fix))
           return true;

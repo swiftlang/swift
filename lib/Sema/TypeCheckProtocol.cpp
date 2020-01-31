@@ -2319,13 +2319,12 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     diags.diagnose(match.Witness, diag::protocol_witness_not_objc);
     break;
   case MatchKind::DifferentiableConflict: {
-    // Emit a note showing the missing requirement `@differentiable` attribute.
+    // Emit a note and fix-it showing the missing requirement `@differentiable`
+    // attribute.
     auto *reqAttr = cast<DifferentiableAttr>(match.UnmetAttribute);
     assert(reqAttr);
-    if (!reqAttr->getParameterIndices())
-      break;
-    // Omit printing wrt clause if attribute differentiation parameters match
-    // inferred differentiation parameters.
+    // Omit printing `wrt:` clause if attribute's differentiability
+    // parameters match inferred differentiability parameters.
     auto *original = cast<AbstractFunctionDecl>(match.Witness);
     auto *whereClauseGenEnv =
         reqAttr->getDerivativeGenericEnvironment(original);
@@ -2333,14 +2332,15 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
         original, whereClauseGenEnv);
     bool omitWrtClause = reqAttr->getParameterIndices()->getNumIndices() ==
                          inferredParameters->getNumIndices();
-    // Get `@differentiable` attribute description.
     std::string reqDiffAttrString;
-    llvm::raw_string_ostream stream(reqDiffAttrString);
-    reqAttr->print(stream, req, omitWrtClause,
-                   /*omitDerivativeFunctions*/ true);
-    diags.diagnose(match.Witness,
-                   diag::protocol_witness_missing_differentiable_attr,
-                   StringRef(stream.str()).trim());
+    llvm::raw_string_ostream os(reqDiffAttrString);
+    reqAttr->print(os, req, omitWrtClause, /*omitDerivativeFunctions*/ true);
+    os.flush();
+    diags
+        .diagnose(match.Witness,
+                  diag::protocol_witness_missing_differentiable_attr,
+                  reqDiffAttrString)
+        .fixItInsert(match.Witness->getStartLoc(), reqDiffAttrString + ' ');
     break;
   }
   }
@@ -5143,8 +5143,10 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           continue;
 
         bool valueIsType = isa<TypeDecl>(value);
+        const auto flags =
+            NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
         for (auto requirement
-                : diag.Protocol->lookupDirect(value->getFullName())) {
+                : diag.Protocol->lookupDirect(value->getFullName(), flags)) {
           if (requirement->getDeclContext() != diag.Protocol)
             continue;
 
@@ -5345,7 +5347,8 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     if (!proto->isObjC()) continue;
 
     Optional<ProtocolConformance *> conformance;
-    for (auto req : proto->lookupDirect(name)) {
+    const auto flags = NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    for (auto req : proto->lookupDirect(name, flags)) {
       // Skip anything in a protocol extension.
       if (req->getDeclContext() != proto) continue;
 

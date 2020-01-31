@@ -2063,6 +2063,11 @@ public:
   bool
   isUnavailableInSwiftVersion(const version::Version &effectiveVersion) const;
 
+  /// Finds the most-specific platform-specific attribute that is
+  /// active for the current platform.
+  const AvailableAttr *
+  findMostSpecificActivePlatform(const ASTContext &ctx) const;
+
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or the first one that indicates it's
   /// potentially unavailable, or null otherwise.

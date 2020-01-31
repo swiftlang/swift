@@ -1595,8 +1595,12 @@ WARNING(optional_ambiguous_case_ref,none,
         (StringRef, StringRef, StringRef))
 NOTE(optional_fixit_ambiguous_case_ref,none,
      "explicitly specify 'Optional' to silence this warning", ())
+NOTE(optional_fixit_ambiguous_case_ref_switch,none,
+     "use 'nil' to silence this warning", ())
 NOTE(type_fixit_optional_ambiguous_case_ref,none,
      "use '%0.%1' instead", (StringRef, StringRef))
+NOTE(type_fixit_optional_ambiguous_case_ref_switch,none,
+     "use '%0' instead", (StringRef))
 
 ERROR(nscoding_unstable_mangled_name,none,
       "%select{private|fileprivate|nested|local}0 class %1 has an "
@@ -4797,6 +4801,17 @@ WARNING(observe_keypath_property_not_objc_dynamic, none,
         "passing reference to non-'@objc dynamic' property %0 to KVO method %1 "
         "may lead to unexpected behavior or runtime trap", (DeclName, DeclName))
 
+WARNING(default_magic_identifier_mismatch, none,
+        "parameter %0 with default argument '%1' passed to parameter %2, whose "
+        "default argument is '%3'",
+        (Identifier, StringRef, Identifier, StringRef))
+NOTE(change_caller_default_to_match_callee, none,
+     "did you mean for parameter %0 to default to '%1'?",
+     (Identifier, StringRef))
+NOTE(silence_default_magic_identifier_mismatch, none,
+     "add parentheses to silence this warning", ())
+
+
 //------------------------------------------------------------------------------
 // MARK: Debug diagnostics
 //------------------------------------------------------------------------------
@@ -4849,9 +4864,6 @@ WARNING(non_exhaustive_switch_unknown_only,none,
         "switch covers known cases, but %0 may have additional unknown values"
         "%select{|, possibly added in future versions}1", (Type, bool))
 
-WARNING(override_nsobject_hashvalue_warning,none,
-        "override of 'NSObject.hashValue' is deprecated; "
-        "did you mean to override 'NSObject.hash'?", ())
 ERROR(override_nsobject_hashvalue_error,none,
       "'NSObject.hashValue' is not overridable; "
       "did you mean to override 'NSObject.hash'?", ())

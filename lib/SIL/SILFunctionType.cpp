@@ -22,7 +22,6 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
-// SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
@@ -179,7 +178,7 @@ CanType SILFunctionType::getSelfInstanceType(SILModule &M) const {
 // SWIFT_ENABLE_TENSORFLOW
 IndexSubset *
 SILFunctionType::getDifferentiationParameterIndices() {
-  assert(isDifferentiable() && "Must be a differentiable function");
+  assert(isDifferentiable());
   SmallVector<unsigned, 8> result;
   for (auto valueAndIndex : enumerate(getParameters()))
     if (valueAndIndex.value().getDifferentiability() !=
@@ -190,8 +189,6 @@ SILFunctionType::getDifferentiationParameterIndices() {
 
 CanSILFunctionType SILFunctionType::getWithDifferentiability(
     DifferentiabilityKind kind, IndexSubset *parameterIndices) {
-  assert(kind != DifferentiabilityKind::NonDifferentiable &&
-         "Differentiability kind must be normal or linear");
   SmallVector<SILParameterInfo, 8> newParameters;
   for (auto paramAndIndex : enumerate(getParameters())) {
     auto &param = paramAndIndex.value();
@@ -1099,9 +1096,8 @@ private:
       auto eltPattern = origType.getFunctionParamType(i);
       auto flags = params[i].getParameterFlags();
 
-      visit(flags.getValueOwnership(), /*forSelf=*/false,
-            // SWIFT_ENABLE_TENSORFLOW
-            eltPattern, ty, silRepresentation, flags.isNoDerivative());
+      visit(flags.getValueOwnership(), /*forSelf=*/false, eltPattern, ty,
+            silRepresentation, flags.isNoDerivative());
     }
 
     // Process the self parameter.  Note that we implicitly drop self
@@ -1122,7 +1118,6 @@ private:
 
   void visit(ValueOwnership ownership, bool forSelf,
              AbstractionPattern origType, CanType substType,
-             // SWIFT_ENABLE_TENSORFLOW
              SILFunctionTypeRepresentation rep,
              bool isNonDifferentiable = false) {
     assert(!isa<InOutType>(substType));
@@ -1178,13 +1173,11 @@ private:
       assert(!isIndirectFormalParameter(convention));
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
     SILParameterInfo param(substTL.getLoweredType().getASTType(), convention);
     if (isNonDifferentiable)
       param = param.getWithDifferentiability(
           SILParameterDifferentiability::NotDifferentiable);
     Inputs.push_back(param);
-    // SWIFT_ENABLE_TENSORFLOW END
 
     maybeAddForeignParameters();
   }
@@ -1622,7 +1615,6 @@ static CanSILFunctionType getSILFunctionType(
   auto silExtInfo = SILFunctionType::ExtInfo()
     .withRepresentation(extInfo.getSILRepresentation())
     .withIsPseudogeneric(pseudogeneric)
-    // SWIFT_ENABLE_TENSORFLOW
     .withNoEscape(extInfo.isNoEscape())
     .withDifferentiabilityKind(extInfo.getDifferentiabilityKind());
   
@@ -3110,9 +3102,8 @@ public:
   }
 
   SILParameterInfo substInterface(SILParameterInfo orig) {
-    // SWIFT_ENABLE_TENSORFLOW
-    return SILParameterInfo(visit(orig.getInterfaceType()), orig.getConvention(),
-                            orig.getDifferentiability());
+    return SILParameterInfo(visit(orig.getInterfaceType()),
+                            orig.getConvention(), orig.getDifferentiability());
   }
 
   /// Tuples need to have their component types substituted by these

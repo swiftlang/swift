@@ -355,6 +355,15 @@ namespace driver {
       PendingExecution.insert(Cmd);
     }
 
+    // Sort for ease of testing
+    template <typename Jobs>
+    void scheduleCommandsInSortedOrder(const Jobs &jobs) {
+      llvm::SmallVector<const Job *, 16> sortedJobs;
+      Comp.sortJobsToMatchCompilationInputs(jobs, sortedJobs);
+      for (const Job *Cmd : sortedJobs)
+        scheduleCommandIfNecessaryAndPossible(Cmd);
+    }
+
     void addPendingJobToTaskQueue(const Job *Cmd) {
       // FIXME: Failing here should not take down the whole process.
       bool success =
@@ -393,8 +402,7 @@ namespace driver {
                        << LogJobArray(AllBlocked) << "\n";
         }
         BlockingCommands.erase(BlockedIter);
-        for (auto *Blocked : AllBlocked)
-          scheduleCommandIfNecessaryAndPossible(Blocked);
+        scheduleCommandsInSortedOrder(AllBlocked);
       }
     }
 
@@ -449,7 +457,7 @@ namespace driver {
                                  diag::warn_unable_to_load_dependencies,
                                  DependenciesFile);
       Comp.disableIncrementalBuild(
-          Twine("malformed swift dependencies file ' ") + DependenciesFile +
+          Twine("malformed swift dependencies file '") + DependenciesFile +
           "'");
     }
 
@@ -485,23 +493,23 @@ namespace driver {
         // other recompilations. It is possible that the current code marks
         // things that do not need to be marked. Unecessary compilation would
         // result if that were the case.
-        bool wasKnownToNeedRunning = isMarkedInDepGraph(FinishedCmd, forRanges);
+        bool wasKnownToCascade = isMarkedInDepGraph(FinishedCmd, forRanges);
 
-        switch (loadDepGraphFromPath(FinishedCmd, DependenciesFile,
-                                     Comp.getDiags(), forRanges)) {
+        const auto loadResult = loadDepGraphFromPath(
+            FinishedCmd, DependenciesFile, Comp.getDiags(), forRanges);
+        switch (loadResult) {
         case CoarseGrainedDependencyGraph::LoadResult::HadError:
           if (ReturnCode != EXIT_SUCCESS)
             // let the next build handle it.
             break;
           dependencyLoadFailed(DependenciesFile);
           // Better try compiling whatever was waiting on more info.
-          for (const Job *Cmd : DeferredCommands)
-            scheduleCommandIfNecessaryAndPossible(Cmd);
+          scheduleCommandsInSortedOrder(DeferredCommands);
           DeferredCommands.clear();
           break;
 
         case CoarseGrainedDependencyGraph::LoadResult::UpToDate:
-          if (!wasKnownToNeedRunning)
+          if (!wasKnownToCascade)
             break;
           LLVM_FALLTHROUGH;
         case CoarseGrainedDependencyGraph::LoadResult::AffectsDownstream:
@@ -695,18 +703,9 @@ namespace driver {
       noteBuildingJobs(DependentsInEffect, useRangesForScheduling,
                        "because of dependencies discovered later");
 
-      // Sort dependents for more deterministic behavior
-      llvm::SmallVector<const Job *, 16> UnsortedDependents;
-      for (const Job *j : DependentsInEffect)
-        UnsortedDependents.push_back(j);
-      llvm::SmallVector<const Job *, 16> SortedDependents;
-      Comp.sortJobsToMatchCompilationInputs(UnsortedDependents,
-                                            SortedDependents);
-
-      for (const Job *Cmd : SortedDependents) {
+      scheduleCommandsInSortedOrder(DependentsInEffect);
+      for (const Job *Cmd : DependentsInEffect)
         DeferredCommands.erase(Cmd);
-        scheduleCommandIfNecessaryAndPossible(Cmd);
-      }
       return TaskFinishedResponse::ContinueExecution;
     }
 
@@ -1092,6 +1091,12 @@ namespace driver {
           // using markIntransitive and having later functions call
           // markTransitive. That way markIntransitive would be an
           // implementation detail of CoarseGrainedDependencyGraph.
+          //
+          // As it stands, after this job finishes, this mark will tell the code
+          // that this job was known to be "cascading". That knowledge will
+          // cause any dependent jobs to be run if it hasn't already been.
+          //
+          // TODO: I think this is overly tricky
           markIntransitiveInDepGraph(Cmd, forRanges);
         }
         LLVM_FALLTHROUGH;
@@ -2080,17 +2085,22 @@ void Compilation::addDependencyPathOrCreateDummy(
   }
 }
 
+template <typename JobCollection>
 void Compilation::sortJobsToMatchCompilationInputs(
-    const ArrayRef<const Job *> unsortedJobs,
+    const JobCollection &unsortedJobs,
     SmallVectorImpl<const Job *> &sortedJobs) const {
   llvm::DenseMap<StringRef, const Job *> jobsByInput;
   for (const Job *J : unsortedJobs) {
-    const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
-    const InputAction *IA = CJA->findSingleSwiftInput();
-    auto R =
-        jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
-    assert(R.second);
-    (void)R;
+    // Only worry about sorting compilation jobs
+    if (const CompileJobAction *CJA =
+            dyn_cast<CompileJobAction>(&J->getSource())) {
+      const InputAction *IA = CJA->findSingleSwiftInput();
+      auto R =
+          jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
+      assert(R.second);
+      (void)R;
+    } else
+      sortedJobs.push_back(J);
   }
   for (const InputPair &P : getInputFiles()) {
     auto I = jobsByInput.find(P.second->getValue());
@@ -2099,3 +2109,8 @@ void Compilation::sortJobsToMatchCompilationInputs(
     }
   }
 }
+
+template void
+Compilation::sortJobsToMatchCompilationInputs<ArrayRef<const Job *>>(
+    const ArrayRef<const Job *> &,
+    SmallVectorImpl<const Job *> &sortedJobs) const;
