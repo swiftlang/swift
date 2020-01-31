@@ -102,8 +102,11 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
     // We may not have optimized these functions yet, and it could
     // be beneficial to rerun some earlier passes on the current
     // function now that we've made these direct references visible.
-    if (CalleeFn->isDefinition() && CalleeFn->shouldOptimize())
+    if (CalleeFn->isDefinition() && CalleeFn->shouldOptimize()) {
+      llvm::errs() << "Adding function to pass manger in devirt\n";
+      llvm::errs() << CalleeFn->getName() << "\n";
       addFunctionToPassManagerWorklist(CalleeFn, nullptr);
+    }
   }
 
   return Changed;

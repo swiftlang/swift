@@ -129,6 +129,8 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       // (as opposed to returning a previous specialization), we need to notify
       // the pass manager so that the new functions get optimized.
       for (SILFunction *NewF : reverse(NewFunctions)) {
+        llvm::errs() << "Adding function to pass manger in generic spec\n";
+        llvm::errs() << NewF->getName() << "\n";
         addFunctionToPassManagerWorklist(NewF, Callee);
       }
     }

@@ -407,9 +407,24 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   Mod->registerDeleteNotificationHandler(SFT);
   if (breakBeforeRunning(F->getName(), SFT))
     LLVM_BUILTIN_DEBUGTRAP;
+
+  
+  llvm::errs() << "FUNC NAME: ";
+  F->printName(llvm::errs());
+  llvm::errs() << "\nDEMA NAME: " << Demangle::demangleSymbolAsString(F->getName()) << "\n";
+  llvm::errs() << "PASS NAME: " << SFT->getID() << "\n";
+
   SFT->run();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   Mod->removeDeleteNotificationHandler(SFT);
+  
+  llvm::errs() << "Finished running pass\n\t\t****\n";
+  if (F->getName().contains("ss6UInt32VSjsSj9magnitude9MagnitudeQzvgTW") ||
+      F->getName().contains("ss2geoiySbx_q_q0_q1_q2_q3_t_x_q_q0_q1_q2_q3_ttSLRzSLR_SLR0_SLR1_SLR2_SLR3_r4_lF")) {
+    llvm::errs() << "Dumping module to file...";
+    F->getModule().dump("/Users/zoe/Developer/swift-source/build/buildbot_incremental/swift-macosx-x86_64/module_dump.txt");
+    llvm::errs() << "done.\n";
+  }
 
   auto Delta = (std::chrono::system_clock::now() - StartTime).count();
   if (SILPrintPassTime) {
