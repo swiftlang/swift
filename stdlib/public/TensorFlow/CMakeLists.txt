@@ -39,6 +39,7 @@ foreach(_TENSORFLOW_SWIFT_APIS_SOURCE ${TENSORFLOW_SWIFT_API_SOURCES})
   list(APPEND SOURCES ${_TENSORFLOW_SWIFT_APIS_SOURCE})
 endforeach()
 
+get_filename_component(TensorFlow_LIBRARY_DIR "${TF_LIBRARY}" DIRECTORY)
 add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${SOURCES}"
 

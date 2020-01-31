@@ -3055,10 +3055,6 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   auto differentiability =
       SILParameterDifferentiability::DifferentiableOrNotApplicable;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  auto differentiability =
-      SILParameterDifferentiability::DifferentiableOrNotApplicable;
-
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
     auto attrs = attrRepr->getAttrs();
 
