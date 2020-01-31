@@ -103,14 +103,12 @@ public:
   /// 1. The callee is not found in the module, or cannot be determined
   /// 2. The number of instructions the analysis scans has exceeded the AnalysisThreshold
   uint32_t checkProfitabilityRecursively(SILFunction *Callee) {
-    if (!Callee) {
+    if (!Callee)
       return AnalysisThreshold;
-    }
 
     auto CacheEntry = InstCountCache.find(Callee);
-    if (CacheEntry != InstCountCache.end()) {
+    if (CacheEntry != InstCountCache.end())
       return CacheEntry->second;
-    }
 
     InstCountCache.insert(std::make_pair(Callee, 0));
 
@@ -119,14 +117,16 @@ public:
     for (auto &BB : *Callee) {
       for (auto &I : BB) {
         if (InstCount++ >= AnalysisThreshold) {
-          LLVM_DEBUG(llvm::dbgs() << "ArrayPropertyOpt: Disabled Reason - Exceeded Analysis Threshold in " << BB.getParent()->getName() << "\n");
+          LLVM_DEBUG(llvm::dbgs() << "ArrayPropertyOpt: Disabled Reason - Exceeded Analysis Threshold in "
+                                  << BB.getParent()->getName() << "\n");
           InstCountCache[Callee] = AnalysisThreshold;
           return AnalysisThreshold;
         }
         if (auto Apply = FullApplySite::isa(&I)) {
           auto Callee = Apply.getReferencedFunctionOrNull();
           if (!Callee) {
-            LLVM_DEBUG(llvm::dbgs() << "ArrayPropertyOpt: Disabled Reason - Found opaque code in " << BB.getParent()->getName() << "\n");
+            LLVM_DEBUG(llvm::dbgs() << "ArrayPropertyOpt: Disabled Reason - Found opaque code in "
+                                    << BB.getParent()->getName() << "\n");
             LLVM_DEBUG(Apply.dump());
             LLVM_DEBUG(I.getOperand(0)->dump());
           }
@@ -163,25 +163,23 @@ public:
       for (auto &Inst : *BB) {
         // Can't clone alloc_stack instructions whose dealloc_stack is outside
         // the loop.
-        if (!Loop->canDuplicate(&Inst)) {
+        if (!Loop->canDuplicate(&Inst))
           return false;
-        }
 
         ArraySemanticsCall ArrayPropsInst(&Inst, "array.props", true);
         if (!ArrayPropsInst)
           continue;
 
-        if (!canHoistArrayPropsInst(ArrayPropsInst)) {
+        if (!canHoistArrayPropsInst(ArrayPropsInst))
           return false;
-        }
+
         LoopInstCount++;
         FoundHoistable = true;
       }
     }
 
-    if (!FoundHoistable) {
+    if (!FoundHoistable)
       return false;
-    }
 
     // If the LoopInstCount exceeds the threshold, we will disable the optimization on this loop
     // For loops of deeper nesting we increase the threshold by an additional 10%
@@ -200,14 +198,14 @@ public:
         if (auto Apply = FullApplySite::isa(&Inst)) {
           const auto Callee = Apply.getReferencedFunctionOrNull();
           auto CalleeInstCount = checkProfitabilityRecursively(Callee);
-          if (CalleeInstCount >= AnalysisThreshold) {
+          if (CalleeInstCount >= AnalysisThreshold)
             return false;
-          }
         }
       }
     }
 
-    LLVM_DEBUG(llvm::dbgs()<<"Profitable ArrayPropertyOpt in " << Loop->getLoopPreheader()->getParent()->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Profitable ArrayPropertyOpt in "
+                            << Loop->getLoopPreheader()->getParent()->getName() << "\n");
     LLVM_DEBUG(Loop->dump());
     return true;
   }
