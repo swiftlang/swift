@@ -562,7 +562,7 @@ SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove |
   NotSerialized, 102)
 SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
-  OnVar |
+  OnAbstractFunction | OnVar | OnSubscript |
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   103)
 // SWIFT_ENABLE_TENSORFLOW END

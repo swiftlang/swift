@@ -4860,29 +4860,11 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
 
 // SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
-  auto *vd = dyn_cast<VarDecl>(D);
-  if (attr->isImplicit())
-    return;
-  if (!vd || vd->isStatic()) {
-    diagnoseAndRemoveAttr(attr,
-        diag::noderivative_only_on_differentiable_struct_or_class_fields);
-    return;
-  }
-  auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
-  if (!nominal || (!isa<StructDecl>(nominal) && !isa<ClassDecl>(nominal))) {
-    diagnoseAndRemoveAttr(attr,
-        diag::noderivative_only_on_differentiable_struct_or_class_fields);
-    return;
-  }
-  // Find any `Differentiable` conformance for the nominal type. If no such
-  // conformance exists, emit an error.
-  auto *diffProto =
-      nominal->getASTContext().getProtocol(KnownProtocolKind::Differentiable);
-  auto conf = nominal->getModuleContext()->lookupConformance(
-      nominal->getDeclaredInterfaceType(), diffProto);
-  if (!conf) {
-    diagnoseAndRemoveAttr(
-        attr, diag::noderivative_only_on_differentiable_struct_or_class_fields);
-    return;
-  }
+  auto &ctx = D->getASTContext();
+  // `@noDerivative` implies non-varying semantics for differentiable activity
+  // analysis. SIL values produced from references to `@noDerivative`
+  // declarations will not be marked as varying; these values do not need a
+  // derivative.
+  D->getAttrs().add(
+      new (ctx) SemanticsAttr("autodiff.nonvarying", /*implicit*/ true));
 }
