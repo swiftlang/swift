@@ -349,6 +349,11 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
   endif()
 
+  if("${CFLAGS_SDK}" STREQUAL "LINUX")
+    # this is the minimum architecture that supports 16 byte CAS, which is necessary to avoid a dependency to libatomic
+    list(APPEND result "-march=core2")
+  endif()
+
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -466,7 +471,7 @@ function(_add_variant_link_flags)
     RESULT_VAR_NAME result
     MACCATALYST_BUILD_FLAVOR  "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
-    list(APPEND link_libraries "pthread" "atomic" "dl")
+    list(APPEND link_libraries "pthread" "dl")
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
     list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
