@@ -791,8 +791,13 @@ static int getThreadingCost(SILInstruction *I) {
     return 1000;
 
   // Don't jumpthread function calls.
-  if (isa<ApplyInst>(I))
+  if (isa<ApplyInst>(I)) {
+    auto Apply = cast<ApplyInst>(I);
+    if (isa<ObjCMethodInst>(Apply->getCallee())) {
+      return 1;
+    }
     return 1000;
+  }
 
   // This is a really trivial cost model, which is only intended as a starting
   // point.
