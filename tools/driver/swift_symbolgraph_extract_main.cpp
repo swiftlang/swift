@@ -66,6 +66,10 @@ PrettyPrint("pretty-print", llvm::cl::desc("Pretty-print the resulting Symbol Gr
 static llvm::cl::opt<std::string>
 MinimumAccessLevel("minimum-access-level", llvm::cl::desc("Include symbols with this access level or more"), llvm::cl::cat(Category));
 
+static llvm::cl::list<std::string>
+Xcc("Xcc", llvm::cl::desc("Pass the following command-line flag to Clang"),
+         llvm::cl::cat(Category));
+
 static llvm::cl::opt<std::string>
 OutputPath("o", llvm::cl::desc("Symbol Graph JSON Output Path"), llvm::cl::cat(Category));
 } // end namespace options
@@ -89,6 +93,10 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   Invocation.setModuleName("swift_symbolgraph_extract");
   Invocation.setSDKPath(options::SDK);
   Invocation.setTargetTriple(options::Target);
+
+  for (auto &Arg : options::Xcc) {
+    Invocation.getClangImporterOptions().ExtraArgs.push_back(Arg);
+  }
 
   std::vector<SearchPathOptions::FrameworkSearchPath> FrameworkSearchPaths;
   for (const auto &Path : options::FrameworkSearchPaths) {
