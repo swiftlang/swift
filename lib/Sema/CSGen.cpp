@@ -1323,20 +1323,6 @@ namespace {
       return result;
     }
 
-    Type visitQuoteLiteralExpr(QuoteLiteralExpr *expr) {
-      auto subExprType = CS.getType(expr->getSubExpr());
-      return TypeChecker::getTypeOfQuoteExpr(subExprType, expr->getLoc());
-    }
-
-    Type visitUnquoteExpr(UnquoteExpr *expr) {
-      auto subExprType = CS.getType(expr->getSubExpr());
-      return TypeChecker::getTypeOfUnquoteExpr(subExprType, expr->getLoc());
-    }
-
-    Type visitDeclQuoteExpr(DeclQuoteExpr *expr) {
-      return TypeChecker::getTypeOfQuoteDecl(CS.getASTContext(), expr->getLoc());
-    }
-
     Type visitDeclRefExpr(DeclRefExpr *E) {
       auto locator = CS.getConstraintLocator(E);
 

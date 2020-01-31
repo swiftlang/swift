@@ -327,9 +327,6 @@ namespace swift {
     bool EnableExperimentalForwardModeDifferentiation = false;
     // SWIFT_ENABLE_TENSORFLOW END
 
-    /// Whether to enable #quote, #unquote and @quoted.
-    bool EnableExperimentalQuasiquotes = false;
-
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

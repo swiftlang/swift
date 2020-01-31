@@ -1832,13 +1832,6 @@ namespace decls_block {
     BCFixed<1>,  // implicit flag
     TypeIDField // type referenced by this custom attribute
   >;
-
-  // SWIFT_ENABLE_TENSORFLOW
-  using QuotedDeclAttrLayout = BCRecordLayout<Quoted_DECL_ATTR,
-                                              BCFixed<1>, // implicit flag
-                                              DeclIDField // quote decl
-                                              >;
-  // SWIFT_ENABLE_TENSORFLOW END
 }
 
 /// Returns the encoding kind for the given decl.

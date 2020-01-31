@@ -1968,27 +1968,6 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void visitQuoteLiteralExpr(QuoteLiteralExpr *E) {
-    printCommon(E, "quote_literal");
-    OS << "\n";
-    printRec(E->getSubExpr());
-    printSemanticExpr(E->getSemanticExpr());
-  }
-
-  void visitUnquoteExpr(UnquoteExpr *E) {
-    printCommon(E, "unquote");
-    OS << "\n";
-    printRec(E->getSubExpr());
-  }
-
-  void visitDeclQuoteExpr(DeclQuoteExpr *E) {
-    printCommon(E, "decl_quote");
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    printDeclRef(ConcreteDeclRef(E->getQuotedDecl()));
-    OS << "\n";
-    printSemanticExpr(E->getSemanticExpr());
-  }
-
   void visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
     printCommon(E, "discard_assignment_expr");
     PrintWithColorRAII(OS, ParenthesisColor) << ')';

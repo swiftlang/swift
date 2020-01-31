@@ -1344,19 +1344,6 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
       original, parameters));
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-ParserResult<QuotedAttr> Parser::parseQuotedAttribute(SourceLoc atLoc,
-                                                      SourceLoc loc) {
-  if (Context.LangOpts.EnableExperimentalQuasiquotes) {
-    return ParserResult<QuotedAttr>(QuotedAttr::create(
-        Context, atLoc, SourceRange(loc, loc), /*Implicit=*/false));
-  } else {
-    diagnose(atLoc, diag::attr_quoted_enable_experimental_quasiquotes);
-    return makeParserError();
-  }
-}
-// SWIFT_ENABLE_TENSORFLOW END
-
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
                                SmallVector<SourceLoc, 4> &NameLocs,
                                bool &IsNullarySelector) {
@@ -2353,13 +2340,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     Attributes.add(new (Context) ProjectedValuePropertyAttr(
         name, AtLoc, range, /*implicit*/ false));
-    break;
-  }
-
-  case DAK_Quoted: {
-    auto Attr = parseQuotedAttribute(AtLoc, Loc);
-    if (Attr.isNonNull())
-      Attributes.add(Attr.get());
     break;
   }
   }
@@ -3960,46 +3940,6 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
     if (!declWasHandledAlready(D)) {
       Handler(D);
-      // SWIFT_ENABLE_TENSORFLOW
-      if (auto FD = dyn_cast<FuncDecl>(D)) {
-        if (auto attr = D->getAttrs().getAttribute<QuotedAttr>()) {
-          // TODO(TF-718): Properly mangle names for quote decls.
-          auto originalName = FD->getBaseName().userFacingName();
-          SmallString<16> buf;
-          buf.append("_quoted");
-          buf.push_back(clang::toUppercase(originalName[0]));
-          buf.append(originalName.begin() + 1, originalName.end());
-          auto id = Context.getIdentifier(StringRef(buf.data(), buf.size()));
-          SmallVector<Identifier, 4> pieces;
-          auto name = DeclName(Context, id, pieces);
-
-          // TODO(TF-716): Should this perhaps be a let?
-          // TODO(TF-717): Figure out the overriding story for quote decls.
-          auto kind = CurDeclContext->isTypeContext()
-                          ? StaticSpellingKind::KeywordClass
-                          : StaticSpellingKind::None;
-          auto params =
-              ParameterList::create(Context, SourceLoc(), {}, SourceLoc());
-          auto ret = new (Context)
-              SimpleIdentTypeRepr(DeclNameLoc(),
-                                  DeclNameRef(Context.getIdentifier("Tree")));
-          auto quoteDecl = FuncDecl::create(
-              Context, SourceLoc(), kind, SourceLoc(), name, SourceLoc(),
-              /*Throws=*/false, SourceLoc(),
-              /*GenericParams=*/nullptr, params, TypeLoc(ret), CurDeclContext);
-          quoteDecl->setImplicit(true);
-          auto expr = DeclQuoteExpr::create(Context, FD);
-          auto stmt =
-              new (Context) ReturnStmt(SourceLoc(), expr, /*Implicit=*/true);
-          auto body = BraceStmt::create(Context, SourceLoc(), {stmt},
-                                        SourceLoc(), /*Implicit=*/true);
-          quoteDecl->setBody(body);
-
-          attr->setQuoteDecl(quoteDecl);
-          Handler(quoteDecl);
-        }
-      }
-      // SWIFT_ENABLE_TENSORFLOW END
     }
 
     setOriginalDeclarationForDifferentiableAttributes(D->getAttrs(), D);

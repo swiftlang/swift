@@ -1024,9 +1024,6 @@ public:
   // TODO(TF-999): Remove the deprecated `@differentiating` attribute.
   ParserResult<DerivativeAttr> parseDifferentiatingAttribute(SourceLoc AtLoc,
                                                              SourceLoc Loc);
-
-  /// Parse the @quoted attribute.
-  ParserResult<QuotedAttr> parseQuotedAttribute(SourceLoc AtLoc, SourceLoc Loc);
   // SWIFT_ENABLE_TENSORFLOW END
 
   /// Parse a specific attribute.

@@ -2237,41 +2237,6 @@ namespace {
       return expr;
     }
 
-    Expr *visitQuoteLiteralExpr(QuoteLiteralExpr *expr) {
-      auto subExprType = cs.getType(expr->getSubExpr());
-      cs.setType(expr, TypeChecker::getTypeOfQuoteExpr(subExprType, expr->getLoc()));
-      return expr;
-    }
-
-    Expr *visitUnquoteExpr(UnquoteExpr *expr) {
-      auto subExprType = cs.getType(expr->getSubExpr());
-      cs.setType(expr, TypeChecker::getTypeOfUnquoteExpr(subExprType, expr->getLoc()));
-      return expr;
-    }
-
-    Expr *visitDeclQuoteExpr(DeclQuoteExpr *expr) {
-      // NOTE: Unlike QuoteLiteralExprs which cannot be expanded in CSApply
-      // because their nested closures / funcs aren't yet typechecked by now,
-      // DeclQuoteExprs can be expanded right away.
-      auto &ctx = cs.getASTContext();
-      Expr *quotedExpr = TypeChecker::quoteDecl(expr->getQuotedDecl(), cs.DC);
-      if (quotedExpr) {
-        cs.cacheExprTypes(quotedExpr);
-        auto treeProto = ctx.getTreeDecl();
-        if (treeProto) {
-          quotedExpr =
-              coerceExistential(quotedExpr, treeProto->getDeclaredType());
-          expr->setSemanticExpr(quotedExpr);
-          return expr;
-        } else {
-          ctx.Diags.diagnose(expr->getLoc(), diag::quote_literal_no_tree_proto);
-          return nullptr;
-        }
-      } else {
-        return nullptr;
-      }
-    }
-
     // Add a forced unwrap of an expression which either has type Optional<T>
     // or is a function that returns an Optional<T>. The latter turns into a
     // conversion expression that we will hoist above the ApplyExpr
@@ -7192,8 +7157,6 @@ namespace {
     ExprRewriter &Rewriter;
     SmallVector<ClosureExpr *, 4> ClosuresToTypeCheck;
     SmallVector<std::pair<TapExpr *, DeclContext *>, 4> TapsToTypeCheck;
-    SmallVector<std::pair<QuoteLiteralExpr *, DeclContext *>, 4>
-        QuotesToDesugar;
 
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
@@ -7204,11 +7167,6 @@ namespace {
 
     const SmallVectorImpl<std::pair<TapExpr *, DeclContext *>> &getTapsToTypeCheck() const {
       return TapsToTypeCheck;
-    }
-
-    const SmallVector<std::pair<QuoteLiteralExpr *, DeclContext *>, 4> &
-    getQuotesToDesugar() const {
-      return QuotesToDesugar;
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
@@ -7291,12 +7249,6 @@ namespace {
         // We remember the DeclContext because the code to handle
         // single-expression-body closures above changes it.
         TapsToTypeCheck.push_back(std::make_pair(tap, Rewriter.dc));
-      }
-
-      if (auto quote = dyn_cast<QuoteLiteralExpr>(expr)) {
-        // We remember the DeclContext because the code to handle
-        // single-expression-body closures above changes it.
-        QuotesToDesugar.push_back(std::make_pair(quote, Rewriter.dc));
       }
 
       Rewriter.walkToExprPre(expr);
@@ -7476,29 +7428,6 @@ llvm::PointerUnion<Expr *, Stmt *> ConstraintSystem::applySolutionImpl(
       auto tap = std::get<0>(tuple);
       auto tapDC = std::get<1>(tuple);
       hadError |= TypeChecker::typeCheckTapBody(tap, tapDC);
-    }
-
-    // It's important to desugar quotes at this point rather than in
-    // visitQuoteLiteralExpr because quoting benefits from having as much
-    // information about code possible (hence the need for desugaring quotes
-    // after closures and taps have been typechecked).
-    // TODO(TF-724): Move quote desugaring even further down the pipeline,
-    // since at this point local funcs are still not typechecked.
-    for (auto tuple : walker.getQuotesToDesugar()) {
-      auto quote = std::get<0>(tuple);
-      auto quoteDC = std::get<1>(tuple);
-
-      // If quoted expression is a closure, then its type will still be null.
-      // Therefore, it looks like we need to work around via manual setType.
-      // TODO(TF-724): Perhaps moving desugaring down the pipeline
-      // will obviate the necessity of this workaround.
-      quote->getSubExpr()->setType(getType(quote->getSubExpr()));
-
-      Expr *quotedExpr = TypeChecker::quoteExpr(quote->getSubExpr(), quoteDC);
-      if (quotedExpr) {
-        cacheExprTypes(quotedExpr);
-        quote->setSemanticExpr(quotedExpr);
-      }
     }
 
     // If any of them failed to type check, bail.
