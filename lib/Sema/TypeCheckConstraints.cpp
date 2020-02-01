@@ -2183,7 +2183,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SolutionApplicationTarget target(
-      expr, convertTo,
+      expr, convertTypePurpose, convertTo,
       options.contains(TypeCheckExprFlags::IsDiscarded));
   auto viable = cs.solve(target, listener, allowFreeTypeVariables);
   if (!viable)
@@ -2283,7 +2283,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   // re-check.
   if (needClearType)
     expr->setType(Type());
-  SolutionApplicationTarget target(expr, Type(), /*isDiscarded=*/false);
+  SolutionApplicationTarget target(
+      expr, CTP_Unused, Type(), /*isDiscarded=*/false);
   auto viable = cs.solve(target, listener, allowFreeTypeVariables);
   if (!viable) {
     recoverOriginalType();
@@ -2363,7 +2364,8 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
   if (originalType && originalType->hasError())
     expr->setType(Type());
 
-  SolutionApplicationTarget target(expr, Type(), /*isDiscarded=*/false);
+  SolutionApplicationTarget target(
+      expr, CTP_Unused, Type(), /*isDiscarded=*/false);
   if (auto viable = cs.solve(target, listener, allowFreeTypeVariables)) {
     expr = target.getAsExpr();
     for (auto &solution : *viable) {
