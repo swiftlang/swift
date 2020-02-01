@@ -2433,7 +2433,8 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
       // inout self.
-      selfAccess = SelfAccessKind::Mutating;
+      if (!containerTy->hasReferenceSemantics())
+        selfAccess = SelfAccessKind::Mutating;
     } else {
       // allocating constructors have metatype 'self'.
       isStatic = true;
@@ -2460,10 +2461,6 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
   // 'static' functions have 'self' of type metatype<T>.
   if (isStatic)
     return AnyFunctionType::Param(MetatypeType::get(selfTy, Ctx));
-
-  // Reference types have 'self' of type T.
-  if (containerTy->hasReferenceSemantics())
-    return AnyFunctionType::Param(selfTy);
 
   auto flags = ParameterTypeFlags();
   switch (selfAccess) {
