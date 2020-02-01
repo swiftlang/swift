@@ -163,10 +163,6 @@ enum class TypeCheckExprFlags {
   /// disables constraints forcing an lvalue result to be loadable.
   IsDiscarded = 0x01,
 
-  /// Whether the client wants to disable the structural syntactic restrictions
-  /// that we force for style or other reasons.
-  DisableStructuralChecks = 0x02,
-
   /// If set, the client wants a best-effort solution to the constraint system,
   /// but can tolerate a solution where all of the constraints are solved, but
   /// not all type variables have been determined.  In this case, the constraint
@@ -174,19 +170,10 @@ enum class TypeCheckExprFlags {
   /// left in-tact.
   AllowUnresolvedTypeVariables = 0x08,
 
-  /// If set, the 'convertType' specified to typeCheckExpression should not
-  /// produce a conversion constraint, but it should be used to guide the
-  /// solution in terms of performance optimizations of the solver, and in terms
-  /// of guiding diagnostics.
-  ConvertTypeIsOnlyAHint = 0x10,
-
   /// If set, this expression isn't embedded in a larger expression or
   /// statement. This should only be used for syntactic restrictions, and should
   /// not affect type checking itself.
   IsExprStmt = 0x20,
-
-  /// This is an inout yield.
-  IsInOutYield = 0x100,
 
   /// If set, a conversion constraint should be specified so that the result of
   /// the expression is an optional type.
@@ -821,11 +808,9 @@ public:
   /// to be possible.
   ///
   /// \param convertType The type that the expression is being converted to,
-  /// or null if the expression is standalone.  If the 'ConvertTypeIsOnlyAHint'
-  /// option is specified, then this is only a hint, it doesn't produce a full
-  /// conversion constraint. The location information is only used for
-  /// diagnostics should the conversion fail; it is safe to pass a TypeLoc
-  /// without location information.
+  /// or null if the expression is standalone. The location information is
+  /// only used for diagnostics should the conversion fail; it is safe to pass
+  /// a TypeLoc without location information.
   ///
   /// \param options Options that control how type checking is performed.
   ///
@@ -846,12 +831,6 @@ public:
                       TypeCheckExprOptions options = TypeCheckExprOptions(),
                       ExprTypeCheckListener *listener = nullptr,
                       constraints::ConstraintSystem *baseCS = nullptr);
-
-  static Type typeCheckExpression(Expr *&expr, DeclContext *dc,
-                                  ExprTypeCheckListener *listener) {
-    return TypeChecker::typeCheckExpression(expr, dc, TypeLoc(), CTP_Unused,
-                                            TypeCheckExprOptions(), listener);
-  }
 
   /// Type check the given expression and return its type without
   /// applying the solution.
