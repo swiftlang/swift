@@ -641,7 +641,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     switch (last.getKind()) {
     case ConstraintLocator::ContextualType: {
       auto purpose = getContextualTypePurpose();
-      assert(!(purpose == CTP_Unused && purpose == CTP_CannotFail));
+      assert(!(purpose == CTP_Unused || purpose == CTP_CannotFail));
 
       // If this is call to a closure e.g. `let _: A = { B() }()`
       // let's point diagnostic to its result.
