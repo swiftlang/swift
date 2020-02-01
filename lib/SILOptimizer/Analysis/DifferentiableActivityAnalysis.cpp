@@ -235,9 +235,9 @@ void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
   auto *inst = value->getDefiningInstruction();
   if (!inst)
     return;
-  if (FullApplySite::isa(inst)) {
-    FullApplySite applySite(inst);
-    // Skip non-varying callees.
+  if (ApplySite::isa(inst)) {
+    ApplySite applySite(inst);
+    // If callee is non-varying, skip.
     if (isWithoutDerivative(applySite.getCallee()))
       return;
     // If callee is a `modify` accessor, propagate variedness from yielded
@@ -248,7 +248,7 @@ void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
     if (auto *bai = dyn_cast<BeginApplyInst>(inst)) {
       if (auto *calleeFn = bai->getCalleeFunction()) {
         if (getAccessorKind(calleeFn) == AccessorKind::Modify) {
-          for (auto inoutArg : applySite.getInoutArguments())
+          for (auto inoutArg : bai->getInoutArguments())
             propagateVariedInwardsThroughProjections(inoutArg, i);
         }
       }
@@ -302,6 +302,9 @@ void DifferentiableActivityInfo::propagateUseful(
   // Handle full apply sites: `apply`, `try_apply`, and `begin_apply`.
   if (FullApplySite::isa(inst)) {
     FullApplySite applySite(inst);
+    // If callee is non-varying, skip.
+    if (isWithoutDerivative(applySite.getCallee()))
+      return;
     // If callee is a `modify` accessor, propagate usefulness through yielded
     // addresses. Semantically, yielded addresses can be viewed as a projection
     // into the `inout` argument.
