@@ -9130,6 +9130,7 @@ void ConstraintSystem::addContextualConversionConstraint(
     case CTP_ThrowStmt:
     case CTP_EnumCaseRawValue:
     case CTP_DefaultParameter:
+    case CTP_AutoclosureDefaultParameter:
     case CTP_ClosureResult:
     case CTP_DictionaryKey:
     case CTP_DictionaryValue:

@@ -2107,6 +2107,14 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
     }
   }
 
+  // For an @autoclosure default parameter, we want to convert to the result
+  // type. Stash the autoclosure default parameter type.
+  FunctionType *autoclosureDefaultParamType = nullptr;
+  if (convertTypePurpose == CTP_AutoclosureDefaultParameter) {
+    autoclosureDefaultParamType = convertType.getType()->castTo<FunctionType>();
+    convertType.setType(autoclosureDefaultParamType->getResult());
+  }
+
   // Tell the constraint system what the contextual type is.  This informs
   // diagnostics and is a hint for various performance optimizations.
   // FIXME: Look through LoadExpr. This is an egregious hack due to the
@@ -2130,6 +2138,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
     allowFreeTypeVariables = FreeTypeVariableBinding::UnresolvedType;
 
   Type convertTo = convertType.getType();
+
   if (options.contains(TypeCheckExprFlags::ExpressionTypeMustBeOptional)) {
     assert(!convertTo && "convertType and type check options conflict");
     auto *convertTypeLocator =
@@ -2175,6 +2184,12 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   }
   result = resultTarget->getAsExpr();
 
+  // For an @autoclosure default parameter type, add the autoclosure
+  // conversion.
+  if (convertTypePurpose == CTP_AutoclosureDefaultParameter) {
+    result = cs.buildAutoClosureExpr(result, autoclosureDefaultParamType);
+  }
+
   // Notify listener that we've applied the solution.
   if (listener)
     result = listener->appliedSolution(solution, result);
@@ -2204,32 +2219,9 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                             DeclContext *DC, Type paramType,
                                             bool isAutoClosure) {
   assert(paramType && !paramType->hasError());
-
-  if (isAutoClosure) {
-    class AutoClosureListener : public ExprTypeCheckListener {
-      FunctionType *ParamType;
-
-    public:
-      AutoClosureListener(FunctionType *paramType)
-          : ParamType(paramType) {}
-
-      Expr *appliedSolution(constraints::Solution &solution,
-                            Expr *expr) override {
-        auto &cs = solution.getConstraintSystem();
-        return cs.buildAutoClosureExpr(expr, ParamType);
-      }
-    };
-
-    auto *fnType = paramType->castTo<FunctionType>();
-    AutoClosureListener listener(fnType);
-    return typeCheckExpression(defaultValue, DC,
-                               TypeLoc::withoutLoc(fnType->getResult()),
-                               CTP_DefaultParameter, TypeCheckExprOptions(),
-                               &listener);
-  }
-
-  return typeCheckExpression(defaultValue, DC, TypeLoc::withoutLoc(paramType),
-                             CTP_DefaultParameter);
+  return typeCheckExpression(
+      defaultValue, DC, TypeLoc::withoutLoc(paramType),
+      isAutoClosure ? CTP_AutoclosureDefaultParameter : CTP_DefaultParameter);
 }
 
 Type TypeChecker::
