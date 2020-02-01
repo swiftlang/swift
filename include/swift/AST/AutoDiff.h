@@ -69,6 +69,9 @@ struct AutoDiffDerivativeFunctionKind {
       : rawValue(static_cast<innerty>(linMapKind.rawValue)) {}
   explicit AutoDiffDerivativeFunctionKind(StringRef string);
   operator innerty() const { return rawValue; }
+  bool operator==(const AutoDiffDerivativeFunctionKind &other) const {
+    return rawValue == other.rawValue;
+  }
   AutoDiffLinearMapKind getLinearMapKind() {
     return (AutoDiffLinearMapKind::innerty)rawValue;
   }
