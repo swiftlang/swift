@@ -435,10 +435,6 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// A cache of tangent spaces per type.
-  llvm::DenseMap<CanType, Optional<TangentSpace>> TangentSpaces;
-
   /// For uniquifying `IndexSubset` allocations.
   llvm::FoldingSet<IndexSubset> IndexSubsets;
 

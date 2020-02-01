@@ -117,6 +117,7 @@ namespace swift {
   // SWIFT_ENABLE_TENSORFLOW
   struct AutoDiffConfig;
   struct AutoDiffDerivativeFunctionKind;
+  struct SILAutoDiffDerivativeFunctionKey;
   class DerivativeAttr;
   class DifferentiableAttr;
   // SWIFT_ENABLE_TENSORFLOW END
@@ -293,6 +294,10 @@ public:
 
   /// Cached mapping from types to their associated tangent spaces.
   llvm::DenseMap<Type, Optional<TangentSpace>> AutoDiffTangentSpaces;
+  
+  /// A cache of derivative function types per configuration.
+  llvm::DenseMap<SILAutoDiffDerivativeFunctionKey, CanSILFunctionType>
+      SILAutoDiffDerivativeFunctions;
 
   /// Cache of `@differentiable` attributes keyed by parameter indices. Used to
   /// diagnose duplicate `@differentiable` attributes for the same key.
