@@ -483,7 +483,7 @@ func testAccessorCoroutines(_ x: HasCoroutineAccessors) -> HasCoroutineAccessors
   return x
 }
 
-// TF-1078: `Array.subscript.modify` is a coroutine.
+// TF-1078: diagnose `_modify` accessor application with active `inout` argument.
 // expected-error @+1 {{function is not differentiable}}
 @differentiable
 // expected-note @+1 {{when differentiating this function definition}}
@@ -493,6 +493,41 @@ func TF_1078(array: [Float], x: Float) -> Float {
   // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
   array[0] = x
   return array[0]
+}
+
+// TF-1115: diagnose `_modify` accessor application with initially non-active `inout` argument.
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func TF_1115(_ x: Float) -> Float {
+  var array: [Float] = [0]
+  // Array subscript assignment below calls `Array.subscript.modify`.
+  // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
+  array[0] = x
+  return array[0]
+}
+
+// TF-1115: test `_modify` accessor application with initially non-active `inout` argument,
+// where the yielded value is not a projection from `self`.
+var global: Float = 1
+extension Float {
+  var projection: Float {
+    get { self }
+    // This `modify` accessor yields a global variable, not a projection from `self`.
+    // Diagnosing active applications is nonetheless a safe over-approximation.
+    _modify { yield &global }
+  }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func TF_1115_modifyNonSelfProjection(x: Float) -> Float {
+  var result: Float = 0
+  // Assignment below calls `Float.projection.modify`.
+  // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
+  result.projection = x
+  return result
 }
 
 //===----------------------------------------------------------------------===//
