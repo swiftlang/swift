@@ -789,7 +789,7 @@ using OpenedTypeMap =
 
 /// Describes contextual type information about a particular expression
 /// within a constraint system.
-struct ContextualTypeInfo  {
+struct ContextualTypeInfo {
   TypeLoc typeLoc;
   ContextualTypePurpose purpose;
   bool isOpaqueReturnType = false;

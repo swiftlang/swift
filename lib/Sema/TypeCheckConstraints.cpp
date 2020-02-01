@@ -2058,6 +2058,40 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
   return false;
 }
 
+/// Whether the contextual type provided for the given purpose is only a
+/// hint, and not a requirement.
+static bool contextualTypeIsOnlyAHint(ContextualTypePurpose ctp,
+                                      TypeCheckExprOptions options) {
+  switch (ctp) {
+  case CTP_Initialization:
+    return !options.contains(
+        TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType);
+  case CTP_ForEachStmt:
+    return true;
+  case CTP_Unused:
+  case CTP_ReturnStmt:
+  case CTP_ReturnSingleExpr:
+  case CTP_YieldByValue:
+  case CTP_YieldByReference:
+  case CTP_ThrowStmt:
+  case CTP_EnumCaseRawValue:
+  case CTP_DefaultParameter:
+  case CTP_AutoclosureDefaultParameter:
+  case CTP_CalleeResult:
+  case CTP_CallArgument:
+  case CTP_ClosureResult:
+  case CTP_ArrayElement:
+  case CTP_DictionaryKey:
+  case CTP_DictionaryValue:
+  case CTP_CoerceOperand:
+  case CTP_AssignSource:
+  case CTP_SubscriptAssignSource:
+  case CTP_Condition:
+  case CTP_CannotFail:
+    return false;
+  }
+}
+
 #pragma mark High-level entry points
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,
@@ -2128,7 +2162,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   // If the convertType is *only* provided for that hint, then null it out so
   // that we don't later treat it as an actual conversion constraint.
-  if (options.contains(TypeCheckExprFlags::ConvertTypeIsOnlyAHint))
+  if (contextualTypeIsOnlyAHint(convertTypePurpose, options))
     convertType = TypeLoc();
 
   // If the client can handle unresolved type variables, leave them in the
@@ -2655,7 +2689,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   TypeLoc contextualType;
   auto contextualPurpose = CTP_Unused;
-  TypeCheckExprOptions flags = TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
+  TypeCheckExprOptions flags = None;
 
   // Set the contextual purpose even if the pattern doesn't have a type so
   // if there's an error we can use that information to inform diagnostics.
@@ -2674,7 +2708,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     // opaque type.
     if (auto opaqueType = patternType->getAs<OpaqueTypeArchetypeType>()){
       flags |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
-      flags -= TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
     }
 
     // Only provide a TypeLoc if it makes sense to allow diagnostics.
@@ -3042,7 +3075,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   // Type-check the for-each loop sequence and element pattern.
   auto resultTy = TypeChecker::typeCheckExpression(
       seq, dc, TypeLoc::withoutLoc(sequenceProto->getDeclaredType()),
-      CTP_ForEachStmt, TypeCheckExprFlags::ConvertTypeIsOnlyAHint, &listener);
+      CTP_ForEachStmt, None, &listener);
   if (!resultTy)
     return true;
   return false;
