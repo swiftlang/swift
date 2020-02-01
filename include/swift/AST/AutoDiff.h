@@ -69,9 +69,6 @@ struct AutoDiffDerivativeFunctionKind {
       : rawValue(static_cast<innerty>(linMapKind.rawValue)) {}
   explicit AutoDiffDerivativeFunctionKind(StringRef string);
   operator innerty() const { return rawValue; }
-  bool operator==(const AutoDiffDerivativeFunctionKind &other) const {
-    return rawValue == other.rawValue;
-  }
   AutoDiffLinearMapKind getLinearMapKind() {
     return (AutoDiffLinearMapKind::innerty)rawValue;
   }
@@ -625,7 +622,7 @@ template <> struct DenseMapInfo<SILAutoDiffDerivativeFunctionKey> {
     return lhs.originalType == rhs.originalType &&
         lhs.parameterIndices == rhs.parameterIndices &&
         lhs.resultIndices == rhs.resultIndices &&
-        lhs.kind == rhs.kind &&
+        lhs.kind.rawValue == rhs.kind.rawValue &&
         lhs.derivativeFnGenSig == rhs.derivativeFnGenSig &&
         lhs.isReabstractionThunk == rhs.isReabstractionThunk;
   }
