@@ -133,6 +133,10 @@ enum ContextualTypePurpose {
   CTP_EnumCaseRawValue, ///< Raw value specified for "case X = 42" in enum.
   CTP_DefaultParameter, ///< Default value in parameter 'foo(a : Int = 42)'.
 
+  /// Default value in @autoclosure parameter
+  /// 'foo(a : @autoclosure () -> Int = 42)'.
+  CTP_AutoclosureDefaultParameter,
+
   CTP_CalleeResult,     ///< Constraint is placed on the result of a callee.
   CTP_CallArgument,     ///< Call to function or operator requires type.
   CTP_ClosureResult,    ///< Closure result expects a specific type.

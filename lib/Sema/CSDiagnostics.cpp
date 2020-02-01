@@ -560,6 +560,7 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_ReturnSingleExpr:
     return diag::cannot_convert_to_return_type;
   case CTP_DefaultParameter:
+  case CTP_AutoclosureDefaultParameter:
     return diag::cannot_convert_default_arg_value;
   case CTP_YieldByValue:
     return diag::cannot_convert_yield_value;
@@ -2085,6 +2086,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_EnumCaseRawValue:
     return diag::cannot_convert_raw_initializer_value_nil;
   case CTP_DefaultParameter:
+  case CTP_AutoclosureDefaultParameter:
     return diag::cannot_convert_default_arg_value_nil;
   case CTP_YieldByValue:
     return diag::cannot_convert_yield_value_nil;
@@ -2863,6 +2865,7 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_EnumCaseRawValue:
     return diag::cannot_convert_raw_initializer_value;
   case CTP_DefaultParameter:
+  case CTP_AutoclosureDefaultParameter:
     return forProtocol ? diag::cannot_convert_default_arg_value_protocol
                        : diag::cannot_convert_default_arg_value;
   case CTP_YieldByValue:
