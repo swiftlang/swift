@@ -847,12 +847,6 @@ public:
                       ExprTypeCheckListener *listener = nullptr,
                       constraints::ConstraintSystem *baseCS = nullptr);
 
-  static Type typeCheckExpression(Expr *&expr, DeclContext *dc,
-                                  ExprTypeCheckListener *listener) {
-    return TypeChecker::typeCheckExpression(expr, dc, TypeLoc(), CTP_Unused,
-                                            TypeCheckExprOptions(), listener);
-  }
-
   /// Type check the given expression and return its type without
   /// applying the solution.
   ///
