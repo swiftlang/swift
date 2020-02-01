@@ -163,10 +163,6 @@ enum class TypeCheckExprFlags {
   /// disables constraints forcing an lvalue result to be loadable.
   IsDiscarded = 0x01,
 
-  /// Whether the client wants to disable the structural syntactic restrictions
-  /// that we force for style or other reasons.
-  DisableStructuralChecks = 0x02,
-
   /// If set, the client wants a best-effort solution to the constraint system,
   /// but can tolerate a solution where all of the constraints are solved, but
   /// not all type variables have been determined.  In this case, the constraint

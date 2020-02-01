@@ -2240,7 +2240,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // Unless the client has disabled them, perform syntactic checks on the
   // expression now.
   if (!cs.shouldSuppressDiagnostics() &&
-      !options.contains(TypeCheckExprFlags::DisableStructuralChecks)) {
+      !options.contains(TypeCheckExprFlags::SubExpressionDiagnostics)) {
     bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
     performSyntacticExprDiagnostics(result, dc, isExprStmt);
   }
