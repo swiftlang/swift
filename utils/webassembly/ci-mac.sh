@@ -23,8 +23,8 @@ sudo ln -sf /opt/wasmtime/* /usr/local/bin
 
 cd $SOURCE_PATH
 
-wget -O dist-wasi-sdk.tgz https://github.com/swiftwasm/wasi-sdk/suites/370986556/artifacts/809001
-unzip dist-wasi-sdk.tgz -d .
+wget -O dist-wasi-sdk.tgz.zip "https://github.com/swiftwasm/wasi-sdk/releases/download/0.1.0-swiftwasm/dist-macos-latest.tgz.zip"
+unzip dist-wasi-sdk.tgz.zip -d .
 WASI_SDK_TAR_PATH=$(find . -type f -name "wasi-sdk-*")
 WASI_SDK_FULL_NAME=$(basename $WASI_SDK_TAR_PATH -macos.tar.gz)
 tar xfz $WASI_SDK_TAR_PATH

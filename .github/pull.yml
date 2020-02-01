@@ -1,6 +1,9 @@
 version: "1"
 rules:
   - base: swiftwasm
-    upstream: apple:master
+    upstream: master
     mergeMethod: merge
+  - base: master
+    upstream: apple:master
+    mergeMethod: hardreset
 label: ":arrow_heading_down: Upstream Tracking"
