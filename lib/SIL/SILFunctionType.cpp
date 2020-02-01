@@ -260,12 +260,23 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     AutoDiffDerivativeFunctionKind kind, TypeConverter &TC,
     LookupConformanceFn lookupConformance,
     CanGenericSignature derivativeFnGenSig, bool isReabstractionThunk) {
+  auto &ctx = getASTContext();
+  SILAutoDiffDerivativeFunctionKey key{
+    this, parameterIndices,
+    IndexSubset::get(ctx, getNumResults(), {resultIndex}),
+    kind, derivativeFnGenSig, isReabstractionThunk
+  };
+  auto insertion =
+      ctx.SILAutoDiffDerivativeFunctions.try_emplace(key, CanSILFunctionType());
+  auto &cachedResult = insertion.first->getSecond();
+  if (!insertion.second)
+    return cachedResult;
+
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
   //                 (R.TangentVector...) -> (T.TangentVector...))
 
-  auto &ctx = getASTContext();
 
   // Helper function testing if we are differentiating wrt this index.
   auto isWrtIndex = [&](unsigned index) -> bool {
@@ -431,11 +442,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   auto extInfo = getExtInfo();
   if (getRepresentation() == SILFunctionTypeRepresentation::CFunctionPointer)
     extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
-  return SILFunctionType::get(canGenSig, extInfo, getCoroutineKind(),
-                              getCalleeConvention(), newParameters, getYields(),
-                              newResults, getOptionalErrorResult(),
-                              getSubstitutions(), isGenericSignatureImplied(),
-                              ctx, getWitnessMethodConformanceOrInvalid());
+  cachedResult = SILFunctionType::get(
+      canGenSig, extInfo, getCoroutineKind(), getCalleeConvention(),
+      newParameters, getYields(), newResults, getOptionalErrorResult(),
+      getSubstitutions(), isGenericSignatureImplied(), ctx,
+      getWitnessMethodConformanceOrInvalid());
+  return cachedResult;
 }
 
 CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
