@@ -390,15 +390,10 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // type check operation.
   Expr *preCheckedExpr = subExpr;
   
-  // Disable structural checks, because we know that the overall expression
-  // has type constraint problems, and we don't want to know about any
-  // syntactic issues in a well-typed subexpression (which might be because
-  // the context is missing).
-  TypeCheckExprOptions TCEOptions = TypeCheckExprFlags::DisableStructuralChecks;
-
   // Make sure that typechecker knows that this is an attempt
   // to diagnose a problem.
-  TCEOptions |= TypeCheckExprFlags::SubExpressionDiagnostics;
+  TypeCheckExprOptions TCEOptions =
+      TypeCheckExprFlags::SubExpressionDiagnostics;
 
   // Claim that the result is discarded to preserve the lvalue type of
   // the expression.

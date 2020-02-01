@@ -789,7 +789,7 @@ using OpenedTypeMap =
 
 /// Describes contextual type information about a particular expression
 /// within a constraint system.
-struct ContextualTypeInfo  {
+struct ContextualTypeInfo {
   TypeLoc typeLoc;
   ContextualTypePurpose purpose;
   bool isOpaqueReturnType = false;
@@ -1149,8 +1149,11 @@ class SolutionApplicationTarget {
     struct {
       Expr *expression;
 
+      /// The purpose of the contextual type.
+      ContextualTypePurpose contextualPurpose;
+
       /// The type to which the expression should be converted.
-      Type convertType;
+      TypeLoc convertType;
 
       /// Whether the expression result will be discarded at the end.
       bool isDiscarded;
@@ -1163,9 +1166,18 @@ class SolutionApplicationTarget {
   };
 
 public:
-  SolutionApplicationTarget(Expr *expr, Type convertType, bool isDiscarded) {
+  SolutionApplicationTarget(Expr *expr,
+                            ContextualTypePurpose contextualPurpose,
+                            Type convertType, bool isDiscarded)
+      : SolutionApplicationTarget(expr, contextualPurpose,
+                                  TypeLoc::withoutLoc(convertType),
+                                  isDiscarded) { }
+
+  SolutionApplicationTarget(Expr *expr, ContextualTypePurpose contextualPurpose,
+                            TypeLoc convertType, bool isDiscarded) {
     kind = Kind::expression;
     expression.expression = expr;
+    expression.contextualPurpose = contextualPurpose;
     expression.convertType = convertType;
     expression.isDiscarded = isDiscarded;
   }
@@ -1189,16 +1201,31 @@ public:
     }
   }
 
+  ContextualTypePurpose getExprContextualTypePurpose() const {
+    assert(kind == Kind::expression);
+    return expression.contextualPurpose;
+  }
+
   Type getExprConversionType() const {
+    assert(kind == Kind::expression);
+    return expression.convertType.getType();
+  }
+
+  TypeLoc getExprConversionTypeLoc() const {
     assert(kind == Kind::expression);
     return expression.convertType;
   }
 
   void setExprConversionType(Type type) {
     assert(kind == Kind::expression);
+    expression.convertType = TypeLoc::withoutLoc(type);
+  }
+
+  void setExprConversionTypeLoc(TypeLoc type) {
+    assert(kind == Kind::expression);
     expression.convertType = type;
   }
-  
+
   bool isDiscardedExpr() const {
     assert(kind == Kind::expression);
     return expression.isDiscarded;
