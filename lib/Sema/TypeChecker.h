@@ -175,9 +175,6 @@ enum class TypeCheckExprFlags {
   /// not affect type checking itself.
   IsExprStmt = 0x20,
 
-  /// This is an inout yield.
-  IsInOutYield = 0x100,
-
   /// If set, a conversion constraint should be specified so that the result of
   /// the expression is an optional type.
   ExpressionTypeMustBeOptional = 0x200,
