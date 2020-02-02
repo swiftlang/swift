@@ -2429,10 +2429,8 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
       isDynamicSelf = true;
   } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
     if (isInitializingCtor) {
-      // initializing constructors of value types always have an implicitly
-      // inout self.
-      if (!containerTy->hasReferenceSemantics())
-        selfAccess = SelfAccessKind::Mutating;
+      // Initializing constructors are implicitly mutating.
+      selfAccess = SelfAccessKind::Mutating;
     } else {
       // allocating constructors have metatype 'self'.
       isStatic = true;
@@ -2451,6 +2449,9 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // Note that we can't assert(containerTy->hasReferenceSemantics()) here
     // since incorrect or incomplete code could have deinit decls in invalid
     // contexts, and we need to recover gracefully in those cases.
+
+    // Destructors are implicitly mutating.
+    selfAccess = SelfAccessKind::Mutating;
   }
 
   if (isDynamicSelf)
@@ -2466,7 +2467,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     flags = flags.withOwned(true);
     break;
   case SelfAccessKind::Mutating:
-    flags = flags.withInOut(true);
+    flags = flags.withInOut(!containerTy->hasReferenceSemantics());
     break;
   case SelfAccessKind::NonMutating:
     // The default flagless state.
