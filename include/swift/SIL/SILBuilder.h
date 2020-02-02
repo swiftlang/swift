@@ -806,12 +806,6 @@ public:
                       EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
   }
 
-  EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue BorrowedValue,
-                                 SILValue OriginalValue) {
-    return insert(new (getModule())
-                      EndBorrowInst(getSILDebugLocation(Loc), BorrowedValue));
-  }
-
   BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
                                      SILAccessKind accessKind,
                                      SILAccessEnforcement enforcement,
