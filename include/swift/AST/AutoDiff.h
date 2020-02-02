@@ -622,7 +622,7 @@ template <> struct DenseMapInfo<SILAutoDiffDerivativeFunctionKey> {
     return lhs.originalType == rhs.originalType &&
         lhs.parameterIndices == rhs.parameterIndices &&
         lhs.resultIndices == rhs.resultIndices &&
-        lhs.kind == rhs.kind &&
+        lhs.kind.rawValue == rhs.kind.rawValue &&
         lhs.derivativeFnGenSig == rhs.derivativeFnGenSig &&
         lhs.isReabstractionThunk == rhs.isReabstractionThunk;
   }
