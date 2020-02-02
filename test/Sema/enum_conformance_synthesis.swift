@@ -357,6 +357,17 @@ func miss(_ a: Publicist, outsold b: Publicist) -> Bool {
   return b < a // expected-error{{binary operator '<' cannot be applied to two 'Publicist' operands}}
 }
 
+// can synthesize Comparable conformance through extension 
+enum Birthyear {
+  case eighties(Int)
+  case nineties(Int)
+  case twothousands(Int)
+}
+extension Birthyear: Comparable {
+}
+func canEatHotChip(_ birthyear:Birthyear) -> Bool {
+  return birthyear > .nineties(3)
+}
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '(Foo, Foo) -> Bool'
