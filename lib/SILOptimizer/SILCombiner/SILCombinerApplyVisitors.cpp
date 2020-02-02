@@ -893,17 +893,12 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     // Ensure that we have a concrete value to propagate.
     assert(CEI.ConcreteValue);
 
-    // If the parameter is expecting a pointer, then we need to create a
-    // alloc_stack to store the temporary value.
-    if (Apply.getArgument(ArgIdx)->getType().isAddress()) {
-      auto argSub =
-          ConcreteArgumentCopy::generate(CEI, Apply, ArgIdx, BuilderCtx);
-      if (argSub) {
-        concreteArgCopies.push_back(*argSub);
-        NewArgs.push_back(argSub->tempArg);
-      }
+    auto argSub =
+        ConcreteArgumentCopy::generate(CEI, Apply, ArgIdx, BuilderCtx);
+    if (argSub) {
+      concreteArgCopies.push_back(*argSub);
+      NewArgs.push_back(argSub->tempArg);
     } else {
-      // Otherwise, we can just use the value itself.
       NewArgs.push_back(CEI.ConcreteValue);
     }
 
@@ -928,7 +923,17 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
         });
   }
 
-  if (NewArgs.size() != Apply.getNumArguments()) {
+  bool canUpdateArgs = [&]() {
+    auto substTy = Apply.getCallee()->getType().substGenericArgs(Apply.getModule(), NewCallSubs, Apply.getFunction()->getTypeExpansionContext()).getAs<SILFunctionType>();
+    SILFunctionConventions conv(substTy, SILModuleConventions(Apply.getModule()));
+    bool canUpdate = true;
+    for (unsigned index = 0; index < conv.getNumSILArguments(); ++index) {
+      canUpdate &= conv.getSILArgumentType(index) == NewArgs[index]->getType();
+    }
+    return canUpdate;
+  }();
+
+  if (!canUpdateArgs) {
     // Remove any new instructions created while attempting to optimize this
     // apply. Since the apply was never rewritten, if they aren't removed here,
     // they will be removed later as dead when visited by SILCombine, causing

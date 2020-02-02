@@ -793,8 +793,6 @@ specializePartialApply(SILOptFunctionBuilder &FuncBuilder,
                                ClonedName);
     Cloner.populateCloned();
     ClonedFn = Cloner.getCloned();
-    llvm::errs() << "Adding function to pass manger in alloc box\n";
-    llvm::errs() << ClonedFn->getName() << "\n";
     pass.T->addFunctionToPassManagerWorklist(ClonedFn, F);
   }
 

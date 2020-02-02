@@ -336,9 +336,6 @@ void ExistentialSpecializer::specializeExistentialArgsInAppliesWithinFunction(
         /// Update statistics on the number of functions specialized.
         ++NumFunctionsWithExistentialArgsSpecialized;
 
-        llvm::errs() << "Adding function to pass manger in existential\n";
-        llvm::errs() << ET.getExistentialSpecializedFunction()->getName() << "\n";
-        
         /// Make sure the PM knows about the new specialized inner function.
         addFunctionToPassManagerWorklist(ET.getExistentialSpecializedFunction(),
                                          Callee);
