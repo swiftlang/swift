@@ -2058,40 +2058,6 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
   return false;
 }
 
-/// Whether the contextual type provided for the given purpose is only a
-/// hint, and not a requirement.
-static bool contextualTypeIsOnlyAHint(ContextualTypePurpose ctp,
-                                      TypeCheckExprOptions options) {
-  switch (ctp) {
-  case CTP_Initialization:
-    return !options.contains(
-        TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType);
-  case CTP_ForEachStmt:
-    return true;
-  case CTP_Unused:
-  case CTP_ReturnStmt:
-  case CTP_ReturnSingleExpr:
-  case CTP_YieldByValue:
-  case CTP_YieldByReference:
-  case CTP_ThrowStmt:
-  case CTP_EnumCaseRawValue:
-  case CTP_DefaultParameter:
-  case CTP_AutoclosureDefaultParameter:
-  case CTP_CalleeResult:
-  case CTP_CallArgument:
-  case CTP_ClosureResult:
-  case CTP_ArrayElement:
-  case CTP_DictionaryKey:
-  case CTP_DictionaryValue:
-  case CTP_CoerceOperand:
-  case CTP_AssignSource:
-  case CTP_SubscriptAssignSource:
-  case CTP_Condition:
-  case CTP_CannotFail:
-    return false;
-  }
-}
-
 #pragma mark High-level entry points
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,
@@ -2099,14 +2065,34 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeCheckExprOptions options,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
+  SolutionApplicationTarget target(
+      expr, convertTypePurpose, convertType,
+      options.contains(TypeCheckExprFlags::IsDiscarded));
+  auto resultType = typeCheckExpression(target, dc, options, listener, baseCS);
+  if (!resultType) {
+    return Type();
+  }
+
+  expr = resultType->getAsExpr();
+  return expr->getType();
+}
+
+Optional<SolutionApplicationTarget>
+TypeChecker::typeCheckExpression(
+    SolutionApplicationTarget target,
+    DeclContext *dc,
+    TypeCheckExprOptions options,
+    ExprTypeCheckListener *listener,
+    ConstraintSystem *baseCS) {
   auto &Context = dc->getASTContext();
+  Expr *expr = target.getAsExpr();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckExpression(expr, dc, baseCS)) {
-    return Type();
+    return None;
   }
 
   // Construct a constraint system from this expression.
@@ -2124,45 +2110,23 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   ConstraintSystem cs(dc, csOptions);
   cs.baseCS = baseCS;
 
-  // Verify that a purpose was specified if a convertType was.  Note that it is
-  // ok to have a purpose without a convertType (which is used for call
-  // return types).
-  assert((!convertType.getType() || convertTypePurpose != CTP_Unused) &&
-         "Purpose for conversion type was not specified");
-
-  // Take a look at the conversion type to check to make sure it is sensible.
-  if (auto type = convertType.getType()) {
-    // If we're asked to convert to an UnresolvedType, then ignore the request.
-    // This happens when CSDiags nukes a type.
-    if (type->is<UnresolvedType>() ||
-        (type->is<MetatypeType>() && type->hasUnresolvedType())) {
-      convertType = TypeLoc();
-      convertTypePurpose = CTP_Unused;
-    }
-  }
-
-  // For an @autoclosure default parameter, we want to convert to the result
-  // type. Stash the autoclosure default parameter type.
-  FunctionType *autoclosureDefaultParamType = nullptr;
-  if (convertTypePurpose == CTP_AutoclosureDefaultParameter) {
-    autoclosureDefaultParamType = convertType.getType()->castTo<FunctionType>();
-    convertType.setType(autoclosureDefaultParamType->getResult());
-  }
-
   // Tell the constraint system what the contextual type is.  This informs
   // diagnostics and is a hint for various performance optimizations.
   // FIXME: Look through LoadExpr. This is an egregious hack due to the
   // way typeCheckExprIndependently works.
+  TypeLoc convertType = target.getExprConversionTypeLoc();
   Expr *contextualTypeExpr = expr;
   if (auto loadExpr = dyn_cast_or_null<LoadExpr>(contextualTypeExpr))
     contextualTypeExpr = loadExpr->getSubExpr();
   cs.setContextualType(
-      contextualTypeExpr, convertType, convertTypePurpose,
+      contextualTypeExpr, convertType,
+      target.getExprContextualTypePurpose(),
       options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType));
 
   // If the convertType is *only* provided for that hint, then null it out so
   // that we don't later treat it as an actual conversion constraint.
-  if (contextualTypeIsOnlyAHint(convertTypePurpose, options))
+  if (target.contextualTypeIsOnlyAHint(
+          options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType)))
     convertType = TypeLoc();
 
   // If the client can handle unresolved type variables, leave them in the
@@ -2179,15 +2143,20 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
         cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
     Type var = cs.createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
     convertTo = getOptionalType(expr->getLoc(), var);
+  } else if (target.getExprContextualTypePurpose()
+                 == CTP_AutoclosureDefaultParameter) {
+    // FIXME: Hack around the convertTo adjustment below, which we want to
+    // eliminate.
+    convertTo = Type(target.getAsAutoclosureParamType());
   }
 
   // Attempt to solve the constraint system.
-  SolutionApplicationTarget target(
-      expr, convertTypePurpose, convertTo,
-      options.contains(TypeCheckExprFlags::IsDiscarded));
-  auto viable = cs.solve(target, listener, allowFreeTypeVariables);
+  SolutionApplicationTarget innerTarget(
+      expr, target.getExprContextualTypePurpose(), convertTo,
+      target.isDiscardedExpr());
+  auto viable = cs.solve(innerTarget, listener, allowFreeTypeVariables);
   if (!viable)
-    return Type();
+    return None;
 
   // If the client allows the solution to have unresolved type expressions,
   // check for them now.  We cannot apply the solution with unresolved TypeVars,
@@ -2195,40 +2164,36 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
        (viable->size() != 1 ||
        (convertType.getType() && convertType.getType()->hasUnresolvedType()))) {
-    return ErrorType::get(Context);
+    // FIXME: This hack should only be needed for CSDiag.
+    target.getAsExpr()->setType(ErrorType::get(Context));
+    return target;
   }
 
-  auto result = target.getAsExpr();
-  auto &solution = (*viable)[0];
-  if (!result)
-    return Type();
-
   // Apply this solution to the constraint system.
+  // FIXME: This shouldn't be necessary.
+  auto &solution = (*viable)[0];
   cs.applySolution(solution);
 
   // Apply the solution to the expression.
   bool performingDiagnostics =
       options.contains(TypeCheckExprFlags::SubExpressionDiagnostics);
-  // FIXME: HACK!
-  target.setExprConversionType(convertType.getType());
+  // FIXME: HACK! Copy over the inner target's expression info.
+  target.setExpr(innerTarget.getAsExpr());
+  if (convertTo.isNull())
+    target.setExprConversionType(convertTo);
   auto resultTarget = cs.applySolution(solution, target, performingDiagnostics);
   if (!resultTarget) {
     // Failure already diagnosed, above, as part of applying the solution.
-    return Type();
+    return None;
   }
-  result = resultTarget->getAsExpr();
-
-  // For an @autoclosure default parameter type, add the autoclosure
-  // conversion.
-  if (convertTypePurpose == CTP_AutoclosureDefaultParameter) {
-    result = cs.buildAutoClosureExpr(result, autoclosureDefaultParamType);
-  }
+  Expr *result = resultTarget->getAsExpr();
 
   // Notify listener that we've applied the solution.
-  if (listener)
+  if (listener) {
     result = listener->appliedSolution(solution, result);
-  if (!result)
-    return Type();
+    if (!result)
+      return None;
+  }
 
   if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
@@ -2245,8 +2210,8 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
     performSyntacticExprDiagnostics(result, dc, isExprStmt);
   }
 
-  expr = result;
-  return cs.getType(expr);
+  target.setExpr(result);
+  return target;
 }
 
 Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,

@@ -3968,3 +3968,62 @@ ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
 
   return choice.getDecl();
 }
+
+SolutionApplicationTarget::SolutionApplicationTarget(
+    Expr *expr, ContextualTypePurpose contextualPurpose,
+    TypeLoc convertType, bool isDiscarded) {
+  // Verify that a purpose was specified if a convertType was.  Note that it is
+  // ok to have a purpose without a convertType (which is used for call
+  // return types).
+  assert((!convertType.getType() || contextualPurpose != CTP_Unused) &&
+         "Purpose for conversion type was not specified");
+
+  // Take a look at the conversion type to check to make sure it is sensible.
+  if (auto type = convertType.getType()) {
+    // If we're asked to convert to an UnresolvedType, then ignore the request.
+    // This happens when CSDiags nukes a type.
+    if (type->is<UnresolvedType>() ||
+        (type->is<MetatypeType>() && type->hasUnresolvedType())) {
+      convertType = TypeLoc();
+      contextualPurpose = CTP_Unused;
+    }
+  }
+
+  kind = Kind::expression;
+  expression.expression = expr;
+  expression.contextualPurpose = contextualPurpose;
+  expression.convertType = convertType;
+  expression.isDiscarded = isDiscarded;
+}
+
+bool SolutionApplicationTarget::contextualTypeIsOnlyAHint(
+    bool isOpaqueReturnType) const {
+  assert(kind == Kind::expression);
+  switch (expression.contextualPurpose) {
+  case CTP_Initialization:
+    return !isOpaqueReturnType;
+  case CTP_ForEachStmt:
+    return true;
+  case CTP_Unused:
+  case CTP_ReturnStmt:
+  case CTP_ReturnSingleExpr:
+  case CTP_YieldByValue:
+  case CTP_YieldByReference:
+  case CTP_ThrowStmt:
+  case CTP_EnumCaseRawValue:
+  case CTP_DefaultParameter:
+  case CTP_AutoclosureDefaultParameter:
+  case CTP_CalleeResult:
+  case CTP_CallArgument:
+  case CTP_ClosureResult:
+  case CTP_ArrayElement:
+  case CTP_DictionaryKey:
+  case CTP_DictionaryValue:
+  case CTP_CoerceOperand:
+  case CTP_AssignSource:
+  case CTP_SubscriptAssignSource:
+  case CTP_Condition:
+  case CTP_CannotFail:
+    return false;
+  }
+}
