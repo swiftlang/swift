@@ -45,8 +45,14 @@ function(add_swift_target_executable name)
           DEPENDS ${SWIFTEXE_TARGET_DEPENDS_with_suffix}
           LLVM_LINK_COMPONENTS ${SWIFTEXE_TARGET_LLVM_LINK_COMPONENTS}
           SDK "${sdk}"
-          ARCHITECTURE "${arch}"
-          LINK_LIBRARIES ${SWIFTEXE_TARGET_LINK_LIBRARIES})
+          ARCHITECTURE "${arch}")
+
+      _list_add_string_suffix(
+          "${SWIFTEXE_TARGET_LINK_LIBRARIES}"
+          "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}"
+          SWIFTEXE_TARGET_LINK_LIBRARIES_TARGETS)
+      target_link_libraries(${VARIANT_NAME} PRIVATE
+          ${SWIFTEXE_TARGET_LINK_LIBRARIES_TARGETS})
 
       if(NOT "${VARIANT_SUFFIX}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SUFFIX}")
         # By default, don't build executables for target SDKs to avoid building
