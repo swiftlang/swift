@@ -4931,9 +4931,9 @@ makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
 }
 
 AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
-    IndexSubset *parameterIndices, unsigned resultIndex,
-    AutoDiffDerivativeFunctionKind kind, LookupConformanceFn lookupConformance,
-    GenericSignature derivativeGenSig, bool makeSelfParamFirst) {
+    IndexSubset *parameterIndices, AutoDiffDerivativeFunctionKind kind,
+    LookupConformanceFn lookupConformance, GenericSignature derivativeGenSig,
+    bool makeSelfParamFirst) {
   assert(!parameterIndices->isEmpty() &&
          "Expected at least one differentiability parameter");
   auto &ctx = getASTContext();
@@ -4976,12 +4976,11 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
               ->getType()));
     SmallVector<TupleTypeElt, 8> differentialResults;
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
-      auto resultTupleEltType = resultTuple->getElementType(resultIndex);
+      auto resultTupleEltType = resultTuple->getElementType(0);
       differentialResults.push_back(
           resultTupleEltType->getAutoDiffTangentSpace(lookupConformance)
               ->getType());
     } else {
-      assert(resultIndex == 0 && "resultIndex out of bounds");
       differentialResults.push_back(
           originalResult->getAutoDiffTangentSpace(lookupConformance)
               ->getType());
@@ -4997,13 +4996,11 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
     //   `LinearMapType = (R.TangentVector) -> (T.TangentVector, ...)`
     SmallVector<AnyFunctionType::Param, 8> pullbackParams;
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
-      auto resultTupleEltType = resultTuple->getElementType(resultIndex);
+      auto resultTupleEltType = resultTuple->getElementType(0);
       pullbackParams.push_back(AnyFunctionType::Param(
           resultTupleEltType->getAutoDiffTangentSpace(lookupConformance)
               ->getType()));
     } else {
-      assert(resultIndex == 0 &&
-             "Expected result index 0 for non-tuple result");
       pullbackParams.push_back(AnyFunctionType::Param(
           originalResult->getAutoDiffTangentSpace(lookupConformance)
               ->getType()));

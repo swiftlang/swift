@@ -705,8 +705,7 @@ getExtracteeType(
     return SILType::getPrimitiveObjectType(originalFnTy);
   }
   auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-        fnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
-        *kindOpt, module.Types,
+        fnTy->getDifferentiationParameterIndices(), *kindOpt, module.Types,
         LookUpConformanceInModule(module.getSwiftModule()));
   return SILType::getPrimitiveObjectType(resultFnTy);
 }
@@ -762,14 +761,13 @@ SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
   if (auto witnessGenSig = witness->getDerivativeGenericSignature())
     witnessCanGenSig = witnessGenSig->getCanonicalSignature();
   auto *parameterIndices = witness->getParameterIndices();
-  auto *resultIndices = witness->getResultIndices();
   if (auto derivativeKind = witnessKind.getAsDerivativeFunctionKind()) {
     bool isReabstractionThunk =
         witness->getOriginalFunction()->isThunk() == IsReabstractionThunk;
     auto diffFnTy = fnTy->getAutoDiffDerivativeFunctionType(
-        parameterIndices, *resultIndices->begin(), *derivativeKind,
-        module.Types, LookUpConformanceInModule(module.getSwiftModule()),
-        witnessCanGenSig, isReabstractionThunk);
+        parameterIndices, *derivativeKind, module.Types,
+        LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig,
+        isReabstractionThunk);
     return SILType::getPrimitiveObjectType(diffFnTy);
   }
   assert(witnessKind ==
@@ -796,6 +794,10 @@ DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
     assert(module.getStage() == SILStage::Lowered &&
            "Explicit type is valid only in lowered SIL");
   }
+  auto *resultIndices = witness->getResultIndices();
+  assert(resultIndices->getNumIndices() == 1 &&
+         *resultIndices->getIndices().begin() == 0 &&
+         "Only result indices {0} is supported for now");
 #endif
 }
 // SWIFT_ENABLE_TENSORFLOW END

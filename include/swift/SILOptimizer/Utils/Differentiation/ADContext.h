@@ -84,9 +84,6 @@ private:
                        32>
       invokers;
 
-  /// Mapping from `differentiable_function` instructions to result indices.
-  llvm::DenseMap<DifferentiableFunctionInst *, unsigned> resultIndices;
-
   /// Mapping from original `apply` instructions to their corresponding
   /// `NestedApplyInfo`s.
   llvm::DenseMap<ApplyInst *, NestedApplyInfo> nestedApplyInfo;
@@ -165,17 +162,6 @@ public:
     assert(!invokers.count(witness) &&
            "Differentiability witness already has an invoker");
     invokers.insert({witness, DifferentiationInvoker(witness)});
-  }
-
-  /// Returns the result index for `dfi` if found in this context. Otherwise,
-  /// sets the result index to zero and returns it.
-  unsigned getResultIndex(DifferentiableFunctionInst *dfi) {
-    return resultIndices[dfi];
-  }
-
-  /// Sets the result index for `dfi`.
-  void setResultIndex(DifferentiableFunctionInst *dfi, unsigned index) {
-    resultIndices[dfi] = index;
   }
 
   llvm::DenseMap<ApplyInst *, NestedApplyInfo> &getNestedApplyInfo() {

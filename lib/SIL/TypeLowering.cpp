@@ -269,11 +269,11 @@ namespace {
       // `SILFunctionType:getAutoDiffDerivativeFunctionType` for correct type
       // lowering.
       auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
-          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+          type->getDifferentiationParameterIndices(),
           AutoDiffDerivativeFunctionKind::JVP, TC,
           LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
       auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
-          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+          type->getDifferentiationParameterIndices(),
           AutoDiffDerivativeFunctionKind::VJP, TC,
           LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
       RecursiveProperties props;
@@ -941,7 +941,7 @@ namespace {
                {AutoDiffDerivativeFunctionKind::JVP,
                 AutoDiffDerivativeFunctionKind::VJP}) {
         auto derivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
-            paramIndices, 0, kind, TC,
+            paramIndices, kind, TC,
             LookUpConformanceInModule(&TC.M));
         auto silTy = SILType::getPrimitiveObjectType(derivativeFnTy);
         NormalDifferentiableFunctionTypeComponent extractee(kind);
@@ -2181,8 +2181,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     auto originalFnTy =
         makeConstantInterfaceType(c.asAutoDiffOriginalFunction());
     auto *fnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-        autoDiffFuncId->getParameterIndices(), /*resultIndex*/ 0,
-        autoDiffFuncId->getKind(), LookUpConformanceInModule(&M));
+        autoDiffFuncId->getParameterIndices(), autoDiffFuncId->getKind(),
+        LookUpConformanceInModule(&M));
     return cast<AnyFunctionType>(fnTy->getCanonicalType());
   }
 

@@ -3863,9 +3863,8 @@ bool resolveDifferentiableAttrDerivativeFunctions(
   // Resolve the JVP function, if it is specified and exists.
   if (attr->getJVP()) {
     auto *expectedJVPFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-        resolvedDiffParamIndices, /*resultIndex*/ 0,
-        AutoDiffDerivativeFunctionKind::JVP, lookupConformance,
-        derivativeGenSig, /*makeSelfParamFirst*/ true);
+        resolvedDiffParamIndices, AutoDiffDerivativeFunctionKind::JVP,
+        lookupConformance, derivativeGenSig, /*makeSelfParamFirst*/ true);
     auto isValidJVP = [&](AbstractFunctionDecl *jvpCandidate) -> bool {
       return checkFunctionSignature(
           cast<AnyFunctionType>(expectedJVPFnTy->getCanonicalType()),
@@ -3884,9 +3883,8 @@ bool resolveDifferentiableAttrDerivativeFunctions(
   // Resolve the VJP function, if it is specified and exists.
   if (attr->getVJP()) {
     auto *expectedVJPFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-        resolvedDiffParamIndices, /*resultIndex*/ 0,
-        AutoDiffDerivativeFunctionKind::VJP, lookupConformance,
-        derivativeGenSig, /*makeSelfParamFirst*/ true);
+        resolvedDiffParamIndices, AutoDiffDerivativeFunctionKind::VJP,
+        lookupConformance, derivativeGenSig, /*makeSelfParamFirst*/ true);
     auto isValidVJP = [&](AbstractFunctionDecl *vjpCandidate) -> bool {
       return checkFunctionSignature(
           cast<AnyFunctionType>(expectedVJPFnTy->getCanonicalType()),

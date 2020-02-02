@@ -1035,7 +1035,7 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
   BuiltinFunctionBuilder::LambdaGenerator resultGen{
       [=, &Context](BuiltinFunctionBuilder &builder) -> Type {
         auto derivativeFnTy = diffFnType->getAutoDiffDerivativeFunctionType(
-            paramIndices, /*resultIndex*/ 0, kind,
+            paramIndices, kind,
             LookUpConformanceInModule(Context.TheBuiltinModule));
         return derivativeFnTy->getResult();
       }};

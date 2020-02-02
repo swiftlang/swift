@@ -75,8 +75,8 @@ public:
       return SILType::getPrimitiveObjectType(origFnTy);
     auto kind = *component.getAsDerivativeFunctionKind();
     auto assocTy = origFnTy->getAutoDiffDerivativeFunctionType(
-        parameterIndices, /*resultIndex*/ 0, kind,
-        IGM.getSILTypes(), LookUpConformanceInModule(IGM.getSwiftModule()));
+        parameterIndices, kind, IGM.getSILTypes(),
+        LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }
 };
@@ -166,7 +166,7 @@ public:
       return SILType::getPrimitiveObjectType(originalType->getCanonicalType());
     auto kind = *component.getAsDerivativeFunctionKind();
     auto assocTy = originalType->getAutoDiffDerivativeFunctionType(
-        parameterIndices, /*resultIndex*/ 0, kind, IGM.getSILTypes(),
+        parameterIndices, kind, IGM.getSILTypes(),
         LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }

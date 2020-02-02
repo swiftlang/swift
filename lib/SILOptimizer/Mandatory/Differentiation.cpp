@@ -666,8 +666,7 @@ emitDerivativeFunctionReference(
     // Emit a `witness_method` instruction for the derivative function.
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
-        minimalIndices.parameters, minimalIndices.source, kind,
-        context.getTypeConverter(),
+        minimalIndices.parameters, kind, context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
         kind, minimalASTParamIndices, minimalConfig->derivativeGenericSignature,
@@ -711,8 +710,7 @@ emitDerivativeFunctionReference(
     // Emit a `class_method` instruction for the derivative function.
     auto originalType = classMethodInst->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
-        minimalIndices.parameters, minimalIndices.source, kind,
-        context.getTypeConverter(),
+        minimalIndices.parameters, kind, context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
         kind, minimalASTParamIndices, minimalConfig->derivativeGenericSignature,
@@ -765,7 +763,7 @@ static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
   if (vjpCanGenSig && !vjpCanGenSig->areAllParamsConcrete())
     vjpGenericEnv = vjpCanGenSig->getGenericEnvironment();
   auto vjpType = originalTy->getAutoDiffDerivativeFunctionType(
-      indices.parameters, indices.source, AutoDiffDerivativeFunctionKind::VJP,
+      indices.parameters, AutoDiffDerivativeFunctionKind::VJP,
       module.Types, LookUpConformanceInModule(module.getSwiftModule()),
       vjpCanGenSig,
       /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
@@ -810,7 +808,7 @@ static SILFunction *createEmptyJVP(ADContext &context, SILFunction *original,
   if (jvpCanGenSig && !jvpCanGenSig->areAllParamsConcrete())
     jvpGenericEnv = jvpCanGenSig->getGenericEnvironment();
   auto jvpType = originalTy->getAutoDiffDerivativeFunctionType(
-      indices.parameters, indices.source, AutoDiffDerivativeFunctionKind::JVP,
+      indices.parameters, AutoDiffDerivativeFunctionKind::JVP,
       module.Types, LookUpConformanceInModule(module.getSwiftModule()),
       jvpCanGenSig,
       /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
@@ -954,13 +952,12 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
   auto origFnOperand = dfi->getOriginalFunction();
   auto origFnTy = origFnOperand->getType().castTo<SILFunctionType>();
   auto parameterIndices = dfi->getParameterIndices();
-  unsigned resultIndex = context.getResultIndex(dfi);
 
   // Handle curry thunk applications specially.
   if (auto *ai = dyn_cast<ApplyInst>(origFnOperand)) {
     if (auto *thunkRef = dyn_cast<FunctionRefInst>(ai->getCallee())) {
       // Create a new curry thunk.
-      SILAutoDiffIndices desiredIndices(resultIndex, parameterIndices);
+      SILAutoDiffIndices desiredIndices(0, parameterIndices);
       auto *thunk = thunkRef->getReferencedFunctionOrNull();
       // TODO(TF-685): Use more principled mangling for thunks.
       auto newThunkName = "AD__" + thunk->getName().str() +
@@ -1013,7 +1010,6 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
               std::next(returnValue->getDefiningInstruction()->getIterator()));
           auto *dfi = context.createDifferentiableFunction(
               dfiBuilder, loc, parameterIndices, returnValue);
-          context.setResultIndex(dfi, resultIndex);
           dfiBuilder.setInsertionPoint(newThunk->findReturnBB());
           dfiBuilder.createReturn(loc, dfi);
           retInst->eraseFromParent();
@@ -1044,7 +1040,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
     }
   }
 
-  SILAutoDiffIndices desiredIndices(resultIndex, parameterIndices);
+  SILAutoDiffIndices desiredIndices(0, parameterIndices);
   SmallVector<SILValue, 2> derivativeFns;
   SmallVector<AllocStackInst *, 2> newBuffersToDealloc;
   for (auto derivativeFnKind : {AutoDiffDerivativeFunctionKind::JVP,
@@ -1117,7 +1113,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
       }
     }
     auto expectedDerivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
-        parameterIndices, resultIndex, derivativeFnKind,
+        parameterIndices, derivativeFnKind,
         context.getTypeConverter(),
         LookUpConformanceInModule(context.getModule().getSwiftModule()));
     // If `derivativeFn` is `@convention(thin)` but is expected to be
@@ -1142,7 +1138,6 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
   auto *newDFI = context.createDifferentiableFunction(
       builder, loc, parameterIndices, origFnCopy,
       std::make_pair(derivativeFns[0], derivativeFns[1]));
-  context.setResultIndex(dfi, resultIndex);
   context.addDifferentiableFunctionInstToWorklist(dfi);
 
   return newDFI;
