@@ -2506,6 +2506,9 @@ function(_add_swift_executable_single name)
   if(SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL)
     message(SEND_ERROR "${name} is using EXCLUDE_FROM_ALL option which is deprecated.")
   endif()
+  if(SWIFTEXE_SINGLE_LINK_LIBRARIES)
+    message(SEND_ERROR "${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
+  endif()
 
   # Check arguments.
   precondition(SWIFTEXE_SINGLE_SDK MESSAGE "Should specify an SDK")
@@ -2539,12 +2542,6 @@ function(_add_swift_executable_single name)
     RESULT_VAR_NAME link_flags
     LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
-
-  _list_add_string_suffix(
-      "${SWIFTEXE_SINGLE_LINK_LIBRARIES}"
-      "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
-      SWIFTEXE_SINGLE_LINK_LIBRARIES_TARGETS)
-  set(SWIFTEXE_SINGLE_LINK_LIBRARIES ${SWIFTEXE_SINGLE_LINK_LIBRARIES_TARGETS})
 
   handle_swift_sources(
       dependency_target
@@ -2609,7 +2606,6 @@ function(_add_swift_executable_single name)
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-  target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_LINK_COMPONENTS})
 
   # NOTE(compnerd) use the C linker language to invoke `clang` rather than
