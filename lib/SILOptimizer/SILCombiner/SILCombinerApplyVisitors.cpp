@@ -792,7 +792,7 @@ struct ConcreteArgumentCopy {
            && "A mutated opened existential value can't be replaced");
 
     if (!paramInfo.isConsumed())
-       return None;
+      return None;
 
     SILValue origArg = apply.getArgument(argIdx);
     // FIXME_opaque: With SIL opaque values, a formally indirect argument may be
@@ -924,8 +924,14 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
   }
 
   bool canUpdateArgs = [&]() {
-    auto substTy = Apply.getCallee()->getType().substGenericArgs(Apply.getModule(), NewCallSubs, Apply.getFunction()->getTypeExpansionContext()).getAs<SILFunctionType>();
-    SILFunctionConventions conv(substTy, SILModuleConventions(Apply.getModule()));
+    auto substTy =
+        Apply.getCallee()
+            ->getType()
+            .substGenericArgs(Apply.getModule(), NewCallSubs,
+                              Apply.getFunction()->getTypeExpansionContext())
+            .getAs<SILFunctionType>();
+    SILFunctionConventions conv(substTy,
+                                SILModuleConventions(Apply.getModule()));
     bool canUpdate = true;
     for (unsigned index = 0; index < conv.getNumSILArguments(); ++index) {
       canUpdate &= conv.getSILArgumentType(index) == NewArgs[index]->getType();
