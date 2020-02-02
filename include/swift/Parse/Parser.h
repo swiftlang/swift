@@ -431,9 +431,8 @@ public:
                           PreviousLoc);
   }
 
-  ParserPosition getParserPosition(const PersistentParserState::ParserPos &Pos){
-    return ParserPosition(L->getStateForBeginningOfTokenLoc(Pos.Loc),
-                          Pos.PrevLoc);
+  ParserPosition getParserPosition(SourceLoc loc, SourceLoc previousLoc) {
+    return ParserPosition(L->getStateForBeginningOfTokenLoc(loc), previousLoc);
   }
 
   void restoreParserPosition(ParserPosition PP, bool enableDiagnostics = false) {

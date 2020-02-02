@@ -148,7 +148,7 @@ void Parser::performCodeCompletionSecondPassImpl(
   if (info.PrevOffset != ~0U)
     prevLoc = SourceMgr.getLocForOffset(BufferID, info.PrevOffset);
   // Set the parser position to the start of the delayed decl or the body.
-  restoreParserPosition(getParserPosition({startLoc, prevLoc}));
+  restoreParserPosition(getParserPosition(startLoc, prevLoc));
 
   // Do not delay parsing in the second pass.
   llvm::SaveAndRestore<bool> DisableDelayedBody(DelayBodyParsing, false);
@@ -543,13 +543,6 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
   // Set the token to a sentinel so that we know the lexer isn't primed yet.
   // This cannot be tok::unknown, since that is a token the lexer could produce.
   Tok.setKind(tok::NUM_TOKENS);
-
-  auto ParserPos = State->takeParserPosition();
-  if (ParserPos.isValid() &&
-      L->isStateForCurrentBuffer(ParserPos.LS)) {
-    restoreParserPosition(ParserPos);
-    InPoundLineEnvironment = State->InPoundLineEnvironment;
-  }
 }
 
 Parser::~Parser() {

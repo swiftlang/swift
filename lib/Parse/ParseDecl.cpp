@@ -239,11 +239,6 @@ void Parser::parseTopLevel() {
   SF.ASTStage = SourceFile::Parsed;
   verify(SF);
 
-  // Next time start relexing from the beginning of the comment so that we can
-  // attach it to the token.
-  State->markParserPosition(getParserPosition(),
-                            InPoundLineEnvironment);
-
   // Finalize the token receiver.
   SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
   TokReceiver->finalize();
@@ -4012,7 +4007,8 @@ Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
     return {std::vector<Decl *>(), None};
   }
 
-  auto BeginParserPosition = getParserPosition({BodyRange.Start, SourceLoc()});
+  auto BeginParserPosition = getParserPosition(BodyRange.Start,
+                                               /*previousLoc*/ SourceLoc());
   auto EndLexerState = L->getStateForEndOfTokenLoc(BodyRange.End);
 
   // ParserPositionRAII needs a primed parser to restore to.
@@ -6426,7 +6422,8 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
          "function body should be delayed");
 
   auto bodyRange = AFD->getBodySourceRange();
-  auto BeginParserPosition = getParserPosition({bodyRange.Start, SourceLoc()});
+  auto BeginParserPosition = getParserPosition(bodyRange.Start,
+                                               /*previousLoc*/ SourceLoc());
   auto EndLexerState = L->getStateForEndOfTokenLoc(AFD->getEndLoc());
 
   // ParserPositionRAII needs a primed parser to restore to.
