@@ -1541,6 +1541,9 @@ function(add_swift_host_library name)
   if(ASHL_DEPENDS)
     message(SEND_ERROR "library ${name} is using DEPENDS parameter which is deprecated.  Please use add_dependencies instead")
   endif()
+  if(ASHL_FILE_DEPENDS)
+    message(SEND_ERROR "library ${name} is using FILE_DEPENDS parameter which is deprecated.")
+  endif()
   if(ASHL_LINK_LIBRARIES)
     message(SEND_ERROR "library ${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
   endif()
@@ -1560,7 +1563,6 @@ function(add_swift_host_library name)
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     LLVM_LINK_COMPONENTS ${ASHL_LLVM_LINK_COMPONENTS}
-    FILE_DEPENDS ${ASHL_FILE_DEPENDS}
     INSTALL_IN_COMPONENT "dev"
     )
 
