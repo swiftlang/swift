@@ -1,5 +1,6 @@
 import Foundation
 
+
 func argFail(_ message: String) -> Never {
   print(message, to: &Std.err)
   exit(EX_USAGE)
@@ -44,9 +45,29 @@ guard let pidStr = argv.popFirst() else {
   argFail("Specify a pid")
 }
 
-guard let pid = pid_t(pidStr) else {
-  argFail("Invalid pid \(pidStr)")
+guard let pid = pidFromHint(pidStr) else {
+  argFail("Cannot find pid/process \(pidStr)")
 }
 
-print(findTask(pid, tryForkCorpse: false))
+let task = findTask(pid, tryForkCorpse: false)
+let symbolicator = CSSymbolicatorCreateWithTask(task)
 
+let swiftCore = CSSymbolicatorGetSymbolOwnerWithNameAtTime(
+  symbolicator, "libswiftCore.dylib", kCSNow)
+
+_ = task_start_peeking(task)
+
+let conformances = CSSymbolOwnerGetSymbolWithMangledName(swiftCore, "__ZL12Conformances")
+let range = CSSymbolGetRange(conformances)
+if let p = task_peek(task, mach_vm_address_t(range.location), mach_vm_size_t(range.length)) {
+  let d = NSData(bytes: p, length: range.length)
+  print(d)
+}
+
+CSSymbolOwnerForeachSymbol(swiftCore, {
+ if !CSSymbolIsFunction($0),
+    let name = CSSymbolGetName($0),
+    let mangledName = CSSymbolGetMangledName($0) {
+   print("\(name) -- \(mangledName)")
+ }
+})
