@@ -43,6 +43,8 @@ enum Sym {
                                         UnsafeMutablePointer<UnsafeRawPointer?>) ->
                                          kern_return_t =
     symbol(symbolicationHandle, "task_peek")
+  static let task_stop_peeking: @convention(c) (task_t) -> kern_return_t =
+    symbol(symbolicationHandle, "task_stop_peeking")
 }
 
 typealias CSTypeRef = NSRange
@@ -102,6 +104,10 @@ func task_start_peeking(_ task: task_t) -> Bool {
   
   print("task_start_peeking failed: \(machErrStr(result))", to: &Std.err)
   return false
+}
+
+func task_stop_peeking(_ task: task_t) {
+  _ = Sym.task_stop_peeking(task)
 }
 
 func task_peek(_ task: task_t, _ start: mach_vm_address_t, _ size: mach_vm_size_t) ->
