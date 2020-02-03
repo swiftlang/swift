@@ -7345,6 +7345,13 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     if (!resultExpr)
       return None;
 
+    // For an @autoclosure default parameter type, add the autoclosure
+    // conversion.
+    if (FunctionType *autoclosureParamType =
+            target.getAsAutoclosureParamType()) {
+      resultExpr = buildAutoClosureExpr(resultExpr, autoclosureParamType);
+    }
+
     solution.setExprTypes(resultExpr);
     result.setExpr(resultExpr);
   }

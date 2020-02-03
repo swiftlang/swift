@@ -49,6 +49,7 @@ namespace constraints {
   enum class ConstraintKind : char;
   class ConstraintSystem;
   class Solution;
+  class SolutionApplicationTarget;
   class SolutionResult;
 }
 
@@ -828,6 +829,14 @@ public:
   typeCheckExpression(Expr *&expr, DeclContext *dc,
                       TypeLoc convertType = TypeLoc(),
                       ContextualTypePurpose convertTypePurpose = CTP_Unused,
+                      TypeCheckExprOptions options = TypeCheckExprOptions(),
+                      ExprTypeCheckListener *listener = nullptr,
+                      constraints::ConstraintSystem *baseCS = nullptr);
+
+  static Optional<constraints::SolutionApplicationTarget>
+  typeCheckExpression(constraints::SolutionApplicationTarget &target,
+                      DeclContext *dc,
+                      bool &unresolvedTypeExprs,
                       TypeCheckExprOptions options = TypeCheckExprOptions(),
                       ExprTypeCheckListener *listener = nullptr,
                       constraints::ConstraintSystem *baseCS = nullptr);
