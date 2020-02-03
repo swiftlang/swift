@@ -1174,13 +1174,7 @@ public:
                                   isDiscarded) { }
 
   SolutionApplicationTarget(Expr *expr, ContextualTypePurpose contextualPurpose,
-                            TypeLoc convertType, bool isDiscarded) {
-    kind = Kind::expression;
-    expression.expression = expr;
-    expression.contextualPurpose = contextualPurpose;
-    expression.convertType = convertType;
-    expression.isDiscarded = isDiscarded;
-  }
+                            TypeLoc convertType, bool isDiscarded);
 
   SolutionApplicationTarget(AnyFunctionRef fn)
       : SolutionApplicationTarget(fn, fn.getBody()) { }
@@ -1207,13 +1201,29 @@ public:
   }
 
   Type getExprConversionType() const {
-    assert(kind == Kind::expression);
-    return expression.convertType.getType();
+    return getExprConversionTypeLoc().getType();
   }
 
   TypeLoc getExprConversionTypeLoc() const {
     assert(kind == Kind::expression);
+
+    // For an @autoclosure parameter, the conversion type is
+    // the result of the function type.
+    if (FunctionType *autoclosureParamType = getAsAutoclosureParamType()) {
+      return TypeLoc(expression.convertType.getTypeRepr(),
+                     autoclosureParamType->getResult());
+    }
+
     return expression.convertType;
+  }
+
+  /// Returns the autoclosure parameter type, or \c nullptr if the
+  /// expression has a different kind of context.
+  FunctionType *getAsAutoclosureParamType() const {
+    assert(kind == Kind::expression);
+    if (expression.contextualPurpose == CTP_AutoclosureDefaultParameter)
+      return expression.convertType.getType()->castTo<FunctionType>();
+    return nullptr;
   }
 
   void setExprConversionType(Type type) {
@@ -1225,6 +1235,9 @@ public:
     assert(kind == Kind::expression);
     expression.convertType = type;
   }
+
+  /// Whether the contextual type is only a hint, rather than a type
+  bool contextualTypeIsOnlyAHint(bool isOpaqueReturnType) const;
 
   bool isDiscardedExpr() const {
     assert(kind == Kind::expression);
