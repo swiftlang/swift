@@ -5376,7 +5376,8 @@ RValue RValueEmitter::visitDifferentiableFunctionExpr(
   auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
   auto *diffFunc = SGF.B.createDifferentiableFunction(
-      E, destTy->getDifferentiationParameterIndices(), origFunc.forward(SGF));
+      E, destTy->getDifferentiationParameterIndices(),
+      destTy->getDifferentiationResultIndices(), origFunc.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
 

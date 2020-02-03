@@ -483,9 +483,18 @@ bool DifferentiableActivityInfo::isUseful(
   return set.count(value);
 }
 
+bool DifferentiableActivityInfo::isUseful(
+    SILValue value, IndexSubset *dependentVariableIndices) const {
+  for (auto i : dependentVariableIndices->getIndices())
+    if (isUseful(value, i))
+      return true;
+  return false;
+}
+
 bool DifferentiableActivityInfo::isActive(
     SILValue value, const SILAutoDiffIndices &indices) const {
-  return isVaried(value, indices.parameters) && isUseful(value, indices.source);
+  return isVaried(value, indices.parameters) &&
+         isUseful(value, indices.results);
 }
 
 Activity DifferentiableActivityInfo::getActivity(
@@ -493,7 +502,7 @@ Activity DifferentiableActivityInfo::getActivity(
   Activity activity;
   if (isVaried(value, indices.parameters))
     activity |= ActivityFlags::Varied;
-  if (isUseful(value, indices.source))
+  if (isUseful(value, indices.results))
     activity |= ActivityFlags::Useful;
   return activity;
 }

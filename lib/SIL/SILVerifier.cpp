@@ -1517,7 +1517,8 @@ public:
       require(!jvpType->isDifferentiable(),
               "The JVP function must not be @differentiable");
       auto expectedJVPType = origTy->getAutoDiffDerivativeFunctionType(
-          dfi->getParameterIndices(), AutoDiffDerivativeFunctionKind::JVP, TC,
+          dfi->getParameterIndices(), dfi->getResultIndices(),
+          AutoDiffDerivativeFunctionKind::JVP, TC,
           LookUpConformanceInModule(M));
       requireSameType(SILType::getPrimitiveObjectType(jvpType),
                       SILType::getPrimitiveObjectType(expectedJVPType),
@@ -1528,7 +1529,8 @@ public:
       require(!vjpType->isDifferentiable(),
               "The VJP function must not be @differentiable");
       auto expectedVJPType = origTy->getAutoDiffDerivativeFunctionType(
-          dfi->getParameterIndices(), AutoDiffDerivativeFunctionKind::VJP, TC,
+          dfi->getParameterIndices(), dfi->getResultIndices(),
+          AutoDiffDerivativeFunctionKind::VJP, TC,
           LookUpConformanceInModule(M));
       requireSameType(SILType::getPrimitiveObjectType(vjpType),
                       SILType::getPrimitiveObjectType(expectedVJPType),
@@ -5441,20 +5443,18 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
       exit(1);
   };
   if (auto *jvp = getJVP()) {
-    // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
-    // to accept result indices.
     auto expectedJVPType = origFnType->getAutoDiffDerivativeFunctionType(
-        getParameterIndices(), AutoDiffDerivativeFunctionKind::JVP, M.Types,
+        getParameterIndices(), getResultIndices(),
+        AutoDiffDerivativeFunctionKind::JVP, M.Types,
         LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig,
         origIsReabstractionThunk);
     requireSameType(jvp->getLoweredFunctionType(), expectedJVPType,
                     "JVP type does not match expected JVP type");
   }
   if (auto *vjp = getVJP()) {
-    // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
-    // to result indices.
     auto expectedVJPType = origFnType->getAutoDiffDerivativeFunctionType(
-        getParameterIndices(), AutoDiffDerivativeFunctionKind::VJP, M.Types,
+        getParameterIndices(), getResultIndices(),
+        AutoDiffDerivativeFunctionKind::VJP, M.Types,
         LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig,
         origIsReabstractionThunk);
     requireSameType(vjp->getLoweredFunctionType(), expectedVJPType,

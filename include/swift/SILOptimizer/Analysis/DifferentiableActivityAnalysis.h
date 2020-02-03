@@ -199,6 +199,10 @@ public:
   /// index.
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
 
+  /// Returns true if the given value is useful for the given result (dependent
+  /// variable) indices.
+  bool isUseful(SILValue value, IndexSubset *resultIndices) const;
+
   /// Returns true if the given value is active for the given
   /// `SILAutoDiffIndices` (parameter indices and result index).
   bool isActive(SILValue value, const SILAutoDiffIndices &indices) const;

@@ -146,7 +146,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   auto indices = witness->getSILAutoDiffIndices();
 
   // Add pullback parameter for the seed.
-  auto origResult = origTy->getResults()[indices.source];
+  auto origResult = origTy->getResults()[*indices.results->begin()];
   origResult = origResult.getWithInterfaceType(
       origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
   pbParams.push_back(getTangentParameterInfoForOriginalResult(
@@ -500,10 +500,12 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
 
   // Form expected indices, assuming there's only one result.
   SILAutoDiffIndices indices(
-      activeResultIndices.front(),
       IndexSubset::get(getASTContext(),
-                       ai->getArgumentsWithoutIndirectResults().size(),
-                       activeParamIndices));
+                       ai->getSubstCalleeType()->getNumParameters(),
+                       activeParamIndices),
+      IndexSubset::get(getASTContext(),
+                       ai->getSubstCalleeType()->getNumResults(),
+                       activeResultIndices));
 
   // Emit the VJP.
   auto loc = ai->getLoc();
@@ -546,13 +548,17 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
           }
         }
         // Check and diagnose non-differentiable results.
-        if (!originalFnTy->getResults()[indices.source]
-                 .getSILStorageInterfaceType()
-                 .isDifferentiable(getModule())) {
-          context.emitNondifferentiabilityError(
-              original, invoker, diag::autodiff_nondifferentiable_result);
-          errorOccurred = true;
-          return true;
+        for (unsigned resultIndex : range(originalFnTy->getNumResults())) {
+          if (indices.isWrtResult(resultIndex) &&
+              !originalFnTy->getResults()[resultIndex]
+                   .getSILStorageInterfaceType()
+                   .isDifferentiable(getModule())) {
+            context.emitNondifferentiabilityError(
+                allResults[resultIndex], invoker,
+                diag::autodiff_nondifferentiable_result);
+            errorOccurred = true;
+            return true;
+          }
         }
         return false;
       };
@@ -596,7 +602,7 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
     }
 
     auto *diffFuncInst = context.createDifferentiableFunction(
-        getBuilder(), loc, indices.parameters, original);
+        getBuilder(), loc, indices.parameters, indices.results, original);
 
     // Record the `differentiable_function` instruction.
     context.addDifferentiableFunctionInstToWorklist(diffFuncInst);

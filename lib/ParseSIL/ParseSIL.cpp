@@ -2849,14 +2849,22 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::DifferentiableFunctionInst: {
     // e.g. differentiable_function [parameters 0 1 2] %0 : $T
     //
-    // e.g. differentiable_function [parameters 0 1 2] %0 : $T with_derivative
-    //      {%1 : $T, %2 : $T}
-    //       ^~ jvp   ^~ vjp
+    // e.g. differentiable_function [parameters 0 1 2] [results 0] %0 : $T
+    //          with_derivative {%1 : $T, %2 : $T}
+    //                           ^~ jvp   ^~ vjp
     // Parse `[parameters <integer_literal>...]`.
     SmallVector<unsigned, 8> parameterIndices;
+    SmallVector<unsigned, 1> resultIndices;
     if (parseIndexList(P, "parameters", parameterIndices,
                        diag::sil_autodiff_expected_parameter_index))
       return true;
+    if (P.Tok.is(tok::l_square) && P.peekToken().getText() == "results") {
+      if (parseIndexList(P, "results", resultIndices,
+                         diag::sil_autodiff_expected_result_index))
+        return true;
+    } else {
+      resultIndices.push_back(0);
+    }
     // Parse the original function value.
     SILValue original;
     SourceLoc originalOperandLoc;
@@ -2891,8 +2899,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     auto *parameterIndicesSubset = IndexSubset::get(
         P.Context, fnType->getNumParameters(), parameterIndices);
+    auto *resultIndicesSubset = IndexSubset::get(
+        P.Context, fnType->getNumResults(), resultIndices);
     ResultVal = B.createDifferentiableFunction(
-        InstLoc, parameterIndicesSubset, original, derivativeFunctions);
+        InstLoc, parameterIndicesSubset, resultIndicesSubset, original,
+        derivativeFunctions);
     break;
   }
 

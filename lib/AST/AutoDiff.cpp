@@ -105,7 +105,7 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
 using namespace swift;
 
 bool SILAutoDiffIndices::operator==(const SILAutoDiffIndices &other) const {
-  return source == other.source && parameters == other.parameters;
+  return parameters == other.parameters && results == other.results;
 }
 
 AutoDiffDerivativeFunctionKind::
@@ -174,8 +174,11 @@ LinearDifferentiableFunctionTypeComponent(StringRef string) {
 }
 
 void SILAutoDiffIndices::print(llvm::raw_ostream &s) const {
-  s << "(source=" << source << " parameters=(";
+  s << "(parameters=(";
   interleave(parameters->getIndices(),
+             [&s](unsigned p) { s << p; }, [&s]{ s << ' '; });
+  s << ") results=(";
+  interleave(results->getIndices(),
              [&s](unsigned p) { s << p; }, [&s]{ s << ' '; });
   s << "))";
 }
@@ -186,8 +189,7 @@ void SILAutoDiffIndices::dump() const {
 }
 
 SILAutoDiffIndices AutoDiffConfig::getSILAutoDiffIndices() const {
-  assert(resultIndices->getNumIndices() == 1);
-  return SILAutoDiffIndices(*resultIndices->begin(), parameterIndices);
+  return SILAutoDiffIndices(parameterIndices, resultIndices);
 }
 
 void AutoDiffConfig::print(llvm::raw_ostream &s) const {

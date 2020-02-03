@@ -3676,6 +3676,18 @@ enum class SILParameterDifferentiability : unsigned {
   NotDifferentiable,
 };
 
+/// Determines whether a differentiable function type is differentiable with
+/// respect to this result.
+enum class SILResultDifferentiability : unsigned {
+  /// The function type is differentiable with respect to this result, or
+  /// differentiability is not applicable because the function is not
+  /// differentiable.
+  DifferentiableOrNotApplicable,
+
+  /// The function type is not differentiable with respect to this result.
+  NotDifferentiable,
+};
+
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
   llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
@@ -3842,10 +3854,18 @@ inline bool isIndirectFormalResult(ResultConvention convention) {
 /// A result type and the rules for returning it.
 class SILResultInfo {
   llvm::PointerIntPair<CanType, 3, ResultConvention> TypeAndConvention;
+  // SWIFT_ENABLE_TENSORFLOW
+  SILResultDifferentiability Differentiability : 1;
+  // SWIFT_ENABLE_TENSORFLOW END
 public:
   SILResultInfo() = default;
-  SILResultInfo(CanType type, ResultConvention conv)
-    : TypeAndConvention(type, conv) {
+  // SWIFT_ENABLE_TENSORFLOW
+  SILResultInfo(
+      CanType type, ResultConvention conv,
+      SILResultDifferentiability differentiability =
+          SILResultDifferentiability::DifferentiableOrNotApplicable)
+    : TypeAndConvention(type, conv), Differentiability(differentiability) {
+  // SWIFT_ENABLE_TENSORFLOW END
     assert(type->isLegalSILType() && "SILResultInfo has illegal SIL type");
   }
 
@@ -3866,6 +3886,19 @@ public:
   ResultConvention getConvention() const {
     return TypeAndConvention.getInt();
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  SILResultDifferentiability getDifferentiability() const {
+    return Differentiability;
+  }
+
+  SILResultInfo getWithDifferentiability(
+      SILResultDifferentiability differentiability) const {
+    return SILResultInfo(
+        getInterfaceType(), getConvention(), differentiability);
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
+
   /// The SIL storage type determines the ABI for arguments based purely on the
   /// formal result conventions. The actual SIL type for the result values may
   /// differ in canonical SIL. In particular, opaque values require indirect
@@ -3902,6 +3935,7 @@ public:
 
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(TypeAndConvention.getOpaqueValue());
+    id.AddInteger((unsigned)getDifferentiability());
   }
 
   SWIFT_DEBUG_DUMP;
@@ -4444,7 +4478,8 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   CanSILFunctionType getWithDifferentiability(
-      DifferentiabilityKind kind, IndexSubset *parameterIndices);
+      DifferentiabilityKind kind, IndexSubset *parameterIndices,
+      IndexSubset *resultIndices);
 
   CanSILFunctionType getWithoutDifferentiability();
 
@@ -4525,8 +4560,9 @@ public:
   ///   function results. At the Swift level, this enables differentiating wrt
   ///   multiple tuple elements for tuple-returning functions.
   CanSILFunctionType getAutoDiffDerivativeFunctionType(
-      IndexSubset *parameterIndices, AutoDiffDerivativeFunctionKind kind,
-      Lowering::TypeConverter &TC, LookupConformanceFn lookupConformance,
+      IndexSubset *parameterIndices, IndexSubset *resultIndices,
+      AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
+      LookupConformanceFn lookupConformance,
       CanGenericSignature derivativeFunctionGenericSignature = nullptr,
       bool isReabstractionThunk = false);
 
@@ -4536,11 +4572,17 @@ public:
       LookupConformanceFn lookupConformance,
       CanGenericSignature derivativeFunctionGenericSignature = nullptr);
 
-  /// Returns a bit vector that specifices which parameters you can
+  /// Returns a index subset that specifices which parameters you can
   /// differentiate with respect to for this differentiable function type. (e.g.
   /// which parameters are not `@noDerivative`). The function type must be
   /// differentiable.
   IndexSubset *getDifferentiationParameterIndices();
+
+  /// Returns a index subset that specifices which results you can
+  /// differentiate with respect to for this differentiable function type. (e.g.
+  /// which results are not `@noDerivative`). The function type must be
+  /// differentiable.
+  IndexSubset *getDifferentiationResultIndices();
 
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the

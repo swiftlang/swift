@@ -270,10 +270,12 @@ namespace {
       // lowering.
       auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
           type->getDifferentiationParameterIndices(),
+          type->getDifferentiationResultIndices(),
           AutoDiffDerivativeFunctionKind::JVP, TC,
           LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
       auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
           type->getDifferentiationParameterIndices(),
+          type->getDifferentiationResultIndices(),
           AutoDiffDerivativeFunctionKind::VJP, TC,
           LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
       RecursiveProperties props;
@@ -921,9 +923,10 @@ namespace {
                               ArrayRef<SILValue> values) const override {
       assert(values.size() == 3);
       auto fnTy = getLoweredType().castTo<SILFunctionType>();
-      auto paramIndices = fnTy->getDifferentiationParameterIndices();
       return B.createDifferentiableFunction(
-          loc, paramIndices, values[0], std::make_pair(values[1], values[2]));
+          loc, fnTy->getDifferentiationParameterIndices(),
+          fnTy->getDifferentiationResultIndices(), values[0],
+          std::make_pair(values[1], values[2]));
     }
 
     void lowerChildren(TypeConverter &TC,
@@ -933,6 +936,7 @@ namespace {
       children.reserve(numDerivativeFns + 1);
       auto origFnTy = fnTy->getWithoutDifferentiability();
       auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      auto resultIndices = fnTy->getDifferentiationResultIndices();
       children.push_back(Child{
         NormalDifferentiableFunctionTypeComponent::Original,
         TC.getTypeLowering(origFnTy, getExpansionContext())
@@ -941,7 +945,7 @@ namespace {
                {AutoDiffDerivativeFunctionKind::JVP,
                 AutoDiffDerivativeFunctionKind::VJP}) {
         auto derivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
-            paramIndices, kind, TC,
+            paramIndices, resultIndices, kind, TC,
             LookUpConformanceInModule(&TC.M));
         auto silTy = SILType::getPrimitiveObjectType(derivativeFnTy);
         NormalDifferentiableFunctionTypeComponent extractee(kind);

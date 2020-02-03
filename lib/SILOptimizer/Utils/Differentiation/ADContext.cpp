@@ -98,10 +98,10 @@ void ADContext::cleanUp() {
 
 DifferentiableFunctionInst *ADContext::createDifferentiableFunction(
     SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
-    SILValue original,
+    IndexSubset *resultIndices, SILValue original,
     Optional<std::pair<SILValue, SILValue>> derivativeFunctions) {
   auto *dfi = builder.createDifferentiableFunction(
-      loc, parameterIndices, original, derivativeFunctions);
+      loc, parameterIndices, resultIndices, original, derivativeFunctions);
   processedDifferentiableFunctionInsts.erase(dfi);
   return dfi;
 }

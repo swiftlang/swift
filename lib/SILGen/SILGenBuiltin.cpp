@@ -1215,6 +1215,8 @@ static ManagedValue emitBuiltinDifferentiableFunction(
       IndexSubset::getDefault(
           SGF.getASTContext(), origType->getNumParameters(),
           /*includeAll*/ true),
+      IndexSubset::getDefault(
+          SGF.getASTContext(), origType->getNumResults(), /*includeAll*/ true),
       origFn.forward(SGF),
       std::make_pair(args[1].forward(SGF), args[2].forward(SGF)));
   return SGF.emitManagedRValueWithCleanup(diffFn);

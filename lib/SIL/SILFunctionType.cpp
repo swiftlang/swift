@@ -178,17 +178,32 @@ CanType SILFunctionType::getSelfInstanceType(SILModule &M) const {
 // SWIFT_ENABLE_TENSORFLOW
 IndexSubset *
 SILFunctionType::getDifferentiationParameterIndices() {
-  assert(isDifferentiable());
-  SmallVector<unsigned, 8> result;
+  assert(isDifferentiable() && "Must be a differentiable function");
+  SmallVector<unsigned, 8> parameterIndices;
   for (auto valueAndIndex : enumerate(getParameters()))
     if (valueAndIndex.value().getDifferentiability() !=
             SILParameterDifferentiability::NotDifferentiable)
-      result.push_back(valueAndIndex.index());
-  return IndexSubset::get(getASTContext(), getNumParameters(), result);
+      parameterIndices.push_back(valueAndIndex.index());
+  return IndexSubset::get(
+      getASTContext(), getNumParameters(), parameterIndices);
+}
+
+IndexSubset *
+SILFunctionType::getDifferentiationResultIndices() {
+  assert(isDifferentiable() && "Must be a differentiable function");
+  SmallVector<unsigned, 8> resultIndices;
+  for (auto valueAndIndex : enumerate(getResults()))
+    if (valueAndIndex.value().getDifferentiability() !=
+            SILResultDifferentiability::NotDifferentiable)
+      resultIndices.push_back(valueAndIndex.index());
+  return IndexSubset::get(getASTContext(), getNumResults(), resultIndices);
 }
 
 CanSILFunctionType SILFunctionType::getWithDifferentiability(
-    DifferentiabilityKind kind, IndexSubset *parameterIndices) {
+    DifferentiabilityKind kind, IndexSubset *parameterIndices,
+    IndexSubset *resultIndices) {
+  assert(kind != DifferentiabilityKind::NonDifferentiable &&
+         "Differentiability kind must be normal or linear");
   SmallVector<SILParameterInfo, 8> newParameters;
   for (auto paramAndIndex : enumerate(getParameters())) {
     auto &param = paramAndIndex.value();
@@ -199,9 +214,19 @@ CanSILFunctionType SILFunctionType::getWithDifferentiability(
                 ? SILParameterDifferentiability::DifferentiableOrNotApplicable
                 : SILParameterDifferentiability::NotDifferentiable));
   }
+  SmallVector<SILResultInfo, 8> newResults;
+  for (auto resultAndIndex : enumerate(getResults())) {
+    auto &result = resultAndIndex.value();
+    unsigned index = resultAndIndex.index();
+    newResults.push_back(result.getWithDifferentiability(
+        index < resultIndices->getCapacity() &&
+            resultIndices->contains(index)
+                ? SILResultDifferentiability::DifferentiableOrNotApplicable
+                : SILResultDifferentiability::NotDifferentiable));
+  }
   auto newExtInfo = getExtInfo().withDifferentiabilityKind(kind);
   return get(getSubstGenericSignature(), newExtInfo, getCoroutineKind(),
-             getCalleeConvention(), newParameters, getYields(), getResults(),
+             getCalleeConvention(), newParameters, getYields(), newResults,
              getOptionalErrorResult(), getSubstitutions(),
              isGenericSignatureImplied(), getASTContext(),
              getWitnessMethodConformanceOrInvalid());
@@ -224,7 +249,8 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
 }
 
 CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
-    IndexSubset *parameterIndices, AutoDiffDerivativeFunctionKind kind,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices,
+    AutoDiffDerivativeFunctionKind kind,
     TypeConverter &TC, LookupConformanceFn lookupConformance,
     CanGenericSignature derivativeFnGenSig, bool isReabstractionThunk) {
   auto &ctx = getASTContext();
@@ -392,7 +418,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     auto fnParamType = dyn_cast<SILFunctionType>(fnParam.getInterfaceType());
     assert(fnParamType);
     auto diffFnType = fnParamType->getWithDifferentiability(
-        DifferentiabilityKind::Normal, parameterIndices);
+        DifferentiabilityKind::Normal, parameterIndices, resultIndices);
     newParameters.back() = fnParam.getWithInterfaceType(diffFnType);
   }
   SmallVector<SILResultInfo, 4> newResults;
@@ -2721,8 +2747,9 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
     auto loweredIndices = autodiff::getLoweredParameterIndices(
         autoDiffFuncId->getParameterIndices(), formalInterfaceType);
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffDerivativeFunctionType(
-        loweredIndices, autoDiffFuncId->getKind(), *this,
-        LookUpConformanceInModule(&M));
+        loweredIndices,
+        IndexSubset::get(Context, /*capacity*/ 1, /*indices*/ {0}),
+        autoDiffFuncId->getKind(), *this, LookUpConformanceInModule(&M));
   }
 
   LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";

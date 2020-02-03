@@ -290,26 +290,27 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   if (!hasActiveResults || !hasActiveArguments)
     return;
 
-  // Compute differentiation result index.
-  auto source = activeResultIndices.front();
   // Compute differentiation parameters.
   // - If the callee has `@differentiable` function type, use differentiation
   //   parameters from the function type.
   // - Otherwise, use the active parameters.
-  IndexSubset *parameters;
+  IndexSubset *parameterIndices = nullptr;
   auto origFnSubstTy = ai->getSubstCalleeType();
   auto remappedOrigFnSubstTy =
       remapTypeInDerivative(SILType::getPrimitiveObjectType(origFnSubstTy))
           .castTo<SILFunctionType>();
   if (remappedOrigFnSubstTy->isDifferentiable()) {
-    parameters = remappedOrigFnSubstTy->getDifferentiationParameterIndices();
+    parameterIndices = remappedOrigFnSubstTy->getDifferentiationParameterIndices();
   } else {
-    parameters = IndexSubset::get(
-        original->getASTContext(),
-        ai->getArgumentsWithoutIndirectResults().size(), activeParamIndices);
+    parameterIndices = IndexSubset::get(
+        original->getASTContext(), ai->getSubstCalleeType()->getNumParameters(),
+        activeParamIndices);
   }
+  auto *resultIndices = IndexSubset::get(
+      original->getASTContext(), ai->getSubstCalleeType()->getNumResults(),
+      activeResultIndices);
   // Create autodiff indices for the `apply` instruction.
-  SILAutoDiffIndices applyIndices(source, parameters);
+  SILAutoDiffIndices applyIndices(parameterIndices, resultIndices);
 
   // Check for non-differentiable original function type.
   auto checkNondifferentiableOriginalFunctionType =
@@ -323,10 +324,13 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
             return true;
         }
         // Check non-differentiable results.
-        auto remappedResultType = origFnTy->getResults()[applyIndices.source]
-                                      .getSILStorageInterfaceType();
-        if (!remappedResultType.isDifferentiable(derivative->getModule()))
-          return true;
+        for (unsigned resultIndex : range(origFnTy->getNumResults())) {
+          auto remappedResultType = origFnTy->getResults()[resultIndex]
+                                       .getSILStorageInterfaceType();
+          if (applyIndices.isWrtResult(resultIndex) &&
+              !remappedResultType.isDifferentiable(derivative->getModule()))
+            return true;
+        }
         return false;
       };
   if (checkNondifferentiableOriginalFunctionType(remappedOrigFnSubstTy))
@@ -335,7 +339,8 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   AutoDiffDerivativeFunctionKind derivativeFnKind(kind);
   auto derivativeFnType =
       remappedOrigFnSubstTy->getAutoDiffDerivativeFunctionType(
-          parameters, derivativeFnKind, context.getTypeConverter(),
+          parameterIndices, resultIndices, derivativeFnKind,
+          context.getTypeConverter(),
           LookUpConformanceInModule(derivative->getModule().getSwiftModule()));
 
   auto derivativeFnResultTypes =

@@ -101,7 +101,8 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
       autoDiffFuncId->getParameterIndices(),
       derivativeFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
   auto diffFn = SGF.B.createDifferentiableFunction(
-      loc, loweredIndices, originalFnRef);
+      loc, loweredIndices, IndexSubset::get(getASTContext(), 1, {0}),
+      originalFnRef);
   auto diffDerivativeFn = SGF.B.createDifferentiableFunctionExtract(
       loc, NormalDifferentiableFunctionTypeComponent(autoDiffFuncId->getKind()),
       diffFn);

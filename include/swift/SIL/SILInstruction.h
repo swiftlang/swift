@@ -7962,16 +7962,20 @@ private:
   friend SILBuilder;
   /// Differentiation parameter indices.
   IndexSubset *ParameterIndices;
+  /// Differentiation result indices.
+  IndexSubset *ResultIndices;
   /// Indicates whether derivative functions (JVP/VJP) exist.
   bool HasDerivativeFunctions;
 
   DifferentiableFunctionInst(
       SILDebugLocation DebugLoc, IndexSubset *ParameterIndices,
-      SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions,
+      IndexSubset *ResultIndices, SILValue OriginalFunction,
+      ArrayRef<SILValue> DerivativeFunctions,
       bool HasOwnership);
 
   static SILType getDifferentiableFunctionType(
-      SILValue OriginalFunction, IndexSubset *ParameterIndices);
+      SILValue OriginalFunction, IndexSubset *ParameterIndices,
+      IndexSubset *ResultIndices);
 
   static ValueOwnershipKind getMergedOwnershipKind(
       SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions);
@@ -7979,15 +7983,19 @@ private:
 public:
   static DifferentiableFunctionInst *create(
       SILModule &Module, SILDebugLocation Loc,
-      IndexSubset *ParameterIndices, SILValue OriginalFunction,
+      IndexSubset *ParameterIndices, IndexSubset *ResultIndices,
+      SILValue OriginalFunction,
       Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
       bool HasOwnership);
 
   /// Returns the original function.
   SILValue getOriginalFunction() const { return getOperand(0); }
 
-  /// Returns differentiation indices.
+  /// Returns differentiation parameter indices.
   IndexSubset *getParameterIndices() const { return ParameterIndices; }
+
+  /// Returns differentiation result indices.
+  IndexSubset *getResultIndices() const { return ResultIndices; }
 
   /// Returns true if derivative functions (JVP/VJP) exist.
   bool hasDerivativeFunctions() const { return HasDerivativeFunctions; }

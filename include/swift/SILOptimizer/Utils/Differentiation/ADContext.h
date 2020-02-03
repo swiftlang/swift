@@ -194,7 +194,7 @@ public:
   /// `CanonicalizeInstruction` may get rid of the need for this workaround.
   DifferentiableFunctionInst *createDifferentiableFunction(
       SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
-      SILValue original,
+      IndexSubset *resultIndices, SILValue original,
       Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None);
 
   // Given an `differentiable_function` instruction, finds the corresponding

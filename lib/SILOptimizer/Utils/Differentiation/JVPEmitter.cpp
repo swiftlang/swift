@@ -833,7 +833,7 @@ void JVPEmitter::emitTangentForApplyInst(
   });
   SmallVector<SILValue, 8> origAllResults;
   collectAllActualResultsInTypeOrder(ai, origDirectResults, origAllResults);
-  auto origResult = origAllResults[actualIndices.source];
+  auto origResult = origAllResults[*actualIndices.results->begin()];
 
   // Get the differential results of the `apply` instructions.
   SmallVector<SILValue, 8> differentialDirectResults;
@@ -897,7 +897,7 @@ void JVPEmitter::emitReturnInstForDifferential() {
 
   if (activeResults.empty() && !originalResults.empty()) {
     // Create zero tangent value for direct result.
-    auto origResult = originalResults[getIndices().source];
+    auto origResult = originalResults[*getIndices().results->begin()];
     assert(origResult->getType().isObject() &&
            "Should only be handling direct results for 'return' "
            "instruction.");
@@ -1036,7 +1036,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
   auto indices = witness->getSILAutoDiffIndices();
 
   // Add differential results.
-  auto origResult = origTy->getResults()[indices.source];
+  auto origResult = origTy->getResults()[*indices.results->begin()];
   origResult = origResult.getWithInterfaceType(
       origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
   dfResults.push_back(
@@ -1231,10 +1231,12 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
 
   // Form expected indices, assuming there's only one result.
   SILAutoDiffIndices indices(
-      activeResultIndices.front(),
       IndexSubset::get(getASTContext(),
-                       ai->getArgumentsWithoutIndirectResults().size(),
-                       activeParamIndices));
+                       ai->getSubstCalleeType()->getNumParameters(),
+                       activeParamIndices),
+      IndexSubset::get(getASTContext(),
+                       ai->getSubstCalleeType()->getNumResults(),
+                       activeResultIndices));
 
   // Emit the JVP.
   auto loc = ai->getLoc();
@@ -1309,13 +1311,17 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
             }
           }
           // Check and diagnose non-differentiable results.
-          if (!originalFnTy->getResults()[indices.source]
-                   .getSILStorageInterfaceType()
-                   .isDifferentiable(getModule())) {
-            context.emitNondifferentiabilityError(
-                original, invoker, diag::autodiff_nondifferentiable_result);
-            errorOccurred = true;
-            return true;
+          for (unsigned resultIndex : range(originalFnTy->getNumResults())) {
+            if (indices.isWrtResult(resultIndex) &&
+                !originalFnTy->getResults()[resultIndex]
+                     .getSILStorageInterfaceType()
+                     .isDifferentiable(getModule())) {
+              context.emitNondifferentiabilityError(
+                  allResults[resultIndex], invoker,
+                  diag::autodiff_nondifferentiable_result);
+              errorOccurred = true;
+              return true;
+            }
           }
           return false;
         };
@@ -1323,7 +1329,7 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
       return;
 
     auto *diffFuncInst = context.createDifferentiableFunction(
-        builder, loc, indices.parameters, original);
+        builder, loc, indices.parameters, indices.results, original);
 
     // Record the `differentiable_function` instruction.
     context.addDifferentiableFunctionInstToWorklist(diffFuncInst);

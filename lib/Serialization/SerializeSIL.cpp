@@ -981,8 +981,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto *dfi = cast<DifferentiableFunctionInst>(&SI);
     SmallVector<ValueID, 4> trailingInfo;
     auto *paramIndices = dfi->getParameterIndices();
-    for (unsigned idx : paramIndices->getIndices())
-      trailingInfo.push_back(idx);
+    for (unsigned i : paramIndices->getIndices())
+      trailingInfo.push_back(i);
+    auto *resultIndices = dfi->getResultIndices();
+    for (unsigned i : resultIndices->getIndices())
+      trailingInfo.push_back(i);
     for (auto &op : dfi->getAllOperands()) {
       auto val = op.get();
       trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
@@ -991,7 +994,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstDifferentiableFunctionLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstDifferentiableFunctionLayout::Code],
-        paramIndices->getCapacity(), dfi->hasDerivativeFunctions(),
+        paramIndices->getCapacity(), paramIndices->getNumIndices(),
+        resultIndices->getCapacity(), dfi->hasDerivativeFunctions(),
         trailingInfo);
     break;
   }
