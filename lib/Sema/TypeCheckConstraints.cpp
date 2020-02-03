@@ -2009,11 +2009,11 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
   SolutionApplicationTarget target(
-      expr, convertTypePurpose, convertType,
+      expr, dc, convertTypePurpose, convertType,
       options.contains(TypeCheckExprFlags::IsDiscarded));
   bool unresolvedTypeExprs = false;
   auto resultTarget = typeCheckExpression(
-      target, dc, unresolvedTypeExprs, options, listener, baseCS);
+      target, unresolvedTypeExprs, options, listener, baseCS);
   if (!resultTarget) {
     expr = target.getAsExpr();
     return Type();
@@ -2033,14 +2033,14 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 Optional<SolutionApplicationTarget>
 TypeChecker::typeCheckExpression(
     SolutionApplicationTarget &target,
-    DeclContext *dc,
     bool &unresolvedTypeExprs,
     TypeCheckExprOptions options,
     ExprTypeCheckListener *listener,
     ConstraintSystem *baseCS) {
   unresolvedTypeExprs = false;
-  auto &Context = dc->getASTContext();
   Expr *expr = target.getAsExpr();
+  DeclContext *dc = target.getDeclContext();
+  auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
@@ -2077,12 +2077,11 @@ TypeChecker::typeCheckExpression(
   cs.setContextualType(
       contextualTypeExpr, convertType,
       target.getExprContextualTypePurpose(),
-      options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType));
+      target.infersOpaqueReturnType());
 
   // If the convertType is *only* provided for that hint, then null it out so
   // that we don't later treat it as an actual conversion constraint.
-  if (target.contextualTypeIsOnlyAHint(
-          options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType)))
+  if (target.contextualTypeIsOnlyAHint())
     convertType = TypeLoc();
 
   // If the client can handle unresolved type variables, leave them in the
@@ -2093,7 +2092,7 @@ TypeChecker::typeCheckExpression(
 
   Type convertTo = convertType.getType();
 
-  if (options.contains(TypeCheckExprFlags::ExpressionTypeMustBeOptional)) {
+  if (target.isOptionalSomePatternInit()) {
     assert(!convertTo && "convertType and type check options conflict");
     auto *convertTypeLocator =
         cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
@@ -2108,7 +2107,7 @@ TypeChecker::typeCheckExpression(
 
   // Attempt to solve the constraint system.
   SolutionApplicationTarget innerTarget(
-      expr, target.getExprContextualTypePurpose(), convertTo,
+      expr, dc, target.getExprContextualTypePurpose(), convertTo,
       target.isDiscardedExpr());
   auto viable = cs.solve(innerTarget, listener, allowFreeTypeVariables);
   if (!viable) {
@@ -2207,7 +2206,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   if (needClearType)
     expr->setType(Type());
   SolutionApplicationTarget target(
-      expr, CTP_Unused, Type(), /*isDiscarded=*/false);
+      expr, dc, CTP_Unused, Type(), /*isDiscarded=*/false);
   auto viable = cs.solve(target, listener, allowFreeTypeVariables);
   if (!viable) {
     recoverOriginalType();
@@ -2288,7 +2287,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
     expr->setType(Type());
 
   SolutionApplicationTarget target(
-      expr, CTP_Unused, Type(), /*isDiscarded=*/false);
+      expr, dc, CTP_Unused, Type(), /*isDiscarded=*/false);
   if (auto viable = cs.solve(target, listener, allowFreeTypeVariables)) {
     expr = target.getAsExpr();
     for (auto &solution : *viable) {
@@ -2612,54 +2611,22 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   if (!initializer)
     return true;
 
-  TypeLoc contextualType;
-  auto contextualPurpose = CTP_Unused;
-  TypeCheckExprOptions flags = None;
-
-  // Set the contextual purpose even if the pattern doesn't have a type so
-  // if there's an error we can use that information to inform diagnostics.
-  contextualPurpose = CTP_Initialization;
-
-  if (isa<OptionalSomePattern>(pattern)) {
-    flags |= TypeCheckExprFlags::ExpressionTypeMustBeOptional;
-  } else if (patternType && !patternType->isEqual(Context.TheUnresolvedType)) {
-    contextualType = TypeLoc::withoutLoc(patternType);
-
-    // If we already had an error, don't repeat the problem.
-    if (contextualType.getType()->hasError())
-      return true;
-    
-    // Allow the initializer expression to establish the underlying type of an
-    // opaque type.
-    if (auto opaqueType = patternType->getAs<OpaqueTypeArchetypeType>()){
-      flags |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
-    }
-
-    // Only provide a TypeLoc if it makes sense to allow diagnostics.
-    if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
-      const Pattern *inner = typedPattern->getSemanticsProvidingPattern();
-      if (isa<NamedPattern>(inner) || isa<AnyPattern>(inner)) {
-        contextualType = typedPattern->getTypeLoc();
-        if (!contextualType.getType())
-          contextualType.setType(patternType);
-      }
-    }
-  }
-    
   // Type-check the initializer.
-  auto resultTy = typeCheckExpression(initializer, DC, contextualType,
-                                      contextualPurpose, flags, &listener);
+  auto target = SolutionApplicationTarget::forInitialization(
+      initializer, DC, patternType, pattern);
+  bool unresolvedTypeExprs = false;
+  auto resultTarget = typeCheckExpression(target, unresolvedTypeExprs,
+                                          None, &listener);
 
-  if (resultTy) {
+  if (resultTarget) {
+    initializer = resultTarget->getAsExpr();
+
     TypeResolutionOptions options =
         isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())
         ? TypeResolverContext::EditorPlaceholderExpr
         : TypeResolverContext::InExpression;
     options |= TypeResolutionFlags::OverrideType;
 
-    // FIXME: initTy should be the same as resultTy; now that typeCheckExpression()
-    // returns a Type and not bool, we should be able to simplify the listener
-    // implementation here.
     auto initTy = listener.getPatternInitType(nullptr);
     if (initTy->hasDependentMember())
       return true;
@@ -2673,15 +2640,17 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     } else {
       return true;
     }
+  } else {
+    initializer = target.getAsExpr();
   }
 
-  if (!resultTy && !initializer->getType())
+  if (!resultTarget && !initializer->getType())
     initializer->setType(ErrorType::get(Context));
 
   // If the type of the pattern is inferred, assign error types to the pattern
   // and its variables, to prevent it from being referenced by the constraint
   // system.
-  if (!resultTy &&
+  if (!resultTarget &&
       (patternType->hasUnresolvedType() ||
        patternType->hasUnboundGenericType())) {
     pattern->setType(ErrorType::get(Context));
@@ -2697,7 +2666,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     });
   }
 
-  return !resultTy;
+  return !resultTarget;
 }
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
