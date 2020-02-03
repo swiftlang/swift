@@ -2066,11 +2066,11 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
   SolutionApplicationTarget target(
-      expr, convertTypePurpose, convertType,
+      expr, dc, convertTypePurpose, convertType,
       options.contains(TypeCheckExprFlags::IsDiscarded));
   bool unresolvedTypeExprs = false;
   auto resultTarget = typeCheckExpression(
-      target, dc, unresolvedTypeExprs, options, listener, baseCS);
+      target, unresolvedTypeExprs, options, listener, baseCS);
   if (!resultTarget) {
     expr = target.getAsExpr();
     return Type();
@@ -2090,14 +2090,14 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 Optional<SolutionApplicationTarget>
 TypeChecker::typeCheckExpression(
     SolutionApplicationTarget &target,
-    DeclContext *dc,
     bool &unresolvedTypeExprs,
     TypeCheckExprOptions options,
     ExprTypeCheckListener *listener,
     ConstraintSystem *baseCS) {
   unresolvedTypeExprs = false;
-  auto &Context = dc->getASTContext();
   Expr *expr = target.getAsExpr();
+  DeclContext *dc = target.getDeclContext();
+  auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
@@ -2134,12 +2134,11 @@ TypeChecker::typeCheckExpression(
   cs.setContextualType(
       contextualTypeExpr, convertType,
       target.getExprContextualTypePurpose(),
-      options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType));
+      target.infersOpaqueReturnType());
 
   // If the convertType is *only* provided for that hint, then null it out so
   // that we don't later treat it as an actual conversion constraint.
-  if (target.contextualTypeIsOnlyAHint(
-          options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType)))
+  if (target.contextualTypeIsOnlyAHint())
     convertType = TypeLoc();
 
   // If the client can handle unresolved type variables, leave them in the
@@ -2165,7 +2164,7 @@ TypeChecker::typeCheckExpression(
 
   // Attempt to solve the constraint system.
   SolutionApplicationTarget innerTarget(
-      expr, target.getExprContextualTypePurpose(), convertTo,
+      expr, dc, target.getExprContextualTypePurpose(), convertTo,
       target.isDiscardedExpr());
   auto viable = cs.solve(innerTarget, listener, allowFreeTypeVariables);
   if (!viable) {
@@ -2264,7 +2263,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   if (needClearType)
     expr->setType(Type());
   SolutionApplicationTarget target(
-      expr, CTP_Unused, Type(), /*isDiscarded=*/false);
+      expr, dc, CTP_Unused, Type(), /*isDiscarded=*/false);
   auto viable = cs.solve(target, listener, allowFreeTypeVariables);
   if (!viable) {
     recoverOriginalType();
@@ -2345,7 +2344,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
     expr->setType(Type());
 
   SolutionApplicationTarget target(
-      expr, CTP_Unused, Type(), /*isDiscarded=*/false);
+      expr, dc, CTP_Unused, Type(), /*isDiscarded=*/false);
   if (auto viable = cs.solve(target, listener, allowFreeTypeVariables)) {
     expr = target.getAsExpr();
     for (auto &solution : *viable) {
@@ -2671,9 +2670,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   // Type-check the initializer.
   auto target = SolutionApplicationTarget::forInitialization(
-      initializer, patternType, pattern);
+      initializer, DC, patternType, pattern);
   bool unresolvedTypeExprs = false;
-  auto resultTarget = typeCheckExpression(target, DC, unresolvedTypeExprs,
+  auto resultTarget = typeCheckExpression(target, unresolvedTypeExprs,
                                           None, &listener);
 
   if (resultTarget) {

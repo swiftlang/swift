@@ -1150,6 +1150,10 @@ class SolutionApplicationTarget {
       /// The expression being type-checked.
       Expr *expression;
 
+      /// The declaration context in which the expression is being
+      /// type-checked.
+      DeclContext *dc;
+
       /// The purpose of the contextual type.
       ContextualTypePurpose contextualPurpose;
 
@@ -1171,14 +1175,15 @@ class SolutionApplicationTarget {
   };
 
 public:
-  SolutionApplicationTarget(Expr *expr,
+  SolutionApplicationTarget(Expr *expr, DeclContext *dc,
                             ContextualTypePurpose contextualPurpose,
                             Type convertType, bool isDiscarded)
-      : SolutionApplicationTarget(expr, contextualPurpose,
+      : SolutionApplicationTarget(expr, dc, contextualPurpose,
                                   TypeLoc::withoutLoc(convertType),
                                   isDiscarded) { }
 
-  SolutionApplicationTarget(Expr *expr, ContextualTypePurpose contextualPurpose,
+  SolutionApplicationTarget(Expr *expr, DeclContext *dc,
+                            ContextualTypePurpose contextualPurpose,
                             TypeLoc convertType, bool isDiscarded);
 
   SolutionApplicationTarget(AnyFunctionRef fn)
@@ -1192,7 +1197,7 @@ public:
 
   /// Form a target for the initialization of a pattern from an expression.
   static SolutionApplicationTarget forInitialization(
-      Expr *initializer, Type patternType, Pattern *pattern);
+      Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern);
 
   Expr *getAsExpr() const {
     switch (kind) {
@@ -1201,6 +1206,16 @@ public:
 
     case Kind::function:
       return nullptr;
+    }
+  }
+
+  DeclContext *getDeclContext() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression.dc;
+
+    case Kind::function:
+      return function.function.getAsDeclContext();
     }
   }
 
@@ -1258,9 +1273,12 @@ public:
         expression.contextualPurpose == CTP_Initialization &&
         isa<OptionalSomePattern>(expression.pattern);
   }
-  
+
+  /// Whether this context infers an opaque return type.
+  bool infersOpaqueReturnType() const;
+
   /// Whether the contextual type is only a hint, rather than a type
-  bool contextualTypeIsOnlyAHint(bool isOpaqueReturnType) const;
+  bool contextualTypeIsOnlyAHint() const;
 
   bool isDiscardedExpr() const {
     assert(kind == Kind::expression);

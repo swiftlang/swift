@@ -3970,7 +3970,7 @@ ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
 }
 
 SolutionApplicationTarget::SolutionApplicationTarget(
-    Expr *expr, ContextualTypePurpose contextualPurpose,
+    Expr *expr, DeclContext *dc, ContextualTypePurpose contextualPurpose,
     TypeLoc convertType, bool isDiscarded) {
   // Verify that a purpose was specified if a convertType was.  Note that it is
   // ok to have a purpose without a convertType (which is used for call
@@ -3991,13 +3991,14 @@ SolutionApplicationTarget::SolutionApplicationTarget(
 
   kind = Kind::expression;
   expression.expression = expr;
+  expression.dc = dc;
   expression.contextualPurpose = contextualPurpose;
   expression.convertType = convertType;
   expression.isDiscarded = isDiscarded;
 }
 
 SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
-    Expr *initializer, Type patternType, Pattern *pattern) {
+    Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern) {
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
   if (!isa<OptionalSomePattern>(pattern) &&
@@ -4016,18 +4017,43 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
   }
 
   SolutionApplicationTarget target(
-      initializer, CTP_Initialization, contextualType,
+      initializer, dc, CTP_Initialization, contextualType,
       /*isDiscarded=*/false);
   target.expression.pattern = pattern;
   return target;
 }
 
-bool SolutionApplicationTarget::contextualTypeIsOnlyAHint(
-    bool isOpaqueReturnType) const {
+bool SolutionApplicationTarget::infersOpaqueReturnType() const {
   assert(kind == Kind::expression);
   switch (expression.contextualPurpose) {
   case CTP_Initialization:
-    return !isOpaqueReturnType;
+    if (Type convertType = expression.convertType.getType()) {
+      return convertType->is<OpaqueTypeArchetypeType>();
+    }
+    return false;
+
+  case CTP_ReturnStmt:
+  case CTP_ReturnSingleExpr:
+    if (Type convertType = expression.convertType.getType()) {
+      if (auto opaqueType = convertType->getAs<OpaqueTypeArchetypeType>()) {
+        auto dc = getDeclContext();
+        if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
+          return opaqueType->getDecl()->isOpaqueReturnTypeOfFunction(func);
+        }
+      }
+    }
+    return false;
+
+  default:
+    return false;
+  }
+}
+
+bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
+  assert(kind == Kind::expression);
+  switch (expression.contextualPurpose) {
+  case CTP_Initialization:
+    return !infersOpaqueReturnType();
   case CTP_ForEachStmt:
     return true;
   case CTP_Unused:
