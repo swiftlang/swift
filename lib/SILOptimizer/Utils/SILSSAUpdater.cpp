@@ -122,7 +122,7 @@ void SILSSAUpdater::RewriteUse(Operand &Op) {
     auto *NewFR = cast<DynamicFunctionRefInst>(FR->clone(User));
     Op.set(NewFR);
     return;
-  } else if (auto *IL = dyn_cast<IntegerLiteralInst>(Op.get()))
+  } else if (auto *IL = dyn_cast<IntegerLiteralInst>(Op.get())) {
     if (areIdentical(*AV)) {
       // Some llvm intrinsics don't like phi nodes as their constant inputs (e.g
       // ctlz).
@@ -131,7 +131,14 @@ void SILSSAUpdater::RewriteUse(Operand &Op) {
       Op.set(NewIL);
       return;
     }
-
+  } else if (auto *OM = dyn_cast<ObjCMethodInst>(Op.get())) {
+    assert(areIdentical(*AV) &&
+           "The objc_methods need to have the same value");
+    SILInstruction *User = Op.getUser();
+    auto *NewOM = cast<ObjCMethodInst>(OM->clone(User));
+    Op.set(NewOM);
+    return;
+  }
   // Again we need to be careful here, because ssa construction (with the
   // existing representation) can change the operand from under us.
   UseWrapper UW(&Op);

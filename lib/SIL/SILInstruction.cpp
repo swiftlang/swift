@@ -1190,11 +1190,6 @@ bool SILInstruction::isTriviallyDuplicatable() const {
     return false;
   }
 
-  if (auto *MI = dyn_cast<MethodInst>(this)) {
-    // We can't build SSA for method values that lower to objc methods.
-    if (MI->getMember().isForeign)
-      return false;
-  }
   if (isa<ThrowInst>(this))
     return false;
 
