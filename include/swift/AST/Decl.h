@@ -2332,17 +2332,17 @@ public:
       Bits.PoundDiagnosticDecl.HasBeenEmitted = false; 
     }
 
-  DiagnosticKind getKind() {
+  DiagnosticKind getKind() const {
     return isError() ? DiagnosticKind::Error : DiagnosticKind::Warning;
   }
 
-  StringLiteralExpr *getMessage() { return Message; }
+  StringLiteralExpr *getMessage() const { return Message; }
 
-  bool isError() {
+  bool isError() const {
     return Bits.PoundDiagnosticDecl.IsError;
   }
 
-  bool hasBeenEmitted() {
+  bool hasBeenEmitted() const {
     return Bits.PoundDiagnosticDecl.HasBeenEmitted;
   }
 
