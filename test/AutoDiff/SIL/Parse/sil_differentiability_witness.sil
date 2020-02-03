@@ -1,0 +1,129 @@
+// Round-trip parsing/printing test.
+
+// RUN: %target-sil-opt %s | %target-sil-opt -emit-sorted-sil | %FileCheck --check-prefix=ROUNDTRIP %s
+// REQUIRES: differentiable_programming
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+// Test SIL differentiability witness for bodiless original function, with defined jvp/vjp.
+
+sil @externalFn1 : $@convention(thin) (Float) -> Float
+
+sil @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+}
+
+sil @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+}
+
+sil_differentiability_witness [parameters 0] [results 0] @externalFn1 : $@convention(thin) (Float) -> Float {
+  jvp: @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+  vjp: @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+}
+
+// ROUNDTRIP-LABEL: // differentiability witness for externalFn1
+// ROUNDTRIP: sil_differentiability_witness{{( public_external)?}} [parameters 0] [results 0] @externalFn1 : $@convention(thin) (Float) -> Float {
+// ROUNDTRIP:   jvp: @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP:   vjp: @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP: }
+
+// Test SIL differentiability witness for bodiless original function, with bodiless jvp/vjp.
+
+sil @externalFn2 : $@convention(thin) (Float) -> Float
+
+sil @AD__externalFn2__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+
+sil @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+
+sil_differentiability_witness [parameters 0] [results 0] @externalFn2 : $@convention(thin) (Float) -> Float {
+  jvp: @AD__externalFn2__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+  vjp: @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+}
+
+// ROUNDTRIP-LABEL: // differentiability witness for externalFn2
+// ROUNDTRIP: sil_differentiability_witness{{( public_external)?}} [parameters 0] [results 0] @externalFn2 : $@convention(thin) (Float) -> Float {
+// ROUNDTRIP:   jvp: @AD__externalFn2__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP:   vjp: @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP: }
+
+// Test SIL differentiability witness declaration.
+
+sil @externalFn3 : $@convention(thin) (Float) -> Float
+
+sil_differentiability_witness [parameters 0] [results 0] @externalFn3 : $@convention(thin) (Float) -> Float
+
+// ROUNDTRIP-LABEL: // differentiability witness for externalFn3
+// ROUNDTRIP: sil_differentiability_witness{{( public_external)?}} [parameters 0] [results 0] @externalFn3 : $@convention(thin) (Float) -> Float{{[^{]*$}}
+
+// Test public non-generic function.
+// SIL differentiability witness:
+// - Has public linkage (implicit).
+// - Has no `where` clause.
+
+sil [ossa] @foo : $@convention(thin) (Float) -> Float {
+bb0(%0 : $Float):
+  return %0 : $Float
+}
+
+sil @AD__foo__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+}
+
+sil @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+}
+
+sil_differentiability_witness [parameters 0] [results 0] @foo : $@convention(thin) (Float) -> Float {
+  jvp: @AD__foo__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+  vjp: @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+}
+
+// ROUNDTRIP-LABEL: // differentiability witness for foo
+// ROUNDTRIP: sil_differentiability_witness{{( public_external)?}} [parameters 0] [results 0] @foo : $@convention(thin) (Float) -> Float {
+// ROUNDTRIP:   jvp: @AD__foo__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP:   vjp: @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP: }
+
+// Test internal generic function.
+// SIL differentiability witness:
+// - Has hidden linkage.
+// - Has `where` clause.
+
+sil hidden [ossa] @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T {
+bb0(%0 : $*T, %1 : $*T, %2 : $Float):
+  copy_addr %1 to [initialization] %0 : $*T
+  %void = tuple ()
+  return %void : $()
+}
+
+sil hidden @AD__generic__jvp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector) {
+bb0(%0 : $*τ_0_0, %1 : $*τ_0_0, %2 : $Float):
+  return undef : $@callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector
+}
+
+sil hidden @AD__generic__vjp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float)) {
+bb0(%0 : $*τ_0_0, %1 : $*τ_0_0, %2 : $Float):
+  return undef : $@callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float)
+}
+
+sil_differentiability_witness hidden [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T {
+  jvp: @AD__generic__jvp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector)
+  vjp: @AD__generic__vjp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float))
+}
+
+// ROUNDTRIP-LABEL: // differentiability witness for generic
+// ROUNDTRIP: sil_differentiability_witness {{(hidden)|(hidden_external)}} [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T {
+// ROUNDTRIP:   jvp: @AD__generic__jvp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector)
+// ROUNDTRIP:   vjp: @AD__generic__vjp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float))
+// ROUNDTRIP: }

@@ -226,6 +226,7 @@ void Parser::parseTopLevel() {
     CASE_SIL(sil_global, SILGlobal)
     CASE_SIL(sil_witness_table, SILWitnessTable)
     CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
+    CASE_SIL(sil_differentiability_witness, SILDifferentiabilityWitness)
     CASE_SIL(sil_coverage_map, SILCoverageMap)
     CASE_SIL(sil_property, SILProperty)
     CASE_SIL(sil_scope, SILScope)
