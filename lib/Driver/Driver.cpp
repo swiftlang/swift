@@ -2718,7 +2718,10 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   if (OI.ShouldGenerateModule &&
       (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA))) {
     chooseSwiftModuleDocOutputPath(C, OutputMap, workingDirectory, Output.get());
-    chooseSwiftSourceInfoOutputPath(C, OutputMap, workingDirectory, Output.get());
+    if (!C.getArgs().hasArg(options::OPT_avoid_emit_module_source_info)) {
+      chooseSwiftSourceInfoOutputPath(C, OutputMap, workingDirectory,
+                                      Output.get());
+    }
   }
 
   if (C.getArgs().hasArg(options::OPT_emit_module_interface,
