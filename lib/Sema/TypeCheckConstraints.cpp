@@ -2068,22 +2068,34 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   SolutionApplicationTarget target(
       expr, convertTypePurpose, convertType,
       options.contains(TypeCheckExprFlags::IsDiscarded));
-  auto resultType = typeCheckExpression(target, dc, options, listener, baseCS);
-  if (!resultType) {
+  bool unresolvedTypeExprs = false;
+  auto resultTarget = typeCheckExpression(
+      target, dc, unresolvedTypeExprs, options, listener, baseCS);
+  if (!resultTarget) {
+    expr = target.getAsExpr();
     return Type();
   }
 
-  expr = resultType->getAsExpr();
+  expr = resultTarget->getAsExpr();
+
+  // HACK for clients that want unresolved types.
+  if (unresolvedTypeExprs) {
+    return ErrorType::get(dc->getASTContext());
+  }
+
+
   return expr->getType();
 }
 
 Optional<SolutionApplicationTarget>
 TypeChecker::typeCheckExpression(
-    SolutionApplicationTarget target,
+    SolutionApplicationTarget &target,
     DeclContext *dc,
+    bool &unresolvedTypeExprs,
     TypeCheckExprOptions options,
     ExprTypeCheckListener *listener,
     ConstraintSystem *baseCS) {
+  unresolvedTypeExprs = false;
   auto &Context = dc->getASTContext();
   Expr *expr = target.getAsExpr();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr", expr);
@@ -2092,6 +2104,7 @@ TypeChecker::typeCheckExpression(
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckExpression(expr, dc, baseCS)) {
+    target.setExpr(expr);
     return None;
   }
 
@@ -2155,8 +2168,10 @@ TypeChecker::typeCheckExpression(
       expr, target.getExprContextualTypePurpose(), convertTo,
       target.isDiscardedExpr());
   auto viable = cs.solve(innerTarget, listener, allowFreeTypeVariables);
-  if (!viable)
+  if (!viable) {
+    target.setExpr(expr);
     return None;
+  }
 
   // If the client allows the solution to have unresolved type expressions,
   // check for them now.  We cannot apply the solution with unresolved TypeVars,
@@ -2165,7 +2180,7 @@ TypeChecker::typeCheckExpression(
        (viable->size() != 1 ||
        (convertType.getType() && convertType.getType()->hasUnresolvedType()))) {
     // FIXME: This hack should only be needed for CSDiag.
-    target.getAsExpr()->setType(ErrorType::get(Context));
+    unresolvedTypeExprs = true;
     return target;
   }
 

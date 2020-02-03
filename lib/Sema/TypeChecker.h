@@ -834,8 +834,9 @@ public:
                       constraints::ConstraintSystem *baseCS = nullptr);
 
   static Optional<constraints::SolutionApplicationTarget>
-  typeCheckExpression(constraints::SolutionApplicationTarget target,
+  typeCheckExpression(constraints::SolutionApplicationTarget &target,
                       DeclContext *dc,
+                      bool &unresolvedTypeExprs,
                       TypeCheckExprOptions options = TypeCheckExprOptions(),
                       ExprTypeCheckListener *listener = nullptr,
                       constraints::ConstraintSystem *baseCS = nullptr);
