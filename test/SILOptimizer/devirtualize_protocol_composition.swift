@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -parse-as-library -O -wmo -emit-sil  %s | %FileCheck %s
 // RUN: %target-swift-frontend -parse-as-library -Osize -wmo -emit-sil  %s | %FileCheck %s
 
+// REQUIRES: objc_interop
+
 // This is an end-to-end test to ensure that the optimizer devertualizes
 // calls to a protocol composition type.
 
