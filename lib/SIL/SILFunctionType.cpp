@@ -191,36 +191,6 @@ SILFunctionType::getWitnessMethodClass(SILModule &M) const {
   return nullptr;
 }
 
-// Returns the canonical generic signature for an autodiff derivative function
-// given an existing derivative function generic signature. All
-// differentiability parameters are required to conform to `Differentiable`.
-static CanGenericSignature getAutoDiffDerivativeFunctionGenericSignature(
-    CanGenericSignature derivativeFnGenSig,
-    ArrayRef<SILParameterInfo> originalParameters,
-    IndexSubset *parameterIndices, ModuleDecl *module) {
-  if (!derivativeFnGenSig)
-    return nullptr;
-  auto &ctx = module->getASTContext();
-  GenericSignatureBuilder builder(ctx);
-  // Add derivative function generic signature.
-  builder.addGenericSignature(derivativeFnGenSig);
-  // All differentiability parameters are required to conform to
-  // `Differentiable`.
-  auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-  auto *differentiableProtocol =
-      ctx.getProtocol(KnownProtocolKind::Differentiable);
-  for (unsigned paramIdx : parameterIndices->getIndices()) {
-    auto paramType = originalParameters[paramIdx].getInterfaceType();
-    Requirement req(RequirementKind::Conformance, paramType,
-                    differentiableProtocol->getDeclaredType());
-    builder.addRequirement(req, source, module);
-  }
-  return std::move(builder)
-      .computeGenericSignature(SourceLoc(), /*allowConcreteGenericParams*/ true)
-      ->getCanonicalSignature();
-}
-
 CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     IndexSubset *parameterIndices, unsigned resultIndex,
     AutoDiffDerivativeFunctionKind kind, TypeConverter &TC,
@@ -243,8 +213,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // Get the canonical derivative function generic signature.
   if (!derivativeFnGenSig)
     derivativeFnGenSig = getSubstGenericSignature();
-  derivativeFnGenSig = getAutoDiffDerivativeFunctionGenericSignature(
-      derivativeFnGenSig, getParameters(), parameterIndices, &TC.M);
+  derivativeFnGenSig = autodiff::getConstrainedDerivativeGenericSignature(
+      this, parameterIndices, derivativeFnGenSig).getCanonicalSignature();
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult =
