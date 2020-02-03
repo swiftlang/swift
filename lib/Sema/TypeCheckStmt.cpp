@@ -517,23 +517,6 @@ public:
     
     TypeCheckExprOptions options = {};
     
-    // If the result type is an opaque type, this is an opportunity to resolve
-    // the underlying type.
-    auto isOpaqueReturnTypeOfCurrentFunc = [&](OpaqueTypeDecl *opaque) -> bool {
-      // Closures currently don't support having opaque types.
-      auto funcDecl = TheFunc->getAbstractFunctionDecl();
-      if (!funcDecl)
-        return false;
-
-      return opaque->isOpaqueReturnTypeOfFunction(funcDecl);
-    };
-    
-    if (auto opaque = ResultTy->getAs<OpaqueTypeArchetypeType>()) {
-      if (isOpaqueReturnTypeOfCurrentFunc(opaque->getDecl())) {
-        options |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
-      }
-    }
-
     if (EndTypeCheckLoc.isValid()) {
       assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
              "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
