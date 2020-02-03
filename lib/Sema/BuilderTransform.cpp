@@ -693,9 +693,9 @@ private:
       declRef->setType(LValueType::get(temporaryVar->getType()));
 
       // Load the right-hand side if needed.
-      if (finalCapturedExpr->getType()->is<LValueType>()) {
-        auto &cs = solution.getConstraintSystem();
-        finalCapturedExpr = cs.addImplicitLoadExpr(finalCapturedExpr);
+      if (finalCapturedExpr->getType()->hasLValueType()) {
+        finalCapturedExpr =
+            TypeChecker::addImplicitLoadExpr(ctx, finalCapturedExpr);
       }
 
       auto assign = new (ctx) AssignExpr(
@@ -839,9 +839,8 @@ public:
         auto finalCondExpr = rewriteExpr(condExpr);
 
         // Load the condition if needed.
-        if (finalCondExpr->getType()->is<LValueType>()) {
-          auto &cs = solution.getConstraintSystem();
-          finalCondExpr = cs.addImplicitLoadExpr(finalCondExpr);
+        if (finalCondExpr->getType()->hasLValueType()) {
+          finalCondExpr = TypeChecker::addImplicitLoadExpr(ctx, finalCondExpr);
         }
 
         condElement.setBoolean(finalCondExpr);

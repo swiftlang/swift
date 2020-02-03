@@ -1074,10 +1074,13 @@ public:
   /// more complicated than simplify wrapping given root in newly created
   /// `LoadExpr`, because `ForceValueExpr` and `ParenExpr` supposed to appear
   /// only at certain positions in AST.
-  static Expr *
-  addImplicitLoadExpr(ASTContext &Context, Expr *expr,
-                      std::function<Type(Expr *)> getType,
-                      std::function<void(Expr *, Type)> setType);
+  static Expr *addImplicitLoadExpr(ASTContext &Context, Expr *expr,
+                                   std::function<Type(Expr *)> getType =
+                                       [](Expr *E) { return E->getType(); },
+                                   std::function<void(Expr *, Type)> setType =
+                                       [](Expr *E, Type type) {
+                                         E->setType(type);
+                                       });
 
   /// Determine whether the given type contains the given protocol.
   ///
