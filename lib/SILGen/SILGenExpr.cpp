@@ -165,8 +165,14 @@ namespace {
 struct EndBorrowCleanup : Cleanup {
   SILValue borrowedValue;
 
-  EndBorrowCleanup(SILValue borrowedValue)
-      : borrowedValue(borrowedValue) {}
+  EndBorrowCleanup(SILValue borrowedValue) : borrowedValue(borrowedValue) {
+    if (auto *arg = dyn_cast<SILPhiArgument>(borrowedValue)) {
+      if (auto *ti = arg->getSingleTerminator()) {
+        assert(!ti->isTransformationTerminator() &&
+               "Transforming terminators do not have end_borrow");
+      }
+    }
+  }
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
