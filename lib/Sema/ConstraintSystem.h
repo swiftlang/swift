@@ -1147,6 +1147,7 @@ class SolutionApplicationTarget {
 
   union {
     struct {
+      /// The expression being type-checked.
       Expr *expression;
 
       /// The purpose of the contextual type.
@@ -1154,6 +1155,10 @@ class SolutionApplicationTarget {
 
       /// The type to which the expression should be converted.
       TypeLoc convertType;
+
+      /// When initializing a pattern from the expression, this is the
+      /// pattern.
+      Pattern *pattern = nullptr;
 
       /// Whether the expression result will be discarded at the end.
       bool isDiscarded;
@@ -1184,6 +1189,10 @@ public:
     function.function = fn;
     function.body = body;
   }
+
+  /// Form a target for the initialization of a pattern from an expression.
+  static SolutionApplicationTarget forInitialization(
+      Expr *initializer, Type patternType, Pattern *pattern);
 
   Expr *getAsExpr() const {
     switch (kind) {
@@ -1234,6 +1243,13 @@ public:
   void setExprConversionTypeLoc(TypeLoc type) {
     assert(kind == Kind::expression);
     expression.convertType = type;
+  }
+
+  /// For a pattern initialization target, retrieve the pattern.
+  Pattern *getInitializationPattern() const {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_Initialization);
+    return expression.pattern;
   }
 
   /// Whether the contextual type is only a hint, rather than a type

@@ -2679,44 +2679,24 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   if (isa<OptionalSomePattern>(pattern)) {
     flags |= TypeCheckExprFlags::ExpressionTypeMustBeOptional;
-  } else if (patternType && !patternType->isEqual(Context.TheUnresolvedType)) {
-    contextualType = TypeLoc::withoutLoc(patternType);
-
-    // If we already had an error, don't repeat the problem.
-    if (contextualType.getType()->hasError())
-      return true;
-    
-    // Allow the initializer expression to establish the underlying type of an
-    // opaque type.
-    if (auto opaqueType = patternType->getAs<OpaqueTypeArchetypeType>()){
-      flags |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
-    }
-
-    // Only provide a TypeLoc if it makes sense to allow diagnostics.
-    if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
-      const Pattern *inner = typedPattern->getSemanticsProvidingPattern();
-      if (isa<NamedPattern>(inner) || isa<AnyPattern>(inner)) {
-        contextualType = typedPattern->getTypeLoc();
-        if (!contextualType.getType())
-          contextualType.setType(patternType);
-      }
-    }
   }
     
   // Type-check the initializer.
-  auto resultTy = typeCheckExpression(initializer, DC, contextualType,
-                                      contextualPurpose, flags, &listener);
+  auto target = SolutionApplicationTarget::forInitialization(
+      initializer, patternType, pattern);
+  bool unresolvedTypeExprs = false;
+  auto resultTarget = typeCheckExpression(target, DC, unresolvedTypeExprs,
+                                          flags, &listener);
 
-  if (resultTy) {
+  if (resultTarget) {
+    initializer = resultTarget->getAsExpr();
+
     TypeResolutionOptions options =
         isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())
         ? TypeResolverContext::EditorPlaceholderExpr
         : TypeResolverContext::InExpression;
     options |= TypeResolutionFlags::OverrideType;
 
-    // FIXME: initTy should be the same as resultTy; now that typeCheckExpression()
-    // returns a Type and not bool, we should be able to simplify the listener
-    // implementation here.
     auto initTy = listener.getPatternInitType(nullptr);
     if (initTy->hasDependentMember())
       return true;
@@ -2730,15 +2710,17 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     } else {
       return true;
     }
+  } else {
+    initializer = target.getAsExpr();
   }
 
-  if (!resultTy && !initializer->getType())
+  if (!resultTarget && !initializer->getType())
     initializer->setType(ErrorType::get(Context));
 
   // If the type of the pattern is inferred, assign error types to the pattern
   // and its variables, to prevent it from being referenced by the constraint
   // system.
-  if (!resultTy &&
+  if (!resultTarget &&
       (patternType->hasUnresolvedType() ||
        patternType->hasUnboundGenericType())) {
     pattern->setType(ErrorType::get(Context));
@@ -2754,7 +2736,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     });
   }
 
-  return !resultTy;
+  return !resultTarget;
 }
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,

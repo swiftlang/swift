@@ -3996,6 +3996,32 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.isDiscarded = isDiscarded;
 }
 
+SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
+    Expr *initializer, Type patternType, Pattern *pattern) {
+  // Determine the contextual type for the initialization.
+  TypeLoc contextualType;
+  if (!isa<OptionalSomePattern>(pattern) &&
+      patternType && !patternType->isHole()) {
+    contextualType = TypeLoc::withoutLoc(patternType);
+
+    // Only provide a TypeLoc if it makes sense to allow diagnostics.
+    if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
+      const Pattern *inner = typedPattern->getSemanticsProvidingPattern();
+      if (isa<NamedPattern>(inner) || isa<AnyPattern>(inner)) {
+        contextualType = typedPattern->getTypeLoc();
+        if (!contextualType.getType())
+          contextualType.setType(patternType);
+      }
+    }
+  }
+
+  SolutionApplicationTarget target(
+      initializer, CTP_Initialization, contextualType,
+      /*isDiscarded=*/false);
+  target.expression.pattern = pattern;
+  return target;
+}
+
 bool SolutionApplicationTarget::contextualTypeIsOnlyAHint(
     bool isOpaqueReturnType) const {
   assert(kind == Kind::expression);
