@@ -872,10 +872,6 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
       NewArgs.push_back(Apply.getArgument(ArgIdx));
   }
 
-  // Keep track of weather we made any updates at all. Otherwise, we will
-  // have an infinite loop.
-  bool madeUpdate = false;
-
   // Transform the parameter arguments.
   SmallVector<ConcreteArgumentCopy, 4> concreteArgCopies;
   for (unsigned EndIdx = Apply.getNumArguments(); ArgIdx < EndIdx; ++ArgIdx) {
@@ -903,7 +899,6 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     if (argSub) {
       concreteArgCopies.push_back(*argSub);
       NewArgs.push_back(argSub->tempArg);
-      madeUpdate = true;
     } else {
       NewArgs.push_back(CEI.ConcreteValue);
     }
@@ -929,7 +924,8 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
         });
   }
 
-  bool canUpdateArgs = [&]() {
+  bool canUpdateArgs, madeUpdate;
+  std::tie(canUpdateArgs, madeUpdate) = [&]() {
     auto substTy =
         Apply.getCallee()
             ->getType()
@@ -939,12 +935,16 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     SILFunctionConventions conv(substTy,
                                 SILModuleConventions(Apply.getModule()));
     bool canUpdate = true;
+    // Keep track of weather we made any updates at all. Otherwise, we will
+    // have an infinite loop.
+    bool madeUpdate = false;
     for (unsigned index = 0; index < conv.getNumSILArguments(); ++index) {
       canUpdate &= conv.getSILArgumentType(index) == NewArgs[index]->getType();
+      madeUpdate |= NewArgs[index]->getType() != Apply.getArgument(index)->getType();
     }
-    return canUpdate;
+    return std::make_tuple(canUpdate, madeUpdate);
   }();
-
+  
   if (!canUpdateArgs || !madeUpdate) {
     // Remove any new instructions created while attempting to optimize this
     // apply. Since the apply was never rewritten, if they aren't removed here,
