@@ -2857,6 +2857,11 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       ElementType = solution.simplifyType(ElementType);
       IteratorType = solution.simplifyType(IteratorType);
 
+      // If the type doesn't conform to Sequence we'll get its element type
+      // bound to `UnresolvedType` since fixes are allowed.
+      if (InitType->is<UnresolvedType>())
+        return nullptr;
+
       cs.cacheExprTypes(expr);
       Stmt->setSequence(expr);
       solution.setExprTypes(expr);
