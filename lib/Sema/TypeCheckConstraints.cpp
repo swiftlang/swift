@@ -2150,7 +2150,7 @@ TypeChecker::typeCheckExpression(
 
   Type convertTo = convertType.getType();
 
-  if (options.contains(TypeCheckExprFlags::ExpressionTypeMustBeOptional)) {
+  if (target.isOptionalSomePatternInit()) {
     assert(!convertTo && "convertType and type check options conflict");
     auto *convertTypeLocator =
         cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
@@ -2669,24 +2669,12 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   if (!initializer)
     return true;
 
-  TypeLoc contextualType;
-  auto contextualPurpose = CTP_Unused;
-  TypeCheckExprOptions flags = None;
-
-  // Set the contextual purpose even if the pattern doesn't have a type so
-  // if there's an error we can use that information to inform diagnostics.
-  contextualPurpose = CTP_Initialization;
-
-  if (isa<OptionalSomePattern>(pattern)) {
-    flags |= TypeCheckExprFlags::ExpressionTypeMustBeOptional;
-  }
-    
   // Type-check the initializer.
   auto target = SolutionApplicationTarget::forInitialization(
       initializer, patternType, pattern);
   bool unresolvedTypeExprs = false;
   auto resultTarget = typeCheckExpression(target, DC, unresolvedTypeExprs,
-                                          flags, &listener);
+                                          None, &listener);
 
   if (resultTarget) {
     initializer = resultTarget->getAsExpr();

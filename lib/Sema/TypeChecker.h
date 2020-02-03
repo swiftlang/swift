@@ -176,10 +176,6 @@ enum class TypeCheckExprFlags {
   /// not affect type checking itself.
   IsExprStmt = 0x20,
 
-  /// If set, a conversion constraint should be specified so that the result of
-  /// the expression is an optional type.
-  ExpressionTypeMustBeOptional = 0x200,
-
   /// FIXME(diagnostics): Once diagnostics are completely switched to new
   /// framework, this flag could be removed as obsolete.
   ///

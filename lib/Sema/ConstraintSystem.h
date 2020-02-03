@@ -1252,6 +1252,13 @@ public:
     return expression.pattern;
   }
 
+  /// Whether this is an initialization for an Optional.Some pattern.
+  bool isOptionalSomePatternInit() const {
+    return kind == Kind::expression &&
+        expression.contextualPurpose == CTP_Initialization &&
+        isa<OptionalSomePattern>(expression.pattern);
+  }
+  
   /// Whether the contextual type is only a hint, rather than a type
   bool contextualTypeIsOnlyAHint(bool isOpaqueReturnType) const;
 
