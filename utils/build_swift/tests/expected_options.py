@@ -14,7 +14,6 @@ import multiprocessing
 from build_swift import argparse
 from build_swift import defaults
 
-from swift_build_support.swift_build_support import host
 from swift_build_support.swift_build_support import targets
 
 
@@ -169,7 +168,7 @@ EXPECTED_DEFAULTS = {
     'llvm_assertions': True,
     'llvm_build_variant': 'Debug',
     'llvm_max_parallel_lto_link_jobs':
-        host.max_lto_link_job_counts()['llvm'],
+        defaults.LLVM_MAX_PARALLEL_LTO_LINK_JOBS,
     'llvm_targets_to_build': 'X86;ARM;AArch64;PowerPC;SystemZ;Mips',
     'tsan_libdispatch_test': False,
     'long_test': False,
@@ -191,7 +190,7 @@ EXPECTED_DEFAULTS = {
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
     'swift_tools_max_parallel_lto_link_jobs':
-        host.max_lto_link_job_counts()['swift'],
+        defaults.SWIFT_MAX_PARALLEL_LTO_LINK_JOBS,
     'swift_user_visible_version': defaults.SWIFT_USER_VISIBLE_VERSION,
     'symbols_package': None,
     'test': None,
