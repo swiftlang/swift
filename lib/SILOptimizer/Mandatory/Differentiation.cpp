@@ -84,39 +84,6 @@ template <typename T> static inline void debugDump(T &v) {
                           << v << "\n==== END DEBUG DUMP ====\n");
 }
 
-/// Returns the "constrained" derivative generic signature given:
-/// - An original SIL function type.
-/// - A wrt parameter index subset.
-/// - A possibly uncanonical derivative generic signature (optional).
-/// - Additional derivative requirements (optional).
-/// The constrained derivative generic signature constrains all wrt parameters
-/// to conform to `Differentiable`.
-static GenericSignature
-getConstrainedDerivativeGenericSignature(CanSILFunctionType originalFnTy,
-                                         IndexSubset *paramIndexSet,
-                                         GenericSignature derivativeGenSig) {
-  if (!derivativeGenSig)
-    derivativeGenSig = originalFnTy->getSubstGenericSignature();
-  if (!derivativeGenSig)
-    return nullptr;
-  // Constrain all wrt parameters to `Differentiable`.
-  auto &ctx = derivativeGenSig->getASTContext();
-  auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  SmallVector<Requirement, 4> requirements;
-  for (unsigned paramIdx : paramIndexSet->getIndices()) {
-    auto paramType = originalFnTy->getParameters()[paramIdx].getInterfaceType();
-    Requirement req(RequirementKind::Conformance, paramType,
-                    diffableProto->getDeclaredType());
-    requirements.push_back(req);
-  }
-  return evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequest{derivativeGenSig.getPointer(),
-                                      /*addedGenericParams*/ {},
-                                      std::move(requirements)},
-      nullptr);
-}
-
 namespace {
 
 class DifferentiationTransformer {
@@ -597,7 +564,7 @@ emitDerivativeFunctionReference(
             invoker.getIndirectDifferentiation()
                 .second->getDerivativeGenericSignature();
       auto derivativeConstrainedGenSig =
-          getConstrainedDerivativeGenericSignature(
+          autodiff::getConstrainedDerivativeGenericSignature(
               originalFn->getLoweredFunctionType(), desiredParameterIndices,
               contextualDerivativeGenSig);
       minimalWitness = SILDifferentiabilityWitness::createDefinition(
