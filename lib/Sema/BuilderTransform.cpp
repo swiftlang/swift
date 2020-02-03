@@ -693,7 +693,7 @@ private:
       declRef->setType(LValueType::get(temporaryVar->getType()));
 
       // Load the right-hand side if needed.
-      if (finalCapturedExpr->getType()->is<LValueType>()) {
+      if (finalCapturedExpr->getType()->hasLValueType()) {
         finalCapturedExpr =
             TypeChecker::addImplicitLoadExpr(ctx, finalCapturedExpr);
       }
@@ -839,7 +839,7 @@ public:
         auto finalCondExpr = rewriteExpr(condExpr);
 
         // Load the condition if needed.
-        if (finalCondExpr->getType()->is<LValueType>()) {
+        if (finalCondExpr->getType()->hasLValueType()) {
           finalCondExpr = TypeChecker::addImplicitLoadExpr(ctx, finalCondExpr);
         }
 
