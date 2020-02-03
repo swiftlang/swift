@@ -65,6 +65,7 @@ struct TestOptions {
   Optional<unsigned> fuzzyWeight;
   Optional<unsigned> popularityBonus;
   StringRef filterRulesJSON;
+  std::string moduleCachePath;
   bool rawOutput = false;
   bool structureOutput = false;
   ArrayRef<const char *> compilerArgs;
@@ -251,6 +252,8 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
         return false;
       }
       options.showTopNonLiteral = uval;
+    } else if (opt == "module-cache-path") {
+      options.moduleCachePath = value;
     }
   }
 
@@ -672,6 +675,10 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
     if (const char *sdk = getenv("SDKROOT")) {
       sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND,"-sdk");
       sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND, sdk);
+    }
+    if (!options.moduleCachePath.empty()) {
+      sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND, "-module-cache-path");
+      sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND, options.moduleCachePath.c_str());
     }
     // Add -- options.
     for (const char *arg : options.compilerArgs)
