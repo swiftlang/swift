@@ -15,58 +15,102 @@ private func symbol<T>(_ handle: UnsafeMutableRawPointer, _ name: String) -> T {
   return unsafeBitCast(result, to: T.self)
 }
 
+enum Sym {
+  static let pidFromHint: @convention(c) (NSString) -> pid_t =
+    symbol(symbolicationHandle, "pidFromHint")
+  static let CSSymbolicatorCreateWithTask: @convention(c) (task_t) -> CSTypeRef =
+    symbol(coreSymbolicationHandle, "CSSymbolicatorCreateWithTask")
+  static let CSSymbolicatorGetSymbolOwnerWithNameAtTime:
+    @convention(c) (CSTypeRef, UnsafePointer<CChar>, CSMachineTime) -> CSTypeRef =
+      symbol(coreSymbolicationHandle, "CSSymbolicatorGetSymbolOwnerWithNameAtTime")
+  static let CSSymbolOwnerForeachSymbol:
+    @convention(c) (CSTypeRef, @convention(block) (CSTypeRef) -> Void) -> UInt =
+      symbol(coreSymbolicationHandle, "CSSymbolOwnerForeachSymbol")
+  static let CSSymbolOwnerGetSymbolWithMangledName: @convention(c)
+    (CSTypeRef, UnsafePointer<CChar>) -> CSTypeRef =
+      symbol(coreSymbolicationHandle, "CSSymbolOwnerGetSymbolWithMangledName")
+  static let CSSymbolGetName: @convention(c) (CSTypeRef) -> UnsafePointer<CChar>? =
+    symbol(coreSymbolicationHandle, "CSSymbolGetName")
+  static let CSSymbolGetMangledName: @convention(c) (CSTypeRef) -> UnsafePointer<CChar>? =
+    symbol(coreSymbolicationHandle, "CSSymbolGetMangledName")
+  static let CSSymbolIsFunction: @convention(c) (CSTypeRef) -> CBool =
+    symbol(coreSymbolicationHandle, "CSSymbolIsFunction")
+  static let CSSymbolGetRange: @convention(c) (CSTypeRef) -> NSRange =
+    symbol(coreSymbolicationHandle, "CSSymbolGetRange")
+  static let task_start_peeking: @convention(c) (task_t) -> kern_return_t =
+    symbol(symbolicationHandle, "task_start_peeking")
+  static let task_peek: @convention(c) (task_t, mach_vm_address_t, mach_vm_size_t,
+                                        UnsafeMutablePointer<UnsafeRawPointer?>) ->
+                                         kern_return_t =
+    symbol(symbolicationHandle, "task_peek")
+}
+
 typealias CSTypeRef = NSRange
 typealias CSMachineTime = UInt64
 let kCSNow = CSMachineTime(Int64.max) + 1
 
 func pidFromHint(_ hint: String) -> pid_t? {
-  let pidFromHint: @convention(c) (NSString) -> pid_t =
-    symbol(symbolicationHandle, "pidFromHint")
-  let result = pidFromHint(hint as NSString)
+  let result = Sym.pidFromHint(hint as NSString)
   return result == 0 ? nil : result
 }
 
 func CSSymbolicatorCreateWithTask(_ task: task_t) -> CSTypeRef {
-  let CSSymbolicatorCreateWithTask: @convention(c) (task_t) -> CSTypeRef =
-    symbol(coreSymbolicationHandle, "CSSymbolicatorCreateWithTask")
-  return CSSymbolicatorCreateWithTask(task)
+  return Sym.CSSymbolicatorCreateWithTask(task)
 }
 
 func CSSymbolicatorGetSymbolOwnerWithNameAtTime(_ symbolicator: CSTypeRef,
                                                 _ name: String,
                                                 _ time: CSMachineTime)
                                                 -> CSTypeRef {
-  let CSSymbolicatorGetSymbolOwnerWithNameAtTime:
-    @convention(c) (CSTypeRef, UnsafePointer<CChar>, CSMachineTime) -> CSTypeRef =
-      symbol(coreSymbolicationHandle, "CSSymbolicatorGetSymbolOwnerWithNameAtTime")
-  return CSSymbolicatorGetSymbolOwnerWithNameAtTime(symbolicator, name, time)
+  return Sym.CSSymbolicatorGetSymbolOwnerWithNameAtTime(symbolicator, name, time)
 }
 
 @discardableResult
 func CSSymbolOwnerForeachSymbol(_ symbolOwner: CSTypeRef,
                                 _ iterator: (CSTypeRef) -> Void) -> UInt {
-  let CSSymbolOwnerForeachSymbol:
-    @convention(c) (CSTypeRef, @convention(block) (CSTypeRef) -> Void) -> UInt =
-      symbol(coreSymbolicationHandle, "CSSymbolOwnerForeachSymbol")
-  return CSSymbolOwnerForeachSymbol(symbolOwner, iterator)
+  return Sym.CSSymbolOwnerForeachSymbol(symbolOwner, iterator)
+}
+
+func CSSymbolOwnerGetSymbolWithMangledName(_ owner: CSTypeRef, _ name: String)
+  -> CSTypeRef {
+  return Sym.CSSymbolOwnerGetSymbolWithMangledName(owner, name)
 }
 
 func CSSymbolGetName(_ sym: CSTypeRef) -> String? {
-  let CSSymbolGetName: @convention(c) (CSTypeRef) -> UnsafePointer<CChar>? =
-    symbol(coreSymbolicationHandle, "CSSymbolGetName")
-  let name = CSSymbolGetName(sym)
+  let name = Sym.CSSymbolGetName(sym)
   return name.map({ String(cString: $0) })
 }
 
 func CSSymbolGetMangledName(_ sym: CSTypeRef) -> String? {
-  let CSSymbolGetMangledName: @convention(c) (CSTypeRef) -> UnsafePointer<CChar>? =
-    symbol(coreSymbolicationHandle, "CSSymbolGetMangledName")
-  let name = CSSymbolGetMangledName(sym)
+  let name = Sym.CSSymbolGetMangledName(sym)
   return name.map({ String(cString: $0) })
 }
 
 func CSSymbolIsFunction(_ sym: CSTypeRef) -> Bool {
-  let CSSymbolIsFunction: @convention(c) (CSTypeRef) -> CBool =
-    symbol(coreSymbolicationHandle, "CSSymbolIsFunction")
-  return CSSymbolIsFunction(sym)
+  return Sym.CSSymbolIsFunction(sym)
+}
+
+func CSSymbolGetRange(_ sym: CSTypeRef) -> NSRange {
+  return Sym.CSSymbolGetRange(sym)
+}
+
+func task_start_peeking(_ task: task_t) -> Bool {
+  let result = Sym.task_start_peeking(task)
+  if result == KERN_SUCCESS {
+    return true
+  }
+  
+  print("task_start_peeking failed: \(machErrStr(result))", to: &Std.err)
+  return false
+}
+
+func task_peek(_ task: task_t, _ start: mach_vm_address_t, _ size: mach_vm_size_t) ->
+  UnsafeRawPointer? {
+  var ptr: UnsafeRawPointer? = nil
+  let result = Sym.task_peek(task, start, size, &ptr)
+  if result != KERN_SUCCESS {
+    print("Unable to read (\(start), \(size)): \(machErrStr(result))", to: &Std.err)
+    return nil
+  }
+  return ptr
 }
