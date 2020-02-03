@@ -871,6 +871,11 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
        ArgIdx < EndIdx; ++ArgIdx) {
       NewArgs.push_back(Apply.getArgument(ArgIdx));
   }
+
+  // Keep track of weather we made any updates at all. Otherwise, we will
+  // have an infinite loop.
+  bool madeUpdate = false;
+
   // Transform the parameter arguments.
   SmallVector<ConcreteArgumentCopy, 4> concreteArgCopies;
   for (unsigned EndIdx = Apply.getNumArguments(); ArgIdx < EndIdx; ++ArgIdx) {
@@ -898,6 +903,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     if (argSub) {
       concreteArgCopies.push_back(*argSub);
       NewArgs.push_back(argSub->tempArg);
+      madeUpdate = true;
     } else {
       NewArgs.push_back(CEI.ConcreteValue);
     }
@@ -939,7 +945,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     return canUpdate;
   }();
 
-  if (!canUpdateArgs) {
+  if (!canUpdateArgs || !madeUpdate) {
     // Remove any new instructions created while attempting to optimize this
     // apply. Since the apply was never rewritten, if they aren't removed here,
     // they will be removed later as dead when visited by SILCombine, causing
