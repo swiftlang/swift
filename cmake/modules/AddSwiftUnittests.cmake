@@ -50,8 +50,6 @@ function(add_swift_unittest test_dirname)
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     set_property(TARGET "${test_dirname}" APPEND PROPERTY COMPILE_FLAGS
       " -march=core2")
-    set_property(TARGET "${test_dirname}" APPEND PROPERTY LINK_FLAGS
-      " -march=core2")
   endif()
 
   find_program(LDLLD_PATH "ld.lld")
