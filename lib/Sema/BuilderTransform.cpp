@@ -694,8 +694,8 @@ private:
 
       // Load the right-hand side if needed.
       if (finalCapturedExpr->getType()->is<LValueType>()) {
-        auto &cs = solution.getConstraintSystem();
-        finalCapturedExpr = cs.addImplicitLoadExpr(finalCapturedExpr);
+        finalCapturedExpr =
+            TypeChecker::addImplicitLoadExpr(ctx, finalCapturedExpr);
       }
 
       auto assign = new (ctx) AssignExpr(
@@ -840,8 +840,7 @@ public:
 
         // Load the condition if needed.
         if (finalCondExpr->getType()->is<LValueType>()) {
-          auto &cs = solution.getConstraintSystem();
-          finalCondExpr = cs.addImplicitLoadExpr(finalCondExpr);
+          finalCondExpr = TypeChecker::addImplicitLoadExpr(ctx, finalCondExpr);
         }
 
         condElement.setBoolean(finalCondExpr);
