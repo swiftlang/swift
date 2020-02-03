@@ -940,11 +940,12 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     bool madeUpdate = false;
     for (unsigned index = 0; index < conv.getNumSILArguments(); ++index) {
       canUpdate &= conv.getSILArgumentType(index) == NewArgs[index]->getType();
-      madeUpdate |= NewArgs[index]->getType() != Apply.getArgument(index)->getType();
+      madeUpdate |=
+          NewArgs[index]->getType() != Apply.getArgument(index)->getType();
     }
     return std::make_tuple(canUpdate, madeUpdate);
   }();
-  
+
   if (!canUpdateArgs || !madeUpdate) {
     // Remove any new instructions created while attempting to optimize this
     // apply. Since the apply was never rewritten, if they aren't removed here,
