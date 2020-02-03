@@ -198,7 +198,7 @@ namespace {
       ASTContext &ctx = Function.getAsDeclContext()->getASTContext();
       auto *AFD = Function.getAbstractFunctionDecl();
 
-      if (ctx.TypeCheckerOpts.WarnLongFunctionBodies) {
+      if (ctx.TypeCheckerOpts.DebugTimeFunctionBodies) {
         // Round up to the nearest 100th of a millisecond.
         llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100) << "ms\t";
         Function.getLoc().print(llvm::errs(), ctx.SourceMgr);
@@ -213,7 +213,7 @@ namespace {
         llvm::errs() << "\n";
       }
 
-      const auto WarnLimit = ctx.TypeCheckerOpts.DebugTimeFunctionBodies;
+      const auto WarnLimit = ctx.TypeCheckerOpts.WarnLongFunctionBodies;
       if (WarnLimit != 0 && elapsedMS >= WarnLimit) {
         if (AFD) {
           ctx.Diags.diagnose(AFD, diag::debug_long_function_body,
