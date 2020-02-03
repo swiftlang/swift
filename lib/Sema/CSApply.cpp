@@ -845,11 +845,9 @@ namespace {
 
       // If we're referring to a member type, it's just a type
       // reference.
-      if (isa<TypeDecl>(member)) {
+      if (auto *TD = dyn_cast<TypeDecl>(member)) {
         Type refType = simplifyType(openedType);
-        auto ref =
-            TypeExpr::createImplicitHack(memberLoc.getBaseNameLoc(),
-                                         refType, context);
+        auto ref = TypeExpr::createForDecl(memberLoc, TD, cs.DC, /*isImplicit=*/false);
         cs.setType(ref, refType);
         auto *result = new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, ref, refType);
