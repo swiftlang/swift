@@ -36,7 +36,7 @@ public func testVTableBuilding(user: User) {
   // changes, please check that offset is still correct.
   // CHECK-IR-NOT: ret
   // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 28|i32 31}}
-  _ = user.lastMethod()
+  user.lastMethod()
 } // CHECK-IR: ret void
 
 #if VERIFY

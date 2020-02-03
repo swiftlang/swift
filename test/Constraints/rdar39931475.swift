@@ -5,5 +5,5 @@ protocol P {
 }
 
 func foo<T: P>(_ bar: T) {
-  _ = bar.b { a in Double((a, a += 1).0) }
+  bar.b { a in Double((a, a += 1).0) }
 }
