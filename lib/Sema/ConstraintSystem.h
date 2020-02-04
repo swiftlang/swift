@@ -3767,7 +3767,10 @@ public:
   void simplifyDisjunctionChoice(Constraint *choice);
 
   /// Apply the given function builder to the closure expression.
-  TypeMatchResult matchFunctionBuilder(
+  ///
+  /// \returns \c None when the function builder cannot be applied at all,
+  /// otherwise the result of applying the function builder.
+  Optional<TypeMatchResult> matchFunctionBuilder(
       AnyFunctionRef fn, Type builderType, Type bodyResultType,
       ConstraintKind bodyResultConstraintKind,
       ConstraintLocator *calleeLocator, ConstraintLocatorBuilder locator);
