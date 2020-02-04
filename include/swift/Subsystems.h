@@ -55,7 +55,6 @@ namespace swift {
   class ModuleDecl;
   typedef void *OpaqueSyntaxNode;
   class Parser;
-  class PersistentParserState;
   class SerializationOptions;
   class SILOptions;
   class SILModule;
@@ -110,13 +109,9 @@ namespace swift {
   ///
   /// \param BufferID The buffer to parse from.
   ///
-  /// \param PersistentState If non-null the same PersistentState object can be
-  /// used to save parser state for code completion.
-  ///
   /// \param DelayBodyParsing Whether parsing of type and function bodies can be
   /// delayed.
   void parseIntoSourceFile(SourceFile &SF, unsigned BufferID,
-                           PersistentParserState *PersistentState = nullptr,
                            bool DelayBodyParsing = true,
                            bool EvaluateConditionals = true);
 
@@ -124,7 +119,7 @@ namespace swift {
   void parseSourceFileSIL(SourceFile &SF, SILParserState *sil);
 
   /// Finish the code completion.
-  void performCodeCompletionSecondPass(PersistentParserState &PersistentState,
+  void performCodeCompletionSecondPass(SourceFile &SF,
                                        CodeCompletionCallbacksFactory &Factory);
 
   /// Lex and return a vector of tokens for the given buffer.

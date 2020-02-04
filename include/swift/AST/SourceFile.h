@@ -18,6 +18,8 @@
 
 namespace swift {
 
+class PersistentParserState;
+
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
@@ -153,6 +155,16 @@ private:
   /// be part of the underlying module. (ClangImporter overlays use a different
   /// mechanism which is not SourceFile-dependent.)
   SeparatelyImportedOverlayMap separatelyImportedOverlays;
+
+  /// A pointer to PersistentParserState with a function reference to its
+  /// deleter to handle the fact that it's forward declared.
+  using ParserStatePtr =
+      std::unique_ptr<PersistentParserState, void (*)(PersistentParserState *)>;
+
+  /// Stores delayed parser state that code completion needs to be able to
+  /// resume parsing at the code completion token in the file.
+  ParserStatePtr DelayedParserState =
+      ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
 
   friend ASTContext;
   friend Impl;
@@ -404,6 +416,20 @@ public:
 
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
+
+  /// Retrieves the previously set delayed parser state, asserting that it
+  /// exists.
+  PersistentParserState *getDelayedParserState() {
+    auto *state = DelayedParserState.get();
+    assert(state && "Didn't set any delayed parser state!");
+    return state;
+  }
+
+  /// Record delayed parser state for the source file. This is needed for code
+  /// completion's second pass.
+  void setDelayedParserState(ParserStatePtr &&state) {
+    DelayedParserState = std::move(state);
+  }
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;

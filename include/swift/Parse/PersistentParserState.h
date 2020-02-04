@@ -79,11 +79,15 @@ public:
   void restoreCodeCompletionDelayedDeclState(
       const CodeCompletionDelayedDeclState &other);
 
-  bool hasCodeCompletionDelayedDeclState() {
+  bool hasCodeCompletionDelayedDeclState() const {
     return CodeCompletionDelayedDeclStat.get() != nullptr;
   }
 
   CodeCompletionDelayedDeclState &getCodeCompletionDelayedDeclState() {
+    return *CodeCompletionDelayedDeclStat.get();
+  }
+  const CodeCompletionDelayedDeclState &
+  getCodeCompletionDelayedDeclState() const {
     return *CodeCompletionDelayedDeclStat.get();
   }
 

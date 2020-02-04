@@ -776,8 +776,8 @@ static bool doCodeCompletionImpl(
       Offset, /*EnableASTCaching=*/false, Error,
       CodeCompletionDiagnostics ? &PrintDiags : nullptr,
       [&](CompilerInstance &CI) {
-        performCodeCompletionSecondPass(CI.getPersistentParserState(),
-                                        *callbacksFactory);
+        auto SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
       });
   return isSuccess ? 0 : 1;
 }

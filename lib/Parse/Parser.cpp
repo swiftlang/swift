@@ -112,20 +112,20 @@ using namespace swift::syntax;
 void SILParserTUStateBase::anchor() { }
 
 void swift::performCodeCompletionSecondPass(
-    PersistentParserState &ParserState,
-    CodeCompletionCallbacksFactory &Factory) {
-  if (!ParserState.hasCodeCompletionDelayedDeclState())
+    SourceFile &SF, CodeCompletionCallbacksFactory &Factory) {
+  // If we didn't find the code completion token, bail.
+  auto *parserState = SF.getDelayedParserState();
+  if (!parserState->hasCodeCompletionDelayedDeclState())
     return;
 
-  auto state = ParserState.takeCodeCompletionDelayedDeclState();
-  auto &SF = *state->ParentContext->getParentSourceFile();
+  auto state = parserState->takeCodeCompletionDelayedDeclState();
   auto &Ctx = SF.getASTContext();
 
   FrontendStatsTracer tracer(Ctx.Stats,
                              "CodeCompletionSecondPass");
 
   auto BufferID = Ctx.SourceMgr.getCodeCompletionBufferID();
-  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
+  Parser TheParser(BufferID, SF, nullptr, parserState, nullptr);
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
       Factory.createCodeCompletionCallbacks(TheParser));
