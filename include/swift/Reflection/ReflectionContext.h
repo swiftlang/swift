@@ -104,7 +104,10 @@ public:
   using super::readMetadataAndValueOpaqueExistential;
   using super::readMetadataFromInstance;
   using super::readTypeFromMetadata;
+  using super::stripSignedPointer;
   using typename super::StoredPointer;
+  using typename super::StoredSignedPointer;
+  using typename super::StoredSize;
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
     : super(std::move(reader), *this)
@@ -766,6 +769,84 @@ public:
     } else {
       return getBuilder().getTypeConverter().getTypeInfo(TR);
     }
+  }
+
+  
+
+  struct ConformanceNode {
+    StoredPointer Left, Right;
+    StoredPointer Type;
+    StoredPointer Proto;
+    StoredPointer Description;
+    StoredSize FailureGeneration;
+  };
+
+  StoredSignedPointer getTypeContextDescriptor(const TargetMetadata<Runtime> *Metadata) const {
+    switch (Metadata->getKind()) {
+    case MetadataKind::Class: {
+      const auto cls = static_cast<const TargetClassMetadata<Runtime> *>(Metadata);
+      if (!cls->isTypeMetadata())
+        return {};
+      return cls->getDescriptionAsSignedPointer();
+    }
+    case MetadataKind::Struct:
+    case MetadataKind::Enum:
+    case MetadataKind::Optional:
+      return static_cast<const TargetValueMetadata<Runtime> *>(Metadata)
+          ->Description;
+    case MetadataKind::ForeignClass:
+      return static_cast<const TargetForeignClassMetadata<Runtime> *>(Metadata)
+          ->Description;
+    default:
+      return {};
+    }
+  }
+
+
+  void dumpConformanceNode(const struct ConformanceNode *Node) {
+    Demangler dem;
+    
+    auto TypeDemangled = readDemanglingForContextDescriptor(Node->Type, dem);
+    if (!TypeDemangled) {
+      if (auto Metadata = readMetadata(Node->Type)) {
+        auto Desc = getTypeContextDescriptor(Metadata.getLocalBuffer());
+        TypeDemangled = readDemanglingForContextDescriptor(stripSignedPointer(Desc), dem);
+      }
+    }
+
+    auto TypeName = mangleNode(TypeDemangled);
+
+    auto ProtocolDemangled = readDemanglingForContextDescriptor(Node->Proto, dem);
+    auto ProtocolName = nodeToString(ProtocolDemangled);
+    
+    if (!TypeDemangled) {
+      printf("Unable to dump a conformance to %s\n", ProtocolName.c_str());
+    } else {
+      printf("Conformance: %s: %s\n", TypeName.c_str(), ProtocolName.c_str());
+    }
+  }
+  
+  void dumpConformanceTree(StoredPointer NodePtr) {
+    if (!NodePtr)
+      return;
+    auto NodeBytes = getReader().readBytes(RemoteAddress(NodePtr), sizeof(Node));
+    auto NodeData = reinterpret_cast<const ConformanceNode *>(NodeBytes.get());
+    if (!NodeData)
+      return;
+    dumpConformanceNode(NodeData);
+    dumpConformanceTree(NodeData->Left);
+    dumpConformanceTree(NodeData->Right);
+  }
+
+  void dumpConformances() {
+    std::string ConformancesName = "__ZL12Conformances";
+    auto ConformancesAddr = getReader().getSymbolAddress(ConformancesName);
+    printf("%#llx\n", ConformancesAddr);
+    if (!ConformancesAddr)
+      return;
+
+    auto Root = getReader().readPointer(ConformancesAddr, sizeof(StoredPointer));
+    dumpConformanceTree(Root->getResolvedAddress().getAddressData());
   }
 
 private:

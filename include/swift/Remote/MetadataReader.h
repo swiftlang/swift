@@ -2192,6 +2192,8 @@ private:
         readMangledName(RemoteAddress(extendedContextAddress),
                         MangledNameKind::Type,
                         dem);
+      if (!demangledExtendedContext)
+        return nullptr;
 
       auto demangling = dem.createNode(Node::Kind::Extension);
       demangling->addChild(parentDemangling, dem);
