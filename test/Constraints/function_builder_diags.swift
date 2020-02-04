@@ -284,3 +284,18 @@ func checkConditions(cond: Bool) {
     }
   }
 }
+
+// Check that a closure with a single "return" works with function builders.
+func checkSingleReturn(cond: Bool) {
+  tuplify(cond) { value in
+    return (value, 17)
+  }
+
+  tuplify(cond) { value in
+    (value, 17)
+  }
+
+  tuplify(cond) {
+    ($0, 17)
+  }
+}

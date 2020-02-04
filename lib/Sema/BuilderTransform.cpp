@@ -244,7 +244,15 @@ protected:
       expressions.push_back(buildVarRef(childVar, childVar->getLoc()));
     };
 
-    for (const auto &node : braceStmt->getElements()) {
+    for (auto node : braceStmt->getElements()) {
+      // Implicit returns in single-expression function bodies are treated
+      // as the expression.
+      if (auto returnStmt =
+              dyn_cast_or_null<ReturnStmt>(node.dyn_cast<Stmt *>())) {
+        assert(returnStmt->isImplicit());
+        node = returnStmt->getResult();
+      }
+
       if (auto stmt = node.dyn_cast<Stmt *>()) {
         addChild(visit(stmt));
         continue;
@@ -291,14 +299,9 @@ protected:
   }
 
   VarDecl *visitReturnStmt(ReturnStmt *stmt) {
-    // Allow implicit returns due to 'return' elision.
-    if (!stmt->isImplicit() || !stmt->hasResult()) {
-      if (!unhandledNode)
-        unhandledNode = stmt;
-      return nullptr;
-    }
-
-    return captureExpr(stmt->getResult(), /*oneWay=*/true);
+    if (!unhandledNode)
+      unhandledNode = stmt;
+    return nullptr;
   }
 
   VarDecl *visitDoStmt(DoStmt *doStmt) {
@@ -1117,7 +1120,8 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   return nullptr;
 }
 
-ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
+Optional<ConstraintSystem::TypeMatchResult>
+ConstraintSystem::matchFunctionBuilder(
     AnyFunctionRef fn, Type builderType, Type bodyResultType,
     ConstraintKind bodyResultConstraintKind,
     ConstraintLocator *calleeLocator, ConstraintLocatorBuilder locator) {
@@ -1141,7 +1145,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
   case FunctionBuilderBodyPreCheck::HasReturnStmt:
     // If the body has a return statement, suppress the transform but
     // continue solving the constraint system.
-    return getTypeMatchSuccess();
+    return None;
   }
 
   // Check the form of this body to see if we can apply the
@@ -1287,12 +1291,6 @@ public:
 llvm::Expected<FunctionBuilderBodyPreCheck>
 PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
                                          AnyFunctionRef fn) const {
-  // Single-expression closures should already have been pre-checked.
-  if (auto closure = fn.getAbstractClosureExpr()) {
-    if (closure->hasSingleExpressionBody())
-      return FunctionBuilderBodyPreCheck::Okay;
-  }
-
   return PreCheckFunctionBuilderApplication(fn, false).run();
 }
 
