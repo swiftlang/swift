@@ -3031,33 +3031,25 @@ void ClangImporter::loadObjCMethods(
 
   // Collect the set of visible Objective-C methods with this selector.
   clang::Selector clangSelector = Impl.exportSelector(selector);
-  SmallVector<clang::ObjCMethodDecl *, 4> objcMethods;
-  auto &sema = Impl.Instance->getSema();
-  sema.CollectMultipleMethodsInGlobalPool(clangSelector, objcMethods,
-                                          isInstanceMethod,
-                                          /*CheckTheOther=*/false);
 
-  // Check whether this method is in the class we care about.
-  SmallVector<AbstractFunctionDecl *, 4> foundMethods;
-  for (auto objcMethod : objcMethods) {
-    // Find the owner of this method and determine whether it is the class
-    // we're looking for.
-    if (objcMethod->getClassInterface() != objcClass)
-      continue;
+  AbstractFunctionDecl *method = nullptr;
+  auto *objcMethod = objcClass->lookupMethod(
+      clangSelector, isInstanceMethod,
+      /*shallowCategoryLookup=*/false,
+      /*followSuper=*/false);
 
+  if (objcMethod) {
     // If we found a property accessor, import the property.
     if (objcMethod->isPropertyAccessor())
       (void)Impl.importDecl(objcMethod->findPropertyDecl(true),
                             Impl.CurrentVersion);
 
-    if (auto method = dyn_cast_or_null<AbstractFunctionDecl>(
-                        Impl.importDecl(objcMethod, Impl.CurrentVersion))) {
-      foundMethods.push_back(method);
-    }
+    method = dyn_cast_or_null<AbstractFunctionDecl>(
+        Impl.importDecl(objcMethod, Impl.CurrentVersion));
   }
 
   // If we didn't find anything, we're done.
-  if (foundMethods.empty())
+  if (method == nullptr)
     return;
 
   // If we did find something, it might be a duplicate of something we found
@@ -3066,10 +3058,9 @@ void ClangImporter::loadObjCMethods(
   // FIXME: We shouldn't need to do this.
   llvm::SmallPtrSet<AbstractFunctionDecl *, 4> known;
   known.insert(methods.begin(), methods.end());
-  for (auto method : foundMethods) {
-    if (known.insert(method).second)
-      methods.push_back(method);
-  }
+
+  if (known.insert(method).second)
+    methods.push_back(method);
 }
 
 void
