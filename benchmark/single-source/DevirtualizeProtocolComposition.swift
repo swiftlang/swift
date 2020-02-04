@@ -59,7 +59,7 @@ public func entryPoint1(c: ClassB) -> Int {
 
 @inline(never)
 public func run_DevirtualizeProtocolComposition(N: Int) {
-  for _ in 0..<N * 10_000 {
-    entryPoint1(c: ClassB())
+  for _ in 0..<N * 20_000 {
+    blackHole(entryPoint1(c: ClassB()))
   }
 }
