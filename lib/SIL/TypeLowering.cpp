@@ -1828,9 +1828,8 @@ getEffectiveGenericSignature(AnyFunctionRef fn,
 static CanGenericSignature
 getCanonicalSignatureOrNull(GenericSignature sig) {
   if (!sig || sig->areAllParamsConcrete())
-      return nullptr;
-
-  return sig->getCanonicalSignature();
+    return nullptr;
+  return sig.getCanonicalSignature();
 }
 
 /// Get the type of a global variable accessor function, () -> RawPointer.
@@ -2172,6 +2171,20 @@ CaptureInfo
 TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   PrettyStackTraceSILLocation stack("getting lowered local captures",
                                     fn.getAsRegularLocation(), Context);
+  // If we're guaranteed to never have local captures, bail out now.
+  switch (fn.kind) {
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    return CaptureInfo::empty();
+
+  default:
+    if (fn.hasDecl()) {
+      if (!fn.getDecl()->isLocalCapture())
+        return CaptureInfo::empty();
+    }
+
+    break;
+  }
 
   fn.isForeign = 0;
   fn.isCurried = 0;
@@ -2199,8 +2212,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   std::function<void (SILDeclRef)> collectConstantCaptures;
 
   collectCaptures = [&](CaptureInfo captureInfo, DeclContext *dc) {
-    assert(captureInfo.hasBeenComputed() ||
-           !TypeConverter::canCaptureFromParent(dc));
+    assert(captureInfo.hasBeenComputed());
 
     if (captureInfo.hasGenericParamCaptures())
       capturesGenericParams = true;
@@ -2288,9 +2300,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           continue;
 
         // We can always capture the storage in these cases.
-        Type captureType = capturedVar->getType();
-        if (auto *metatypeType = captureType->getAs<MetatypeType>())
-          captureType = metatypeType->getInstanceType();
+        Type captureType = capturedVar->getType()->getMetatypeInstanceType();
 
         if (auto *selfType = captureType->getAs<DynamicSelfType>()) {
           captureType = selfType->getSelfType();
@@ -2302,11 +2312,22 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           // mutable, we're going to be capturing a box or an address.
           if (captureType->getClassOrBoundGenericClass() &&
               capturedVar->isLet()) {
-            if (selfCapture)
+            // If we've already captured the same value already, just merge
+            // flags.
+            if (selfCapture && selfCapture->getDecl() == capture.getDecl()) {
               selfCapture = selfCapture->mergeFlags(capture);
-            else
+              continue;
+
+            // Otherwise, record the canonical self capture. It will appear
+            // at the end of the capture list.
+            } else if (!selfCapture) {
               selfCapture = capture;
-            continue;
+              continue;
+            }
+
+            // If we end up here, we have multiple different captured values
+            // with a dynamic 'Self' type. Handle this and any subsequent
+            // captures via the normal code path below.
           }
         }
 
@@ -2325,6 +2346,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   };
 
   collectFunctionCaptures = [&](AnyFunctionRef curFn) {
+    if (!curFn.getBody())
+      return;
+
     if (!visitedFunctions.insert(curFn).second)
       return;
 

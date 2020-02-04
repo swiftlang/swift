@@ -532,8 +532,9 @@ class ContextualFailure : public FailureDiagnostic {
 public:
   ContextualFailure(ConstraintSystem &cs, Type lhs, Type rhs,
                     ConstraintLocator *locator)
-      : ContextualFailure(cs, cs.getContextualTypePurpose(), lhs, rhs,
-                          locator) {}
+      : ContextualFailure(cs,
+                          cs.getContextualTypePurpose(locator->getAnchor()),
+                          lhs, rhs, locator) {}
 
   ContextualFailure(ConstraintSystem &cs, ContextualTypePurpose purpose,
                     Type lhs, Type rhs, ConstraintLocator *locator)
@@ -554,9 +555,12 @@ public:
 
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
+  
+  /// Diagnose failed conversion in a `CoerceExpr`.
+  bool diagnoseCoercionToUnrelatedType() const;
 
-  // If we're trying to convert something of type "() -> T" to T,
-  // then we probably meant to call the value.
+  /// If we're trying to convert something of type "() -> T" to T,
+  /// then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
 
   /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
@@ -649,7 +653,7 @@ protected:
   ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
 
   static Optional<Diag<Type, Type>>
-  getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+  getDiagnosticFor(ContextualTypePurpose context, Type contextualType);
 };
 
 /// Diagnose errors related to converting function type which
@@ -1207,6 +1211,8 @@ public:
 
   bool diagnoseAsError() override;
 
+  bool diagnoseAsNote() override;
+
   bool diagnoseSingleMissingArgument() const;
 
 private:
@@ -1371,11 +1377,11 @@ public:
   bool diagnoseAsError() override;
 };
 
-// Diagnose an attempt to use AnyObject as the root type of a KeyPath
-//
-// ```swift
-// let keyPath = \AnyObject.bar
-// ```
+/// Diagnose an attempt to use AnyObject as the root type of a KeyPath
+///
+/// ```swift
+/// let keyPath = \AnyObject.bar
+/// ```
 class AnyObjectKeyPathRootFailure final : public FailureDiagnostic {
 
 public:
@@ -1908,6 +1914,47 @@ public:
                                           DeclNameRef member,
                                           ConstraintLocator *locator)
       : FailureDiagnostic(cs, locator), MemberName(member) {}
+
+  bool diagnoseAsError();
+};
+
+class UnableToInferClosureReturnType final : public FailureDiagnostic {
+public:
+  UnableToInferClosureReturnType(ConstraintSystem &cs,
+                                 ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator) {}
+
+  bool diagnoseAsError();
+};
+
+class UnableToInferProtocolLiteralType final : public FailureDiagnostic {
+public:
+  UnableToInferProtocolLiteralType(ConstraintSystem &cs,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator) {}
+
+  bool diagnoseAsError();
+};
+
+/// Diagnose an attempt to reference a top-level name shadowed by a local
+/// member e.g.
+///
+/// ```swift
+/// extension Sequence {
+///   func test() -> Int {
+///     return max(1, 2)
+///   }
+/// }
+/// ```
+///
+/// Here `max` refers to a global function `max<T>(_: T, _: T)` in `Swift`
+/// module and can only be accessed by adding `Swift.` to it, because `Sequence`
+/// has a member named `max` which accepts a single argument.
+class MissingQuialifierInMemberRefFailure final : public FailureDiagnostic {
+public:
+  MissingQuialifierInMemberRefFailure(ConstraintSystem &cs,
+                                      ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator) {}
 
   bool diagnoseAsError();
 };

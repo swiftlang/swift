@@ -329,11 +329,20 @@ class alignas(8) PoundAvailableInfo final :
   /// The version range when this query will return true. This value is
   /// filled in by Sema.
   VersionRange AvailableRange;
-  
+
+  /// For zippered builds, this is the version range for the target variant
+  /// that must hold for the query to return true. For example, when
+  /// compiling with target x86_64-macosx10.15 and target-variant
+  /// x86_64-ios13.0 a query of #available(macOS 10.22, iOS 20.0, *) will
+  /// have a variant range of [20.0, +inf).
+  /// This is filled in by Sema.
+  VersionRange VariantAvailableRange;
+
   PoundAvailableInfo(SourceLoc PoundLoc, ArrayRef<AvailabilitySpec *> queries,
                      SourceLoc RParenLoc)
    : PoundLoc(PoundLoc), RParenLoc(RParenLoc), NumQueries(queries.size()),
-     AvailableRange(VersionRange::empty()) {
+     AvailableRange(VersionRange::empty()),
+     VariantAvailableRange(VersionRange::empty()) {
     std::uninitialized_copy(queries.begin(), queries.end(),
                             getTrailingObjects<AvailabilitySpec *>());
   }
@@ -356,6 +365,13 @@ public:
   
   const VersionRange &getAvailableRange() const { return AvailableRange; }
   void setAvailableRange(const VersionRange &Range) { AvailableRange = Range; }
+
+  const VersionRange &getVariantAvailableRange() const {
+    return VariantAvailableRange;
+  }
+  void setVariantAvailableRange(const VersionRange &Range) {
+    VariantAvailableRange = Range;
+  }
 };
 
 
@@ -808,8 +824,6 @@ class ForEachStmt : public LabeledStmt {
 
   // Set by Sema:
   ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
-  ConcreteDeclRef makeIterator;
-  ConcreteDeclRef iteratorNext;
   VarDecl *iteratorVar = nullptr;
   Expr *iteratorVarRef = nullptr;
   OpaqueValueExpr *elementExpr = nullptr;
@@ -837,12 +851,6 @@ public:
 
   void setConvertElementExpr(Expr *expr) { convertElementExpr = expr; }
   Expr *getConvertElementExpr() const { return convertElementExpr; }
-
-  void setMakeIterator(ConcreteDeclRef declRef) { makeIterator = declRef; }
-  ConcreteDeclRef getMakeIterator() const { return makeIterator; }
-
-  void setIteratorNext(ConcreteDeclRef declRef) { iteratorNext = declRef; }
-  ConcreteDeclRef getIteratorNext() const { return iteratorNext; }
 
   void setSequenceConformance(ProtocolConformanceRef conformance) {
     sequenceConformance = conformance;

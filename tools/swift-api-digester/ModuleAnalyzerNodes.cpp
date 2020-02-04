@@ -37,7 +37,7 @@ struct swift::ide::api::SDKNodeInitInfo {
 #define KEY_STRING_ARR(X, Y) std::vector<StringRef> X;
 #include "swift/IDE/DigesterEnums.def"
 
-  ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
+  swift::ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
   std::vector<DeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
 
@@ -126,7 +126,9 @@ SDKNodeTypeAlias::SDKNodeTypeAlias(SDKNodeInitInfo Info):
 SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclType), SuperclassUsr(Info.SuperclassUsr),
   SuperclassNames(Info.SuperclassNames),
-  EnumRawTypeName(Info.EnumRawTypeName), IsExternal(Info.IsExternal) {}
+  EnumRawTypeName(Info.EnumRawTypeName), IsExternal(Info.IsExternal),
+  HasMissingDesignatedInitializers(Info.HasMissingDesignatedInitializers),
+  InheritsConvenienceInitializers(Info.InheritsConvenienceInitializers) {}
 
 SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::Conformance),
@@ -1148,7 +1150,7 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical)
   if (auto *GC = D->getAsGenericContext()) {
     if (auto Sig = GC->getGenericSignature()) {
       if (Canonical)
-        Sig->getCanonicalSignature()->print(OS, Opts);
+        Sig.getCanonicalSignature()->print(OS, Opts);
       else
         Sig->print(OS, Opts);
       return Ctx.buffer(OS.str());
@@ -1403,6 +1405,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
         SuperclassNames.push_back(getPrintedName(Ctx, T->getCanonicalType()));
       }
     }
+    HasMissingDesignatedInitializers = CD->hasMissingDesignatedInitializers();
+    InheritsConvenienceInitializers = CD->inheritsSuperclassInitializers();
   }
 
   if (auto *FD = dyn_cast<FuncDecl>(VD)) {
@@ -1975,6 +1979,10 @@ void SDKNodeDeclType::jsonize(json::Output &out) {
   output(out, KeyKind::KK_superclassUsr, SuperclassUsr);
   output(out, KeyKind::KK_enumRawTypeName, EnumRawTypeName);
   output(out, KeyKind::KK_isExternal, IsExternal);
+  output(out, KeyKind::KK_hasMissingDesignatedInitializers,
+         HasMissingDesignatedInitializers);
+  output(out, KeyKind::KK_inheritsConvenienceInitializers,
+         InheritsConvenienceInitializers);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_superclassNames).data(), SuperclassNames);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_conformances).data(), Conformances);
 }

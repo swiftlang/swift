@@ -88,8 +88,6 @@ public:
   }
 
   OperandOwnershipKindMap
-  visitEnumArgument(ValueOwnershipKind requiredConvention);
-  OperandOwnershipKindMap
   visitApplyParameter(ValueOwnershipKind requiredConvention,
                       UseLifetimeConstraint requirement);
   OperandOwnershipKindMap visitFullApply(FullApplySite apply);
@@ -142,6 +140,18 @@ SHOULD_NEVER_VISIT_INST(StrongRelease)
 #include "swift/AST/ReferenceStorage.def"
 #undef SHOULD_NEVER_VISIT_INST
 
+/// Instructions that are interior pointers into a guaranteed value.
+#define INTERIOR_POINTER_PROJECTION(INST)                                      \
+  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
+      INST##Inst *i) {                                                         \
+    assert(i->getNumOperands() && "Expected to have non-zero operands");       \
+    return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,               \
+                                 UseLifetimeConstraint::MustBeLive);           \
+  }
+INTERIOR_POINTER_PROJECTION(RefElementAddr)
+INTERIOR_POINTER_PROJECTION(RefTailAddr)
+#undef INTERIOR_POINTER_PROJECTION
+
 /// Instructions whose arguments are always compatible with one convention.
 #define CONSTANT_OWNERSHIP_INST(OWNERSHIP, USE_LIFETIME_CONSTRAINT, INST)      \
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
@@ -151,7 +161,6 @@ SHOULD_NEVER_VISIT_INST(StrongRelease)
         ValueOwnershipKind::OWNERSHIP,                                         \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
-CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBoxValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, AutoreleaseValue)
@@ -271,7 +280,6 @@ ACCEPTS_ANY_OWNERSHIP_INST(BridgeObjectToWord)
 ACCEPTS_ANY_OWNERSHIP_INST(ClassifyBridgeObject)
 ACCEPTS_ANY_OWNERSHIP_INST(CopyBlock)
 ACCEPTS_ANY_OWNERSHIP_INST(OpenExistentialBox)
-ACCEPTS_ANY_OWNERSHIP_INST(RefTailAddr)
 ACCEPTS_ANY_OWNERSHIP_INST(RefToRawPointer)
 ACCEPTS_ANY_OWNERSHIP_INST(SetDeallocating)
 ACCEPTS_ANY_OWNERSHIP_INST(ProjectExistentialBox)
@@ -333,7 +341,6 @@ FORWARD_ANY_OWNERSHIP_INST(ConvertFunction)
 FORWARD_ANY_OWNERSHIP_INST(RefToBridgeObject)
 FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
-FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
 FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
@@ -355,6 +362,8 @@ FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
   }
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, TupleExtract)
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, StructExtract)
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
+                                        MarkUninitialized)
 #undef CONSTANT_OR_NONE_OWNERSHIP_INST
 
 OperandOwnershipKindMap
@@ -398,17 +407,9 @@ OperandOwnershipKindClassifier::checkTerminatorArgumentMatchesDestBB(
   // Grab the ownership kind of the destination block.
   ValueOwnershipKind destBlockArgOwnershipKind =
       destBB->getArgument(opIndex)->getOwnershipKind();
-
-  // Then if we do not have an enum, make sure that the conventions match.
-  if (!getType().getEnumOrBoundGenericEnum()) {
-    auto lifetimeConstraint =
-        destBlockArgOwnershipKind.getForwardingLifetimeConstraint();
-    return Map::compatibilityMap(destBlockArgOwnershipKind, lifetimeConstraint);
-  }
-
-  // Otherwise, we need to properly handle the sum type nature of enum
-  // arguments.
-  return visitEnumArgument(destBlockArgOwnershipKind);
+  auto lifetimeConstraint =
+      destBlockArgOwnershipKind.getForwardingLifetimeConstraint();
+  return Map::compatibilityMap(destBlockArgOwnershipKind, lifetimeConstraint);
 }
 
 OperandOwnershipKindMap
@@ -454,8 +455,8 @@ OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
   // Otherwise, go through the ownership constraints of our successor arguments
   // and merge them.
   auto mergedKind = ValueOwnershipKind::merge(makeTransformRange(
-      sei->getSuccessorBlockArguments(),
-      [&](SILPhiArgumentArrayRef array) -> ValueOwnershipKind {
+      sei->getSuccessorBlockArgumentLists(),
+      [&](ArrayRef<SILArgument *> array) -> ValueOwnershipKind {
         // If the array is empty, we have a non-payloaded case. Return any.
         if (array.empty())
           return ValueOwnershipKind::None;
@@ -463,8 +464,7 @@ OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
         // Otherwise, we should have a single element since a payload is
         // a tuple.
         assert(std::distance(array.begin(), array.end()) == 1);
-        SILPhiArgument *arg = array.front();
-        return arg->getOwnershipKind();
+        return array.front()->getOwnershipKind();
       }));
 
   // If we failed to merge, return an empty map so we will fail to pattern match
@@ -484,7 +484,7 @@ OperandOwnershipKindClassifier::visitCheckedCastBranchInst(
     CheckedCastBranchInst *ccbi) {
   // TODO: Simplify this using ValueOwnershipKind::merge.
   Optional<OperandOwnershipKindMap> map;
-  for (auto argArray : ccbi->getSuccessorBlockArguments()) {
+  for (auto argArray : ccbi->getSuccessorBlockArgumentLists()) {
     assert(!argArray.empty());
 
     auto argOwnershipKind = argArray[getOperandIndex()]->getOwnershipKind();
@@ -538,12 +538,6 @@ OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
     return Map();
 
   auto base = *mergedBase;
-
-  // TODO: This may not be needed once trivial is any.
-  if (getType().getEnumOrBoundGenericEnum()) {
-    return visitEnumArgument(base);
-  }
-
   return Map::compatibilityMap(base, base.getForwardingLifetimeConstraint());
 }
 
@@ -631,57 +625,20 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
   llvm_unreachable("Unhandled ParameterConvention in switch.");
 }
 
-// Visit an enum value that is passed at argument position, including block
-// arguments, apply arguments, and return values.
-//
-// The operand definition's ownership kind may be known to be "trivial",
-// but it is still valid to pass that enum to a argument nontrivial type.
-// For example:
-//
-// %val = enum $Optional<SomeClass>, #Optional.none // trivial ownership
-// apply %f(%val) : (@owned Optional<SomeClass>)    // owned argument
-OperandOwnershipKindMap OperandOwnershipKindClassifier::visitEnumArgument(
-    ValueOwnershipKind requiredKind) {
-  // Begin with an empty map.
-  OperandOwnershipKindMap map;
-
-  // The operand has a non-trivial ownership kind. It must match the argument
-  // convention.
-  if (requiredKind != ValueOwnershipKind::Owned) {
-    map.addCompatibilityConstraint(ValueOwnershipKind::Owned,
-                                   UseLifetimeConstraint::MustBeLive);
-  } else {
-    map.addCompatibilityConstraint(ValueOwnershipKind::Owned,
-                                   UseLifetimeConstraint::MustBeInvalidated);
-  }
-  map.addCompatibilityConstraint(ValueOwnershipKind::Guaranteed,
-                                 UseLifetimeConstraint::MustBeLive);
-  map.addCompatibilityConstraint(ValueOwnershipKind::Unowned,
-                                 UseLifetimeConstraint::MustBeLive);
-  return map;
-}
-
 // We allow for trivial cases of enums with non-trivial cases to be passed in
 // non-trivial argument positions. This fits with modeling of a
 // SILFunctionArgument as a phi in a global program graph.
 OperandOwnershipKindMap OperandOwnershipKindClassifier::visitApplyParameter(
     ValueOwnershipKind kind, UseLifetimeConstraint requirement) {
 
-  // Check if we have an enum. If not, then we just check against the passed in
-  // convention.
-  if (!getType().getEnumOrBoundGenericEnum()) {
-    // We allow for owned to be passed to apply parameters.
-    if (kind != ValueOwnershipKind::Owned) {
-      return Map::compatibilityMap(
-          {{kind, requirement},
-           {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeLive}});
-    }
-    return Map::compatibilityMap(kind, requirement);
+  // Check against the passed in convention. We allow for owned to be passed to
+  // apply parameters.
+  if (kind != ValueOwnershipKind::Owned) {
+    return Map::compatibilityMap(
+        {{kind, requirement},
+         {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeLive}});
   }
-
-  // Otherwise consider that we may have a payload with a trivial case
-  // that has other non-trivial cases.
-  return visitEnumArgument(kind);
+  return Map::compatibilityMap(kind, requirement);
 }
 
 // Handle Apply and TryApply.

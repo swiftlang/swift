@@ -26,7 +26,7 @@
 #define NOMINMAX
 #include <windows.h>
 #else
-#if !defined(__HAIKU__)
+#if !defined(__HAIKU__) && !defined(__wasi__)
 #include <sys/errno.h>
 #else
 #include <errno.h>
@@ -67,7 +67,7 @@ static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
 #define strtod_l swift_strtod_l
 #define strtof_l swift_strtof_l
 #endif
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__wasi__)
 #include <locale.h>
 #else
 #include <xlocale.h>
@@ -503,6 +503,8 @@ const char *swift::_swift_stdlib_strtof_clocale(
 void swift::_swift_stdlib_flockfile_stdout() {
 #if defined(_WIN32)
   _lock_file(stdout);
+#elif defined(__wasi__)
+  // WebAssembly/WASI doesn't support file locking yet https://bugs.swift.org/browse/SR-12097
 #else
   flockfile(stdout);
 #endif
@@ -511,6 +513,8 @@ void swift::_swift_stdlib_flockfile_stdout() {
 void swift::_swift_stdlib_funlockfile_stdout() {
 #if defined(_WIN32)
   _unlock_file(stdout);
+#elif defined(__wasi__)
+  // WebAssembly/WASI doesn't support file locking yet https://bugs.swift.org/browse/SR-12097
 #else
   funlockfile(stdout);
 #endif

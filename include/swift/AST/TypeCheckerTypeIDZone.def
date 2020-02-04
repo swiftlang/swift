@@ -43,6 +43,9 @@ SWIFT_REQUEST(TypeChecker, DefaultDefinitionTypeRequest,
 SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
               Type(KnownProtocolKind, const DeclContext *), SeparatelyCached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DifferentiableAttributeTypeCheckRequest,
+              IndexSubset *(DifferentiableAttr *),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DynamicallyReplacedDeclRequest,
               ValueDecl *(ValueDecl *),
               Cached, NoLocationInfo)
@@ -196,7 +199,7 @@ SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
 SWIFT_REQUEST(TypeChecker, HasMemberwiseInitRequest,
               bool(StructDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PreCheckFunctionBuilderRequest,
-              FunctionBuilderClosurePreCheck(ClosureExpr *),
+              FunctionBuilderClosurePreCheck(AnyFunctionRef),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
               bool(NominalTypeDecl *, ImplicitMemberAction), Uncached,
@@ -216,3 +219,6 @@ SWIFT_REQUEST(TypeChecker, TypeWitnessRequest,
 SWIFT_REQUEST(TypeChecker, ValueWitnessRequest,
               Witness(NormalProtocolConformance *, ValueDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PatternTypeRequest,
+              Type(ContextualPattern),
+              Cached, HasNearestLocation)

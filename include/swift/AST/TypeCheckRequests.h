@@ -16,10 +16,12 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/AnyValue.h"
@@ -33,6 +35,7 @@ namespace swift {
 class AbstractStorageDecl;
 class AccessorDecl;
 enum class AccessorKind;
+class ContextualPattern;
 class DefaultArgumentExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
@@ -372,7 +375,9 @@ struct WhereClauseOwner {
 
   /// The source of the where clause, which can be a generic parameter list
   /// or a declaration that can have a where clause.
-  llvm::PointerUnion<GenericParamList *, TrailingWhereClause *, SpecializeAttr *> source;
+  llvm::PointerUnion<GenericParamList *, TrailingWhereClause *,
+                     SpecializeAttr *, DifferentiableAttr *>
+      source;
 
   WhereClauseOwner(GenericContext *genCtx);
   WhereClauseOwner(AssociatedTypeDecl *atd);
@@ -381,6 +386,9 @@ struct WhereClauseOwner {
       : dc(dc), source(genericParams) {}
 
   WhereClauseOwner(DeclContext *dc, SpecializeAttr *attr)
+      : dc(dc), source(attr) {}
+
+  WhereClauseOwner(DeclContext *dc, DifferentiableAttr *attr)
       : dc(dc), source(attr) {}
 
   SourceLoc getLoc() const;
@@ -1679,6 +1687,8 @@ public:
 enum class ImplicitMemberAction : uint8_t {
   ResolveImplicitInit,
   ResolveCodingKeys,
+  ResolveEncodable,
+  ResolveDecodable,
 };
 
 class ResolveImplicitMemberRequest
@@ -1745,7 +1755,7 @@ public:
   void cacheResult(Witness value) const;
 };
 
-enum class FunctionBuilderClosurePreCheck : uint8_t {
+enum class FunctionBuilderBodyPreCheck : uint8_t {
   /// There were no problems pre-checking the closure.
   Okay,
 
@@ -1758,7 +1768,7 @@ enum class FunctionBuilderClosurePreCheck : uint8_t {
 
 class PreCheckFunctionBuilderRequest
     : public SimpleRequest<PreCheckFunctionBuilderRequest,
-                           FunctionBuilderClosurePreCheck(ClosureExpr *),
+                           FunctionBuilderBodyPreCheck(AnyFunctionRef),
                            CacheKind::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1767,8 +1777,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<FunctionBuilderClosurePreCheck>
-  evaluate(Evaluator &evaluator, ClosureExpr *closure) const;
+  llvm::Expected<FunctionBuilderBodyPreCheck>
+  evaluate(Evaluator &evaluator, AnyFunctionRef fn) const;
 
 public:
   // Separate caching.
@@ -1991,6 +2001,61 @@ public:
   }
 };
 
+/// Determines the type of a given pattern.
+///
+/// Note that this returns the "raw" pattern type, which can involve
+/// unresolved types and unbound generic types where type inference is
+/// allowed.
+class PatternTypeRequest
+    : public SimpleRequest<PatternTypeRequest, Type(ContextualPattern),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(
+      Evaluator &evaluator, ContextualPattern pattern) const;
+
+public:
+  bool isCached() const { return true; }
+
+  SourceLoc getNearestLoc() const {
+    return std::get<0>(getStorage()).getPattern()->getLoc();
+  }
+};
+
+/// Type-checks a `@differentiable` attribute and returns the resolved parameter
+/// indices on success. On failure, emits diagnostics and returns `nullptr`.
+///
+/// Currently, this request resolves other `@differentiable` attribute
+/// components but mutates them in place:
+/// - `JVPFunction`
+/// - `VJPFunction`
+/// - `DerivativeGenericSignature`
+class DifferentiableAttributeTypeCheckRequest
+    : public SimpleRequest<DifferentiableAttributeTypeCheckRequest,
+                           IndexSubset *(DifferentiableAttr *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<IndexSubset *> evaluate(Evaluator &evaluator,
+                                         DifferentiableAttr *attr) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<IndexSubset *> getCachedResult() const;
+  void cacheResult(IndexSubset *value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
@@ -2013,7 +2078,7 @@ AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
-void simple_display(llvm::raw_ostream &out, FunctionBuilderClosurePreCheck pck);
+void simple_display(llvm::raw_ostream &out, FunctionBuilderBodyPreCheck pck);
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

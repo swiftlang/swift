@@ -90,6 +90,8 @@ protected:
 
   llvm::SmallPtrSet<void *, 32> AliveFunctionsAndTables;
 
+  bool keepExternalWitnessTablesAlive;
+
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
 
@@ -148,6 +150,11 @@ protected:
   /// Marks all contained functions and witness tables of a witness table as
   /// alive.
   void makeAlive(SILWitnessTable *WT) {
+    if (isAvailableExternally(WT->getLinkage()) &&
+        !keepExternalWitnessTablesAlive) {
+      return;
+    }
+  
     LLVM_DEBUG(llvm::dbgs() << "    scan witness table " << WT->getName()
                             << '\n');
 
@@ -393,8 +400,10 @@ protected:
   }
 
 public:
-  FunctionLivenessComputation(SILModule *module) :
-    Module(module) {}
+  FunctionLivenessComputation(SILModule *module,
+                              bool keepExternalWitnessTablesAlive) :
+    Module(module),
+    keepExternalWitnessTablesAlive(keepExternalWitnessTablesAlive) {}
 
   /// The main entry point of the optimization.
   bool findAliveFunctions() {
@@ -635,8 +644,8 @@ class DeadFunctionElimination : FunctionLivenessComputation {
   }
 
 public:
-  DeadFunctionElimination(SILModule *module)
-      : FunctionLivenessComputation(module) {}
+  DeadFunctionElimination(SILModule *module, bool keepExternalWitnessTablesAlive)
+      : FunctionLivenessComputation(module, keepExternalWitnessTablesAlive) {}
 
   /// The main entry point of the optimization.
   void eliminateFunctions(SILModuleTransform *DFEPass) {
@@ -693,6 +702,13 @@ public:
 namespace {
 
 class SILDeadFuncElimination : public SILModuleTransform {
+
+private:
+  bool isLateDFE;
+
+public:
+  SILDeadFuncElimination(bool isLateDFE) : isLateDFE(isLateDFE) { }
+
   void run() override {
     LLVM_DEBUG(llvm::dbgs() << "Running DeadFuncElimination\n");
 
@@ -703,7 +719,8 @@ class SILDeadFuncElimination : public SILModuleTransform {
     // can eliminate such functions.
     getModule()->invalidateSILLoaderCaches();
 
-    DeadFunctionElimination deadFunctionElimination(getModule());
+    DeadFunctionElimination deadFunctionElimination(getModule(),
+                                /*keepExternalWitnessTablesAlive*/ !isLateDFE);
     deadFunctionElimination.eliminateFunctions(this);
   }
 };
@@ -711,7 +728,11 @@ class SILDeadFuncElimination : public SILModuleTransform {
 } // end anonymous namespace
 
 SILTransform *swift::createDeadFunctionElimination() {
-  return new SILDeadFuncElimination();
+  return new SILDeadFuncElimination(/*isLateDFE*/ false);
+}
+
+SILTransform *swift::createLateDeadFunctionElimination() {
+  return new SILDeadFuncElimination(/*isLateDFE*/ true);
 }
 
 void swift::performSILDeadFunctionElimination(SILModule *M) {

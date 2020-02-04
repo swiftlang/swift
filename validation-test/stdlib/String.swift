@@ -7,6 +7,9 @@
 // REQUIRES: executable_test
 // XFAIL: interpret
 
+// With a non-optimized stdlib the test takes very long.
+// REQUIRES: optimized_stdlib
+
 import StdlibUnittest
 import StdlibCollectionUnittest
 

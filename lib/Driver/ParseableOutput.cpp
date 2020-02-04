@@ -125,7 +125,7 @@ public:
       if (const auto *BJAction = dyn_cast<BackendJobAction>(&Cmd.getSource())) {
         Inputs.push_back(CommandInput(OutFiles[BJAction->getInputIndex()]));
       } else {
-        for (const std::string &FileName : OutFiles) {
+        for (const std::string FileName : OutFiles) {
           Inputs.push_back(CommandInput(FileName));
         }
       }
@@ -134,7 +134,7 @@ public:
     // TODO: set up Outputs appropriately.
     file_types::ID PrimaryOutputType = Cmd.getOutput().getPrimaryOutputType();
     if (PrimaryOutputType != file_types::TY_Nothing) {
-      for (const std::string &OutputFileName : Cmd.getOutput().
+      for (const std::string OutputFileName : Cmd.getOutput().
                                                  getPrimaryOutputFilenames()) {
         Outputs.push_back(OutputPair(PrimaryOutputType, OutputFileName));
       }

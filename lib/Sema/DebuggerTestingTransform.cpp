@@ -225,8 +225,9 @@ private:
     // Create the closure.
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
-        ClosureExpr(Params, SourceLoc(), SourceLoc(), SourceLoc(), TypeLoc(),
-                    DF.getNextDiscriminator(), getCurrentDeclContext());
+        ClosureExpr(SourceRange(), nullptr, Params, SourceLoc(), SourceLoc(),
+                    SourceLoc(), TypeLoc(), DF.getNextDiscriminator(),
+                    getCurrentDeclContext());
     Closure->setImplicit(true);
 
     // TODO: Save and return the value of $OriginalExpr.
@@ -260,11 +261,11 @@ void swift::performDebuggerTestingTransform(SourceFile &SF) {
   // Walk over all decls in the file to find the next available closure
   // discriminator.
   DiscriminatorFinder DF;
-  for (Decl *D : SF.Decls)
+  for (Decl *D : SF.getTopLevelDecls())
     D->walk(DF);
 
   // Instrument the decls with checkExpect() sanity-checks.
-  for (Decl *D : SF.Decls) {
+  for (Decl *D : SF.getTopLevelDecls()) {
     DebuggerTestingTransform Transform{D->getASTContext(), DF};
     D->walk(Transform);
     swift::verify(D);

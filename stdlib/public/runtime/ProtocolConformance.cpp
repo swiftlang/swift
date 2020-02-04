@@ -642,22 +642,6 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   return nullptr;
 }
 
-void
-swift::_forEachProtocolConformanceSectionAfter(
-  size_t *start, 
-  const std::function<void(const ProtocolConformanceRecord *,
-                           const ProtocolConformanceRecord *)> &f) {
-  auto snapshot = Conformances.get().SectionsToScan.snapshot();
-  if (snapshot.Count > *start) {
-    auto *begin = snapshot.begin() + *start;
-    auto *end = snapshot.end();
-    for (auto *section = begin; section != end; section++) {
-      f(section->Begin, section->End);
-    }
-    *start = snapshot.Count;
-  }
-}
-
 bool swift::_checkGenericRequirements(
                       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
                       SmallVectorImpl<const void *> &extraArguments,

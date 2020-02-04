@@ -571,10 +571,16 @@ bb0(%0 : $Cls):
   return %r : $()
 }
 
-// CHECK-LABEL: sil @dont_remove_as_local_object_indirectly_escapes_to_callee
-// CHECK: retain_value
-// CHECK: release_value
-sil @dont_remove_as_local_object_indirectly_escapes_to_callee : $@convention(thin) (Cls) -> () {
+// Remove a retain release "pair" for the local reference if a child object.
+//
+// The local 'Cls' reference is now effectively "moved" into the parent
+// 'Container' object, so the child will be destroyed with the parent.
+// The original SIL already has an over-release of the parent.
+//
+// CHECK-LABEL: sil @remove_as_local_object_indirectly_escapes_to_callee
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+sil @remove_as_local_object_indirectly_escapes_to_callee : $@convention(thin) (Cls) -> () {
 bb0(%0 : $Cls):
   %1 = alloc_ref $Cls
   %2 = alloc_ref $Container
@@ -589,9 +595,41 @@ bb0(%0 : $Cls):
   return %r : $()
 }
 
+// Remove a retain release "pair" for the local reference if a child object.
+//
+// The local 'Cls' reference is now effectively "moved" into the parent
+// 'Container' object, so the child will be destroyed with the parent.
+//
+// CHECK-LABEL: sil @local_object_indirectly_escapes_to_use_and_owned_arg
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+sil @local_object_indirectly_escapes_to_use_and_owned_arg : $@convention(thin) (Cls) -> () {
+bb0(%0 : $Cls):
+  %1 = alloc_ref $Cls
+  %2 = alloc_ref $Container
+  %3 = ref_element_addr %2 : $Container, #Container.c
+  store %1 to %3 : $*Cls
+  retain_value %1 : $Cls
+  %f1 = function_ref @use_container : $@convention(thin) (@guaranteed Container) -> ()
+  apply %f1 (%2) : $@convention(thin) (@guaranteed Container) -> ()
+  %f2 = function_ref @release_container : $@convention(thin) (Container) -> ()
+  apply %f2 (%2) : $@convention(thin) (Container) -> ()
+  release_value %1 : $Cls
+  %r = tuple()
+  return %r : $()
+}
+
 sil @release_arg1 : $@convention(thin) (Cls, Cls) -> () {
 bb0(%0 : $Cls, %1 : $Cls):
   strong_release %1 : $Cls
+  %r = tuple()
+  return %r : $()
+}
+
+sil @use_container : $@convention(thin) (@guaranteed Container) -> () {
+bb0(%0 : $Container):
+  %1 = ref_element_addr %0 : $Container, #Container.c
+  %2 = load %1 : $*Cls
   %r = tuple()
   return %r : $()
 }

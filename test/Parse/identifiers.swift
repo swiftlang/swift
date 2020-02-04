@@ -26,7 +26,7 @@ func s̈pin̈al_tap̈() {}
 () // expected-error{{invalid character in source file}} {{1-4= }}
 
 // Placeholders are recognized as identifiers but with error.
-func <#some name#>() {} // expected-error 2 {{editor placeholder in source file}}
+func <#some name#>() {} // expected-error {{editor placeholder in source file}}
 
 // Keywords as identifiers
 class switch {} // expected-error {{keyword 'switch' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{7-13=`switch`}}

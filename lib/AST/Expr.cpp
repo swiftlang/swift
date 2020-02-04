@@ -228,7 +228,7 @@ DeclRefExpr *Expr::getMemberOperatorRef() {
   return operatorRef;
 }
 
-ConcreteDeclRef Expr::getReferencedDecl() const {
+ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   switch (getKind()) {
   // No declaration reference.
   #define NO_REFERENCE(Id) case ExprKind::Id: return ConcreteDeclRef()
@@ -237,7 +237,8 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
       return cast<Id##Expr>(this)->Getter()
   #define PASS_THROUGH_REFERENCE(Id, GetSubExpr)                      \
     case ExprKind::Id:                                                \
-      return cast<Id##Expr>(this)->GetSubExpr()->getReferencedDecl()
+      return cast<Id##Expr>(this)                                     \
+                 ->GetSubExpr()->getReferencedDecl(stopAtParenExpr)
 
   NO_REFERENCE(Error);
   NO_REFERENCE(NilLiteral);
@@ -254,13 +255,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   SIMPLE_REFERENCE(DeclRef, getDeclRef);
   SIMPLE_REFERENCE(SuperRef, getSelf);
 
-  case ExprKind::Type: {
-    auto typeRepr = cast<TypeExpr>(this)->getTypeRepr();
-    if (!typeRepr) return ConcreteDeclRef();
-    auto ident = dyn_cast<IdentTypeRepr>(typeRepr);
-    if (!ident) return ConcreteDeclRef();
-    return ident->getComponentRange().back()->getBoundDecl();
-  }
+  NO_REFERENCE(Type);
 
   SIMPLE_REFERENCE(OtherConstructorDeclRef, getDeclRef);
 
@@ -281,7 +276,12 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(UnresolvedMember);
   NO_REFERENCE(UnresolvedDot);
   NO_REFERENCE(Sequence);
-  PASS_THROUGH_REFERENCE(Paren, getSubExpr);
+
+  case ExprKind::Paren:
+    if (stopAtParenExpr) return ConcreteDeclRef();
+    return cast<ParenExpr>(this)
+               ->getSubExpr()->getReferencedDecl(stopAtParenExpr);
+
   PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
   PASS_THROUGH_REFERENCE(Try, getSubExpr);
   PASS_THROUGH_REFERENCE(ForceTry, getSubExpr);
@@ -324,8 +324,8 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(Binary);
   NO_REFERENCE(DotSyntaxCall);
   NO_REFERENCE(MakeTemporarilyEscapable);
+  NO_REFERENCE(ConstructorRefCall);
 
-  PASS_THROUGH_REFERENCE(ConstructorRefCall, getFn);
   PASS_THROUGH_REFERENCE(Load, getSubExpr);
   NO_REFERENCE(DestructureTuple);
   NO_REFERENCE(UnresolvedTypeConversion);
@@ -1179,6 +1179,17 @@ UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
                                              UnresolvedParams, RAngleLoc);
 }
 
+bool CaptureListEntry::isSimpleSelfCapture() const {
+  if (Init->getPatternList().size() != 1)
+    return false;
+  if (auto *DRE = dyn_cast<DeclRefExpr>(Init->getInit(0)))
+    if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+      return (VD->isSelfParameter() || VD->isSelfParamCapture())
+             && VD->getName() == Var->getName();
+    }
+  return false;
+}
+
 CaptureListExpr *CaptureListExpr::create(ASTContext &ctx,
                                          ArrayRef<CaptureListEntry> captureList,
                                          ClosureExpr *closureBody) {
@@ -1811,6 +1822,12 @@ void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
 
 bool ClosureExpr::hasEmptyBody() const {
   return getBody()->empty();
+}
+
+bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
+  if (auto *VD = getCapturedSelfDecl())
+    return VD->isSelfParamCapture() && !VD->getType()->is<WeakStorageType>();
+  return false;
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)

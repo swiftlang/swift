@@ -99,6 +99,10 @@ public:
   /// When set, don't enforce warnings with -Werror.
   bool DebuggerSupport = false;
 
+  /// When set, ClangImporter is disabled, and all requests go to the
+  /// DWARFImporter delegate.
+  bool DisableSourceImport = false;
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {

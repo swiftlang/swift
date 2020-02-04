@@ -2,7 +2,7 @@
 // RUN: touch %t/file-01.swift %t/file-02.swift %t/file-03.swift
 // RUN: echo 'public func main() {}' >%t/main.swift
 //
-// RUN: %swiftc_driver -enable-batch-mode -parseable-output -driver-skip-execution -c -emit-module -module-name main -j 2 %t/file-01.swift %t/file-02.swift %t/file-03.swift %t/main.swift 2>&1 | %FileCheck %s
+// RUN: %swiftc_driver -disable-fine-grained-dependencies -enable-batch-mode -parseable-output -driver-skip-execution -c -emit-module -module-name main -j 2 %t/file-01.swift %t/file-02.swift %t/file-03.swift %t/main.swift 2>&1 | %FileCheck %s
 //
 //
 // CHECK: {{[1-9][0-9]*}}

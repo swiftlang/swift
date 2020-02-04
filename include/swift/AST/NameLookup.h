@@ -70,13 +70,15 @@ private:
   /// When finding \c bar() from the function body of \c foo(), \c BaseDC is
   /// the method \c foo().
   ///
-  /// \c BaseDC will be the method if \c self is needed for the lookup,
-  /// and will be the type if not.
-  /// In other words: If \c baseDC is a method, it means you found an instance
-  /// member and you should add an implicit 'self.' (Each method has its own
-  /// implicit self decl.) There's one other kind of non-method context that
-  /// has a 'self.' -- a lazy property initializer, which unlike a non-lazy
-  /// property can reference \c self) Hence: \code
+  /// \c BaseDC will be the type if \c self is not needed for the lookup. If
+  /// \c self is needed, \c baseDC will be either the method or a closure
+  /// which explicitly captured \c self.
+  /// In other words: If \c baseDC is a method or a closure, it means you
+  /// found an instance member and you should add an implicit 'self.' (Each
+  /// method has its own implicit self decl.) There's one other kind of
+  /// non-method, non-closure context that has a 'self.' -- a lazy property
+  /// initializer, which unlike a non-lazy property can reference \c self.
+  /// \code
   ///  class Outer {
   ///    static func s()
   ///    func i()
@@ -493,7 +495,7 @@ void recordLookupOfTopLevelName(DeclContext *topLevelContext, DeclName name,
 void getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
     unsigned i,
-    llvm::SmallVectorImpl<std::pair<SourceLoc, NominalTypeDecl *>> &result,
+    llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
     bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -501,7 +503,7 @@ void getDirectlyInheritedNominalTypeDecls(
 /// and splitting out the components of compositions.
 ///
 /// If we come across the AnyObject type, set \c anyObject true.
-SmallVector<std::pair<SourceLoc, NominalTypeDecl *>, 4>
+SmallVector<Located<NominalTypeDecl *>, 4>
 getDirectlyInheritedNominalTypeDecls(
                       llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
                       bool &anyObject);

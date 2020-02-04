@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -parse -verify %s
 
+// TODO(TF-1021): Remove "deprecated 'jvp:' and 'vjp:' argument" warnings.
+
 /// Good
 
 struct Foo {
@@ -7,21 +9,31 @@ struct Foo {
   var x: Float
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(vjp: foo(_:_:)) // okay
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
+@differentiable(vjp: foo(_:_:)) // okay
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(vjp: foo(_:_:) where T : FloatingPoint) // okay
 func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
+@differentiable(vjp: foo(_:_:)) // okay
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(wrt: (self, x, y), vjp: foo(_:_:)) // okay
 func bar(_ x: Float, _ y: Float) -> Float {
   return 1 + x
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
+@differentiable(vjp: foo(_:_:)) // okay
+// expected-warning @+1 2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(wrt: (self, x, y), jvp: bar, vjp: foo(_:_:)) // okay
 func bar(_ x: Float, _ y: Float) -> Float {
   return 1 + x
@@ -55,6 +67,7 @@ func playWellWithOtherAttrs(_ x: Float, _: Float) -> Float {
 }
 
 @_transparent
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(wrt: (self), vjp: _vjpSquareRoot) // okay
 public func squareRoot() -> Self {
   var lhs = self
@@ -99,82 +112,104 @@ func two(x: Float, y: Float) -> Float {
 
 /// Bad
 
-@differentiable(3) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+// expected-error @+1 {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+@differentiable(3)
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(foo(_:_:)) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+// expected-error @+1 {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+@differentiable(foo(_:_:))
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(vjp: foo(_:_:), 3) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
+// expected-error @+1 {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+@differentiable(vjp: foo(_:_:), 3)
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(wrt: (x), foo(_:_:)) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+// expected-error @+1 {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+@differentiable(wrt: (x), foo(_:_:))
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(wrt: x, y) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+// expected-error @+1 {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+@differentiable(wrt: x, y)
 func bar(_ x: Float, _ y: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(wrt: 0, 1) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+// expected-error @+1 {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+@differentiable(wrt: 0, 1)
 func two(x: Float, y: Float) -> Float {
   return x + y
 }
 
-@differentiable(wrt: 0, y) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+// expected-error @+1 {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+@differentiable(wrt: 0, y)
 func two(x: Float, y: Float) -> Float {
   return x + y
 }
 
-@differentiable(wrt: 0,) // expected-error {{unexpected ',' separator}}
+// expected-error @+1 {{unexpected ',' separator}}
+@differentiable(wrt: 0,)
 func two(x: Float, y: Float) -> Float {
   return x + y
 }
 
-@differentiable(vjp: foo(_:_:) // expected-error {{expected ')' in 'differentiable' attribute}}
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
+// expected-error @+1 {{expected ')' in 'differentiable' attribute}}
+@differentiable(vjp: foo(_:_:)
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(vjp: foo(_:_:) where T) // expected-error {{expected ':' or '==' to indicate a conformance or same-type requirement}}
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
+// expected-error @+1 {{expected ':' or '==' to indicate a conformance or same-type requirement}}
+@differentiable(vjp: foo(_:_:) where T)
 func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
 }
 
-@differentiable(,) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+// expected-error @+1 {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+@differentiable(,)
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(vjp: foo(_:_:),) // expected-error {{unexpected ',' separator}}
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
+// expected-error @+1 {{unexpected ',' separator}}
+@differentiable(vjp: foo(_:_:),)
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(vjp: foo(_:_:), where T) // expected-error {{unexpected ',' separator}}
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
+// expected-error @+1 {{unexpected ',' separator}}
+@differentiable(vjp: foo(_:_:), where T)
 func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
 }
 
-@differentiable(wrt: x, linear) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+// expected-error @+1 {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+@differentiable(wrt: x, linear)
 func slope4(_ x: Float) -> Float {
   return 4 * x
 }
 
-@differentiable(wrt: x, linear, vjp: const5) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+// expected-error @+1 {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+@differentiable(wrt: x, linear, vjp: const5)
 func slope5(_ x: Float) -> Float {
   return 5 * x
 }
 
-@differentiable(wrt: x, vjp: const6, linear) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
+// expected-error @+1 {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+@differentiable(wrt: x, vjp: const6, linear)
 func slope5(_ x: Float) -> Float {
   return 6 * x
 }

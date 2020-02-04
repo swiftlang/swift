@@ -25,6 +25,11 @@
 using namespace swift;
 using namespace swift::driver;
 
+CommandOutput::CommandOutput(StringRef dummyBase, OutputFileMap &dummyOFM)
+    : Inputs({CommandInputPair(dummyBase, "")}), DerivedOutputMap(dummyOFM) {
+  setAdditionalOutputForType(file_types::TY_SwiftDeps, dummyBase);
+}
+
 StringRef CommandOutput::getOutputForInputAndType(StringRef PrimaryInputFile,
                                                   file_types::ID Type) const {
   if (Type == file_types::TY_Nothing)
@@ -234,6 +239,10 @@ CommandOutput::getAdditionalOutputsForType(file_types::ID Type) const {
   }
   assert(V.empty() || V.size() == 1 || V.size() == Inputs.size());
   return V;
+}
+
+bool CommandOutput::hasAdditionalOutputForType(file_types::ID type) const {
+  return AdditionalOutputTypes.count(type);
 }
 
 StringRef CommandOutput::getAnyOutputForType(file_types::ID Type) const {

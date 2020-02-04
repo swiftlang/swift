@@ -28,8 +28,7 @@ func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
 
 /// Bad
 
-// expected-error @+3 {{expected an original function name}}
-// expected-error @+2 {{expected ')' in 'derivative' attribute}}
+// expected-error @+2 {{expected an original function name}}
 // expected-error @+1 {{expected declaration}}
 @derivative(of: 3)
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {

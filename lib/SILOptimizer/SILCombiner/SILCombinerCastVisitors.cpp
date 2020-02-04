@@ -164,11 +164,13 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   //   %addr = pointer_to_address %ptr, [strict] $T
   //   %result = index_addr %addr, %distance
   //
-  BuiltinInst *Bytes;
+  BuiltinInst *Bytes = nullptr;
   if (match(PTAI->getOperand(),
             m_IndexRawPointerInst(
                 m_ValueBase(),
                 m_TupleExtractOperation(m_BuiltinInst(Bytes), 0)))) {
+    assert(Bytes != nullptr &&
+           "Bytes should have been assigned a non-null value");
     if (match(Bytes, m_ApplyInst(BuiltinValueKind::SMulOver, m_ValueBase(),
                                  m_ApplyInst(BuiltinValueKind::Strideof,
                                              m_MetatypeInst(Metatype)),
@@ -284,9 +286,12 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
   Builder.setCurrentDebugScope(URCI->getDebugScope());
   LoadInst *load = Builder.createLoad(Loc, URCI->getSrc(),
                                       LoadOwnershipQualifier::Unqualified);
-  auto *cast = Builder.tryCreateUncheckedRefCast(Loc, load,
-                                                 DestTy.getObjectType());
-  assert(cast && "SILBuilder cannot handle reference-castable types");
+
+  assert(SILType::canRefCast(load->getType(), DestTy.getObjectType(),
+                             Builder.getModule()) &&
+         "SILBuilder cannot handle reference-castable types");
+  auto *cast = Builder.createUncheckedRefCast(Loc, load,
+                                              DestTy.getObjectType());
   Builder.createStore(Loc, cast, URCI->getDest(),
                       StoreOwnershipQualifier::Unqualified);
 
@@ -391,11 +396,12 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
                                                  UBCI->getOperand(),
                                                  UBCI->getType());
 
-  if (auto refCast = Builder.tryCreateUncheckedRefCast(
-        UBCI->getLoc(), UBCI->getOperand(), UBCI->getType()))
-    return refCast;
+  if (!SILType::canRefCast(UBCI->getOperand()->getType(), UBCI->getType(),
+                           Builder.getModule()))
+    return nullptr;
 
-  return nullptr;
+  return Builder.createUncheckedRefCast(UBCI->getLoc(), UBCI->getOperand(),
+                                        UBCI->getType());
 }
 
 SILInstruction *

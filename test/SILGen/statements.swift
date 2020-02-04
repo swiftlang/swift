@@ -167,8 +167,8 @@ func for_loops2() {
   // rdar://problem/19316670
   // CHECK: alloc_stack $Optional<MyClass>
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown]
-  // CHECK: [[NEXT:%[0-9]+]] = function_ref @$ss16IndexingIteratorV4next{{[_0-9a-zA-Z]*}}F
-  // CHECK-NEXT: apply [[NEXT]]<Array<MyClass>>
+  // CHECK: [[NEXT:%[0-9]+]] = witness_method $IndexingIterator<Array<MyClass>>, #IteratorProtocol.next!1 : <Self where Self : IteratorProtocol> (inout Self) -> () -> Self.Element? : $@convention(witness_method: IteratorProtocol) <τ_0_0 where τ_0_0 : IteratorProtocol> (@inout τ_0_0) -> @out Optional<τ_0_0.Element>
+  // CHECK-NEXT: apply [[NEXT]]<IndexingIterator<Array<MyClass>>>
   // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
   let objects = [MyClass(), MyClass() ]
   for obj in objects {

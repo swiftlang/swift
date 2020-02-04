@@ -199,6 +199,13 @@ ManagedValue SILGenBuilder::createGuaranteedPhiArgument(SILType type) {
   return SGF.emitManagedBorrowedArgumentWithCleanup(arg);
 }
 
+ManagedValue
+SILGenBuilder::createGuaranteedTransformingTerminatorArgument(SILType type) {
+  SILPhiArgument *arg =
+      getInsertionBB()->createPhiArgument(type, ValueOwnershipKind::Guaranteed);
+  return ManagedValue::forUnmanaged(arg);
+}
+
 ManagedValue SILGenBuilder::createAllocRef(
     SILLocation loc, SILType refType, bool objc, bool canAllocOnStack,
     ArrayRef<SILType> inputElementTypes,
@@ -669,8 +676,7 @@ ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
                                         SILValue address,
                                         StoreOwnershipQualifier qualifier) {
   CleanupCloner cloner(*this, value);
-  if (value.getType().isTrivial(SGF.F) ||
-      value.getOwnershipKind() == ValueOwnershipKind::None)
+  if (value.getOwnershipKind() == ValueOwnershipKind::None)
     qualifier = StoreOwnershipQualifier::Trivial;
   createStore(loc, value.forward(SGF), address, qualifier);
   return cloner.clone(address);
@@ -802,17 +808,6 @@ ManagedValue SILGenBuilder::createUncheckedAddrCast(SILLocation loc, ManagedValu
   CleanupCloner cloner(*this, op);
   SILValue cast = createUncheckedAddrCast(loc, op.forward(SGF), resultTy);
   return cloner.clone(cast);
-}
-
-ManagedValue SILGenBuilder::tryCreateUncheckedRefCast(SILLocation loc,
-                                                      ManagedValue original,
-                                                      SILType type) {
-  CleanupCloner cloner(*this, original);
-  SILValue result = tryCreateUncheckedRefCast(loc, original.getValue(), type);
-  if (!result)
-    return ManagedValue();
-  original.forward(SGF);
-  return cloner.clone(result);
 }
 
 ManagedValue SILGenBuilder::createUncheckedTrivialBitCast(SILLocation loc,

@@ -143,8 +143,8 @@ cleanupDeadTrivialPhiArgs(SILValue initialValue,
   if (ReverseInitialWorklist) {
     std::reverse(insertedPhis.begin(), insertedPhis.end());
   }
-  SmallVector<SILPhiArgument *, 8> worklist(insertedPhis.begin(),
-                                            insertedPhis.end());
+  SmallVector<SILArgument *, 8> worklist(insertedPhis.begin(),
+                                         insertedPhis.end());
   sortUnique(insertedPhis);
   SmallVector<SILValue, 8> incomingValues;
 
@@ -187,9 +187,9 @@ cleanupDeadTrivialPhiArgs(SILValue initialValue,
         continue;
 
       auto *termInst = cast<TermInst>(user);
-      for (auto succBlockArgList : termInst->getSuccessorBlockArguments()) {
+      for (auto succBlockArgList : termInst->getSuccessorBlockArgumentLists()) {
         llvm::copy_if(succBlockArgList, std::back_inserter(worklist),
-                      [&](SILPhiArgument *succArg) -> bool {
+                      [&](SILArgument *succArg) -> bool {
                         auto it = lower_bound(insertedPhis, succArg);
                         return it != insertedPhis.end() && *it == succArg;
                       });
