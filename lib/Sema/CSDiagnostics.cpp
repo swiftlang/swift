@@ -2356,6 +2356,37 @@ bool ContextualFailure::diagnoseConversionToBool() const {
     return true;
   }
 
+  // If we're trying to convert something from optional type to an integer, then
+  // a comparison against nil was probably expected.
+  auto &cs = getConstraintSystem();
+  if (conformsToKnownProtocol(cs, fromType, KnownProtocolKind::BinaryInteger) &&
+      conformsToKnownProtocol(cs, fromType,
+                              KnownProtocolKind::ExpressibleByIntegerLiteral)) {
+    StringRef prefix = "((";
+    StringRef suffix;
+    if (notOperatorLoc.isValid())
+      suffix = ") == 0)";
+    else
+      suffix = ") != 0)";
+
+    // Check if we need the inner parentheses.
+    // Technically we only need them if there's something in 'expr' with
+    // lower precedence than '!=', but the code actually comes out nicer
+    // in most cases with parens on anything non-trivial.
+    if (expr->canAppendPostfixExpression()) {
+      prefix = prefix.drop_back();
+      suffix = suffix.drop_front();
+    }
+    // FIXME: The outer parentheses may be superfluous too.
+
+    emitDiagnostic(expr->getLoc(), diag::integer_used_as_boolean, fromType,
+                   notOperatorLoc.isValid())
+        .fixItInsert(expr->getStartLoc(), prefix)
+        .fixItInsertAfter(expr->getEndLoc(), suffix)
+        .fixItRemove(notOperatorLoc);
+    return true;
+  }
+
   return false;
 }
 

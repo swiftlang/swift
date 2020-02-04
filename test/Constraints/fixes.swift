@@ -135,6 +135,19 @@ ciuo ? true : false // expected-error{{optional type 'C?' cannot be used as a bo
 !co // expected-error{{optional type 'C?' cannot be used as a boolean; test for '== nil' instead}} {{1-2=}} {{2-2=(}} {{4-4= == nil)}}
 !ciuo // expected-error{{optional type 'C?' cannot be used as a boolean; test for '== nil' instead}} {{1-2=}} {{2-2=(}} {{6-6= == nil)}}
 
+// Used an integer in a conditional expression
+var n1: Int = 1
+var n2: UInt8 = 0
+var n3: Int16 = 2
+
+if n1 {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}} {{4-4=(}} {{6-6= != 0)}}
+if !n1 {} // expected-error {{type 'Int' cannot be used as a boolean; test for '== 0' instead}} {{4-5=}} {{5-5=(}} {{7-7= == 0)}}
+n1 ? true : false // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}} {{1-1=(}} {{3-3= != 0)}}
+!n1 ? false : true // expected-error {{type 'Int' cannot be used as a boolean; test for '== 0' instead}} {{1-2=}} {{2-2=(}} {{4-4= == 0)}}
+!n1 // expected-error {{type 'Int' cannot be used as a boolean; test for '== 0' instead}} {{1-2=}} {{2-2=(}} {{4-4= == 0)}}
+if n2 {} // expected-error {{type 'UInt8' cannot be used as a boolean; test for '!= 0' instead}} {{4-4=(}} {{6-6= != 0)}}
+!n3 // expected-error {{type 'Int16' cannot be used as a boolean; test for '== 0' instead}} {{1-2=}} {{2-2=(}} {{4-4= == 0)}}
+
 // Forgotten ! or ?
 var someInt = co.a // expected-error{{value of optional type 'C?' must be unwrapped to refer to member 'a' of wrapped base type 'C'}}
 // expected-note@-1{{chain the optional using '?' to access member 'a' only for non-'nil' base values}}{{17-17=?}}
