@@ -32,6 +32,7 @@ namespace swift {
     virtual bool parseSILGlobal(Parser &P) = 0;
     virtual bool parseSILWitnessTable(Parser &P) = 0;
     virtual bool parseSILDefaultWitnessTable(Parser &P) = 0;
+    virtual bool parseSILDifferentiabilityWitness(Parser &P) = 0;
     virtual bool parseSILCoverageMap(Parser &P) = 0;
     virtual bool parseSILProperty(Parser &P) = 0;
     virtual bool parseSILScope(Parser &P) = 0;

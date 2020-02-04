@@ -28,6 +28,7 @@
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
+#include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILPrintContext.h"
@@ -113,6 +114,8 @@ public:
   using PropertyListType = llvm::ilist<SILProperty>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
+  using DifferentiabilityWitnessListType =
+      llvm::ilist<SILDifferentiabilityWitness>;
   using CoverageMapCollectionType =
       llvm::MapVector<StringRef, SILCoverageMap *>;
 
@@ -131,6 +134,7 @@ private:
   friend SILBasicBlock;
   friend SILCoverageMap;
   friend SILDefaultWitnessTable;
+  friend SILDifferentiabilityWitness;
   friend SILFunction;
   friend SILGlobalVariable;
   friend SILLayout;
@@ -193,6 +197,17 @@ private:
 
   /// The list of SILDefaultWitnessTables in the module.
   DefaultWitnessTableListType defaultWitnessTables;
+
+  /// Lookup table for SIL differentiability witnesses, keyed by mangled name.
+  llvm::StringMap<SILDifferentiabilityWitness *> DifferentiabilityWitnessMap;
+
+  /// Lookup table for SILDifferentiabilityWitnesses, keyed by original
+  /// function name.
+  llvm::StringMap<llvm::SmallVector<SILDifferentiabilityWitness *, 1>>
+      DifferentiabilityWitnessesByFunction;
+
+  /// The list of SILDifferentiabilityWitnesses in the module.
+  DifferentiabilityWitnessListType differentiabilityWitnesses;
 
   /// Declarations which are externally visible.
   ///
@@ -455,6 +470,24 @@ public:
     return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
   }
 
+  using differentiability_witness_iterator = DifferentiabilityWitnessListType::iterator;
+  using differentiability_witness_const_iterator = DifferentiabilityWitnessListType::const_iterator;
+  DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() { return differentiabilityWitnesses; }
+  const DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() const { return differentiabilityWitnesses; }  differentiability_witness_iterator differentiability_witness_begin() { return differentiabilityWitnesses.begin(); }
+  differentiability_witness_iterator differentiability_witness_end() { return differentiabilityWitnesses.end(); }
+  differentiability_witness_const_iterator differentiability_witness_begin() const { return differentiabilityWitnesses.begin(); }
+  differentiability_witness_const_iterator differentiability_witness_end() const { return differentiabilityWitnesses.end(); }
+  iterator_range<differentiability_witness_iterator>
+  getDifferentiabilityWitnesses() {
+    return {differentiabilityWitnesses.begin(),
+            differentiabilityWitnesses.end()};
+  }
+  iterator_range<differentiability_witness_const_iterator>
+  getDifferentiabilityWitnesses() const {
+    return {differentiabilityWitnesses.begin(),
+            differentiabilityWitnesses.end()};
+  }
+
   void addExternallyVisibleDecl(ValueDecl *decl) {
     externallyVisible.insert(decl);
   }
@@ -590,6 +623,17 @@ public:
   /// Attempt to lookup the function corresponding to \p Member in the class
   /// hierarchy of \p Class.
   SILFunction *lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member);
+
+  /// Look up the differentiability witness with the given name.
+  SILDifferentiabilityWitness *lookUpDifferentiabilityWitness(StringRef name);
+
+  /// Look up the differentiability witness corresponding to the given key.
+  SILDifferentiabilityWitness *
+  lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
+
+  /// Look up the differentiability witness corresponding to the given function.
+  llvm::ArrayRef<SILDifferentiabilityWitness *>
+  lookUpDifferentiabilityWitnessesForFunction(StringRef name);
 
   // Given a protocol, attempt to create a default witness table declaration
   // for it.
