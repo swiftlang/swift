@@ -21,7 +21,8 @@ extension Int {
 var i: Int = b.my_identity()
 
 
-// RUN: %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
+// Note: '-dump-scope-maps' requires ASTScopes. '-enable-astscope-lookup' just to make sure.
+// RUN: %target-swift-frontend -enable-astscope-lookup -dump-scope-maps expanded %s 2> %t.expanded
 // RUN: %FileCheck -check-prefix CHECK-EXPANDED %s < %t.expanded
 
 
