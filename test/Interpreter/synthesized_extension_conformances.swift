@@ -19,6 +19,11 @@ class TestSuper { }
 struct SInt: Codable, Equatable, Hashable {
     var x: Int
 }
+extension SInt: Comparable {
+  static func < (_ lhs: Self, _ rhs: Self) -> Bool {
+    return lhs.x < rhs.x
+  }
+}
 struct SFloat {
     var y: Float
 }
