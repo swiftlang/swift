@@ -942,7 +942,7 @@ namespace {
         for (auto lhsTypeRep : lhsTypeReps) {
           for (auto rhsTypeRep : rhsTypeReps) {
             if (lhsTypeRep == rhsTypeRep)
-              break;
+              continue;
 
             insertIfUnique(oneWayDigraph[rhsTypeRep].outAdjacencies,lhsTypeRep);
             insertIfUnique(oneWayDigraph[lhsTypeRep].inAdjacencies,rhsTypeRep);
