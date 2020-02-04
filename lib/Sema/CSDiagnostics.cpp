@@ -1958,12 +1958,12 @@ bool ContextualFailure::diagnoseAsError() {
     if (diagnoseYieldByReferenceMismatch())
       return true;
 
-    if (auto *OTE = dyn_cast<OptionalTryExpr>(anchor)) {
-      auto tryType = fromType->getOptionalObjectType();
-      if (tryType->isEqual(toType)) {
+    if (isa<OptionalTryExpr>(anchor) || isa<OptionalEvaluationExpr>(anchor)) {
+      auto objectType = fromType->getOptionalObjectType();
+      if (objectType->isEqual(toType)) {
         auto &cs = getConstraintSystem();
-        MissingOptionalUnwrapFailure failure(cs, getType(OTE), toType,
-                                             cs.getConstraintLocator(OTE));
+        MissingOptionalUnwrapFailure failure(cs, getType(anchor), toType,
+                                             cs.getConstraintLocator(anchor));
         if (failure.diagnoseAsError())
           return true;
       }

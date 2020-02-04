@@ -2596,6 +2596,15 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   if (!anchor)
     return false;
 
+  bool possibleContextualMismatch = false;
+  // If this is a conversion to a non-optional contextual type e.g.
+  // `let _: Bool = try? foo()` and `foo()` produces `Int`
+  // we should diagnose it as type mismatch instead of missing unwrap.
+  if (auto last = locator.last()) {
+    possibleContextualMismatch = last->is<LocatorPathElt::ContextualType>() &&
+                                 !toType->getOptionalObjectType();
+  }
+
   // `OptionalEvaluationExpr` doesn't add a new level of
   // optionality but it could be hiding concrete types
   // behind itself which we can use to better understand
@@ -2612,7 +2621,12 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
     // other type e.g. contextual type or a parameter type,
     // let's use `Bind` to match object types because
     // object type of the optinal chain is a type variable.
-    if (matchKind >= ConstraintKind::Conversion)
+    //
+    // One exception is contextual conversion - in such cases
+    // let's give optional chain a chance to infer its inner type
+    // first, that makes it much easier to diagnose contextual
+    // mismatch vs. missing optional unwrap.
+    if (!possibleContextualMismatch && matchKind >= ConstraintKind::Conversion)
       matchKind = ConstraintKind::Bind;
   }
 
@@ -2644,13 +2658,12 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
       // language mode, so we can safely try to bind its
       // object type to contextual type without risk of
       // causing more optionality mismatches down the road.
-      auto last = locator.last();
+      //
       // For contextual conversions let's give `try?` a chance to
       // infer inner type which, if incorrect, should result in
       // contextual conversion failure instead of optional unwrap.
-      matchKind = last && last->is<LocatorPathElt::ContextualType>()
-                      ? ConstraintKind::Conversion
-                      : ConstraintKind::Bind;
+      matchKind = possibleContextualMismatch ? ConstraintKind::Conversion
+                                             : ConstraintKind::Bind;
     }
   }
 
