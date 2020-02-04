@@ -117,6 +117,7 @@ public:
   IGNORED_ATTR(ReferenceOwnership)
   IGNORED_ATTR(OriginallyDefinedIn)
   // SWIFT_ENABLE_TENSORFLOW
+  IGNORED_ATTR(NoDerivative)
   // TODO(TF-715): Allow @quoted on more decls.
   IGNORED_ATTR(Quoted)
   // SWIFT_ENABLE_TENSORFLOW END
@@ -260,7 +261,6 @@ public:
   // TODO(TF-999): Remove deprecated `@differentiating` attribute.
   void visitDifferentiatingAttr(DerivativeAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
-  void visitNoDerivativeAttr(NoDerivativeAttr *attr);
   // SWIFT_ENABLE_TENSORFLOW END
 };
 } // end anonymous namespace
@@ -4864,15 +4864,4 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
   // follow certain rules. We can only check these rules after the body is type
   // checked, and it's not type checked yet, so we check these rules later in
   // TypeChecker::checkFunctionBodyCompilerEvaluable().
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
-  auto &ctx = D->getASTContext();
-  // `@noDerivative` implies non-varying semantics for differentiable activity
-  // analysis. SIL values produced from references to `@noDerivative`
-  // declarations will not be marked as varying; these values do not need a
-  // derivative.
-  D->getAttrs().add(
-      new (ctx) SemanticsAttr("autodiff.nonvarying", /*implicit*/ true));
 }
