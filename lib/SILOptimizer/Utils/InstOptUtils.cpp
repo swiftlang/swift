@@ -509,6 +509,21 @@ void InstructionDeleter::recursivelyDeleteUsersIfDead(SILInstruction *inst,
   deleteIfDead(inst, callback);
 }
 
+void InstructionDeleter::recursivelyForceDeleteUsersAndFixLifetimes(
+    SILInstruction *inst, CallbackTy callback) {
+  for (SILValue result : inst->getResults()) {
+    while (!result->use_empty()) {
+      SILInstruction *user = result->use_begin()->getUser();
+      recursivelyForceDeleteUsersAndFixLifetimes(user);
+    }
+  }
+  if (isIncidentalUse(inst) || isa<DestroyValueInst>(inst)) {
+    forceDelete(inst);
+    return;
+  }
+  forceDeleteAndFixLifetimes(inst);
+}
+
 void swift::eliminateDeadInstruction(SILInstruction *inst,
                                      CallbackTy callback) {
   InstructionDeleter deleter;

@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -swift-version 5 -DPTR_SIZE_%target-ptrsize -o %t/OSLogPrototypeExecTest
 // RUN: %target-run %t/OSLogPrototypeExecTest
+//
+// RUN: %target-build-swift %s -O -swift-version 5 -DPTR_SIZE_%target-ptrsize -o %t/OSLogPrototypeExecTest
+// RUN: %target-run %t/OSLogPrototypeExecTest
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
 
