@@ -6585,6 +6585,13 @@ SwiftDeclConverter::importSubscript(Decl *decl,
     if (!counterpart)
       return nullptr;
 
+    // If we're looking at a class but the getter was found in a protocol,
+    // we're going to build the subscript later when we mirror the protocol
+    // member. Bail out here, otherwise we'll build it twice.
+    if (interface &&
+        isa<clang::ObjCProtocolDecl>(counterpart->getDeclContext()))
+      return nullptr;
+
     return cast_or_null<FuncDecl>(
         Impl.importDecl(counterpart, getActiveSwiftVersion()));
   };
