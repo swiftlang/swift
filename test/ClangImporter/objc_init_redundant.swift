@@ -16,6 +16,6 @@ extension NSObject {
 extension NSObject {
   @objc(class) func foo() { } // expected-error{{method 'foo()' with Objective-C selector 'class' conflicts with method 'class()' with the same Objective-C selector}}
 // CHECK: objc_init_redundant.swift:[[@LINE-1]]:21: error: method 'foo()' with Objective-C selector 'class' conflicts
-// CHECK: ObjectiveC.NSObjectProtocol:{{.*}}note: method 'class()' declared here
+// CHECK: ObjectiveC.NSObject:{{.*}}note: method 'class()' declared here
 }
 

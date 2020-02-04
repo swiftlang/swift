@@ -4522,8 +4522,7 @@ namespace {
     /// methods become class methods on NSObject).
     void importMirroredProtocolMembers(const clang::ObjCContainerDecl *decl,
                                        DeclContext *dc,
-                                       Optional<DeclBaseName> name,
-                                       SmallVectorImpl<Decl *> &newMembers);
+                                       SmallVectorImpl<Decl *> &members);
 
     void importNonOverriddenMirroredMethods(DeclContext *dc,
                                   MutableArrayRef<MirroredMethodEntry> entries,
@@ -6937,16 +6936,9 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
       genericParams, Impl.importSourceLoc(typeParamList->getRAngleLoc()));
 }
 
-void ClangImporter::Implementation::importMirroredProtocolMembers(
-    const clang::ObjCContainerDecl *decl, DeclContext *dc,
-    Optional<DeclBaseName> name, SmallVectorImpl<Decl *> &members) {
-  SwiftDeclConverter converter(*this, CurrentVersion);
-  converter.importMirroredProtocolMembers(decl, dc, name, members);
-}
-
 void SwiftDeclConverter::importMirroredProtocolMembers(
     const clang::ObjCContainerDecl *decl, DeclContext *dc,
-    Optional<DeclBaseName> name, SmallVectorImpl<Decl *> &members) {
+    SmallVectorImpl<Decl *> &members) {
   assert(dc);
   const clang::ObjCInterfaceDecl *interfaceDecl = nullptr;
   const ClangModuleUnit *declModule;
@@ -6986,16 +6978,16 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
 
     const auto &languageVersion =
         Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
-    auto importProtocolRequirement = [&](Decl *member) {
+    for (auto member : proto->getMembers()) {
       // Skip compatibility stubs; there's no reason to mirror them.
       if (member->getAttrs().isUnavailableInSwiftVersion(languageVersion))
-        return;
+        continue;
 
       if (auto prop = dyn_cast<VarDecl>(member)) {
         auto objcProp =
             dyn_cast_or_null<clang::ObjCPropertyDecl>(prop->getClangDecl());
         if (!objcProp)
-          return;
+          continue;
 
         // We can't import a property if there's already a method with this
         // name. (This also covers other properties with that same name.)
@@ -7003,7 +6995,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
         // not already there.
         clang::Selector sel = objcProp->getGetterName();
         if (interfaceDecl->getInstanceMethod(sel))
-          return;
+          continue;
 
         bool inNearbyCategory =
             std::any_of(interfaceDecl->visible_categories_begin(),
@@ -7020,7 +7012,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
                           return category->getInstanceMethod(sel);
                         });
         if (inNearbyCategory)
-          return;
+          continue;
 
         if (auto imported =
                 Impl.importMirroredDecl(objcProp, dc, getVersion(), proto)) {
@@ -7029,38 +7021,24 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
           // metatype.
         }
 
-        return;
+        continue;
       }
 
       auto afd = dyn_cast<AbstractFunctionDecl>(member);
       if (!afd)
-        return;
+        continue;
 
       if (isa<AccessorDecl>(afd))
-        return;
+        continue;
 
       auto objcMethod =
           dyn_cast_or_null<clang::ObjCMethodDecl>(member->getClangDecl());
       if (!objcMethod)
-        return;
+        continue;
 
       // For now, just remember that we saw this method.
       methodsByName[objcMethod->getSelector()]
         .push_back(MirroredMethodEntry{objcMethod, proto});
-    };
-
-    if (name) {
-      // If we're asked to import a specific name only, look for that in the
-      // protocol.
-      auto results = proto->lookupDirect(*name);
-      for (auto *member : results)
-        if (member->getDeclContext() == proto)
-          importProtocolRequirement(member);
-
-    } else {
-      // Otherwise, import all mirrored members.
-      for (auto *member : proto->getMembers())
-        importProtocolRequirement(member);
     }
   }
 
@@ -8702,12 +8680,7 @@ void ClangImporter::Implementation::collectMembersToAdd(
       insertMembersAndAlternates(nd, members);
   }
 
-  // Objective-C protocols don't require any special handling.
-  if (isa<clang::ObjCProtocolDecl>(objcContainer))
-    return;
-
-  // Objective-C interfaces can inherit constructors from their superclass,
-  // which we must model explicitly.
+  SwiftDeclConverter converter(*this, CurrentVersion);
   if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(objcContainer)) {
     objcContainer = clangClass = clangClass->getDefinition();
     importInheritedConstructors(clangClass, cast<ClassDecl>(D), members);
@@ -8715,12 +8688,10 @@ void ClangImporter::Implementation::collectMembersToAdd(
                = dyn_cast<clang::ObjCProtocolDecl>(objcContainer)) {
     objcContainer = clangProto->getDefinition();
   }
-
-  // Interfaces and categories can declare protocol conformances, and
-  // members of those protocols are mirrored into the interface or
-  // category.
+  // Import mirrored declarations for protocols to which this category
+  // or extension conforms.
   // FIXME: This is supposed to be a short-term hack.
-  importMirroredProtocolMembers(objcContainer, DC, None, members);
+  converter.importMirroredProtocolMembers(objcContainer, DC, members);
 }
 
 void ClangImporter::Implementation::loadAllConformances(

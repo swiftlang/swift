@@ -818,10 +818,7 @@ public:
   void importInheritedConstructors(const clang::ObjCInterfaceDecl *curObjCClass,
                                    const ClassDecl *classDecl,
                                    SmallVectorImpl<Decl *> &newMembers);
-  void importMirroredProtocolMembers(const clang::ObjCContainerDecl *decl,
-                                     DeclContext *dc, Optional<DeclBaseName> name,
-                                     SmallVectorImpl<Decl *> &members);
-
+  
   /// Utility function for building simple generic signatures.
   GenericSignature buildGenericSignature(GenericParamList *genericParams,
                                           DeclContext *dc);

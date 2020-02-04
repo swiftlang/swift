@@ -3726,13 +3726,25 @@ ClangImporter::Implementation::loadNamedMembers(
     const IterableDeclContext *IDC, DeclBaseName N, uint64_t contextData) {
 
   auto *D = IDC->getDecl();
-  auto *DC = D->getInnermostDeclContext();
+  auto *DC = cast<DeclContext>(D);
   auto *CD = D->getClangDecl();
   auto *CDC = cast<clang::DeclContext>(CD);
   assert(CD && "loadNamedMembers on a Decl without a clangDecl");
 
   auto *nominal = DC->getSelfNominalTypeDecl();
   auto effectiveClangContext = getEffectiveClangContext(nominal);
+
+  // FIXME: The legacy of mirroring protocol members rears its ugly head,
+  // and as a result we have to bail on any @interface or @category that
+  // has a declared protocol conformance.
+  if (auto *ID = dyn_cast<clang::ObjCInterfaceDecl>(CD)) {
+    if (ID->protocol_begin() != ID->protocol_end())
+      return None;
+  }
+  if (auto *CCD = dyn_cast<clang::ObjCCategoryDecl>(CD)) {
+    if (CCD->protocol_begin() != CCD->protocol_end())
+      return None;
+  }
 
   // There are 3 cases:
   //
@@ -3820,16 +3832,6 @@ ClangImporter::Implementation::loadNamedMembers(
         Members.push_back(cast<ValueDecl>(ctor));
     }
   }
-
-  if (!isa<ProtocolDecl>(D)) {
-    if (auto *OCD = dyn_cast<clang::ObjCContainerDecl>(CD)) {
-      SmallVector<Decl *, 1> newMembers;
-      importMirroredProtocolMembers(OCD, DC, N, newMembers);
-      for (auto member : newMembers)
-          Members.push_back(cast<ValueDecl>(member));
-    }
-  }
-
   return Members;
 }
 
