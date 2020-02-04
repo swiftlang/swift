@@ -821,7 +821,7 @@ ERROR(sil_box_expected_r_angle,none,
 ERROR(sil_function_subst_expected_l_angle,none,
       "expected '<' to begin SIL function type substitution list after 'for'", ())
 ERROR(sil_function_subst_expected_r_angle,none,
-      "expected '>' to begin SIL function type substitution list after 'for'", ())
+      "expected '>' to end SIL function type substitution list after 'for <...'", ())
 
 // Opaque types
 ERROR(opaque_mid_composition,none,
