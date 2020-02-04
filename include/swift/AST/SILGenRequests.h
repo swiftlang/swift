@@ -31,6 +31,7 @@ class SourceFile;
 
 namespace Lowering {
   class TypeConverter;
+  class SILGenModule;
 }
 
 /// Report that a request of the given kind is being evaluated, so it
@@ -95,6 +96,30 @@ public:
 void simple_display(llvm::raw_ostream &out, const SILGenDescriptor &d);
 
 SourceLoc extractNearestSourceLoc(const SILGenDescriptor &desc);
+
+class SILGenSourceFileRequest :
+    public SimpleRequest<SILGenSourceFileRequest,
+                         bool(Lowering::SILGenModule *, SourceFile *),
+                         CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator,
+           Lowering::SILGenModule *SGM, SourceFile *SF) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+inline void
+simple_display(llvm::raw_ostream &out, const Lowering::SILGenModule *SGM) {
+  // No-op
+}
 
 /// The zone number for SILGen.
 #define SWIFT_TYPEID_ZONE SILGen

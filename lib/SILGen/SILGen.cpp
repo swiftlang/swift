@@ -1669,22 +1669,24 @@ public:
 
 } // end anonymous namespace
 
-void SILGenModule::emitSourceFile(SourceFile *sf) {
-  SourceFileScope scope(*this, sf);
-  FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-file", sf);
+llvm::Expected<bool>
+SILGenSourceFileRequest::evaluate(Evaluator &evaluator,
+                                  SILGenModule *SGM, SourceFile *sf) const {
+  SourceFileScope scope(*SGM, sf);
   for (Decl *D : sf->getTopLevelDecls()) {
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-decl", D);
-    visit(D);
+    FrontendStatsTracer StatsTracer(SGM->getASTContext().Stats, "SILgen-decl", D);
+    SGM->visit(D);
   }
 
   for (TypeDecl *TD : sf->LocalTypeDecls) {
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-tydecl", TD);
+    FrontendStatsTracer StatsTracer(SGM->getASTContext().Stats, "SILgen-tydecl", TD);
     // FIXME: Delayed parsing would prevent these types from being added to the
     //        module in the first place.
     if (TD->getDeclContext()->getInnermostSkippedFunctionContext())
       continue;
-    visit(TD);
+    SGM->visit(TD);
   }
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1708,7 +1710,8 @@ SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
 
   if (SF) {
     if (auto *file = dyn_cast<SourceFile>(SF)) {
-      SGM.emitSourceFile(file);
+      (void)evaluateOrDefault(file->getASTContext().evaluator,
+                              SILGenSourceFileRequest{&SGM, file}, false);
     } else if (auto *file = dyn_cast<SerializedASTFile>(SF)) {
       if (file->isSIB())
         M->getSILLoader()->getAllForModule(mod->getName(), file);
@@ -1718,7 +1721,8 @@ SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
       auto nextSF = dyn_cast<SourceFile>(file);
       if (!nextSF || nextSF->ASTStage != SourceFile::TypeChecked)
         continue;
-      SGM.emitSourceFile(nextSF);
+      (void)evaluateOrDefault(nextSF->getASTContext().evaluator,
+                              SILGenSourceFileRequest{&SGM, nextSF}, false);
     }
 
     // Also make sure to process any intermediate files that may contain SIL

@@ -17,3 +17,6 @@
 SWIFT_REQUEST(SILGen, GenerateSILRequest,
               std::unique_ptr<SILModule>(SILGenDescriptor),
               Uncached, NoLocationInfo)
+SWIFT_REQUEST(SILGen, SILGenSourceFileRequest,
+              bool(Lowering::SILGenModule *, SourceFile *),
+              Uncached, NoLocationInfo)
