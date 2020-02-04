@@ -105,6 +105,8 @@ enum class SILStage {
 /// when a Swift compilation context is lowered to SIL.
 class SILModule {
   friend class SILFunctionBuilder;
+  friend class SILGenSourceFileRequest;
+  friend class SILGenWholeModuleRequest;
 
 public:
   using FunctionListType = llvm::ilist<SILFunction>;
