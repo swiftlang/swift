@@ -54,10 +54,8 @@ final internal class __StringStorage
   internal var _flags: UInt16
   internal var _reserved: UInt16
 
-  @inline(__always)
   internal var count: Int { return _count }
 
-  @inline(__always)
   internal var _countAndFlags: _StringObject.CountAndFlags {
     return CountAndFlags(count: _count, flags: _flags)
   }
@@ -67,23 +65,19 @@ final internal class __StringStorage
   internal var _realCapacityAndFlags: UInt64
   internal var _countAndFlags: _StringObject.CountAndFlags
 
-  @inline(__always)
   internal var count: Int { return _countAndFlags.count }
 
   // The total allocated storage capacity. Note that this includes the required
   // nul-terminator.
-  @inline(__always)
   internal var _realCapacity: Int {
     return Int(truncatingIfNeeded:
       _realCapacityAndFlags & CountAndFlags.countMask)
   }
 #endif
 
-  @inline(__always)
   final internal var isASCII: Bool { return _countAndFlags.isASCII }
 
   final internal var asString: String {
-    @_effects(readonly) @inline(__always)
     get { return String(_StringGuts(self)) }
   }
 
@@ -131,7 +125,6 @@ private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
 
 // Creation
 extension __StringStorage {
-  @_effects(releasenone)
   private static func create(
     realCodeUnitCapacity: Int, countAndFlags: CountAndFlags
   ) -> __StringStorage {
@@ -157,7 +150,6 @@ extension __StringStorage {
     return storage
   }
 
-  @_effects(releasenone)
   private static func create(
     capacity: Int, countAndFlags: CountAndFlags
   ) -> __StringStorage {
@@ -197,7 +189,6 @@ extension __StringStorage {
     return storage
   }
 
-  @_effects(releasenone)
   internal static func create(
     initializingFrom bufPtr: UnsafeBufferPointer<UInt8>,
     capacity: Int,
@@ -208,13 +199,12 @@ extension __StringStorage {
     _internalInvariant(capacity >= bufPtr.count)
     let storage = __StringStorage.create(
       capacity: capacity, countAndFlags: countAndFlags)
-    let addr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
+    let addr = bufPtr.baseAddress!
     storage.mutableStart.initialize(from: addr, count: bufPtr.count)
     storage._invariantCheck()
     return storage
   }
 
-  @_effects(releasenone)
   internal static func create(
     initializingFrom bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool
   ) -> __StringStorage {
@@ -225,32 +215,26 @@ extension __StringStorage {
 
 // Usage
 extension __StringStorage {
-  @inline(__always)
   private var mutableStart: UnsafeMutablePointer<UInt8> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
   }
-  @inline(__always)
   private var mutableEnd: UnsafeMutablePointer<UInt8> {
      return mutableStart + count
   }
 
-  @inline(__always)
   internal var start: UnsafePointer<UInt8> {
      return UnsafePointer(mutableStart)
   }
 
-  @inline(__always)
   private final var end: UnsafePointer<UInt8> {
     return UnsafePointer(mutableEnd)
   }
 
   // Point to the nul-terminator.
-  @inline(__always)
   private final var terminator: UnsafeMutablePointer<UInt8> {
     return mutableEnd
   }
 
-  @inline(__always)
   internal var codeUnits: UnsafeBufferPointer<UInt8> {
     return UnsafeBufferPointer(start: start, count: count)
   }
@@ -275,7 +259,6 @@ extension __StringStorage {
   // required nul-terminator.
   //
   // NOTE: Callers who wish to mutate this storage should enfore nul-termination
-  @inline(__always)
   private var unusedStorage: UnsafeMutableBufferPointer<UInt8> {
     return UnsafeMutableBufferPointer(
       start: mutableEnd, count: unusedCapacity)
@@ -315,7 +298,6 @@ extension __StringStorage {
 // Appending
 extension __StringStorage {
   // Perform common post-RRC adjustments and invariant enforcement.
-  @_effects(releasenone)
   internal func _updateCountAndFlags(newCount: Int, newIsASCII: Bool) {
     let countAndFlags = CountAndFlags(
       mortalCount: newCount, isASCII: newIsASCII)
@@ -333,7 +315,6 @@ extension __StringStorage {
   }
 
   // Perform common post-append adjustments and invariant enforcement.
-  @_effects(releasenone)
   private func _postAppendAdjust(
     appendedCount: Int, appendedIsASCII isASCII: Bool
   ) {
@@ -343,18 +324,16 @@ extension __StringStorage {
     _internalInvariant(oldTerminator + appendedCount == self.terminator)
   }
 
-  @_effects(releasenone)
   internal func appendInPlace(
     _ other: UnsafeBufferPointer<UInt8>, isASCII: Bool
   ) {
     _internalInvariant(self.capacity >= other.count)
-    let srcAddr = other.baseAddress._unsafelyUnwrappedUnchecked
+    let srcAddr = other.baseAddress!
     let srcCount = other.count
     self.mutableEnd.initialize(from: srcAddr, count: srcCount)
     _postAppendAdjust(appendedCount: srcCount, appendedIsASCII: isASCII)
   }
 
-  @_effects(releasenone)
   internal func appendInPlace<Iter: IteratorProtocol>(
     _ other: inout Iter, isASCII: Bool
   ) where Iter.Element == UInt8 {
@@ -374,7 +353,6 @@ extension __StringStorage {
 
 // Removing
 extension __StringStorage {
-  @_effects(releasenone)
   internal func remove(from lower: Int, to upper: Int) {
     _internalInvariant(lower <= upper)
 
@@ -389,7 +367,6 @@ extension __StringStorage {
 
   // Reposition a tail of this storage from src to dst. Returns the length of
   // the tail.
-  @_effects(releasenone)
   internal func _slideTail(
     src: UnsafeMutablePointer<UInt8>,
     dst: UnsafeMutablePointer<UInt8>
@@ -400,7 +377,6 @@ extension __StringStorage {
     return tailCount
   }
 
-  @_effects(releasenone)
   internal func replace(
     from lower: Int, to upper: Int, with replacement: UnsafeBufferPointer<UInt8>
   ) {
@@ -416,7 +392,7 @@ extension __StringStorage {
     // Copy in the contents.
     lowerPtr.moveInitialize(
       from: UnsafeMutablePointer(
-        mutating: replacement.baseAddress._unsafelyUnwrappedUnchecked),
+        mutating: replacement.baseAddress!),
       count: replCount)
 
     let isASCII = self.isASCII && _allASCII(replacement)
@@ -424,7 +400,6 @@ extension __StringStorage {
   }
 
 
-  @_effects(releasenone)
   internal func replace<C: Collection>(
     from lower: Int,
     to upper: Int,
@@ -467,7 +442,6 @@ final internal class __SharedStringStorage
   internal var _count: Int
   internal var _flags: UInt16
 
-  @inline(__always)
   internal var _countAndFlags: _StringObject.CountAndFlags {
     return CountAndFlags(count: _count, flags: _flags)
   }
@@ -495,11 +469,10 @@ final internal class __SharedStringStorage
     self._invariantCheck()
   }
 
-  @inline(__always)
   final internal var isASCII: Bool { return _countAndFlags.isASCII }
 
   final internal var asString: String {
-    @_effects(readonly) @inline(__always) get {
+    get {
       return String(_StringGuts(self))
     }
   }
@@ -507,7 +480,6 @@ final internal class __SharedStringStorage
 
 extension __SharedStringStorage {
 #if !INTERNAL_CHECKS_ENABLED
-  @inline(__always)
   internal func _invariantCheck() {}
 #else
   internal func _invariantCheck() {

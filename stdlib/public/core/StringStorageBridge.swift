@@ -14,7 +14,6 @@ import SwiftShims
 
 #if _runtime(_ObjC)
 
-@_effects(readonly)
 private func _isNSString(_ str:AnyObject) -> UInt8 {
   return _swift_stdlib_isNSString(str)
 }
@@ -24,8 +23,6 @@ internal let _cocoaUTF8Encoding:UInt = 4 /* NSUTF8StringEncoding */
 
 // ObjC interfaces.
 extension _AbstractStringStorage {
-  @inline(__always)
-  @_effects(releasenone)
   internal func _getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>, _ aRange: _SwiftNSRange
   ) {
@@ -42,8 +39,6 @@ extension _AbstractStringStorage {
       range: range)
   }
 
-  @inline(__always)
-  @_effects(releasenone)
   internal func _getCString(
     _ outputPtr: UnsafeMutablePointer<UInt8>, _ maxLength: Int, _ encoding: UInt
   ) -> Int8 {
@@ -59,8 +54,6 @@ extension _AbstractStringStorage {
     }
   }
 
-  @inline(__always)
-  @_effects(readonly)
   internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     switch (encoding, isASCII) {
     case (_cocoaASCIIEncoding, true),
@@ -71,7 +64,6 @@ extension _AbstractStringStorage {
     }
   }
 
-  @_effects(readonly)
   internal func _nativeIsEqual<T:_AbstractStringStorage>(
     _ nativeOther: T
   ) -> Int8 {
@@ -82,8 +74,6 @@ extension _AbstractStringStorage {
       (memcmp(start, nativeOther.start, count) == 0)) ? 1 : 0
   }
 
-  @inline(__always)
-  @_effects(readonly)
   internal func _isEqual(_ other: AnyObject?) -> Int8 {
     guard let other = other else {
       return 0
@@ -148,14 +138,14 @@ extension _AbstractStringStorage {
 extension __StringStorage {
   @objc(length)
   final internal var UTF16Length: Int {
-    @_effects(readonly) @inline(__always) get {
+    get {
       return asString.utf16.count // UTF16View special-cases ASCII for us.
     }
   }
 
   @objc
   final internal var hash: UInt {
-    @_effects(readonly) get {
+    get {
       if isASCII {
         return _cocoaHashASCIIBytes(start, length: count)
       }
@@ -164,14 +154,12 @@ extension __StringStorage {
   }
 
   @objc(characterAtIndex:)
-  @_effects(readonly)
   final internal func character(at offset: Int) -> UInt16 {
     let str = asString
     return str.utf16[str._toUTF16Index(offset)]
   }
 
   @objc(getCharacters:range:)
-  @_effects(releasenone)
   final internal func getCharacters(
    _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
   ) {
@@ -179,7 +167,6 @@ extension __StringStorage {
   }
 
   @objc(_fastCStringContents:)
-  @_effects(readonly)
   final internal func _fastCStringContents(
     _ requiresNulTermination: Int8
   ) -> UnsafePointer<CChar>? {
@@ -190,19 +177,16 @@ extension __StringStorage {
   }
 
   @objc(UTF8String)
-  @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8>? {
     return start
   }
 
   @objc(cStringUsingEncoding:)
-  @_effects(readonly)
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     return _cString(encoding: encoding)
   }
 
   @objc(getCString:maxLength:encoding:)
-  @_effects(releasenone)
   final internal func getCString(
     _ outputPtr: UnsafeMutablePointer<UInt8>, maxLength: Int, encoding: UInt
   ) -> Int8 {
@@ -211,7 +195,7 @@ extension __StringStorage {
 
   @objc
   final internal var fastestEncoding: UInt {
-    @_effects(readonly) get {
+    get {
       if isASCII {
         return _cocoaASCIIEncoding
       }
@@ -220,13 +204,11 @@ extension __StringStorage {
   }
 
   @objc(isEqualToString:)
-  @_effects(readonly)
   final internal func isEqualToString(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
   }
 
   @objc(isEqual:)
-  @_effects(readonly)
   final internal func isEqual(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
   }
@@ -244,14 +226,14 @@ extension __StringStorage {
 extension __SharedStringStorage {
   @objc(length)
   final internal var UTF16Length: Int {
-    @_effects(readonly) get {
+    get {
       return asString.utf16.count // UTF16View special-cases ASCII for us.
     }
   }
 
   @objc
   final internal var hash: UInt {
-    @_effects(readonly) get {
+    get {
       if isASCII {
         return _cocoaHashASCIIBytes(start, length: count)
       }
@@ -260,14 +242,12 @@ extension __SharedStringStorage {
   }
 
   @objc(characterAtIndex:)
-  @_effects(readonly)
   final internal func character(at offset: Int) -> UInt16 {
     let str = asString
     return str.utf16[str._toUTF16Index(offset)]
   }
 
   @objc(getCharacters:range:)
-  @_effects(releasenone)
   final internal func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
   ) {
@@ -276,7 +256,7 @@ extension __SharedStringStorage {
 
   @objc
   final internal var fastestEncoding: UInt {
-    @_effects(readonly) get {
+    get {
       if isASCII {
         return _cocoaASCIIEncoding
       }
@@ -285,7 +265,6 @@ extension __SharedStringStorage {
   }
 
   @objc(_fastCStringContents:)
-  @_effects(readonly)
   final internal func _fastCStringContents(
     _ requiresNulTermination: Int8
   ) -> UnsafePointer<CChar>? {
@@ -296,19 +275,16 @@ extension __SharedStringStorage {
   }
 
   @objc(UTF8String)
-  @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8>? {
     return start
   }
 
   @objc(cStringUsingEncoding:)
-  @_effects(readonly)
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     return _cString(encoding: encoding)
   }
 
   @objc(getCString:maxLength:encoding:)
-  @_effects(releasenone)
   final internal func getCString(
     _ outputPtr: UnsafeMutablePointer<UInt8>, maxLength: Int, encoding: UInt
   ) -> Int8 {
@@ -316,13 +292,11 @@ extension __SharedStringStorage {
   }
 
   @objc(isEqualToString:)
-  @_effects(readonly)
   final internal func isEqualToString(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
   }
 
   @objc(isEqual:)
-  @_effects(readonly)
   final internal func isEqual(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
   }
