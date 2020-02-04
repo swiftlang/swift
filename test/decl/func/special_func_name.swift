@@ -35,7 +35,7 @@ struct S3 {
 
 _ = S11(0) // expected-error {{argument passed to call that takes no arguments}}
 _ = S11.init(0) // expected-error {{argument passed to call that takes no arguments}}
-_ = S11.`init`(0)
+S11.`init`(0)
 
 _ = S12(0)
 _ = S12.init(0)
@@ -43,7 +43,7 @@ _ = S12.`init`(0) // expected-error {{type 'S12' has no member 'init'}}
 
 _ = S21(0) // expected-error {{argument passed to call that takes no arguments}}
 _ = S21.init(0) // expected-error {{argument passed to call that takes no arguments}}
-_ = S21.`init`(0)
+S21.`init`(0)
 
 _ = S22(0)
 _ = S22.init(0)
