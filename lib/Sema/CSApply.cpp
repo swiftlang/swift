@@ -7321,6 +7321,7 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     Type convertType = target.getExprConversionType();
     auto shouldCoerceToContextualType = [&]() {
       return convertType &&
+          !target.isOptionalSomePatternInit() &&
           !(getType(resultExpr)->isUninhabited() &&
             getContextualTypePurpose(target.getAsExpr())
               == CTP_ReturnSingleExpr);
