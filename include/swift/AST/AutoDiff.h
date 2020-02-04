@@ -223,6 +223,11 @@ public:
   NominalTypeDecl *getNominal() const;
 };
 
+/// The key type used for uniquing `SILDifferentiabilityWitness` in
+/// `SILModule`: original function name, parameter indices, result indices, and
+/// derivative generic signature.
+using SILDifferentiabilityWitnessKey = std::pair<StringRef, AutoDiffConfig>;
+
 /// Automatic differentiation utility namespace.
 namespace autodiff {
 

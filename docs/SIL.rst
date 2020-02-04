@@ -1316,6 +1316,66 @@ variable cannot be used as l-value, i.e. the reference to the object cannot be
 modified. As a consequence the variable cannot be accessed with ``global_addr``
 but only with ``global_value``.
 
+Differentiability Witnesses
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+::
+
+  decl ::= sil-differentiability-witness
+  sil-differentiability-witness ::=
+      'sil_differentiability_witness'
+      sil-linkage?
+      '[' 'parameters' sil-differentiability-witness-function-index-list ']'
+      '[' 'results' sil-differentiability-witness-function-index-list ']'
+      generic-parameter-clause?
+      sil-function-name ':' sil-type
+      sil-differentiability-witness-body?
+
+  sil-differentiability-witness-body ::=
+      '{' sil-differentiability-witness-entry?
+          sil-differentiability-witness-entry? '}'
+
+  sil-differentiability-witness-entry ::=
+      sil-differentiability-witness-entry-kind ':'
+      sil-entry-name ':' sil-type
+
+  sil-differentiability-witness-entry-kind ::= 'jvp' | 'vjp'
+
+SIL encodes function differentiability via differentiability witnesses.
+
+Differentiability witnesses map a "key" (including an "original" SIL function)
+to derivative SIL functions.
+
+Differentiability witnesses are keyed by the following:
+
+- An "original" SIL function name.
+- Differentiability parameter indices.
+- Differentiability result indices.
+- A generic parameter clause, representing differentiability generic
+  requirements.
+
+Differentiability witnesses may have a body, specifying derivative functions for
+the key. Verification checks that derivative functions have the expected type
+based on the key.
+
+::
+
+  sil_differentiability_witness hidden [parameters 0] [results 0] <T where T : Differentiable> @id : $@convention(thin) (T) -> T {
+    jvp: @id_jvp : $@convention(thin) (T) -> (T, @owned @callee_guaranteed (T.TangentVector) -> T.TangentVector)
+    vjp: @id_vjp : $@convention(thin) (T) -> (T, @owned @callee_guaranteed (T.TangentVector) -> T.TangentVector)
+  }
+
+During SILGen, differentiability witnesses are emitted for the following:
+
+- `@differentiable` declaration attributes.
+- `@derivative` declaration attributes. Registered derivative functions
+  become differentiability witness entries.
+
+The SIL differentiation transform canonicalizes differentiability witnesses,
+filling in missing entries.
+
+Differentiability witness entries are accessed via the
+`differentiability_witness_function` instruction.
+
 Dataflow Errors
 ---------------
 
