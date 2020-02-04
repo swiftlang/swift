@@ -2644,7 +2644,13 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
       // language mode, so we can safely try to bind its
       // object type to contextual type without risk of
       // causing more optionality mismatches down the road.
-      matchKind = ConstraintKind::Bind;
+      auto last = locator.last();
+      // For contextual conversions let's give `try?` a chance to
+      // infer inner type which, if incorrect, should result in
+      // contextual conversion failure instead of optional unwrap.
+      matchKind = last && last->is<LocatorPathElt::ContextualType>()
+                      ? ConstraintKind::Conversion
+                      : ConstraintKind::Bind;
     }
   }
 

@@ -1958,6 +1958,17 @@ bool ContextualFailure::diagnoseAsError() {
     if (diagnoseYieldByReferenceMismatch())
       return true;
 
+    if (auto *OTE = dyn_cast<OptionalTryExpr>(anchor)) {
+      auto tryType = fromType->getOptionalObjectType();
+      if (tryType->isEqual(toType)) {
+        auto &cs = getConstraintSystem();
+        MissingOptionalUnwrapFailure failure(cs, getType(OTE), toType,
+                                             cs.getConstraintLocator(OTE));
+        if (failure.diagnoseAsError())
+          return true;
+      }
+    }
+
     if (CTP == CTP_ForEachStmt) {
       if (fromType->isAnyExistentialType()) {
         emitDiagnostic(anchor->getLoc(), diag::type_cannot_conform,
