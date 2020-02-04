@@ -2077,8 +2077,11 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               // will also fail (because type can't satisfy it), and it's
               // more interesting for diagnostics.
               auto req = last->getAs<LocatorPathElt::AnyRequirement>();
-              if (type1->isHole() || (req &&
-                  req->getRequirementKind() == RequirementKind::Superclass))
+              if (!req)
+                return getTypeMatchFailure(locator);
+
+              if (type1->isHole() ||
+                  req->getRequirementKind() == RequirementKind::Superclass)
                 return getTypeMatchSuccess();
 
               auto *fix = fixRequirementFailure(*this, type1, type2, locator);
@@ -2169,6 +2172,11 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           // Once either reacher locators or better diagnostic presentation for
           // nested type failures is available this check could be removed.
           if (last->is<LocatorPathElt::FunctionResult>())
+            return getTypeMatchFailure(locator);
+
+          // If instance types didn't line up correctly, let's produce a
+          // diagnostic which mentions them together with their metatypes.
+          if (last->is<LocatorPathElt::InstanceType>())
             return getTypeMatchFailure(locator);
 
         } else { // There are no elements in the path
@@ -2814,6 +2822,14 @@ bool ConstraintSystem::repairFailures(
       return false;
 
     if (auto *coercion = dyn_cast<CoerceExpr>(anchor)) {
+      // Coercion from T.Type to T.Protocol.
+      if (hasConversionOrRestriction(
+              ConversionRestrictionKind::MetatypeToExistentialMetatype))
+        return false;
+
+      if (hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
+        return false;
+
       // Let's check whether the sub-expression is an optional type which
       // is possible to unwrap (either by force or `??`) to satisfy the cast,
       // otherwise we'd have to fallback to force downcast.
@@ -2839,10 +2855,11 @@ bool ConstraintSystem::repairFailures(
 
       if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
         return false;
-      
+
       auto *fix = ContextualMismatch::create(*this, lhs, rhs,
                                              getConstraintLocator(locator));
       conversionsOrFixes.push_back(fix);
+      return true;
     }
 
     // This could be:
@@ -3486,15 +3503,17 @@ bool ConstraintSystem::repairFailures(
     // If there is a deep equality, superclass restriction
     // already recorded, let's not add bother ignoring
     // contextual type, because actual fix is going to
-    // be perform once restriction is applied.
-    if (llvm::any_of(conversionsOrFixes,
-                     [](const RestrictionOrFix &entry) -> bool {
-                       return entry.IsRestriction &&
-                              (entry.getRestriction() ==
-                                   ConversionRestrictionKind::Superclass ||
-                               entry.getRestriction() ==
-                                   ConversionRestrictionKind::DeepEquality);
-                     }))
+    // be performed once restriction is applied.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
+      break;
+
+    if (hasConversionOrRestriction(
+            ConversionRestrictionKind::MetatypeToExistentialMetatype))
+      break;
+
+    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) &&
+        !hasConversionOrRestriction(
+            ConversionRestrictionKind::OptionalToOptional))
       break;
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
@@ -8232,15 +8251,42 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   };
 
+  auto fixContextualFailure = [&](Type fromType, Type toType,
+                                  ConstraintLocatorBuilder locator) -> bool {
+    auto *loc = getConstraintLocator(locator);
+    if (loc->isForAssignment() || loc->isForCoercion() ||
+        loc->isForContextualType()) {
+      if (restriction == ConversionRestrictionKind::Superclass) {
+        if (auto *fix =
+                CoerceToCheckedCast::attempt(*this, fromType, toType, loc))
+          return !recordFix(fix);
+      }
+
+      auto *fix = ContextualMismatch::create(*this, fromType, toType, loc);
+      return !recordFix(fix);
+    }
+
+    return false;
+  };
+
   switch (restriction) {
   // for $< in { <, <c, <oc }:
   //   T_i $< U_i ===> (T_i...) $< (U_i...)
   case ConversionRestrictionKind::DeepEquality:
     return matchDeepEqualityTypes(type1, type2, locator);
 
-  case ConversionRestrictionKind::Superclass:
+  case ConversionRestrictionKind::Superclass: {
     addContextualScore();
-    return matchSuperclassTypes(type1, type2, subflags, locator);
+
+    auto result = matchSuperclassTypes(type1, type2, subflags, locator);
+
+    if (!(shouldAttemptFixes() && result.isFailure()))
+      return result;
+
+    return fixContextualFailure(type1, type2, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
+  }
 
   // for $< in { <, <c, <oc }:
   //   T $< U, U : P_i ===> T $< protocol<P_i...>
@@ -8255,15 +8301,23 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   //     P : Q ===> T.Protocol $< Q.Type
   //   for P protocol, Q protocol,
   //     P $< Q ===> P.Type $< Q.Type
-  case ConversionRestrictionKind::MetatypeToExistentialMetatype:
+  case ConversionRestrictionKind::MetatypeToExistentialMetatype: {
     addContextualScore();
 
-    return matchExistentialTypes(
-             type1->castTo<MetatypeType>()->getInstanceType(),
-             type2->castTo<ExistentialMetatypeType>()->getInstanceType(),
-             ConstraintKind::ConformsTo,
-             subflags,
-             locator.withPathElement(ConstraintLocator::InstanceType));
+    auto instanceTy1 = type1->getMetatypeInstanceType();
+    auto instanceTy2 = type2->getMetatypeInstanceType();
+
+    auto result = matchExistentialTypes(
+        instanceTy1, instanceTy2, ConstraintKind::ConformsTo, subflags,
+        locator.withPathElement(ConstraintLocator::InstanceType));
+
+    if (!(shouldAttemptFixes() && result.isFailure()))
+      return result;
+
+    return fixContextualFailure(type1, type2, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
+  }
 
   // for $< in { <, <c, <oc }:
   //   for P protocol, C class, D class,
@@ -8278,13 +8332,16 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (!superclass1)
       return SolutionKind::Error;
 
-    return matchTypes(
-             superclass1,
-             instance2,
-             ConstraintKind::Subtype,
-             subflags,
-             locator.withPathElement(ConstraintLocator::InstanceType));
+    auto result =
+        matchTypes(superclass1, instance2, ConstraintKind::Subtype, subflags,
+                   locator.withPathElement(ConstraintLocator::InstanceType));
 
+    if (!(shouldAttemptFixes() && result.isFailure()))
+      return result;
+
+    return fixContextualFailure(type1, type2, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
   }
   // for $< in { <, <c, <oc }:
   //   T $< U ===> T $< U?

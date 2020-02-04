@@ -243,7 +243,6 @@ let _: String = try? optProducer?.produceInt() // expected-error {{cannot conver
 let _: Int?? = try? optProducer?.produceInt() // good
 
 let _: Int? = try? optProducer?.produceIntNoThrowing() // expected-error {{cannot convert value of type 'Int??' to specified type 'Int?'}}
-// expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
 let _: Int?? = try? optProducer?.produceIntNoThrowing() // expected-warning {{no calls to throwing functions occur within 'try' expression}}
 
 let _: Int? = (try? optProducer?.produceAny()) as? Int // good
