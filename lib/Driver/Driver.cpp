@@ -2177,6 +2177,11 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
       commandLine.push_back("-target");
       commandLine.push_back(targetArg->getValue());
     }
+    if (const Arg *targetVariantArg =
+            Args.getLastArg(options::OPT_target_variant)) {
+      commandLine.push_back("-target-variant");
+      commandLine.push_back(targetVariantArg->getValue());
+    }
     if (const Arg *sdkArg = Args.getLastArg(options::OPT_sdk)) {
       commandLine.push_back("-sdk");
       commandLine.push_back(sdkArg->getValue());
@@ -2189,6 +2194,7 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
 
     std::string executable = getSwiftProgramPath();
 
+    // FIXME: This bypasses mechanisms like -v and -###. (SR-12119)
     sys::TaskQueue queue;
     queue.addTask(executable.c_str(), commandLine);
     queue.execute(nullptr,
