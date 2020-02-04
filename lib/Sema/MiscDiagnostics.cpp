@@ -221,8 +221,24 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
       
       // If we have an assignment expression, scout ahead for acceptable _'s.
-      if (auto *AE = dyn_cast<AssignExpr>(E))
-        markAcceptableDiscardExprs(AE->getDest());
+      if (auto *AE = dyn_cast<AssignExpr>(E)) {
+        auto destExpr = AE->getDest();
+        markAcceptableDiscardExprs(destExpr);
+        // If the user is assigning the result of a function that returns
+        // Void to _ then warn, because that is redundant.
+        if (auto DAE = dyn_cast<DiscardAssignmentExpr>(destExpr)) {
+          if (auto CE = dyn_cast<CallExpr>(AE->getSrc())) {
+            if (CE->getCalledValue() && isa<FuncDecl>(CE->getCalledValue()) &&
+                CE->getType()->isVoid()) {
+              Ctx.Diags
+                  .diagnose(DAE->getLoc(),
+                            diag::discard_expr_void_result_redundant)
+                  .fixItRemoveChars(DAE->getStartLoc(),
+                                    AE->getSrc()->getStartLoc());
+            }
+          }
+        }
+      }
 
       /// Diagnose a '_' that isn't on the immediate LHS of an assignment.
       if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E)) {
@@ -409,7 +425,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     /// in simple pattern-like expressions, so we reject anything complex here.
     void markAcceptableDiscardExprs(Expr *E) {
       if (!E) return;
-      
+
       if (auto *PE = dyn_cast<ParenExpr>(E))
         return markAcceptableDiscardExprs(PE->getSubExpr());
       if (auto *TE = dyn_cast<TupleExpr>(E)) {
