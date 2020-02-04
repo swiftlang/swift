@@ -2134,8 +2134,7 @@ TypeChecker::typeCheckExpression(
   cs.setContextualType(
       contextualTypeExpr,
       target.getExprContextualTypeLoc(),
-      target.getExprContextualTypePurpose(),
-      target.infersOpaqueReturnType());
+      target.getExprContextualTypePurpose());
 
   // If the client can handle unresolved type variables, leave them in the
   // system.

@@ -240,8 +240,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (const auto &contextualType : solution.contextualTypes) {
     if (!getContextualTypeInfo(contextualType.first)) {
       setContextualType(contextualType.first, contextualType.second.typeLoc,
-                        contextualType.second.purpose,
-                        contextualType.second.isOpaqueReturnType);
+                        contextualType.second.purpose);
     }
   }
 
@@ -1243,8 +1242,6 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
   Expr *expr = target.getAsExpr();
   Timer.emplace(expr, *this);
 
-  Expr *origExpr = expr;
-
   // Try to shrink the system by reducing disjunction domains. This
   // goes through every sub-expression and generate its own sub-system, to
   // try to reduce the domains of those subexpressions.
@@ -1277,9 +1274,8 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
       });
     }
 
-    ContextualTypeInfo info{
-        TypeLoc::withoutLoc(convertType), ctp, isOpaqueReturnType};
-    addContextualConversionConstraint(expr, info);
+    addContextualConversionConstraint(expr, convertType, ctp,
+                                      isOpaqueReturnType);
   }
 
   // Notify the listener that we've built the constraint system.

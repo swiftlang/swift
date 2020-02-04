@@ -792,7 +792,6 @@ using OpenedTypeMap =
 struct ContextualTypeInfo {
   TypeLoc typeLoc;
   ContextualTypePurpose purpose;
-  bool isOpaqueReturnType = false;
 
   Type getType() const { return typeLoc.getType(); }
 };
@@ -2336,12 +2335,11 @@ public:
   }
 
   void setContextualType(
-      const Expr *expr, TypeLoc T, ContextualTypePurpose purpose,
-       bool isOpaqueReturnType) {
+      const Expr *expr, TypeLoc T, ContextualTypePurpose purpose) {
     assert(expr != nullptr && "Expected non-null expression!");
     assert(contextualTypes.count(expr) == 0 &&
            "Already set this contextual type");
-    contextualTypes[expr] = { T, purpose, isOpaqueReturnType };
+    contextualTypes[expr] = { T, purpose };
   }
 
   Optional<ContextualTypeInfo> getContextualTypeInfo(const Expr *expr) const {
@@ -2573,7 +2571,8 @@ public:
 
   /// Add the appropriate constraint for a contextual conversion.
   void addContextualConversionConstraint(
-      Expr *expr, ContextualTypeInfo contextualType);
+      Expr *expr, Type conversionType, ContextualTypePurpose purpose,
+      bool isOpaqueReturnType);
 
   /// Add a "join" constraint between a set of types, producing the common
   /// supertype.
