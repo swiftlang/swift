@@ -3971,7 +3971,7 @@ public:
   }
 
   ValueOwnershipKind
-  getOwnershipKind(SILFunction &) const; // in SILType.cpp
+  getOwnershipKind(SILFunction &, CanSILFunctionType fTy) const; // in SILType.cpp
 
   bool operator==(SILResultInfo rhs) const {
     return TypeAndConvention == rhs.TypeAndConvention;

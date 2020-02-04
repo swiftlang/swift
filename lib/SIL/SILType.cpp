@@ -418,9 +418,9 @@ CanType swift::getSILBoxFieldLoweredType(TypeExpansionContext context,
 }
 
 ValueOwnershipKind
-SILResultInfo::getOwnershipKind(SILFunction &F) const {
+SILResultInfo::getOwnershipKind(SILFunction &F,
+                                CanSILFunctionType FTy) const {
   auto &M = F.getModule();
-  auto FTy = F.getLoweredFunctionType();
 
   bool IsTrivial = getSILStorageType(M, FTy).isTrivial(F);
   switch (getConvention()) {
