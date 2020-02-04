@@ -2306,14 +2306,37 @@ bool ContextualFailure::diagnoseConversionToBool() const {
     return true;
   }
 
+  // Determine if the boolean negation operator was applied to the anchor. This
+  // upwards traversal of the AST is somewhat fragile, but enables much better
+  // diagnostics if someone attempts to use an optional or integer as a boolean
+  // condition.
+  SourceLoc notOperatorLoc;
+  if (Expr *parent = findParentExpr(getAnchor())) {
+    if (isa<ParenExpr>(parent) && parent->isImplicit()) {
+      if ((parent = findParentExpr(parent))) {
+        auto parentOperatorApplication = dyn_cast<PrefixUnaryExpr>(parent);
+        if (parentOperatorApplication) {
+          auto operatorRefExpr =
+              dyn_cast<DeclRefExpr>(parentOperatorApplication->getFn());
+          if (operatorRefExpr && operatorRefExpr->getDecl()->getBaseName() ==
+                                     getASTContext().Id_NegationOperator) {
+            notOperatorLoc = operatorRefExpr->getLoc();
+          }
+        }
+      }
+    }
+  }
+
   // If we're trying to convert something from optional type to Bool, then a
   // comparison against nil was probably expected.
-  // TODO: It would be nice to handle "!x" --> x == false, but we have no way
-  // to get to the parent expr at present.
   auto fromType = getFromType();
   if (fromType->getOptionalObjectType()) {
     StringRef prefix = "((";
-    StringRef suffix = ") != nil)";
+    StringRef suffix;
+    if (notOperatorLoc.isValid())
+      suffix = ") == nil)";
+    else
+      suffix = ") != nil)";
 
     // Check if we need the inner parentheses.
     // Technically we only need them if there's something in 'expr' with
@@ -2325,9 +2348,11 @@ bool ContextualFailure::diagnoseConversionToBool() const {
     }
     // FIXME: The outer parentheses may be superfluous too.
 
-    emitDiagnostic(expr->getLoc(), diag::optional_used_as_boolean, fromType)
+    emitDiagnostic(expr->getLoc(), diag::optional_used_as_boolean, fromType,
+                   notOperatorLoc.isValid())
         .fixItInsert(expr->getStartLoc(), prefix)
-        .fixItInsertAfter(expr->getEndLoc(), suffix);
+        .fixItInsertAfter(expr->getEndLoc(), suffix)
+        .fixItRemove(notOperatorLoc);
     return true;
   }
 

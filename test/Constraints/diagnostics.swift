@@ -634,11 +634,11 @@ func r18397777(_ d : r21447318?) {
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
   }
   
-  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{8-8= != nil)}}
+  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{8-8= == nil)}}
 
   }
 
-  if !Optional(c) { // expected-error {{optional type 'Optional<r21447318>' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{18-18= != nil)}}
+  if !Optional(c) { // expected-error {{optional type 'Optional<r21447318>' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{18-18= == nil)}}
   }
 }
 
