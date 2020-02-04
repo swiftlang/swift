@@ -4053,7 +4053,7 @@ bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
   assert(kind == Kind::expression);
   switch (expression.contextualPurpose) {
   case CTP_Initialization:
-    return !infersOpaqueReturnType();
+    return !infersOpaqueReturnType() && !isOptionalSomePatternInit();
   case CTP_ForEachStmt:
     return true;
   case CTP_Unused:

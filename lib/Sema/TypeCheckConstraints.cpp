@@ -2050,6 +2050,7 @@ TypeChecker::typeCheckExpression(
     target.setExpr(expr);
     return None;
   }
+  target.setExpr(expr);
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
@@ -2070,19 +2071,13 @@ TypeChecker::typeCheckExpression(
   // diagnostics and is a hint for various performance optimizations.
   // FIXME: Look through LoadExpr. This is an egregious hack due to the
   // way typeCheckExprIndependently works.
-  TypeLoc convertType = target.getExprConversionTypeLoc();
   Expr *contextualTypeExpr = expr;
   if (auto loadExpr = dyn_cast_or_null<LoadExpr>(contextualTypeExpr))
     contextualTypeExpr = loadExpr->getSubExpr();
   cs.setContextualType(
-      contextualTypeExpr, convertType,
-      target.getExprContextualTypePurpose(),
-      target.infersOpaqueReturnType());
-
-  // If the convertType is *only* provided for that hint, then null it out so
-  // that we don't later treat it as an actual conversion constraint.
-  if (target.contextualTypeIsOnlyAHint())
-    convertType = TypeLoc();
+      contextualTypeExpr,
+      target.getExprContextualTypeLoc(),
+      target.getExprContextualTypePurpose());
 
   // If the client can handle unresolved type variables, leave them in the
   // system.
@@ -2090,26 +2085,20 @@ TypeChecker::typeCheckExpression(
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     allowFreeTypeVariables = FreeTypeVariableBinding::UnresolvedType;
 
-  Type convertTo = convertType.getType();
-
+  // If the target requires an optional of some type, form a new appropriate
+  // type variable and update the target's type with an optional of that
+  // type variable.
   if (target.isOptionalSomePatternInit()) {
-    assert(!convertTo && "convertType and type check options conflict");
+    assert(!target.getExprContextualType() &&
+           "some pattern cannot have contextual type pre-configured");
     auto *convertTypeLocator =
         cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
     Type var = cs.createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
-    convertTo = getOptionalType(expr->getLoc(), var);
-  } else if (target.getExprContextualTypePurpose()
-                 == CTP_AutoclosureDefaultParameter) {
-    // FIXME: Hack around the convertTo adjustment below, which we want to
-    // eliminate.
-    convertTo = Type(target.getAsAutoclosureParamType());
+    target.setExprConversionType(getOptionalType(expr->getLoc(), var));
   }
 
   // Attempt to solve the constraint system.
-  SolutionApplicationTarget innerTarget(
-      expr, dc, target.getExprContextualTypePurpose(), convertTo,
-      target.isDiscardedExpr());
-  auto viable = cs.solve(innerTarget, listener, allowFreeTypeVariables);
+  auto viable = cs.solve(target, listener, allowFreeTypeVariables);
   if (!viable) {
     target.setExpr(expr);
     return None;
@@ -2120,7 +2109,8 @@ TypeChecker::typeCheckExpression(
   // because they will leak out into arbitrary places in the resultant AST.
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
        (viable->size() != 1 ||
-       (convertType.getType() && convertType.getType()->hasUnresolvedType()))) {
+        (target.getExprConversionType() &&
+         target.getExprConversionType()->hasUnresolvedType()))) {
     // FIXME: This hack should only be needed for CSDiag.
     unresolvedTypeExprs = true;
     return target;
@@ -2134,10 +2124,6 @@ TypeChecker::typeCheckExpression(
   // Apply the solution to the expression.
   bool performingDiagnostics =
       options.contains(TypeCheckExprFlags::SubExpressionDiagnostics);
-  // FIXME: HACK! Copy over the inner target's expression info.
-  target.setExpr(innerTarget.getAsExpr());
-  if (convertTo.isNull())
-    target.setExprConversionType(convertTo);
   auto resultTarget = cs.applySolution(solution, target, performingDiagnostics);
   if (!resultTarget) {
     // Failure already diagnosed, above, as part of applying the solution.

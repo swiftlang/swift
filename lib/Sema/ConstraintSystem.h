@@ -792,7 +792,6 @@ using OpenedTypeMap =
 struct ContextualTypeInfo {
   TypeLoc typeLoc;
   ContextualTypePurpose purpose;
-  bool isOpaqueReturnType = false;
 
   Type getType() const { return typeLoc.getType(); }
 };
@@ -1224,11 +1223,11 @@ public:
     return expression.contextualPurpose;
   }
 
-  Type getExprConversionType() const {
-    return getExprConversionTypeLoc().getType();
+  Type getExprContextualType() const {
+    return getExprContextualTypeLoc().getType();
   }
 
-  TypeLoc getExprConversionTypeLoc() const {
+  TypeLoc getExprContextualTypeLoc() const {
     assert(kind == Kind::expression);
 
     // For an @autoclosure parameter, the conversion type is
@@ -1239,6 +1238,14 @@ public:
     }
 
     return expression.convertType;
+  }
+
+  /// Retrieve the type to which an expression should be converted, or
+  /// a NULL type if no conversion constraint should be generated.
+  Type getExprConversionType() const {
+    if (contextualTypeIsOnlyAHint())
+      return Type();
+    return getExprContextualType();
   }
 
   /// Returns the autoclosure parameter type, or \c nullptr if the
@@ -2328,12 +2335,11 @@ public:
   }
 
   void setContextualType(
-      const Expr *expr, TypeLoc T, ContextualTypePurpose purpose,
-       bool isOpaqueReturnType) {
+      const Expr *expr, TypeLoc T, ContextualTypePurpose purpose) {
     assert(expr != nullptr && "Expected non-null expression!");
     assert(contextualTypes.count(expr) == 0 &&
            "Already set this contextual type");
-    contextualTypes[expr] = { T, purpose, isOpaqueReturnType };
+    contextualTypes[expr] = { T, purpose };
   }
 
   Optional<ContextualTypeInfo> getContextualTypeInfo(const Expr *expr) const {
@@ -2565,7 +2571,8 @@ public:
 
   /// Add the appropriate constraint for a contextual conversion.
   void addContextualConversionConstraint(
-      Expr *expr, ContextualTypeInfo contextualType);
+      Expr *expr, Type conversionType, ContextualTypePurpose purpose,
+      bool isOpaqueReturnType);
 
   /// Add a "join" constraint between a set of types, producing the common
   /// supertype.
