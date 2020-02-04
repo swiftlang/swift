@@ -11,7 +11,6 @@ import CategoryOverrides
 
 // Nail down some emergent behaviors of the Clang Importer's override checking:
 
-
 // A category declared in a (private) header can happen to double-import a property
 // and a function with the same name - both before and after omit-needless-words -
 // as long as they have different contextual types.
@@ -77,4 +76,21 @@ extension Refinery {
 func takesARefinery(_ x: Refinery) {
   // CHECK: cannot assign to property: 'sugar' is a get-only property
   x.sugar = .caster
+}
+
+func nullabilityRefinementProto(_ x: MyBaseClass) {
+  // CHECK-PUBLIC: has no member 'requirement'
+  // CHECK-PRIVATE-NOT: has no member 'requirement'
+  // CHECK-PRIVATE-NOT: value of optional type 'Base?'
+  let _ : Base = x.requirement
+}
+
+func readwriteRefinementProto(_ x: MyDerivedClass) {
+  // CHECK-PUBLIC: has no member 'answer'
+  // CHECK-PRIVATE-NOT: has no member 'answer'
+  if x.answer == 0 {
+    // CHECK-PUBLIC: has no member 'answer'
+    // CHECK-PRIVATE-NOT: has no member 'answer'
+    x.answer = 42
+  }
 }
