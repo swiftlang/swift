@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -swift-version 5 -emit-sil -primary-file %s |  %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -swift-version 5 -emit-sil -primary-file %s |  %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -swift-version 5 -emit-sil -primary-file %s -Xllvm -sil-print-after=OSLogOptimization -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -swift-version 5 -emit-sil -primary-file %s -Xllvm -sil-print-after=OSLogOptimization -o /dev/null 2>&1 |  %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
 
 // Tests for the OSLogOptimization pass that performs compile-time analysis
@@ -12,7 +12,7 @@ import Foundation
 
 if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
-  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest23testSimpleInterpolationL_1hy0aB06LoggerV_tF
+  // CHECK-LABEL: @${{.*}}testSimpleInterpolationL_
   func testSimpleInterpolation(h: Logger) {
     h.log(level: .debug, "Minimum integer value: \(Int.min)")
 
@@ -20,9 +20,13 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG is used here as it is easier to perform the checks backwards
     // from uses to the definitions.
 
-    // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
-    // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
-    // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+    // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
+    // We need to wade through some borrows and copy values here.
+    // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
+    // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
+    // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
+    // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
+    // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK-64-DAG: [[LIT]] = string_literal utf8 "Minimum integer value: %{public}lld"
     // CHECK-32-DAG: [[LIT]] = string_literal utf8 "Minimum integer value: %{public}d"
 
@@ -51,22 +55,29 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
     // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
-    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
-    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // We need to wade through some borrows and copy values here.
+    // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+    // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
     // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
     // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
     // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 3
   }
 
-  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest34testInterpolationWithFormatOptionsL_1hy0aB06LoggerV_tF
+  // CHECK-LABEL: @${{.*}}testInterpolationWithFormatOptionsL_
   func testInterpolationWithFormatOptions(h: Logger) {
     h.log(level: .info, "Maximum integer value: \(Int.max, format: .hex)")
 
     // Check if there is a call to _os_log_impl with a literal format string.
 
-    // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
-    // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
-    // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+    // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
+    // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
+    // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
+    // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
+    // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
+    // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK-64-DAG: [[LIT]] = string_literal utf8 "Maximum integer value: %{public}llx"
     // CHECK-32-DAG: [[LIT]] = string_literal utf8 "Maximum integer value: %{public}x"
 
@@ -95,14 +106,17 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
     // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
-    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
-    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+    // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
     // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
     // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
     // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 3
   }
 
-  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest44testInterpolationWithFormatOptionsAndPrivacyL_1hy0aB06LoggerV_tF
+  // CHECK-LABEL: @${{.*}}testInterpolationWithFormatOptionsAndPrivacyL_
   func testInterpolationWithFormatOptionsAndPrivacy(h: Logger) {
     let privateID = 0x79abcdef
     h.log(
@@ -111,9 +125,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // Check if there is a call to _os_log_impl with a literal format string.
 
-    // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
-    // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
-    // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+    // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
+    // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
+    // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
+    // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
+    // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
+    // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK-64-DAG: [[LIT]] = string_literal utf8 "Private Identifier: %{private}llx"
     // CHECK-32-DAG: [[LIT]] = string_literal utf8 "Private Identifier: %{private}x"
 
@@ -142,14 +159,17 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
     // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
-    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
-    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+    // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
     // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
     // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
     // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 3
   }
 
-  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest38testInterpolationWithMultipleArgumentsL_1hy0aB06LoggerV_tF
+  // CHECK-LABEL: @${{.*}}testInterpolationWithMultipleArgumentsL_
   func testInterpolationWithMultipleArguments(h: Logger) {
     let privateID = 0x79abcdef
     let filePermissions = 0o777
@@ -164,9 +184,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // Check if there is a call to _os_log_impl with a literal format string.
 
-    // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
-    // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
-    // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+    // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
+    // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
+    // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
+    // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
+    // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
+    // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK-64-DAG: [[LIT]] = string_literal utf8 "Access prevented: process %{public}lld initiated by user: %{private}lld attempted resetting permissions to %{public}llo"
     // CHECK-32-DAG: [[LIT]] = string_literal utf8 "Access prevented: process %{public}d initiated by user: %{private}d attempted resetting permissions to %{public}o"
 
@@ -195,14 +218,17 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
     // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
-    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
-    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+    // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
     // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
     // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
     // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 9
   }
 
-  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest25testLogMessageWithoutDataL_1hy0aB06LoggerV_tF
+  // CHECK-LABEL: @${{.*}}testLogMessageWithoutDataL_
   func testLogMessageWithoutData(h: Logger) {
     // FIXME: here `ExpressibleByStringLiteral` conformance of OSLogMessage
     // is used. In this case, the constant evaluation begins from the apply of
@@ -214,9 +240,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // Check if there is a call to _os_log_impl with a literal format string.
 
-    // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
-    // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
-    // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+    // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
+    // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
+    // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
+    // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
+    // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
+    // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK-DAG: [[LIT]] = string_literal utf8 "A message with no data"
 
     // Check if the size of the argument buffer is a constant.
@@ -242,44 +271,56 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
     // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
-    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
-    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+    // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
     // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
     // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
     // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 0
   }
 
-  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest22testEscapingOfPercentsL_1hy0aB06LoggerV_tF
+  // CHECK-LABEL: @${{.*}}testEscapingOfPercentsL_
   func testEscapingOfPercents(h: Logger) {
     h.log("Process failed after 99% completion")
-    // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
-    // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
-    // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+    // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
+    // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
+    // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
+    // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
+    // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
+    // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK-DAG: [[LIT]] = string_literal utf8 "Process failed after 99%% completion"
   }
 
-  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest18testDoublePercentsL_1hy0aB06LoggerV_tF
+  // CHECK-LABEL: @${{.*}}testDoublePercentsL_
   func testDoublePercents(h: Logger) {
     h.log("Double percents: %%")
-    // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
-    // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
-    // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+    // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
+    // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
+    // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
+    // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
+    // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
+    // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK-DAG: [[LIT]] = string_literal utf8 "Double percents: %%%%"
   }
 
-  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest22testSmallFormatStringsL_1hy0aB06LoggerV_tF
+  // CHECK-LABEL: @${{.*}}testSmallFormatStringsL_
   func testSmallFormatStrings(h: Logger) {
     h.log("a")
-    // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
-    // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
-    // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+    // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
+    // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
+    // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
+    // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
+    // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
+    // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK-DAG: [[LIT]] = string_literal utf8 "a"
   }
 
   /// A stress test that checks whether the optimizer handle messages with more
   /// than 48 interpolated expressions. Interpolated expressions beyond this
   /// limit must be ignored.
-  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest31testMessageWithTooManyArgumentsL_1hy0aB06LoggerV_tF
+  // CHECK-LABEL: @${{.*}}testMessageWithTooManyArgumentsL_
   func testMessageWithTooManyArguments(h: Logger) {
     h.log(
       level: .error,
@@ -292,9 +333,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // Check if there is a call to _os_log_impl with a literal format string.
 
-    // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
-    // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
-    // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+    // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
+    // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
+    // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
+    // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
+    // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
+    // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK-64-DAG: [[LIT]] = string_literal utf8 "%{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld "
     // CHECK-32-DAG: [[LIT]] = string_literal utf8 "%{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d "
 
@@ -322,22 +366,28 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
     // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
-    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
-    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+    // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
     // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
     // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
     // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 144
   }
 
-  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest22testInt32InterpolationL_1hy0aB06LoggerV_tF
+  // CHECK-LABEL: @${{.*}}testInt32InterpolationL_
   func testInt32Interpolation(h: Logger) {
     h.log("32-bit integer value: \(Int32.min)")
 
     // Check if there is a call to _os_log_impl with a literal format string.
 
-    // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
-    // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
-    // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+    // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
+    // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
+    // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
+    // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
+    // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
+    // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK-DAG: [[LIT]] = string_literal utf8 "32-bit integer value: %{public}d"
 
     // Check if the size of the argument buffer is a constant.
@@ -361,7 +411,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 1
   }
 
-  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest26testDynamicStringArgumentsL_1hy0aB06LoggerV_tF
+  // CHECK-LABEL: @${{.*}}testDynamicStringArgumentsL_
   func testDynamicStringArguments(h: Logger) {
     let concatString = "hello" + " - " + "world"
     let interpolatedString = "\(31) trillion digits of pi are known so far"
@@ -375,9 +425,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG is used here as it is easier to perform the checks backwards
     // from uses to the definitions.
 
-    // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
-    // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
-    // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+    // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
+    // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
+    // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
+    // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
+    // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
+    // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK-DAG: [[LIT]] = string_literal utf8 "concat: %{public}s interpolated: %{private}s"
 
     // Check if the size of the argument buffer is a constant.
@@ -405,14 +458,17 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
     // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
-    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
-    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+    // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
     // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
     // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
     // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 6
   }
 
-  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest25testNSObjectInterpolationL_1hy0aB06LoggerV_tF
+  // CHECK-LABEL: @${{.*}}testNSObjectInterpolationL_
   func testNSObjectInterpolation(h: Logger) {
     let nsArray: NSArray = [0, 1, 2]
     let nsDictionary: NSDictionary = [1 : ""]
@@ -424,9 +480,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
       // CHECK-DAG is used here as it is easier to perform the checks backwards
       // from uses to the definitions.
 
-      // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
-      // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
-      // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+      // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
+      // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
+      // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
+      // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
+      // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
+      // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
       // CHECK-DAG: [[LIT]] = string_literal utf8 "NSArray: %{public}@ NSDictionary: %{private}@"
 
       // Check if the size of the argument buffer is a constant.
@@ -454,14 +513,17 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
       // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
       // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
-      // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
-      // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+      // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
+      // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
+      // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
+      // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+      // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
       // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
       // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
       // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 6
   }
 
-  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest23testDeadCodeEliminationL_1h6number8num32bit6stringy0aB06LoggerV_Sis5Int32VSStF
+  // CHECK-LABEL: @${{.*}}testDeadCodeEliminationL_
   func testDeadCodeElimination(
     h: Logger,
     number: Int,
@@ -488,7 +550,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     h.log("\(concatString)")
       // CHECK-NOT: OSLogMessage
       // CHECK-NOT: OSLogInterpolation
-      // CHECK-LABEL: end sil function '$s25OSLogPrototypeCompileTest23testDeadCodeEliminationL_1h6number8num32bit6stringy0aB06LoggerV_Sis5Int32VSStF'
+      // CHECK-LABEL: end sil function '${{.*}}testDeadCodeEliminationL_
   }
 }
 
