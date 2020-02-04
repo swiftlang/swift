@@ -10,7 +10,8 @@ target_link_libraries(swift
                       PRIVATE
                         swiftDriver
                         swiftFrontendTool
-                        swiftSymbolGraphGen)
+                        swiftSymbolGraphGen
+                        LLVMBitstreamReader)
 
 swift_create_post_build_symlink(swift
   SOURCE "swift${CMAKE_EXECUTABLE_SUFFIX}"

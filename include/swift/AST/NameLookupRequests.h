@@ -467,6 +467,54 @@ private:
            NLOptions opts) const;
 };
 
+/// The input type for a direct lookup request.
+class DirectLookupDescriptor final {
+  using LookupOptions = OptionSet<NominalTypeDecl::LookupDirectFlags>;
+
+public:
+  NominalTypeDecl *DC;
+  DeclName Name;
+  LookupOptions Options;
+
+  DirectLookupDescriptor(NominalTypeDecl *dc, DeclName name,
+                         LookupOptions options = {})
+      : DC(dc), Name(name), Options(options) {}
+
+  friend llvm::hash_code hash_value(const DirectLookupDescriptor &desc) {
+    return llvm::hash_combine(desc.Name, desc.DC, desc.Options.toRaw());
+  }
+
+  friend bool operator==(const DirectLookupDescriptor &lhs,
+                         const DirectLookupDescriptor &rhs) {
+    return lhs.Name == rhs.Name && lhs.DC == rhs.DC &&
+           lhs.Options.toRaw() == rhs.Options.toRaw();
+  }
+
+  friend bool operator!=(const DirectLookupDescriptor &lhs,
+                         const DirectLookupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const DirectLookupDescriptor &desc);
+
+SourceLoc extractNearestSourceLoc(const DirectLookupDescriptor &desc);
+
+class DirectLookupRequest
+    : public SimpleRequest<DirectLookupRequest,
+                           TinyPtrVector<ValueDecl *>(DirectLookupDescriptor),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<TinyPtrVector<ValueDecl *>>
+  evaluate(Evaluator &evaluator, DirectLookupDescriptor desc) const;
+};
+
 #define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

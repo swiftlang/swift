@@ -1,4 +1,4 @@
-#import <Foundation.h>
+@import ObjectiveC;
 
 @protocol ObjcProt
   -(void) someFunctionFromProt;

@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "MiscDiagnostics.h"
 #include "SolutionResult.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -323,18 +324,11 @@ protected:
   CONTROL_FLOW_STMT(Yield)
   CONTROL_FLOW_STMT(Defer)
 
-  static Expr *getTrivialBooleanCondition(StmtCondition condition) {
-    if (condition.size() != 1)
-      return nullptr;
-
-    return condition.front().getBooleanOrNull();
-  }
-
   static bool isBuildableIfChainRecursive(IfStmt *ifStmt,
                                           unsigned &numPayloads,
                                           bool &isOptional) {
-    // The conditional must be trivial.
-    if (!getTrivialBooleanCondition(ifStmt->getCond()))
+    // Check whether we can handle the conditional.
+    if (!ConstraintSystem::canGenerateConstraints(ifStmt->getCond()))
       return false;
 
     // The 'then' clause contributes a payload.
@@ -460,26 +454,11 @@ protected:
           payloadIndex + 1, numPayloads, isOptional);
     }
 
-    // Generate constraints for the various subexpressions.
-    auto condExpr = getTrivialBooleanCondition(ifStmt->getCond());
-    assert(condExpr && "Cannot get here without a trivial Boolean condition");
-    condExpr = cs->generateConstraints(condExpr, dc);
-    if (!condExpr) {
+    // Generate constraints for the conditions.
+    if (cs->generateConstraints(ifStmt->getCond(), dc)) {
       hadError = true;
       return nullptr;
     }
-
-    // Condition must convert to Bool.
-    // FIXME: This should be folded into constraint generation for conditions.
-    auto boolDecl = ctx.getBoolDecl();
-    if (!boolDecl) {
-      hadError = true;
-      return nullptr;
-    }
-    cs->addConstraint(ConstraintKind::Conversion,
-                      cs->getType(condExpr),
-                      boolDecl->getDeclaredType(),
-                      cs->getConstraintLocator(condExpr));
 
     // The operand should have optional type if we had optional results,
     // so we just need to call `buildIf` now, since we're at the top level.
@@ -645,7 +624,7 @@ class BuilderClosureRewriter
   const Solution &solution;
   DeclContext *dc;
   AppliedBuilderTransform builderTransform;
-  std::function<Expr *(Expr *)> rewriteExpr;
+  std::function<Expr *(Expr *)> rewriteExprFn;
   std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType;
 
   /// Retrieve the temporary variable that will be used to capture the
@@ -730,7 +709,8 @@ private:
   /// Declare the given temporary variable, adding the appropriate
   /// entries to the elements of a brace stmt.
   void declareTemporaryVariable(VarDecl *temporaryVar,
-                                std::vector<ASTNode> &elements) {
+                                std::vector<ASTNode> &elements,
+                                Expr *initExpr = nullptr) {
     if (!temporaryVar)
       return;
 
@@ -739,9 +719,18 @@ private:
     auto pattern = new (ctx) NamedPattern(temporaryVar,/*implicit=*/true);
     pattern->setType(temporaryVar->getType());
 
-    auto pbd = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None, pattern, nullptr, dc);
+    auto pbd = PatternBindingDecl::create(
+        ctx, SourceLoc(), StaticSpellingKind::None, temporaryVar->getLoc(),
+        pattern, SourceLoc(), initExpr, dc);
     elements.push_back(temporaryVar);
     elements.push_back(pbd);
+  }
+
+  Expr *rewriteExpr(Expr *expr) {
+    Expr *result = rewriteExprFn(expr);
+    if (result)
+      performSyntacticExprDiagnostics(expr, dc, /*isExprStmt=*/false);
+    return result;
   }
 
 public:
@@ -753,7 +742,7 @@ public:
       std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType
     ) : ctx(solution.getConstraintSystem().getASTContext()),
         solution(solution), dc(dc), builderTransform(builderTransform),
-        rewriteExpr(rewriteExpr),
+        rewriteExprFn(rewriteExpr),
         coerceToType(coerceToType){ }
 
   Stmt *visitBraceStmt(BraceStmt *braceStmt, FunctionBuilderTarget target,
@@ -789,13 +778,7 @@ public:
 
         // Form a new pattern binding to bind the temporary variable to the
         // transformed expression.
-        auto pattern = new (ctx) NamedPattern(
-            recorded.temporaryVar, /*implicit=*/true);
-        pattern->setType(recorded.temporaryVar->getType());
-        newElements.push_back(recorded.temporaryVar);
-
-        auto pbd = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None, pattern, finalExpr, dc);
-        newElements.push_back(pbd);
+        declareTemporaryVariable(recorded.temporaryVar, newElements, finalExpr);
         continue;
       }
 
@@ -845,19 +828,31 @@ public:
 
   Stmt *visitIfStmt(IfStmt *ifStmt, FunctionBuilderTarget target) {
     // Rewrite the condition.
-    // FIXME: We should handle the whole condition within the type system.
-    auto cond = ifStmt->getCond();
-    auto condExpr = cond.front().getBoolean();
-    auto finalCondExpr = rewriteExpr(condExpr);
+    auto condition = ifStmt->getCond();
+    for (auto &condElement : condition) {
+      switch (condElement.getKind()) {
+      case StmtConditionElement::CK_Availability:
+        continue;
 
-    // Load the condition if needed.
-    if (finalCondExpr->getType()->is<LValueType>()) {
-      auto &cs = solution.getConstraintSystem();
-      finalCondExpr = cs.addImplicitLoadExpr(finalCondExpr);
+      case StmtConditionElement::CK_Boolean: {
+        auto condExpr = condElement.getBoolean();
+        auto finalCondExpr = rewriteExpr(condExpr);
+
+        // Load the condition if needed.
+        if (finalCondExpr->getType()->is<LValueType>()) {
+          auto &cs = solution.getConstraintSystem();
+          finalCondExpr = cs.addImplicitLoadExpr(finalCondExpr);
+        }
+
+        condElement.setBoolean(finalCondExpr);
+        continue;
+      }
+
+      case StmtConditionElement::CK_PatternBinding:
+        llvm_unreachable("unhandled statement condition");
+      }
     }
-
-    cond.front().setBoolean(finalCondExpr);
-    ifStmt->setCond(cond);
+    ifStmt->setCond(condition);
 
     assert(target.kind == FunctionBuilderTarget::TemporaryVar);
     auto temporaryVar = target.captured.first;

@@ -64,6 +64,7 @@ _register("lipo", "lipo")
 _register("libtool", "libtool")
 # SWIFT_ENABLE_TENSORFLOW
 _register("bazel", "bazel")
+_register("swiftc", "swiftc")
 
 
 class Darwin(Toolchain):

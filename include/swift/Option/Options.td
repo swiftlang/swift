@@ -882,6 +882,10 @@ def whole_module_optimization : Flag<["-"], "whole-module-optimization">,
   HelpText<"Optimize input files together instead of individually">,
   Flags<[FrontendOption, NoInteractiveOption]>;
 
+def no_whole_module_optimization : Flag<["-"], "no-whole-module-optimization">,
+  HelpText<"Disable optimizing input files together instead of individually">,
+  Flags<[FrontendOption, NoInteractiveOption]>;
+
 def enable_batch_mode : Flag<["-"], "enable-batch-mode">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Enable combining frontend jobs into batches">;
@@ -933,6 +937,11 @@ def print_target_info : Flag<["-"], "print-target-info">,
 
 def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Generate code for a particular CPU variant">;
+
+def target_variant : Separate<["-"], "target-variant">,
+  Flags<[FrontendOption]>,
+  HelpText<"Generate 'zippered' code for macCatalyst that can run on the specified"
+           " variant target triple in addition to the main -target triple">;
 
 def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,

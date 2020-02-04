@@ -8,6 +8,10 @@ enum Either<T,U> {
 
 @_functionBuilder
 struct TupleBuilder {
+  static func buildBlock<T1>(_ t1: T1) -> (T1) {
+    return (t1)
+  }
+
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
@@ -430,3 +434,45 @@ func test_single_stmt_closure_support() {
 
   let _ = test { 0 } // ok
 }
+
+// Check a case involving nested closures that refer to parameters of their
+// enclosing closures.
+struct X<C: Collection, T> {
+  init(_ c: C, @TupleBuilder body: (C.Element) -> T) { }
+}
+
+struct Y<T> {
+  init(@TupleBuilder body: () -> T) { }
+}
+
+struct Z<T> {
+  init(@TupleBuilder body: () -> T) { }
+}
+
+func testNestedClosuresWithDependencies(cond: Bool) {
+  tuplify(cond) { _ in
+    X([1, 2, 3]) { x in
+      Y {
+        Z {
+          x
+          1
+        }
+      }
+    }
+  }
+}
+
+// Check that we can handle multiple conditions in an 'if' statement.
+func testIfConditions(cond: Bool, c1: Bool, i1: Int, i2: Int) {
+  tuplify(cond) { x in
+    "testIfConditions"
+    if i1 == i2, c1, x {
+      1
+      "hello"
+    }
+    3.14159
+  }
+}
+testIfConditions(cond: true, c1: true, i1: 1, i2: 1)
+// CHECK: testIfConditions
+// CHECK-SAME: hello

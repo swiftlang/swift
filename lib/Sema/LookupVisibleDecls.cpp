@@ -538,6 +538,8 @@ static void lookupVisibleMemberDeclsImpl(
     // The metatype represents an arbitrary named type: dig through to the
     // declared type to see what we're dealing with.
     Type Ty = MTT->getInstanceType();
+    if (auto dynSelfTy = Ty->getAs<DynamicSelfType>())
+      Ty = dynSelfTy->getSelfType();
     if (Ty->is<AnyMetatypeType>())
       return;
 

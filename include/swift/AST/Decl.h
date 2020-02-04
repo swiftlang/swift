@@ -3326,6 +3326,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   friend class ExtensionDecl;
   friend class DeclContext;
   friend class IterableDeclContext;
+  friend class DirectLookupRequest;
   friend ArrayRef<ValueDecl *>
   ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
 
@@ -3400,6 +3401,12 @@ public:
     /// Whether to include @_implements members.
     /// Used by conformance-checking to find special @_implements members.
     IncludeAttrImplements = 1 << 0,
+    /// Whether to avoid loading lazy members from any new extensions that would otherwise be found
+    /// by deserialization.
+    ///
+    /// Used by the module loader to break recursion and as an optimization e.g. when it is known that a
+    /// particular member declaration will never appear in an extension.
+    IgnoreNewExtensions = 1 << 1,
   };
 
   /// Find all of the declarations with the given name within this nominal type
@@ -7433,11 +7440,16 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   return result;
 }
 
-/// Retrieve the parameter list for a given declaration.
+/// Retrieve the parameter list for a given declaration, or nullputr if there
+/// is none.
 ParameterList *getParameterList(ValueDecl *source);
 
-/// Retrieve parameter declaration from the given source at given index.
+/// Retrieve parameter declaration from the given source at given index, or
+/// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
+
+void simple_display(llvm::raw_ostream &out,
+                    OptionSet<NominalTypeDecl::LookupDirectFlags> options);
 
 /// Display Decl subclasses.
 void simple_display(llvm::raw_ostream &out, const Decl *decl);

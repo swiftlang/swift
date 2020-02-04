@@ -220,26 +220,9 @@ private:
   std::pair<Type, ContextualTypePurpose>
   validateContextualType(Type contextualType, ContextualTypePurpose CTP);
 
-  /// Given a result of name lookup that had no viable results, diagnose the
-  /// unviable ones.
-  void diagnoseUnviableLookupResults(MemberLookupResult &lookupResults,
-                                     Expr *expr, Type baseObjTy, Expr *baseExpr,
-                                     DeclNameRef memberName,
-                                     DeclNameLoc nameLoc, SourceLoc loc);
-
-  bool diagnoseMemberFailures(
-      Expr *E, Expr *baseEpxr, ConstraintKind lookupKind,
-      DeclNameRef memberName, FunctionRefKind funcRefKind,
-      ConstraintLocator *locator,
-      Optional<std::function<bool(ArrayRef<OverloadChoice>)>> callback = None,
-      bool includeInaccessibleMembers = true);
-
   bool visitExpr(Expr *E);
-  bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
 
-  bool visitUnresolvedDotExpr(UnresolvedDotExpr *UDE);
-  bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
   bool visitQuoteLiteralExpr(QuoteLiteralExpr *E);
   bool visitUnquoteExpr(UnquoteExpr *E);
   bool visitDeclQuoteExpr(DeclQuoteExpr *E);
@@ -248,125 +231,6 @@ private:
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
 };
 } // end anonymous namespace
-
-/// Given a result of name lookup that had no viable results, diagnose the
-/// unviable ones.
-void FailureDiagnosis::diagnoseUnviableLookupResults(
-    MemberLookupResult &result, Expr *E, Type baseObjTy, Expr *baseExpr,
-    DeclNameRef memberName, DeclNameLoc nameLoc, SourceLoc loc) {
-  SourceRange baseRange = baseExpr ? baseExpr->getSourceRange() : SourceRange();
-
-  // If we found no results at all, mention that fact.
-  if (result.UnviableCandidates.empty()) {
-    MissingMemberFailure failure(CS, baseObjTy, memberName,
-                                 CS.getConstraintLocator(E));
-    auto diagnosed = failure.diagnoseAsError();
-    assert(diagnosed && "Failed to produce missing member diagnostic");
-    (void)diagnosed;
-    return;
-  }
-
-  // Otherwise, we have at least one (and potentially many) viable candidates
-  // sort them out.  If all of the candidates have the same problem (commonly
-  // because there is exactly one candidate!) diagnose this.
-  auto firstProblem = result.UnviableReasons[0];
-  bool sameProblem = llvm::all_of(
-      result.UnviableReasons,
-      [&firstProblem](const MemberLookupResult::UnviableReason &problem) {
-        return problem == firstProblem;
-      });
-
-  auto instanceTy = baseObjTy;
-  if (auto *MTT = instanceTy->getAs<AnyMetatypeType>())
-    instanceTy = MTT->getInstanceType();
-  
-  if (sameProblem) {
-    // If the problem is the same for all of the choices, let's
-    // just pick one which has a declaration.
-    auto choice = llvm::find_if(
-        result.UnviableCandidates,
-        [&](const OverloadChoice &choice) { return choice.isDecl(); });
-
-    // This code can't currently diagnose key path application
-    // related failures.
-    if (!choice)
-      return;
-
-    switch (firstProblem) {
-    case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
-    case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
-    case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
-      break;
-
-    case MemberLookupResult::UR_UnavailableInExistential: {
-      InvalidMemberRefOnExistential failure(
-          CS, instanceTy, memberName, CS.getConstraintLocator(E));
-      failure.diagnoseAsError();
-      return;
-    }
-
-    case MemberLookupResult::UR_InstanceMemberOnType:
-    case MemberLookupResult::UR_TypeMemberOnInstance: {
-      auto locatorKind = isa<SubscriptExpr>(E)
-                             ? ConstraintLocator::SubscriptMember
-                             : ConstraintLocator::Member;
-      AllowTypeOrInstanceMemberFailure failure(
-          CS, baseObjTy, choice->getDecl(), memberName,
-          CS.getConstraintLocator(E, locatorKind));
-      auto diagnosed = failure.diagnoseAsError();
-      assert(diagnosed &&
-             "Failed to produce missing or extraneous metatype diagnostic");
-      (void)diagnosed;
-      return;
-    }
-    case MemberLookupResult::UR_MutatingMemberOnRValue:
-    case MemberLookupResult::UR_MutatingGetterOnRValue: {
-      MutatingMemberRefOnImmutableBase failure(CS, choice->getDecl(),
-                                               CS.getConstraintLocator(E));
-      (void)failure.diagnose();
-      return;
-    }
-        
-    case MemberLookupResult::UR_Inaccessible: {
-      // FIXME: What if the unviable candidates have different levels of access?
-      //
-      // If we found an inaccessible member of a protocol extension, it might
-      // be declared 'public'. This can only happen if the protocol is not
-      // visible to us, but the conforming type is. In this case, we need to
-      // clamp the formal access for diagnostics purposes to the formal access
-      // of the protocol itself.
-      InaccessibleMemberFailure failure(CS, choice->getDecl(),
-                                        CS.getConstraintLocator(E));
-      auto diagnosed = failure.diagnoseAsError();
-      assert(diagnosed && "failed to produce expected diagnostic");
-      for (auto cand : result.UnviableCandidates) {
-        if (!cand.isDecl())
-          continue;
-
-        auto *candidate = cand.getDecl();
-        // failure is going to highlight candidate given to it,
-        // we just need to handle the rest here.
-        if (candidate != choice->getDecl())
-          diagnose(candidate, diag::decl_declared_here,
-                   candidate->getFullName());
-      }
-      return;
-    }
-    }
-  }
-
-  // Otherwise, we don't have a specific issue to diagnose.  Just say the vague
-  // 'cannot use' diagnostic.
-  if (!baseObjTy->isEqual(instanceTy))
-    diagnose(loc, diag::could_not_use_type_member,
-             instanceTy, memberName)
-    .highlight(baseRange).highlight(nameLoc.getSourceRange());
-  else
-    diagnose(loc, diag::could_not_use_value_member,
-             baseObjTy, memberName)
-    .highlight(baseRange).highlight(nameLoc.getSourceRange());
-  return;
-}
 
 namespace {
   class ExprTypeSaverAndEraser {
@@ -1542,10 +1406,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                               argLabels))
     return true;
 
-  // Diagnose some simple and common errors.
-  if (calleeInfo.diagnoseSimpleErrors(callExpr))
-    return true;
-
   // Force recheck of the arg expression because we allowed unresolved types
   // before, and that turned out not to help, and now we want any diagnoses
   // from disallowing them.
@@ -1566,7 +1426,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     if (calleeInfo.closeness == CC_ExactMatch)
       return true;
 
-    if (!CS.getContextualType() ||
+    if (!CS.getContextualType(callExpr) ||
         (calleeInfo.closeness != CC_ArgumentMismatch &&
          calleeInfo.closeness != CC_OneGenericArgumentMismatch))
       return false;
@@ -1589,29 +1449,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     auto lhsExpr = argTuple->getElement(0), rhsExpr = argTuple->getElement(1);
     auto lhsType = CS.getType(lhsExpr)->getRValueType();
     auto rhsType = CS.getType(rhsExpr)->getRValueType();
-
-    // TODO(diagnostics): There are still cases not yet handled by new
-    // diagnostics framework e.g.
-    //
-    // var tuple = (1, 2, 3)
-    // switch tuple {
-    //   case (let (_, _, _)) + 1: break
-    // }
-    if (callExpr->isImplicit() && overloadName == "~=") {
-      auto flags = ParameterTypeFlags();
-      if (calleeInfo.candidates.size() == 1)
-        if (auto fnType = calleeInfo.candidates[0].getFunctionType())
-          flags = fnType->getParams()[0].getParameterFlags();
-
-      auto *locator = CS.getConstraintLocator(
-          callExpr,
-          {ConstraintLocator::ApplyArgument,
-           LocatorPathElt::ApplyArgToParam(0, 0, flags)},
-          /*summaryFlags=*/0);
-
-      ArgumentMismatchFailure failure(CS, lhsType, rhsType, locator);
-      return failure.diagnosePatternMatchingMismatch();
-    }
 
     if (isContextualConversionFailure(argTuple))
       return false;
@@ -1660,41 +1497,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   AnyFunctionType::decomposeInput(CS.getType(argExpr), params);
   auto argString = AnyFunctionType::getParamListAsString(params);
 
-  // If we couldn't get the name of the callee, then it must be something of a
-  // more complex "value of function type".
-  if (overloadName.empty()) {
-    // If we couldn't infer the result type of the closure expr, then we have
-    // some sort of ambiguity, let the ambiguity diagnostic stuff handle this.
-    if (auto ffty = fnType->getAs<AnyFunctionType>())
-      if (ffty->getResult()->hasTypeVariable()) {
-        diagnoseAmbiguity(fnExpr);
-        return true;
-      }
-    
-    // The most common unnamed value of closure type is a ClosureExpr, so
-    // special case it.
-    if (isa<ClosureExpr>(fnExpr->getValueProvidingExpr())) {
-      if (fnType->hasTypeVariable())
-        diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure, argString)
-          .highlight(fnExpr->getSourceRange());
-      else
-        diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure_type,
-                 fnType, argString)
-          .highlight(fnExpr->getSourceRange());
-      
-    } else if (fnType->hasTypeVariable()) {
-      diagnose(argExpr->getStartLoc(), diag::cannot_call_function_value,
-               argString)
-        .highlight(fnExpr->getSourceRange());
-    } else {
-      diagnose(argExpr->getStartLoc(), diag::cannot_call_value_of_function_type,
-                fnType, argString)
-        .highlight(fnExpr->getSourceRange());
-    }
-    
-    return true;
-  }
-
   if (auto MTT = fnType->getAs<MetatypeType>()) {
     if (MTT->getInstanceType()->isExistentialType()) {
       diagnose(fnExpr->getLoc(), diag::construct_protocol_value, fnType);
@@ -1725,74 +1527,6 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   return false;
 }
 
-/// When an object literal fails to typecheck because its protocol's
-/// corresponding default type has not been set in the global namespace (e.g.
-/// _ColorLiteralType), suggest that the user import the appropriate module for
-/// the target.
-bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
-  // Type check the argument first.
-  auto protocol = TypeChecker::getLiteralProtocol(CS.getASTContext(), E);
-  if (!protocol)
-    return false;
-  auto constrName =
-      TypeChecker::getObjectLiteralConstructorName(CS.getASTContext(), E);
-  assert(constrName);
-  auto *constr = dyn_cast_or_null<ConstructorDecl>(
-      protocol->getSingleRequirement(constrName));
-  if (!constr)
-    return false;
-  auto paramType = TypeChecker::getObjectLiteralParameterType(E, constr);
-  if (!typeCheckChildIndependently(
-        E->getArg(), paramType, CTP_CallArgument))
-    return true;
-
-  // Conditions for showing this diagnostic:
-  // * The object literal protocol's default type is unimplemented
-  if (TypeChecker::getDefaultType(protocol, CS.DC))
-    return false;
-  // * The object literal has no contextual type
-  if (CS.getContextualType())
-    return false;
-
-  // Figure out what import to suggest.
-  auto &Ctx = CS.getASTContext();
-  const auto &target = Ctx.LangOpts.Target;
-  StringRef importModule;
-  StringRef importDefaultTypeName;
-  if (protocol == Ctx.getProtocol(KnownProtocolKind::ExpressibleByColorLiteral)) {
-    if (target.isMacOSX()) {
-      importModule = "AppKit";
-      importDefaultTypeName = "NSColor";
-    } else if (target.isiOS() || target.isTvOS()) {
-      importModule = "UIKit";
-      importDefaultTypeName = "UIColor";
-    }
-  } else if (protocol == Ctx.getProtocol(
-               KnownProtocolKind::ExpressibleByImageLiteral)) {
-    if (target.isMacOSX()) {
-      importModule = "AppKit";
-      importDefaultTypeName = "NSImage";
-    } else if (target.isiOS() || target.isTvOS()) {
-      importModule = "UIKit";
-      importDefaultTypeName = "UIImage";
-    }
-  } else if (protocol == Ctx.getProtocol( 
-               KnownProtocolKind::ExpressibleByFileReferenceLiteral)) {
-    importModule = "Foundation";
-    importDefaultTypeName = "URL";
-  }
-
-  // Emit the diagnostic.
-  const auto plainName = E->getLiteralKindPlainName();
-  Ctx.Diags.diagnose(E->getLoc(), diag::object_literal_default_type_missing,
-                     plainName);
-  if (!importModule.empty()) {
-    Ctx.Diags.diagnose(E->getLoc(), diag::object_literal_resolve_import,
-                       importModule, importDefaultTypeName, plainName);
-  }
-  return true;
-}
-
 // No need to do additional diagnostics for quote literals.
 bool FailureDiagnosis::visitQuoteLiteralExpr(QuoteLiteralExpr *E) {
   return false;
@@ -1804,258 +1538,7 @@ bool FailureDiagnosis::visitUnquoteExpr(UnquoteExpr *E) { return false; }
 // No need to do additional diagnostics for decl quotes.
 bool FailureDiagnosis::visitDeclQuoteExpr(DeclQuoteExpr *E) { return false; }
 
-bool FailureDiagnosis::diagnoseMemberFailures(
-    Expr *E, Expr *baseExpr, ConstraintKind lookupKind, DeclNameRef memberName,
-    FunctionRefKind funcRefKind, ConstraintLocator *locator,
-    Optional<std::function<bool(ArrayRef<OverloadChoice>)>> callback,
-    bool includeInaccessibleMembers) {
-  auto isInitializer = memberName.isSimpleName(DeclBaseName::createConstructor());
 
-  // Get the referenced base expression from the failed constraint, along with
-  // the SourceRange for the member ref.  In "x.y", this returns the expr for x
-  // and the source range for y.
-  SourceRange memberRange;
-  SourceLoc BaseLoc;
-  DeclNameLoc NameLoc;
-
-  Type baseTy, baseObjTy;
-  // UnresolvedMemberExpr doesn't have "base" expression,
-  // it's represented as ".foo", which means that we need
-  // to get base from the context.
-  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
-    memberRange = E->getSourceRange();
-    BaseLoc = E->getLoc();
-    NameLoc = UME->getNameLoc();
-    baseTy = CS.getContextualType();
-    if (!baseTy)
-      return false;
-
-    // If we succeeded, get ready to do the member lookup.
-    baseObjTy = baseTy->getRValueType();
-
-    // If the base object is already a metatype type, then something weird is
-    // going on.  For now, just generate a generic error.
-    if (baseObjTy->is<MetatypeType>())
-      return false;
-
-    baseTy = baseObjTy = MetatypeType::get(baseObjTy);
-  } else {
-    memberRange = baseExpr->getSourceRange();
-    if (locator)
-      locator = simplifyLocator(CS, locator, memberRange);
-
-    BaseLoc = baseExpr->getLoc();
-    NameLoc = DeclNameLoc(memberRange.Start);
-
-    // Retypecheck the anchor type, which is the base of the member expression.
-    baseExpr = typeCheckChildIndependently(baseExpr, TCC_AllowLValue);
-    if (!baseExpr)
-      return true;
-
-    baseTy = CS.getType(baseExpr);
-    baseObjTy = baseTy->getWithoutSpecifierType();
-  }
-
-  // If the base type is an IUO, look through it.  Odds are, the code is not
-  // trying to find a member of it.
-  // FIXME: We need to rework this with IUOs out of the type system.
-  // if (auto objTy = CS.lookThroughImplicitlyUnwrappedOptionalType(baseObjTy))
-  //   baseTy = baseObjTy = objTy;
-
-  // If the base of this property access is a function that takes an empty
-  // argument list, then the most likely problem is that the user wanted to
-  // call the function, e.g. in "a.b.c" where they had to write "a.b().c".
-  // Produce a specific diagnostic + fixit for this situation.
-  if (auto baseFTy = baseObjTy->getAs<AnyFunctionType>()) {
-    if (baseExpr && baseFTy->getParams().empty()) {
-      auto failure =
-          MissingCallFailure(CS, CS.getConstraintLocator(baseExpr));
-      return failure.diagnoseAsError();
-    }
-  }
-
-  // If this is a tuple, then the index needs to be valid.
-  if (auto tuple = baseObjTy->getAs<TupleType>()) {
-    auto baseName = memberName.getBaseName();
-
-    if (!baseName.isSpecial()) {
-      StringRef nameStr = baseName.userFacingName();
-
-      int fieldIdx = -1;
-      // Resolve a number reference into the tuple type.
-      unsigned Value = 0;
-      if (!nameStr.getAsInteger(10, Value) && Value < tuple->getNumElements()) {
-        fieldIdx = Value;
-      } else {
-        fieldIdx = tuple->getNamedElementId(memberName.getBaseIdentifier());
-      }
-
-      if (fieldIdx != -1)
-        return false; // Lookup is valid.
-    }
-
-    diagnose(BaseLoc, diag::could_not_find_tuple_member, baseObjTy, memberName)
-        .highlight(memberRange);
-    return true;
-  }
-
-  // If this is initializer/constructor lookup we are dealing this.
-  if (isInitializer) {
-    // Let's check what is the base type we are trying to look it up on
-    // because only MetatypeType is viable to find constructor on, as per
-    // rules in ConstraintSystem::performMemberLookup.
-    if (!baseTy->is<AnyMetatypeType>()) {
-      baseTy = MetatypeType::get(baseTy, CS.getASTContext());
-    }
-  }
-
-  // If base type has unresolved generic parameters, such might mean
-  // that it's initializer with erroneous argument, otherwise this would
-  // be a simple ambiguous archetype case, neither can be diagnosed here.
-  if (baseTy->hasTypeParameter() && baseTy->hasUnresolvedType())
-    return false;
-
-  MemberLookupResult result =
-      CS.performMemberLookup(lookupKind, memberName, baseTy, funcRefKind,
-                             locator, includeInaccessibleMembers);
-
-  switch (result.OverallResult) {
-  case MemberLookupResult::Unsolved:
-    // If we couldn't resolve a specific type for the base expression, then we
-    // cannot produce a specific diagnostic.
-    return false;
-
-  case MemberLookupResult::ErrorAlreadyDiagnosed:
-    // If an error was already emitted, then we're done, don't emit anything
-    // redundant.
-    return true;
-
-  case MemberLookupResult::HasResults:
-    break;
-  }
-
-  SmallVector<OverloadChoice, 4> viableCandidatesToReport;
-  for (auto candidate : result.ViableCandidates)
-    if (candidate.getKind() != OverloadChoiceKind::KeyPathApplication)
-      viableCandidatesToReport.push_back(candidate);
-
-  // Since the lookup was allowing inaccessible members, let's check
-  // if it found anything of that sort, which is easy to diagnose.
-  bool allUnavailable =
-      !CS.getASTContext().LangOpts.DisableAvailabilityChecking;
-  bool allInaccessible = true;
-  for (auto &member : viableCandidatesToReport) {
-    if (!member.isDecl()) {
-      // if there is no declaration, this choice is implicitly available.
-      allUnavailable = false;
-      continue;
-    }
-
-    auto decl = member.getDecl();
-    // Check availability of the found choice.
-    if (!decl->getAttrs().isUnavailable(CS.getASTContext()))
-      allUnavailable = false;
-
-    if (decl->isAccessibleFrom(CS.DC))
-      allInaccessible = false;
-  }
-
-  // diagnoseSimpleErrors() should have diagnosed this scenario.
-  assert(!allInaccessible || viableCandidatesToReport.empty());
-
-  if (result.UnviableCandidates.empty() && isInitializer &&
-      !baseObjTy->is<AnyMetatypeType>()) {
-    if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(E)) {
-      // Diagnose 'super.init', which can only appear inside another
-      // initializer, specially.
-      if (isa<SuperRefExpr>(ctorRef->getBase())) {
-        diagnose(BaseLoc, diag::super_initializer_not_in_initializer);
-        return true;
-      }
-
-      // Suggest inserting a call to 'type(of:)' to construct another object
-      // of the same dynamic type.
-      SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
-
-      // Surround the caller in `type(of:)`.
-      diagnose(BaseLoc, diag::init_not_instance_member)
-          .fixItInsert(fixItRng.Start, "type(of: ")
-          .fixItInsertAfter(fixItRng.End, ")");
-      return true;
-    }
-  }
-
-  if (viableCandidatesToReport.empty()) {
-    // If this was an optional type let's check if the base type
-    // has requested member, if so - generate nice error saying that
-    // optional was not unwrapped, otherwise say that type value has
-    // no such member.
-    if (auto *OT = dyn_cast<OptionalType>(baseObjTy.getPointer())) {
-      auto optionalResult = CS.performMemberLookup(
-          lookupKind, memberName, OT->getBaseType(), funcRefKind, locator,
-          /*includeInaccessibleMembers*/ false);
-
-      switch (optionalResult.OverallResult) {
-      case MemberLookupResult::ErrorAlreadyDiagnosed:
-        // If an error was already emitted, then we're done, don't emit anything
-        // redundant.
-        return true;
-
-      case MemberLookupResult::Unsolved:
-      case MemberLookupResult::HasResults:
-        break;
-      }
-
-      if (!optionalResult.ViableCandidates.empty()) {
-        MemberAccessOnOptionalBaseFailure failure(
-            CS, CS.getConstraintLocator(baseExpr), memberName,
-            /*resultOptional=*/false);
-        return failure.diagnoseAsError();
-      }
-    }
-
-    // FIXME: Dig out the property DeclNameLoc.
-    diagnoseUnviableLookupResults(result, E, baseObjTy, baseExpr, memberName,
-                                  NameLoc, BaseLoc);
-    return true;
-  }
-
-  if (allUnavailable) {
-    auto firstDecl = viableCandidatesToReport[0].getDecl();
-    // FIXME: We need the enclosing CallExpr to rewrite the argument labels.
-    if (diagnoseExplicitUnavailability(firstDecl, BaseLoc, CS.DC,
-                                       /*call*/ nullptr))
-      return true;
-  }
-
-  return callback.hasValue() ? (*callback)(viableCandidatesToReport) : false;
-}
-
-bool FailureDiagnosis::visitUnresolvedDotExpr(UnresolvedDotExpr *UDE) {
-  auto *baseExpr = UDE->getBase();
-  auto *locator = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
-  if (!locator)
-    return false;
-
-  return diagnoseMemberFailures(UDE, baseExpr, ConstraintKind::ValueMember,
-                                UDE->getName(), UDE->getFunctionRefKind(),
-                                locator);
-}
-
-/// An IdentityExpr doesn't change its argument, but it *can* propagate its
-/// contextual type information down.
-bool FailureDiagnosis::visitIdentityExpr(IdentityExpr *E) {
-  auto contextualType = CS.getContextualType();
-
-  // If we have a paren expr and our contextual type is a ParenType, remove the
-  // paren expr sugar.
-  if (contextualType)
-    contextualType = contextualType->getWithoutParens();
-  if (!typeCheckChildIndependently(E->getSubExpr(), contextualType,
-                                   CS.getContextualTypePurpose()))
-    return true;
-  return false;
-}
 
 /// A TryExpr doesn't change it's argument, nor does it change the contextual
 /// type.
@@ -2126,8 +1609,10 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
       return;
 
     // If this is a contextual conversion problem, dig out some information.
-    if (diagnosis.diagnoseContextualConversionError(expr, getContextualType(),
-                                                    getContextualTypePurpose()))
+    if (diagnosis.diagnoseContextualConversionError(
+            expr,
+            getContextualType(expr),
+            getContextualTypePurpose(expr)))
       return;
 
     // If no one could find a problem with this expression or constraint system,
@@ -2214,22 +1699,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   if (auto *assignment = dyn_cast<AssignExpr>(E)) {
     if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
       auto *srcExpr = assignment->getSrc();
-
-      bool diagnosedInvalidUseOfDiscardExpr = false;
-      srcExpr->forEachChildExpr([&](Expr *expr) -> Expr * {
-        if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(expr)) {
-          diagnose(DAE->getLoc(), diag::discard_expr_outside_of_assignment)
-              .highlight(srcExpr->getSourceRange());
-          diagnosedInvalidUseOfDiscardExpr = true;
-          return nullptr;
-        }
-
-        return expr;
-      });
-
-      if (diagnosedInvalidUseOfDiscardExpr)
-        return;
-
       diagnoseAmbiguity(srcExpr);
       return;
     }
@@ -2243,40 +1712,15 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     return;
   }
 
-  // A DiscardAssignmentExpr (spelled "_") needs contextual type information to
-  // infer its type. If we see one at top level, diagnose that it must be part
-  // of an assignment so we don't get a generic "expression is ambiguous" error.
-  if (isa<DiscardAssignmentExpr>(E)) {
-    diagnose(E->getLoc(), diag::discard_expr_outside_of_assignment)
-      .highlight(E->getSourceRange());
-    return;
-  }
-  
   // Diagnose ".foo" expressions that lack context specifically.
   if (auto UME =
         dyn_cast<UnresolvedMemberExpr>(E->getSemanticsProvidingExpr())) {
-    if (!CS.getContextualType()) {
+    if (!CS.getContextualType(E)) {
       diagnose(E->getLoc(), diag::unresolved_member_no_inference,UME->getName())
         .highlight(SourceRange(UME->getDotLoc(),
                                UME->getNameLoc().getSourceRange().End));
       return;
     }
-  }
-
-  // Diagnose empty collection literals that lack context specifically.
-  if (auto CE = dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
-    if (CE->getNumElements() == 0) {
-      diagnose(E->getLoc(), diag::unresolved_collection_literal)
-        .highlight(E->getSourceRange());
-      return;
-    }
-  }
-
-  // Diagnose 'nil' without a contextual type.
-  if (isa<NilLiteralExpr>(E->getSemanticsProvidingExpr())) {
-    diagnose(E->getLoc(), diag::unresolved_nil_literal)
-      .highlight(E->getSourceRange());
-    return;
   }
 
   // Attempt to re-type-check the entire expression, allowing ambiguity, but

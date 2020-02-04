@@ -2,6 +2,7 @@
 // REQUIRES: objc_interop
 import ImportAsMember.A
 import ImportAsMember.Class
+import Foundation
 
 public func returnGlobalVar() -> Double {
 	return Struct1.globalVar
@@ -65,7 +66,6 @@ extension SomeClass {
 }
 
 public func useSpecialInit() -> Struct1 {
-  // FIXME: the below triggers an assert, due to number or params mismatch
-  // return Struct1(specialLabel:())
+  return Struct1(specialLabel:())
 }
 

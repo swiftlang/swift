@@ -158,8 +158,8 @@ class SwiftVersionType(RegexType):
     """
 
     ERROR_MESSAGE = ('Invalid version value, must be "MAJOR.MINOR" '
-                     'or "MAJOR.MINOR.PATCH"')
-    VERSION_REGEX = r'^(\d+)\.(\d+)(\.(\d+))?$'
+                     ', "MAJOR.MINOR.PATCH" or "MAJOR.MINOR.PATCH.PATCH"')
+    VERSION_REGEX = r'^(\d+)\.(\d+)(\.(\d+))?(\.(\d+))?$'
 
     def __init__(self):
         super(SwiftVersionType, self).__init__(
