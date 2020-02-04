@@ -599,29 +599,8 @@ static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr) {
   return Attr == llvm::Attribute::Returned;
 }
 
-namespace {
-bool isStandardLibrary(const llvm::Module &M) {
-  if (auto *Flags = M.getNamedMetadata("swift.module.flags")) {
-    for (const auto *F : Flags->operands()) {
-      const auto *Key = dyn_cast_or_null<llvm::MDString>(F->getOperand(0));
-      if (!Key)
-        continue;
-
-      const auto *Value =
-          dyn_cast_or_null<llvm::ConstantAsMetadata>(F->getOperand(1));
-      if (!Value)
-        continue;
-
-      if (Key->getString() == "standard-library")
-        return cast<llvm::ConstantInt>(Value->getValue())->isOne();
-    }
-  }
-  return false;
-}
-}
-
 bool IRGenModule::isStandardLibrary() const {
-  return ::isStandardLibrary(Module);
+  return getSwiftModule()->isStdlibModule();
 }
 
 llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
