@@ -6635,10 +6635,11 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       auto *calleeLocator = getCalleeLocator(getConstraintLocator(locator));
       if (auto functionBuilderType = getFunctionBuilderTypeFor(
               *this, argToParam->getParamIdx(), calleeLocator)) {
-        auto result = matchFunctionBuilder(
-            closure, functionBuilderType, closureType->getResult(),
-            ConstraintKind::Conversion, calleeLocator, locator);
-        return result.isSuccess();
+        if (auto result = matchFunctionBuilder(
+                closure, functionBuilderType, closureType->getResult(),
+                ConstraintKind::Conversion, calleeLocator, locator)) {
+          return result->isSuccess();
+        }
       }
     }
   }
