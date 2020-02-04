@@ -1241,6 +1241,12 @@ public:
     return expression.convertType;
   }
 
+  Type getExprConversionTypeForConstraint() const {
+    if (contextualTypeIsOnlyAHint())
+      return Type();
+    return getExprConversionType();
+  }
+
   /// Returns the autoclosure parameter type, or \c nullptr if the
   /// expression has a different kind of context.
   FunctionType *getAsAutoclosureParamType() const {

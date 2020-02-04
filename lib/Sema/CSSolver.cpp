@@ -1259,14 +1259,10 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
 
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
-  if (Type convertType = target.getExprConversionType()) {
+  if (Type convertType = target.getExprConversionTypeForConstraint()) {
     // Determine whether we know more about the contextual type.
-    ContextualTypePurpose ctp = CTP_Unused;
-    bool isOpaqueReturnType = false;
-    if (auto contextualInfo = getContextualTypeInfo(origExpr)) {
-      ctp = contextualInfo->purpose;
-      isOpaqueReturnType = contextualInfo->isOpaqueReturnType;
-    }
+    ContextualTypePurpose ctp = target.getExprContextualTypePurpose();
+    bool isOpaqueReturnType = target.infersOpaqueReturnType();
 
     // Substitute type variables in for unresolved types.
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
