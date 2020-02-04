@@ -29,6 +29,7 @@
 namespace swift {
 
 class AnyFunctionType;
+class SILFunctionType;
 class TupleType;
 
 /// A function type differentiability kind.
@@ -230,6 +231,18 @@ namespace autodiff {
 void getSubsetParameterTypes(IndexSubset *indices, AnyFunctionType *type,
                              SmallVectorImpl<Type> &results,
                              bool reverseCurryLevels = false);
+
+/// "Constrained" derivative generic signatures require all differentiability
+/// parameters to conform to the `Differentiable` protocol.
+///
+/// Returns the "constrained" derivative generic signature given:
+/// - An original SIL function type.
+/// - Differentiability parameter indices.
+/// - A possibly "unconstrained" derivative generic signature.
+GenericSignature
+getConstrainedDerivativeGenericSignature(SILFunctionType *originalFnTy,
+                                         IndexSubset *diffParamIndices,
+                                         GenericSignature derivativeGenSig);
 
 } // end namespace autodiff
 
