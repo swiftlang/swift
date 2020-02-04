@@ -19,7 +19,7 @@
       key.description: "east",
       key.typename: "Foo",
       key.context: source.codecompletion.context.exprspecific,
-      key.typerelation: source.codecompletion.typerelation.unrelated,
+      key.typerelation: source.codecompletion.typerelation.identical,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO4eastyA2CmF",
       key.modulename: "complete_unresolvedmember"
@@ -67,7 +67,7 @@
       key.description: "other(String)",
       key.typename: "Foo",
       key.context: source.codecompletion.context.exprspecific,
-      key.typerelation: source.codecompletion.typerelation.unrelated,
+      key.typerelation: source.codecompletion.typerelation.identical,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO5otheryACSScACmF",
       key.modulename: "complete_unresolvedmember"
@@ -79,7 +79,7 @@
       key.description: "west",
       key.typename: "Foo",
       key.context: source.codecompletion.context.exprspecific,
-      key.typerelation: source.codecompletion.typerelation.unrelated,
+      key.typerelation: source.codecompletion.typerelation.identical,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO4westyA2CmF",
       key.modulename: "complete_unresolvedmember"
