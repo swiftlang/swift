@@ -2133,7 +2133,7 @@ TypeChecker::typeCheckExpression(
     contextualTypeExpr = loadExpr->getSubExpr();
   cs.setContextualType(
       contextualTypeExpr,
-      target.getExprConversionTypeLoc(),
+      target.getExprContextualTypeLoc(),
       target.getExprContextualTypePurpose(),
       target.infersOpaqueReturnType());
 
@@ -2147,7 +2147,8 @@ TypeChecker::typeCheckExpression(
   // type variable and update the target's type with an optional of that
   // type variable.
   if (target.isOptionalSomePatternInit()) {
-    assert(!target.getExprConversionType() && "convertType and type check options conflict");
+    assert(!target.getExprContextualType() &&
+           "some pattern cannot have contextual type pre-configured");
     auto *convertTypeLocator =
         cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
     Type var = cs.createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
@@ -2166,8 +2167,8 @@ TypeChecker::typeCheckExpression(
   // because they will leak out into arbitrary places in the resultant AST.
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
        (viable->size() != 1 ||
-        (target.getExprConversionTypeForConstraint() &&
-         target.getExprConversionTypeForConstraint()->hasUnresolvedType()))) {
+        (target.getExprConversionType() &&
+         target.getExprConversionType()->hasUnresolvedType()))) {
     // FIXME: This hack should only be needed for CSDiag.
     unresolvedTypeExprs = true;
     return target;

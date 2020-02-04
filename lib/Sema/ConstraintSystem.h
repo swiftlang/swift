@@ -1224,11 +1224,11 @@ public:
     return expression.contextualPurpose;
   }
 
-  Type getExprConversionType() const {
-    return getExprConversionTypeLoc().getType();
+  Type getExprContextualType() const {
+    return getExprContextualTypeLoc().getType();
   }
 
-  TypeLoc getExprConversionTypeLoc() const {
+  TypeLoc getExprContextualTypeLoc() const {
     assert(kind == Kind::expression);
 
     // For an @autoclosure parameter, the conversion type is
@@ -1241,10 +1241,12 @@ public:
     return expression.convertType;
   }
 
-  Type getExprConversionTypeForConstraint() const {
+  /// Retrieve the type to which an expression should be converted, or
+  /// a NULL type if no conversion constraint should be generated.
+  Type getExprConversionType() const {
     if (contextualTypeIsOnlyAHint())
       return Type();
-    return getExprConversionType();
+    return getExprContextualType();
   }
 
   /// Returns the autoclosure parameter type, or \c nullptr if the

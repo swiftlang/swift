@@ -7320,7 +7320,7 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     // We are supposed to use contextual type only if it is present and
     // this expression doesn't represent the implicit return of the single
     // expression function which got deduced to be `Never`.
-    Type convertType = target.getExprConversionTypeForConstraint();
+    Type convertType = target.getExprConversionType();
     auto shouldCoerceToContextualType = [&]() {
       return convertType &&
           !target.isOptionalSomePatternInit() &&

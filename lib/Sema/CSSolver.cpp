@@ -1259,7 +1259,7 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
 
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
-  if (Type convertType = target.getExprConversionTypeForConstraint()) {
+  if (Type convertType = target.getExprConversionType()) {
     // Determine whether we know more about the contextual type.
     ContextualTypePurpose ctp = target.getExprContextualTypePurpose();
     bool isOpaqueReturnType = target.infersOpaqueReturnType();
