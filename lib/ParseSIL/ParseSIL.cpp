@@ -115,7 +115,8 @@ void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
 
 void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
                                 PersistentParserState *PersistentState,
-                                bool DelayBodyParsing) {
+                                bool DelayBodyParsing,
+                                bool EvaluateConditionals) {
   std::shared_ptr<SyntaxTreeCreator> STreeCreator;
   if (SF.shouldBuildSyntaxTree()) {
     STreeCreator = std::make_shared<SyntaxTreeCreator>(
@@ -136,7 +137,7 @@ void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "Parsing");
   Parser P(BufferID, SF, /*SIL*/ nullptr, PersistentState, STreeCreator,
-           DelayBodyParsing);
+           DelayBodyParsing, EvaluateConditionals);
   PrettyStackTraceParser StackTrace(P);
 
   llvm::SaveAndRestore<NullablePtr<llvm::MD5>> S(P.CurrentTokenHash,

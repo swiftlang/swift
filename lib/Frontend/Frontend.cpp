@@ -1122,7 +1122,6 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
   }
 
   PersistentState = std::make_unique<PersistentParserState>();
-  PersistentState->PerformConditionEvaluation = EvaluateConditionals;
 
   auto shouldDelayBodies = [&](unsigned bufferID) -> bool {
     if (!CanDelayBodies)
@@ -1142,7 +1141,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
         BufferID);
 
     parseIntoSourceFile(*NextInput, BufferID, PersistentState.get(),
-                        shouldDelayBodies(BufferID));
+                        shouldDelayBodies(BufferID), EvaluateConditionals);
   }
 
   // Now parse the main file.
@@ -1153,7 +1152,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
     assert(MainBufferID == MainFile.getBufferID());
 
     parseIntoSourceFile(MainFile, MainBufferID, PersistentState.get(),
-                        shouldDelayBodies(MainBufferID));
+                        shouldDelayBodies(MainBufferID), EvaluateConditionals);
   }
 
   assert(Context->LoadedModules.size() == 1 &&

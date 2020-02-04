@@ -117,7 +117,8 @@ namespace swift {
   /// delayed.
   void parseIntoSourceFile(SourceFile &SF, unsigned BufferID,
                            PersistentParserState *PersistentState = nullptr,
-                           bool DelayBodyParsing = true);
+                           bool DelayBodyParsing = true,
+                           bool EvaluateConditionals = true);
 
   /// Parse a source file's SIL declarations into a given SIL module.
   void parseSourceFileSIL(SourceFile &SF, SILParserState *sil);

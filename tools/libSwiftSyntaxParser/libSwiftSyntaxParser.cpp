@@ -290,7 +290,7 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
                 "syntax_parse_module", std::move(parseActions),
                 /*SyntaxCache=*/nullptr);
   // Evaluating pound conditions may lead to unknown syntax.
-  PU.getParser().State->PerformConditionEvaluation = false;
+  PU.getParser().EvaluateConditionals = false;
   std::unique_ptr<SynParserDiagConsumer> pConsumer;
   if (DiagHandler) {
     pConsumer = std::make_unique<SynParserDiagConsumer>(*this, bufID);
