@@ -1405,8 +1405,16 @@ function(_add_swift_library_single target name)
       if(${SWIFTLIB_SINGLE_SDK} MATCHES "(I|TV|WATCH)OS")
         target_link_options(${target} PRIVATE
           "LINKER:-bitcode_bundle"
-          $<$<BOOL:SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS>:"LINKER:-bitcode_hide_symbols">
           "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
+
+          # Please note that using a generator expression to fit
+          # this in a single target_link_options does not work,
+          # since that seems not to allow the LINKER: prefix to be
+          # evaluated (i.e. it will be added as-is to the linker parameters)
+          if(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
+            target_link_options(${target} PRIVATE
+              "LINKER:-bitcode_hide_symbols")
+          endif()
       endif()
     endif()
   endif()
