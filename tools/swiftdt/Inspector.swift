@@ -117,12 +117,14 @@ private func ReadBytesFn(
   size: UInt64,
   outContext: UnsafeMutablePointer<UnsafeMutableRawPointer?>?) ->
   UnsafeRawPointer? {
-  fatalError()
+  return task_peek(instance(context).task, address, size)
 }
 
 private func GetStringLengthFn(context: UnsafeMutableRawPointer?,
-                              address: swift_addr_t) -> UInt64 {
-  fatalError()
+                               address: swift_addr_t) -> UInt64 {
+  let maybeStr = task_peek_string(instance(context).task, address)
+  guard let str = maybeStr else { return 0 }
+  return UInt64(strlen(str))
 }
 
 private func GetSymbolAddressFn(context: UnsafeMutableRawPointer?,

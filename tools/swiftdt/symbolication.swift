@@ -43,6 +43,9 @@ enum Sym {
                                         UnsafeMutablePointer<UnsafeRawPointer?>) ->
                                          kern_return_t =
     symbol(symbolicationHandle, "task_peek")
+  static let task_peek_string: @convention(c) (task_t, mach_vm_address_t) ->
+                                              UnsafeMutablePointer<CChar>? =
+    symbol(symbolicationHandle, "task_peek_string")
   static let task_stop_peeking: @convention(c) (task_t) -> kern_return_t =
     symbol(symbolicationHandle, "task_stop_peeking")
 }
@@ -106,10 +109,6 @@ func task_start_peeking(_ task: task_t) -> Bool {
   return false
 }
 
-func task_stop_peeking(_ task: task_t) {
-  _ = Sym.task_stop_peeking(task)
-}
-
 func task_peek(_ task: task_t, _ start: mach_vm_address_t, _ size: mach_vm_size_t) ->
   UnsafeRawPointer? {
   var ptr: UnsafeRawPointer? = nil
@@ -119,4 +118,13 @@ func task_peek(_ task: task_t, _ start: mach_vm_address_t, _ size: mach_vm_size_
     return nil
   }
   return ptr
+}
+
+func task_peek_string(_ task: task_t, _ addr: mach_vm_address_t) ->
+  UnsafeMutablePointer<CChar>? {
+  return Sym.task_peek_string(task, addr)
+}
+
+func task_stop_peeking(_ task: task_t) {
+  _ = Sym.task_stop_peeking(task)
 }
