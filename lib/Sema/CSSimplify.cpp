@@ -6596,14 +6596,29 @@ static Type getFunctionBuilderTypeFor(ConstraintSystem &cs, unsigned paramIdx,
 bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                                       Type contextualType,
                                       ConstraintLocatorBuilder locator) {
+  auto getContextualParamAt =
+      [&contextualType](unsigned index) -> Optional<AnyFunctionType::Param> {
+    auto *fnType = contextualType->getAs<FunctionType>();
+    return fnType && fnType->getNumParams() > index
+               ? fnType->getParams()[index]
+               : Optional<AnyFunctionType::Param>();
+  };
+
   auto *closureLocator = typeVar->getImpl().getLocator();
   auto *closure = cast<ClosureExpr>(closureLocator->getAnchor());
-
-  auto *closureType = getClosureType(closure);
+  auto *inferredClosureType = getClosureType(closure);
 
   auto *paramList = closure->getParameters();
+  SmallVector<AnyFunctionType::Param, 4> parameters;
   for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
-    const auto &param = closureType->getParams()[i];
+    auto param = inferredClosureType->getParams()[i];
+
+    // In case of anonymous parameters let's infer flags from context
+    // that helps to infer variadic and inout earlier.
+    if (closure->hasAnonymousClosureVars()) {
+      if (auto contextualParam = getContextualParamAt(i))
+        param = param.withFlags(contextualParam->getParameterFlags());
+    }
 
     Type internalType;
 
@@ -6617,17 +6632,25 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       auto *paramLoc =
           getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
 
-      internalType = createTypeVariable(paramLoc, TVO_CanBindToLValue |
-                                                      TVO_CanBindToNoEscape);
+      auto *typeVar = createTypeVariable(paramLoc, TVO_CanBindToLValue |
+                                                       TVO_CanBindToNoEscape);
+
+      // If external parameter is variadic it translates into an array in
+      // the body of the closure.
+      internalType =
+          param.isVariadic() ? ArraySliceType::get(typeVar) : Type(typeVar);
 
       auto externalType = param.getOldType();
-      addConstraint(ConstraintKind::BindParam, externalType, internalType,
-                    paramLoc);
+      addConstraint(ConstraintKind::BindParam, externalType, typeVar, paramLoc);
     }
 
     setType(paramList->get(i), internalType);
+    parameters.push_back(param);
   }
 
+  auto closureType =
+      FunctionType::get(parameters, inferredClosureType->getResult(),
+                        inferredClosureType->getExtInfo());
   assignFixedType(typeVar, closureType, closureLocator);
 
   if (auto last = locator.last()) {
