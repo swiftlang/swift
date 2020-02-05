@@ -1467,8 +1467,30 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
   auto PBE = PatternBindingEntry(Pat, EqualLoc, E, BindingInitContext);
   auto *Result = create(Ctx, StaticLoc, StaticSpelling, VarLoc, PBE, Parent);
 
-  if (BindingInitContext)
+  if (BindingInitContext) {
     cast<PatternBindingInitializer>(BindingInitContext)->setBinding(Result, 0);
+
+    // If the expression contains any closures, then we must change the
+    // closures' parents to `BindingInitContext`, because the closures are now
+    // children of `BindingInitContext`.
+    if (E) {
+      class Walker : public ASTWalker {
+      public:
+        DeclContext *NewParent;
+        explicit Walker(DeclContext *NewParent) : NewParent(NewParent) {}
+        virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+          if (auto *ACE = dyn_cast<AbstractClosureExpr>(E)) {
+            ACE->setParent(NewParent);
+            // Don't set the parents of nested closures.
+            return { false, E };
+          }
+          return { true, E };
+        }
+      };
+      Walker walker(BindingInitContext);
+      E->walk(walker);
+    }
+  }
 
   return Result;
 }
