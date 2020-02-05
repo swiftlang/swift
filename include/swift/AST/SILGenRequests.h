@@ -74,8 +74,12 @@ public:
   }
 };
 
-class GenerateSILRequest :
-    public SimpleRequest<GenerateSILRequest,
+void simple_display(llvm::raw_ostream &out, const SILGenDescriptor &d);
+
+SourceLoc extractNearestSourceLoc(const SILGenDescriptor &desc);
+
+class SILGenSourceFileRequest :
+    public SimpleRequest<SILGenSourceFileRequest,
                          std::unique_ptr<SILModule>(SILGenDescriptor),
                          CacheKind::Uncached> {
 public:
@@ -92,9 +96,23 @@ public:
   bool isCached() const { return true; }
 };
 
-void simple_display(llvm::raw_ostream &out, const SILGenDescriptor &d);
+class SILGenWholeModuleRequest :
+    public SimpleRequest<SILGenWholeModuleRequest,
+                         std::unique_ptr<SILModule>(SILGenDescriptor),
+                         CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
 
-SourceLoc extractNearestSourceLoc(const SILGenDescriptor &desc);
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<std::unique_ptr<SILModule>>
+  evaluate(Evaluator &evaluator, SILGenDescriptor desc) const;
+
+public:
+  bool isCached() const { return true; }
+};
 
 /// The zone number for SILGen.
 #define SWIFT_TYPEID_ZONE SILGen
