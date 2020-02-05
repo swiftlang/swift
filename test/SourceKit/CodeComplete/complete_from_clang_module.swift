@@ -9,6 +9,7 @@ import Foo
 // CHECK-NEXT:       key.typename: "Int32",
 // CHECK-NEXT:       key.doc.brief: "Aaa.  fooIntVar.  Bbb.",
 // CHECK-NEXT:       key.context: source.codecompletion.context.othermodule,
+// CHECK-NEXT:       key.typerelation: source.codecompletion.typerelation.unrelated,
 // CHECK-NEXT:       key.num_bytes_to_erase: 0,
 // CHECK-NEXT:       key.associated_usrs: "c:@fooIntVar",
 // CHECK-NEXT:       key.modulename: "Foo"

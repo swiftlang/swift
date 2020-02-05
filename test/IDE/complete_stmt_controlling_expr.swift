@@ -519,7 +519,7 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
 enum A { case aaa }
 enum B { case bbb }
 // UNRESOLVED_B-NOT: aaa
-// UNRESOLVED_B: Decl[EnumElement]/ExprSpecific:     bbb[#B#]; name=bbb
+// UNRESOLVED_B: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bbb[#B#]; name=bbb
 // UNRESOLVED_B-NOT: aaa
 
 struct AA {

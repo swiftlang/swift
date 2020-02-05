@@ -262,25 +262,25 @@ class C4 {
   }
 }
 // UNRESOLVED_3: Begin completions, 2 items
-// UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#]; name=North
-// UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#]; name=South
+// UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
+// UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
 // UNRESOLVED_3-NOT: SomeOptions1
 // UNRESOLVED_3-NOT: SomeOptions2
 // UNRESOLVED_3-NOT: none
 // UNRESOLVED_3-NOT: some(
 
 // UNRESOLVED_3_OPT: Begin completions, 5 items
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#];
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#SomeEnum1?#]; name=nil
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<SomeEnum1>#]; name=none
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#SomeEnum1#})[#Optional<SomeEnum1>#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific: none[#Optional<SomeEnum1>#]; name=none
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
 // UNRESOLVED_3_OPT-NOT: init({#(some):
 // UNRESOLVED_3_OPT-NOT: init({#nilLiteral:
 
 // UNRESOLVED_3_OPTOPTOPT: Begin completions, 5 items
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#SomeEnum1???#]; name=nil
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<SomeEnum1??>#]; name=none
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
@@ -297,8 +297,8 @@ extension Optional where Wrapped == Somewhere {
 func testOptionalWithCustomExtension() {
   var _: Somewhere? = .#^UNRESOLVED_OPT_4^#
 // UNRESOLVED_OPT_4: Begin completions, 7 items
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     earth[#Somewhere#];
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     mars[#Somewhere#];
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     earth[#Somewhere#];
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     mars[#Somewhere#];
 // UNRESOLVED_OPT_4-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#Somewhere?#]; name=nil
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<Somewhere>#]; name=none
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     some({#Somewhere#})[#Optional<Somewhere>#];
@@ -414,8 +414,8 @@ func testAvail1(_ x: EnumAvail1) {
 }
 // ENUM_AVAIL_1: Begin completions, 2 items
 // ENUM_AVAIL_1-NOT: AAA
-// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific:     aaa[#EnumAvail1#];
-// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific/NotRecommended: BBB[#EnumAvail1#];
+// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: aaa[#EnumAvail1#];
+// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific/NotRecommended/TypeRelation[Identical]: BBB[#EnumAvail1#];
 // ENUM_AVAIL_1-NOT: AAA
 // ENUM_AVAIL_1: End completions
 
@@ -440,7 +440,7 @@ func testWithLiteral1() {
   let s: S
   _ = s.takeEnum(thing: .#^WITH_LITERAL_1^#, other: 1.0)
 // WITH_LITERAL_1: Begin completions, 1 items
-// WITH_LITERAL_1-NEXT: Decl[EnumElement]/ExprSpecific:     myCase[#S.MyEnum#];
+// WITH_LITERAL_1-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myCase[#S.MyEnum#];
 // WITH_LITERAL_1-NEXT: End completions
 }
 func testWithLiteral2() {
@@ -464,7 +464,7 @@ func testWithLiteral3() {
     func test(s: S) {
       _ = s.takeEnum(thing: .#^WITH_LITERAL_3^#, other: 1.0)
 // WITH_LITERAL_3: Begin completions, 1 items
-// WITH_LITERAL_3-NEXT: Decl[EnumElement]/ExprSpecific:     myCase[#MyEnum#];
+// WITH_LITERAL_3-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myCase[#MyEnum#];
 // WITH_LITERAL_3-NEXT: End completions
     }
   }
@@ -480,9 +480,9 @@ func enumFromOtherFile() -> EnumFromOtherFile {
   return .#^OTHER_FILE_1^# // Don't crash.
 }
 // OTHER_FILE_1: Begin completions
-// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     b({#String#})[#EnumFromOtherFile#];
-// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     a({#Int#})[#EnumFromOtherFile#];
-// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     c[#EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: b({#String#})[#EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: a({#Int#})[#EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: c[#EnumFromOtherFile#];
 // OTHER_FILE_1: End completions
 
 struct NonOptSet {
@@ -522,8 +522,8 @@ func testInStringInterpolation() {
   let y = "enum: \(.#^STRING_INTERPOLATION_INVALID^#)" // Dont'crash.
 }
 // STRING_INTERPOLATION_1: Begin completions
-// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific:     foo[#MyEnum#];
-// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific:     bar[#MyEnum#];
+// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: foo[#MyEnum#];
+// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: bar[#MyEnum#];
 // STRING_INTERPOLATION_1: End completions
 
 class BaseClass {
@@ -607,10 +607,10 @@ struct HasOverloaded {
 func testOverload(val: HasOverloaded) {
   let _ = val.takeEnum(.#^OVERLOADED_METHOD_1^#)
 // OVERLOADED_METHOD_1: Begin completions, 4 items
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#]; name=South
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#]; name=North
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     East[#SomeEnum2#]; name=East
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     West[#SomeEnum2#]; name=West
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: East[#SomeEnum2#]; name=East
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: West[#SomeEnum2#]; name=West
 // OVERLOADED_METHOD_1: End completions
 
   let _ = HasOverloaded.init(e: .#^OVERLOADED_INIT_1^#)
