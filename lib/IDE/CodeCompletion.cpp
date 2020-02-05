@@ -695,7 +695,7 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     Prefix.append(Twine(NumBytesToErase).str());
     Prefix.append("]");
   }
-  switch (TypeDistance) {
+  switch (ExpectedTypeRelation(TypeDistance)) {
     case ExpectedTypeRelation::Invalid:
       Prefix.append("/TypeRelation[Invalid]");
       break;
@@ -705,6 +705,8 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     case ExpectedTypeRelation::Convertible:
       Prefix.append("/TypeRelation[Convertible]");
       break;
+    case ExpectedTypeRelation::NotApplicable:
+    case ExpectedTypeRelation::Unknown:
     case ExpectedTypeRelation::Unrelated:
       break;
   }
