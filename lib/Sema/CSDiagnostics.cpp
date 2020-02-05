@@ -232,7 +232,8 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   };
 
   if (isFromContextualType())
-    return getAffectedDeclFromType(cs.getContextualType());
+    return getAffectedDeclFromType(
+        cs.getContextualType(getLocator()->getAnchor()));
 
   if (auto overload = getChoiceFor(getLocator())) {
     // If there is a declaration associated with this
@@ -336,8 +337,9 @@ bool RequirementFailure::diagnoseAsError() {
     return true;
   }
 
-  if (genericCtx != reqDC && (genericCtx->isChildContextOf(reqDC) ||
-                              isStaticOrInstanceMember(AffectedDecl))) {
+  if (reqDC->isTypeContext() && genericCtx != reqDC &&
+      (genericCtx->isChildContextOf(reqDC) ||
+       isStaticOrInstanceMember(AffectedDecl))) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();
     emitDiagnostic(anchor->getLoc(), getDiagnosticInRereference(),
                    AffectedDecl->getDescriptiveKind(),
@@ -558,6 +560,7 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_ReturnSingleExpr:
     return diag::cannot_convert_to_return_type;
   case CTP_DefaultParameter:
+  case CTP_AutoclosureDefaultParameter:
     return diag::cannot_convert_default_arg_value;
   case CTP_YieldByValue:
     return diag::cannot_convert_yield_value;
@@ -638,7 +641,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     switch (last.getKind()) {
     case ConstraintLocator::ContextualType: {
       auto purpose = getContextualTypePurpose();
-      assert(!(purpose == CTP_Unused && purpose == CTP_CannotFail));
+      assert(!(purpose == CTP_Unused || purpose == CTP_CannotFail));
 
       // If this is call to a closure e.g. `let _: A = { B() }()`
       // let's point diagnostic to its result.
@@ -1207,7 +1210,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   // Assignment is not allowed inside of a condition,
   // so let's not diagnose immutability, because
   // most likely the problem is related to use of `=` itself.
-  if (cs.getContextualTypePurpose() == CTP_Condition)
+  if (cs.getContextualTypePurpose(diagExpr) == CTP_Condition)
     return false;
 
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
@@ -1975,7 +1978,7 @@ bool ContextualFailure::diagnoseAsError() {
         CTP = CTP_ClosureResult;
     }
 
-    if (auto msg = getDiagnosticFor(CTP, toType->isExistentialType())) {
+    if (auto msg = getDiagnosticFor(CTP, toType)) {
       diagnostic = *msg;
       break;
     }
@@ -2083,6 +2086,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_EnumCaseRawValue:
     return diag::cannot_convert_raw_initializer_value_nil;
   case CTP_DefaultParameter:
+  case CTP_AutoclosureDefaultParameter:
     return diag::cannot_convert_default_arg_value_nil;
   case CTP_YieldByValue:
     return diag::cannot_convert_yield_value_nil;
@@ -2200,7 +2204,8 @@ bool ContextualFailure::diagnoseConversionToNil() const {
   emitDiagnostic(anchor->getLoc(), *diagnostic, getToType());
 
   if (CTP == CTP_Initialization) {
-    auto *patternTR = cs.getContextualTypeLoc().getTypeRepr();
+    auto *patternTR =
+      cs.getContextualTypeLoc(locator->getAnchor()).getTypeRepr();
     if (!patternTR)
       return true;
 
@@ -2273,11 +2278,9 @@ bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
   if (auto *coerceExpr = dyn_cast<CoerceExpr>(anchor)) {
     auto fromType = getType(coerceExpr->getSubExpr());
     auto toType = getType(coerceExpr->getCastTypeLoc());
-    
-    auto diagnostic =
-        getDiagnosticFor(CTP_CoerceOperand,
-                         /*forProtocol=*/toType->isExistentialType());
-    
+
+    auto diagnostic = getDiagnosticFor(CTP_CoerceOperand, toType);
+
     auto diag =
         emitDiagnostic(anchor->getLoc(), *diagnostic, fromType, toType);
     diag.highlight(anchor->getSourceRange());
@@ -2305,14 +2308,37 @@ bool ContextualFailure::diagnoseConversionToBool() const {
     return true;
   }
 
+  // Determine if the boolean negation operator was applied to the anchor. This
+  // upwards traversal of the AST is somewhat fragile, but enables much better
+  // diagnostics if someone attempts to use an optional or integer as a boolean
+  // condition.
+  SourceLoc notOperatorLoc;
+  if (Expr *parent = findParentExpr(getAnchor())) {
+    if (isa<ParenExpr>(parent) && parent->isImplicit()) {
+      if ((parent = findParentExpr(parent))) {
+        auto parentOperatorApplication = dyn_cast<PrefixUnaryExpr>(parent);
+        if (parentOperatorApplication) {
+          auto operatorRefExpr =
+              dyn_cast<DeclRefExpr>(parentOperatorApplication->getFn());
+          if (operatorRefExpr && operatorRefExpr->getDecl()->getBaseName() ==
+                                     getASTContext().Id_NegationOperator) {
+            notOperatorLoc = operatorRefExpr->getLoc();
+          }
+        }
+      }
+    }
+  }
+
   // If we're trying to convert something from optional type to Bool, then a
   // comparison against nil was probably expected.
-  // TODO: It would be nice to handle "!x" --> x == false, but we have no way
-  // to get to the parent expr at present.
   auto fromType = getFromType();
   if (fromType->getOptionalObjectType()) {
     StringRef prefix = "((";
-    StringRef suffix = ") != nil)";
+    StringRef suffix;
+    if (notOperatorLoc.isValid())
+      suffix = ") == nil)";
+    else
+      suffix = ") != nil)";
 
     // Check if we need the inner parentheses.
     // Technically we only need them if there's something in 'expr' with
@@ -2324,9 +2350,42 @@ bool ContextualFailure::diagnoseConversionToBool() const {
     }
     // FIXME: The outer parentheses may be superfluous too.
 
-    emitDiagnostic(expr->getLoc(), diag::optional_used_as_boolean, fromType)
+    emitDiagnostic(expr->getLoc(), diag::optional_used_as_boolean, fromType,
+                   notOperatorLoc.isValid())
         .fixItInsert(expr->getStartLoc(), prefix)
-        .fixItInsertAfter(expr->getEndLoc(), suffix);
+        .fixItInsertAfter(expr->getEndLoc(), suffix)
+        .fixItRemove(notOperatorLoc);
+    return true;
+  }
+
+  // If we're trying to convert something from optional type to an integer, then
+  // a comparison against nil was probably expected.
+  auto &cs = getConstraintSystem();
+  if (conformsToKnownProtocol(cs, fromType, KnownProtocolKind::BinaryInteger) &&
+      conformsToKnownProtocol(cs, fromType,
+                              KnownProtocolKind::ExpressibleByIntegerLiteral)) {
+    StringRef prefix = "((";
+    StringRef suffix;
+    if (notOperatorLoc.isValid())
+      suffix = ") == 0)";
+    else
+      suffix = ") != 0)";
+
+    // Check if we need the inner parentheses.
+    // Technically we only need them if there's something in 'expr' with
+    // lower precedence than '!=', but the code actually comes out nicer
+    // in most cases with parens on anything non-trivial.
+    if (expr->canAppendPostfixExpression()) {
+      prefix = prefix.drop_back();
+      suffix = suffix.drop_front();
+    }
+    // FIXME: The outer parentheses may be superfluous too.
+
+    emitDiagnostic(expr->getLoc(), diag::integer_used_as_boolean, fromType,
+                   notOperatorLoc.isValid())
+        .fixItInsert(expr->getStartLoc(), prefix)
+        .fixItInsertAfter(expr->getEndLoc(), suffix)
+        .fixItRemove(notOperatorLoc);
     return true;
   }
 
@@ -2841,26 +2900,40 @@ bool ContextualFailure::isIntegerToStringIndexConversion() const {
 
 Optional<Diag<Type, Type>>
 ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
-                                    bool forProtocol) {
+                                    Type contextualType) {
+  auto forProtocol = contextualType->isExistentialType();
   switch (context) {
-  case CTP_Initialization:
+  case CTP_Initialization: {
+    if (contextualType->isAnyObject())
+      return diag::cannot_convert_initializer_value_anyobject;
+
     return forProtocol ? diag::cannot_convert_initializer_value_protocol
                        : diag::cannot_convert_initializer_value;
+  }
   case CTP_ReturnStmt:
-  case CTP_ReturnSingleExpr:
+  case CTP_ReturnSingleExpr: {
+    if (contextualType->isAnyObject())
+      return diag::cannot_convert_return_type_to_anyobject;
+
     return forProtocol ? diag::cannot_convert_to_return_type_protocol
                        : diag::cannot_convert_to_return_type;
+  }
   case CTP_EnumCaseRawValue:
     return diag::cannot_convert_raw_initializer_value;
   case CTP_DefaultParameter:
+  case CTP_AutoclosureDefaultParameter:
     return forProtocol ? diag::cannot_convert_default_arg_value_protocol
                        : diag::cannot_convert_default_arg_value;
   case CTP_YieldByValue:
     return forProtocol ? diag::cannot_convert_yield_value_protocol
                        : diag::cannot_convert_yield_value;
-  case CTP_CallArgument:
+  case CTP_CallArgument: {
+    if (contextualType->isAnyObject())
+      return diag::cannot_convert_argument_value_anyobject;
+
     return forProtocol ? diag::cannot_convert_argument_value_protocol
                        : diag::cannot_convert_argument_value;
+  }
   case CTP_ClosureResult:
     return forProtocol ? diag::cannot_convert_closure_result_protocol
                        : diag::cannot_convert_closure_result;
@@ -2876,9 +2949,13 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_CoerceOperand:
     return forProtocol ? diag::cannot_convert_coerce_protocol
                        : diag::cannot_convert_coerce;
-  case CTP_AssignSource:
+  case CTP_AssignSource: {
+    if (contextualType->isAnyObject())
+      return diag::cannot_convert_assign_anyobject;
+
     return forProtocol ? diag::cannot_convert_assign_protocol
                        : diag::cannot_convert_assign;
+  }
   case CTP_SubscriptAssignSource:
     return forProtocol ? diag::cannot_convert_subscript_assign_protocol
                        : diag::cannot_convert_subscript_assign;
@@ -2902,9 +2979,10 @@ bool TupleContextualFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   if (isNumElementsMismatch())
     diagnostic = diag::tuple_types_not_convertible_nelts;
-  else if ((purpose == CTP_Initialization) && !cs.getContextualType())
+  else if ((purpose == CTP_Initialization) &&
+           !cs.getContextualType(getAnchor()))
     diagnostic = diag::tuple_types_not_convertible;
-  else if (auto diag = getDiagnosticFor(purpose, /*forProtocol=*/false))
+  else if (auto diag = getDiagnosticFor(purpose, getToType()))
     diagnostic = *diag;
   else
     return false;
@@ -2915,7 +2993,7 @@ bool TupleContextualFailure::diagnoseAsError() {
 
 bool FunctionTypeMismatch::diagnoseAsError() {
   auto purpose = getContextualTypePurpose();
-  auto diagnostic = getDiagnosticFor(purpose, /*forProtocol=*/false);
+  auto diagnostic = getDiagnosticFor(purpose, getToType());
   if (!diagnostic)
     return false;
 
@@ -3387,6 +3465,12 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     return true;
   }
 
+  auto getRootExpr = [&cs](Expr *expr) {
+    while (auto parent = cs.getParentExpr(expr))
+      expr = parent;
+    return expr;
+  };
+
   Expr *expr = findParentExpr(getAnchor());
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
 
@@ -3442,7 +3526,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         OverloadChoice choice = selection->choice;
         if (choice.isDecl() && isMutable(choice.getDecl()) &&
             !isCallArgument(initCall) &&
-            cs.getContextualTypePurpose() == CTP_Unused) {
+            cs.getContextualTypePurpose(getRootExpr(ctorRef)) == CTP_Unused) {
           auto fixItLoc = ctorRef->getBase()->getSourceRange().End;
           emitDiagnostic(loc, diag::init_not_instance_member_use_assignment)
               .fixItInsertAfter(fixItLoc, " = ");
@@ -3628,7 +3712,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     Type contextualType;
     for (auto iterateCS = &cs; contextualType.isNull() && iterateCS;
          iterateCS = iterateCS->baseCS) {
-      contextualType = iterateCS->getContextualType();
+      contextualType = iterateCS->getContextualType(getRawAnchor());
     }
     
     // Try to provide a fix-it that only contains a '.'
@@ -3639,11 +3723,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
     // Check if the expression is the matching operator ~=, most often used in
     // case statements. If so, try to provide a single dot fix-it
-    const Expr *contextualTypeNode = nullptr;
+    const Expr *contextualTypeNode = getRootExpr(getAnchor());
     ConstraintSystem *lastCS = nullptr;
     for (auto iterateCS = &cs; iterateCS; iterateCS = iterateCS->baseCS) {
       lastCS = iterateCS;
-      contextualTypeNode = iterateCS->getContextualTypeNode();
     }
     
     // The '~=' operator is an overloaded decl ref inside a binaryExpr
@@ -3791,7 +3874,8 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   if (locator->isLastElement<LocatorPathElt::ContextualType>()) {
     auto &cs = getConstraintSystem();
     emitDiagnostic(anchor->getLoc(), diag::cannot_convert_initializer_value,
-                   getType(anchor), resolveType(cs.getContextualType()));
+                   getType(anchor),
+                   resolveType(cs.getContextualType(getAnchor())));
     // TODO: It would be great so somehow point out which arguments are missing.
     return true;
   }
@@ -4003,7 +4087,7 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
 
   auto *locator = getLocator();
   if (locator->isForContextualType()) {
-    funcType = cs.getContextualType()->getAs<FunctionType>();
+    funcType = cs.getContextualType(locator->getAnchor())->getAs<FunctionType>();
   } else if (auto info = cs.getFunctionArgApplyInfo(locator)) {
     funcType = info->getParamType()->getAs<FunctionType>();
   } else if (locator->isLastElement<LocatorPathElt::ClosureResult>()) {
@@ -4551,7 +4635,21 @@ bool ExtraneousArgumentsFailure::diagnoseAsNote() {
 }
 
 bool ExtraneousArgumentsFailure::diagnoseSingleExtraArgument() const {
-  auto *arguments = getArgumentListExprFor(getLocator());
+  auto *locator = getLocator();
+
+  // This specifically handles a case of `Void(...)` which generates
+  // constraints differently from other constructor invocations and
+  // wouldn't have `ApplyArgument` as a last element in the locator.
+  if (auto *call = dyn_cast<CallExpr>(getRawAnchor())) {
+    auto *TE = dyn_cast<TypeExpr>(call->getFn());
+    if (TE && getType(TE)->getMetatypeInstanceType()->isVoid()) {
+      emitDiagnostic(call->getLoc(), diag::extra_argument_to_nullary_call)
+          .highlight(call->getArg()->getSourceRange());
+      return true;
+    }
+  }
+
+  auto *arguments = getArgumentListExprFor(locator);
   if (!arguments)
     return false;
 
@@ -4815,17 +4913,16 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
   if (path.empty()) {
     assert(isa<AssignExpr>(anchor));
     if (isa<SubscriptExpr>(cast<AssignExpr>(anchor)->getDest())) {
-      diagnostic =
-          getDiagnosticFor(CTP_SubscriptAssignSource, /*forProtocol=*/true);
+      diagnostic = getDiagnosticFor(CTP_SubscriptAssignSource, getToType());
     } else {
-      diagnostic = getDiagnosticFor(CTP_AssignSource, /*forProtocol=*/true);
+      diagnostic = getDiagnosticFor(CTP_AssignSource, getToType());
     }
   } else {
     const auto &last = path.back();
     switch (last.getKind()) {
     case ConstraintLocator::ContextualType:
       assert(Context != CTP_Unused);
-      diagnostic = getDiagnosticFor(Context, /*forProtocol=*/true);
+      diagnostic = getDiagnosticFor(Context, getToType());
       break;
 
     case ConstraintLocator::SequenceElementType: {
@@ -5251,9 +5348,9 @@ bool InOutConversionFailure::diagnoseAsError() {
           argApplyInfo->getArgType(), argApplyInfo->getParamType());
     } else {
       assert(locator->findLast<LocatorPathElt::ContextualType>());
-      auto contextualType = cs.getContextualType();
+      auto contextualType = cs.getContextualType(anchor);
       auto purpose = getContextualTypePurpose();
-      auto diagnostic = getDiagnosticFor(purpose, /*forProtocol=*/false);
+      auto diagnostic = getDiagnosticFor(purpose, contextualType);
 
       if (!diagnostic)
         return false;
@@ -5360,6 +5457,12 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 
   auto argType = getFromType();
   auto paramType = getToType();
+
+  if (paramType->isAnyObject()) {
+    emitDiagnostic(getLoc(), diag::cannot_convert_argument_value_anyobject,
+                   argType, paramType);
+    return true;
+  }
 
   Diag<Type, Type> diagnostic = diag::cannot_convert_argument_value;
 
@@ -6091,5 +6194,47 @@ bool UnableToInferProtocolLiteralType::diagnoseAsError() {
                    importModule, importDefaultTypeName, plainName);
   }
 
+  return true;
+}
+
+bool MissingQuialifierInMemberRefFailure::diagnoseAsError() {
+  auto selectedOverload = getOverloadChoiceIfAvailable(getLocator());
+  if (!selectedOverload)
+    return false;
+
+  auto *UDE = cast<UnresolvedDotExpr>(getRawAnchor());
+
+  auto baseType = getType(UDE->getBase());
+
+  auto methodKind = baseType->isAnyExistentialType()
+                        ? DescriptiveDeclKind::StaticMethod
+                        : DescriptiveDeclKind::Method;
+
+  auto choice = selectedOverload->choice.getDeclOrNull();
+  if (!choice)
+    return false;
+
+  auto *DC = choice->getDeclContext();
+  if (!(DC->isModuleContext() || DC->isModuleScopeContext())) {
+    emitDiagnostic(UDE->getLoc(), diag::member_shadows_function, UDE->getName(),
+                   methodKind, choice->getDescriptiveKind(),
+                   choice->getFullName());
+    return true;
+  }
+
+  auto qualifier = DC->getParentModule()->getName();
+
+  emitDiagnostic(UDE->getLoc(), diag::member_shadows_global_function,
+                 UDE->getName(), methodKind, choice->getDescriptiveKind(),
+                 choice->getFullName(), qualifier);
+
+  SmallString<32> namePlusDot = qualifier.str();
+  namePlusDot.push_back('.');
+
+  emitDiagnostic(UDE->getLoc(), diag::fix_unqualified_access_top_level_multi,
+                 namePlusDot, choice->getDescriptiveKind(), qualifier)
+      .fixItInsert(UDE->getStartLoc(), namePlusDot);
+
+  emitDiagnostic(choice, diag::decl_declared_here, choice->getFullName());
   return true;
 }

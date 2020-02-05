@@ -17,7 +17,7 @@ namespace swift {
 template <typename RefCountBits>
 void RefCounts<RefCountBits>::incrementSlow(RefCountBits oldbits,
                                             uint32_t n) {
-  if (oldbits.isImmortal()) {
+  if (oldbits.isImmortal(false)) {
     return;
   }
   else if (oldbits.hasSideTable()) {
@@ -36,7 +36,7 @@ template void RefCounts<SideTableRefCountBits>::incrementSlow(SideTableRefCountB
 template <typename RefCountBits>
 void RefCounts<RefCountBits>::incrementNonAtomicSlow(RefCountBits oldbits,
                                                      uint32_t n) {
-  if (oldbits.isImmortal()) {
+  if (oldbits.isImmortal(false)) {
     return;
   }
   else if (oldbits.hasSideTable()) {
@@ -52,7 +52,7 @@ template void RefCounts<SideTableRefCountBits>::incrementNonAtomicSlow(SideTable
 
 template <typename RefCountBits>
 bool RefCounts<RefCountBits>::tryIncrementSlow(RefCountBits oldbits) {
-  if (oldbits.isImmortal()) {
+  if (oldbits.isImmortal(false)) {
     return true;
   }
   else if (oldbits.hasSideTable())
@@ -65,7 +65,7 @@ template bool RefCounts<SideTableRefCountBits>::tryIncrementSlow(SideTableRefCou
 
 template <typename RefCountBits>
 bool RefCounts<RefCountBits>::tryIncrementNonAtomicSlow(RefCountBits oldbits) {
-  if (oldbits.isImmortal()) {
+  if (oldbits.isImmortal(false)) {
     return true;
   }
   else if (oldbits.hasSideTable())

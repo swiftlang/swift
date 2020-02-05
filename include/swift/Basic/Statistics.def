@@ -240,9 +240,6 @@ FRONTEND_STATISTIC(Sema, NumLazyRequirementSignaturesLoaded)
 /// Number of lazy iterable declaration contexts constructed.
 FRONTEND_STATISTIC(Sema, NumLazyIterableDeclContexts)
 
-/// Number of direct member-name lookups performed on nominal types.
-FRONTEND_STATISTIC(Sema, NominalTypeLookupDirectCount)
-
 /// Number of member-name lookups that avoided loading all members.
 FRONTEND_STATISTIC(Sema, NamedLazyMemberLoadSuccessCount)
 
@@ -267,6 +264,10 @@ FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 #include "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #include "swift/IDE/IDERequestIDZone.def"
+#undef SWIFT_REQUEST
+
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(SILGen, NAME)
+#include "swift/AST/SILGenTypeIDZone.def"
 #undef SWIFT_REQUEST
 
 /// The next 10 statistics count 5 kinds of SIL entities present

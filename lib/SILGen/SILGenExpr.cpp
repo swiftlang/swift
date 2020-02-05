@@ -165,8 +165,14 @@ namespace {
 struct EndBorrowCleanup : Cleanup {
   SILValue borrowedValue;
 
-  EndBorrowCleanup(SILValue borrowedValue)
-      : borrowedValue(borrowedValue) {}
+  EndBorrowCleanup(SILValue borrowedValue) : borrowedValue(borrowedValue) {
+    if (auto *arg = dyn_cast<SILPhiArgument>(borrowedValue)) {
+      if (auto *ti = arg->getSingleTerminator()) {
+        assert(!ti->isTransformationTerminator() &&
+               "Transforming terminators do not have end_borrow");
+      }
+    }
+  }
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
@@ -5023,13 +5029,17 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
     return visit(E->getSubExpr(), C);
   };
 
-  // Handle @convention(block). No withoutActuallyEscaping verification yet.
-  if (silFnTy->getExtInfo().getRepresentation() !=
-      SILFunctionTypeRepresentation::Thick) {
+  // Handle @convention(block) an @convention(c). No withoutActuallyEscaping
+  // verification yet.
+  auto closureRepresentation = silFnTy->getExtInfo().getRepresentation();
+  if (closureRepresentation != SILFunctionTypeRepresentation::Thick) {
     auto escapingClosure =
         SGF.B.createConvertFunction(E, functionValue, escapingFnTy,
                                     /*WithoutActuallyEscaping=*/true);
-    return visitSubExpr(escapingClosure, true /*isClosureConsumable*/);
+    bool isBlockConvention =
+        closureRepresentation == SILFunctionTypeRepresentation::Block;
+    return visitSubExpr(escapingClosure,
+                        isBlockConvention /*isClosureConsumable*/);
   }
 
   // Convert it to an escaping function value.

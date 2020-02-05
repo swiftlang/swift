@@ -87,6 +87,11 @@ struct ExternalUnionMembers {
   static constexpr int maybeIndexOf() {
     return ExternalUnionImpl::indexOf<T, Members...>::value;
   }
+
+  template <class T>
+  static constexpr bool contains() {
+    return ExternalUnionImpl::indexOf<T, Members...>::value != -1;
+  }
 };
 
 /// An external union that uses the member-list index as the user-facing
@@ -237,7 +242,7 @@ public:
       Members::Info::copyAssignSame(unsigned(thisIndex),
                                     Storage, other.Storage);
     } else {
-      destruct(thisIndex, Storage);
+      destruct(thisIndex);
       copyConstruct(otherIndex, other);
     }
   }

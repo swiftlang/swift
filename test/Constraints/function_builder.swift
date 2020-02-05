@@ -461,3 +461,18 @@ func testNestedClosuresWithDependencies(cond: Bool) {
     }
   }
 }
+
+// Check that we can handle multiple conditions in an 'if' statement.
+func testIfConditions(cond: Bool, c1: Bool, i1: Int, i2: Int) {
+  tuplify(cond) { x in
+    "testIfConditions"
+    if i1 == i2, c1, x {
+      1
+      "hello"
+    }
+    3.14159
+  }
+}
+testIfConditions(cond: true, c1: true, i1: 1, i2: 1)
+// CHECK: testIfConditions
+// CHECK-SAME: hello

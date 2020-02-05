@@ -396,7 +396,6 @@ bb3:
 //
 // CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] : @guaranteed
 // CHECK-NEXT:   [[CAST_VALUE_COPY:%.*]] = copy_value [[CAST_VALUE]]
-// CHECK-NEXT:   end_borrow [[CAST_VALUE]]
 // CHECK-NEXT:   end_borrow [[RELOADED_ARG]]
 // CHECK-NEXT:   store [[CAST_VALUE_COPY]] to [init] [[DEST_ADDR]]
 // CHECK-NEXT:   destroy_addr [[DEST_ADDR]]
@@ -404,7 +403,6 @@ bb3:
 // CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
 //
 // CHECK: [[FAILURE_BB]]([[FAILURE_BORROWED_ARG:%.*]] :
-// CHECK-NEXT:   end_borrow [[FAILURE_BORROWED_ARG]]
 // CHECK-NEXT:   end_borrow [[RELOADED_ARG]]
 // CHECK-NEXT:   destroy_addr [[SRC_ADDR]]
 // CHECK-NEXT:   br [[CONT_BB]]

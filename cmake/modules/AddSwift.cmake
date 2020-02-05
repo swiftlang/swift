@@ -28,16 +28,6 @@ function(add_dependencies_multiple_targets)
   endif()
 endfunction()
 
-# Compute the library subdirectory to use for the given sdk and
-# architecture, placing the result in 'result_var_name'.
-function(compute_library_subdir result_var_name sdk arch)
-  if(sdk IN_LIST SWIFT_APPLE_PLATFORMS OR sdk STREQUAL "MACCATALYST")
-    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}" PARENT_SCOPE)
-  else()
-    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
-  endif()
-endfunction()
-
 function(_compute_lto_flag option out_var)
   string(TOLOWER "${option}" lowercase_option)
   if (lowercase_option STREQUAL "full")
@@ -163,9 +153,12 @@ function(_add_variant_c_compile_link_flags)
   endif()
 
   if(IS_DARWIN)
+    # We collate -F with the framework path to avoid unwanted deduplication
+    # of options by target_compile_options -- this way no undesired
+    # side effects are introduced should a new search path be added.
     list(APPEND result
       "-arch" "${CFLAGS_ARCH}"
-      "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks")
+      "-F${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks")
 
     set(add_explicit_version TRUE)
 
@@ -202,7 +195,7 @@ function(_add_variant_c_compile_flags)
     RESULT_VAR_NAME ENABLE_LTO
     MACCATALYST_BUILD_FLAVOR)
   cmake_parse_arguments(CFLAGS
-    "FORCE_BUILD_OPTIMIZED"
+    ""
     "${oneValueArgs}"
     ""
     ${ARGN})
@@ -225,7 +218,7 @@ function(_add_variant_c_compile_flags)
     MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
   is_build_type_optimized("${CFLAGS_BUILD_TYPE}" optimized)
-  if(optimized OR CFLAGS_FORCE_BUILD_OPTIMIZED)
+  if(optimized)
     list(APPEND result "-O2")
 
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
@@ -264,18 +257,6 @@ function(_add_variant_c_compile_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
-    # MSVC doesn't support -Xclang. We don't need to manually specify
-    # the dependent libraries as `cl` does so.
-    if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
-      list(APPEND result -Xclang;--dependent-lib=oldnames)
-      # TODO(compnerd) handle /MT, /MTd
-      if("${CFLAGS_BUILD_TYPE}" STREQUAL "Debug")
-        list(APPEND result -Xclang;--dependent-lib=msvcrtd)
-      else()
-        list(APPEND result -Xclang;--dependent-lib=msvcrt)
-      endif()
-    endif()
-
     # MSVC/clang-cl don't support -fno-pic or -fms-compatibility-version.
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
       list(APPEND result -fno-pic)
@@ -363,38 +344,9 @@ function(_add_variant_c_compile_flags)
     swift_android_libcxx_include_paths(CFLAGS_CXX_INCLUDES)
     swift_android_include_for_arch("${CFLAGS_ARCH}" "${CFLAGS_ARCH}_INCLUDE")
     foreach(path IN LISTS CFLAGS_CXX_INCLUDES ${CFLAGS_ARCH}_INCLUDE)
-      list(APPEND result -isystem;${path})
+      list(APPEND result "SHELL:${CMAKE_INCLUDE_SYSTEM_FLAG_C}${path}")
     endforeach()
     list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
-  elseif(CFLAGS_SDK STREQUAL WINDOWS)
-    swift_windows_include_for_arch(${CFLAGS_ARCH} ${CFLAGS_ARCH}_INCLUDE)
-    foreach(path ${${CFLAGS_ARCH}_INCLUDE})
-      list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
-    endforeach()
-  endif()
-
-  set(ICU_UC_INCLUDE_DIR ${SWIFT_${CFLAGS_SDK}_${CFLAGS_ARCH}_ICU_UC_INCLUDE})
-  if(NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "" AND
-     NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "/usr/include" AND
-     NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}/include" AND
-     NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
-   if(SWIFT_COMPILER_IS_MSVC_LIKE)
-     list(APPEND result -I;${ICU_UC_INCLUDE_DIR})
-   else()
-     list(APPEND result -isystem;${ICU_UC_INCLUDE_DIR})
-   endif()
-  endif()
-
-  set(ICU_I18N_INCLUDE_DIR ${SWIFT_${CFLAGS_SDK}_${CFLAGS_ARCH}_ICU_I18N_INCLUDE})
-  if(NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "" AND
-     NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "/usr/include" AND
-     NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}/include" AND
-     NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
-   if(SWIFT_COMPILER_IS_MSVC_LIKE)
-     list(APPEND result -I;${ICU_I18N_INCLUDE_DIR})
-   else()
-     list(APPEND result -isystem;${ICU_I18N_INCLUDE_DIR})
-   endif()
   endif()
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
@@ -446,8 +398,11 @@ function(_add_variant_swift_compile_flags
   endif()
 
   if(IS_DARWIN)
+    # We collate -F with the framework path to avoid unwanted deduplication
+    # of options by target_compile_options -- this way no undesired
+    # side effects are introduced should a new search path be added.
     list(APPEND result
-      "-F" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/../../../Developer/Library/Frameworks")
+      "-F${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/../../../Developer/Library/Frameworks")
   endif()
 
   is_build_type_optimized("${build_type}" optimized)
@@ -702,14 +657,6 @@ function(_add_swift_lipo_target)
   endif()
 endfunction()
 
-function(swift_target_link_search_directories target directories)
-  set(STLD_FLAGS "")
-  foreach(directory ${directories})
-    set(STLD_FLAGS "${STLD_FLAGS} \"${CMAKE_LIBRARY_PATH_FLAG}${directory}\"")
-  endforeach()
-  set_property(TARGET ${target} APPEND_STRING PROPERTY LINK_FLAGS ${STLD_FLAGS})
-endfunction()
-
 # Add a single variant of a new Swift library.
 #
 # Usage:
@@ -732,7 +679,6 @@ endfunction()
 #     [FILE_DEPENDS target1 ...]
 #     [DONT_EMBED_BITCODE]
 #     [IS_STDLIB]
-#     [FORCE_BUILD_OPTIMIZED]
 #     [IS_STDLIB_CORE]
 #     [IS_SDK_OVERLAY]
 #     INSTALL_IN_COMPONENT comp
@@ -810,7 +756,6 @@ endfunction()
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
         DONT_EMBED_BITCODE
-        FORCE_BUILD_OPTIMIZED
         IS_SDK_OVERLAY
         IS_STDLIB
         IS_STDLIB_CORE
@@ -888,19 +833,7 @@ function(_add_swift_library_single target name)
   if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
     if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
       list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
-      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_bundle" "-Xlinker" "-lto_library" "-Xlinker" "${LLVM_LIBRARY_DIR}/libLTO.dylib")
-      # If we are asked to hide symbols, pass the obfuscation flag to libLTO.
-      if (SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
-        list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_hide_symbols")
-      endif()
       set(embed_bitcode_arg EMBED_BITCODE)
-    endif()
-  endif()
-
-  if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
-    list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-compatibility_version" "-Xlinker" "1")
-    if (SWIFT_COMPILER_VERSION)
-      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-current_version" "-Xlinker" "${SWIFT_COMPILER_VERSION}" )
     endif()
   endif()
 
@@ -956,11 +889,9 @@ function(_add_swift_library_single target name)
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
     if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
-      swift_windows_generate_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY_FLAGS)
-      foreach(flag ${SWIFTLIB_SINGLE_VFS_OVERLAY_FLAGS})
-        list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;${flag})
-        list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS ${flag})
-      endforeach()
+      swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
+        -Xcc;-Xclang;-Xcc;-ivfsoverlay;-Xcc;-Xclang;-Xcc;${SWIFTLIB_SINGLE_VFS_OVERLAY})
     endif()
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
     foreach(directory ${SWIFTLIB_INCLUDE})
@@ -1276,23 +1207,6 @@ function(_add_swift_library_single target name)
         "${swift_module_dependency_target}"
         ${LLVM_COMMON_DEPENDS})
 
-  # HACK: On some systems or build directory setups, CMake will not find static
-  # archives of Clang libraries in the Clang build directory, and it will pass
-  # them as '-lclangFoo'.  Some other logic in CMake would reorder libraries
-  # specified with this syntax, which breaks linking.
-  set(prefixed_link_libraries)
-  foreach(dep ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
-    if("${dep}" MATCHES "^clang")
-      if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
-        set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/${dep}.lib")
-      else()
-        set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
-      endif()
-    endif()
-    list(APPEND prefixed_link_libraries "${dep}")
-  endforeach()
-  set(SWIFTLIB_SINGLE_LINK_LIBRARIES "${prefixed_link_libraries}")
-
   if("${libkind}" STREQUAL "SHARED")
     target_link_libraries("${target}" PRIVATE ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
   elseif("${libkind}" STREQUAL "OBJECT")
@@ -1384,7 +1298,6 @@ function(_add_swift_library_single target name)
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
-    "${SWIFTLIB_SINGLE_FORCE_BUILD_OPTIMIZED_keyword}"
     RESULT_VAR_NAME c_compile_flags
     MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
     )
@@ -1453,17 +1366,54 @@ function(_add_swift_library_single target name)
     set(PLIST_INFO_BUILD_VERSION)
   endif()
 
-  # Convert variables to space-separated strings.
-  _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
-  _list_escape_for_shell("${link_flags}" link_flags)
-
   # Set compilation and link flags.
-  set_property(TARGET "${target}" APPEND_STRING PROPERTY
-      COMPILE_FLAGS " ${c_compile_flags}")
-  set_property(TARGET "${target}" APPEND_STRING PROPERTY
-      LINK_FLAGS " ${link_flags}")
-  set_property(TARGET "${target}" APPEND PROPERTY LINK_LIBRARIES ${link_libraries})
-  swift_target_link_search_directories("${target}" "${library_search_directories}")
+  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
+    swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE}
+      ${SWIFTLIB_SINGLE_ARCHITECTURE}_INCLUDE)
+    target_include_directories(${target} SYSTEM PRIVATE
+      ${${SWIFTLIB_SINGLE_ARCHITECTURE}_INCLUDE})
+
+    if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
+      swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
+      target_compile_options(${target} PRIVATE
+        "SHELL:-Xclang -ivfsoverlay -Xclang ${SWIFTLIB_SINGLE_VFS_OVERLAY}")
+
+      # MSVC doesn't support -Xclang. We don't need to manually specify
+      # the dependent libraries as `cl` does so.
+      target_compile_options(${target} PRIVATE
+        "SHELL:-Xclang --dependent-lib=oldnames"
+        # TODO(compnerd) handle /MT, /MTd
+        "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
+    endif()
+  endif()
+  target_include_directories(${target} SYSTEM PRIVATE
+    ${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}
+    ${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE})
+  target_compile_options(${target} PRIVATE
+    ${c_compile_flags})
+  target_link_options(${target} PRIVATE
+    ${link_flags})
+  if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+    target_link_options(${target} PRIVATE
+      "LINKER:-compatibility_version,1")
+    if(SWIFT_COMPILER_VERSION)
+      target_link_options(${target} PRIVATE
+        "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
+    endif()
+    # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
+    if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
+      if(${SWIFTLIB_SINGLE_SDK} MATCHES "(I|TV|WATCH)OS")
+        target_link_options(${target} PRIVATE
+          "LINKER:-bitcode_bundle"
+          $<$<BOOL:SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS>:"LINKER:-bitcode_hide_symbols">
+          "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
+      endif()
+    endif()
+  endif()
+  target_link_libraries(${target} PRIVATE
+    ${link_libraries})
+  target_link_directories(${target} PRIVATE
+    ${library_search_directories})
 
   # Adjust the linked libraries for windows targets.  On Windows, the link is
   # performed against the import library, and the runtime uses the dll.  Not
@@ -1513,8 +1463,8 @@ function(_add_swift_library_single target name)
   endif()
 
   if(target_static)
-    set_property(TARGET "${target_static}" APPEND_STRING PROPERTY
-        COMPILE_FLAGS " ${c_compile_flags}")
+    target_compile_options(${target_static} PRIVATE
+      ${c_compile_flags})
     # FIXME: The fallback paths here are going to be dynamic libraries.
 
     if(SWIFTLIB_INSTALL_WITH_SHARED)
@@ -1526,7 +1476,8 @@ function(_add_swift_library_single target name)
         "${search_base_dir}/${SWIFTLIB_SINGLE_SUBDIR}"
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
-    swift_target_link_search_directories("${target_static}" "${library_search_directories}")
+    target_link_directories(${target_static} PRIVATE
+      ${library_search_directories})
     target_link_libraries("${target_static}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
@@ -1581,11 +1532,17 @@ function(add_swift_host_library name)
                         ${ARGN})
   set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
 
+  if(ASHL_FORCE_BUILD_OPTIMIZED)
+    message(SEND_ERROR "library ${name} is using FORCE_BUILD_OPTIMIZED flag which is deprecated.  Please use target_compile_options instead")
+  endif()
   if(ASHL_C_COMPILE_FLAGS)
     message(SEND_ERROR "library ${name} is using C_COMPILE_FLAGS parameter which is deprecated.  Please use target_compile_definitions, target_compile_options, or target_include_directories instead")
   endif()
   if(ASHL_DEPENDS)
     message(SEND_ERROR "library ${name} is using DEPENDS parameter which is deprecated.  Please use add_dependencies instead")
+  endif()
+  if(ASHL_FILE_DEPENDS)
+    message(SEND_ERROR "library ${name} is using FILE_DEPENDS parameter which is deprecated.")
   endif()
   if(ASHL_LINK_LIBRARIES)
     message(SEND_ERROR "library ${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
@@ -1603,11 +1560,9 @@ function(add_swift_host_library name)
     ${ASHL_SHARED_keyword}
     ${ASHL_STATIC_keyword}
     ${ASHL_SOURCES}
-    ${ASHL_FORCE_BUILD_OPTIMIZED_keyword}
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     LLVM_LINK_COMPONENTS ${ASHL_LLVM_LINK_COMPONENTS}
-    FILE_DEPENDS ${ASHL_FILE_DEPENDS}
     INSTALL_IN_COMPONENT "dev"
     )
 
@@ -1779,7 +1734,6 @@ endfunction()
 function(add_swift_target_library name)
   set(SWIFTLIB_options
         DONT_EMBED_BITCODE
-        FORCE_BUILD_OPTIMIZED
         HAS_SWIFT_CONTENT
         IS_SDK_OVERLAY
         IS_STDLIB
@@ -2181,7 +2135,10 @@ function(add_swift_target_library name)
 
         list(APPEND swiftlib_swift_compile_flags_all "-Fsystem" "${ios_support_frameworks_path}")
         list(APPEND swiftlib_c_compile_flags_all "-iframework" "${ios_support_frameworks_path}")
-        list(APPEND swiftlib_link_flags_all "-F" "${ios_support_frameworks_path}")
+        # We collate -F with the framework path to avoid unwanted deduplication
+        # of options by target_compile_options -- this way no undesired
+        # side effects are introduced should a new search path be added.
+        list(APPEND swiftlib_link_flags_all "-F${ios_support_frameworks_path}")
       endif()
 
       if(sdk IN_LIST SWIFT_APPLE_PLATFORMS AND SWIFTLIB_IS_SDK_OVERLAY)
@@ -2233,7 +2190,6 @@ function(add_swift_target_library name)
         ${SWIFTLIB_IS_STDLIB_keyword}
         ${SWIFTLIB_IS_STDLIB_CORE_keyword}
         ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
-        ${SWIFTLIB_FORCE_BUILD_OPTIMIZED_keyword}
         ${SWIFTLIB_NOSWIFTRT_keyword}
         DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
         INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
@@ -2549,9 +2505,12 @@ function(_add_swift_executable_single name)
 
   set(SWIFTEXE_SINGLE_SOURCES ${SWIFTEXE_SINGLE_UNPARSED_ARGUMENTS})
 
-  translate_flag(${SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL}
-      "EXCLUDE_FROM_ALL"
-      SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL_FLAG)
+  if(SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL)
+    message(SEND_ERROR "${name} is using EXCLUDE_FROM_ALL option which is deprecated.")
+  endif()
+  if(SWIFTEXE_SINGLE_LINK_LIBRARIES)
+    message(SEND_ERROR "${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
+  endif()
 
   # Check arguments.
   precondition(SWIFTEXE_SINGLE_SDK MESSAGE "Should specify an SDK")
@@ -2586,18 +2545,6 @@ function(_add_swift_executable_single name)
     LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
 
-  if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
-    list(APPEND link_flags
-        "-Xlinker" "-rpath"
-        "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
-  endif()
-
-  _list_add_string_suffix(
-      "${SWIFTEXE_SINGLE_LINK_LIBRARIES}"
-      "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
-      SWIFTEXE_SINGLE_LINK_LIBRARIES_TARGETS)
-  set(SWIFTEXE_SINGLE_LINK_LIBRARIES ${SWIFTEXE_SINGLE_LINK_LIBRARIES_TARGETS})
-
   handle_swift_sources(
       dependency_target
       unused_module_dependency_target
@@ -2615,7 +2562,6 @@ function(_add_swift_executable_single name)
   add_swift_source_group("${SWIFTEXE_SINGLE_EXTERNAL_SOURCES}")
 
   add_executable(${name}
-      ${SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL_FLAG}
       ${SWIFTEXE_SINGLE_SOURCES}
       ${SWIFTEXE_SINGLE_EXTERNAL_SOURCES})
 
@@ -2627,24 +2573,41 @@ function(_add_swift_executable_single name)
         ${SWIFTEXE_SINGLE_DEPENDS})
   llvm_update_compile_flags("${name}")
 
-  # Convert variables to space-separated strings.
-  _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
-  _list_escape_for_shell("${link_flags}" link_flags)
+  if(SWIFTEXE_SINGLE_SDK STREQUAL WINDOWS)
+    swift_windows_include_for_arch(${SWIFTEXE_SINGLE_ARCHITECTURE}
+      ${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE)
+    target_include_directories(${name} SYSTEM PRIVATE
+      ${${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE})
 
-  set_property(TARGET ${name} APPEND_STRING PROPERTY
-      COMPILE_FLAGS " ${c_compile_flags}")
-  swift_target_link_search_directories("${name}" "${library_search_directories}")
-  set_property(TARGET ${name} APPEND_STRING PROPERTY
-      LINK_FLAGS " ${link_flags}")
-  set_property(TARGET ${name} APPEND PROPERTY LINK_LIBRARIES ${link_libraries})
+    if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
+      # MSVC doesn't support -Xclang. We don't need to manually specify
+      # the dependent libraries as `cl` does so.
+      target_compile_options(${name} PRIVATE
+        "SHELL:-Xclang --dependent-lib=oldnames"
+        # TODO(compnerd) handle /MT, /MTd
+        "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
+    endif()
+  endif()
+  target_compile_options(${name} PRIVATE
+    ${c_compile_flags})
+  target_link_directories(${name} PRIVATE
+    ${library_search_directories})
+  target_link_options(${name} PRIVATE
+    ${link_flags})
+  target_link_libraries(${name} PRIVATE
+    ${link_libraries})
   if (SWIFT_PARALLEL_LINK_JOBS)
     set_property(TARGET ${name} PROPERTY JOB_POOL_LINK swift_link_job_pool)
+  endif()
+  if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+    set_target_properties(${name} PROPERTIES
+      BUILD_WITH_INSTALL_RPATH YES
+      INSTALL_RPATH "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
   endif()
   set_output_directory(${name}
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-  target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_LINK_COMPONENTS})
 
   # NOTE(compnerd) use the C linker language to invoke `clang` rather than

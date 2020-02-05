@@ -30,12 +30,13 @@ umask 0022
 # A default value of "" indicates that the corresponding variable
 # will remain unset unless set explicitly.
 #
-# skip-* parameters do not affect the configuration (CMake parameters).
-# You can turn them on and off in different invocations of the script for the
-# same build directory.
+# The --skip-build parameter, with no product name, does not affect the
+# configuration (CMake parameters). You can turn this option on and
+# off in different invocations of the script for the same build
+# directory without affecting configutation.
 #
-# build-* parameters affect the CMake configuration (enable/disable those
-# components).
+# skip-build-* and build-* parameters affect the CMake configuration
+# (enable/disable those components).
 #
 # Each variable name is re-exported into this script in uppercase, where dashes
 # are substituted by underscores. For example, `swift-install-components` is
@@ -118,6 +119,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-build-type                       "Debug"           "the CMake build variant for Swift"
 
     ## Skip Build ...
+    skip-build                                    ""                "set to configure as usual while skipping the build step"
     skip-build-android                            ""                "set to skip building Swift stdlibs for Android"
     skip-build-benchmarks                         ""                "set to skip building Swift Benchmark Suite"
     skip-build-clang-tools-extra                  ""                "set to skip building clang-tools-extra as part of llvm"
@@ -1041,10 +1043,11 @@ if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR
     exit 1
 fi
 
-PRODUCTS=(cmark llvm)
+[[ "${SKIP_BUILD_CMARK}" ]] || PRODUCTS+=(cmark)
 [[ "${SKIP_BUILD_LIBCXX}" ]] || PRODUCTS+=(libcxx)
 [[ "${SKIP_BUILD_LIBICU}" ]] || PRODUCTS+=(libicu)
-PRODUCTS+=(swift)
+[[ "${SKIP_BUILD_LLVM}" ]] || PRODUCTS+=(llvm)
+[[ "${SKIP_BUILD_SWIFT}" ]] || PRODUCTS+=(swift)
 [[ "${SKIP_BUILD_LLDB}" ]] || PRODUCTS+=(lldb)
 [[ "${SKIP_BUILD_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch)
 [[ "${SKIP_BUILD_STATIC_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch_static)
@@ -1400,20 +1403,8 @@ for host in "${ALL_HOSTS[@]}"; do
     fi
 
     for product in "${PRODUCTS[@]}"; do
-        # Check if we should perform this action.
-        tmp_product=${product}
-        if [[ ${tmp_product} == "libdispatch_static" ]]; then
-            tmp_product=libdispatch
-            LIBDISPATCH_STATIC_CMAKE_OPTIONS=${LIBDISPATCH_CMAKE_OPTIONS[@]}
-        fi
-        if [[ ${tmp_product} == "foundation_static" ]]; then
-            tmp_product=foundation
-        fi
-        if ! [[ $(should_execute_action "${host}-${tmp_product}-build") ]]; then
-            continue
-        fi
+        [[ $(should_execute_action "${host}-${product/_static}-build") ]] || continue
 
-        unset skip_build
         source_dir_var="$(toupper ${product})_SOURCE_DIR"
         source_dir=${!source_dir_var}
         build_dir=$(build_directory ${host} ${product})
@@ -1425,7 +1416,7 @@ for host in "${ALL_HOSTS[@]}"; do
         module_cache="${build_dir}/module-cache"
 
         # Add any specific cmake options specified by build-script
-        product_cmake_options_name=$(to_varname "${product}")_CMAKE_OPTIONS
+        product_cmake_options_name=$(to_varname "${product/_static}")_CMAKE_OPTIONS
         product_cmake_options=(${!product_cmake_options_name}) # convert to array
         cmake_options+=("${product_cmake_options[@]}")
 
@@ -1436,7 +1427,6 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_BUILD_TYPE:STRING="${CMARK_BUILD_TYPE}"
                   "${cmark_cmake_options[@]}"
                 )
-                skip_build=${SKIP_BUILD_CMARK}
                 build_targets=(all)
                 ;;
 
@@ -1444,7 +1434,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [ "${BUILD_LLVM}" == "0" ] ; then
                     build_targets=(clean)
                 fi
-                if [ "${SKIP_BUILD_LLVM}" ] ; then
+                if [ "${SKIP_BUILD}" ] ; then
                     # We can't skip the build completely because the standalone
                     # build of Swift depend on these for building and testing.
                     build_targets=(llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets)
@@ -1709,18 +1699,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_CMARK_LIBRARY_DIR:PATH=$(build_directory ${host} cmark)/src/${CMARK_BUILD_TYPE}
-                    )
-                else
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_CMARK_LIBRARY_DIR:PATH=$(build_directory ${host} cmark)/src
-                    )
-                fi
-
                 if [[ "${SWIFT_SDKS}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -1761,7 +1739,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_targets=("${build_targets[@]}"
                                    "${SWIFT_BENCHMARK_TARGETS[@]}")
                 fi
-                skip_build=${SKIP_BUILD_SWIFT}
                 ;;
             lldb)
                 if [ ! -d "${LLDB_SOURCE_DIR}" ]; then
@@ -2228,7 +2205,12 @@ for host in "${ALL_HOSTS[@]}"; do
         fi
 
         # Build.
-        if [[ ! "${skip_build}" ]]; then
+        #
+        # Even if builds are skipped, Swift configuration relies on
+        # some LLVM tools like TableGen. In the LLVM configure rules
+        # above, a small subset of LLVM build_targets are selected
+        # when SKIP_BUILD is set.
+        if [[ $(not ${SKIP_BUILD}) || "${product}" == "llvm" ]]; then
             if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
                 # Xcode generator uses "ALL_BUILD" instead of "all".
                 # Also, xcodebuild uses -target instead of bare names.
@@ -2241,35 +2223,35 @@ for host in "${ALL_HOSTS[@]}"; do
             fi
 
             call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
+        fi
 
-            # When we are building LLVM copy over the compiler-rt
-            # builtins for iOS/tvOS/watchOS to ensure that Swift's
-            # stdlib can use compiler-rt builtins when targetting iOS/tvOS/watchOS.
-            if [[ "${product}" = "llvm" ]] && [[ "${BUILD_LLVM}" = "1" ]] && [[ "$(uname -s)" = "Darwin" ]]; then
-                HOST_CXX_DIR=$(dirname "${HOST_CXX}")
-                HOST_LIB_CLANG_DIR="${HOST_CXX_DIR}/../lib/clang"
-                DEST_LIB_CLANG_DIR="$(build_directory_bin ${host} llvm)/../lib/clang"
+        # When we are building LLVM copy over the compiler-rt
+        # builtins for iOS/tvOS/watchOS to ensure that Swift's
+        # stdlib can use compiler-rt builtins when targetting iOS/tvOS/watchOS.
+        if [[ "${product}" = "llvm" ]] && [[ "${BUILD_LLVM}" = "1" ]] && [[ "$(uname -s)" = "Darwin" ]]; then
+            HOST_CXX_DIR=$(dirname "${HOST_CXX}")
+            HOST_LIB_CLANG_DIR="${HOST_CXX_DIR}/../lib/clang"
+            DEST_LIB_CLANG_DIR="$(build_directory_bin ${host} llvm)/../lib/clang"
 
-                if [[ -d "${HOST_LIB_CLANG_DIR}" ]] && [[ -d "${DEST_LIB_CLANG_DIR}" ]]; then
-                    DEST_CXX_BUILTINS_VERSION=$(ls "${DEST_LIB_CLANG_DIR}" | awk '{print $0}')
-                    DEST_BUILTINS_DIR="$(build_directory_bin ${host} llvm)/../lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
+            if [[ -d "${HOST_LIB_CLANG_DIR}" ]] && [[ -d "${DEST_LIB_CLANG_DIR}" ]]; then
+                DEST_CXX_BUILTINS_VERSION=$(ls "${DEST_LIB_CLANG_DIR}" | awk '{print $0}')
+                DEST_BUILTINS_DIR="$(build_directory_bin ${host} llvm)/../lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
 
-                    if [[ -d "${DEST_BUILTINS_DIR}" ]]; then
-                        for HOST_CXX_BUILTINS_PATH in "${HOST_LIB_CLANG_DIR}"/*; do
-                            HOST_CXX_BUILTINS_DIR="${HOST_CXX_BUILTINS_PATH}/lib/darwin"
-                            echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
+                if [[ -d "${DEST_BUILTINS_DIR}" ]]; then
+                    for HOST_CXX_BUILTINS_PATH in "${HOST_LIB_CLANG_DIR}"/*; do
+                        HOST_CXX_BUILTINS_DIR="${HOST_CXX_BUILTINS_PATH}/lib/darwin"
+                        echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
 
-                            for OS in ios watchos tvos; do
-                                LIB_NAME="libclang_rt.$OS.a"
-                                HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
-                                if [[ -f "${HOST_LIB_PATH}" ]]; then
-                                    call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${LIB_NAME}"
-                                elif [[ "${VERBOSE_BUILD}" ]]; then
-                                    echo "no file exists at ${HOST_LIB_PATH}"
-                                fi
-                            done
+                        for OS in ios watchos tvos; do
+                            LIB_NAME="libclang_rt.$OS.a"
+                            HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
+                            if [[ -f "${HOST_LIB_PATH}" ]]; then
+                                call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${LIB_NAME}"
+                            elif [[ "${VERBOSE_BUILD}" ]]; then
+                                echo "no file exists at ${HOST_LIB_PATH}"
+                            fi
                         done
-                    fi
+                    done
                 fi
             fi
         fi
@@ -2639,17 +2621,7 @@ for host in "${ALL_HOSTS[@]}"; do
     set_build_options_for_host $host
 
     for product in "${PRODUCTS[@]}"; do
-        # Check if we should perform this action.
-        tmp_product=${product}
-        if [[ ${tmp_product} == "libdispatch_static" ]]; then
-            tmp_product=libdispatch
-        fi
-        if [[ ${tmp_product} == "foundation_static" ]]; then
-            tmp_product=foundation
-        fi
-        if ! [[ $(should_execute_action "${host}-${tmp_product}-install") ]]; then
-            continue
-        fi
+        [[ $(should_execute_action "${host}-${product/_static}-install") ]] || continue
         if [[ -z "${INSTALL_DESTDIR}" ]] ; then
             echo "--install-destdir is required to install products."
             exit 1

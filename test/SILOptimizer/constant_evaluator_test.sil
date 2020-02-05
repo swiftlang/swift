@@ -1503,3 +1503,31 @@ bb0:
   %3 = apply %2<Int64>(%1) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1
   return %3 : $Builtin.Int1
 } // CHECK: Returns int: -1
+
+// CHECK-LABEL: @interpretBinaryIntegerDescription
+sil [ossa] @interpretBinaryIntegerDescription : $@convention(thin) () -> @owned String {
+bb0:
+  %0 = integer_literal $Builtin.Int64, -10
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = alloc_stack $Int64
+  store %1 to [trivial] %2 : $*Int64
+  %4 = function_ref @binaryIntegerDescription : $@convention(method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in_guaranteed τ_0_0) -> @owned String
+  %5 = apply %4<Int64>(%2) : $@convention(method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in_guaranteed τ_0_0) -> @owned String
+  dealloc_stack %2 : $*Int64
+  return %5 : $String
+} // CHECK: Returns string: "-10"
+
+sil [_semantics "binaryInteger.description"] @binaryIntegerDescription : $@convention(method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in_guaranteed τ_0_0) -> @owned String
+
+// CHECK-LABEL: @interpretUnsignedBinaryIntegerDescription
+sil [ossa] @interpretUnsignedBinaryIntegerDescription : $@convention(thin) () -> @owned String {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0xffffffffffffffff
+  %1 = struct $UInt64 (%0 : $Builtin.Int64)
+  %2 = alloc_stack $UInt64
+  store %1 to [trivial] %2 : $*UInt64
+  %4 = function_ref @binaryIntegerDescription : $@convention(method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in_guaranteed τ_0_0) -> @owned String
+  %5 = apply %4<UInt64>(%2) : $@convention(method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in_guaranteed τ_0_0) -> @owned String
+  dealloc_stack %2 : $*UInt64
+  return %5 : $String
+} // CHECK: Returns string: "18446744073709551615"

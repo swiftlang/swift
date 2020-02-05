@@ -235,6 +235,14 @@ SILValue SILPhiArgument::getSingleTerminatorOperand() const {
   return getSingleTerminatorOperandForPred(parentBlock, predBlock, getIndex());
 }
 
+TermInst *SILPhiArgument::getSingleTerminator() const {
+  auto *parentBlock = getParent();
+  auto *predBlock = parentBlock->getSinglePredecessorBlock();
+  if (!predBlock)
+    return nullptr;
+  return const_cast<SILBasicBlock *>(predBlock)->getTerminator();
+}
+
 const SILPhiArgument *BranchInst::getArgForOperand(const Operand *oper) const {
   assert(oper->getUser() == this);
   return cast<SILPhiArgument>(

@@ -199,6 +199,13 @@ ManagedValue SILGenBuilder::createGuaranteedPhiArgument(SILType type) {
   return SGF.emitManagedBorrowedArgumentWithCleanup(arg);
 }
 
+ManagedValue
+SILGenBuilder::createGuaranteedTransformingTerminatorArgument(SILType type) {
+  SILPhiArgument *arg =
+      getInsertionBB()->createPhiArgument(type, ValueOwnershipKind::Guaranteed);
+  return ManagedValue::forUnmanaged(arg);
+}
+
 ManagedValue SILGenBuilder::createAllocRef(
     SILLocation loc, SILType refType, bool objc, bool canAllocOnStack,
     ArrayRef<SILType> inputElementTypes,

@@ -2827,7 +2827,8 @@ namespace {
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
       auto locator = CS.getConstraintLocator(expr);
-      auto typeVar = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+      auto typeVar = CS.createTypeVariable(locator, TVO_CanBindToNoEscape |
+                                                    TVO_CanBindToHole);
       return LValueType::get(typeVar);
     }
 
@@ -3796,6 +3797,61 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
                                            ConstraintLocatorBuilder locator) {
   ConstraintGenerator cg(*this, nullptr);
   return cg.getTypeForPattern(pattern, locator);
+}
+
+bool ConstraintSystem::canGenerateConstraints(StmtCondition condition) {
+  for (const auto &element : condition) {
+    switch (element.getKind()) {
+    case StmtConditionElement::CK_Availability:
+    case StmtConditionElement::CK_Boolean:
+      continue;
+
+    case StmtConditionElement::CK_PatternBinding:
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool ConstraintSystem::generateConstraints(StmtCondition condition,
+                                           DeclContext *dc) {
+  // FIXME: This should be folded into constraint generation for conditions.
+  auto boolDecl = getASTContext().getBoolDecl();
+  if (!boolDecl) {
+    return true;
+  }
+
+  Type boolTy = boolDecl->getDeclaredType();
+  for (const auto &condElement : condition) {
+    switch (condElement.getKind()) {
+    case StmtConditionElement::CK_Availability:
+      // Nothing to do here.
+      continue;
+
+    case StmtConditionElement::CK_Boolean: {
+      Expr *condExpr = condElement.getBoolean();
+      setContextualType(condExpr, TypeLoc::withoutLoc(boolTy), CTP_Condition);
+
+      condExpr = generateConstraints(condExpr, dc);
+      if (!condExpr) {
+        return true;
+      }
+
+      addConstraint(ConstraintKind::Conversion,
+                    getType(condExpr),
+                    boolTy,
+                    getConstraintLocator(condExpr,
+                                         LocatorPathElt::ContextualType()));
+      continue;
+    }
+
+    case StmtConditionElement::CK_PatternBinding:
+      llvm_unreachable("unhandled statement condition");
+    }
+  }
+
+  return false;
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {

@@ -56,6 +56,8 @@ template <typename Range>
 unsigned findIndexInRange(Decl *D, const Range &Decls) {
   unsigned N = 0;
   for (auto I = Decls.begin(), E = Decls.end(); I != E; ++I) {
+    if ((*I)->isImplicit())
+      continue;
     if (*I == D)
       return N;
     ++N;
@@ -66,6 +68,8 @@ unsigned findIndexInRange(Decl *D, const Range &Decls) {
 /// Return the element at \p N in \p Decls .
 template <typename Range> Decl *getElementAt(const Range &Decls, unsigned N) {
   for (auto I = Decls.begin(), E = Decls.end(); I != E; ++I) {
+    if ((*I)->isImplicit())
+      continue;
     if (N == 0)
       return *I;
     --N;
@@ -140,6 +144,8 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       llvm_unreachable("invalid DC kind for finding equivalent DC (query)");
 
     if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
+      if (IndexStack.empty())
+        return nullptr;
       auto accessorN = IndexStack.pop_back_val();
       D = getElementAt(storage->getAllAccessors(), accessorN);
     }
@@ -202,12 +208,15 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
       ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
   registerIDERequestFunctions(Ctx->evaluator);
   registerTypeCheckerRequestFunctions(Ctx->evaluator);
+  registerSILGenRequestFunctions(Ctx->evaluator);
   ModuleDecl *M = ModuleDecl::create(Identifier(), *Ctx);
   PersistentParserState newState;
   SourceFile *newSF =
       new (*Ctx) SourceFile(*M, SourceFileKind::Library, tmpBufferID,
                             SourceFile::ImplicitModuleImportKind::None);
   newSF->enableInterfaceHash();
+  // Ensure all non-function-body tokens are hashed into the interface hash
+  Ctx->LangOpts.EnableTypeFingerprints = false;
   parseIntoSourceFileFull(*newSF, tmpBufferID, &newState);
   // Couldn't find any completion token?
   if (!newState.hasCodeCompletionDelayedDeclState())
@@ -352,6 +361,10 @@ bool swift::ide::CompletionInstance::performOperation(
   // Disable to build syntax tree because code-completion skips some portion of
   // source text. That breaks an invariant of syntax tree building.
   Invocation.getLangOptions().BuildSyntaxTree = false;
+
+  // Since caching uses the interface hash, and since per type fingerprints
+  // weaken that hash, disable them here:
+  Invocation.getLangOptions().EnableTypeFingerprints = false;
 
   // FIXME: ASTScopeLookup doesn't support code completion yet.
   Invocation.disableASTScopeLookup();

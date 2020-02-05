@@ -111,8 +111,7 @@ StringTestSuite.test("SliceConcurrentAppend") {
   expectEqual(0, joinRet1)
   expectEqual(0, joinRet2)
 
-  ret = _stdlib_thread_barrier_destroy(barrierVar!)
-  expectEqual(0, ret)
+  _stdlib_thread_barrier_destroy(barrierVar!)
 
   barrierVar!.deinitialize(count: 1)
   barrierVar!.deallocate()

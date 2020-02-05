@@ -532,8 +532,9 @@ class ContextualFailure : public FailureDiagnostic {
 public:
   ContextualFailure(ConstraintSystem &cs, Type lhs, Type rhs,
                     ConstraintLocator *locator)
-      : ContextualFailure(cs, cs.getContextualTypePurpose(), lhs, rhs,
-                          locator) {}
+      : ContextualFailure(cs,
+                          cs.getContextualTypePurpose(locator->getAnchor()),
+                          lhs, rhs, locator) {}
 
   ContextualFailure(ConstraintSystem &cs, ContextualTypePurpose purpose,
                     Type lhs, Type rhs, ConstraintLocator *locator)
@@ -652,7 +653,7 @@ protected:
   ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
 
   static Optional<Diag<Type, Type>>
-  getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+  getDiagnosticFor(ContextualTypePurpose context, Type contextualType);
 };
 
 /// Diagnose errors related to converting function type which
@@ -1930,6 +1931,29 @@ class UnableToInferProtocolLiteralType final : public FailureDiagnostic {
 public:
   UnableToInferProtocolLiteralType(ConstraintSystem &cs,
                                    ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator) {}
+
+  bool diagnoseAsError();
+};
+
+/// Diagnose an attempt to reference a top-level name shadowed by a local
+/// member e.g.
+///
+/// ```swift
+/// extension Sequence {
+///   func test() -> Int {
+///     return max(1, 2)
+///   }
+/// }
+/// ```
+///
+/// Here `max` refers to a global function `max<T>(_: T, _: T)` in `Swift`
+/// module and can only be accessed by adding `Swift.` to it, because `Sequence`
+/// has a member named `max` which accepts a single argument.
+class MissingQuialifierInMemberRefFailure final : public FailureDiagnostic {
+public:
+  MissingQuialifierInMemberRefFailure(ConstraintSystem &cs,
+                                      ConstraintLocator *locator)
       : FailureDiagnostic(cs, locator) {}
 
   bool diagnoseAsError();

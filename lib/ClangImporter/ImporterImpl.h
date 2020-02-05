@@ -818,7 +818,10 @@ public:
   void importInheritedConstructors(const clang::ObjCInterfaceDecl *curObjCClass,
                                    const ClassDecl *classDecl,
                                    SmallVectorImpl<Decl *> &newMembers);
-  
+  void importMirroredProtocolMembers(const clang::ObjCContainerDecl *decl,
+                                     DeclContext *dc, Optional<DeclBaseName> name,
+                                     SmallVectorImpl<Decl *> &members);
+
   /// Utility function for building simple generic signatures.
   GenericSignature buildGenericSignature(GenericParamList *genericParams,
                                           DeclContext *dc);
@@ -1298,6 +1301,13 @@ public:
   /// \returns \c true if the \c visitor ever returns \c true, \c
   /// false otherwise.
   bool forEachLookupTable(llvm::function_ref<bool(SwiftLookupTable &table)> fn);
+
+  /// Determine whether the given Clang entry is visible.
+  ///
+  /// FIXME: this is an elaborate hack to badly reflect Clang's
+  /// submodule visibility into Swift.
+  bool isVisibleClangEntry(const clang::NamedDecl *clangDecl);
+  bool isVisibleClangEntry(SwiftLookupTable::SingleEntry entry);
 
   /// Look for namespace-scope values with the given name in the given
   /// Swift lookup table.

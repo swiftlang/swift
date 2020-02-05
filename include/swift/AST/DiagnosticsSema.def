@@ -338,6 +338,10 @@ ERROR(cannot_convert_initializer_value,none,
       "cannot convert value of type %0 to specified type %1", (Type,Type))
 ERROR(cannot_convert_initializer_value_protocol,none,
       "value of type %0 does not conform to specified type %1", (Type,Type))
+ERROR(cannot_convert_initializer_value_anyobject,none,
+      "value of type %0 expected to be instance of class or "
+      "class-constrained type",
+      (Type, Type))
 ERROR(cannot_convert_initializer_value_nil,none,
       "'nil' cannot initialize specified type %0", (Type))
 
@@ -346,6 +350,10 @@ ERROR(cannot_convert_to_return_type,none,
       (Type,Type))
 ERROR(cannot_convert_to_return_type_protocol,none,
       "return expression of type %0 does not conform to %1", (Type,Type))
+ERROR(cannot_convert_return_type_to_anyobject,none,
+      "return expression of type %0 expected to be an instance of "
+      "a class or class-constrained type",
+      (Type, Type))
 ERROR(cannot_convert_to_return_type_nil,none,
       "'nil' is incompatible with return type %0", (Type))
 
@@ -440,7 +448,10 @@ NOTE(candidate_performs_illegal_ephemeral_conv,none,
 
 ERROR(cannot_convert_argument_value_protocol,none,
       "argument type %0 does not conform to expected type %1", (Type, Type))
-
+ERROR(cannot_convert_argument_value_anyobject,none,
+      "argument type %0 expected to be an instance of "
+      "a class or class-constrained type",
+      (Type, Type))
 ERROR(cannot_convert_argument_value_nil,none,
       "'nil' is not compatible with expected argument type %0", (Type))
 
@@ -535,6 +546,10 @@ NOTE(assign_protocol_conformance_fix_it,none,
      (Type, DescriptiveDeclKind, Type))
 ERROR(cannot_convert_assign_protocol,none,
       "value of type %0 does not conform to %1 in assignment",
+      (Type, Type))
+ERROR(cannot_convert_assign_anyobject,none,
+      "value of type %0 expected to be an instance of "
+      "a class or class-constrained type in assignment",
       (Type, Type))
 ERROR(cannot_convert_assign_nil,none,
       "'nil' cannot be assigned to type %0", (Type))
@@ -1138,14 +1153,12 @@ NOTE(candidate_expected_different_labels,none,
      "incorrect labels for candidate (have: '%0', expected: '%1')",
      (StringRef, StringRef))
 
+ERROR(member_shadows_function,none,
+      "use of %0 refers to %1 rather than %2 %3",
+      (DeclNameRef, DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
 ERROR(member_shadows_global_function,none,
-      "use of %0 refers to %1 %2 rather than %3 %4 in %5 %6",
-      (DeclNameRef, DescriptiveDeclKind, DeclName, DescriptiveDeclKind,
-       DeclName, DescriptiveDeclKind, DeclName))
-ERROR(member_shadows_global_function_near_match,none,
-      "use of %0 nearly matches %3 %4 in %5 %6 rather than %1 %2",
-      (DeclNameRef, DescriptiveDeclKind, DeclName, DescriptiveDeclKind,
-       DeclName, DescriptiveDeclKind, DeclName))
+      "use of %0 refers to %1 rather than %2 %3 in module %4",
+      (DeclNameRef, DescriptiveDeclKind, DescriptiveDeclKind, DeclName, DeclName))
 
 ERROR(instance_member_use_on_type,none,
       "instance member %1 cannot be used on type %0; "
@@ -1583,8 +1596,12 @@ WARNING(optional_ambiguous_case_ref,none,
         (StringRef, StringRef, StringRef))
 NOTE(optional_fixit_ambiguous_case_ref,none,
      "explicitly specify 'Optional' to silence this warning", ())
+NOTE(optional_fixit_ambiguous_case_ref_switch,none,
+     "use 'nil' to silence this warning", ())
 NOTE(type_fixit_optional_ambiguous_case_ref,none,
      "use '%0.%1' instead", (StringRef, StringRef))
+NOTE(type_fixit_optional_ambiguous_case_ref_switch,none,
+     "use '%0' instead", (StringRef))
 
 ERROR(nscoding_unstable_mangled_name,none,
       "%select{private|fileprivate|nested|local}0 class %1 has an "
@@ -3162,7 +3179,10 @@ NOTE(note_explicitly_compare_cftypeid,none,
 
 ERROR(optional_used_as_boolean,none,
      "optional type %0 cannot be used as a boolean; "
-     "test for '!= nil' instead", (Type))
+     "test for '%select{!|=}1= nil' instead", (Type, bool))
+ERROR(integer_used_as_boolean,none,
+     "type %0 cannot be used as a boolean; "
+     "test for '%select{!|=}1= 0' instead", (Type, bool))
 
 ERROR(interpolation_missing_proto,none,
       "string interpolation requires the protocol 'ExpressibleByStringInterpolation' to be defined",
@@ -3177,6 +3197,9 @@ ERROR(object_literal_broken_proto,none,
 ERROR(discard_expr_outside_of_assignment,none,
       "'_' can only appear in a pattern or on the left side of an assignment",
       ())
+WARNING(discard_expr_void_result_redundant, none,
+        "using '_' to ignore the result of a Void-returning function "
+        "is redundant", ())
 ERROR(collection_literal_heterogeneous,none,
       "heterogeneous collection literal could only be inferred to %0; add"
       " explicit type annotation if this is intentional", (Type))

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend %s -parse-as-library -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -parse-as-library -enable-spec-devirt -O -emit-sil | %FileCheck %s
 // RUN: %target-swift-frontend %s -parse-as-library -Osize -emit-sil
 //
 // Test speculative devirtualization.

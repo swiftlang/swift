@@ -428,7 +428,19 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableFineGrainedDependencies =
       Args.hasFlag(options::OPT_enable_fine_grained_dependencies,
-                   options::OPT_disable_fine_grained_dependencies, false);
+                   options::OPT_disable_fine_grained_dependencies,
+                   Opts.EnableFineGrainedDependencies);
+  Opts.EnableTypeFingerprints =
+      Args.hasFlag(options::OPT_enable_type_fingerprints,
+                   options::OPT_disable_type_fingerprints,
+                   LangOptions().EnableTypeFingerprints);
+
+  if (!Opts.EnableFineGrainedDependencies && Opts.EnableTypeFingerprints) {
+    Diags.diagnose(
+        SourceLoc(),
+        diag::warning_type_fingerprints_require_fine_grained_dependencies);
+    Opts.EnableTypeFingerprints = false;
+  }
 
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
@@ -958,6 +970,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
+  Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   Opts.CrossModuleOptimization |= Args.hasArg(OPT_CrossModuleOptimization);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);

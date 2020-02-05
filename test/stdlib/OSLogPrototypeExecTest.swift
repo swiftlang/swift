@@ -405,30 +405,6 @@ InterpolationTestSuite.test("integer with privacy and formatting") {
   })
 }
 
-InterpolationTestSuite.test("integer with privacy and formatting") {
-  let addr = 0x7afebabe
-  _checkFormatStringAndBuffer(
-    "Access to invalid address: \(addr, format: .hex, privacy: .private)",
-    with: { (formatString, buffer) in
-      expectEqual(
-        "Access to invalid address: %{private}\(intPrefix)x",
-        formatString)
-
-      let bufferChecker = OSLogBufferChecker(buffer)
-      bufferChecker.checkSummaryBytes(
-        argumentCount: 1,
-        hasPrivate: true,
-        hasNonScalar: false)
-
-      bufferChecker.checkArguments({
-        bufferChecker.checkInt(
-            startIndex: $0,
-            flag: .privateFlag,
-            expectedInt: addr)
-      })
-  })
-}
-
 InterpolationTestSuite.test("test multiple arguments") {
   let filePerms = 0o777
   let pid = 122225

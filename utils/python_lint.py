@@ -84,7 +84,7 @@ def lint(args, verbose=False):
         if verbose:
             print(_INSTALL_FLAKE8_MESSAGE)
 
-        return 0
+        return 1
 
     return subprocess.call(
         [sys.executable, '-m', 'flake8'] + args,

@@ -18,10 +18,10 @@ import os.path
 import platform
 import sys
 
+from build_swift.build_swift import cache_utils
 from build_swift.build_swift.wrappers import xcrun
 
 from . import product
-from .. import cache_util
 from .. import shell
 
 
@@ -44,7 +44,7 @@ class NinjaBuilder(product.ProductBuilder):
         self.args = args
         self.toolchain = toolchain
 
-    @cache_util.reify
+    @cache_utils.reify
     def ninja_bin_path(self):
         return os.path.join(self.build_dir, 'ninja')
 

@@ -467,6 +467,11 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine *Diags,
                         StringRef OutputFilename,
                         UnifiedStatsReporter *Stats) {
 #ifndef NDEBUG
+// FIXME: Some bots are failing. See: rdar://54708850
+//#define DEBUG_VERIFY_GENERATED_CODE
+#endif
+
+#ifdef DEBUG_VERIFY_GENERATED_CODE
   // To check that we only skip generating code when it would have no effect, in
   // assertion builds we still generate the code, but write it into a temporary
   // file that we compare to the original file.
@@ -499,7 +504,7 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine *Diags,
         !Opts.PrintInlineTree &&
         !needsRecompile(OutputFilename, HashData, HashGlobal, DiagMutex)) {
       // The llvm IR did not change. We don't need to re-create the object file.
-#ifdef NDEBUG
+#ifndef DEBUG_VERIFY_GENERATED_CODE
       return false;
 #else
       // ...but we're in an asserts build, so we want to check that assumption.
@@ -603,8 +608,7 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine *Diags,
     if (DiagMutex)
       DiagMutex->unlock();
   }
-#if 0
-#ifndef NDEBUG
+#ifdef DEBUG_VERIFY_GENERATED_CODE
   if (!OriginalOutputFilename.empty()) {
     // We're done changing the file; make sure it's saved before we compare.
     RawOS->close();
@@ -639,7 +643,6 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine *Diags,
       llvm_unreachable("one of these should be a temporary file");
     }
   }
-#endif
 #endif
 
   return false;

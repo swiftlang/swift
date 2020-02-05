@@ -798,8 +798,7 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 
   ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, loader);
-  auto lazyMembers = FirstDeclAndLazyMembers.getInt() | LazyMembers::Present;
-  FirstDeclAndLazyMembers.setInt(LazyMembers(lazyMembers));
+  FirstDeclAndLazyMembers.setInt(true);
   contextInfo->memberData = contextData;
 
   ++NumLazyIterableDeclContexts;
@@ -839,8 +838,10 @@ void IterableDeclContext::loadAllMembers() const {
     // members to this context, this call is important for recording the
     // dependency edge.
     auto mutableThis = const_cast<IterableDeclContext *>(this);
-    auto members = evaluateOrDefault(
-        ctx.evaluator, ParseMembersRequest{mutableThis}, ArrayRef<Decl*>());
+    auto members =
+        evaluateOrDefault(ctx.evaluator, ParseMembersRequest{mutableThis},
+                          FingerprintAndMembers())
+            .members;
 
     // If we haven't already done so, add these members to this context.
     if (!AddedParsedMembers) {
@@ -855,12 +856,11 @@ void IterableDeclContext::loadAllMembers() const {
     return;
 
   // Don't try to load all members re-entrant-ly.
-  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
-    /*lazyLoader=*/nullptr);
-  auto lazyMembers = FirstDeclAndLazyMembers.getInt() & ~LazyMembers::Present;
-  FirstDeclAndLazyMembers.setInt(LazyMembers(lazyMembers));
+  FirstDeclAndLazyMembers.setInt(false);
 
   const Decl *container = getDecl();
+  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
+    /*lazyLoader=*/nullptr);
   contextInfo->loader->loadAllMembers(const_cast<Decl *>(container),
                                       contextInfo->memberData);
 
@@ -899,6 +899,21 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
         static_cast<const IterableDeclContext*>(cast<ID##Decl>(D)));
 #include "swift/AST/DeclNodes.def"
   }
+}
+
+Optional<std::string> IterableDeclContext::getBodyFingerprint() const {
+  // Only makes sense for contexts in a source file
+  if (!getDecl()->getDeclContext()->getParentSourceFile())
+    return None;
+  auto mutableThis = const_cast<IterableDeclContext *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ParseMembersRequest{mutableThis},
+                           FingerprintAndMembers())
+      .fingerprint;
+}
+
+bool IterableDeclContext::areDependenciesUsingTokenHashesForTypeBodies() const {
+  return getASTContext().LangOpts.EnableTypeFingerprints;
 }
 
 /// Return the DeclContext to compare when checking private access in

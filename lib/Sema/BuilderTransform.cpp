@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "MiscDiagnostics.h"
 #include "SolutionResult.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -243,7 +244,15 @@ protected:
       expressions.push_back(buildVarRef(childVar, childVar->getLoc()));
     };
 
-    for (const auto &node : braceStmt->getElements()) {
+    for (auto node : braceStmt->getElements()) {
+      // Implicit returns in single-expression function bodies are treated
+      // as the expression.
+      if (auto returnStmt =
+              dyn_cast_or_null<ReturnStmt>(node.dyn_cast<Stmt *>())) {
+        assert(returnStmt->isImplicit());
+        node = returnStmt->getResult();
+      }
+
       if (auto stmt = node.dyn_cast<Stmt *>()) {
         addChild(visit(stmt));
         continue;
@@ -290,14 +299,9 @@ protected:
   }
 
   VarDecl *visitReturnStmt(ReturnStmt *stmt) {
-    // Allow implicit returns due to 'return' elision.
-    if (!stmt->isImplicit() || !stmt->hasResult()) {
-      if (!unhandledNode)
-        unhandledNode = stmt;
-      return nullptr;
-    }
-
-    return captureExpr(stmt->getResult(), /*oneWay=*/true);
+    if (!unhandledNode)
+      unhandledNode = stmt;
+    return nullptr;
   }
 
   VarDecl *visitDoStmt(DoStmt *doStmt) {
@@ -323,18 +327,11 @@ protected:
   CONTROL_FLOW_STMT(Yield)
   CONTROL_FLOW_STMT(Defer)
 
-  static Expr *getTrivialBooleanCondition(StmtCondition condition) {
-    if (condition.size() != 1)
-      return nullptr;
-
-    return condition.front().getBooleanOrNull();
-  }
-
   static bool isBuildableIfChainRecursive(IfStmt *ifStmt,
                                           unsigned &numPayloads,
                                           bool &isOptional) {
-    // The conditional must be trivial.
-    if (!getTrivialBooleanCondition(ifStmt->getCond()))
+    // Check whether we can handle the conditional.
+    if (!ConstraintSystem::canGenerateConstraints(ifStmt->getCond()))
       return false;
 
     // The 'then' clause contributes a payload.
@@ -460,26 +457,11 @@ protected:
           payloadIndex + 1, numPayloads, isOptional);
     }
 
-    // Generate constraints for the various subexpressions.
-    auto condExpr = getTrivialBooleanCondition(ifStmt->getCond());
-    assert(condExpr && "Cannot get here without a trivial Boolean condition");
-    condExpr = cs->generateConstraints(condExpr, dc);
-    if (!condExpr) {
+    // Generate constraints for the conditions.
+    if (cs->generateConstraints(ifStmt->getCond(), dc)) {
       hadError = true;
       return nullptr;
     }
-
-    // Condition must convert to Bool.
-    // FIXME: This should be folded into constraint generation for conditions.
-    auto boolDecl = ctx.getBoolDecl();
-    if (!boolDecl) {
-      hadError = true;
-      return nullptr;
-    }
-    cs->addConstraint(ConstraintKind::Conversion,
-                      cs->getType(condExpr),
-                      boolDecl->getDeclaredType(),
-                      cs->getConstraintLocator(condExpr));
 
     // The operand should have optional type if we had optional results,
     // so we just need to call `buildIf` now, since we're at the top level.
@@ -645,7 +627,7 @@ class BuilderClosureRewriter
   const Solution &solution;
   DeclContext *dc;
   AppliedBuilderTransform builderTransform;
-  std::function<Expr *(Expr *)> rewriteExpr;
+  std::function<Expr *(Expr *)> rewriteExprFn;
   std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType;
 
   /// Retrieve the temporary variable that will be used to capture the
@@ -714,9 +696,9 @@ private:
       declRef->setType(LValueType::get(temporaryVar->getType()));
 
       // Load the right-hand side if needed.
-      if (finalCapturedExpr->getType()->is<LValueType>()) {
-        auto &cs = solution.getConstraintSystem();
-        finalCapturedExpr = cs.addImplicitLoadExpr(finalCapturedExpr);
+      if (finalCapturedExpr->getType()->hasLValueType()) {
+        finalCapturedExpr =
+            TypeChecker::addImplicitLoadExpr(ctx, finalCapturedExpr);
       }
 
       auto assign = new (ctx) AssignExpr(
@@ -747,6 +729,13 @@ private:
     elements.push_back(pbd);
   }
 
+  Expr *rewriteExpr(Expr *expr) {
+    Expr *result = rewriteExprFn(expr);
+    if (result)
+      performSyntacticExprDiagnostics(expr, dc, /*isExprStmt=*/false);
+    return result;
+  }
+
 public:
   BuilderClosureRewriter(
       const Solution &solution,
@@ -756,7 +745,7 @@ public:
       std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType
     ) : ctx(solution.getConstraintSystem().getASTContext()),
         solution(solution), dc(dc), builderTransform(builderTransform),
-        rewriteExpr(rewriteExpr),
+        rewriteExprFn(rewriteExpr),
         coerceToType(coerceToType){ }
 
   Stmt *visitBraceStmt(BraceStmt *braceStmt, FunctionBuilderTarget target,
@@ -842,19 +831,30 @@ public:
 
   Stmt *visitIfStmt(IfStmt *ifStmt, FunctionBuilderTarget target) {
     // Rewrite the condition.
-    // FIXME: We should handle the whole condition within the type system.
-    auto cond = ifStmt->getCond();
-    auto condExpr = cond.front().getBoolean();
-    auto finalCondExpr = rewriteExpr(condExpr);
+    auto condition = ifStmt->getCond();
+    for (auto &condElement : condition) {
+      switch (condElement.getKind()) {
+      case StmtConditionElement::CK_Availability:
+        continue;
 
-    // Load the condition if needed.
-    if (finalCondExpr->getType()->is<LValueType>()) {
-      auto &cs = solution.getConstraintSystem();
-      finalCondExpr = cs.addImplicitLoadExpr(finalCondExpr);
+      case StmtConditionElement::CK_Boolean: {
+        auto condExpr = condElement.getBoolean();
+        auto finalCondExpr = rewriteExpr(condExpr);
+
+        // Load the condition if needed.
+        if (finalCondExpr->getType()->hasLValueType()) {
+          finalCondExpr = TypeChecker::addImplicitLoadExpr(ctx, finalCondExpr);
+        }
+
+        condElement.setBoolean(finalCondExpr);
+        continue;
+      }
+
+      case StmtConditionElement::CK_PatternBinding:
+        llvm_unreachable("unhandled statement condition");
+      }
     }
-
-    cond.front().setBoolean(finalCondExpr);
-    ifStmt->setCond(cond);
+    ifStmt->setCond(condition);
 
     assert(target.kind == FunctionBuilderTarget::TemporaryVar);
     auto temporaryVar = target.captured.first;
@@ -1043,7 +1043,6 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   ConstraintKind resultConstraintKind = ConstraintKind::Conversion;
   if (auto opaque = resultContextType->getAs<OpaqueTypeArchetypeType>()) {
     if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(func)) {
-      options |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
       resultConstraintKind = ConstraintKind::OpaqueUnderlyingType;
     }
   }
@@ -1110,11 +1109,18 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   }
 
   // Apply the solution to the function body.
-  return cast_or_null<BraceStmt>(
-     cs.applySolutionToBody(solutions.front(), func));
+  if (auto result = cs.applySolution(
+          solutions.front(),
+          SolutionApplicationTarget(func),
+          /*performingDiagnostics=*/false)) {
+    return result->getFunctionBody();
+  }
+
+  return nullptr;
 }
 
-ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
+Optional<ConstraintSystem::TypeMatchResult>
+ConstraintSystem::matchFunctionBuilder(
     AnyFunctionRef fn, Type builderType, Type bodyResultType,
     ConstraintKind bodyResultConstraintKind,
     ConstraintLocator *calleeLocator, ConstraintLocatorBuilder locator) {
@@ -1138,7 +1144,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
   case FunctionBuilderBodyPreCheck::HasReturnStmt:
     // If the body has a return statement, suppress the transform but
     // continue solving the constraint system.
-    return getTypeMatchSuccess();
+    return None;
   }
 
   // Check the form of this body to see if we can apply the
@@ -1284,12 +1290,6 @@ public:
 llvm::Expected<FunctionBuilderBodyPreCheck>
 PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
                                          AnyFunctionRef fn) const {
-  // Single-expression closures should already have been pre-checked.
-  if (auto closure = fn.getAbstractClosureExpr()) {
-    if (closure->hasSingleExpressionBody())
-      return FunctionBuilderBodyPreCheck::Okay;
-  }
-
   return PreCheckFunctionBuilderApplication(fn, false).run();
 }
 

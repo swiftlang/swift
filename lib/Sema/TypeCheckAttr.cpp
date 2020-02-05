@@ -3564,13 +3564,13 @@ resolveDifferentiableAttrOriginalFunction(DifferentiableAttr *attr) {
 }
 
 /// Given a `@differentiable` attribute, attempts to resolve the derivative
-/// generic environment. The derivative generic environment is returned as
-/// `derivativeGenEnv`. On error, emits diagnostic, assigns `nullptr` to
-/// `derivativeGenEnv`, and returns true.
-bool resolveDifferentiableAttrDerivativeGenericEnvironment(
+/// generic signature. The derivative generic signature is returned as
+/// `derivativeGenSig`. On error, emits diagnostic, assigns `nullptr` to
+/// `derivativeGenSig`, and returns true.
+bool resolveDifferentiableAttrDerivativeGenericSignature(
     DifferentiableAttr *attr, AbstractFunctionDecl *original,
-    GenericEnvironment *&derivativeGenEnv) {
-  derivativeGenEnv = nullptr;
+    GenericSignature &derivativeGenSig) {
+  derivativeGenSig = nullptr;
 
   auto &ctx = original->getASTContext();
   auto &diags = ctx.Diags;
@@ -3584,7 +3584,7 @@ bool resolveDifferentiableAttrDerivativeGenericEnvironment(
   // - If the `@differentiable` attribute has a `where` clause, use it to
   //   compute the derivative generic signature.
   // - Otherwise, use the original function's generic signature by default.
-  auto derivativeGenSig = original->getGenericSignature();
+  derivativeGenSig = original->getGenericSignature();
 
   // Handle the `where` clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute
@@ -3663,10 +3663,9 @@ bool resolveDifferentiableAttrDerivativeGenericEnvironment(
       return true;
     }
 
-    // Compute generic signature and environment for derivative functions.
+    // Compute generic signature for derivative functions.
     derivativeGenSig = std::move(builder).computeGenericSignature(
         attr->getLocation(), /*allowConcreteGenericParams=*/true);
-    derivativeGenEnv = derivativeGenSig->getGenericEnvironment();
   }
 
   // Set the resolved derivative generic signature in the attribute.
@@ -3893,14 +3892,14 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
     }
   }
 
-  // Resolve the derivative generic environment.
-  GenericEnvironment *derivativeGenEnv = nullptr;
-  if (resolveDifferentiableAttrDerivativeGenericEnvironment(attr, original,
-                                                            derivativeGenEnv))
+  // Resolve the derivative generic signature.
+  GenericSignature derivativeGenSig = nullptr;
+  if (resolveDifferentiableAttrDerivativeGenericSignature(attr, original,
+                                                          derivativeGenSig))
     return nullptr;
-  GenericSignature derivativeGenSig;
-  if (derivativeGenEnv)
-    derivativeGenSig = derivativeGenEnv->getGenericSignature();
+  GenericEnvironment *derivativeGenEnv = nullptr;
+  if (derivativeGenSig)
+    derivativeGenEnv = derivativeGenSig->getGenericEnvironment();
 
   // Compute the derivative function type.
   auto derivativeFnTy = originalFnTy;

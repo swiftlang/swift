@@ -30,8 +30,8 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
     // emits unreachable if there is no source level return.
     NeedsReturn = (fnConv.funcTy->getNumResults() != 0);
     for (auto directResult : fnConv.getDirectSILResults()) {
-      SILType resultType =
-          F.mapTypeIntoContext(fnConv.getSILType(directResult));
+      SILType resultType = F.getLoweredType(
+          F.mapTypeIntoContext(fnConv.getSILType(directResult)));
       epilogBB->createPhiArgument(resultType, ValueOwnershipKind::Owned);
     }
   }

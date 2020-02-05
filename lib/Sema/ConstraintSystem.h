@@ -787,6 +787,15 @@ using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
 using OpenedTypeMap =
     llvm::DenseMap<GenericTypeParamType *, TypeVariableType *>;
 
+/// Describes contextual type information about a particular expression
+/// within a constraint system.
+struct ContextualTypeInfo {
+  TypeLoc typeLoc;
+  ContextualTypePurpose purpose;
+
+  Type getType() const { return typeLoc.getType(); }
+};
+
 /// A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -848,6 +857,9 @@ public:
 
   /// The node -> type mappings introduced by this solution.
   llvm::MapVector<TypedNode, Type> addedNodeTypes;
+
+  /// Contextual types introduced by this solution.
+  std::vector<std::pair<const Expr *, ContextualTypeInfo>> contextualTypes;
 
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
@@ -1000,10 +1012,6 @@ enum class ConstraintSystemFlags {
   /// expression, and doesn't dig into its subexpressions.
   ReusePrecheckedType = 0x20,
   
-  /// If set, the top-level expression may be able to provide an underlying
-  /// type for the contextual opaque archetype.
-  UnderlyingTypeForOpaqueReturnType = 0x40,
-
   /// FIXME(diagnostics): Once diagnostics are completely switched to new
   /// framework, this flag could be removed as obsolete.
   ///
@@ -1137,29 +1145,156 @@ class SolutionApplicationTarget {
   } kind;
 
   union {
-    Expr *expression;
-    AnyFunctionRef function;
+    struct {
+      /// The expression being type-checked.
+      Expr *expression;
+
+      /// The declaration context in which the expression is being
+      /// type-checked.
+      DeclContext *dc;
+
+      /// The purpose of the contextual type.
+      ContextualTypePurpose contextualPurpose;
+
+      /// The type to which the expression should be converted.
+      TypeLoc convertType;
+
+      /// When initializing a pattern from the expression, this is the
+      /// pattern.
+      Pattern *pattern = nullptr;
+
+      /// Whether the expression result will be discarded at the end.
+      bool isDiscarded;
+    } expression;
+
+    struct {
+      AnyFunctionRef function;
+      BraceStmt *body;
+    } function;
   };
 
 public:
-  SolutionApplicationTarget(Expr *expr) {
-    kind = Kind::expression;
-    expression = expr;
+  SolutionApplicationTarget(Expr *expr, DeclContext *dc,
+                            ContextualTypePurpose contextualPurpose,
+                            Type convertType, bool isDiscarded)
+      : SolutionApplicationTarget(expr, dc, contextualPurpose,
+                                  TypeLoc::withoutLoc(convertType),
+                                  isDiscarded) { }
+
+  SolutionApplicationTarget(Expr *expr, DeclContext *dc,
+                            ContextualTypePurpose contextualPurpose,
+                            TypeLoc convertType, bool isDiscarded);
+
+  SolutionApplicationTarget(AnyFunctionRef fn)
+      : SolutionApplicationTarget(fn, fn.getBody()) { }
+
+  SolutionApplicationTarget(AnyFunctionRef fn, BraceStmt *body) {
+    kind = Kind::function;
+    function.function = fn;
+    function.body = body;
   }
 
-  SolutionApplicationTarget(AnyFunctionRef fn) {
-    kind = Kind::function;
-    function = fn;
-  }
+  /// Form a target for the initialization of a pattern from an expression.
+  static SolutionApplicationTarget forInitialization(
+      Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern);
 
   Expr *getAsExpr() const {
     switch (kind) {
     case Kind::expression:
-      return expression;
+      return expression.expression;
 
     case Kind::function:
       return nullptr;
     }
+  }
+
+  DeclContext *getDeclContext() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression.dc;
+
+    case Kind::function:
+      return function.function.getAsDeclContext();
+    }
+  }
+
+  ContextualTypePurpose getExprContextualTypePurpose() const {
+    assert(kind == Kind::expression);
+    return expression.contextualPurpose;
+  }
+
+  Type getExprContextualType() const {
+    return getExprContextualTypeLoc().getType();
+  }
+
+  TypeLoc getExprContextualTypeLoc() const {
+    assert(kind == Kind::expression);
+
+    // For an @autoclosure parameter, the conversion type is
+    // the result of the function type.
+    if (FunctionType *autoclosureParamType = getAsAutoclosureParamType()) {
+      return TypeLoc(expression.convertType.getTypeRepr(),
+                     autoclosureParamType->getResult());
+    }
+
+    return expression.convertType;
+  }
+
+  /// Retrieve the type to which an expression should be converted, or
+  /// a NULL type if no conversion constraint should be generated.
+  Type getExprConversionType() const {
+    if (contextualTypeIsOnlyAHint())
+      return Type();
+    return getExprContextualType();
+  }
+
+  /// Returns the autoclosure parameter type, or \c nullptr if the
+  /// expression has a different kind of context.
+  FunctionType *getAsAutoclosureParamType() const {
+    assert(kind == Kind::expression);
+    if (expression.contextualPurpose == CTP_AutoclosureDefaultParameter)
+      return expression.convertType.getType()->castTo<FunctionType>();
+    return nullptr;
+  }
+
+  void setExprConversionType(Type type) {
+    assert(kind == Kind::expression);
+    expression.convertType = TypeLoc::withoutLoc(type);
+  }
+
+  void setExprConversionTypeLoc(TypeLoc type) {
+    assert(kind == Kind::expression);
+    expression.convertType = type;
+  }
+
+  /// For a pattern initialization target, retrieve the pattern.
+  Pattern *getInitializationPattern() const {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_Initialization);
+    return expression.pattern;
+  }
+
+  /// Whether this is an initialization for an Optional.Some pattern.
+  bool isOptionalSomePatternInit() const {
+    return kind == Kind::expression &&
+        expression.contextualPurpose == CTP_Initialization &&
+        isa<OptionalSomePattern>(expression.pattern);
+  }
+
+  /// Whether this context infers an opaque return type.
+  bool infersOpaqueReturnType() const;
+
+  /// Whether the contextual type is only a hint, rather than a type
+  bool contextualTypeIsOnlyAHint() const;
+
+  bool isDiscardedExpr() const {
+    assert(kind == Kind::expression);
+    return expression.isDiscarded;
+  }
+
+  void setExpr(Expr *expr) {
+    assert(kind == Kind::expression);
+    expression.expression = expr;
   }
 
   Optional<AnyFunctionRef> getAsFunction() const {
@@ -1168,12 +1303,44 @@ public:
       return None;
 
     case Kind::function:
-      return function;
+      return function.function;
+    }
+  }
+
+  BraceStmt *getFunctionBody() const {
+    assert(kind == Kind::function);
+    return function.body;
+  }
+
+  void setFunctionBody(BraceStmt *stmt) {
+    assert(kind == Kind::function);
+    function.body = stmt;
+  }
+
+  /// Retrieve the source range of the target.
+  SourceRange getSourceRange() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression.expression->getSourceRange();
+
+    case Kind::function:
+      return function.body->getSourceRange();
+    }
+  }
+
+  /// Retrieve the source location for the target.
+  SourceLoc getLoc() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression.expression->getLoc();
+
+    case Kind::function:
+      return function.function.getLoc();
     }
   }
 
   /// Walk the contents of the application target.
-  llvm::PointerUnion<Expr *, Stmt *> walk(ASTWalker &walker);
+  SolutionApplicationTarget walk(ASTWalker &walker);
 };
 
 enum class ConstraintSystemPhase {
@@ -1300,17 +1467,14 @@ private:
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
       KeyPathComponentTypes;
 
+  /// Contextual type information for expressions that are part of this
+  /// constraint system.
+  llvm::MapVector<const Expr *, ContextualTypeInfo> contextualTypes;
+
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
     OpenedParameterTypes;
 
-  /// There can only be a single contextual type on the root of the expression
-  /// being checked.  If specified, this holds its type along with the base
-  /// expression, and the purpose of it.
-  TypeLoc contextualType;
-  Expr *contextualTypeNode = nullptr;
-  ContextualTypePurpose contextualTypePurpose = CTP_Unused;
-  
   /// The set of constraint restrictions used to reach the
   /// current constraint system.
   ///
@@ -1880,6 +2044,9 @@ public:
     /// The length of \c ClosureTypes.
     unsigned numInferredClosureTypes;
 
+    /// The length of \c contextualTypes.
+    unsigned numContextualTypes;
+
     /// The previous score.
     Score PreviousScore;
 
@@ -2167,33 +2334,42 @@ public:
     return E;
   }
 
-  void setContextualType(Expr *E, TypeLoc T, ContextualTypePurpose purpose) {
-    assert(E != nullptr && "Expected non-null expression!");
-    contextualTypeNode = E;
-    contextualType = T;
-    contextualTypePurpose = purpose;
+  void setContextualType(
+      const Expr *expr, TypeLoc T, ContextualTypePurpose purpose) {
+    assert(expr != nullptr && "Expected non-null expression!");
+    assert(contextualTypes.count(expr) == 0 &&
+           "Already set this contextual type");
+    contextualTypes[expr] = { T, purpose };
   }
 
-  Type getContextualType(Expr *E) const {
-    assert(E != nullptr && "Expected non-null expression!");
-    return E == contextualTypeNode ? contextualType.getType() : Type();
-  }
-  Type getContextualType() const {
-    return contextualType.getType();
-  }
-
-  TypeLoc getContextualTypeLoc() const {
-    return contextualType;
+  Optional<ContextualTypeInfo> getContextualTypeInfo(const Expr *expr) const {
+    auto known = contextualTypes.find(expr);
+    if (known == contextualTypes.end())
+      return None;
+    return known->second;
   }
 
-  const Expr *getContextualTypeNode() const {
-    return contextualTypeNode;
+  Type getContextualType(const Expr *expr) const {
+    auto result = getContextualTypeInfo(expr);
+    if (result)
+      return result->typeLoc.getType();
+    return Type();
   }
 
-  ContextualTypePurpose getContextualTypePurpose() const {
-    return contextualTypePurpose;
+  TypeLoc getContextualTypeLoc(const Expr *expr) const {
+    auto result = getContextualTypeInfo(expr);
+    if (result)
+      return result->typeLoc;
+    return TypeLoc();
   }
-  
+
+  ContextualTypePurpose getContextualTypePurpose(const Expr *expr) const {
+    auto result = getContextualTypeInfo(expr);
+    if (result)
+      return result->purpose;
+    return CTP_Unused;
+  }
+
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued.
   ConstraintLocator *
@@ -2340,6 +2516,7 @@ public:
   bool recordFix(ConstraintFix *fix, unsigned impact = 1);
 
   void recordPotentialHole(TypeVariableType *typeVar);
+  void recordPotentialHole(FunctionType *fnType);
 
   /// Determine whether constraint system already has a fix recorded
   /// for a particular location.
@@ -2391,6 +2568,11 @@ public:
   /// Add a requirement as a constraint to the constraint system.
   void addConstraint(Requirement req, ConstraintLocatorBuilder locator,
                      bool isFavored = false);
+
+  /// Add the appropriate constraint for a contextual conversion.
+  void addContextualConversionConstraint(
+      Expr *expr, Type conversionType, ContextualTypePurpose purpose,
+      bool isOpaqueReturnType);
 
   /// Add a "join" constraint between a set of types, producing the common
   /// supertype.
@@ -3057,13 +3239,23 @@ public:
   /// Generate constraints for the given (unchecked) expression.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraints(Expr *E, DeclContext *dc = nullptr);
+  Expr *generateConstraints(Expr *E, DeclContext *dc);
 
   /// Generate constraints for binding the given pattern to the
   /// value of the given expression.
   ///
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator);
+
+  /// Determines whether we can generate constraints for this statement
+  /// condition.
+  static bool canGenerateConstraints(StmtCondition condition);
+
+  /// Generate constraints for a statement condition.
+  ///
+  /// \returns true if there was an error in constraint generation, false
+  /// if generation succeeded.
+  bool generateConstraints(StmtCondition condition, DeclContext *dc);
 
   /// Generate constraints for a given set of overload choices.
   ///
@@ -3582,7 +3774,10 @@ public:
   void simplifyDisjunctionChoice(Constraint *choice);
 
   /// Apply the given function builder to the closure expression.
-  TypeMatchResult matchFunctionBuilder(
+  ///
+  /// \returns \c None when the function builder cannot be applied at all,
+  /// otherwise the result of applying the function builder.
+  Optional<TypeMatchResult> matchFunctionBuilder(
       AnyFunctionRef fn, Type builderType, Type bodyResultType,
       ConstraintKind bodyResultConstraintKind,
       ConstraintLocator *calleeLocator, ConstraintLocatorBuilder locator);
@@ -4002,21 +4197,14 @@ private:
 
   /// Solve the system of constraints generated from provided expression.
   ///
-  /// \param expr The expression to generate constraints from.
-  /// \param convertType The expected type of the expression.
+  /// \param target The target to generate constraints from.
   /// \param listener The callback to check solving progress.
-  /// \param solutions The set of solutions to the system of constraints.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
-  ///
-  /// \returns Error is an error occurred, Solved is system is consistent
-  /// and solutions were found, Unsolved otherwise.
-  SolutionKind solveImpl(Expr *&expr,
-                         Type convertType,
-                         ExprTypeCheckListener *listener,
-                         SmallVectorImpl<Solution> &solutions,
-                         FreeTypeVariableBinding allowFreeTypeVariables
-                          = FreeTypeVariableBinding::Disallow);
+  SolutionResult solveImpl(SolutionApplicationTarget &target,
+                           ExprTypeCheckListener *listener,
+                           FreeTypeVariableBinding allowFreeTypeVariables
+                             = FreeTypeVariableBinding::Disallow);
 
 public:
   /// Pre-check the expression, validating any types that occur in the
@@ -4024,26 +4212,21 @@ public:
   static bool preCheckExpression(Expr *&expr, DeclContext *dc,
                                  ConstraintSystem *baseCS = nullptr);
         
-  /// Solve the system of constraints generated from provided expression.
+  /// Solve the system of constraints generated from provided target.
   ///
-  /// The expression should have already been pre-checked with
-  /// preCheckExpression().
-  ///
-  /// \param expr The expression to generate constraints from.
-  /// \param convertType The expected type of the expression.
+  /// \param target The target that we'll generate constraints from, which
+  /// may be updated by the solving process.
   /// \param listener The callback to check solving progress.
-  /// \param solutions The set of solutions to the system of constraints.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
-  /// \returns true is an error occurred, false is system is consistent
-  /// and solutions were found.
-  bool solve(Expr *&expr,
-             Type convertType,
-             ExprTypeCheckListener *listener,
-             SmallVectorImpl<Solution> &solutions,
-             FreeTypeVariableBinding allowFreeTypeVariables
-             = FreeTypeVariableBinding::Disallow);
+  /// \returns the set of solutions, if any were found, or \c None if an
+  /// error occurred. When \c None, an error has been emitted.
+  Optional<std::vector<Solution>> solve(
+      SolutionApplicationTarget &target,
+      ExprTypeCheckListener *listener,
+      FreeTypeVariableBinding allowFreeTypeVariables
+        = FreeTypeVariableBinding::Disallow);
 
   /// Solve the system of constraints.
   ///
@@ -4117,35 +4300,16 @@ public:
   findBestSolution(SmallVectorImpl<Solution> &solutions,
                    bool minimize);
 
-private:
-  llvm::PointerUnion<Expr *, Stmt *> applySolutionImpl(
-      Solution &solution, SolutionApplicationTarget target,
-      Type convertType, bool discardedExpr, bool performingDiagnostics);
-
 public:
-  /// Apply a given solution to the expression, producing a fully
-  /// type-checked expression.
+  /// Apply a given solution to the target, producing a fully
+  /// type-checked target or \c None if an error occurred.
   ///
-  /// \param convertType the contextual type to which the
-  /// expression should be converted, if any.
-  /// \param discardedExpr if true, the result of the expression
-  /// is contextually ignored.
+  /// \param target the target to which the solution will be applied.
   /// \param performingDiagnostics if true, don't descend into bodies of
   /// non-single expression closures, or build curry thunks.
-  Expr *applySolution(Solution &solution, Expr *expr,
-                      Type convertType,
-                      bool discardedExpr,
-                      bool performingDiagnostics) {
-    return applySolutionImpl(solution, expr, convertType, discardedExpr,
-                             performingDiagnostics).get<Expr *>();
-  }
-
-  /// Apply a given solution to the body of the given function.
-  BraceStmt *applySolutionToBody(Solution &solution, AnyFunctionRef fn) {
-    return cast_or_null<BraceStmt>(
-        applySolutionImpl(solution, fn, Type(), false, false)
-      .dyn_cast<Stmt *>());
-  }
+  Optional<SolutionApplicationTarget> applySolution(
+      Solution &solution, SolutionApplicationTarget target,
+      bool performingDiagnostics);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
