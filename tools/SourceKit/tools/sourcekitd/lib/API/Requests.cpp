@@ -1982,6 +1982,7 @@ bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
                      DocBriefOpt,
                      AssocUSRsOpt,
                      R.SemanticContext,
+                     R.TypeRelation,
                      R.NotRecommended,
                      R.NumBytesToErase);
   return true;
