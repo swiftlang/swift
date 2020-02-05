@@ -1466,7 +1466,7 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
       class Walker : public ASTWalker {
       public:
         DeclContext *NewParent;
-        Walker(DeclContext *NewParent) : NewParent(NewParent) {}
+        explicit Walker(DeclContext *NewParent) : NewParent(NewParent) {}
         virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
           if (auto *ACE = dyn_cast<AbstractClosureExpr>(E)) {
             ACE->setParent(NewParent);
