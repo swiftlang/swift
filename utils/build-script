@@ -221,6 +221,66 @@ def validate_arguments(toolchain, args):
             "--legacy-impl is incompatible with building packages needing "
             "a toolchain (%s)" % ", ".join(targets_needing_toolchain))
 
+    # SWIFT_ENABLE_TENSORFLOW
+    if args.enable_tensorflow:
+        tensorflow_libs = ["libtensorflow.so"]
+        tensorflow_dirs = [
+            ("tensorflow_host_lib_dir", True),
+            ("tensorflow_host_include_dir", False),
+            ("tensorflow_target_lib_dir", True),
+            ("tensorflow_target_include_dir", False),
+        ]
+        tensorflow_dirs = [d for d in tensorflow_dirs
+                            if getattr(args, d[0]) is not None]
+        for dirname, is_lib_dir in tensorflow_dirs:
+            tensorflow_dir = getattr(args, dirname)
+            if not os.path.isdir(tensorflow_dir):
+                diagnostics.fatal(
+                    "--{} does not exist (was '{}')"
+                    .format(dirname, tensorflow_dir))
+            if is_lib_dir:
+                for lib in tensorflow_libs:
+                    if not os.path.exists(
+                            os.path.join(tensorflow_dir, lib)):
+                        diagnostics.fatal(
+                            "--{} does not contain '{}' (was '{}')"
+                            .format(dirname, lib, tensorflow_dir))
+
+        if args.build_tensorflow and \
+            args.tensorflow_host_lib_dir is not None and \
+                args.tensorflow_host_include_dir is not None:
+            diagnostics.fatal(
+                "when building with TensorFlow support, cannot specify "
+                " --build-tensorflow (to build TensorFlow from source) at "
+                "the same time as --tensorflow-host-lib-dir and "
+                "--tensorflow-host-include-dir (to use custom TensorFlow "
+                "headers/libraries); please pick one")
+
+        if args.tensorflow_swift_apis is not None:
+            if not os.path.isdir(args.tensorflow_swift_apis):
+                diagnostics.fatal(
+                    "invalid repository specified for "
+                    "--tensorflow-swift-apis (was '{}')"
+                    .format(args.tensorflow_swift_apis))
+
+    if args.enable_tensorflow_gpu:
+        os.environ['TF_NEED_CUDA'] = '1'
+        if '--config=cuda' not in args.tensorflow_bazel_options:
+            args.tensorflow_bazel_options += ['--config=cuda']
+
+        # Warn if TensorFlow GPU support environmental variable is not
+        # specified.
+        def warn_unspecified_tensorflow_env_var(name):
+            if name not in os.environ:
+                diagnostics.note(
+                    "'{}' environment variable was not specified; "
+                    "TensorFlow configure script default will be used"
+                    .format(name))
+        warn_unspecified_tensorflow_env_var('TF_CUDA_VERSION')
+        warn_unspecified_tensorflow_env_var('TF_CUDNN_VERSION')
+        warn_unspecified_tensorflow_env_var('CUDA_TOOLKIT_PATH')
+        warn_unspecified_tensorflow_env_var('CUDNN_INSTALL_PATH')
+
 
 def default_stdlib_deployment_targets(args):
     """
@@ -331,106 +391,32 @@ def apply_default_arguments(toolchain, args):
             if (target.platform.is_darwin and
                 target.arch in supported_archs)
         ]
-
-<<<<<<< HEAD
-        # SWIFT_ENABLE_TENSORFLOW
-        if args.enable_tensorflow:
-            tensorflow_libs = ["libtensorflow.so"]
-            tensorflow_dirs = [
-                ("tensorflow_host_lib_dir", True),
-                ("tensorflow_host_include_dir", False),
-                ("tensorflow_target_lib_dir", True),
-                ("tensorflow_target_include_dir", False),
-            ]
-            tensorflow_dirs = [d for d in tensorflow_dirs
-                               if getattr(args, d[0]) is not None]
-            for dirname, is_lib_dir in tensorflow_dirs:
-                tensorflow_dir = getattr(args, dirname)
-                if not os.path.isdir(tensorflow_dir):
-                    diagnostics.fatal(
-                        "--{} does not exist (was '{}')"
-                        .format(dirname, tensorflow_dir))
-                if is_lib_dir:
-                    for lib in tensorflow_libs:
-                        if not os.path.exists(
-                                os.path.join(tensorflow_dir, lib)):
-                            diagnostics.fatal(
-                                "--{} does not contain '{}' (was '{}')"
-                                .format(dirname, lib, tensorflow_dir))
-
-            if args.build_tensorflow and \
-               args.tensorflow_host_lib_dir is not None and \
-                args.tensorflow_host_include_dir is not None:
-                diagnostics.fatal(
-                    "when building with TensorFlow support, cannot specify "
-                    " --build-tensorflow (to build TensorFlow from source) at "
-                    "the same time as --tensorflow-host-lib-dir and "
-                    "--tensorflow-host-include-dir (to use custom TensorFlow "
-                    "headers/libraries); please pick one")
-
-            if args.tensorflow_swift_apis is not None:
-                if not os.path.isdir(args.tensorflow_swift_apis):
-                    diagnostics.fatal(
-                        "invalid repository specified for "
-                        "--tensorflow-swift-apis (was '{}')"
-                        .format(args.tensorflow_swift_apis))
-
-        if args.enable_tensorflow_gpu:
-            os.environ['TF_NEED_CUDA'] = '1'
-            if '--config=cuda' not in args.tensorflow_bazel_options:
-                args.tensorflow_bazel_options += ['--config=cuda']
-
-            # Warn if TensorFlow GPU support environmental variable is not
-            # specified.
-            def warn_unspecified_tensorflow_env_var(name):
-                if name not in os.environ:
-                    diagnostics.note(
-                        "'{}' environment variable was not specified; "
-                        "TensorFlow configure script default will be used"
-                        .format(name))
-            warn_unspecified_tensorflow_env_var('TF_CUDA_VERSION')
-            warn_unspecified_tensorflow_env_var('TF_CUDNN_VERSION')
-            warn_unspecified_tensorflow_env_var('CUDA_TOOLKIT_PATH')
-            warn_unspecified_tensorflow_env_var('CUDNN_INSTALL_PATH')
-
-
-    @staticmethod
-    def default_stdlib_deployment_targets(args):
-        """
-        Return targets for the Swift stdlib, based on the build machine.
-        If the build machine is not one of the recognized ones, return None.
-        """
-=======
+    
     # Include the Darwin module-only architectures in the CMake options.
     if args.swift_darwin_module_archs:
         args.extra_cmake_options.append(
             '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
                 args.swift_darwin_module_archs))
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2020-01-31-a
+
+    # SWIFT_ENABLE_TENSORFLOW
+    if args.enable_tensorflow_gpu:
+        args.enable_tensorflow = True
+
+    if args.enable_tensorflow:
+        if args.tensorflow_host_lib_dir is None and \
+            args.tensorflow_host_include_dir is None:
+            args.build_tensorflow = True
+        elif args.tensorflow_host_lib_dir is not None and \
+                args.tensorflow_host_include_dir is not None:
+            args.build_tensorflow = False
 
 
 # -----------------------------------------------------------------------------
 # Build Script Impl Wrapping
 
-<<<<<<< HEAD
-        # SWIFT_ENABLE_TENSORFLOW
-        if args.enable_tensorflow_gpu:
-           args.enable_tensorflow = True
-
-        if args.enable_tensorflow:
-            if args.tensorflow_host_lib_dir is None and \
-               args.tensorflow_host_include_dir is None:
-                args.build_tensorflow = True
-            elif args.tensorflow_host_lib_dir is not None and \
-                 args.tensorflow_host_include_dir is not None:
-                args.build_tensorflow = False
-
-# ---
-=======
 class BuildScriptInvocation(object):
     """Represent a single build script invocation.
     """
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2020-01-31-a
 
     def __init__(self, toolchain, args):
         self.toolchain = toolchain
