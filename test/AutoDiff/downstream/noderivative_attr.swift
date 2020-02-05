@@ -28,11 +28,11 @@ struct NotDifferentiable {
 }
 
 // CHECK-LABEL: struct NotDifferentiable {
-// CHECK:   @noDerivative @_hasStorage @_semantics("autodiff.nonvarying") var stored: Float { get set }
-// CHECK:   @noDerivative @_semantics("autodiff.nonvarying") var computedProperty: Float { get set _modify }
-// CHECK:   @noDerivative @_semantics("autodiff.nonvarying") func instanceMethod(_ x: Float) -> Float
-// CHECK:   @noDerivative @_semantics("autodiff.nonvarying") static func staticMethod(_ x: Float) -> Float
-// CHECK:   @noDerivative @_semantics("autodiff.nonvarying") subscript(x: Float) -> Float { get set _modify }
+// CHECK:   @noDerivative @_hasStorage var stored: Float { get set }
+// CHECK:   @noDerivative var computedProperty: Float { get set _modify }
+// CHECK:   @noDerivative func instanceMethod(_ x: Float) -> Float
+// CHECK:   @noDerivative static func staticMethod(_ x: Float) -> Float
+// CHECK:   @noDerivative subscript(x: Float) -> Float { get set _modify }
 // CHECK: }
 
 // CHECK-LABEL: // NotDifferentiable.computedProperty.getter
