@@ -1,4 +1,6 @@
-// Note: this test has a client: inherits-superclass-initializers-client.swift
+// Note: this test has clients:
+// - inherits-superclass-initializers-client.swift
+// - forbid-inherits-superclass-initializers-client.swift
 
 // RUN: %empty-directory(%t)
 

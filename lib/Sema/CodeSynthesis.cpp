@@ -1008,11 +1008,18 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
   assert(superclass);
 
   // If the superclass has known-missing designated initializers, inheriting
-  // is unsafe.
+  // is unsafe if there is any additional storage defined in the client.
   auto *superclassDecl = superclass->getClassOrBoundGenericClass();
   if (superclassDecl->getModuleContext() != decl->getParentModule() &&
-      superclassDecl->hasMissingDesignatedInitializers())
-    return false;
+      superclassDecl->hasMissingDesignatedInitializers()) {
+    return llvm::none_of(decl->getMembers(), [](Decl *member) {
+      auto pbd = dyn_cast<PatternBindingDecl>(member);
+      if (!pbd)
+        return false;
+
+      return !pbd->isStatic() && pbd->hasStorage();
+    });
+  }
 
   // If we're allowed to inherit designated initializers, then we can inherit
   // convenience inits too.
