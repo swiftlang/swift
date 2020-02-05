@@ -80,7 +80,10 @@ endlocal
 :: It supposes the %CD% is the source root.
 setlocal enableextensions enabledelayedexpansion
 
-git config --global core.autocrlf false
+git -C "%source_root%\swift" config --local core.autocrlf input
+git -C "%source_root%\swift" config --local core.symlink true
+git -C "%source_root%\swift" checkout HEAD
+
 git clone --depth 1 --single-branch https://github.com/apple/swift-cmark cmark %exitOnError%
 git clone --depth 1 --single-branch --branch swift/master https://github.com/apple/llvm-project llvm-project %exitOnError%
 mklink /D "%source_root%\clang" "%source_root%\llvm-project\clang"
