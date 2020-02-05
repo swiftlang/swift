@@ -226,6 +226,15 @@ func f11295_overload() -> Double { 0.0 }
 _ = f11295_overload() as Int // OK
 _ = f11295_overload() as Double // OK
 
+// Param overload with generics
+func f11295_param_overload(_ a: Int) {}
+func f11295_param_overload(_ a: Double) {}
+
+func fNum<N: Numeric>() -> N { 0 }
+
+f11295_param_overload(fNum() as Int) // Ok
+f11295_param_overload(fNum() as Double) // Ok
+
 // Coerce tuple elements
 func f11295_Tuple(_ a: (Int, Int)){}
 func f11295_TupleGeneric<T>(_ a: (T, T)){}
