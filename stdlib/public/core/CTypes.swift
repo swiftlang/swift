@@ -56,6 +56,9 @@ public typealias CLong = Int
 /// The C 'long long' type.
 public typealias CLongLong = Int64
 
+/// The C '_Float16' type.
+public typealias CFloat16 = Float16
+
 /// The C 'float' type.
 public typealias CFloat = Float
 
