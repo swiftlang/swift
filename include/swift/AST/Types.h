@@ -2853,6 +2853,10 @@ public:
     Param getWithoutLabel() const { return Param(Ty, Identifier(), Flags); }
 
     Param withType(Type newType) const { return Param(newType, Label, Flags); }
+
+    Param withFlags(ParameterTypeFlags flags) const {
+      return Param(Ty, Label, flags);
+    }
   };
 
   class CanParam : public Param {
