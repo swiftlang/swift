@@ -3613,8 +3613,13 @@ public:
     }
 
     // Fallback to showing the default type.
-    if (!defaultTypeName.empty())
+    if (!defaultTypeName.empty()) {
       builder.addTypeAnnotation(defaultTypeName);
+      builder.setExpectedTypeRelation(
+          expectedTypeContext.possibleTypes.empty()
+              ? CodeCompletionResult::ExpectedTypeRelation::Unknown
+              : CodeCompletionResult::ExpectedTypeRelation::Unrelated);
+    }
   }
 
   /// Add '#file', '#line', et at.
