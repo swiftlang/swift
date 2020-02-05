@@ -4592,6 +4592,28 @@ extension RawRepresentable where RawValue == Float, Self: Decodable {
   }
 }
 
+extension Float16: Codable {
+  /// Creates a new instance by decoding from the given decoder.
+  ///
+  /// This initializer throws an error if reading from the decoder fails, or
+  /// if the data read is corrupted or otherwise invalid.
+  ///
+  /// - Parameter decoder: The decoder to read data from.
+  public init(from decoder: Decoder) throws {
+    self = try Self(Float(from: decoder))
+  }
+
+  /// Encodes this value into the given encoder.
+  ///
+  /// This function throws an error if any values are invalid for the given
+  /// encoder's format.
+  ///
+  /// - Parameter encoder: The encoder to write data to.
+  public func encode(to encoder: Encoder) throws {
+    try Float(self).encode(to: encoder)
+  }
+}
+
 extension Int: Codable {
   /// Creates a new instance by decoding from the given decoder.
   ///
