@@ -78,6 +78,7 @@ public:
     case KeyPathComponent:
     case SynthesizedArgument:
     case KeyPathDynamicMember:
+    case TernaryBranch:
       return 1;
 
     case TypeParameterRequirement:
@@ -779,6 +780,20 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::KeyPathDynamicMember;
+  }
+};
+
+class LocatorPathElt::TernaryBranch final : public LocatorPathElt {
+public:
+  TernaryBranch(bool side)
+      : LocatorPathElt(ConstraintLocator::TernaryBranch, side) {}
+
+  bool forThen() const { return bool(getValue(0)); }
+
+  bool forElse() const { return !bool(getValue(0)); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::TernaryBranch;
   }
 };
 

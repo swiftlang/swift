@@ -168,6 +168,26 @@ public:
   static bool classof(const Action *A) {
     return A->getKind() == Action::Kind::CompileJob;
   }
+
+  /// Return a _single_ TY_Swift InputAction, if one exists;
+  /// if 0 or >1 such inputs exist, return nullptr.
+  const InputAction *findSingleSwiftInput() const {
+    auto Inputs = getInputs();
+    const InputAction *IA = nullptr;
+    for (auto const *I : Inputs) {
+      if (auto const *S = dyn_cast<InputAction>(I)) {
+        if (S->getType() == file_types::TY_Swift) {
+          if (IA == nullptr) {
+            IA = S;
+          } else {
+            // Already found one, two is too many.
+            return nullptr;
+          }
+        }
+      }
+    }
+    return IA;
+  }
 };
 
 class InterpretJobAction : public JobAction {

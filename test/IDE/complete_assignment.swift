@@ -128,16 +128,16 @@ func f2() {
 	}
 
 // ASSIGN_5: Begin completions, 2 items
-// ASSIGN_5-DAG: Decl[EnumElement]/ExprSpecific:     case2[#C1.D1#]; name=case2
-// ASSIGN_5-DAG: Decl[EnumElement]/ExprSpecific:     case1[#C1.D1#]; name=case1
+// ASSIGN_5-DAG: Decl[EnumElement]/ExprSpecific:     case2[#D1#]; name=case2
+// ASSIGN_5-DAG: Decl[EnumElement]/ExprSpecific:     case1[#D1#]; name=case1
 
 	func f6() {
 	  var d : D2
 	  d = .#^ASSIGN_6^#
 	}
 // ASSIGN_6: Begin completions, 2 items
-// ASSIGN_6-DAG: Decl[EnumElement]/ExprSpecific:     case3[#C1.D2#]; name=case3
-// ASSIGN_6-DAG:Decl[EnumElement]/ExprSpecific:     case4[#C1.D2#]; name=case4
+// ASSIGN_6-DAG: Decl[EnumElement]/ExprSpecific:     case3[#D2#]; name=case3
+// ASSIGN_6-DAG:Decl[EnumElement]/ExprSpecific:     case4[#D2#]; name=case4
 
   func f7 (C : C2) {
     var i : Int
@@ -147,10 +147,10 @@ func f2() {
 // ASSIGN_7: Begin completions
 // ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntGen()[#Int#]
 // ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
-// ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#C1.D1#]
-// ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#D1#]
+// ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#D2#]
 // ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: VoidGen()[#Void#]
-// ASSIGN_7-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+// ASSIGN_7-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C2#]
 
   func f8 (C : C2) {
     var i : Int?
@@ -160,10 +160,10 @@ func f2() {
 // ASSIGN_8: Begin completions
 // ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntGen()[#Int#]
 // ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntOpGen()[#Int?#]
-// ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#C1.D1#]
-// ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#D1#]
+// ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#D2#]
 // ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: VoidGen()[#Void#]
-// ASSIGN_8-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+// ASSIGN_8-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C2#]
 
   func f9 (C : C2) {
     var d : D1
@@ -173,10 +173,10 @@ func f2() {
 // ASSIGN_9: Begin completions
 // ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]
 // ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
-// ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: D1Gen()[#C1.D1#]
-// ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: D1Gen()[#D1#]
+// ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#D2#]
 // ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: VoidGen()[#Void#]
-// ASSIGN_9-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+// ASSIGN_9-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C2#]
 
   func f10 (C : C2) {
     var d : D1
@@ -186,10 +186,10 @@ func f2() {
 // ASSIGN_10: Begin completions
 // ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]
 // ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
-// ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: D1Gen()[#C1.D1#]
-// ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: D1Gen()[#D1#]
+// ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#D2#]
 // ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: VoidGen()[#Void#]
-// ASSIGN_10-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+// ASSIGN_10-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C2#]
 
   func f11(C: C2) {
     d = C.#^ASSIGN_11^#
@@ -198,10 +198,10 @@ func f2() {
 // ASSIGN_11: Begin completions
 // ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]
 // ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
-// ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#C1.D1#]
-// ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#D1#]
+// ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#D2#]
 // ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   VoidGen()[#Void#]
-// ASSIGN_11-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+// ASSIGN_11-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C2#]
 
   func f12() {
     var i : Int
@@ -211,10 +211,10 @@ func f2() {
 // ASSIGN_12: Begin completions
 // ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntGen()[#Int#]
 // ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
-// ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#C1.D1#]
-// ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#D1#]
+// ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#D2#]
 // ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: VoidGen()[#Void#]
-// ASSIGN_12-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+// ASSIGN_12-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C2#]
 
   func f13() {
     var i : Int = #^ASSIGN_13^#
@@ -250,10 +250,10 @@ func f2() {
 // ASSIGN_16: Begin completions
 // ASSIGN_16-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]
 // ASSIGN_16-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
-// ASSIGN_16-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: D1Gen()[#C1.D1#]
-// ASSIGN_16-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_16-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: D1Gen()[#D1#]
+// ASSIGN_16-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#D2#]
 // ASSIGN_16-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: VoidGen()[#Void#]
-// ASSIGN_16-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+// ASSIGN_16-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C2#]
 
   func f17() {
     var i : Int = C2Gen().#^ASSIGN_17^#
@@ -262,10 +262,10 @@ func f2() {
 // ASSIGN_17: Begin completions
 // ASSIGN_17-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntGen()[#Int#]
 // ASSIGN_17-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
-// ASSIGN_17-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#C1.D1#]
-// ASSIGN_17-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_17-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#D1#]
+// ASSIGN_17-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#D2#]
 // ASSIGN_17-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: VoidGen()[#Void#]
-// ASSIGN_17-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+// ASSIGN_17-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C2#]
 
   func f18 (C : C2) {
     var d : D1 = C.#^ASSIGN_18^#
@@ -274,10 +274,10 @@ func f2() {
 // ASSIGN_18: Begin completions
 // ASSIGN_18-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]
 // ASSIGN_18-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
-// ASSIGN_18-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: D1Gen()[#C1.D1#]
-// ASSIGN_18-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_18-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: D1Gen()[#D1#]
+// ASSIGN_18-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#D2#]
 // ASSIGN_18-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: VoidGen()[#Void#]
-// ASSIGN_18-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+// ASSIGN_18-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C2#]
 }
 
 

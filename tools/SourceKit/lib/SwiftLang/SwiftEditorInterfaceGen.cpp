@@ -92,7 +92,7 @@ typedef SwiftInterfaceGenContext::Implementation::TextDecl TextDecl;
 typedef SwiftInterfaceGenContext::Implementation::SourceTextInfo SourceTextInfo;
 
 static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
-  SmallVector<std::pair<Identifier, SourceLoc>, 4>
+  SmallVector<Located<Identifier>, 4>
       AccessPath;
   while (!ModuleName.empty()) {
     StringRef SubModuleName;
@@ -103,7 +103,7 @@ static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
-  return Ctx.getModule(std::make_pair(ModuleName, SourceLoc()));
+  return Ctx.getModule({ Located<Identifier>(ModuleName, SourceLoc()) });
 }
 
 namespace {

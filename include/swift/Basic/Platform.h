@@ -46,6 +46,14 @@ namespace swift {
   /// Return true if the given triple represents any simulator.
   bool tripleIsAnySimulator(const llvm::Triple &triple);
 
+  /// Returns true if the given triple represents a macCatalyst environment.
+  bool tripleIsMacCatalystEnvironment(const llvm::Triple &triple);
+
+  /// Returns true if the given -target triple and -target-variant triple
+  /// can be zippered.
+  bool triplesAreValidForZippering(const llvm::Triple &target,
+                                   const llvm::Triple &targetVariant);
+
   /// Returns true if the given triple represents an OS that ships with
   /// ABI-stable swift libraries (eg. in /usr/lib/swift).
   bool tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple);
@@ -91,7 +99,9 @@ namespace swift {
   /// llvm::Triple::normalize() would not affect it.
   llvm::Triple getTargetSpecificModuleTriple(const llvm::Triple &triple);
   
-  
+  /// Computes the target triple without version information.
+  llvm::Triple getUnversionedTriple(const llvm::Triple &triple);
+
   /// Get the Swift runtime version to deploy back to, given a deployment target expressed as an
   /// LLVM target triple.
   Optional<llvm::VersionTuple>

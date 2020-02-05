@@ -127,12 +127,11 @@ func test20886179(_ handlers: [(Int) -> Void], buttonIndex: Int) {
 
 // The problem here is that the call has a contextual result type incompatible
 // with *all* overload set candidates.  This is not an ambiguity.
-func overloaded_identity(_ a : Int) -> Int {}
-func overloaded_identity(_ b : Float) -> Float {}
+func overloaded_identity(_ a : Int) -> Int {} // expected-note {{found this candidate}}
+func overloaded_identity(_ b : Float) -> Float {} // expected-note {{found this candidate}}
 
 func test_contextual_result_1() {
-  return overloaded_identity()  // expected-error {{cannot invoke 'overloaded_identity' with no arguments}}
-  // expected-note @-1 {{overloads for 'overloaded_identity' exist with these partially matching parameter lists: (Float), (Int)}}
+  return overloaded_identity()  // expected-error {{no exact matches in call to global function 'overloaded_identity'}}
 }
 
 func test_contextual_result_2() {

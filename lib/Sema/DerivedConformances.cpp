@@ -71,7 +71,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         // The presence of a raw type is an explicit declaration that
         // the compiler should derive a RawRepresentable conformance.
       case KnownProtocolKind::RawRepresentable:
-        return enumDecl->hasRawType();
+        return canDeriveRawRepresentable(DC, Nominal);
 
         // Enums without associated values can implicitly derive Equatable
         // conformance.

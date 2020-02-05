@@ -205,21 +205,10 @@ namespace {
   };
 } // end anonymous namespace
 
-inline llvm::hash_code llvm::hash_value(StringRef S) {
-  return hash_combine_range(S.begin(), S.end());
-}
-
 struct TypeMetadataPrivateState {
   ConcurrentMap<NominalTypeDescriptorCacheEntry> NominalCache;
   ConcurrentReadableArray<TypeMetadataSection> SectionsToScan;
   
-  llvm::DenseMap<llvm::StringRef,
-                 llvm::SmallDenseSet<const ContextDescriptor *, 1>>
-    ContextDescriptorCache;
-  size_t ConformanceDescriptorLastSectionScanned = 0;
-  size_t TypeContextDescriptorLastSectionScanned = 0;
-  Mutex ContextDescriptorCacheLock;
-
   TypeMetadataPrivateState() {
     initializeTypeMetadataRecordLookup();
   }
@@ -233,29 +222,6 @@ _registerTypeMetadataRecords(TypeMetadataPrivateState &T,
                              const TypeMetadataRecord *begin,
                              const TypeMetadataRecord *end) {
   T.SectionsToScan.push_back(TypeMetadataSection{begin, end});
-}
-
-/// Iterate over type metadata sections starting from the given index.
-/// The index is updated to the current number of sections. Passing
-/// the same index to the next call will iterate over any sections that were
-/// added after the previous call.
-///
-/// Takes a function to call for each section found. The two parameters are
-/// the start and end of the section.
-static void _forEachTypeMetadataSectionAfter(
-  TypeMetadataPrivateState &T,
-  size_t *start,
-  const std::function<void(const TypeMetadataRecord *,
-                           const TypeMetadataRecord *)> &f) {
-  auto snapshot = T.SectionsToScan.snapshot();
-  if (snapshot.Count > *start) {
-    auto *begin = snapshot.begin() + *start;
-    auto *end = snapshot.end();
-    for (auto *section = begin; section != end; section++) {
-      f(section->Begin, section->End);
-    }
-    *start = snapshot.Count;
-  }
 }
 
 void swift::addImageTypeMetadataRecordBlockCallbackUnsafe(
@@ -654,70 +620,6 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
   return nullptr;
 }
 
-// Read ContextDescriptors for any loaded images that haven't already been
-// scanned, if any.
-static void
-_scanAdditionalContextDescriptors(TypeMetadataPrivateState &T) {
-  _forEachTypeMetadataSectionAfter(
-    T,
-    &T.TypeContextDescriptorLastSectionScanned,
-    [&T](const TypeMetadataRecord *Begin,
-         const TypeMetadataRecord *End) {
-      for (const auto *record = Begin; record != End; record++) {
-        if (auto ntd = record->getContextDescriptor()) {
-          if (auto type = llvm::dyn_cast<TypeContextDescriptor>(ntd)) {
-            auto identity = ParsedTypeIdentity::parse(type);
-            auto name = identity.getABIName();
-            T.ContextDescriptorCache[name].insert(type);
-          }
-        }
-      }
-    });
-
-  _forEachProtocolConformanceSectionAfter(
-    &T.ConformanceDescriptorLastSectionScanned,
-    [&T](const ProtocolConformanceRecord *Begin,
-       const ProtocolConformanceRecord *End) {
-    for (const auto *record = Begin; record != End; record++) {
-      if (auto ntd = record[0]->getTypeDescriptor()) {
-        if (auto type = llvm::dyn_cast<TypeContextDescriptor>(ntd)) {
-          auto identity = ParsedTypeIdentity::parse(type);
-          auto name = identity.getABIName();
-          T.ContextDescriptorCache[name].insert(type);
-        }
-      }
-    }
-  });
-}
-
-// Search for a ContextDescriptor in the context descriptor cache matching the
-// given demangle node. Returns the found node, or nullptr if no match was
-// found.
-static llvm::SmallDenseSet<const ContextDescriptor *, 1>
-_findContextDescriptorInCache(TypeMetadataPrivateState &T,
-                              Demangle::NodePointer node) {
-  if (node->getNumChildren() < 2)
-    return { };
-
-  auto nameNode = node->getChild(1);
-
-  // Declarations synthesized by the Clang importer get a small tag
-  // string in addition to their name.
-  if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName)
-    nameNode = nameNode->getChild(1);
-
-  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
-    return { };
-
-  auto name = nameNode->getText();
-  
-  auto iter = T.ContextDescriptorCache.find(name);
-  if (iter == T.ContextDescriptorCache.end())
-    return { };
-
-  return iter->getSecond();
-}
-
 #define DESCRIPTOR_MANGLING_SUFFIX_Structure Mn
 #define DESCRIPTOR_MANGLING_SUFFIX_Enum Mn
 #define DESCRIPTOR_MANGLING_SUFFIX_Protocol Mp
@@ -785,50 +687,17 @@ _findContextDescriptor(Demangle::NodePointer node,
   if (auto Value = T.NominalCache.find(mangledName))
     return Value->getDescription();
 
+  // Check type metadata records		   
   // Scan any newly loaded images for context descriptors, then try the context
-  // descriptor cache. This must be done with the cache's lock held.
-  llvm::SmallDenseSet<const ContextDescriptor *, 1> cachedContexts;
-  {
-    ScopedLock guard(T.ContextDescriptorCacheLock);
-    _scanAdditionalContextDescriptors(T);
-    cachedContexts = _findContextDescriptorInCache(T, node);
-  }
-
-  bool foundInCache = false;
-  for (auto cachedContext : cachedContexts) {
-    if (_contextDescriptorMatchesMangling(cachedContext, node)) {
-      foundContext = cachedContext;
-      foundInCache = true;
-      break;
-    }
-  }
-
-  if (!foundContext) {
-    // Slow path, as a fallback if the cache itself isn't capturing everything.
-    (void)foundInCache;
-
-    // Check type metadata records
-    foundContext = _searchTypeMetadataRecords(T, node);
-
-    // Check protocol conformances table. Note that this has no support for
-    // resolving generic types yet.
-    if (!foundContext)
-      foundContext = _searchConformancesByMangledTypeName(node);
-  }
-
-  if (foundContext) {
+  foundContext = _searchTypeMetadataRecords(T, node);
+  
+  // Check protocol conformances table. Note that this has no support for		
+  // resolving generic types yet.
+  if (!foundContext)
+    foundContext = _searchConformancesByMangledTypeName(node);
+  
+  if (foundContext)
     T.NominalCache.getOrInsert(mangledName, foundContext);
-
-#ifndef NDEBUG
-    // If we found something in the slow path but not in the cache, it is a
-    // bug in the cache. Fail in assertions builds.
-    if (!foundInCache) {
-      fatalError(0,
-                 "_findContextDescriptor cache miss for demangled tree:\n%s\n",
-                 getNodeTreeAsString(node).c_str());
-    }
-#endif
-  }
 
   return foundContext;
 }

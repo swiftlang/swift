@@ -362,10 +362,10 @@ private:
   }
 
   void handleMemberwiseInitRefs(Expr *E) {
-    if (!isa<ConstructorRefCallExpr>(E))
+    if (!isa<ApplyExpr>(E))
       return;
 
-    auto *DeclRef = dyn_cast<DeclRefExpr>(cast<ConstructorRefCallExpr>(E)->getFn());
+    auto *DeclRef = dyn_cast<DeclRefExpr>(cast<ApplyExpr>(E)->getFn());
     if (!DeclRef || !isMemberwiseInit(DeclRef->getDecl()))
       return;
 

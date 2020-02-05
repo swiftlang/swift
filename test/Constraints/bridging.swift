@@ -89,7 +89,7 @@ func bridgeToObjC(_ s: BridgedStruct) -> BridgedClass {
 }
 
 func bridgeToAnyObject(_ s: BridgedStruct) -> AnyObject {
-  return s // expected-error{{return expression of type 'BridgedStruct' does not conform to 'AnyObject'}}
+  return s // expected-error{{return expression of type 'BridgedStruct' expected to be an instance of a class or class-constrained type}}
   return s as AnyObject
 }
 
@@ -265,7 +265,7 @@ func rdar19831698() {
   var v71 = true + 1.0 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Double'}}
 // expected-note@-1{{overloads for '+'}}
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
-  var v73 = true + [] // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'Array<Bool>'}}
+  var v73 = true + [] // expected-error@:18 {{binary operator '+' cannot be applied to operands of type 'Bool' and '[Any]'}}
   var v75 = true + "str" // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'String'}}
 }
 
@@ -344,14 +344,14 @@ func forceUniversalBridgeToAnyObject<T, U: KnownClassProtocol>(a: T, b: U, c: An
   z = g as AnyObject
   z = h as AnyObject
 
-  z = a // expected-error{{does not conform to 'AnyObject'}}
+  z = a // expected-error{{value of type 'T' expected to be an instance of a class or class-constrained type in assignment}}
   z = b
-  z = c // expected-error{{does not conform to 'AnyObject'}} expected-note {{cast 'Any' to 'AnyObject'}} {{8-8= as AnyObject}}
-  z = d // expected-error{{does not conform to 'AnyObject'}}
+  z = c // expected-error{{value of type 'Any' expected to be an instance of a class or class-constrained type in assignment}} expected-note {{cast 'Any' to 'AnyObject'}} {{8-8= as AnyObject}}
+  z = d // expected-error{{value of type 'KnownUnbridged' expected to be an instance of a class or class-constrained type in assignment}}
   z = e
   z = f
   z = g
-  z = h // expected-error{{does not conform to 'AnyObject'}}
+  z = h // expected-error{{value of type 'String' expected to be an instance of a class or class-constrained type in assignment}}
 
   _ = z
 }

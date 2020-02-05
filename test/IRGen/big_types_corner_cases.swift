@@ -215,7 +215,7 @@ public func testGetFunc() {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases7TestBigC5test2yyF"(%T22big_types_corner_cases7TestBigC* swiftself)
 // CHECK: [[CALL1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$sSaySS2ID_y22big_types_corner_cases9BigStructVcSg7handlertGMD"
 // CHECK: [[CALL2:%.*]] = call i8** @"$sSaySS2ID_y22big_types_corner_cases9BigStructVcSg7handlertGSayxGSlsWl"
-// CHECK: call swiftcc void @"$sSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyF"(%Ts16IndexingIteratorV* noalias nocapture sret {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself {{.*}})
+// CHECK: call swiftcc void @"$sSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyF"(%Ts16IndexingIteratorV{{.*}}* noalias nocapture sret {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself {{.*}})
 // CHECK: ret void
 class TestBig {
     typealias Handler = (BigStruct) -> Void

@@ -1261,7 +1261,7 @@ static bool sinkArgument(EnumCaseDataflowContext &Context, SILBasicBlock *BB, un
       TI->setOperand(ArgNum, CloneInst->getOperand(*DifferentOperandIndex));
       // Now delete the clone as we only needed it operand.
       if (CloneInst != FSI)
-        recursivelyDeleteTriviallyDeadInstructions(CloneInst);
+        eliminateDeadInstruction(CloneInst);
       ++CloneIt;
     }
     assert(CloneIt == Clones.end() && "Clone/pred mismatch");

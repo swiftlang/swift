@@ -690,7 +690,15 @@ class SwiftAnyEnjoyer: NSIdLover, NSIdLoving {
   func takesId(viaProtocol x: Any) { }
 }
 
+enum SillyOptional {
+  case nothing
+  case something(NSObject)
+}
 
+func bridgeNoPayloadEnumCase(_ receiver: NSIdLover) {
+  let value = SillyOptional.nothing
+  receiver.takesId(value)
+}
 
 // CHECK-LABEL: sil_witness_table shared [serialized] GenericOption: Hashable module objc_generics {
 // CHECK-NEXT: base_protocol Equatable: GenericOption: Equatable module objc_generics

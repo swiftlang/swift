@@ -18,14 +18,14 @@ class ClassB : ClassA
     override init (_ input : Int64)
     {
     // CHECK:       @"$s{{.*}}6ClassBCyACs5Int64Vcfc"
-    // NOPCOPY:     @"$s{{.*}}6ClassBCyACs5Int64Vcfc"
+    // NOCOPY:      @"$s{{.*}}6ClassBCyACs5Int64Vcfc"
     // CHECK:       alloca {{.*}}ClassBC*
-    // NOPCOPY:     alloca {{.*}}ClassBC*
+    // NOCOPY:      alloca {{.*}}ClassBC*
 
     // CHECK:       alloca i64
 
     // CHECK-NOT:   alloca
-    // NOPCOPY-NOT: alloca
+    // NOCOPY-NOT:  alloca
     // CHECK:       ret {{.*}}ClassBC
     // NOCOPY:      ret {{.*}}ClassBC
         super.init (input)
@@ -33,3 +33,30 @@ class ClassB : ClassA
 }
 
 let b = ClassB(1);
+
+func use(_ x: Int) {}
+
+class ClassC
+{
+    // CHECK:  define {{.*}}@"$s13shadow_copies6ClassCCACycfc"
+    // NOCOPY: define {{.*}}@"$s13shadow_copies6ClassCCACycfc"
+    init ()
+    {
+    // CHECK:  alloca %T13shadow_copies6ClassCC*
+    // CHECK-NOT: alloca
+    // NOCOPY-NOT: alloca
+
+    // CHECK:  call void @llvm.dbg.value(metadata i{{(64|32)}} 10
+    // NOCOPY: call void @llvm.dbg.value(metadata i{{(64|32)}} 10
+        let x = 10
+
+        use(x)
+
+        use(x)
+
+    // CHECK:  ret
+    // NOCOPY: ret
+    }
+}
+
+let c = ClassC()

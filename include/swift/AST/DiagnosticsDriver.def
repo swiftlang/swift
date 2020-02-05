@@ -117,6 +117,10 @@ ERROR(error_sdk_too_old,none,
 ERROR(error_ios_maximum_deployment_32,none,
       "iOS %0 does not support 32-bit programs", (unsigned))
 
+ERROR(error_unsupported_target_variant,none,
+      "unsupported '%select{-target|-target-variant}1' value '%0'; use 'ios-macabi' instead",
+      (StringRef, bool))
+
 WARNING(warn_arclite_not_found_when_link_objc_runtime,none,
         "unable to find Objective-C runtime support library 'arclite'; "
         "pass '-no-link-objc-runtime' to silence this warning", ())
@@ -165,6 +169,9 @@ WARNING(warn_opt_remark_disabled, none,
 
 WARNING(warn_ignoring_batch_mode,none,
 "ignoring '-enable-batch-mode' because '%0' was also specified", (StringRef))
+
+WARNING(warn_ignoring_wmo, none,
+        "ignoring '-wmo' because '-dump-ast' was also specified", ())
 
 WARNING(warn_ignoring_source_range_dependencies,none,
 "ignoring '-enable-source-range-dependencies' because '%0' was also specified", (StringRef))

@@ -322,7 +322,6 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   SILModule &M = F->getModule();
   auto &Ctx = M.getASTContext();
   GenericSignature NewGenericSig;
-  GenericEnvironment *NewGenericEnv;
 
   /// If the original function is generic, then maintain the same.
   auto OrigGenericSig = FTy->getInvocationGenericSignature();
@@ -340,8 +339,6 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
         OrigGenericSig.getPointer(), std::move(GenericParams),
         std::move(Requirements)},
       GenericSignature());
-
-  NewGenericEnv = NewGenericSig->getGenericEnvironment();
 
   /// Create a lambda for GenericParams.
   auto getCanonicalType = [&](Type t) -> CanType {

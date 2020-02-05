@@ -196,6 +196,35 @@ extension __RawDictionaryStorage {
     return Builtin.bridgeFromRawPointer(
       Builtin.addressof(&_swiftEmptyDictionarySingleton))
   }
+  
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal final func uncheckedKey<Key: Hashable>(at bucket: _HashTable.Bucket) -> Key {
+    defer { _fixLifetime(self) }
+    _internalInvariant(_hashTable.isOccupied(bucket))
+    let keys = _rawKeys.assumingMemoryBound(to: Key.self)
+    return keys[bucket.offset]
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(never)
+  internal final func find<Key: Hashable>(_ key: Key) -> (bucket: _HashTable.Bucket, found: Bool) {
+    return find(key, hashValue: key._rawHashValue(seed: _seed))
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(never)
+  internal final func find<Key: Hashable>(_ key: Key, hashValue: Int) -> (bucket: _HashTable.Bucket, found: Bool) {
+      let hashTable = _hashTable
+      var bucket = hashTable.idealBucket(forHashValue: hashValue)
+      while hashTable._isOccupied(bucket) {
+        if uncheckedKey(at: bucket) == key {
+          return (bucket, true)
+        }
+        bucket = hashTable.bucket(wrappedAfter: bucket)
+      }
+      return (bucket, false)
+  }
 }
 
 @usableFromInline

@@ -17,6 +17,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
@@ -35,10 +36,6 @@ using namespace swift;
 STATISTIC(NumEliminatedInsts, "number of removed instructions");
 STATISTIC(NumLoadCopyConvertedToLoadBorrow,
           "number of load_copy converted to load_borrow");
-
-//===----------------------------------------------------------------------===//
-//                                  Utility
-//===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
 //                            Live Range Modeling
@@ -155,6 +152,129 @@ LiveRange::LiveRange(SILValue value)
 }
 
 //===----------------------------------------------------------------------===//
+//                        Address Written To Analysis
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// A simple analysis that checks if a specific def (in our case an inout
+/// argument) is ever written to. This is conservative, local and processes
+/// recursively downwards from def->use.
+struct IsAddressWrittenToDefUseAnalysis {
+  llvm::SmallDenseMap<SILValue, bool, 8> isWrittenToCache;
+
+  bool operator()(SILValue value) {
+    auto iter = isWrittenToCache.try_emplace(value, true);
+
+    // If we are already in the map, just return that.
+    if (!iter.second)
+      return iter.first->second;
+
+    // Otherwise, compute our value, cache it and return.
+    bool result = isWrittenToHelper(value);
+    iter.first->second = result;
+    return result;
+  }
+
+private:
+  bool isWrittenToHelper(SILValue value);
+};
+
+} // end anonymous namespace
+
+bool IsAddressWrittenToDefUseAnalysis::isWrittenToHelper(SILValue initialValue) {
+  SmallVector<Operand *, 8> worklist(initialValue->getUses());
+  while (!worklist.empty()) {
+    auto *op = worklist.pop_back_val();
+    SILInstruction *user = op->getUser();
+
+    if (Projection::isAddressProjection(user) ||
+        isa<ProjectBlockStorageInst>(user)) {
+      for (SILValue r : user->getResults()) {
+        llvm::copy(r->getUses(), std::back_inserter(worklist));
+      }
+      continue;
+    }
+
+    if (auto *oeai = dyn_cast<OpenExistentialAddrInst>(user)) {
+      // Mutable access!
+      if (oeai->getAccessKind() != OpenedExistentialAccess::Immutable) {
+        return true;
+      }
+
+      //  Otherwise, look through it and continue.
+      llvm::copy(oeai->getUses(), std::back_inserter(worklist));
+      continue;
+    }
+
+    // load_borrow and incidental uses are fine as well.
+    if (isa<LoadBorrowInst>(user) || isIncidentalUse(user)) {
+      continue;
+    }
+
+    // Look through immutable begin_access.
+    if (auto *bai = dyn_cast<BeginAccessInst>(user)) {
+      // If we do not have a read, return true.
+      if (bai->getAccessKind() != SILAccessKind::Read) {
+        return true;
+      }
+
+      // Otherwise, add the users to the worklist and continue.
+      llvm::copy(bai->getUses(), std::back_inserter(worklist));
+      continue;
+    }
+
+    // As long as we do not have a load [take], we are fine.
+    if (auto *li = dyn_cast<LoadInst>(user)) {
+      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+        return true;
+      }
+      continue;
+    }
+
+    // If we have a FullApplySite, see if we use the value as an
+    // indirect_guaranteed parameter. If we use it as inout, we need
+    // interprocedural analysis that we do not perform here.
+    if (auto fas = FullApplySite::isa(user)) {
+      if (fas.getArgumentConvention(*op) ==
+          SILArgumentConvention::Indirect_In_Guaranteed)
+        continue;
+
+      // Otherwise, be conservative and return true.
+      return true;
+    }
+
+    // Copy addr that read are just loads.
+    if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+      // If our value is the destination, this is a write.
+      if (cai->getDest() == op->get()) {
+        return true;
+      }
+
+      // Ok, so we are Src by process of elimination. Make sure we are not being
+      // taken.
+      if (cai->isTakeOfSrc()) {
+        return true;
+      }
+
+      // Otherwise, we are safe and can continue.
+      continue;
+    }
+
+    // If we did not recognize the user, just return conservatively that it was
+    // written to.
+    LLVM_DEBUG(llvm::dbgs()
+               << "Function: " << user->getFunction()->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Value: " << op->get());
+    LLVM_DEBUG(llvm::dbgs() << "Unknown instruction!: " << *user);
+    return true;
+  }
+
+  // Ok, we finished our worklist and this address is not being written to.
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
 //                               Implementation
 //===----------------------------------------------------------------------===//
 
@@ -189,6 +309,7 @@ struct SemanticARCOptVisitor
   SILFunction &F;
   Optional<DeadEndBlocks> TheDeadEndBlocks;
   ValueLifetimeAnalysis::Frontier lifetimeFrontier;
+  IsAddressWrittenToDefUseAnalysis isAddressWrittenToDefUseAnalysis;
 
   explicit SemanticARCOptVisitor(SILFunction &F) : F(F) {}
 
@@ -296,7 +417,7 @@ struct SemanticARCOptVisitor
 
 #define FORWARDING_TERM(NAME)                                                  \
   bool visit##NAME##Inst(NAME##Inst *cls) {                                    \
-    for (auto succValues : cls->getSuccessorBlockArguments()) {                \
+    for (auto succValues : cls->getSuccessorBlockArgumentLists()) {            \
       for (SILValue v : succValues) {                                          \
         worklist.insert(v);                                                    \
       }                                                                        \
@@ -310,7 +431,7 @@ struct SemanticARCOptVisitor
   FORWARDING_TERM(CondBranch)
 #undef FORWARDING_TERM
 
-  bool isWrittenTo(LoadInst *li, ArrayRef<SILInstruction *> destroys);
+  bool isWrittenTo(LoadInst *li, const LiveRange &lr);
 
   bool processWorklist();
 
@@ -653,12 +774,14 @@ bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) 
 bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
   // If our copy value inst has only destroy_value users, it is a dead live
   // range. Try to eliminate them.
-  if (eliminateDeadLiveRangeCopyValue(cvi))
+  if (eliminateDeadLiveRangeCopyValue(cvi)) {
     return true;
+  }
 
   // Then try to perform the guaranteed copy value optimization.
-  if (performGuaranteedCopyValueOptimization(cvi))
+  if (performGuaranteedCopyValueOptimization(cvi)) {
     return true;
+  }
 
   return false;
 }
@@ -667,56 +790,31 @@ bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
 //                         load [copy] Optimizations
 //===----------------------------------------------------------------------===//
 
-// A flow insensitive analysis that tells the load [copy] analysis if the
-// storage has 0, 1, >1 writes to it.
-//
-// In the case of 0 writes, we return CanOptimizeLoadCopyResult::Always.
-//
-// In the case of 1 write, we return OnlyIfStorageIsLocal. We are taking
-// advantage of definite initialization implying that an alloc_stack must be
-// written to once before any loads from the memory location. Thus if we are
-// local and see 1 write, we can still change to load_borrow if all other uses
-// check out.
-//
-// If there is 2+ writes, we can not optimize = (.
-
-bool mayFunctionMutateArgument(const AccessedStorage &storage, SILFunction &f) {
-  auto *arg = cast<SILFunctionArgument>(storage.getArgument());
-
-  // Then check if we have an in_guaranteed argument. In this case, we can
-  // always optimize load [copy] from this.
-  if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed))
-    return false;
-
-  // For now just return false.
-  return true;
-}
-
-// Then find our accessed storage to determine whether it provides a guarantee
-// for the loaded value.
 namespace {
 
+/// A class that computes in a flow insensitive way if we can prove that our
+/// storage is either never written to, or is initialized exactly once and never
+/// written to again. In both cases, we can convert load [copy] -> load_borrow
+/// safely.
 class StorageGuaranteesLoadVisitor
   : public AccessUseDefChainVisitor<StorageGuaranteesLoadVisitor>
 {
   // The outer SemanticARCOptVisitor.
   SemanticARCOptVisitor &ARCOpt;
-  
-  // The original load instruction.
-  LoadInst *Load;
-  
+
+  // The live range of the original load.
+  const LiveRange &liveRange;
+
   // The current address being visited.
   SILValue currentAddress;
   
   Optional<bool> isWritten;
 
-  ArrayRef<SILInstruction *> destroyValues;
-
 public:
   StorageGuaranteesLoadVisitor(SemanticARCOptVisitor &arcOpt, LoadInst *load,
-                               ArrayRef<SILInstruction *> destroyValues)
-      : ARCOpt(arcOpt), Load(load), currentAddress(load->getOperand()),
-        destroyValues(destroyValues) {}
+                               const LiveRange &liveRange)
+      : ARCOpt(arcOpt), liveRange(liveRange),
+        currentAddress(load->getOperand()) {}
 
   void answer(bool written) {
     currentAddress = nullptr;
@@ -733,9 +831,24 @@ public:
   }
   
   void visitArgumentAccess(SILFunctionArgument *arg) {
-    return answer(mayFunctionMutateArgument(
-                             AccessedStorage(arg, AccessedStorage::Argument),
-                             ARCOpt.F));
+    // If this load_copy is from an indirect in_guaranteed argument, then we
+    // know for sure that it will never be written to.
+    if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)) {
+      return answer(false);
+    }
+
+    // If we have an inout parameter that isn't ever actually written to, return
+    // false.
+    if (arg->getKnownParameterInfo().isIndirectMutating()) {
+      return answer(ARCOpt.isAddressWrittenToDefUseAnalysis(arg));
+    }
+
+    // TODO: This should be extended:
+    //
+    // 1. We should be able to analyze in arguments and see if they are only
+    //    ever destroyed at the end of the function. In such a case, we may be
+    //    able to also to promote load [copy] from such args to load_borrow.
+    return answer(true);
   }
   
   void visitGlobalAccess(SILValue global) {
@@ -787,15 +900,11 @@ public:
     llvm::copy(borrowInst->getUsersOfType<EndBorrowInst>(),
                std::back_inserter(baseEndBorrows));
 
-    SmallVector<SILInstruction *, 4> valueDestroys;
-    llvm::copy(Load->getUsersOfType<DestroyValueInst>(),
-               std::back_inserter(valueDestroys));
-
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
     // Returns true on success. So we invert.
-    bool foundError =
-        !checker.validateLifetime(baseObject, baseEndBorrows, valueDestroys);
+    bool foundError = !checker.validateLifetime(baseObject, baseEndBorrows,
+                                                liveRange.getDestroys());
     return answer(foundError);
   }
   
@@ -831,9 +940,9 @@ public:
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
     // Returns true on success. So we invert.
-    bool foundError =
-        !checker.validateLifetime(stack, destroyAddrs /*consuming users*/,
-                                  destroyValues /*non consuming users*/);
+    bool foundError = !checker.validateLifetime(
+        stack, destroyAddrs /*consuming users*/,
+        liveRange.getDestroys() /*non consuming users*/);
     return answer(foundError);
   }
 
@@ -847,9 +956,8 @@ public:
 
 } // namespace
 
-bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load,
-                                        ArrayRef<SILInstruction *> destroys) {
-  StorageGuaranteesLoadVisitor visitor(*this, load, destroys);
+bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load, const LiveRange &lr) {
+  StorageGuaranteesLoadVisitor visitor(*this, load, lr);
   return visitor.doIt();
 }
 
@@ -873,8 +981,7 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // Then check if our address is ever written to. If it is, then we cannot use
   // the load_borrow because the stored value may be released during the loaded
   // value's live range.
-  auto destroyValues = lr.getDestroys();
-  if (isWrittenTo(li, destroyValues))
+  if (isWrittenTo(li, lr))
     return false;
 
   // Ok, we can perform our optimization. Convert the load [copy] into a
@@ -887,6 +994,7 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // to find the post-dominating block set of these destroy value to ensure that
   // we do not insert multiple end_borrow.
   assert(lifetimeFrontier.empty());
+  auto destroyValues = lr.getDestroys();
   ValueLifetimeAnalysis analysis(li, destroyValues);
   bool foundCriticalEdges = !analysis.computeFrontier(
       lifetimeFrontier, ValueLifetimeAnalysis::DontModifyCFG,

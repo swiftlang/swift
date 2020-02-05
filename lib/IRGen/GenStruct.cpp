@@ -413,17 +413,14 @@ namespace {
     }
     
     llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
-      // TODO: do this with StructMetadataLayout::getFieldOffset
-
-      // Get the field offset vector from the struct metadata.
+      auto &layout =
+          IGF.IGM.getMetadataLayout(TheStruct.getStructOrBoundGenericStruct());
+      auto offset = layout.getFieldOffset(
+          IGF, layout.getDecl()->getStoredProperties()[index]);
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
-      Address fieldVector = emitAddressOfFieldOffsetVector(IGF, metadata,
-                                    TheStruct.getStructOrBoundGenericStruct());
-      
-      // Grab the indexed offset.
-      fieldVector = IGF.Builder.CreateConstArrayGEP(fieldVector, index,
-                                                    IGF.IGM.getPointerSize());
-      return IGF.Builder.CreateLoad(fieldVector);
+      auto field = IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.Int32Ty,
+                                           IGF.IGM.getPointerAlignment());
+      return IGF.Builder.CreateLoad(field);
     }
 
     MemberAccessStrategy getFieldAccessStrategy(IRGenModule &IGM,

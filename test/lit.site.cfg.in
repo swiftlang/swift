@@ -51,6 +51,10 @@ msvc_runtime_flags = {
 config.swift_stdlib_msvc_runtime = \
     msvc_runtime_flags["@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@"]
 
+config.darwin_enable_maccatalyst = "@SWIFT_ENABLE_MACCATALYST@" == "TRUE"
+config.darwin_maccatalyst_build_flavor = "@BUILD_FLAVOR@"
+config.darwin_osx_variant_suffix = "@DEFAULT_OSX_VARIANT_SUFFIX@"
+
 # Please remember to handle empty strings and/or unset variables correctly.
 
 if "@SWIFT_ASAN_BUILD@" == "TRUE":
@@ -102,6 +106,9 @@ if "@CMAKE_GENERATOR@" == "Xcode":
       os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
 
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
+
+if "@SWIFT_ENABLE_MACCATALYST@" == "TRUE":
+    config.available_features.add('maccatalyst_support')
 
 if "@SWIFT_BUILD_SYNTAXPARSERLIB@" == "TRUE":
     config.available_features.add('syntax_parser_lib')

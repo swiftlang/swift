@@ -288,8 +288,7 @@ case (_, var e, 3) +++ (1, 2, 3):
 // expected-error@-2{{'var' binding pattern cannot appear in an expression}}
   ()
 case (let (_, _, _)) + 1:
-// expected-error@-1 2 {{'var' binding pattern cannot appear in an expression}}
-// expected-error@-2 {{expression pattern of type 'Int' cannot match values of type '(Int, Int, Int)'}}
+// expected-error@-1 {{expression pattern of type 'Int' cannot match values of type '(Int, Int, Int)'}}
   ()
 }
 
@@ -333,6 +332,6 @@ case (_?)?: break // expected-warning {{case is already handled by previous patt
 let (responseObject: Int?) = op1
 // expected-error @-1 {{expected ',' separator}} {{25-25=,}}
 // expected-error @-2 {{expected pattern}}
-// expected-error @-3 {{expression type 'Int?' is ambiguous without more context}}
+// expected-error @-3 {{cannot convert value of type 'Int?' to specified type '(responseObject: _)'}}
 
 

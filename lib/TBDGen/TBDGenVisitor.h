@@ -44,6 +44,21 @@ struct TBDGenOptions;
 
 namespace tbdgen {
 
+enum class LinkerPlatformId: uint8_t {
+#define LD_PLATFORM(Name, Id) Name = Id,
+#include "ldPlatformKinds.def"
+};
+
+struct InstallNameStore {
+  // The default install name to use when no specific install name is specified.
+  std::string InstallName;
+  // The install name specific to the platform id. This takes precedence over
+  // the default install name.
+  std::map<uint8_t, std::string> PlatformInstallName;
+  StringRef getInstallName(LinkerPlatformId Id) const;
+  void remark(ASTContext &Ctx, StringRef ModuleName) const;
+};
+
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 public:
   llvm::MachO::InterfaceFile &Symbols;
@@ -54,8 +69,17 @@ public:
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
   const TBDGenOptions &Opts;
+  Decl* TopLevelDecl = nullptr;
 
 private:
+  std::unique_ptr<std::map<std::string, InstallNameStore>>
+    previousInstallNameMap;
+  std::unique_ptr<std::map<std::string, InstallNameStore>>
+    parsePreviousModuleInstallNameMap();
+  void addSymbolInternal(StringRef name, llvm::MachO::SymbolKind kind,
+                         bool isLinkerDirective = false);
+  void addLinkerDirectiveSymbolsLdHide(StringRef name, llvm::MachO::SymbolKind kind);
+  void addLinkerDirectiveSymbolsLdPrevious(StringRef name, llvm::MachO::SymbolKind kind);
   void addSymbol(StringRef name, llvm::MachO::SymbolKind kind =
                                      llvm::MachO::SymbolKind::GlobalSymbol);
 
@@ -82,7 +106,8 @@ public:
                 ModuleDecl *swiftModule, const TBDGenOptions &opts)
       : Symbols(symbols), Targets(targets), StringSymbols(stringSymbols),
         DataLayout(dataLayout), UniversalLinkInfo(universalLinkInfo),
-        SwiftModule(swiftModule), Opts(opts) {}
+        SwiftModule(swiftModule), Opts(opts),
+        previousInstallNameMap(parsePreviousModuleInstallNameMap())  {}
 
   void addMainIfNecessary(FileUnit *file) {
     // HACK: 'main' is a special symbol that's always emitted in SILGen if

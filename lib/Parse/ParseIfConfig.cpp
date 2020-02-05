@@ -311,6 +311,16 @@ public:
         D.diagnose(Loc, diag::note_typo_candidate, suggestion)
           .fixItReplace(Arg->getSourceRange(), suggestion);
     }
+    else if (!suggestedValues.empty()) {
+      // The value the user gave has been replaced by something newer.
+      assert(suggestedValues.size() == 1 && "only support one replacement");
+      auto replacement = suggestedValues.front();
+
+      auto Loc = Arg->getLoc();
+      D.diagnose(Loc, diag::renamed_platform_condition_argument,
+                 *ArgStr, replacement)
+        .fixItReplace(Arg->getSourceRange(), replacement);
+    }
 
     return E;
   }

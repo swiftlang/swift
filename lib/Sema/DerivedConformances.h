@@ -109,6 +109,12 @@ public:
   /// \returns the derived member, which will also be added to the type.
   Type deriveCaseIterable(AssociatedTypeDecl *assocType);
 
+  /// Determine if a RawRepresentable requirement can be derived for a type.
+  ///
+  /// This is implemented for non-empty enums without associated values,
+  /// that declare a raw type in the inheritance clause.
+  static bool canDeriveRawRepresentable(DeclContext *DC, NominalTypeDecl *type);
+
   /// Derive a RawRepresentable requirement for an enum, if it has a valid
   /// raw type and raw values for all of its cases.
   ///
@@ -188,9 +194,6 @@ public:
   ///
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDecodable(ValueDecl *requirement);
-
-  /// Derive the CodingKeys requirement for a value type.
-  TypeDecl *derivePhantomCodingKeysRequirement();
 
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>

@@ -30,13 +30,11 @@ import os
 import platform
 import sys
 
-from build_swift import argparse, defaults
-from swift_build_support.swift_build_support import (
-    shell,
-    xcrun,
-)
+from build_swift.build_swift import argparse, defaults
+from build_swift.build_swift.wrappers import xcrun
+
+from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support.SwiftBuildSupport import (
-    HOME,
     SWIFT_BUILD_ROOT,
     SWIFT_SOURCE_ROOT,
 )

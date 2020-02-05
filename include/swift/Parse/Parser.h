@@ -120,10 +120,16 @@ public:
   DeclContext *CurDeclContext;
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
-  std::vector<std::pair<SourceLoc, std::vector<ParamDecl*>>> AnonClosureVars;
+  std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
 
-  bool IsParsingInterfaceTokens = false;
-  
+  NullablePtr<llvm::MD5> CurrentTokenHash;
+  void recordTokenHash(const Token Tok) {
+    if (!Tok.getText().empty())
+      recordTokenHash(Tok.getText());
+  }
+
+  void recordTokenHash(StringRef token);
+
   /// DisabledVars is a list of variables for whom local name lookup is
   /// disabled.  This is used when parsing a PatternBindingDecl to reject self
   /// uses and to disable uses of the bound variables in a let/else block.  The
@@ -857,10 +863,18 @@ public:
                            TopLevelCodeDecl *TLCD);
 
   ParserStatus parseBraceItems(SmallVectorImpl<ASTNode> &Decls,
+                               BraceItemListKind Kind,
+                               BraceItemListKind ConditionalBlockKind,
+                               bool &IsFollowingGuard);
+  ParserStatus parseBraceItems(SmallVectorImpl<ASTNode> &Decls,
                                BraceItemListKind Kind =
                                    BraceItemListKind::Brace,
                                BraceItemListKind ConditionalBlockKind =
-                                   BraceItemListKind::Brace);
+                                   BraceItemListKind::Brace) {
+    bool IsFollowingGuard = false;
+    return parseBraceItems(Decls, Kind, ConditionalBlockKind,
+                           IsFollowingGuard);
+  }
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
   
   //===--------------------------------------------------------------------===//
@@ -869,7 +883,7 @@ public:
   /// Return true if parser is at the start of a decl or decl-import.
   bool isStartOfDecl();
 
-  bool parseTopLevel();
+  void parseTopLevel();
 
   /// Flags that control the parsing of declarations.
   enum ParseDeclFlags {
@@ -913,7 +927,8 @@ public:
                                bool IsAtStartOfLineOrPreviousHadSemi,
                                llvm::function_ref<void(Decl*)> Handler);
 
-  std::vector<Decl *> parseDeclListDelayed(IterableDeclContext *IDC);
+  std::pair<std::vector<Decl *>, Optional<std::string>>
+  parseDeclListDelayed(IterableDeclContext *IDC);
 
   bool parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                            SourceLoc PosBeforeLB,
@@ -994,13 +1009,22 @@ public:
       Optional<DeclNameRefWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
 
-  /// Parse a differentiation parameters clause.
-  bool parseDifferentiationParametersClause(
-      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
+  /// Parse a differentiability parameters clause, i.e. the 'wrt:' clause in
+  /// `@differentiable`, `@derivative`, and `@transpose` attributes.
+  ///
+  /// If `allowNamedParameters` is false, allow only index parameters and
+  /// 'self'. Used for `@transpose` attributes.
+  bool parseDifferentiabilityParametersClause(
+      SmallVectorImpl<ParsedAutoDiffParameter> &parameters, StringRef attrName,
+      bool allowNamedParameters = true);
 
   /// Parse the @derivative attribute.
   ParserResult<DerivativeAttr> parseDerivativeAttribute(SourceLoc AtLoc,
                                                         SourceLoc Loc);
+
+  /// Parse the @transpose attribute.
+  ParserResult<TransposeAttr> parseTransposeAttribute(SourceLoc AtLoc,
+                                                      SourceLoc Loc);
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
@@ -1042,10 +1066,10 @@ public:
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
                              Parser::ParseDeclOptions Options,
                              llvm::function_ref<void(Decl*)> handler);
-  std::vector<Decl *> parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                                    Diag<> ErrorDiag, ParseDeclOptions Options,
-                                    IterableDeclContext *IDC,
-                                    bool &hadError);
+  std::pair<std::vector<Decl *>, Optional<std::string>>
+  parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
+                ParseDeclOptions Options, IterableDeclContext *IDC,
+                bool &hadError);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
   ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,
@@ -1143,7 +1167,19 @@ public:
                                      SourceLoc &LAngleLoc,
                                      SourceLoc &RAngleLoc);
 
-  ParserResult<TypeRepr> parseTypeIdentifier();
+  /// Parses a type identifier (e.g. 'Foo' or 'Foo.Bar.Baz').
+  ///
+  /// When `isParsingQualifiedDeclBaseType` is true:
+  /// - Parses and returns the base type for a qualified declaration name,
+  ///   positioning the parser at the '.' before the final declaration name.
+  //    This position is important for parsing final declaration names like
+  //    '.init' via `parseUnqualifiedDeclName`.
+  /// - For example, 'Foo.Bar.f' parses as 'Foo.Bar' and the parser is
+  ///   positioned at '.f'.
+  /// - If there is no base type qualifier (e.g. when parsing just 'f'), returns
+  ///   an empty parser error.
+  ParserResult<TypeRepr> parseTypeIdentifier(
+      bool isParsingQualifiedDeclBaseType = false);
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<TypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
@@ -1357,6 +1393,14 @@ public:
   bool canParseAsGenericArgumentList();
 
   bool canParseType();
+
+  /// Returns true if a simple type identifier can be parsed.
+  ///
+  /// \verbatim
+  ///   simple-type-identifier: identifier generic-argument-list?
+  /// \endverbatim
+  bool canParseSimpleTypeIdentifier();
+
   bool canParseTypeIdentifier();
   bool canParseTypeIdentifierOrTypeComposition();
   bool canParseOldStyleProtocolComposition();
@@ -1365,6 +1409,13 @@ public:
   bool canParseGenericArguments();
 
   bool canParseTypedPattern();
+
+  /// Returns true if a qualified declaration name base type can be parsed.
+  ///
+  /// \verbatim
+  ///   qualified-decl-name-base-type: simple-type-identifier '.'
+  /// \endverbatim
+  bool canParseBaseTypeForQualifiedDeclName();
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
@@ -1479,6 +1530,8 @@ public:
   ///     identifier (',' identifier)* func-signature-result? 'in'
   /// \endverbatim
   ///
+  /// \param bracketRange The range of the brackets enclosing a capture list, if
+  /// present. Needed to offer fix-its for inserting 'self' into a capture list.
   /// \param captureList The entries in the capture list.
   /// \param params The parsed parameter list, or null if none was provided.
   /// \param arrowLoc The location of the arrow, if present.
@@ -1487,12 +1540,14 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool parseClosureSignatureIfPresent(
-                                SmallVectorImpl<CaptureListEntry> &captureList,
-                                      ParameterList *&params,
-                                      SourceLoc &throwsLoc,
-                                      SourceLoc &arrowLoc,
-                                      TypeRepr *&explicitResultType,
-                                      SourceLoc &inLoc);
+          SourceRange &bracketRange,
+          SmallVectorImpl<CaptureListEntry> &captureList,
+          VarDecl *&capturedSelfParamDecl,
+          ParameterList *&params,
+          SourceLoc &throwsLoc,
+          SourceLoc &arrowLoc,
+          TypeRepr *&explicitResultType,
+          SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok,
@@ -1555,7 +1610,8 @@ public:
   ParserResult<Stmt> parseStmtGuard();
   ParserResult<Stmt> parseStmtWhile(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtRepeat(LabeledStmtInfo LabelInfo);
-  ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo);
+  ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo,
+                                 bool shouldSkipDoTokenConsume = false);
   ParserResult<CatchStmt> parseStmtCatch();
   ParserResult<Stmt> parseStmtForEach(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
@@ -1607,12 +1663,8 @@ public:
   //===--------------------------------------------------------------------===//
   // Code completion second pass.
 
-  static void
-  performCodeCompletionSecondPass(PersistentParserState &ParserState,
-                                  CodeCompletionCallbacksFactory &Factory);
-
   void performCodeCompletionSecondPassImpl(
-      PersistentParserState::CodeCompletionDelayedDeclState &info);
+      CodeCompletionDelayedDeclState &info);
 };
 
 /// Describes a parsed declaration name.

@@ -206,6 +206,42 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
     
   return outBuf;
 }
+#elif defined(__wasi__)
+#include <wasi/api.h>
+#include <wasi/libc.h>
+#include <stdlib.h>
+
+SWIFT_RUNTIME_STDLIB_API
+char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+  assert(outArgLen != nullptr);
+
+  if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
+    *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
+    return _swift_stdlib_ProcessOverrideUnsafeArgv;
+  }
+
+  __wasi_errno_t err;
+
+  size_t argv_buf_size;
+  size_t argc;
+  err = __wasi_args_sizes_get(&argc, &argv_buf_size);
+  if (err != __WASI_ERRNO_SUCCESS) return nullptr;
+
+  size_t num_ptrs = argc + 1;
+  char *argv_buf = (char *)malloc(argv_buf_size);
+  char **argv = (char **)calloc(num_ptrs, sizeof(char *));
+
+  err = __wasi_args_get((uint8_t **)argv, (uint8_t *)argv_buf);
+  if (err != __WASI_ERRNO_SUCCESS) {
+    free(argv_buf);
+    free(argv);
+    return nullptr;
+  }
+
+  *outArgLen = static_cast<int>(argc);
+
+  return argv;
+}
 #else // Add your favorite OS's command line arg grabber here.
 SWIFT_RUNTIME_STDLIB_API
 char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {

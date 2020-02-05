@@ -931,7 +931,7 @@ class ObjCMethodCall : public OutlinePattern {
   std::string OutlinedName;
   llvm::BitVector IsBridgedArgument;
   llvm::BitVector IsGuaranteedArgument;
-  BridgedReturn BridgedReturn;
+  ::BridgedReturn BridgedReturn;
 public:
   bool matchInstSequence(SILBasicBlock::iterator I) override;
 

@@ -55,17 +55,27 @@ protected:
                                      const JobContext &context) const override;
     
   void validateArguments(DiagnosticEngine &diags,
-                         const llvm::opt::ArgList &args) const override;
+                         const llvm::opt::ArgList &args,
+                         StringRef defaultTarget) const override;
 
   std::string findProgramRelativeToSwiftImpl(StringRef name) const override;
 
   bool shouldStoreInvocationInDebugInfo() const override;
 
+  const Optional<llvm::Triple> TargetVariant;
+
 public:
-  Darwin(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
+  Darwin(const Driver &D, const llvm::Triple &Triple,
+         const Optional<llvm::Triple> &TargetVariant) :
+      ToolChain(D, Triple), TargetVariant(TargetVariant) {}
+
   ~Darwin() = default;
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,
                                       bool shared = true) const override;
+  
+  Optional<llvm::Triple> getTargetVariant() const {
+    return TargetVariant;
+  }
 };
 
 class LLVM_LIBRARY_VISIBILITY Windows : public ToolChain {

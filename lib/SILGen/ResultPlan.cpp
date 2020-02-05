@@ -105,8 +105,7 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
     MakeAbstractConformanceForGenericType());
 
   return std::make_tuple(mappedTy->getCanonicalType(mappedSig),
-                         mappedSig->getCanonicalSignature(),
-                         mappedSubs);
+                         mappedSig.getCanonicalSignature(), mappedSubs);
 }
 
 /// A result plan for an indirectly-returned opened existential value.
@@ -149,11 +148,11 @@ public:
     SubstitutionMap layoutSubs;
     std::tie(layoutTy, layoutSig, layoutSubs)
       = mapTypeOutOfOpenedExistentialContext(resultTy);
-    
-    auto boxLayout = SILLayout::get(SGF.getASTContext(),
-      layoutSig->getCanonicalSignature(),
-      SILField(layoutTy->getCanonicalType(layoutSig), true));
-    
+
+    auto boxLayout =
+        SILLayout::get(SGF.getASTContext(), layoutSig.getCanonicalSignature(),
+                       SILField(layoutTy->getCanonicalType(layoutSig), true));
+
     resultBox = SGF.B.createAllocBox(loc,
       SILBoxType::get(SGF.getASTContext(),
                       boxLayout,

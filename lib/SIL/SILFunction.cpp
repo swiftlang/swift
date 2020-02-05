@@ -167,6 +167,17 @@ bool SILFunction::hasForeignBody() const {
   return SILDeclRef::isClangGenerated(getClangNode());
 }
 
+const SILFunction *SILFunction::getOriginOfSpecialization() const {
+  if (!isSpecialization())
+    return nullptr;
+
+  const SILFunction *p = getSpecializationInfo()->getParent();
+  while (p->isSpecialization()) {
+    p = p->getSpecializationInfo()->getParent();
+  }
+  return p;
+}
+
 void SILFunction::numberValues(llvm::DenseMap<const SILNode*, unsigned> &
                                  ValueToNumberMap) const {
   unsigned idx = 0;
@@ -220,7 +231,7 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
                                                SILType type) const {
   assert(!type.hasArchetype());
 
-  auto genericSig = getGenericSignature()->getCanonicalSignature();
+  auto genericSig = getGenericSignature().getCanonicalSignature();
   return type.subst(M,
                     QueryInterfaceTypeSubstitutions(this),
                     LookUpConformanceInSignature(genericSig.getPointer()),

@@ -71,7 +71,9 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                       "trailingclosure", "Perform trailing closure refactoring"),
            clEnumValN(RefactoringKind::ReplaceBodiesWithFatalError,
                       "replace-bodies-with-fatalError", "Perform trailing closure refactoring"),
-           clEnumValN(RefactoringKind::MemberwiseInitLocalRefactoring, "memberwise-init", "Generate member wise initializer")));
+           clEnumValN(RefactoringKind::MemberwiseInitLocalRefactoring, "memberwise-init", "Generate member wise initializer"),
+           clEnumValN(RefactoringKind::ConvertToComputedProperty,
+                   "convert-to-computed-property", "Convert from field initialization to computed property")));
 
 
 static llvm::cl::opt<std::string>

@@ -29,4 +29,9 @@ EDUCATIONAL_NOTES(associated_type_witness_conform_impossible,
 EDUCATIONAL_NOTES(cannot_infer_closure_result_type,
                   "complex-closure-inference.md")
 
+EDUCATIONAL_NOTES(invalid_dynamic_callable_type,
+                  "dynamic-callable-requirements.md")
+EDUCATIONAL_NOTES(missing_dynamic_callable_kwargs_method,
+                  "dynamic-callable-requirements.md")
+
 #undef EDUCATIONAL_NOTES

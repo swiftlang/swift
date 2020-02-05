@@ -14,6 +14,7 @@
 // RUN: touch %t/lib/swift/clang/lib/darwin/libclang_rt.osx.a %t/lib/swift/clang/lib/darwin/libclang_rt.ios.a %t/lib/swift/clang/lib/darwin/libclang_rt.tvos.a %t/lib/swift/clang/lib/darwin/libclang_rt.watchos.a
 
 // RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-MACOS %s
+// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-ios13.0-macabi %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-MACCATALYST %s
 
 // RUN: %t/bin/swiftc -driver-print-jobs -target i386-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOS %s
 // RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOS %s
@@ -31,6 +32,7 @@
 
 // CHECK: {{(bin/)?}}ld{{(.exe)?"? }}
 // CHECK-NO-RUNTIME-NOT: libclang_rt
+// CHECK-MACCATALYST-SAME: {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)clang(/|\\\\)lib(/|\\\\)darwin(/|\\\\)libclang_rt.osx.a}}
 // CHECK-MACOS-SAME: {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)clang(/|\\\\)lib(/|\\\\)darwin(/|\\\\)libclang_rt.osx.a}}
 // CHECK-IOS-SAME: {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)clang(/|\\\\)lib(/|\\\\)darwin(/|\\\\)libclang_rt.ios.a}}
 // CHECK-TVOS-SAME: {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)clang(/|\\\\)lib(/|\\\\)darwin(/|\\\\)libclang_rt.tvos.a}}
