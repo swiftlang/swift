@@ -1692,7 +1692,20 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(argumentLocator);
 
-    auto *anchor = locator.trySimplifyToExpr();
+    auto *loc = getConstraintLocator(locator);
+
+    // If this is conversion between optional (or IUO) parameter
+    // and argument, let's drop the last path element so locator
+    // could be simplified down to an argument expression.
+    //
+    // func foo(_: ((Int, Int) -> Void)?) {}
+    // _ = foo { _ in } <- missing second closure parameter.
+    if (loc->isLastElement<LocatorPathElt::OptionalPayload>()) {
+      auto path = loc->getPath();
+      loc = getConstraintLocator(loc->getAnchor(), path.drop_back());
+    }
+
+    auto *anchor = simplifyLocatorToAnchor(loc);
     if (!anchor)
       return getTypeMatchFailure(argumentLocator);
 
@@ -1700,12 +1713,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     // using parameter as a template.
     if (diff < 0) {
       if (fixMissingArguments(*this, anchor, func1Params, func2Params,
-                              abs(diff), locator))
+                              abs(diff), loc))
         return getTypeMatchFailure(argumentLocator);
     } else {
       // If there are extraneous arguments, let's remove
       // them from the list.
-      if (fixExtraneousArguments(*this, func2, func1Params, diff, locator))
+      if (fixExtraneousArguments(*this, func2, func1Params, diff, loc))
         return getTypeMatchFailure(argumentLocator);
 
       // Drop all of the extraneous arguments.

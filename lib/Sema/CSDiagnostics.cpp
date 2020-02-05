@@ -4100,7 +4100,12 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
   if (locator->isForContextualType()) {
     funcType = cs.getContextualType(locator->getAnchor())->getAs<FunctionType>();
   } else if (auto info = cs.getFunctionArgApplyInfo(locator)) {
-    funcType = info->getParamType()->getAs<FunctionType>();
+    auto paramType = info->getParamType();
+    // Drop a single layer of optionality because argument could get injected
+    // into optional and that doesn't contribute to the problem.
+    if (auto objectType = paramType->getOptionalObjectType())
+      paramType = objectType;
+    funcType = paramType->getAs<FunctionType>();
   } else if (locator->isLastElement<LocatorPathElt::ClosureResult>()) {
     // Based on the locator we know this this is something like this:
     // `let _: () -> ((Int) -> Void) = { return {} }`.
