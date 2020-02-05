@@ -9,21 +9,17 @@
 // REQUIRES: CPU=arm64 || CPU=x86_64
 
 protocol P {
-  func modifyIt()
+  mutating func modifyIt()
   var computed: Int { get set }
-  
-  subscript(a: Int, b: Bool, c: Int?) -> Int { get set }
 }
 
 struct GenStruct<T : P> : P {
   var st: T
   var computed: Int { get { st.computed } set { st.computed = newValue } }
   
-  subscript(a: Int, b: Bool, c: Int?) -> Int { get { st[a, b, c] } set { st[a, b, c] = newValue } }
-  
   init(_ st: T) { self.st = st }
 
-  func modifyIt() {
+  mutating func modifyIt() {
     st.modifyIt()
   }
 }
@@ -34,10 +30,11 @@ final class GenClass<T : P> : P {
   var ct: T
   var computed: Int { get { ct.computed } set { ct.computed = newValue } }
   
-  subscript(a: Int, b: Bool, c: Int?) -> Int { get { ct[a, b, c] } set { ct[a, b, c] = newValue } }
+  var gs: GenStruct<T>
 
   init(_ ct: T) {
     self.ct = ct
+    self.gs = .init(ct)
     numGenClassObjs += 1
   }
 
@@ -62,11 +59,21 @@ final class DerivedClass2 : DerivedClass<Int> {
 
 final class SimpleClass : P {
   var i: Int
-  var array = [1, 2, 3, 4, 5]
   static var numObjs = 0
+  
+  var tuple = (0, 1)
+  
+  struct Nested {
+    var i: Int = 0
+    
+    @inline(never)
+    var computedGenClass: GenClass<SimpleStruct> { GenClass(SimpleStruct(i: i)) }
+  }
+  var opt: Nested?
 
-  init(_ i: Int) {
+  init(_ i: Int, nested: Int? = nil) {
     self.i = i
+    self.opt = nested.map { Nested(i: $0) }
     Self.numObjs += 1
   }
 
@@ -79,14 +86,9 @@ final class SimpleClass : P {
   }
   
   var computed: Int { get { i + 1 } set { i = newValue - 1} }
-  
-  subscript(a: Int, b: Bool, c: Int?) -> Int {
-    get { precondition(!b && c == nil, "arguments are corrupt"); return array[a] }
-    set { precondition(b && c == 42, "arguments are corrupt"); array[a] = newValue }
-  }
 }
 
-struct SimpleStruct {
+struct SimpleStruct: P {
   var tuple = (0, 1)
   
   struct Nested {
@@ -94,7 +96,18 @@ struct SimpleStruct {
   }
   var opt: Nested?
   
+  struct Nested2 {
+    var opt: Nested?
+  }
+  var opt2: Nested2?
+  
   var i = 0
+  
+  init(i: Int = 0) { self.i = i }
+
+  mutating func modifyIt() {
+    i += 10
+  }
   
   var computed: Int { get { i + 1 } set { i = newValue - 1} }
 }
@@ -311,6 +324,23 @@ func testGetter<T : P>(_ s: GenStruct<T>) -> Int {
   return s[keyPath: kp]
 }
 
+// CHECK-LABEL: sil {{.*}} [noinline] {{.*}}testClassMemberGetter
+// CHECK: [[E:%[0-9]+]] = ref_element_addr
+// CHECK: [[M:%[0-9]+]] = begin_access [read] [dynamic] [[E]]
+// CHECK: [[A:%[0-9]+]] = alloc_stack $Int
+// CHECK: [[F:%[0-9]+]] = function_ref {{.*}}computed
+// CHECK: apply [[F]]<T>([[A]], [[M]])
+// CHECK: end_access
+// destroy_addr gets optimized out
+// CHECK: dealloc_stack [[A]]
+// CHECK: return
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testClassMemberGetter<T : P>(_ c: GenClass<T>) -> Int {
+  let kp = \GenClass<T>.gs.computed
+  return c[keyPath: kp]
+}
+
 // CHECK-LABEL: sil {{.*}}testComputedModify
 // CHECK: [[A:%[0-9]+]] = alloc_stack $Int
 // CHECK: [[G:%[0-9]+]] = function_ref {{.*}}computed
@@ -328,28 +358,24 @@ func testComputedModify<T : P>(_ s: inout GenStruct<T>) {
   s[keyPath: kp] += 10
 }
 
-// CHECK-LABEL: sil {{.*}}testSubscript
-// CHECK: [[I1:%[0-9]+]] = alloc_stack $Int
-// CHECK: [[C1:%[0-9]+]] = alloc_stack $(Int, Bool, Optional<Int>)
-// CHECK: [[A1:%[0-9]+]] = address_to_pointer [[C1]]
-// CHECK: [[R1:%[0-9]+]] = struct $UnsafeRawPointer ([[A1]]
-// CHECK: [[G:%[0-9]+]] = function_ref
-// CHECK: apply [[G]]<T>([[I1]], {{%[0-9]+}}, [[R1]])
-// CHECK: dealloc_stack [[C1]]
-//
-// CHECK: [[I2:%[0-9]+]] = alloc_stack $Int
-// CHECK: [[C2:%[0-9]+]] = alloc_stack $(Int, Bool, Optional<Int>)
-// CHECK: [[A2:%[0-9]+]] = address_to_pointer [[C2]]
-// CHECK: [[R2:%[0-9]+]] = struct $UnsafeRawPointer ([[A2]]
-// CHECK: [[S:%[0-9]+]] = function_ref
-// CHECK: apply [[S]]<T>([[I2]], {{%[0-9]+}}, [[R2]])
-// CHECK: dealloc_stack [[C2]]
+// CHECK-LABEL: sil {{.*}}testComputedModify
+// CHECK: [[E:%[0-9]+]] = ref_element_addr
+// CHECK: [[M:%[0-9]+]] = begin_access [modify] [dynamic] [[E]]
+// CHECK: [[A:%[0-9]+]] = alloc_stack $Int
+// CHECK: [[G:%[0-9]+]] = function_ref {{.*}}computed
+// CHECK: apply [[G]]<T>([[A]], [[M]])
+// CHECK: store {{%[0-9]+}} to [[A]]
+// CHECK: [[S:%[0-9]+]] = function_ref {{.*}}computed
+// CHECK: apply [[S]]<T>([[A]], [[M]])
+// destroy_addr gets optimized out
+// CHECK: dealloc_stack [[A]]
+// CHECK: end_access
+// CHECK: return
 @inline(never)
 @_semantics("optimize.sil.specialize.generic.never")
-func testSubscript<T : P>(_ s: inout GenStruct<T>) {
-  let kp1 = \GenStruct<T>[1, true, 42]
-  let kp2 = \GenStruct<T>[2, false, nil]
-  s[keyPath: kp1] = s[keyPath: kp2]
+func testClassMemberComputedModify<T : P>(_ s: inout GenClass<T>) {
+  let kp = \GenClass<T>.gs.computed
+  s[keyPath: kp] += 10
 }
 
 // CHECK-LABEL: sil {{.*}}testModifyOptionalForce
@@ -364,6 +390,24 @@ func testSubscript<T : P>(_ s: inout GenStruct<T>) {
 @_semantics("optimize.sil.specialize.generic.never")
 func testModifyOptionalForce(_ s: inout SimpleStruct) {
   let kp = \SimpleStruct.opt!.i
+  s[keyPath: kp] += 10
+}
+
+// CHECK-LABEL: sil {{.*}}testModifyOptionalForceClass
+// CHECK: [[O:%[0-9]+]] = ref_element_addr
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[O]]
+// CHECK: [[F:%[0-9]+]] = select_enum
+// CHECK: cond_fail [[F]]
+// CHECK: unchecked_enum_data [[E1:%[0-9]+]]
+// CHECK: [[E2:%[0-9]+]] = init_enum_data_addr [[E1:%[0-9]+]]
+// CHECK: store {{%[0-9]+}} to [[E2]]
+// CHECK: inject_enum_addr [[E1]]
+// CHECK: end_access
+// CHECK: return
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testModifyOptionalForceClass(_ s: inout SimpleClass) {
+  let kp = \SimpleClass.opt!.i
   s[keyPath: kp] += 10
 }
 
@@ -398,6 +442,80 @@ func testOptionalChain(_ s: SimpleStruct) -> Int? {
   return s[keyPath: kp]
 }
 
+// CHECK-LABEL: sil {{.*}}testOptionalChainClass
+// By the time the test gets run, lots of stack
+// allocations have been promoted to registers.
+//
+// CHECK: [[E1:%[0-9]+]] = ref_element_addr
+// CHECK: [[E2:%[0-9]+]] = begin_access [read] [dynamic] [no_nested_conflict] [[E1]]
+//     Check if value is null
+// CHECK: switch_enum [[O:%[0-9]+]]
+// CHECK: {{bb.}}:
+//         Unwrap value
+//     CHECK: [[A1:%[0-9]+]] = alloc_stack
+//     CHECK: store [[O]] to [[A1]]
+//     CHECK: [[U:%[0-9]+]] = unchecked_take_enum_data_addr [[A1]]
+//         Access stored property & re-wrap result
+//     CHECK: [[I:%[0-9]+]] = struct_element_addr [[U]]
+//     CHECK: [[R1:%[0-9]+]] = enum
+//     CHECK: dealloc_stack [[A1]]
+//     CHECK: br [[CONTINUATION:bb.]]([[R1]] : $Optional<Int>)
+// CHECK: {{bb.}}:
+//         Store nil in result
+//     CHECK: [[R2:%[0-9]+]] = enum
+//     CHECK: br [[CONTINUATION]]([[R2]] : $Optional<Int>)
+// CHECK: [[CONTINUATION]]([[R:%[0-9]+]] : $Optional<Int>):
+// CHECK: end_access [[E2]]
+// CHECK: return [[R]]
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testOptionalChainClass(_ s: SimpleClass) -> Int? {
+  let kp = \SimpleClass.opt?.i
+  return s[keyPath: kp]
+}
+
+// CHECK-LABEL: sil {{.*}}testNestedOptionalChain
+// By the time the test gets run, lots of stack
+// allocations have been promoted to registers.
+//
+//     Check if value is null
+// CHECK: switch_enum [[O:%[0-9]+]]
+// CHECK: {{bb.}}:
+//         Unwrap value
+//     CHECK: [[A1:%[0-9]+]] = alloc_stack
+//     CHECK: store [[O]] to [[A1]]
+//     CHECK: [[U:%[0-9]+]] = unchecked_take_enum_data_addr [[A1]]
+//
+//         Unwrap nested optional
+//     CHECK: switch_enum [[O2:%[0-9]+]]
+//     CHECK: {{bb.}}:
+//         CHECK: [[A2:%[0-9]+]] = alloc_stack
+//         CHECK: store [[O2]] to [[A2]]
+//         CHECK: [[U2:%[0-9]+]] = unchecked_take_enum_data_addr [[A2]]
+//             Access stored property & re-wrap result
+//         CHECK: [[I:%[0-9]+]] = struct_element_addr [[U2]]
+//         CHECK: [[R1:%[0-9]+]] = enum
+//         CHECK: dealloc_stack [[A2]]
+//         CHECK: br [[CONT2:bb.]]([[R1]] : $Optional<Int>
+//     CHECK: {{bb.}}:
+//             Store nil in result
+//         CHECK: [[R2:%[0-9]+]] = enum
+//         CHECK: br [[CONT2]]([[R2]] : $Optional<Int>
+// CHECK: [[CONT2]]([[R3:%[0-9]+]] : $Optional<Int>):
+//     CHECK: dealloc_stack [[A1]]
+//     CHECK: br [[CONT1:bb.]]([[R3]] : $Optional<Int>)
+// CHECK: {{bb.}}:
+//         Store nil in result
+//     CHECK: [[R2:%[0-9]+]] = enum
+//     CHECK: br [[CONT1]]([[R2]] : $Optional<Int>)
+// CHECK: [[CONT1]]([[R:%[0-9]+]] : $Optional<Int>):
+// CHECK: return [[R]]
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testNestedOptionalChain(_ s: SimpleStruct) -> Int? {
+  let kp = \SimpleStruct.opt2?.opt?.i
+  return s[keyPath: kp]
+}
 
 // CHECK-LABEL: sil {{.*}}testGetOptionalForce
 // CHECK: [[F:%[0-9]+]] = select_enum [[O:%[0-9]+]]
@@ -413,6 +531,53 @@ func testOptionalChain(_ s: SimpleStruct) -> Int? {
 @_semantics("optimize.sil.specialize.generic.never")
 func testGetOptionalForce(_ s: SimpleStruct) -> Int {
   let kp = \SimpleStruct.opt!.i
+  return s[keyPath: kp]
+}
+
+// CHECK-LABEL: sil {{.*}}testGetOptionalForceClass
+// CHECK: [[R1:%[0-9]+]] = ref_element_addr
+// CHECK: [[R2:%[0-9]+]] = begin_access [read] [dynamic] [no_nested_conflict] [[R1]]
+// CHECK: [[F:%[0-9]+]] = select_enum [[O:%[0-9]+]]
+// CHECK: cond_fail [[F]]
+// CHECK: [[A:%[0-9]+]] = alloc_stack
+// CHECK: store [[O]] to [[A]]
+// CHECK: [[E2:%[0-9]+]] = unchecked_take_enum_data_addr [[A]]
+// CHECK: [[E3:%[0-9]+]] = struct_element_addr [[E2]]
+// CHECK: [[I:%[0-9]+]] = load [[E3]]
+// CHECK: dealloc_stack [[A]]
+// CHECK: end_access [[R2]]
+// CHECK: return [[I]]
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testGetOptionalForceClass(_ s: SimpleClass) -> Int {
+  let kp = \SimpleClass.opt!.i
+  return s[keyPath: kp]
+}
+
+// CHECK-LABEL: sil {{.*}}testGetComplex
+// opt
+// CHECK: [[E1:%[0-9]+]] = ref_element_addr
+// CHECK: [[B1:%[0-9]+]] = begin_access [read] [dynamic] [[E1]]
+// !
+// CHECK: [[F:%[0-9]+]] = select_enum [[O:%[0-9]+]]
+// CHECK: cond_fail [[F]]
+// computedGenClass
+// CHECK: [[F:%[0-9]+]] = function_ref
+// CHECK: apply [[F]]
+// CHECK: end_access [[B1]]
+// ct
+// CHECK: [[E3:%[0-9]+]] = ref_element_addr
+// CHECK: [[B2:%[0-9]+]] = begin_access [read] [dynamic] [no_nested_conflict] [[E3]]
+// tuple
+// CHECK: [[E4:%[0-9]+]] = struct_element_addr
+// 0
+// CHECK: [[E5:%[0-9]+]] = tuple_element_addr [[E4]]
+// CHECK: load [[E5]]
+// CHECK: end_access [[B2]]
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testGetComplex(_ s: SimpleClass) -> Int {
+  let kp = \SimpleClass.opt!.computedGenClass.ct.tuple.1
   return s[keyPath: kp]
 }
 
@@ -467,30 +632,54 @@ func testit() {
   // CHECK-OUTPUT: Getter: 51
   var s3 = GenStruct(SimpleClass(50))
   print("Getter: \(testGetter(s3))")
+  // CHECK-OUTPUT: ClassMemberGetter: 52
+  var c3 = GenClass(SimpleClass(51))
+  print("ClassMemberGetter: \(testClassMemberGetter(c3))")
   
   // CHECK-OUTPUT: ComputedModify: 61
   testComputedModify(&s3)
   print("ComputedModify: \(s3.computed)")
-  
-  // CHECK-OUTPUT: Subscript: [1, 3, 3, 4, 5]
-  testSubscript(&s3)
-  print("Subscript: \(s3.st.array)")
+  // CHECK-OUTPUT: ClassComputedModify: 62
+  testClassMemberComputedModify(&c3)
+  print("ClassComputedModify: \(c3.computed)")
   
   var s4 = SimpleStruct()
   // CHECK-OUTPUT: Tuple: 1
   testTuple(&s4)
   print("Tuple: \(s4.tuple.0)")
   
+  var c4 = SimpleClass(0)
+  
   // CHECK-OUTPUT: OptionalChain1: nil
   print("OptionalChain1: \(String(describing: testOptionalChain(s4)))")
+  // CHECK-OUTPUT: ClassOptionalChain1: nil
+  print("ClassOptionalChain1: \(String(describing: testOptionalChainClass(c4)))")
   
   // CHECK-OUTPUT: OptionalChain2: Optional(70)
   s4.opt = .init(i: 70)
   print("OptionalChain2: \(String(describing: testOptionalChain(s4)))")
+  // CHECK-OUTPUT: ClassOptionalChain2: Optional(71)
+  c4.opt = .init(i: 71)
+  print("ClassOptionalChain2: \(String(describing: testOptionalChainClass(c4)))")
   
   // CHECK-OUTPUT: OptionalForce: 80
   testModifyOptionalForce(&s4)
   print("OptionalForce: \(testGetOptionalForce(s4))")
+  // CHECK-OUTPUT: ClassOptionalForce: 81
+  testModifyOptionalForceClass(&c4)
+  print("ClassOptionalForce: \(testGetOptionalForceClass(c4))")
+  
+  // CHECK-OUTPUT: NestedOptionalChain1: nil
+  print("NestedOptionalChain1: \(String(describing: testNestedOptionalChain(s4)))")
+  // CHECK-OUTPUT: NestedOptionalChain2: nil
+  s4.opt2 = .init()
+  print("NestedOptionalChain2: \(String(describing: testNestedOptionalChain(s4)))")
+  // CHECK-OUTPUT: NestedOptionalChain3: Optional(90)
+  s4.opt2!.opt = .init(i: 90)
+  print("NestedOptionalChain3: \(String(describing: testNestedOptionalChain(s4)))")
+  
+  // CHECK-OUTPUT: testGetComplex: 1
+  print("testGetComplex: \(testGetComplex(c4))")
 }
 
 testit()

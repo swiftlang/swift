@@ -104,13 +104,13 @@ public:
       else
         parentAccessType = AccessType::Modify;
       
-      parent->project(parentAccessType, [&](SILValue parent) {
-        callback(builder.createStructElementAddr(loc, parent, storedProperty));
+      parent->project(parentAccessType, [&](SILValue parentValue) {
+        callback(builder.createStructElementAddr(loc, parentValue, storedProperty));
       });
     } else {
       // Accessing a class member -> reading the class
-      parent->project(AccessType::Get, [&](SILValue parent) {
-        SingleValueInstruction *Ref = builder.createLoad(loc, parent,
+      parent->project(AccessType::Get, [&](SILValue parentValue) {
+        SingleValueInstruction *Ref = builder.createLoad(loc, parentValue,
                                                          LoadOwnershipQualifier::Unqualified);
         
         // If we were previously accessing a class member, we're done now.
@@ -149,7 +149,6 @@ public:
         // end the access now
         if (beginAccess == addr) {
           insertEndAccess(beginAccess, builder);
-          beginAccess = nullptr;
         }
       });
     }
@@ -178,8 +177,8 @@ public:
     else
       parentAccessType = AccessType::Modify;
     
-    parent->project(parentAccessType, [&](SILValue parent) {
-      callback(builder.createTupleElementAddr(loc, parent,
+    parent->project(parentAccessType, [&](SILValue parentValue) {
+      callback(builder.createTupleElementAddr(loc, parentValue,
                                               component.getTupleIndex()));
     });
   }
@@ -203,7 +202,7 @@ public:
            KeyPathPatternComponent::Kind::SettableProperty);
     assert(accessType == AccessType::Get && "property is not settable");
     
-    parent->project(accessType, [&](SILValue parent) {
+    parent->project(accessType, [&](SILValue parentValue) {
       auto getter = component.getComputedPropertyGetter();
       
       // The callback expects a memory address it can read from,
@@ -212,35 +211,16 @@ public:
       SILType type = function.getLoweredType(component.getComponentType());
       auto addr = builder.createAllocStack(loc, type);
       
-      // Get subscript indices.
-      auto context = createContextContainer();
-      SILValue contextPtr = SILValue();
-      if (context) {
-        auto rawPtrType = builder.getASTContext().TheRawPointerType;
-        auto rawPtrLoweredType = function.getLoweredLoadableType(rawPtrType);
-        auto rawPtr = builder.createAddressToPointer(loc, context, rawPtrLoweredType);
-        
-        auto ptrDecl = builder.getASTContext().getUnsafeRawPointerDecl();
-        SILType ptrType = function.getLoweredType(ptrDecl->getDeclaredType());
-        contextPtr = builder.createStruct(loc, ptrType, {rawPtr});
-      }
+      assertHasNoContext();
+      assert(getter->getArguments().size() == 2);
       
       auto ref = builder.createFunctionRef(loc, getter);
-      if (contextPtr)
-        builder.createApply(loc, ref, subs, {addr, parent, contextPtr});
-      else
-        builder.createApply(loc, ref, subs, {addr, parent});
+      builder.createApply(loc, ref, subs, {addr, parentValue});
       
       // If we were previously accessing a class member, we're done now.
       insertEndAccess(beginAccess, builder);
-      beginAccess = nullptr;
       
       callback(addr);
-      
-      if (context) {
-        builder.createDestroyAddr(loc, context);
-        builder.createDeallocStack(loc, context);
-      }
       
       builder.createDestroyAddr(loc, addr);
       builder.createDeallocStack(loc, addr);
@@ -252,52 +232,11 @@ protected:
   SubstitutionMap subs;
   BeginAccessInst *&beginAccess;
   
-  // Creates the subscript index context for a computed property.
-  // Returns either null or a stack address that must be deallocated.
-  SILValue createContextContainer() {
-    auto indices = component.getSubscriptIndices();
-    if (indices.empty()) return SILValue();
-    
-    if (indices.size() == 1) {
-      auto index = indices.front();
-      auto addr = builder.createAllocStack(loc, index.LoweredType);
-      auto value = keyPath->getAllOperands()[index.Operand].get();
-      if (value->getType().isObject())
-        builder.createStore(loc, value, addr,
-                            StoreOwnershipQualifier::Unqualified);
-      else
-        builder.createCopyAddr(loc, value, addr,
-                               IsNotTake, IsInitialization);
-      return addr;
-    } else {
-      // Create a tuple containing the context.
-      std::vector<TupleTypeElt> elementTypes;
-      elementTypes.reserve(indices.size());
-      for (auto index : indices) {
-        elementTypes.push_back(TupleTypeElt(index.FormalType));
-      }
-      auto tupleType = TupleType::get(ArrayRef<TupleTypeElt>(elementTypes),
-                                      builder.getASTContext());
-      
-      auto &function = builder.getFunction();
-      SILType lowered = function.getLoweredType(tupleType);
-      
-      auto tupleAddr = builder.createAllocStack(loc, lowered);
-      
-      // Copy the context elements into the tuple.
-      for (size_t i = 0; i < indices.size(); i++) {
-        auto index = indices[i];
-        auto elementAddr = builder.createTupleElementAddr(loc, tupleAddr, i);
-        auto value = keyPath->getAllOperands()[index.Operand].get();
-        if (value->getType().isObject())
-          builder.createStore(loc, value, elementAddr,
-                              StoreOwnershipQualifier::Unqualified);
-        else
-          builder.createCopyAddr(loc, value, elementAddr,
-                                 IsNotTake, IsInitialization);
-      }
-      return tupleAddr;
-    }
+  void assertHasNoContext() {
+    assert(component.getSubscriptIndices().empty() &&
+           component.getExternalSubstitutions().empty() &&
+           "cannot yet optimize key path component with external context; "
+           "we should have checked for this before trying to project");
   }
 };
 
@@ -330,10 +269,14 @@ public:
         if (component.isComputedSettablePropertyMutating()) {
           // A mutating setter modifies the parent
           parentAccessType = AccessType::Modify;
-          if (beginAccess) beginAccess->setAccessKind(SILAccessKind::Modify);
-        } else parentAccessType = AccessType::Get;
+          if (beginAccess) {
+            beginAccess->setAccessKind(SILAccessKind::Modify);
+          }
+        } else {
+            parentAccessType = AccessType::Get;
+        }
         
-        parent->project(parentAccessType, [&](SILValue parent) {
+        parent->project(parentAccessType, [&](SILValue parentValue) {
           auto getter = component.getComputedPropertyGetter();
           auto setter = component.getComputedPropertySetter();
           
@@ -342,28 +285,16 @@ public:
           auto &function = builder.getFunction();
           SILType type = function.getLoweredType(component.getComponentType());
           auto addr = builder.createAllocStack(loc, type);
-          
-          // Get subscript indices.
-          auto context = createContextContainer();
-          SILValue contextPtr = SILValue();
-          if (context) {
-            auto rawPtrType = builder.getASTContext().TheRawPointerType;
-            auto rawPtrLoweredType = function.getLoweredLoadableType(rawPtrType);
-            auto rawPtr = builder.createAddressToPointer(loc, context, rawPtrLoweredType);
-            
-            auto ptrDecl = builder.getASTContext().getUnsafeRawPointerDecl();
-            SILType ptrType = function.getLoweredType(ptrDecl->getDeclaredType());
-            contextPtr = builder.createStruct(loc, ptrType, {rawPtr});
-          }
+
+          assertHasNoContext();
+          assert(getter->getArguments().size() == 2);
+          assert(setter->getArguments().size() == 2);
           
           // If this is a modify, we need to call the getter and
           // store the result in the writeback buffer.
           if (accessType == AccessType::Modify) {
             auto getterRef = builder.createFunctionRef(loc, getter);
-            if (contextPtr)
-              builder.createApply(loc, getterRef, subs, {addr, parent, contextPtr});
-            else
-              builder.createApply(loc, getterRef, subs, {addr, parent});
+            builder.createApply(loc, getterRef, subs, {addr, parentValue});
           }
           
           // The callback function will write into the writeback buffer.
@@ -371,15 +302,7 @@ public:
           
           // Pass the value from the writeback buffer to the setter.
           auto setterRef = builder.createFunctionRef(loc, setter);
-          if (contextPtr)
-            builder.createApply(loc, setterRef, subs, {addr, parent, contextPtr});
-          else
-            builder.createApply(loc, setterRef, subs, {addr, parent});
-          
-          if (context) {
-            builder.createDestroyAddr(loc, context);
-            builder.createDeallocStack(loc, context);
-          }
+          builder.createApply(loc, setterRef, subs, {addr, parentValue});
           
           // Deallocate the writeback buffer.
           builder.createDestroyAddr(loc, addr);
@@ -389,7 +312,6 @@ public:
     }
   }
 };
-
 
 class OptionalWrapProjector : public ComponentProjector {
 public:
@@ -404,7 +326,7 @@ public:
            KeyPathPatternComponent::Kind::OptionalWrap);
     assert(accessType == AccessType::Get && "optional wrap components are immutable");
     
-    parent->project(AccessType::Get, [&](SILValue parent) {
+    parent->project(AccessType::Get, [&](SILValue parentValue) {
       auto &function = builder.getFunction();
       SILType optType = function.getLoweredType(component.getComponentType());
       SILType objType = optType.getOptionalObjectType().getAddressType();
@@ -418,7 +340,7 @@ public:
       auto someDecl = builder.getASTContext().getOptionalSomeDecl();
       auto objAddr = builder.createInitEnumDataAddr(loc, optAddr,
                                                     someDecl, objType);
-      builder.createCopyAddr(loc, parent, objAddr, IsNotTake, IsInitialization);
+      builder.createCopyAddr(loc, parentValue, objAddr, IsNotTake, IsInitialization);
       
       // Initialize the Optional enum.
       builder.createInjectEnumAddr(loc, optAddr, someDecl);
@@ -578,9 +500,6 @@ private:
   SILValue optionalChainResult;
 };
 
-
-
-
 /// A projector to handle a complete key path.
 class CompleteKeyPathProjector : public KeyPathProjector {
 public:
@@ -717,6 +636,21 @@ KeyPathProjector::create(SILValue keyPath, SILValue root,
   auto *kpInst = dyn_cast<KeyPathInst>(keyPath);
   if (!kpInst || !kpInst->hasPattern())
     return nullptr;
+  
+  // Check if the keypath only contains patterns which we support.
+  auto components = kpInst->getPattern()->getComponents();
+  for (const KeyPathPatternComponent &comp : components) {
+    if (comp.getKind() == KeyPathPatternComponent::Kind::GettableProperty ||
+        comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty) {
+      if (!comp.getExternalSubstitutions().empty() ||
+          !comp.getSubscriptIndices().empty()) {
+        // TODO: right now we can't optimize computed properties that require
+        // additional context for subscript indices or generic environment
+        // See https://github.com/apple/swift/pull/28799#issuecomment-570299845
+        return nullptr;
+      }
+    }
+  }
 
   return std::make_unique<CompleteKeyPathProjector>(kpInst, root,
                                                     loc, builder);
