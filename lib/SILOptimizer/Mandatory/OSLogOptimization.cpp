@@ -766,11 +766,19 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     PartialApplyInst *papply = builder.createPartialApply(
         loc, functionRef, callSubstMap, capturedSILVals, convention);
     // The type of the created closure must be a lowering of the expected type.
-    SILType resultType = papply->getType();
+    auto resultType = papply->getType().castTo<SILFunctionType>();
     CanType expectedCanType = expectedType->getCanonicalType();
-    assert(expectedType->is<SILFunctionType>()
-               ? resultType.getASTType() == expectedCanType
-               : resultType.is<SILFunctionType>());
+    if (auto expectedFnType = dyn_cast<SILFunctionType>(expectedCanType)) {
+      assert(expectedFnType->getUnsubstitutedType(module)
+               == resultType->getUnsubstitutedType(module));
+      // Convert to the expected type if necessary.
+      if (expectedFnType != resultType) {
+        auto convert = builder.createConvertFunction(loc, papply,
+                               SILType::getPrimitiveObjectType(expectedFnType),
+                               false);
+        return convert;
+      }
+    }
     return papply;
   }
   default: {
