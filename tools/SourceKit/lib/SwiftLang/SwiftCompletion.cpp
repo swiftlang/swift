@@ -502,6 +502,22 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
     Info.SemanticContext = CCCtxOtherModule; break;
   }
 
+  static UIdent CCTypeRelUnrelated("source.codecompletion.typerelation.unrelated");
+  static UIdent CCTypeRelInvalid("source.codecompletion.typerelation.invalid");
+  static UIdent CCTypeRelConvertible("source.codecompletion.typerelation.convertible");
+  static UIdent CCTypeRelIdentical("source.codecompletion.typerelation.identical");
+
+  switch (Result->getExpectedTypeRelation()) {
+  case CodeCompletionResult::Unrelated:
+    Info.TypeRelation = CCTypeRelUnrelated; break;
+  case CodeCompletionResult::Invalid:
+    Info.TypeRelation = CCTypeRelInvalid; break;
+  case CodeCompletionResult::Convertible:
+    Info.TypeRelation = CCTypeRelConvertible; break;
+  case  CodeCompletionResult::Identical:
+    Info.TypeRelation = CCTypeRelIdentical; break;
+  }
+
   Info.ModuleName = Result->getModuleName();
   Info.DocBrief = Result->getBriefDocComment();
   Info.NotRecommended = Result->isNotRecommended();

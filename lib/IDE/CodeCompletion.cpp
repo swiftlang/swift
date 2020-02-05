@@ -886,6 +886,11 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
       return relation;
     }
   }
+  if (auto EED = dyn_cast<EnumElementDecl>(VD)) {
+    return calculateTypeRelation(
+        EED->getParentEnum()->TypeDecl::getDeclaredInterfaceType(),
+        ExpectedType, DC);
+  }
   if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
     return std::max(
         calculateTypeRelation(NTD->getInterfaceType(), ExpectedType, DC),

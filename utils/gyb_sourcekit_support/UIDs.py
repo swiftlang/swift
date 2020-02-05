@@ -65,6 +65,7 @@ UID_KEYS = [
         'key.fully_annotated_generic_signature'),
     KEY('DocBrief', 'key.doc.brief'),
     KEY('Context', 'key.context'),
+    KEY('TypeRelation', 'key.typerelation'),
     KEY('ModuleImportDepth', 'key.moduleimportdepth'),
     KEY('NumBytesToErase', 'key.num_bytes_to_erase'),
     KEY('NotRecommended', 'key.not_recommended'),
