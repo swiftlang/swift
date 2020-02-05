@@ -45,9 +45,9 @@ mkdir %full_build_root%
 
 :: Use the shortest path we can for the build directory, to avoid Windows
 :: path problems as much as we can.
-subst S: /d
-subst S: %full_build_root% %exitOnError%
-set build_root=S:
+subst T: /d
+subst T: %full_build_root% %exitOnError%
+set build_root=T:
 set install_directory=%build_root%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr
 
 call :clone_repositories %exitOnError%
@@ -104,7 +104,7 @@ set file_name=icu4c-%icu_version%-Win64-MSVC2017.zip
 curl -L -O "https://github.com/unicode-org/icu/releases/download/release-%icu_version_dashed%/%file_name%" %exitOnError%
 :: unzip warns about the paths in the zip using slashes, which raises the
 :: errorLevel to 1. We cannot use exitOnError, and have to ignore errors.
-unzip -o %file_name% -d "%source_root%\icu-%icu_version%"
+"%ProgramFiles%\Git\usr\bin\unzip.exe" -o %file_name% -d "%source_root%\icu-%icu_version%"
 exit /b 0
 
 goto :eof
@@ -118,7 +118,7 @@ setlocal enableextensions enabledelayedexpansion
 
 set file_name=sqlite-amalgamation-3270200.zip
 curl -L -O "https://www.sqlite.org/2019/%file_name%" %exitOnError%
-unzip -o %file_name% %exitOnError%
+"%ProgramFiles%\Git\usr\bin\unzip.exe" -o %file_name% %exitOnError%
 
 goto :eof
 endlocal
