@@ -924,28 +924,32 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
         });
   }
 
-  bool canUpdateArgs, madeUpdate;
-  std::tie(canUpdateArgs, madeUpdate) = [&]() {
-    auto substTy =
-        Apply.getCallee()
-            ->getType()
-            .substGenericArgs(Apply.getModule(), NewCallSubs,
-                              Apply.getFunction()->getTypeExpansionContext())
-            .getAs<SILFunctionType>();
-    SILFunctionConventions conv(substTy,
-                                SILModuleConventions(Apply.getModule()));
-    bool canUpdate = true;
-    // Keep track of weather we made any updates at all. Otherwise, we will
-    // have an infinite loop.
-    bool madeUpdate = false;
-    for (unsigned index = 0; index < conv.getNumSILArguments(); ++index) {
-      canUpdate &= conv.getSILArgumentType(index) == NewArgs[index]->getType();
-      madeUpdate |=
-          NewArgs[index]->getType() != Apply.getArgument(index)->getType();
-    }
-    return std::make_tuple(canUpdate, madeUpdate);
-  }();
+  // We need to make sure that we can a) update Apply to use the new args and b)
+  // at least one argument has changed. If no arguments have changed, we need
+  // to return nullptr. Otherwise, we will have an infinite loop.
+  auto substTy =
+      Apply.getCallee()
+          ->getType()
+          .substGenericArgs(Apply.getModule(), NewCallSubs,
+                            Apply.getFunction()->getTypeExpansionContext())
+          .getAs<SILFunctionType>();
+  SILFunctionConventions conv(substTy,
+                              SILModuleConventions(Apply.getModule()));
+  bool canUpdateArgs = true;
+  bool madeUpdate = false;
+  for (unsigned index = 0; index < conv.getNumSILArguments(); ++index) {
+    // Make sure that *all* the arguments in both the new substitution function
+    // and our vector of new arguments have the same type.
+    canUpdateArgs &=
+        conv.getSILArgumentType(index) == NewArgs[index]->getType();
+    // Make sure that we have changed at least one argument.
+    madeUpdate |=
+        NewArgs[index]->getType() != Apply.getArgument(index)->getType();
+  }
 
+  // If we can't update the args (because of a type mismatch) or the args don't
+  // change, bail out by removing the instructions we've added and returning
+  // nullptr.
   if (!canUpdateArgs || !madeUpdate) {
     // Remove any new instructions created while attempting to optimize this
     // apply. Since the apply was never rewritten, if they aren't removed here,
