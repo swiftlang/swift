@@ -413,7 +413,8 @@ public:
          bool DelayBodyParsing = true);
   ~Parser();
 
-  bool isInSILMode() const { return SIL != nullptr; }
+  /// Returns true if the buffer being parsed is allowed to contain SIL.
+  bool isInSILMode() const;
 
   /// Calling this function to finalize libSyntax tree creation without destroying
   /// the parser instance.
@@ -430,9 +431,8 @@ public:
                           PreviousLoc);
   }
 
-  ParserPosition getParserPosition(const PersistentParserState::ParserPos &Pos){
-    return ParserPosition(L->getStateForBeginningOfTokenLoc(Pos.Loc),
-                          Pos.PrevLoc);
+  ParserPosition getParserPosition(SourceLoc loc, SourceLoc previousLoc) {
+    return ParserPosition(L->getStateForBeginningOfTokenLoc(loc), previousLoc);
   }
 
   void restoreParserPosition(ParserPosition PP, bool enableDiagnostics = false) {
@@ -661,6 +661,9 @@ public:
   /// Returns \c true if the parser hit the eof before finding matched '}'.
   bool skipBracedBlock();
 
+  /// Skip over SIL decls until we encounter the start of a Swift decl or eof.
+  void skipSILUntilSwiftDecl();
+
   /// If the parser is generating only a syntax tree, try loading the current
   /// node from a previously generated syntax tree.
   /// Returns \c true if the node has been loaded and inserted into the current
@@ -880,10 +883,17 @@ public:
   //===--------------------------------------------------------------------===//
   // Decl Parsing
 
-  /// Return true if parser is at the start of a decl or decl-import.
-  bool isStartOfDecl();
+  /// Returns true if parser is at the start of a Swift decl or decl-import.
+  bool isStartOfSwiftDecl();
 
+  /// Returns true if the parser is at the start of a SIL decl.
+  bool isStartOfSILDecl();
+
+  /// Parse the top-level Swift decls into the source file.
   void parseTopLevel();
+
+  /// Parse the top-level SIL decls into the SIL module.
+  void parseTopLevelSIL();
 
   /// Flags that control the parsing of declarations.
   enum ParseDeclFlags {
