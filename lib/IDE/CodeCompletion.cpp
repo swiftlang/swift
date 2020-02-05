@@ -903,6 +903,9 @@ static CodeCompletionResult::ExpectedTypeRelation
 calculateMaxTypeRelationForDecl(
     const Decl *D, const ExpectedTypeContext &typeContext,
     bool IsImplicitlyCurriedInstanceMethod = false) {
+  if (typeContext.empty())
+    return CodeCompletionResult::ExpectedTypeRelation::Unknown;
+
   auto Result = CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   for (auto Type : typeContext.possibleTypes) {
     // Do not use Void type context for a single-expression body, since the
@@ -1034,7 +1037,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     }
 
     auto typeRelation = ExpectedTypeRelation;
-    if (typeRelation == CodeCompletionResult::Unrelated)
+    if (typeRelation == CodeCompletionResult::Unknown)
       typeRelation =
           calculateMaxTypeRelationForDecl(AssociatedDecl, declTypeContext);
 

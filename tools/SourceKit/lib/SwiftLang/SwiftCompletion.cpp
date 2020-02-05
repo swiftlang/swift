@@ -503,6 +503,7 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   }
 
   static UIdent CCTypeRelNotApplicable("source.codecompletion.typerelation.notapplicable");
+  static UIdent CCTypeRelUnknown("source.codecompletion.typerelation.unknown");
   static UIdent CCTypeRelUnrelated("source.codecompletion.typerelation.unrelated");
   static UIdent CCTypeRelInvalid("source.codecompletion.typerelation.invalid");
   static UIdent CCTypeRelConvertible("source.codecompletion.typerelation.convertible");
@@ -511,6 +512,8 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   switch (Result->getExpectedTypeRelation()) {
   case CodeCompletionResult::NotApplicable:
     Info.TypeRelation = CCTypeRelNotApplicable; break;
+  case CodeCompletionResult::Unknown:
+    Info.TypeRelation = CCTypeRelUnknown; break;
   case CodeCompletionResult::Unrelated:
     Info.TypeRelation = CCTypeRelUnrelated; break;
   case CodeCompletionResult::Invalid:

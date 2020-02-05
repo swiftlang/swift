@@ -530,6 +530,9 @@ public:
     /// The result does not have a type (e.g. keyword).
     NotApplicable,
 
+    /// The type relation have not been calculated.
+    Unknown,
+
     /// The relationship of the result's type to the expected type is not
     /// invalid, not convertible, and not identical.
     Unrelated,
