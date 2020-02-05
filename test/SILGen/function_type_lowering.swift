@@ -118,6 +118,26 @@ func w<T>(_: (C<T, T>) -> T) {}
 // CHECK-LABEL: sil {{.*}}1x{{.*}} : $@convention(thin) <T, U, V where V : C<T, U>> (@noescape @callee_guaranteed <τ_0_0 where τ_0_0 : _RefCountedObject> in (@guaranteed τ_0_0) -> () for <V>) -> ()
 func x<T, U, V: C<T, U>>(_: (V) -> Void) {}
 
+// We can't generally lower away protocol constraints 
+// in nominal type argument positions, because they're necessary for the
+// substitutions to be valid, and associated types may influence the ABI of
+// the nominal type.
+
+struct SP<T: P> { var x: T.A }
+class CP<T: P> { }
+
+// CHECK-LABEL: sil {{.*}}1z{{.*}} : $@convention(thin) <T where T : P> (@noescape @callee_guaranteed <τ_0_0 where τ_0_0 : P> in (@in_guaranteed SP<τ_0_0>) -> () for <T>) -> ()
+func z<T: P>(_: (SP<T>) -> Void) {}
+
+struct SCP<T: P, U: CP<T>> {}
+
+// CHECK-LABEL: sil {{.*}}2z2{{.*}} : $@convention(thin) <T, U where T : P, U : CP<T>> (@noescape @callee_guaranteed  <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : CP<T>, τ_0_1 : _NativeClass> in (SCP<τ_0_0, τ_0_1>) -> () for <T, U>) -> ()
+func z2<T: P, U: CP<T>>(_: (SCP<T, U>) -> Void) {}
+// CHECK-LABEL: sil {{.*}}3z2a{{.*}} : $@convention(thin) <T, U where T : AnyObject, T : P, U : CP<T>> (@noescape @callee_guaranteed  <τ_0_0, τ_0_1 where τ_0_0 : _RefCountedObject, τ_0_0 : P, τ_0_1 : CP<T>, τ_0_1 : _NativeClass> in (SCP<τ_0_0, τ_0_1>) -> () for <T, U>) -> ()
+func z2a<T: P & AnyObject, U: CP<T>>(_: (SCP<T, U>) -> Void) {}
+
+// CHECK-LABEL: sil {{.*}}2z3{{.*}} : $@convention(thin) <T, U where T : P, U : CP<T>> (@noescape @callee_guaranteed <τ_0_0, τ_0_1 where τ_0_0 : _RefCountedObject, τ_0_1 : _RefCountedObject> in (S<τ_0_0, τ_0_1>) -> () for <U, U>) -> ()
+func z3<T: P, U: CP<T>>(_: (S<U, U>) -> Void) {}
 
 // Opaque types should not be extracted as substituted arguments because they
 // aren't freely substitutable.

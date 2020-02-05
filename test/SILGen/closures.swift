@@ -7,14 +7,16 @@ import Swift
 var zero = 0
 
 // <rdar://problem/15921334>
-// CHECK-LABEL: sil hidden [ossa] @$s8closures46return_local_generic_function_without_captures{{[_0-9a-zA-Z]*}}F : $@convention(thin) <A, R> () -> @owned @callee_guaranteed (@in_guaranteed A) -> @out R {
+// CHECK-LABEL: sil hidden [ossa] @$s8closures46return_local_generic_function_without_captures{{[_0-9a-zA-Z]*}}F : $@convention(thin) <A, R> () -> @owned @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <A, R> {
+
 func return_local_generic_function_without_captures<A, R>() -> (A) -> R {
   func f(_: A) -> R {
     Builtin.int_trap()
   }
   // CHECK:  [[FN:%.*]] = function_ref @$s8closures46return_local_generic_function_without_captures{{[_0-9a-zA-Z]*}} : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1
   // CHECK:  [[FN_WITH_GENERIC_PARAMS:%.*]] = partial_apply [callee_guaranteed] [[FN]]<A, R>() : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1
-  // CHECK:  return [[FN_WITH_GENERIC_PARAMS]] : $@callee_guaranteed (@in_guaranteed A) -> @out R
+  // CHECK:  [[FN_CONV:%.*]] = convert_function [[FN_WITH_GENERIC_PARAMS]]
+  // CHECK:  return [[FN_CONV]] :
   return f
 }
 
@@ -607,9 +609,10 @@ class SuperSub : SuperBase {
     // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
     // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PA]]
     // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply [callee_guaranteed] {{.*}}([[CVT]])
-    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[REABSTRACT_PA]]
-    // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @$ss2qqoiyxxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
-    // CHECK:   try_apply [[TRY_APPLY_AUTOCLOSURE]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
+    // CHECK:   [[REABSTRACT_CVF:%.*]] = convert_function [[REABSTRACT_PA]]
+    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[REABSTRACT_CVF]]
+    // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @$ss2qqoiyxxSg_xyKXKtKlF :
+    // CHECK:   try_apply [[TRY_APPLY_AUTOCLOSURE]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : {{.*}}, normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     let f1 = {
@@ -638,9 +641,10 @@ class SuperSub : SuperBase {
     // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
     // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed () -> @error Error to $@noescape @callee_guaranteed () -> @error Error
     // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[CVT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> @error Error) -> (@out (), @error Error)
-    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[REABSTRACT_PA]]
-    // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @$ss2qqoiyxxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
-    // CHECK:   try_apply [[TRY_APPLY_FUNC]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
+    // CHECK:   [[REABSTRACT_CVF:%.*]] = convert_function [[REABSTRACT_PA]]
+    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[REABSTRACT_CVF]]
+    // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @$ss2qqoiyxxSg_xyKXKtKlF :
+    // CHECK:   try_apply [[TRY_APPLY_FUNC]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : {{.*}}, normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     func g1() {
