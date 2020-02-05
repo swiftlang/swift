@@ -912,14 +912,8 @@ void CompilerInstance::parseLibraryFile(
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
   Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
-  bool Done;
-  do {
-    // Parser may stop at some erroneous constructions like #else, #endif
-    // or '}' in some cases, continue parsing until we are done
-    parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
-                        PersistentState.get(),
-                        /*DelayedBodyParsing=*/!IsPrimary);
-  } while (!Done);
+  parseIntoSourceFile(*NextInput, BufferID, PersistentState.get(),
+                      /*DelayedBodyParsing=*/!IsPrimary);
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
 
@@ -952,6 +946,7 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
 
 void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     SourceFile::ASTStage_t LimitStage) {
+  assert(LimitStage >= SourceFile::NameBound);
   FrontendStatsTracer tracer(Context->Stats,
                              "parse-and-typecheck-main-file");
   bool mainIsPrimary =
@@ -964,45 +959,23 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
   Diags.setSuppressWarnings(DidSuppressWarnings || !mainIsPrimary);
 
-  SILParserState SILContext(TheSILModule.get());
-  unsigned CurTUElem = 0;
-  bool Done;
-  do {
-    // Pump the parser multiple times if necessary.  It will return early
-    // after parsing any top level code in a main module, or in SIL mode when
-    // there are chunks of swift decls (e.g. imports and types) interspersed
-    // with 'sil' definitions.
-    parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
-                        TheSILModule ? &SILContext : nullptr,
-                        PersistentState.get(),
-                        !mainIsPrimary);
+  // Parse the Swift decls into the source file.
+  parseIntoSourceFile(MainFile, MainBufferID, PersistentState.get(),
+                      /*delayBodyParsing*/ !mainIsPrimary);
 
-    // For SIL we actually have to interleave parsing and type checking
-    // because the SIL parser expects to see fully type checked declarations.
-    if (TheSILModule) {
-      if (Done || CurTUElem < MainFile.getTopLevelDecls().size()) {
-        assert(mainIsPrimary);
-        performTypeChecking(MainFile, CurTUElem);
-      }
-    }
+  // For a primary, also perform type checking if needed. Otherwise, just do
+  // name binding.
+  if (mainIsPrimary && LimitStage >= SourceFile::TypeChecked) {
+    performTypeChecking(MainFile);
+  } else {
+    assert(!TheSILModule && "Should perform type checking for SIL");
+    performNameBinding(MainFile);
+  }
 
-    CurTUElem = MainFile.getTopLevelDecls().size();
-  } while (!Done);
-
-  if (!TheSILModule) {
-    if (mainIsPrimary) {
-      switch (LimitStage) {
-      case SourceFile::Parsing:
-      case SourceFile::Parsed:
-        llvm_unreachable("invalid limit stage");
-      case SourceFile::NameBound:
-        performNameBinding(MainFile);
-        break;
-      case SourceFile::TypeChecked:
-        performTypeChecking(MainFile);
-        break;
-      }
-    }
+  // Parse the SIL decls if needed.
+  if (TheSILModule) {
+    SILParserState SILContext(TheSILModule.get());
+    parseSourceFileSIL(MainFile, &SILContext);
   }
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
@@ -1010,12 +983,6 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
   if (mainIsPrimary && !Context->hadError() &&
       Invocation.getFrontendOptions().DebuggerTestingTransform) {
     performDebuggerTestingTransform(MainFile);
-  }
-
-  if (!TheSILModule) {
-    if (!mainIsPrimary) {
-      performNameBinding(MainFile);
-    }
   }
 }
 
@@ -1108,8 +1075,8 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
         SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
         BufferID);
 
-    parseIntoSourceFileFull(*NextInput, BufferID, PersistentState.get(),
-                            shouldDelayBodies(BufferID));
+    parseIntoSourceFile(*NextInput, BufferID, PersistentState.get(),
+                        shouldDelayBodies(BufferID));
   }
 
   // Now parse the main file.
@@ -1119,8 +1086,8 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
     MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
     assert(MainBufferID == MainFile.getBufferID());
 
-    parseIntoSourceFileFull(MainFile, MainBufferID, PersistentState.get(),
-                            shouldDelayBodies(MainBufferID));
+    parseIntoSourceFile(MainFile, MainBufferID, PersistentState.get(),
+                        shouldDelayBodies(MainBufferID));
   }
 
   assert(Context->LoadedModules.size() == 1 &&

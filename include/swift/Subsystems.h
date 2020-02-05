@@ -106,29 +106,21 @@ namespace swift {
 
   /// Parse a single buffer into the given source file.
   ///
-  /// If the source file is the main file, stop parsing after the next
-  /// stmt-brace-item with side-effects.
+  /// \param SF The file within the module being parsed.
   ///
-  /// \param SF the file within the module being parsed.
+  /// \param BufferID The buffer to parse from.
   ///
-  /// \param BufferID the buffer to parse from.
+  /// \param PersistentState If non-null the same PersistentState object can be
+  /// used to save parser state for code completion.
   ///
-  /// \param[out] Done set to \c true if end of the buffer was reached.
-  ///
-  /// \param SIL if non-null, we're parsing a SIL file.
-  ///
-  /// \param PersistentState if non-null the same PersistentState object can
-  /// be used to resume parsing or parse delayed function bodies.
-  void parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
-                           SILParserState *SIL = nullptr,
+  /// \param DelayBodyParsing Whether parsing of type and function bodies can be
+  /// delayed.
+  void parseIntoSourceFile(SourceFile &SF, unsigned BufferID,
                            PersistentParserState *PersistentState = nullptr,
                            bool DelayBodyParsing = true);
 
-  /// Parse a single buffer into the given source file, until the full source
-  /// contents are parsed.
-  void parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
-                               PersistentParserState *PersistentState = nullptr,
-                               bool DelayBodyParsing = true);
+  /// Parse a source file's SIL declarations into a given SIL module.
+  void parseSourceFileSIL(SourceFile &SF, SILParserState *sil);
 
   /// Finish the code completion.
   void performCodeCompletionSecondPass(PersistentParserState &PersistentState,
