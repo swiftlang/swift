@@ -802,28 +802,39 @@ public:
     }
   }
 
+  std::string getNameOfMetadataOrContextDescriptor(StoredPointer Ptr, Demangler &dem) {
+    auto TypeDemangled = readDemanglingForContextDescriptor(Ptr, dem);
+    if (TypeDemangled)
+      return mangleNode(TypeDemangled);
+
+    if (auto Metadata = readMetadata(Ptr)) {
+      if (auto ClassWrapper = dyn_cast<TargetObjCClassWrapperMetadata<Runtime>>(Metadata)) {
+        if (auto Class = ClassWrapper->Class) {
+          std::string Name;
+          bool success = readObjCClassName(Class, Name);
+          if (success)
+            return Name;
+        }
+      }
+      auto Desc = getTypeContextDescriptor(Metadata.getLocalBuffer());
+      TypeDemangled = readDemanglingForContextDescriptor(stripSignedPointer(Desc), dem);
+      if (TypeDemangled)
+        return mangleNode(TypeDemangled);
+    }
+    
+    printf("Unable to get name of conformance type %#llx\n", Ptr);
+    return "";
+  }
 
   void dumpConformanceNode(const struct ConformanceNode *Node) {
     Demangler dem;
     
-    auto TypeDemangled = readDemanglingForContextDescriptor(Node->Type, dem);
-    if (!TypeDemangled) {
-      if (auto Metadata = readMetadata(Node->Type)) {
-        auto Desc = getTypeContextDescriptor(Metadata.getLocalBuffer());
-        TypeDemangled = readDemanglingForContextDescriptor(stripSignedPointer(Desc), dem);
-      }
-    }
-
-    auto TypeName = mangleNode(TypeDemangled);
+    auto TypeName = getNameOfMetadataOrContextDescriptor(Node->Type, dem);
 
     auto ProtocolDemangled = readDemanglingForContextDescriptor(Node->Proto, dem);
     auto ProtocolName = nodeToString(ProtocolDemangled);
     
-    if (!TypeDemangled) {
-      printf("Unable to dump a conformance to %s\n", ProtocolName.c_str());
-    } else {
-      printf("Conformance: %s: %s\n", TypeName.c_str(), ProtocolName.c_str());
-    }
+    printf("Conformance: %s: %s\n", TypeName.c_str(), ProtocolName.c_str());
   }
   
   void dumpConformanceTree(StoredPointer NodePtr) {
