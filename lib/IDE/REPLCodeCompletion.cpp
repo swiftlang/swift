@@ -208,10 +208,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   const unsigned OriginalDeclCount = SF.getTopLevelDecls().size();
 
   PersistentParserState PersistentState;
-  bool Done;
-  do {
-    parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState);
-  } while (!Done);
+  parseIntoSourceFile(SF, *BufferID, &PersistentState);
   performTypeChecking(SF, OriginalDeclCount);
 
   performCodeCompletionSecondPass(PersistentState, *CompletionCallbacksFactory);

@@ -217,7 +217,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   newSF->enableInterfaceHash();
   // Ensure all non-function-body tokens are hashed into the interface hash
   Ctx->LangOpts.EnableTypeFingerprints = false;
-  parseIntoSourceFileFull(*newSF, tmpBufferID, &newState);
+  parseIntoSourceFile(*newSF, tmpBufferID, &newState);
   // Couldn't find any completion token?
   if (!newState.hasCodeCompletionDelayedDeclState())
     return false;
