@@ -72,6 +72,14 @@ func test_powl() {
 }
 #endif
 
+func test_f16() {
+  var x = Float16.zero
+  f16ptrfunc(&x)
+  #if arch(arm) || arch(arm64)
+  f16func(x)
+  #endif
+}
+
 func test_puts(_ s: String) {
   _ = s.withCString { puts($0) + 32 };
 }
