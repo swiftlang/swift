@@ -1137,12 +1137,9 @@ public:
       // affect representation.
       //
       // For now, eliminate substitutions from the capture representation.
-      SwiftType = SwiftType.transform([&](Type t) -> Type {
-        if (auto f = t->getAs<SILFunctionType>()) {
-          return f->getUnsubstitutedType(IGM.getSILModule());
-        }
-        return t;
-      })->getCanonicalType();
+      SwiftType =
+        SwiftType->replaceSubstitutedSILFunctionTypesWithUnsubstituted(IGM.getSILModule())
+                 ->getCanonicalType();
 
       CaptureTypes.push_back(SILType::getPrimitiveObjectType(SwiftType));
     }

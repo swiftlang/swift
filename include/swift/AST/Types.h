@@ -1170,6 +1170,8 @@ public:
   /// object type.
   TypeTraitResult canBeClass();
 
+  Type replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const; // in SILType.cpp
+  
   /// Return the tangent space of the given type, if it exists. Otherwise,
   /// return `None`.
   Optional<TangentSpace>
