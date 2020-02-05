@@ -255,8 +255,6 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   // SWIFT_ENABLE_TENSORFLOW
   inputArgs.AddLastArg(
       arguments, options::OPT_enable_experimental_forward_mode_differentiation);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_enable_experimental_quasiquotes);
   // SWIFT_ENABLE_TENSORFLOW END
 
   // Pass on any build config options

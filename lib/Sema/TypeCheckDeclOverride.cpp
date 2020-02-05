@@ -1485,8 +1485,6 @@ namespace  {
     UNINTERESTING_ATTR(FunctionBuilder)
     UNINTERESTING_ATTR(ProjectedValueProperty)
     UNINTERESTING_ATTR(OriginallyDefinedIn)
-
-    UNINTERESTING_ATTR(Quoted)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

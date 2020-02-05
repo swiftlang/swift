@@ -56,7 +56,6 @@ TYPE_ATTR(noDerivative)
 // SWIFT_ENABLE_TENSORFLOW
 TYPE_ATTR(autodiff)
 TYPE_ATTR(nondiff)
-TYPE_ATTR(quoted)
 // SWIFT_ENABLE_TENSORFLOW END
 
 // SIL-specific attributes
@@ -548,10 +547,6 @@ DECL_ATTR(transpose, Transpose,
   99)
 
 // SWIFT_ENABLE_TENSORFLOW
-DECL_ATTR(quoted, Quoted,
-  OnFunc |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  100)
 // TODO(TF-999): Remove deprecated `@differentiating` attribute.
 DECL_ATTR(differentiating, Differentiating,
   OnFunc | LongAttribute | AllowMultipleAttributes |

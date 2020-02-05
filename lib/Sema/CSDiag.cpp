@@ -223,10 +223,6 @@ private:
   bool visitExpr(Expr *E);
   bool visitTryExpr(TryExpr *E);
 
-  bool visitQuoteLiteralExpr(QuoteLiteralExpr *E);
-  bool visitUnquoteExpr(UnquoteExpr *E);
-  bool visitDeclQuoteExpr(DeclQuoteExpr *E);
-
   bool visitApplyExpr(ApplyExpr *AE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
 };
@@ -1526,17 +1522,6 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   // because of how sema injects this node into the type checker.
   return false;
 }
-
-// No need to do additional diagnostics for quote literals.
-bool FailureDiagnosis::visitQuoteLiteralExpr(QuoteLiteralExpr *E) {
-  return false;
-}
-
-// No need to do additional diagnostics for unquotes.
-bool FailureDiagnosis::visitUnquoteExpr(UnquoteExpr *E) { return false; }
-
-// No need to do additional diagnostics for decl quotes.
-bool FailureDiagnosis::visitDeclQuoteExpr(DeclQuoteExpr *E) { return false; }
 
 
 

@@ -1394,8 +1394,6 @@ static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
           cast<MagicIdentifierLiteralExpr>(LE)->getKind());
     case ExprKind::NilLiteral: return "nil";
     case ExprKind::ObjectLiteral: return "object";
-    case ExprKind::QuoteLiteral:
-      return "quote";
 
     // Define an unreachable case for all non-literal expressions.
     // This way, if a new literal is added in the future, the compiler

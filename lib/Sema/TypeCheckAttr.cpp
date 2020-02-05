@@ -118,8 +118,6 @@ public:
   IGNORED_ATTR(OriginallyDefinedIn)
   // SWIFT_ENABLE_TENSORFLOW
   IGNORED_ATTR(NoDerivative)
-  // TODO(TF-715): Allow @quoted on more decls.
-  IGNORED_ATTR(Quoted)
   // SWIFT_ENABLE_TENSORFLOW END
 #undef IGNORED_ATTR
 

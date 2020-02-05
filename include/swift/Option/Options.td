@@ -151,7 +151,7 @@ Flag<["-"], "enable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalB
 def disable_only_one_dependency_file :
 Flag<["-"], "disable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
  HelpText<"Disables incremental build optimization that only produces one dependencies file">;
- 
+
 
 def enable_source_range_dependencies :
 Flag<["-"], "enable-source-range-dependencies">, Flags<[]>,
@@ -483,10 +483,6 @@ def enable_experimental_forward_mode_differentiation : Flag<["-"], "enable-exper
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental forward mode differentiation">;
 // SWIFT_ENABLE_TENSORFLOW END
-
-def enable_experimental_quasiquotes : Flag<["-"], "enable-experimental-quasiquotes">,
-  Flags<[FrontendOption]>,
-  HelpText<"Experimental work-in-progress implementation of quasiquotes">;
 
 def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,

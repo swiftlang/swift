@@ -2412,19 +2412,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           origDeclID, indices);
       return;
     }
-
-    // SWIFT_ENABLE_TENSORFLOW
-    case DAK_Quoted: {
-      auto abbrCode = S.DeclTypeAbbrCodes[QuotedDeclAttrLayout::Code];
-      auto attr = cast<QuotedAttr>(DA);
-      assert(attr->getQuoteDecl());
-      QuotedDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                       attr->isImplicit(),
-                                       S.addDeclRef(attr->getQuoteDecl()));
-      return;
-    }
-    // SWIFT_ENABLE_TENSORFLOW END
-
     }
   }
 
