@@ -3648,9 +3648,9 @@ namespace {
       auto sub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
 
-
+      bool isSubExprLiteral = isa<LiteralExpr>(sub);
       auto castContextKind =
-          (SuppressDiagnostics || isInsideIsExpr)
+          (SuppressDiagnostics || isInsideIsExpr || isSubExprLiteral)
             ? CheckedCastContextKind::None
             : CheckedCastContextKind::ConditionalCast;
 
@@ -3661,13 +3661,35 @@ namespace {
       switch (castKind) {
       // Invalid cast.
       case CheckedCastKind::Unresolved:
+        // FIXME: This literal diagnostics needs to be revisited by a proposal
+        // to unify casting semantics for literals.
+        // https://bugs.swift.org/browse/SR-12093
+        if (isSubExprLiteral) {
+          auto protocol = TypeChecker::getLiteralProtocol(ctx, sub);
+          // Special handle for literals conditional checked cast when they can
+          // be statically coerced to the cast type.
+          if (protocol && TypeChecker::conformsToProtocol(
+                              toType, protocol, cs.DC,
+                              ConformanceCheckFlags::InExpression)) {
+            ctx.Diags
+                .diagnose(expr->getLoc(),
+                          diag::literal_conditional_downcast_to_coercion,
+                          toType);
+          } else {
+            ctx.Diags
+                .diagnose(expr->getLoc(), diag::downcast_to_unrelated, fromType,
+                          toType)
+                .highlight(sub->getSourceRange())
+                .highlight(expr->getCastTypeLoc().getSourceRange());
+          }
+        }
         expr->setCastKind(CheckedCastKind::ValueCast);
         break;
 
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion: {
         ctx.Diags.diagnose(expr->getLoc(), diag::conditional_downcast_coercion,
-                           cs.getType(sub), toType);
+                           fromType, toType);
         expr->setCastKind(castKind);
         cs.setType(expr, OptionalType::get(toType));
         return expr;
@@ -3681,7 +3703,7 @@ namespace {
         expr->setCastKind(castKind);
         break;
       }
-      
+
       return handleOptionalBindingsForCast(expr, simplifyType(cs.getType(expr)),
                                          OptionalBindingsCastKind::Conditional);
     }

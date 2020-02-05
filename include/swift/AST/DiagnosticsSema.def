@@ -1015,6 +1015,11 @@ WARNING(conditional_downcast_coercion,none,
       "conditional cast from %0 to %1 always succeeds",
       (Type, Type))
 
+WARNING(literal_conditional_downcast_to_coercion,none,
+        "conditional downcast from literal to %0 always fails; "
+        "consider using 'as' coercion",
+        (Type))
+
 WARNING(forced_downcast_noop,none,
         "forced cast of %0 to same type has no effect", (Type))
 
