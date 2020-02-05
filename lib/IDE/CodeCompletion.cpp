@@ -4308,6 +4308,8 @@ public:
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::Super, {});
+    Builder.setExpectedTypeRelation(
+        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
     Builder.setAssociatedDecl(FD);
     addValueOverride(FD, Reason, dynamicLookupInfo, Builder, hasFuncIntroducer);
     Builder.addBraceStmtWithCursor();
@@ -4335,6 +4337,8 @@ public:
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::Super, {});
+    Builder.setExpectedTypeRelation(
+        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
     Builder.setAssociatedDecl(SD);
     addValueOverride(SD, Reason, dynamicLookupInfo, Builder, false);
     Builder.addBraceStmtWithCursor();
@@ -4345,6 +4349,8 @@ public:
     CodeCompletionResultBuilder Builder(Sink,
       CodeCompletionResult::ResultKind::Declaration,
       SemanticContextKind::Super, {});
+    Builder.setExpectedTypeRelation(
+        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
     Builder.setAssociatedDecl(ATD);
     if (!hasTypealiasIntroducer && !hasAccessModifier)
       addAccessControl(ATD, Builder);
@@ -4361,6 +4367,8 @@ public:
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::Super, {});
+    Builder.setExpectedTypeRelation(
+        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
     Builder.setAssociatedDecl(CD);
 
     if (!hasAccessModifier)
@@ -4845,16 +4853,19 @@ static bool isClangSubModule(ModuleDecl *TheModule) {
   return false;
 }
 
-static void addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
-                       CodeCompletionKeywordKind Kind,
-                       StringRef TypeAnnotation = "") {
-    CodeCompletionResultBuilder Builder(
-        Sink, CodeCompletionResult::ResultKind::Keyword,
-        SemanticContextKind::None, {});
-    Builder.setKeywordKind(Kind);
-    Builder.addTextChunk(Name);
-    if (!TypeAnnotation.empty())
-      Builder.addTypeAnnotation(TypeAnnotation);
+static void
+addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
+           CodeCompletionKeywordKind Kind, StringRef TypeAnnotation = "",
+           CodeCompletionResult::ExpectedTypeRelation TypeRelation =
+               CodeCompletionResult::ExpectedTypeRelation::NotApplicable) {
+  CodeCompletionResultBuilder Builder(Sink,
+                                      CodeCompletionResult::ResultKind::Keyword,
+                                      SemanticContextKind::None, {});
+  Builder.setKeywordKind(Kind);
+  Builder.addTextChunk(Name);
+  if (!TypeAnnotation.empty())
+    Builder.addTypeAnnotation(TypeAnnotation);
+  Builder.setExpectedTypeRelation(TypeRelation);
 }
 
 static void addDeclKeywords(CodeCompletionResultSink &Sink) {

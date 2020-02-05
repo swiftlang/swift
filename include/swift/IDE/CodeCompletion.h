@@ -527,6 +527,8 @@ public:
   /// Describes the relationship between the type of the completion results and
   /// the expected type at the code completion position.
   enum ExpectedTypeRelation {
+    /// The result does not have a type (e.g. keyword).
+    NotApplicable,
 
     /// The relationship of the result's type to the expected type is not
     /// invalid, not convertible, and not identical.
