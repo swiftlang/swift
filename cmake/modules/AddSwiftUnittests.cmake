@@ -49,8 +49,8 @@ function(add_swift_unittest test_dirname)
     set_property(TARGET "${test_dirname}" APPEND PROPERTY LINK_LIBRARIES "log")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
-      set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY COMPILE_FLAGS
-        " -march=core2")
+      target_compile_options(${test_dirname} PRIVATE
+        -march=core2)
     endif()
   endif()
 
