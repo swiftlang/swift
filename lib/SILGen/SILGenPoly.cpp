@@ -459,7 +459,7 @@ ManagedValue Transform::transform(ManagedValue v,
     inputSubstType = inputSelfType.getSelfType();
   }
 
-  //  - upcasts for classes
+  //  - casts for classes
   if (outputSubstType->getClassOrBoundGenericClass() &&
       inputSubstType->getClassOrBoundGenericClass()) {
     auto class1 = inputSubstType->getClassOrBoundGenericClass();
@@ -1439,7 +1439,7 @@ namespace {
         Outputs.push_back(input);
         return;
       }
-
+      
       switch (result.getConvention()) {
       // Direct translation is relatively easy.
       case ParameterConvention::Direct_Owned:
@@ -1591,8 +1591,25 @@ static void forwardFunctionArguments(SILGenFunction &SGF,
                                      SmallVectorImpl<SILValue> &forwardedArgs) {
   auto argTypes = fTy->getParameters();
   for (auto index : indices(managedArgs)) {
-    auto &arg = managedArgs[index];
+    auto arg = managedArgs[index];
     auto argTy = argTypes[index];
+    auto argSubstTy = argTy.getArgumentType(SGF.SGM.M, fTy);
+    
+    // Adjust the class of covariant/contravariant arguments.
+    if (arg.getType().getASTType() != argSubstTy) {
+      if (arg.getType().getClassOrBoundGenericClass()
+          && argSubstTy->getClassOrBoundGenericClass()) {
+        if (argSubstTy->isExactSuperclassOf(arg.getType().getASTType())) {
+          arg = SGF.B.createUpcast(loc, arg,
+                                   SILType::getPrimitiveObjectType(argSubstTy));
+        } else if (arg.getType().getASTType()->isExactSuperclassOf(argSubstTy)) {
+          arg = SGF.B.createUncheckedRefCast(loc, arg,
+                                     SILType::getPrimitiveObjectType(argSubstTy));
+        }
+      } else {
+        llvm_unreachable("unexpected type mismatch");
+      }
+    }
     if (argTy.isConsumed()) {
       forwardedArgs.push_back(arg.ensurePlusOne(SGF, loc).forward(SGF));
       continue;
@@ -1616,7 +1633,7 @@ namespace {
   public:
     YieldInfo(SILGenModule &SGM, SILDeclRef function,
               CanSILFunctionType loweredType, SubstitutionMap subs) {
-      LoweredInfos = loweredType->getYields();
+      LoweredInfos = loweredType->getUnsubstitutedType(SGM.M)->getYields();
 
       auto accessor = cast<AccessorDecl>(function.getDecl());
       auto storage = accessor->getStorage();
@@ -1848,7 +1865,8 @@ public:
         SILFunctionConventions(innerFnType, SGF.SGM.M)
             .getNumIndirectSILResults());
 
-    PlanData data = {outerFnType->getResults(), innerFnType->getResults(),
+    PlanData data = {outerFnType->getUnsubstitutedType(SGF.SGM.M)->getResults(),
+                     innerFnType->getUnsubstitutedType(SGF.SGM.M)->getResults(),
                      innerIndirectResultAddrs, 0};
 
     // Recursively walk the result types.
@@ -3329,17 +3347,20 @@ ManagedValue
 SILGenFunction::createWithoutActuallyEscapingClosure(
     SILLocation loc, ManagedValue noEscapingFunctionValue, SILType escapingTy) {
 
-  auto escapingFnTy = escapingTy.castTo<SILFunctionType>();
+  auto escapingFnSubstTy = escapingTy.castTo<SILFunctionType>();
+  auto noEscapingFnSubstTy = noEscapingFunctionValue.getType()
+    .castTo<SILFunctionType>();
   // TODO: maybe this should use a more explicit instruction.
-  assert(escapingFnTy->getExtInfo() == noEscapingFunctionValue.getType()
-                                           .castTo<SILFunctionType>()
-                                           ->getExtInfo()
-                                           .withNoEscape(false));
+  assert(escapingFnSubstTy->getExtInfo() == noEscapingFnSubstTy->getExtInfo()
+                                                         .withNoEscape(false));
+
+  // Apply function type substitutions, since the code sequence for a thunk
+  // doesn't vary with function representation.
+  auto escapingFnTy = escapingFnSubstTy->getUnsubstitutedType(SGM.M);
+  auto noEscapingFnTy = noEscapingFnSubstTy->getUnsubstitutedType(SGM.M);
 
   SubstitutionMap interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
-  auto noEscapingFnTy =
-      noEscapingFunctionValue.getType().castTo<SILFunctionType>();
 
   CanType dynamicSelfType;
   auto thunkType = buildWithoutActuallyEscapingThunkType(
@@ -3361,11 +3382,22 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   // Create a copy for the noescape value, so we can mark_dependence upon the
   // original value.
   auto noEscapeValue = noEscapingFunctionValue.copy(*this, loc);
+  // Convert away function type substitutions.
+  if (noEscapingFnTy != noEscapingFnSubstTy) {
+    noEscapeValue = B.createConvertFunction(loc, noEscapeValue,
+                              SILType::getPrimitiveObjectType(noEscapingFnTy));
+  }
 
   auto thunkedFn =
     createPartialApplyOfThunk(*this, loc, thunk, interfaceSubs, dynamicSelfType,
                               escapingFnTy, noEscapeValue);
 
+  // Convert to the substituted escaping type.
+  if (escapingFnTy != escapingFnSubstTy) {
+    thunkedFn = B.createConvertFunction(loc, thunkedFn,
+                            SILType::getPrimitiveObjectType(escapingFnSubstTy));
+  }
+  
   // We need to ensure the 'lifetime' of the trivial values context captures. As
   // long as we represent these captures by the same value the following works.
   thunkedFn = emitManagedRValueWithCleanup(
@@ -3895,9 +3927,11 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   auto origWitnessFTy = getWitnessFunctionType(getTypeExpansionContext(), SGM,
                                                witness, witnessKind);
   auto witnessFTy = origWitnessFTy;
-  if (!witnessSubs.empty())
+  if (!witnessSubs.empty()) {
     witnessFTy = origWitnessFTy->substGenericArgs(SGM.M, witnessSubs,
                                                   getTypeExpansionContext());
+  }
+  auto witnessUnsubstTy = witnessFTy->getUnsubstitutedType(SGM.M);
 
   auto reqtSubstParams = reqtSubstTy.getParams();
   auto witnessSubstParams = witnessSubstTy.getParams();
@@ -3907,8 +3941,8 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
     assert(!isFree && "shouldn't have a free witness for a self-conformance");
     origParams.back() =
       emitOpenExistentialInSelfConformance(*this, loc, witness, witnessSubs,
-                                           origParams.back(),
-                                           witnessFTy->getSelfParameter());
+                                         origParams.back(),
+                                         witnessUnsubstTy->getSelfParameter());
   }
 
   // For a free function witness, discard the 'self' parameter of the
@@ -3924,7 +3958,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   AbstractionPattern witnessOrigTy(witnessInfo.LoweredType);
   TranslateArguments(*this, loc,
                      origParams, witnessParams,
-                     witnessFTy->getParameters())
+                     witnessUnsubstTy->getParameters())
     .translate(reqtOrigTy,
                reqtSubstParams,
                witnessOrigTy,
