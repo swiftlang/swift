@@ -991,12 +991,14 @@ extension ${Self}: Hashable {
   }
 }
 
+% if bits != 16:
 extension ${Self}: _HasCustomAnyHashableRepresentation {
   // Not @inlinable
   public func _toCustomAnyHashable() -> AnyHashable? {
     return AnyHashable(_box: _${Self}AnyHashableBox(self))
   }
 }
+% end
 
 extension ${Self} {
   @inlinable // FIXME(inline-always)
@@ -1199,6 +1201,7 @@ extension ${Self}: Strideable {
 // AnyHashable
 //===----------------------------------------------------------------------===//
 
+% if bits != 16:
 internal struct _${Self}AnyHashableBox: _AnyHashableBox {
   internal typealias Base = ${Self}
   internal let _value: Base
@@ -1275,6 +1278,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
     return true
   }
 }
+% end
 
 //===----------------------------------------------------------------------===//
 // Deprecated operators
