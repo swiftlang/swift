@@ -19,3 +19,16 @@ typedef struct SomeStruct_s {
 @interface MyDerivedClass : MyBaseClass
 @property (nonatomic, strong, nullable) Base *derivedMember;
 @end
+
+typedef enum {
+  Caster,
+  Grantulated,
+  Confectioners,
+  Cane,
+  Demerara,
+  Turbinado,
+} RefinedSugar /*NS_REFINED_FOR_SWIFT*/ __attribute__((swift_private));
+
+@interface Refinery : Base
+@property (nonatomic, readonly) RefinedSugar sugar /*NS_REFINED_FOR_SWIFT*/ __attribute__((swift_private));
+@end

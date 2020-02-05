@@ -1702,7 +1702,8 @@ _ = x.map { (_: ()) in () }
 // https://bugs.swift.org/browse/SR-9470
 do {
   func f(_: Int...) {}
-  let _ = [(1, 2, 3)].map(f) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping (Int...) -> ())'}}
+  let _ = [(1, 2, 3)].map(f) // expected-error {{cannot convert value of type '(Int...) -> ()' to expected argument type '((Int, Int, Int)) throws -> T'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 }
 
 // rdar://problem/48443263 - cannot convert value of type '() -> Void' to expected argument type '(_) -> Void'

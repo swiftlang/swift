@@ -151,8 +151,8 @@ static void parseIntoSourceFileImpl(SourceFile &SF,
            PersistentState, STreeCreator, DelayBodyParsing);
   PrettyStackTraceParser StackTrace(P);
 
-  llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,
-                               SF.hasInterfaceHash());
+  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> S(P.CurrentTokenHash,
+                                                 SF.getInterfaceHashPtr());
 
   do {
     P.parseTopLevel();

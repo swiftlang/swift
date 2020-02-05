@@ -149,24 +149,15 @@ StringRef SymbolGraphASTWalker::getUSR(const ValueDecl *VD) {
   return USR;
 }
 
-SymbolIdentifier
-SymbolGraphASTWalker::getSymbolIdentifier(const ValueDecl *VD) {
-  // Look in the symbol identifier cache for this declartion.
-  auto Found = SymbolIdentifierCache.find(VD);
-  if (Found != SymbolIdentifierCache.end()) {
-    return Found->getSecond();
-  }
-
-  // Not found; need to build a symbol identifier and add it to the cache.
-  auto PreciseIdentifier = getUSR(VD);
-  llvm::SmallVector<llvm::StringRef, 4> SimpleIdentifierChain;
-  
+void
+SymbolGraphASTWalker::getPathComponents(const ValueDecl *VD,
+                                        SmallVectorImpl<SmallString<32>> &Components) {
   // Collect the spellings of the fully qualified identifier components.
   auto Decl = VD;
   while (Decl && !isa<ModuleDecl>(Decl)) {
     SmallString<32> Scratch;
     Decl->getFullName().getString(Scratch);
-    SimpleIdentifierChain.push_back(Ctx.allocateCopy(Scratch.str()));
+    Components.push_back(Scratch);
     if (const auto *DC = Decl->getDeclContext()) {
       if (const auto *Proto = DC->getExtendedProtocolDecl()) {
         Decl = Proto;
@@ -179,17 +170,9 @@ SymbolGraphASTWalker::getSymbolIdentifier(const ValueDecl *VD) {
       Decl = nullptr;
     }
   }
-  
+
   // The list is leaf-to-root, but our list is root-to-leaf, so reverse it.
-  std::reverse(SimpleIdentifierChain.begin(), SimpleIdentifierChain.end());
-
-  SymbolIdentifier Identifier {
-    PreciseIdentifier,
-    Ctx.allocateCopy(llvm::makeArrayRef(SimpleIdentifierChain))
-  };
-
-  SymbolIdentifierCache.insert({VD, Identifier});
-  return Identifier;
+  std::reverse(Components.begin(), Components.end());
 }
 
 PrintOptions SymbolGraphASTWalker::getDeclarationFragmentsPrintOptions() const {
