@@ -264,18 +264,6 @@ function(_add_variant_c_compile_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
-    # MSVC doesn't support -Xclang. We don't need to manually specify
-    # the dependent libraries as `cl` does so.
-    if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
-      list(APPEND result -Xclang;--dependent-lib=oldnames)
-      # TODO(compnerd) handle /MT, /MTd
-      if("${CFLAGS_BUILD_TYPE}" STREQUAL "Debug")
-        list(APPEND result -Xclang;--dependent-lib=msvcrtd)
-      else()
-        list(APPEND result -Xclang;--dependent-lib=msvcrt)
-      endif()
-    endif()
-
     # MSVC/clang-cl don't support -fno-pic or -fms-compatibility-version.
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
       list(APPEND result -fno-pic)
@@ -366,35 +354,6 @@ function(_add_variant_c_compile_flags)
       list(APPEND result -isystem;${path})
     endforeach()
     list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
-  elseif(CFLAGS_SDK STREQUAL WINDOWS)
-    swift_windows_include_for_arch(${CFLAGS_ARCH} ${CFLAGS_ARCH}_INCLUDE)
-    foreach(path ${${CFLAGS_ARCH}_INCLUDE})
-      list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
-    endforeach()
-  endif()
-
-  set(ICU_UC_INCLUDE_DIR ${SWIFT_${CFLAGS_SDK}_${CFLAGS_ARCH}_ICU_UC_INCLUDE})
-  if(NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "" AND
-     NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "/usr/include" AND
-     NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}/include" AND
-     NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
-   if(SWIFT_COMPILER_IS_MSVC_LIKE)
-     list(APPEND result -I;${ICU_UC_INCLUDE_DIR})
-   else()
-     list(APPEND result -isystem;${ICU_UC_INCLUDE_DIR})
-   endif()
-  endif()
-
-  set(ICU_I18N_INCLUDE_DIR ${SWIFT_${CFLAGS_SDK}_${CFLAGS_ARCH}_ICU_I18N_INCLUDE})
-  if(NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "" AND
-     NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "/usr/include" AND
-     NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}/include" AND
-     NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
-   if(SWIFT_COMPILER_IS_MSVC_LIKE)
-     list(APPEND result -I;${ICU_I18N_INCLUDE_DIR})
-   else()
-     list(APPEND result -isystem;${ICU_I18N_INCLUDE_DIR})
-   endif()
   endif()
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
@@ -945,11 +904,9 @@ function(_add_swift_library_single target name)
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
     if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
-      swift_windows_generate_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY_FLAGS)
-      foreach(flag ${SWIFTLIB_SINGLE_VFS_OVERLAY_FLAGS})
-        list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;${flag})
-        list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS ${flag})
-      endforeach()
+      swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
+        -Xcc;-Xclang;-Xcc;-ivfsoverlay;-Xcc;-Xclang;-Xcc;${SWIFTLIB_SINGLE_VFS_OVERLAY})
     endif()
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
     foreach(directory ${SWIFTLIB_INCLUDE})
@@ -1447,6 +1404,28 @@ function(_add_swift_library_single target name)
   endif()
 
   # Set compilation and link flags.
+  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
+    swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE}
+      ${SWIFTLIB_SINGLE_ARCHITECTURE}_INCLUDE)
+    target_include_directories(${target} SYSTEM PRIVATE
+      ${${SWIFTLIB_SINGLE_ARCHITECTURE}_INCLUDE})
+
+    if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
+      swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
+      target_compile_options(${target} PRIVATE
+        "SHELL:-Xclang -ivfsoverlay -Xclang ${SWIFTLIB_SINGLE_VFS_OVERLAY}")
+
+      # MSVC doesn't support -Xclang. We don't need to manually specify
+      # the dependent libraries as `cl` does so.
+      target_compile_options(${target} PRIVATE
+        "SHELL:-Xclang --dependent-lib=oldnames"
+        # TODO(compnerd) handle /MT, /MTd
+        "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
+    endif()
+  endif()
+  target_include_directories(${target} SYSTEM PRIVATE
+    ${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}
+    ${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE})
   target_compile_options(${target} PRIVATE
     ${c_compile_flags})
   target_link_options(${target} PRIVATE
@@ -2646,6 +2625,21 @@ function(_add_swift_executable_single name)
         ${SWIFTEXE_SINGLE_DEPENDS})
   llvm_update_compile_flags("${name}")
 
+  if(SWIFTEXE_SINGLE_SDK STREQUAL WINDOWS)
+    swift_windows_include_for_arch(${SWIFTEXE_SINGLE_ARCHITECTURE}
+      ${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE)
+    target_include_directories(${name} SYSTEM PRIVATE
+      ${${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE})
+
+    if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
+      # MSVC doesn't support -Xclang. We don't need to manually specify
+      # the dependent libraries as `cl` does so.
+      target_compile_options(${name} PRIVATE
+        "SHELL:-Xclang --dependent-lib=oldnames"
+        # TODO(compnerd) handle /MT, /MTd
+        "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
+    endif()
+  endif()
   target_compile_options(${name} PRIVATE
     ${c_compile_flags})
   target_link_directories(${name} PRIVATE
