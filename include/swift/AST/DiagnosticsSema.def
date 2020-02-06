@@ -1699,6 +1699,12 @@ WARNING(function_type_usable_from_inline_warn,none,
         "should be '@usableFromInline' or public",
         (unsigned, bool))
 
+ERROR(spi_attribute_on_non_public,none,
+      "%select{private|fileprivate|internal|%error|%error}0 %1 "
+      "cannot be declared '@_spi' because only public and open "
+      "declarations can be '@_spi'",
+      (AccessLevel, DescriptiveDeclKind))
+
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
       "an 'opaque' type must specify only 'Any', 'AnyObject', protocols, "
