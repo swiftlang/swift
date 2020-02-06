@@ -123,6 +123,8 @@ public:
     return DepGraphNode::humanReadableName(where);
   }
 
+  void dump(raw_ostream &) const;
+
   SWIFT_DEBUG_DUMP;
 };
 
@@ -185,11 +187,13 @@ class ModuleDepGraph {
   /// files for the same name distinct, keep a sequence number for each name.
   std::unordered_map<std::string, unsigned> dotFileSequenceNumber;
 
+public:
   const bool verifyFineGrainedDependencyGraphAfterEveryImport;
   const bool emitFineGrainedDependencyDotFileAfterEveryImport;
 
   const bool EnableTypeFingerprints;
 
+private:
   /// If tracing dependencies, holds a vector used to hold the current path
   /// def - use/def - use/def - ...
   Optional<std::vector<const ModuleDepGraphNode *>> currentPathIfTracing;
@@ -312,9 +316,11 @@ public:
   }
 
   /// For unit tests.
-  ModuleDepGraph(const bool EnableTypeFingerprints)
-      : ModuleDepGraph(true, false, EnableTypeFingerprints, false, nullptr) {}
-
+  ModuleDepGraph(const bool EnableTypeFingerprints,
+                 const bool EmitDotFilesForDebugging = false)
+      : ModuleDepGraph(
+            true, /*emitFineGrainedDependencyDotFileAfterEveryImport=*/
+            EmitDotFilesForDebugging, EnableTypeFingerprints, false, nullptr) {}
 
   //============================================================================
   // MARK: ModuleDepGraph - updating from a switdeps file
@@ -328,26 +334,17 @@ public:
   /// compensates.
   Changes loadFromPath(const driver::Job *, StringRef, DiagnosticEngine &);
 
-
   Changes loadFromSourceFileDepGraph(const driver::Job *cmd,
-                                     const SourceFileDepGraph &);
-
-    /// Also for unit tests
-    Changes
-    simulateLoad(const driver::Job *cmd,
-                                llvm::StringMap<std::vector<std::string>> simpleNames,
-                                llvm::StringMap<std::vector<std::pair<std::string, std::string>>>
-                                compoundNames = {},
-                                const bool includePrivateDeps = false,
-                                const bool hadCompilationError = false);
-
+                                     const SourceFileDepGraph &,
+                                     DiagnosticEngine &);
 
 private:
   /// Read a SourceFileDepGraph belonging to \p job from \p buffer
   /// and integrate it into the ModuleDepGraph.
   /// Used both the first time, and to reload the SourceFileDepGraph.
   /// If any changes were observed, indicate same in the return vale.
-  Changes loadFromBuffer(const driver::Job *, llvm::MemoryBuffer &);
+  Changes loadFromBuffer(const driver::Job *, llvm::MemoryBuffer &,
+                         DiagnosticEngine &);
 
   /// Integrate a SourceFileDepGraph into the receiver.
   /// Integration happens when the driver needs to read SourceFileDepGraph.
@@ -365,8 +362,9 @@ private:
                        const SourceFileDepGraphNode *integrand) const;
 
   /// Integrate the \p integrand into the receiver.
-  /// Return the changed node if any..
-  NullablePtr<ModuleDepGraphNode>
+  /// If an illegal value was found, return \c None, otherwise
+  /// return the changed node if any..
+  Optional<NullablePtr<ModuleDepGraphNode>>
   integrateSourceFileDepGraphNode(const SourceFileDepGraph &g,
                                   const SourceFileDepGraphNode *integrand,
                                   const PreexistingNodeIfAny preexistingMatch,
@@ -392,6 +390,12 @@ private:
   /// After importing a provides node from the frontend, record its
   /// dependencies.
   /// Return true if moduleUseNode picks up a new external-dependency
+  ///
+  /// \param g The source file graph being integrated into the module graph
+  /// \param sourceFileUseNode  The source file node just integrated, which may
+  /// also be a use (i.e. a "depends", a declaration used by something else)
+  /// \param moduleUseNode The module file node corresponding to the \c
+  /// sourceFileUseNode
   bool recordWhatUseDependsUpon(const SourceFileDepGraph &g,
                                 const SourceFileDepGraphNode *sourceFileUseNode,
                                 ModuleDepGraphNode *moduleUseNode);
@@ -486,17 +490,8 @@ public:
 
   bool haveAnyNodesBeenTraversedIn(const driver::Job *) const;
 
-  /// Given a "cascading" job, that is a job whose dependents must be recompiled
-  /// when this job is recompiled, Compute two sets of jobs:
-  /// 1. Return value (via visited) is the set of jobs needing recompilation
-  /// after this one, and
-  /// 2. Jobs not previously known to need dependencies reexamined after they
-  /// are recompiled.
-  ///
-  /// Returns jobs to be run because of changes to any/ever node in the
-  /// argument. Only return jobs marked that were previously unmarked, assuming
-  /// previously marked jobs are already scheduled.
-  /// TODO: rewrite above comment
+  /// Find all jobs (possibly including the argument) requiring recompilation
+  /// assuming that every entity in \p jobToBeRecompiled has changed.
   std::vector<const driver::Job *>
   findJobsToRecompileWhenWholeJobChanges(const driver::Job *jobToBeRecompiled);
 
@@ -511,6 +506,8 @@ private:
 public:
   /// Record a new (to this graph) Job.
   void registerJob(const driver::Job *);
+
+  std::vector<const driver::Job *> allJobs() const;
 
   /// Find jobs that were previously not known to need compilation but that
   /// depend on \c externalDependency.
@@ -576,8 +573,6 @@ private:
     return true;
   }
 
-  static std::vector<const driver::Job *>
-  printJobsForDebugging(const std::vector<const driver::Job *> &jobs);
 };
 } // namespace fine_grained_dependencies
 } // namespace swift

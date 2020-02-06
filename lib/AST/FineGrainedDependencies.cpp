@@ -15,10 +15,15 @@
 #include "swift/AST/FineGrainedDependencies.h"
 
 // may not all be needed
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Frontend/FrontendOptions.h"
+
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -33,6 +38,28 @@
 
 using namespace swift;
 using namespace fine_grained_dependencies;
+
+//==============================================================================
+// MARK: Emitting and reading SourceFileDepGraph
+//==============================================================================
+
+Optional<SourceFileDepGraph> SourceFileDepGraph::loadFromPath(StringRef path) {
+  auto bufferOrError = llvm::MemoryBuffer::getFile(path);
+  if (!bufferOrError)
+    return None;
+  return loadFromBuffer(*bufferOrError.get());
+}
+
+Optional<SourceFileDepGraph>
+SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer) {
+  SourceFileDepGraph fg;
+  llvm::yaml::Input yamlReader(llvm::MemoryBufferRef(buffer), nullptr);
+  yamlReader >> fg;
+  if (yamlReader.error())
+    return None;
+  // return fg; compiles for Mac but not Linux, because it cannot be copied.
+  return Optional<SourceFileDepGraph>(std::move(fg));
+}
 
 //==============================================================================
 // MARK: SourceFileDepGraph access
@@ -76,16 +103,13 @@ void SourceFileDepGraph::forEachArc(
 
 InterfaceAndImplementationPair<SourceFileDepGraphNode>
 SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
-    NodeKind k, const ContextNameFingerprint &contextNameFingerprint) {
-  const std::string &context = std::get<0>(contextNameFingerprint);
-  const std::string &name = std::get<1>(contextNameFingerprint);
-  const Optional<std::string> &fingerprint =
-      std::get<2>(contextNameFingerprint);
-  auto *interfaceNode = findExistingNodeOrCreateIfNew(
-      DependencyKey(k, DeclAspect::interface, context, name), fingerprint,
-      true /* = isProvides */);
+    const SerializableDecl &decl) {
+  const Optional<std::string> &fingerprint = decl.fingerprint;
+  auto *interfaceNode =
+      findExistingNodeOrCreateIfNew(decl.key.withAspect(DeclAspect::interface),
+                                    fingerprint, true /* = isProvides */);
   auto *implementationNode = findExistingNodeOrCreateIfNew(
-      DependencyKey(k, DeclAspect::implementation, context, name), fingerprint,
+      decl.key.withAspect(DeclAspect::implementation), fingerprint,
       true /* = isProvides */);
 
   InterfaceAndImplementationPair<SourceFileDepGraphNode> nodePair{
@@ -139,18 +163,6 @@ SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
 
 std::string DependencyKey::demangleTypeAsContext(StringRef s) {
   return swift::Demangle::demangleTypeAsString(s.str());
-}
-
-DependencyKey
-DependencyKey::createKeyForWholeSourceFile(const StringRef swiftDeps) {
-  assert(!swiftDeps.empty());
-  const auto context = DependencyKey::computeContextForProvidedEntity<
-      NodeKind::sourceFileProvide>(swiftDeps);
-  const auto name =
-      DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide>(
-          swiftDeps);
-  return DependencyKey(NodeKind::sourceFileProvide, DeclAspect::interface,
-                       context, name);
 }
 
 //==============================================================================
@@ -229,6 +241,23 @@ raw_ostream &fine_grained_dependencies::operator<<(raw_ostream &out,
 bool DependencyKey::verify() const {
   assert((getKind() != NodeKind::externalDepend || isInterface()) &&
          "All external dependencies must be interfaces.");
+  switch (getKind()) {
+  case NodeKind::topLevel:
+  case NodeKind::dynamicLookup:
+  case NodeKind::externalDepend:
+  case NodeKind::sourceFileProvide:
+    assert(context.empty() && !name.empty() && "Must only have a name");
+    break;
+  case NodeKind::nominal:
+  case NodeKind::potentialMember:
+    assert(!context.empty() && name.empty() && "Must only have a context");
+    break;
+  case NodeKind::member:
+    assert(!context.empty() && !name.empty() && "Must have both");
+    break;
+  case NodeKind::kindCount:
+    llvm_unreachable("impossible");
+  }
   return true;
 }
 
@@ -298,6 +327,15 @@ void SourceFileDepGraph::verifySame(const SourceFileDepGraph &other) const {
            "Both graphs must have corresponding nodes");
   }
 #endif
+}
+
+void SourceFileDepGraph::emitDotFile(StringRef outputPath,
+                                     DiagnosticEngine &diags) {
+  std::string dotFileName = outputPath.str() + ".dot";
+  withOutputFile(diags, dotFileName, [&](llvm::raw_pwrite_stream &out) {
+    DotFileEmitter<SourceFileDepGraph>(out, *this, false, false).emit();
+    return false;
+  });
 }
 
 //==============================================================================

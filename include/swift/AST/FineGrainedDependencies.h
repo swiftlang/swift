@@ -348,7 +348,7 @@ bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
 /// graph, splitting the current *member* into \ref member and \ref
 /// potentialMember and adding \ref sourceFileProvide.
 
-enum class NodeKind {
+enum class NodeKind : uint8_t {
   topLevel,
   nominal,
   /// In the status quo scheme, *member* dependencies could have blank names
@@ -499,26 +499,26 @@ public:
   }
   bool isInterface() const { return getAspect() == DeclAspect::interface; }
 
-  /// Given some type of provided entity compute the context field of the key.
+  static DependencyKey createInterfaceKey(NodeKind kind, StringRef context,
+                                          StringRef name);
+
+  static DependencyKey
+  createNominalOrMemberInterfaceKeyNominal(StringRef mangledHolderName,
+                                           StringRef memberBaseNameIfAny);
+
+  /// Given some entity derived from the \c SourceFile, create the key
+  /// Will always have the interface aspect, even though in the final graph,
+  /// there will be interface/implementation pairs
   template <NodeKind kind, typename Entity>
-  static std::string computeContextForProvidedEntity(Entity);
-
-  /// Given some type of provided entity compute the name field of the key.
-  template <NodeKind kind, typename Entity>
-  static std::string computeNameForProvidedEntity(Entity);
-
-  /// Given some type of depended-upon entity create the key.
-  static DependencyKey createDependedUponKey(StringRef mangledHolderName,
-                                             StringRef memberBaseName);
-
-  template <NodeKind kind>
-  static DependencyKey createDependedUponKey(StringRef);
-
-  static DependencyKey createKeyForWholeSourceFile(StringRef swiftDeps);
+  static DependencyKey createProvidedInterfaceKey(Entity);
 
   std::string humanReadableName() const;
 
   StringRef aspectName() const { return DeclAspectNames[size_t(aspect)]; }
+
+  DependencyKey withAspect(DeclAspect newAspect) const {
+    return DependencyKey(kind, newAspect, context, name);
+  }
 
   void dump(llvm::raw_ostream &os) const { os << asString() << "\n"; }
   SWIFT_DEBUG_DUMP { dump(llvm::errs()); }
@@ -558,9 +558,19 @@ struct std::hash<typename swift::fine_grained_dependencies::DeclAspect> {
 
 namespace swift {
 namespace fine_grained_dependencies {
-using ContextNameFingerprint =
-    std::tuple<std::string, std::string, Optional<std::string>>;
-}
+
+struct SerializableDecl {
+  DependencyKey key;
+  Optional<std::string> fingerprint;
+};
+struct SerializableUse {
+  bool isCascadingUse;
+  Optional<bool> isPrivate; // to enclosing file if known
+  std::string context, name;
+  Optional<SerializableDecl> use;
+};
+
+} // namespace fine_grained_dependencies
 } // namespace swift
 
 //==============================================================================
@@ -721,7 +731,8 @@ public:
   }
 
   std::string humanReadableName() const {
-    return DepGraphNode::humanReadableName("here");
+    return DepGraphNode::humanReadableName(getIsProvides() ? "here"
+                                                           : "somewhere else");
   }
 
   bool verify() const {
@@ -779,32 +790,6 @@ public:
   SourceFileDepGraph(const SourceFileDepGraph &g) = delete;
   SourceFileDepGraph(SourceFileDepGraph &&g) = default;
 
-  /// Simulate loading for unit testing:
-  /// \param swiftDepsFileName The name of the swiftdeps file of the phony job
-  /// \param includePrivateDeps Whether the graph includes intra-file arcs
-  /// \param hadCompilationError Simulate a compilation error
-  /// \param interfaceHash The interface hash of the simulated graph
-  /// \param simpleNamesByRDK A map of vectors of names keyed by reference
-  /// dependency key \param compoundNamesByRDK A map of (mangledHolder,
-  /// baseName) pairs keyed by reference dependency key. For single-name
-  /// dependencies, an initial underscore indicates that the name does not
-  /// cascade. For compound names, it is the first name, the holder which
-  /// indicates non-cascading. For member names, an initial underscore indicates
-  /// file-privacy.
-  static SourceFileDepGraph
-  simulateLoad(std::string swiftDepsFileName, const bool includePrivateDeps,
-               const bool hadCompilationError, std::string interfaceHash,
-               llvm::StringMap<std::vector<std::string>> simpleNamesByRDK,
-               llvm::StringMap<std::vector<std::pair<std::string, std::string>>>
-                   compoundNamesByRDK);
-
-  static constexpr char noncascadingOrPrivatePrefix = '#';
-  static constexpr char nameFingerprintSeparator = ',';
-
-  static std::string noncascading(std::string name);
-
-  LLVM_ATTRIBUTE_UNUSED
-  static std::string privatize(std::string name);
 
 
   /// Nodes are owned by the graph.
@@ -851,7 +836,7 @@ public:
   /// file itself.
   InterfaceAndImplementationPair<SourceFileDepGraphNode>
   findExistingNodePairOrCreateAndAddIfNew(
-      NodeKind k, const ContextNameFingerprint &contextNameFingerprint);
+      const SerializableDecl &serializableDecl);
 
   SourceFileDepGraphNode *
   findExistingNodeOrCreateIfNew(DependencyKey key,
@@ -882,6 +867,8 @@ public:
   bool verifyReadsWhatIsWritten(StringRef path) const;
 
   bool verifySequenceNumber() const;
+
+  void emitDotFile(StringRef outputPath, DiagnosticEngine &diags);
 
 private:
   void addNode(SourceFileDepGraphNode *n) {
