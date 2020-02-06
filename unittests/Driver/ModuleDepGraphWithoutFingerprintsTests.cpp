@@ -5,17 +5,11 @@
 #include "swift/Driver/Job.h"
 #include "gtest/gtest.h"
 
-// This file adapts the unit tests from the older, coarse-grained, dependency
-// graph to the new fine-grained graph.
-
-// \c findJobsToRecompileWhenWholeJobChanges and \c
-// findExternallyDependentUntracedJobs may include jobs in their result that
-// would be excluded in the coarse-grained graph. But since these will be jobs
-// that have already been scheduled, downstream mechanisms will filter them out.
-
-// To debug a test, create the \c ModuleDepGraph pass true into the
-// constructor, find the dot files in the directory where the tests run,
-// and inspect them with, e.g. OmniGraffle.
+// A version of \c ModuleDepGraphTests.cpp that tests things with
+// type-body fingerprints disabled.
+//
+// In order to get the test macros to work right, it seems that the tests
+// must be copied-and-pasted, sigh.
 
 using namespace swift;
 using namespace fine_grained_dependencies;

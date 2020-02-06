@@ -8,13 +8,15 @@
 // This file adapts the unit tests from the older, coarse-grained, dependency
 // graph to the new fine-grained graph.
 
-// \c findJobsToRecompileWhenWholeJobChanges and \c
-// findExternallyDependentUntracedJobs may include jobs in their result that
+// \c findJobsToRecompileWhenWholeJobChanges,
+// \c findExternallyDependentUntracedJobs, and \c simulateReload
+// may include jobs in their result that
 // would be excluded in the coarse-grained graph. But since these will be jobs
 // that have already been scheduled, downstream mechanisms will filter them out.
 
-// To debug a test, create the \c ModuleDepGraph pass true into the
-// constructor, find the dot files in the directory where the tests run,
+// To debug a test, create the \c ModuleDepGraph and pass true as the second
+// argument to the constructor, then find the dot files in the directory
+// where the tests run,
 // and inspect them with, e.g. OmniGraffle.
 
 using namespace swift;

@@ -26,28 +26,41 @@ namespace fine_grained_dependencies {
 
 namespace mocking_fine_grained_dependency_graphs {
 
-
-/// Simulate loading for unit testing:
-/// \param cmd A mocked job out of which the \c swiftDeps and \c interfaceHash
-/// will be used \param unparsedByKind A map of vectors of unparsed entries (see
-/// below) keyed by reference \param includePrivateDeps Whether the graph
-/// includes intra-file arcs \param hadCompilationError Simulate a compilation
-/// error dependency key whose values are unparsed strings descriping
-/// dependencies.
+/// Simulate loading for unit testing, as if the driver is reading the swiftdeps
+/// file for the first time.
+///
+/// \param g The graph to load into.
+/// \param cmd The \c Job whose dependency info will be loaded.
+/// \param unparsedByKind Dependency info, see below
+/// \param interfaceHashIfNonEmpty If non-empty, overrides the default simulated
+/// interface hash \param includePrivateDeps Include file-private declarations
+/// in the dependency information. \param hadCompilationError Simulate a
+/// compilation error.
+///
+/// Fails an assertion if the information is not valid (for instance a
+/// fingerprint where it should not be).
+///
+/// *Dependency info format:*
+/// A list of entries, each of which is keyed by a \c NodeKind and contains a
+/// list of dependency nodes.
+///
+/// *Dependency node format:*
+/// Each node here is either a "provides" (i.e. a declaration provided by the
+/// file) or a "depends" (i.e. a declaration that is depended upon).
 ///
 /// For "provides" (i.e. declarations provided by the source file):
-/// <provides> = [#]<contextAndName>[@<identifier>],
+/// <provides> = [#]<contextAndName>[@<fingerprint>],
 /// where the '#' prefix indicates that the declaration is file-private.
 ///
 /// <contextAndName> = <name> |  <context>,<name>
 /// where <context> is a mangled type name, and <name> is a base-name.
 ///
 /// For "depends" (i.e. uses of declarations in the source file):
-/// [#][~]<contextAndName>[-><provides>]
+/// [#][~]<contextAndName>->[<provides>]
 /// where the '#' prefix indicates that the use does not cascade,
 /// the '~' prefix indicates that the holder is private,
-/// <contextAndName> is the used declaration (the "def") and the optional
-/// <provides> is the using declaration (the "use") if known. If not known, the
+/// <contextAndName> is the depended-upon declaration and the optional
+/// <provides> is the dependent declaration if known. If not known, the
 /// use will be the entire file.
 
 void simulateLoad(
@@ -57,6 +70,9 @@ void simulateLoad(
     const bool includePrivateDeps = true,
     const bool hadCompilationError = false);
 
+/// Same as \ref simulateLoad, but returns the specifically changed nodes or
+/// None if the load failed.
+
 ModuleDepGraph::Changes getChangesForSimulatedLoad(
     ModuleDepGraph &g, const driver::Job *cmd,
     std::unordered_multimap<NodeKind, std::vector<std::string>> unparsedByKind,
@@ -64,11 +80,12 @@ ModuleDepGraph::Changes getChangesForSimulatedLoad(
     const bool includePrivateDeps = true,
     const bool hadCompilationError = false);
 
-/// In \c reloadAndRemarkFineGrainedDepsOnNormalExit,
-/// after a job runs, its changed nodes are obtained by reloading the swiftdeps
-/// file, and *only those* are traced.
+/// Simulates the driver reloading a swiftdeps file after a job has run.
+/// Returns the jobs that must now be run, possibly redundantly including \p
+/// cmd.
 ///
-/// Return the jobs that would be rebuilt.
+/// See \ref simulateLoad for a parameter description.
+
 std::vector<const driver::Job *> simulateReload(
     ModuleDepGraph &g, const driver::Job *cmd,
     std::unordered_multimap<NodeKind, std::vector<std::string>> unparsedByKind,
