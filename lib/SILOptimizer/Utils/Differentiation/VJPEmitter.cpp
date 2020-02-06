@@ -378,7 +378,7 @@ void VJPEmitter::visitCondBranchInst(CondBranchInst *cbi) {
                                 createTrampolineBasicBlock(cbi->getFalseBB()));
 }
 
-void VJPEmitter::visitSwitchEnumInst(SwitchEnumInst *sei) {
+void VJPEmitter::visitSwitchEnumInstBase(SwitchEnumInstBase *sei) {
   // Build pullback struct value for original block.
   auto *origBB = sei->getParent();
   auto *pbStructVal = buildPullbackValueStructValue(sei);
@@ -423,8 +423,27 @@ void VJPEmitter::visitSwitchEnumInst(SwitchEnumInst *sei) {
     newDefaultBB = createTrampolineBasicBlock(defaultBB);
 
   // Create a new `switch_enum` instruction.
-  getBuilder().createSwitchEnum(sei->getLoc(), getOpValue(sei->getOperand()),
-                                newDefaultBB, caseBBs);
+  switch (sei->getKind()) {
+  case SILInstructionKind::SwitchEnumInst:
+    getBuilder().createSwitchEnum(sei->getLoc(), getOpValue(sei->getOperand()),
+                                  newDefaultBB, caseBBs);
+    break;
+  case SILInstructionKind::SwitchEnumAddrInst:
+    getBuilder().createSwitchEnumAddr(sei->getLoc(),
+                                      getOpValue(sei->getOperand()),
+                                      newDefaultBB, caseBBs);
+    break;
+  default:
+    llvm_unreachable("Expected `switch_enum` or `switch_enum_addr`");
+  }
+}
+
+void VJPEmitter::visitSwitchEnumInst(SwitchEnumInst *sei) {
+  visitSwitchEnumInstBase(sei);
+}
+
+void VJPEmitter::visitSwitchEnumAddrInst(SwitchEnumAddrInst *seai) {
+  visitSwitchEnumInstBase(seai);
 }
 
 void VJPEmitter::visitApplyInst(ApplyInst *ai) {

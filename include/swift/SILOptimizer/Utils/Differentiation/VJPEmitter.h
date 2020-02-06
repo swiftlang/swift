@@ -135,7 +135,11 @@ public:
 
   void visitCondBranchInst(CondBranchInst *cbi);
 
+  void visitSwitchEnumInstBase(SwitchEnumInstBase *inst);
+
   void visitSwitchEnumInst(SwitchEnumInst *sei);
+
+  void visitSwitchEnumAddrInst(SwitchEnumAddrInst *seai);
 
   // If an `apply` has active results or active inout arguments, replace it
   // with an `apply` of its VJP.
