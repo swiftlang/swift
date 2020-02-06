@@ -4442,7 +4442,7 @@ public:
   /// Given that `this` is a `@differentiable` or `@differentiable(linear)`
   /// function type, returns an `IndexSubset` corresponding to the
   /// differentiability/linearity parameters (e.g. all parameters except the
-  //// `@noDerivative` ones).
+  /// `@noDerivative` ones).
   IndexSubset *getDifferentiabilityParameterIndices();
 
   /// Returns the `@differentiable` or `@differentiable(linear)` function type
