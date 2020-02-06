@@ -248,6 +248,10 @@ option(SWIFT_BENCHMARK_GENERATE_OPT_VIEW
 set(SWIFT_BENCHMARK_OPT_VIEWER "" CACHE FILEPATH
   "Path to opt-viewer")
 
+option(SWIFT_BENCHMARK_GENERATE_DEBUG_INFO
+  "Produce debug info for benchmarks"
+  TRUE)
+
 if(SWIFT_BENCHMARK_OPT_VIEWER)
   # If the path to the opt-viewer was specified manually and we have no access
   # to the LLVM tree, assume we have the modules for the opt-viewer installed.
