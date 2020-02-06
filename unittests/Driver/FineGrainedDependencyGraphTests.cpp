@@ -1,3 +1,4 @@
+#include "MockingFineGrainedDependencyGraphs.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Driver/CoarseGrainedDependencyGraph.h"
 #include "swift/Driver/FineGrainedDependencyDriverGraph.h"
@@ -12,9 +13,13 @@
 // would be excluded in the coarse-grained graph. But since these will be jobs
 // that have already been scheduled, downstream mechanisms will filter them out.
 
+// To debug a test, create the \c ModuleDepGraph pass true into the
+// constructor, find the dot files in the directory where the tests run,
+// and inspect them with, e.g. OmniGraffle.
+
 using namespace swift;
-using namespace reference_dependency_keys;
 using namespace fine_grained_dependencies;
+using namespace mocking_fine_grained_dependency_graphs;
 using Job = driver::Job;
 
 
@@ -44,36 +49,25 @@ static bool contains(const Range &range, const T &value) {
 TEST(ModuleDepGraph, BasicLoad) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{dependsTopLevel, {"a", "b"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"c", "d"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job2, {{providesTopLevel, {"e", "f"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job3, {{providesNominal, {"g", "h"}}}));
-  EXPECT_TRUE(
-      graph.simulateLoad( &job4, {{providesDynamicLookup, {"i", "j"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job5, {{dependsDynamicLookup, {"k", "l"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job6, {},
-                           {{providesMember, {{"m", "mm"}, {"n", "nn"}}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job7, {},
-                           {{dependsMember, {{"o", "oo"}, {"p", "pp"}}}}));
-  EXPECT_TRUE(
-      graph.simulateLoad( &job8, {{dependsExternal, {"/foo", "/bar"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::topLevel, {"a->", "b->"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"c->", "d->"}}});
+  simulateLoad(graph, &job2, {{NodeKind::topLevel, {"e", "f"}}});
+  simulateLoad(graph, &job3, {{NodeKind::nominal, {"g", "h"}}});
+  simulateLoad(graph, &job4, {{NodeKind::dynamicLookup, {"i", "j"}}});
+  simulateLoad(graph, &job5, {{NodeKind::dynamicLookup, {"k->", "l->"}}});
+  simulateLoad(graph, &job6, {{NodeKind::member, {"m,mm", "n,nn"}}});
+  simulateLoad(graph, &job7, {{NodeKind::member, {"o,oo->", "p,pp->"}}});
+  simulateLoad(graph, &job8, {{NodeKind::externalDepend, {"/foo->", "/bar->"}}});
 
-  EXPECT_TRUE(graph.simulateLoad( &job9,
-                           {{providesNominal, {"a", "b"}},
-                            {providesTopLevel, {"b", "c"}},
-                            {dependsNominal, {"c", "d"}},
-                            {dependsTopLevel, {"d", "a"}}}));
+  simulateLoad(graph, &job9, {{NodeKind::nominal, {"a", "b", "c->", "d->"}}, {NodeKind::topLevel, {"b", "c", "d->", "a->"}}});
 }
 
 TEST(ModuleDepGraph, IndependentNodes) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad(
-      &job0, {{dependsTopLevel, {"a"}}, {providesTopLevel, {"a0"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job1, {{dependsTopLevel, {"b"}}, {providesTopLevel, {"b0"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job2, {{dependsTopLevel, {"c"}}, {providesTopLevel, {"c0"}}}));
+  simulateLoad( graph, &job0, {{NodeKind::topLevel, {"a0", "a->"}}});
+  simulateLoad( graph, &job1, {{NodeKind::topLevel, {"b0", "b->"}}});
+  simulateLoad( graph, &job2, {{NodeKind::topLevel, {"c0", "c->"}}});
 
   EXPECT_EQ(1u, graph.findJobsToRecompileWhenWholeJobChanges(&job0).size());
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job0));
@@ -100,10 +94,8 @@ TEST(ModuleDepGraph, IndependentNodes) {
 TEST(ModuleDepGraph, IndependentDepKinds) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad(
-      &job0, {{dependsNominal, {"a"}}, {providesNominal, {"b"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job1, {{dependsTopLevel, {"b"}}, {providesTopLevel, {"a"}}}));
+  simulateLoad( graph, &job0, {{NodeKind::nominal, {"a", "a->"}}});
+  simulateLoad( graph, &job1, {{NodeKind::topLevel, {"a", "b->"}}});
 
   EXPECT_EQ(1u, graph.findJobsToRecompileWhenWholeJobChanges(&job0).size());
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job0));
@@ -113,10 +105,8 @@ TEST(ModuleDepGraph, IndependentDepKinds) {
 TEST(ModuleDepGraph, IndependentDepKinds2) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad(
-      &job0, {{dependsNominal, {"a"}}, {providesNominal, {"b"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job1, {{dependsTopLevel, {"b"}}, {providesTopLevel, {"a"}}}));
+  simulateLoad( graph, &job0, {{NodeKind::nominal, {"a->", "b"}}});
+  simulateLoad( graph, &job1, {{NodeKind::topLevel, {"b->", "a"}}});
 
   EXPECT_EQ(1u, graph.findJobsToRecompileWhenWholeJobChanges(&job1).size());
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job0));
@@ -126,12 +116,11 @@ TEST(ModuleDepGraph, IndependentDepKinds2) {
 TEST(ModuleDepGraph, IndependentMembers) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(
-      graph.simulateLoad( &job0, {}, {{providesMember, {{"a", "aa"}}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {}, {{dependsMember, {{"a", "bb"}}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job2, {}, {{dependsMember, {{"a", ""}}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job3, {}, {{dependsMember, {{"b", "aa"}}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job4, {}, {{dependsMember, {{"b", "bb"}}}}));
+  simulateLoad(graph, &job0, {{NodeKind::member, {"a,aa"}}});
+  simulateLoad(graph, &job1, {{NodeKind::member, {"a,bb->"}}});
+  simulateLoad(graph, &job2, {{NodeKind::potentialMember, {"a"}}});
+  simulateLoad(graph, &job3, {{NodeKind::member, {"b,aa->"}}});
+  simulateLoad(graph, &job4, {{NodeKind::member, {"b,bb->"}}});
 
   EXPECT_EQ(1u, graph.findJobsToRecompileWhenWholeJobChanges(&job0).size());
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job0));
@@ -144,9 +133,8 @@ TEST(ModuleDepGraph, IndependentMembers) {
 TEST(ModuleDepGraph, SimpleDependent) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(
-      graph.simulateLoad( &job0, {{providesTopLevel, {"a", "b", "c"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsTopLevel, {"x", "b", "z"}}}));
+      simulateLoad(graph, &job0, {{NodeKind::topLevel, {"a", "b", "c"}}});
+  simulateLoad(graph, &job1, {{NodeKind::topLevel, {"x->", "b->", "z->"}}});
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
     EXPECT_EQ(2u, jobs.size());
@@ -163,14 +151,13 @@ TEST(ModuleDepGraph, SimpleDependent) {
 TEST(ModuleDepGraph, SimpleDependentReverse) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{dependsTopLevel, {"a", "b", "c"}}}));
-  EXPECT_TRUE(
-      graph.simulateLoad( &job1, {{providesTopLevel, {"x", "b", "z"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::topLevel, {"a->", "b->", "c->"}}});
+  simulateLoad(graph, &job1, {{NodeKind::topLevel, {"x", "b", "z"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job1);
     EXPECT_EQ(2u, jobs.size());
-    EXPECT_EQ(&job0, jobs.front());
+    EXPECT_TRUE(contains(jobs, &job0));
   }
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job0));
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
@@ -185,10 +172,10 @@ TEST(ModuleDepGraph, SimpleDependentReverse) {
 }
 
 TEST(ModuleDepGraph, SimpleDependent2) {
-  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/false);
 
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a", "b", "c"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"x", "b", "z"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"a", "b", "c"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"x->", "b->", "z->"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -206,9 +193,8 @@ TEST(ModuleDepGraph, SimpleDependent2) {
 TEST(ModuleDepGraph, SimpleDependent3) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad(
-      &job0, {{providesNominal, {"a"}}, {providesTopLevel, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"a"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"a"}}, {NodeKind::topLevel, {"a"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"a->"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -226,9 +212,8 @@ TEST(ModuleDepGraph, SimpleDependent3) {
 TEST(ModuleDepGraph, SimpleDependent4) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job1, {{dependsNominal, {"a"}}, {dependsTopLevel, {"a"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"a"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"a->"}}, {NodeKind::topLevel, {"a->"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -246,10 +231,8 @@ TEST(ModuleDepGraph, SimpleDependent4) {
 TEST(ModuleDepGraph, SimpleDependent5) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad(
-      &job0, {{providesNominal, {"a"}}, {providesTopLevel, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job1, {{dependsNominal, {"a"}}, {dependsTopLevel, {"a"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"a"}}, {NodeKind::topLevel, {"a"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"a->"}}, {NodeKind::topLevel, {"a->"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -268,10 +251,8 @@ TEST(ModuleDepGraph, SimpleDependent5) {
 TEST(ModuleDepGraph, SimpleDependent6) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(
-      graph.simulateLoad( &job0, {{providesDynamicLookup, {"a", "b", "c"}}}));
-  EXPECT_TRUE(
-      graph.simulateLoad( &job1, {{dependsDynamicLookup, {"x", "b", "z"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::dynamicLookup, {"a", "b", "c"}}});
+  simulateLoad(graph, &job1, {{NodeKind::dynamicLookup, {"x->", "b->", "z->"}}});
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
     EXPECT_EQ(2u, jobs.size());
@@ -288,12 +269,8 @@ TEST(ModuleDepGraph, SimpleDependent6) {
 TEST(ModuleDepGraph, SimpleDependentMember) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad(
-      &job0, {},
-      {{providesMember, {{"a", "aa"}, {"b", "bb"}, {"c", "cc"}}}}));
-  EXPECT_TRUE(
-      graph.simulateLoad( &job1, {},
-                   {{dependsMember, {{"x", "xx"}, {"b", "bb"}, {"z", "zz"}}}}));
+  simulateLoad(graph, &job0, {{NodeKind::member, {"a,aa", "b,bb", "c,cc"}}});
+  simulateLoad(graph, &job1, {{NodeKind::member, {"x,xx->", "b,bb->", "z,zz->"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -311,9 +288,9 @@ TEST(ModuleDepGraph, SimpleDependentMember) {
 TEST(ModuleDepGraph, MultipleDependentsSame) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a", "b", "c"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"x", "b", "z"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job2, {{dependsNominal, {"q", "b", "s"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"a", "b", "c"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"x->", "b->", "z->"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"q->", "b->", "s->"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -334,9 +311,9 @@ TEST(ModuleDepGraph, MultipleDependentsSame) {
 TEST(ModuleDepGraph, MultipleDependentsDifferent) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a", "b", "c"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"x", "b", "z"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job2, {{dependsNominal, {"q", "r", "c"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"a", "b", "c"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"x->", "b->", "z->"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"q->", "r->", "c->"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -357,10 +334,9 @@ TEST(ModuleDepGraph, MultipleDependentsDifferent) {
 TEST(ModuleDepGraph, ChainedDependents) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a", "b", "c"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job1, {{dependsNominal, {"x", "b"}}, {providesNominal, {"z"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job2, {{dependsNominal, {"z"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"a", "b", "c"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"x->", "b->", "z"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"z->"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -381,10 +357,9 @@ TEST(ModuleDepGraph, ChainedDependents) {
 TEST(ModuleDepGraph, ChainedNoncascadingDependents) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a", "b", "c"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job1, {{dependsNominal, {"x", "b"}}, {providesNominal, {SourceFileDepGraph::noncascading("z")}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job2, {{dependsNominal, {SourceFileDepGraph::noncascading("z")}}}));
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"a", "b", "c"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"x->", "b->", "#z"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"#z->"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -405,12 +380,9 @@ TEST(ModuleDepGraph, ChainedNoncascadingDependents) {
 TEST(ModuleDepGraph, ChainedNoncascadingDependents2) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(
-      graph.simulateLoad( &job0, {{providesTopLevel, {"a", SourceFileDepGraph::noncascading("b"), "c"}}}));
-  EXPECT_TRUE(
-      graph.simulateLoad( &job1,
-                   {{dependsTopLevel, {"x", SourceFileDepGraph::noncascading("b")}}, {providesNominal, {"z"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job2, {{dependsNominal, {"z"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::topLevel, {"a", "b", "c"}}});
+  simulateLoad(graph, &job1, {{NodeKind::topLevel, {"x->", "#b->"}}, {NodeKind::nominal, {"z"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"z->"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -425,16 +397,12 @@ TEST(ModuleDepGraph, ChainedNoncascadingDependents2) {
 TEST(ModuleDepGraph, MarkTwoNodes) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{providesTopLevel, {"a", "b"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job1, {{dependsTopLevel, {"a"}}, {providesTopLevel, {"z"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job2, {{dependsTopLevel, {"z"}}}));
-  EXPECT_TRUE(
-      graph.simulateLoad( &job10,
-                   {{providesTopLevel, {"y", "z"}}, {dependsTopLevel, {"q"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job11, {{dependsTopLevel, {"y"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job12, {{dependsTopLevel, {"q"}}, {providesTopLevel, {"q"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::topLevel, {"a", "b"}}});
+  simulateLoad(graph, &job1, {{NodeKind::topLevel, {"a->", "z"}}});
+  simulateLoad(graph, &job2, {{NodeKind::topLevel, {"z->"}}});
+  simulateLoad(graph, &job10, {{NodeKind::topLevel, {"y", "z", "q->"}}});
+  simulateLoad(graph, &job11, {{NodeKind::topLevel, {"y->"}}});
+  simulateLoad(graph, &job12, {{NodeKind::topLevel, {"q->", "q"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -467,9 +435,9 @@ TEST(ModuleDepGraph, MarkTwoNodes) {
 TEST(ModuleDepGraph, MarkOneNodeTwice) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job2, {{dependsNominal, {"b"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"a"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"a->"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"b->"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -480,11 +448,8 @@ TEST(ModuleDepGraph, MarkOneNodeTwice) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job2));
 
-  // Reload 0.
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"b"}}}));
-
   {
-    auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
+    auto jobs = simulateReload(graph, &job0, {{NodeKind::nominal, {"b"}}});
     EXPECT_EQ(2u, jobs.size());
     EXPECT_TRUE(contains(jobs, &job2));
   }
@@ -496,9 +461,9 @@ TEST(ModuleDepGraph, MarkOneNodeTwice) {
 TEST(ModuleDepGraph, MarkOneNodeTwice2) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job2, {{dependsNominal, {"b"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"a"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"a->"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"b->"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -509,11 +474,8 @@ TEST(ModuleDepGraph, MarkOneNodeTwice2) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job2));
 
-  // Reload 0.
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a", "b"}}}));
-
   {
-    auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
+    auto jobs = simulateReload(graph, &job0, {{NodeKind::nominal, {"a", "b"}}});
     EXPECT_EQ(2u, jobs.size());
     EXPECT_TRUE(contains(jobs, &job2));
   }
@@ -525,9 +487,9 @@ TEST(ModuleDepGraph, MarkOneNodeTwice2) {
 TEST(ModuleDepGraph, ReloadDetectsChange) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job2, {{dependsNominal, {"b"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"a"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"a->"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"b->"}}});
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job1);
     EXPECT_EQ(1u, jobs.size());
@@ -537,28 +499,14 @@ TEST(ModuleDepGraph, ReloadDetectsChange) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job2));
 
-  // Reload 1.
-  EXPECT_TRUE(graph.simulateLoad(
-      &job1, {{dependsNominal, {"a"}}, {providesNominal, {"b"}}}));
-
   {
-    auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
-    EXPECT_EQ(1u, jobs.size());
-    EXPECT_TRUE(contains(jobs, &job0));
-  }
-  EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job0));
-  EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
-  EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job2));
-
-  // Re-mark 1.
-  {
-    auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job1);
+    auto jobs = simulateReload(
+                 graph, &job1, {{NodeKind::nominal, {"b", "a->"}}});
     EXPECT_EQ(2u, jobs.size());
     EXPECT_TRUE(contains(jobs, &job1));
     EXPECT_TRUE(contains(jobs, &job2));
   }
-
-  EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job0));
+  EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job0));
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job2));
 }
@@ -566,9 +514,9 @@ TEST(ModuleDepGraph, ReloadDetectsChange) {
 TEST(ModuleDepGraph, NotTransitiveOnceMarked) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad( &job0, {{providesNominal, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsNominal, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job2, {{dependsNominal, {"b"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"a"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"a->"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"b->"}}});
 
   {
   const auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job1);
@@ -579,27 +527,13 @@ TEST(ModuleDepGraph, NotTransitiveOnceMarked) {
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job2));
 
-  // Reload 1.
-  EXPECT_TRUE(graph.simulateLoad( &job1,
-  {{dependsNominal, {"a"}}, {providesNominal, {"b"}}}));
-
   {
-  const auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
-    EXPECT_EQ(1u, jobs.size());
-    EXPECT_TRUE(contains(jobs, &job0));
+  const auto jobs = simulateReload(graph, &job1, {{NodeKind::nominal, {"b", "a->"}}});
+    EXPECT_EQ(2u, jobs.size());
+    EXPECT_TRUE(contains(jobs, &job1));
+    EXPECT_TRUE(contains(jobs, &job2));
   }
-  EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job0));
-  EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
-  EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job2));
-
-  // Re-mark 1.
-  {
-    auto found = graph.findJobsToRecompileWhenWholeJobChanges(&job1);
-    EXPECT_EQ(2u, found.size());
-    EXPECT_TRUE(contains(found, &job1));
-    EXPECT_TRUE(contains(found, &job2));
-  }
-  EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job0));
+  EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job0));
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job2));
 }
@@ -607,13 +541,9 @@ TEST(ModuleDepGraph, NotTransitiveOnceMarked) {
 TEST(ModuleDepGraph, DependencyLoops) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad(
-      &job0,
-      {{providesTopLevel, {"a", "b", "c"}}, {dependsTopLevel, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job1,
-      {{providesTopLevel, {"x"}}, {dependsTopLevel, {"x", "b", "z"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job2, {{dependsTopLevel, {"x"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::topLevel, {"a", "b", "c", "a->"}}});
+  simulateLoad(graph, &job1, {{NodeKind::topLevel, {"x", "x->", "b->", "z->"}}});
+  simulateLoad(graph, &job2, {{NodeKind::topLevel, {"x->"}}});
 
   {
     auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
@@ -637,9 +567,8 @@ TEST(ModuleDepGraph, DependencyLoops) {
 TEST(ModuleDepGraph, MarkIntransitive) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(
-      graph.simulateLoad( &job0, {{providesTopLevel, {"a", "b", "c"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsTopLevel, {"x", "b", "z"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::topLevel, {"a", "b", "c"}}});
+  simulateLoad(graph, &job1, {{NodeKind::topLevel, {"x->", "b->", "z->"}}});
 
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job0));
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job1));
@@ -656,9 +585,8 @@ TEST(ModuleDepGraph, MarkIntransitive) {
 TEST(ModuleDepGraph, MarkIntransitiveTwice) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(
-      graph.simulateLoad( &job0, {{providesTopLevel, {"a", "b", "c"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsTopLevel, {"x", "b", "z"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::topLevel, {"a", "b", "c"}}});
+  simulateLoad(graph, &job1, {{NodeKind::topLevel, {"x->", "b->", "z->"}}});
 
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job0));
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job1));
@@ -667,9 +595,8 @@ TEST(ModuleDepGraph, MarkIntransitiveTwice) {
 TEST(ModuleDepGraph, MarkIntransitiveThenIndirect) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(
-      graph.simulateLoad( &job0, {{providesTopLevel, {"a", "b", "c"}}}));
-  EXPECT_TRUE(graph.simulateLoad( &job1, {{dependsTopLevel, {"x", "b", "z"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::topLevel, {"a", "b", "c"}}});
+  simulateLoad(graph, &job1, {{NodeKind::topLevel, {"x->", "b->", "z->"}}});
 
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job0));
   EXPECT_FALSE(graph.haveAnyNodesBeenTraversedIn(&job1));
@@ -687,8 +614,7 @@ TEST(ModuleDepGraph, MarkIntransitiveThenIndirect) {
 TEST(ModuleDepGraph, SimpleExternal) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(
-      graph.simulateLoad( &job0, {{dependsExternal, {"/foo", "/bar"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::externalDepend, {"/foo->", "/bar->"}}});
 
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/foo"));
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/bar"));
@@ -708,8 +634,7 @@ TEST(ModuleDepGraph, SimpleExternal) {
 TEST(ModuleDepGraph, SimpleExternal2) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(
-      graph.simulateLoad( &job0, {{dependsExternal, {"/foo", "/bar"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::externalDepend, {"/foo->", "/bar->"}}});
 
   EXPECT_EQ(1u, graph.findExternallyDependentUntracedJobs("/bar").size());
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job0));
@@ -721,10 +646,8 @@ TEST(ModuleDepGraph, SimpleExternal2) {
 TEST(ModuleDepGraph, ChainedExternal) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad(
-      &job0, {{dependsExternal, {"/foo"}}, {providesTopLevel, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job1, {{dependsExternal, {"/bar"}}, {dependsTopLevel, {"a"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::externalDepend, {"/foo->"}}, {NodeKind::topLevel, {"a"}}});
+  simulateLoad(graph, &job1, {{NodeKind::externalDepend, {"/bar->"}}, {NodeKind::topLevel, {"a->"}}});
 
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/foo"));
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/bar"));
@@ -749,10 +672,8 @@ TEST(ModuleDepGraph, ChainedExternal) {
 TEST(ModuleDepGraph, ChainedExternalReverse) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad(
-      &job0, {{dependsExternal, {"/foo"}}, {providesTopLevel, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job1, {{dependsExternal, {"/bar"}}, {dependsTopLevel, {"a"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::externalDepend, {"/foo->"}}, {NodeKind::topLevel, {"a"}}});
+  simulateLoad(graph, &job1, {{NodeKind::externalDepend, {"/bar->"}}, {NodeKind::topLevel, {"a->"}}});
 
   {
     auto jobs = graph.findExternallyDependentUntracedJobs("/bar");
@@ -769,7 +690,7 @@ TEST(ModuleDepGraph, ChainedExternalReverse) {
   {
     auto jobs = graph.findExternallyDependentUntracedJobs("/foo");
     EXPECT_EQ(1u, jobs.size());
-    EXPECT_EQ(&job0, jobs.front());
+    EXPECT_TRUE(contains(jobs, &job0));
   }
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job0));
   EXPECT_TRUE(graph.haveAnyNodesBeenTraversedIn(&job1));
@@ -778,10 +699,8 @@ TEST(ModuleDepGraph, ChainedExternalReverse) {
 TEST(ModuleDepGraph, ChainedExternalPreMarked) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  EXPECT_TRUE(graph.simulateLoad(
-      &job0, {{dependsExternal, {"/foo"}}, {providesTopLevel, {"a"}}}));
-  EXPECT_TRUE(graph.simulateLoad(
-      &job1, {{dependsExternal, {"/bar"}}, {dependsTopLevel, {"a"}}}));
+  simulateLoad(graph, &job0, {{NodeKind::externalDepend, {"/foo->"}}, {NodeKind::topLevel, {"a"}}});
+  simulateLoad(graph, &job1, {{NodeKind::externalDepend, {"/bar->"}}, {NodeKind::topLevel, {"a->"}}});
 
   {
     auto jobs = graph.findExternallyDependentUntracedJobs("/foo");
@@ -796,14 +715,8 @@ TEST(ModuleDepGraph, ChainedExternalPreMarked) {
 
 TEST(ModuleDepGraph, MutualInterfaceHash) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
-  graph.simulateLoad( &job0, {
-    {providesTopLevel, {"a"}},
-    {dependsTopLevel, {"b"}}
-  });
-  graph.simulateLoad( &job1, {
-    {dependsTopLevel, {"a"}},
-    {providesTopLevel, {"b"}}
-  });
+  simulateLoad(graph, &job0, {{NodeKind::topLevel, {"a", "b->"}}});
+  simulateLoad(graph, &job1, {{NodeKind::topLevel, {"a->", "b"}}});
 
   const auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
   EXPECT_TRUE(contains(jobs, &job1));
@@ -812,9 +725,9 @@ TEST(ModuleDepGraph, MutualInterfaceHash) {
 TEST(ModuleDepGraph, DisabledTypeBodyFingerprints) {
   ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
 
-  graph.simulateLoad(&job0, {{dependsNominal, {"B2"}}});
-  graph.simulateLoad(&job1, {{providesNominal, {"B1", "B2"}}});
-  graph.simulateLoad(&job2, {{dependsNominal, {"B1"}}});
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"B2->"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"B1", "B2"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"B1->"}}});
 
   {
   const auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job1);
@@ -823,4 +736,80 @@ TEST(ModuleDepGraph, DisabledTypeBodyFingerprints) {
   EXPECT_TRUE(contains(jobs, &job1));
   EXPECT_TRUE(contains(jobs, &job2));
   }
+}
+
+TEST(ModuleDepGraph, BaselineForPrintsAndCrossType) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/false);
+
+  // Because when A1 changes, B1 and not B2 is affected, only jobs1 and job2
+  // should be recompiled, except type fingerprints is off!
+
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"A1", "A2"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"B1", "A1->"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"C1", "A2->"}}});
+  simulateLoad(graph, &job3, {{NodeKind::nominal, {"D1"}}});
+
+  {
+    const auto jobs = simulateReload(graph, &job0, {{NodeKind::nominal, {"A1", "A2"}}}, "changed");
+    EXPECT_EQ(3u, jobs.size());
+    EXPECT_TRUE(contains(jobs, &job0));
+    EXPECT_TRUE(contains(jobs, &job1));
+    EXPECT_TRUE(contains(jobs, &job2));
+    EXPECT_FALSE(contains(jobs, &job3));
+  }
+}
+
+TEST(ModuleDepGraph, LoadFailsWithFingerprint) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/false);
+  EXPECT_FALSE(
+      getChangesForSimulatedLoad(graph, &job0, {{NodeKind::nominal, {"A@1"}}}));
+}
+
+TEST(ModuleDepGraph, IgnoreFingerprints) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/false);
+
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"A1", "A2"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"B1", "A1->"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"C1", "A2->"}}});
+  simulateLoad(graph, &job3, {{NodeKind::nominal, {"D1"}}});
+
+  {
+    const auto jobs = simulateReload(graph, &job0, {{NodeKind::nominal, {"A1@11", "A2@2"}}} );
+    EXPECT_EQ(4u, jobs.size());
+    EXPECT_TRUE(contains(jobs, &job0));
+    EXPECT_TRUE(contains(jobs, &job1));
+    EXPECT_TRUE(contains(jobs, &job2));
+    EXPECT_TRUE(contains(jobs, &job3));
+  }
+}
+
+TEST(ModuleDepGraph, CrossTypeDependencyBaseline) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/false);
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"A"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"B", "C", "A->"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"B->"}}});
+  simulateLoad(graph, &job3, {{NodeKind::nominal, {"C->"}}});
+
+  const auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
+  EXPECT_TRUE(contains(jobs, &job0));
+  EXPECT_TRUE(contains(jobs, &job1));
+  EXPECT_TRUE(contains(jobs, &job2));
+  EXPECT_TRUE(contains(jobs, &job3));
+}
+
+TEST(ModuleDepGraph, CrossTypeDependency) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/false);
+  // Because of the cross-type dependency, A->B,
+  // when A changes, only B is dirtied in job1.
+
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"A"}}});
+  simulateLoad(graph, &job1, {{NodeKind::nominal, {"B", "C", "A->B"}}});
+  simulateLoad(graph, &job2, {{NodeKind::nominal, {"B->"}}});
+  simulateLoad(graph, &job3, {{NodeKind::nominal, {"C->"}}});
+
+  const auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
+  EXPECT_TRUE(contains(jobs, &job0));
+  EXPECT_TRUE(contains(jobs, &job1));
+  EXPECT_TRUE(contains(jobs, &job2));
+  EXPECT_FALSE(contains(jobs, &job3));
 }
