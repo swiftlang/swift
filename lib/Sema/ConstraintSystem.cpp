@@ -2749,13 +2749,66 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       return false;
   }
 
-  // Problems related to fixes forming ambiguous solution set
-  // could only be diagnosed (at the moment), if all of the fixes
-  // have the same callee locator, which means they fix different
-  // overloads of the same declaration.
-  ConstraintLocator *commonCalleeLocator = nullptr;
+  // Collect aggregated fixes from all solutions
+  llvm::SmallMapVector<std::pair<ConstraintLocator *, FixKind>,
+      llvm::SmallVector<ConstraintFix *, 4>, 4> aggregatedFixes;
+  for (const auto &solution: solutions) {
+    for (auto fixesPerLocator: solution.getAggregatedFixes()) {
+      for (auto kindAndFixes: fixesPerLocator.second) {
+        aggregatedFixes[{fixesPerLocator.first, kindAndFixes.first}]
+            .push_back(kindAndFixes.second.front());
+      }
+    }
+  }
+
+  // If there are no overload differences, diagnose the common fixes.
+  SolutionDiff solutionDiff(solutions);
+  if (solutionDiff.overloads.size() == 0) {
+    bool diagnosed = false;
+    ConstraintSystem::SolverScope scope(*this);
+    applySolution(solutions.front());
+    for (auto fixes: aggregatedFixes) {
+      // A common fix must appear in all solutions
+      if (fixes.second.size() < solutions.size()) continue;
+      diagnosed |= fixes.second.front()->diagnose();
+    }
+    return diagnosed;
+  }
+
+  // If there is an overload difference, let's see if there's a common callee
+  // locator for all of the fixes.
+  auto ambiguousOverload = llvm::find_if(solutionDiff.overloads,
+      [&](const auto &overloadDiff) {
+        return llvm::all_of(aggregatedFixes, [&](const auto &aggregatedFix) {
+          auto *locator = aggregatedFix.first.first;
+          auto *anchor = locator->getAnchor();
+          // Assignment failures are all about the source expression, because
+          // they treat destination as a contextual type.
+          if (auto *assignExpr = dyn_cast<AssignExpr>(anchor))
+            anchor = assignExpr->getSrc();
+
+          if (auto *callExpr = dyn_cast<CallExpr>(anchor)) {
+            if (!isa<TypeExpr>(callExpr->getDirectCallee()))
+              anchor = callExpr->getDirectCallee();
+          } else if (auto *applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+            anchor = applyExpr->getFn();
+          }
+
+          return overloadDiff.locator->getAnchor() == anchor;
+        });
+      });
+
+  if (ambiguousOverload == solutionDiff.overloads.end())
+    return false;
+
+  ConstraintLocator* commonCalleeLocator = ambiguousOverload->locator;
   SmallPtrSet<ValueDecl *, 4> distinctChoices;
   SmallVector<const Solution *, 4> viableSolutions;
+  assert(ambiguousOverload->choices.size() == solutions.size());
+  for (unsigned i = 0; i < solutions.size(); ++i) {
+    if (distinctChoices.insert(ambiguousOverload->choices[i].getDecl()).second)
+      viableSolutions.push_back(&solutions[i]);
+  }
 
   enum class AmbiguityKind {
     /// There is exactly one fix associated with each candidate.
@@ -2771,103 +2824,23 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   };
   auto ambiguityKind = AmbiguityKind::CloseMatch;
 
-  bool diagnosable = llvm::all_of(solutions, [&](const Solution &solution) {
-    ArrayRef<ConstraintFix *> fixes = solution.Fixes;
-
-    if (fixes.empty())
+  // FIXME: Can this be re-written in a cleaner way?
+  for (const auto &solution: solutions) {
+    if (solution.Fixes.empty())
       return false;
 
-    if (fixes.size() > 1) {
-      // Attempt to disambiguite in cases where the argument matches
-      // involves tuple mismatches. e.g.
-      // func t<T, U>(_: (T, U), _: (U, T)) {}
-      // func useTuples(_ x: Int, y: Float) {
-      //     t((x, y), (x, y))
-      // }
-      // So fixes are ambiguous in all solutions.
-      if ((ambiguityKind == AmbiguityKind::CloseMatch ||
-           ambiguityKind == AmbiguityKind::ArgumentMismatch) &&
-          llvm::all_of(fixes, [](const ConstraintFix *fix) -> bool {
-            return fix->getKind() == FixKind::AllowTupleTypeMismatch;
-          })) {
-        ambiguityKind = AmbiguityKind::ArgumentMismatch;
-      } else {
-        ambiguityKind =
-            (ambiguityKind == AmbiguityKind::CloseMatch ||
-             ambiguityKind == AmbiguityKind::ArgumentMismatch ||
-             ambiguityKind == AmbiguityKind::ParameterList) &&
-                    llvm::all_of(
-                        fixes,
-                        [](const ConstraintFix *fix) -> bool {
-                          auto *locator = fix->getLocator();
-                          return locator
-                              ->findLast<LocatorPathElt::ApplyArgument>()
-                              .hasValue();
-                        })
-                ? AmbiguityKind::ParameterList
-                : AmbiguityKind::General;
-      }
+    if (solution.Fixes.size() > 1) {
+      ambiguityKind = (ambiguityKind == AmbiguityKind::CloseMatch ||
+                       ambiguityKind == AmbiguityKind::ParameterList) &&
+          llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) -> bool {
+            auto *locator = fix->getLocator();
+            return locator->findLast<LocatorPathElt::ApplyArgument>().hasValue();
+          }) ? AmbiguityKind::ParameterList
+             : AmbiguityKind::General;
     }
-
-    if (fixes.size() == 1) {
-      // Attempt to disambiguite in cases where all the solutions
-      // produces the same fixes for different generic arguments e.g.
-      //   func f<T>(_: T, _: T) {}
-      //   f(Int(1), Float(1))
-      //
-      ambiguityKind =
-          ((ambiguityKind == AmbiguityKind::CloseMatch ||
-            ambiguityKind == AmbiguityKind::ArgumentMismatch) &&
-           fixes.front()->getKind() == FixKind::AllowArgumentTypeMismatch)
-              ? AmbiguityKind::ArgumentMismatch
-              : AmbiguityKind::CloseMatch;
-    }
-
-    for (const auto *fix : fixes) {
-      auto *locator = fix->getLocator();
-      // Assignment failures are all about the source expression,
-      // because they treat destination as a contextual type.
-      if (auto *anchor = locator->getAnchor()) {
-        if (auto *assignExpr = dyn_cast<AssignExpr>(anchor))
-          locator = getConstraintLocator(assignExpr->getSrc());
-      }
-
-      auto *calleeLocator = solution.getCalleeLocator(locator);
-      if (!commonCalleeLocator)
-        commonCalleeLocator = calleeLocator;
-      else if (commonCalleeLocator != calleeLocator)
-        return false;
-    }
-
-    auto overload = solution.getOverloadChoiceIfAvailable(commonCalleeLocator);
-    if (!overload)
-      return false;
-
-    auto *decl = overload->choice.getDeclOrNull();
-    if (!decl)
-      return false;
-
-    // If this declaration is distinct, let's record this solution
-    // as viable, otherwise we'd produce the same diagnostic multiple
-    // times, which means that actual problem is elsewhere.
-    if (distinctChoices.insert(decl).second)
-      viableSolutions.push_back(&solution);
-    return true;
-  });
-
-  if (ambiguityKind == AmbiguityKind::ArgumentMismatch &&
-      viableSolutions.size() == 1) {
-    // Let's apply the solution so the contextual generic types
-    // are available in the system for diagnostics.
-    applySolution(*viableSolutions[0]);
-    solutions.front().Fixes.front()->diagnose(/*asNote*/ false);
-    return true;
   }
 
-  if (!diagnosable || viableSolutions.size() < 2)
-    return false;
-
-  auto *decl = *distinctChoices.begin();
+  auto *decl = ambiguousOverload->choices.front().getDecl();
   assert(solverState);
 
   bool diagnosed = true;
