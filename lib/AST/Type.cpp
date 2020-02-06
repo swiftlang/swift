@@ -3229,8 +3229,7 @@ void AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType(
   cml->printClangType(ClangFunctionType, os);
 }
 
-void
-AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
+static void assertIsFunctionType(const clang::Type *type) {
 #ifndef NDEBUG
   if (!(type->isFunctionPointerType() || type->isBlockPointerType())) {
     SmallString<256> buf;
@@ -3242,6 +3241,10 @@ AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
   }
 #endif
   return;
+}
+
+void AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
+  ::assertIsFunctionType(type);
 }
 
 const clang::Type *AnyFunctionType::getClangFunctionType() const {
@@ -3261,9 +3264,16 @@ const clang::Type *AnyFunctionType::getCanonicalClangFunctionType() const {
   return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
 }
 
-// TODO: [store-sil-clang-function-type]
-const clang::FunctionType *SILFunctionType::getClangFunctionType() const {
-  return nullptr;
+void SILFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
+  ::assertIsFunctionType(type);
+}
+
+const clang::Type *SILFunctionType::getClangFunctionType() const {
+  if (!Bits.SILFunctionType.HasUncommonInfo)
+    return nullptr;
+  auto *type = getTrailingObjects<ExtInfo::Uncommon>()->ClangFunctionType;
+  assert(type && "If the pointer was null, we shouldn't have stored it.");
+  return type;
 }
 
 FunctionType *
