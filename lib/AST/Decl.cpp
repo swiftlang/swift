@@ -3158,7 +3158,8 @@ static AccessLevel getMaximallyOpenAccessFor(const ValueDecl *decl) {
 static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
                                            AccessLevel access,
                                            const DeclContext *useDC,
-                                           bool treatUsableFromInlineAsPublic) {
+                                           bool treatUsableFromInlineAsPublic,
+                                           bool treatSPIAsPublic) {
   // If access control is disabled in the current context, adjust
   // access level of the current declaration to be as open as possible.
   if (useDC && VD->getASTContext().isAccessControlDisabled())
@@ -3177,7 +3178,8 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     if (!useSF) return access;
     if (useSF->hasTestableOrPrivateImport(access, VD))
       return getMaximallyOpenAccessFor(VD);
-  } else if (VD->getAttrs().hasAttribute<SPIAccessControlAttr>()) {
+  } else if (!treatSPIAsPublic &&
+             VD->getAttrs().hasAttribute<SPIAccessControlAttr>()) {
     // Restrict access to SPI decls.
     return AccessLevel::Internal;
   }
@@ -3189,15 +3191,18 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
 /// adjust.
 static AccessLevel
 getAdjustedFormalAccess(const ValueDecl *VD, const DeclContext *useDC,
-                        bool treatUsableFromInlineAsPublic) {
+                        bool treatUsableFromInlineAsPublic,
+                        bool treatSPIAsPublic) {
   return getAdjustedFormalAccess(VD, VD->getFormalAccess(), useDC,
-                                 treatUsableFromInlineAsPublic);
+                                 treatUsableFromInlineAsPublic,
+                                 treatSPIAsPublic);
 }
 
 AccessLevel ValueDecl::getEffectiveAccess() const {
   auto effectiveAccess =
     getAdjustedFormalAccess(this, /*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true);
+                            /*treatUsableFromInlineAsPublic=*/true,
+                            /*treatSPIAsPublic=*/true);
 
   // Handle @testable/@_private(sourceFile:)
   switch (effectiveAccess) {
@@ -3264,7 +3269,8 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
 
   AccessLevel access =
       getAdjustedFormalAccess(this, useDC,
-                              /*treatUsableFromInlineAsPublic*/false);
+                              /*treatUsableFromInlineAsPublic*/false,
+                              /*treatSPIAsPublic=*/false);
   return access == AccessLevel::Open;
 }
 
@@ -3280,7 +3286,8 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
                               const DeclContext *useDC,
                               bool treatUsableFromInlineAsPublic) {
   AccessLevel access = getAdjustedFormalAccess(VD, formalAccess, useDC,
-                                               treatUsableFromInlineAsPublic);
+                                               treatUsableFromInlineAsPublic,
+                                               /*treatSPIAsPublic=*/false);
   const DeclContext *resultDC = VD->getDeclContext();
 
   while (!resultDC->isModuleScopeContext()) {
@@ -3295,7 +3302,8 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     if (auto enclosingNominal = dyn_cast<GenericTypeDecl>(resultDC)) {
       auto enclosingAccess =
           getAdjustedFormalAccess(enclosingNominal, useDC,
-                                  treatUsableFromInlineAsPublic);
+                                  treatUsableFromInlineAsPublic,
+                                  /*treatSPIAsPublic=*/false);
       access = std::min(access, enclosingAccess);
 
     } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(resultDC)) {
@@ -3305,7 +3313,8 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
         if (nominal->getParentModule() == enclosingExt->getParentModule()) {
           auto nominalAccess =
               getAdjustedFormalAccess(nominal, useDC,
-                                      treatUsableFromInlineAsPublic);
+                                      treatUsableFromInlineAsPublic,
+                                      /*treatSPIAsPublic=*/false);
           access = std::min(access, nominalAccess);
         }
       }
