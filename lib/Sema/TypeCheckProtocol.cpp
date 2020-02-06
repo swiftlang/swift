@@ -384,15 +384,25 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
     }
     if (!foundExactConfig) {
       bool success = false;
-      if (supersetConfig) {
-        // If the witness has a "superset" derivative configuration, create an
-        // implicit `@differentiable` attribute with the exact requirement
-        // `@differentiable` attribute parameter indices.
+      // If no exact witness derivative configuration was found, check
+      // conditions for creating an implicit witness `@differentiable` attribute
+      // with the exaxct derivative configuration:
+      // - If the witness has a "superset" derivative configuration.
+      // - If the witness is less than public.
+      //   - `@differentiable` attributes are really only significant for public
+      //     declarations: it improves usability to not require explicit
+      //     `@differentiable` attributes for less-visible declarations.
+      bool createImplicitWitnessAttribute =
+          supersetConfig || witness->getFormalAccess() < AccessLevel::Public;
+      if (supersetConfig || witness->getFormalAccess() < AccessLevel::Public) {
+        auto derivativeGenSig = witnessAFD->getGenericSignature();
+        if (supersetConfig)
+          derivativeGenSig = supersetConfig->derivativeGenericSignature;
         auto *newAttr = DifferentiableAttr::create(
             witnessAFD, /*implicit*/ true, reqDiffAttr->AtLoc,
             reqDiffAttr->getRange(), reqDiffAttr->isLinear(),
             reqDiffAttr->getParameterIndices(), /*jvp*/ None,
-            /*vjp*/ None, supersetConfig->derivativeGenericSignature);
+            /*vjp*/ None, derivativeGenSig);
         auto insertion = ctx.DifferentiableAttrs.try_emplace(
             {witnessAFD, newAttr->getParameterIndices()}, newAttr);
         // Valid `@differentiable` attributes are uniqued by original function
