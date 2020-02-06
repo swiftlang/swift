@@ -74,34 +74,31 @@ void Symbol::serializeKind(llvm::json::OStream &OS) const {
   }
 }
 
-void Symbol::serializeIdentifier(SymbolGraphASTWalker &Walker,
-                                 llvm::json::OStream &OS) const {
+void Symbol::serializeIdentifier(llvm::json::OStream &OS) const {
   OS.attributeObject("identifier", [&](){
-    OS.attribute("precise", Walker.getUSR(VD));
+    OS.attribute("precise", Graph.getUSR(VD));
     OS.attribute("interfaceLanguage", "swift");
   });
 }
 
-void Symbol::serializePathComponents(SymbolGraphASTWalker &Walker,
-                                     llvm::json::OStream &OS) const {
+void Symbol::serializePathComponents(llvm::json::OStream &OS) const {
   OS.attributeArray("pathComponents", [&](){
     SmallVector<SmallString<32>, 8> PathComponents;
-    Walker.getPathComponents(VD, PathComponents);
+    Graph.getPathComponents(VD, PathComponents);
     for (auto Component : PathComponents) {
       OS.value(Component);
     }
   });
 }
 
-void Symbol::serializeNames(SymbolGraphASTWalker &Walker,
-                            llvm::json::OStream &OS) const {
+void Symbol::serializeNames(llvm::json::OStream &OS) const {
   OS.attributeObject("names", [&](){
     SmallVector<SmallString<32>, 8> PathComponents;
-    Walker.getPathComponents(VD, PathComponents);
+    Graph.getPathComponents(VD, PathComponents);
     
     OS.attribute("title", PathComponents.back());
     // "navigator": null
-    Walker.serializeSubheadingDeclarationFragments("subheading", VD, OS);
+    Graph.serializeSubheadingDeclarationFragments("subheading", VD, OS);
     // "prose": null
   });
 }
@@ -131,10 +128,9 @@ void Symbol::serializeRange(size_t InitialIndentation,
   });
 }
 
-void Symbol::serializeDocComment(SymbolGraphASTWalker &Walker,
-                                 llvm::json::OStream &OS) const {
+void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
   OS.attributeObject("docComment", [&](){
-    auto LL = Walker.Ctx.getLineList(VD->getRawComment());
+    auto LL = Graph.Ctx.getLineList(VD->getRawComment());
     size_t InitialIndentation = LL.getLines().empty()
       ? 0
       : markup::measureIndentation(LL.getLines().front().Text);
@@ -146,7 +142,7 @@ void Symbol::serializeDocComment(SymbolGraphASTWalker &Walker,
           // text and start of its source range, if it has one.
           if (Line.Range.isValid()) {
             serializeRange(InitialIndentation,
-                           Line.Range, Walker.M.getASTContext().SourceMgr, OS);
+                           Line.Range, Graph.M.getASTContext().SourceMgr, OS);
           }
           auto TrimmedLine = Line.Text.drop_front(std::min(InitialIndentation,
                                                   Line.FirstNonspaceOffset));
@@ -157,8 +153,7 @@ void Symbol::serializeDocComment(SymbolGraphASTWalker &Walker,
   }); // end docComment:
 }
 
-void Symbol::serializeFunctionSignature(SymbolGraphASTWalker &Walker,
-                                llvm::json::OStream &OS) const {
+void Symbol::serializeFunctionSignature(llvm::json::OStream &OS) const {
   if (const auto *FD = dyn_cast_or_null<FuncDecl>(VD)) {
     OS.attributeObject("functionSignature", [&](){
 
@@ -180,7 +175,7 @@ void Symbol::serializeFunctionSignature(SymbolGraphASTWalker &Walker,
                     OS.attribute("internalName", InternalName);
                   }
                 }
-                Walker.serializeDeclarationFragments("declarationFragments",
+                Graph.serializeDeclarationFragments("declarationFragments",
                                                      Param, OS);
               }); // end parameter object
             }
@@ -190,7 +185,7 @@ void Symbol::serializeFunctionSignature(SymbolGraphASTWalker &Walker,
 
       // Returns
       if (const auto ReturnType = FD->getResultInterfaceType()) {
-        Walker.serializeDeclarationFragments("returns", ReturnType, OS);
+        Graph.serializeDeclarationFragments("returns", ReturnType, OS);
       }
     });
   }
@@ -257,12 +252,11 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
   }
 }
 
-void Symbol::serializeSwiftExtensionMixin(SymbolGraphASTWalker &Walker,
-                                          llvm::json::OStream &OS) const {
+void Symbol::serializeSwiftExtensionMixin(llvm::json::OStream &OS) const {
   if (const auto *Extension
           = dyn_cast_or_null<ExtensionDecl>(VD->getInnermostDeclContext())) {
     OS.attributeObject("swiftExtension", [&](){
-      OS.attribute("definedInModule", Walker.M.getNameStr());
+      OS.attribute("definedInModule", Graph.M.getNameStr());
       auto Generics = Extension->getGenericSignature();
       if (Generics && !Generics->getRequirements().empty()) {
         OS.attributeArray("constraints", [&](){
@@ -275,9 +269,8 @@ void Symbol::serializeSwiftExtensionMixin(SymbolGraphASTWalker &Walker,
   }
 }
 
-void Symbol::serializeDeclarationFragmentMixin(SymbolGraphASTWalker &Walker,
-                                               llvm::json::OStream &OS) const {
-  Walker.serializeDeclarationFragments("declarationFragments", VD, OS);
+void Symbol::serializeDeclarationFragmentMixin(llvm::json::OStream &OS) const {
+  Graph.serializeDeclarationFragments("declarationFragments", VD, OS);
 }
 
 void Symbol::serializeAccessLevelMixin(llvm::json::OStream &OS) const {
@@ -380,20 +373,19 @@ void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
   }); // end availability: []
 }
 
-void Symbol::serialize(SymbolGraphASTWalker &Walker,
-                       llvm::json::OStream &OS) const {
+void Symbol::serialize(llvm::json::OStream &OS) const {
   OS.object([&](){
     serializeKind(OS);
-    serializeIdentifier(Walker, OS);
-    serializePathComponents(Walker, OS);
-    serializeNames(Walker, OS);
-    serializeDocComment(Walker, OS);
+    serializeIdentifier(OS);
+    serializePathComponents(OS);
+    serializeNames(OS);
+    serializeDocComment(OS);
 
     // "Mixins"
-    serializeFunctionSignature(Walker, OS);
+    serializeFunctionSignature(OS);
     serializeSwiftGenericMixin(OS);
-    serializeSwiftExtensionMixin(Walker, OS);
-    serializeDeclarationFragmentMixin(Walker, OS);
+    serializeSwiftExtensionMixin(OS);
+    serializeDeclarationFragmentMixin(OS);
     serializeAccessLevelMixin(OS);
     serializeAvailabilityMixin(OS);
   });

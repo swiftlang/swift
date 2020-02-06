@@ -50,7 +50,7 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
   }
 
   llvm::json::OStream J(OS, Options.PrettyPrint ? 2 : 0);
-  Walker.Graph.serialize(Walker, J);
+  Walker.Graph.serialize(J);
 
   return EXIT_SUCCESS;
 }
