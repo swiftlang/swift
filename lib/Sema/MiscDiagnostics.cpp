@@ -83,17 +83,23 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     DiagnoseWalker(const DeclContext *DC, bool isExprStmt)
       : IsExprStmt(isExprStmt), Ctx(DC->getASTContext()), DC(DC) {}
 
-    // Not interested in going outside a basic expression.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
-    }
     std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
       return { false, P };
     }
-    bool walkToDeclPre(Decl *D) override { return false; }
+
+    bool walkToDeclPre(Decl *D) override {
+      if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
+        return closure->hasAppliedFunctionBuilder();
+      return false;
+    }
+
     bool walkToTypeReprPre(TypeRepr *T) override { return true; }
 
-    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+      return expr->hasAppliedFunctionBuilder();
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // See through implicit conversions of the expression.  We want to be able
@@ -1314,7 +1320,11 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
              cast<VarDecl>(DRE->getDecl())->isSelfParameter();
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+      return expr->hasAppliedFunctionBuilder();
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       Expr *subExpr;
@@ -1478,10 +1488,16 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
     // Don't walk into nested decls.
     bool walkToDeclPre(Decl *D) override {
+      if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
+        return closure->hasAppliedFunctionBuilder();
       return false;
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+      return expr->hasAppliedFunctionBuilder();
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
@@ -3302,7 +3318,11 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   public:
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
 
-    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+      return expr->hasAppliedFunctionBuilder();
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       switch (E->getKind()) {
@@ -3447,7 +3467,11 @@ public:
   ObjCSelectorWalker(const DeclContext *dc, Type selectorTy)
     : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
 
-  bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+  bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+    return expr->hasAppliedFunctionBuilder();
+  }
+
+  bool shouldWalkIntoTapExpression() override { return false; }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     auto *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
@@ -4164,7 +4188,11 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       }
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+      return expr->hasAppliedFunctionBuilder();
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -4236,7 +4264,11 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
       }
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+      return expr->hasAppliedFunctionBuilder();
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
