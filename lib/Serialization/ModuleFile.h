@@ -786,6 +786,11 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results);
 
+  /// Find all SPI imported from \p importedModule by this module, collecting
+  /// their identifiers in \p spis.
+  void lookupImportedSPIs(const ModuleDecl *importedModule,
+                          SmallVectorImpl<Identifier> &spis) const;
+
   /// Reports all link-time dependencies.
   void collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const;
 

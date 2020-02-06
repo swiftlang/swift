@@ -549,6 +549,11 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
+void ModuleDecl::lookupImportedSPIs(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spis) const {
+  FORWARD(lookupImportedSPIs, (importedModule, spis));
+}
+
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
                               SmallVectorImpl<ValueDecl*> &result) const {
   getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
@@ -1775,6 +1780,17 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
 
   // Now check this file's enclosing module in case there are re-exports.
   return !imports.isImportedBy(module, getParentModule());
+}
+
+void SourceFile::lookupImportedSPIs(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spis) const {
+  for (auto &import : Imports) {
+    if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
+        importedModule == std::get<ModuleDecl*>(import.module)) {
+      auto importedSpis = import.spis;
+      spis.append(importedSpis.begin(), importedSpis.end());
+    }
+  }
 }
 
 bool SourceFile::shouldCrossImport() const {

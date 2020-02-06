@@ -2531,6 +2531,11 @@ void ModuleFile::lookupObjCMethods(
   }
 }
 
+void ModuleFile::lookupImportedSPIs(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spis) const {
+  // TODO
+}
+
 void
 ModuleFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
   for (auto &lib : LinkLibraries)

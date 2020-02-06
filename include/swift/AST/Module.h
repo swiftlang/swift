@@ -458,6 +458,11 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
 
+  /// Find all SPI imported from \p importedModule by this module, collecting
+  /// their identifiers in \p spis.
+  void lookupImportedSPIs(const ModuleDecl *importedModule,
+                          SmallVectorImpl<Identifier> &spis) const;
+
   /// \sa getImportedModules
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.

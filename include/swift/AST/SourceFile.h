@@ -281,6 +281,12 @@ public:
 
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
+  /// Find all SPI imported from \p importedModule by this module, collecting
+  /// their identifiers in \p spis.
+  virtual void
+  lookupImportedSPIs(const ModuleDecl *importedModule,
+                     SmallVectorImpl<Identifier> &spis) const override;
+
   bool shouldCrossImport() const;
 
   /// Register a separately-imported overlay as shadowing the module that

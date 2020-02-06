@@ -1110,6 +1110,11 @@ void SerializedASTFile::lookupObjCMethods(
   File.lookupObjCMethods(selector, results);
 }
 
+void SerializedASTFile::lookupImportedSPIs(const ModuleDecl *importedModule,
+                                           SmallVectorImpl<Identifier> &spis) const {
+  File.lookupImportedSPIs(importedModule, spis);
+}
+
 Optional<CommentInfo>
 SerializedASTFile::getCommentForDecl(const Decl *D) const {
   return File.getCommentForDecl(D);

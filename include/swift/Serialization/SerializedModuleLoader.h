@@ -350,6 +350,10 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
+  virtual void
+  lookupImportedSPIs(const ModuleDecl *importedModule,
+                     SmallVectorImpl<Identifier> &spis) const override;
+
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const override;
 
   Optional<StringRef> getGroupNameForDecl(const Decl *D) const override;

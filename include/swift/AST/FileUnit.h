@@ -101,6 +101,11 @@ public:
                  ObjCSelector selector,
                  SmallVectorImpl<AbstractFunctionDecl *> &results) const = 0;
 
+  /// Find all SPI imported from \p importedModule by this module, collecting
+  /// their identifiers in \p spis.
+  virtual void lookupImportedSPIs(const ModuleDecl *importedModule,
+                                  SmallVectorImpl<Identifier> &spis) const {};
+
   /// Returns the comment attached to the given declaration.
   ///
   /// This function is an implementation detail for comment serialization.
