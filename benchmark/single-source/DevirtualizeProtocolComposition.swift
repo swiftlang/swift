@@ -16,50 +16,30 @@ public let DevirtualizeProtocolComposition = [
   BenchmarkInfo(name: "DevirtualizeProtocolComposition", runFunction: run_DevirtualizeProtocolComposition, tags: [.validation, .api]),
 ]
 
-public class ClassA<T> { }
+protocol Pingable { func ping() -> Int; func pong() -> Int}
 
-protocol ProtocolA {
-  func foo() -> Int
+public class Game<T> {
+  func length() -> Int { return 10 }
 }
 
-protocol ProtocolB {
-  func bar() -> Int
+public class PingPong: Game<String> { }
+
+extension PingPong : Pingable {
+  func ping() -> Int { return 1 }
+  func pong() -> Int { return 2 }
 }
 
-public class ClassB: ClassA<String> {
-  func foo() -> Int {
-    return 10
-  }
-}
-
-extension ClassB: ProtocolA { }
-
-func quadratic(a: Int) -> Int {
+func playGame<T>(_ x: Game<T> & Pingable) -> Int {
   var sum = 0
-  for _ in 0..<a {
-    for _ in 0..<a {
-      sum += 1
-    }
+  for _ in 0..<x.length() {
+    sum += x.ping() + x.pong()
   }
   return sum
-}
-
-func shouldOptimize1<T>(_ x: ClassA<T> & ProtocolA, count: Int) -> Int {
-  var sum = 0
-  for _ in 0..<count {
-    sum += quadratic(a: x.foo())
-  }
-  return sum
-}
-
-@inline(never)
-public func entryPoint1(c: ClassB) -> Int {
-  return shouldOptimize1(c, count: 25)
 }
 
 @inline(never)
 public func run_DevirtualizeProtocolComposition(N: Int) {
   for _ in 0..<N * 20_000 {
-    blackHole(entryPoint1(c: ClassB()))
+    blackHole(playGame(PingPong()))
   }
 }
