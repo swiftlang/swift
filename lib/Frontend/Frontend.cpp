@@ -727,7 +727,15 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   const ImplicitImports implicitImports(*this);
 
   if (Invocation.getInputKind() == InputFileKind::SwiftREPL) {
-    createREPLFile(implicitImports);
+    // Create the initial empty REPL file. This only exists to feed in the
+    // implicit imports such as the standard library.
+    auto *replFile = createSourceFileForMainModule(
+        SourceFileKind::REPL, implicitImports.kind, /*BufferID*/ None);
+    addAdditionalInitialImportsTo(replFile, implicitImports);
+
+    // Given this file is empty, we can go ahead and just mark it as having been
+    // type checked.
+    replFile->ASTStage = SourceFile::TypeChecked;
     return;
   }
 
@@ -822,12 +830,6 @@ void CompilerInstance::getImplicitlyImportedModules(
                            ImplicitImportModuleName, false);
     }
   }
-}
-
-void CompilerInstance::createREPLFile(const ImplicitImports &implicitImports) {
-  auto *SingleInputFile = createSourceFileForMainModule(
-      Invocation.getSourceFileKind(), implicitImports.kind, None);
-  addAdditionalInitialImportsTo(SingleInputFile, implicitImports);
 }
 
 void CompilerInstance::addMainFileToModule(

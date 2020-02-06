@@ -204,18 +204,39 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
 
   Ctx.SourceMgr.setCodeCompletionPoint(*BufferID, CodeCompletionOffset);
 
-  // Parse, typecheck and temporarily insert the incomplete code into the AST.
-  const unsigned OriginalDeclCount = SF.getTopLevelDecls().size();
+  // Create a new module and file for the code completion buffer, similar to how
+  // we handle new lines of REPL input.
+  auto *newModule =
+      ModuleDecl::create(Ctx.getIdentifier("REPL_Code_Completion"), Ctx);
+  auto &newSF =
+      *new (Ctx) SourceFile(*newModule, SourceFileKind::REPL, *BufferID,
+                            SourceFile::ImplicitModuleImportKind::None);
+  newModule->addFile(newSF);
+
+  // Import the last module.
+  auto *lastModule = SF.getParentModule();
+  ModuleDecl::ImportedModule importOfLastModule{/*AccessPath*/ {}, lastModule};
+  newSF.addImports(SourceFile::ImportedModuleDesc(importOfLastModule,
+                                                  SourceFile::ImportOptions()));
+
+  // Carry over the private imports from the last module.
+  SmallVector<ModuleDecl::ImportedModule, 8> imports;
+  lastModule->getImportedModules(imports,
+                                 ModuleDecl::ImportFilterKind::Private);
+  if (!imports.empty()) {
+    SmallVector<SourceFile::ImportedModuleDesc, 8> importsWithOptions;
+    for (auto &import : imports) {
+      importsWithOptions.emplace_back(
+          SourceFile::ImportedModuleDesc(import, SourceFile::ImportOptions()));
+    }
+    newSF.addImports(importsWithOptions);
+  }
 
   PersistentParserState PersistentState;
-  parseIntoSourceFile(SF, *BufferID, &PersistentState);
-  performTypeChecking(SF, OriginalDeclCount);
+  parseIntoSourceFile(newSF, *BufferID, &PersistentState);
+  performTypeChecking(newSF);
 
   performCodeCompletionSecondPass(PersistentState, *CompletionCallbacksFactory);
-
-  // Now we are done with code completion.  Remove the declarations we
-  // temporarily inserted.
-  SF.truncateTopLevelDecls(OriginalDeclCount);
 
   // Reset the error state because it's only relevant to the code that we just
   // processed, which now gets thrown away.
