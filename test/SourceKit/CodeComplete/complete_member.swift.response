@@ -44,7 +44,7 @@
       key.description: "self",
       key.typename: "FooProtocol",
       key.context: source.codecompletion.context.thisclass,
-      key.typerelation: source.codecompletion.typerelation.unrelated,
+      key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0
     }
   ]
