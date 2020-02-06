@@ -227,6 +227,16 @@ bool ConstraintLocator::isForContextualType() const {
   return isLastElement<LocatorPathElt::ContextualType>();
 }
 
+bool ConstraintLocator::isForAssignment() const {
+  auto *anchor = getAnchor();
+  return anchor && isa<AssignExpr>(anchor) && getPath().empty();
+}
+
+bool ConstraintLocator::isForCoercion() const {
+  auto *anchor = getAnchor();
+  return anchor && isa<CoerceExpr>(anchor) && getPath().empty();
+}
+
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter.
   return isForGenericParameter() ?

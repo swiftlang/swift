@@ -631,6 +631,10 @@ public:
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
 
+  /// Get the runtime availability of features introduced in the Swift 5.3
+  /// compiler for the target platform.
+  AvailabilityContext getSwift53Availability();
+
   /// Get the runtime availability of features that have been introduced in the
   /// Swift compiler for future versions of the target platform.
   AvailabilityContext getSwiftFutureAvailability();
