@@ -200,9 +200,43 @@ public func concrete_concrete() {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s34conditional_conformance_with_assoc09concrete_E0yyF"()
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[X:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMD")
 // CHECK-NEXT:    [[Z:%.*]] = call i8** @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGACyxq_GAA2P1A2A0I0R_AA0H03AT2RpzAakM_AmaLP3AT3RPzrlWl"()
-// CHECK-NEXT:    call swiftcc void @"$s34conditional_conformance_with_assoc8takes_p1yyxmAA2P1RzlF"(%swift.type* [[X]], %swift.type* [[X]], i8** [[Z]])
+// CHECK-NEXT:    call swiftcc void @"$s34conditional_conformance_with_assoc8takes_p1yyxmAA2P1RzlF"(
+// CHECK-SAME:      %swift.type* getelementptr inbounds (
+// CHECK-SAME:        %swift.full_type, 
+// CHECK-SAME:        %swift.full_type* bitcast (
+// CHECK-SAME:          <{ 
+// CHECK-SAME:            i8**, 
+// CHECK-SAME:            [[INT]], 
+// CHECK-SAME:            %swift.type_descriptor*, 
+// CHECK-SAME:            %swift.type*, 
+// CHECK-SAME:            %swift.type*, 
+// CHECK-SAME:            i8**, 
+// CHECK-SAME:            i64 
+// CHECK-SAME:          }>* @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMf" 
+// CHECK-SAME:          to %swift.full_type*
+// CHECK-SAME:        ), 
+// CHECK-SAME:        i32 0, 
+// CHECK-SAME:        i32 1
+// CHECK-SAME:      ), 
+// CHECK-SAME:      %swift.type* getelementptr inbounds (
+// CHECK-SAME:        %swift.full_type, 
+// CHECK-SAME:        %swift.full_type* bitcast (
+// CHECK-SAME:          <{ 
+// CHECK-SAME:            i8**, 
+// CHECK-SAME:            [[INT]], 
+// CHECK-SAME:            %swift.type_descriptor*, 
+// CHECK-SAME:            %swift.type*, 
+// CHECK-SAME:            %swift.type*, 
+// CHECK-SAME:            i8**, 
+// CHECK-SAME:            i64 
+// CHECK-SAME:          }>* @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMf" 
+// CHECK-SAME:          to %swift.full_type*
+// CHECK-SAME:        ), 
+// CHECK-SAME:        i32 0, 
+// CHECK-SAME:        i32 1
+// CHECK-SAME:      )
+// CHECK-SAME:    )
 // CHECK-NEXT:    ret void
 // CHECK-NEXT: }
 
@@ -216,21 +250,6 @@ public func concrete_concrete() {
 // CHECK-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// macosx-NEXT:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMa"(i64 255)
-// macosx-NEXT:   [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// macosx-NEXT:   extractvalue %swift.metadata_response [[T0]], 1
-// ios-NEXT:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMa"(i64 255)
-// ios-NEXT:   [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// ios-NEXT:   extractvalue %swift.metadata_response [[T0]], 1
-// watchos-NEXT:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMa"(i64 255)
-// watchos-NEXT:   [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// watchos-NEXT:   extractvalue %swift.metadata_response [[T0]], 1
-// tvos-NEXT:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMa"(i64 255)
-// tvos-NEXT:   [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// tvos-NEXT:   extractvalue %swift.metadata_response [[T0]], 1
-// linux-gnu-NEXT:    [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMD")
-// linux-android-NEXT: [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMD")
-// windows-msvc-NEXT: [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMD")
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [3 x i8**], [3 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @"$s34conditional_conformance_with_assoc4IsP3VAA0F0AAWP", i32 0, i32 0), i8*** [[C_P3_PTR]], align 8
@@ -238,7 +257,31 @@ public func concrete_concrete() {
 // CHECK-NEXT:    store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @"$s34conditional_conformance_with_assoc6IsBothVAA2P2AAWP", i32 0, i32 0), i8*** [[B_AT2_P2_PTR]], align 8
 // CHECK-NEXT:    [[B_AT2_AT2_AT3_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 2
 // CHECK-NEXT:    store i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @"$s34conditional_conformance_with_assoc4IsP3VAA0F0AAWP", i32 0, i32 0), i8*** [[B_AT2_AT2_AT3_P3_PTR]], align 8
-// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @swift_getWitnessTable
+// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @swift_getWitnessTable(
+// CHECK-SAME:      %swift.protocol_conformance_descriptor* bitcast (
+// CHECK-SAME:        { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i32, i32 }* 
+// CHECK-SAME:        @"$s34conditional_conformance_with_assoc6DoubleVyxq_GAA2P1A2A2P3R_AA2P23AT2RpzAafH_AhaGP3AT3RPzrlMc" 
+// CHECK-SAME:        to %swift.protocol_conformance_descriptor*
+// CHECK-SAME:      ), 
+// CHECK-SAME:      %swift.type* getelementptr inbounds (
+// CHECK-SAME:        %swift.full_type, 
+// CHECK-SAME:        %swift.full_type* bitcast (
+// CHECK-SAME:          <{ 
+// CHECK-SAME:            i8**, 
+// CHECK-SAME:            [[INT]], 
+// CHECK-SAME:            %swift.type_descriptor*, 
+// CHECK-SAME:            %swift.type*, 
+// CHECK-SAME:            %swift.type*, 
+// CHECK-SAME:            i8**, 
+// CHECK-SAME:            i64 
+// CHECK-SAME:          }>* @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMf" 
+// CHECK-SAME:          to %swift.full_type*
+// CHECK-SAME:        ), 
+// CHECK-SAME:        i32 0, 
+// CHECK-SAME:        i32 1
+// CHECK-SAME:      ), 
+// CHECK-SAME:      i8*** [[CONDITIONAL_REQUIREMENTS]]
+// CHECK-SAME:    )
 // CHECK-NEXT:    store atomic i8** [[Double_P1]], i8*** @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGACyxq_GAA2P1A2A0I0R_AA0H03AT2RpzAakM_AmaLP3AT3RPzrlWL" release, align 8
 // CHECK-NEXT:    br label %cont
 
