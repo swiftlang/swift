@@ -192,6 +192,7 @@ public:
   void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitAccessControlAttr(AccessControlAttr *attr);
   void visitSetterAccessAttr(SetterAccessAttr *attr);
+  void visitSPIAccessControlAttr(SPIAccessControlAttr *attr);
   bool visitAbstractAccessControlAttr(AbstractAccessControlAttr *attr);
 
   void visitObjCAttr(ObjCAttr *attr);
@@ -861,6 +862,8 @@ void AttributeChecker::visitSetterAccessAttr(
     return;
   }
 }
+
+void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {}
 
 static bool checkObjCDeclContext(Decl *D) {
   DeclContext *DC = D->getDeclContext();

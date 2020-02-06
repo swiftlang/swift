@@ -466,6 +466,8 @@ public:
     Private = 1 << 1,
     /// Include imports declared with `@_implementationOnly`.
     ImplementationOnly = 1 << 2,
+    /// Include imports of SPIs declared with `@_spi`
+    SPIAccessControl = 1 << 3,
     /// Include imports shadowed by a separately-imported overlay (i.e. a
     /// cross-import overlay). Unshadowed imports are included whether or not
     /// this flag is specified.

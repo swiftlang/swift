@@ -1670,7 +1670,11 @@ namespace decls_block {
     BCBlob      // _silgen_name
   >;
 
-  
+  using SPIAccessControlDeclAttrLayout = BCRecordLayout<
+    SPIAccessControl_DECL_ATTR,
+    BCArray<IdentifierIDField>  // SPI names
+  >;
+
   using AlignmentDeclAttrLayout = BCRecordLayout<
     Alignment_DECL_ATTR,
     BCFixed<1>, // implicit flag

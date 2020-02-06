@@ -56,6 +56,10 @@ public:
     /// Mutually exclusive with Exported.
     ImplementationOnly = 0x8,
 
+    // The module is imported to have access to named SPIs which is an
+    // implementation detail of this file.
+    SPIAccessControl = 0x10,
+
     /// Used for DenseMap.
     Reserved = 0x80
   };
@@ -66,11 +70,16 @@ public:
   struct ImportedModuleDesc {
     ModuleDecl::ImportedModule module;
     ImportOptions importOptions;
+
+    // Filename for a @_private import.
     StringRef filename;
 
+    // Names of explicitly imported SPIs.
+    ArrayRef<Identifier> spis;
+
     ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options,
-                       StringRef filename = {})
-        : module(module), importOptions(options), filename(filename) {
+                       StringRef filename = {}, ArrayRef<Identifier> spis = {})
+        : module(module), importOptions(options), filename(filename), spis(spis) {
       assert(!(importOptions.contains(ImportFlags::Exported) &&
                importOptions.contains(ImportFlags::ImplementationOnly)) ||
              importOptions.contains(ImportFlags::Reserved));

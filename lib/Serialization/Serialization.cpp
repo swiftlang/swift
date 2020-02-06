@@ -2189,6 +2189,21 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_SPIAccessControl: {
+      auto theAttr = cast<SPIAccessControlAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[SPIAccessControlDeclAttrLayout::Code];
+
+      SmallVector<IdentifierID, 4> spis;
+      for (auto spi : theAttr->getSPINames()) {
+        assert(!spi.empty() && "Empty SPI name");
+        spis.push_back(S.addDeclBaseNameRef(spi));
+      }
+
+      SPIAccessControlDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord,
+                                                 abbrCode, spis);
+      return;
+    }
+
     case DAK_Alignment: {
       auto *theAlignment = cast<AlignmentAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[AlignmentDeclAttrLayout::Code];

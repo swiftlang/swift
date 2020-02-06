@@ -81,6 +81,9 @@ namespace {
     /// \c AccessPathTy is the common currency type for this.)
     ModuleDecl::AccessPathTy declPath;
 
+    // Names of explicitly imported SPI groups via @_spi.
+    ArrayRef<Identifier> spiNames;
+
     /// If this UnboundImport directly represents an ImportDecl, contains the
     /// ImportDecl it represents. This should only be used for diagnostics and
     /// for updating the AST; if you want to read information about the import,
@@ -513,6 +516,14 @@ UnboundImport::UnboundImport(ImportDecl *ID)
     options |= ImportFlags::PrivateImport;
     privateImportFileName = privateImportAttr->getSourceFile();
   }
+
+  SmallVector<Identifier, 4> spiNames;
+  for (auto attr : ID->getAttrs().getAttributes<SPIAccessControlAttr>()) {
+    options |= SourceFile::ImportFlags::SPIAccessControl;
+    auto attrSPIs = attr->getSPINames();
+    spiNames.append(attrSPIs.begin(), attrSPIs.end());
+  }
+  this->spiNames = ID->getASTContext().AllocateCopy(spiNames);
 }
 
 bool UnboundImport::checkNotTautological(const SourceFile &SF) {

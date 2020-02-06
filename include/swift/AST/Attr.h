@@ -1171,6 +1171,36 @@ public:
   }
 };
 
+/// SPI attribute applied to both decls and imports.
+class SPIAccessControlAttr final : public DeclAttribute,
+                                   private llvm::TrailingObjects<SPIAccessControlAttr, Identifier> {
+  friend TrailingObjects;
+
+  SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,
+                       ArrayRef<Identifier> spiNames);
+
+  // Number of trailing names.
+  size_t numSPINames;
+
+public:
+  static SPIAccessControlAttr *create(ASTContext &context, SourceLoc atLoc,
+                                      SourceRange range,
+                                      ArrayRef<Identifier> spiNames);
+
+  /// Name of SPIs declared by the attribute.
+  ///
+  /// Note: A single SPI name per attribute is currently supported but this
+  /// may change with the syntax change.
+  ArrayRef<Identifier> getSPINames() const {
+    return { this->template getTrailingObjects<Identifier>(),
+             numSPINames };
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_SPIAccessControl;
+  }
+};
+
 /// Represents an inline attribute.
 class InlineAttr : public DeclAttribute {
 public:
