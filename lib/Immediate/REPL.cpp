@@ -997,10 +997,6 @@ public:
     IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::None;
     IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::None;
 
-    // The very first module is a dummy.
-    CI.getMainModule()->getMainSourceFile(SourceFileKind::REPL).ASTStage =
-        SourceFile::TypeChecked;
-
     if (!ParseStdlib) {
       // Force standard library to be loaded immediately.  This forces any
       // errors to appear upfront, and helps eliminate some nasty lag after the

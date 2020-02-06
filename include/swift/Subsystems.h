@@ -137,10 +137,7 @@ namespace swift {
 
   /// Once parsing is complete, this walks the AST to resolve imports, record
   /// operators, and do other top-level validation.
-  ///
-  /// \param StartElem Where to start for incremental name binding in the main
-  ///                  source file.
-  void performNameBinding(SourceFile &SF, unsigned StartElem = 0);
+  void performNameBinding(SourceFile &SF);
 
   /// Once type-checking is complete, this instruments code with calls to an
   /// intrinsic that record the expected values of local variables so they can
@@ -171,10 +168,7 @@ namespace swift {
 
   /// Once parsing and name-binding are complete, this walks the AST to resolve
   /// types and diagnose problems therein.
-  ///
-  /// \param StartElem Where to start for incremental type-checking in the main
-  /// source file.
-  void performTypeChecking(SourceFile &SF, unsigned StartElem = 0);
+  void performTypeChecking(SourceFile &SF);
 
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method
