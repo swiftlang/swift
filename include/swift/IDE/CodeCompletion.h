@@ -585,7 +585,7 @@ public:
   CodeCompletionResult(ResultKind Kind, SemanticContextKind SemanticContext,
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
-                       ExpectedTypeRelation TypeDistance = Unrelated,
+                       ExpectedTypeRelation TypeDistance,
                        CodeCompletionOperatorKind KnownOperatorKind =
                            CodeCompletionOperatorKind::None)
       : Kind(Kind), KnownOperatorKind(unsigned(KnownOperatorKind)),
@@ -610,7 +610,7 @@ public:
                        SemanticContextKind SemanticContext,
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
-                       ExpectedTypeRelation TypeDistance = Unrelated)
+                       ExpectedTypeRelation TypeDistance)
       : Kind(Keyword), KnownOperatorKind(0),
         SemanticContext(unsigned(SemanticContext)), NotRecommended(false),
         NotRecReason(NotRecommendedReason::NoReason),
@@ -689,7 +689,7 @@ public:
         AssociatedUSRs(AssociatedUSRs), DocWords(DocWords) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
-    TypeDistance = ExpectedTypeRelation::Unrelated;
+    TypeDistance = ExpectedTypeRelation::Unknown;
     assert(!isOperator() ||
            getOperatorKind() != CodeCompletionOperatorKind::None);
   }

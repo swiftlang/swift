@@ -992,7 +992,8 @@ static void transformAndForwardResults(
     CodeCompletion::SwiftResult paren(
         CodeCompletion::SwiftResult::ResultKind::BuiltinOperator,
         SemanticContextKind::ExpressionSpecific,
-        exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString);
+        exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString,
+        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
 
     SwiftCompletionInfo info;
     std::vector<Completion *> extended =

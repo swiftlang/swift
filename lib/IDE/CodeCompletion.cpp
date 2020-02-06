@@ -695,7 +695,7 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     Prefix.append(Twine(NumBytesToErase).str());
     Prefix.append("]");
   }
-  switch (ExpectedTypeRelation(TypeDistance)) {
+  switch (getExpectedTypeRelation()) {
     case ExpectedTypeRelation::Invalid:
       Prefix.append("/TypeRelation[Invalid]");
       break;

@@ -36,15 +36,20 @@ func testUnknown() {
 // RUN: %sourcekitd-test -req=complete -pos=17:17 %s -- %s > %t.convertible.response
 // RUN: diff -u %s.convertible.response %t.convertible.response
 
-// RUN:  %sourcekitd-test -req=complete -pos=21:10 %s -- %s | %FileCheck %s --check-prefix=BOOLCONTEXT
-// RUN:  %sourcekitd-test -req=complete -pos=24:10 %s -- %s | %FileCheck %s --check-prefix=OPTIONALCONTEXT
-// RUN:  %sourcekitd-test -req=complete -pos=27:10 %s -- %s | %FileCheck %s --check-prefix=VOIDCONTEXT
-// RUN:  %sourcekitd-test -req=complete -pos=27:10 %s -- %s | %FileCheck %s --check-prefix=UNKNOWNCONTEXT
+// RUN: %empty-directory(%t/cache)
+// RUN: %sourcekitd-test -req=complete.cache.ondisk -cache-path %t/cache == -req=complete -pos=21:10 %s -- %s | %FileCheck %s --check-prefix=BOOLCONTEXT
+// RUN: %sourcekitd-test -req=complete.cache.ondisk -cache-path %t/cache == -req=complete -pos=24:10 %s -- %s | %FileCheck %s --check-prefix=OPTIONALCONTEXT
+// RUN: %sourcekitd-test -req=complete.cache.ondisk -cache-path %t/cache == -req=complete -pos=27:10 %s -- %s | %FileCheck %s --check-prefix=VOIDCONTEXT
+// RUN: %sourcekitd-test -req=complete.cache.ondisk -cache-path %t/cache == -req=complete -pos=27:10 %s -- %s | %FileCheck %s --check-prefix=UNKNOWNCONTEXT
 
 // BOOLCONTEXT-LABEL: key.name: "false",
 // BOOLCONTEXT-NOT:   key.name:
 // BOOLCONTEXT:       key.typename: "Bool",
 // BOOLCONTEXT:       key.typerelation: source.codecompletion.typerelation.identical,
+// BOOLCONTEXT-LABEL: key.name: "Int",
+// BOOLCONTEXT-NOT:   key.name:
+// BOOLCONTEXT:       key.typename: "Int",
+// BOOLCONTEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
 // BOOLCONTEXT-LABEL: key.name: "nil",
 // BOOLCONTEXT-NOT:   key.name:
 // BOOLCONTEXT:       key.typename: "",
@@ -58,6 +63,10 @@ func testUnknown() {
 // OPTIONALCONTEXT-NOT:   key.name:
 // OPTIONALCONTEXT:       key.typename: "Bool",
 // OPTIONALCONTEXT:       key.typerelation: source.codecompletion.typerelation.unrelated,
+// OPTIONALCONTEXT-LABEL: key.name: "Int",
+// OPTIONALCONTEXT-NOT:   key.name:
+// OPTIONALCONTEXT:       key.typename: "Int",
+// OPTIONALCONTEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
 // OPTIONALCONTEXT-LABEL: key.name: "nil",
 // OPTIONALCONTEXT-NOT:   key.name:
 // OPTIONALCONTEXT:       key.typename: "Int?",
@@ -71,6 +80,10 @@ func testUnknown() {
 // VOIDCONTEXT-NOT:   key.name:
 // VOIDCONTEXT:       key.typename: "Bool",
 // VOIDCONTEXT:       key.typerelation: source.codecompletion.typerelation.unrelated,
+// VOIDCONTEXT-LABEL: key.name: "Int",
+// VOIDCONTEXT-NOT:   key.name:
+// VOIDCONTEXT:       key.typename: "Int",
+// VOIDCONTEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
 // VOIDCONTEXT-LABEL: key.name: "nil",
 // VOIDCONTEXT-NOT:   key.name:
 // VOIDCONTEXT:       key.typename: "",
@@ -83,6 +96,10 @@ func testUnknown() {
 // UNKNOWNCONTEXT-LABEL: key.name: "false",
 // UNKNOWNCONTEXT-NOT:   key.name:
 // UNKNOWNCONTEXT:       key.typename: "Bool",
+// UNKNOWNCONTEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
+// UNKNOWNCONTEXT-LABEL: key.name: "Int",
+// UNKNOWNCONTEXT-NOT:   key.name:
+// UNKNOWNCONTEXT:       key.typename: "Int",
 // UNKNOWNCONTEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
 // UNKNOWNCONTEXT-LABEL: key.name: "nil",
 // UNKNOWNCONTEXT-NOT:   key.name:
