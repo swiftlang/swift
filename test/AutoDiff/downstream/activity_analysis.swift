@@ -583,7 +583,7 @@ func testActiveOptional(_ x: Float) -> Float {
   return maybe!
 }
 
-// CHECK-LABEL: [AD] Activity info for $s17activity_analysis12testOptionalyS2fF at (source=0 parameters=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveOptional{{.*}} at (source=0 parameters=(0))
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE]   %2 = alloc_stack $Optional<Float>, var, name "maybe"
@@ -597,18 +597,15 @@ func testActiveOptional(_ x: Float) -> Float {
 // CHECK: [ACTIVE]   %13 = begin_access [read] [static] %2 : $*Optional<Float>
 // CHECK: [ACTIVE]   %14 = load [trivial] %13 : $*Optional<Float>
 // CHECK: bb1:
-// CHECK: [NONE]   %18 = integer_literal $Builtin.Word, 85
-// CHECK: [NONE]   %19 = integer_literal $Builtin.Int1, -1
-// CHECK: [NONE]   %20 = integer_literal $Builtin.Word, 537
-// CHECK: [NONE]   %21 = integer_literal $Builtin.Word, 15
-// CHECK: [NONE]   %22 = integer_literal $Builtin.Int1, 0
 // CHECK: [NONE]   // function_ref _diagnoseUnexpectedNilOptional(_filenameStart:_filenameLength:_filenameIsASCII:_line:_isImplicitUnwrap:)
 // CHECK: [NONE]   %24 = apply %23(%17, %18, %19, %20, %22) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Int1) -> ()
 // CHECK: bb2:
 // CHECK: [ACTIVE] %26 = argument of bb2 : $Float
 
 enum DirectEnum: Differentiable & AdditiveArithmetic {
-  case leaf(Float)
+  case case0
+  case case1(Float)
+  case case2(Float, Float)
 
   typealias TangentVector = Self
 
@@ -623,19 +620,33 @@ enum DirectEnum: Differentiable & AdditiveArithmetic {
 // expected-note @+1 {{differentiating enum values is not yet supported}}
 func testActiveEnumValue(_ e: DirectEnum, _ x: Float) -> Float {
   switch e {
-  case let .leaf(y): return y
+  case .case0: return x
+  case let .case1(y1): return y1
+  case let .case2(y1, y2): return y1 + y2
   }
 }
 
 // CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveEnumValue{{.*}} at (source=0 parameters=(0))
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $DirectEnum
-// CHECK: [NONE] %1 = argument of bb0 : $Float
+// CHECK: [USEFUL] %1 = argument of bb0 : $Float
 // CHECK: bb1:
-// CHECK: [ACTIVE] %5 = argument of bb1 : $Float
+// CHECK: bb2:
+// CHECK: [ACTIVE] %6 = argument of bb2 : $Float
+// CHECK: bb3:
+// CHECK: [ACTIVE] %9 = argument of bb3 : $(Float, Float)
+// CHECK: [ACTIVE] (**%10**, %11) = destructure_tuple %9 : $(Float, Float)
+// CHECK: [ACTIVE] (%10, **%11**) = destructure_tuple %9 : $(Float, Float)
+// CHECK: [USEFUL]   %14 = metatype $@thin Float.Type
+// CHECK: [NONE]   // function_ref static Float.+ infix(_:_:)
+// CHECK:   %15 = function_ref @$sSf1poiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: [ACTIVE]   %16 = apply %15(%10, %11, %14) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: bb4:
+// CHECK: [ACTIVE] %18 = argument of bb4 : $Float
 
 enum IndirectEnum<T: Differentiable>: Differentiable & AdditiveArithmetic {
-  case leaf(T)
+  case case1(T)
+  case case2(Float, T)
 
   typealias TangentVector = Self
 
@@ -649,9 +660,10 @@ enum IndirectEnum<T: Differentiable>: Differentiable & AdditiveArithmetic {
 @differentiable(wrt: e)
 // expected-note @+2 {{when differentiating this function definition}}
 // expected-note @+1 {{differentiating enum values is not yet supported}}
-func testActiveEnumAddr<T>(_ e: IndirectEnum<T>, _ x: Float) -> T {
+func testActiveEnumAddr<T>(_ e: IndirectEnum<T>) -> T {
   switch e {
-  case let .leaf(y): return y
+  case let .case1(y1): return y1
+  case let .case2(_, y2): return y2
   }
 }
 
@@ -659,9 +671,15 @@ func testActiveEnumAddr<T>(_ e: IndirectEnum<T>, _ x: Float) -> T {
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*T
 // CHECK: [ACTIVE] %1 = argument of bb0 : $*IndirectEnum<T>
-// CHECK: [NONE] %2 = argument of bb0 : $Float
-// CHECK: [ACTIVE]   %5 = alloc_stack $IndirectEnum<T>
+// CHECK: [ACTIVE]   %3 = alloc_stack $IndirectEnum<T>
 // CHECK: bb1:
-// CHECK: [ACTIVE]   %8 = unchecked_take_enum_data_addr %5 : $*IndirectEnum<T>, #IndirectEnum.leaf!enumelt.1
-// CHECK: [ACTIVE]   %9 = alloc_stack $T, let, name "y"
-// CHECK: [NONE]   %15 = tuple ()
+// CHECK: [ACTIVE]   %6 = unchecked_take_enum_data_addr %3 : $*IndirectEnum<T>, #IndirectEnum.case1!enumelt.1
+// CHECK: [ACTIVE]   %7 = alloc_stack $T, let, name "y1"
+// CHECK: bb2:
+// CHECK: [ACTIVE]   %14 = unchecked_take_enum_data_addr %3 : $*IndirectEnum<T>, #IndirectEnum.case2!enumelt.1
+// CHECK: [ACTIVE]   %15 = tuple_element_addr %14 : $*(Float, T), 0
+// CHECK: [VARIED]   %16 = load [trivial] %15 : $*Float
+// CHECK: [ACTIVE]   %17 = tuple_element_addr %14 : $*(Float, T), 1
+// CHECK: [ACTIVE]   %18 = alloc_stack $T, let, name "y2"
+// CHECK: bb3:
+// CHECK: [NONE]   %25 = tuple ()
