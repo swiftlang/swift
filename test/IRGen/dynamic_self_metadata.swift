@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend %s -emit-ir -parse-as-library | %FileCheck %s
+// RUN: %target-swift-frontend -disable-generic-metadata-prespecialization %s -emit-ir -parse-as-library | %FileCheck %s
 
+// UNSUPPORTED: OS=windows-msvc
 // REQUIRES: CPU=x86_64
 
 // FIXME: Not a SIL test because we can't parse dynamic Self in SIL.
