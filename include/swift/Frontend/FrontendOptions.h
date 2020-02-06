@@ -85,6 +85,9 @@ public:
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
+  /// We should only include public symbols in the objc compatibility header.
+  bool ObjcCompatibilityHeaderIsPublic = false;
+
   enum class ActionType {
     NoneAction,        ///< No specific action
     Parse,             ///< Parse only

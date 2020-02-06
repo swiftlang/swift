@@ -1308,10 +1308,10 @@ static bool performCompile(CompilerInstance &Instance,
 
   // FIXME: This is still a lousy approximation of whether the module file will
   // be externally consumed.
-  bool moduleIsPublic =
-      !Instance.getMainModule()->hasEntryPoint() &&
+  bool moduleIsPublic = opts.ObjcCompatibilityHeaderIsPublic ||
+      (!Instance.getMainModule()->hasEntryPoint() &&
       opts.ImplicitObjCHeaderPath.empty() &&
-      !Context.LangOpts.EnableAppExtensionRestrictions;
+      !Context.LangOpts.EnableAppExtensionRestrictions);
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {

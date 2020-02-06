@@ -82,7 +82,7 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.SerializeModuleInterfaceDependencyHashes |=
     Args.hasArg(OPT_serialize_module_interface_dependency_hashes);
-
+  Opts.ObjcCompatibilityHeaderIsPublic |= Args.hasArg(OPT_objc_header_is_public);
   Opts.RemarkOnRebuildFromModuleInterface |=
     Args.hasArg(OPT_Rmodule_interface_rebuild);
 
