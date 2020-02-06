@@ -78,10 +78,48 @@ public struct UnsafeValue<Element: AnyObject> {
   }
 
   // Access the underlying value at +0, guaranteeing its lifetime by base.
+  //
+  // CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base1fqd_0_qd___qd_0_xXEtr0_lF : $@convention(method) <Element where Element : AnyObject><Base, Result> (@in_guaranteed Base, @noescape @callee_guaranteed (@guaranteed Element) -> @out Result, UnsafeValue<Element>) -> @out Result {
+  // CHECK: bb0([[RESULT:%.*]] : $*Result, [[BASE:%.*]] : $*Base, [[CLOSURE:%.*]] : $@noescape @callee_guaranteed (@guaranteed Element) -> @out Result, [[UNSAFE_VALUE:%.*]] : $UnsafeValue<Element>):
+  // CHECK:  [[COPY_BOX:%.*]] = alloc_box
+  // CHECK:  [[COPY_PROJ:%.*]] = project_box [[COPY_BOX]]
+  // CHECK:  store [[UNSAFE_VALUE]] to [trivial] [[COPY_PROJ]]
+  // CHECK:  [[VALUE_ADDR:%.*]] = begin_access [read] [unknown] [[COPY_PROJ]]
+  // CHECK:  [[STR_VALUE_ADDR:%.*]] = struct_element_addr [[VALUE_ADDR]]
+  // CHECK:  [[UNMANAGED_VALUE:%.*]] = load [trivial] [[STR_VALUE_ADDR]]
+  // CHECK:  [[UNOWNED_REF_OPTIONAL:%.*]] = unmanaged_to_ref [[UNMANAGED_VALUE]]
+  // CHECK:  [[GUARANTEED_REF_OPTIONAL:%.*]] = unchecked_ownership_conversion [[UNOWNED_REF_OPTIONAL]]
+  // CHECK:  [[GUARANTEED_REF:%.*]] = unchecked_enum_data [[GUARANTEED_REF_OPTIONAL]]
+  // CHECK:  [[GUARANTEED_REF_DEP_ON_BASE:%.*]] = mark_dependence [[GUARANTEED_REF]] : $Element on [[BASE]]
+  // CHECK:  end_access [[VALUE_ADDR]]
+  // CHECK:  apply [[CLOSURE]]([[RESULT]], [[GUARANTEED_REF_DEP_ON_BASE]])
+  // CHECK:  end_borrow [[GUARANTEED_REF_OPTIONAL]]
+  // CHECK:  destroy_value [[COPY_BOX]]
+  // CHECK: } // end sil function '$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base1fqd_0_qd___qd_0_xXEtr0_lF'
+  //
+  // CANONICAL-LABEL: sil [transparent] [serialized] @$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base1fqd_0_qd___qd_0_xXEtr0_lF : $@convention(method) <Element where Element : AnyObject><Base, Result> (@in_guaranteed Base, @noescape @callee_guaranteed (@guaranteed Element) -> @out Result, UnsafeValue<Element>) -> @out Result {
+  // CANONICAL: bb0([[RESULT:%.*]] : $*Result, [[BASE:%.*]] : $*Base, [[CLOSURE:%.*]] : $@noescape @callee_guaranteed (@guaranteed Element) -> @out Result, [[UNSAFE_VALUE:%.*]] : $UnsafeValue<Element>):
+  // CANONICAL:  [[UNMANAGED_VALUE:%.*]] = struct_extract [[UNSAFE_VALUE]]
+  // CANONICAL:  [[UNOWNED_REF_OPTIONAL:%.*]] = unmanaged_to_ref [[UNMANAGED_VALUE]]
+  // CANONICAL:  [[GUARANTEED_REF:%.*]] = unchecked_enum_data [[UNOWNED_REF_OPTIONAL]]
+  // CANONICAL:  [[GUARANTEED_REF_DEP_ON_BASE:%.*]] = mark_dependence [[GUARANTEED_REF]] : $Element on [[BASE]]
+  // CANONICAL:  apply [[CLOSURE]]([[RESULT]], [[GUARANTEED_REF_DEP_ON_BASE]])
+  // CANONICAL: } // end sil function '$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base1fqd_0_qd___qd_0_xXEtr0_lF'
+  //
+  // OPT-LABEL: sil [transparent] @$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base1fqd_0_qd___qd_0_xXEtr0_lF : $@convention(method) <Element where Element : AnyObject><Base, Result> (@in_guaranteed Base, @noescape @callee_guaranteed (@guaranteed Element) -> @out Result, UnsafeValue<Element>) -> @out Result {
+  // OPT: bb0([[RESULT:%.*]] : $*Result, [[BASE:%.*]] : $*Base, [[CLOSURE:%.*]] : $@noescape @callee_guaranteed (@guaranteed Element) -> @out Result, [[UNSAFE_VALUE:%.*]] : $UnsafeValue<Element>):
+  // OPT:  [[UNMANAGED_VALUE:%.*]] = struct_extract [[UNSAFE_VALUE]]
+  // OPT:  [[UNOWNED_REF_OPTIONAL:%.*]] = unmanaged_to_ref [[UNMANAGED_VALUE]]
+  // OPT:  [[GUARANTEED_REF:%.*]] = unchecked_enum_data [[UNOWNED_REF_OPTIONAL]]
+  // OPT:  [[GUARANTEED_REF_DEP_ON_BASE:%.*]] = mark_dependence [[GUARANTEED_REF]] : $Element on [[BASE]]
+  // OPT:  apply [[CLOSURE]]([[RESULT]], [[GUARANTEED_REF_DEP_ON_BASE]])
+  // OPT: } // end sil function '$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base1fqd_0_qd___qd_0_xXEtr0_lF'
   @_transparent
   @inlinable
-  func withGuaranteeingBase<Base>(base: Base, f: (Element) -> ()) {
-    // TODO: Once we have a builtin for mark_dependence, fill this in.
+  func withGuaranteeingBase<Base, Result>(base: Base, f: (Element) -> Result) -> Result {
+    // Just so we can not mark self as mutating. This is just a bitwise copy.
+    var tmp = self
+    return f(Builtin.convertUnownedUnsafeToGuaranteed(base, &tmp._value))
   }
 
   // If the unmanaged value was initialized with a copy, release the underlying value.
