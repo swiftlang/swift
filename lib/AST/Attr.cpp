@@ -778,8 +778,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printKeyword(getAttrName(), Options, "(set)");
     return true;
 
-  case DAK_SPIAccessControl:
+  case DAK_SPIAccessControl: {
+    if (!Options.PrintSPIs) return false;
+
+    auto spiAttr = static_cast<const SPIAccessControlAttr*>(this);
+    interleave(spiAttr->getSPINames(),
+               [&](Identifier spiName) {
+                 Printer.printAttrName(getAttrName(), true);
+                 Printer << "(" << spiName << ")";
+               },
+               [&] { Printer << " "; });
     return true;
+  }
 
   default:
     break;
