@@ -2353,9 +2353,11 @@ public:
     return true;
   }
 
-  bool shouldWalkIntoNonSingleExpressionClosure() override {
-    return false;
+  bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+    return expr->hasAppliedFunctionBuilder();
   }
+
+  bool shouldWalkIntoTapExpression() override { return false; }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     ExprStack.push_back(E);

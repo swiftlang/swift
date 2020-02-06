@@ -299,3 +299,31 @@ func checkSingleReturn(cond: Bool) {
     ($0, 17)
   }
 }
+
+// rdar://problem/59116520
+func checkImplicitSelfInClosure() {
+  @_functionBuilder
+  struct Builder {
+    static func buildBlock(_ children: String...) -> Element { Element() }
+  }
+
+  struct Element {
+    static func nonEscapingClosure(@Builder closure: (() -> Element)) {}
+    static func escapingClosure(@Builder closure: @escaping (() -> Element)) {}
+  }
+
+  class C {
+    let identifier: String = ""
+
+    func testImplicitSelf() {
+      Element.nonEscapingClosure {
+        identifier // okay
+      }
+
+      Element.escapingClosure { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+        identifier // expected-error {{reference to property 'identifier' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        // expected-note@-1 {{reference 'self.' explicitly}}
+      }
+    }
+  }
+}
