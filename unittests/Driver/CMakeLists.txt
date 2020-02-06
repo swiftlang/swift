@@ -1,8 +1,8 @@
 add_swift_unittest(SwiftDriverTests
   CoarseGrainedDependencyGraphTests.cpp
-  FineGrainedDependencyGraphTests.cpp
+  ModuleDepGraphWithoutFingerprintsTests.cpp
   MockingFineGrainedDependencyGraphs.cpp
-  TypeBodyFingerprintsDependencyGraphTests.cpp
+  ModuleDepGraphTests.cpp
 )
 
 target_link_libraries(SwiftDriverTests
