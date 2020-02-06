@@ -614,14 +614,8 @@ private:
   
 } // end anonymous namespace
 
-void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
-                                                      unsigned StartElem) {
+void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
   TypeRefinementContext *RootTRC = SF.getTypeRefinementContext();
-
-  // If we are not starting at the beginning of the source file, we had better
-  // already have a root type refinement context.
-  assert(StartElem == 0 || RootTRC);
-
   ASTContext &Context = SF.getASTContext();
 
   if (!RootTRC) {
@@ -636,7 +630,7 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
   // Build refinement contexts, if necessary, for all declarations starting
   // with StartElem.
   TypeRefinementContextBuilder Builder(RootTRC, Context);
-  for (auto D : SF.getTopLevelDecls().slice(StartElem)) {
+  for (auto D : SF.getTopLevelDecls()) {
     Builder.build(D);
   }
 }
@@ -645,7 +639,7 @@ TypeRefinementContext *
 TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
   TypeRefinementContext *TRC = SF->getTypeRefinementContext();
   if (!TRC) {
-    buildTypeRefinementContextHierarchy(*SF, 0);
+    buildTypeRefinementContextHierarchy(*SF);
     TRC = SF->getTypeRefinementContext();
   }
 
