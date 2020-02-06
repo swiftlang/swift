@@ -502,12 +502,18 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
     Info.SemanticContext = CCCtxOtherModule; break;
   }
 
+  static UIdent CCTypeRelNotApplicable("source.codecompletion.typerelation.notapplicable");
+  static UIdent CCTypeRelUnknown("source.codecompletion.typerelation.unknown");
   static UIdent CCTypeRelUnrelated("source.codecompletion.typerelation.unrelated");
   static UIdent CCTypeRelInvalid("source.codecompletion.typerelation.invalid");
   static UIdent CCTypeRelConvertible("source.codecompletion.typerelation.convertible");
   static UIdent CCTypeRelIdentical("source.codecompletion.typerelation.identical");
 
   switch (Result->getExpectedTypeRelation()) {
+  case CodeCompletionResult::NotApplicable:
+    Info.TypeRelation = CCTypeRelNotApplicable; break;
+  case CodeCompletionResult::Unknown:
+    Info.TypeRelation = CCTypeRelUnknown; break;
   case CodeCompletionResult::Unrelated:
     Info.TypeRelation = CCTypeRelUnrelated; break;
   case CodeCompletionResult::Invalid:
@@ -986,7 +992,8 @@ static void transformAndForwardResults(
     CodeCompletion::SwiftResult paren(
         CodeCompletion::SwiftResult::ResultKind::BuiltinOperator,
         SemanticContextKind::ExpressionSpecific,
-        exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString);
+        exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString,
+        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
 
     SwiftCompletionInfo info;
     std::vector<Completion *> extended =
