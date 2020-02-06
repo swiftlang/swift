@@ -62,16 +62,9 @@ static llvm::cl::opt<bool> AbortOnFailure(
                               "verify-abort-on-failure",
                               llvm::cl::init(true));
 
-// SWIFT_ENABLE_TENSORFLOW
-// This flag is temporarily set to false because debug scope verification does
-// not handle inlined call sites. This is problematic for deabstraction, which
-// does performance inlining at -Onone.
-// When debug scope verification handles inlined call sites, set this flag to
-// true.
-// Documented at SR-8114.
 static llvm::cl::opt<bool> VerifyDIHoles(
                               "verify-di-holes",
-                              llvm::cl::init(false));
+                              llvm::cl::init(true));
 
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
@@ -1563,7 +1556,7 @@ public:
                       "Transpose type does not match expected transpose type");
     }
   }
-  
+
   void checkDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *dfei) {
     auto fnTy = dfei->getFunctionOperand()->getType().getAs<SILFunctionType>();

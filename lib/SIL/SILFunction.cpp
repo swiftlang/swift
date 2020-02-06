@@ -68,9 +68,6 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
   if (!name.empty()) {
     entry = &*M.FunctionTable.insert(std::make_pair(name, nullptr)).first;
     PrettyStackTraceSILFunction trace("creating", entry->getValue());
-    if (entry->getValue()) {
-      entry->getValue()->dump();
-    }
     assert(!entry->getValue() && "function already exists");
     name = entry->getKey();
   }
@@ -611,14 +608,6 @@ SubstitutionMap SILFunction::getForwardingSubstitutionMap() {
 
 bool SILFunction::shouldVerifyOwnership() const {
   return !hasSemanticsAttr("verify.ownership.sil.never");
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-unsigned SILFunction::codeSize() const {
-  unsigned size = 0;
-  for (auto &BB : *this)
-    size += BB.codeSize();
-  return size;
 }
 
 static Identifier getIdentifierForObjCSelector(ObjCSelector selector, ASTContext &Ctxt) {
