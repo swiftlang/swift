@@ -859,6 +859,68 @@ public:
     auto Root = getReader().readPointer(ConformancesAddr, sizeof(StoredPointer));
     dumpConformanceTree(Root->getResolvedAddress().getAddressData());
   }
+  
+  void dumpMetadataAllocations() {
+    std::string AllocationPoolName = "__ZL14AllocationPool";
+    auto AllocationPoolAddr = getReader().getSymbolAddress(AllocationPoolName);
+    printf("%#llx\n", AllocationPoolAddr);
+    
+    printf("Initial pool: %#llx\n", getReader().getSymbolAddress("__ZL21InitialAllocationPool"));
+    
+    struct PoolRange {
+      StoredPointer Begin;
+      StoredSize Remaining;
+    };
+    struct PoolTrailer {
+      StoredPointer PrevTrailer;
+      StoredSize PoolSize;
+    };
+    struct alignas(StoredPointer) AllocationHeader {
+      uint16_t Size;
+      uint16_t Tag;
+    };
+
+    auto PoolBytes = getReader()
+      .readBytes(RemoteAddress(AllocationPoolAddr), sizeof(PoolRange));
+    auto Pool = reinterpret_cast<const PoolRange *>(PoolBytes.get());
+    if (!Pool)
+      return;
+    
+    auto TrailerPtr = Pool->Begin + Pool->Remaining;
+    while (TrailerPtr) {
+      auto TrailerBytes = getReader()
+        .readBytes(RemoteAddress(TrailerPtr), sizeof(PoolTrailer));
+      auto Trailer = reinterpret_cast<const PoolTrailer *>(TrailerBytes.get());
+      if (!Trailer)
+        break;
+      auto PoolStart = TrailerPtr - Trailer->PoolSize;
+      printf("Found pool at %#llx, allocation size is %llu\n",
+              PoolStart, Trailer->PoolSize + sizeof(PoolTrailer));
+      
+      auto PoolBytes = getReader()
+        .readBytes(RemoteAddress(PoolStart), Trailer->PoolSize);
+      auto PoolPtr = (char *)PoolBytes.get();
+      if (!PoolPtr)
+        break;
+      auto AllocationPtr = PoolPtr;
+      while (AllocationPtr - PoolPtr < Trailer->PoolSize) {
+        auto Header = (AllocationHeader *)AllocationPtr;
+        if (Header->Size == 0)
+          break;
+        auto Allocation = AllocationPtr + sizeof(AllocationHeader);
+        printf("Allocation tag %u size %u offset %#llx\n", Header->Tag, Header->Size, Allocation - PoolPtr);
+        
+        switch (Header->Tag) {
+          default:
+            break;
+        }
+        
+        AllocationPtr = Allocation + Header->Size;
+      }
+      
+      TrailerPtr = Trailer->PrevTrailer;
+    }
+  }
 
 private:
   const TypeInfo *getClosureContextInfo(StoredPointer Context,

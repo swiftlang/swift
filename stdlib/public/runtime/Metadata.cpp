@@ -331,7 +331,8 @@ namespace {
 } // end anonymous namespace
 
 namespace {
-  class GenericMetadataCache : public MetadataCache<GenericCacheEntry, false> {
+  class GenericMetadataCache :
+    public MetadataCache<GenericCacheEntry, GenericMetadataCacheTag, false> {
   public:
     uint16_t NumKeyParameters;
     uint16_t NumWitnessTables;
@@ -887,7 +888,8 @@ namespace {
 }
 
 /// The uniquing structure for ObjC class-wrapper metadata.
-static SimpleGlobalCache<ObjCClassCacheEntry> ObjCClassWrappers;
+static SimpleGlobalCache<ObjCClassCacheEntry, ObjCClassWrappersTag>
+  ObjCClassWrappers;
 
 const Metadata *
 swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
@@ -1018,7 +1020,7 @@ public:
 } // end anonymous namespace
 
 /// The uniquing structure for function type metadata.
-static SimpleGlobalCache<FunctionCacheEntry> FunctionTypes;
+static SimpleGlobalCache<FunctionCacheEntry, FunctionTypesTag> FunctionTypes;
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata0(FunctionTypeFlags flags,
@@ -1212,7 +1214,7 @@ public:
 };
 
 class TupleCacheStorage :
-  public LockingConcurrentMapStorage<TupleCacheEntry, false> {
+  public LockingConcurrentMapStorage<TupleCacheEntry, TupleCacheTag, false> {
 public:
 // FIXME: https://bugs.swift.org/browse/SR-1155
 #pragma clang diagnostic push
@@ -2133,7 +2135,7 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
 
 static MetadataAllocator &getResilientMetadataAllocator() {
   // This should be constant-initialized, but this is safe.
-  static MetadataAllocator allocator;
+  static MetadataAllocator allocator(ResilientMetadataAllocatorTag);
   return allocator;
 }
 
@@ -3120,7 +3122,7 @@ namespace {
 } // end anonymous namespace
 
 /// The uniquing structure for metatype type metadata.
-static SimpleGlobalCache<MetatypeCacheEntry> MetatypeTypes;
+static SimpleGlobalCache<MetatypeCacheEntry, MetatypeTypesTag> MetatypeTypes;
 
 /// Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
@@ -3188,11 +3190,13 @@ public:
 } // end anonymous namespace
 
 /// The uniquing structure for existential metatype value witness tables.
-static SimpleGlobalCache<ExistentialMetatypeValueWitnessTableCacheEntry>
+static SimpleGlobalCache<ExistentialMetatypeValueWitnessTableCacheEntry,
+                         ExistentialMetatypeValueWitnessTablesTag>
 ExistentialMetatypeValueWitnessTables;
 
 /// The uniquing structure for existential metatype type metadata.
-static SimpleGlobalCache<ExistentialMetatypeCacheEntry> ExistentialMetatypes;
+static SimpleGlobalCache<ExistentialMetatypeCacheEntry,
+                         ExistentialMetatypesTag> ExistentialMetatypes;
 
 static const ValueWitnessTable
 ExistentialMetatypeValueWitnesses_1 =
@@ -3386,7 +3390,7 @@ public:
 } // end anonymous namespace
 
 /// The uniquing structure for existential type metadata.
-static SimpleGlobalCache<ExistentialCacheEntry> ExistentialTypes;
+static SimpleGlobalCache<ExistentialCacheEntry, ExistentialTypesTag> ExistentialTypes;
 
 static const ValueWitnessTable
 OpaqueExistentialValueWitnesses_0 =
@@ -3426,7 +3430,8 @@ METADATA_SYM(ANYOBJECT_MANGLING) = {
 };
 
 /// The uniquing structure for opaque existential value witness tables.
-static SimpleGlobalCache<OpaqueExistentialValueWitnessTableCacheEntry>
+static SimpleGlobalCache<OpaqueExistentialValueWitnessTableCacheEntry,
+                         OpaqueExistentialValueWitnessTablesTag>
 OpaqueExistentialValueWitnessTables;
 
 /// Instantiate a value witness table for an opaque existential container with
@@ -3472,7 +3477,8 @@ static const ValueWitnessTable ClassExistentialValueWitnesses_2 =
   ValueWitnessTableForBox<ClassExistentialBox<2>>::table;
 
 /// The uniquing structure for class existential value witness tables.
-static SimpleGlobalCache<ClassExistentialValueWitnessTableCacheEntry>
+static SimpleGlobalCache<ClassExistentialValueWitnessTableCacheEntry,
+                         ClassExistentialValueWitnessTablesTag>
 ClassExistentialValueWitnessTables;
 
 /// Instantiate a value witness table for a class-constrained existential
@@ -3970,7 +3976,8 @@ public:
 
 } // end anonymous namespace
 
-static Lazy<MetadataCache<ForeignMetadataCacheEntry, false>> ForeignMetadata;
+static Lazy<MetadataCache<ForeignMetadataCacheEntry, ForeignMetadataCacheTag,
+                          false>> ForeignMetadata;
 
 MetadataResponse
 swift::swift_getForeignTypeMetadata(MetadataRequest request,
@@ -4017,7 +4024,8 @@ namespace {
   };
 }
 
-static SimpleGlobalCache<ForeignWitnessTableCacheEntry> ForeignWitnessTables;
+static SimpleGlobalCache<ForeignWitnessTableCacheEntry,
+                         ForeignWitnessTablesTag> ForeignWitnessTables;
 
 static const WitnessTable *_getForeignWitnessTable(
     const WitnessTable *witnessTableCandidate,
@@ -4279,7 +4287,8 @@ public:
 } // end anonymous namespace
 
 using GenericWitnessTableCache =
-  MetadataCache<WitnessTableCacheEntry, /*destructor*/ false>;
+  MetadataCache<WitnessTableCacheEntry, GenericWitnessTableCacheTag,
+                /*destructor*/ false>;
 using LazyGenericWitnessTableCache = Lazy<GenericWitnessTableCache>;
 
 /// Fetch the cache for a generic witness-table structure.
@@ -5460,16 +5469,32 @@ namespace {
     /// The number of bytes remaining.
     size_t Remaining;
   };
+
+  struct PoolTrailer {
+    void *PrevTrailer;
+    size_t PoolSize;
+  };
+
+  static constexpr size_t InitialPoolSize = 64 * 1024 - sizeof(PoolTrailer);
+
+  struct alignas(void *) AllocationHeader {
+    uint16_t Size;
+    uint16_t Tag;
+  };
 } // end anonymous namespace
 
 // A statically-allocated pool.  It's zero-initialized, so this
 // doesn't cost us anything in binary size.
-alignas(void *) static char InitialAllocationPool[64 * 1024];
+alignas(void *) static struct {
+  char Pool[InitialPoolSize];
+  PoolTrailer Trailer{ nullptr, InitialPoolSize };
+} InitialAllocationPool;
 static std::atomic<PoolRange>
-AllocationPool{PoolRange{InitialAllocationPool,
-                         sizeof(InitialAllocationPool)}};
+AllocationPool{PoolRange{InitialAllocationPool.Pool,
+                         sizeof(InitialAllocationPool.Pool)}};
 
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
+  if (Tag == 0) abort();
   assert(alignment <= alignof(void*));
   assert(size % alignof(void*) == 0);
 
@@ -5479,20 +5504,30 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
 
   // Allocate out of the pool.
   PoolRange curState = AllocationPool.load(std::memory_order_relaxed);
+  auto sizeWithHeader = size + sizeof(AllocationHeader);
   while (true) {
     char *allocation;
     PoolRange newState;
     bool allocatedNewPage;
 
     // Try to allocate out of the current page.
-    if (size <= curState.Remaining) {
+    if (sizeWithHeader <= curState.Remaining) {
       allocatedNewPage = false;
       allocation = curState.Begin;
-      newState = PoolRange{curState.Begin + size, curState.Remaining - size};
+      newState = PoolRange{curState.Begin + sizeWithHeader,
+                           curState.Remaining - sizeWithHeader};
     } else {
+      auto poolSize = PoolRange::PageSize - sizeof(PoolTrailer);
       allocatedNewPage = true;
       allocation = new char[PoolRange::PageSize];
-      newState = PoolRange{allocation + size, PoolRange::PageSize - size};
+
+      char *prevTrailer = curState.Begin + curState.Remaining;
+      PoolTrailer *newTrailer = (PoolTrailer *)(allocation + poolSize);
+      newTrailer->PrevTrailer = prevTrailer;
+      newTrailer->PoolSize = poolSize;
+
+      newState = PoolRange{allocation + sizeWithHeader,
+                           poolSize - sizeWithHeader};
       __asan_poison_memory_region(allocation, PoolRange::PageSize);
     }
 
@@ -5502,9 +5537,14 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
                                               std::memory_order_relaxed,
                                               std::memory_order_relaxed)) {
       // If that succeeded, we've successfully allocated.
-      __msan_allocated_memory(allocation, size);
-      __asan_unpoison_memory_region(allocation, size);
-      return allocation;
+      __msan_allocated_memory(allocation, sizeWithHeader);
+      __asan_unpoison_memory_region(allocation, sizeWithHeader);
+      
+      AllocationHeader *header = (AllocationHeader *)allocation;
+      header->Size = size;
+      header->Tag = Tag;
+      
+      return allocation + sizeof(AllocationHeader);
     }
 
     // If it failed, go back to a neutral state and try again.
@@ -5542,7 +5582,7 @@ void MetadataAllocator::Deallocate(const void *allocation, size_t size,
 }
 
 void *swift::allocateMetadata(size_t size, size_t alignment) {
-  return MetadataAllocator().Allocate(size, alignment);
+  return MetadataAllocator(MetadataTag).Allocate(size, alignment);
 }
 
 template<>

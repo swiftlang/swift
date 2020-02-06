@@ -43,6 +43,7 @@ let reflectionContext = swift_reflection_createReflectionContextWithDataLayout(
   Inspector.Callbacks.GetSymbolAddress)
 
 swift_reflection_dumpConformances(reflectionContext)
+swift_reflection_dumpMetadataAllocations(reflectionContext)
 
 swift_reflection_destroyReflectionContext(reflectionContext)
 inspector.destroyContext()
