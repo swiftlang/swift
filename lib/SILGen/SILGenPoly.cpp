@@ -1593,11 +1593,12 @@ static void forwardFunctionArguments(SILGenFunction &SGF,
   for (auto index : indices(managedArgs)) {
     auto arg = managedArgs[index];
     auto argTy = argTypes[index];
+    auto argOrigTy = arg.getType().getASTType();
     auto argSubstTy = argTy.getArgumentType(SGF.SGM.M, fTy);
     
     // Adjust the class of covariant/contravariant arguments.
-    if (arg.getType().getASTType() != argSubstTy) {
-      if (arg.getType().getClassOrBoundGenericClass()
+    if (argOrigTy != argSubstTy) {
+      if (argOrigTy->getClassOrBoundGenericClass()
           && argSubstTy->getClassOrBoundGenericClass()) {
         if (argSubstTy->isExactSuperclassOf(arg.getType().getASTType())) {
           arg = SGF.B.createUpcast(loc, arg,
@@ -1606,8 +1607,28 @@ static void forwardFunctionArguments(SILGenFunction &SGF,
           arg = SGF.B.createUncheckedRefCast(loc, arg,
                                      SILType::getPrimitiveObjectType(argSubstTy));
         }
-      } else {
-        llvm_unreachable("unexpected type mismatch");
+      } else if (auto argOrigFn = dyn_cast<SILFunctionType>(argOrigTy)) {
+        if (auto argSubstFn = dyn_cast<SILFunctionType>(argSubstTy)) {
+          auto abiDiffA =
+            SGF.SGM.Types.checkFunctionForABIDifferences(SGF.SGM.M,
+                                                         argOrigFn,
+                                                         argSubstFn);
+          auto abiDiffB =
+            SGF.SGM.Types.checkFunctionForABIDifferences(SGF.SGM.M,
+                                                         argSubstFn,
+                                                         argOrigFn);
+          
+          if (abiDiffA == TypeConverter::ABIDifference::CompatibleRepresentation
+              || abiDiffA == TypeConverter::ABIDifference::CompatibleCallingConvention
+              || abiDiffB == TypeConverter::ABIDifference::CompatibleRepresentation
+              || abiDiffB == TypeConverter::ABIDifference::CompatibleCallingConvention) {
+            arg = SGF.B.createConvertFunction(loc, arg,
+                                  SILType::getPrimitiveObjectType(argSubstTy));
+          }
+        }
+      }
+      if (arg.getType().getASTType() != argSubstTy) {
+        llvm_unreachable("unhandled argument type mismatch");
       }
     }
     if (argTy.isConsumed()) {

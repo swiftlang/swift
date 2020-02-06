@@ -4143,7 +4143,7 @@ case TypeKind::Id:
       for (Type type : fnTy->getSubstitutions().getReplacementTypes()) {
         auto transformed = type.transformRec(fn);
         assert((type->isEqual(transformed)
-                || (type->isTypeParameter() && transformed->isTypeParameter()))
+                || (type->hasTypeParameter() && transformed->hasTypeParameter()))
                && "Substituted SILFunctionType can't be transformed into a concrete type");
         newReplacements.push_back(transformed->getCanonicalType());
         if (!type->isEqual(transformed))
