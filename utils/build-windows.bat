@@ -45,9 +45,9 @@ mkdir %full_build_root%
 
 :: Use the shortest path we can for the build directory, to avoid Windows
 :: path problems as much as we can.
-subst S: /d
-subst S: %full_build_root% %exitOnError%
-set build_root=S:
+subst T: /d
+subst T: %full_build_root% %exitOnError%
+set build_root=T:
 set install_directory=%build_root%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr
 
 call :clone_repositories %exitOnError%
@@ -80,7 +80,10 @@ endlocal
 :: It supposes the %CD% is the source root.
 setlocal enableextensions enabledelayedexpansion
 
-git config --global core.autocrlf false
+git -C "%source_root%\swift" config --local core.autocrlf input
+git -C "%source_root%\swift" config --local core.symlink true
+git -C "%source_root%\swift" checkout HEAD
+
 git clone --depth 1 --single-branch https://github.com/apple/swift-cmark cmark %exitOnError%
 git clone --depth 1 --single-branch --branch swift/master https://github.com/apple/llvm-project llvm-project %exitOnError%
 mklink /D "%source_root%\clang" "%source_root%\llvm-project\clang"
@@ -104,7 +107,7 @@ set file_name=icu4c-%icu_version%-Win64-MSVC2017.zip
 curl -L -O "https://github.com/unicode-org/icu/releases/download/release-%icu_version_dashed%/%file_name%" %exitOnError%
 :: unzip warns about the paths in the zip using slashes, which raises the
 :: errorLevel to 1. We cannot use exitOnError, and have to ignore errors.
-unzip -o %file_name% -d "%source_root%\icu-%icu_version%"
+"%ProgramFiles%\Git\usr\bin\unzip.exe" -o %file_name% -d "%source_root%\icu-%icu_version%"
 exit /b 0
 
 goto :eof
@@ -118,7 +121,7 @@ setlocal enableextensions enabledelayedexpansion
 
 set file_name=sqlite-amalgamation-3270200.zip
 curl -L -O "https://www.sqlite.org/2019/%file_name%" %exitOnError%
-unzip -o %file_name% %exitOnError%
+"%ProgramFiles%\Git\usr\bin\unzip.exe" -o %file_name% %exitOnError%
 
 goto :eof
 endlocal
@@ -287,6 +290,7 @@ cmake "%source_root%\lldb"^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
+    -DLLDB_DISABLE_PYTHON=YES^
     -DLLDB_INCLUDE_TESTS:BOOL=NO %exitOnError%
 
 popd
