@@ -3083,6 +3083,14 @@ public:
     ExtInfo withClangFunctionType(const clang::Type *type) const {
       return ExtInfo(Bits, Uncommon(type));
     }
+    LLVM_NODISCARD
+    ExtInfo
+    withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
+      return ExtInfo(
+          (Bits & ~DifferentiabilityMask) |
+              ((unsigned)differentiability << DifferentiabilityMaskOffset),
+          Other);
+    }
 
     std::pair<unsigned, const void *> getFuncAttrKey() const {
       return std::make_pair(Bits, Other.ClangFunctionType);
@@ -3742,7 +3750,7 @@ public:
 
   /// Return a version of this parameter info with the type replaced.
   SILParameterInfo getWithInterfaceType(CanType type) const {
-    return SILParameterInfo(type, getConvention());
+    return SILParameterInfo(type, getConvention(), getDifferentiability());
   }
 
   /// Transform this SILParameterInfo by applying the user-provided
@@ -4430,6 +4438,22 @@ public:
   }
 
   const clang::FunctionType *getClangFunctionType() const;
+
+  /// Given that `this` is a `@differentiable` or `@differentiable(linear)`
+  /// function type, returns an `IndexSubset` corresponding to the
+  /// differentiability/linearity parameters (e.g. all parameters except the
+  //// `@noDerivative` ones).
+  IndexSubset *getDifferentiabilityParameterIndices();
+
+  /// Returns the `@differentiable` or `@differentiable(linear)` function type
+  /// for the given differentiability kind and parameter indices representing
+  /// differentiability/linearity parameters.
+  CanSILFunctionType getWithDifferentiability(DifferentiabilityKind kind,
+                                              IndexSubset *parameterIndices);
+
+  /// Returns the SIL function type stripping differentiability kind and
+  /// differentiability from all parameters.
+  CanSILFunctionType getWithoutDifferentiability();
 
   /// Returns the type of the derivative function for the given parameter
   /// indices, result index, derivative function kind, derivative function

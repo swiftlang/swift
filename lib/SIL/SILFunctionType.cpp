@@ -191,6 +191,56 @@ SILFunctionType::getWitnessMethodClass(SILModule &M) const {
   return nullptr;
 }
 
+IndexSubset *
+SILFunctionType::getDifferentiabilityParameterIndices() {
+  assert(isDifferentiable() && "Must be a differentiable function");
+  SmallVector<unsigned, 8> result;
+  for (auto valueAndIndex : enumerate(getParameters()))
+    if (valueAndIndex.value().getDifferentiability() !=
+            SILParameterDifferentiability::NotDifferentiable)
+      result.push_back(valueAndIndex.index());
+  return IndexSubset::get(getASTContext(), getNumParameters(), result);
+}
+
+CanSILFunctionType
+SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
+                                          IndexSubset *parameterIndices) {
+  assert(kind != DifferentiabilityKind::NonDifferentiable &&
+         "Differentiability kind must be normal or linear");
+  SmallVector<SILParameterInfo, 8> newParameters;
+  for (auto paramAndIndex : enumerate(getParameters())) {
+    auto &param = paramAndIndex.value();
+    unsigned index = paramAndIndex.index();
+    newParameters.push_back(param.getWithDifferentiability(
+        index < parameterIndices->getCapacity() &&
+                parameterIndices->contains(index)
+            ? SILParameterDifferentiability::DifferentiableOrNotApplicable
+            : SILParameterDifferentiability::NotDifferentiable));
+  }
+  auto newExtInfo = getExtInfo().withDifferentiabilityKind(kind);
+  return get(getSubstGenericSignature(), newExtInfo, getCoroutineKind(),
+             getCalleeConvention(), newParameters, getYields(), getResults(),
+             getOptionalErrorResult(), getSubstitutions(),
+             isGenericSignatureImplied(), getASTContext(),
+             getWitnessMethodConformanceOrInvalid());
+}
+
+CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
+  if (!isDifferentiable())
+    return CanSILFunctionType(this);
+  auto nondiffExtInfo = getExtInfo().withDifferentiabilityKind(
+      DifferentiabilityKind::NonDifferentiable);
+  SmallVector<SILParameterInfo, 8> newParams;
+  for (auto &param : getParameters())
+    newParams.push_back(param.getWithDifferentiability(
+        SILParameterDifferentiability::DifferentiableOrNotApplicable));
+  return SILFunctionType::get(getSubstGenericSignature(), nondiffExtInfo,
+                              getCoroutineKind(), getCalleeConvention(),
+                              newParams, getYields(), getResults(),
+                              getOptionalErrorResult(), getSubstitutions(),
+                              isGenericSignatureImplied(), getASTContext());
+}
+
 CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     IndexSubset *parameterIndices, unsigned resultIndex,
     AutoDiffDerivativeFunctionKind kind, TypeConverter &TC,
