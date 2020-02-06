@@ -255,7 +255,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     } else {
       result = new (*V.Sink.Allocator)
           CodeCompletionResult(kind, context, numBytesToErase, string,
-                               CodeCompletionResult::Unrelated, opKind);
+                               CodeCompletionResult::NotApplicable, opKind);
     }
 
     V.Sink.Results.push_back(result);
