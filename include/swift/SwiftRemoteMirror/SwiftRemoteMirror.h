@@ -286,6 +286,9 @@ size_t swift_reflection_demangle(const char *MangledName, size_t Length,
 SWIFT_REMOTE_MIRROR_LINKAGE
 void swift_reflection_dumpConformances(SwiftReflectionContextRef ContextRef);
 
+SWIFT_REMOTE_MIRROR_LINKAGE
+void swift_reflection_dumpMetadataAllocations(SwiftReflectionContextRef ContextRef);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

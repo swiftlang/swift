@@ -25,6 +25,26 @@ namespace swift {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
 
+enum MetadataAllocatorTags : uint16_t {
+  UnusedTag = 0,
+  BoxesTag,
+  ObjCClassWrappersTag,
+  FunctionTypesTag,
+  MetatypeTypesTag,
+  ExistentialMetatypeValueWitnessTablesTag,
+  ExistentialMetatypesTag,
+  ExistentialTypesTag,
+  OpaqueExistentialValueWitnessTablesTag,
+  ClassExistentialValueWitnessTablesTag,
+  ForeignWitnessTablesTag,
+  ResilientMetadataAllocatorTag,
+  MetadataTag,
+  TupleCacheTag,
+  GenericMetadataCacheTag,
+  ForeignMetadataCacheTag,
+  GenericWitnessTableCacheTag,
+};
+
 /// The buffer used by a yield-once coroutine (such as the generalized
 /// accessors `read` and `modify`).
 struct YieldOnceBuffer {
