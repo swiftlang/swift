@@ -1644,16 +1644,33 @@ ModuleFile::ModuleFile(
         case input_block::IMPORTED_MODULE: {
           unsigned rawImportControl;
           bool scoped;
+          bool hasSPI;
           input_block::ImportedModuleLayout::readRecord(scratch,
                                                         rawImportControl,
-                                                        scoped);
+                                                        scoped, hasSPI);
           auto importKind = getActualImportControl(rawImportControl);
           if (!importKind) {
             // We don't know how to import this dependency.
             info.status = error(Status::Malformed);
             return;
           }
-          Dependencies.push_back({blobData, importKind.getValue(), scoped});
+
+          StringRef spiBlob;
+          if (hasSPI) {
+            scratch.clear();
+
+            llvm::BitstreamEntry entry =
+                fatalIfUnexpected(cursor.advance(AF_DontPopBlockAtEnd));
+            unsigned recordID =
+                fatalIfUnexpected(cursor.readRecord(entry.ID, scratch, &spiBlob));
+            assert(recordID == input_block::IMPORTED_MODULE_SPIS);
+            input_block::ImportedModuleLayoutSPI::readRecord(scratch);
+            (void) recordID;
+          } else {
+            spiBlob = StringRef();
+          }
+
+          Dependencies.push_back({blobData, spiBlob, importKind.getValue(), scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {
@@ -1990,6 +2007,14 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       Located<Identifier> accessPathElem = { scopeID, SourceLoc() };
       dependency.Import = {ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)),
                            module};
+    }
+
+    // SPI
+    StringRef spisStr = dependency.RawSPIs;
+    while (!spisStr.empty()) {
+      StringRef nextComponent;
+      std::tie(nextComponent, spisStr) = spisStr.split('\0');
+      dependency.spis.push_back(ctx.getIdentifier(nextComponent));
     }
 
     if (!module->hasResolvedImports()) {
@@ -2533,7 +2558,13 @@ void ModuleFile::lookupObjCMethods(
 
 void ModuleFile::lookupImportedSPIs(const ModuleDecl *importedModule,
                                     SmallVectorImpl<Identifier> &spis) const {
-  // TODO
+  for (auto &dep : Dependencies) {
+    auto depSpis = dep.spis;
+    if (dep.Import.second == importedModule &&
+        !depSpis.empty()) {
+      spis.append(depSpis.begin(), depSpis.end());
+    }
+  }
 }
 
 void
