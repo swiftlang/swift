@@ -578,9 +578,10 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                                                   MetatypeRepresentation::ObjC);
 
     auto paramConvention = ParameterConvention::Direct_Unowned;
-    auto params = {SILParameterInfo(anyObjectMetaTy, paramConvention)};
-    ArrayRef<SILResultInfo> resultInfos =
-        {SILResultInfo(OptNSStringTy, ResultConvention::Autoreleased)};
+    SmallVector<SILParameterInfo, 1> params(
+      {SILParameterInfo(anyObjectMetaTy, paramConvention)});
+    SmallVector<SILResultInfo, 1> resultInfos(
+      {SILResultInfo(OptNSStringTy, ResultConvention::Autoreleased)});
     auto incompleteExtInfo = SILFunctionType::ExtInfo();
     auto repr = SILFunctionType::Representation::CFunctionPointer;
     auto *clangFnType = ctx.getCanonicalClangFunctionType(params,

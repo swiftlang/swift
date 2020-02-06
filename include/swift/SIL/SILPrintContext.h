@@ -66,6 +66,9 @@ protected:
   /// Print debug locations and scopes.
   bool DebugInfo;
 
+  /// See \ref FrontendOptions.PrintFullConvention.
+  bool PrintFullConvention;
+
 public:
   /// Constructor with default values for options.
   ///
@@ -99,6 +102,9 @@ public:
 
   /// Returns true if debug locations and scopes should be printed.
   bool printDebugInfo() const { return DebugInfo; }
+
+  /// Returns true if the entire @convention(c, cType: ..) should be printed.
+  bool printFullConvention() const { return PrintFullConvention; }
 
   SILPrintContext::ID getID(const SILBasicBlock *Block);
 
