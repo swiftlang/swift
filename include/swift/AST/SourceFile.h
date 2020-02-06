@@ -287,6 +287,9 @@ public:
   lookupImportedSPIs(const ModuleDecl *importedModule,
                      SmallVectorImpl<Identifier> &spis) const override;
 
+  // Is \p targetDecl accessible as an explictly imported SPI from this file?
+  bool isImportedAsSPI(const ValueDecl *targetDecl) const;
+
   bool shouldCrossImport() const;
 
   /// Register a separately-imported overlay as shadowing the module that

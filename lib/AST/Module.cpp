@@ -1793,6 +1793,23 @@ void SourceFile::lookupImportedSPIs(const ModuleDecl *importedModule,
   }
 }
 
+bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
+  if (!targetDecl->getAttrs().hasAttribute<SPIAccessControlAttr>())
+    return false;
+
+  auto targetModule = targetDecl->getModuleContext();
+  SmallVector<Identifier, 4> importedSpis;
+  lookupImportedSPIs(targetModule, importedSpis);
+
+  for (auto attr : targetDecl->getAttrs().getAttributes<SPIAccessControlAttr>())
+    for (auto declSPI : attr->getSPINames())
+      for (auto importedSPI : importedSpis)
+        if (importedSPI == declSPI)
+          return true;
+
+  return false;
+}
+
 bool SourceFile::shouldCrossImport() const {
   return Kind != SourceFileKind::SIL && Kind != SourceFileKind::Interface &&
          getASTContext().LangOpts.EnableCrossImportOverlays;
