@@ -224,6 +224,17 @@ typedef struct Dummy {
 
 Dummy * (*getFunctionPointer3(void))(Dummy *);
 
+// These two function types should be serializable despite the struct
+// declarations being incomplete and therefore (currently) unimportable.
+typedef struct ForwardInTypedefForFP *OpaqueTypedefForFP;
+typedef OpaqueTypedefForFP (*FunctionPointerReturningOpaqueTypedef)(void);
+
+typedef struct ForwardInTypedefForFP2 *OpaqueTypedefForFP2;
+typedef OpaqueTypedefForFP2 (*FunctionPointerReturningOpaqueTypedef2)(void);
+
+// This will probably never be serializable.
+typedef struct { int x; int y; } *(*UnserializableFunctionPointer)(void);
+
 //===---
 // Unions
 //===---
