@@ -143,6 +143,13 @@ def disable_fine_grained_dependencies :
 Flag<["-"], "disable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Don't be more selective about incremental recompilation">;
 
+def enable_type_fingerprints :
+Flag<["-"], "enable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Enable per-nominal and extension body fingerprints">;
+
+def disable_type_fingerprints :
+Flag<["-"], "disable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Disable per-nominal and extension body fingerprints">;
 
 def enable_only_one_dependency_file :
 Flag<["-"], "enable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
@@ -184,7 +191,7 @@ HelpText<"Emit dot files every time driver imports an fine-grained swiftdeps fil
 
 def fine_grained_dependency_include_intrafile :
 Flag<["-"], "fine-grained-dependency-include-intrafile">,
-InternalDebugOpt,
+Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Include within-file dependencies.">;
 
 def emit_fine_grained_dependency_sourcefile_dot_files :

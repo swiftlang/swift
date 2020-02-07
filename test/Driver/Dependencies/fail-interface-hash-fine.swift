@@ -24,7 +24,15 @@
 // CHECK-SECOND: Handled bad.swift
 // CHECK-SECOND-NOT: Handled depends
 
-// CHECK-RECORD-DAG: "./bad.swift": !dirty [
+// CHECK-RECORD-DAG: "./bad.swift": !private [
 // CHECK-RECORD-DAG: "./main.swift": [
-// CHECK-RECORD-DAG: "./depends-on-main.swift": !dirty [
+// CHECK-RECORD-DAG: "./depends-on-main.swift": !private [
 // CHECK-RECORD-DAG: "./depends-on-bad.swift": [
+
+// RUN: cd %t &&  %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental ./main.swift ./bad.swift ./depends-on-main.swift ./depends-on-bad.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-THIRD %s
+
+// CHECK-THIRD-DAG: Handled bad
+// CHECK-THIRD-DAG: Handled depends-on-bad
+// CHECK-THIRD-DAG: Handled depends-on-main
+// CHECK-THIRD-DAG: Handled main
+

@@ -28,16 +28,6 @@ function(add_dependencies_multiple_targets)
   endif()
 endfunction()
 
-# Compute the library subdirectory to use for the given sdk and
-# architecture, placing the result in 'result_var_name'.
-function(compute_library_subdir result_var_name sdk arch)
-  if(sdk IN_LIST SWIFT_APPLE_PLATFORMS OR sdk STREQUAL "MACCATALYST")
-    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}" PARENT_SCOPE)
-  else()
-    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
-  endif()
-endfunction()
-
 function(_compute_lto_flag option out_var)
   string(TOLOWER "${option}" lowercase_option)
   if (lowercase_option STREQUAL "full")
@@ -163,9 +153,12 @@ function(_add_variant_c_compile_link_flags)
   endif()
 
   if(IS_DARWIN)
+    # We collate -F with the framework path to avoid unwanted deduplication
+    # of options by target_compile_options -- this way no undesired
+    # side effects are introduced should a new search path be added.
     list(APPEND result
       "-arch" "${CFLAGS_ARCH}"
-      "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks")
+      "-F${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks")
 
     set(add_explicit_version TRUE)
 
@@ -351,7 +344,7 @@ function(_add_variant_c_compile_flags)
     swift_android_libcxx_include_paths(CFLAGS_CXX_INCLUDES)
     swift_android_include_for_arch("${CFLAGS_ARCH}" "${CFLAGS_ARCH}_INCLUDE")
     foreach(path IN LISTS CFLAGS_CXX_INCLUDES ${CFLAGS_ARCH}_INCLUDE)
-      list(APPEND result -isystem;${path})
+      list(APPEND result "SHELL:${CMAKE_INCLUDE_SYSTEM_FLAG_C}${path}")
     endforeach()
     list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
   endif()
@@ -405,8 +398,11 @@ function(_add_variant_swift_compile_flags
   endif()
 
   if(IS_DARWIN)
+    # We collate -F with the framework path to avoid unwanted deduplication
+    # of options by target_compile_options -- this way no undesired
+    # side effects are introduced should a new search path be added.
     list(APPEND result
-      "-F" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/../../../Developer/Library/Frameworks")
+      "-F${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/../../../Developer/Library/Frameworks")
   endif()
 
   is_build_type_optimized("${build_type}" optimized)
@@ -1500,7 +1496,7 @@ function(_add_swift_library_single target name)
   endif()
 
   if(target_static)
-    target_link_options(${target_static} PRIVATE
+    target_compile_options(${target_static} PRIVATE
       ${c_compile_flags})
     # FIXME: The fallback paths here are going to be dynamic libraries.
 
@@ -2175,7 +2171,10 @@ function(add_swift_target_library name)
 
         list(APPEND swiftlib_swift_compile_flags_all "-Fsystem" "${ios_support_frameworks_path}")
         list(APPEND swiftlib_c_compile_flags_all "-iframework" "${ios_support_frameworks_path}")
-        list(APPEND swiftlib_link_flags_all "-F" "${ios_support_frameworks_path}")
+        # We collate -F with the framework path to avoid unwanted deduplication
+        # of options by target_compile_options -- this way no undesired
+        # side effects are introduced should a new search path be added.
+        list(APPEND swiftlib_link_flags_all "-F${ios_support_frameworks_path}")
       endif()
 
       if(sdk IN_LIST SWIFT_APPLE_PLATFORMS AND SWIFTLIB_IS_SDK_OVERLAY)

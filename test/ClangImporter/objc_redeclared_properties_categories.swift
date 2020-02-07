@@ -1,11 +1,11 @@
 // RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -F %S/Inputs/frameworks %s 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-PUBLIC %s
 
 // RUN: echo '#import <CategoryOverrides/Private.h>' > %t.h
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.h %s 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s --allow-empty
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.h %s 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s --allow-empty
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-pch -F %S/Inputs/frameworks -o %t.pch %t.h
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.pch %s 2>&1 | %FileCheck --allow-empty -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.h -pch-output-dir %t/pch %s 2>&1 | %FileCheck --allow-empty -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.pch %s 2>&1 | %FileCheck --allow-empty -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.h -pch-output-dir %t/pch %s 2>&1 | %FileCheck --allow-empty -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s
 
 import CategoryOverrides
 
@@ -53,4 +53,28 @@ func takesABaseClass(_ x: MyBaseClass) {
   // CHECK-PUBLIC: has no member 'derivedMember'
   // CHECK-PRIVATE-NOT: has no member 'derivedMember'
   x.derivedMember = Base()
+}
+
+// A category declared in a (private) header can introduce overrides of a
+// property that has mismatched Swift naming conventions. If we see a
+// non-__attribute__((swift_private)) decl, sometimes it comes in too.
+
+extension Refinery {
+  public enum RefinedSugar {
+    case caster
+    case grantulated
+    case confectioners
+    case cane
+    case demerara
+    case turbinado
+  }
+
+  public var sugar: Refinery.RefinedSugar {
+    return .caster // RefinedSugar(self.__sugar)
+  }
+}
+
+func takesARefinery(_ x: Refinery) {
+  // CHECK: cannot assign to property: 'sugar' is a get-only property
+  x.sugar = .caster
 }

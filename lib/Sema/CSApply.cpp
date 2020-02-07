@@ -7630,6 +7630,11 @@ ArrayRef<Solution> SolutionResult::getAmbiguousSolutions() const {
   return makeArrayRef(solutions, numSolutions);
 }
 
+MutableArrayRef<Solution> SolutionResult::takeAmbiguousSolutions() && {
+  assert(getKind() == Ambiguous);
+  return MutableArrayRef<Solution>(solutions, numSolutions);
+}
+
 llvm::PointerUnion<Expr *, Stmt *> SolutionApplicationTarget::walk(
     ASTWalker &walker) {
   switch (kind) {

@@ -444,10 +444,8 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
       auto *gp = cast<GenericTypeParamType>(type);
       if (gp->getDepth() < superclassDepth)
         return Type(gp).subst(subMap);
-      return CanGenericTypeParamType::get(
-        gp->getDepth() - superclassDepth + depth,
-          gp->getIndex(),
-          ctx);
+      return genericParams->getParams()[gp->getIndex()]
+                 ->getDeclaredInterfaceType();
     };
 
     auto lookupConformanceFn =

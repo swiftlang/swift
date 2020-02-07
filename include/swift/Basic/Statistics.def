@@ -266,6 +266,10 @@ FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 #include "swift/IDE/IDERequestIDZone.def"
 #undef SWIFT_REQUEST
 
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(SILGen, NAME)
+#include "swift/AST/SILGenTypeIDZone.def"
+#undef SWIFT_REQUEST
+
 /// The next 10 statistics count 5 kinds of SIL entities present
 /// after the SILGen and SILOpt phases. The entities are functions,
 /// vtables, witness tables, default witness tables and global

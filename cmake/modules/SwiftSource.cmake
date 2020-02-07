@@ -1,6 +1,16 @@
 include(macCatalystUtils)
 include(SwiftUtils)
 
+# Compute the library subdirectory to use for the given sdk and
+# architecture, placing the result in 'result_var_name'.
+function(compute_library_subdir result_var_name sdk arch)
+  if(sdk IN_LIST SWIFT_APPLE_PLATFORMS OR sdk STREQUAL "MACCATALYST")
+    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}" PARENT_SCOPE)
+  else()
+    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
+  endif()
+endfunction()
+
 # Process the sources within the given variable, pulling out any Swift
 # sources to be compiled with 'swift' directly. This updates
 # ${sourcesvar} in place with the resulting list and ${externalvar} with the

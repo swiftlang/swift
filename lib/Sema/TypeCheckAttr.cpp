@@ -3998,7 +3998,7 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
   }
 
   // Resolve the derivative generic signature.
-  GenericSignature derivativeGenSig;
+  GenericSignature derivativeGenSig = nullptr;
   if (resolveDifferentiableAttrDerivativeGenericSignature(attr, original,
                                                           derivativeGenSig))
     return nullptr;

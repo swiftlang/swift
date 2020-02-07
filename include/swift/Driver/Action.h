@@ -173,17 +173,20 @@ public:
   /// if 0 or >1 such inputs exist, return nullptr.
   const InputAction *findSingleSwiftInput() const {
     auto Inputs = getInputs();
-    auto isSwiftInput = [](const Action *A) -> const InputAction* {
-      if (auto const *S = dyn_cast<InputAction>(A))
-        return S->getType() == file_types::TY_Swift ? S : nullptr;
-      return nullptr;
-    };
-    const auto loc1 = std::find_if(Inputs.begin(), Inputs.end(), isSwiftInput);
-    if (loc1 == Inputs.end())
-      return nullptr; // none found
-    // Ensure uniqueness
-    const auto loc2 = std::find_if(loc1 + 1, Inputs.end(), isSwiftInput);
-    return loc2 == Inputs.end() ? dyn_cast<InputAction>(*loc1) : nullptr;
+    const InputAction *IA = nullptr;
+    for (auto const *I : Inputs) {
+      if (auto const *S = dyn_cast<InputAction>(I)) {
+        if (S->getType() == file_types::TY_Swift) {
+          if (IA == nullptr) {
+            IA = S;
+          } else {
+            // Already found one, two is too many.
+            return nullptr;
+          }
+        }
+      }
+    }
+    return IA;
   }
 };
 

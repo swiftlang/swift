@@ -655,12 +655,23 @@ private:
   static std::vector<ContextNameFingerprint>
   namesForProvidersOfAGivenType(std::vector<ContentsT> &contentsVec) {
     std::vector<ContextNameFingerprint> result;
-    for (const auto &declOrPair : contentsVec)
-      result.push_back(ContextNameFingerprint(
+    for (const auto declOrPair : contentsVec)
+      result.push_back(
+        std::make_tuple(
           DependencyKey::computeContextForProvidedEntity<kind>(declOrPair),
           DependencyKey::computeNameForProvidedEntity<kind>(declOrPair),
-          Optional<std::string>()));
+          getFingerprintIfAny(declOrPair)));
     return result;
+  }
+
+  static Optional<std::string>
+  getFingerprintIfAny(std::pair<const NominalTypeDecl *, const ValueDecl *>) {
+    return None;
+  }
+  static Optional<std::string> getFingerprintIfAny(const Decl *d) {
+    if (const auto *idc = dyn_cast<IterableDeclContext>(d))
+      return idc->getBodyFingerprint();
+    return None;
   }
 
   template <NodeKind kind>
@@ -669,12 +680,10 @@ private:
     for (const auto &contextNameFingerprint : contextNameFingerprints) {
       auto p = g.findExistingNodePairOrCreateAndAddIfNew(
           kind, contextNameFingerprint);
-      // When we don't have a fingerprint yet, must rebuild every provider when
-      // interfaceHash changes. So when interface (i.e. interface hash) of
-      // sourceFile changes, every provides is dirty. And since we don't know
-      // what happened, dirtyness might affect the interface.
-      if (!p.getInterface()->getFingerprint().hasValue())
-        g.addArc(g.getSourceFileNodePair().getInterface(), p.getInterface());
+      // Since the current type fingerprints only include tokens in the body,
+      // when the interface hash changes, it is possible that the type in the
+      // file has changed.
+      g.addArc(g.getSourceFileNodePair().getInterface(), p.getInterface());
     }
   }
 
@@ -798,8 +807,15 @@ bool swift::fine_grained_dependencies::emitReferenceDependencies(
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
   llvm::sys::fs::rename(outputPath, outputPath + "~");
+  // Since, when fingerprints are enabled,
+  // the parser diverts token hashing into per-body fingerprints
+  // before it can know if a difference is in a private type,
+  // in order to be able to test the changed  fingerprints
+  // we force the inclusion of private declarations when fingerprints
+  // are enabled.
   const bool includeIntrafileDeps =
-      SF->getASTContext().LangOpts.FineGrainedDependenciesIncludeIntrafileOnes;
+    SF->getASTContext().LangOpts.FineGrainedDependenciesIncludeIntrafileOnes ||
+    SF->getASTContext().LangOpts.EnableTypeFingerprints;
   const bool hadCompilationError = SF->getASTContext().hadError();
   auto gc = SourceFileDepGraphConstructor::forSourceFile(
       SF, depTracker, outputPath, includeIntrafileDeps, hadCompilationError);
@@ -832,12 +848,29 @@ bool swift::fine_grained_dependencies::emitReferenceDependencies(
 static StringRef stripPrefix(const StringRef name) {
   return name.ltrim(SourceFileDepGraph::noncascadingOrPrivatePrefix);
 }
+static StringRef stripFingerprint(const StringRef nameAndFingerprint) {
+  return nameAndFingerprint.split(SourceFileDepGraph::nameFingerprintSeparator)
+           .first;
+}
+static StringRef stripName(const StringRef nameAndFingerprint) {
+  return nameAndFingerprint.split(SourceFileDepGraph::nameFingerprintSeparator)
+           .second;
+}
+static std::string extractName(const StringRef prefixNameFingerprint) {
+  return stripFingerprint(stripPrefix(prefixNameFingerprint)).str();
+}
+static Optional<std::string> extractFingerprint(
+         const StringRef prefixNameFingerprint) {
+  const auto fp = stripName(stripPrefix(prefixNameFingerprint));
+  return fp.empty() ? None : Optional<std::string>(fp.str());
+}
 
 static std::vector<ContextNameFingerprint>
 getBaseNameProvides(ArrayRef<std::string> simpleNames) {
   std::vector<ContextNameFingerprint> result;
   for (StringRef n : simpleNames)
-    result.push_back(ContextNameFingerprint("", stripPrefix(n).str(), None));
+    result.push_back(ContextNameFingerprint("", extractName(n),
+                     extractFingerprint(n)));
   return result;
 }
 
@@ -845,7 +878,8 @@ static std::vector<ContextNameFingerprint>
 getMangledHolderProvides(ArrayRef<std::string> simpleNames) {
   std::vector<ContextNameFingerprint> result;
   for (StringRef n : simpleNames)
-    result.push_back(ContextNameFingerprint(stripPrefix(n).str(), "", None));
+    result.push_back(ContextNameFingerprint(extractName(n), "",
+                     extractFingerprint(n)));
   return result;
 }
 
@@ -853,12 +887,15 @@ static std::vector<ContextNameFingerprint> getCompoundProvides(
     ArrayRef<std::pair<std::string, std::string>> compoundNames) {
   std::vector<ContextNameFingerprint> result;
   for (const auto &p : compoundNames)
-    result.push_back(ContextNameFingerprint(stripPrefix(p.first),
-                                            stripPrefix(p.second), None));
+    result.push_back(ContextNameFingerprint(extractName(p.first),
+                                            extractName(p.second),
+                                            extractFingerprint(p.second)));
   return result;
 }
 
-static bool cascades(const std::string &s) { return s.empty() || s[0] != SourceFileDepGraph::noncascadingOrPrivatePrefix; }
+static bool cascades(const std::string &s) {
+  return s.empty() || s[0] != SourceFileDepGraph::noncascadingOrPrivatePrefix;
+}
 
 // Use '_' as a prefix for a file-private member
 static bool isPrivate(const std::string &s) {
@@ -888,7 +925,8 @@ getCompoundDepends(
     // (On Linux, the compiler needs more verbosity than:
     //  result.push_back({{n, "", false}, cascades(n)});
     result.push_back(
-        std::make_pair(std::make_tuple(stripPrefix(n), std::string(), false), cascades(n)));
+        std::make_pair(std::make_tuple(stripPrefix(n), std::string(), false),
+                       cascades(n)));
   }
   for (auto &p : compoundNames) {
     // Likewise, for Linux expand the following out:
@@ -916,7 +954,8 @@ SourceFileDepGraph SourceFileDepGraph::simulateLoad(
   SourceFileDepGraphConstructor c(
     swiftDepsFilename, includePrivateDeps, hadCompilationError, interfaceHash,
     getSimpleDepends(simpleNamesByRDK[dependsTopLevel]),
-    getCompoundDepends(simpleNamesByRDK[dependsNominal], compoundNamesByRDK[dependsMember]),
+    getCompoundDepends(simpleNamesByRDK[dependsNominal],
+                       compoundNamesByRDK[dependsMember]),
     getSimpleDepends(simpleNamesByRDK[dependsDynamicLookup]),
     getExternalDepends(simpleNamesByRDK[dependsExternal]),
     {}, // precedence groups
