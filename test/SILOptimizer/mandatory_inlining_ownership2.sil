@@ -663,7 +663,6 @@ bb0(%0 : $Bool, %1 : $Bool):
 // CHECK:   br [[BB3]](
 //
 // CHECK: [[BB3]](
-// CHECK:   destroy_value [[BOX2_COPY]]
 // CHECK:   destroy_value [[BOX2]]
 // CHECK:   destroy_value [[BOX1]]
 // CHECK:   return {{.*}}
