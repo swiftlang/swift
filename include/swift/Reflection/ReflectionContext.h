@@ -710,6 +710,55 @@ public:
     }
   }
 
+  bool projectEnum(RemoteAddress EnumAddress,
+                   const TypeRef *EnumTR,
+                   unsigned *CaseIndex,
+                   RemoteAddress *OutPayloadAddr) {
+    if (EnumTR == nullptr)
+      return false;
+
+    auto EnumTI = getTypeInfo(EnumTR);
+    if (EnumTI == nullptr)
+      return false;
+
+    auto EnumRecordTI = dyn_cast<const RecordTypeInfo>(EnumTI);
+    if (EnumRecordTI == nullptr)
+      return false;
+
+    switch (EnumRecordTI->getRecordKind()) {
+    case RecordKind::NoPayloadEnum:
+      *OutPayloadAddr = RemoteAddress(nullptr);
+      switch (EnumRecordTI->getSize()) {
+      case 0: {
+        *CaseIndex = 0;
+        return true;
+      }
+      case 1: {
+        uint8_t n;
+        if (!getReader().readInteger(EnumAddress, &n))
+          return false;
+        *CaseIndex = n;
+        return true;
+      }
+      case 2: {
+        uint16_t n;
+        if (!getReader().readInteger(EnumAddress, &n))
+          return false;
+        *CaseIndex = n;
+        return true;
+      }
+      default:
+        // We don't try to handle enums with more than 65536 cases.
+        return false;
+      }
+    default:
+      // Unknown record kind.
+      return false;
+    }
+
+    return false;
+  }
+
   /// Return a description of the layout of a value with the given type.
   const TypeInfo *getTypeInfo(const TypeRef *TR) {
     return getBuilder().getTypeConverter().getTypeInfo(TR);
