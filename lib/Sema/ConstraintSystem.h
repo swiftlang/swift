@@ -789,10 +789,9 @@ using OpenedTypeMap =
 
 /// Describes contextual type information about a particular expression
 /// within a constraint system.
-struct ContextualTypeInfo  {
+struct ContextualTypeInfo {
   TypeLoc typeLoc;
   ContextualTypePurpose purpose;
-  bool isOpaqueReturnType = false;
 
   Type getType() const { return typeLoc.getType(); }
 };
@@ -1146,29 +1145,156 @@ class SolutionApplicationTarget {
   } kind;
 
   union {
-    Expr *expression;
-    AnyFunctionRef function;
+    struct {
+      /// The expression being type-checked.
+      Expr *expression;
+
+      /// The declaration context in which the expression is being
+      /// type-checked.
+      DeclContext *dc;
+
+      /// The purpose of the contextual type.
+      ContextualTypePurpose contextualPurpose;
+
+      /// The type to which the expression should be converted.
+      TypeLoc convertType;
+
+      /// When initializing a pattern from the expression, this is the
+      /// pattern.
+      Pattern *pattern = nullptr;
+
+      /// Whether the expression result will be discarded at the end.
+      bool isDiscarded;
+    } expression;
+
+    struct {
+      AnyFunctionRef function;
+      BraceStmt *body;
+    } function;
   };
 
 public:
-  SolutionApplicationTarget(Expr *expr) {
-    kind = Kind::expression;
-    expression = expr;
+  SolutionApplicationTarget(Expr *expr, DeclContext *dc,
+                            ContextualTypePurpose contextualPurpose,
+                            Type convertType, bool isDiscarded)
+      : SolutionApplicationTarget(expr, dc, contextualPurpose,
+                                  TypeLoc::withoutLoc(convertType),
+                                  isDiscarded) { }
+
+  SolutionApplicationTarget(Expr *expr, DeclContext *dc,
+                            ContextualTypePurpose contextualPurpose,
+                            TypeLoc convertType, bool isDiscarded);
+
+  SolutionApplicationTarget(AnyFunctionRef fn)
+      : SolutionApplicationTarget(fn, fn.getBody()) { }
+
+  SolutionApplicationTarget(AnyFunctionRef fn, BraceStmt *body) {
+    kind = Kind::function;
+    function.function = fn;
+    function.body = body;
   }
 
-  SolutionApplicationTarget(AnyFunctionRef fn) {
-    kind = Kind::function;
-    function = fn;
-  }
+  /// Form a target for the initialization of a pattern from an expression.
+  static SolutionApplicationTarget forInitialization(
+      Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern);
 
   Expr *getAsExpr() const {
     switch (kind) {
     case Kind::expression:
-      return expression;
+      return expression.expression;
 
     case Kind::function:
       return nullptr;
     }
+  }
+
+  DeclContext *getDeclContext() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression.dc;
+
+    case Kind::function:
+      return function.function.getAsDeclContext();
+    }
+  }
+
+  ContextualTypePurpose getExprContextualTypePurpose() const {
+    assert(kind == Kind::expression);
+    return expression.contextualPurpose;
+  }
+
+  Type getExprContextualType() const {
+    return getExprContextualTypeLoc().getType();
+  }
+
+  TypeLoc getExprContextualTypeLoc() const {
+    assert(kind == Kind::expression);
+
+    // For an @autoclosure parameter, the conversion type is
+    // the result of the function type.
+    if (FunctionType *autoclosureParamType = getAsAutoclosureParamType()) {
+      return TypeLoc(expression.convertType.getTypeRepr(),
+                     autoclosureParamType->getResult());
+    }
+
+    return expression.convertType;
+  }
+
+  /// Retrieve the type to which an expression should be converted, or
+  /// a NULL type if no conversion constraint should be generated.
+  Type getExprConversionType() const {
+    if (contextualTypeIsOnlyAHint())
+      return Type();
+    return getExprContextualType();
+  }
+
+  /// Returns the autoclosure parameter type, or \c nullptr if the
+  /// expression has a different kind of context.
+  FunctionType *getAsAutoclosureParamType() const {
+    assert(kind == Kind::expression);
+    if (expression.contextualPurpose == CTP_AutoclosureDefaultParameter)
+      return expression.convertType.getType()->castTo<FunctionType>();
+    return nullptr;
+  }
+
+  void setExprConversionType(Type type) {
+    assert(kind == Kind::expression);
+    expression.convertType = TypeLoc::withoutLoc(type);
+  }
+
+  void setExprConversionTypeLoc(TypeLoc type) {
+    assert(kind == Kind::expression);
+    expression.convertType = type;
+  }
+
+  /// For a pattern initialization target, retrieve the pattern.
+  Pattern *getInitializationPattern() const {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_Initialization);
+    return expression.pattern;
+  }
+
+  /// Whether this is an initialization for an Optional.Some pattern.
+  bool isOptionalSomePatternInit() const {
+    return kind == Kind::expression &&
+        expression.contextualPurpose == CTP_Initialization &&
+        isa<OptionalSomePattern>(expression.pattern);
+  }
+
+  /// Whether this context infers an opaque return type.
+  bool infersOpaqueReturnType() const;
+
+  /// Whether the contextual type is only a hint, rather than a type
+  bool contextualTypeIsOnlyAHint() const;
+
+  bool isDiscardedExpr() const {
+    assert(kind == Kind::expression);
+    return expression.isDiscarded;
+  }
+
+  void setExpr(Expr *expr) {
+    assert(kind == Kind::expression);
+    expression.expression = expr;
   }
 
   Optional<AnyFunctionRef> getAsFunction() const {
@@ -1177,12 +1303,44 @@ public:
       return None;
 
     case Kind::function:
-      return function;
+      return function.function;
+    }
+  }
+
+  BraceStmt *getFunctionBody() const {
+    assert(kind == Kind::function);
+    return function.body;
+  }
+
+  void setFunctionBody(BraceStmt *stmt) {
+    assert(kind == Kind::function);
+    function.body = stmt;
+  }
+
+  /// Retrieve the source range of the target.
+  SourceRange getSourceRange() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression.expression->getSourceRange();
+
+    case Kind::function:
+      return function.body->getSourceRange();
+    }
+  }
+
+  /// Retrieve the source location for the target.
+  SourceLoc getLoc() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression.expression->getLoc();
+
+    case Kind::function:
+      return function.function.getLoc();
     }
   }
 
   /// Walk the contents of the application target.
-  llvm::PointerUnion<Expr *, Stmt *> walk(ASTWalker &walker);
+  SolutionApplicationTarget walk(ASTWalker &walker);
 };
 
 enum class ConstraintSystemPhase {
@@ -2177,12 +2335,11 @@ public:
   }
 
   void setContextualType(
-      const Expr *expr, TypeLoc T, ContextualTypePurpose purpose,
-       bool isOpaqueReturnType) {
+      const Expr *expr, TypeLoc T, ContextualTypePurpose purpose) {
     assert(expr != nullptr && "Expected non-null expression!");
     assert(contextualTypes.count(expr) == 0 &&
            "Already set this contextual type");
-    contextualTypes[expr] = { T, purpose, isOpaqueReturnType };
+    contextualTypes[expr] = { T, purpose };
   }
 
   Optional<ContextualTypeInfo> getContextualTypeInfo(const Expr *expr) const {
@@ -2414,7 +2571,8 @@ public:
 
   /// Add the appropriate constraint for a contextual conversion.
   void addContextualConversionConstraint(
-      Expr *expr, ContextualTypeInfo contextualType);
+      Expr *expr, Type conversionType, ContextualTypePurpose purpose,
+      bool isOpaqueReturnType);
 
   /// Add a "join" constraint between a set of types, producing the common
   /// supertype.
@@ -3616,7 +3774,10 @@ public:
   void simplifyDisjunctionChoice(Constraint *choice);
 
   /// Apply the given function builder to the closure expression.
-  TypeMatchResult matchFunctionBuilder(
+  ///
+  /// \returns \c None when the function builder cannot be applied at all,
+  /// otherwise the result of applying the function builder.
+  Optional<TypeMatchResult> matchFunctionBuilder(
       AnyFunctionRef fn, Type builderType, Type bodyResultType,
       ConstraintKind bodyResultConstraintKind,
       ConstraintLocator *calleeLocator, ConstraintLocatorBuilder locator);
@@ -4036,13 +4197,11 @@ private:
 
   /// Solve the system of constraints generated from provided expression.
   ///
-  /// \param expr The expression to generate constraints from.
-  /// \param convertType The expected type of the expression.
+  /// \param target The target to generate constraints from.
   /// \param listener The callback to check solving progress.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
-  SolutionResult solveImpl(Expr *&expr,
-                           Type convertType,
+  SolutionResult solveImpl(SolutionApplicationTarget &target,
                            ExprTypeCheckListener *listener,
                            FreeTypeVariableBinding allowFreeTypeVariables
                              = FreeTypeVariableBinding::Disallow);
@@ -4053,26 +4212,21 @@ public:
   static bool preCheckExpression(Expr *&expr, DeclContext *dc,
                                  ConstraintSystem *baseCS = nullptr);
         
-  /// Solve the system of constraints generated from provided expression.
+  /// Solve the system of constraints generated from provided target.
   ///
-  /// The expression should have already been pre-checked with
-  /// preCheckExpression().
-  ///
-  /// \param expr The expression to generate constraints from.
-  /// \param convertType The expected type of the expression.
+  /// \param target The target that we'll generate constraints from, which
+  /// may be updated by the solving process.
   /// \param listener The callback to check solving progress.
-  /// \param solutions The set of solutions to the system of constraints.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
-  /// \returns true is an error occurred, false is system is consistent
-  /// and solutions were found.
-  bool solve(Expr *&expr,
-             Type convertType,
-             ExprTypeCheckListener *listener,
-             SmallVectorImpl<Solution> &solutions,
-             FreeTypeVariableBinding allowFreeTypeVariables
-             = FreeTypeVariableBinding::Disallow);
+  /// \returns the set of solutions, if any were found, or \c None if an
+  /// error occurred. When \c None, an error has been emitted.
+  Optional<std::vector<Solution>> solve(
+      SolutionApplicationTarget &target,
+      ExprTypeCheckListener *listener,
+      FreeTypeVariableBinding allowFreeTypeVariables
+        = FreeTypeVariableBinding::Disallow);
 
   /// Solve the system of constraints.
   ///
@@ -4146,35 +4300,16 @@ public:
   findBestSolution(SmallVectorImpl<Solution> &solutions,
                    bool minimize);
 
-private:
-  llvm::PointerUnion<Expr *, Stmt *> applySolutionImpl(
-      Solution &solution, SolutionApplicationTarget target,
-      Type convertType, bool discardedExpr, bool performingDiagnostics);
-
 public:
-  /// Apply a given solution to the expression, producing a fully
-  /// type-checked expression.
+  /// Apply a given solution to the target, producing a fully
+  /// type-checked target or \c None if an error occurred.
   ///
-  /// \param convertType the contextual type to which the
-  /// expression should be converted, if any.
-  /// \param discardedExpr if true, the result of the expression
-  /// is contextually ignored.
+  /// \param target the target to which the solution will be applied.
   /// \param performingDiagnostics if true, don't descend into bodies of
   /// non-single expression closures, or build curry thunks.
-  Expr *applySolution(Solution &solution, Expr *expr,
-                      Type convertType,
-                      bool discardedExpr,
-                      bool performingDiagnostics) {
-    return applySolutionImpl(solution, expr, convertType, discardedExpr,
-                             performingDiagnostics).get<Expr *>();
-  }
-
-  /// Apply a given solution to the body of the given function.
-  BraceStmt *applySolutionToBody(Solution &solution, AnyFunctionRef fn) {
-    return cast_or_null<BraceStmt>(
-        applySolutionImpl(solution, fn, Type(), false, false)
-      .dyn_cast<Stmt *>());
-  }
+  Optional<SolutionApplicationTarget> applySolution(
+      Solution &solution, SolutionApplicationTarget target,
+      bool performingDiagnostics);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully

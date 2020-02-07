@@ -12,9 +12,7 @@
 
 #define DEBUG_TYPE "sil-differentiability-witness"
 
-// SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/ASTMangler.h"
-// SWIFT_ENABLE_TENSORFLOW_END
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILModule.h"
 
@@ -30,8 +28,8 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDeclaration(
       /*isDeclaration*/ true, /*isSerialized*/ false, attribute);
   // Register the differentiability witness in the module.
   Mangle::ASTMangler mangler;
-  auto mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(
-      diffWitness->getKey());
+  auto mangledKey =
+      mangler.mangleSILDifferentiabilityWitnessKey(diffWitness->getKey());
   assert(!module.DifferentiabilityWitnessMap.count(mangledKey) &&
          "Cannot create duplicate differentiability witness in a module");
   module.DifferentiabilityWitnessMap[mangledKey] = diffWitness;
@@ -51,10 +49,9 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDefinition(
       derivativeGenSig, jvp, vjp, /*isDeclaration*/ false, isSerialized,
       attribute);
   // Register the differentiability witness in the module.
-  // Register the differentiability witness in the module.
   Mangle::ASTMangler mangler;
-  auto mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(
-      diffWitness->getKey());
+  auto mangledKey =
+      mangler.mangleSILDifferentiabilityWitnessKey(diffWitness->getKey());
   assert(!module.DifferentiabilityWitnessMap.count(mangledKey) &&
          "Cannot create duplicate differentiability witness in a module");
   module.DifferentiabilityWitnessMap[mangledKey] = diffWitness;
@@ -78,6 +75,8 @@ SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {
   return std::make_pair(getOriginalFunction()->getName(), getConfig());
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 SILAutoDiffIndices SILDifferentiabilityWitness::getSILAutoDiffIndices() const {
   return getConfig().getSILAutoDiffIndices();
 }
+// SWIFT_ENABLE_TENSORFLOW END

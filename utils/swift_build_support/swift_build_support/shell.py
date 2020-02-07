@@ -23,12 +23,17 @@ import subprocess
 import sys
 from contextlib import contextmanager
 
-from . import diagnostics
-
 
 DEVNULL = getattr(subprocess, 'DEVNULL', subprocess.PIPE)
 
 dry_run = False
+
+
+def _fatal_error(message):
+    """Raises a SystemExit error with the given message.
+    """
+
+    raise SystemExit('ERROR: {}\n'.format(message))
 
 
 def _quote(arg):
@@ -84,11 +89,11 @@ def call(command, stderr=None, env=None, dry_run=None, echo=True):
     try:
         subprocess.check_call(command, env=_env, stderr=stderr)
     except subprocess.CalledProcessError as e:
-        diagnostics.fatal(
+        _fatal_error(
             "command terminated with a non-zero exit status " +
             str(e.returncode) + ", aborting")
     except OSError as e:
-        diagnostics.fatal(
+        _fatal_error(
             "could not execute '" + quote_command(command) +
             "': " + e.strerror)
 
@@ -135,13 +140,13 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
             return e.output
         if optional:
             return None
-        diagnostics.fatal(
+        _fatal_error(
             "command terminated with a non-zero exit status " +
             str(e.returncode) + ", aborting")
     except OSError as e:
         if optional:
             return None
-        diagnostics.fatal(
+        _fatal_error(
             "could not execute '" + quote_command(command) +
             "': " + e.strerror)
 

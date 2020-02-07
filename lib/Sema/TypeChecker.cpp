@@ -331,15 +331,13 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   TC.definedFunctions.clear();
 }
 
-void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
+void swift::performTypeChecking(SourceFile &SF) {
   return (void)evaluateOrDefault(SF.getASTContext().evaluator,
-                                 TypeCheckSourceFileRequest{&SF, StartElem},
-                                 false);
+                                 TypeCheckSourceFileRequest{&SF}, false);
 }
 
 llvm::Expected<bool>
-TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
-                                     SourceFile *SF, unsigned StartElem) const {
+TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   assert(SF && "Source file cannot be null!");
   assert(SF->ASTStage != SourceFile::TypeChecked &&
          "Should not be re-typechecking this file!");
@@ -360,7 +358,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
 
   // Make sure that name binding has been completed before doing any type
   // checking.
-  performNameBinding(*SF, StartElem);
+  performNameBinding(*SF);
                                   
   // Could build scope maps here because the AST is stable now.
 
@@ -377,7 +375,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
     if (!Ctx.LangOpts.DisableAvailabilityChecking) {
       // Build the type refinement hierarchy for the primary
       // file before type checking.
-      TypeChecker::buildTypeRefinementContextHierarchy(*SF, StartElem);
+      TypeChecker::buildTypeRefinementContextHierarchy(*SF);
     }
 
     // Resolve extensions. This has to occur first during type checking,
@@ -386,7 +384,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
     ::bindExtensions(*SF);
 
     // Type check the top-level elements of the source file.
-    for (auto D : SF->getTopLevelDecls().slice(StartElem)) {
+    for (auto D : SF->getTopLevelDecls()) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         // Immediately perform global name-binding etc.
         TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
@@ -399,7 +397,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
     // If we're in REPL mode, inject temporary result variables and other stuff
     // that the REPL needs to synthesize.
     if (SF->Kind == SourceFileKind::REPL && !Ctx.hadError())
-      TypeChecker::processREPLTopLevel(*SF, StartElem);
+      TypeChecker::processREPLTopLevel(*SF);
 
     typeCheckFunctionsAndExternalDecls(*SF, TC);
   }

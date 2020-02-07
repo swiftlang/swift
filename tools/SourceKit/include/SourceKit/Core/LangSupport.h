@@ -91,6 +91,7 @@ struct CodeCompletionInfo {
   StringRef DocBrief;
   StringRef AssocUSRs;
   UIdent SemanticContext;
+  UIdent TypeRelation;
   Optional<uint8_t> ModuleImportDepth;
   bool NotRecommended;
   unsigned NumBytesToErase;

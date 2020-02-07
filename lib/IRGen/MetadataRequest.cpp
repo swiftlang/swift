@@ -701,36 +701,40 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
   auto substitutions =
       type->getContextSubstitutionMap(IGM.getSwiftModule(), &nominal);
 
-  return llvm::all_of(environment->getGenericParams(), [&](auto parameter) {
-    auto conformances =
-        environment->getGenericSignature()->getConformsTo(parameter);
-    auto witnessTablesAreReferenceable =
-        llvm::all_of(conformances, [&](ProtocolDecl *conformance) {
-          return conformance->getModuleContext() == IGM.getSwiftModule() &&
-                 !conformance->isResilient(IGM.getSwiftModule(),
-                                           ResilienceExpansion::Minimal);
-        });
+  auto allWitnessTablesAreReferenceable = llvm::all_of(environment->getGenericParams(), [&](auto parameter) {
+    auto signature = environment->getGenericSignature();
+    auto protocols = signature->getConformsTo(parameter);
     auto argument = ((Type *)parameter)->subst(substitutions);
-    auto genericArgument = argument->getAnyGeneric();
-    // For now, to avoid statically specializing generic protocol witness
-    // tables, don't statically specialize metadata for types any of whose
-    // arguments are generic.
-    //
-    // TODO: This is more pessimistic than necessary.  Specialize even in
-    //       the face of generic arguments so long as those arguments
-    //       aren't required to conform to any protocols.
-    //
+    auto canonicalType = argument->getCanonicalType();
+    auto witnessTablesAreReferenceable = [&]() {
+      return llvm::all_of(protocols, [&](ProtocolDecl *protocol) {
+        auto conformance =
+            signature->lookupConformance(canonicalType, protocol);
+        if (!conformance.isConcrete()) {
+          return false;
+        }
+        auto rootConformance = conformance.getConcrete()->getRootConformance();
+        return !IGM.isDependentConformance(rootConformance) &&
+               !IGM.isResilientConformance(rootConformance);
+      });
+    };
     // TODO: Once witness tables are statically specialized, check whether the
     //       ConformanceInfo returns nullptr from tryGetConstantTable.
-    //       early return.
-    auto isGeneric = genericArgument && genericArgument->isGenericContext();
-    auto isNominal = argument->getNominalOrBoundGenericNominal();
-    auto isExistential = argument->isExistentialType();
-    return isNominal && !isGeneric && !isExistential &&
-           witnessTablesAreReferenceable &&
-           irgen::isTypeMetadataAccessTrivial(IGM,
-                                              argument->getCanonicalType());
-  }) && IGM.getTypeInfoForUnlowered(type).isFixedSize(ResilienceExpansion::Maximal);
+    auto isGenericWithoutPrespecializedConformance = [&]() {
+      auto genericArgument = argument->getAnyGeneric();
+      return genericArgument && genericArgument->isGenericContext() && 
+        (protocols.size() > 0);
+    };
+    auto isExistential = [&]() { return argument->isExistentialType(); };
+    auto metadataAccessIsTrivial = [&]() {
+      return irgen::isTypeMetadataAccessTrivial(IGM,
+                                                argument->getCanonicalType());
+    };
+    return !isGenericWithoutPrespecializedConformance() && !isExistential() && 
+           metadataAccessIsTrivial() && witnessTablesAreReferenceable();
+  });
+  return allWitnessTablesAreReferenceable
+  && IGM.getTypeInfoForUnlowered(type).isFixedSize(ResilienceExpansion::Maximal);
 }
 
 /// Is it basically trivial to access the given metadata?  If so, we don't
@@ -1773,28 +1777,33 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
     SmallVector<std::pair<llvm::BasicBlock *, llvm::Value *>, 4>
         specializationBlocks;
     auto switchDestination = llvm::BasicBlock::Create(IGM.getLLVMContext());
-    unsigned long index = 0;
+    unsigned long blockIndex = 0;
     for (auto specialization : specializations) {
-      auto conditionBlock = conditionBlocks[index];
+      auto conditionBlock = conditionBlocks[blockIndex];
       IGF.Builder.emitBlock(conditionBlock);
-      auto successorBlock = index < conditionBlocks.size() - 1
-                                ? conditionBlocks[index + 1]
+      auto successorBlock = blockIndex < conditionBlocks.size() - 1
+                                ? conditionBlocks[blockIndex + 1]
                                 : switchDestination;
       auto specializationBlock = llvm::BasicBlock::Create(IGM.getLLVMContext());
       auto substitutions = specialization->getContextSubstitutionMap(
           IGM.getSwiftModule(), nominal);
 
       llvm::Value *condition = llvm::ConstantInt::get(IGM.Int1Ty, 1);
-      auto generic = specialization->getAnyGeneric();
-      auto parameters = generic->getGenericEnvironment()->getGenericParams();
-      for (size_t index = 0; index < parameters.size(); ++index) {
-        auto parameter = parameters[index];
-        auto argument = ((Type *)parameter)->subst(substitutions);
+      auto nominal = specialization->getAnyNominal();
+      auto requirements = GenericTypeRequirements(IGF.IGM, nominal);
+      int requirementIndex = 0;
+      for (auto requirement : requirements.getRequirements()) {
+        if (requirement.Protocol) {
+          continue;
+        }
+        auto parameter = requirement.TypeParameter;
+        auto argument = parameter.subst(substitutions);
         llvm::Constant *addr =
             IGM.getAddrOfTypeMetadata(argument->getCanonicalType());
         auto addrInt = IGF.Builder.CreateBitCast(addr, IGM.Int8PtrTy);
         condition = IGF.Builder.CreateAnd(
-            condition, IGF.Builder.CreateICmpEQ(addrInt, valueAtIndex(index)));
+            condition, IGF.Builder.CreateICmpEQ(addrInt, valueAtIndex(requirementIndex)));
+        ++requirementIndex;
       }
       IGF.Builder.CreateCondBr(condition, specializationBlock, successorBlock);
 
@@ -1813,7 +1822,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
       response = IGF.Builder.CreateInsertValue(
           response, state, 1, "insert metadata state into response");
       specializationBlocks.push_back({specializationBlock, response});
-      ++index;
+      ++blockIndex;
     }
 
     for (auto pair : specializationBlocks) {

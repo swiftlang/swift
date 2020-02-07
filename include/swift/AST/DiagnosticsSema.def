@@ -1153,14 +1153,12 @@ NOTE(candidate_expected_different_labels,none,
      "incorrect labels for candidate (have: '%0', expected: '%1')",
      (StringRef, StringRef))
 
+ERROR(member_shadows_function,none,
+      "use of %0 refers to %1 rather than %2 %3",
+      (DeclNameRef, DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
 ERROR(member_shadows_global_function,none,
-      "use of %0 refers to %1 %2 rather than %3 %4 in %5 %6",
-      (DeclNameRef, DescriptiveDeclKind, DeclName, DescriptiveDeclKind,
-       DeclName, DescriptiveDeclKind, DeclName))
-ERROR(member_shadows_global_function_near_match,none,
-      "use of %0 nearly matches %3 %4 in %5 %6 rather than %1 %2",
-      (DeclNameRef, DescriptiveDeclKind, DeclName, DescriptiveDeclKind,
-       DeclName, DescriptiveDeclKind, DeclName))
+      "use of %0 refers to %1 rather than %2 %3 in module %4",
+      (DeclNameRef, DescriptiveDeclKind, DescriptiveDeclKind, DeclName, DeclName))
 
 ERROR(instance_member_use_on_type,none,
       "instance member %1 cannot be used on type %0; "
@@ -2674,6 +2672,10 @@ ERROR(assoc_conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
       "%4); %2 has been imported as implementation-only",
       (Type, DeclName, Identifier, Type, Type))
+ERROR(unexportable_clang_function_type,none,
+      "cannot export the underlying C type of the function type %0; "
+      "it may use anonymous types or types defined outside of a module",
+      (Type))
 
 WARNING(warn_implementation_only_conflict,none,
         "%0 inconsistently imported as implementation-only",
@@ -2707,6 +2709,8 @@ ERROR(broken_case_iterable_requirement,none,
       "CaseIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_raw_representable_requirement,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())
+ERROR(broken_comparable_requirement,none,
+      "Comparable protocol is broken: unexpected requirement", ())
 ERROR(broken_equatable_requirement,none,
       "Equatable protocol is broken: unexpected requirement", ())
 ERROR(broken_hashable_requirement,none,
@@ -2719,6 +2723,8 @@ ERROR(broken_int_hashable_conformance,none,
       "Int type is broken: does not conform to Hashable", ())
 ERROR(broken_int_integer_literal_convertible_conformance,none,
       "Int type is broken: does not conform to ExpressibleByIntegerLiteral", ())
+ERROR(no_less_than_overload_for_int,none,
+      "no overload of '<' for Int", ())
 ERROR(no_equal_overload_for_int,none,
       "no overload of '==' for Int", ())
 ERROR(broken_coding_key_requirement,none,
@@ -3263,7 +3269,10 @@ NOTE(note_explicitly_compare_cftypeid,none,
 
 ERROR(optional_used_as_boolean,none,
      "optional type %0 cannot be used as a boolean; "
-     "test for '!= nil' instead", (Type))
+     "test for '%select{!|=}1= nil' instead", (Type, bool))
+ERROR(integer_used_as_boolean,none,
+     "type %0 cannot be used as a boolean; "
+     "test for '%select{!|=}1= 0' instead", (Type, bool))
 
 ERROR(interpolation_missing_proto,none,
       "string interpolation requires the protocol 'ExpressibleByStringInterpolation' to be defined",
@@ -3294,6 +3303,9 @@ ERROR(unquote_wrong_type,none,
 ERROR(discard_expr_outside_of_assignment,none,
       "'_' can only appear in a pattern or on the left side of an assignment",
       ())
+WARNING(discard_expr_void_result_redundant, none,
+        "using '_' to ignore the result of a Void-returning function "
+        "is redundant", ())
 ERROR(collection_literal_heterogeneous,none,
       "heterogeneous collection literal could only be inferred to %0; add"
       " explicit type annotation if this is intentional", (Type))

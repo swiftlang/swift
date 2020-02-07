@@ -97,10 +97,8 @@ namespace sil_index_block {
     SIL_DEFAULT_WITNESS_TABLE_NAMES,
     SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
     SIL_PROPERTY_OFFSETS,
-    // SWIFT_ENABLE_TENSORFLOW
     SIL_DIFFERENTIABILITY_WITNESS_NAMES,
     SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
-    // SWIFT_ENABLE_TENSORFLOW END
   };
 
   using ListLayout = BCGenericRecordLayout<
@@ -145,6 +143,7 @@ namespace sil_block {
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
     SIL_DEFAULT_WITNESS_TABLE,
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
+    SIL_DIFFERENTIABILITY_WITNESS,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
     SIL_PROPERTY,
@@ -156,7 +155,6 @@ namespace sil_block {
     SIL_INST_LINEAR_FUNCTION,
     SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
     SIL_INST_LINEAR_FUNCTION_EXTRACT,
-    SIL_DIFFERENTIABILITY_WITNESS,
     // SWIFT_ENABLE_TENSORFLOW END
 
     // We also share these layouts from the decls block. Their enumerators must
@@ -262,7 +260,6 @@ namespace sil_block {
     DeclIDField
   >;
 
-  // SWIFT_ENABLE_TENSORFLOW
   using DifferentiabilityWitnessLayout = BCRecordLayout<
     SIL_DIFFERENTIABILITY_WITNESS,
     DeclIDField,             // Original function name
@@ -276,7 +273,6 @@ namespace sil_block {
     BCVBR<8>,                // Number of result indices
     BCArray<ValueIDField>    // Parameter and result indices
   >;
-  // SWIFT_ENABLE_TENSORFLOW END
 
   using SILFunctionLayout =
       BCRecordLayout<SIL_FUNCTION, SILLinkageField,

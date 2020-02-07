@@ -101,10 +101,10 @@ extension OSLogArguments {
 /// bitWidth property, and since MemoryLayout is not supported by the constant
 /// evaluator, this function returns the byte size of Int, which must equal the
 /// word length of the target architecture and hence the pointer size.
-/// This function must be constant evaluable.
-@_semantics("constant_evaluable")
-@inlinable
-@_optimize(none)
+/// This function must be constant evaluable. Note that it is marked transparent
+/// instead of @inline(__always) as it is used in optimize(none) functions.
+@_transparent
+@usableFromInline
 internal func pointerSizeInBytes() -> Int {
   return Int.bitWidth &>> logBitsPerByte
 }

@@ -187,11 +187,7 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
     REPLInputFile.addImports(ImportsWithOptions);
   }
 
-  bool Done;
-  do {
-    parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
-                        &PersistentState);
-  } while (!Done);
+  parseIntoSourceFile(REPLInputFile, BufferID, &PersistentState);
   performTypeChecking(REPLInputFile);
   return REPLModule;
 }
@@ -1000,10 +996,6 @@ public:
     IRGenOpts.IntegratedREPL = true;
     IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::None;
     IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::None;
-
-    // The very first module is a dummy.
-    CI.getMainModule()->getMainSourceFile(SourceFileKind::REPL).ASTStage =
-        SourceFile::TypeChecked;
 
     if (!ParseStdlib) {
       // Force standard library to be loaded immediately.  This forces any

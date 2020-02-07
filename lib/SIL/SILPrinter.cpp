@@ -456,23 +456,28 @@ void SILType::dump() const {
   llvm::errs() << '\n';
 }
 
-// TODO(TF-893): Use this helper to dedupe the same logic in
-// `SILFunction::print`.
-static void printSILFunctionNameAndType(
-    llvm::raw_ostream &OS, SILFunction *function) {
+/// Prints the name and type of the given SIL function with the given
+/// `PrintOptions`. Mutates `printOptions`, setting `GenericEnv` and
+/// `AlternativeTypeNames`.
+static void printSILFunctionNameAndType(llvm::raw_ostream &OS,
+                                        const SILFunction *function,
+                                        PrintOptions &printOptions) {
   function->printName(OS);
   OS << " : $";
-  llvm::DenseMap<CanType, Identifier> Aliases;
-  llvm::DenseSet<Identifier> UsedNames;
-  auto sig = function->getLoweredFunctionType()->getSubstGenericSignature();
-  auto env = function->getGenericEnvironment();
-  if (sig && env) {
+  llvm::DenseMap<CanType, Identifier> aliases;
+  auto genSig = function->getLoweredFunctionType()->getSubstGenericSignature();
+  auto *genEnv = function->getGenericEnvironment();
+  // If `genSig` and `genEnv` are both defined, get sugared names of generic
+  // parameter types for printing.
+  if (genSig && genEnv) {
+    llvm::DenseSet<Identifier> usedNames;
     llvm::SmallString<16> disambiguatedNameBuf;
     unsigned disambiguatedNameCounter = 1;
-    for (auto *paramTy : sig->getGenericParams()) {
-      auto sugaredTy = env->getSugaredType(paramTy);
+    for (auto *paramTy : genSig->getGenericParams()) {
+      // Get a uniqued sugared name for the generic parameter type.
+      auto sugaredTy = genEnv->getSugaredType(paramTy);
       Identifier name = sugaredTy->getName();
-      while (!UsedNames.insert(name).second) {
+      while (!usedNames.insert(name).second) {
         disambiguatedNameBuf.clear();
         {
           llvm::raw_svector_ostream names(disambiguatedNameBuf);
@@ -480,25 +485,27 @@ static void printSILFunctionNameAndType(
         }
         name = function->getASTContext().getIdentifier(disambiguatedNameBuf);
       }
-      if (name != sugaredTy->getName()) {
-        Aliases[paramTy->getCanonicalType()] = name;
-
-        // Also for the archetype
-        auto archetypeTy = env->mapTypeIntoContext(paramTy)
-            ->getAs<ArchetypeType>();
-        if (archetypeTy)
-          Aliases[archetypeTy->getCanonicalType()] = name;
-      }
+      // If the uniqued sugared name is equal to the sugared name, continue.
+      if (name == sugaredTy->getName())
+        continue;
+      // Otherwise, add sugared name mapping for the type (and its archetype, if
+      // defined).
+      aliases[paramTy->getCanonicalType()] = name;
+      if (auto *archetypeTy =
+              genEnv->mapTypeIntoContext(paramTy)->getAs<ArchetypeType>())
+        aliases[archetypeTy->getCanonicalType()] = name;
     }
   }
+  printOptions.GenericEnv = genEnv;
+  printOptions.AlternativeTypeNames = aliases.empty() ? nullptr : &aliases;
+  function->getLoweredFunctionType()->print(OS, printOptions);
+}
 
-  {
-    PrintOptions withGenericEnvironment = PrintOptions::printSIL();
-    withGenericEnvironment.GenericEnv = env;
-    withGenericEnvironment.AlternativeTypeNames =
-      Aliases.empty() ? nullptr : &Aliases;
-    function->getLoweredFunctionType()->print(OS, withGenericEnvironment);
-  }
+/// Prints the name and type of the given SIL function.
+static void printSILFunctionNameAndType(llvm::raw_ostream &OS,
+                                        const SILFunction *function) {
+  auto printOptions = PrintOptions::printSIL();
+  printSILFunctionNameAndType(OS, function, printOptions);
 }
 
 namespace {
@@ -2589,62 +2596,16 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (!isExternalDeclaration() && hasOwnership())
     OS << "[ossa] ";
 
-  printName(OS);
-  OS << " : $";
-  
-  // Print the type by substituting our context parameter names for the dependent
-  // parameters. In SIL, we may end up with multiple generic parameters that
-  // have the same name from different contexts, for instance, a generic
-  // protocol requirement with a generic method parameter <T>, which is
-  // witnessed by a generic type that has a generic type parameter also named
-  // <T>, so we may need to introduce disambiguating aliases.
-  llvm::DenseMap<CanType, Identifier> Aliases;
-  llvm::DenseSet<Identifier> UsedNames;
-  
-  auto sig = getLoweredFunctionType()->getSubstGenericSignature();
-  auto *env = getGenericEnvironment();
-  if (sig && env) {
-    llvm::SmallString<16> disambiguatedNameBuf;
-    unsigned disambiguatedNameCounter = 1;
-    for (auto *paramTy : sig->getGenericParams()) {
-      auto sugaredTy = env->getSugaredType(paramTy);
-      Identifier name = sugaredTy->getName();
-      while (!UsedNames.insert(name).second) {
-        disambiguatedNameBuf.clear();
-        {
-          llvm::raw_svector_ostream names(disambiguatedNameBuf);
-          names << sugaredTy->getName() << disambiguatedNameCounter++;
-        }
-        name = getASTContext().getIdentifier(disambiguatedNameBuf);
-      }
-      if (name != sugaredTy->getName()) {
-        Aliases[paramTy->getCanonicalType()] = name;
+  auto printOptions = PrintOptions::printSIL();
+  printSILFunctionNameAndType(OS, this, printOptions);
 
-        // Also for the archetype
-        auto archetypeTy = env->mapTypeIntoContext(paramTy)
-            ->getAs<ArchetypeType>();
-        if (archetypeTy)
-          Aliases[archetypeTy->getCanonicalType()] = name;
-      }
-    }
-  }
-
-  {
-    PrintOptions withGenericEnvironment = PrintOptions::printSIL();
-    withGenericEnvironment.GenericEnv = env;
-    withGenericEnvironment.AlternativeTypeNames =
-      Aliases.empty() ? nullptr : &Aliases;
-    LoweredType->print(OS, withGenericEnvironment);
-  }
-  
   if (!isExternalDeclaration()) {
     if (auto eCount = getEntryCount()) {
       OS << " !function_entry_count(" << eCount.getValue() << ")";
     }
     OS << " {\n";
 
-    SILPrinter(PrintCtx, (Aliases.empty() ? nullptr : &Aliases))
-        .print(this);
+    SILPrinter(PrintCtx, printOptions.AlternativeTypeNames).print(this);
     OS << "} // end sil function '" << getName() << '\'';
   }
 
@@ -2824,7 +2785,6 @@ printSILDefaultWitnessTables(SILPrintContext &Ctx,
     wt->print(Ctx.OS(), Ctx.printVerbose());
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 static void printSILDifferentiabilityWitnesses(
     SILPrintContext &Ctx,
     const SILModule::DifferentiabilityWitnessListType &diffWitnesses) {
@@ -2839,17 +2799,16 @@ static void printSILDifferentiabilityWitnesses(
   for (auto &dw : diffWitnesses)
     sortedDiffWitnesses.push_back(&dw);
   std::sort(sortedDiffWitnesses.begin(), sortedDiffWitnesses.end(),
-    [] (const SILDifferentiabilityWitness *w1,
-        const SILDifferentiabilityWitness *w2) -> bool {
-      // TODO(TF-893): Sort based on more criteria for deterministic ordering.
-      return w1->getOriginalFunction()->getName().compare(
-                 w2->getOriginalFunction()->getName()) == -1;
-    }
-  );
+            [](const SILDifferentiabilityWitness *dw1,
+               const SILDifferentiabilityWitness *dw2) -> bool {
+              // TODO(TF-893): Sort based on more criteria for deterministic
+              // ordering.
+              return dw1->getOriginalFunction()->getName().compare(
+                         dw2->getOriginalFunction()->getName()) == -1;
+            });
   for (auto *dw : sortedDiffWitnesses)
     dw->print(Ctx.OS(), Ctx.printVerbose());
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 static void
 printSILCoverageMaps(SILPrintContext &Ctx,
@@ -2976,10 +2935,8 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   }
 
   printSILGlobals(PrintCtx, getSILGlobalList());
-  // SWIFT_ENABLE_TENSORFLOW
   printSILDifferentiabilityWitnesses(PrintCtx,
                                      getDifferentiabilityWitnessList());
-  // SWIFT_ENABLE_TENSORFLOW END
   printSILFunctions(PrintCtx, getFunctionList());
   printSILVTables(PrintCtx, getVTableList());
   printSILWitnessTables(PrintCtx, getWitnessTableList());
@@ -3199,9 +3156,8 @@ void SILDefaultWitnessTable::dump() const {
   print(llvm::errs());
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-void SILDifferentiabilityWitness::print(
-    llvm::raw_ostream &OS, bool verbose) const {
+void SILDifferentiabilityWitness::print(llvm::raw_ostream &OS,
+                                        bool verbose) const {
   OS << "// differentiability witness for "
      << demangleSymbol(getOriginalFunction()->getName()) << '\n';
   PrintOptions qualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
@@ -3213,14 +3169,14 @@ void SILDifferentiabilityWitness::print(
     OS << "[serialized] ";
   // [parameters ...]
   OS << "[parameters ";
-  interleave(getParameterIndices()->getIndices(),
-             [&](unsigned index) { OS << index; },
-             [&] { OS << ' '; });
+  interleave(
+      getParameterIndices()->getIndices(), [&](unsigned index) { OS << index; },
+      [&] { OS << ' '; });
   // [results ...]
   OS << "] [results ";
-  interleave(getResultIndices()->getIndices(),
-             [&](unsigned index) { OS << index; },
-             [&] { OS << ' '; });
+  interleave(
+      getResultIndices()->getIndices(), [&](unsigned index) { OS << index; },
+      [&] { OS << ' '; });
   OS << "] ";
   // (<...>)?
   if (auto derivativeGenSig = getDerivativeGenericSignature()) {
@@ -3257,7 +3213,6 @@ void SILDifferentiabilityWitness::print(
 void SILDifferentiabilityWitness::dump() const {
   print(llvm::errs());
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();

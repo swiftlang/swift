@@ -262,7 +262,7 @@ public:
         EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
         LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
-        PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
+        PrespecializeGenericMetadata(true), UseIncrementalLLVMCodeGen(true),
         UseSwiftCall(false), GenerateProfile(false),
         EnableDynamicReplacementChaining(false),
         // SWIFT_ENABLE_TENSORFLOW

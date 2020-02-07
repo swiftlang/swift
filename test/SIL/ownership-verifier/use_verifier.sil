@@ -518,7 +518,6 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%2 : @guaranteed $Builtin.NativeObject):
-  end_borrow %2 : $Builtin.NativeObject
   br bb3
 
 bb2:
@@ -536,7 +535,6 @@ bb0(%0 : @owned $Builtin.NativeObject):
   switch_enum %2 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%3 : @guaranteed $Builtin.NativeObject):
-  end_borrow %3 : $Builtin.NativeObject
   end_borrow %1 : $Builtin.NativeObject
   br bb3
 
@@ -557,7 +555,6 @@ bb0(%0 : @owned $Builtin.NativeObject):
   switch_enum %2 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%3 : @guaranteed $Builtin.NativeObject):
-  end_borrow %3 : $Builtin.NativeObject
   br bb3
 
 bb2:
@@ -577,7 +574,6 @@ bb0(%0 : @owned $Builtin.NativeObject):
   switch_enum %2 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%3 : @guaranteed $Builtin.NativeObject):
-  end_borrow %3 : $Builtin.NativeObject
   br bb3
 
 bb2:
@@ -784,11 +780,9 @@ bb6:
   checked_cast_br %6 : $Builtin.NativeObject to SuperKlass, bb7, bb8
 
 bb7(%7 : @guaranteed $SuperKlass):
-  end_borrow %7 : $SuperKlass
   br bb9
 
 bb8(%8 : @guaranteed $Builtin.NativeObject):
-  end_borrow %8 : $Builtin.NativeObject
   br bb9
 
 bb9:
@@ -1195,4 +1189,3 @@ bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
-

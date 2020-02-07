@@ -39,6 +39,10 @@
 - (void)simplyDoSomeWorkWithSpeed:(int)s alacrity:(int)a
   NS_SWIFT_NAME(simplyDoSomeWorkWithSpeed(speed:levelOfAlacrity:));
 
+// Make sure that swift_private correctly adds the '__' prefix.
+- (void)count __attribute__((swift_private));
+- (void)objectForKey:(NSObject *)key __attribute__((swift_private));
+
 // These we are generally trying to not-import, via laziness.
 - (void)simplyGoForWalk;
 - (void)simplyTakeNap;
@@ -72,6 +76,7 @@
 - (void)categoricallyReadBook;
 - (void)categoricallyAttendLecture;
 - (void)categoricallyWriteLetter;
+
 @end
 
 
@@ -119,4 +124,17 @@
 - (void)exuberantlyReadBook;
 - (void)exuberantlyAttendLecture;
 - (void)exuberantlyWriteLetter;
+@end
+
+@protocol PrivateMethods <NSObject>
+- (void)count;
+- (void)objectForKey:(NSObject *)key;
+@end
+
+@interface PrivateDoer
+- (void)count;
+- (void)objectForKey:(NSObject *)key;
+@end
+
+@interface PrivateDoer(Category) <PrivateMethods>
 @end

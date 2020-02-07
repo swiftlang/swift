@@ -513,7 +513,7 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
   // If functionSource is a `@differentiable` function, just extract it.
   auto originalFnTy = original->getType().castTo<SILFunctionType>();
   if (originalFnTy->isDifferentiable()) {
-    auto paramIndices = originalFnTy->getDifferentiationParameterIndices();
+    auto paramIndices = originalFnTy->getDifferentiabilityParameterIndices();
     for (auto i : indices.parameters->getIndices()) {
       if (!paramIndices->contains(i)) {
         context.emitNondifferentiabilityError(

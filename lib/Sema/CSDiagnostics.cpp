@@ -562,6 +562,7 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_ReturnSingleExpr:
     return diag::cannot_convert_to_return_type;
   case CTP_DefaultParameter:
+  case CTP_AutoclosureDefaultParameter:
     return diag::cannot_convert_default_arg_value;
   case CTP_YieldByValue:
     return diag::cannot_convert_yield_value;
@@ -642,7 +643,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     switch (last.getKind()) {
     case ConstraintLocator::ContextualType: {
       auto purpose = getContextualTypePurpose();
-      assert(!(purpose == CTP_Unused && purpose == CTP_CannotFail));
+      assert(!(purpose == CTP_Unused || purpose == CTP_CannotFail));
 
       // If this is call to a closure e.g. `let _: A = { B() }()`
       // let's point diagnostic to its result.
@@ -1892,9 +1893,6 @@ bool ContextualFailure::diagnoseAsError() {
   if (diagnoseMissingFunctionCall())
     return true;
 
-  if (diagnoseConversionToDictionary())
-    return true;
-
   // Special case of some common conversions involving Swift.String
   // indexes, catching cases where people attempt to index them with an integer.
   if (isIntegerToStringIndexConversion()) {
@@ -1958,6 +1956,17 @@ bool ContextualFailure::diagnoseAsError() {
 
     if (diagnoseYieldByReferenceMismatch())
       return true;
+
+    if (isa<OptionalTryExpr>(anchor) || isa<OptionalEvaluationExpr>(anchor)) {
+      auto objectType = fromType->getOptionalObjectType();
+      if (objectType->isEqual(toType)) {
+        auto &cs = getConstraintSystem();
+        MissingOptionalUnwrapFailure failure(cs, getType(anchor), toType,
+                                             cs.getConstraintLocator(anchor));
+        if (failure.diagnoseAsError())
+          return true;
+      }
+    }
 
     if (CTP == CTP_ForEachStmt) {
       if (fromType->isAnyExistentialType()) {
@@ -2087,6 +2096,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_EnumCaseRawValue:
     return diag::cannot_convert_raw_initializer_value_nil;
   case CTP_DefaultParameter:
+  case CTP_AutoclosureDefaultParameter:
     return diag::cannot_convert_default_arg_value_nil;
   case CTP_YieldByValue:
     return diag::cannot_convert_yield_value_nil;
@@ -2308,14 +2318,37 @@ bool ContextualFailure::diagnoseConversionToBool() const {
     return true;
   }
 
+  // Determine if the boolean negation operator was applied to the anchor. This
+  // upwards traversal of the AST is somewhat fragile, but enables much better
+  // diagnostics if someone attempts to use an optional or integer as a boolean
+  // condition.
+  SourceLoc notOperatorLoc;
+  if (Expr *parent = findParentExpr(getAnchor())) {
+    if (isa<ParenExpr>(parent) && parent->isImplicit()) {
+      if ((parent = findParentExpr(parent))) {
+        auto parentOperatorApplication = dyn_cast<PrefixUnaryExpr>(parent);
+        if (parentOperatorApplication) {
+          auto operatorRefExpr =
+              dyn_cast<DeclRefExpr>(parentOperatorApplication->getFn());
+          if (operatorRefExpr && operatorRefExpr->getDecl()->getBaseName() ==
+                                     getASTContext().Id_NegationOperator) {
+            notOperatorLoc = operatorRefExpr->getLoc();
+          }
+        }
+      }
+    }
+  }
+
   // If we're trying to convert something from optional type to Bool, then a
   // comparison against nil was probably expected.
-  // TODO: It would be nice to handle "!x" --> x == false, but we have no way
-  // to get to the parent expr at present.
   auto fromType = getFromType();
   if (fromType->getOptionalObjectType()) {
     StringRef prefix = "((";
-    StringRef suffix = ") != nil)";
+    StringRef suffix;
+    if (notOperatorLoc.isValid())
+      suffix = ") == nil)";
+    else
+      suffix = ") != nil)";
 
     // Check if we need the inner parentheses.
     // Technically we only need them if there's something in 'expr' with
@@ -2327,68 +2360,46 @@ bool ContextualFailure::diagnoseConversionToBool() const {
     }
     // FIXME: The outer parentheses may be superfluous too.
 
-    emitDiagnostic(expr->getLoc(), diag::optional_used_as_boolean, fromType)
+    emitDiagnostic(expr->getLoc(), diag::optional_used_as_boolean, fromType,
+                   notOperatorLoc.isValid())
         .fixItInsert(expr->getStartLoc(), prefix)
-        .fixItInsertAfter(expr->getEndLoc(), suffix);
+        .fixItInsertAfter(expr->getEndLoc(), suffix)
+        .fixItRemove(notOperatorLoc);
+    return true;
+  }
+
+  // If we're trying to convert something from optional type to an integer, then
+  // a comparison against nil was probably expected.
+  auto &cs = getConstraintSystem();
+  if (conformsToKnownProtocol(cs, fromType, KnownProtocolKind::BinaryInteger) &&
+      conformsToKnownProtocol(cs, fromType,
+                              KnownProtocolKind::ExpressibleByIntegerLiteral)) {
+    StringRef prefix = "((";
+    StringRef suffix;
+    if (notOperatorLoc.isValid())
+      suffix = ") == 0)";
+    else
+      suffix = ") != 0)";
+
+    // Check if we need the inner parentheses.
+    // Technically we only need them if there's something in 'expr' with
+    // lower precedence than '!=', but the code actually comes out nicer
+    // in most cases with parens on anything non-trivial.
+    if (expr->canAppendPostfixExpression()) {
+      prefix = prefix.drop_back();
+      suffix = suffix.drop_front();
+    }
+    // FIXME: The outer parentheses may be superfluous too.
+
+    emitDiagnostic(expr->getLoc(), diag::integer_used_as_boolean, fromType,
+                   notOperatorLoc.isValid())
+        .fixItInsert(expr->getStartLoc(), prefix)
+        .fixItInsertAfter(expr->getEndLoc(), suffix)
+        .fixItRemove(notOperatorLoc);
     return true;
   }
 
   return false;
-}
-
-bool ContextualFailure::isInvalidDictionaryConversion(
-    ConstraintSystem &cs, Expr *anchor, Type contextualType) {
-  auto *arrayExpr = dyn_cast<ArrayExpr>(anchor);
-  if (!arrayExpr)
-    return false;
-
-  auto type = contextualType->lookThroughAllOptionalTypes();
-  if (!conformsToKnownProtocol(
-        cs, type, KnownProtocolKind::ExpressibleByDictionaryLiteral))
-    return false;
-
-  return (arrayExpr->getNumElements() & 1) == 0;
-}
-
-bool ContextualFailure::diagnoseConversionToDictionary() const {
-  auto &cs = getConstraintSystem();
-  auto toType = getToType()->lookThroughAllOptionalTypes();
-
-  if (!isInvalidDictionaryConversion(cs, getAnchor(), toType))
-    return false;
-
-  auto *arrayExpr = cast<ArrayExpr>(getAnchor());
-
-  // If the contextual type conforms to ExpressibleByDictionaryLiteral and
-  // this is an empty array, then they meant "[:]".
-  auto numElements = arrayExpr->getNumElements();
-  if (numElements == 0) {
-    emitDiagnostic(arrayExpr->getStartLoc(),
-                   diag::should_use_empty_dictionary_literal)
-        .fixItInsert(arrayExpr->getEndLoc(), ":");
-    return true;
-  }
-
-  // If the contextual type conforms to ExpressibleByDictionaryLiteral, then
-  // they wrote "x = [1,2]" but probably meant "x = [1:2]".
-  bool isIniting = getContextualTypePurpose() == CTP_Initialization;
-  emitDiagnostic(arrayExpr->getStartLoc(), diag::should_use_dictionary_literal,
-                 toType, isIniting);
-
-  auto diagnostic =
-      emitDiagnostic(arrayExpr->getStartLoc(), diag::meant_dictionary_lit);
-
-  // Change every other comma into a colon, only if the number
-  // of commas present matches the number of elements, because
-  // otherwise it might a structural problem with the expression
-  // e.g. ["a""b": 1].
-  const auto commaLocs = arrayExpr->getCommaLocs();
-  if (commaLocs.size() == numElements - 1) {
-    for (unsigned i = 0, e = numElements / 2; i != e; ++i)
-      diagnostic.fixItReplace(commaLocs[i * 2], ":");
-  }
-
-  return true;
 }
 
 bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
@@ -2865,6 +2876,7 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_EnumCaseRawValue:
     return diag::cannot_convert_raw_initializer_value;
   case CTP_DefaultParameter:
+  case CTP_AutoclosureDefaultParameter:
     return forProtocol ? diag::cannot_convert_default_arg_value_protocol
                        : diag::cannot_convert_default_arg_value;
   case CTP_YieldByValue:
@@ -4032,7 +4044,12 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
   if (locator->isForContextualType()) {
     funcType = cs.getContextualType(locator->getAnchor())->getAs<FunctionType>();
   } else if (auto info = cs.getFunctionArgApplyInfo(locator)) {
-    funcType = info->getParamType()->getAs<FunctionType>();
+    auto paramType = info->getParamType();
+    // Drop a single layer of optionality because argument could get injected
+    // into optional and that doesn't contribute to the problem.
+    if (auto objectType = paramType->getOptionalObjectType())
+      paramType = objectType;
+    funcType = paramType->getAs<FunctionType>();
   } else if (locator->isLastElement<LocatorPathElt::ClosureResult>()) {
     // Based on the locator we know this this is something like this:
     // `let _: () -> ((Int) -> Void) = { return {} }`.
@@ -4783,24 +4800,6 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
 bool CollectionElementContextualFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
   auto *locator = getLocator();
-
-  // Check whether this is situation like `let _: [String: Int] = ["A", 0]`
-  // which attempts to convert an array into a dictionary. We have a tailored
-  // contextual diagnostic for that, so no need to diagnose element mismatches
-  // as well.
-  auto &cs = getConstraintSystem();
-  auto *rawAnchor = getRawAnchor();
-  if (llvm::any_of(cs.getFixes(), [&](const ConstraintFix *fix) -> bool {
-        auto *locator = fix->getLocator();
-        if (!(fix->getKind() == FixKind::ContextualMismatch &&
-              locator->getAnchor() == rawAnchor))
-          return false;
-
-        auto *mismatch = static_cast<const ContextualMismatch *>(fix);
-        return isInvalidDictionaryConversion(cs, rawAnchor,
-                                             mismatch->getToType());
-      }))
-    return false;
 
   auto eltType = getFromType();
   auto contextualType = getToType();
@@ -6137,5 +6136,47 @@ bool UnableToInferProtocolLiteralType::diagnoseAsError() {
                    importModule, importDefaultTypeName, plainName);
   }
 
+  return true;
+}
+
+bool MissingQuialifierInMemberRefFailure::diagnoseAsError() {
+  auto selectedOverload = getOverloadChoiceIfAvailable(getLocator());
+  if (!selectedOverload)
+    return false;
+
+  auto *UDE = cast<UnresolvedDotExpr>(getRawAnchor());
+
+  auto baseType = getType(UDE->getBase());
+
+  auto methodKind = baseType->isAnyExistentialType()
+                        ? DescriptiveDeclKind::StaticMethod
+                        : DescriptiveDeclKind::Method;
+
+  auto choice = selectedOverload->choice.getDeclOrNull();
+  if (!choice)
+    return false;
+
+  auto *DC = choice->getDeclContext();
+  if (!(DC->isModuleContext() || DC->isModuleScopeContext())) {
+    emitDiagnostic(UDE->getLoc(), diag::member_shadows_function, UDE->getName(),
+                   methodKind, choice->getDescriptiveKind(),
+                   choice->getFullName());
+    return true;
+  }
+
+  auto qualifier = DC->getParentModule()->getName();
+
+  emitDiagnostic(UDE->getLoc(), diag::member_shadows_global_function,
+                 UDE->getName(), methodKind, choice->getDescriptiveKind(),
+                 choice->getFullName(), qualifier);
+
+  SmallString<32> namePlusDot = qualifier.str();
+  namePlusDot.push_back('.');
+
+  emitDiagnostic(UDE->getLoc(), diag::fix_unqualified_access_top_level_multi,
+                 namePlusDot, choice->getDescriptiveKind(), qualifier)
+      .fixItInsert(UDE->getStartLoc(), namePlusDot);
+
+  emitDiagnostic(choice, diag::decl_declared_here, choice->getFullName());
   return true;
 }

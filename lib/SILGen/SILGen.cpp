@@ -1786,111 +1786,112 @@ public:
   }
 };
 
+// An RAII object that constructs a \c SILGenModule instance.
+// On destruction, delayed definitions are automatically emitted.
+class SILGenModuleRAII {
+  SILGenModule SGM;
+
+public:
+  void emitSourceFile(SourceFile *sf) {
+    SourceFileScope scope(SGM, sf);
+    for (Decl *D : sf->getTopLevelDecls()) {
+      FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
+                                      "SILgen-decl", D);
+      SGM.visit(D);
+    }
+
+    for (TypeDecl *TD : sf->LocalTypeDecls) {
+      FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
+                                      "SILgen-tydecl", TD);
+      // FIXME: Delayed parsing would prevent these types from being added to
+      //        the module in the first place.
+      if (TD->getDeclContext()->getInnermostSkippedFunctionContext())
+        continue;
+      SGM.visit(TD);
+    }
+  }
+
+  SILGenModuleRAII(SILModule &M, ModuleDecl *SM) : SGM{M, SM} {}
+
+  ~SILGenModuleRAII() {
+    // Emit any delayed definitions that were forced.
+    // Emitting these may in turn force more definitions, so we have to take
+    // care to keep pumping the queues.
+    while (!SGM.forcedFunctions.empty()
+           || !SGM.pendingConformances.empty()) {
+      while (!SGM.forcedFunctions.empty()) {
+        auto &front = SGM.forcedFunctions.front();
+        front.second.emitter(SGM.getFunction(front.first, ForDefinition));
+        SGM.forcedFunctions.pop_front();
+      }
+      while (!SGM.pendingConformances.empty()) {
+        SGM.getWitnessTable(SGM.pendingConformances.front());
+        SGM.pendingConformances.pop_front();
+      }
+    }
+  }
+};
 } // end anonymous namespace
 
-void SILGenModule::emitSourceFile(SourceFile *sf) {
-  SourceFileScope scope(*this, sf);
-  FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-file", sf);
-  for (Decl *D : sf->getTopLevelDecls()) {
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-decl", D);
-    visit(D);
+llvm::Expected<std::unique_ptr<SILModule>>
+SILGenSourceFileRequest::evaluate(Evaluator &evaluator,
+                                  SILGenDescriptor desc) const {
+  auto *unit = desc.context.get<FileUnit *>();
+  auto *mod = unit->getParentModule();
+  auto M = std::unique_ptr<SILModule>(
+      new SILModule(mod, desc.conv, desc.opts, unit, /*wholeModule*/ false));
+  SILGenModuleRAII scope(*M, mod);
+
+  if (auto *file = dyn_cast<SourceFile>(unit)) {
+    scope.emitSourceFile(file);
+  } else if (auto *file = dyn_cast<SerializedASTFile>(unit)) {
+    if (file->isSIB())
+      M->getSILLoader()->getAllForModule(mod->getName(), file);
   }
 
-  for (TypeDecl *TD : sf->LocalTypeDecls) {
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-tydecl", TD);
-    // FIXME: Delayed parsing would prevent these types from being added to the
-    //        module in the first place.
-    if (TD->getDeclContext()->getInnermostSkippedFunctionContext())
-      continue;
-    visit(TD);
-  }
+  return std::move(M);
 }
 
-//===----------------------------------------------------------------------===//
-// SILModule::constructSIL method implementation
-//===----------------------------------------------------------------------===//
+llvm::Expected<std::unique_ptr<SILModule>>
+SILGenWholeModuleRequest::evaluate(Evaluator &evaluator,
+                                   SILGenDescriptor desc) const {
+  auto *mod = desc.context.get<ModuleDecl *>();
+  auto M = std::unique_ptr<SILModule>(
+      new SILModule(mod, desc.conv, desc.opts, mod, /*wholeModule*/ true));
+  SILGenModuleRAII scope(*M, mod);
 
-std::unique_ptr<SILModule>
-SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
-                        const SILOptions &options, FileUnit *SF) {
-  FrontendStatsTracer tracer(mod->getASTContext().Stats, "SILGen");
-  const DeclContext *DC;
-  if (SF) {
-    DC = SF;
-  } else {
-    DC = mod;
+  for (auto file : mod->getFiles()) {
+    auto nextSF = dyn_cast<SourceFile>(file);
+    if (!nextSF || nextSF->ASTStage != SourceFile::TypeChecked)
+      continue;
+    scope.emitSourceFile(nextSF);
   }
 
-  std::unique_ptr<SILModule> M(
-      new SILModule(mod, tc, options, DC, /*wholeModule*/ SF == nullptr));
-  SILGenModule SGM(*M, mod);
+  // Also make sure to process any intermediate files that may contain SIL
+  bool hasSIB = std::any_of(mod->getFiles().begin(),
+                            mod->getFiles().end(),
+                            [](const FileUnit *File) -> bool {
+    auto *SASTF = dyn_cast<SerializedASTFile>(File);
+    return SASTF && SASTF->isSIB();
+  });
+  if (hasSIB)
+    M->getSILLoader()->getAllForModule(mod->getName(), nullptr);
 
-  if (SF) {
-    if (auto *file = dyn_cast<SourceFile>(SF)) {
-      SGM.emitSourceFile(file);
-    } else if (auto *file = dyn_cast<SerializedASTFile>(SF)) {
-      if (file->isSIB())
-        M->getSILLoader()->getAllForModule(mod->getName(), file);
-    }
-  } else {
-    for (auto file : mod->getFiles()) {
-      auto nextSF = dyn_cast<SourceFile>(file);
-      if (!nextSF || nextSF->ASTStage != SourceFile::TypeChecked)
-        continue;
-      SGM.emitSourceFile(nextSF);
-    }
-
-    // Also make sure to process any intermediate files that may contain SIL
-    bool hasSIB = std::any_of(mod->getFiles().begin(),
-                              mod->getFiles().end(),
-                              [](const FileUnit *File) -> bool {
-      auto *SASTF = dyn_cast<SerializedASTFile>(File);
-      return SASTF && SASTF->isSIB();
-    });
-    if (hasSIB)
-      M->getSILLoader()->getAllForModule(mod->getName(), nullptr);
-  }
-
-  // Emit any delayed definitions that were forced.
-  // Emitting these may in turn force more definitions, so we have to take care
-  // to keep pumping the queues.
-  while (!SGM.forcedFunctions.empty()
-         || !SGM.pendingConformances.empty()) {
-    while (!SGM.forcedFunctions.empty()) {
-      auto &front = SGM.forcedFunctions.front();
-      front.second.emitter(SGM.getFunction(front.first, ForDefinition));
-      SGM.forcedFunctions.pop_front();
-    }
-    while (!SGM.pendingConformances.empty()) {
-      SGM.getWitnessTable(SGM.pendingConformances.front());
-      SGM.pendingConformances.pop_front();
-    }
-  }
-
-  return M;
+  return std::move(M);
 }
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(ModuleDecl *mod, Lowering::TypeConverter &tc,
                             const SILOptions &options) {
   auto desc = SILGenDescriptor::forWholeModule(mod, tc, options);
-  return llvm::cantFail(mod->getASTContext().evaluator(GenerateSILRequest{desc}));
+  return llvm::cantFail(
+      mod->getASTContext().evaluator(SILGenWholeModuleRequest{desc}));
 }
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(FileUnit &sf, Lowering::TypeConverter &tc,
                             const SILOptions &options) {
   auto desc = SILGenDescriptor::forFile(sf, tc, options);
-  return llvm::cantFail(sf.getASTContext().evaluator(GenerateSILRequest{desc}));
-}
-
-llvm::Expected<std::unique_ptr<SILModule>>
-GenerateSILRequest::evaluate(Evaluator &evaluator, SILGenDescriptor sgd) const {
-  if (auto *MD = sgd.context.dyn_cast<ModuleDecl *>()) {
-    return SILModule::constructSIL(MD, sgd.conv, sgd.opts, nullptr);
-  } else {
-    auto *SF = sgd.context.get<FileUnit *>();
-    return SILModule::constructSIL(SF->getParentModule(),
-                                   sgd.conv, sgd.opts, SF);
-  }
+  return llvm::cantFail(
+      sf.getASTContext().evaluator(SILGenSourceFileRequest{desc}));
 }

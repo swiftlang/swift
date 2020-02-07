@@ -88,8 +88,6 @@ public:
   }
 
   OperandOwnershipKindMap
-  visitEnumArgument(ValueOwnershipKind requiredConvention);
-  OperandOwnershipKindMap
   visitApplyParameter(ValueOwnershipKind requiredConvention,
                       UseLifetimeConstraint requirement);
   OperandOwnershipKindMap visitFullApply(FullApplySite apply);
@@ -421,17 +419,9 @@ OperandOwnershipKindClassifier::checkTerminatorArgumentMatchesDestBB(
   // Grab the ownership kind of the destination block.
   ValueOwnershipKind destBlockArgOwnershipKind =
       destBB->getArgument(opIndex)->getOwnershipKind();
-
-  // Then if we do not have an enum, make sure that the conventions match.
-  if (!getType().getEnumOrBoundGenericEnum()) {
-    auto lifetimeConstraint =
-        destBlockArgOwnershipKind.getForwardingLifetimeConstraint();
-    return Map::compatibilityMap(destBlockArgOwnershipKind, lifetimeConstraint);
-  }
-
-  // Otherwise, we need to properly handle the sum type nature of enum
-  // arguments.
-  return visitEnumArgument(destBlockArgOwnershipKind);
+  auto lifetimeConstraint =
+      destBlockArgOwnershipKind.getForwardingLifetimeConstraint();
+  return Map::compatibilityMap(destBlockArgOwnershipKind, lifetimeConstraint);
 }
 
 OperandOwnershipKindMap
@@ -560,12 +550,6 @@ OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
     return Map();
 
   auto base = *mergedBase;
-
-  // TODO: This may not be needed once trivial is any.
-  if (getType().getEnumOrBoundGenericEnum()) {
-    return visitEnumArgument(base);
-  }
-
   return Map::compatibilityMap(base, base.getForwardingLifetimeConstraint());
 }
 
@@ -653,57 +637,20 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
   llvm_unreachable("Unhandled ParameterConvention in switch.");
 }
 
-// Visit an enum value that is passed at argument position, including block
-// arguments, apply arguments, and return values.
-//
-// The operand definition's ownership kind may be known to be "trivial",
-// but it is still valid to pass that enum to a argument nontrivial type.
-// For example:
-//
-// %val = enum $Optional<SomeClass>, #Optional.none // trivial ownership
-// apply %f(%val) : (@owned Optional<SomeClass>)    // owned argument
-OperandOwnershipKindMap OperandOwnershipKindClassifier::visitEnumArgument(
-    ValueOwnershipKind requiredKind) {
-  // Begin with an empty map.
-  OperandOwnershipKindMap map;
-
-  // The operand has a non-trivial ownership kind. It must match the argument
-  // convention.
-  if (requiredKind != ValueOwnershipKind::Owned) {
-    map.addCompatibilityConstraint(ValueOwnershipKind::Owned,
-                                   UseLifetimeConstraint::MustBeLive);
-  } else {
-    map.addCompatibilityConstraint(ValueOwnershipKind::Owned,
-                                   UseLifetimeConstraint::MustBeInvalidated);
-  }
-  map.addCompatibilityConstraint(ValueOwnershipKind::Guaranteed,
-                                 UseLifetimeConstraint::MustBeLive);
-  map.addCompatibilityConstraint(ValueOwnershipKind::Unowned,
-                                 UseLifetimeConstraint::MustBeLive);
-  return map;
-}
-
 // We allow for trivial cases of enums with non-trivial cases to be passed in
 // non-trivial argument positions. This fits with modeling of a
 // SILFunctionArgument as a phi in a global program graph.
 OperandOwnershipKindMap OperandOwnershipKindClassifier::visitApplyParameter(
     ValueOwnershipKind kind, UseLifetimeConstraint requirement) {
 
-  // Check if we have an enum. If not, then we just check against the passed in
-  // convention.
-  if (!getType().getEnumOrBoundGenericEnum()) {
-    // We allow for owned to be passed to apply parameters.
-    if (kind != ValueOwnershipKind::Owned) {
-      return Map::compatibilityMap(
-          {{kind, requirement},
-           {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeLive}});
-    }
-    return Map::compatibilityMap(kind, requirement);
+  // Check against the passed in convention. We allow for owned to be passed to
+  // apply parameters.
+  if (kind != ValueOwnershipKind::Owned) {
+    return Map::compatibilityMap(
+        {{kind, requirement},
+         {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeLive}});
   }
-
-  // Otherwise consider that we may have a payload with a trivial case
-  // that has other non-trivial cases.
-  return visitEnumArgument(kind);
+  return Map::compatibilityMap(kind, requirement);
 }
 
 // Handle Apply and TryApply.

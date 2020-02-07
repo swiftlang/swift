@@ -131,7 +131,7 @@ public:
   DifferentiableFuncTypeBuilder(IRGenModule &IGM, SILFunctionType *fnTy)
       : RecordTypeBuilder(IGM),
         originalType(fnTy->getWithoutDifferentiability()),
-        parameterIndices(fnTy->getDifferentiationParameterIndices()) {
+        parameterIndices(fnTy->getDifferentiabilityParameterIndices()) {
     assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal);
   }
 
@@ -269,7 +269,7 @@ public:
   LinearFuncTypeBuilder(IRGenModule &IGM, SILFunctionType *fnTy)
       : RecordTypeBuilder(IGM),
         originalType(fnTy->getWithoutDifferentiability()),
-        parameterIndices(fnTy->getDifferentiationParameterIndices()) {
+        parameterIndices(fnTy->getDifferentiabilityParameterIndices()) {
     assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Linear);
   }
 

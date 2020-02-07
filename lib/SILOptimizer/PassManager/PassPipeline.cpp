@@ -113,7 +113,6 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
 #endif
 
   if (Options.shouldOptimize()) {
-    P.addSemanticARCOpts();
     P.addDestroyHoisting();
   }
   if (!Options.StripOwnershipAfterSerialization)

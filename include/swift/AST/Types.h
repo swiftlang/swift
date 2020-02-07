@@ -2861,6 +2861,10 @@ public:
     Param getWithoutLabel() const { return Param(Ty, Identifier(), Flags); }
 
     Param withType(Type newType) const { return Param(newType, Label, Flags); }
+
+    Param withFlags(ParameterTypeFlags flags) const {
+      return Param(Ty, Label, flags);
+    }
   };
 
   class CanParam : public Param {
@@ -3094,14 +3098,13 @@ public:
     ExtInfo withClangFunctionType(const clang::Type *type) const {
       return ExtInfo(Bits, Uncommon(type));
     }
-    // SWIFT_ENABLE_TENSORFLOW
     LLVM_NODISCARD
-    ExtInfo withDifferentiabilityKind(
-        DifferentiabilityKind differentiability)
-    const {
-      return ExtInfo((Bits & ~DifferentiabilityMask) |
-                     ((unsigned)differentiability <<
-                      DifferentiabilityMaskOffset), Other);
+    ExtInfo
+    withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
+      return ExtInfo(
+          (Bits & ~DifferentiabilityMask) |
+              ((unsigned)differentiability << DifferentiabilityMaskOffset),
+          Other);
     }
 
     std::pair<unsigned, const void *> getFuncAttrKey() const {
@@ -3765,7 +3768,6 @@ public:
 
   /// Return a version of this parameter info with the type replaced.
   SILParameterInfo getWithInterfaceType(CanType type) const {
-    // SWIFT_ENABLE_TENSORFLOW
     return SILParameterInfo(type, getConvention(), getDifferentiability());
   }
 
@@ -4443,10 +4445,20 @@ public:
 
   CanType getSelfInstanceType(SILModule &M) const;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  CanSILFunctionType getWithDifferentiability(
-      DifferentiabilityKind kind, IndexSubset *parameterIndices);
+  /// Given that `this` is a `@differentiable` or `@differentiable(linear)`
+  /// function type, returns an `IndexSubset` corresponding to the
+  /// differentiability/linearity parameters (e.g. all parameters except the
+  /// `@noDerivative` ones).
+  IndexSubset *getDifferentiabilityParameterIndices();
 
+  /// Returns the `@differentiable` or `@differentiable(linear)` function type
+  /// for the given differentiability kind and parameter indices representing
+  /// differentiability/linearity parameters.
+  CanSILFunctionType getWithDifferentiability(DifferentiabilityKind kind,
+                                              IndexSubset *parameterIndices);
+
+  /// Returns the SIL function type stripping differentiability kind and
+  /// differentiability from all parameters.
   CanSILFunctionType getWithoutDifferentiability();
 
   /// Returns the type of the derivative function for the given parameter
@@ -4537,12 +4549,6 @@ public:
       IndexSubset *parameterIndices, Lowering::TypeConverter &TC,
       LookupConformanceFn lookupConformance,
       CanGenericSignature derivativeFunctionGenericSignature = nullptr);
-
-  /// Returns a bit vector that specifices which parameters you can
-  /// differentiate with respect to for this differentiable function type. (e.g.
-  /// which parameters are not `@noDerivative`). The function type must be
-  /// differentiable.
-  IndexSubset *getDifferentiationParameterIndices();
 
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the

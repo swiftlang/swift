@@ -166,12 +166,10 @@ SILDeserializer::SILDeserializer(
              kind == sil_index_block::SIL_WITNESS_TABLE_NAMES ||
              kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
              kind == sil_index_block::SIL_PROPERTY_OFFSETS ||
-// SWIFT_ENABLE_TENSORFLOW
              kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES)) &&
          "Expect SIL_FUNC_NAMES, SIL_VTABLE_NAMES, SIL_GLOBALVAR_NAMES, \
           SIL_WITNESS_TABLE_NAMES, SIL_DEFAULT_WITNESS_TABLE_NAMES, \
-          SIL_DIFFERENTIABILITY_WITNESS_NAMES, or SIL_PROPERTY_OFFSETS.");
-// SWIFT_ENABLE_TENSORFLOW END
+          SIL_PROPERTY_OFFSETS, or SIL_DIFFERENTIABILITY_WITNESS_NAMES.");
     (void)prevKind;
 
     if (kind == sil_index_block::SIL_FUNC_NAMES)
@@ -184,10 +182,8 @@ SILDeserializer::SILDeserializer(
       WitnessTableList = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES)
       DefaultWitnessTableList = readFuncTable(scratch, blobData);
-    // SWIFT_ENABLE_TENSORFLOW
     else if (kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES)
       DifferentiabilityWitnessList = readFuncTable(scratch, blobData);
-    // SWIFT_ENABLE_TENSORFLOW END
     else if (kind == sil_index_block::SIL_PROPERTY_OFFSETS) {
       // No matching 'names' block for property descriptors needed yet.
       MF->allocateBuffer(Properties, scratch);
@@ -225,14 +221,12 @@ SILDeserializer::SILDeserializer(
               offKind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_OFFSETS) &&
              "Expect a SIL_DEFAULT_WITNESS_TABLE_OFFSETS record.");
       MF->allocateBuffer(DefaultWitnessTables, scratch);
-    // SWIFT_ENABLE_TENSORFLOW
     } else if (kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind ==
                   sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_OFFSETS) &&
              "Expect a SIL_DIFFERENTIABILITY_WITNESS_OFFSETS record.");
       MF->allocateBuffer(DifferentiabilityWitnesses, scratch);
-    // SWIFT_ENABLE_TENSORFLOW END
     }
   }
 }
@@ -355,7 +349,6 @@ SILType SILDeserializer::getSILType(Type Ty, SILValueCategory Category,
       .getCategoryType(Category);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 /// Helper function to find a SILDifferentiabilityWitness, given its mangled
 /// key.
 SILDifferentiabilityWitness *
@@ -795,9 +788,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESS_TABLE record also means the end
   // of this SILFunction.
   while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR &&
-         // SWIFT_ENABLE_TENSORFLOW
          kind != SIL_WITNESS_TABLE && kind != SIL_DIFFERENTIABILITY_WITNESS) {
-         // SWIFT_ENABLE_TENSORFLOW END
     if (kind == SIL_BASIC_BLOCK)
       // Handle a SILBasicBlock record.
       CurrentBB = readSILBasicBlock(fn, CurrentBB, scratch);
@@ -3139,9 +3130,7 @@ void SILDeserializer::readWitnessTableEntries(
   // Another record means the end of this WitnessTable.
   while (kind != SIL_WITNESS_TABLE &&
          kind != SIL_DEFAULT_WITNESS_TABLE &&
-         // SWIFT_ENABLE_TENSORFLOW
          kind != SIL_DIFFERENTIABILITY_WITNESS &&
-         // SWIFT_ENABLE_TENSORFLOW END
          kind != SIL_FUNCTION) {
     if (kind == SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY) {
       witnessEntries.push_back(SILDefaultWitnessTable::Entry());
@@ -3497,7 +3486,6 @@ SILDeserializer::lookupDefaultWitnessTable(SILDefaultWitnessTable *existingWt) {
   return Wt;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 SILDifferentiabilityWitness *
 SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   if (DId == 0)
@@ -3505,7 +3493,7 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   assert(DId <= DifferentiabilityWitnesses.size() &&
          "Invalid SILDifferentiabilityWitness ID");
 
-  auto &diffWitnessOrOffset = DifferentiabilityWitnesses[DId-1];
+  auto &diffWitnessOrOffset = DifferentiabilityWitnesses[DId - 1];
   if (diffWitnessOrOffset.isFullyDeserialized())
     return diffWitnessOrOffset.get();
 
@@ -3536,7 +3524,7 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
 
   DeclID originalNameId, jvpNameId, vjpNameId;
   unsigned rawLinkage, isDeclaration, isSerialized, numParameterIndices,
-           numResultIndices;
+      numResultIndices;
   GenericSignatureID derivativeGenSigID;
   ArrayRef<uint64_t> rawParameterAndResultIndices;
 
@@ -3570,8 +3558,7 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   auto derivativeGenSig = MF->getGenericSignature(derivativeGenSigID);
 
   SmallVector<unsigned, 8> parameterAndResultIndices(
-      rawParameterAndResultIndices.begin(),
-      rawParameterAndResultIndices.end());
+      rawParameterAndResultIndices.begin(), rawParameterAndResultIndices.end());
   assert(parameterAndResultIndices.size() ==
              numParameterIndices + numResultIndices &&
          "Parameter/result indices count mismatch");
@@ -3628,9 +3615,8 @@ void SILDeserializer::getAllDifferentiabilityWitnesses() {
   if (!DifferentiabilityWitnessList)
     return;
   for (unsigned I = 0, E = DifferentiabilityWitnesses.size(); I < E; ++I)
-    readDifferentiabilityWitness(I+1);
+    readDifferentiabilityWitness(I + 1);
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 SILDeserializer::~SILDeserializer() {
   // Drop our references to anything we've deserialized.

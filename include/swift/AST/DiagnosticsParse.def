@@ -470,6 +470,8 @@ ERROR(expected_precedencegroup_relation,none,
       (StringRef))
 
 // SIL
+ERROR(expected_sil_keyword,none,
+      "expected SIL keyword", ())
 ERROR(inout_not_attribute, none,
       "@inout is no longer an attribute", ())
 ERROR(only_allowed_in_sil,none,
@@ -688,6 +690,10 @@ ERROR(sil_diff_witness_serialized_declaration,none,
       "differentiability witness declaration should not be serialized", ())
 ERROR(sil_diff_witness_undefined,PointsToFirstBadToken,
       "reference to undefined differentiability witness", ())
+ERROR(sil_diff_witness_invalid_generic_signature,PointsToFirstBadToken,
+      "expected witness generic signature '%0' does not have same generic "
+      "parameters as original function generic signature '%1'",
+      (StringRef, StringRef))
 
 // SIL Coverage Map
 ERROR(sil_coverage_invalid_hash, none,
@@ -1606,6 +1612,7 @@ ERROR(sil_autodiff_expected_parameter_index,PointsToFirstBadToken,
       "expected the index of a parameter to differentiate with respect to", ())
 ERROR(sil_autodiff_expected_result_index,PointsToFirstBadToken,
       "expected the index of a result to differentiate from", ())
+// SWIFT_ENABLE_TENSORFLOW
 ERROR(sil_inst_autodiff_operand_list_expected_lbrace,PointsToFirstBadToken,
       "expected '{' to start a derivative function list", ())
 ERROR(sil_inst_autodiff_operand_list_expected_comma,PointsToFirstBadToken,
@@ -1625,10 +1632,7 @@ ERROR(sil_inst_autodiff_expected_function_type_operand,PointsToFirstBadToken,
 ERROR(sil_inst_autodiff_expected_differentiability_witness_kind,PointsToFirstBadToken,
       "expected a differentiability witness kind, which can be one of '[jvp]', "
       "'[vjp]', or '[transpose]'", ())
-ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
-      "expected witness_generic signature '%0' does not have same generic "
-      "parameters as original function generic signature '%1'",
-      (StringRef, StringRef))
+// SWIFT_ENABLE_TENSORFLOW END
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics

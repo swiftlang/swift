@@ -14,3 +14,8 @@
 // RUN: %swiftc_driver -driver-print-jobs -emit-module %s -emit-module-path %t/build/sourceinfo_file.swiftmodule -module-name sourceinfo_file -emit-module-source-info-path %t/build/DriverPath.swiftsourceinfo | %FileCheck %s -check-prefix CHECK-DRIVER-OPT
 
 // CHECK-DRIVER-OPT: build{{[/\\]}}DriverPath.swiftsourceinfo
+
+// RUN: %empty-directory(%t/build)
+// RUN: %swiftc_driver -driver-print-jobs -emit-module %s -emit-module-path %t/build/sourceinfo_file.swiftmodule -module-name sourceinfo_file -avoid-emit-module-source-info | %FileCheck %s -check-prefix CHECK-DRIVER-AVOID
+
+// CHECK-DRIVER-AVOID-NOT: swiftsourceinfo

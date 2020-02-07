@@ -28,7 +28,6 @@
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
-// SWIFT_ENABLE_TENSORFLOW
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -107,6 +106,8 @@ enum class SILStage {
 /// when a Swift compilation context is lowered to SIL.
 class SILModule {
   friend class SILFunctionBuilder;
+  friend class SILGenSourceFileRequest;
+  friend class SILGenWholeModuleRequest;
 
 public:
   using FunctionListType = llvm::ilist<SILFunction>;
@@ -115,10 +116,8 @@ public:
   using PropertyListType = llvm::ilist<SILProperty>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
-  // SWIFT_ENABLE_TENSORFLOW
   using DifferentiabilityWitnessListType =
       llvm::ilist<SILDifferentiabilityWitness>;
-  // SWIFT_ENABLE_TENSORFLOW END
   using CoverageMapCollectionType =
       llvm::MapVector<StringRef, SILCoverageMap *>;
 
@@ -137,6 +136,7 @@ private:
   friend SILBasicBlock;
   friend SILCoverageMap;
   friend SILDefaultWitnessTable;
+  friend SILDifferentiabilityWitness;
   friend SILFunction;
   friend SILGlobalVariable;
   friend SILLayout;
@@ -203,7 +203,6 @@ private:
   /// The list of SILDefaultWitnessTables in the module.
   DefaultWitnessTableListType defaultWitnessTables;
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Lookup table for SIL differentiability witnesses, keyed by mangled name.
   llvm::StringMap<SILDifferentiabilityWitness *> DifferentiabilityWitnessMap;
 
@@ -214,7 +213,6 @@ private:
 
   /// The list of SILDifferentiabilityWitnesses in the module.
   DifferentiabilityWitnessListType differentiabilityWitnesses;
-  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Declarations which are externally visible.
   ///
@@ -477,7 +475,6 @@ public:
     return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   using differentiability_witness_iterator = DifferentiabilityWitnessListType::iterator;
   using differentiability_witness_const_iterator = DifferentiabilityWitnessListType::const_iterator;
   DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() { return differentiabilityWitnesses; }
@@ -496,7 +493,6 @@ public:
     return {differentiabilityWitnesses.begin(),
             differentiabilityWitnesses.end()};
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   void addExternallyVisibleDecl(ValueDecl *decl) {
     externallyVisible.insert(decl);
@@ -634,7 +630,6 @@ public:
   /// hierarchy of \p Class.
   SILFunction *lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Look up the differentiability witness with the given name.
   SILDifferentiabilityWitness *lookUpDifferentiabilityWitness(StringRef name);
 
@@ -648,8 +643,7 @@ public:
 
   /// Attempt to deserialize the SILDifferentiabilityWitness. Returns true if
   /// deserialization succeeded, false otherwise.
-  bool loadDifferentiabilityWitness(SILDifferentiabilityWitness *W);
-  // SWIFT_ENABLE_TENSORFLOW_END
+  bool loadDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
 
   // Given a protocol, attempt to create a default witness table declaration
   // for it.

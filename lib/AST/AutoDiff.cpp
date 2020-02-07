@@ -12,6 +12,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 

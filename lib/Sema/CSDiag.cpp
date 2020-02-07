@@ -195,16 +195,6 @@ public:
   /// Emit an ambiguity diagnostic about the specified expression.
   void diagnoseAmbiguity(Expr *E);
 
-  /// Attempt to produce a diagnostic for a mismatch between an expression's
-  /// type and its assumed contextual type.
-  bool diagnoseContextualConversionError(Expr *expr, Type contextualType,
-                                         ContextualTypePurpose CTP,
-                                         Type suggestedType = Type());
-
-  bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
-                                  CalleeCandidateInfo &CCI,
-                                  ArrayRef<Identifier> argLabels);
-
 private:
   /// Validate potential contextual type for type-checking one of the
   /// sub-expressions, usually correct/valid types are the ones which
@@ -394,15 +384,10 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // type check operation.
   Expr *preCheckedExpr = subExpr;
   
-  // Disable structural checks, because we know that the overall expression
-  // has type constraint problems, and we don't want to know about any
-  // syntactic issues in a well-typed subexpression (which might be because
-  // the context is missing).
-  TypeCheckExprOptions TCEOptions = TypeCheckExprFlags::DisableStructuralChecks;
-
   // Make sure that typechecker knows that this is an attempt
   // to diagnose a problem.
-  TCEOptions |= TypeCheckExprFlags::SubExpressionDiagnostics;
+  TypeCheckExprOptions TCEOptions =
+      TypeCheckExprFlags::SubExpressionDiagnostics;
 
   // Claim that the result is discarded to preserve the lvalue type of
   // the expression.
@@ -507,51 +492,6 @@ DeclContext *FailureDiagnosis::findDeclContext(Expr *subExpr) const {
 
   expr->walk(finder);
   return finder.DC;
-}
-
-bool FailureDiagnosis::diagnoseContextualConversionError(
-    Expr *expr, Type contextualType, ContextualTypePurpose CTP,
-    Type suggestedType) {
-  // If the constraint system has a contextual type, then we can test to see if
-  // this is the problem that prevents us from solving the system.
-  if (!contextualType)
-    return false;
-
-  // Try re-type-checking the expression without the contextual type to see if
-  // it can work without it.  If so, the contextual type is the problem.  We
-  // force a recheck, because "expr" is likely in our table with the extra
-  // contextual constraint that we know we are relaxing.
-  TCCOptions options = TCC_ForceRecheck;
-  if (contextualType->is<InOutType>())
-    options |= TCC_AllowLValue;
-
-  auto *recheckedExpr = typeCheckChildIndependently(expr, options);
-  auto exprType = recheckedExpr ? CS.getType(recheckedExpr) : Type();
-
-  // If there is a suggested type and re-typecheck failed, let's use it.
-  if (!exprType)
-    exprType = suggestedType;
-
-  // If it failed and diagnosed something, then we're done.
-  if (!exprType)
-    return CS.getASTContext().Diags.hadAnyError();
-
-  // If we don't have a type for the expression, then we cannot use it in
-  // conversion constraint diagnostic generation.  If the types match, then it
-  // must not be the contextual type that is the problem.
-  if (isUnresolvedOrTypeVarType(exprType) || exprType->isEqual(contextualType))
-    return false;
-
-  // Don't attempt fixits if we have an unsolved type variable, since
-  // the recovery path's recursion into the type checker via typeCheckCast()
-  // will confuse matters.
-  if (exprType->hasTypeVariable())
-    return false;
-
-  ContextualFailure failure(
-      CS, CTP, exprType, contextualType,
-      CS.getConstraintLocator(expr, LocatorPathElt::ContextualType()));
-  return failure.diagnoseAsError();
 }
 
 //===----------------------------------------------------------------------===//
@@ -963,223 +903,6 @@ decomposeArgType(Type argType, ArrayRef<Identifier> argLabels) {
   return result;
 }
 
-bool FailureDiagnosis::diagnoseImplicitSelfErrors(
-    Expr *fnExpr, Expr *argExpr, CalleeCandidateInfo &CCI,
-    ArrayRef<Identifier> argLabels) {
-  // If candidate list is empty it means that problem is somewhere else,
-  // since we need to have candidates which might be shadowing other funcs.
-  if (CCI.empty() || !CCI[0].getDecl())
-    return false;
-
-  auto &ctx = CS.getASTContext();
-  // Call expression is formed as 'foo.bar' where 'foo' might be an
-  // implicit "Self" reference, such use wouldn't provide good diagnostics
-  // for situations where instance members have equal names to functions in
-  // Swift Standard Library e.g. min/max.
-  auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr);
-  if (!UDE)
-    return false;
-
-  auto baseExpr = dyn_cast<DeclRefExpr>(UDE->getBase());
-  if (!baseExpr)
-    return false;
-
-  auto baseDecl = baseExpr->getDecl();
-  if (!baseExpr->isImplicit() || baseDecl->getFullName() != ctx.Id_self)
-    return false;
-
-  // Our base expression is an implicit 'self.' reference e.g.
-  //
-  // extension Sequence {
-  //   func test() -> Int {
-  //     return max(1, 2)
-  //   }
-  // }
-  //
-  // In this example the Sequence class already has two methods named 'max'
-  // none of which accept two arguments, but there is a function in
-  // Swift Standard Library called 'max' which does accept two arguments,
-  // so user might have called that by mistake without realizing that
-  // compiler would add implicit 'self.' prefix to the call of 'max'.
-  auto argType = CS.getType(argExpr);
-  // If argument wasn't properly type-checked, let's retry without changing AST.
-  if (!argType || argType->hasUnresolvedType() || argType->hasTypeVariable() ||
-      argType->hasTypeParameter()) {
-    auto *argTuple = dyn_cast<TupleExpr>(argExpr);
-    if (!argTuple) {
-      // Bail out if we don't have a well-formed argument list.
-      return false;
-    }
-    
-    // Let's type check individual argument expressions without any
-    // contextual information to try to recover an argument type that
-    // matches what the user actually wrote instead of what the typechecker
-    // expects.
-    SmallVector<TupleTypeElt, 4> elts;
-    for (unsigned i = 0, e = argTuple->getNumElements(); i < e; ++i) {
-      ConcreteDeclRef ref = nullptr;
-      auto *el = argTuple->getElement(i);
-      auto typeResult =
-          TypeChecker::getTypeOfExpressionWithoutApplying(el, CS.DC, ref);
-      if (!typeResult)
-        return false;
-      auto flags = ParameterTypeFlags().withInOut(typeResult->is<InOutType>());
-      elts.push_back(TupleTypeElt(typeResult->getInOutObjectType(),
-                                  argTuple->getElementName(i),
-                                  flags));
-    }
-
-    argType = TupleType::get(elts, CS.getASTContext());
-  }
-
-  auto typeKind = argType->getKind();
-  if (typeKind != TypeKind::Tuple && typeKind != TypeKind::Paren)
-    return false;
-
-  // If argument type couldn't be properly resolved or has errors,
-  // we can't diagnose anything in here, it points to the different problem.
-  if (isUnresolvedOrTypeVarType(argType) || argType->hasError())
-    return false;
-
-  auto context = CS.DC;
-  using CandidateMap =
-      llvm::SmallDenseMap<ValueDecl *, llvm::SmallVector<OverloadChoice, 2>>;
-
-  auto getBaseKind = [](ValueDecl *base) -> DescriptiveDeclKind {
-    DescriptiveDeclKind kind = DescriptiveDeclKind::Module;
-    if (!base)
-      return kind;
-
-    auto context = base->getDeclContext();
-    do {
-      if (isa<ExtensionDecl>(context))
-        return DescriptiveDeclKind::Extension;
-
-      if (auto nominal = dyn_cast<NominalTypeDecl>(context)) {
-        kind = nominal->getDescriptiveKind();
-        break;
-      }
-
-      context = context->getParent();
-    } while (context);
-
-    return kind;
-  };
-
-  auto diagnoseShadowing = [&](ValueDecl *base,
-                               ArrayRef<OverloadChoice> candidates) -> bool {
-    CalleeCandidateInfo calleeInfo(base ? base->getInterfaceType() : nullptr,
-                                   candidates, CCI.hasTrailingClosure, CS,
-                                   base);
-
-    calleeInfo.filterListArgs(decomposeArgType(argType, argLabels));
-
-    auto diagnostic = diag::member_shadows_global_function_near_match;
-    switch (calleeInfo.closeness) {
-    case CC_Unavailable:
-    case CC_Inaccessible:
-    case CC_SelfMismatch:
-    case CC_ArgumentLabelMismatch:
-    case CC_ArgumentCountMismatch:
-    case CC_GeneralMismatch:
-      return false;
-
-    case CC_NonLValueInOut:
-    case CC_OneArgumentNearMismatch:
-    case CC_OneArgumentMismatch:
-    case CC_OneGenericArgumentNearMismatch:
-    case CC_OneGenericArgumentMismatch:
-    case CC_ArgumentNearMismatch:
-    case CC_ArgumentMismatch:
-    case CC_GenericNonsubstitutableMismatch:
-      break; // Near match cases
-
-    case CC_ExactMatch:
-      diagnostic = diag::member_shadows_global_function;
-      break;
-    }
-
-    auto choice = calleeInfo.candidates[0].getDecl();
-    auto baseKind = getBaseKind(base);
-    auto baseName = getBaseName(choice->getDeclContext());
-
-    auto origCandidate = CCI[0].getDecl();
-    ctx.Diags.diagnose(UDE->getLoc(), diagnostic, UDE->getName(),
-                      origCandidate->getDescriptiveKind(),
-                      origCandidate->getFullName(),
-                      choice->getDescriptiveKind(),
-                      choice->getFullName(), baseKind, baseName);
-
-    auto topLevelDiag = diag::fix_unqualified_access_top_level;
-    if (baseKind == DescriptiveDeclKind::Module)
-      topLevelDiag = diag::fix_unqualified_access_top_level_multi;
-
-    emitFixItForExplicitlyQualifiedReference(ctx.Diags, UDE, topLevelDiag,
-                                             baseName,
-                                             choice->getDescriptiveKind());
-
-    for (auto &candidate : calleeInfo.candidates) {
-      if (auto decl = candidate.getDecl())
-        ctx.Diags.diagnose(decl, diag::decl_declared_here, decl->getFullName());
-    }
-
-    return true;
-  };
-
-  // For each of the parent contexts, let's try to find any candidates
-  // which have the same name and the same number of arguments as callee.
-  while (context->getParent()) {
-    auto result =
-        TypeChecker::lookupUnqualified(context, UDE->getName(), UDE->getLoc());
-    context = context->getParent();
-
-    if (!result || result.empty())
-      continue;
-
-    CandidateMap candidates;
-    for (const auto &candidate : result) {
-      auto base = candidate.getBaseDecl();
-      auto decl = candidate.getValueDecl();
-      if ((base && base->isInvalid()) || decl->isInvalid())
-        continue;
-
-      // If base is present but it doesn't represent a valid nominal,
-      // we can't use current candidate as one of the choices.
-      if (base && !base->getInterfaceType()->getNominalOrBoundGenericNominal())
-        continue;
-
-      auto context = decl->getDeclContext();
-      // We are only interested in static or global functions, because
-      // there is no way to call anything else properly.
-      if (!decl->isStatic() && !context->isModuleScopeContext())
-        continue;
-
-      OverloadChoice choice(base ? base->getInterfaceType() : nullptr,
-                            decl, UDE->getFunctionRefKind());
-
-      if (base) { // Let's group all of the candidates have a common base.
-        candidates[base].push_back(choice);
-        continue;
-      }
-
-      // If there is no base, it means this is one of the global functions,
-      // let's try to diagnose its shadowing inline.
-      if (diagnoseShadowing(base, choice))
-        return true;
-    }
-
-    if (candidates.empty())
-      continue;
-
-    for (const auto &candidate : candidates) {
-      if (diagnoseShadowing(candidate.getFirst(), candidate.getSecond()))
-        return true;
-    }
-  }
-
-  return false;
-}
-
 // Extract expression for failed argument number
 static Expr *getFailedArgumentExpr(CalleeCandidateInfo CCI, Expr *argExpr) {
   if (auto *TE = dyn_cast<TupleExpr>(argExpr))
@@ -1201,10 +924,6 @@ static Expr *getFailedArgumentExpr(CalleeCandidateInfo CCI, Expr *argExpr) {
 bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
                                                Expr *fnExpr, Expr *argExpr,
                                                ArrayRef<Identifier> argLabels) {
-  // Try to diagnose errors related to the use of implicit self reference.
-  if (diagnoseImplicitSelfErrors(fnExpr, argExpr, CCI, argLabels))
-    return true;
-
   // If we have a failure where the candidate set differs on exactly one
   // argument, and where we have a consistent mismatch across the candidate set
   // (often because there is only one candidate in the set), then diagnose this
@@ -1484,13 +1203,6 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
 
     // Now, attempt to diagnose the failure from the info we've collected.
     if (diagnosis.diagnoseExprFailure())
-      return;
-
-    // If this is a contextual conversion problem, dig out some information.
-    if (diagnosis.diagnoseContextualConversionError(
-            expr,
-            getContextualType(expr),
-            getContextualTypePurpose(expr)))
       return;
 
     // If no one could find a problem with this expression or constraint system,

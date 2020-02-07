@@ -128,7 +128,6 @@ lookupDefaultWitnessTable(SILDefaultWitnessTable *WT) {
   return nullptr;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 SILDifferentiabilityWitness *
 SerializedSILLoader::lookupDifferentiabilityWitness(
     SILDifferentiabilityWitnessKey key) {
@@ -136,15 +135,14 @@ SerializedSILLoader::lookupDifferentiabilityWitness(
   std::string mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(key);
   // It is possible that one module has a declaration of a
   // SILDifferentiabilityWitness, while another has the full definition.
-  SILDifferentiabilityWitness *wit = nullptr;
+  SILDifferentiabilityWitness *dw = nullptr;
   for (auto &Des : LoadedSILSections) {
-    wit = Des->lookupDifferentiabilityWitness(mangledKey);
-    if (wit && wit->isDefinition())
-      return wit;
+    dw = Des->lookupDifferentiabilityWitness(mangledKey);
+    if (dw && dw->isDefinition())
+      return dw;
   }
-  return wit;
+  return dw;
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 void SerializedSILLoader::invalidateCaches() {
   for (auto &Des : LoadedSILSections)

@@ -1356,7 +1356,8 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
       AvailabilityContext::forDeploymentTarget(context);
   return IRGen.Opts.PrespecializeGenericMetadata && 
     deploymentAvailability.isContainedIn(
-      context.getPrespecializedGenericMetadataAvailability());
+      context.getPrespecializedGenericMetadataAvailability()) &&
+    (Triple.isOSDarwin() || Triple.isTvOS() || Triple.isOSLinux());
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -187,6 +187,8 @@ TEST(IndexSubset, Insertion) {
   EXPECT_EQ(indices1->adding(3, ctx.Ctx),
             IndexSubset::get(ctx.Ctx, 5, {0, 2, 3, 4}));
 }
+
+// SWIFT_ENABLE_TENSORFLOW
 TEST(IndexSubset, Lowering) {
   TestContext testCtx;
   auto &C = testCtx.Ctx;
@@ -299,4 +301,28 @@ TEST(IndexSubset, GetSubsetParameterTypes) {
     EXPECT_TRUE(std::equal(subset.begin(), subset.end(), expected,
                     [](Type ty1, Type ty2) { return ty1->isEqual(ty2); }));
   }
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
+TEST(IndexSubset, FindNext) {
+  TestContext ctx;
+  auto *indices1 = IndexSubset::get(ctx.Ctx, 5, {1, 2, 4});
+  EXPECT_EQ(indices1->findFirst(), 1);
+  EXPECT_EQ(indices1->findNext(/*startIndex*/ -1), 1);
+  EXPECT_EQ(indices1->findNext(/*startIndex*/ 0), 1);
+  EXPECT_EQ(indices1->findNext(/*startIndex*/ 1), 2);
+  EXPECT_EQ(indices1->findNext(/*startIndex*/ 2), 4);
+  EXPECT_EQ(indices1->findNext(/*startIndex*/ 3), 4);
+}
+
+TEST(IndexSubset, FindPrevious) {
+  TestContext ctx;
+  auto *indices1 = IndexSubset::get(ctx.Ctx, 5, {0, 2, 4});
+  EXPECT_EQ(indices1->findLast(), 4);
+  EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 5), 4);
+  EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 4), 2);
+  EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 3), 2);
+  EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 2), 0);
+  EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 1), 0);
+  EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 0), -1);
 }

@@ -14,7 +14,6 @@ import os
 
 import android.adb.commands
 
-from swift_build_support.swift_build_support import host
 from swift_build_support.swift_build_support import targets
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
@@ -479,15 +478,14 @@ def create_argument_parser():
     option('--clang-profile-instr-use', store_path,
            help='profile file to use for clang PGO')
 
-    default_max_lto_link_job_counts = host.max_lto_link_job_counts()
     option('--llvm-max-parallel-lto-link-jobs', store_int,
-           default=default_max_lto_link_job_counts['llvm'],
+           default=defaults.LLVM_MAX_PARALLEL_LTO_LINK_JOBS,
            metavar='COUNT',
            help='the maximum number of parallel link jobs to use when '
                 'compiling llvm')
 
     option('--swift-tools-max-parallel-lto-link-jobs', store_int,
-           default=default_max_lto_link_job_counts['swift'],
+           default=defaults.SWIFT_MAX_PARALLEL_LTO_LINK_JOBS,
            metavar='COUNT',
            help='the maximum number of parallel link jobs to use when '
                 'compiling swift tools.')

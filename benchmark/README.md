@@ -67,6 +67,9 @@ The following build options are available:
     * Enable this option to link the benchmark binaries against the target
       machine's Swift standard library and runtime installed with the OS.
     (default: OFF)
+* `-DSWIFT_BENCHMARK_GENERATE_DEBUG_INFO`
+    * Enable this option to compile benchmark binaries with debug info.
+    (default: ON)
 
 The following build targets are available:
 

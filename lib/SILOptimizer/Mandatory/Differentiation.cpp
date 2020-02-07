@@ -471,7 +471,7 @@ emitDerivativeFunctionReference(
   if (auto diffableFnType =
           functionSource->getType().castTo<SILFunctionType>()) {
     if (diffableFnType->isDifferentiable()) {
-      auto paramIndices = diffableFnType->getDifferentiationParameterIndices();
+      auto paramIndices = diffableFnType->getDifferentiabilityParameterIndices();
       for (auto i : desiredIndices.parameters->getIndices()) {
         if (!paramIndices->contains(i)) {
           context.emitNondifferentiabilityError(

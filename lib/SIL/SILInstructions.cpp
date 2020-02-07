@@ -705,7 +705,7 @@ getExtracteeType(
     return SILType::getPrimitiveObjectType(originalFnTy);
   }
   auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-        fnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+        fnTy->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
         *kindOpt, module.Types,
         LookUpConformanceInModule(module.getSwiftModule()));
   return SILType::getPrimitiveObjectType(resultFnTy);
@@ -741,7 +741,7 @@ getExtracteeType(
     return SILType::getPrimitiveObjectType(originalFnTy);
   case LinearDifferentiableFunctionTypeComponent::Transpose:
     auto transposeFnTy = originalFnTy->getAutoDiffTransposeFunctionType(
-        fnTy->getDifferentiationParameterIndices(), module.Types,
+        fnTy->getDifferentiabilityParameterIndices(), module.Types,
         LookUpConformanceInModule(module.getSwiftModule()));
     return SILType::getPrimitiveObjectType(transposeFnTy);
   }

@@ -269,11 +269,11 @@ namespace {
       // `SILFunctionType:getAutoDiffDerivativeFunctionType` for correct type
       // lowering.
       auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
-          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+          type->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
           AutoDiffDerivativeFunctionKind::JVP, TC,
           LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
       auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
-          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+          type->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
           AutoDiffDerivativeFunctionKind::VJP, TC,
           LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
       RecursiveProperties props;
@@ -289,7 +289,7 @@ namespace {
       auto &M = TC.M;
       auto origTy = type->getWithoutDifferentiability();
       auto transTy = origTy->getAutoDiffTransposeFunctionType(
-          type->getDifferentiationParameterIndices(), TC,
+          type->getDifferentiabilityParameterIndices(), TC,
           LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
       RecursiveProperties props;
       props.addSubobject(classifyType(origType, origTy, TC, Expansion));
@@ -921,7 +921,7 @@ namespace {
                               ArrayRef<SILValue> values) const override {
       assert(values.size() == 3);
       auto fnTy = getLoweredType().castTo<SILFunctionType>();
-      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      auto paramIndices = fnTy->getDifferentiabilityParameterIndices();
       return B.createDifferentiableFunction(
           loc, paramIndices, values[0], std::make_pair(values[1], values[2]));
     }
@@ -932,7 +932,7 @@ namespace {
       auto numDerivativeFns = 2;
       children.reserve(numDerivativeFns + 1);
       auto origFnTy = fnTy->getWithoutDifferentiability();
-      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      auto paramIndices = fnTy->getDifferentiabilityParameterIndices();
       children.push_back(Child{
         NormalDifferentiableFunctionTypeComponent::Original,
         TC.getTypeLowering(origFnTy, getExpansionContext())
@@ -975,7 +975,7 @@ namespace {
                               ArrayRef<SILValue> values) const override {
       assert(values.size() == 2);
       auto fnTy = getLoweredType().castTo<SILFunctionType>();
-      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      auto paramIndices = fnTy->getDifferentiabilityParameterIndices();
       return B.createLinearFunction(loc, paramIndices, values[0], values[1]);
     }
 
@@ -984,7 +984,7 @@ namespace {
       auto fnTy = getLoweredType().castTo<SILFunctionType>();
       children.reserve(2);
       auto origFnTy = fnTy->getWithoutDifferentiability();
-      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      auto paramIndices = fnTy->getDifferentiabilityParameterIndices();
       children.push_back(Child{
         LinearDifferentiableFunctionTypeComponent::Original,
         TC.getTypeLowering(origFnTy, getExpansionContext())

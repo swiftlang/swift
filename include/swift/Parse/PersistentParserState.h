@@ -59,22 +59,11 @@ public:
 /// Parser state persistent across multiple parses.
 class PersistentParserState {
 public:
-  struct ParserPos {
-    SourceLoc Loc;
-    SourceLoc PrevLoc;
-
-    bool isValid() const { return Loc.isValid(); }
-  };
-
-  bool InPoundLineEnvironment = false;
   // FIXME: When condition evaluation moves to a later phase, remove this bit
   // and adjust the client call 'performParseOnly'.
   bool PerformConditionEvaluation = true;
 private:
   swift::ScopeInfo ScopeInfo;
-
-  /// Parser sets this if it stopped parsing before the buffer ended.
-  ParserPosition MarkedPos;
 
   std::unique_ptr<CodeCompletionDelayedDeclState> CodeCompletionDelayedDeclStat;
 
@@ -112,19 +101,6 @@ public:
 
   TopLevelContext &getTopLevelContext() {
     return TopLevelCode;
-  }
-
-  void markParserPosition(ParserPosition Pos,
-                          bool InPoundLineEnvironment) {
-    MarkedPos = Pos;
-    this->InPoundLineEnvironment = InPoundLineEnvironment;
-  }
-
-  /// Returns the marked parser position and resets it.
-  ParserPosition takeParserPosition() {
-    ParserPosition Pos = MarkedPos;
-    MarkedPos = ParserPosition();
-    return Pos;
   }
 };
 

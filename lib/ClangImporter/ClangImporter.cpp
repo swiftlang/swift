@@ -3057,33 +3057,25 @@ void ClangImporter::loadObjCMethods(
 
   // Collect the set of visible Objective-C methods with this selector.
   clang::Selector clangSelector = Impl.exportSelector(selector);
-  SmallVector<clang::ObjCMethodDecl *, 4> objcMethods;
-  auto &sema = Impl.Instance->getSema();
-  sema.CollectMultipleMethodsInGlobalPool(clangSelector, objcMethods,
-                                          isInstanceMethod,
-                                          /*CheckTheOther=*/false);
 
-  // Check whether this method is in the class we care about.
-  SmallVector<AbstractFunctionDecl *, 4> foundMethods;
-  for (auto objcMethod : objcMethods) {
-    // Find the owner of this method and determine whether it is the class
-    // we're looking for.
-    if (objcMethod->getClassInterface() != objcClass)
-      continue;
+  AbstractFunctionDecl *method = nullptr;
+  auto *objcMethod = objcClass->lookupMethod(
+      clangSelector, isInstanceMethod,
+      /*shallowCategoryLookup=*/false,
+      /*followSuper=*/false);
 
+  if (objcMethod) {
     // If we found a property accessor, import the property.
     if (objcMethod->isPropertyAccessor())
       (void)Impl.importDecl(objcMethod->findPropertyDecl(true),
                             Impl.CurrentVersion);
 
-    if (auto method = dyn_cast_or_null<AbstractFunctionDecl>(
-                        Impl.importDecl(objcMethod, Impl.CurrentVersion))) {
-      foundMethods.push_back(method);
-    }
+    method = dyn_cast_or_null<AbstractFunctionDecl>(
+        Impl.importDecl(objcMethod, Impl.CurrentVersion));
   }
 
   // If we didn't find anything, we're done.
-  if (foundMethods.empty())
+  if (method == nullptr)
     return;
 
   // If we did find something, it might be a duplicate of something we found
@@ -3092,10 +3084,9 @@ void ClangImporter::loadObjCMethods(
   // FIXME: We shouldn't need to do this.
   llvm::SmallPtrSet<AbstractFunctionDecl *, 4> known;
   known.insert(methods.begin(), methods.end());
-  for (auto method : foundMethods) {
-    if (known.insert(method).second)
-      methods.push_back(method);
-  }
+
+  if (known.insert(method).second)
+    methods.push_back(method);
 }
 
 void
@@ -3756,51 +3747,18 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
   }
 }
 
-// Force the members of the entire inheritance hierarchy to be loaded and
-// deserialized before loading the named member of this class. This allows the
-// decl members table to be warmed up and enables the correct identification of
-// overrides.
-//
-// FIXME: Very low hanging fruit: Loading everything is extremely wasteful. We
-// should be able to just load the name lazy member loading is asking for.
-static void ensureSuperclassMembersAreLoaded(const ClassDecl *CD) {
-  if (!CD)
-    return;
-
-  CD = CD->getSuperclassDecl();
-  if (!CD || !CD->hasClangNode())
-    return;
-  
-  CD->loadAllMembers();
-
-  for (auto *ED : const_cast<ClassDecl *>(CD)->getExtensions())
-    ED->loadAllMembers();
-}
-
 Optional<TinyPtrVector<ValueDecl *>>
 ClangImporter::Implementation::loadNamedMembers(
     const IterableDeclContext *IDC, DeclBaseName N, uint64_t contextData) {
 
   auto *D = IDC->getDecl();
-  auto *DC = cast<DeclContext>(D);
+  auto *DC = D->getInnermostDeclContext();
   auto *CD = D->getClangDecl();
   auto *CDC = cast<clang::DeclContext>(CD);
   assert(CD && "loadNamedMembers on a Decl without a clangDecl");
 
   auto *nominal = DC->getSelfNominalTypeDecl();
   auto effectiveClangContext = getEffectiveClangContext(nominal);
-
-  // FIXME: The legacy of mirroring protocol members rears its ugly head,
-  // and as a result we have to bail on any @interface or @category that
-  // has a declared protocol conformance.
-  if (auto *ID = dyn_cast<clang::ObjCInterfaceDecl>(CD)) {
-    if (ID->protocol_begin() != ID->protocol_end())
-      return None;
-  }
-  if (auto *CCD = dyn_cast<clang::ObjCCategoryDecl>(CD)) {
-    if (CCD->protocol_begin() != CCD->protocol_end())
-      return None;
-  }
 
   // There are 3 cases:
   //
@@ -3825,7 +3783,16 @@ ClangImporter::Implementation::loadNamedMembers(
 
   assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD));
 
-  ensureSuperclassMembersAreLoaded(dyn_cast<ClassDecl>(D));
+  // Force the members of the entire inheritance hierarchy to be loaded and
+  // deserialized before loading the named member of a class. This warms up
+  // ClangImporter::Implementation::MembersForNominal, used for computing
+  // property overrides.
+  //
+  // FIXME: If getOverriddenDecl() kicked off a request for imported decls,
+  // we could postpone this until overrides are actually requested.
+  if (auto *classDecl = dyn_cast<ClassDecl>(D))
+    if (auto *superclassDecl = classDecl->getSuperclassDecl())
+      (void) const_cast<ClassDecl *>(superclassDecl)->lookupDirect(N);
 
   TinyPtrVector<ValueDecl *> Members;
   for (auto entry : table->lookup(SerializedSwiftName(N),
@@ -3855,7 +3822,7 @@ ClangImporter::Implementation::loadNamedMembers(
     auto member = entry.get<clang::NamedDecl *>();
     if (!isVisibleClangEntry(member)) continue;
 
-     // Skip Decls from different clang::DeclContexts
+    // Skip Decls from different clang::DeclContexts
     if (member->getDeclContext() != CDC) continue;
 
     SmallVector<Decl*, 4> tmp;
@@ -3879,6 +3846,16 @@ ClangImporter::Implementation::loadNamedMembers(
         Members.push_back(cast<ValueDecl>(ctor));
     }
   }
+
+  if (!isa<ProtocolDecl>(D)) {
+    if (auto *OCD = dyn_cast<clang::ObjCContainerDecl>(CD)) {
+      SmallVector<Decl *, 1> newMembers;
+      importMirroredProtocolMembers(OCD, DC, N, newMembers);
+      for (auto member : newMembers)
+          Members.push_back(cast<ValueDecl>(member));
+    }
+  }
+
   return Members;
 }
 

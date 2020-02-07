@@ -573,7 +573,7 @@ ManagedValue Transform::transform(ManagedValue v,
       instanceType = metatypeType.getInstanceType();
 
     auto layout = instanceType.getExistentialLayout();
-    if (layout.explicitSuperclass) {
+    if (layout.getSuperclass()) {
       CanType openedType = OpenedArchetypeType::getAny(inputSubstType);
       SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
@@ -3385,7 +3385,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
   auto vjpThunk = createDerivativeFnThunk(AutoDiffDerivativeFunctionKind::VJP);
 
   SILValue convertedBundle = SGF.B.createDifferentiableFunction(
-      loc, sourceType->getDifferentiationParameterIndices(),
+      loc, sourceType->getDifferentiabilityParameterIndices(),
       originalThunk.forward(SGF),
       std::make_pair(jvpThunk.forward(SGF), vjpThunk.forward(SGF)));
   return SGF.emitManagedRValueWithCleanup(convertedBundle);

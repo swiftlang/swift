@@ -1852,7 +1852,56 @@ namespace {
         
         return contextualArrayType;
       }
-      
+
+      // Produce a specialized diagnostic if this is an attempt to initialize
+      // or convert an array literal to a dictionary e.g.
+      // `let _: [String: Int] = ["A", 0]`
+      auto isDictionaryContextualType = [&](Type contextualType) -> bool {
+        if (!contextualType)
+          return false;
+
+        auto type = contextualType->lookThroughAllOptionalTypes();
+        if (conformsToKnownProtocol(
+                CS, type, KnownProtocolKind::ExpressibleByArrayLiteral))
+          return false;
+
+        return conformsToKnownProtocol(
+            CS, type, KnownProtocolKind::ExpressibleByDictionaryLiteral);
+      };
+
+      if (isDictionaryContextualType(contextualType)) {
+        auto &DE = CS.getASTContext().Diags;
+        auto numElements = expr->getNumElements();
+
+        if (numElements == 0) {
+          DE.diagnose(expr->getStartLoc(),
+                      diag::should_use_empty_dictionary_literal)
+              .fixItInsert(expr->getEndLoc(), ":");
+          return nullptr;
+        }
+
+        bool isIniting =
+            CS.getContextualTypePurpose(expr) == CTP_Initialization;
+        DE.diagnose(expr->getStartLoc(), diag::should_use_dictionary_literal,
+                    contextualType->lookThroughAllOptionalTypes(), isIniting);
+
+        auto diagnostic =
+            DE.diagnose(expr->getStartLoc(), diag::meant_dictionary_lit);
+
+        // If there is an even number of elements in the array, let's produce
+        // a fix-it which suggests to replace "," with ":" to form a dictionary
+        // literal.
+        if ((numElements & 1) == 0) {
+          const auto commaLocs = expr->getCommaLocs();
+          if (commaLocs.size() == numElements - 1) {
+            for (unsigned i = 0, e = numElements / 2; i != e; ++i)
+              diagnostic.fixItReplace(commaLocs[i * 2], ":");
+          }
+        }
+
+        return nullptr;
+      }
+
       auto arrayTy = CS.createTypeVariable(locator,
                                            TVO_PrefersSubtypeBinding |
                                            TVO_CanBindToNoEscape);
@@ -3831,8 +3880,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
 
     case StmtConditionElement::CK_Boolean: {
       Expr *condExpr = condElement.getBoolean();
-      setContextualType(condExpr, TypeLoc::withoutLoc(boolTy), CTP_Condition,
-                        /*isOpaqueReturnType=*/false);
+      setContextualType(condExpr, TypeLoc::withoutLoc(boolTy), CTP_Condition);
 
       condExpr = generateConstraints(condExpr, dc);
       if (!condExpr) {

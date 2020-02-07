@@ -1504,7 +1504,7 @@ for host in "${ALL_HOSTS[@]}"; do
         module_cache="${build_dir}/module-cache"
 
         # Add any specific cmake options specified by build-script
-        product_cmake_options_name=$(to_varname "${product}")_CMAKE_OPTIONS
+        product_cmake_options_name=$(to_varname "${product/_static}")_CMAKE_OPTIONS
         product_cmake_options=(${!product_cmake_options_name}) # convert to array
         cmake_options+=("${product_cmake_options[@]}")
 

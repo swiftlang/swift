@@ -262,11 +262,15 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
 /// and the contextual type.
 static Optional<std::tuple<ContextualTypePurpose, Type, Type>>
 getStructuralTypeContext(ConstraintSystem &cs, ConstraintLocator *locator) {
-  if (auto contextualType = cs.getContextualType(locator->getAnchor())) {
-    if (auto *anchor = simplifyLocatorToAnchor(locator))
-      return std::make_tuple(cs.getContextualTypePurpose(locator->getAnchor()),
-                             cs.getType(anchor),
-                             contextualType);
+  if (locator->findLast<LocatorPathElt::ContextualType>()) {
+    assert(locator->isLastElement<LocatorPathElt::ContextualType>() ||
+           locator->isLastElement<LocatorPathElt::FunctionArgument>());
+
+    auto *anchor = locator->getAnchor();
+    auto contextualType = cs.getContextualType(anchor);
+    auto exprType = cs.getType(anchor);
+    return std::make_tuple(cs.getContextualTypePurpose(anchor), exprType,
+                           contextualType);
   } else if (auto argApplyInfo = cs.getFunctionArgApplyInfo(locator)) {
     return std::make_tuple(CTP_CallArgument,
                            argApplyInfo->getArgType(),
@@ -1216,4 +1220,16 @@ AllowNonClassTypeToConvertToAnyObject::create(ConstraintSystem &cs, Type type,
                                               ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowNonClassTypeToConvertToAnyObject(cs, type, locator);
+}
+
+bool AddQualifierToAccessTopLevelName::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+  MissingQuialifierInMemberRefFailure failure(cs, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AddQualifierToAccessTopLevelName *
+AddQualifierToAccessTopLevelName::create(ConstraintSystem &cs,
+                                         ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AddQualifierToAccessTopLevelName(cs, locator);
 }

@@ -772,7 +772,7 @@ void JVPEmitter::emitTangentForApplyInst(
       if (!origCalleeType->isDifferentiable())
         continue;
       auto actualOrigCalleeIndices =
-          origCalleeType->getDifferentiationParameterIndices();
+          origCalleeType->getDifferentiabilityParameterIndices();
       if (actualOrigCalleeIndices->contains(i)) {
         SILValue tanParam;
         if (origArg->getType().isObject()) {
@@ -1244,7 +1244,7 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
   // If functionSource is a `@differentiable` function, just extract it.
   auto originalFnTy = original->getType().castTo<SILFunctionType>();
   if (originalFnTy->isDifferentiable()) {
-    auto paramIndices = originalFnTy->getDifferentiationParameterIndices();
+    auto paramIndices = originalFnTy->getDifferentiabilityParameterIndices();
     for (auto i : indices.parameters->getIndices()) {
       if (!paramIndices->contains(i)) {
         context.emitNondifferentiabilityError(

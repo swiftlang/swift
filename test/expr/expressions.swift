@@ -36,7 +36,7 @@ func basictest() {
 
   var x4 : Bool = true
   var x5 : Bool =
-        4 // expected-error {{cannot convert value of type 'Int' to specified type 'Bool'}}
+        4 // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 
   //var x6 : Float = 4+5
 
@@ -295,7 +295,7 @@ func fib(_ n: Int) -> Int {
 
 // FIXME: Should warn about integer constants being too large <rdar://problem/14070127>
 var
-   il_a: Bool = 4  // expected-error {{cannot convert value of type 'Int' to specified type 'Bool'}}
+   il_a: Bool = 4  // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 var il_b: Int8
    = 123123
 var il_c: Int8 = 4  // ok
@@ -804,13 +804,13 @@ func testParenExprInTheWay() {
   let x = 42
   
   if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-  // expected-error@-1 {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
   if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-  // expected-error@-1 {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
   if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
+  // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 
-  if x & x {} // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if x & x {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 }
 
 // <rdar://problem/21352576> Mixed method/property overload groups can cause a crash during constraint optimization

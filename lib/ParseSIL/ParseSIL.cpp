@@ -78,9 +78,7 @@ public:
   bool parseSILGlobal(Parser &P) override;
   bool parseSILWitnessTable(Parser &P) override;
   bool parseSILDefaultWitnessTable(Parser &P) override;
-  // SWIFT_ENABLE_TENSORFLOW
   bool parseSILDifferentiabilityWitness(Parser &P) override;
-  // SWIFT_ENABLE_TENSORFLOW END
   bool parseSILCoverageMap(Parser &P) override;
   bool parseSILProperty(Parser &P) override;
   bool parseSILScope(Parser &P) override;
@@ -117,16 +115,9 @@ void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
   out << '\n';
 }
 
-static void parseIntoSourceFileImpl(SourceFile &SF,
-                                    unsigned BufferID,
-                                    bool *Done,
-                                    SILParserState *SIL,
-                                    PersistentParserState *PersistentState,
-                                    bool FullParse,
-                                    bool DelayBodyParsing) {
-  assert((!FullParse || (SF.canBeParsedInFull() && !SIL)) &&
-         "cannot parse in full with the given parameters!");
-
+void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
+                                PersistentParserState *PersistentState,
+                                bool DelayBodyParsing) {
   std::shared_ptr<SyntaxTreeCreator> STreeCreator;
   if (SF.shouldBuildSyntaxTree()) {
     STreeCreator = std::make_shared<SyntaxTreeCreator>(
@@ -143,21 +134,15 @@ static void parseIntoSourceFileImpl(SourceFile &SF,
     DelayBodyParsing = false;
   if (SF.shouldBuildSyntaxTree())
     DelayBodyParsing = false;
-  if (SIL)
-    DelayBodyParsing = false;
 
   FrontendStatsTracer tracer(SF.getASTContext().Stats, "Parsing");
-  Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr,
-           PersistentState, STreeCreator, DelayBodyParsing);
+  Parser P(BufferID, SF, /*SIL*/ nullptr, PersistentState, STreeCreator,
+           DelayBodyParsing);
   PrettyStackTraceParser StackTrace(P);
 
   llvm::SaveAndRestore<NullablePtr<llvm::MD5>> S(P.CurrentTokenHash,
                                                  SF.getInterfaceHashPtr());
-
-  do {
-    P.parseTopLevel();
-    *Done = P.Tok.is(tok::eof);
-  } while (FullParse && !*Done);
+  P.parseTopLevel();
 
   if (STreeCreator) {
     auto rawNode = P.finalizeSyntaxTree();
@@ -165,27 +150,17 @@ static void parseIntoSourceFileImpl(SourceFile &SF,
   }
 }
 
-void swift::parseIntoSourceFile(SourceFile &SF,
-                                unsigned BufferID,
-                                bool *Done,
-                                SILParserState *SIL,
-                                PersistentParserState *PersistentState,
-                                bool DelayBodyParsing) {
-  parseIntoSourceFileImpl(SF, BufferID, Done, SIL,
-                          PersistentState,
-                          /*FullParse=*/SF.shouldBuildSyntaxTree(),
-                          DelayBodyParsing);
-}
+void swift::parseSourceFileSIL(SourceFile &SF, SILParserState *sil) {
+  auto bufferID = SF.getBufferID();
+  assert(bufferID);
 
-void swift::parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
-                                    PersistentParserState *PersistentState,
-                                    bool DelayBodyParsing) {
-  bool Done = false;
-  parseIntoSourceFileImpl(SF, BufferID, &Done, /*SIL=*/nullptr,
-                          PersistentState, /*FullParse=*/true,
-                          DelayBodyParsing);
+  FrontendStatsTracer tracer(SF.getASTContext().Stats, "Parsing SIL");
+  Parser parser(*bufferID, SF, sil->Impl.get(),
+                /*persistentParserState*/ nullptr,
+                /*syntaxTreeCreator*/ nullptr, /*delayBodyParsing*/ false);
+  PrettyStackTraceParser StackTrace(parser);
+  parser.parseTopLevelSIL();
 }
-
 
 //===----------------------------------------------------------------------===//
 // SILParser
@@ -1171,9 +1146,6 @@ bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
                                        GenericEnvironment *GenericEnv,
                                        DeclContext *DC) {
   // Do some type checking / name binding for the parsed type.
-  assert(P.SF.ASTStage == SourceFile::Parsing &&
-         "Unexpected stage during parsing!");
-
   if (GenericEnv == nullptr)
     GenericEnv = ContextGenericEnv;
 
@@ -1191,12 +1163,6 @@ bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
 static llvm::PointerUnion<ValueDecl *, ModuleDecl *>
 lookupTopDecl(Parser &P, DeclBaseName Name, bool typeLookup) {
   // Use UnqualifiedLookup to look through all of the imports.
-  // We have to lie and say we're done with parsing to make this happen.
-  assert(P.SF.ASTStage == SourceFile::Parsing &&
-         "Unexpected stage during parsing!");
-  llvm::SaveAndRestore<SourceFile::ASTStage_t> ASTStage(P.SF.ASTStage,
-                                                        SourceFile::Parsed);
-
   UnqualifiedLookupOptions options;
   if (typeLookup)
     options |= UnqualifiedLookupFlags::TypeLookup;
@@ -2075,7 +2041,6 @@ static bool parseAssignOwnershipQualifier(AssignOwnershipQualifier &Result,
   return false;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 // Parse a list of integer indices, prefaced with the given string label.
 // Returns true on error.
 static bool parseIndexList(Parser &P, StringRef label,
@@ -2099,9 +2064,7 @@ static bool parseIndexList(Parser &P, StringRef label,
     return true;
   return false;
 };
-// SWIFT_ENABLE_TENSORFLOW END
 
-// SWIFT_ENABLE_TENSORFLOW
 /// sil-differentiability-witness-config-and-function ::=
 ///   '[' 'parameters' index-subset ']'
 ///   '[' 'results' index-subset ']'
@@ -2140,8 +2103,8 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
     return {};
   // Resolve parsed witness generic signature.
   if (witnessGenSig) {
-    auto origGenSig = originalFunction
-        ->getLoweredFunctionType()->getSubstGenericSignature();
+    auto origGenSig =
+        originalFunction->getLoweredFunctionType()->getSubstGenericSignature();
     // Check whether original function generic signature and parsed witness
     // generic have the same generic parameters.
     auto areGenericParametersConsistent = [&]() {
@@ -2155,7 +2118,7 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
     };
     if (!areGenericParametersConsistent()) {
       P.diagnose(witnessGenSigStartLoc,
-                 diag::sil_inst_autodiff_invalid_witness_generic_signature,
+                 diag::sil_diff_witness_invalid_generic_signature,
                  witnessGenSig->getAsString(), origGenSig->getAsString());
       return {};
     }
@@ -2166,21 +2129,19 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
         witnessGenSig->getRequirements().end());
     witnessGenSig = evaluateOrDefault(
         P.Context.evaluator,
-        AbstractGenericSignatureRequest{
-            origGenSig.getPointer(),
-            /*addedGenericParams=*/{},
-            std::move(witnessRequirements)},
-            nullptr);
+        AbstractGenericSignatureRequest{origGenSig.getPointer(),
+                                        /*addedGenericParams=*/{},
+                                        std::move(witnessRequirements)},
+        nullptr);
   }
   auto origFnType = originalFunction->getLoweredFunctionType();
   auto *parameterIndexSet = IndexSubset::get(
       P.Context, origFnType->getNumParameters(), parameterIndices);
-  auto *resultIndexSet = IndexSubset::get(
-      P.Context, origFnType->getNumResults(), resultIndices);
+  auto *resultIndexSet =
+      IndexSubset::get(P.Context, origFnType->getNumResults(), resultIndices);
   AutoDiffConfig config(parameterIndexSet, resultIndexSet, witnessGenSig);
   return std::make_pair(config, originalFunction);
 }
-// SWIFT_ENABLE_TENSORFLOW_END
 
 bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
   SourceLoc TyLoc;
@@ -6820,8 +6781,8 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
   // We need to turn on InSILBody to parse the function references.
   Lexer::SILBodyRAII tmp(*P.L);
 
-  auto configAndFn = parseSILDifferentiabilityWitnessConfigAndFunction(
-      P, State, silLoc);
+  auto configAndFn =
+      parseSILDifferentiabilityWitnessConfigAndFunction(P, State, silLoc);
   if (!configAndFn) {
     return true;
   }
@@ -6881,7 +6842,6 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
       config.derivativeGenericSignature, jvp, vjp, isSerialized);
   return false;
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 llvm::Optional<llvm::coverage::Counter> SILParser::parseSILCoverageExpr(
     llvm::coverage::CounterExpressionBuilder &Builder) {

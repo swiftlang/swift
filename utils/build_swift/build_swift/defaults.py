@@ -3,8 +3,8 @@
 # Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
 """
@@ -14,6 +14,9 @@ Default option value definitions.
 
 from __future__ import absolute_import, unicode_literals
 
+import platform
+
+from . import shell
 from .versions import Version
 
 
@@ -32,6 +35,8 @@ __all__ = [
     'DARWIN_DEPLOYMENT_VERSION_WATCHOS',
     'UNIX_INSTALL_PREFIX',
     'DARWIN_INSTALL_PREFIX',
+    'LLVM_MAX_PARALLEL_LTO_LINK_JOBS',
+    'SWIFT_MAX_PARALLEL_LTO_LINK_JOBS',
 
     # Constants
 ]
@@ -55,6 +60,58 @@ DARWIN_DEPLOYMENT_VERSION_WATCHOS = '2.0'
 UNIX_INSTALL_PREFIX = '/usr'
 DARWIN_INSTALL_PREFIX = ('/Applications/Xcode.app/Contents/Developer/'
                          'Toolchains/XcodeDefault.xctoolchain/usr')
+
+
+def _system_memory():
+    """Returns the system memory as an int. None if the system memory cannot
+    be determined.
+
+    TODO: Support Linux and Windows platforms.
+    """
+
+    if platform.platform() == 'Darwin':
+        try:
+            output = shell.check_output(['sysctl', 'hw.memsize']).strip()
+            return int(output.split(' ')[1])
+        except shell.CalledProcessError:
+            return None
+
+    return None
+
+
+def _default_llvm_lto_link_jobs():
+    """Use the formula (GB Memory - 3)/6.0GB to get the number of parallel
+    link threads we can support. This gives the OS 3 GB of room to work with.
+
+    This is a bit conservative, but I have found that this hueristic prevents
+    me from swapping on my test machine.
+    """
+
+    memory = _system_memory()
+    if memory is None:
+        return None
+
+    return int((memory / 1000000000.0 - 3.0) / 6.0)
+
+
+def _default_swift_lto_link_jobs():
+    """Use the formula (GB Memory - 3)/8.0GB to get the number of parallel
+    link threads we can support. This gives the OS 3 GB of room to work with.
+
+    This is a bit conservative, but I have found that this hueristic prevents
+    me from swapping on my test machine.
+    """
+
+    memory = _system_memory()
+    if memory is None:
+        return None
+
+    return int((memory / 1000000000.0 - 3.0) / 8.0)
+
+
+LLVM_MAX_PARALLEL_LTO_LINK_JOBS = _default_llvm_lto_link_jobs()
+SWIFT_MAX_PARALLEL_LTO_LINK_JOBS = _default_swift_lto_link_jobs()
+
 
 # Options that can only be "configured" by editing this file.
 #

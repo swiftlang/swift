@@ -1254,9 +1254,7 @@ void swift::emitIndirectConditionalCastWithScalar(
     case CastConsumptionKind::TakeOnSuccess:
       break;
     case CastConsumptionKind::CopyOnSuccess: {
-      SILValue originalSuccValue = succValue;
       succValue = B.emitCopyValueOperation(loc, succValue);
-      B.emitEndBorrowOperation(loc, originalSuccValue);
       B.emitEndBorrowOperation(loc, srcValue);
       break;
     }
@@ -1295,7 +1293,6 @@ void swift::emitIndirectConditionalCastWithScalar(
                                 StoreOwnershipQualifier::Init);
       break;
     case CastConsumptionKind::CopyOnSuccess:
-      B.emitEndBorrowOperation(loc, failValue);
       B.emitEndBorrowOperation(loc, srcValue);
       break;
     case CastConsumptionKind::BorrowAlways:

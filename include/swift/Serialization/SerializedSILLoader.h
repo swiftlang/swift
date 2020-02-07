@@ -35,9 +35,7 @@ class SILModule;
 class SILVTable;
 class SILWitnessTable;
 class SILDefaultWitnessTable;
-// SWIFT_ENABLE_TENSORFLOW
 class SILDifferentiabilityWitness;
-// SWIFT_ENABLE_TENSORFLOW END
 
 /// Maintains a list of SILDeserializer, one for each serialized modules
 /// in ASTContext. It provides lookupSILFunction that will perform lookup
@@ -70,10 +68,8 @@ public:
   SILVTable *lookupVTable(const ClassDecl *C);
   SILWitnessTable *lookupWitnessTable(SILWitnessTable *C);
   SILDefaultWitnessTable *lookupDefaultWitnessTable(SILDefaultWitnessTable *C);
-  // SWIFT_ENABLE_TENSORFLOW
   SILDifferentiabilityWitness *
   lookupDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
-  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Invalidate the cached entries for deserialized SILFunctions.
   void invalidateCaches();

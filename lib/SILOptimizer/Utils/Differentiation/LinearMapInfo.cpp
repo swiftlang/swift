@@ -302,7 +302,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
       remapTypeInDerivative(SILType::getPrimitiveObjectType(origFnSubstTy))
           .castTo<SILFunctionType>();
   if (remappedOrigFnSubstTy->isDifferentiable()) {
-    parameters = remappedOrigFnSubstTy->getDifferentiationParameterIndices();
+    parameters = remappedOrigFnSubstTy->getDifferentiabilityParameterIndices();
   } else {
     parameters = IndexSubset::get(
         original->getASTContext(),
