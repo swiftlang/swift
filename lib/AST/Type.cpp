@@ -1575,7 +1575,8 @@ public:
       // binding impossible.
       // For instance, if the archetype is class-constrained, and the binding
       // is not a class, it can never be bound.
-      if (orig->requiresClass() && !subst->satisfiesClassConstraint())
+      if (orig->requiresClass()
+          && !subst->satisfiesClassConstraint())
         return CanType();
 
       if (auto superclass = orig->getSuperclass())
@@ -1894,6 +1895,12 @@ public:
       auto substConf = substSubMap.lookupConformance(canTy, proto);
 
       if (origConf.isConcrete()) {
+        // A generic argument may inherit a concrete conformance from a class
+        // constraint, which could still be bound to a type parameter we don't
+        // know more about.
+        if (origConf.getConcrete()->getType()->is<ArchetypeType>())
+          continue;
+        
         if (!substConf.isConcrete())
           return CanType();
         if (origConf.getConcrete()->getRootConformance()
