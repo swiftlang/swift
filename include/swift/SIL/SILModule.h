@@ -637,6 +637,10 @@ public:
   llvm::ArrayRef<SILDifferentiabilityWitness *>
   lookUpDifferentiabilityWitnessesForFunction(StringRef name);
 
+  /// Attempt to deserialize the SILDifferentiabilityWitness. Returns true if
+  /// deserialization succeeded, false otherwise.
+  bool loadDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
+
   // Given a protocol, attempt to create a default witness table declaration
   // for it.
   SILDefaultWitnessTable *

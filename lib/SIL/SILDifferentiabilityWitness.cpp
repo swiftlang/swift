@@ -12,9 +12,7 @@
 
 #define DEBUG_TYPE "sil-differentiability-witness"
 
-// SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/ASTMangler.h"
-// SWIFT_ENABLE_TENSORFLOW_END
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILModule.h"
 
@@ -50,7 +48,6 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDefinition(
       module, linkage, originalFunction, parameterIndices, resultIndices,
       derivativeGenSig, jvp, vjp, /*isDeclaration*/ false, isSerialized,
       attribute);
-  // Register the differentiability witness in the module.
   // Register the differentiability witness in the module.
   Mangle::ASTMangler mangler;
   auto mangledKey =
