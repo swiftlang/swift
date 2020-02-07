@@ -146,10 +146,8 @@ endlocal
 :: Configures, builds, and installs LLVM
 setlocal enableextensions enabledelayedexpansion
 
-mkdir "%build_root%\llvm" %exitOnError%
-pushd "%build_root%\llvm"
-
-cmake "%source_root%\llvm"^
+cmake^
+    -B "%build_root%\llvm"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
@@ -175,9 +173,8 @@ cmake "%source_root%\llvm"^
     -DCLANG_TOOLS="clang;clang-format;clang-headers;clang-tidy"^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
-    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO %exitOnError%
-
-popd
+    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
+    -S "%source_root%\llvm" %exitOnError%
 
 cmake --build "%build_root%\llvm" %exitOnError%
 cmake --build "%build_root%\llvm" --target install %exitOnError%
@@ -190,19 +187,16 @@ endlocal
 :: Configures and builds CMark
 setlocal enableextensions enabledelayedexpansion
 
-mkdir "%build_root%\cmark" %exitOnError%
-pushd "%build_root%\cmark"
-
-cmake "%source_root%\cmark"^
+cmake^
+    -B "%build_root%\cmark"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
-    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO %exitOnError%
-
-popd
+    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
+    -S "%source_root%\cmark" %exitOnError%
 
 cmake --build "%build_root%\cmark" %exitOnError%
 
@@ -214,12 +208,10 @@ endlocal
 :: Configures, builds, and installs Swift and the Swift Standard Library
 setlocal enableextensions enabledelayedexpansion
 
-mkdir "%build_root%\swift" %exitOnError%
-pushd "%build_root%\swift"
-
 :: SWIFT_PARALLEL_LINK_JOBS=8 allows the build machine to use as many CPU as
 :: possible, while not exhausting the RAM.
-cmake "%source_root%\swift"^
+cmake^
+    -B "%build_root%\swift"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
@@ -247,9 +239,8 @@ cmake "%source_root%\swift"^
     -DPYTHON_EXECUTABLE:PATH=%PYTHON_HOME%\python.exe^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
-    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO %exitOnError%
-
-popd
+    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
+    -S "%source_root%\swift" %exitOnError%
 
 cmake --build "%build_root%\swift" %exitOnError%
 cmake --build "%build_root%\swift" --target install %exitOnError%
@@ -272,10 +263,8 @@ endlocal
 :: Configures, builds, and installs LLDB
 setlocal enableextensions enabledelayedexpansion
 
-mkdir "%build_root%\lldb" %exitOnError%
-pushd "%build_root%\lldb"
-
-cmake "%source_root%\lldb"^
+cmake^
+    -B "%build_root%\lldb"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=clang-cl^
@@ -291,9 +280,8 @@ cmake "%source_root%\lldb"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DLLDB_DISABLE_PYTHON=YES^
-    -DLLDB_INCLUDE_TESTS:BOOL=NO %exitOnError%
-
-popd
+    -DLLDB_INCLUDE_TESTS:BOOL=NO^
+    -S "%source_root%\lldb" %exitOnError%
 
 cmake --build "%build_root%\lldb" %exitOnError%
 cmake --build "%build_root%\lldb" --target install %exitOnError%
@@ -306,10 +294,8 @@ endlocal
 :: Configures, builds, and installs Dispatch
 setlocal enableextensions enabledelayedexpansion
 
-mkdir "%build_root%\swift-corelibs-libdispatch" %exitOnError%
-pushd "%build_root%\swift-corelibs-libdispatch"
-
-cmake "%source_root%\swift-corelibs-libdispatch"^
+cmake^
+    -B "%build_root%\swift-corelibs-libdispatch"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=clang-cl^
@@ -327,10 +313,8 @@ cmake "%source_root%\swift-corelibs-libdispatch"^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
     -DCMAKE_Swift_COMPILER_TARGET:STRING=x86_64-unknown-windows-msvc^
     -DCMAKE_Swift_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\""^
-    -DCMAKE_Swift_LINK_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\"" %exitOnError%
-
-
-popd
+    -DCMAKE_Swift_LINK_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\""^
+    -S "%source_root%\swift-corelibs-libdispatch" %exitOnError%
 
 cmake --build "%build_root%\swift-corelibs-libdispatch" %exitOnError%
 cmake --build "%build_root%\swift-corelibs-libdispatch" --target install %exitOnError%
