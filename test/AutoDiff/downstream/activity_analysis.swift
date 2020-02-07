@@ -568,3 +568,118 @@ func testBeginApplyActiveButInitiallyNonactiveInoutArgument(x: Float) -> Float {
 // CHECK: [NONE]   // function_ref Array.subscript.getter
 // CHECK: [NONE]   %34 = apply %33<Float>(%32, %29, %31) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
 // CHECK: [ACTIVE]   %35 = load [trivial] %32 : $*Float
+
+//===----------------------------------------------------------------------===//
+// Enum differentiation
+//===----------------------------------------------------------------------===//
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func testActiveOptional(_ x: Float) -> Float {
+  // expected-note @+1 {{differentiating enum values is not yet supported}}
+  var maybe: Float? = 10
+  maybe = x
+  return maybe!
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveOptional{{.*}} at (source=0 parameters=(0))
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $Float
+// CHECK: [ACTIVE]   %2 = alloc_stack $Optional<Float>, var, name "maybe"
+// CHECK: [USEFUL]   %3 = integer_literal $Builtin.IntLiteral, 10
+// CHECK: [USEFUL]   %4 = metatype $@thin Float.Type
+// CHECK: [NONE]   // function_ref Float.init(_builtinIntegerLiteral:)
+// CHECK: [USEFUL]   %6 = apply %5(%3, %4) : $@convention(method) (Builtin.IntLiteral, @thin Float.Type) -> Float
+// CHECK: [USEFUL]   %7 = enum $Optional<Float>, #Optional.some!enumelt.1, %6 : $Float
+// CHECK: [ACTIVE]   %9 = enum $Optional<Float>, #Optional.some!enumelt.1, %0 : $Float
+// CHECK: [ACTIVE]   %10 = begin_access [modify] [static] %2 : $*Optional<Float>
+// CHECK: [ACTIVE]   %13 = begin_access [read] [static] %2 : $*Optional<Float>
+// CHECK: [ACTIVE]   %14 = load [trivial] %13 : $*Optional<Float>
+// CHECK: bb1:
+// CHECK: [NONE]   // function_ref _diagnoseUnexpectedNilOptional(_filenameStart:_filenameLength:_filenameIsASCII:_line:_isImplicitUnwrap:)
+// CHECK: [NONE]   %24 = apply %23(%17, %18, %19, %20, %22) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Int1) -> ()
+// CHECK: bb2:
+// CHECK: [ACTIVE] %26 = argument of bb2 : $Float
+
+enum DirectEnum: Differentiable & AdditiveArithmetic {
+  case case0
+  case case1(Float)
+  case case2(Float, Float)
+
+  typealias TangentVector = Self
+
+  static var zero: Self { fatalError() }
+  static func +(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+  static func -(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: e)
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{differentiating enum values is not yet supported}}
+func testActiveEnumValue(_ e: DirectEnum, _ x: Float) -> Float {
+  switch e {
+  case .case0: return x
+  case let .case1(y1): return y1
+  case let .case2(y1, y2): return y1 + y2
+  }
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveEnumValue{{.*}} at (source=0 parameters=(0))
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $DirectEnum
+// CHECK: [USEFUL] %1 = argument of bb0 : $Float
+// CHECK: bb1:
+// CHECK: bb2:
+// CHECK: [ACTIVE] %6 = argument of bb2 : $Float
+// CHECK: bb3:
+// CHECK: [ACTIVE] %9 = argument of bb3 : $(Float, Float)
+// CHECK: [ACTIVE] (**%10**, %11) = destructure_tuple %9 : $(Float, Float)
+// CHECK: [ACTIVE] (%10, **%11**) = destructure_tuple %9 : $(Float, Float)
+// CHECK: [USEFUL]   %14 = metatype $@thin Float.Type
+// CHECK: [NONE]   // function_ref static Float.+ infix(_:_:)
+// CHECK:   %15 = function_ref @$sSf1poiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: [ACTIVE]   %16 = apply %15(%10, %11, %14) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: bb4:
+// CHECK: [ACTIVE] %18 = argument of bb4 : $Float
+
+enum IndirectEnum<T: Differentiable>: Differentiable & AdditiveArithmetic {
+  case case1(T)
+  case case2(Float, T)
+
+  typealias TangentVector = Self
+
+  static func ==(_ lhs: Self, _ rhs: Self) -> Bool { fatalError() }
+  static var zero: Self { fatalError() }
+  static func +(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+  static func -(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: e)
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{differentiating enum values is not yet supported}}
+func testActiveEnumAddr<T>(_ e: IndirectEnum<T>) -> T {
+  switch e {
+  case let .case1(y1): return y1
+  case let .case2(_, y2): return y2
+  }
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveEnumAddr{{.*}} at (source=0 parameters=(0))
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $*T
+// CHECK: [ACTIVE] %1 = argument of bb0 : $*IndirectEnum<T>
+// CHECK: [ACTIVE]   %3 = alloc_stack $IndirectEnum<T>
+// CHECK: bb1:
+// CHECK: [ACTIVE]   %6 = unchecked_take_enum_data_addr %3 : $*IndirectEnum<T>, #IndirectEnum.case1!enumelt.1
+// CHECK: [ACTIVE]   %7 = alloc_stack $T, let, name "y1"
+// CHECK: bb2:
+// CHECK: [ACTIVE]   %14 = unchecked_take_enum_data_addr %3 : $*IndirectEnum<T>, #IndirectEnum.case2!enumelt.1
+// CHECK: [ACTIVE]   %15 = tuple_element_addr %14 : $*(Float, T), 0
+// CHECK: [VARIED]   %16 = load [trivial] %15 : $*Float
+// CHECK: [ACTIVE]   %17 = tuple_element_addr %14 : $*(Float, T), 1
+// CHECK: [ACTIVE]   %18 = alloc_stack $T, let, name "y2"
+// CHECK: bb3:
+// CHECK: [NONE]   %25 = tuple ()

@@ -64,16 +64,6 @@ _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) {
 // Function composition
 //===----------------------------------------------------------------------===//
 
-func uses_optionals(_ x: Float) -> Float {
-  // expected-note @+1 {{differentiating enum values is not yet supported}}
-  var maybe: Float? = 10
-  maybe = x
-  return maybe!
-}
-
-// expected-error @+1 {{function is not differentiable}}
-_ = gradient(at: 0, in: uses_optionals)
-
 func base(_ x: Float) -> Float {
   // expected-error @+2 {{expression is not differentiable}}
   // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}}
@@ -104,6 +94,71 @@ func func_to_diff(_ x: Float) -> Float {
 func calls_grad_of_nested(_ x: Float) -> Float {
   // xpected-error @+1 {{function is not differentiable}}
   return gradient(at: x, in: func_to_diff)
+}
+
+//===----------------------------------------------------------------------===//
+// Enum differentiation
+//===----------------------------------------------------------------------===//
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func usesOptionals(_ x: Float) -> Float {
+  // expected-note @+1 {{differentiating enum values is not yet supported}}
+  var maybe: Float? = 10
+  maybe = x
+  return maybe!
+}
+
+enum DirectEnum: Differentiable & AdditiveArithmetic {
+  case leaf(Float)
+
+  typealias TangentVector = Self
+
+  static var zero: Self { fatalError() }
+  static func +(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+  static func -(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: e)
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{differentiating enum values is not yet supported}}
+func enum_active(_ e: DirectEnum, _ x: Float) -> Float {
+  switch e {
+  case let .leaf(y): return y
+  }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: e)
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{differentiating enum values is not yet supported}}
+func activeEnumValue(_ e: DirectEnum, _ x: Float) -> Float {
+  switch e {
+  case let .leaf(y): return y
+  }
+}
+
+enum IndirectEnum<T: Differentiable>: Differentiable & AdditiveArithmetic {
+  case leaf(T)
+
+  typealias TangentVector = Self
+
+  static func ==(_ lhs: Self, _ rhs: Self) -> Bool { fatalError() }
+  static var zero: Self { fatalError() }
+  static func +(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+  static func -(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: e)
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{differentiating enum values is not yet supported}}
+func activeEnumAddr(_ e: IndirectEnum<Float>, _ x: Float) -> Float {
+  switch e {
+  case let .leaf(y): return y
+  }
 }
 
 //===----------------------------------------------------------------------===//
