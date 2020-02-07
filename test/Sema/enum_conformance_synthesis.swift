@@ -174,7 +174,7 @@ func genericNotHashable() {
 }
 
 // An enum with no cases should also derive conformance.
-enum NoCases: Hashable {}
+enum NoCases: Hashable, Comparable {}
 
 // rdar://19773050
 private enum Bar<T> {
@@ -201,7 +201,7 @@ extension Instrument : Equatable {}
 extension Instrument : CaseIterable {}
 
 enum UnusedGeneric<T> {
-    case a, b, c
+  case a, b, c
 }
 extension UnusedGeneric : CaseIterable {}
 
@@ -288,7 +288,7 @@ case only([NotEquatable]) //expected-note {{associated value type '[NotEquatable
 
 // Conditional conformances should be able to be synthesized
 enum GenericDeriveExtension<T> {
-    case A(T)
+  case A(T)
 }
 extension GenericDeriveExtension: Equatable where T: Equatable {}
 extension GenericDeriveExtension: Hashable where T: Hashable {}
@@ -327,7 +327,47 @@ enum ImpliedMain: ImplierMain {
 }
 extension ImpliedOther: ImplierMain {}
 
+// Comparable enum synthesis
+enum Angel: Comparable {
+  case lily, elsa, karlie 
+}
 
+func pit(_ a: Angel, against b: Angel) -> Bool {
+  return a < b
+}
+
+// enums with non-conforming payloads don’t get synthesized Comparable 
+enum Notice: Comparable { // expected-error{{type 'Notice' does not conform to protocol 'Comparable'}} expected-error{{type 'Notice' does not conform to protocol 'Equatable'}} 
+  case taylor((Int, Int)), taylornation(Int) // expected-note{{associated value type '(Int, Int)' does not conform to protocol 'Equatable', preventing synthesized conformance of 'Notice' to 'Equatable'}} 
+}
+
+// neither do enums with raw values 
+enum Track: Int, Comparable { // expected-error{{type 'Track' does not conform to protocol 'Comparable'}} 
+  case four = 4
+  case five = 5 
+  case six  = 6
+}
+
+// synthesized Comparable must be explicit 
+enum Publicist {
+  case thow, paine 
+}
+
+func miss(_ a: Publicist, outsold b: Publicist) -> Bool {
+  return b < a // expected-error{{binary operator '<' cannot be applied to two 'Publicist' operands}}
+}
+
+// can synthesize Comparable conformance through extension 
+enum Birthyear {
+  case eighties(Int)
+  case nineties(Int)
+  case twothousands(Int)
+}
+extension Birthyear: Comparable {
+}
+func canEatHotChip(_ birthyear:Birthyear) -> Bool {
+  return birthyear > .nineties(3)
+}
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '(Foo, Foo) -> Bool'
