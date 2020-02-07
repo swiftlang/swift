@@ -18,6 +18,7 @@
 #include "TypeAccessScopeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Pattern.h"
@@ -1534,6 +1535,24 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
         visitSubstitutionMap(ty->getSubstitutionMap());
         return Action::Continue;
       }
+
+      // We diagnose unserializable Clang function types in the
+      // post-visitor so that we diagnose any unexportable component
+      // types first.
+      Action walkToTypePost(Type T) override {
+        if (auto fnType = T->getAs<AnyFunctionType>()) {
+          if (auto clangType = fnType->getClangFunctionType()) {
+            auto loader = T->getASTContext().getClangModuleLoader();
+            // Serialization will serialize the sugared type if it can,
+            // but we need the canonical type to be serializable or else
+            // canonicalization (e.g. in SIL) might break things.
+            if (!loader->isSerializable(clangType, /*check canonical*/ true)) {
+              diagnoser.diagnoseClangFunctionType(T, clangType);
+            }
+          }
+        }
+        return TypeDeclFinder::walkToTypePost(T);
+      }
     };
 
     type.walk(ProblematicTypeFinder(SF, diagnoser));
@@ -1604,6 +1623,10 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
                   offendingConformance->getType(),
                   offendingConformance->getProtocol()->getFullName(),
                   static_cast<unsigned>(reason), M->getName());
+    }
+
+    void diagnoseClangFunctionType(Type fnType, const clang::Type *type) const {
+      D->diagnose(diag::unexportable_clang_function_type, fnType);
     }
   };
 
