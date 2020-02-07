@@ -200,10 +200,7 @@ protected:
     FieldNo : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TupleExpr, Expr, 1+1+1+32,
-    /// Whether this tuple has a trailing closure.
-    HasTrailingClosure : 1,
-
+  SWIFT_INLINE_BITFIELD_FULL(TupleExpr, Expr, 1+1+32,
     /// Whether this tuple has any labels.
     HasElementNames : 1,
 
@@ -2046,6 +2043,11 @@ class TupleExpr final : public Expr,
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
 
+  SourceLoc TrailingBlockLBrace;
+  SourceLoc TrailingBlockRBrace;
+
+  Optional<unsigned> FirstTrailingArgumentAt;
+
   size_t numTrailingObjects(OverloadToken<Expr *>) const {
     return getNumElements();
   }
@@ -2072,11 +2074,13 @@ class TupleExpr final : public Expr,
     return { getTrailingObjects<SourceLoc>(), getNumElements() };
   }
 
-  TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
-            ArrayRef<Identifier> ElementNames, 
+  TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
+            ArrayRef<Expr *> SubExprs,
+            ArrayRef<Identifier> ElementNames,
             ArrayRef<SourceLoc> ElementNameLocs,
-            SourceLoc RParenLoc, bool HasTrailingClosure, bool Implicit, 
-            Type Ty);
+            SourceLoc TrailingLBrace,
+            SourceLoc TrailingRBrace,
+            Optional<unsigned> FirstTrailingArgumentAt, bool Implicit, Type Ty);
 
 public:
   /// Create a tuple.
@@ -2086,6 +2090,17 @@ public:
                            ArrayRef<Identifier> ElementNames, 
                            ArrayRef<SourceLoc> ElementNameLocs,
                            SourceLoc RParenLoc, bool HasTrailingClosure, 
+                           bool Implicit, Type Ty = Type());
+
+  static TupleExpr *create(ASTContext &ctx,
+                           SourceLoc LParenLoc,
+                           SourceLoc RParenLoc,
+                           ArrayRef<Expr *> SubExprs,
+                           ArrayRef<Identifier> ElementNames,
+                           ArrayRef<SourceLoc> ElementNameLocs,
+                           SourceLoc TrailingLBrace,
+                           SourceLoc TrailingRBrace,
+                           Optional<unsigned> FirstTrailingArgumentAt,
                            bool Implicit, Type Ty = Type());
 
   /// Create an empty tuple.
@@ -2102,7 +2117,15 @@ public:
   SourceRange getSourceRange() const;
 
   /// Whether this expression has a trailing closure as its argument.
-  bool hasTrailingClosure() const { return Bits.TupleExpr.HasTrailingClosure; }
+  bool hasTrailingClosure() const {
+    return FirstTrailingArgumentAt
+               ? *FirstTrailingArgumentAt == getNumElements() - 1
+               : false;
+  }
+
+  bool hasMultipleTrailingClosures() const {
+    return FirstTrailingArgumentAt ? !hasTrailingClosure() : false;
+  }
 
   /// Retrieve the elements of this tuple.
   MutableArrayRef<Expr*> getElements() {
