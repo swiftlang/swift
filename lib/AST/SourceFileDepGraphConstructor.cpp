@@ -469,27 +469,27 @@ SourceFileDepGraphConstructor::forSourceFile(
   SourceFileDeclFinder declFinder(SF, includePrivateDeps);
   std::vector<SerializableUse> topLevelDepends;
   for (const auto &p : SF->getReferencedNameTracker()->getTopLevelNames())
-    topLevelDepends.push_back(SerializableUse{
-        p.getSecond(), None, "", p.getFirst().userFacingName(), None});
+    topLevelDepends.push_back(SerializableUse::create(
+        p.getSecond(), None, "", p.getFirst().userFacingName(), None));
 
   std::vector<SerializableUse> dynamicLookupDepends;
   for (const auto &p : SF->getReferencedNameTracker()->getDynamicLookupNames())
-    dynamicLookupDepends.push_back(SerializableUse{
-        p.getSecond(), None, "", p.getFirst().userFacingName(), None});
+    dynamicLookupDepends.push_back(SerializableUse::create(
+        p.getSecond(), None, "", p.getFirst().userFacingName(), None));
 
   std::vector<SerializableUse> nominalMemberPotentialMemberDepends;
   for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
     const auto &member = p.getFirst().second;
     StringRef emptyOrUserFacingName =
         member.empty() ? "" : member.userFacingName();
-    nominalMemberPotentialMemberDepends.push_back(SerializableUse{
+    nominalMemberPotentialMemberDepends.push_back(SerializableUse::create(
         declIsPrivate(p.getFirst().first), p.getSecond(),
-        mangleTypeAsContext(p.getFirst().first), emptyOrUserFacingName, None});
+        mangleTypeAsContext(p.getFirst().first), emptyOrUserFacingName, None));
   }
 
   std::vector<SerializableUse> externalDepends;
   for (StringRef s : depTracker.getDependencies())
-    externalDepends.push_back(SerializableUse{false, None, "", s, None});
+    externalDepends.push_back(SerializableUse::create(false, None, "", s, None));
 
   // clang-format off
   return SourceFileDepGraphConstructor(

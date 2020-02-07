@@ -596,6 +596,9 @@ struct SerializableUse {
   Optional<bool> isPrivate; // to enclosing file if known
   std::string context, name;
   Optional<SerializableDecl> use;
+  static SerializableUse create(bool isCascadingUse, Optional<bool> isPrivate, StringRef context, StringRef name, Optional<SerializableDecl> use);
+  private:
+  SerializableUse(bool isCascadingUse, Optional<bool> isPrivate, StringRef context, StringRef name, Optional<SerializableDecl> use);
 };
 
 } // namespace fine_grained_dependencies

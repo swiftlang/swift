@@ -103,8 +103,8 @@ static const char* privateHolderPrefix = "~";
 
   const Optional<SerializableDecl> use = providesIfNotEmpty(defUseStrings.second, kindOfUse, includePrivateDeps);
 
-  return SerializableUse{
-    isCascadingUse, isHolderPrivate, context, name, use};
+  return SerializableUse::create(
+    isCascadingUse, isHolderPrivate, context, name, use);
 }
 
 static std::pair<std::unordered_map<NodeKind, std::vector<SerializableDecl>>,

@@ -443,3 +443,14 @@ void MappingTraits<SourceFileDepGraph>::mapping(IO &io, SourceFileDepGraph &g) {
 }
 } // namespace yaml
 } // namespace llvm
+
+//==============================================================================
+// MARK: SerializableUse
+//==============================================================================
+
+SerializableUse SerializableUse::create(bool isCascadingUse, Optional<bool> isPrivate, StringRef context, StringRef name, Optional<SerializableDecl> use) {
+  return SerializableUse(isCascadingUse, isPrivate, context, name, use);
+}
+
+SerializableUse::SerializableUse(bool isCascadingUse, Optional<bool> isPrivate, StringRef context, StringRef name, Optional<SerializableDecl> use) :
+isCascadingUse(isCascadingUse), isPrivate(isPrivate), context(context.str()), name(name.str()), use(use) {}
