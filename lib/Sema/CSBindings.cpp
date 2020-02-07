@@ -246,7 +246,14 @@ bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
     // if it's something like a collection (where it has to pick
     // between a conversion and bridging conversion) or concrete
     // type let's prefer the disjunction.
-    return boundType->is<TypeVariableType>();
+    //
+    // We are looking through optionals here because it could be
+    // a situation where disjunction is formed to match optionals
+    // either as deep equality or optional-to-optional conversion.
+    // Such type variables might be connected to closure as well
+    // e.g. when result type is optional, so it makes sense to
+    // open closure before attempting such disjunction.
+    return boundType->lookThroughAllOptionalTypes()->is<TypeVariableType>();
   }
 
   return !InvolvesTypeVariables;
