@@ -82,16 +82,14 @@ class TrailingCallArguments
 protected:
   /// Determine the total size to allocate.
   static size_t totalSizeToAlloc(ArrayRef<Identifier> argLabels,
-                                 ArrayRef<SourceLoc> argLabelLocs,
-                                 bool hasTrailingClosure) {
+                                 ArrayRef<SourceLoc> argLabelLocs) {
     return TrailingObjects::template totalSizeToAlloc<Identifier, SourceLoc>(
         argLabels.size(), argLabelLocs.size());
   }
 
   /// Initialize the actual call arguments.
   void initializeCallArguments(ArrayRef<Identifier> argLabels,
-                               ArrayRef<SourceLoc> argLabelLocs,
-                               bool hasTrailingClosure) {
+                               ArrayRef<SourceLoc> argLabelLocs) {
     if (!argLabels.empty()) {
       std::uninitialized_copy(argLabels.begin(), argLabels.end(),
                               this->template getTrailingObjects<Identifier>());
