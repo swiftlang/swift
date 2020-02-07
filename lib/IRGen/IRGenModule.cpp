@@ -524,6 +524,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
+
+  DifferentiabilityWitnessTy = createStructType(
+      *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 }
 
 IRGenModule::~IRGenModule() {
