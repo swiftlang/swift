@@ -17,7 +17,7 @@
 // CHECK-ADDED: Handled bad.swift
 // CHECK-ADDED-NOT: Handled
 
-// CHECK-RECORD-ADDED-DAG: "./bad.swift": !dirty [
+// CHECK-RECORD-ADDED-DAG: "./bad.swift": !private [
 // CHECK-RECORD-ADDED-DAG: "./main.swift": [
 // CHECK-RECORD-ADDED-DAG: "./other.swift": [
 

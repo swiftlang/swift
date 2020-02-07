@@ -1959,8 +1959,7 @@ public:
 
 class TypeCheckSourceFileRequest :
     public SimpleRequest<TypeCheckSourceFileRequest,
-                         bool (SourceFile *, unsigned),
-                         CacheKind::SeparatelyCached> {
+                         bool (SourceFile *), CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1968,8 +1967,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator,
-                                SourceFile *SF, unsigned StartElem) const;
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, SourceFile *SF) const;
 
 public:
   // Separate caching.
