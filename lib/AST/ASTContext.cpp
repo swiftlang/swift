@@ -4393,6 +4393,18 @@ ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
   return impl.Converter.getValue().getFunctionType(params, resultTy, trueRep);
 }
 
+const Decl *
+ASTContext::getSwiftDeclForExportedClangDecl(const clang::Decl *decl) {
+  auto &impl = getImpl();
+
+  // If we haven't exported anything yet, this must not be how we found
+  // this declaration.
+  if (!impl.Converter) return nullptr;
+
+  return impl.Converter->getSwiftDeclForExportedClangDecl(decl);
+}
+
+
 CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   if (auto theSig = getImpl().SingleGenericParameterSignature)
     return theSig;

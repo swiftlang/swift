@@ -986,6 +986,10 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         allocateBuffer(Types, scratch);
         break;
+      case index_block::CLANG_TYPE_OFFSETS:
+        assert(blobData.empty());
+        allocateBuffer(ClangTypes, scratch);
+        break;
       case index_block::IDENTIFIER_OFFSETS:
         assert(blobData.empty());
         allocateBuffer(Identifiers, scratch);

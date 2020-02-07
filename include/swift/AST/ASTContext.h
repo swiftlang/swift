@@ -595,6 +595,10 @@ public:
                        const FunctionType::ExtInfo incompleteExtInfo,
                        FunctionTypeRepresentation trueRep);
 
+  /// Get the Swift declaration that a Clang declaration was exported from,
+  /// if applicable.
+  const Decl *getSwiftDeclForExportedClangDecl(const clang::Decl *decl);
+
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.
   ForeignRepresentationInfo
