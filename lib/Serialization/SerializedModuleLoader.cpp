@@ -1181,6 +1181,10 @@ StringRef SerializedASTFile::getFilename() const {
   return File.getModuleFilename();
 }
 
+StringRef SerializedASTFile::getTargetTriple() const {
+  return File.getTargetTriple();
+}
+
 const clang::Module *SerializedASTFile::getUnderlyingClangModule() const {
   if (auto *UnderlyingModule = File.getUnderlyingModule())
     return UnderlyingModule->findUnderlyingClangModule();

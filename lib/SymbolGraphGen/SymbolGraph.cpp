@@ -16,6 +16,8 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Version.h"
+#include "swift/ClangImporter/ClangModule.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 
 #include "DeclarationFragmentPrinter.h"
 #include "FormatVersion.h"
@@ -25,10 +27,16 @@
 using namespace swift;
 using namespace symbolgraphgen;
 
-SymbolGraph::SymbolGraph(ModuleDecl &M, llvm::Triple Target,
+SymbolGraph::SymbolGraph(ModuleDecl &M,
+                         Optional<ModuleDecl *> ExtendedModule,
+                         llvm::Triple Target,
                          markup::MarkupContext &Ctx,
                          Optional<llvm::VersionTuple> ModuleVersion)
-: M(M), Target(Target), Ctx(Ctx), ModuleVersion(ModuleVersion) {}
+: M(M),
+  ExtendedModule(ExtendedModule),
+  Target(Target),
+  Ctx(Ctx),
+  ModuleVersion(ModuleVersion) {}
 
 // MARK: - Utilities
 
@@ -98,11 +106,27 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   return Opts;
 }
 
-// MARK: - Relationships
+// MARK: - Symbols (Nodes)
+
+void SymbolGraph::recordNode(const ValueDecl *VD) {
+  Nodes.insert(VD);
+
+  // Record all of the possible relationships (edges) originating
+  // with this declaration.
+  recordMemberRelationship(VD);
+  recordConformanceRelationships(VD);
+  recordInheritanceRelationships(VD);
+  recordDefaultImplementationRelationships(VD);
+  recordOverrideRelationship(VD);
+  recordRequirementRelationships(VD);
+  recordOptionalRequirementRelationships(VD);
+}
+
+// MARK: - Relationships (Edges)
 
 void SymbolGraph::recordEdge(const ValueDecl *Source,
-                                      const ValueDecl *Target,
-                                      RelationshipKind Kind) {
+                             const ValueDecl *Target,
+                             RelationshipKind Kind) {
   if (Target->isPrivateStdlibDecl(
       /*treatNonBuiltinProtocolsAsPublic = */false)) {
     return;
@@ -237,7 +261,36 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
     OS.attributeObject("module", [&](){
       OS.attribute("name", M.getNameStr());
       AttributeRAII Platform("platform", OS);
-      symbolgraphgen::serialize(Target, OS);
+
+      auto *MainFile = M.getFiles().front();
+      switch (MainFile->getKind()) {
+          case FileUnitKind::Builtin:
+            llvm_unreachable("Unexpected module kind: Builtin");
+          case FileUnitKind::DWARFModule:
+            llvm_unreachable("Unexpected module kind: DWARFModule");
+          case FileUnitKind::Source:
+            llvm_unreachable("Unexpected module kind: Source");
+            break;
+          case FileUnitKind::SerializedAST: {
+            auto SerializedAST = cast<SerializedASTFile>(MainFile);
+            auto Target = llvm::Triple(SerializedAST->getTargetTriple());
+            symbolgraphgen::serialize(Target, OS);
+            break;
+          }
+          case FileUnitKind::ClangModule: {
+            auto ClangModule = cast<ClangModuleUnit>(MainFile);
+            if (const auto *Overlay = ClangModule->getOverlayModule()) {
+              auto &OverlayMainFile =
+                  Overlay->getMainFile(FileUnitKind::SerializedAST);
+              auto SerializedAST = cast<SerializedASTFile>(OverlayMainFile);
+              auto Target = llvm::Triple(SerializedAST.getTargetTriple());
+              symbolgraphgen::serialize(Target, OS);
+            } else {
+              symbolgraphgen::serialize(Target, OS);
+            }
+            break;
+        }
+      }
     });
 
     if (ModuleVersion) {

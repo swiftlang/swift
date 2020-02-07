@@ -13,6 +13,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 
 #include "SymbolGraphASTWalker.h"
@@ -24,7 +25,7 @@ SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
                                            const SymbolGraphOptions &Options)
   : Options(Options),
     M(M),
-    Graph(M, Options.Target, Ctx) {}
+    Graph(M, None, Options.Target, Ctx) {}
 
 /// Returns `true` if the symbol should be included as a node in the graph.
 bool SymbolGraphASTWalker::shouldIncludeNode(const Decl *D) const {
@@ -86,6 +87,21 @@ bool SymbolGraphASTWalker::shouldIncludeNode(const Decl *D) const {
   return ShouldInclude;
 }
 
+/// Get a "sub" symbol graph for the parent module of a type that the main module `M` is extending.
+SymbolGraph &SymbolGraphASTWalker::getExtendedModuleSymbolGraph(ModuleDecl *M) {
+  auto Found = ExtendedModuleGraphs.find(M);
+  if (Found != ExtendedModuleGraphs.end()) {
+    return *Found->getSecond();
+  }
+  auto *Memory = Ctx.allocate(sizeof(SymbolGraph), alignof(SymbolGraph));  
+  auto *SG = new (Memory) SymbolGraph(Graph.M,
+                                      Optional<ModuleDecl *>(M),
+                                      Options.Target,
+                                      Ctx);
+  ExtendedModuleGraphs.insert({M, SG});
+  return *SG;
+}
+
 bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 
     switch (D->getKind()) {
@@ -111,17 +127,23 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
   }
 
   auto *VD = cast<ValueDecl>(D);
-  Graph.Nodes.insert(VD);
-  
-  // Record all of the possible relationships (edges) originating
-  // with this declaration.
-  Graph.recordMemberRelationship(VD);
-  Graph.recordConformanceRelationships(VD);
-  Graph.recordInheritanceRelationships(VD);
-  Graph.recordDefaultImplementationRelationships(VD);
-  Graph.recordOverrideRelationship(VD);
-  Graph.recordRequirementRelationships(VD);
-  Graph.recordOptionalRequirementRelationships(VD);
-  
+
+  // If this symbol extends a type from another module, record it in that
+  // module's symbol graph, which will be emitted separately.
+  if (const auto *Extension
+          = dyn_cast_or_null<ExtensionDecl>(VD->getInnermostDeclContext())) {
+    if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
+      auto ExtendedModule = ExtendedNominal->getModuleContext();
+      if (ExtendedModule != &M) {
+        auto &SG = getExtendedModuleSymbolGraph(ExtendedModule);
+        SG.recordNode(VD);
+        return true;
+      }
+    }
+  }
+
+  // Otherwise, record this in the main module `M`'s symbol graph.
+  Graph.recordNode(VD);
+
   return true;
 }

@@ -13,6 +13,8 @@
 #ifndef SWIFT_SYMBOLGRAPHGEN_SYMBOLGRAPHASTWALKER_H
 #define SWIFT_SYMBOLGRAPHGEN_SYMBOLGRAPHASTWALKER_H
 
+#include "llvm/ADT/DenseMap.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Markup/Markup.h"
@@ -48,15 +50,23 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   /// The symbol graph for a module.
   SymbolGraph Graph;
 
-  // MARK: -
+  /// A map of modules whose types were extended by the main module of interest `M`.
+  llvm::DenseMap<ModuleDecl *, SymbolGraph *> ExtendedModuleGraphs;
+
+  // MARK: - Initialization
   
   SymbolGraphASTWalker(ModuleDecl &M, const SymbolGraphOptions &Options);
   virtual ~SymbolGraphASTWalker() {}
 
-  // MARK: - 
+  // MARK: - Utilities
 
   /// Returns `true` if the symbol should be included as a node in the graph.
   bool shouldIncludeNode(const Decl *D) const;
+
+  /// Get a "sub" symbol graph for the parent module of a type that the main module `M` is extending.
+  SymbolGraph &getExtendedModuleSymbolGraph(ModuleDecl *M);
+
+  // MARK: - SourceEntityWalker
 
   virtual bool walkToDeclPre(Decl *D, CharSourceRange Range);
 };

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name IncludeInternal -emit-module -emit-module-path %t/
-// RUN: %target-swift-symbolgraph-extract -module-name IncludeInternal -I %t -pretty-print -o %t/IncludeInternal.symbols.json -minimum-access-level internal
+// RUN: %target-swift-symbolgraph-extract -module-name IncludeInternal -I %t -pretty-print -output-dir %t -minimum-access-level internal
 // RUN: %FileCheck %s --input-file %t/IncludeInternal.symbols.json
 
 public struct ShouldAppear {

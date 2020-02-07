@@ -32,6 +32,11 @@ struct SymbolGraph {
   ModuleDecl &M;
 
   /**
+   The module whose types were extended in `M`.
+   */
+  Optional<ModuleDecl *> ExtendedModule;
+  
+  /**
    The module's target triple.
   */
   llvm::Triple Target;
@@ -60,7 +65,9 @@ struct SymbolGraph {
   /// A cache of USRs for declarations.
   llvm::DenseMap<const ValueDecl *, StringRef> USRCache;
 
-  SymbolGraph(ModuleDecl &M, llvm::Triple Target,
+  SymbolGraph(ModuleDecl &M,
+              Optional<ModuleDecl *> ExtendedModule,
+              llvm::Triple Target,
               markup::MarkupContext &Ctx,
               Optional<llvm::VersionTuple> ModuleVersion = None);
 
@@ -75,6 +82,13 @@ struct SymbolGraph {
 
   /// Get the base print options for declaration fragments.
   PrintOptions getDeclarationFragmentsPrintOptions() const;
+
+  // MARK: - Symbols (Nodes)
+
+  /**
+   Record a symbol as a node in the graph.
+   */
+  void recordNode(const ValueDecl *VD);
 
   // MARK: - Relationships (Edges)
 

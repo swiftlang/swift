@@ -256,7 +256,11 @@ void Symbol::serializeSwiftExtensionMixin(llvm::json::OStream &OS) const {
   if (const auto *Extension
           = dyn_cast_or_null<ExtensionDecl>(VD->getInnermostDeclContext())) {
     OS.attributeObject("swiftExtension", [&](){
-      OS.attribute("definedInModule", Graph.M.getNameStr());
+      if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
+        if (const auto *ExtendedModule = ExtendedNominal->getModuleContext()) {
+          OS.attribute("extendedModule", ExtendedModule->getNameStr());
+        }
+      }
       auto Generics = Extension->getGenericSignature();
       if (Generics && !Generics->getRequirements().empty()) {
         OS.attributeArray("constraints", [&](){
