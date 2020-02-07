@@ -940,6 +940,38 @@ static ValueDecl *getGlobalStringTablePointer(ASTContext &Context,
   return getBuiltinFunction(Id, {stringType}, Context.TheRawPointerType);
 }
 
+static ValueDecl *getConvertStrongToUnownedUnsafe(ASTContext &ctx,
+                                                  Identifier id) {
+  // We actually want this:
+  //
+  // (T, inout unowned (unsafe) T) -> ()
+  //
+  // But for simplicity, we actually accept T, U and do the checking
+  // in the emission method that everything works up. This is a
+  // builtin, so we can crash.
+  BuiltinFunctionBuilder builder(ctx, 2);
+  builder.addParameter(makeGenericParam(0));
+  builder.addParameter(makeGenericParam(1), ValueOwnership::InOut);
+  builder.setResult(makeConcrete(TupleType::getEmpty(ctx)));
+  return builder.build(id);
+}
+
+static ValueDecl *getConvertUnownedUnsafeToGuaranteed(ASTContext &ctx,
+                                                      Identifier id) {
+  // We actually want this:
+  //
+  ///   <BaseT, T> (BaseT, @inout unowned(unsafe) T) -> T
+  //
+  // But for simplicity, we actually accept three generic params T, U and do the
+  // checking in the emission method that everything works up. This is a
+  // builtin, so we can crash.
+  BuiltinFunctionBuilder builder(ctx, 3);
+  builder.addParameter(makeGenericParam(0));                        // Base
+  builder.addParameter(makeGenericParam(1), ValueOwnership::InOut); // Unmanaged
+  builder.setResult(makeGenericParam(2)); // Guaranteed Result
+  return builder.build(id);
+}
+
 static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
   auto int1Type = BuiltinIntegerType::get(1, Context);
   auto optionalRawPointerType = BoundGenericEnumType::get(
@@ -1999,6 +2031,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::GlobalStringTablePointer:
     return getGlobalStringTablePointer(Context, Id);
+
+  case BuiltinValueKind::ConvertStrongToUnownedUnsafe:
+    return getConvertStrongToUnownedUnsafe(Context, Id);
+
+  case BuiltinValueKind::ConvertUnownedUnsafeToGuaranteed:
+    return getConvertUnownedUnsafeToGuaranteed(Context, Id);
 
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);

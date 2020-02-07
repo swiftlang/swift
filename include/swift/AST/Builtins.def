@@ -444,6 +444,31 @@ BUILTIN_SIL_OPERATION(AllocWithTailElems, "allocWithTailElems", Special)
 /// Projects the first tail-allocated element of type E from a class C.
 BUILTIN_SIL_OPERATION(ProjectTailElems, "projectTailElems", Special)
 
+/// Unsafely convert a value of type T to an unowned value.
+///
+/// It has type (T, @inout @unowned(unsafe) T) -> (). The reason for the weird
+/// signature is to work around issues with results in SILGen builtin emission.
+BUILTIN_SIL_OPERATION(ConvertStrongToUnownedUnsafe, "convertStrongToUnownedUnsafe", Special)
+
+/// Unsafely convert a value of type @inout @unowned(unsafe) T to a loaded
+/// guaranteed T value that has a lifetime guaranteed by the passed in base
+/// value of type BaseTy.
+///
+/// It has type (@in_guaranteed BaseTy, @in_guaranteed @unowned (unsafe) T) -> @guaranteed T.
+///
+/// NOTE: Saying the result is a guaranteed T is a bit of a misnomer. We aren't
+/// emitting a builtin call, but are just emitting SIL directly.
+///
+/// NOTE: Even though the signature is as mentioned above, we actually tell the
+/// AST we have the signature:
+///
+///   <BaseT, T, U> (BaseT, T) -> U
+///
+/// We then perform the actual type checking in SILGen and assert on
+/// failure. This is an early, unsupported feature so this is sufficient for
+/// now.
+BUILTIN_SIL_OPERATION(ConvertUnownedUnsafeToGuaranteed, "convertUnownedUnsafeToGuaranteed", Special)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
@@ -634,6 +659,12 @@ BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
 
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
+//
+// The intention is that this is meant for builtins that need a named
+// builtin representation so one can create a builtin instruction in
+// SIL, but that also need special SILGen behavior. If an operation
+// just emits custom SIL and does not need to be able to form a
+// builtin instruction, please use BUILTIN_SIL_OPERATION.
 #ifndef BUILTIN_MISC_OPERATION_WITH_SILGEN
 #define BUILTIN_MISC_OPERATION_WITH_SILGEN(Id, Name, Attrs, Overload) \
   BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
