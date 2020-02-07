@@ -569,7 +569,7 @@ ManagedValue Transform::transform(ManagedValue v,
       instanceType = metatypeType.getInstanceType();
 
     auto layout = instanceType.getExistentialLayout();
-    if (layout.explicitSuperclass) {
+    if (layout.getSuperclass()) {
       CanType openedType = OpenedArchetypeType::getAny(inputSubstType);
       SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
