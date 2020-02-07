@@ -1261,14 +1261,18 @@ SourceRange TupleExpr::getSourceRange() const {
   }
 }
 
-TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
+TupleExpr::TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
+                     ArrayRef<Expr *> SubExprs,
                      ArrayRef<Identifier> ElementNames, 
                      ArrayRef<SourceLoc> ElementNameLocs,
-                     SourceLoc RParenLoc, bool HasTrailingClosure, 
+                     SourceLoc TrailingLBrace,
+                     SourceLoc TrailingRBrace,
+                     Optional<unsigned> FirstTrailingArgumentAt,
                      bool Implicit, Type Ty)
   : Expr(ExprKind::Tuple, Implicit, Ty),
-    LParenLoc(LParenLoc), RParenLoc(RParenLoc) {
-  Bits.TupleExpr.HasTrailingClosure = HasTrailingClosure;
+    LParenLoc(LParenLoc), RParenLoc(RParenLoc),
+    TrailingBlockLBrace(TrailingLBrace), TrailingBlockRBrace(TrailingRBrace),
+    FirstTrailingArgumentAt(FirstTrailingArgumentAt) {
   Bits.TupleExpr.HasElementNames = !ElementNames.empty();
   Bits.TupleExpr.HasElementNameLocations = !ElementNameLocs.empty();
   Bits.TupleExpr.NumElements = SubExprs.size();
@@ -1297,11 +1301,30 @@ TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
 }
 
 TupleExpr *TupleExpr::create(ASTContext &ctx,
-                             SourceLoc LParenLoc, 
+                             SourceLoc LParenLoc,
                              ArrayRef<Expr *> SubExprs,
-                             ArrayRef<Identifier> ElementNames, 
+                             ArrayRef<Identifier> ElementNames,
                              ArrayRef<SourceLoc> ElementNameLocs,
-                             SourceLoc RParenLoc, bool HasTrailingClosure, 
+                             SourceLoc RParenLoc,
+                             bool HasTrailingClosure,
+                             bool Implicit, Type Ty) {
+  Optional<unsigned> FirstTrailingArgumentAt =
+      HasTrailingClosure ? SubExprs.size() - 1 : Optional<unsigned>();
+
+  return create(ctx, LParenLoc, RParenLoc, SubExprs, ElementNames,
+                ElementNameLocs, SourceLoc(), SourceLoc(),
+                FirstTrailingArgumentAt, Implicit, Ty);
+}
+
+TupleExpr *TupleExpr::create(ASTContext &ctx,
+                             SourceLoc LParenLoc,
+                             SourceLoc RParenLoc,
+                             ArrayRef<Expr *> SubExprs,
+                             ArrayRef<Identifier> ElementNames,
+                             ArrayRef<SourceLoc> ElementNameLocs,
+                             SourceLoc TrailingLBrace,
+                             SourceLoc TrailingRBrace,
+                             Optional<unsigned> FirstTrailingArgumentAt,
                              bool Implicit, Type Ty) {
   assert(!Ty || isa<TupleType>(Ty.getPointer()));
   auto hasNonEmptyIdentifier = [](ArrayRef<Identifier> Ids) -> bool {
@@ -1321,23 +1344,24 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
                                                       ElementNames.size(),
                                                       ElementNameLocs.size());
   void *mem = ctx.Allocate(size, alignof(TupleExpr));
-  return new (mem) TupleExpr(LParenLoc, SubExprs, ElementNames, ElementNameLocs,
-                             RParenLoc, HasTrailingClosure, Implicit, Ty);
+  return new (mem) TupleExpr(LParenLoc, RParenLoc, SubExprs, ElementNames,
+                             ElementNameLocs, TrailingLBrace, TrailingRBrace,
+                             FirstTrailingArgumentAt, Implicit, Ty);
 }
 
 TupleExpr *TupleExpr::createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
                                   SourceLoc RParenLoc, bool Implicit) {
-  return create(ctx, LParenLoc, { }, { }, { }, RParenLoc, 
-                /*HasTrailingClosure=*/false, Implicit, 
+  return create(ctx, LParenLoc, RParenLoc, {}, {}, {}, SourceLoc(), SourceLoc(),
+                /*FirstTrailingArgumentAt=*/None, Implicit,
                 TupleType::getEmpty(ctx));
 }
 
 TupleExpr *TupleExpr::createImplicit(ASTContext &ctx, ArrayRef<Expr *> SubExprs,
                                      ArrayRef<Identifier> ElementNames) {
-  return create(ctx, SourceLoc(), SubExprs, ElementNames, { }, SourceLoc(),
-                /*HasTrailingClosure=*/false, /*Implicit=*/true, Type());
+  return create(ctx, SourceLoc(), SourceLoc(), SubExprs, ElementNames, {},
+                SourceLoc(), SourceLoc(), /*FirstTrailingArgumentAt=*/None,
+                /*Implicit=*/true, Type());
 }
-
 
 ArrayExpr *ArrayExpr::create(ASTContext &C, SourceLoc LBracketLoc,
                              ArrayRef<Expr*> Elements,
