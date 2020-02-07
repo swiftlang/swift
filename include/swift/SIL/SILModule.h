@@ -475,7 +475,8 @@ public:
   using differentiability_witness_iterator = DifferentiabilityWitnessListType::iterator;
   using differentiability_witness_const_iterator = DifferentiabilityWitnessListType::const_iterator;
   DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() { return differentiabilityWitnesses; }
-  const DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() const { return differentiabilityWitnesses; }  differentiability_witness_iterator differentiability_witness_begin() { return differentiabilityWitnesses.begin(); }
+  const DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() const { return differentiabilityWitnesses; }
+  differentiability_witness_iterator differentiability_witness_begin() { return differentiabilityWitnesses.begin(); }
   differentiability_witness_iterator differentiability_witness_end() { return differentiabilityWitnesses.end(); }
   differentiability_witness_const_iterator differentiability_witness_begin() const { return differentiabilityWitnesses.begin(); }
   differentiability_witness_const_iterator differentiability_witness_end() const { return differentiabilityWitnesses.end(); }
