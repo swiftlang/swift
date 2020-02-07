@@ -448,9 +448,13 @@ void MappingTraits<SourceFileDepGraph>::mapping(IO &io, SourceFileDepGraph &g) {
 // MARK: SerializableUse
 //==============================================================================
 
-SerializableUse SerializableUse::create(bool isCascadingUse, Optional<bool> isPrivate, StringRef context, StringRef name, Optional<SerializableDecl> use) {
-  return SerializableUse(isCascadingUse, isPrivate, context, name, use);
+SerializableUse SerializableUse::create(Optional<bool> isPrivate, StringRef context, StringRef name, SerializableDecl use) {
+  return SerializableUse(isPrivate, context, name, use);
 }
 
-SerializableUse::SerializableUse(bool isCascadingUse, Optional<bool> isPrivate, StringRef context, StringRef name, Optional<SerializableDecl> use) :
-isCascadingUse(isCascadingUse), isPrivate(isPrivate), context(context.str()), name(name.str()), use(use) {}
+SerializableUse::SerializableUse(Optional<bool> isPrivate, StringRef context, StringRef name, SerializableDecl use) :
+isPrivate(isPrivate), context(context.str()), name(name.str()), use(use) {}
+
+SerializableDecl SerializableDecl::createUsedByWholeFile(bool isCascadingUse, StringRef swiftDeps, StringRef fingerprint) {
+  return SerializableDecl{DependencyKey::createUsedByWholeFile(swiftDeps, isCascadingUse), fingerprint.str()};
+}

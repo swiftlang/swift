@@ -514,6 +514,11 @@ public:
   }
   bool isInterface() const { return getAspect() == DeclAspect::interface; }
 
+//==============================================================================
+// MARK: creation
+//==============================================================================
+
+
   static DependencyKey create(NodeKind kind, DeclAspect aspect, StringRef context,
                                           StringRef name) {
     return DependencyKey("gazorp", kind, aspect, context, name);
@@ -535,6 +540,13 @@ public:
   /// there will be interface/implementation pairs
   template <NodeKind kind, typename Entity>
   static DependencyKey createProvidedInterfaceKey(Entity);
+
+  static DependencyKey createUsedByWholeFile(StringRef swiftDeps, bool isCascadingUse);
+
+  //==============================================================================
+// MARK: end of creation
+//==============================================================================
+
 
   std::string humanReadableName() const;
 
@@ -590,15 +602,20 @@ namespace fine_grained_dependencies {
 struct SerializableDecl {
   DependencyKey key;
   Optional<std::string> fingerprint;
+  static SerializableDecl createUsedByWholeFile(bool isCascadingUse, StringRef swiftDeps, StringRef fingerprint);
 };
 struct SerializableUse {
-  bool isCascadingUse;
   Optional<bool> isPrivate; // to enclosing file if known
   std::string context, name;
-  Optional<SerializableDecl> use;
-  static SerializableUse create(bool isCascadingUse, Optional<bool> isPrivate, StringRef context, StringRef name, Optional<SerializableDecl> use);
+  SerializableDecl use;
+  
+  static SerializableUse create(Optional<bool> isPrivate, StringRef context, StringRef name, SerializableDecl usingDecl);
+
+  bool isCascadingUseGazorp() const {
+    return use.key.isInterface();
+  }
   private:
-  SerializableUse(bool isCascadingUse, Optional<bool> isPrivate, StringRef context, StringRef name, Optional<SerializableDecl> use);
+  SerializableUse(Optional<bool> isPrivate, StringRef context, StringRef name, SerializableDecl use);
 };
 
 } // namespace fine_grained_dependencies

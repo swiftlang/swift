@@ -321,6 +321,10 @@ DependencyKey DependencyKey::createMemberOrPotentialMemberInterfaceKey(const cha
                                            memberBaseNameIfAny);
 }
 
+DependencyKey DependencyKey::createUsedByWholeFile(StringRef swiftDeps, bool isCascadingUse) {
+return DependencyKey::create(NodeKind::sourceFileProvide, aspectOfUseIfCascades(isCascadingUse), "", swiftDeps);
+}
+
 //==============================================================================
 // MARK: Start of SourceFileDepGraph building, specific to status quo
 //==============================================================================
@@ -411,6 +415,7 @@ DependencyKey DependencyKey::createProvidedInterfaceKey<
 // MARK: SourceFileDepGraphConstructor
 //==============================================================================
 
+
 // clang-format off
 /// Used by the unit tests
 SourceFileDepGraphConstructor::SourceFileDepGraphConstructor(
@@ -456,6 +461,44 @@ SourceFileDepGraphConstructor::SourceFileDepGraphConstructor(
     {}
 // clang-format on
 
+static std::vector<SerializableUse> createUsesFromScalars(
+   const llvm::DenseMap<DeclBaseName, bool> &entries,
+   function_ref<SerializableDecl(bool)> useByWholeFile) {
+  std::vector<SerializableUse> uses;
+  for (const auto &p : entries) {
+    const bool isCascadingUse = p.getSecond();
+    // If entry had use info, would not use useByWholeFile below
+    uses.push_back(SerializableUse::create(
+        None, "", p.getFirst().userFacingName(), useByWholeFile(isCascadingUse)));
+        }
+    return uses;
+  };
+
+ static std::vector<SerializableUse> createUsesFromPairs(
+   const llvm::DenseMap<ReferencedNameTracker::MemberPair, bool> &entries,
+   function_ref<SerializableDecl(bool)> useByWholeFile) {
+    std::vector<SerializableUse> uses;
+    for (const auto &p :entries) {
+      const auto &member = p.getFirst().second;
+      StringRef emptyOrUserFacingName = member.empty() ? "" : member.userFacingName();
+      uses.push_back(
+        SerializableUse::create(
+                                /*isPrivate=*/ declIsPrivate(p.getFirst().first),
+                                mangleTypeAsContext(p.getFirst().first),
+                                emptyOrUserFacingName, useByWholeFile(p.second)));
+    }
+    return uses;
+  };
+
+   static std::vector<SerializableUse>  createUsesFromExternalSwiftDeps(
+     ArrayRef<std::string> externalSwiftDeps,
+   function_ref<SerializableDecl(bool)> useByWholeFile) {
+    std::vector<SerializableUse> uses;
+    for (StringRef s: externalSwiftDeps)
+      uses.push_back(SerializableUse::create(None, "", s, useByWholeFile(true)));
+    return uses;
+  };
+
 // clang-format off
 SourceFileDepGraphConstructor
 SourceFileDepGraphConstructor::forSourceFile(
@@ -466,30 +509,25 @@ SourceFileDepGraphConstructor::forSourceFile(
   const bool hadCompilationError) {
 // clang-format on
 
+  const SerializableDecl cascadinglyUsedByWholeFile = SerializableDecl::createUsedByWholeFile(/*isCascadingUse=*/true, swiftDeps, getInterfaceHash(SF));
+
+  const SerializableDecl noncascadinglyUsedByWholeFile = SerializableDecl::createUsedByWholeFile(/*isCascadingUse=*/false, swiftDeps, getInterfaceHash(SF));
+
+  auto useByWholeFile = [&](bool isCascadingUse) {
+    return isCascadingUse ? cascadinglyUsedByWholeFile : noncascadinglyUsedByWholeFile;
+  };
+
+  std::vector<SerializableUse> topLevelDepends = createUsesFromScalars(SF->getReferencedNameTracker()->getTopLevelNames(), useByWholeFile);
+
+  std::vector<SerializableUse> dynamicLookupDepends = createUsesFromScalars(SF->getReferencedNameTracker()->getDynamicLookupNames(), useByWholeFile);
+
+  std::vector<SerializableUse> nominalMemberPotentialMemberDepends = createUsesFromPairs(SF->getReferencedNameTracker()->getUsedMembers(), useByWholeFile);
+
+
+  std::vector<SerializableUse> externalDepends = createUsesFromExternalSwiftDeps(depTracker.getDependencies(), useByWholeFile);
+
   SourceFileDeclFinder declFinder(SF, includePrivateDeps);
-  std::vector<SerializableUse> topLevelDepends;
-  for (const auto &p : SF->getReferencedNameTracker()->getTopLevelNames())
-    topLevelDepends.push_back(SerializableUse::create(
-        p.getSecond(), None, "", p.getFirst().userFacingName(), None));
 
-  std::vector<SerializableUse> dynamicLookupDepends;
-  for (const auto &p : SF->getReferencedNameTracker()->getDynamicLookupNames())
-    dynamicLookupDepends.push_back(SerializableUse::create(
-        p.getSecond(), None, "", p.getFirst().userFacingName(), None));
-
-  std::vector<SerializableUse> nominalMemberPotentialMemberDepends;
-  for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
-    const auto &member = p.getFirst().second;
-    StringRef emptyOrUserFacingName =
-        member.empty() ? "" : member.userFacingName();
-    nominalMemberPotentialMemberDepends.push_back(SerializableUse::create(
-        declIsPrivate(p.getFirst().first), p.getSecond(),
-        mangleTypeAsContext(p.getFirst().first), emptyOrUserFacingName, None));
-  }
-
-  std::vector<SerializableUse> externalDepends;
-  for (StringRef s : depTracker.getDependencies())
-    externalDepends.push_back(SerializableUse::create(false, None, "", s, None));
 
   // clang-format off
   return SourceFileDepGraphConstructor(
@@ -538,7 +576,7 @@ void SourceFileDepGraphConstructor::addAllDependenciesFrom(
     ArrayRef<SerializableUse> depends) {
   for (const auto &d : depends) {
     g.recordDefUse(DependencyKey::createInterfaceKey("gazorp1", kind, d.context, d.name),
-                 d.isCascadingUse, d.use);
+                 d.isCascadingUseGazorp(), d.use);
   }
 }
 
@@ -550,7 +588,7 @@ void SourceFileDepGraphConstructor::addAllDependenciesFrom<NodeKind::member>(
   for (const auto &entry : nominalMemberPotentialMemberDepends) {
     if (!includePrivateDeps && entry.isPrivate.getValueOr(false))
       continue;
-    if (entry.isCascadingUse)
+    if (entry.isCascadingUseGazorp())
       holdersOfCascadingMembers.insert(entry.context);
   }
   for (const auto &entry : nominalMemberPotentialMemberDepends) {
@@ -561,7 +599,7 @@ void SourceFileDepGraphConstructor::addAllDependenciesFrom<NodeKind::member>(
         holdersOfCascadingMembers.count(entry.context) != 0, entry.use);
     g.recordDefUse(DependencyKey::createMemberOrPotentialMemberInterfaceKey("gazorp",
                      entry.context, entry.name),
-                 entry.isCascadingUse, entry.use);
+                 entry.isCascadingUseGazorp(), entry.use);
   }
 }
 

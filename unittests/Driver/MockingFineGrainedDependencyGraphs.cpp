@@ -90,9 +90,10 @@ static Optional<SerializableDecl> providesIfNotEmpty(const StringRef s, const No
 
 static const char* defUseSeparator = "->";
 
-SerializableUse parseDefUse(const StringRef argString, const NodeKind kind, const bool includePrivateDeps) {
-static const char* noncascadingPrefix = "#";
-static const char* privateHolderPrefix = "~";
+SerializableUse parseDefUse(const StringRef argString, const NodeKind kind, const bool includePrivateDeps,
+StringRef swiftDeps, StringRef interfaceHash) {
+  static const char* noncascadingPrefix = "#";
+  static const char* privateHolderPrefix = "~";
 
   StringRef s = argString;
   const bool isCascadingUse = !s.consume_front(noncascadingPrefix);
@@ -101,16 +102,19 @@ static const char* privateHolderPrefix = "~";
   const auto context = parseContext(defUseStrings.first, kind);
   const auto name = parseName(defUseStrings.first, kind);
 
-  const Optional<SerializableDecl> use = providesIfNotEmpty(defUseStrings.second, kindOfUse, includePrivateDeps);
+  const auto wholeFileUse = SerializableDecl::createUsedByWholeFile(isCascadingUse, swiftDeps, interfaceHash);
 
-  return SerializableUse::create(
-    isCascadingUse, isHolderPrivate, context, name, use);
+  const auto use = s.empty() ? wholeFileUse : parseProvides(defUseStrings.second, kindOfUse, includePrivateDeps).getValueOr(wholeFileUse);
+
+  return SerializableUse::create(isHolderPrivate, context, name, use);
 }
 
 static std::pair<std::unordered_map<NodeKind, std::vector<SerializableDecl>>,
                  std::unordered_map<NodeKind, std::vector<SerializableUse>>>
 parseProvidesAndDepends(std::unordered_multimap<NodeKind, std::vector<std::string>> unparsedByKind,
-                        const bool includePrivateDeps) {
+                        const bool includePrivateDeps,
+                        StringRef swiftDeps,
+                        StringRef interfaceHash) {
   std::unordered_map<NodeKind, std::vector<SerializableDecl>> provides;
   std::unordered_map<NodeKind, std::vector<SerializableUse>> depends;
   for (const auto &entry : unparsedByKind) {
@@ -123,7 +127,7 @@ parseProvidesAndDepends(std::unordered_multimap<NodeKind, std::vector<std::strin
           provides[kind].push_back(provide.getValue());
       }
       else
-        depends[kind].push_back(parseDefUse(s, kind, includePrivateDeps));
+        depends[kind].push_back(parseDefUse(s, kind, includePrivateDeps, swiftDeps, interfaceHash));
     }
   }
   return {provides, depends};
@@ -141,7 +145,7 @@ static SourceFileDepGraph mockSourceFileDepGraph(
   std::unordered_map<NodeKind, std::vector<SerializableDecl>> provides;
   std::unordered_map<NodeKind, std::vector<SerializableUse>> depends;
   std::tie(provides, depends) =
-      parseProvidesAndDepends(unparsedByKind, includePrivateDeps);
+      parseProvidesAndDepends(unparsedByKind, includePrivateDeps, swiftDepsFilename, interfaceHash);
 
   std::vector<SerializableUse> nominalsMembersAndPotentialMembers;
   const std::array<NodeKind, 3> kinds {NodeKind::nominal, NodeKind::member, NodeKind::potentialMember};
