@@ -165,6 +165,27 @@ std::string DependencyKey::demangleTypeAsContext(StringRef s) {
   return swift::Demangle::demangleTypeAsString(s.str());
 }
 
+
+//==============================================================================
+// MARK: Building
+//==============================================================================
+
+void SourceFileDepGraph::recordDefUse(
+    const DependencyKey &defKey, bool isCascadingUse,
+    Optional<SerializableDecl> use) {
+  SourceFileDepGraphNode *defNode =
+      findExistingNodeOrCreateIfNew(defKey, None, false /* = !isProvides */);
+
+  const DeclAspect aspectOfUser = DependencyKey::aspectOfUseIfCascades(isCascadingUse);
+  SourceFileDepGraphNode *useNode =
+    use
+    ? findExistingNodeOrCreateIfNew(use.getValue().key.withAspect(aspectOfUser),
+                                 use.getValue().fingerprint, true /* = isProvides */)
+    : getSourceFileNodePair().usedMemberWhenCascading(isCascadingUse);
+
+  addArc(defNode, useNode);
+}
+
 //==============================================================================
 // MARK: Debugging
 //==============================================================================

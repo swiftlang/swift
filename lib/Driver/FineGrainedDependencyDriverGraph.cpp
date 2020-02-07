@@ -202,7 +202,7 @@ void ModuleDepGraph::forEachUntracedJobDirectlyDependentOnExternalSwiftDeps(
     StringRef externalSwiftDeps, function_ref<void(const Job *)> fn) {
   // TODO move nameForDep into key
   // These nodes will depend on the *interface* of the external Decl.
-  DependencyKey key = DependencyKey::createInterfaceKey(
+  DependencyKey key = DependencyKey::createInterfaceKey("gazorp1", 
       NodeKind::externalDepend, "", externalSwiftDeps.str());
   for (const ModuleDepGraphNode *useNode : usesByDef[key]) {
     if (!useNode->getHasBeenTraced())
@@ -413,9 +413,7 @@ void ModuleDepGraph::forCorrespondingImplementationOfProvidedInterface(
     return;
   const auto swiftDeps = interfaceNode->getSwiftDeps().getValue();
   const auto &interfaceKey = interfaceNode->getKey();
-  const DependencyKey implementationKey(
-      interfaceKey.getKind(), DeclAspect::implementation,
-      interfaceKey.getContext(), interfaceKey.getName());
+  const DependencyKey implementationKey = interfaceKey.withAspect(DeclAspect::implementation);
   if (const auto implementationNode =
           nodeMap.find(swiftDeps, implementationKey))
     fn(implementationNode.getValue());

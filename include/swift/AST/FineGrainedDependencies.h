@@ -431,8 +431,8 @@ public:
   /// the arc depends on if the dependency is a cascading one. Centralize that
   /// choice here.
   /// ("use" in the name represents the noun, not the verb.)
-  NodeT *useDependingOnCascading(bool ifCascades) {
-    return ifCascades ? interface : implementation;
+  NodeT *usedMemberWhenCascading(bool isCascadingUse) {
+    return isCascadingUse ? interface : implementation;
   }
 };
 
@@ -459,18 +459,19 @@ class DependencyKey {
   /// nominal kinds.
   std::string name;
 
+   /// For constructing a key in the frontend.
+  DependencyKey(const char* gazorp, NodeKind kind, DeclAspect aspect, const std::string &context,
+                const std::string &name)
+      : kind(kind), aspect(aspect), context(context), name(name) {
+    assert(verify());
+  }
+
+
 public:
   /// See \ref SourceFileDepGraphNode::SourceFileDepGraphNode().
   DependencyKey()
       : kind(NodeKind::kindCount), aspect(DeclAspect::aspectCount), context(),
         name() {}
-
-  /// For constructing a key in the frontend.
-  DependencyKey(NodeKind kind, DeclAspect aspect, const std::string &context,
-                const std::string &name)
-      : kind(kind), aspect(aspect), context(context), name(name) {
-    assert(verify());
-  }
 
   NodeKind getKind() const { return kind; }
   DeclAspect getAspect() const { return aspect; }
@@ -513,11 +514,20 @@ public:
   }
   bool isInterface() const { return getAspect() == DeclAspect::interface; }
 
-  static DependencyKey createInterfaceKey(NodeKind kind, StringRef context,
+  static DependencyKey create(NodeKind kind, DeclAspect aspect, StringRef context,
+                                          StringRef name) {
+    return DependencyKey("gazorp", kind, aspect, context, name);
+  }
+
+/// Create a key with the \c DeclAspect::interface \c aspect.
+/// When creating a dependency graph from a \c SourceFile or for a unit test
+/// a key with the \c NodeKind::interface stands in for an interface, implementation pair.
+  static DependencyKey createInterfaceKey(const char* gazorp1, NodeKind kind, StringRef context,
                                           StringRef name);
 
   static DependencyKey
-  createNominalOrMemberInterfaceKeyNominal(StringRef mangledHolderName,
+  createMemberOrPotentialMemberInterfaceKey(const char* gazorp,
+  StringRef mangledHolderName,
                                            StringRef memberBaseNameIfAny);
 
   /// Given some entity derived from the \c SourceFile, create the key
@@ -530,8 +540,12 @@ public:
 
   StringRef aspectName() const { return DeclAspectNames[size_t(aspect)]; }
 
+  static DeclAspect aspectOfUseIfCascades(bool isCascadingUse) {
+    return isCascadingUse ? DeclAspect::interface : DeclAspect::implementation;
+  }
+
   DependencyKey withAspect(DeclAspect newAspect) const {
-    return DependencyKey(kind, newAspect, context, name);
+    return DependencyKey("gazorp", kind, newAspect, context, name);
   }
 
   void dump(llvm::raw_ostream &os) const { os << asString() << "\n"; }
@@ -863,6 +877,9 @@ public:
     getNode(use->getSequenceNumber())
         ->addDefIDependUpon(def->getSequenceNumber());
   }
+
+  void recordDefUse(const DependencyKey &defKey, bool isCascadingUse,
+                    Optional<SerializableDecl>);
 
   /// Read a swiftdeps file at \p path and return a SourceFileDepGraph if
   /// successful.

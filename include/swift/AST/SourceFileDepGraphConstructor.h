@@ -158,9 +158,7 @@ private:
   template <NodeKind kind>
   void addAllDependenciesFrom(ArrayRef<SerializableUse> depends);
 
-  void recordDefUse(const DependencyKey &defKey, bool isCascadingUse,
-                    Optional<SerializableDecl> use);
-};
+ };
 
 } // namespace fine_grained_dependencies
 } // namespace swift

@@ -305,18 +305,19 @@ private:
 // MARK: creating keys
 //==============================================================================
 
-DependencyKey DependencyKey::createInterfaceKey(NodeKind kind,
+DependencyKey DependencyKey::createInterfaceKey(const char* gazorp1,
+NodeKind kind,
                                                 StringRef context,
                                                 StringRef name) {
-  return DependencyKey(kind, DeclAspect::interface, context, name);
+  return DependencyKey("gazorp", kind, DeclAspect::interface, context, name);
 }
 
-DependencyKey DependencyKey::createNominalOrMemberInterfaceKeyNominal(
+DependencyKey DependencyKey::createMemberOrPotentialMemberInterfaceKey(const char* gazorp,
     StringRef mangledHolderName, StringRef memberBaseNameIfAny) {
   const bool isMemberBlank = memberBaseNameIfAny.empty();
   const auto kind =
       isMemberBlank ? NodeKind::potentialMember : NodeKind::member;
-  return DependencyKey::createInterfaceKey(kind, mangledHolderName,
+  return DependencyKey::createInterfaceKey("gazorp1", kind, mangledHolderName,
                                            memberBaseNameIfAny);
 }
 
@@ -333,7 +334,7 @@ DependencyKey
 DependencyKey::createProvidedInterfaceKey<NodeKind::topLevel,
                                           PrecedenceGroupDecl const *>(
     PrecedenceGroupDecl const *D) {
-  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "",
+  return DependencyKey("gazorp", NodeKind::topLevel, DeclAspect::interface, "",
                        ::getName(D));
 }
 
@@ -341,42 +342,42 @@ template <>
 DependencyKey
 DependencyKey::createProvidedInterfaceKey<NodeKind::topLevel, FuncDecl const *>(
     FuncDecl const *D) {
-  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "",
+  return DependencyKey("gazorp", NodeKind::topLevel, DeclAspect::interface, "",
                        ::getName(D));
 }
 
 template <>
 DependencyKey DependencyKey::createProvidedInterfaceKey<
     NodeKind::topLevel, OperatorDecl const *>(const OperatorDecl *D) {
-  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "",
+  return DependencyKey("gazorp", NodeKind::topLevel, DeclAspect::interface, "",
                        ::getName(D));
 }
 
 template <>
 DependencyKey DependencyKey::createProvidedInterfaceKey<
     NodeKind::topLevel, NominalTypeDecl const *>(const NominalTypeDecl *D) {
-  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "",
+  return DependencyKey("gazorp", NodeKind::topLevel, DeclAspect::interface, "",
                        ::getName(D));
 }
 
 template <>
 DependencyKey DependencyKey::createProvidedInterfaceKey<
     NodeKind::topLevel, ValueDecl const *>(const ValueDecl *D) {
-  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "",
+  return DependencyKey("gazorp", NodeKind::topLevel, DeclAspect::interface, "",
                        getBaseName(D));
 }
 
 template <>
 DependencyKey DependencyKey::createProvidedInterfaceKey<
     NodeKind::dynamicLookup, ValueDecl const *>(const ValueDecl *D) {
-  return DependencyKey(NodeKind::dynamicLookup, DeclAspect::interface, "",
+  return DependencyKey("gazorp", NodeKind::dynamicLookup, DeclAspect::interface, "",
                        getBaseName(D));
 }
 
 template <>
 DependencyKey DependencyKey::createProvidedInterfaceKey<
     NodeKind::nominal, NominalTypeDecl const *>(const NominalTypeDecl *D) {
-  return DependencyKey(NodeKind::nominal, DeclAspect::interface,
+  return DependencyKey("gazorp", NodeKind::nominal, DeclAspect::interface,
                        mangleTypeAsContext(D), "");
 }
 
@@ -385,7 +386,7 @@ DependencyKey
 DependencyKey::createProvidedInterfaceKey<NodeKind::potentialMember,
                                           NominalTypeDecl const *>(
     const NominalTypeDecl *D) {
-  return DependencyKey(NodeKind::potentialMember, DeclAspect::interface,
+  return DependencyKey("gazorp", NodeKind::potentialMember, DeclAspect::interface,
                        mangleTypeAsContext(D), "");
 }
 
@@ -393,7 +394,7 @@ template <>
 DependencyKey
 DependencyKey::createProvidedInterfaceKey<NodeKind::sourceFileProvide,
                                           StringRef>(StringRef swiftDeps) {
-  return DependencyKey(NodeKind::sourceFileProvide, DeclAspect::interface, "",
+  return DependencyKey("gazorp", NodeKind::sourceFileProvide, DeclAspect::interface, "",
                        swiftDeps);
 }
 
@@ -401,7 +402,7 @@ template <>
 DependencyKey DependencyKey::createProvidedInterfaceKey<
     NodeKind::member, std::pair<const NominalTypeDecl *, const ValueDecl *>>(
     std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember) {
-  return DependencyKey(NodeKind::member, DeclAspect::interface,
+  return DependencyKey("gazorp", NodeKind::member, DeclAspect::interface,
                        mangleTypeAsContext(holderAndMember.first),
                        getBaseName(holderAndMember.second));
 }
@@ -536,7 +537,7 @@ template <NodeKind kind>
 void SourceFileDepGraphConstructor::addAllDependenciesFrom(
     ArrayRef<SerializableUse> depends) {
   for (const auto &d : depends) {
-    recordDefUse(DependencyKey::createInterfaceKey(kind, d.context, d.name),
+    g.recordDefUse(DependencyKey::createInterfaceKey("gazorp1", kind, d.context, d.name),
                  d.isCascadingUse, d.use);
   }
 }
@@ -555,10 +556,10 @@ void SourceFileDepGraphConstructor::addAllDependenciesFrom<NodeKind::member>(
   for (const auto &entry : nominalMemberPotentialMemberDepends) {
     if (!includePrivateDeps && entry.isPrivate.getValueOr(false))
       continue;
-    recordDefUse(
-        DependencyKey::createInterfaceKey(NodeKind::nominal, entry.context, ""),
+    g.recordDefUse(
+        DependencyKey::createInterfaceKey("gazorp1", NodeKind::nominal, entry.context, ""),
         holdersOfCascadingMembers.count(entry.context) != 0, entry.use);
-    recordDefUse(DependencyKey::createNominalOrMemberInterfaceKeyNominal(
+    g.recordDefUse(DependencyKey::createMemberOrPotentialMemberInterfaceKey("gazorp",
                      entry.context, entry.name),
                  entry.isCascadingUse, entry.use);
   }
@@ -571,7 +572,7 @@ void SourceFileDepGraphConstructor::addAllDependenciesFrom<NodeKind::member>(
 
 void SourceFileDepGraphConstructor::addSourceFileNodesToGraph() {
   g.findExistingNodePairOrCreateAndAddIfNew(
-      SerializableDecl{DependencyKey::createInterfaceKey(
+      SerializableDecl{DependencyKey::createInterfaceKey("gazorp1",
                            NodeKind::sourceFileProvide, "", swiftDeps),
                        getSourceFileFingerprint()});
 }
@@ -605,16 +606,6 @@ void SourceFileDepGraphConstructor::addDependencyArcsToGraph() {
   addAllDependenciesFrom<NodeKind::externalDepend>(externalDependencies);
 }
 
-void SourceFileDepGraphConstructor::recordDefUse(
-    const DependencyKey &defKey, bool isCascadingUse,
-    Optional<SerializableDecl> use) {
-  SourceFileDepGraphNode *defNode =
-      g.findExistingNodeOrCreateIfNew(defKey, None, false /* = !isProvides */);
-  auto useNodePair =
-      use ? g.findExistingNodePairOrCreateAndAddIfNew(use.getValue())
-          : g.getSourceFileNodePair();
-  g.addArc(defNode, useNodePair.useDependingOnCascading(isCascadingUse));
-}
 
 //==============================================================================
 // Entry point from the Frontend to this whole system

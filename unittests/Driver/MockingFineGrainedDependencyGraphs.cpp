@@ -80,7 +80,7 @@ static Optional<SerializableDecl> parseProvides(StringRef s, const NodeKind kind
   std::string name = parseName(s.split(fingerprintSeparator).first, kind);
   Optional<std::string> fingerprint = noneIfEmpty(s.split(fingerprintSeparator).second.str());
 
-  return SerializableDecl{DependencyKey::createInterfaceKey(kind, context, name), fingerprint};
+  return SerializableDecl{DependencyKey::createInterfaceKey("gazorp1", kind, context, name), fingerprint};
 }
 
 
