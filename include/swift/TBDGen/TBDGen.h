@@ -49,6 +49,10 @@ struct TBDGenOptions {
   /// The dylib compatibility-version to use in the generated TBD file. Defaults
   /// to empty string if not provided.
   std::string CompatibilityVersion;
+
+  /// The path to a Json file indicating the module name to install-name map
+  /// used by @_originallyDefinedIn
+  std::string ModuleInstallNameMapPath;
 };
 
 void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,

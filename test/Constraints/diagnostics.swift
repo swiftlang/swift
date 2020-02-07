@@ -195,10 +195,10 @@ func r17224804(_ monthNumber : Int) {
 
 // <rdar://problem/17020197> QoI: Operand of postfix '!' should have optional type; type is 'Int?'
 func r17020197(_ x : Int?, y : Int) {
-  if x! {  }  // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if x! {  }  // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 
   // <rdar://problem/12939553> QoI: diagnostic for using an integer in a condition is utterly terrible
-  if y {}    // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if y {}    // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 }
 
 // <rdar://problem/20714480> QoI: Boolean expr not treated as Bool type when function return type is different
@@ -288,7 +288,7 @@ func r18800223(_ i : Int) {
 
   
   var buttonTextColor: String?
-  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{unable to infer closure type in the current context}}
+  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '(_) -> _'}}
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
@@ -492,7 +492,9 @@ enum Color {
   static func rainbow() -> Color {}
   
   static func overload(a : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(a:)')}}
+  // expected-note@-1 {{candidate has partially matching parameter list (a: Int)}}
   static func overload(b : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(b:)')}}
+  // expected-note@-1 {{candidate has partially matching parameter list (b: Int)}}
   
   static func frob(_ a : Int, b : inout Int) -> Color {}
   static var svar: Color { return .Red }
@@ -517,8 +519,7 @@ let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of t
 let _ : Color = .rainbow  // expected-error {{member 'rainbow()' is a function; did you mean to call it?}} {{25-25=()}}
 
 let _: Color = .overload(a : 1.0)  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-let _: Color = .overload(1.0)  // expected-error {{ambiguous reference to member 'overload'}}
-// expected-note @-1 {{overloads for 'overload' exist with these partially matching parameter lists: (a: Int), (b: Int)}}
+let _: Color = .overload(1.0)  // expected-error {{no exact matches in call to static method 'overload'}}
 let _: Color = .overload(1)  // expected-error {{no exact matches in call to static method 'overload'}}
 let _: Color = .frob(1.0, &i) // expected-error {{missing argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
@@ -633,11 +634,11 @@ func r18397777(_ d : r21447318?) {
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
   }
   
-  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{8-8= != nil)}}
+  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{8-8= == nil)}}
 
   }
 
-  if !Optional(c) { // expected-error {{optional type 'Optional<r21447318>' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{18-18= != nil)}}
+  if !Optional(c) { // expected-error {{optional type 'Optional<r21447318>' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{18-18= == nil)}}
   }
 }
 
@@ -1270,7 +1271,7 @@ func badTypes() {
 // rdar://34357545
 func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
-  // expected-error@-1 {{expression type 'Bool' is ambiguous without more context}}
+  // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
 }
 
 func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}

@@ -160,9 +160,9 @@ struct Text : P {
   init(_: T) {}
 }
 
-struct Label<L> : P where L : P { // expected-note {{'L' declared as parameter to type 'Label'}}
+struct Label<L> : P where L : P { // expected-note 2 {{'L' declared as parameter to type 'Label'}}
   typealias T = L
-  init(@Builder _: () -> L) {}
+  init(@Builder _: () -> L) {} // expected-note {{'init(_:)' declared here}}
 }
 
 func test_51167632() -> some P {
@@ -170,6 +170,15 @@ func test_51167632() -> some P {
     Text("hello")
     Label  // expected-error {{generic parameter 'L' could not be inferred}}
     // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
+  })
+}
+
+func test_56221372() -> some P {
+  AnyP(G {
+    Text("hello")
+    Label() // expected-error {{generic parameter 'L' could not be inferred}}
+    // expected-error@-1 {{missing argument for parameter #1 in call}}
+    // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
   })
 }
 
@@ -211,7 +220,7 @@ func erroneousSR11350(x: Int) {
       if b {
         acceptInt(0) { }
       }
-    }).domap(0) // expected-error{{value of type 'Optional<()>' has no member 'domap'}}
+    }).domap(0) // expected-error{{value of type '()?' has no member 'domap'}}
   }
 }
 
@@ -233,4 +242,88 @@ tuplify(true) { x in
   "hello"
   #warning("oops")  // expected-warning{{oops}}
   3.14159
+}
+
+struct MyTuplifiedStruct {
+  var condition: Bool
+
+  @TupleBuilder var computed: some Any { // expected-note{{remove the attribute to explicitly disable the function builder}}{{3-17=}}
+    if condition {
+      return 17 // expected-warning{{application of function builder 'TupleBuilder' disabled by explicit 'return' statement}}
+      // expected-note@-1{{remove 'return' statements to apply the function builder}}{{7-14=}}{{12-19=}}
+    } else {
+           return 42
+    }
+  }
+}
+
+// Check that we're performing syntactic use diagnostics.
+func acceptMetatype<T>(_: T.Type) -> Bool { true }
+
+func syntacticUses<T>(_: T) {
+  tuplify(true) { x in
+    if x && acceptMetatype(T) { // expected-error{{expected member name or constructor call after type name}}
+      // expected-note@-1{{use '.self' to reference the type object}}
+      acceptMetatype(T) // expected-error{{expected member name or constructor call after type name}}
+      // expected-note@-1{{use '.self' to reference the type object}}
+    }
+  }
+}
+
+// Check custom diagnostics within "if" conditions.
+struct HasProperty {
+  var property: Bool = false
+}
+
+func checkConditions(cond: Bool) {
+  var x = HasProperty()
+
+  tuplify(cond) { value in
+    if x.property = value { // expected-error{{use of '=' in a boolean context, did you mean '=='?}}
+      "matched it"
+    }
+  }
+}
+
+// Check that a closure with a single "return" works with function builders.
+func checkSingleReturn(cond: Bool) {
+  tuplify(cond) { value in
+    return (value, 17)
+  }
+
+  tuplify(cond) { value in
+    (value, 17)
+  }
+
+  tuplify(cond) {
+    ($0, 17)
+  }
+}
+
+// rdar://problem/59116520
+func checkImplicitSelfInClosure() {
+  @_functionBuilder
+  struct Builder {
+    static func buildBlock(_ children: String...) -> Element { Element() }
+  }
+
+  struct Element {
+    static func nonEscapingClosure(@Builder closure: (() -> Element)) {}
+    static func escapingClosure(@Builder closure: @escaping (() -> Element)) {}
+  }
+
+  class C {
+    let identifier: String = ""
+
+    func testImplicitSelf() {
+      Element.nonEscapingClosure {
+        identifier // okay
+      }
+
+      Element.escapingClosure { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+        identifier // expected-error {{reference to property 'identifier' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        // expected-note@-1 {{reference 'self.' explicitly}}
+      }
+    }
+  }
 }

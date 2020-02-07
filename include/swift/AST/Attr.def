@@ -535,11 +535,7 @@ DECL_ATTR(derivative, Derivative,
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   97)
 
-DECL_ATTR(_implicitly_synthesizes_nested_requirement, ImplicitlySynthesizesNestedRequirement,
-  OnProtocol |
-  UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  98)
+// NOTE: 98 is unused
 
 DECL_ATTR(transpose, Transpose,
   OnFunc | LongAttribute | AllowMultipleAttributes |

@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -314,19 +315,6 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
 static StringRef
-getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
-  switch (value) {
-    case MagicIdentifierLiteralExpr::File: return "#file";
-    case MagicIdentifierLiteralExpr::FilePath: return "#filePath";
-    case MagicIdentifierLiteralExpr::Function: return "#function";
-    case MagicIdentifierLiteralExpr::Line: return "#line";
-    case MagicIdentifierLiteralExpr::Column: return "#column";
-    case MagicIdentifierLiteralExpr::DSOHandle: return "#dsohandle";
-  }
-
-  llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
-}
-static StringRef
 getObjCSelectorExprKindString(ObjCSelectorExpr::ObjCSelectorKind value) {
   switch (value) {
     case ObjCSelectorExpr::Method: return "method";
@@ -589,7 +577,7 @@ namespace {
       OS << " '";
       interleave(ID->getFullAccessPath(),
                  [&](const ImportDecl::AccessPathElement &Elem) {
-                   OS << Elem.first;
+                   OS << Elem.Item;
                  },
                  [&] { OS << '.'; });
       OS << "')";
@@ -794,7 +782,7 @@ namespace {
       PrintWithColorRAII(OS, ASTNodeColor) << "source_file ";
       PrintWithColorRAII(OS, LocationColor) << '\"' << SF.getFilename() << '\"';
       
-      for (Decl *D : SF.Decls) {
+      for (Decl *D : SF.getTopLevelDecls()) {
         if (D->isImplicit())
           continue;
 
@@ -1957,7 +1945,7 @@ public:
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E) {
     printCommon(E, "magic_identifier_literal_expr")
-      << " kind=" << getMagicIdentifierLiteralExprKindString(E->getKind());
+      << " kind=" << MagicIdentifierLiteralExpr::getKindString(E->getKind());
 
     if (E->isString()) {
       OS << " encoding="
@@ -3775,6 +3763,10 @@ void Type::dump() const {
 }
 
 void Type::dump(raw_ostream &os, unsigned indent) const {
+  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+    return; // not needed for the parser library.
+  #endif
+
   PrintType(os, indent).visit(*this, "");
   os << "\n";
 }
@@ -3816,4 +3808,45 @@ StringRef swift::getAccessorKindString(AccessorKind value) {
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
+}
+
+void StableSerializationPath::dump() const {
+  dump(llvm::errs());
+}
+
+static StringRef getExternalPathComponentKindString(
+                  StableSerializationPath::ExternalPath::ComponentKind kind) {
+  switch (kind) {
+#define CASE(ID, STRING) \
+  case StableSerializationPath::ExternalPath::ID: return STRING;
+  CASE(Record, "record")
+  CASE(Enum, "enum")
+  CASE(Namespace, "namespace")
+  CASE(Typedef, "typedef")
+  CASE(TypedefAnonDecl, "anonymous tag")
+  CASE(ObjCInterface, "@interface")
+  CASE(ObjCProtocol, "@protocol")
+#undef CASE
+  }
+  llvm_unreachable("bad kind");
+}
+
+void StableSerializationPath::dump(llvm::raw_ostream &os) const {
+  if (isSwiftDecl()) {
+    os << "clang decl of:\n";
+    getSwiftDecl()->dump(os, 2);
+  } else {
+    auto &path = getExternalPath();
+    using ExternalPath = StableSerializationPath::ExternalPath;
+    os << "external path: ";
+    size_t index = 0;
+    for (auto &entry : path.Path) {
+      if (index++) os << " -> ";
+      os << getExternalPathComponentKindString(entry.first);
+      if (ExternalPath::requiresIdentifier(entry.first))  {
+        os << "(" << entry.second << ")";
+      }
+    }
+    os << "\n";
+  }
 }

@@ -57,6 +57,10 @@ public:
   /// purposes.
   bool EnableOSSAOptimizations = true;
 
+  /// Controls whether to turn on speculative devirtualization.
+  /// It is turned off by default.
+  bool EnableSpeculativeDevirtualization = false;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
@@ -73,6 +77,10 @@ public:
 
   /// Whether to dump verbose SIL with scope and location information.
   bool EmitVerboseSIL = false;
+
+  /// Should we sort SIL functions, vtables, witness tables, and global
+  /// variables by name when we print it out. This eases diffing of SIL files.
+  bool EmitSortedSIL = false;
 
   /// Whether to stop the optimization pipeline after serializing SIL.
   bool StopOptimizationAfterSerialization = false;

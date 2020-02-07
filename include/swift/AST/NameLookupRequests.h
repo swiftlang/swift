@@ -161,6 +161,29 @@ public:
   void cacheResult(ClassDecl *value) const;
 };
 
+/// Requests whether or not this class has designated initializers that are
+/// not public or @usableFromInline.
+class HasMissingDesignatedInitializersRequest :
+    public SimpleRequest<HasMissingDesignatedInitializersRequest,
+                         bool(ClassDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, ClassDecl *subject) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool) const;
+};
+
 /// Request the nominal declaration extended by a given extension declaration.
 class ExtendedNominalRequest :
     public SimpleRequest<ExtendedNominalRequest,
@@ -442,6 +465,54 @@ private:
            SmallVector<NominalTypeDecl *, 4> decls,
            DeclNameRef name,
            NLOptions opts) const;
+};
+
+/// The input type for a direct lookup request.
+class DirectLookupDescriptor final {
+  using LookupOptions = OptionSet<NominalTypeDecl::LookupDirectFlags>;
+
+public:
+  NominalTypeDecl *DC;
+  DeclName Name;
+  LookupOptions Options;
+
+  DirectLookupDescriptor(NominalTypeDecl *dc, DeclName name,
+                         LookupOptions options = {})
+      : DC(dc), Name(name), Options(options) {}
+
+  friend llvm::hash_code hash_value(const DirectLookupDescriptor &desc) {
+    return llvm::hash_combine(desc.Name, desc.DC, desc.Options.toRaw());
+  }
+
+  friend bool operator==(const DirectLookupDescriptor &lhs,
+                         const DirectLookupDescriptor &rhs) {
+    return lhs.Name == rhs.Name && lhs.DC == rhs.DC &&
+           lhs.Options.toRaw() == rhs.Options.toRaw();
+  }
+
+  friend bool operator!=(const DirectLookupDescriptor &lhs,
+                         const DirectLookupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const DirectLookupDescriptor &desc);
+
+SourceLoc extractNearestSourceLoc(const DirectLookupDescriptor &desc);
+
+class DirectLookupRequest
+    : public SimpleRequest<DirectLookupRequest,
+                           TinyPtrVector<ValueDecl *>(DirectLookupDescriptor),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<TinyPtrVector<ValueDecl *>>
+  evaluate(Evaluator &evaluator, DirectLookupDescriptor desc) const;
 };
 
 #define SWIFT_TYPEID_ZONE NameLookup

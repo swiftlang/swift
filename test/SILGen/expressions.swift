@@ -1,6 +1,6 @@
 
 // RUN: %empty-directory(%t)
-// RUN: echo "public var x = Int()" | %target-swift-frontend -module-name FooBar -emit-module -o %t -
+// RUN: echo "public var x = Int()" | %target-swift-frontend -parse-as-library -module-name FooBar -emit-module -o %t -
 // RUN: %target-swift-emit-silgen -parse-stdlib -module-name expressions %s -I%t -disable-access-control | %FileCheck %s
 
 import Swift

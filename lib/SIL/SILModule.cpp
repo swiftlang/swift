@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-module"
 #include "swift/SIL/SILModule.h"
 #include "Linker.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -90,7 +91,7 @@ class SILModule::SerializationCallback final
 };
 
 SILModule::SILModule(ModuleDecl *SwiftModule, TypeConverter &TC,
-                     SILOptions &Options, const DeclContext *associatedDC,
+                     const SILOptions &Options, const DeclContext *associatedDC,
                      bool wholeModule)
     : TheSwiftModule(SwiftModule),
       AssociatedDeclContext(associatedDC),
@@ -120,7 +121,7 @@ SILModule::~SILModule() {
 }
 
 std::unique_ptr<SILModule>
-SILModule::createEmptyModule(ModuleDecl *M, TypeConverter &TC, SILOptions &Options,
+SILModule::createEmptyModule(ModuleDecl *M, TypeConverter &TC, const SILOptions &Options,
                              bool WholeModule) {
   return std::unique_ptr<SILModule>(
       new SILModule(M, TC, Options, M, WholeModule));
@@ -574,6 +575,28 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
     return E->Implementation;
 
   return nullptr;
+}
+
+SILDifferentiabilityWitness *
+SILModule::lookUpDifferentiabilityWitness(StringRef name) {
+  auto it = DifferentiabilityWitnessMap.find(name);
+  if (it != DifferentiabilityWitnessMap.end()) {
+    return it->second;
+  }
+  return nullptr;
+}
+
+SILDifferentiabilityWitness *
+SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
+  Mangle::ASTMangler mangler;
+  return lookUpDifferentiabilityWitness(
+      mangler.mangleSILDifferentiabilityWitnessKey(key));
+}
+
+/// Look up the differentiability witness corresponding to the given indices.
+llvm::ArrayRef<SILDifferentiabilityWitness *>
+SILModule::lookUpDifferentiabilityWitnessesForFunction(StringRef name) {
+  return DifferentiabilityWitnessesByFunction[name];
 }
 
 void SILModule::registerDeserializationNotificationHandler(

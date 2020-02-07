@@ -619,9 +619,11 @@ class WrongInheritanceClause6(Int {}
 class WrongInheritanceClause7<T>(Int where T:AnyObject {}
 
 // <rdar://problem/18502220> [swift-crashes 078] parser crash on invalid cast in sequence expr
-Base=1 as Base=1  // expected-error {{cannot convert value of type 'Int' to type 'Base' in coercion}}
-
-
+Base=1 as Base=1 // expected-error{{cannot convert value of type 'Int' to type 'Base' in coercion}}
+// expected-error@-1 {{cannot assign to immutable expression of type 'Base.Type'}}
+// expected-error@-2 {{cannot assign to immutable expression of type 'Base'}}
+// expected-error@-3 {{cannot assign value of type '()' to type 'Base.Type'}}
+// expected-error@-4 {{cannot assign value of type 'Int' to type 'Base'}}
 
 // <rdar://problem/18634543> Parser hangs at swift::Parser::parseType
 public enum TestA {

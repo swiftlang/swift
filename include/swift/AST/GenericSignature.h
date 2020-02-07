@@ -93,6 +93,7 @@ public:
   SWIFT_DEBUG_DUMP;
 };
 
+class CanGenericSignature;
 class GenericSignatureImpl;
 class GenericTypeParamType;
 
@@ -139,6 +140,10 @@ public:
   void print(ASTPrinter &Printer, PrintOptions Opts = PrintOptions()) const;
   SWIFT_DEBUG_DUMP;
   std::string getAsString() const;
+
+  /// Returns the canonical generic signature, or \c nullptr if the underlying
+  /// pointer is \c nullptr. The result is cached.
+  CanGenericSignature getCanonicalSignature() const;
 
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
@@ -300,8 +305,8 @@ public:
   bool isCanonical() const;
   
   ASTContext &getASTContext() const;
-  
-  /// Canonicalize the components of a generic signature.
+
+  /// Returns the canonical generic signature. The result is cached.
   CanGenericSignature getCanonicalSignature() const;
 
   /// Retrieve the generic signature builder for the given generic signature.

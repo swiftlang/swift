@@ -187,24 +187,9 @@ public:
   bool validateLifetime(SILValue value,
                         ArrayRef<SILInstruction *> consumingUses,
                         ArrayRef<SILInstruction *> nonConsumingUses) {
-    assert(llvm::all_of(
-               consumingUses,
-               [](SILInstruction *i) { return !isa<CondBranchInst>(i); }) &&
-           "Passed cond branch to a non-BranchPropagatedUser API");
-    assert(llvm::all_of(
-               nonConsumingUses,
-               [](SILInstruction *i) { return !isa<CondBranchInst>(i); }) &&
-           "Passed cond branch to a non-BranchPropagatedUser API");
-    auto *consumingUsesCast =
-        reinterpret_cast<const BranchPropagatedUser *>(consumingUses.data());
-    auto *nonConsumingUsesCast =
-        reinterpret_cast<const BranchPropagatedUser *>(nonConsumingUses.data());
-    ArrayRef<BranchPropagatedUser> consumingUsesCastArray(consumingUsesCast,
-                                                          consumingUses.size());
-    ArrayRef<BranchPropagatedUser> nonConsumingUsesCastArray(
-        nonConsumingUsesCast, nonConsumingUses.size());
-    return validateLifetime(value, consumingUsesCastArray,
-                            nonConsumingUsesCastArray);
+    return validateLifetime(
+        value, BranchPropagatedUser::convertFromInstArray(consumingUses),
+        BranchPropagatedUser::convertFromInstArray(nonConsumingUses));
   }
 };
 

@@ -172,6 +172,9 @@ SIMPLE_LOCATOR_PATH_ELT(Condition)
 
 SIMPLE_LOCATOR_PATH_ELT(DynamicCallable)
 
+/// The 'true' or 'false' branch of a ternary operator.
+CUSTOM_LOCATOR_PATH_ELT(TernaryBranch)
+
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT
 #undef SIMPLE_LOCATOR_PATH_ELT

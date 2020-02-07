@@ -49,7 +49,7 @@ function(swift_windows_lib_for_arch arch var)
   set(${var} ${paths} PARENT_SCOPE)
 endfunction()
 
-function(swift_windows_generate_sdk_vfs_overlay flags)
+function(swift_windows_get_sdk_vfs_overlay overlay)
   get_filename_component(VCToolsInstallDir ${VCToolsInstallDir} ABSOLUTE)
   get_filename_component(UniversalCRTSdkDir ${UniversalCRTSdkDir} ABSOLUTE)
   set(UCRTVersion ${UCRTVersion})
@@ -58,10 +58,8 @@ function(swift_windows_generate_sdk_vfs_overlay flags)
   configure_file("${SWIFT_SOURCE_DIR}/utils/WindowsSDKVFSOverlay.yaml.in"
                  "${CMAKE_CURRENT_BINARY_DIR}/windows-sdk-vfs-overlay.yaml"
                  @ONLY)
-
-  set(${flags}
-        -Xclang;-ivfsoverlay;-Xclang;"${CMAKE_CURRENT_BINARY_DIR}/windows-sdk-vfs-overlay.yaml"
-      PARENT_SCOPE)
+  set(${overlay} ${CMAKE_CURRENT_BINARY_DIR}/windows-sdk-vfs-overlay.yaml
+    PARENT_SCOPE)
 endfunction()
 
 function(swift_verify_windows_VCVAR var)

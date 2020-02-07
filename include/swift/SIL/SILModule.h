@@ -28,6 +28,7 @@
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
+#include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILPrintContext.h"
@@ -105,6 +106,8 @@ enum class SILStage {
 /// when a Swift compilation context is lowered to SIL.
 class SILModule {
   friend class SILFunctionBuilder;
+  friend class SILGenSourceFileRequest;
+  friend class SILGenWholeModuleRequest;
 
 public:
   using FunctionListType = llvm::ilist<SILFunction>;
@@ -113,6 +116,8 @@ public:
   using PropertyListType = llvm::ilist<SILProperty>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
+  using DifferentiabilityWitnessListType =
+      llvm::ilist<SILDifferentiabilityWitness>;
   using CoverageMapCollectionType =
       llvm::MapVector<StringRef, SILCoverageMap *>;
 
@@ -131,6 +136,7 @@ private:
   friend SILBasicBlock;
   friend SILCoverageMap;
   friend SILDefaultWitnessTable;
+  friend SILDifferentiabilityWitness;
   friend SILFunction;
   friend SILGlobalVariable;
   friend SILLayout;
@@ -166,10 +172,10 @@ private:
   /// Functions, which are dead (and not in the functions list anymore),
   /// but kept alive for debug info generation.
   FunctionListType zombieFunctions;
-  
+
   /// Stores the names of zombie functions.
   llvm::BumpPtrAllocator zombieFunctionNames;
-  
+
   /// Lookup table for SIL vtables from class decls.
   llvm::DenseMap<const ClassDecl *, SILVTable *> VTableMap;
 
@@ -194,6 +200,17 @@ private:
   /// The list of SILDefaultWitnessTables in the module.
   DefaultWitnessTableListType defaultWitnessTables;
 
+  /// Lookup table for SIL differentiability witnesses, keyed by mangled name.
+  llvm::StringMap<SILDifferentiabilityWitness *> DifferentiabilityWitnessMap;
+
+  /// Lookup table for SILDifferentiabilityWitnesses, keyed by original
+  /// function name.
+  llvm::StringMap<llvm::SmallVector<SILDifferentiabilityWitness *, 1>>
+      DifferentiabilityWitnessesByFunction;
+
+  /// The list of SILDifferentiabilityWitnesses in the module.
+  DifferentiabilityWitnessListType differentiabilityWitnesses;
+
   /// Declarations which are externally visible.
   ///
   /// These are method declarations which are referenced from inlinable
@@ -211,7 +228,7 @@ private:
 
   // The map of SILCoverageMaps in the module.
   CoverageMapCollectionType coverageMaps;
-  
+
   // The list of SILProperties in the module.
   PropertyListType properties;
 
@@ -254,7 +271,7 @@ private:
   bool wholeModule;
 
   /// The options passed into this SILModule.
-  SILOptions &Options;
+  const SILOptions &Options;
 
   /// Set if the SILModule was serialized already. It is used
   /// to ensure that the module is serialized only once.
@@ -270,7 +287,7 @@ private:
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
   SILModule(ModuleDecl *M, Lowering::TypeConverter &TC,
-            SILOptions &Options, const DeclContext *associatedDC,
+            const SILOptions &Options, const DeclContext *associatedDC,
             bool wholeModule);
 
   SILModule(const SILModule&) = delete;
@@ -351,13 +368,13 @@ public:
   /// source file.
   static std::unique_ptr<SILModule>
   constructSIL(ModuleDecl *M, Lowering::TypeConverter &TC,
-               SILOptions &Options, FileUnit *sf = nullptr);
+               const SILOptions &Options, FileUnit *sf = nullptr);
 
   /// Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule>
   createEmptyModule(ModuleDecl *M, Lowering::TypeConverter &TC,
-                    SILOptions &Options,
+                    const SILOptions &Options,
                     bool WholeModule = false);
 
   /// Get the Swift module associated with this SIL module.
@@ -390,7 +407,7 @@ public:
   /// Returns true if it is the optimized OnoneSupport module.
   bool isOptimizedOnoneSupportModule() const;
 
-  SILOptions &getOptions() const { return Options; }
+  const SILOptions &getOptions() const { return Options; }
 
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;
@@ -455,6 +472,24 @@ public:
     return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
   }
 
+  using differentiability_witness_iterator = DifferentiabilityWitnessListType::iterator;
+  using differentiability_witness_const_iterator = DifferentiabilityWitnessListType::const_iterator;
+  DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() { return differentiabilityWitnesses; }
+  const DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() const { return differentiabilityWitnesses; }  differentiability_witness_iterator differentiability_witness_begin() { return differentiabilityWitnesses.begin(); }
+  differentiability_witness_iterator differentiability_witness_end() { return differentiabilityWitnesses.end(); }
+  differentiability_witness_const_iterator differentiability_witness_begin() const { return differentiabilityWitnesses.begin(); }
+  differentiability_witness_const_iterator differentiability_witness_end() const { return differentiabilityWitnesses.end(); }
+  iterator_range<differentiability_witness_iterator>
+  getDifferentiabilityWitnesses() {
+    return {differentiabilityWitnesses.begin(),
+            differentiabilityWitnesses.end()};
+  }
+  iterator_range<differentiability_witness_const_iterator>
+  getDifferentiabilityWitnesses() const {
+    return {differentiabilityWitnesses.begin(),
+            differentiabilityWitnesses.end()};
+  }
+
   void addExternallyVisibleDecl(ValueDecl *decl) {
     externallyVisible.insert(decl);
   }
@@ -502,7 +537,7 @@ public:
 
   PropertyListType &getPropertyList() { return properties; }
   const PropertyListType &getPropertyList() const { return properties; }
-  
+
   /// Look for a global variable by name.
   ///
   /// \return null if this module has no such global variable
@@ -591,6 +626,17 @@ public:
   /// hierarchy of \p Class.
   SILFunction *lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member);
 
+  /// Look up the differentiability witness with the given name.
+  SILDifferentiabilityWitness *lookUpDifferentiabilityWitness(StringRef name);
+
+  /// Look up the differentiability witness corresponding to the given key.
+  SILDifferentiabilityWitness *
+  lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
+
+  /// Look up the differentiability witness corresponding to the given function.
+  llvm::ArrayRef<SILDifferentiabilityWitness *>
+  lookUpDifferentiabilityWitnessesForFunction(StringRef name);
+
   // Given a protocol, attempt to create a default witness table declaration
   // for it.
   SILDefaultWitnessTable *
@@ -630,7 +676,7 @@ public:
 
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;
-  
+
   /// Pretty-print the module to a file.
   /// Useful for dumping the module when running in a debugger.
   /// Warning: no error handling is done. Fails with an assert if the file
@@ -640,17 +686,17 @@ public:
 
   /// Pretty-print the module to the designated stream.
   ///
-  /// \param Verbose Dump SIL location information in verbose mode.
   /// \param M If present, the types and declarations from this module will be
   ///        printed. The module would usually contain the types and Decls that
   ///        the SIL module depends on.
-  /// \param ShouldSort If set to true sorts functions, vtables, sil global
-  ///        variables, and witness tables by name to ease diffing.
+  /// \param Opts The SIL options, used to determine printing verbosity and
+  ///        and sorting.
   /// \param PrintASTDecls If set to true print AST decls.
-  void print(raw_ostream &OS, bool Verbose = false,
-             ModuleDecl *M = nullptr, bool ShouldSort = false,
+  void print(raw_ostream& OS,
+             ModuleDecl *M = nullptr,
+             const SILOptions &Opts = SILOptions(),
              bool PrintASTDecls = true) const {
-    SILPrintContext PrintCtx(OS, Verbose, ShouldSort);
+    SILPrintContext PrintCtx(OS, Opts);
     print(PrintCtx, M, PrintASTDecls);
   }
 

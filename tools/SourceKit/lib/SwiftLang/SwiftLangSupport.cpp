@@ -771,7 +771,6 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
     }
 
     // Ignore these.
-    case DAK_ImplicitlySynthesizesNestedRequirement:
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
     case DAK_HasInitialValue:

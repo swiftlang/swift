@@ -82,14 +82,63 @@ class ArrayPropertiesAnalysis {
   SILBasicBlock *Preheader;
   DominanceInfo *DomTree;
 
+  llvm::DenseMap<SILFunction *, uint32_t> InstCountCache;
   llvm::SmallSet<SILValue, 16> HoistableArray;
 
   SmallPtrSet<SILBasicBlock *, 16> ReachingBlocks;
   SmallPtrSet<SILBasicBlock *, 16> CachedExitingBlocks;
+
+  // This controls the max instructions the analysis can scan before giving up
+  const uint32_t AnalysisThreshold = 5000;
+  // This controls the max threshold for instruction count in the loop
+  const uint32_t LoopInstCountThreshold = 500;
+
 public:
   ArrayPropertiesAnalysis(SILLoop *L, DominanceAnalysis *DA)
       : Fun(L->getHeader()->getParent()), Loop(L), Preheader(nullptr),
         DomTree(DA->get(Fun)) {}
+
+  /// Check if it is profitable to specialize a loop when you see an apply
+  /// instruction. We consider it is not profitable to specialize the loop when:
+  /// 1. The callee is not found in the module, or cannot be determined
+  /// 2. The number of instructions the analysis scans has exceeded the AnalysisThreshold
+  uint32_t checkProfitabilityRecursively(SILFunction *Callee) {
+    if (!Callee)
+      return AnalysisThreshold;
+
+    auto CacheEntry = InstCountCache.find(Callee);
+    if (CacheEntry != InstCountCache.end())
+      return CacheEntry->second;
+
+    InstCountCache.insert(std::make_pair(Callee, 0));
+
+    uint32_t InstCount = 0;
+
+    for (auto &BB : *Callee) {
+      for (auto &I : BB) {
+        if (InstCount++ >= AnalysisThreshold) {
+          LLVM_DEBUG(llvm::dbgs() << "ArrayPropertyOpt: Disabled Reason - Exceeded Analysis Threshold in "
+                                  << BB.getParent()->getName() << "\n");
+          InstCountCache[Callee] = AnalysisThreshold;
+          return AnalysisThreshold;
+        }
+        if (auto Apply = FullApplySite::isa(&I)) {
+          auto Callee = Apply.getReferencedFunctionOrNull();
+          if (!Callee) {
+            LLVM_DEBUG(llvm::dbgs() << "ArrayPropertyOpt: Disabled Reason - Found opaque code in "
+                                    << BB.getParent()->getName() << "\n");
+            LLVM_DEBUG(Apply.dump());
+            LLVM_DEBUG(I.getOperand(0)->dump());
+          }
+          const auto CalleeInstCount = checkProfitabilityRecursively(Callee);
+          InstCount += CalleeInstCount;
+        }
+      }
+    }
+    InstCountCache[Callee] = InstCount;
+
+    return InstCount;
+  }
 
   bool run() {
     Preheader = Loop->getLoopPreheader();
@@ -107,10 +156,11 @@ public:
     // beneficial. This heuristic also simplifies which regions we want to
     // specialize on. We will specialize the outermost loopnest that has
     // 'array.props' instructions in its preheader.
+
     bool FoundHoistable = false;
+    uint32_t LoopInstCount = 0;
     for (auto *BB : Loop->getBlocks()) {
       for (auto &Inst : *BB) {
-
         // Can't clone alloc_stack instructions whose dealloc_stack is outside
         // the loop.
         if (!Loop->canDuplicate(&Inst))
@@ -122,11 +172,42 @@ public:
 
         if (!canHoistArrayPropsInst(ArrayPropsInst))
           return false;
+
+        LoopInstCount++;
         FoundHoistable = true;
       }
     }
 
-    return FoundHoistable;
+    if (!FoundHoistable)
+      return false;
+
+    // If the LoopInstCount exceeds the threshold, we will disable the optimization on this loop
+    // For loops of deeper nesting we increase the threshold by an additional 10%
+    if (LoopInstCount > LoopInstCountThreshold * (1 + (Loop->getLoopDepth() - 1) / 10)) {
+      LLVM_DEBUG(llvm::dbgs() << "Exceeded LoopInstCountThreshold\n");
+      return false;
+    }
+
+    // Additionally, we don't specialize the loop if we find opaque code or
+    // the analysis scans instructions greater than a threshold
+    // Since only few loops qualify as hoistable, and the profitability check
+    // can run long in cases of large thresholds, these checks are not folded
+    // along with the legality checks above.
+    for (auto *BB : Loop->getBlocks()) {
+      for (auto &Inst : *BB) {
+        if (auto Apply = FullApplySite::isa(&Inst)) {
+          const auto Callee = Apply.getReferencedFunctionOrNull();
+          auto CalleeInstCount = checkProfitabilityRecursively(Callee);
+          if (CalleeInstCount >= AnalysisThreshold)
+            return false;
+        }
+      }
+    }
+
+    LLVM_DEBUG(llvm::dbgs() << "Profitable ArrayPropertyOpt in "
+                            << Loop->getLoopPreheader()->getParent()->getName() << "\n");
+    LLVM_DEBUG(Loop->dump());
+    return true;
   }
 
 private:

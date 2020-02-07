@@ -170,6 +170,7 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
                   ArrayCallKind::kArrayPropsIsNativeTypeChecked)
             .StartsWith("array.init", ArrayCallKind::kArrayInit)
             .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
+            .Case("array.uninitialized_intrinsic", ArrayCallKind::kArrayUninitializedIntrinsic)
             .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
             .Case("array.check_index", ArrayCallKind::kCheckIndex)
             .Case("array.get_count", ArrayCallKind::kGetCount)
@@ -591,11 +592,15 @@ bool swift::ArraySemanticsCall::canInlineEarly() const {
     case ArrayCallKind::kAppendContentsOf:
     case ArrayCallKind::kReserveCapacityForAppend:
     case ArrayCallKind::kAppendElement:
+    case ArrayCallKind::kArrayUninitializedIntrinsic:
       // append(Element) calls other semantics functions. Therefore it's
       // important that it's inlined by the early inliner (which is before all
       // the array optimizations). Also, this semantics is only used to lookup
       // Array.append(Element), so inlining it does not prevent any other
       // optimization.
+      //
+      // Early inlining array.uninitialized_intrinsic semantic call helps in
+      // stack promotion.
       return true;
   }
 }
@@ -622,61 +627,57 @@ SILValue swift::ArraySemanticsCall::getInitializationCount() const {
   return SILValue();
 }
 
-SILValue swift::ArraySemanticsCall::getArrayValue() const {
-  if (getKind() == ArrayCallKind::kArrayUninitialized) {
-    TupleExtractInst *ArrayDef = nullptr;
-    for (auto *Op : SemanticsCall->getUses()) {
-      auto *TupleElt = dyn_cast<TupleExtractInst>(Op->getUser());
-      if (!TupleElt)
-        return SILValue();
-      switch (TupleElt->getFieldNo()) {
-      default:
-        return SILValue();
-      case 0: {
-          // Should only have one tuple extract after CSE.
-        if (ArrayDef)
-          return SILValue();
-        ArrayDef = TupleElt;
-        break;
-      }
-      case 1: /*Ignore the storage address */ break;
-      }
+/// Given an array semantic call \c arrayCall, if it is an "array.uninitialized"
+/// initializer, which returns a two-element tuple, return the element of the
+/// tuple at \c tupleElementIndex. Return a null SILValue if the
+/// array call is not an "array.uninitialized" initializer or if the extraction
+/// of the result tuple fails.
+static SILValue getArrayUninitializedInitResult(ArraySemanticsCall arrayCall,
+                                                unsigned tupleElementIndex) {
+  assert(tupleElementIndex <= 1 && "tupleElementIndex must be 0 or 1");
+  ArrayCallKind arrayCallKind = arrayCall.getKind();
+  if (arrayCallKind != ArrayCallKind::kArrayUninitialized &&
+      arrayCallKind != ArrayCallKind::kArrayUninitializedIntrinsic)
+    return SILValue();
+
+  // In OSSA, the call result will be extracted through a destructure_tuple
+  // instruction.
+  ApplyInst *callInst = arrayCall;
+  if (callInst->getFunction()->hasOwnership()) {
+    Operand *singleUse = callInst->getSingleUse();
+    if (!singleUse)
+      return SILValue();
+    if (DestructureTupleInst *destructTuple =
+            dyn_cast<DestructureTupleInst>(singleUse->getUser())) {
+      return destructTuple->getResult(tupleElementIndex);
     }
-    return SILValue(ArrayDef);
+    return SILValue();
   }
 
-  if (getKind() == ArrayCallKind::kArrayInit)
-    return SILValue(SemanticsCall);
+  // In non-OSSA, look for a tuple_extract instruction of the call result with
+  // the requested tupleElementIndex.
+  TupleExtractInst *tupleExtractInst = nullptr;
+  for (auto *op : callInst->getUses()) {
+    auto *tupleElt = dyn_cast<TupleExtractInst>(op->getUser());
+    if (!tupleElt)
+      return SILValue();
+    if (tupleElt->getFieldNo() != tupleElementIndex)
+      continue;
+    tupleExtractInst = tupleElt;
+    break;
+  }
+  return SILValue(tupleExtractInst);
+}
 
-  return SILValue();
+SILValue swift::ArraySemanticsCall::getArrayValue() const {
+  ArrayCallKind arrayCallKind = getKind();
+  if (arrayCallKind == ArrayCallKind::kArrayInit)
+    return SILValue(SemanticsCall);
+  return getArrayUninitializedInitResult(*this, 0);
 }
 
 SILValue swift::ArraySemanticsCall::getArrayElementStoragePointer() const {
-  if (getKind() == ArrayCallKind::kArrayUninitialized) {
-    TupleExtractInst *ArrayElementStorage = nullptr;
-    for (auto *Op : SemanticsCall->getUses()) {
-      auto *TupleElt = dyn_cast<TupleExtractInst>(Op->getUser());
-      if (!TupleElt)
-        return SILValue();
-      switch (TupleElt->getFieldNo()) {
-      default:
-        return SILValue();
-      case 0: {
-        // Ignore the array value.
-        break;
-      }
-      case 1:
-        // Should only have one tuple extract after CSE.
-        if (ArrayElementStorage)
-          return SILValue();
-        ArrayElementStorage = TupleElt;
-        break;
-      }
-    }
-    return SILValue(ArrayElementStorage);
-  }
-
-  return SILValue();
+  return getArrayUninitializedInitResult(*this, 1);
 }
 
 bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
@@ -785,4 +786,76 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
   removeCall();
 
   return true;
+}
+
+bool swift::ArraySemanticsCall::mapInitializationStores(
+    llvm::DenseMap<uint64_t, StoreInst *> &ElementValueMap) {
+  if (getKind() != ArrayCallKind::kArrayUninitialized &&
+      getKind() != ArrayCallKind::kArrayUninitializedIntrinsic)
+    return false;
+  SILValue ElementBuffer = getArrayElementStoragePointer();
+  if (!ElementBuffer)
+    return false;
+
+  // Match initialization stores into ElementBuffer. E.g.
+  // %83 = struct_extract %element_buffer : $UnsafeMutablePointer<Int>
+  // %84 = pointer_to_address %83 : $Builtin.RawPointer to strict $*Int
+  // store %85 to %84 : $*Int
+  // %87 = integer_literal $Builtin.Word, 1
+  // %88 = index_addr %84 : $*Int, %87 : $Builtin.Word
+  // store %some_value to %88 : $*Int
+
+  // If this an ArrayUinitializedIntrinsic then the ElementBuffer is a
+  // builtin.RawPointer. Otherwise, it is an UnsafeMutablePointer, which would
+  // be struct-extracted to obtain a builtin.RawPointer.
+  SILValue UnsafeMutablePointerExtract =
+      (getKind() == ArrayCallKind::kArrayUninitialized)
+          ? dyn_cast_or_null<StructExtractInst>(
+                getSingleNonDebugUser(ElementBuffer))
+          : ElementBuffer;
+  if (!UnsafeMutablePointerExtract)
+    return false;
+
+  auto *PointerToAddress = dyn_cast_or_null<PointerToAddressInst>(
+      getSingleNonDebugUser(UnsafeMutablePointerExtract));
+  if (!PointerToAddress)
+    return false;
+
+  // Match the stores. We can have either a store directly to the address or
+  // to an index_addr projection.
+  for (auto *Op : PointerToAddress->getUses()) {
+    auto *Inst = Op->getUser();
+
+    // Store to the base.
+    auto *SI = dyn_cast<StoreInst>(Inst);
+    if (SI && SI->getDest() == PointerToAddress) {
+      // We have already seen an entry for this index bail.
+      if (ElementValueMap.count(0))
+        return false;
+      ElementValueMap[0] = SI;
+      continue;
+    } else if (SI)
+      return false;
+
+    // Store to an index_addr projection.
+    auto *IndexAddr = dyn_cast<IndexAddrInst>(Inst);
+    if (!IndexAddr)
+      return false;
+    SI = dyn_cast_or_null<StoreInst>(getSingleNonDebugUser(IndexAddr));
+    if (!SI || SI->getDest() != IndexAddr)
+      return false;
+    auto *Index = dyn_cast<IntegerLiteralInst>(IndexAddr->getIndex());
+    if (!Index)
+      return false;
+    auto IndexVal = Index->getValue();
+    // Let's not blow up our map.
+    if (IndexVal.getActiveBits() > 16)
+      return false;
+    // Already saw an entry.
+    if (ElementValueMap.count(IndexVal.getZExtValue()))
+      return false;
+
+    ElementValueMap[IndexVal.getZExtValue()] = SI;
+  }
+  return !ElementValueMap.empty();
 }

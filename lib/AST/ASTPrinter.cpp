@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -98,7 +99,8 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
 }
 
-PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr) {
+PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
+                                                   bool printFullConvention) {
   PrintOptions result;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
@@ -115,6 +117,9 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr) {
   result.OpaqueReturnTypePrinting =
       OpaqueReturnTypePrintingMode::StableReference;
   result.PreferTypeRepr = preferTypeRepr;
+  if (printFullConvention)
+    result.PrintFunctionRepresentationAttrs =
+      PrintOptions::FunctionRepresentationMode::Full;
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
@@ -319,6 +324,14 @@ void ASTPrinter::callPrintDeclPre(const Decl *D,
     printSynthesizedExtensionPre(cast<ExtensionDecl>(D), SynthesizeTarget, Bracket);
   else
     printDeclPre(D, Bracket);
+}
+
+ASTPrinter &ASTPrinter::operator<<(QuotedString s) {
+  llvm::SmallString<32> Str;
+  llvm::raw_svector_ostream OS(Str);
+  OS << s;
+  printTextImpl(OS.str());
+  return *this;
 }
 
 ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
@@ -988,6 +1001,22 @@ void PrintAST::printAttributes(const Decl *D) {
           !VD->getAttrs().hasAttribute<ObjCAttr>()) {
         Printer.printAttrName("@objc");
         Printer << " ";
+      }
+    }
+
+    // If the declaration has designated inits that won't be visible to
+    // clients, or if it inherits superclass convenience initializers,
+    // then print those attributes specially.
+    if (auto CD = dyn_cast<ClassDecl>(D)) {
+      if (Options.PrintImplicitAttrs) {
+        if (CD->inheritsSuperclassInitializers()) {
+          Printer.printAttrName("@_inheritsConvenienceInitializers");
+          Printer << " ";
+        }
+        if (CD->hasMissingDesignatedInitializers()) {
+          Printer.printAttrName("@_hasMissingDesignatedInitializers");
+          Printer << " ";
+        }
       }
     }
   }
@@ -2097,10 +2126,10 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
   interleave(decl->getFullAccessPath(),
              [&](const ImportDecl::AccessPathElement &Elem) {
                if (!Mods.empty()) {
-                 Printer.printModuleRef(Mods.front(), Elem.first);
+                 Printer.printModuleRef(Mods.front(), Elem.Item);
                  Mods = Mods.slice(1);
                } else {
-                 Printer << Elem.first.str();
+                 Printer << Elem.Item.str();
                }
              },
              [&] { Printer << "."; });
@@ -2603,6 +2632,9 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       // Else, print the argument only.
       LLVM_FALLTHROUGH;
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
+      if (ArgName.empty() && !Options.PrintEmptyArgumentNames) {
+        return;
+      }
       Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
 
       if (!ArgNameIsAPIByDefault && !ArgName.empty())
@@ -2657,7 +2689,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
   if (param->isVariadic())
     Printer << "...";
 
-  if (param->isDefaultArgument()) {
+  if (param->isDefaultArgument() && Options.PrintDefaultArgumentValue) {
     SmallString<128> scratch;
     auto defaultArgStr = param->getDefaultValueStringRepresentation(scratch);
 
@@ -3010,10 +3042,10 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   Printer << " -> ";
 
   TypeLoc elementTy = decl->getElementTypeLoc();
-  Printer.printDeclResultTypePre(decl, elementTy);
-  Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
   if (!elementTy.getTypeRepr())
     elementTy = TypeLoc::withoutLoc(decl->getElementInterfaceType());
+  Printer.printDeclResultTypePre(decl, elementTy);
+  Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
   // HACK: When printing result types for subscripts with opaque result types,
   //       always print them using the `some` keyword instead of printing
@@ -3462,6 +3494,15 @@ void Pattern::print(llvm::raw_ostream &OS, const PrintOptions &Options) const {
 //  Type Printing
 //===----------------------------------------------------------------------===//
 
+template <typename ExtInfo>
+void printCType(ASTContext &Ctx, ASTPrinter &Printer, ExtInfo &info) {
+  auto *cml = Ctx.getClangModuleLoader();
+  SmallString<64> buf;
+  llvm::raw_svector_ostream os(buf);
+  info.getUncommonInfo().getValue().printClangFunctionType(cml, os);
+  Printer << ", cType: " << QuotedString(os.str());
+}
+
 namespace {
 class TypePrinter : public TypeVisitor<TypePrinter> {
   using super = TypeVisitor;
@@ -3488,24 +3529,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return;
     }
 
-    bool isSimple = T->hasSimpleTypeRepr();
-    if (!isSimple && T->is<OpaqueTypeArchetypeType>()) {
-      auto opaqueTy = T->castTo<OpaqueTypeArchetypeType>();
-      switch (Options.OpaqueReturnTypePrinting) {
-      case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
-      case PrintOptions::OpaqueReturnTypePrintingMode::Description:
-        isSimple = true;
-        break;
-      case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
-        isSimple = false;
-        break;
-      case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword: {
-        isSimple = opaqueTy->getExistentialType()->hasSimpleTypeRepr();
-        break;
-      }
-      }
-    }
-
+    bool isSimple = isSimpleUnderPrintOptions(T);
     if (isSimple) {
       visit(T);
     } else {
@@ -3513,6 +3537,28 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       visit(T);
       Printer << ")";
     }
+  }
+
+  /// Determinee whether the given type has a simple representation
+  /// under the current print options.
+  bool isSimpleUnderPrintOptions(Type T) {
+    if (auto typealias = dyn_cast<TypeAliasType>(T.getPointer())) {
+      if (shouldDesugarTypeAliasType(typealias))
+        return isSimpleUnderPrintOptions(typealias->getSinglyDesugaredType());
+    } else if (auto opaque =
+                 dyn_cast<OpaqueTypeArchetypeType>(T.getPointer())) {
+      switch (Options.OpaqueReturnTypePrinting) {
+      case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
+      case PrintOptions::OpaqueReturnTypePrintingMode::Description:
+        return true;
+      case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
+        return false;
+      case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword:
+        return isSimpleUnderPrintOptions(opaque->getExistentialType());
+      }
+      llvm_unreachable("bad opaque-return-type printing mode");
+    }
+    return T->hasSimpleTypeRepr();
   }
 
   template <typename T>
@@ -3652,8 +3698,12 @@ public:
     Printer << BUILTIN_TYPE_NAME_SILTOKEN;
   }
 
+  bool shouldDesugarTypeAliasType(TypeAliasType *T) {
+    return Options.PrintForSIL || Options.PrintTypeAliasUnderlyingType;
+  }
+
   void visitTypeAliasType(TypeAliasType *T) {
-    if (Options.PrintForSIL || Options.PrintTypeAliasUnderlyingType) {
+    if (shouldDesugarTypeAliasType(T)) {
       visit(T->getSinglyDesugaredType());
       return;
     }
@@ -3824,7 +3874,7 @@ public:
     visit(staticSelfT);
   }
 
-  void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
+  void printFunctionExtInfo(ASTContext &Ctx, AnyFunctionType::ExtInfo info) {
     if (Options.SkipAttributes)
       return;
 
@@ -3837,9 +3887,18 @@ public:
       }
     }
 
-    if (Options.PrintFunctionRepresentationAttrs &&
-        !Options.excludeAttrKind(TAK_convention) &&
-        info.getSILRepresentation() != SILFunctionType::Representation::Thick) {
+    SmallString<64> buf;
+    switch (Options.PrintFunctionRepresentationAttrs) {
+    case PrintOptions::FunctionRepresentationMode::None:
+      return;
+    case PrintOptions::FunctionRepresentationMode::Full:
+    case PrintOptions::FunctionRepresentationMode::NameOnly:
+      if (Options.excludeAttrKind(TAK_convention) ||
+          info.getSILRepresentation() == SILFunctionType::Representation::Thick)
+        return;
+
+      bool printNameOnly = Options.PrintFunctionRepresentationAttrs ==
+                           PrintOptions::FunctionRepresentationMode::NameOnly;
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@convention");
       Printer << "(";
@@ -3855,6 +3914,11 @@ public:
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
+        // FIXME: [clang-function-type-serialization] Once we start serializing
+        // Clang function types, we should be able to remove the second check.
+        if (printNameOnly || !info.getUncommonInfo().hasValue())
+          break;
+        printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::Method:
         Printer << "method";
@@ -3875,7 +3939,8 @@ public:
     }
   }
 
-  void printFunctionExtInfo(SILFunctionType::ExtInfo info,
+  void printFunctionExtInfo(ASTContext &Ctx,
+                            SILFunctionType::ExtInfo info,
                             ProtocolConformanceRef witnessMethodConformance) {
     if (Options.SkipAttributes)
       return;
@@ -3889,9 +3954,19 @@ public:
       }
     }
 
-    if (Options.PrintFunctionRepresentationAttrs &&
-        !Options.excludeAttrKind(TAK_convention) &&
-        info.getRepresentation() != SILFunctionType::Representation::Thick) {
+
+    SmallString<64> buf;
+    switch (Options.PrintFunctionRepresentationAttrs) {
+    case PrintOptions::FunctionRepresentationMode::None:
+      break;
+    case PrintOptions::FunctionRepresentationMode::NameOnly:
+    case PrintOptions::FunctionRepresentationMode::Full:
+      if (Options.excludeAttrKind(TAK_convention) ||
+          info.getRepresentation() == SILFunctionType::Representation::Thick)
+        break;
+
+      bool printNameOnly = Options.PrintFunctionRepresentationAttrs ==
+                           PrintOptions::FunctionRepresentationMode::NameOnly;
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@convention");
       Printer << "(";
@@ -3906,6 +3981,11 @@ public:
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
+        // FIXME: [clang-function-type-serialization] Once we start serializing
+        // Clang function types, we should be able to remove the second check.
+        if (printNameOnly || !info.getUncommonInfo().hasValue())
+          break;
+        printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::Method:
         Printer << "method";
@@ -3975,7 +4055,7 @@ public:
       Printer.printStructurePost(PrintStructureKind::FunctionType);
     };
 
-    printFunctionExtInfo(T->getExtInfo());
+    printFunctionExtInfo(T->getASTContext(), T->getExtInfo());
 
     // If we're stripping argument labels from types, do it when printing.
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/false);
@@ -4012,7 +4092,7 @@ public:
       Printer.printStructurePost(PrintStructureKind::FunctionType);
     };
 
-    printFunctionExtInfo(T->getExtInfo());
+    printFunctionExtInfo(T->getASTContext(), T->getExtInfo());
     printGenericSignature(T->getGenericSignature(),
                           PrintAST::PrintParams |
                           PrintAST::PrintRequirements);
@@ -4065,7 +4145,7 @@ public:
 
   void visitSILFunctionType(SILFunctionType *T) {
     printSILCoroutineKind(T->getCoroutineKind());
-    printFunctionExtInfo(T->getExtInfo(),
+    printFunctionExtInfo(T->getASTContext(), T->getExtInfo(),
                          T->getWitnessMethodConformanceOrInvalid());
     printCalleeConvention(T->getCalleeConvention());
   
@@ -4578,6 +4658,13 @@ void SILParameterInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
 }
 void SILParameterInfo::print(ASTPrinter &Printer,
                              const PrintOptions &Opts) const {
+  switch (getDifferentiability()) {
+  case SILParameterDifferentiability::NotDifferentiable:
+    Printer << "@noDerivative ";
+    break;
+  default:
+    break;
+  }
   Printer << getStringForParameterConvention(getConvention());
   getInterfaceType().print(Printer, Opts);
 }

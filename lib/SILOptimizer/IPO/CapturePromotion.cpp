@@ -160,6 +160,8 @@ public:
     return !(*this == RHS);
   }
 
+  ReachingBlockSet(const ReachingBlockSet &RHS)
+      : Bits(RHS.Bits), NumBitWords(RHS.NumBitWords) {}
   const ReachingBlockSet &operator=(const ReachingBlockSet &RHS) {
     assert(NumBitWords == RHS.NumBitWords && "mismatched sets");
     for (size_t i = 0, e = NumBitWords; i != e; ++i)

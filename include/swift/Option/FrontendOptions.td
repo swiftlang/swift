@@ -246,8 +246,10 @@ def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-pref
 
 def debug_cycles : Flag<["-"], "debug-cycles">,
   HelpText<"Print out debug dumps when cycles are detected in evaluation">;
+def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph">,
+  HelpText<"Build request dependency graph">;
 def output_request_graphviz : Separate<["-"], "output-request-graphviz">,
-  HelpText<"Emit GraphViz output visualizing the request graph">;
+  HelpText<"Emit GraphViz output visualizing the request dependency graph">;
 
 def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
   HelpText<"Prints the time taken by each compilation phase">;
@@ -279,6 +281,9 @@ def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
 
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
+
+def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
+  HelpText<"Enable speculative devirtualization pass.">;
 
 def enable_ownership_stripping_after_serialization
   : Flag<["-"], "enable-ownership-stripping-after-serialization">,
@@ -331,6 +336,10 @@ def disable_reflection_metadata : Flag<["-"], "disable-reflection-metadata">,
 def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
   HelpText<"Disable emission of names of stored properties and enum cases in"
            "reflection metadata">;
+
+def function_sections: Flag<["-"], "function-sections">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit functions to separate sections.">;
 
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
@@ -602,6 +611,11 @@ def module_interface_preserve_types_as_written :
   HelpText<"When emitting a module interface, preserve types as they were "
            "written in the source">;
 
+def experimental_print_full_convention :
+ Flag<["-"], "experimental-print-full-convention">,
+ HelpText<"When emitting a module interface, emit additional @convention "
+          "arguments, regardless of whether they were written in the source">;
+
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
   HelpText<"Directory of prebuilt modules for loading module interfaces">;
@@ -637,6 +651,10 @@ def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
 def disable_legacy_type_info : Flag<["-"], "disable-legacy-type-info">,
   HelpText<"Completely disable legacy type layout">;
 
+def disable_generic_metadata_prespecialization : Flag<["-"], "disable-generic-metadata-prespecialization">,
+  HelpText<"Do not statically specialize metadata for generic types at types "
+           "that are known to be used in source.">;
+
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;
 
@@ -647,4 +665,8 @@ def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
 def emit_ldadd_cfile_path
   : Separate<["-"], "emit-ldadd-cfile-path">, MetaVarName<"<path>">,
     HelpText<"Generate .c file defining symbols to add back">;
+
+def previous_module_installname_map_file
+  : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,
+    HelpText<"Path to a Json file indicating module name to installname map for @_originallyDefinedIn">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

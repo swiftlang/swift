@@ -764,58 +764,6 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   return listener.relabelArguments(actualArgNames);
 }
 
-/// Find the callee declaration and uncurry level for a given call
-/// locator.
-static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
-                  ConstraintLocator *>
-getCalleeDeclAndArgs(ConstraintSystem &cs,
-                     ConstraintLocatorBuilder callBuilder) {
-  auto formUnknownCallee =
-      []() -> std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
-                         ConstraintLocator *> {
-    return std::make_tuple(/*decl*/ nullptr, /*hasAppliedSelf*/ false,
-                           /*argLabels*/ ArrayRef<Identifier>(),
-                           /*hasTrailingClosure*/ false,
-                           /*calleeLocator*/ nullptr);
-  };
-
-  auto *callLocator = cs.getConstraintLocator(callBuilder);
-  auto *callExpr = callLocator->getAnchor();
-
-  // Break down the call.
-  if (!callExpr)
-    return formUnknownCallee();
-
-  // Our remaining path can only be 'ApplyArgument'.
-  auto path = callLocator->getPath();
-  if (!path.empty() && !path.back().is<LocatorPathElt::ApplyArgument>())
-    return formUnknownCallee();
-
-  // Dig out the callee information.
-  auto argInfo = cs.getArgumentInfo(callLocator);
-  if (!argInfo)
-    return formUnknownCallee();
-
-  auto argLabels = argInfo->Labels;
-  auto hasTrailingClosure = argInfo->HasTrailingClosure;
-  auto calleeLocator = cs.getCalleeLocator(callLocator);
-
-  // Find the overload choice corresponding to the callee locator.
-  auto selectedOverload = cs.findSelectedOverloadFor(calleeLocator);
-
-  // If we didn't find any matching overloads, we're done. Just return the
-  // argument info.
-  if (!selectedOverload)
-    return std::make_tuple(/*decl*/ nullptr, /*hasAppliedSelf*/ false,
-                           argLabels, hasTrailingClosure,
-                           /*calleeLocator*/ nullptr);
-
-  // Return the found declaration, assuming there is one.
-  auto choice = selectedOverload->choice;
-  return std::make_tuple(choice.getDeclOrNull(), hasAppliedSelf(cs, choice),
-                         argLabels, hasTrailingClosure, calleeLocator);
-}
-
 class ArgumentFailureTracker : public MatchCallArgumentListener {
   ConstraintSystem &CS;
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
@@ -973,17 +921,27 @@ public:
     if (!CS.shouldAttemptFixes())
       return true;
 
-    auto argType = Arguments[argIdx].getPlainType();
-    argType.visit([&](Type type) {
-      if (auto *typeVar = type->getAs<TypeVariableType>())
-        CS.recordPotentialHole(typeVar);
-    });
-
     const auto &param = Parameters[paramIdx];
 
     auto *argLoc = CS.getConstraintLocator(
         Locator.withPathElement(LocatorPathElt::ApplyArgToParam(
             argIdx, paramIdx, param.getParameterFlags())));
+
+    // TODO(diagnostics): This fix should be attempted later
+    // when the argument is matched to a parameter. Doing that
+    // would not require special handling of the closure type.
+    Type argType;
+    if (auto *closure =
+            dyn_cast<ClosureExpr>(simplifyLocatorToAnchor(argLoc))) {
+      argType = CS.getClosureType(closure);
+    } else {
+      argType = Arguments[argIdx].getPlainType();
+    }
+
+    argType.visit([&](Type type) {
+      if (auto *typeVar = type->getAs<TypeVariableType>())
+        CS.recordPotentialHole(typeVar);
+    });
 
     auto *fix = AllowInvalidUseOfTrailingClosure::create(
         CS, argType, param.getPlainType(), argLoc);
@@ -1002,22 +960,29 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ArrayRef<AnyFunctionType::Param> args,
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator) {
-  // Extract the parameters.
-  ValueDecl *callee;
-  bool hasAppliedSelf;
-  ArrayRef<Identifier> argLabels;
-  bool hasTrailingClosure = false;
-  ConstraintLocator *calleeLocator;
-  std::tie(callee, hasAppliedSelf, argLabels, hasTrailingClosure,
-           calleeLocator) =
-    getCalleeDeclAndArgs(cs, locator);
+  auto *loc = cs.getConstraintLocator(locator);
+  assert(loc->isLastElement<LocatorPathElt::ApplyArgument>());
 
-  ParameterListInfo paramInfo(params, callee, hasAppliedSelf);
+  ValueDecl *callee = nullptr;
+  bool appliedSelf = false;
+
+  // Resolve the callee for the application.
+  auto *calleeLocator = cs.getCalleeLocator(loc);
+  if (auto overload = cs.findSelectedOverloadFor(calleeLocator)) {
+    callee = overload->choice.getDeclOrNull();
+    appliedSelf = hasAppliedSelf(cs, overload->choice);
+  }
+
+  ParameterListInfo paramInfo(params, callee, appliedSelf);
+
+  // Dig out the argument information.
+  auto argInfo = cs.getArgumentInfo(loc);
+  assert(argInfo);
 
   // Apply labels to arguments.
   SmallVector<AnyFunctionType::Param, 8> argsWithLabels;
   argsWithLabels.append(args.begin(), args.end());
-  AnyFunctionType::relabelParams(argsWithLabels, argLabels);
+  AnyFunctionType::relabelParams(argsWithLabels, argInfo->Labels);
 
   // Special case when a single tuple argument if used
   // instead of N distinct arguments e.g.:
@@ -1059,7 +1024,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ArgumentFailureTracker listener(cs, argsWithLabels, params,
                                     parameterBindings, locator);
     if (constraints::matchCallArguments(
-            argsWithLabels, params, paramInfo, hasTrailingClosure,
+            argsWithLabels, params, paramInfo, argInfo->HasTrailingClosure,
             cs.shouldAttemptFixes(), listener, parameterBindings))
       return cs.getTypeMatchFailure(locator);
 
@@ -1136,20 +1101,6 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
           // in Swift <= 4 mode.
           cs.increaseScore(SK_FunctionConversion);
           matchingAutoClosureResult = false;
-        }
-      }
-
-      // If the parameter has a function builder type and the argument is a
-      // closure, apply the function builder transformation.
-      if (Type functionBuilderType
-              = paramInfo.getFunctionBuilderType(paramIdx)) {
-        Expr *arg = getArgumentExpr(locator.getAnchor(), argIdx);
-        if (auto closure = dyn_cast_or_null<ClosureExpr>(arg)) {
-          auto result =
-              cs.applyFunctionBuilder(closure, functionBuilderType,
-                                      calleeLocator, loc);
-          if (result.isFailure())
-            return result;
         }
       }
 
@@ -1257,6 +1208,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Not a conversion");
   }
 
@@ -1321,6 +1273,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     return false;
   }
 
@@ -1601,6 +1554,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -1738,7 +1692,20 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(argumentLocator);
 
-    auto *anchor = locator.trySimplifyToExpr();
+    auto *loc = getConstraintLocator(locator);
+
+    // If this is conversion between optional (or IUO) parameter
+    // and argument, let's drop the last path element so locator
+    // could be simplified down to an argument expression.
+    //
+    // func foo(_: ((Int, Int) -> Void)?) {}
+    // _ = foo { _ in } <- missing second closure parameter.
+    if (loc->isLastElement<LocatorPathElt::OptionalPayload>()) {
+      auto path = loc->getPath();
+      loc = getConstraintLocator(loc->getAnchor(), path.drop_back());
+    }
+
+    auto *anchor = simplifyLocatorToAnchor(loc);
     if (!anchor)
       return getTypeMatchFailure(argumentLocator);
 
@@ -1746,12 +1713,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     // using parameter as a template.
     if (diff < 0) {
       if (fixMissingArguments(*this, anchor, func1Params, func2Params,
-                              abs(diff), locator))
+                              abs(diff), loc))
         return getTypeMatchFailure(argumentLocator);
     } else {
       // If there are extraneous arguments, let's remove
       // them from the list.
-      if (fixExtraneousArguments(*this, func2, func1Params, diff, locator))
+      if (fixExtraneousArguments(*this, func2, func1Params, diff, loc))
         return getTypeMatchFailure(argumentLocator);
 
       // Drop all of the extraneous arguments.
@@ -2123,8 +2090,11 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               // will also fail (because type can't satisfy it), and it's
               // more interesting for diagnostics.
               auto req = last->getAs<LocatorPathElt::AnyRequirement>();
-              if (type1->isHole() || (req &&
-                  req->getRequirementKind() == RequirementKind::Superclass))
+              if (!req)
+                return getTypeMatchFailure(locator);
+
+              if (type1->isHole() ||
+                  req->getRequirementKind() == RequirementKind::Superclass)
                 return getTypeMatchSuccess();
 
               auto *fix = fixRequirementFailure(*this, type1, type2, locator);
@@ -2141,9 +2111,17 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
         // Subtype relation to AnyObject also allows class-bound
         // existentials that are not @objc and therefore carry
         // witness tables.
-        if (!type1->isClassExistentialType() &&
-            !type1->mayHaveSuperclass())
+        if (!type1->isClassExistentialType() && !type1->mayHaveSuperclass()) {
+          if (shouldAttemptFixes()) {
+            auto *fix = AllowNonClassTypeToConvertToAnyObject::create(
+                *this, type1, getConstraintLocator(locator));
+
+            return recordFix(fix) ? getTypeMatchFailure(locator)
+                                  : getTypeMatchSuccess();
+          }
+
           return getTypeMatchFailure(locator);
+        }
       }
 
       // Keep going.
@@ -2198,10 +2176,36 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
             break;
           }
+
+          // TODO(diagnostics): If there are any requirement failures associated
+          // with result types which are part of a function type conversion,
+          // let's record general conversion mismatch in order for it to capture
+          // and display complete function types.
+          //
+          // Once either reacher locators or better diagnostic presentation for
+          // nested type failures is available this check could be removed.
+          if (last->is<LocatorPathElt::FunctionResult>())
+            return getTypeMatchFailure(locator);
+
+          // If instance types didn't line up correctly, let's produce a
+          // diagnostic which mentions them together with their metatypes.
+          if (last->is<LocatorPathElt::InstanceType>())
+            return getTypeMatchFailure(locator);
+
         } else { // There are no elements in the path
           auto *anchor = locator.getAnchor();
-          if (!(anchor && isa<AssignExpr>(anchor)))
+          if (!(anchor &&
+               (isa<AssignExpr>(anchor) || isa<CoerceExpr>(anchor))))
             return getTypeMatchFailure(locator);
+        }
+        
+        auto *anchor = locator.getAnchor();
+        if (isa<CoerceExpr>(anchor)) {
+          auto *fix = ContextualMismatch::create(
+              *this, type1, type2, getConstraintLocator(locator));
+          if (recordFix(fix))
+            return getTypeMatchFailure(locator);
+          break;
         }
 
         auto *fix = MissingConformance::forContextual(
@@ -2285,8 +2289,17 @@ ConstraintSystem::matchTypesBindTypeVar(
   // Simplify the right-hand type and perform the "occurs" check.
   typeVar = getRepresentative(typeVar);
   type = simplifyType(type, flags);
-  if (!isBindable(typeVar, type))
+  if (!isBindable(typeVar, type)) {
+    if (shouldAttemptFixes()) {
+      // If type variable is allowed to be a hole and it can't be bound to
+      // a particular (full resolved) type, just ignore this binding
+      // instead of re-trying it and failing later.
+      if (typeVar->getImpl().canBindToHole() && !type->hasTypeVariable())
+        return getTypeMatchSuccess();
+    }
+
     return formUnsolvedResult();
+  }
 
   // Since member lookup doesn't check requirements
   // it might sometimes return types which are not
@@ -2402,6 +2415,12 @@ ConstraintSystem::matchTypesBindTypeVar(
         }
       }
     });
+  }
+
+  if (typeVar->getImpl().isClosureType()) {
+    return resolveClosure(typeVar, type, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
   }
 
   assignFixedType(typeVar, type);
@@ -2590,6 +2609,15 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   if (!anchor)
     return false;
 
+  bool possibleContextualMismatch = false;
+  // If this is a conversion to a non-optional contextual type e.g.
+  // `let _: Bool = try? foo()` and `foo()` produces `Int`
+  // we should diagnose it as type mismatch instead of missing unwrap.
+  if (auto last = locator.last()) {
+    possibleContextualMismatch = last->is<LocatorPathElt::ContextualType>() &&
+                                 !toType->getOptionalObjectType();
+  }
+
   // `OptionalEvaluationExpr` doesn't add a new level of
   // optionality but it could be hiding concrete types
   // behind itself which we can use to better understand
@@ -2606,7 +2634,12 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
     // other type e.g. contextual type or a parameter type,
     // let's use `Bind` to match object types because
     // object type of the optinal chain is a type variable.
-    if (matchKind >= ConstraintKind::Conversion)
+    //
+    // One exception is contextual conversion - in such cases
+    // let's give optional chain a chance to infer its inner type
+    // first, that makes it much easier to diagnose contextual
+    // mismatch vs. missing optional unwrap.
+    if (!possibleContextualMismatch && matchKind >= ConstraintKind::Conversion)
       matchKind = ConstraintKind::Bind;
   }
 
@@ -2638,7 +2671,12 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
       // language mode, so we can safely try to bind its
       // object type to contextual type without risk of
       // causing more optionality mismatches down the road.
-      matchKind = ConstraintKind::Bind;
+      //
+      // For contextual conversions let's give `try?` a chance to
+      // infer inner type which, if incorrect, should result in
+      // contextual conversion failure instead of optional unwrap.
+      matchKind = possibleContextualMismatch ? ConstraintKind::Conversion
+                                             : ConstraintKind::Bind;
     }
   }
 
@@ -2804,11 +2842,26 @@ bool ConstraintSystem::repairFailures(
                         });
   };
 
+  auto markAnyTypeVarsAsPotentialHoles = [&](Type type) {
+    type.visit([&](Type subType) {
+      if (auto *typeVar = subType->getAs<TypeVariableType>())
+        recordPotentialHole(typeVar);
+    });
+  };
+
   if (path.empty()) {
     if (!anchor)
       return false;
 
     if (auto *coercion = dyn_cast<CoerceExpr>(anchor)) {
+      // Coercion from T.Type to T.Protocol.
+      if (hasConversionOrRestriction(
+              ConversionRestrictionKind::MetatypeToExistentialMetatype))
+        return false;
+
+      if (hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
+        return false;
+
       // Let's check whether the sub-expression is an optional type which
       // is possible to unwrap (either by force or `??`) to satisfy the cast,
       // otherwise we'd have to fallback to force downcast.
@@ -2823,6 +2876,22 @@ bool ConstraintSystem::repairFailures(
         conversionsOrFixes.push_back(coerceToCheckCastFix);
         return true;
       }
+
+      // If it has a deep equality restriction, defer the diagnostic to
+      // GenericMismatch.
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) &&
+          !hasConversionOrRestriction(
+              ConversionRestrictionKind::OptionalToOptional)) {
+        return false;
+      }
+
+      if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
+        return false;
+
+      auto *fix = ContextualMismatch::create(*this, lhs, rhs,
+                                             getConstraintLocator(locator));
+      conversionsOrFixes.push_back(fix);
+      return true;
     }
 
     // This could be:
@@ -3003,7 +3072,7 @@ bool ConstraintSystem::repairFailures(
   auto elt = path.back();
   switch (elt.getKind()) {
   case ConstraintLocator::LValueConversion: {
-    auto CTP = getContextualTypePurpose();
+    auto CTP = getContextualTypePurpose(anchor);
     // Special case for `CTP_CallArgument` set by CSDiag
     // while type-checking each argument because we yet
     // to cover argument-to-parameter conversions in the
@@ -3264,6 +3333,30 @@ bool ConstraintSystem::repairFailures(
                                 locator))
       break;
 
+    {
+      auto *calleeLocator = getCalleeLocator(loc);
+      if (hasFixFor(calleeLocator, FixKind::AddQualifierToAccessTopLevelName)) {
+        if (auto overload = findSelectedOverloadFor(calleeLocator)) {
+          if (auto choice = overload->choice.getDeclOrNull()) {
+            // If this is an argument of a symetric function/operator let's
+            // not fix any position rather than first because we'd just end
+            // up with ambiguity instead of reporting an actual problem with
+            // mismatched type since each argument can have district bindings.
+            if (auto *AFD = dyn_cast<AbstractFunctionDecl>(choice)) {
+              auto *paramList = AFD->getParameters();
+              auto firstParamType = paramList->get(0)->getInterfaceType();
+              if (elt.castTo<LocatorPathElt::ApplyArgToParam>().getParamIdx() >
+                      0 &&
+                  llvm::all_of(*paramList, [&](const ParamDecl *param) -> bool {
+                    return param->getInterfaceType()->isEqual(firstParamType);
+                  }))
+                return true;
+            }
+          }
+        }
+      }
+    }
+
     conversionsOrFixes.push_back(
         AllowArgumentMismatch::create(*this, lhs, rhs, loc));
     break;
@@ -3330,10 +3423,13 @@ bool ConstraintSystem::repairFailures(
     if (lhs->hasHole() || rhs->hasHole())
       return true;
 
-    // If dependent members are present here it's because
-    // base doesn't conform to associated type's protocol.
-    if (lhs->hasDependentMember() || rhs->hasDependentMember())
-      break;
+    // If dependent members are present here it's because the base doesn't
+    // conform to the associated type's protocol. We can only get here if we
+    // already applied a fix for the conformance failure.
+    if (lhs->hasDependentMember() || rhs->hasDependentMember()) {
+      increaseScore(SK_Fix);
+      return true;
+    }
 
     // If requirement is something like `T == [Int]` let's let
     // type matcher a chance to match generic parameters before
@@ -3376,7 +3472,7 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isHole() || rhs->isHole())
       return true;
 
-    auto purpose = getContextualTypePurpose();
+    auto purpose = getContextualTypePurpose(anchor);
     if (rhs->isVoid() &&
         (purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr)) {
       conversionsOrFixes.push_back(
@@ -3439,15 +3535,17 @@ bool ConstraintSystem::repairFailures(
     // If there is a deep equality, superclass restriction
     // already recorded, let's not add bother ignoring
     // contextual type, because actual fix is going to
-    // be perform once restriction is applied.
-    if (llvm::any_of(conversionsOrFixes,
-                     [](const RestrictionOrFix &entry) -> bool {
-                       return entry.IsRestriction &&
-                              (entry.getRestriction() ==
-                                   ConversionRestrictionKind::Superclass ||
-                               entry.getRestriction() ==
-                                   ConversionRestrictionKind::DeepEquality);
-                     }))
+    // be performed once restriction is applied.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
+      break;
+
+    if (hasConversionOrRestriction(
+            ConversionRestrictionKind::MetatypeToExistentialMetatype))
+      break;
+
+    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) &&
+        !hasConversionOrRestriction(
+            ConversionRestrictionKind::OptionalToOptional))
       break;
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
@@ -3475,6 +3573,13 @@ bool ConstraintSystem::repairFailures(
             IgnoreContextualType::create(*this, lhs, rhs, locator));
         break;
       }
+    }
+    // Handle function result coerce expression wrong type conversion.
+    if (anchor && isa<CoerceExpr>(anchor)) {
+      auto *fix =
+          ContextualMismatch::create(*this, lhs, rhs, loc);
+      conversionsOrFixes.push_back(fix);
+      break;
     }
     LLVM_FALLTHROUGH;
   }
@@ -3651,6 +3756,33 @@ bool ConstraintSystem::repairFailures(
                                 locator))
       return true;
 
+    break;
+  }
+
+  case ConstraintLocator::TernaryBranch: {
+    markAnyTypeVarsAsPotentialHoles(lhs);
+    markAnyTypeVarsAsPotentialHoles(rhs);
+
+    // If `if` expression has a contextual type, let's consider it a source of
+    // truth and produce a contextual mismatch instead of  per-branch failure,
+    // because it's a better pointer than potential then-to-else type mismatch.
+    if (auto contextualType = getContextualType(anchor)) {
+      if (contextualType->isEqual(rhs)) {
+        auto *loc =
+            getConstraintLocator(anchor, LocatorPathElt::ContextualType());
+        if (hasFixFor(loc, FixKind::ContextualMismatch))
+          return true;
+
+        conversionsOrFixes.push_back(
+            ContextualMismatch::create(*this, lhs, rhs, loc));
+        break;
+      }
+    }
+
+    // If there is no contextual type, this is most likely a contextual type
+    // mismatch between then/else branches of ternary operator.
+    conversionsOrFixes.push_back(ContextualMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
     break;
   }
 
@@ -3870,6 +4002,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::FunctionInput:
     case ConstraintKind::FunctionResult:
     case ConstraintKind::OneWayEqual:
+    case ConstraintKind::DefaultClosureType:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -3913,12 +4046,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       llvm_unreachable("type variables should have already been handled by now");
 
     case TypeKind::DependentMember: {
-      // If one of the dependent member types has no type variables,
-      // this comparison is effectively illformed, because dependent
-      // member couldn't be simplified down to the actual type, and
-      // we wouldn't be able to solve this constraint, so let's just fail.
-      if (!desugar1->hasTypeVariable() || !desugar2->hasTypeVariable())
-        return getTypeMatchFailure(locator);
+      // If one of the dependent member types has no type variables, the
+      // dependent member can't be simplified because the base doesn't conform
+      // to the associated type's protocol. We can only get here if we already
+      // applied a fix for the conformance failure.
+      if (!desugar1->hasTypeVariable() || !desugar2->hasTypeVariable()) {
+        increaseScore(SK_Fix);
+        return getTypeMatchSuccess();
+      }
 
       // Nothing we can solve yet, since we need to wait until
       // type variables will get resolved.
@@ -4016,9 +4151,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         subKind = ConstraintKind::Bind;
       }
 
-      return matchTypes(
-          instanceType1, instanceType2, subKind, subflags,
-          locator.withPathElement(ConstraintLocator::InstanceType));
+      auto result =
+          matchTypes(instanceType1, instanceType2, subKind, subflags,
+                     locator.withPathElement(ConstraintLocator::InstanceType));
+
+      // If matching of the instance types resulted in the failure make sure
+      // to give `repairFailure` a chance to run to attempt to fix the issue.
+      if (shouldAttemptFixes() && result.isFailure())
+        break;
+
+      return result;
     }
 
     case TypeKind::Function: {
@@ -4027,21 +4169,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
       auto result = matchFunctionTypes(func1, func2, kind, flags, locator);
 
-      if (shouldAttemptFixes() && result.isFailure()) {
-        // If this is a contextual type mismatch failure
-        // let's give the solver a chance to "fix" it.
-        if (auto last = locator.last()) {
-          if (last->is<LocatorPathElt::ContextualType>())
-            break;
-        }
-
-        // If this is a type mismatch in assignment, we don't really care
-        // (yet) was it argument or result type mismatch, let's produce a
-        // diagnostic which mentions both function types.
-        auto *anchor = locator.getAnchor();
-        if (anchor && isa<AssignExpr>(anchor))
-          break;
-      }
+      if (shouldAttemptFixes() && result.isFailure())
+        break;
 
       return result;
     }
@@ -5423,22 +5552,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   auto addChoice = [&](OverloadChoice candidate) {
     auto decl = candidate.getDecl();
 
-    // In a pattern binding initializer, immediately reject all of its bound
-    // variables. These would otherwise allow circular references.
-    if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC)) {
-      if (auto *VD = dyn_cast<VarDecl>(decl)) {
-        if (PBI->getBinding() == VD->getParentPatternBinding()) {
-          // If this is a recursive reference to an instance variable,
-          // try to see if we can give a good diagnostic by adding it as
-          // an unviable candidate.
-          if (!VD->isStatic()) {
-            result.addUnviable(candidate,
-                               MemberLookupResult::UR_InstanceMemberOnType);
-          }
-          return;
-        }
-      }
-    }
+    // Reject circular references immediately.
+    if (decl->isRecursiveValidation())
+      return;
 
     // If the result is invalid, skip it.
     if (decl->isInvalid()) {
@@ -6002,10 +6118,6 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     switch (*reason) {
     case MemberLookupResult::UR_InstanceMemberOnType:
     case MemberLookupResult::UR_TypeMemberOnInstance: {
-      if (choice.getKind() == OverloadChoiceKind::DynamicMemberLookup ||
-          choice.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup)
-        return nullptr;
-
       return choice.isDecl()
                  ? AllowTypeOrInstanceMember::create(
                        cs, baseTy, choice.getDecl(), memberName, locator)
@@ -6121,8 +6233,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     return formUnsolved();
 
   case MemberLookupResult::ErrorAlreadyDiagnosed:
-    return SolutionKind::Error;
-
   case MemberLookupResult::HasResults:
     // Keep going!
     break;
@@ -6160,8 +6270,27 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       if (candidates.size() == 1)
         candidates.front()->setFavored();
 
-      generateConstraints(candidates, memberTy, outerAlternatives,
-                          useDC, locator);
+      // We *might* include any non-members that we found in outer contexts in
+      // some special cases, for backwards compatibility: first, we have to be
+      // looking for one of the special names ('min' or 'max'), and second, all
+      // of the inner (viable) results need to come from conditional
+      // conformances. The second condition is how the problem here was
+      // encountered: a type ('Range') was made to conditionally conform to a
+      // new protocol ('Sequence'), which introduced some extra methods
+      // ('min' and 'max') that shadowed global functions that people regularly
+      // called within extensions to that type (usually adding 'clamp').
+      bool treatAsViable =
+          (member.isSimpleName("min") || member.isSimpleName("max")) &&
+          allFromConditionalConformances(DC, baseTy, result.ViableCandidates);
+
+      generateConstraints(
+          candidates, memberTy, outerAlternatives, useDC, locator, None,
+          /*requiresFix=*/!treatAsViable,
+          [&](unsigned, const OverloadChoice &) {
+            return treatAsViable ? nullptr
+                                 : AddQualifierToAccessTopLevelName::create(
+                                       *this, locator);
+          });
     }
   }
 
@@ -6198,8 +6327,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         return type;
       });
 
-      auto *fix =
-          DefineMemberBasedOnUse::create(*this, baseTy, member, locator);
+      bool alreadyDiagnosed = (result.OverallResult ==
+                               MemberLookupResult::ErrorAlreadyDiagnosed);
+      auto *fix = DefineMemberBasedOnUse::create(*this, baseTy, member,
+                                                 alreadyDiagnosed, locator);
       // Impact is higher if the base is expected to be inferred from context,
       // because a failure to find a member ultimately means that base type is
       // not a match in this case.
@@ -6208,9 +6339,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       if (recordFix(fix, impact))
         return SolutionKind::Error;
 
-      // Allow member type to default to `Any` to make it possible to form
-      // solutions when contextual type of the result cannot be deduced e.g.
-      // `let _ = x.foo`.
+      // Record a hole for memberTy to make it possible to form solutions
+      // when contextual result type cannot be deduced e.g. `let _ = x.foo`.
       if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>())
         recordPotentialHole(memberTypeVar);
 
@@ -6335,14 +6465,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       }
     }
 
-    // FIXME(diagnostics): Errors related to `AnyObject` could be diagnosed
-    // better in the future, relevant failure information has to be extracted
-    // from `performMemberLookup` result, in order to figure out if it was a
-    // simple labeling or # of arguments mismatch, or member with requested name
-    // really doesn't exist.
-    if (baseTy->isAnyObject())
-      return SolutionKind::Error;
-
     result = performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                                  /*includeInaccessibleMembers*/ true);
 
@@ -6426,18 +6548,38 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   return SolutionKind::Solved;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyDefaultableConstraint(
-                                            Type first, Type second,
-                                            TypeMatchOptions flags,
-                                            ConstraintLocatorBuilder locator) {
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyDefaultableConstraint(
+    Type first, Type second, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
   first = getFixedTypeRecursive(first, flags, true);
 
   if (first->isTypeVariableOrMember()) {
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
-        Constraint::create(*this, ConstraintKind::Defaultable, first, second,
-                           getConstraintLocator(locator)));
+          Constraint::create(*this, ConstraintKind::Defaultable, first, second,
+                             getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  }
+
+  // Otherwise, any type is fine.
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyDefaultClosureTypeConstraint(
+    Type closureType, Type inferredType,
+    ArrayRef<TypeVariableType *> referencedOuterParameters,
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+  closureType = getFixedTypeRecursive(closureType, flags, /*wantRValue=*/true);
+
+  if (closureType->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(Constraint::create(
+          *this, ConstraintKind::DefaultClosureType, closureType, inferredType,
+          getConstraintLocator(locator), referencedOuterParameters));
       return SolutionKind::Solved;
     }
 
@@ -6467,9 +6609,131 @@ ConstraintSystem::simplifyOneWayConstraint(
     return SolutionKind::Unsolved;
   }
 
+  // Propagate holes through one-way constraints.
+  if (secondSimplified->isHole()) {
+    first.visit([&](Type subType) {
+      if (auto *typeVar = subType->getAs<TypeVariableType>())
+        recordPotentialHole(typeVar);
+    });
+
+    return SolutionKind::Solved;
+  }
+
   // Translate this constraint into a one-way binding constraint.
   return matchTypes(first, secondSimplified, ConstraintKind::Equal, flags,
                     locator);
+}
+
+static Type getFunctionBuilderTypeFor(ConstraintSystem &cs, unsigned paramIdx,
+                                      ConstraintLocator *calleeLocator) {
+  auto selectedOverload = cs.findSelectedOverloadFor(calleeLocator);
+  if (!(selectedOverload &&
+        selectedOverload->choice.getKind() == OverloadChoiceKind::Decl))
+    return Type();
+
+  auto *choice = selectedOverload->choice.getDecl();
+  bool skipCurriedSelf = hasAppliedSelf(cs, selectedOverload->choice);
+
+  if (choice->hasCurriedSelf() && !skipCurriedSelf)
+    return Type();
+
+  if (!choice->hasParameterList())
+    return Type();
+
+  auto *PD = getParameterAt(choice, paramIdx);
+  return PD->getFunctionBuilderType();
+}
+
+bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
+                                      Type contextualType,
+                                      ConstraintLocatorBuilder locator) {
+  auto getContextualParamAt =
+      [&contextualType](unsigned index) -> Optional<AnyFunctionType::Param> {
+    auto *fnType = contextualType->getAs<FunctionType>();
+    return fnType && fnType->getNumParams() > index
+               ? fnType->getParams()[index]
+               : Optional<AnyFunctionType::Param>();
+  };
+
+  auto *closureLocator = typeVar->getImpl().getLocator();
+  auto *closure = cast<ClosureExpr>(closureLocator->getAnchor());
+  auto *inferredClosureType = getClosureType(closure);
+
+  auto *paramList = closure->getParameters();
+  SmallVector<AnyFunctionType::Param, 4> parameters;
+  for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
+    auto param = inferredClosureType->getParams()[i];
+
+    // In case of anonymous parameters let's infer flags from context
+    // that helps to infer variadic and inout earlier.
+    if (closure->hasAnonymousClosureVars()) {
+      if (auto contextualParam = getContextualParamAt(i))
+        param = param.withFlags(contextualParam->getParameterFlags());
+    }
+
+    Type internalType;
+
+    if (paramList->get(i)->getTypeRepr()) {
+      // Internal type is the type used in the body of the closure,
+      // so "external" type translates to it as follows:
+      //  - `Int...` -> `[Int]`,
+      //  - `inout Int` -> `@lvalue Int`.
+      internalType = param.getParameterType();
+    } else {
+      auto *paramLoc =
+          getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
+
+      auto *typeVar = createTypeVariable(paramLoc, TVO_CanBindToLValue |
+                                                       TVO_CanBindToNoEscape);
+
+      // If external parameter is variadic it translates into an array in
+      // the body of the closure.
+      internalType =
+          param.isVariadic() ? ArraySliceType::get(typeVar) : Type(typeVar);
+
+      auto externalType = param.getOldType();
+      addConstraint(ConstraintKind::BindParam, externalType, typeVar, paramLoc);
+    }
+
+    setType(paramList->get(i), internalType);
+    parameters.push_back(param);
+  }
+
+  auto closureType =
+      FunctionType::get(parameters, inferredClosureType->getResult(),
+                        inferredClosureType->getExtInfo());
+  assignFixedType(typeVar, closureType, closureLocator);
+
+  if (auto last = locator.last()) {
+    if (auto argToParam = last->getAs<LocatorPathElt::ApplyArgToParam>()) {
+      auto *calleeLocator = getCalleeLocator(getConstraintLocator(locator));
+      if (auto functionBuilderType = getFunctionBuilderTypeFor(
+              *this, argToParam->getParamIdx(), calleeLocator)) {
+        if (auto result = matchFunctionBuilder(
+                closure, functionBuilderType, closureType->getResult(),
+                ConstraintKind::Conversion, calleeLocator, locator)) {
+          return result->isSuccess();
+        }
+      }
+    }
+  }
+
+  // If this is a multi-statement closure its body doesn't participate
+  // in type-checking.
+  if (closure->hasSingleExpressionBody()) {
+    auto *closureBody = generateConstraints(closure);
+    if (!closureBody)
+      return false;
+
+    // Since result of the closure type has to be r-value type, we have
+    // to use equality here.
+    addConstraint(
+        ConstraintKind::Conversion, getType(closureBody),
+        closureType->getResult(),
+        getConstraintLocator(closure, ConstraintLocator::ClosureResult));
+  }
+
+  return true;
 }
 
 ConstraintSystem::SolutionKind
@@ -7379,6 +7643,18 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // following: $T1 -> $T2.
   auto func1 = type1->castTo<FunctionType>();
 
+  // If a type variable representing "function type" is a hole
+  // or it could be bound to some concrete type with a help of
+  // a fix, let's propagate holes to the "input" type. Doing so
+  // provides more information to upcoming argument and result matching.
+  if (shouldAttemptFixes()) {
+    if (auto *typeVar = type2->getAs<TypeVariableType>()) {
+      auto *locator = typeVar->getImpl().getLocator();
+      if (typeVar->isHole() || hasFixFor(locator))
+        recordPotentialHole(func1);
+    }
+  }
+
   // Before stripping lvalue-ness and optional types, save the original second
   // type for handling `func callAsFunction` and `@dynamicCallable`
   // applications. This supports the following cases:
@@ -7446,8 +7722,9 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   }
 
   // If right-hand side is a type variable, the constraint is unsolved.
-  if (desugar2->isTypeVariableOrMember())
+  if (desugar2->isTypeVariableOrMember()) {
     return formUnsolved();
+  }
 
   // Strip the 'ApplyFunction' off the locator.
   // FIXME: Perhaps ApplyFunction can go away entirely?
@@ -7590,10 +7867,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     // If there are any type variables associated with arguments/result
     // they have to be marked as "holes".
-    type1.visit([&](Type subType) {
-      if (auto *typeVar = subType->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-    });
+    recordPotentialHole(func1);
 
     if (desugar2->isHole())
       return SolutionKind::Solved;
@@ -7860,18 +8134,14 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
     DeclNameRef memberName({ ctx, ctx.Id_dynamicallyCall, {argLabel} });
 
     auto *fix = DefineMemberBasedOnUse::create(
-        *this, desugar2, memberName,
+        *this, desugar2, memberName, /*alreadyDiagnosed=*/false,
         getConstraintLocator(loc, ConstraintLocator::DynamicCallable));
 
     if (recordFix(fix))
       return SolutionKind::Error;
 
     recordPotentialHole(tv);
-
-    Type(func1).visit([&](Type type) {
-      if (auto *typeVar = type->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-    });
+    recordPotentialHole(func1);
 
     return SolutionKind::Solved;
   }
@@ -8013,15 +8283,42 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   };
 
+  auto fixContextualFailure = [&](Type fromType, Type toType,
+                                  ConstraintLocatorBuilder locator) -> bool {
+    auto *loc = getConstraintLocator(locator);
+    if (loc->isForAssignment() || loc->isForCoercion() ||
+        loc->isForContextualType()) {
+      if (restriction == ConversionRestrictionKind::Superclass) {
+        if (auto *fix =
+                CoerceToCheckedCast::attempt(*this, fromType, toType, loc))
+          return !recordFix(fix);
+      }
+
+      auto *fix = ContextualMismatch::create(*this, fromType, toType, loc);
+      return !recordFix(fix);
+    }
+
+    return false;
+  };
+
   switch (restriction) {
   // for $< in { <, <c, <oc }:
   //   T_i $< U_i ===> (T_i...) $< (U_i...)
   case ConversionRestrictionKind::DeepEquality:
     return matchDeepEqualityTypes(type1, type2, locator);
 
-  case ConversionRestrictionKind::Superclass:
+  case ConversionRestrictionKind::Superclass: {
     addContextualScore();
-    return matchSuperclassTypes(type1, type2, subflags, locator);
+
+    auto result = matchSuperclassTypes(type1, type2, subflags, locator);
+
+    if (!(shouldAttemptFixes() && result.isFailure()))
+      return result;
+
+    return fixContextualFailure(type1, type2, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
+  }
 
   // for $< in { <, <c, <oc }:
   //   T $< U, U : P_i ===> T $< protocol<P_i...>
@@ -8036,15 +8333,23 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   //     P : Q ===> T.Protocol $< Q.Type
   //   for P protocol, Q protocol,
   //     P $< Q ===> P.Type $< Q.Type
-  case ConversionRestrictionKind::MetatypeToExistentialMetatype:
+  case ConversionRestrictionKind::MetatypeToExistentialMetatype: {
     addContextualScore();
 
-    return matchExistentialTypes(
-             type1->castTo<MetatypeType>()->getInstanceType(),
-             type2->castTo<ExistentialMetatypeType>()->getInstanceType(),
-             ConstraintKind::ConformsTo,
-             subflags,
-             locator.withPathElement(ConstraintLocator::InstanceType));
+    auto instanceTy1 = type1->getMetatypeInstanceType();
+    auto instanceTy2 = type2->getMetatypeInstanceType();
+
+    auto result = matchExistentialTypes(
+        instanceTy1, instanceTy2, ConstraintKind::ConformsTo, subflags,
+        locator.withPathElement(ConstraintLocator::InstanceType));
+
+    if (!(shouldAttemptFixes() && result.isFailure()))
+      return result;
+
+    return fixContextualFailure(type1, type2, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
+  }
 
   // for $< in { <, <c, <oc }:
   //   for P protocol, C class, D class,
@@ -8059,13 +8364,16 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (!superclass1)
       return SolutionKind::Error;
 
-    return matchTypes(
-             superclass1,
-             instance2,
-             ConstraintKind::Subtype,
-             subflags,
-             locator.withPathElement(ConstraintLocator::InstanceType));
+    auto result =
+        matchTypes(superclass1, instance2, ConstraintKind::Subtype, subflags,
+                   locator.withPathElement(ConstraintLocator::InstanceType));
 
+    if (!(shouldAttemptFixes() && result.isFailure()))
+      return result;
+
+    return fixContextualFailure(type1, type2, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
   }
   // for $< in { <, <c, <oc }:
   //   T $< U ===> T $< U?
@@ -8432,6 +8740,14 @@ void ConstraintSystem::recordPotentialHole(TypeVariableType *typeVar) {
   typeVar->getImpl().enableCanBindToHole(getSavedBindings());
 }
 
+void ConstraintSystem::recordPotentialHole(FunctionType *fnType) {
+  assert(fnType);
+  Type(fnType).visit([&](Type type) {
+    if (auto *typeVar = type->getAs<TypeVariableType>())
+      recordPotentialHole(typeVar);
+  });
+}
+
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     ConstraintFix *fix, Type type1, Type type2, ConstraintKind matchKind,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
@@ -8583,7 +8899,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::UseValueTypeOfRawRepresentative:
   case FixKind::ExplicitlyConstructRawRepresentable:
   case FixKind::SpecifyBaseTypeForContextualMember:
-  case FixKind::CoerceToCheckedCast: {
+  case FixKind::CoerceToCheckedCast:
+  case FixKind::SpecifyObjectLiteralTypeImport: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -8618,7 +8935,24 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::ContextualMismatch: {
-    if (recordFix(fix))
+    auto impact = 1;
+
+    auto locator = fix->getLocator();
+    if (auto branchElt =
+            locator->getLastElementAs<LocatorPathElt::TernaryBranch>()) {
+      // If this is `else` branch of a ternary operator, let's
+      // increase its impact to eliminate the chance of ambiguity.
+      //
+      // Branches are connected through two `subtype` constraints
+      // to a common type variable with represents their join, which
+      // means that result would attempt a type from each side if
+      // one is available and that would result in two fixes - one for
+      // each mismatched branch.
+      if (branchElt->forElse())
+        impact = 10;
+    }
+
+    if (recordFix(fix, impact))
       return SolutionKind::Error;
 
     if (auto *fnType1 = type1->getAs<FunctionType>()) {
@@ -8666,7 +9000,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowMutatingMemberOnRValueBase:
   case FixKind::AllowTupleSplatForSingleParameter:
   case FixKind::AllowInvalidUseOfTrailingClosure:
+  case FixKind::AllowNonClassTypeToConvertToAnyObject:
   case FixKind::SpecifyClosureReturnType:
+  case FixKind::AddQualifierToAccessTopLevelName:
     llvm_unreachable("handled elsewhere");
   }
 
@@ -8748,6 +9084,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::Disjunction:
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
+  case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Use the correct addConstraint()");
   }
 
@@ -8914,6 +9251,60 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
   }
 }
 
+void ConstraintSystem::addContextualConversionConstraint(
+    Expr *expr, Type conversionType, ContextualTypePurpose purpose,
+    bool isOpaqueReturnType) {
+  if (conversionType.isNull())
+    return;
+
+  // Determine the type of the constraint.
+  auto constraintKind = ConstraintKind::Conversion;
+  switch (purpose) {
+  case CTP_ReturnStmt:
+  case CTP_ReturnSingleExpr:
+  case CTP_Initialization:
+    if (isOpaqueReturnType)
+      constraintKind = ConstraintKind::OpaqueUnderlyingType;
+    break;
+
+  case CTP_CallArgument:
+    constraintKind = ConstraintKind::ArgumentConversion;
+    break;
+
+  case CTP_YieldByReference:
+    // In a by-reference yield, we expect the contextual type to be an
+    // l-value type, so the result must be bound to that.
+    constraintKind = ConstraintKind::Bind;
+    break;
+
+  case CTP_ArrayElement:
+  case CTP_AssignSource:
+  case CTP_CalleeResult:
+  case CTP_CannotFail:
+  case CTP_Condition:
+  case CTP_Unused:
+  case CTP_YieldByValue:
+  case CTP_ThrowStmt:
+  case CTP_EnumCaseRawValue:
+  case CTP_DefaultParameter:
+  case CTP_AutoclosureDefaultParameter:
+  case CTP_ClosureResult:
+  case CTP_DictionaryKey:
+  case CTP_DictionaryValue:
+  case CTP_CoerceOperand:
+  case CTP_SubscriptAssignSource:
+  case CTP_ForEachStmt:
+    break;
+  }
+
+  // Add the constraint.
+  bool isForSingleExprFunction = (purpose == CTP_ReturnSingleExpr);
+  auto *convertTypeLocator = getConstraintLocator(
+      expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
+  addConstraint(constraintKind, getType(expr), conversionType,
+                convertTypeLocator, /*isFavored*/ true);
+}
+
 Type ConstraintSystem::addJoinConstraint(
     ConstraintLocator *locator,
     ArrayRef<std::pair<Type, ConstraintLocator *>> inputs) {
@@ -9076,7 +9467,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::BindOverload:
     if (auto *fix = constraint.getFix()) {
-      if (recordFix(fix))
+      // TODO(diagnostics): Impact should be associated with a fix unless
+      // it's a contextual problem, then only solver can decide what the impact
+      // would be in each particular situation.
+      auto impact =
+          fix->getKind() == FixKind::AddQualifierToAccessTopLevelName ? 10 : 1;
+      if (recordFix(fix, impact))
         return SolutionKind::Error;
     }
 
@@ -9146,6 +9542,13 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                          constraint.getSecondType(),
                                          TMF_GenerateConstraints,
                                          constraint.getLocator());
+
+  case ConstraintKind::DefaultClosureType:
+    return simplifyDefaultClosureTypeConstraint(constraint.getFirstType(),
+                                                constraint.getSecondType(),
+                                                constraint.getTypeVariables(),
+                                                TMF_GenerateConstraints,
+                                                constraint.getLocator());
 
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:

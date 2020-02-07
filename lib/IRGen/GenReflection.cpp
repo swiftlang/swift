@@ -322,8 +322,7 @@ std::pair<llvm::Constant *, unsigned>
 IRGenModule::getTypeRef(Type type, GenericSignature genericSig,
                         MangledTypeRefRole role) {
   return getTypeRef(type->getCanonicalType(genericSig),
-      genericSig ? genericSig->getCanonicalSignature() : CanGenericSignature(),
-      role);
+                    genericSig.getCanonicalSignature(), role);
 }
 
 std::pair<llvm::Constant *, unsigned>
@@ -359,7 +358,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
   GenericEnvironment *genericEnv = nullptr;
 
   if (origGenericSig) {
-    genericSig = origGenericSig->getCanonicalSignature();
+    genericSig = origGenericSig.getCanonicalSignature();
     enumerateGenericSignatureRequirements(genericSig,
                 [&](GenericRequirement reqt) { requirements.push_back(reqt); });
     genericEnv = genericSig->getGenericEnvironment();
@@ -523,9 +522,7 @@ protected:
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
     addTypeRef(type->getCanonicalType(genericSig),
-               genericSig ? genericSig->getCanonicalSignature()
-                          : CanGenericSignature(),
-               role);
+               genericSig.getCanonicalSignature(), role);
   }
 
   /// Add a 32-bit relative offset to a mangled typeref string
@@ -647,9 +644,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
       auto NameGlobal = IGM.getAddrOfFieldName(AssocTy.first);
       B.addRelativeAddress(NameGlobal);
       addTypeRef(AssocTy.second,
-                 Nominal->getGenericSignature()
-                   ? Nominal->getGenericSignature()->getCanonicalSignature()
-                   : CanGenericSignature());
+                 Nominal->getGenericSignature().getCanonicalSignature());
     }
   }
 
@@ -671,7 +666,10 @@ public:
 };
 
 class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
-  const uint32_t fieldRecordSize = 12;
+public:
+  static const uint32_t FieldRecordSize = 12;
+  
+private:
   const NominalTypeDecl *NTD;
 
   void addFieldDecl(const ValueDecl *value, Type type,
@@ -714,7 +712,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     }
 
     B.addInt16(uint16_t(kind));
-    B.addInt16(fieldRecordSize);
+    B.addInt16(FieldRecordSize);
 
     auto properties = NTD->getStoredProperties();
     B.addInt32(properties.size());
@@ -737,7 +735,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     }
 
     B.addInt16(uint16_t(kind));
-    B.addInt16(fieldRecordSize);
+    B.addInt16(FieldRecordSize);
     B.addInt32(strategy.getElementsWithPayload().size()
                + strategy.getElementsWithNoPayload().size());
 
@@ -764,7 +762,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     else
       Kind = FieldDescriptorKind::Protocol;
     B.addInt16(uint16_t(Kind));
-    B.addInt16(fieldRecordSize);
+    B.addInt16(FieldRecordSize);
     B.addInt32(0);
   }
 
@@ -813,6 +811,57 @@ public:
   FieldTypeMetadataBuilder(IRGenModule &IGM,
                            const NominalTypeDecl * NTD)
     : ReflectionMetadataBuilder(IGM), NTD(NTD) {}
+
+  llvm::GlobalVariable *emit() {
+    auto section = IGM.getFieldTypeMetadataSectionName();
+    return ReflectionMetadataBuilder::emit(
+      [&](IRGenModule &IGM, ConstantInit definition) -> llvm::Constant* {
+        return IGM.getAddrOfReflectionFieldDescriptor(
+          NTD->getDeclaredType()->getCanonicalType(), definition);
+      },
+      section);
+  }
+};
+
+static bool
+deploymentTargetHasRemoteMirrorZeroSizedTypeDescriptorBug(IRGenModule &IGM) {
+  auto target = IGM.Context.LangOpts.Target;
+  
+  if (target.isMacOSX() && target.isMacOSXVersionLT(10, 16, 0)) {
+    return true;
+  }
+  if (target.isiOS() && target.isOSVersionLT(14)) { // includes tvOS
+    return true;
+  }
+  if (target.isWatchOS() && target.isOSVersionLT(7)) {
+    return true;
+  }
+  
+  return false;
+}
+
+/// Metadata builder that emits a fixed-layout empty type as an empty struct, as
+/// a workaround for a RemoteMirror crash in older OSes.
+class EmptyStructMetadataBuilder : public ReflectionMetadataBuilder {
+  const NominalTypeDecl *NTD;
+  
+  void layout() override {
+    addNominalRef(NTD);
+    B.addInt32(0);
+    B.addInt16(uint16_t(FieldDescriptorKind::Struct));
+    B.addInt16(FieldTypeMetadataBuilder::FieldRecordSize);
+    B.addInt32(0);
+  }
+  
+public:
+  EmptyStructMetadataBuilder(IRGenModule &IGM,
+                             const NominalTypeDecl *NTD)
+    : ReflectionMetadataBuilder(IGM), NTD(NTD) {
+      assert(IGM.getTypeInfoForUnlowered(
+                           NTD->getDeclaredTypeInContext()->getCanonicalType())
+                .isKnownEmpty(ResilienceExpansion::Maximal)
+             && "should only be used for known empty types");
+  }
 
   llvm::GlobalVariable *emit() {
     auto section = IGM.getFieldTypeMetadataSectionName();
@@ -1094,12 +1143,10 @@ public:
     B.addInt32(CaptureTypes.size());
     B.addInt32(MetadataSources.size());
     B.addInt32(Layout.getBindings().size());
-    
-    auto sig = OrigCalleeType->getSubstGenericSignature()
-              ? OrigCalleeType->getSubstGenericSignature()
-                              ->getCanonicalSignature()
-              : CanGenericSignature();
-    
+
+    auto sig =
+        OrigCalleeType->getSubstGenericSignature().getCanonicalSignature();
+
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
       addLoweredTypeRef(CaptureType, sig);
@@ -1338,6 +1385,19 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
   }
 
   if (needsOpaqueDescriptor) {
+    // Work around an issue in the RemoteMirror library that ships in
+    // macOS 10.15/iOS 13 and earlier that causes it to crash on a
+    // BuiltinTypeDescriptor with zero size. If the type has zero size, emit it
+    // as an empty struct instead, which will have the same impact on the
+    // encoded type layout.
+    auto &TI = getTypeInfoForUnlowered(T);
+    if (deploymentTargetHasRemoteMirrorZeroSizedTypeDescriptorBug(*this)
+        && TI.isKnownEmpty(ResilienceExpansion::Maximal)) {
+      EmptyStructMetadataBuilder builder(*this, D);
+      builder.emit();
+      return;
+    }
+    
     FixedTypeMetadataBuilder builder(*this, D);
     builder.emit();
   }

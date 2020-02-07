@@ -69,6 +69,7 @@ class SourceFile;
 class SourceManager;
 class Stmt;
 class TypeRepr;
+struct FingerprintAndMembers;
 
 // There are a handful of cases where the swift compiler can introduce
 // counter-measurement noise via nondeterminism, especially via
@@ -161,6 +162,10 @@ private:
   std::unique_ptr<RecursionSafeTimers> RecursiveTimers;
   std::unique_ptr<StatsProfilers> EventProfilers;
   std::unique_ptr<StatsProfilers> EntityProfilers;
+
+  /// Whether we are currently flushing statistics and should not therefore
+  /// record any additional stats until we've finished.
+  bool IsFlushingTracesAndProfiles;
 
   void publishAlwaysOnStatsToLLVM();
   void printAlwaysOnStatsAndTimers(raw_ostream &OS);

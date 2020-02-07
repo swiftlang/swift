@@ -206,6 +206,8 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   // In particular, it's /not/ correct to check the PBD's DeclContext because
   // top-level variables in a script file are accessible from other files,
   // even though the PBD is inside a TopLevelCodeDecl.
+  auto contextualPattern =
+      ContextualPattern::forPatternBindingDecl(binding, entryNumber);
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
   if (binding->isInitialized(entryNumber)) {
@@ -214,7 +216,8 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
 
-  if (TypeChecker::typeCheckPattern(pattern, binding->getDeclContext(), options)) {
+  Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+  if (patternType->hasError()) {
     swift::setBoundVarsTypeError(pattern, Context);
     binding->setInvalid();
     pattern->setType(ErrorType::get(Context));
@@ -225,20 +228,20 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   // default-initializable. If so, do it.
   if (!pbe.isInitialized() &&
       binding->isDefaultInitializable(entryNumber) &&
-      pattern->hasStorage() &&
-      !pattern->getType()->hasError()) {
-    auto type = pattern->getType();
-    if (auto defaultInit = TypeChecker::buildDefaultInitializer(type)) {
+      pattern->hasStorage()) {
+    if (auto defaultInit = TypeChecker::buildDefaultInitializer(patternType)) {
       // If we got a default initializer, install it and re-type-check it
       // to make sure it is properly coerced to the pattern type.
       binding->setInit(entryNumber, defaultInit);
     }
   }
 
-  // If the pattern didn't get a type or if it contains an unbound generic type,
-  // we'll need to check the initializer.
-  if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
-    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber)) {
+  // If the pattern contains some form of unresolved type, we'll need to
+  // check the initializer.
+  if (patternType->hasUnresolvedType() ||
+      patternType->hasUnboundGenericType()) {
+    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber,
+                                             patternType)) {
       binding->setInvalid();
       return &pbe;
     }
@@ -253,9 +256,11 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     }
   } else {
     // Coerce the pattern to the computed type.
-    auto resolution = TypeResolution::forContextual(binding->getDeclContext());
-    if (TypeChecker::coercePatternToType(pattern, resolution,
-                                         pattern->getType(), options)) {
+    if (auto newPattern = TypeChecker::coercePatternToType(
+            contextualPattern, patternType,
+            TypeResolverContext::PatternBindingDecl)) {
+      pattern = newPattern;
+    } else {
       binding->setInvalid();
       pattern->setType(ErrorType::get(Context));
       return &pbe;
@@ -596,7 +601,9 @@ getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
   return result;
 }
 
-/// Build an l-value for the storage of a declaration.
+/// Build an l-value for the storage of a declaration. Returns nullptr if there
+/// was an error. This should only occur if an invalid declaration was type
+/// checked; another diagnostic should have been emitted already.
 static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    TargetImpl target,
@@ -683,12 +690,8 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     auto *backing = var->getPropertyWrapperBackingProperty();
 
     // Error recovery.
-    if (!backing) {
-      auto type = storage->getValueInterfaceType();
-      if (isLValue)
-        type = LValueType::get(type);
-      return new (ctx) ErrorExpr(SourceRange(), type);
-    }
+    if (!backing)
+      return nullptr;
 
     storage = backing;
 
@@ -730,12 +733,8 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     auto *backing = var->getPropertyWrapperBackingProperty();
 
     // Error recovery.
-    if (!backing) {
-      auto type = storage->getValueInterfaceType();
-      if (isLValue)
-        type = LValueType::get(type);
-      return new (ctx) ErrorExpr(SourceRange(), type);
-    }
+    if (!backing)
+      return nullptr;
 
     storage = backing;
 
@@ -845,7 +844,12 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
         ctx, wrapperMetatype, SourceLoc(), args,
         subscriptDecl->getFullName().getArgumentNames(), { }, SourceLoc(),
         nullptr, subscriptDecl, /*Implicit=*/true);
-    TypeChecker::typeCheckExpression(lookupExpr, accessor);
+
+    // FIXME: Since we're not resolving overloads or anything, we should be
+    // building fully type-checked AST above; we already have all the
+    // information that we need.
+    if (!TypeChecker::typeCheckExpression(lookupExpr, accessor))
+      return nullptr;
 
     // Make sure we produce an lvalue only when desired.
     if (isMemberLValue != lookupExpr->getType()->is<LValueType>()) {
@@ -1043,6 +1047,10 @@ void createPropertyStoreOrCallSuperclassSetter(AccessorDecl *accessor,
   Expr *dest = buildStorageReference(accessor, storage, target,
                                      /*isLValue=*/true, ctx);
 
+  // Error recovery.
+  if (dest == nullptr)
+    return;
+
   // A lazy property setter will store a value of type T into underlying storage
   // of type T?.
   auto destType = dest->getType()->getWithoutSpecifierType();
@@ -1052,6 +1060,7 @@ void createPropertyStoreOrCallSuperclassSetter(AccessorDecl *accessor,
     return;
 
   if (!destType->isEqual(value->getType())) {
+    assert(destType->getOptionalObjectType());
     assert(destType->getOptionalObjectType()->isEqual(value->getType()));
     value = new (ctx) InjectIntoOptionalExpr(value, destType);
   }
@@ -1087,10 +1096,15 @@ synthesizeTrivialGetterBody(AccessorDecl *getter, TargetImpl target,
 
   Expr *result =
     createPropertyLoadOrCallSuperclassGetter(getter, storage, target, ctx);
-  ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result,
-                                            /*IsImplicit=*/true);
 
-  return { BraceStmt::create(ctx, loc, returnStmt, loc, true),
+  SmallVector<ASTNode, 2> body;
+  if (result != nullptr) {
+    ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result,
+                                              /*IsImplicit=*/true);
+    body.push_back(returnStmt);
+  }
+
+  return { BraceStmt::create(ctx, loc, body, loc, true),
            /*isTypeChecked=*/true };
 }
 
@@ -1482,7 +1496,13 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   if (VD->getParsedAccessor(AccessorKind::DidSet)) {
     Expr *OldValueExpr
       = buildStorageReference(Set, VD, target, /*isLValue=*/true, Ctx);
-    OldValueExpr = new (Ctx) LoadExpr(OldValueExpr, VD->getType());
+
+    // Error recovery.
+    if (OldValueExpr == nullptr) {
+      OldValueExpr = new (Ctx) ErrorExpr(SourceRange(), VD->getType());
+    } else {
+      OldValueExpr = new (Ctx) LoadExpr(OldValueExpr, VD->getType());
+    }
 
     OldValue = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                  /*IsCaptureList*/false, SourceLoc(),
@@ -1610,13 +1630,14 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
 
   // Build a reference to the storage.
   Expr *ref = buildStorageReference(accessor, storage, target, isLValue, ctx);
+  if (ref != nullptr) {
+    // Wrap it with an `&` marker if this is a modify.
+    ref = maybeWrapInOutExpr(ref, ctx);
 
-  // Wrap it with an `&` marker if this is a modify.
-  ref = maybeWrapInOutExpr(ref, ctx);
-
-  // Yield it.
-  YieldStmt *yield = YieldStmt::create(ctx, loc, loc, ref, loc, true);
-  body.push_back(yield);
+    // Yield it.
+    YieldStmt *yield = YieldStmt::create(ctx, loc, loc, ref, loc, true);
+    body.push_back(yield);
+  }
 
   return { BraceStmt::create(ctx, loc, body, loc, true),
            /*isTypeChecked=*/true };

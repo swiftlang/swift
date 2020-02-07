@@ -3711,7 +3711,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
     if (!isTake) {                                                             \
       SILValue value = SGF.B.createLoadBorrow(loc, src);                       \
       SILValue strongValue = SGF.B.createStrongCopy##Name##Value(loc, value);  \
-      SGF.B.createEndBorrow(loc, value, src);                                  \
+      SGF.B.createEndBorrow(loc, value);                                       \
       return strongValue;                                                      \
     }                                                                          \
     /* Otherwise perform a load take and destroy the stored value. */          \

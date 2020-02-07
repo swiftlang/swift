@@ -47,7 +47,7 @@ AbstractionPattern
 TypeConverter::getAbstractionPattern(SubscriptDecl *decl, bool isNonObjC) {
   CanGenericSignature genericSig;
   if (auto sig = decl->getGenericSignatureOfContext())
-    genericSig = sig->getCanonicalSignature();
+    genericSig = sig.getCanonicalSignature();
   return AbstractionPattern(genericSig,
                             decl->getElementInterfaceType()
                                 ->getCanonicalType());
@@ -77,7 +77,7 @@ AbstractionPattern
 TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
   CanGenericSignature genericSig;
   if (auto sig = var->getDeclContext()->getGenericSignatureOfContext())
-    genericSig = sig->getCanonicalSignature();
+    genericSig = sig.getCanonicalSignature();
 
   CanType swiftType = var->getInterfaceType()
                          ->getCanonicalType();
@@ -110,7 +110,7 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
 
   CanGenericSignature genericSig;
   if (auto sig = decl->getParentEnum()->getGenericSignatureOfContext())
-    genericSig = sig->getCanonicalSignature();
+    genericSig = sig.getCanonicalSignature();
   return AbstractionPattern(genericSig,
                             decl->getArgumentInterfaceType()
                                 ->getCanonicalType());
@@ -839,10 +839,7 @@ const {
     CanType memberTy = origMemberInterfaceType
       ? origMemberInterfaceType
       : member->getInterfaceType()->getCanonicalType(sig);
-      
-    return AbstractionPattern(sig ? sig->getCanonicalSignature()
-                                  : CanGenericSignature(),
-                              memberTy);
+    return AbstractionPattern(sig.getCanonicalSignature(), memberTy);
   }
 
   switch (getKind()) {

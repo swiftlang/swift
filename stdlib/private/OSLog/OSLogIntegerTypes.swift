@@ -58,6 +58,17 @@ extension OSLogInterpolation {
     appendInteger(number, format: format, privacy: privacy)
   }
 
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
+  public mutating func appendInterpolation(
+    _ number: @autoclosure @escaping () -> UInt,
+    format: IntFormat = .decimal,
+    privacy: Privacy = .public
+  ) {
+    appendInteger(number, format: format, privacy: privacy)
+  }
+
   /// Given an integer, create and append a format specifier for the integer to the
   /// format string property. Also, append the integer along with necessary headers
   /// to the OSLogArguments property.
@@ -154,10 +165,11 @@ extension OSLogArguments {
 }
 
 /// Return the number of bytes needed for serializing an integer argument as
-/// specified by os_log. This function must be constant evaluable.
-@_semantics("constant_evaluable")
-@inlinable
-@_optimize(none)
+/// specified by os_log. This function must be constant evaluable. Note that
+/// it is marked transparent instead of @inline(__always) as it is used in
+/// optimize(none) functions.
+@_transparent
+@usableFromInline
 internal func sizeForEncoding<T>(
   _ type: T.Type
 ) -> Int where T : FixedWidthInteger  {

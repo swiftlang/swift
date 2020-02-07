@@ -85,7 +85,8 @@ PrintOptions PrintOptions::printDocInterface() {
       PrintOptions::ArgAndParamPrintingMode::BothAlways;
   result.PrintDocumentationComments = false;
   result.PrintRegularClangComments = false;
-  result.PrintFunctionRepresentationAttrs = false;
+  result.PrintFunctionRepresentationAttrs =
+    PrintOptions::FunctionRepresentationMode::None;
   return result;
 }
 

@@ -7000,7 +7000,7 @@ public:
   }
 
   using SuccessorBlockArgumentListTy =
-      TransformRange<ConstSuccessorListTy, function_ref<SILPhiArgumentArrayRef(
+      TransformRange<ConstSuccessorListTy, function_ref<ArrayRef<SILArgument *>(
                                                const SILSuccessor &)>>;
 
   /// Return the range of Argument arrays for each successor of this
@@ -7042,6 +7042,30 @@ public:
   bool isProgramTerminating() const;
 
   TermKind getTermKind() const { return TermKind(getKind()); }
+
+  /// Returns true if this is a transformation terminator.
+  bool isTransformationTerminator() const {
+    switch (getTermKind()) {
+    case TermKind::UnwindInst:
+    case TermKind::UnreachableInst:
+    case TermKind::ReturnInst:
+    case TermKind::ThrowInst:
+    case TermKind::YieldInst:
+    case TermKind::TryApplyInst:
+    case TermKind::BranchInst:
+    case TermKind::CondBranchInst:
+    case TermKind::SwitchValueInst:
+    case TermKind::SwitchEnumAddrInst:
+    case TermKind::DynamicMethodBranchInst:
+    case TermKind::CheckedCastAddrBranchInst:
+    case TermKind::CheckedCastValueBranchInst:
+      return false;
+    case TermKind::SwitchEnumInst:
+    case TermKind::CheckedCastBranchInst:
+      return true;
+    }
+    llvm_unreachable("Covered switch isn't covered.");
+  }
 };
 
 /// UnreachableInst - Position in the code which would be undefined to reach.

@@ -22,6 +22,8 @@ SWIFT_REPO = os.path.join(REPO_BASE, "swift")
 LLVM_REPO = os.path.join(REPO_BASE, "llvm")
 LLVM_DATAFORMATTER_PATH = os.path.join(LLVM_REPO, "utils",
                                        "lldbDataFormatters.py")
+SWIFT_DATAFORMATTER_PATH = os.path.join(SWIFT_REPO, "utils",
+                                        "lldb", "lldbSwiftDataFormatters.py")
 
 
 def import_llvm_dataformatters(debugger):
@@ -31,6 +33,15 @@ def import_llvm_dataformatters(debugger):
     cmd = 'command script import {}'.format(LLVM_DATAFORMATTER_PATH)
     debugger.HandleCommand(cmd)
     print("Loaded LLVM data formatters.")
+
+
+def import_swift_dataformatters(debugger):
+    if not os.access(SWIFT_DATAFORMATTER_PATH, os.F_OK):
+        print("WARNING! Could not find Swift data formatters!")
+        return
+    cmd = 'command script import {}'.format(SWIFT_DATAFORMATTER_PATH)
+    debugger.HandleCommand(cmd)
+    print("Loaded Swift data formatters.")
 
 
 VIEWCFG_PATH = os.path.join(SWIFT_REPO, "utils", "viewcfg")
@@ -107,6 +118,7 @@ def sequence(debugger, command, exec_ctx, result, internal_dict):
 
 def __lldb_init_module(debugger, internal_dict):
     import_llvm_dataformatters(debugger)
+    import_swift_dataformatters(debugger)
     debugger.HandleCommand('command script add disassemble-asm-cfg '
                            '-f lldbToolBox.disassemble_asm_cfg')
     debugger.HandleCommand('command script add disassemble-to-file '

@@ -117,6 +117,10 @@ ERROR(error_sdk_too_old,none,
 ERROR(error_ios_maximum_deployment_32,none,
       "iOS %0 does not support 32-bit programs", (unsigned))
 
+ERROR(error_unsupported_target_variant,none,
+      "unsupported '%select{-target|-target-variant}1' value '%0'; use 'ios-macabi' instead",
+      (StringRef, bool))
+
 WARNING(warn_arclite_not_found_when_link_objc_runtime,none,
         "unable to find Objective-C runtime support library 'arclite'; "
         "pass '-no-link-objc-runtime' to silence this warning", ())

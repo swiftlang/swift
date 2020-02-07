@@ -137,8 +137,19 @@ def driver_always_rebuild_dependents :
 
 def enable_fine_grained_dependencies :
 Flag<["-"], "enable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
+HelpText<"Be more selective about incremental recompilation">;
 
+def disable_fine_grained_dependencies :
+Flag<["-"], "disable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Don't be more selective about incremental recompilation">;
+
+def enable_type_fingerprints :
+Flag<["-"], "enable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Enable per-nominal and extension body fingerprints">;
+
+def disable_type_fingerprints :
+Flag<["-"], "disable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Disable per-nominal and extension body fingerprints">;
 
 def enable_only_one_dependency_file :
 Flag<["-"], "enable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
@@ -180,8 +191,13 @@ HelpText<"Emit dot files every time driver imports an fine-grained swiftdeps fil
 
 def fine_grained_dependency_include_intrafile :
 Flag<["-"], "fine-grained-dependency-include-intrafile">,
-InternalDebugOpt,
+Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Include within-file dependencies.">;
+
+def emit_fine_grained_dependency_sourcefile_dot_files :
+Flag<["-"], "emit-fine-grained-dependency-sourcefile-dot-files">,
+InternalDebugOpt,
+HelpText<"Emit dot files for every source file.">;
 
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
@@ -402,6 +418,11 @@ def emit_module_interface_path :
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
+
+def avoid_emit_module_source_info :
+  Flag<["-"], "avoid-emit-module-source-info">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"don't emit Swift source info file">;
 
 def emit_module_source_info_path :
   Separate<["-"], "emit-module-source-info-path">,
@@ -858,6 +879,10 @@ def whole_module_optimization : Flag<["-"], "whole-module-optimization">,
   HelpText<"Optimize input files together instead of individually">,
   Flags<[FrontendOption, NoInteractiveOption]>;
 
+def no_whole_module_optimization : Flag<["-"], "no-whole-module-optimization">,
+  HelpText<"Disable optimizing input files together instead of individually">,
+  Flags<[FrontendOption, NoInteractiveOption]>;
+
 def enable_batch_mode : Flag<["-"], "enable-batch-mode">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Enable combining frontend jobs into batches">;
@@ -909,6 +934,11 @@ def print_target_info : Flag<["-"], "print-target-info">,
 
 def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Generate code for a particular CPU variant">;
+
+def target_variant : Separate<["-"], "target-variant">,
+  Flags<[FrontendOption]>,
+  HelpText<"Generate 'zippered' code for macCatalyst that can run on the specified"
+           " variant target triple in addition to the main -target triple">;
 
 def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,

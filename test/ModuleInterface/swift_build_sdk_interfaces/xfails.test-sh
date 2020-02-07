@@ -1,7 +1,7 @@
 RUN: %empty-directory(%t)
-RUN: not %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -o %t/output 2> %t/stderr.txt | %FileCheck %s
+RUN: env SWIFT_EXEC=%swiftc_driver_plain not %{python} %utils/swift_build_sdk_interfaces.py %mcp_opt -sdk %S/Inputs/xfails-sdk/ -o %t/output 2> %t/stderr.txt | %FileCheck %s
 RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/stderr.txt
-RUN: not %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -v -o %t/output 2> %t/stderr.txt | %FileCheck -check-prefix CHECK-VERBOSE %s
+RUN: env SWIFT_EXEC=%swiftc_driver_plain not %{python} %utils/swift_build_sdk_interfaces.py %mcp_opt -sdk %S/Inputs/xfails-sdk/ -v -o %t/output 2> %t/stderr.txt | %FileCheck -check-prefix CHECK-VERBOSE %s
 RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/stderr.txt
 
 CHECK: # (FAIL) {{.+}}{{\\|/}}Bad.swiftinterface
@@ -13,9 +13,9 @@ HIDES-ERROR-NOT: unresolved identifier 'garbage'
 
 RUN: %empty-directory(%t)
 RUN: echo '["Good"]' > %t/xfails-good.json
-RUN: not %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -o %t/output -xfails %t/xfails-good.json 2> %t/stderr.txt | %FileCheck -check-prefix=CHECK-XFAIL-GOOD %s
+RUN: env SWIFT_EXEC=%swiftc_driver_plain not %{python} %utils/swift_build_sdk_interfaces.py %mcp_opt -sdk %S/Inputs/xfails-sdk/ -o %t/output -xfails %t/xfails-good.json 2> %t/stderr.txt | %FileCheck -check-prefix=CHECK-XFAIL-GOOD %s
 RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/stderr.txt
-RUN: not %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -v -o %t/output -xfails %t/xfails-good.json 2> %t/stderr.txt | %FileCheck -check-prefix=CHECK-XFAIL-GOOD %s
+RUN: env SWIFT_EXEC=%swiftc_driver_plain not %{python} %utils/swift_build_sdk_interfaces.py %mcp_opt -sdk %S/Inputs/xfails-sdk/ -v -o %t/output -xfails %t/xfails-good.json 2> %t/stderr.txt | %FileCheck -check-prefix=CHECK-XFAIL-GOOD %s
 RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/stderr.txt
 
 CHECK-XFAIL-GOOD-DAG: # (FAIL) {{.+}}{{\\|/}}Bad.swiftinterface

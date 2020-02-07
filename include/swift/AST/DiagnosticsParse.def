@@ -470,6 +470,8 @@ ERROR(expected_precedencegroup_relation,none,
       (StringRef))
 
 // SIL
+ERROR(expected_sil_keyword,none,
+      "expected SIL keyword", ())
 ERROR(inout_not_attribute, none,
       "@inout is no longer an attribute", ())
 ERROR(only_allowed_in_sil,none,
@@ -677,6 +679,18 @@ ERROR(sil_witness_assoc_conf_not_found,none,
       "sil associated type path for conformance not found %0", (StringRef))
 ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
+
+// SIL differentiability witnesses
+ERROR(sil_diff_witness_expected_token,PointsToFirstBadToken,
+      "expected '%0' in differentiability witness", (StringRef))
+ERROR(sil_diff_witness_serialized_declaration,none,
+      "differentiability witness declaration should not be serialized", ())
+ERROR(sil_diff_witness_undefined,PointsToFirstBadToken,
+      "reference to undefined differentiability witness", ())
+ERROR(sil_diff_witness_invalid_generic_signature,PointsToFirstBadToken,
+      "expected witness generic signature '%0' does not have same generic "
+      "parameters as original function generic signature '%1'",
+      (StringRef, StringRef))
 
 // SIL Coverage Map
 ERROR(sil_coverage_invalid_hash, none,
@@ -933,6 +947,8 @@ ERROR(statement_same_line_without_semi,none,
       "consecutive statements on a line must be separated by ';'", ())
 ERROR(invalid_label_on_stmt,none,
       "labels are only valid on loops, if, and switch statements", ())
+ERROR(labeled_block_needs_do,none,
+      "labeled block needs 'do'", ())
 
 ERROR(snake_case_deprecated,none,
       "%0 has been replaced with %1 in Swift 3",
@@ -1542,21 +1558,24 @@ ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
       "expected a member name as second parameter in '_implements' attribute", ())
 
 // differentiable
+// TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
 ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
       "expected a %0 function name", (StringRef))
 ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to", ())
+// TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
 ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
-ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
-      "missing label '%0:' in '@differentiable' attribute", (StringRef))
 ERROR(attr_differentiable_expected_label,none,
       "expected either 'wrt:' or a function specifier label, e.g. 'jvp:', "
       "or 'vjp:'", ())
-ERROR(differentiable_attribute_expected_rparen,none,
-      "expected ')' in '@differentiable' attribute", ())
-ERROR(unexpected_argument_differentiable,none,
+ERROR(attr_differentiable_unexpected_argument,none,
       "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
+// TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
+WARNING(attr_differentiable_jvp_vjp_deprecated_warning,none,
+        "'jvp:' and 'vjp:' arguments in '@differentiable' attribute are "
+        "deprecated; use '@derivative' attribute for derivative registration "
+        "instead", ())
 
 // differentiation `wrt` parameters clause
 ERROR(expected_colon_after_label,PointsToFirstBadToken,
@@ -1571,6 +1590,20 @@ ERROR(diff_params_clause_expected_parameter_unnamed,PointsToFirstBadToken,
 // Automatic differentiation attributes
 ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
       "expected an original function name", ())
+
+// SIL autodiff
+ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
+      "expected '[' to start the %0", (StringRef))
+ERROR(sil_autodiff_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' to complete the %0", (StringRef))
+ERROR(sil_autodiff_expected_index_list,PointsToFirstBadToken,
+      "expected a space-separated list of indices, e.g. '0 1'", ())
+ERROR(sil_autodiff_expected_index_list_label,PointsToFirstBadToken,
+      "expected label '%0' in index list", (StringRef))
+ERROR(sil_autodiff_expected_parameter_index,PointsToFirstBadToken,
+      "expected the index of a parameter to differentiate with respect to", ())
+ERROR(sil_autodiff_expected_result_index,PointsToFirstBadToken,
+      "expected the index of a result to differentiate from", ())
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
@@ -1646,6 +1679,8 @@ ERROR(empty_version_string,none,
 WARNING(unknown_platform_condition_argument,none,
       "unknown %0 for build configuration '%1'",
       (StringRef, StringRef))
+WARNING(renamed_platform_condition_argument,none,
+      "'%0' has been renamed to '%1'", (StringRef, StringRef))
 WARNING(likely_simulator_platform_condition,none,
       "platform condition appears to be testing for simulator environment; "
       "use 'targetEnvironment(simulator)' instead",

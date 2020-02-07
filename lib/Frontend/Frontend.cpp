@@ -142,7 +142,7 @@ CompilerInvocation::getModuleInterfaceOutputPathForWholeModule() const {
 }
 
 SerializationOptions CompilerInvocation::computeSerializationOptions(
-    const SupplementaryOutputPaths &outs, bool moduleIsPublic) {
+    const SupplementaryOutputPaths &outs, bool moduleIsPublic) const {
   const FrontendOptions &opts = getFrontendOptions();
 
   SerializationOptions serializationOpts;
@@ -185,10 +185,6 @@ void CompilerInstance::createSILModule() {
       Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
 }
 
-void CompilerInstance::setSILModule(std::unique_ptr<SILModule> M) {
-  TheSILModule = std::move(M);
-}
-
 void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
   PrimaryBufferIDs.insert(BufID);
 }
@@ -216,6 +212,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
       Invocation.getSearchPathOptions(), SourceMgr, Diagnostics));
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
+  registerSILGenRequestFunctions(Context->evaluator);
 
   // Migrator, indexing and typo correction need some IDE requests.
   // The integrated REPL needs IDE requests for completion.
@@ -618,7 +615,7 @@ std::unique_ptr<SILModule> CompilerInstance::takeSILModule() {
   return std::move(TheSILModule);
 }
 
-ModuleDecl *CompilerInstance::getMainModule() {
+ModuleDecl *CompilerInstance::getMainModule() const {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
     MainModule = ModuleDecl::create(ID, *Context);
@@ -730,7 +727,15 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   const ImplicitImports implicitImports(*this);
 
   if (Invocation.getInputKind() == InputFileKind::SwiftREPL) {
-    createREPLFile(implicitImports);
+    // Create the initial empty REPL file. This only exists to feed in the
+    // implicit imports such as the standard library.
+    auto *replFile = createSourceFileForMainModule(
+        SourceFileKind::REPL, implicitImports.kind, /*BufferID*/ None);
+    addAdditionalInitialImportsTo(replFile, implicitImports);
+
+    // Given this file is empty, we can go ahead and just mark it as having been
+    // type checked.
+    replFile->ASTStage = SourceFile::TypeChecked;
     return;
   }
 
@@ -778,7 +783,7 @@ ModuleDecl *CompilerInstance::importUnderlyingModule() {
   ModuleDecl *objCModuleUnderlyingMixedFramework =
       static_cast<ClangImporter *>(Context->getClangModuleLoader())
           ->loadModule(SourceLoc(),
-                       std::make_pair(MainModule->getName(), SourceLoc()));
+                       { Located<Identifier>(MainModule->getName(), SourceLoc()) });
   if (objCModuleUnderlyingMixedFramework)
     return objCModuleUnderlyingMixedFramework;
   Diagnostics.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
@@ -808,7 +813,7 @@ void CompilerInstance::getImplicitlyImportedModules(
     if (Lexer::isIdentifier(ImplicitImportModuleName)) {
       auto moduleID = Context->getIdentifier(ImplicitImportModuleName);
       ModuleDecl *importModule =
-          Context->getModule(std::make_pair(moduleID, SourceLoc()));
+        Context->getModule({ Located<Identifier>(moduleID, SourceLoc()) });
       if (importModule) {
         importModules.push_back(importModule);
       } else {
@@ -825,12 +830,6 @@ void CompilerInstance::getImplicitlyImportedModules(
                            ImplicitImportModuleName, false);
     }
   }
-}
-
-void CompilerInstance::createREPLFile(const ImplicitImports &implicitImports) {
-  auto *SingleInputFile = createSourceFileForMainModule(
-      Invocation.getSourceFileKind(), implicitImports.kind, None);
-  addAdditionalInitialImportsTo(SingleInputFile, implicitImports);
 }
 
 void CompilerInstance::addMainFileToModule(
@@ -916,14 +915,8 @@ void CompilerInstance::parseLibraryFile(
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
   Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
-  bool Done;
-  do {
-    // Parser may stop at some erroneous constructions like #else, #endif
-    // or '}' in some cases, continue parsing until we are done
-    parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
-                        PersistentState.get(),
-                        /*DelayedBodyParsing=*/!IsPrimary);
-  } while (!Done);
+  parseIntoSourceFile(*NextInput, BufferID, PersistentState.get(),
+                      /*DelayedBodyParsing=*/!IsPrimary);
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
 
@@ -956,6 +949,7 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
 
 void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     SourceFile::ASTStage_t LimitStage) {
+  assert(LimitStage >= SourceFile::NameBound);
   FrontendStatsTracer tracer(Context->Stats,
                              "parse-and-typecheck-main-file");
   bool mainIsPrimary =
@@ -968,45 +962,23 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
   Diags.setSuppressWarnings(DidSuppressWarnings || !mainIsPrimary);
 
-  SILParserState SILContext(TheSILModule.get());
-  unsigned CurTUElem = 0;
-  bool Done;
-  do {
-    // Pump the parser multiple times if necessary.  It will return early
-    // after parsing any top level code in a main module, or in SIL mode when
-    // there are chunks of swift decls (e.g. imports and types) interspersed
-    // with 'sil' definitions.
-    parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
-                        TheSILModule ? &SILContext : nullptr,
-                        PersistentState.get(),
-                        !mainIsPrimary);
+  // Parse the Swift decls into the source file.
+  parseIntoSourceFile(MainFile, MainBufferID, PersistentState.get(),
+                      /*delayBodyParsing*/ !mainIsPrimary);
 
-    // For SIL we actually have to interleave parsing and type checking
-    // because the SIL parser expects to see fully type checked declarations.
-    if (TheSILModule) {
-      if (Done || CurTUElem < MainFile.Decls.size()) {
-        assert(mainIsPrimary);
-        performTypeChecking(MainFile, CurTUElem);
-      }
-    }
+  // For a primary, also perform type checking if needed. Otherwise, just do
+  // name binding.
+  if (mainIsPrimary && LimitStage >= SourceFile::TypeChecked) {
+    performTypeChecking(MainFile);
+  } else {
+    assert(!TheSILModule && "Should perform type checking for SIL");
+    performNameBinding(MainFile);
+  }
 
-    CurTUElem = MainFile.Decls.size();
-  } while (!Done);
-
-  if (!TheSILModule) {
-    if (mainIsPrimary) {
-      switch (LimitStage) {
-      case SourceFile::Parsing:
-      case SourceFile::Parsed:
-        llvm_unreachable("invalid limit stage");
-      case SourceFile::NameBound:
-        performNameBinding(MainFile);
-        break;
-      case SourceFile::TypeChecked:
-        performTypeChecking(MainFile);
-        break;
-      }
-    }
+  // Parse the SIL decls if needed.
+  if (TheSILModule) {
+    SILParserState SILContext(TheSILModule.get());
+    parseSourceFileSIL(MainFile, &SILContext);
   }
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
@@ -1014,12 +986,6 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
   if (mainIsPrimary && !Context->hadError() &&
       Invocation.getFrontendOptions().DebuggerTestingTransform) {
     performDebuggerTestingTransform(MainFile);
-  }
-
-  if (!TheSILModule) {
-    if (!mainIsPrimary) {
-      performNameBinding(MainFile);
-    }
   }
 }
 
@@ -1071,7 +1037,7 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
 }
 
 void CompilerInstance::performParseOnly(bool EvaluateConditionals,
-                                        bool ParseDelayedBodyOnEnd) {
+                                        bool CanDelayBodies) {
   const InputFileKind Kind = Invocation.getInputKind();
   ModuleDecl *const MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
@@ -1093,25 +1059,27 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
   }
 
   PersistentState = llvm::make_unique<PersistentParserState>();
-
-  SWIFT_DEFER {
-    if (ParseDelayedBodyOnEnd)
-      PersistentState->parseAllDelayedDeclLists();
-  };
   PersistentState->PerformConditionEvaluation = EvaluateConditionals;
+
+  auto shouldDelayBodies = [&](unsigned bufferID) -> bool {
+    if (!CanDelayBodies)
+      return false;
+
+    // Don't delay bodies in whole module mode or for primary files.
+    return !(isWholeModuleCompilation() || isPrimaryInput(bufferID));
+  };
+
   // Parse all the library files.
   for (auto BufferID : InputSourceCodeBufferIDs) {
     if (BufferID == MainBufferID)
       continue;
 
-    auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
-
     SourceFile *NextInput = createSourceFileForMainModule(
         SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
         BufferID);
 
-    parseIntoSourceFileFull(*NextInput, BufferID, PersistentState.get(),
-                            /*DelayBodyParsing=*/!IsPrimary);
+    parseIntoSourceFile(*NextInput, BufferID, PersistentState.get(),
+                        shouldDelayBodies(BufferID));
   }
 
   // Now parse the main file.
@@ -1119,10 +1087,10 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
     SourceFile &MainFile =
         MainModule->getMainSourceFile(Invocation.getSourceFileKind());
     MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
+    assert(MainBufferID == MainFile.getBufferID());
 
-    parseIntoSourceFileFull(MainFile, MainFile.getBufferID().getValue(),
-                            PersistentState.get(),
-                            /*DelayBodyParsing=*/false);
+    parseIntoSourceFile(MainFile, MainBufferID, PersistentState.get(),
+                        shouldDelayBodies(MainBufferID));
   }
 
   assert(Context->LoadedModules.size() == 1 &&

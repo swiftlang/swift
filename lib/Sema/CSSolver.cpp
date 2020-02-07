@@ -165,19 +165,18 @@ Solution ConstraintSystem::finalize() {
                                        DefaultedConstraints.end());
 
   for (auto &nodeType : addedNodeTypes) {
-    solution.addedNodeTypes.push_back(nodeType);
+    solution.addedNodeTypes.insert(nodeType);
   }
+
+  // Remember contextual types.
+  solution.contextualTypes.assign(
+      contextualTypes.begin(), contextualTypes.end());
 
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
 
-  for (const auto &transformed : builderTransformedClosures) {
-    auto known =
-        solution.builderTransformedClosures.find(transformed.first);
-    if (known != solution.builderTransformedClosures.end()) {
-      assert(known->second.singleExpr == transformed.second.singleExpr);
-    }
-    solution.builderTransformedClosures.insert(transformed);
+  for (const auto &transformed : functionBuilderTransformed) {
+    solution.functionBuilderTransformed.insert(transformed);
   }
 
   return solution;
@@ -237,12 +236,20 @@ void ConstraintSystem::applySolution(const Solution &solution) {
       setType(nodeType.first, nodeType.second);
   }
 
+  // Add the contextual types.
+  for (const auto &contextualType : solution.contextualTypes) {
+    if (!getContextualTypeInfo(contextualType.first)) {
+      setContextualType(contextualType.first, contextualType.second.typeLoc,
+                        contextualType.second.purpose);
+    }
+  }
+
   // Register the conformances checked along the way to arrive to solution.
   for (auto &conformance : solution.Conformances)
     CheckedConformances.push_back(conformance);
 
-  for (const auto &transformed : solution.builderTransformedClosures) {
-    builderTransformedClosures.push_back(transformed);
+  for (const auto &transformed : solution.functionBuilderTransformed) {
+    functionBuilderTransformed.push_back(transformed);
   }
     
   // Register any fixes produced along this path.
@@ -333,6 +340,13 @@ void truncate(llvm::SmallSetVector<T, N> &vec, unsigned newSize) {
   assert(newSize <= vec.size() && "Not a truncation!");
   for (unsigned i = 0, n = vec.size() - newSize; i != n; ++i)
     vec.pop_back();
+}
+
+template <typename K, typename V>
+void truncate(llvm::MapVector<K, V> &map, unsigned newSize) {
+  assert(newSize <= map.size() && "Not a truncation!");
+  for (unsigned i = 0, n = map.size() - newSize; i != n; ++i)
+    map.pop_back();
 }
 
 } // end anonymous namespace
@@ -436,8 +450,10 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numCheckedConformances = cs.CheckedConformances.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
-  numBuilderTransformedClosures = cs.builderTransformedClosures.size();
+  numFunctionBuilderTransformed = cs.functionBuilderTransformed.size();
   numResolvedOverloads = cs.ResolvedOverloads.size();
+  numInferredClosureTypes = cs.ClosureTypes.size();
+  numContextualTypes = cs.contextualTypes.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -450,8 +466,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   while (cs.TypeVariables.size() > numTypeVariables)
     cs.TypeVariables.pop_back();
 
-  while (cs.ResolvedOverloads.size() > numResolvedOverloads)
-    cs.ResolvedOverloads.pop_back();
+  truncate(cs.ResolvedOverloads, numResolvedOverloads);
 
   // Restore bindings.
   cs.restoreTypeVariableBindings(cs.solverState->savedBindings.size() -
@@ -503,7 +518,13 @@ ConstraintSystem::SolverScope::~SolverScope() {
   truncate(cs.CheckedConformances, numCheckedConformances);
 
   /// Remove any builder transformed closures.
-  truncate(cs.builderTransformedClosures, numBuilderTransformedClosures);
+  truncate(cs.functionBuilderTransformed, numFunctionBuilderTransformed);
+
+  // Remove any inferred closure types (e.g. used in function builder body).
+  truncate(cs.ClosureTypes, numInferredClosureTypes);
+
+  // Remove any contextual types.
+  truncate(cs.contextualTypes, numContextualTypes);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -570,7 +591,7 @@ bool ConstraintSystem::Candidate::solve(
   cs.Timer.emplace(E, cs);
 
   // Generate constraints for the new system.
-  if (auto generatedExpr = cs.generateConstraints(E)) {
+  if (auto generatedExpr = cs.generateConstraints(E, DC)) {
     E = generatedExpr;
   } else {
     // Failure to generate constraint system for sub-expression
@@ -742,7 +763,7 @@ void ConstraintSystem::shrink(Expr *expr) {
       // that have overload sets.
       if (auto collectionExpr = dyn_cast<CollectionExpr>(expr)) {
         visitCollectionExpr(collectionExpr, CS.getContextualType(expr),
-                            CS.getContextualTypePurpose());
+                            CS.getContextualTypePurpose(expr));
         // Don't try to walk into the dictionary.
         return {false, expr};
       }
@@ -808,11 +829,11 @@ void ConstraintSystem::shrink(Expr *expr) {
         if (Candidates.empty())
           return expr;
 
-        auto contextualType = CS.getContextualType();
+        auto contextualType = CS.getContextualType(expr);
         // If there is a contextual type set for this expression.
         if (!contextualType.isNull()) {
           Candidates.push_back(Candidate(CS, PrimaryExpr, contextualType,
-                                         CS.getContextualTypePurpose()));
+                                         CS.getContextualTypePurpose(expr)));
           return expr;
         }
 
@@ -1052,7 +1073,8 @@ void ConstraintSystem::shrink(Expr *expr) {
   }
 }
 
-static bool debugConstraintSolverForExpr(ASTContext &C, Expr *expr) {
+static bool debugConstraintSolverForTarget(
+   ASTContext &C, SolutionApplicationTarget target) {
   if (C.TypeCheckerOpts.DebugConstraintSolver)
     return true;
 
@@ -1060,14 +1082,13 @@ static bool debugConstraintSolverForExpr(ASTContext &C, Expr *expr) {
     // No need to compute the line number to find out it's not present.
     return false;
 
-  // Get the lines on which the expression starts and ends.
+  // Get the lines on which the target starts and ends.
   unsigned startLine = 0, endLine = 0;
-  if (expr->getSourceRange().isValid()) {
-    auto range =
-      Lexer::getCharSourceRangeFromSourceRange(C.SourceMgr,
-                                               expr->getSourceRange());
-    startLine = C.SourceMgr.getLineNumber(range.getStart());
-    endLine = C.SourceMgr.getLineNumber(range.getEnd());
+  SourceRange range = target.getSourceRange();
+  if (range.isValid()) {
+    auto charRange = Lexer::getCharSourceRangeFromSourceRange(C.SourceMgr, range);
+    startLine = C.SourceMgr.getLineNumber(charRange.getStart());
+    endLine = C.SourceMgr.getLineNumber(charRange.getEnd());
   }
 
   assert(startLine <= endLine && "expr ends before it starts?");
@@ -1085,94 +1106,128 @@ static bool debugConstraintSolverForExpr(ASTContext &C, Expr *expr) {
   return startBound != endBound;
 }
 
-bool ConstraintSystem::solve(Expr *&expr,
-                             Type convertType,
-                             ExprTypeCheckListener *listener,
-                             SmallVectorImpl<Solution> &solutions,
-                             FreeTypeVariableBinding allowFreeTypeVariables) {
-  llvm::SaveAndRestore<bool> debugForExpr(
-      getASTContext().TypeCheckerOpts.DebugConstraintSolver,
-      debugConstraintSolverForExpr(getASTContext(), expr));
+/// If we aren't certain that we've emitted a diagnostic, emit a fallback
+/// diagnostic.
+static void maybeProduceFallbackDiagnostic(
+    ConstraintSystem &cs, SolutionApplicationTarget target) {
+  if (cs.Options.contains(ConstraintSystemFlags::SubExpressionDiagnostics) ||
+      cs.Options.contains(ConstraintSystemFlags::SuppressDiagnostics))
+    return;
 
-  // Attempt to solve the constraint system.
-  auto solution = solveImpl(expr,
-                            convertType,
-                            listener,
-                            solutions,
-                            allowFreeTypeVariables);
+  // Before producing fatal error here, let's check if there are any "error"
+  // diagnostics already emitted or waiting to be emitted. Because they are
+  // a better indication of the problem.
+  ASTContext &ctx = cs.getASTContext();
+  if (ctx.Diags.hadAnyError() || ctx.hasDelayedConformanceErrors())
+    return;
 
-  // The constraint system has failed
-  if (solution == SolutionKind::Error)
-    return true;
-
-  // If the system is unsolved or there are multiple solutions present but
-  // type checker options do not allow unresolved types, let's try to salvage
-  if (solution == SolutionKind::Unsolved ||
-      (solutions.size() != 1 &&
-       !Options.contains(
-           ConstraintSystemFlags::AllowUnresolvedTypeVariables))) {
-    if (shouldSuppressDiagnostics())
-      return true;
-
-    // Try to fix the system or provide a decent diagnostic.
-    auto salvagedResult = salvage();
-    switch (salvagedResult.getKind()) {
-    case SolutionResult::Kind::Success:
-      solutions.clear();
-      solutions.push_back(std::move(salvagedResult).takeSolution());
-      break;
-
-    case SolutionResult::Kind::Error:
-    case SolutionResult::Kind::Ambiguous:
-      return true;
-
-    case SolutionResult::Kind::UndiagnosedError:
-      diagnoseFailureForExpr(expr);
-      salvagedResult.markAsDiagnosed();
-      return true;
-
-    case SolutionResult::Kind::TooComplex:
-      getASTContext().Diags.diagnose(expr->getLoc(), diag::expression_too_complex)
-        .highlight(expr->getSourceRange());
-      salvagedResult.markAsDiagnosed();
-      return true;
-    }
-
-    // The system was salvaged; continue on as if nothing happened.
-  }
-
-  if (getExpressionTooComplex(solutions)) {
-    getASTContext().Diags.diagnose(expr->getLoc(), diag::expression_too_complex)
-      .highlight(expr->getSourceRange());
-    return true;
-  }
-
-  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = getASTContext().TypeCheckerDebug->getStream();
-    if (solutions.size() == 1) {
-      log << "---Solution---\n";
-      solutions[0].dump(log);
-    } else {
-      for (unsigned i = 0, e = solutions.size(); i != e; ++i) {
-        log << "--- Solution #" << i << " ---\n";
-        solutions[i].dump(log);
-      }
-    }
-  }
-
-  return false;
+  ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::solveImpl(Expr *&expr,
-                            Type convertType,
+Optional<std::vector<Solution>> ConstraintSystem::solve(
+    SolutionApplicationTarget &target,
+    ExprTypeCheckListener *listener,
+    FreeTypeVariableBinding allowFreeTypeVariables
+) {
+  llvm::SaveAndRestore<bool> debugForExpr(
+      getASTContext().TypeCheckerOpts.DebugConstraintSolver,
+      debugConstraintSolverForTarget(getASTContext(), target));
+
+  /// Dump solutions for debugging purposes.
+  auto dumpSolutions = [&](const SolutionResult &result) {
+    // Debug-print the set of solutions.
+    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      if (result.getKind() == SolutionResult::Success) {
+        log << "---Solution---\n";
+        result.getSolution().dump(log);
+      } else if (result.getKind() == SolutionResult::Ambiguous) {
+        auto solutions = result.getAmbiguousSolutions();
+        for (unsigned i : indices(solutions)) {
+          log << "--- Solution #" << i << " ---\n";
+          solutions[i].dump(log);
+        }
+      }
+    }
+  };
+
+  // Take up to two attempts at solving the system. The first attempts to
+  // solve a system that is expected to be well-formed, the second kicks in
+  // when there is an error and attempts to salvage an ill-formed program.
+  for (unsigned stage = 0; stage != 2; ++stage) {
+    auto solution = (stage == 0)
+        ? solveImpl(target, listener, allowFreeTypeVariables)
+        : salvage();
+
+    switch (solution.getKind()) {
+    case SolutionResult::Success: {
+      // Return the successful solution.
+      dumpSolutions(solution);
+      std::vector<Solution> result;
+      result.push_back(std::move(solution).takeSolution());
+      return std::move(result);
+    }
+
+    case SolutionResult::Error:
+      maybeProduceFallbackDiagnostic(*this, target);
+      return None;
+
+    case SolutionResult::TooComplex:
+      getASTContext().Diags.diagnose(
+          target.getLoc(), diag::expression_too_complex)
+            .highlight(target.getSourceRange());
+      solution.markAsDiagnosed();
+      return None;
+
+    case SolutionResult::Ambiguous:
+      // If salvaging produced an ambiguous result, it has already been
+      // diagnosed.
+      if (stage == 1) {
+        solution.markAsDiagnosed();
+        return None;
+      }
+
+      if (Options.contains(
+            ConstraintSystemFlags::AllowUnresolvedTypeVariables)) {
+        dumpSolutions(solution);
+        auto ambiguousSolutions = std::move(solution).takeAmbiguousSolutions();
+        std::vector<Solution> result(
+            std::make_move_iterator(ambiguousSolutions.begin()),
+            std::make_move_iterator(ambiguousSolutions.end()));
+        return std::move(result);
+      }
+
+      LLVM_FALLTHROUGH;
+
+    case SolutionResult::UndiagnosedError:
+      if (shouldSuppressDiagnostics()) {
+        solution.markAsDiagnosed();
+        return None;
+      }
+
+      if (stage == 1) {
+        diagnoseFailureFor(target);
+        solution.markAsDiagnosed();
+        return None;
+      }
+
+      // Loop again to try to salvage.
+      solution.markAsDiagnosed();
+      continue;
+    }
+  }
+
+  llvm_unreachable("Loop always returns");
+}
+
+SolutionResult
+ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
                             ExprTypeCheckListener *listener,
-                            SmallVectorImpl<Solution> &solutions,
                             FreeTypeVariableBinding allowFreeTypeVariables) {
   if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
-    log << "---Constraint solving for the expression at ";
-    auto R = expr->getSourceRange();
+    log << "---Constraint solving at ";
+    auto R = target.getSourceRange();
     if (R.isValid()) {
       R.print(log, getASTContext().SourceMgr, /*PrintText=*/ false);
     } else {
@@ -1184,6 +1239,7 @@ ConstraintSystem::solveImpl(Expr *&expr,
   assert(!solverState && "cannot be used directly");
 
   // Set up the expression type checker timer.
+  Expr *expr = target.getAsExpr();
   Timer.emplace(expr, *this);
 
   // Try to shrink the system by reducing disjunction domains. This
@@ -1192,39 +1248,25 @@ ConstraintSystem::solveImpl(Expr *&expr,
   shrink(expr);
 
   // Generate constraints for the main system.
-  if (auto generatedExpr = generateConstraints(expr))
+  if (auto generatedExpr = generateConstraints(expr, DC))
     expr = generatedExpr;
   else {
-    if (listener)
-      listener->constraintGenerationFailed(expr);
-    return SolutionKind::Error;
+    return SolutionResult::forError();
   }
 
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
-  if (convertType) {
-    auto constraintKind = ConstraintKind::Conversion;
-    
-    if ((getContextualTypePurpose() == CTP_ReturnStmt ||
-         getContextualTypePurpose() == CTP_ReturnSingleExpr ||
-         getContextualTypePurpose() == CTP_Initialization)
-        && Options.contains(ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType))
-      constraintKind = ConstraintKind::OpaqueUnderlyingType;
-    
-    if (getContextualTypePurpose() == CTP_CallArgument)
-      constraintKind = ConstraintKind::ArgumentConversion;
+  if (Type convertType = target.getExprConversionType()) {
+    // Determine whether we know more about the contextual type.
+    ContextualTypePurpose ctp = target.getExprContextualTypePurpose();
+    bool isOpaqueReturnType = target.infersOpaqueReturnType();
 
-    // In a by-reference yield, we expect the contextual type to be an
-    // l-value type, so the result must be bound to that.
-    if (getContextualTypePurpose() == CTP_YieldByReference)
-      constraintKind = ConstraintKind::Bind;
-
-    bool isForSingleExprFunction =
-        getContextualTypePurpose() == CTP_ReturnSingleExpr;
-    auto *convertTypeLocator = getConstraintLocator(
-        expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
-
+    // Substitute type variables in for unresolved types.
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
+      bool isForSingleExprFunction = (ctp == CTP_ReturnSingleExpr);
+      auto *convertTypeLocator = getConstraintLocator(
+          expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
+
       convertType = convertType.transform([&](Type type) -> Type {
         if (type->is<UnresolvedType>())
           return createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
@@ -1232,13 +1274,13 @@ ConstraintSystem::solveImpl(Expr *&expr,
       });
     }
 
-    addConstraint(constraintKind, getType(expr), convertType,
-                  convertTypeLocator, /*isFavored*/ true);
+    addContextualConversionConstraint(expr, convertType, ctp,
+                                      isOpaqueReturnType);
   }
 
   // Notify the listener that we've built the constraint system.
   if (listener && listener->builtConstraints(*this, expr)) {
-    return SolutionKind::Error;
+    return SolutionResult::forError();
   }
 
   if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
@@ -1250,11 +1292,24 @@ ConstraintSystem::solveImpl(Expr *&expr,
   }
 
   // Try to solve the constraint system using computed suggestions.
+  SmallVector<Solution, 4> solutions;
   solve(solutions, allowFreeTypeVariables);
 
-  // If there are no solutions let's mark system as unsolved,
-  // and solved otherwise even if there are multiple solutions still present.
-  return solutions.empty() ? SolutionKind::Unsolved : SolutionKind::Solved;
+  if (getExpressionTooComplex(solutions))
+    return SolutionResult::forTooComplex();
+
+  target.setExpr(expr);
+
+  switch (solutions.size()) {
+  case 0:
+    return SolutionResult::forUndiagnosedError();
+
+  case 1:
+    return SolutionResult::forSolved(std::move(solutions.front()));
+
+  default:
+    return SolutionResult::forAmbiguous(solutions);
+  }
 }
 
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
@@ -1684,6 +1739,7 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       case ConstraintKind::ConformsTo:
       case ConstraintKind::Defaultable:
       case ConstraintKind::OneWayEqual:
+      case ConstraintKind::DefaultClosureType:
         break;
       }
     }

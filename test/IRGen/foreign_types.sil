@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -disable-generic-metadata-prespecialization -I %S/Inputs/abi %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
 
 sil_stage canonical
 import c_layout

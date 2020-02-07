@@ -678,7 +678,7 @@ bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
     if (ArgEffect.mayRelease()) {
       // The function may release this argument, so check if the pointer can
       // escape to it.
-      if (EA->canEscapeToValue(Ptr, FAS.getArgument(Idx)))
+      if (EA->mayReleaseContent(FAS.getArgument(Idx), Ptr))
         return true;
     }
   }
@@ -696,54 +696,51 @@ bool AliasAnalysis::canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr) {
 
     // A builtin can only release an object if it can escape to one of the
     // builtin's arguments.
-    if (EA->canEscapeToValue(Ptr, Arg))
+    if (EA->mayReleaseContent(Arg, Ptr))
       return true;
   }
   return false;
 }
 
+// If the deinit for releasedReference can release any values used by User, then
+// this is an interference. (The retains that originally forced liveness of
+// those values may have already been eliminated). Note that we only care about
+// avoiding a dangling pointer. The memory side affects of Release are
+// unordered.
+//
+// \p releasedReference must be a value that directly contains the references
+// being released. It cannot be an address or other kind of pointer that
+// indirectly releases a reference. Otherwise, the escape analysis query is
+// invalid.
+bool AliasAnalysis::mayValueReleaseInterfereWithInstruction(
+    SILInstruction *User, SILValue releasedReference) {
+  assert(!releasedReference->getType().isAddress()
+         && "an address is never a reference");
 
-bool AliasAnalysis::mayValueReleaseInterfereWithInstruction(SILInstruction *User,
-                                                            SILValue Ptr) {
-  // TODO: Its important to make this as precise as possible.
-  //
-  // TODO: Eventually we can plug in some analysis on the what the release of
-  // the Ptr can do, i.e. be more precise about Ptr's deinit.
-  //
-  // TODO: If we know the specific release instruction, we can potentially do
-  // more.
-  //
   // If this instruction can not read or write any memory. Its OK.
   if (!User->mayReadOrWriteMemory())
     return false;
 
-  // These instructions do read or write memory, get memory directly
-  // accessed. 'V' must be the only memory accessed by User, and it must be
-  // directly accessed. Any memory indirectly accessed via 'User' may have
-  // escaped.
-  SILValue V = getDirectlyAccessedMemory(User);
-  if (!V)
+  // Get a pointer to the memory directly accessed by 'Users' (either via an
+  // address or heap reference operand). If additional memory may be indirectly
+  // accessed by 'User', such as via an inout argument, then stop here because
+  // mayReleaseContent can only reason about one level of memory access.
+  //
+  // TODO: Handle @inout arguments by iterating over the apply arguments. For
+  // each argument find out if any reachable content can be released. This is
+  // slightly more involved than mayReleaseContent because it needs to check all
+  // connection graph nodes reachable from accessedPointer that don't pass
+  // through another stored reference.
+  SILValue accessedPointer = getDirectlyAccessedMemory(User);
+  if (!accessedPointer)
     return true;
 
-  // If the 'User' instruction's memory is uniquely identified and does not
-  // escape in the local scope, then it can't be accessed by a deinit in the
-  // local scope. Note that an exclusive argument's content may have escaped in
-  // the caller, but the argument value itself can't be accessed via aliasing
-  // references and we know that User doesn't see through any indirection.
-  if (!isUniquelyIdentified(V))
-    return true;
-
-  // This is a scoped allocation.
-  // The most important check: does the object escape the current function?
-  auto LO = getUnderlyingObject(V);
-  auto *ConGraph = EA->getConnectionGraph(User->getFunction());
-  auto *Content = ConGraph->getValueContent(LO);
-  if (Content && !Content->escapes())
-    return false;
-
-  // This is either a non-local allocation or a scoped allocation that escapes.
-  // We failed to prove anything, it could be read or written by the deinit.
-  return true;
+  // If releasedReference can reach the first refcounted object reachable from
+  // accessedPointer, then releasing it early may destroy the object accessed by
+  // accessedPointer. Access to any objects beyond the first released refcounted
+  // object are irrelevant--they must already have sufficient refcount that they
+  // won't be released when releasing Ptr.
+  return EA->mayReleaseContent(releasedReference, accessedPointer);
 }
 
 bool swift::isLetPointer(SILValue V) {
