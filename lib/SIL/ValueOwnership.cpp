@@ -556,7 +556,6 @@ UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
       BuiltinInst *BI, StringRef Attr) { \
     llvm_unreachable("builtin should have been lowered in SILGen"); \
   }
-
 #include "swift/AST/Builtins.def"
 
 ValueOwnershipKind

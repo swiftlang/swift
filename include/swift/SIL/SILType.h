@@ -459,6 +459,24 @@ public:
     return SILType(getASTType().getReferenceStorageReferent(), getCategory());
   }
 
+  /// Return the reference ownership of this type if it is a reference storage
+  /// type. Otherwse, return None.
+  Optional<ReferenceOwnership> getReferenceStorageOwnership() const {
+    auto type = getASTType()->getAs<ReferenceStorageType>();
+    if (!type)
+      return None;
+    return type->getOwnership();
+  }
+
+  /// Attempt to wrap the passed in type as a type with reference ownership \p
+  /// ownership. For simplicity, we always return an address since reference
+  /// storage types may not be loadable (e.x.: weak ownership).
+  SILType getReferenceStorageType(const ASTContext &ctx,
+                                  ReferenceOwnership ownership) const {
+    auto *type = ReferenceStorageType::get(getASTType(), ownership, ctx);
+    return SILType::getPrimitiveAddressType(type->getCanonicalType());
+  }
+
   /// Transform the function type SILType by replacing all of its interface
   /// generic args with the appropriate item from the substitution.
   ///

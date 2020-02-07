@@ -844,3 +844,12 @@ ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,
   auto *pbi = createProjectBox(loc, mv.getValue(), index);
   return ManagedValue::forUnmanaged(pbi);
 }
+
+ManagedValue SILGenBuilder::createMarkDependence(SILLocation loc,
+                                                 ManagedValue value,
+                                                 ManagedValue base) {
+  CleanupCloner cloner(*this, value);
+  auto *mdi = createMarkDependence(loc, value.forward(getSILGenFunction()),
+                                   base.forward(getSILGenFunction()));
+  return cloner.clone(mdi);
+}
