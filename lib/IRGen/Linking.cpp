@@ -414,6 +414,10 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::ReflectionAssociatedTypeDescriptor:
     return mangler.mangleReflectionAssociatedTypeDescriptor(
                                                     getProtocolConformance());
+  case Kind::DifferentiabilityWitness:
+    return mangler.mangleSILDifferentiabilityWitnessKey(
+        {getSILDifferentiabilityWitness()->getOriginalFunction()->getName(),
+         getSILDifferentiabilityWitness()->getConfig()});
   }
   llvm_unreachable("bad entity kind!");
 }
@@ -659,6 +663,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ExtensionDescriptor:
   case Kind::AnonymousDescriptor:
     return SILLinkage::Shared;
+  case Kind::DifferentiabilityWitness:
+    return getSILDifferentiabilityWitness()->getLinkage();
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -783,6 +789,9 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
                                      ->getDeclContext()
                                      ->getInnermostTypeContext());
   }
+
+  case Kind::DifferentiabilityWitness:
+    return true;
   
   case Kind::ObjCMetadataUpdateFunction:
   case Kind::ObjCResilientClassStub:
@@ -904,6 +913,8 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
       return IGM.ObjCResilientClassStubTy;
     }
     llvm_unreachable("invalid metadata address");
+  case Kind::DifferentiabilityWitness:
+    return IGM.DifferentiabilityWitnessTy;
   default:
     llvm_unreachable("declaration LLVM type not specified");
   }
@@ -951,6 +962,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::ObjCResilientClassStub:
+  case Kind::DifferentiabilityWitness:
     return IGM.getPointerAlignment();
   case Kind::TypeMetadataDemanglingCacheVariable:
     return Alignment(8);
@@ -1052,6 +1064,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:
   case Kind::CoroutineContinuationPrototype:
+  case Kind::DifferentiabilityWitness:
     return false;
   }
 
@@ -1181,6 +1194,7 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ValueWitness:
   case Kind::ValueWitnessTable:
+  case Kind::DifferentiabilityWitness:
     return nullptr;
   }
   
