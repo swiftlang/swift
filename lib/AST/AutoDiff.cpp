@@ -17,6 +17,18 @@
 
 using namespace swift;
 
+void AutoDiffConfig::print(llvm::raw_ostream &s) const {
+  s << "(parameters=";
+  parameterIndices->print(s);
+  s << " results=";
+  resultIndices->print(s);
+  if (derivativeGenericSignature) {
+    s << " where=";
+    derivativeGenericSignature->print(s);
+  }
+  s << ')';
+}
+
 // TODO(TF-874): This helper is inefficient and should be removed. Unwrapping at
 // most once (for curried method types) is sufficient.
 static void unwrapCurryLevels(AnyFunctionType *fnTy,
