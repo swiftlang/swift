@@ -366,6 +366,20 @@ enum class NodeKind : uint8_t {
   kindCount
 };
 
+} // end namespace fine_grained_dependencies
+} // end namespace swift
+
+template <>
+struct std::hash<typename swift::fine_grained_dependencies::NodeKind> {
+  size_t operator()(const swift::fine_grained_dependencies::NodeKind kind) const {
+  return size_t(uint8_t(kind));
+  }
+};
+
+
+namespace swift {
+namespace fine_grained_dependencies {
+
 /// Used for printing out NodeKinds to dot files, and dumping nodes for
 /// debugging.
 const std::string NodeKindNames[]{
