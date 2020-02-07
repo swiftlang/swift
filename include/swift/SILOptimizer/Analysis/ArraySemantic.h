@@ -41,7 +41,8 @@ enum class ArrayCallKind {
   // a function, and it has a self parameter, make sure that it is defined
   // before this comment.
   kArrayInit,
-  kArrayUninitialized
+  kArrayUninitialized,
+  kArrayUninitializedIntrinsic
 };
 
 /// Wrapper around array semantic calls.
@@ -182,6 +183,21 @@ public:
   
   /// Can this function be inlined by the early inliner.
   bool canInlineEarly() const;
+
+  /// If this is a call to  ArrayUninitialized (or
+  /// ArrayUninitializedInstrinsic), identify the instructions that store
+  /// elements into the array indices. For every index, add the store
+  /// instruction that stores to that index to \p ElementStoreMap.
+  ///
+  /// \returns true iff this is an "array.uninitialized" semantic call, and the
+  /// stores into the array indices are identified and the \p ElementStoreMap is
+  /// populated.
+  ///
+  /// Note that this function does not support array initializations that use
+  /// copy_addr, which implies that arrays with address-only types would not
+  /// be recognized by this function as yet.
+  bool mapInitializationStores(
+      llvm::DenseMap<uint64_t, StoreInst *> &ElementStoreMap);
 
 protected:
   /// Validate the signature of this call.

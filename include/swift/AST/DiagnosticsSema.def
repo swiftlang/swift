@@ -2660,6 +2660,10 @@ ERROR(assoc_conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
       "%4); %2 has been imported as implementation-only",
       (Type, DeclName, Identifier, Type, Type))
+ERROR(unexportable_clang_function_type,none,
+      "cannot export the underlying C type of the function type %0; "
+      "it may use anonymous types or types defined outside of a module",
+      (Type))
 
 WARNING(warn_implementation_only_conflict,none,
         "%0 inconsistently imported as implementation-only",
@@ -2693,6 +2697,8 @@ ERROR(broken_case_iterable_requirement,none,
       "CaseIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_raw_representable_requirement,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())
+ERROR(broken_comparable_requirement,none,
+      "Comparable protocol is broken: unexpected requirement", ())
 ERROR(broken_equatable_requirement,none,
       "Equatable protocol is broken: unexpected requirement", ())
 ERROR(broken_hashable_requirement,none,
@@ -2705,6 +2711,8 @@ ERROR(broken_int_hashable_conformance,none,
       "Int type is broken: does not conform to Hashable", ())
 ERROR(broken_int_integer_literal_convertible_conformance,none,
       "Int type is broken: does not conform to ExpressibleByIntegerLiteral", ())
+ERROR(no_less_than_overload_for_int,none,
+      "no overload of '<' for Int", ())
 ERROR(no_equal_overload_for_int,none,
       "no overload of '==' for Int", ())
 ERROR(broken_coding_key_requirement,none,

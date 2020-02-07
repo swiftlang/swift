@@ -2208,6 +2208,50 @@ namespace {
     return {nullptr, foundMethod};
   }
 
+  // Attempt to identify the redeclaration of a property.
+  //
+  // Note that this function does not perform any additional member loading and
+  // is therefore subject to the relativistic effects of module import order.
+  // That is, suppose that a Clang Module and an Overlay module are in play.
+  // Depending on which module loads members first, a redeclaration point may
+  // or may not be identifiable.
+  VarDecl *
+  identifyPropertyRedeclarationPoint(ClangImporter::Implementation &Impl,
+                                     const clang::ObjCPropertyDecl *decl,
+                                     ClassDecl *subject, Identifier name) {
+    llvm::SetVector<Decl *> lookup;
+    // First, pull in all available members of the base class so we can catch
+    // redeclarations of APIs that are refined for Swift.
+    auto currentMembers = subject->getCurrentMembersWithoutLoading();
+    lookup.insert(currentMembers.begin(), currentMembers.end());
+
+    // Now pull in any just-imported members from the overrides table.
+    auto foundNames = Impl.MembersForNominal.find(subject);
+    if (foundNames != Impl.MembersForNominal.end()) {
+      auto foundDecls = foundNames->second.find(name);
+      if (foundDecls != foundNames->second.end()) {
+        lookup.insert(foundDecls->second.begin(), foundDecls->second.end());
+      }
+    }
+
+    for (auto *result : lookup) {
+      auto *var = dyn_cast<VarDecl>(result);
+      if (!var)
+        continue;
+
+      if (var->isInstanceMember() != decl->isInstanceProperty())
+        continue;
+
+      // If the selectors of the getter match in Objective-C, we have a
+      // redeclaration.
+      if (var->getObjCGetterSelector() ==
+          Impl.importSelector(decl->getGetterName())) {
+        return var;
+      }
+    }
+    return nullptr;
+  }
+
   /// Convert Clang declarations into the corresponding Swift
   /// declarations.
   class SwiftDeclConverter
@@ -5094,11 +5138,20 @@ namespace {
               overrideContext->getSelfNominalTypeDecl()
                 == dc->getSelfNominalTypeDecl()) {
             // We've encountered a redeclaration of the property.
-            // HACK: Just update the original declaration instead of importing a
-            // second property.
             handlePropertyRedeclaration(overridden, decl);
             return nullptr;
           }
+        }
+
+        // Try searching the class for a property redeclaration. We can use
+        // the redeclaration to refine the already-imported property with a
+        // setter and also cut off any double-importing behavior.
+        auto *redecl
+            = identifyPropertyRedeclarationPoint(Impl, decl,
+                                                 dc->getSelfClassDecl(), name);
+        if (redecl) {
+          handlePropertyRedeclaration(redecl, decl);
+          return nullptr;
         }
       }
 
@@ -5770,23 +5823,38 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
   if (!importIntoDC)
     importIntoDC = importedEnum;
 
-  // Construct the original constant. Enum constants without payloads look
-  // like simple values, but actually have type 'MyEnum.Type -> MyEnum'.
-  auto constantRef =
-      new (Impl.SwiftContext) DeclRefExpr(original, DeclNameLoc(),
-                                          /*implicit*/ true);
-  constantRef->setType(original->getInterfaceType());
-
   Type importedEnumTy = importedEnum->getDeclaredInterfaceType();
-
   auto typeRef = TypeExpr::createImplicit(importedEnumTy, Impl.SwiftContext);
-  auto instantiate = new (Impl.SwiftContext)
-      DotSyntaxCallExpr(constantRef, SourceLoc(), typeRef);
-  instantiate->setType(importedEnumTy);
-  instantiate->setThrows(false);
+
+  Expr *result = nullptr;
+  if (auto *enumElt = dyn_cast<EnumElementDecl>(original)) {
+    assert(!enumElt->hasAssociatedValues());
+
+    // Construct the original constant. Enum constants without payloads look
+    // like simple values, but actually have type 'MyEnum.Type -> MyEnum'.
+    auto constantRef =
+        new (Impl.SwiftContext) DeclRefExpr(enumElt, DeclNameLoc(),
+                                            /*implicit*/ true);
+    constantRef->setType(enumElt->getInterfaceType());
+
+    auto instantiate = new (Impl.SwiftContext)
+        DotSyntaxCallExpr(constantRef, SourceLoc(), typeRef);
+    instantiate->setType(importedEnumTy);
+    instantiate->setThrows(false);
+
+    result = instantiate;
+  } else {
+    assert(isa<VarDecl>(original));
+
+    result =
+        new (Impl.SwiftContext) MemberRefExpr(typeRef, SourceLoc(),
+                                              original, DeclNameLoc(),
+                                              /*implicit*/ true);
+    result->setType(original->getInterfaceType());
+  }
 
   Decl *CD = Impl.createConstant(name, importIntoDC, importedEnumTy,
-                                 instantiate, ConstantConvertKind::None,
+                                 result, ConstantConvertKind::None,
                                  /*isStatic*/ true, alias);
   Impl.importAttributes(alias, CD);
   return CD;

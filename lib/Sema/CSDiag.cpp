@@ -195,12 +195,6 @@ public:
   /// Emit an ambiguity diagnostic about the specified expression.
   void diagnoseAmbiguity(Expr *E);
 
-  /// Attempt to produce a diagnostic for a mismatch between an expression's
-  /// type and its assumed contextual type.
-  bool diagnoseContextualConversionError(Expr *expr, Type contextualType,
-                                         ContextualTypePurpose CTP,
-                                         Type suggestedType = Type());
-
 private:
   /// Validate potential contextual type for type-checking one of the
   /// sub-expressions, usually correct/valid types are the ones which
@@ -498,51 +492,6 @@ DeclContext *FailureDiagnosis::findDeclContext(Expr *subExpr) const {
 
   expr->walk(finder);
   return finder.DC;
-}
-
-bool FailureDiagnosis::diagnoseContextualConversionError(
-    Expr *expr, Type contextualType, ContextualTypePurpose CTP,
-    Type suggestedType) {
-  // If the constraint system has a contextual type, then we can test to see if
-  // this is the problem that prevents us from solving the system.
-  if (!contextualType)
-    return false;
-
-  // Try re-type-checking the expression without the contextual type to see if
-  // it can work without it.  If so, the contextual type is the problem.  We
-  // force a recheck, because "expr" is likely in our table with the extra
-  // contextual constraint that we know we are relaxing.
-  TCCOptions options = TCC_ForceRecheck;
-  if (contextualType->is<InOutType>())
-    options |= TCC_AllowLValue;
-
-  auto *recheckedExpr = typeCheckChildIndependently(expr, options);
-  auto exprType = recheckedExpr ? CS.getType(recheckedExpr) : Type();
-
-  // If there is a suggested type and re-typecheck failed, let's use it.
-  if (!exprType)
-    exprType = suggestedType;
-
-  // If it failed and diagnosed something, then we're done.
-  if (!exprType)
-    return CS.getASTContext().Diags.hadAnyError();
-
-  // If we don't have a type for the expression, then we cannot use it in
-  // conversion constraint diagnostic generation.  If the types match, then it
-  // must not be the contextual type that is the problem.
-  if (isUnresolvedOrTypeVarType(exprType) || exprType->isEqual(contextualType))
-    return false;
-
-  // Don't attempt fixits if we have an unsolved type variable, since
-  // the recovery path's recursion into the type checker via typeCheckCast()
-  // will confuse matters.
-  if (exprType->hasTypeVariable())
-    return false;
-
-  ContextualFailure failure(
-      CS, CTP, exprType, contextualType,
-      CS.getConstraintLocator(expr, LocatorPathElt::ContextualType()));
-  return failure.diagnoseAsError();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1254,13 +1203,6 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
 
     // Now, attempt to diagnose the failure from the info we've collected.
     if (diagnosis.diagnoseExprFailure())
-      return;
-
-    // If this is a contextual conversion problem, dig out some information.
-    if (diagnosis.diagnoseContextualConversionError(
-            expr,
-            getContextualType(expr),
-            getContextualTypePurpose(expr)))
       return;
 
     // If no one could find a problem with this expression or constraint system,
