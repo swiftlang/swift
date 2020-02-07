@@ -21,7 +21,7 @@
 :: The user will need permission to write files into the Windows SDK and the
 :: VisualC++ folder.
 
-@echo off
+:: @echo off
 
 setlocal enableextensions enabledelayedexpansion
 
