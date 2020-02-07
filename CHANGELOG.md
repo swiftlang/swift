@@ -193,6 +193,23 @@ Swift 5.2
   * `mutating func callAsFunction` is supported.
   * `func callAsFunction` works with `throws` and `rethrows`.
   * `func callAsFunction` works with trailing closures.
+  
+* [SE-0249][]:
+
+  A `\Root.value` key path expression is now allowed wherever a `(Root) -> Value` 
+  function is allowed. Such an expression is implicitly converted to a key path 
+  application of `{ $0[keyPath: \Root.value] }`.
+  
+  For example:
+  
+  ```swift
+  struct User {
+    let email: String
+    let isAdmin: Bool
+  }
+  
+  users.map(\.email) // this is equivalent to: users.map { $0[keyPath: \User.email] }
+  ```
 
 * [SR-4206][]:
 
@@ -7880,6 +7897,7 @@ Swift 1.0
 [SE-0242]: <https://github.com/apple/swift-evolution/blob/master/proposals/0242-default-values-memberwise.md>
 [SE-0244]: <https://github.com/apple/swift-evolution/blob/master/proposals/0244-opaque-result-types.md>
 [SE-0245]: <https://github.com/apple/swift-evolution/blob/master/proposals/0245-array-uninitialized-initializer.md>
+[SE-0249]: <https://github.com/apple/swift-evolution/blob/master/proposals/0249-key-path-literal-function-expressions.md>
 [SE-0252]: <https://github.com/apple/swift-evolution/blob/master/proposals/0252-keypath-dynamic-member-lookup.md>
 [SE-0253]: <https://github.com/apple/swift-evolution/blob/master/proposals/0253-callable.md>
 [SE-0254]: <https://github.com/apple/swift-evolution/blob/master/proposals/0254-static-subscripts.md>
