@@ -2801,45 +2801,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   if (ambiguousOverload == solutionDiff.overloads.end())
     return false;
 
-  ConstraintLocator* commonCalleeLocator = ambiguousOverload->locator;
-  SmallPtrSet<ValueDecl *, 4> distinctChoices;
-  SmallVector<const Solution *, 4> viableSolutions;
-  assert(ambiguousOverload->choices.size() == solutions.size());
-  for (unsigned i = 0; i < solutions.size(); ++i) {
-    if (distinctChoices.insert(ambiguousOverload->choices[i].getDecl()).second)
-      viableSolutions.push_back(&solutions[i]);
-  }
-
-  enum class AmbiguityKind {
-    /// There is exactly one fix associated with each candidate.
-    CloseMatch,
-    /// Solution is ambiguous because all candidates had partially matching
-    /// parameter lists.
-    ParameterList,
-    /// General ambiguity failure.
-    General,
-    /// Argument mismatch ambiguity where each solution has the same
-    /// argument mismatch fixes for the same call.
-    ArgumentMismatch
-  };
-  auto ambiguityKind = AmbiguityKind::CloseMatch;
-
-  // FIXME: Can this be re-written in a cleaner way?
-  for (const auto &solution: solutions) {
-    if (solution.Fixes.empty())
-      return false;
-
-    if (solution.Fixes.size() > 1) {
-      ambiguityKind = (ambiguityKind == AmbiguityKind::CloseMatch ||
-                       ambiguityKind == AmbiguityKind::ParameterList) &&
-          llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) -> bool {
-            auto *locator = fix->getLocator();
-            return locator->findLast<LocatorPathElt::ApplyArgument>().hasValue();
-          }) ? AmbiguityKind::ParameterList
-             : AmbiguityKind::General;
-    }
-  }
-
+  auto *commonCalleeLocator = ambiguousOverload->locator;
   auto *decl = ambiguousOverload->choices.front().getDecl();
   assert(solverState);
 
@@ -2851,66 +2813,71 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     auto &DE = getASTContext().Diags;
     auto name = decl->getFullName();
 
-    auto emitGeneralAmbiguityFailure = [&]() {
-      // Three choices here:
-      // 1. If this is a special name avoid printing it because
-      //    printing kind is sufficient;
-      // 2. If all of the labels match, print a full name;
-      // 3. If labels in different choices are different, it means
-      //    that we can only print a base name.
-      if (name.isSpecial()) {
-        DE.diagnose(commonAnchor->getLoc(),
-                    diag::no_overloads_match_exactly_in_call_special,
-                    decl->getDescriptiveKind());
-      } else if (name.isOperator()) {
-        auto operatorId = name.getBaseIdentifier();
-        diagnoseOperatorAmbiguity(*this, operatorId, solutions,
-                                  commonCalleeLocator);
-      } else if (llvm::all_of(distinctChoices,
-                              [&name](const ValueDecl *choice) {
-                                return choice->getFullName() == name;
-                              })) {
-        DE.diagnose(commonAnchor->getLoc(),
-                    diag::no_overloads_match_exactly_in_call,
-                    decl->getDescriptiveKind(), name);
-      } else {
-        DE.diagnose(commonAnchor->getLoc(),
-                    diag::no_overloads_match_exactly_in_call_no_labels,
-                    decl->getDescriptiveKind(), name.getBaseName());
-      }
-    };
-
-    switch (ambiguityKind) {
-    case AmbiguityKind::ArgumentMismatch:
-    case AmbiguityKind::CloseMatch:
-      // Handled below
-      break;
-    case AmbiguityKind::ParameterList: {
-      emitGeneralAmbiguityFailure();
-
-      for (const auto &viable: viableSolutions) {
-        auto overload = viable->getOverloadChoice(commonCalleeLocator);
-        auto *fn = overload.openedType->getAs<AnyFunctionType>();
-        assert(fn);
-        DE.diagnose(overload.choice.getDecl()->getLoc(),
-                    diag::candidate_partial_match,
-                    fn->getParamListAsString(fn->getParams()));
-      }
-
+    if (name.isOperator()) {
+      diagnoseOperatorAmbiguity(*this, name.getBaseIdentifier(), solutions,
+                                commonCalleeLocator);
       return true;
     }
-    case AmbiguityKind::General: {
-      emitGeneralAmbiguityFailure();
 
-      // Notes for operators are diagnosed through emitGeneralAmbiguityFailure
-      if (name.isOperator())
-        return true;
+    // Emit an error message for the ambiguity.
+    if (aggregatedFixes.size() == 1 &&
+        aggregatedFixes.front().first.first
+            ->getLastElementAs<LocatorPathElt::ContextualType>()) {
+      auto *anchor = aggregatedFixes.front().first.first->getAnchor();
+      auto baseName = name.getBaseName();
+      DE.diagnose(commonAnchor->getLoc(), diag::no_candidates_match_result_type,
+                  baseName.userFacingName(), getContextualType(anchor));
+    } else if (name.isSpecial()) {
+      // If this is a special name, avoid printing it because printing the
+      // decl kind is sufficient.
+      DE.diagnose(commonAnchor->getLoc(),
+                  diag::no_overloads_match_exactly_in_call_special,
+                  decl->getDescriptiveKind());
+    } else if (llvm::all_of(ambiguousOverload->choices,
+                            [&name](const OverloadChoice &choice) {
+                              return choice.getDecl()->getFullName() == name;
+                            })) {
+      // If the labels match in each overload, print a full name.
+      DE.diagnose(commonAnchor->getLoc(),
+                  diag::no_overloads_match_exactly_in_call,
+                  decl->getDescriptiveKind(), name);
+    } else {
+      // If the labels are different, we can only print a base name.
+      DE.diagnose(commonAnchor->getLoc(),
+                  diag::no_overloads_match_exactly_in_call_no_labels,
+                  decl->getDescriptiveKind(), name.getBaseName());
+    }
 
-      llvm::SmallSet<CanType, 4> candidateTypes;
-      for (const auto &viable: viableSolutions) {
-        auto overload = viable->getOverloadChoice(commonCalleeLocator);
-        auto *decl = overload.choice.getDecl();
-        auto type = viable->simplifyType(overload.openedType);
+    // Produce candidate notes
+    SmallPtrSet<ValueDecl *, 4> distinctChoices;
+    llvm::SmallSet<CanType, 4> candidateTypes;
+    for (const auto &solution: solutions) {
+      auto overload = solution.getOverloadChoice(commonCalleeLocator);
+      auto *decl = overload.choice.getDecl();
+      auto type = solution.simplifyType(overload.openedType);
+      // Skip if we've already produced a note for this overload
+      if (!distinctChoices.insert(decl).second)
+        continue;
+
+      if (solution.Fixes.size() == 1) {
+        // Create scope so each applied solution is rolled back.
+        ConstraintSystem::SolverScope scope(*this);
+        applySolution(solution);
+        // All of the solutions supposed to produce a "candidate" note.
+        diagnosed &= solution.Fixes.front()->diagnose(/*asNote*/ true);
+      } else if (llvm::all_of(solution.Fixes,
+                              [&](ConstraintFix *fix) {
+                                return fix->getLocator()
+                                  ->findLast<LocatorPathElt::ApplyArgument>().hasValue();
+                              })) {
+        // All fixes have to do with arguments, so let's show the parameter lists.
+        auto *fn = type->getAs<AnyFunctionType>();
+        assert(fn);
+        DE.diagnose(decl->getLoc(),
+                    diag::candidate_partial_match,
+                    fn->getParamListAsString(fn->getParams()));
+      } else {
+        // Emit a general "found candidate" note
         if (decl->getLoc().isInvalid()) {
           if (candidateTypes.insert(type->getCanonicalType()).second)
             DE.diagnose(commonAnchor->getLoc(), diag::found_candidate_type, type);
@@ -2918,43 +2885,6 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
           DE.diagnose(decl->getLoc(), diag::found_candidate);
         }
       }
-
-      return true;
-    }
-    }
-
-    auto *fix = viableSolutions.front()->Fixes.front();
-    if (fix->getKind() == FixKind::UseSubscriptOperator) {
-      auto *UDE = cast<UnresolvedDotExpr>(commonAnchor);
-      DE.diagnose(commonAnchor->getLoc(),
-                  diag::could_not_find_subscript_member_did_you_mean,
-                  getType(UDE->getBase()));
-    } else if (fix->getKind() == FixKind::TreatRValueAsLValue) {
-      DE.diagnose(commonAnchor->getLoc(),
-                  diag::no_overloads_match_exactly_in_assignment,
-                  decl->getBaseName());
-    } else if (llvm::all_of(
-                   viableSolutions,
-                   [](const Solution *viable) {
-                     auto *locator = viable->Fixes.front()->getLocator();
-                     return locator
-                         ->isLastElement<LocatorPathElt::ContextualType>();
-                   })) {
-      auto anchor =
-          viableSolutions.front()->Fixes.front()->getLocator()->getAnchor();
-      auto baseName = name.getBaseName();
-      DE.diagnose(commonAnchor->getLoc(), diag::no_candidates_match_result_type,
-                  baseName.userFacingName(), getContextualType(anchor));
-    } else {
-      emitGeneralAmbiguityFailure();
-    }
-
-    for (const auto &viable : viableSolutions) {
-      // Create scope so each applied solution is rolled back.
-      ConstraintSystem::SolverScope scope(*this);
-      applySolution(*viable);
-      // All of the solutions supposed to produce a "candidate" note.
-      diagnosed &= viable->Fixes.front()->diagnose(/*asNote*/ true);
     }
 
     // If not all of the fixes produced a note, we can't diagnose this.
