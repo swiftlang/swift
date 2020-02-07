@@ -15,12 +15,15 @@ filename =
 
     ./utils/80+-check,
     ./utils/backtrace-check,
+    ./utils/build-parser-lib,
     ./utils/build-script,
     ./utils/check-incremental,
     ./utils/coverage/coverage-build-db,
     ./utils/coverage/coverage-generate-data,
     ./utils/coverage/coverage-query-db,
     ./utils/coverage/coverage-touch-tests,
+    ./utils/dev-scripts/blockifyasm,
+    ./utils/dev-scripts/split-cmdline,
     ./utils/gyb,
     ./utils/line-directive,
     ./utils/PathSanitizingFileCheck,
@@ -38,11 +41,6 @@ filename =
 
     # TODO: We should be linting the lit configs.
     #lit.cfg,
-
-    # FIXME: We need to be linting these files.
-    #./utils/build-parser-lib,
-    #./utils/dev-scripts/blockifyasm,
-    #./utils/dev-scripts/split-cmdline,
 
 exclude =
     .git,
