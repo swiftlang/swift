@@ -128,6 +128,22 @@ lookupDefaultWitnessTable(SILDefaultWitnessTable *WT) {
   return nullptr;
 }
 
+SILDifferentiabilityWitness *
+SerializedSILLoader::lookupDifferentiabilityWitness(
+    SILDifferentiabilityWitnessKey key) {
+  Mangle::ASTMangler mangler;
+  std::string mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(key);
+  // It is possible that one module has a declaration of a
+  // SILDifferentiabilityWitness, while another has the full definition.
+  SILDifferentiabilityWitness *dw = nullptr;
+  for (auto &Des : LoadedSILSections) {
+    dw = Des->lookupDifferentiabilityWitness(mangledKey);
+    if (dw && dw->isDefinition())
+      return dw;
+  }
+  return dw;
+}
+
 void SerializedSILLoader::invalidateCaches() {
   for (auto &Des : LoadedSILSections)
     Des->invalidateFunctionCache();

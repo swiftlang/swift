@@ -580,9 +580,8 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
 SILDifferentiabilityWitness *
 SILModule::lookUpDifferentiabilityWitness(StringRef name) {
   auto it = DifferentiabilityWitnessMap.find(name);
-  if (it != DifferentiabilityWitnessMap.end()) {
+  if (it != DifferentiabilityWitnessMap.end())
     return it->second;
-  }
   return nullptr;
 }
 
@@ -597,6 +596,14 @@ SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
 llvm::ArrayRef<SILDifferentiabilityWitness *>
 SILModule::lookUpDifferentiabilityWitnessesForFunction(StringRef name) {
   return DifferentiabilityWitnessesByFunction[name];
+}
+
+bool SILModule::loadDifferentiabilityWitness(SILDifferentiabilityWitness *dw) {
+  auto *newDW = getSILLoader()->lookupDifferentiabilityWitness(dw->getKey());
+  if (!newDW)
+    return false;
+  assert(dw == newDW);
+  return true;
 }
 
 void SILModule::registerDeserializationNotificationHandler(
