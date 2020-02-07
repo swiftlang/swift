@@ -953,3 +953,21 @@ class Foo<State: StateType> {
 func test_explicit_variadic_is_interpreted_correctly() {
   _ = { (T: String...) -> String in T[0] + "" } // Ok
 }
+
+// rdar://problem/59208419 - closure result type is incorrectly inferred to be a supertype
+func test_correct_inference_of_closure_result_in_presence_of_optionals() {
+  class A {}
+  class B : A {}
+
+  func foo(_: B) -> Int? { return 42 }
+
+  func bar<T: A>(_: (A) -> T?) -> T? {
+    return .none
+  }
+
+  guard let v = bar({ $0 as? B }),
+        let _ = foo(v) // Ok, v is inferred as `B`
+  else {
+    return;
+  }
+}
