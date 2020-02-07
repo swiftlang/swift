@@ -634,6 +634,12 @@ BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
 
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
+//
+// The intention is that this is meant for builtins that need a named
+// builtin representation so one can create a builtin instruction in
+// SIL, but that also need special SILGen behavior. If an operation
+// just emits custom SIL and does not need to be able to form a
+// builtin instruction, please use BUILTIN_SIL_OPERATION.
 #ifndef BUILTIN_MISC_OPERATION_WITH_SILGEN
 #define BUILTIN_MISC_OPERATION_WITH_SILGEN(Id, Name, Attrs, Overload) \
   BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
