@@ -202,7 +202,6 @@ public:
   void print(llvm::raw_ostream &OS) const override;
 };
 
-// SWIFT_ENABLE_TENSORFLOW
 /// PrettyStackTraceDifferentiabilityWitness - Observe that we are processing a
 /// specific differentiability witness.
 class PrettyStackTraceDifferentiabilityWitness
@@ -220,7 +219,6 @@ public:
 void printDifferentiabilityWitnessDescription(
     llvm::raw_ostream &out, const SILDifferentiabilityWitnessKey key,
     bool addNewline = true);
-// SWIFT_ENABLE_TENSORFLOW END
 
 } // end namespace swift
 

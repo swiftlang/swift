@@ -1074,7 +1074,6 @@ void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
     IGM->emitSILProperty(&prop);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   // Emit differentiability witnesses.
   for (auto &dw :
            PrimaryIGM->getSILModule().getDifferentiabilityWitnessList()) {
@@ -1088,7 +1087,6 @@ void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
 
     IGM->emitSILDifferentiabilityWitness(&dw);
   }
-  // SWIFT_ENABLE_TENSORFLOW_END
 
   // Emit code coverage mapping data.
   PrimaryIGM->emitCoverageMapping();
@@ -4508,14 +4506,12 @@ IRGenModule::getAddrOfWitnessTablePattern(const NormalProtocolConformance *conf,
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 /// Look up the address of a differentiability witness.
 llvm::Constant *IRGenModule::getAddrOfDifferentiabilityWitness(
     const SILDifferentiabilityWitness *witness, ConstantInit definition) {
   auto entity = LinkEntity::forDifferentiabilityWitness(witness);
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
-// SWIFT_ENABLE_TENSORFLOW
 
 llvm::Function *
 IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(

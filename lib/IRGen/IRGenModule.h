@@ -95,6 +95,7 @@ namespace swift {
   class RootProtocolConformance;
   struct SILDeclRef;
   class SILDefaultWitnessTable;
+  class SILDifferentiabilityWitness;
   class SILGlobalVariable;
   class SILModule;
   class SILProperty;
@@ -673,9 +674,7 @@ public:
       *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
-  // SWIFT_ENABLE_TENSORFLOW
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
-  // SWIFT_ENABLE_TENSORFLOW_END
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
@@ -1277,9 +1276,7 @@ public:
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
   void emitSILProperty(SILProperty *prop);
-  // SWIFT_ENABLE_TENSORFLOW
   void emitSILDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
-  // SWIFT_ENABLE_TENSORFLOW END
   void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
   void emitProtocolConformance(const ConformanceDescription &record);
@@ -1462,12 +1459,6 @@ public:
                                       const NormalProtocolConformance *C,
                                       ConstantInit definition = ConstantInit());
 
-  // SWIFT_ENABLE_TENSORFLOW
-  llvm::Constant *
-  getAddrOfDifferentiabilityWitness(const SILDifferentiabilityWitness *witness,
-                                    ConstantInit definition = ConstantInit());
-  // SWIFT_ENABLE_TENSORFLOW_END
-
   llvm::Function *
   getAddrOfGenericWitnessTableInstantiationFunction(
                                     const NormalProtocolConformance *C);
@@ -1476,6 +1467,10 @@ public:
                                      const AssociatedConformance &association);
   llvm::Function *getAddrOfDefaultAssociatedConformanceAccessor(
                                            AssociatedConformance requirement);
+
+  llvm::Constant *
+  getAddrOfDifferentiabilityWitness(const SILDifferentiabilityWitness *witness,
+                                    ConstantInit definition = ConstantInit());
 
   Address getAddrOfObjCISAMask();
 
