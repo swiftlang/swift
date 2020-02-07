@@ -97,6 +97,8 @@ namespace sil_index_block {
     SIL_DEFAULT_WITNESS_TABLE_NAMES,
     SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
     SIL_PROPERTY_OFFSETS,
+    SIL_DIFFERENTIABILITY_WITNESS_NAMES,
+    SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
   };
 
   using ListLayout = BCGenericRecordLayout<
@@ -141,6 +143,7 @@ namespace sil_block {
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
     SIL_DEFAULT_WITNESS_TABLE,
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
+    SIL_DIFFERENTIABILITY_WITNESS,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
     SIL_PROPERTY,
@@ -248,6 +251,20 @@ namespace sil_block {
     BCFixed<1>,          // Is this a let variable.
     TypeIDField,
     DeclIDField
+  >;
+
+  using DifferentiabilityWitnessLayout = BCRecordLayout<
+    SIL_DIFFERENTIABILITY_WITNESS,
+    DeclIDField,             // Original function name
+    SILLinkageField,         // Linkage
+    BCFixed<1>,              // Is declaration?
+    BCFixed<1>,              // Is serialized?
+    GenericSignatureIDField, // Derivative function generic signature
+    DeclIDField,             // JVP function name
+    DeclIDField,             // VJP function name
+    BCVBR<8>,                // Number of parameter indices
+    BCVBR<8>,                // Number of result indices
+    BCArray<ValueIDField>    // Parameter and result indices
   >;
 
   using SILFunctionLayout =
