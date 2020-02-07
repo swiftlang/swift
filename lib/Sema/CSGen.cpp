@@ -207,137 +207,167 @@ namespace {
           !CS.getType(expr)->hasTypeVariable()) {
         return { false, expr };
       }
-      
-      if (isa<IntegerLiteralExpr>(expr)) {
-        LTI.haveIntLiteral = true;
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
 
-        if (tyvar) {
-          LTI.intLiteralTyvars.push_back(tyvar);
-        }
-        
-        return { false, expr };
-      }
-      
-      if (isa<FloatLiteralExpr>(expr)) {
-        LTI.haveFloatLiteral = true;
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
+      class LinkedExprAnalyzerVisitor
+          : public ASTVisitor<LinkedExprAnalyzerVisitor,
+                              std::pair<bool, Expr *>> {
+        LinkedTypeInfo &LTI;
+        ConstraintSystem &CS;
+        ParentTy &Parent;
 
-        if (tyvar) {
-          LTI.floatLiteralTyvars.push_back(tyvar);
-        }
+      public:
+        LinkedExprAnalyzerVisitor(LinkedTypeInfo &LTI, ConstraintSystem &CS,
+                                  ParentTy &Parent)
+            : LTI(LTI), CS(CS), Parent(Parent) {}
 
-        return { false, expr };
-      }
-      
-      if (isa<StringLiteralExpr>(expr)) {
-        LTI.haveStringLiteral = true;
+        std::pair<bool, Expr *>
+        visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
+          LTI.haveIntLiteral = true;
+          auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
 
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
-
-        if (tyvar) {
-          LTI.stringLiteralTyvars.push_back(tyvar);
-        }
-
-        return { false, expr };
-      }
-
-      if (isa<CollectionExpr>(expr)) {
-        return { true, expr };
-      }
-      
-      if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-        
-        if (CS.hasType(UDE))
-          LTI.collectedTypes.insert(CS.getType(UDE).getPointer());
-        
-        // Don't recurse into the base expression.
-        return { false, expr };
-      }
-
-
-      if (isa<ClosureExpr>(expr)) {
-        return {false, expr};
-      }
-
-      if (auto FVE = dyn_cast<ForceValueExpr>(expr)) {
-        LTI.collectedTypes.insert(CS.getType(FVE).getPointer());
-        return { false, expr };
-      }
-
-      if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
-        if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
-          if (isa<ParamDecl>(varDecl) &&
-              cast<ParamDecl>(varDecl)->isAnonClosureParam()) {
-            LTI.anonClosureParams.push_back(DRE);
-          } else if (CS.hasType(DRE)) {
-            LTI.collectedTypes.insert(CS.getType(DRE).getPointer());
+          if (tyvar) {
+            LTI.intLiteralTyvars.push_back(tyvar);
           }
-          return { false, expr };
-        } 
-      }             
 
-      // In the case of a function application, we would have already captured
-      // the return type during constraint generation, so there's no use in
-      // looking any further.
-      if (isa<ApplyExpr>(expr) &&
-          !(isa<BinaryExpr>(expr) || isa<PrefixUnaryExpr>(expr) ||
-            isa<PostfixUnaryExpr>(expr))) {      
-        return { false, expr };
-      }
+          return {false, expr};
+        }
 
-      if (isa<BinaryExpr>(expr)) {
-        LTI.binaryExprs.push_back(dyn_cast<BinaryExpr>(expr));
-      }  
-      
-      if (auto favoredType = CS.getFavoredType(expr)) {
-        LTI.collectedTypes.insert(favoredType);
+        std::pair<bool, Expr *> visitFloatLiteralExpr(FloatLiteralExpr *expr) {
+          LTI.haveFloatLiteral = true;
+          auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
 
-        return { false, expr };
-      }
+          if (tyvar) {
+            LTI.floatLiteralTyvars.push_back(tyvar);
+          }
 
-      // Optimize branches of a conditional expression separately.
-      if (auto IE = dyn_cast<IfExpr>(expr)) {
-        CS.optimizeConstraints(IE->getCondExpr());
-        CS.optimizeConstraints(IE->getThenExpr());
-        CS.optimizeConstraints(IE->getElseExpr());
-        return { false, expr };
-      }      
+          return {false, expr};
+        }
 
-      // For exprs of a structural type that are not modeling argument lists,
-      // avoid merging the type variables. (We need to allow for cases like
-      // (Int, Int32).)
-      if (isa<TupleExpr>(expr) && !isa<ApplyExpr>(Parent.getAsExpr())) {
-        return { false, expr };
-      }
+        std::pair<bool, Expr *>
+        visitStringLiteralExpr(StringLiteralExpr *expr) {
+          LTI.haveStringLiteral = true;
 
-      // Coercion exprs have a rigid type, so there's no use in gathering info
-      // about them.
-      if (auto *coercion = dyn_cast<CoerceExpr>(expr)) {
-        // Let's not collect information about types initialized by
-        // coercions just like we don't for regular initializer calls,
-        // because that might lead to overly eager type variable merging.
-        if (!coercion->isLiteralInit())
+          auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
+
+          if (tyvar) {
+            LTI.stringLiteralTyvars.push_back(tyvar);
+          }
+
+          return {false, expr};
+        }
+
+        std::pair<bool, Expr *>
+        visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
+          if (CS.hasType(expr))
+            LTI.collectedTypes.insert(CS.getType(expr).getPointer());
+
+          // Don't recurse into the base expression.
+          return {false, expr};
+        }
+
+        std::pair<bool, Expr *> visitClosureExpr(ClosureExpr *expr) {
+          return {false, expr};
+        }
+
+        std::pair<bool, Expr *> visitForceValueExpr(ForceValueExpr *expr) {
           LTI.collectedTypes.insert(CS.getType(expr).getPointer());
-        return { false, expr };
-      }
+          return {false, expr};
+        }
 
-      // Don't walk into subscript expressions - to do so would risk factoring
-      // the index expression into edge contraction. (We don't want to do this
-      // if the index expression is a literal type that differs from the return
-      // type of the subscript operation.)
-      if (isa<SubscriptExpr>(expr) || isa<DynamicLookupExpr>(expr)) {
-        return { false, expr };
-      }
-      
-      // Don't walk into unresolved member expressions - we avoid merging type
-      // variables inside UnresolvedMemberExpr and those outside, since they
-      // should be allowed to behave independently in CS.
-      if (isa<UnresolvedMemberExpr>(expr)) {
-        return {false, expr };
-      }
+        std::pair<bool, Expr *> visitDeclRefExpr(DeclRefExpr *expr) {
+          if (auto varDecl = dyn_cast<VarDecl>(expr->getDecl())) {
+            if (isa<ParamDecl>(varDecl) &&
+                cast<ParamDecl>(varDecl)->isAnonClosureParam()) {
+              LTI.anonClosureParams.push_back(expr);
+            } else if (CS.hasType(expr)) {
+              LTI.collectedTypes.insert(CS.getType(expr).getPointer());
+            }
+            return {false, expr};
+          }
+          return visitExpr(expr);
+        }
 
-      return { true, expr };
+        // In the case of a function application, we would have already captured
+        // the return type during constraint generation, so there's no use in
+        // looking any further. Please note the operator overloads that follow.
+        std::pair<bool, Expr *> visitApplyExpr(ApplyExpr *expr) {
+          return {false, expr};
+        }
+
+        std::pair<bool, Expr *> visitBinaryExpr(BinaryExpr *expr) {
+          LTI.binaryExprs.push_back(expr);
+          return visitExpr(expr);
+        }
+
+        std::pair<bool, Expr *> visitPrefixUnaryExpr(PrefixUnaryExpr *expr) {
+          return visitExpr(expr);
+        }
+
+        std::pair<bool, Expr *> visitPostfixUnaryExpr(PostfixUnaryExpr *expr) {
+          return visitExpr(expr);
+        }
+
+        // Optimize branches of a conditional expression separately.
+        std::pair<bool, Expr *> visitIfExpr(IfExpr *expr) {
+          CS.optimizeConstraints(expr->getCondExpr());
+          CS.optimizeConstraints(expr->getThenExpr());
+          CS.optimizeConstraints(expr->getElseExpr());
+          return { false, expr };
+        }
+
+        // For exprs of a structural type that are not modeling argument lists,
+        // avoid merging the type variables. (We need to allow for cases like
+        // (Int, Int32).)
+        std::pair<bool, Expr *> visitTupleExpr(TupleExpr *expr) {
+          if (!isa<ApplyExpr>(Parent.getAsExpr())) {
+            return {false, expr};
+          }
+          return visitExpr(expr);
+        }
+
+        // Coercion exprs have a rigid type, so there's no use in gathering info
+        // about them.
+        std::pair<bool, Expr *> visitCoerceExpr(CoerceExpr *expr) {
+          // Let's not collect information about types initialized by
+          // coercions just like we don't for regular initializer calls,
+          // because that might lead to overly eager type variable merging.
+          if (!expr->isLiteralInit())
+            LTI.collectedTypes.insert(CS.getType(expr).getPointer());
+          return {false, expr};
+        }
+
+        // Don't walk into subscript or dynamic lookup expressions - to do so
+        // would risk factoring the index expression into edge contraction. (We
+        // don't want to do this if the index expression is a literal type that
+        // differs from the return type of the subscript operation.)
+        std::pair<bool, Expr *> visitSubscriptExpr(SubscriptExpr *expr) {
+          return {false, expr};
+        }
+        std::pair<bool, Expr *>
+        visitDynamicLookupExpr(DynamicLookupExpr *expr) {
+          return {false, expr};
+        }
+
+        // Don't walk into unresolved member expressions - we avoid merging type
+        // variables inside UnresolvedMemberExpr and those outside, since they
+        // should be allowed to behave independently in CS.
+        std::pair<bool, Expr *>
+        visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
+          return {false, expr};
+        }
+
+        std::pair<bool, Expr *> visitExpr(Expr *expr) {
+          if (auto favoredType = CS.getFavoredType(expr)) {
+            LTI.collectedTypes.insert(favoredType);
+
+            return {false, expr};
+          }
+          return {true, expr};
+        }
+      };
+
+      LinkedExprAnalyzerVisitor visitor(LTI, CS, Parent);
+      return visitor.visit(expr);
     }
     
     /// Ignore statements.
