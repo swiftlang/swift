@@ -98,10 +98,32 @@ func r<T: PCAC> (_ x: (T) -> T.A) {}
 
 // Structural positions
 
-struct S<T, U> {}
+struct S<T, U> {
+  struct Nested<V> { 
+    struct NesNestedted<W> { }
+    struct NestedNonGeneric { }
+  }
+  struct NestedNonGeneric {
+    struct NesNestedted<W> { }
+    struct NestedNonGeneric { }
+  }
+}
 
 // CHECK-LABEL: sil {{.*}}1t{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_1 : _RefCountedObject, τ_0_3 : _RefCountedObject> in (S<τ_0_0, τ_0_1>) -> (@out τ_0_2, @owned τ_0_3) for <T, U, T, U>) -> ()
 func t<T, U: AnyObject>(_: (S<T, U>) -> (T, U)) {}
+
+// CHECK-LABEL: sil {{.*}}2t2{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3, τ_0_4 where τ_0_1 : _RefCountedObject, τ_0_2 : _RefCountedObject, τ_0_4 : _RefCountedObject> in (S<τ_0_0, τ_0_1>.Nested<τ_0_2>) -> (@out τ_0_3, @owned τ_0_4) for <T, U, U, T, U>) -> ()
+func t2<T, U: AnyObject>(_: (S<T, U>.Nested<U>) -> (T, U)) {}
+// CHECK-LABEL: sil {{.*}}2t3{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3, τ_0_4, τ_0_5 where τ_0_1 : _RefCountedObject, τ_0_2 : _RefCountedObject, τ_0_5 : _RefCountedObject> in (S<τ_0_0, τ_0_1>.Nested<τ_0_2>.NesNestedted<τ_0_3>) -> (@out τ_0_4, @owned τ_0_5) for <T, U, U, T, T, U>) -> ()
+func t3<T, U: AnyObject>(_: (S<T, U>.Nested<U>.NesNestedted<T>) -> (T, U)) {}
+// CHECK-LABEL: sil {{.*}}2t4{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3, τ_0_4 where τ_0_1 : _RefCountedObject, τ_0_2 : _RefCountedObject, τ_0_4 : _RefCountedObject> in (S<τ_0_0, τ_0_1>.Nested<τ_0_2>.NestedNonGeneric) -> (@out τ_0_3, @owned τ_0_4) for <T, U, U, T, U>) -> ()
+func t4<T, U: AnyObject>(_: (S<T, U>.Nested<U>.NestedNonGeneric) -> (T, U)) {}
+// CHECK-LABEL: sil {{.*}}2t5{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_1 : _RefCountedObject, τ_0_3 : _RefCountedObject> in (S<τ_0_0, τ_0_1>.NestedNonGeneric) -> (@out τ_0_2, @owned τ_0_3) for <T, U, T, U>) -> ()
+func t5<T, U: AnyObject>(_: (S<T, U>.NestedNonGeneric) -> (T, U)) {}
+// CHECK-LABEL: sil {{.*}}2t6{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3, τ_0_4 where τ_0_1 : _RefCountedObject, τ_0_4 : _RefCountedObject> in (S<τ_0_0, τ_0_1>.NestedNonGeneric.NesNestedted<τ_0_2>) -> (@out τ_0_3, @owned τ_0_4) for <T, U, T, T, U>) -> ()
+func t6<T, U: AnyObject>(_: (S<T, U>.NestedNonGeneric.NesNestedted<T>) -> (T, U)) {}
+// CHECK-LABEL: sil {{.*}}2t7{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_1 : _RefCountedObject, τ_0_3 : _RefCountedObject> in (S<τ_0_0, τ_0_1>.NestedNonGeneric.NestedNonGeneric) -> (@out τ_0_2, @owned τ_0_3) for <T, U, T, U>) -> ()
+func t7<T, U: AnyObject>(_: (S<T, U>.NestedNonGeneric.NestedNonGeneric) -> (T, U)) {}
 
 // CHECK-LABEL: sil {{.*}}1u{{.*}} : $@convention(thin) <T> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2> in (S<τ_0_0, τ_0_1>) -> @out τ_0_2 for <T, T, T>) -> ()
 func u<T>(_: (S<T, T>) -> T) {}
@@ -147,3 +169,5 @@ dynamic func opaqueObject() -> some AnyObject { return C<Int, String>() }
 
 // CHECK-LABEL: sil {{.*}}1y{{.*}} : $@convention(thin) (@noescape @callee_guaranteed (@in_guaranteed @_opaqueReturnTypeOf("$s4main9opaqueAnyQryF", 0) {{.*}}) -> @owned @_opaqueReturnTypeOf("$s4main12opaqueObjectQryF", 0) {{.*}}) -> ()
 func y(_: (@_opaqueReturnTypeOf("$s4main9opaqueAnyQryF", 0) X) -> (@_opaqueReturnTypeOf("$s4main12opaqueObjectQryF", 0) X)) {}
+
+

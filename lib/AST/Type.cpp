@@ -1834,73 +1834,80 @@ public:
   
   CanType visitBoundGenericType(BoundGenericType *bgt, CanType subst,
                                 ArchetypeType *) {
-    if (auto substBGT = dyn_cast<BoundGenericType>(subst)) {
-      if (bgt->getDecl() != substBGT->getDecl())
+    auto substBGT = dyn_cast<BoundGenericType>(subst);
+    if (!substBGT)
+      return CanType();
+    
+    if (bgt->getDecl() != substBGT->getDecl())
+      return CanType();
+
+    auto *decl = bgt->getDecl();
+    if (decl->isInvalid())
+      return CanType();
+
+    auto *moduleDecl = decl->getParentModule();
+    auto origSubMap = bgt->getContextSubstitutionMap(
+        moduleDecl, decl, decl->getGenericEnvironment());
+    auto substSubMap = substBGT->getContextSubstitutionMap(
+        moduleDecl, decl, decl->getGenericEnvironment());
+
+    auto genericSig = decl->getGenericSignature();
+    
+    // Same decl should always either have or not have a parent.
+    assert((bool)bgt->getParent() == (bool)substBGT->getParent());
+    CanType newParent;
+    if (bgt->getParent()) {
+      newParent = visit(bgt->getParent()->getCanonicalType(),
+                        substBGT.getParent(),
+                        nullptr);
+      if (!newParent)
         return CanType();
-
-      auto *decl = bgt->getDecl();
-      if (decl->isInvalid())
-        return CanType();
-
-      auto *moduleDecl = decl->getParentModule();
-      auto origSubMap = bgt->getContextSubstitutionMap(
-          moduleDecl, decl, decl->getGenericEnvironment());
-      auto substSubMap = substBGT->getContextSubstitutionMap(
-          moduleDecl, decl, decl->getGenericEnvironment());
-
-      auto genericSig = decl->getGenericSignature();
-      
-      SmallVector<Type, 4> newParams;
-      bool didChange = false;
-      for (auto gp : genericSig->getGenericParams()) {
-        auto orig = Type(gp).subst(origSubMap)->getCanonicalType();
-        auto subst = Type(gp).subst(substSubMap)->getCanonicalType();
-        
-        // The new type is upper-bounded by the constraints the nominal type
-        // requires
-        auto newParam = visit(orig, subst,
-                          decl->mapTypeIntoContext(gp)->getAs<ArchetypeType>());
-        if (!newParam)
-          return CanType();
-        
-        newParams.push_back(newParam);
-        didChange = didChange | (newParam != subst);
-      }
-
-      for (const auto &req : genericSig->getRequirements()) {
-        if (req.getKind() != RequirementKind::Conformance) continue;
-
-        auto canTy = req.getFirstType()->getCanonicalType();
-        auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
-        auto origConf = origSubMap.lookupConformance(canTy, proto);
-        auto substConf = substSubMap.lookupConformance(canTy, proto);
-
-        if (origConf.isConcrete()) {
-          if (!substConf.isConcrete())
-            return CanType();
-          if (origConf.getConcrete()->getRootConformance()
-                != substConf.getConcrete()->getRootConformance())
-            return CanType();
-        }
-      }
-
-      // Same decl should always either have or not have a parent.
-      assert((bool)bgt->getParent() == (bool)substBGT->getParent());
-      CanType newParent;
-      if (bgt->getParent()) {
-        newParent = visit(bgt->getParent()->getCanonicalType(),
-                          substBGT->getParent()->getCanonicalType(),
-                          nullptr);
-      }
-      
-      if (!didChange && newParent == substBGT.getParent())
-        return subst;
-      
-      return BoundGenericType::get(substBGT->getDecl(),
-                                   newParent, newParams)
-        ->getCanonicalType();
     }
-    return CanType();
+    
+    SmallVector<Type, 4> newParams;
+    bool didChange = newParent != substBGT.getParent();
+    
+    auto depthStart =
+      genericSig->getGenericParams().size() - bgt->getGenericArgs().size();
+    for (auto i : indices(bgt->getGenericArgs())) {
+      auto orig = bgt->getGenericArgs()[i]->getCanonicalType();
+      auto subst = substBGT.getGenericArgs()[i];
+      auto gp = genericSig->getGenericParams()[depthStart + i];
+      
+      // The new type is upper-bounded by the constraints the nominal type
+      // requires.
+      auto newParam = visit(orig, subst,
+                        decl->mapTypeIntoContext(gp)->getAs<ArchetypeType>());
+      if (!newParam)
+        return CanType();
+      
+      newParams.push_back(newParam);
+      didChange |= (newParam != subst);
+    }
+
+    for (const auto &req : genericSig->getRequirements()) {
+      if (req.getKind() != RequirementKind::Conformance) continue;
+
+      auto canTy = req.getFirstType()->getCanonicalType();
+      auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+      auto origConf = origSubMap.lookupConformance(canTy, proto);
+      auto substConf = substSubMap.lookupConformance(canTy, proto);
+
+      if (origConf.isConcrete()) {
+        if (!substConf.isConcrete())
+          return CanType();
+        if (origConf.getConcrete()->getRootConformance()
+              != substConf.getConcrete()->getRootConformance())
+          return CanType();
+      }
+    }
+
+    if (!didChange)
+      return subst;
+    
+    return BoundGenericType::get(substBGT->getDecl(),
+                                 newParent, newParams)
+      ->getCanonicalType();
   }
 };
 }
