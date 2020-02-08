@@ -134,43 +134,57 @@ func checkEmptyBody(e: E) {
 // RUN: rm -rf %t.result && mkdir -p %t.result
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=9:3 -end-pos=16:4 > %t.result/L9-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L9-3.swift
 // RUN: diff -u %S/Outputs/basic/L9-3.swift.expected %t.result/L9-3.swift
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=20:3 -end-pos=25:4 > %t.result/L20-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L20-3.swift
 // RUN: diff -u %S/Outputs/basic/L20-3.swift.expected %t.result/L20-3.swift
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=29:3 -end-pos=35:4 > %t.result/L29-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L29-3.swift
 // RUN: diff -u %S/Outputs/basic/L29-3.swift.expected %t.result/L29-3.swift
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=39:3 -end-pos=45:4 > %t.result/L39-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L39-3.swift
 // RUN: diff -u %S/Outputs/basic/L39-3.swift.expected %t.result/L39-3.swift
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=50:3 -end-pos=52:4 > %t.result/L50-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L50-3.swift
 // RUN: diff -u %S/Outputs/basic/L50-3.swift.expected %t.result/L50-3.swift
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=54:3 -end-pos=56:4 > %t.result/L54-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L54-3.swift
 // RUN: diff -u %S/Outputs/basic/L54-3.swift.expected %t.result/L54-3.swift
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=60:3 -end-pos=62:4 > %t.result/L60-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L60-3.swift
 // RUN: diff -u %S/Outputs/basic/L60-3.swift.expected %t.result/L60-3.swift
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=64:3 -end-pos=67:4 > %t.result/L64-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L64-3.swift
 // RUN: diff -u %S/Outputs/basic/L64-3.swift.expected %t.result/L64-3.swift
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=71:3 -end-pos=77:4 > %t.result/L71-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L71-3.swift
 // RUN: diff -u %S/Outputs/basic/L71-3.swift.expected %t.result/L71-3.swift
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=82:3 -end-pos=90:4 > %t.result/L82-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L82-3.swift
 // RUN: diff -u %S/Outputs/basic/L82-3.swift.expected %t.result/L82-3.swift
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=99:3 -end-pos=103:4 > %t.result/L99-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L99-3.swift
 // RUN: diff -u %S/Outputs/basic/L99-3.swift.expected %t.result/L99-3.swift
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=108:3 -end-pos=116:4 > %t.result/L108-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L108-3.swift
 // RUN: diff -u %S/Outputs/basic/L108-3.swift.expected %t.result/L108-3.swift
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=118:3 -end-pos=124:4 > %t.result/L118-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L118-3.swift
 // RUN: diff -u %S/Outputs/basic/L118-3.swift.expected %t.result/L118-3.swift
 
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=128:3 -end-pos=131:4 > %t.result/L128-3.swift
+// RUN: %target-swift-frontend-typecheck %t.result/L128-3.swift
 // RUN: diff -u %S/Outputs/basic/L128-3.swift.expected %t.result/L128-3.swift

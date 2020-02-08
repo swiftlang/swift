@@ -2249,7 +2249,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
   class ConditionalChecker : public ASTWalker {
   public:
     bool ParamsUseSameVars = true;
-    bool ConditionUseOnlyAllowedFunctions = true;
+    bool ConditionUseOnlyAllowedFunctions = false;
     StringRef ExpectName;
 
     Expr *walkToExprPost(Expr *E) {
@@ -2336,6 +2336,8 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
     bool check(StmtConditionElement ConditionElement) {
       if (ConditionElement.getKind() == StmtConditionElement::CK_Availability)
         return false;
+      if (ConditionElement.getKind() == StmtConditionElement::CK_PatternBinding)
+        checker.ConditionUseOnlyAllowedFunctions = true;
       ConditionElement.walk(checker);
       return checker.allCheckPassed();
     }
