@@ -171,10 +171,13 @@ std::string DependencyKey::demangleTypeAsContext(StringRef s) {
 //==============================================================================
 
 void SourceFileDepGraph::recordDefUse(
-    const DependencyKey &defKey, bool isCascadingUse,
+    NodeKind kind, StringRef context, StringRef name, bool isCascadingUse,
     Optional<SerializableDecl> use) {
+  // The ReferenceNameTracker only gives names, so all uses are uses of
+  // the interface. But a use may be a use *by* an interface or implementation.
+  const auto keyOfUsedDecl = DependencyKey::create(kind, DeclAspect::interface, context, name);
   SourceFileDepGraphNode *defNode =
-      findExistingNodeOrCreateIfNew(defKey, None, false /* = !isProvides */);
+      findExistingNodeOrCreateIfNew(keyOfUsedDecl, None, false /* = !isProvides */);
 
   const DeclAspect aspectOfUser = DependencyKey::aspectOfUseIfCascades(isCascadingUse);
   SourceFileDepGraphNode *useNode =

@@ -530,10 +530,8 @@ public:
   static DependencyKey createInterfaceKey(const char* gazorp1, NodeKind kind, StringRef context,
                                           StringRef name);
 
-  static DependencyKey
-  createMemberOrPotentialMemberInterfaceKey(const char* gazorp,
-  StringRef mangledHolderName,
-                                           StringRef memberBaseNameIfAny);
+  static NodeKind
+  kindOfMemberOrPotentialMember(StringRef memberBaseNameIfAny);
 
   /// Given some entity derived from the \c SourceFile, create the key
   /// Will always have the interface aspect, even though in the final graph,
@@ -542,6 +540,8 @@ public:
   static DependencyKey createProvidedInterfaceKey(Entity);
 
   static DependencyKey createUsedByWholeFile(StringRef swiftDeps, bool isCascadingUse);
+
+  static DependencyKey createKeyForExternalModule(StringRef swiftDeps);
 
   //==============================================================================
 // MARK: end of creation
@@ -557,7 +557,7 @@ public:
   }
 
   DependencyKey withAspect(DeclAspect newAspect) const {
-    return DependencyKey("gazorp", kind, newAspect, context, name);
+    return DependencyKey::create(kind, newAspect, context, name);
   }
 
   void dump(llvm::raw_ostream &os) const { os << asString() << "\n"; }
@@ -600,12 +600,14 @@ namespace swift {
 namespace fine_grained_dependencies {
 
 struct SerializableDecl {
+#error aspect of key does not matter except when in use field of S..Use!
   DependencyKey key;
   Optional<std::string> fingerprint;
   static SerializableDecl createUsedByWholeFile(bool isCascadingUse, StringRef swiftDeps, StringRef fingerprint);
 };
 struct SerializableUse {
   Optional<bool> isPrivate; // to enclosing file if known
+#error should serializable use contain a key
   std::string context, name;
   SerializableDecl use;
   
@@ -898,7 +900,7 @@ public:
         ->addDefIDependUpon(def->getSequenceNumber());
   }
 
-  void recordDefUse(const DependencyKey &defKey, bool isCascadingUse,
+  void recordDefUse(NodeKind kind, StringRef context, StringRef name, bool isCascadingUse,
                     Optional<SerializableDecl>);
 
   /// Read a swiftdeps file at \p path and return a SourceFileDepGraph if

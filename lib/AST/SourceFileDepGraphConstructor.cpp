@@ -312,17 +312,21 @@ NodeKind kind,
   return DependencyKey("gazorp", kind, DeclAspect::interface, context, name);
 }
 
-DependencyKey DependencyKey::createMemberOrPotentialMemberInterfaceKey(const char* gazorp,
-    StringRef mangledHolderName, StringRef memberBaseNameIfAny) {
+NodeKind DependencyKey::kindOfMemberOrPotentialMember(
+    StringRef memberBaseNameIfAny) {
   const bool isMemberBlank = memberBaseNameIfAny.empty();
-  const auto kind =
+  return
       isMemberBlank ? NodeKind::potentialMember : NodeKind::member;
-  return DependencyKey::createInterfaceKey("gazorp1", kind, mangledHolderName,
-                                           memberBaseNameIfAny);
 }
 
 DependencyKey DependencyKey::createUsedByWholeFile(StringRef swiftDeps, bool isCascadingUse) {
 return DependencyKey::create(NodeKind::sourceFileProvide, aspectOfUseIfCascades(isCascadingUse), "", swiftDeps);
+}
+
+DependencyKey DependencyKey::createKeyForExternalModule(StringRef swiftDeps) {
+  // External dependencies always "cascade" (for now)
+  const auto aspect = DeclAspect::interface;
+  return DependencyKey::create(NodeKind::externalDepend, aspect, "", swiftDeps);
 }
 
 //==============================================================================
@@ -332,6 +336,7 @@ return DependencyKey::create(NodeKind::sourceFileProvide, aspectOfUseIfCascades(
 //==============================================================================
 // MARK: createProvidedInterfaceKey
 //==============================================================================
+
 
 template <>
 DependencyKey
@@ -494,8 +499,10 @@ static std::vector<SerializableUse> createUsesFromScalars(
      ArrayRef<std::string> externalSwiftDeps,
    function_ref<SerializableDecl(bool)> useByWholeFile) {
     std::vector<SerializableUse> uses;
-    for (StringRef s: externalSwiftDeps)
-      uses.push_back(SerializableUse::create(None, "", s, useByWholeFile(true)));
+    for (StringRef s: externalSwiftDeps) {
+      const auto k = DependencyKey::createKeyForExternalModule(s);
+      uses.push_back(SerializableUse::create(None, k.getContext(), k.getName(), useByWholeFile(true)));
+    }
     return uses;
   };
 
@@ -575,7 +582,7 @@ template <NodeKind kind>
 void SourceFileDepGraphConstructor::addAllDependenciesFrom(
     ArrayRef<SerializableUse> depends) {
   for (const auto &d : depends) {
-    g.recordDefUse(DependencyKey::createInterfaceKey("gazorp1", kind, d.context, d.name),
+    g.recordDefUse(kind, d.context, d.name,
                  d.isCascadingUseGazorp(), d.use);
   }
 }
@@ -594,11 +601,12 @@ void SourceFileDepGraphConstructor::addAllDependenciesFrom<NodeKind::member>(
   for (const auto &entry : nominalMemberPotentialMemberDepends) {
     if (!includePrivateDeps && entry.isPrivate.getValueOr(false))
       continue;
+    const bool isNominalCascading = holdersOfCascadingMembers.count(entry.context) != 0;
     g.recordDefUse(
-        DependencyKey::createInterfaceKey("gazorp1", NodeKind::nominal, entry.context, ""),
-        holdersOfCascadingMembers.count(entry.context) != 0, entry.use);
-    g.recordDefUse(DependencyKey::createMemberOrPotentialMemberInterfaceKey("gazorp",
-                     entry.context, entry.name),
+        NodeKind::nominal, entry.context, "",
+        isNominalCascading, entry.use);
+    g.recordDefUse(DependencyKey::kindOfMemberOrPotentialMember(
+                     entry.name), entry.context, entry.name,
                  entry.isCascadingUseGazorp(), entry.use);
   }
 }

@@ -130,6 +130,7 @@ private:
     std::vector<SerializableDecl> result;
     for (const auto declOrPair : contentsVec)
       result.push_back(SerializableDecl{
+      #error should be create
           DependencyKey::createProvidedInterfaceKey<kind>(declOrPair),
           getFingerprintIfAny(declOrPair)});
     return result;

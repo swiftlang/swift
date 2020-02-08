@@ -94,15 +94,6 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromSourceFileDepGraph(
 bool ModuleDepGraph::haveAnyNodesBeenTraversedIn(const Job *cmd) const {
   const StringRef swiftDeps = getSwiftDeps(cmd);
 
-  // optimization
-  const auto fileKey =
-      DependencyKey::createProvidedInterfaceKey<NodeKind::sourceFileProvide>(
-          swiftDeps);
-  if (const auto fileNode = nodeMap.find(swiftDeps, fileKey)) {
-    if (fileNode && fileNode.getValue()->getHasBeenTraced())
-      return true;
-  }
-
   bool result = false;
   forEachNodeInJob(swiftDeps, [&](const ModuleDepGraphNode *n) {
     if (n->getHasBeenTraced())
@@ -202,8 +193,7 @@ void ModuleDepGraph::forEachUntracedJobDirectlyDependentOnExternalSwiftDeps(
     StringRef externalSwiftDeps, function_ref<void(const Job *)> fn) {
   // TODO move nameForDep into key
   // These nodes will depend on the *interface* of the external Decl.
-  DependencyKey key = DependencyKey::createInterfaceKey("gazorp1", 
-      NodeKind::externalDepend, "", externalSwiftDeps.str());
+  DependencyKey key = DependencyKey::createKeyForExternalModule(externalSwiftDeps);
   for (const ModuleDepGraphNode *useNode : usesByDef[key]) {
     if (!useNode->getHasBeenTraced())
       fn(getJob(useNode->getSwiftDepsOfProvides()));
