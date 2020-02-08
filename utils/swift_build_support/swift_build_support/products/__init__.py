@@ -26,6 +26,7 @@ from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
 from .swift import Swift
 from .swiftevolve import SwiftEvolve
+from .swifttsc import SwiftTSC
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
 from .tsan_libdispatch import TSanLibDispatch
@@ -44,6 +45,7 @@ __all__ = [
     'Ninja',
     'PythonKit',
     'Swift',
+    'SwiftTSC',
     'SwiftPM',
     'XCTest',
     'SwiftSyntax',

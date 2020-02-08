@@ -809,6 +809,8 @@ class BuildScriptInvocation(object):
             product_classes.append(products.XCTest)
         if self.args.build_llbuild:
             product_classes.append(products.LLBuild)
+        if self.args.build_swifttsc:
+            product_classes.append(products.SwiftTSC)
         if self.args.build_swiftpm:
             product_classes.append(products.SwiftPM)
         if self.args.build_swiftsyntax:

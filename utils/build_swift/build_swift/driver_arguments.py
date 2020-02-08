@@ -546,6 +546,9 @@ def create_argument_parser():
     option(['--libcxx'], store_true('build_libcxx'),
            help='build libcxx')
 
+    option(['--swifttsc'], toggle_true('build_swifttsc'),
+           help='build SwiftTSC')
+
     option(['-p', '--swiftpm'], toggle_true('build_swiftpm'),
            help='build swiftpm')
 

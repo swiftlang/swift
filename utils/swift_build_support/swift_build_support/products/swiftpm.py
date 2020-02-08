@@ -39,6 +39,8 @@ class SwiftPM(product.Product):
         build_root = os.path.dirname(self.build_dir)
         llbuild_build_dir = os.path.join(
             build_root, '%s-%s' % ("llbuild", host_target))
+        tsc_build_dir = os.path.join(
+            build_root, '%s-%s' % ("swifttsc", host_target))
 
         helper_cmd = [script_path, action]
 
@@ -51,7 +53,8 @@ class SwiftPM(product.Product):
             "--cmake-path", self.toolchain.cmake,
             "--ninja-path", self.toolchain.ninja,
             "--build-dir", self.build_dir,
-            "--llbuild-build-dir", llbuild_build_dir
+            "--llbuild-build-dir", llbuild_build_dir,
+            "--tsc-build-dir", tsc_build_dir,
         ]
         helper_cmd.extend(additional_params)
 
