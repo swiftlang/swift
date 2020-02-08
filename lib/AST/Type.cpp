@@ -3442,7 +3442,7 @@ Type DependentMemberType::substBaseType(Type substBase,
 Type DependentMemberType::substRootParam(Type newRoot,
                                          LookupConformanceFn lookupConformance){
   auto base = getBase();
-  if (auto param = base->getAs<GenericTypeParamType>()) {
+  if (base->is<GenericTypeParamType>()) {
     return substBaseType(newRoot, lookupConformance);
   }
   if (auto depMem = base->getAs<DependentMemberType>()) {
@@ -3633,7 +3633,7 @@ static Type substType(Type derivedType,
     if (isa<GenericTypeParamType>(substOrig))
       return ErrorType::get(type);
 
-    if (auto primaryArchetype = dyn_cast<PrimaryArchetypeType>(substOrig))
+    if (isa<PrimaryArchetypeType>(substOrig))
       return ErrorType::get(type);
 
     // Opened existentials cannot be substituted in this manner,

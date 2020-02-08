@@ -3891,7 +3891,7 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
     // TODO(TF-654): Class initializers are not yet supported.
     // Extra JVP/VJP type calculation logic is necessary because classes have
     // both allocators and initializers.
-    if (auto *initDecl = dyn_cast<ConstructorDecl>(original)) {
+    if (isa<ConstructorDecl>(original)) {
       diags.diagnose(attr->getLocation(),
                      diag::differentiable_attr_class_init_not_yet_supported);
       attr->setInvalid();

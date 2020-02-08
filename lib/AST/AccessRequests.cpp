@@ -68,7 +68,7 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
 
   // Special case for generic parameters; we just give them a dummy
   // access level.
-  if (auto genericParam = dyn_cast<GenericTypeParamDecl>(D)) {
+  if (isa<GenericTypeParamDecl>(D)) {
     return AccessLevel::Internal;
   }
 

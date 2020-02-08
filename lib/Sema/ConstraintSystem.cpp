@@ -2355,7 +2355,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       }
     }
 
-    if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+    if (isa<SubscriptDecl>(decl)) {
       if (locator->isResultOfKeyPathDynamicMemberLookup() ||
           locator->isKeyPathSubscriptComponent()) {
         // Subscript type has a format of (Self[.Type) -> (Arg...) -> Result
