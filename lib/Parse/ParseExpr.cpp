@@ -1188,18 +1188,18 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       SmallVector<Expr *, 2> indexArgs;
       SmallVector<Identifier, 2> indexArgLabels;
       SmallVector<SourceLoc, 2> indexArgLabelLocs;
-      Expr *trailingClosure;
+      SmallVector<Expr *, 2> trailingClosures;
 
       ParserStatus status = parseExprList(
           tok::l_square, tok::r_square,
           /*isPostfix=*/true, isExprBasic, lSquareLoc, indexArgs,
-          indexArgLabels, indexArgLabelLocs, rSquareLoc, trailingClosure,
+          indexArgLabels, indexArgLabelLocs, rSquareLoc, trailingClosures,
           SyntaxKind::TupleExprElementList);
       Result = makeParserResult(
           status | Result,
           SubscriptExpr::create(Context, Result.get(), lSquareLoc, indexArgs,
                                 indexArgLabels, indexArgLabelLocs, rSquareLoc,
-                                trailingClosure, ConcreteDeclRef(),
+                                trailingClosures, ConcreteDeclRef(),
                                 /*implicit=*/false));
       SyntaxContext->createNodeInPlace(SyntaxKind::SubscriptExpr);
       continue;
@@ -1602,14 +1602,14 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       SmallVector<Expr *, 2> args;
       SmallVector<Identifier, 2> argLabels;
       SmallVector<SourceLoc, 2> argLabelLocs;
-      Expr *trailingClosure;
+      SmallVector<Expr *, 2> trailingClosures;
       
       ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
                                           /*isPostfix=*/true, isExprBasic,
                                           lParenLoc, args, argLabels,
                                           argLabelLocs,
                                           rParenLoc,
-                                          trailingClosure,
+                                          trailingClosures,
                                           SyntaxKind::TupleExprElementList);
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       return makeParserResult(
@@ -1617,7 +1617,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                  UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
                                               lParenLoc, args, argLabels,
                                               argLabelLocs, rParenLoc,
-                                              trailingClosure,
+                                              trailingClosures,
                                               /*implicit=*/false));
     }
 
@@ -2992,7 +2992,7 @@ Parser::parseExprList(tok leftTok, tok rightTok, SyntaxKind Kind) {
   SmallVector<Expr*, 8> subExprs;
   SmallVector<Identifier, 8> subExprNames;
   SmallVector<SourceLoc, 8> subExprNameLocs;
-  Expr *trailingClosure = nullptr;
+  SmallVector<Expr *, 2> trailingClosures;
 
   SourceLoc leftLoc, rightLoc;
   ParserStatus status = parseExprList(leftTok, rightTok, /*isPostfix=*/false,
@@ -3002,7 +3002,7 @@ Parser::parseExprList(tok leftTok, tok rightTok, SyntaxKind Kind) {
                                       subExprNames,
                                       subExprNameLocs,
                                       rightLoc,
-                                      trailingClosure,
+                                      trailingClosures,
                                       Kind);
 
   // A tuple with a single, unlabeled element is just parentheses.
@@ -3038,10 +3038,8 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                                    SmallVectorImpl<Identifier> &exprLabels,
                                    SmallVectorImpl<SourceLoc> &exprLabelLocs,
                                    SourceLoc &rightLoc,
-                                   Expr *&trailingClosure,
+                                   SmallVectorImpl<Expr *> &trailingClosures,
                                    SyntaxKind Kind) {
-  trailingClosure = nullptr;
-
   StructureMarkerRAII ParsingExprList(*this, Tok);
   
   if (ParsingExprList.isFailed()) {
@@ -3129,7 +3127,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     return status;
 
   // Record the trailing closure.
-  trailingClosure = closure.get();
+  trailingClosures.push_back(closure.get());
 
   return status;
 }
@@ -3187,14 +3185,14 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
   SmallVector<Expr *, 2> args;
   SmallVector<Identifier, 2> argLabels;
   SmallVector<SourceLoc, 2> argLabelLocs;
-  Expr *trailingClosure;
+  SmallVector<Expr *, 2> trailingClosures;
 
   ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
                                       /*isPostfix=*/true, isExprBasic,
                                       lParenLoc, args, argLabels,
                                       argLabelLocs,
                                       rParenLoc,
-                                      trailingClosure,
+                                      trailingClosures,
                                       SyntaxKind::TupleExprElementList);
   if (status.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
@@ -3204,7 +3202,7 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
   return makeParserResult(
     ObjectLiteralExpr::create(Context, PoundLoc, LitKind, lParenLoc, args,
                               argLabels, argLabelLocs, rParenLoc,
-                              trailingClosure, /*implicit=*/false));
+                              trailingClosures, /*implicit=*/false));
 }
 
 /// Parse and diagnose unknown pound expression
@@ -3229,13 +3227,13 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
   SmallVector<SourceLoc, 2> argLabelLocs;
   SmallVector<Expr *, 2> args;
   SmallVector<Identifier, 2> argLabels;
-  Expr *trailingClosure;
+  SmallVector<Expr *, 2> trailingClosures;
   if (Tok.isFollowingLParen()) {
     // Parse arguments.
     ParserStatus status =
         parseExprList(tok::l_paren, tok::r_paren,
                       /*isPostfix=*/true, /*isExprBasic*/ true, LParenLoc,
-                      args, argLabels, argLabelLocs, RParenLoc, trailingClosure,
+                      args, argLabels, argLabelLocs, RParenLoc, trailingClosures,
                       SyntaxKind::TupleExprElementList);
     if (status.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
@@ -3330,7 +3328,7 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
                        { Identifier() },
                        { },
                        SourceLoc(),
-                       /*trailingClosure=*/nullptr,
+                       /*trailingClosures=*/{},
                        /*implicit=*/false));
     CodeCompletion->completePostfixExprParen(fn.get(), CCE);
     // Eat the code completion token because we handled it.
@@ -3344,21 +3342,22 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
   SmallVector<Expr *, 2> args;
   SmallVector<Identifier, 2> argLabels;
   SmallVector<SourceLoc, 2> argLabelLocs;
-  Expr *trailingClosure;
+  SmallVector<Expr *, 2> trailingClosures;
 
   ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
                                       /*isPostfix=*/true, isExprBasic,
                                       lParenLoc, args, argLabels,
                                       argLabelLocs,
                                       rParenLoc,
-                                      trailingClosure,
+                                      trailingClosures,
                                       SyntaxKind::TupleExprElementList);
 
   // Form the call.
-  return makeParserResult(
-      status | fn, CallExpr::create(Context, fn.get(), lParenLoc, args,
-                                    argLabels, argLabelLocs, rParenLoc,
-                                    trailingClosure, /*implicit=*/false));
+  return makeParserResult(status | fn,
+                          CallExpr::create(Context, fn.get(), lParenLoc, args,
+                                           argLabels, argLabelLocs, rParenLoc,
+                                           trailingClosures,
+                                           /*implicit=*/false));
 }
 
 /// parseExprCollection - Parse a collection literal expression.

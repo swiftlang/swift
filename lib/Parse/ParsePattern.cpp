@@ -912,13 +912,13 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
         SmallVector<Expr *, 2> args;
         SmallVector<Identifier, 2> argLabels;
         SmallVector<SourceLoc, 2> argLabelLocs;
-        Expr *trailingClosure;
+        SmallVector<Expr *, 2> trailingClosures;
         ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
                                             /*isPostfix=*/true,
                                             /*isExprBasic=*/false,
                                             lParenLoc, args, argLabels,
                                             argLabelLocs, rParenLoc,
-                                            trailingClosure,
+                                            trailingClosures,
                                             SyntaxKind::Unknown);
         if (status.isSuccess()) {
           backtrack.cancelBacktrack();
