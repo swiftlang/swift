@@ -37,7 +37,7 @@ extension OSLogInterpolation {
   @_optimize(none)
   public mutating func appendInterpolation(
     _ argumentString: @autoclosure @escaping () -> String,
-    privacy: Privacy = .private
+    privacy: OSLogPrivacy = .private
   ) {
     guard argumentCount < maxOSLogArgumentCount else { return }
 
