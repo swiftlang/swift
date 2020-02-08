@@ -614,6 +614,7 @@ SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
   }
 
   P.startPipeline("SILOpt Prepare Passes");
+  P.addForEachLoopUnroll();
   P.addMandatoryCombine();
   P.addAccessMarkerElimination();
 
@@ -673,6 +674,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
 
   P.startPipeline("Mandatory Combines");
+  P.addForEachLoopUnroll();
   P.addMandatoryCombine();
 
   // First serialize the SIL if we are asked to.
