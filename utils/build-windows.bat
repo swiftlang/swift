@@ -82,7 +82,7 @@ setlocal enableextensions enabledelayedexpansion
 
 git -C "%source_root%\swift" config --local core.autocrlf input
 git -C "%source_root%\swift" config --local core.symlink true
-git -C "%source_root%\swift" checkout HEAD
+git -C "%source_root%\swift" checkout-index --force --all
 
 git clone --depth 1 --single-branch https://github.com/apple/swift-cmark cmark %exitOnError%
 git clone --depth 1 --single-branch --branch swift/master https://github.com/apple/llvm-project llvm-project %exitOnError%
