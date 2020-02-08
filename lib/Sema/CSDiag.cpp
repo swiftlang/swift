@@ -1297,8 +1297,8 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   // Unresolved/Anonymous ClosureExprs are common enough that we should give
   // them tailored diagnostics.
   if (auto CE = dyn_cast<ClosureExpr>(E->getValueProvidingExpr())) {
-    diagnose(E->getLoc(), diag::cannot_infer_closure_type)
-      .highlight(E->getSourceRange());
+    diagnose(CE->getLoc(), diag::cannot_infer_closure_type)
+      .highlight(CE->getSourceRange());
     return;
   }
 
