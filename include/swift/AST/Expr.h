@@ -1194,7 +1194,7 @@ public:
                                    ArrayRef<Identifier> argLabels,
                                    ArrayRef<SourceLoc> argLabelLocs,
                                    SourceLoc rParenLoc,
-                                   Expr *trailingClosure,
+                                   ArrayRef<Expr *> trailingClosures,
                                    bool implicit);
 
   LiteralKind getLiteralKind() const {
@@ -1822,7 +1822,7 @@ public:
                                       ArrayRef<Identifier> argLabels,
                                       ArrayRef<SourceLoc> argLabelLocs,
                                       SourceLoc rParenLoc,
-                                      Expr *trailingClosure,
+                                      ArrayRef<Expr *> trailingClosures,
                                       bool implicit);
 
   DeclNameRef getName() const { return Name; }
@@ -2373,7 +2373,7 @@ public:
                                ArrayRef<Identifier> indexArgLabels,
                                ArrayRef<SourceLoc> indexArgLabelLocs,
                                SourceLoc rSquareLoc,
-                               Expr *trailingClosure,
+                               ArrayRef<Expr *> trailingClosures,
                                ConcreteDeclRef decl = ConcreteDeclRef(),
                                bool implicit = false,
                                AccessSemantics semantics
@@ -4237,7 +4237,7 @@ public:
                  llvm::function_ref<Type(const Expr *)> getType =
                      [](const Expr *E) -> Type { return E->getType(); }) {
     return create(ctx, fn, SourceLoc(), args, argLabels, { }, SourceLoc(),
-                  /*trailingClosure=*/nullptr, /*implicit=*/true, getType);
+                  /*trailingClosures=*/{}, /*implicit=*/true, getType);
   }
 
   /// Create a new call expression.
@@ -4248,11 +4248,11 @@ public:
   /// or which must be empty.
   /// \param argLabelLocs The locations of the argument labels, whose size must
   /// equal args.size() or which must be empty.
-  /// \param trailingClosure The trailing closure, if any.
+  /// \param trailingClosures The list of trailing closures, if any.
   static CallExpr *
   create(ASTContext &ctx, Expr *fn, SourceLoc lParenLoc, ArrayRef<Expr *> args,
          ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
-         SourceLoc rParenLoc, Expr *trailingClosure, bool implicit,
+         SourceLoc rParenLoc, ArrayRef<Expr *> trailingClosures, bool implicit,
          llvm::function_ref<Type(const Expr *)> getType =
              [](const Expr *E) -> Type { return E->getType(); });
 
@@ -4273,7 +4273,7 @@ public:
   unsigned getNumArguments() const { return Bits.CallExpr.NumArgLabels; }
   bool hasArgumentLabelLocs() const { return Bits.CallExpr.HasArgLabelLocs; }
 
-  /// Whether this call with written with a trailing closure.
+  /// Whether this call with written with a single trailing closure.
   bool hasTrailingClosure() const { return Bits.CallExpr.HasTrailingClosure; }
 
   using TrailingCallArguments::getArgumentLabels;
@@ -5146,7 +5146,7 @@ public:
                                      ArrayRef<Identifier> indexArgLabels,
                                      ArrayRef<SourceLoc> indexArgLabelLocs,
                                      SourceLoc rSquareLoc,
-                                     Expr *trailingClosure);
+                                     ArrayRef<Expr *> trailingClosures);
     
     /// Create an unresolved component for a subscript.
     ///
@@ -5588,7 +5588,7 @@ Expr *packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
                          ArrayRef<Identifier> &argLabels,
                          ArrayRef<SourceLoc> &argLabelLocs,
                          SourceLoc rParenLoc,
-                         Expr *trailingClosure, bool implicit,
+                         ArrayRef<Expr *> trailingClosures, bool implicit,
                          SmallVectorImpl<Identifier> &argLabelsScratch,
                          SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
                          llvm::function_ref<Type(const Expr *)> getType =
