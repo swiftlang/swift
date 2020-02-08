@@ -1,13 +1,13 @@
 # How Swift imports C APIs
 
-When Swift imports a module or parses a bridging header from a C-based language
+When Swift imports a module, or parses a bridging header from a C-based language
 (C, Objective-C), the APIs are mapped into Swift APIs and can be used directly
 from Swift code. This provides the basis for Swift's Foreign Function Interface
 (FFI), providing interoperability with existing libraries written in C-based
-languages. This document describes how APIs from C-based languages are mapped
-into Swift APIs.
+languages.
 
-this document is written for a broad audience, including Swift and C users who
+This document describes how APIs from C-based languages are mapped into Swift
+APIs. It is written for a broad audience, including Swift and C users who
 might not be language experts. Therefore, it explains some advanced concepts
 where necessary.
 
@@ -34,9 +34,9 @@ where necessary.
 * [Typedefs](#typedefs)
 * [Macros](#macros)
 
-# Names, identifiers and keywords
+## Names, identifiers and keywords
 
-## Unicode
+### Unicode
 
 C (and C++) permit non-ASCII Unicode code points in identifiers. While Swift
 does not permit arbitrary Unicode code points in identifiers (so compatibility
@@ -44,7 +44,7 @@ might not be perfect), it tries to allow reasonable ones. However, C,
 Objective-C, and C++ code in practice does not tend to use non-ASCII code points
 in identifiers, so mapping them to Swift is not an important concern.
 
-## Names that are keywords in Swift
+### Names that are keywords in Swift
 
 Some C and C++ identifiers are keywords in Swift. Despite that, such names are
 imported as-is into Swift, because Swift permits escaping keywords to use them
@@ -74,14 +74,14 @@ func test() {
 }
 ```
 
-## Name translation
+### Name translation
 
 Names of some C declarations appear in Swift differently. In particular, names
 of enumerators (enum constants) go through a translation process that is
 hardcoded into the compiler. For more details, see [Name Translation from C to
 Swift](CToSwiftNameTranslation.md).
 
-## Name customization
+### Name customization
 
 As a general principle of Swift/C interoperability, the C API vendor has broad
 control over how their APIs appear in Swift. In particular, the vendor can use
@@ -89,7 +89,7 @@ the `swift_name` Clang attribute to customize the names of their C APIs in order
 to be more idiomatic in Swift. For more details, see [Name Translation from C to
 Swift](CToSwiftNameTranslation.md).
 
-# Size, stride, and alignment of types
+## Size, stride, and alignment of types
 
 In C, every type has a size (computed with the `sizeof` operator), and an
 alignment (computed with `alignof`).
@@ -159,7 +159,7 @@ print(MemoryLayout<CStructWithPadding>.size) // 4
 print(MemoryLayout<CStructWithPadding>.stride) // 4
 ```
 
-# Fundamental types
+## Fundamental types
 
 In C, certain types (`char`, `int`, `float` etc.) are built into the language
 and into the compiler. These builtin types have behaviors that are not possible
@@ -289,12 +289,12 @@ double Add(int x, long y);
 func Add(_ x: CInt, _ y: CLong) -> CDouble
 ```
 
-# Free functions
+## Free functions
 
 C functions are imported as free functions in Swift. Each type in the signature
 of the C function is mapped to the corresponding Swift type.
 
-## Argument labels
+### Argument labels
 
 Imported C functions don't have argument labels in Swift by default.  Argument
 labels can be added by API owners through annotations in the C header.
@@ -322,7 +322,7 @@ drawString("hello", 10, 20)
 drawStringRenamed("hello", x: 10, y: 20)
 ```
 
-## Variadic arguments
+### Variadic arguments
 
 C functions with variadic arguments are not imported into Swift, however, there
 are no technical reasons why they can't be imported.
@@ -344,7 +344,7 @@ See also Apple's documentation about this topic: [Use a CVaListPointer to Call
 Variadic
 Functions](https://developer.apple.com/documentation/swift/imported_c_and_objective-c_apis/using_imported_c_functions_in_swift#2992073).
 
-## Inline functions
+### Inline functions
 
 Inline C functions that are defined in headers are imported as regular Swift
 functions. However, unlike free functions, inline functions require the caller
@@ -356,7 +356,7 @@ the C inline function. LLVM IR for C inline functions and LLVM IR for Swift code
 is put into one LLVM module, allowing all LLVM optimizations (like inlining) to
 work transparently across language boundaries.
 
-# Global variables
+## Global variables
 
 Global C variables are imported as Swift variables or constants, depending on
 constness.
@@ -375,7 +375,7 @@ var NumAlpacas: CInt
 let NumLlamas: CInt
 ```
 
-# Pointers to data
+## Pointers to data
 
 C has one way to form a pointer to a value of type `T` -- `T*`.
 
@@ -420,7 +420,7 @@ void AddSecondToFirst(int *x, const long *y);
 func AddSecondToFirst(_ x: UnsafeMutablePointer<CInt>!, _ y: UnsafePointer<CLong>!)
 ```
 
-# Nullable and non-nullable pointers
+## Nullable and non-nullable pointers
 
 Any C pointer can be null. However, in practice, many pointers are never null.
 Therefore, code often does not expect certain pointers to be null and does not
@@ -559,7 +559,7 @@ See also Apple's documentation about this topic: [Designating Nullability in
 Objective-C
 APIs](https://developer.apple.com/documentation/swift/objective-c_and_c_code_customization/designating_nullability_in_objective-c_apis).
 
-# Incomplete types and pointers to them
+## Incomplete types and pointers to them
 
 C and C++ have a notion of incomplete types; Swift does not have anything
 similar. Incomplete C types are not imported in Swift in any form.
@@ -589,7 +589,7 @@ void Print(const Foo* foo);
 func Print(_ foo: OpaquePointer)
 ```
 
-# Function pointers
+## Function pointers
 
 C supports only one form of function pointers: `Result (*)(Arg1, Arg2, Arg3)`.
 
@@ -641,15 +641,15 @@ void qsort_annotated(
 
 func qsort(
   _ base: UnsafeMutableRawPointer!,
-  _ nmemb: CInt,
-  _ size: CInt,
+  _ nmemb: Int,
+  _ size: Int,
   _ compar: (@convention(c) (UnsafeRawPointer?, UnsafeRawPointer?) -> CInt)!
 )
 
 func qsort_annotated(
   _ base: UnsafeMutableRawPointer,
-  _ nmemb: CInt,
-  _ size: CInt,
+  _ nmemb: Int,
+  _ size: Int,
   _ compar: @convention(c) (UnsafeRawPointer, UnsafeRawPointer) -> CInt
 )
 ```
@@ -657,7 +657,7 @@ func qsort_annotated(
 See also Apple's documentation about this topic: [Using Imported C Functions in
 Swift](https://developer.apple.com/documentation/swift/imported_c_and_objective-c_apis/using_imported_c_functions_in_swift)
 
-# Fixed-size arrays
+## Fixed-size arrays
 
 C's fixed-size arrays are imported as Swift tuples.
 
@@ -685,7 +685,7 @@ Fixed-size arrays are a commonly requested feature in Swift, and a good proposal
 is likely to be accepted. Once Swift has fixed-size arrays natively in the
 language, we can use them to improve C interoperability.
 
-# Structs
+## Structs
 
 C structs are imported as Swift structs, their fields are mapped to stored Swift
 properties. Bitfields are mapped to computed Swift properties. Swift structs
@@ -752,17 +752,17 @@ struct StructWithAnonymousStructs {
 // C header imported in Swift.
 struct StructWithAnonymousStructs {
   struct __Unnamed_struct___Anonymous_field0 {
-    var x: Int32
+    var x: CInt
     init()
-    init(x: Int32)
+    init(x: CInt)
   }
   struct __Unnamed_struct_containerForY {
-    var y: Int32
+    var y: CInt
     init()
-    init(y: Int32)
+    init(y: CInt)
   }
   var __Anonymous_field0: StructWithAnonymousStructs.__Unnamed_struct___Anonymous_field0
-  var x: Int32
+  var x: CInt
   var containerForY: StructWithAnonymousStructs.__Unnamed_struct_containerForY
 
   // Default initializer that sets all properties to zero.
@@ -780,7 +780,7 @@ See also Apple's documentation about this topic: [Using Imported C Structs and
 Unions in
 Swift](https://developer.apple.com/documentation/swift/imported_c_and_objective-c_apis/using_imported_c_structs_and_unions_in_swift).
 
-# Unions
+## Unions
 
 Swift does not have a direct equivalent to a C union. C unions are mapped to
 Swift structs with computed properties that read from/write to the same
@@ -811,7 +811,7 @@ See also Apple's documentation about this topic: [Using Imported C Structs and
 Unions in
 Swift](https://developer.apple.com/documentation/swift/imported_c_and_objective-c_apis/using_imported_c_structs_and_unions_in_swift).
 
-# Enums
+## Enums
 
 We would have liked to map C enums to Swift enums, like this:
 
@@ -829,7 +829,7 @@ enum HomeworkExcuse {
 ```swift
 // C header imported in Swift: aspiration, not an actual mapping!
 
-enum HomeworkExcuse : UInt32 {
+enum HomeworkExcuse: CUnsignedInt {
   case EatenByPet
   case ForgotAtHome
   case ThoughtItWasDueNextWeek
@@ -841,11 +841,11 @@ However, in practice, plain C enums are mapped to Swift structs like this:
 ```swift
 // C header imported in Swift: actual mapping.
 
-struct HomeworkExcuse : Equatable, RawRepresentable {
-  init(_ rawValue: UInt32)
-  init(rawValue: UInt32)
-  var rawValue: UInt32
-  typealias RawValue = UInt32
+struct HomeworkExcuse: Equatable, RawRepresentable {
+  init(_ rawValue: CUnsignedInt)
+  init(rawValue: CUnsignedInt)
+  var rawValue: CUnsignedInt { get }
+  typealias RawValue = CUnsignedInt
 }
 var EatenByPet: HomeworkExcuse { get }
 var ForgotAtHome: HomeworkExcuse { get }
@@ -902,13 +902,6 @@ does not handle all cases available at the compilation time.
 ```c
 // C header.
 
-// Enum that is not explicitly marked as either open or closed.
-enum HomeworkExcuse {
-  EatenByPet,
-  ForgotAtHome,
-  ThoughtItWasDueNextWeek,
-};
-
 // An open enum: we expect to add more kinds of input devices in future.
 enum InputDevice {
   Keyboard,
@@ -929,30 +922,20 @@ enum CardinalDirection {
 ```swift
 // C header imported in Swift.
 
-struct HomeworkExcuse : Equatable, RawRepresentable {
-  init(_ rawValue: UInt32)
-  init(rawValue: UInt32)
-  var rawValue: UInt32
-  typealias RawValue = UInt32
-}
-var EatenByPet: HomeworkExcuse { get }
-var ForgotAtHome: HomeworkExcuse { get }
-var ThoughtItWasDueNextWeek: HomeworkExcuse { get }
-
-enum InputDevice : UInt32 {
-  init?(rawValue: UInt32)
-  var rawValue: UInt32 { get }
-  typealias RawValue = UInt32
+enum InputDevice: CUnsignedInt, Hashable, RawRepresentable {
+  init?(rawValue: CUnsignedInt)
+  var rawValue: CUnsignedInt { get }
+  typealias RawValue = CUnsignedInt
   case Keyboard
   case Mouse
   case Touchscreen
 }
 
-@_frozen
-enum CardinalDirection : UInt32 {
-  init?(rawValue: UInt32)
-  var rawValue: UInt32 { get }
-  typealias RawValue = UInt32
+@frozen
+enum CardinalDirection: CUnsignedInt, Hashable, RawRepresentable {
+  init?(rawValue: CUnsignedInt)
+  var rawValue: CUnsignedInt { get }
+  typealias RawValue = CUnsignedInt
   case East
   case West
   case North
@@ -991,12 +974,12 @@ numeric and typed values.
 // Converting enum values to integers and back.
 
 var south: CardinalDirection = .South
-// var southAsInteger: UInt32 = south // error: type mismatch
-var southAsInteger: UInt32 = south.rawValue // = 3
-var southAsEnum = CardinalDirection(rawValue: 3) // = South
+// var southAsInteger: CUnsignedInt = south // error: type mismatch
+var southAsInteger: CUnsignedInt = south.rawValue // = 3
+var southAsEnum = CardinalDirection(rawValue: 3) // = .South
 ```
 
-# Typedefs
+## Typedefs
 
 C typedefs are generally mapped to Swift typealiases, except for a few common C
 coding patterns that are handled in a special way.
@@ -1027,7 +1010,7 @@ struct Point {
 }
 ```
 
-# Macros
+## Macros
 
 C macros are generally not imported in Swift. Macros that define constants are
 imported as readonly variables.
