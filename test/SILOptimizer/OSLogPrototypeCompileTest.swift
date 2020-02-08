@@ -27,8 +27,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
     // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
     // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-64-DAG: [[LIT]] = string_literal utf8 "Minimum integer value: %{public}lld"
-    // CHECK-32-DAG: [[LIT]] = string_literal utf8 "Minimum integer value: %{public}d"
+    // CHECK-DAG: [[LIT]] = string_literal utf8 "Minimum integer value: %{public}ld"
 
     // Check if the size of the argument buffer is a constant.
 
@@ -68,7 +67,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
   // CHECK-LABEL: @${{.*}}testInterpolationWithFormatOptionsL_
   func testInterpolationWithFormatOptions(h: Logger) {
-    h.log(level: .info, "Maximum integer value: \(Int.max, format: .hex)")
+    h.log(level: .info, "Maximum unsigned integer value: \(UInt.max, format: .hex)")
 
     // Check if there is a call to _os_log_impl with a literal format string.
 
@@ -78,8 +77,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
     // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
     // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-64-DAG: [[LIT]] = string_literal utf8 "Maximum integer value: %{public}llx"
-    // CHECK-32-DAG: [[LIT]] = string_literal utf8 "Maximum integer value: %{public}x"
+    // CHECK-DAG: [[LIT]] = string_literal utf8 "Maximum unsigned integer value: %{public}lx"
 
     // Check if the size of the argument buffer is a constant.
 
@@ -118,7 +116,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
   // CHECK-LABEL: @${{.*}}testInterpolationWithFormatOptionsAndPrivacyL_
   func testInterpolationWithFormatOptionsAndPrivacy(h: Logger) {
-    let privateID = 0x79abcdef
+    let privateID: UInt = 0x79abcdef
     h.log(
       level: .error,
       "Private Identifier: \(privateID, format: .hex, privacy: .private)")
@@ -131,8 +129,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
     // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
     // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-64-DAG: [[LIT]] = string_literal utf8 "Private Identifier: %{private}llx"
-    // CHECK-32-DAG: [[LIT]] = string_literal utf8 "Private Identifier: %{private}x"
+    // CHECK-DAG: [[LIT]] = string_literal utf8 "Private Identifier: %{private}lx"
 
     // Check if the size of the argument buffer is a constant.
 
@@ -172,7 +169,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
   // CHECK-LABEL: @${{.*}}testInterpolationWithMultipleArgumentsL_
   func testInterpolationWithMultipleArguments(h: Logger) {
     let privateID = 0x79abcdef
-    let filePermissions = 0o777
+    let filePermissions: UInt = 0o777
     let pid = 122225
     h.log(
       level: .error,
@@ -190,8 +187,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
     // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
     // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-64-DAG: [[LIT]] = string_literal utf8 "Access prevented: process %{public}lld initiated by user: %{private}lld attempted resetting permissions to %{public}llo"
-    // CHECK-32-DAG: [[LIT]] = string_literal utf8 "Access prevented: process %{public}d initiated by user: %{private}d attempted resetting permissions to %{public}o"
+    // CHECK-DAG: [[LIT]] = string_literal utf8 "Access prevented: process %{public}ld initiated by user: %{private}ld attempted resetting permissions to %{public}lo"
 
     // Check if the size of the argument buffer is a constant.
 
@@ -339,8 +335,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
     // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
     // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-64-DAG: [[LIT]] = string_literal utf8 "%{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld %{public}lld "
-    // CHECK-32-DAG: [[LIT]] = string_literal utf8 "%{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d %{public}d "
+    // CHECK-DAG: [[LIT]] = string_literal utf8 "%{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld %{public}ld "
 
     // Check if the size of the argument buffer is a constant.
 
