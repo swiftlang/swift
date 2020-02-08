@@ -43,9 +43,9 @@ func testSimpleInterpolation(h: Logger) {
     // CHECK-NEXT: [[BITCASTED:%.+]] = bitcast i8* [[OFFSET4]] to i{{.*}}*
     // CHECK-64-NEXT: store i64 -9223372036854775808, i64* [[BITCASTED]], align 1
     // CHECK-32-NEXT: store i32 -2147483648, i32* [[BITCASTED]], align 1
-    // CHECK-64-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([35 x i8], [35 x i8]* @{{.*}}, i64 0, i64 0), i8* [[BUFFER]], i32 12)
-    // CHECK-32-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([35 x i8], [35 x i8]* @{{.*}}, i32 0, i32 0), i8* [[BUFFER]], i32 8)
-    // CHECK-NEXT: tail call void @swift_slowDealloc(i8* [[BUFFER]]
+    // CHECK-64-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([35 x i8], [35 x i8]* @{{.*}}, i64 0, i64 0), i8* {{(nonnull )?}}[[BUFFER]], i32 12)
+    // CHECK-32-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([35 x i8], [35 x i8]* @{{.*}}, i32 0, i32 0), i8* {{(nonnull )?}}[[BUFFER]], i32 8)
+    // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
 
     // CHECK: [[NOT_ENABLED]]:
@@ -114,8 +114,8 @@ func testInterpolationWithMultipleArguments(h: Logger) {
     // CHECK-NEXT: store i32 511, i32* [[BITCASTED3]], align 1
     //
     // os_log_impl call.
-    // CHECK-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([114 x i8], [114 x i8]* @{{.*}}, i{{.*}} 0, i{{.*}} 0), i8* [[BUFFER]], i32 20)
-    // CHECK-NEXT: tail call void @swift_slowDealloc(i8* [[BUFFER]]
+    // CHECK-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([114 x i8], [114 x i8]* @{{.*}}, i{{.*}} 0, i{{.*}} 0), i8* {{(nonnull )?}}[[BUFFER]], i32 20)
+    // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
 
     // CHECK: [[NOT_ENABLED]]:
@@ -158,9 +158,9 @@ func testNSObjectInterpolation(h: Logger, nsArray: NSArray) {
     // CHECK-NEXT: [[BITCASTED_DEST:%.+]] = bitcast i8* [[OFFSET4]] to %TSo7NSArrayC**
     // CHECK-NEXT: [[BITCASTED_SRC:%.+]] = bitcast i8* [[NSARRAY_ARG]] to %TSo7NSArrayC*
     // CHECK-NEXT: store %TSo7NSArrayC*  [[BITCASTED_SRC]], %TSo7NSArrayC** [[BITCASTED_DEST]], align 1
-    // CHECK-64-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i64 0, i64 0), i8* [[BUFFER]], i32 12)
-    // CHECK-32-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i32 0, i32 0), i8* [[BUFFER]], i32 8)
-    // CHECK-NEXT: tail call void @swift_slowDealloc(i8* [[BUFFER]]
+    // CHECK-64-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i64 0, i64 0), i8* {{(nonnull )?}}[[BUFFER]], i32 12)
+    // CHECK-32-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i32 0, i32 0), i8* {{(nonnull )?}}[[BUFFER]], i32 8)
+    // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
 
     // CHECK: [[NOT_ENABLED]]:
