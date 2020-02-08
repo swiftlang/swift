@@ -61,14 +61,8 @@ ERROR(ambiguous_member_overload_set,none,
 ERROR(ambiguous_reference_to_decl,none,
       "ambiguous reference to %0 %1", (DescriptiveDeclKind, DeclName))
 ERROR(no_overloads_match_exactly_in_call,none,
-      "no exact matches in call to %0 %1",
-      (DescriptiveDeclKind, DeclName))
-ERROR(no_overloads_match_exactly_in_call_no_labels,none,
-      "no exact matches in call to %0 %1",
-      (DescriptiveDeclKind, DeclBaseName))
-ERROR(no_overloads_match_exactly_in_call_special,none,
-      "no exact matches in call to %0",
-      (DescriptiveDeclKind))
+      "no exact matches in call to %0 %select{%2|}1",
+      (DescriptiveDeclKind, bool, DeclBaseName))
 ERROR(no_overloads_match_exactly_in_assignment,none,
       "no exact matches in assignment to %0",
       (DeclBaseName))

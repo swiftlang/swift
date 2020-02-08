@@ -2824,25 +2824,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       auto baseName = name.getBaseName();
       DE.diagnose(commonAnchor->getLoc(), diag::no_candidates_match_result_type,
                   baseName.userFacingName(), getContextualType(anchor));
-    } else if (name.isSpecial()) {
-      // If this is a special name, avoid printing it because printing the
-      // decl kind is sufficient.
-      DE.diagnose(commonAnchor->getLoc(),
-                  diag::no_overloads_match_exactly_in_call_special,
-                  decl->getDescriptiveKind());
-    } else if (llvm::all_of(ambiguousOverload->choices,
-                            [&name](const OverloadChoice &choice) {
-                              return choice.getDecl()->getFullName() == name;
-                            })) {
-      // If the labels match in each overload, print a full name.
+    } else {
       DE.diagnose(commonAnchor->getLoc(),
                   diag::no_overloads_match_exactly_in_call,
-                  decl->getDescriptiveKind(), name);
-    } else {
-      // If the labels are different, we can only print a base name.
-      DE.diagnose(commonAnchor->getLoc(),
-                  diag::no_overloads_match_exactly_in_call_no_labels,
-                  decl->getDescriptiveKind(), name.getBaseName());
+                  decl->getDescriptiveKind(), name.isSpecial(),
+                  name.getBaseName());
     }
 
     // Produce candidate notes
