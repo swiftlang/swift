@@ -213,7 +213,7 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
 
   AccessLevel maxAccess = AccessLevel::Public;
 
-  if (GenericParamList *genericParams = ED->getGenericParams()) {
+  if (ED->getGenericParams()) {
     // Only check the trailing 'where' requirements. Other requirements come
     // from the extended type and have already been checked.
     DirectlyReferencedTypeDecls typeDecls =

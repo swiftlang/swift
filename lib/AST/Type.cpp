@@ -2023,7 +2023,7 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   // DynamicSelfType is always representable in Objective-C, even if
   // the class is not @objc, allowing Self-returning methods to witness
   // @objc protocol requirements.
-  if (auto dynSelf = type->getAs<DynamicSelfType>())
+  if (type->is<DynamicSelfType>())
     return ForeignRepresentableKind::Object;
 
   // @objc classes.
@@ -4098,7 +4098,7 @@ case TypeKind::Id:
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
     
-    if (auto subs = fnTy->getSubstitutions()) {
+    if (fnTy->getSubstitutions()) {
 #ifndef NDEBUG
       // This interface isn't suitable for updating the substitution map in a
       // substituted SILFunctionType.
