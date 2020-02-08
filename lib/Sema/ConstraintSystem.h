@@ -3231,6 +3231,12 @@ public:
     return allocateCopy(vec.begin(), vec.end());
   }
 
+  /// Generate constraints for the given solution target.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool generateConstraints(SolutionApplicationTarget &target,
+                           FreeTypeVariableBinding allowFreeTypeVariables);
+
   /// Generate constraints for the body of the given single-statement closure.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.

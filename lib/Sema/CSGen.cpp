@@ -3782,6 +3782,54 @@ static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
   return result;
 }
 
+bool ConstraintSystem::generateConstraints(
+    SolutionApplicationTarget &target,
+    FreeTypeVariableBinding allowFreeTypeVariables) {
+  if (Expr *expr = target.getAsExpr()) {
+    // Try to shrink the system by reducing disjunction domains. This
+    // goes through every sub-expression and generate its own sub-system, to
+    // try to reduce the domains of those subexpressions.
+    shrink(expr);
+    target.setExpr(expr);
+
+    // Generate constraints for the main system.
+    expr = generateConstraints(expr, target.getDeclContext());
+    if (!expr)
+      return true;
+    target.setExpr(expr);
+
+    // If there is a type that we're expected to convert to, add the conversion
+    // constraint.
+    if (Type convertType = target.getExprConversionType()) {
+      // Determine whether we know more about the contextual type.
+      ContextualTypePurpose ctp = target.getExprContextualTypePurpose();
+      bool isOpaqueReturnType = target.infersOpaqueReturnType();
+
+      // Substitute type variables in for unresolved types.
+      if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
+        bool isForSingleExprFunction = (ctp == CTP_ReturnSingleExpr);
+        auto *convertTypeLocator = getConstraintLocator(
+            expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
+
+        convertType = convertType.transform([&](Type type) -> Type {
+          if (type->is<UnresolvedType>()) {
+            return createTypeVariable(
+                convertTypeLocator, TVO_CanBindToNoEscape);
+          }
+          return type;
+        });
+      }
+
+      addContextualConversionConstraint(expr, convertType, ctp,
+                                        isOpaqueReturnType);
+    }
+
+    return false;
+  }
+
+  llvm_unreachable("BOOM");
+}
+
 Expr *ConstraintSystem::generateConstraints(ClosureExpr *closure) {
   assert(closure->hasSingleExpressionBody());
   return generateConstraintsFor(*this, closure->getSingleExpressionBody(),
