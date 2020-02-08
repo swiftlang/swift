@@ -2761,22 +2761,9 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     }
   }
 
-  // If there are no overload differences, diagnose the common fixes.
-  SolutionDiff solutionDiff(solutions);
-  if (solutionDiff.overloads.size() == 0) {
-    bool diagnosed = false;
-    ConstraintSystem::SolverScope scope(*this);
-    applySolution(solutions.front());
-    for (auto fixes: aggregatedFixes) {
-      // A common fix must appear in all solutions
-      if (fixes.second.size() < solutions.size()) continue;
-      diagnosed |= fixes.second.front()->diagnose();
-    }
-    return diagnosed;
-  }
-
   // If there is an overload difference, let's see if there's a common callee
   // locator for all of the fixes.
+  SolutionDiff solutionDiff(solutions);
   auto ambiguousOverload = llvm::find_if(solutionDiff.overloads,
       [&](const auto &overloadDiff) {
         return llvm::all_of(aggregatedFixes, [&](const auto &aggregatedFix) {
@@ -2798,8 +2785,18 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
         });
       });
 
-  if (ambiguousOverload == solutionDiff.overloads.end())
-    return false;
+  // If we didn't find an ambiguous overload, diagnose the common fixes.
+  if (ambiguousOverload == solutionDiff.overloads.end()) {
+    bool diagnosed = false;
+    ConstraintSystem::SolverScope scope(*this);
+    applySolution(solutions.front());
+    for (auto fixes: aggregatedFixes) {
+      // A common fix must appear in all solutions
+      if (fixes.second.size() < solutions.size()) continue;
+      diagnosed |= fixes.second.front()->diagnoseForAmbiguity(solutions);
+    }
+    return diagnosed;
+  }
 
   auto *commonCalleeLocator = ambiguousOverload->locator;
   auto *decl = ambiguousOverload->choices.front().getDecl();
