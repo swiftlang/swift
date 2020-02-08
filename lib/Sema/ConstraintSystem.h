@@ -774,8 +774,8 @@ struct Score {
 
 /// An AST node that can gain type information while solving.
 using TypedNode =
-    llvm::PointerUnion3<const Expr *, const TypeLoc *,
-                        const VarDecl *>;
+    llvm::PointerUnion4<const Expr *, const TypeLoc *,
+                        const VarDecl *, const Pattern *>;
 
 /// Display a score.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
@@ -1164,7 +1164,7 @@ class SolutionApplicationTarget {
       Pattern *pattern = nullptr;
 
       /// Whether the expression result will be discarded at the end.
-      bool isDiscarded;
+      bool isDiscarded = false;
     } expression;
 
     struct {
