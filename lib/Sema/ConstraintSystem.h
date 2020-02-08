@@ -1161,10 +1161,14 @@ class SolutionApplicationTarget {
 
       /// When initializing a pattern from the expression, this is the
       /// pattern.
-      Pattern *pattern = nullptr;
+      Pattern *pattern;
+
+      /// The variable to which property wrappers have been applied, if
+      /// this is an initialization involving a property wrapper.
+      VarDecl *wrappedVar;
 
       /// Whether the expression result will be discarded at the end.
-      bool isDiscarded = false;
+      bool isDiscarded;
     } expression;
 
     struct {
@@ -1172,6 +1176,11 @@ class SolutionApplicationTarget {
       BraceStmt *body;
     } function;
   };
+
+  // If the pattern contains a single variable that has an attached
+  // property wrapper, set up the initializer expression to initialize
+  // the backing storage.
+  void maybeApplyPropertyWrapper();
 
 public:
   SolutionApplicationTarget(Expr *expr, DeclContext *dc,
@@ -1279,6 +1288,14 @@ public:
     return kind == Kind::expression &&
         expression.contextualPurpose == CTP_Initialization &&
         isa<OptionalSomePattern>(expression.pattern);
+  }
+
+  /// Retrieve the wrapped variable when initializing a pattern with a
+  /// property wrapper.
+  VarDecl *getInitializationWrappedVar() const {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_Initialization);
+    return expression.wrappedVar;
   }
 
   /// Whether this context infers an opaque return type.
