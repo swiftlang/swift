@@ -14,19 +14,6 @@
 // the new OS log APIs. These are prototype implementations and should not be
 // used outside of tests.
 
-/// Formatting options supported by the logging APIs for logging integers.
-/// These can be specified in the string interpolation passed to the log APIs.
-/// For Example,
-///     log.info("Writing to file with permissions: \(perm, format: .octal)")
-///
-/// See `OSLogInterpolation.appendInterpolation` definitions for default options
-/// for integer types.
-public enum IntFormat {
-  case decimal
-  case hex
-  case octal
-}
-
 /// Privacy qualifiers for indicating the privacy level of the logged data
 /// to the logging system. These can be specified in the string interpolation
 /// passed to the log APIs.
@@ -35,7 +22,7 @@ public enum IntFormat {
 ///
 /// See `OSLogInterpolation.appendInterpolation` definitions for default options
 /// for each supported type.
-public enum Privacy {
+public enum OSLogPrivacy {
   case `private`
   case `public`
 }
@@ -213,7 +200,7 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   @_semantics("constant_evaluable")
   @_effects(readonly)
   @_optimize(none)
-  internal func isPrivate(_ privacy: Privacy) -> Bool {
+  internal func isPrivate(_ privacy: OSLogPrivacy) -> Bool {
     // Do not use equality comparisons on enums as it is not supported by
     // the constant evaluator.
     if case .private = privacy {
