@@ -3463,7 +3463,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
       // If The next token is at the beginning of a new line and can never start
       // an element, break.
       if (Tok.isAtStartOfLine() && (Tok.isAny(tok::r_brace, tok::pound_endif) ||
-                                    isStartOfDecl() || isStartOfStmt()))
+                                    isStartOfSwiftDecl() || isStartOfStmt()))
         break;
 
       diagnose(Tok, diag::expected_separator, ",")

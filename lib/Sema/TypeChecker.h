@@ -718,7 +718,7 @@ public:
 
   static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  static void processREPLTopLevel(SourceFile &SF, unsigned StartElem);
+  static void processREPLTopLevel(SourceFile &SF);
 
   static void typeCheckDecl(Decl *D);
 
@@ -1491,11 +1491,7 @@ public:
                                         const TypeRefinementContext **MostRefined=nullptr);
 
   /// Walk the AST to build the hierarchy of TypeRefinementContexts
-  ///
-  /// \param StartElem Where to start for incremental building of refinement
-  /// contexts
-  static void buildTypeRefinementContextHierarchy(SourceFile &SF,
-                                                  unsigned StartElem);
+  static void buildTypeRefinementContextHierarchy(SourceFile &SF);
 
   /// Build the hierarchy of TypeRefinementContexts for the entire
   /// source file, if it has not already been built. Returns the root

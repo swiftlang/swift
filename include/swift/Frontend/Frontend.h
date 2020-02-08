@@ -653,8 +653,6 @@ public: // for static functions in Frontend.cpp
   };
 
 private:
-  void createREPLFile(const ImplicitImports &implicitImports);
-
   void addMainFileToModule(const ImplicitImports &implicitImports);
 
   void performSemaUpTo(SourceFile::ASTStage_t LimitStage);

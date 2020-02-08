@@ -470,6 +470,8 @@ ERROR(expected_precedencegroup_relation,none,
       (StringRef))
 
 // SIL
+ERROR(expected_sil_keyword,none,
+      "expected SIL keyword", ())
 ERROR(inout_not_attribute, none,
       "@inout is no longer an attribute", ())
 ERROR(only_allowed_in_sil,none,
