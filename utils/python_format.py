@@ -28,7 +28,9 @@ _KNOWN_SCRIPT_PATHS = [
     _SWIFT_PATH / "benchmark/scripts/Benchmark_Driver",
     _SWIFT_PATH / "benchmark/scripts/Benchmark_DTrace.in",
     _SWIFT_PATH / "benchmark/scripts/Benchmark_GuardMalloc.in",
+    _SWIFT_PATH / "benchmark/scripts/Benchmark_QuickCheck.in",
     _SWIFT_PATH / "benchmark/scripts/Benchmark_RuntimeLeaksRunner.in",
+    _SWIFT_PATH / "benchmark/scripts/run_smoke_bench",
     _SWIFT_PATH / "docs/scripts/ns-html2rst",
     _SWIFT_PATH / "test/Driver/Inputs/fake-toolchain/ld",
     _SWIFT_PATH / "utils/80+-check",
@@ -101,6 +103,14 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
+        "paths",
+        type=Path,
+        metavar="PATH",
+        nargs="*",
+        help="Source path to format.",
+    )
+
+    parser.add_argument(
         "--check",
         action="store_true",
         help="Don't format the file, just retun the status.",
@@ -110,7 +120,7 @@ def parse_args():
         "-v",
         "--verbose",
         action="store_true",
-        help="Also emit messages to stderr about files that were not changed",
+        help="Emit messages to stderr about files that were not changed.",
     )
 
     return parser.parse_args()
@@ -136,7 +146,23 @@ def main():
     if args.verbose:
         command.append("--verbose")
 
-    command += [str(path) for path in _get_python_sources()]
+    requested_paths = [path.resolve() for path in args.paths]
+
+    # Narrow down the set of paths to format to only those paths which are either
+    # included in the set of requested paths or are subpaths of the requested paths.
+    format_paths = {
+        known_path
+        for path in requested_paths
+        for known_path in _get_python_sources()
+        if path == known_path or path in known_path.parents
+    }
+
+    # Add requested paths that exists, but aren't included in the format set.
+    for path in requested_paths:
+        if path not in format_paths and path.exists():
+            format_paths.add(path)
+
+    command += sorted([str(path) for path in format_paths])
 
     return subprocess.call(command)
 
