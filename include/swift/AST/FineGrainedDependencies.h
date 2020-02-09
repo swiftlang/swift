@@ -721,7 +721,8 @@ public:
   }
 
   std::string humanReadableName() const {
-    return DepGraphNode::humanReadableName("here");
+    return DepGraphNode::humanReadableName(getIsProvides() ? "here"
+                                                           : "somewhere else");
   }
 
   bool verify() const {
@@ -882,6 +883,8 @@ public:
   bool verifyReadsWhatIsWritten(StringRef path) const;
 
   bool verifySequenceNumber() const;
+
+  void emitDotFile(StringRef outputPath, DiagnosticEngine &diags);
 
 private:
   void addNode(SourceFileDepGraphNode *n) {
