@@ -3994,7 +3994,60 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.dc = dc;
   expression.contextualPurpose = contextualPurpose;
   expression.convertType = convertType;
+  expression.pattern = nullptr;
+  expression.wrappedVar = nullptr;
   expression.isDiscarded = isDiscarded;
+}
+
+void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
+  assert(kind == Kind::expression);
+  assert(expression.contextualPurpose == CTP_Initialization);
+  auto singleVar = expression.pattern->getSingleVar();
+  if (!singleVar)
+    return;
+
+  auto wrapperAttrs = singleVar->getAttachedPropertyWrappers();
+  if (wrapperAttrs.empty())
+    return;
+
+  // If the outermost property wrapper is directly initialized, form the
+  // call.
+  auto &ctx = singleVar->getASTContext();
+  auto outermostWrapperAttr = wrapperAttrs.front();
+  Expr *backingInitializer;
+  if (Expr *initializer = expression.expression) {
+    // Form init(wrappedValue:) call(s).
+    Expr *wrappedInitializer =
+        buildPropertyWrapperInitialValueCall(
+            singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
+    if (!wrappedInitializer)
+      return;
+
+    backingInitializer = wrappedInitializer;
+  } else if (auto outermostArg = outermostWrapperAttr->getArg()) {
+    Type outermostWrapperType =
+        singleVar->getAttachedPropertyWrapperType(0);
+    if (!outermostWrapperType)
+      return;
+
+    auto typeExpr = TypeExpr::createImplicitHack(
+        outermostWrapperAttr->getTypeLoc().getLoc(),
+        outermostWrapperType, ctx);
+    backingInitializer = CallExpr::create(
+        ctx, typeExpr, outermostArg,
+        outermostWrapperAttr->getArgumentLabels(),
+        outermostWrapperAttr->getArgumentLabelLocs(),
+        /*hasTrailingClosure=*/false,
+        /*implicit=*/false);
+  } else {
+    llvm_unreachable("No initializer anywhere?");
+  }
+  wrapperAttrs[0]->setSemanticInit(backingInitializer);
+
+  // Note that we have applied to property wrapper, so we can adjust
+  // the initializer type later.
+  expression.wrappedVar = singleVar;
+  expression.expression = backingInitializer;
 }
 
 SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
@@ -4020,6 +4073,7 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
       initializer, dc, CTP_Initialization, contextualType,
       /*isDiscarded=*/false);
   target.expression.pattern = pattern;
+  target.maybeApplyPropertyWrapper();
   return target;
 }
 
