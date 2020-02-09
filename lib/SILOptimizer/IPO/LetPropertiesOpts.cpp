@@ -400,8 +400,6 @@ LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
            && "Store instruction should store into a proper let property");
     (void) Dest;
     value = SI->getSrc();
-  } else if (auto *copyValue = dyn_cast<CopyValueInst>(I)) {
-    value = copyValue->getOperand();
   } else if (auto *copyAddr = dyn_cast<CopyAddrInst>(I)) {
     value = copyAddr->getSrc();
   }
@@ -524,7 +522,7 @@ void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
 
   if (isa<RefElementAddrInst>(I) || isa<StructElementAddrInst>(I)
       || isa<BeginAccessInst>(I) || isa<CopyAddrInst>(I) ||
-      isa<CopyValueInst>(I) || isa<BeginBorrowInst>(I)) {
+      isa<BeginBorrowInst>(I)) {
     // Check if there is a store to this property.
     auto projection = cast<SingleValueInstruction>(I);
     for (auto Use : getNonDebugUses(projection)) {
@@ -540,14 +538,6 @@ void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
       if (auto *copyAddr = dyn_cast<CopyAddrInst>(User)) {
         if (copyAddr->getSrc() != projection ||
             !analyzeInitValue(copyAddr, Property)) {
-          SkipProcessing.insert(Property);
-          return;
-        }
-        continue;
-      }
-
-      if (auto *copyVal = dyn_cast<CopyValueInst>(User)) {
-        if (copyVal != projection || !analyzeInitValue(copyVal, Property)) {
           SkipProcessing.insert(Property);
           return;
         }

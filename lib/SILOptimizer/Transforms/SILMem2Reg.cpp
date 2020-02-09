@@ -956,9 +956,9 @@ class SILMem2Reg : public SILFunctionTransform {
   void run() override {
     SILFunction *F = getFunction();
 
-//    // FIXME: We should be able to support ownership.
-//    if (F->hasOwnership())
-//      return;
+    // FIXME: We should be able to support ownership.
+    if (F->hasOwnership())
+      return;
 
     LLVM_DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F->getName()
                             << " **\n");
