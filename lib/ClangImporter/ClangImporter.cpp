@@ -3787,6 +3787,17 @@ ClangImporter::Implementation::loadNamedMembers(
           Members.push_back(V);
         }
       }
+
+      // If the property's accessors have alternate decls, we might have
+      // to import those too.
+      if (auto *ASD = dyn_cast<AbstractStorageDecl>(TD)) {
+        for (auto *AD : ASD->getAllAccessors()) {
+          for (auto *D : getAlternateDecls(AD)) {
+            if (D->getBaseName() == N)
+              Members.push_back(D);
+          }
+        }
+      }
     }
   }
 
