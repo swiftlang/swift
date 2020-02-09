@@ -916,7 +916,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     if (ClangMod)
       ModuleName = ClangMod->getFullModuleName();
   } else if (VD->getLoc().isInvalid() && VD->getModuleContext() != MainModule) {
-    ModuleName = std::string(VD->getModuleContext()->getName());
+    ModuleName = VD->getModuleContext()->getName().str();
   }
   StringRef ModuleInterfaceName;
   if (auto IFaceGenRef = Lang.getIFaceGenContexts().find(ModuleName, Invok))
