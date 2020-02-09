@@ -4733,6 +4733,12 @@ public:
           if (term->isFunctionExiting()) {
             require(state.Stack.empty(),
                     "return with stack allocs that haven't been deallocated");
+            if (!state.ActiveOps.empty()) {
+              for (auto *i : state.ActiveOps) {
+                i->dump();
+              }
+            }
+
             require(state.ActiveOps.empty(),
                     "return with operations still active");
 
