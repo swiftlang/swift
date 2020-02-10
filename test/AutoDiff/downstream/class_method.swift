@@ -69,8 +69,7 @@ ClassMethodTests.test("SimpleWrtSelf") {
     // FIXME(TF-648): Dummy to make `Super.AllDifferentiableVariables` be nontrivial.
     var _nontrivial: [Tracked<Float>] = []
 
-    // TODO(TF-654): Uncomment attribute when differentiation supports class initializers.
-    // TODO(TF-645): Remove `vjpInit` when differentiation supports `ref_element_addr`.
+    // TODO(TF-654): Remove attribute when differentiation supports class initializers.
     // @differentiable(vjp: vjpInit)
     required init(base: Tracked<Float>) {
       self.base = base
@@ -227,8 +226,7 @@ ClassMethodTests.test("Methods") {
     // Dummy to make `Super.AllDifferentiableVariables` be nontrivial.
     var _nontrivial: [Tracked<Float>] = []
 
-    // TODO(TF-654): Uncomment attribute when differentiation supports class initializers.
-    // TODO(TF-645): Remove `vjpInit` when differentiation supports `ref_element_addr`.
+    // TODO(TF-654): Remove attribute when differentiation supports class initializers.
     // @differentiable(vjp: vjpInit)
     init(base: Tracked<Float>) {
       self.base = base
@@ -283,8 +281,7 @@ ClassMethodTests.test("Properties") {
   class Super : Differentiable {
     var base: Tracked<Float>
 
-    // TODO(TF-654): Uncomment attribute when differentiation supports class initializers.
-    // TODO(TF-645): Remove `vjpInit` when differentiation supports `ref_element_addr`.
+    // TODO(TF-654): Remove attribute when differentiation supports class initializers.
     // @differentiable(vjp: vjpInit)
     init(base: Tracked<Float>) { self.base = base }
     static func vjpInit(base: Tracked<Float>) -> (Super, (TangentVector) -> Tracked<Float>) {

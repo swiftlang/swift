@@ -354,6 +354,13 @@ public:
   ///                     field in tangent space corresponding to #field
   void visitStructExtractInst(StructExtractInst *sei);
 
+  /// Handle `ref_element_addr` instruction.
+  ///   Original: y = ref_element_addr x, <n>
+  ///    Adjoint: adj[x] += struct (0, ..., #field': adj[y], ..., 0)
+  ///                                       ^~~~~~~
+  ///                     field in tangent space corresponding to #field
+  void visitRefElementAddrInst(RefElementAddrInst *reai);
+
   /// Handle `tuple` instruction.
   ///   Original: y = tuple (x0, x1, x2, ...)
   ///    Adjoint: (adj[x0], adj[x1], adj[x2], ...) += destructure_tuple adj[y]
@@ -421,8 +428,6 @@ public:
       UnconditionalCheckedCastAddrInst *uccai);
 
 #define NOT_DIFFERENTIABLE(INST, DIAG) void visit##INST##Inst(INST##Inst *inst);
-
-  NOT_DIFFERENTIABLE(RefElementAddr, autodiff_class_property_not_supported)
 #undef NOT_DIFFERENTIABLE
 
 #define NO_ADJOINT(INST)                                                       \

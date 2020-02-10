@@ -157,8 +157,8 @@ private:
   /// Propagates variedness from the given operand to its user's results.
   void propagateVaried(Operand *operand, unsigned independentVariableIndex);
   /// Marks the given value as varied and recursively propagates variedness
-  /// inwards (to operands) through projections. Skips `@noDerivative` struct
-  /// field projections.
+  /// inwards (to operands) through projections. Skips `@noDerivative` field
+  /// projections.
   void
   propagateVariedInwardsThroughProjections(SILValue value,
                                            unsigned independentVariableIndex);
@@ -172,9 +172,9 @@ private:
                                        unsigned dependentVariableIndex);
   /// Propagates usefulnesss to the operands of the given instruction.
   void propagateUseful(SILInstruction *inst, unsigned dependentVariableIndex);
-  /// Marks the given address as useful and recursively propagates usefulness
-  /// inwards (to operands) through projections. Skips `@noDerivative` struct
-  /// field projections.
+  /// Marks the given address or class-typed value as useful and recursively
+  /// propagates usefulness inwards (to operands) through projections. Skips
+  /// `@noDerivative` field projections.
   void propagateUsefulThroughAddress(SILValue value,
                                      unsigned dependentVariableIndex);
   /// If the given value is an `array.uninitialized_intrinsic` application,

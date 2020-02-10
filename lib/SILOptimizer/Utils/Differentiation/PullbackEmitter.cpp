@@ -328,6 +328,7 @@ SILValue PullbackEmitter::getAdjointProjection(SILBasicBlock *origBB,
     auto adjSource = getAdjointBuffer(origBB, seai->getOperand());
     auto *tangentVectorDecl =
         adjSource->getType().getStructOrBoundGenericStruct();
+    // TODO(TF-970): Emit diagnostic when `TangentVector` is not a struct.
     auto tanFieldLookup =
         tangentVectorDecl->lookupDirect(seai->getField()->getName());
     assert(tanFieldLookup.size() == 1);
@@ -505,21 +506,51 @@ bool PullbackEmitter::run() {
       auto &domBBActiveValues = activeValues[domNode->getBlock()];
       bbActiveValues.append(domBBActiveValues.begin(), domBBActiveValues.end());
     }
+    // Booleans tracking whether active-value-related errors have been emitted.
+    // This prevents duplicate diagnostics for the same active values.
     bool diagnosedActiveEnumValue = false;
+    bool diagnosedActiveValueTangentValueCategoryIncompatible = false;
     // Mark the activity of a value if it has not yet been visited.
     auto markValueActivity = [&](SILValue v) {
       if (visited.count(v))
         return;
       visited.insert(v);
+      auto type = v->getType();
       // Diagnose active enum values. Differentiation of enum values requires
       // special adjoint value handling and is not yet supported. Diagnose
       // only the first active enum value to prevent too many diagnostics.
-      if (!diagnosedActiveEnumValue &&
-          v->getType().getEnumOrBoundGenericEnum()) {
+      if (!diagnosedActiveEnumValue && type.getEnumOrBoundGenericEnum()) {
         getContext().emitNondifferentiabilityError(
             v, getInvoker(), diag::autodiff_enums_unsupported);
         errorOccurred = true;
         diagnosedActiveEnumValue = true;
+      }
+      // Diagnose active values whose value category is incompatible with their
+      // tangent types's value category.
+      //
+      // Let $L be a loadable type and $*A be an address-only type.
+      // Table of supported combinations:
+      //
+      // Original type | Tangent type | Currently supported?
+      // --------------|--------------|---------------------
+      // $L            | $L           | Yes (no mismatch)
+      // $*A           | $L           | Yes (can create $*L adjoint buffer)
+      // $L            | $*A          | No (cannot create $A adjoint value)
+      // $*A           | $*A          | Yes (no mismatch)
+      if (!diagnosedActiveValueTangentValueCategoryIncompatible) {
+        if (auto tanSpace = getTangentSpace(remapType(type).getASTType())) {
+          auto tanASTType = tanSpace->getCanonicalType();
+          auto &origTL = getTypeLowering(type.getASTType());
+          auto &tanTL = getTypeLowering(tanASTType);
+          if (!origTL.isAddressOnly() && tanTL.isAddressOnly()) {
+            getContext().emitNondifferentiabilityError(
+                v, getInvoker(),
+                diag::autodiff_loadable_value_addressonly_tangent_unsupported,
+                type.getASTType(), tanASTType);
+            diagnosedActiveValueTangentValueCategoryIncompatible = true;
+            errorOccurred = true;
+          }
+        }
       }
       // Skip address projections.
       // Address projections do not need their own adjoint buffers; they
@@ -1050,7 +1081,7 @@ PullbackEmitter::getArrayAdjointElementBuffer(SILValue arrayAdjoint,
   auto subMap = SubstitutionMap::get(subscriptFnGenSig, {eltTanType},
                                      {addArithConf, diffConf});
   // %elt_adj = alloc_stack $T.TangentVector
-  // Create a local allocation and register it.
+  // Create and register a local allocation.
   localAllocBuilder.setInsertionPoint(
       getPullback().getEntryBlock(),
       getNextFunctionLocalAllocationInsertionPoint());
@@ -1293,6 +1324,7 @@ void PullbackEmitter::visitStructExtractInst(StructExtractInst *sei) {
   assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
   auto tangentVectorSILTy = SILType::getPrimitiveObjectType(tangentVectorTy);
   auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
+  // TODO(TF-970): Emit diagnostic when `TangentVector` is not a struct.
   assert(tangentVectorDecl);
   // Find the corresponding field in the tangent space.
   VarDecl *tanField = nullptr;
@@ -1341,6 +1373,53 @@ void PullbackEmitter::visitStructExtractInst(StructExtractInst *sei) {
                     sei->getLoc());
   }
   }
+}
+
+void PullbackEmitter::visitRefElementAddrInst(RefElementAddrInst *reai) {
+  auto *bb = reai->getParent();
+  auto adjBuf = getAdjointBuffer(bb, reai);
+  auto classTy = remapType(reai->getOperand()->getType()).getASTType();
+  auto tangentVectorTy =
+      getTangentSpace(classTy)->getType()->getCanonicalType();
+  assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
+  auto tangentVectorSILTy = SILType::getPrimitiveObjectType(tangentVectorTy);
+  auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
+  // TODO(TF-970): Emit diagnostic when `TangentVector` is not a struct.
+  assert(tangentVectorDecl);
+  // Look up the corresponding field in the tangent space by name.
+  VarDecl *tanField = nullptr;
+  auto tanFieldLookup =
+      tangentVectorDecl->lookupDirect(reai->getField()->getName());
+  if (tanFieldLookup.empty()) {
+    getContext().emitNondifferentiabilityError(
+        reai, getInvoker(),
+        diag::autodiff_stored_property_no_corresponding_tangent,
+        reai->getClassDecl()->getNameStr(), reai->getField()->getNameStr());
+    errorOccurred = true;
+    return;
+  }
+  tanField = cast<VarDecl>(tanFieldLookup.front());
+  // Accumulate adjoint for the `ref_element_addr` operand.
+  SmallVector<AdjointValue, 8> eltVals;
+  for (auto *field : tangentVectorDecl->getStoredProperties()) {
+    if (field == tanField) {
+      auto adjElt = builder.emitLoadValueOperation(
+          reai->getLoc(), adjBuf, LoadOwnershipQualifier::Copy);
+      eltVals.push_back(makeConcreteAdjointValue(adjElt));
+      recordTemporary(adjElt);
+    } else {
+      auto substMap = tangentVectorTy->getMemberSubstitutionMap(
+          field->getModuleContext(), field);
+      auto fieldTy = field->getType().subst(substMap);
+      auto fieldSILTy = getContext().getTypeConverter().getLoweredType(
+          fieldTy, TypeExpansionContext::minimal());
+      assert(fieldSILTy.isObject());
+      eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
+    }
+  }
+  addAdjointValue(bb, reai->getOperand(),
+                  makeAggregateAdjointValue(tangentVectorSILTy, eltVals),
+                  reai->getLoc());
 }
 
 void PullbackEmitter::visitTupleInst(TupleInst *ti) {
@@ -1558,7 +1637,6 @@ void PullbackEmitter::visitUnconditionalCheckedCastAddrInst(
     errorOccurred = true;                                                      \
     return;                                                                    \
   }
-NOT_DIFFERENTIABLE(RefElementAddr, autodiff_class_property_not_supported)
 #undef NOT_DIFFERENTIABLE
 
 AdjointValue PullbackEmitter::makeZeroAdjointValue(SILType type) {

@@ -570,6 +570,35 @@ func testBeginApplyActiveButInitiallyNonactiveInoutArgument(x: Float) -> Float {
 // CHECK: [ACTIVE]   %35 = load [trivial] %32 : $*Float
 
 //===----------------------------------------------------------------------===//
+// Class differentiation
+//===----------------------------------------------------------------------===//
+
+class C: Differentiable {
+  @differentiable
+  var float: Float
+
+  init(_ float: Float) {
+    self.float = float
+  }
+
+  @differentiable
+  func method(_ x: Float) -> Float {
+    x * float
+  }
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}1CC6methodyS2fF at (source=0 parameters=(0 1))
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $Float
+// CHECK: [ACTIVE] %1 = argument of bb0 : $C
+// CHECK: [USEFUL]   %4 = metatype $@thin Float.Type
+// CHECK: [VARIED]   %5 = class_method %1 : $C, #C.float!getter.1 : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
+// CHECK: [ACTIVE]   %6 = apply %5(%1) : $@convention(method) (@guaranteed C) -> Float
+// CHECK: [NONE]   // function_ref static Float.* infix(_:_:)
+// CHECK:   %7 = function_ref @$sSf1moiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: [ACTIVE]   %8 = apply %7(%0, %6, %4) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+}
+
+//===----------------------------------------------------------------------===//
 // Enum differentiation
 //===----------------------------------------------------------------------===//
 

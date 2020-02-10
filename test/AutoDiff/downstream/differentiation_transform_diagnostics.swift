@@ -270,14 +270,21 @@ class Foo : Differentiable {
     return x
   }
 
-  var base: Float = 1
+  var nonDifferentiableStored: Float = 1
 
-  // TODO(TF-645): Remove when differentiation supports `ref_element_addr`.
   @differentiable
-  func usesRefElementAddr(_ x: Float) -> Float {
+  func testNonDifferentiableRefElementAddr(_ x: Float) -> Float {
     // expected-error @+2 {{expression is not differentiable}}
     // expected-note @+1 {{member is not differentiable because the corresponding class member is not '@differentiable'}}
-    return base * x
+    return nonDifferentiableStored * x
+  }
+
+  @differentiable
+  var stored: Float = 1
+
+  @differentiable
+  func testRefElementAddr(_ x: Float) -> Float {
+    return stored * x
   }
 }
 
@@ -297,6 +304,27 @@ let _: @differentiable (Float) -> Float = Foo().method
 
 // expected-error @+1 {{function is not differentiable}}
 _ = gradient(at: .zero, in: Foo().method)
+
+// TF-1149: Test class with loadable type but address-only `TangentVector` type.
+class C<T: Differentiable>: Differentiable {
+  // expected-error @+1 {{function is not differentiable}}
+  @differentiable
+  // expected-note @+2 {{when differentiating this function definition}}
+  // expected-note @+1 {{cannot differentiate value with loadable type 'C<T>' but address-only 'TangentVector' type 'C<τ_0_0>.TangentVector'}}
+  var stored: T
+
+  init(_ stored: T) {
+    self.stored = stored
+  }
+
+  // expected-error @+1 {{function is not differentiable}}
+  @differentiable
+  // expected-note @+2 {{when differentiating this function definition}}
+  // expected-note @+1 {{cannot differentiate value with loadable type 'C<T>' but address-only 'TangentVector' type 'C<τ_0_0>.TangentVector'}}
+  func foo(_ x: T) -> T {
+    stored
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Unreachable
