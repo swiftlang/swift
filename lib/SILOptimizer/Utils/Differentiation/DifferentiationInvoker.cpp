@@ -16,10 +16,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILDifferentiabilityWitness.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Utils/Differentiation/DifferentiationInvoker.h"
+#include "swift/SIL/SILDifferentiabilityWitness.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 
 namespace swift {
 namespace autodiff {
@@ -32,9 +32,9 @@ SourceLoc DifferentiationInvoker::getLocation() const {
     return getIndirectDifferentiation().first->getLoc().getSourceLoc();
   case Kind::SILDifferentiabilityWitnessInvoker:
     return getSILDifferentiabilityWitnessInvoker()
-      ->getOriginalFunction()
-      ->getLocation()
-      .getSourceLoc();
+        ->getOriginalFunction()
+        ->getLocation()
+        .getSourceLoc();
   }
 }
 

@@ -503,7 +503,7 @@ final class VectorSpaceCustomStruct : DummyAdditiveArithmetic, Differentiable {
 }
 
 class StaticNoDerivative : Differentiable {
-  @noDerivative static var s: Bool = true // expected-error {{'@noDerivative' is only allowed on stored properties in structure or class types that declare a conformance to 'Differentiable'}}
+  @noDerivative static var s: Bool = true
 }
 
 final class StaticMembersShouldNotAffectAnything : DummyAdditiveArithmetic, Differentiable {

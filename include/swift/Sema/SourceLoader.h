@@ -56,7 +56,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
+  virtual bool canImportModule(Located<Identifier> named) override;
 
   /// Import a module with the given module path.
   ///
@@ -69,7 +69,7 @@ public:
   /// returns NULL.
   virtual ModuleDecl *
   loadModule(SourceLoc importLoc,
-             ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
+             ArrayRef<Located<Identifier>> path) override;
 
   /// Load extensions to the given nominal type.
   ///

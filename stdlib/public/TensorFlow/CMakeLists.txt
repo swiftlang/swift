@@ -14,12 +14,10 @@
 #
 #===----------------------------------------------------------------------===#
 
-if(NOT SWIFT_ENABLE_TENSORFLOW)
-  return()
-endif()
-
 find_package(TensorFlow REQUIRED)
 message(STATUS "Building TensorFlow.")
+message(STATUS "Using TensorFlow high-level APIs library.")
+
 
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
@@ -33,23 +31,19 @@ list(APPEND swift_stdlib_compile_flags "-DCOMPILING_TENSORFLOW_STDLIB_MODULE")
 
 set(SOURCES "")
 
-# Copy TensorFlow high-level API sources, if they exist.
-if (TENSORFLOW_SWIFT_APIS)
-  message(STATUS "Using TensorFlow high-level APIs library.")
+# Copy TensorFlow high-level API sources.
+file(GLOB_RECURSE TENSORFLOW_SWIFT_API_SOURCES
+  "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift")
+foreach(_TENSORFLOW_SWIFT_APIS_SOURCE ${TENSORFLOW_SWIFT_API_SOURCES})
+  file(TO_CMAKE_PATH ${_TENSORFLOW_SWIFT_APIS_SOURCE} _TENSORFLOW_SWIFT_APIS_SOURCE)
+  list(APPEND SOURCES ${_TENSORFLOW_SWIFT_APIS_SOURCE})
+endforeach()
 
-  file(GLOB_RECURSE TENSORFLOW_SWIFT_API_SOURCES
-    "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift")
-  foreach(_TENSORFLOW_SWIFT_APIS_SOURCE ${TENSORFLOW_SWIFT_API_SOURCES})
-    file(TO_CMAKE_PATH ${_TENSORFLOW_SWIFT_APIS_SOURCE} _TENSORFLOW_SWIFT_APIS_SOURCE)
-    list(APPEND SOURCES ${_TENSORFLOW_SWIFT_APIS_SOURCE})
-  endforeach()
-endif()
-
+get_filename_component(TensorFlow_LIBRARY_DIR "${TF_LIBRARY}" DIRECTORY)
 add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${SOURCES}"
 
-  INCORPORATE_OBJECT_LIBRARIES swiftCTensorFlow
-  PRIVATE_LINK_LIBRARIES "${TF_LIBRARIES}"
+  PRIVATE_LINK_LIBRARIES ${TF_LIBRARY}
   SWIFT_MODULE_DEPENDS SwiftOnoneSupport
   SWIFT_MODULE_DEPENDS_IOS Darwin
   SWIFT_MODULE_DEPENDS_OSX Darwin
@@ -61,10 +55,33 @@ add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT
   SWIFT_MODULE_DEPENDS Python
-  SWIFT_COMPILE_FLAGS "${swift_stdlib_compile_flags}"
-  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+  SWIFT_COMPILE_FLAGS
+    ${swift_stdlib_compile_flags}
+    -Xcc -I${TENSORFLOW_SWIFT_APIS}/Sources/CTensorFlow
+    -Xcc -I${TF_INCLUDE_DIR}
+  LINK_FLAGS
+    ${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}
+    -L${TensorFlow_LIBRARY_DIR}
   INSTALL_IN_COMPONENT stdlib
   EXTRA_RPATHS "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}"
   # NOTE: This is a workaround for https://github.com/apple/swift/pull/24382,
   # which changed the default install_name_dir to `/usr/bin/swift`.
   DARWIN_INSTALL_NAME_DIR "@rpath")
+
+
+swift_install_in_component(DIRECTORY ${TF_INCLUDE_DIR}/tensorflow/c/
+  DESTINATION lib/swift/tensorflow/c
+  COMPONENT stdlib
+  FILES_MATCHING
+    PATTERN c_api.h
+    PATTERN c_api_experimental.h
+    PATTERN tf_attrtype.h
+    PATTERN tf_datatype.h
+    PATTERN tf_status.h
+    PATTERN tf_tensor.h
+    PATTERN eager/c_api.h)
+swift_install_in_component(FILES
+    ${TENSORFLOW_SWIFT_APIS}/Sources/CTensorFlow/module.modulemap
+    ${TENSORFLOW_SWIFT_APIS}/Sources/CTensorFlow/CTensorFlow.h
+  DESTINATION lib/swift/tensorflow
+  COMPONENT stdlib)

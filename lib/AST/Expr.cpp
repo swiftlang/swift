@@ -228,7 +228,7 @@ DeclRefExpr *Expr::getMemberOperatorRef() {
   return operatorRef;
 }
 
-ConcreteDeclRef Expr::getReferencedDecl() const {
+ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   switch (getKind()) {
   // No declaration reference.
   #define NO_REFERENCE(Id) case ExprKind::Id: return ConcreteDeclRef()
@@ -237,7 +237,8 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
       return cast<Id##Expr>(this)->Getter()
   #define PASS_THROUGH_REFERENCE(Id, GetSubExpr)                      \
     case ExprKind::Id:                                                \
-      return cast<Id##Expr>(this)->GetSubExpr()->getReferencedDecl()
+      return cast<Id##Expr>(this)                                     \
+                 ->GetSubExpr()->getReferencedDecl(stopAtParenExpr)
 
   NO_REFERENCE(Error);
   NO_REFERENCE(NilLiteral);
@@ -247,7 +248,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(StringLiteral);
   NO_REFERENCE(InterpolatedStringLiteral);
   NO_REFERENCE(ObjectLiteral);
-  NO_REFERENCE(QuoteLiteral);
   NO_REFERENCE(MagicIdentifierLiteral);
   NO_REFERENCE(DiscardAssignment);
   NO_REFERENCE(LazyInitializer);
@@ -276,7 +276,12 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(UnresolvedMember);
   NO_REFERENCE(UnresolvedDot);
   NO_REFERENCE(Sequence);
-  PASS_THROUGH_REFERENCE(Paren, getSubExpr);
+
+  case ExprKind::Paren:
+    if (stopAtParenExpr) return ConcreteDeclRef();
+    return cast<ParenExpr>(this)
+               ->getSubExpr()->getReferencedDecl(stopAtParenExpr);
+
   PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
   PASS_THROUGH_REFERENCE(Try, getSubExpr);
   PASS_THROUGH_REFERENCE(ForceTry, getSubExpr);
@@ -372,8 +377,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(KeyPathDot);
   PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
-  NO_REFERENCE(Unquote);
-  SIMPLE_REFERENCE(DeclQuote, getQuotedDecl);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -559,7 +562,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return true;
 
   case ExprKind::ObjectLiteral:
-  case ExprKind::QuoteLiteral:
     return true;
 
   case ExprKind::DiscardAssignment:
@@ -704,8 +706,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return false;
 
   case ExprKind::Tap:
-  case ExprKind::Unquote:
-  case ExprKind::DeclQuote:
     return true;
   }
 
@@ -1133,38 +1133,6 @@ StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
 #include "swift/Syntax/TokenKinds.def"    
   }
   llvm_unreachable("unspecified literal");
-}
-
-QuoteLiteralExpr::QuoteLiteralExpr(SourceLoc poundLoc, Expr *subExpr)
-    : LiteralExpr(ExprKind::QuoteLiteral, /*Implicit=*/false),
-      PoundLoc(poundLoc), SubExpr(subExpr), SemanticExpr(nullptr) {}
-
-QuoteLiteralExpr *QuoteLiteralExpr::create(ASTContext &ctx, SourceLoc poundLoc,
-                                           Expr *subExpr) {
-  size_t size = sizeof(QuoteLiteralExpr);
-  void *memory = ctx.Allocate(size, alignof(QuoteLiteralExpr));
-  return new (memory) QuoteLiteralExpr(poundLoc, subExpr);
-}
-
-UnquoteExpr::UnquoteExpr(SourceLoc poundLoc, Expr *subExpr)
-    : Expr(ExprKind::Unquote, /*Implicit=*/false), PoundLoc(poundLoc),
-      SubExpr(subExpr) {}
-
-UnquoteExpr *UnquoteExpr::create(ASTContext &ctx, SourceLoc poundLoc,
-                                 Expr *subExpr) {
-  size_t size = sizeof(UnquoteExpr);
-  void *memory = ctx.Allocate(size, alignof(UnquoteExpr));
-  return new (memory) UnquoteExpr(poundLoc, subExpr);
-}
-
-DeclQuoteExpr::DeclQuoteExpr(ValueDecl *quotedDecl)
-    : Expr(ExprKind::DeclQuote, /*Implicit=*/true), QuotedDecl(quotedDecl),
-      SemanticExpr(nullptr) {}
-
-DeclQuoteExpr *DeclQuoteExpr::create(ASTContext &ctx, ValueDecl *quotedDecl) {
-  size_t size = sizeof(DeclQuoteExpr);
-  void *memory = ctx.Allocate(size, alignof(DeclQuoteExpr));
-  return new (memory) DeclQuoteExpr(quotedDecl);
 }
 
 ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {

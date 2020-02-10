@@ -232,6 +232,7 @@
   ],
   "DifferentiableProgramming": [
     "Differentiable.swift",
-    "DifferentiationSupport.swift"
+    "DifferentiationSupport.swift",
+    "FloatingPointTypesDerivatives.swift"
   ]
 }

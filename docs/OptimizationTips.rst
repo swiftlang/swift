@@ -319,7 +319,7 @@ generics. Some more examples of generics:
     func pop() -> T { ... }
   }
 
-  func myAlgorithm(_ a: [T], length: Int) { ... }
+  func myAlgorithm<T>(_ a: [T], length: Int) { ... }
 
   // The compiler can specialize code of MyStack<Int>
   var stackOfInts: MyStack<Int>
@@ -446,7 +446,7 @@ construct such a data structure:
       var value: T {
           get { return ref.val }
           set {
-            if (!isKnownUniquelyReferenced(&ref)) {
+            if !isKnownUniquelyReferenced(&ref) {
               ref = Ref(newValue)
               return
             }

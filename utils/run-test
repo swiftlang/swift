@@ -11,16 +11,14 @@
 
 from __future__ import print_function
 
-import argparse
 import multiprocessing
 import os
 import shutil
 import sys
 
-from swift_build_support.swift_build_support import (
-    arguments,
-    shell
-)
+from build_swift.build_swift import argparse
+
+from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support.SwiftBuildSupport import \
     SWIFT_SOURCE_ROOT
 from swift_build_support.swift_build_support.targets import \
@@ -131,8 +129,8 @@ def main():
                         help="build test dependencies before running tests "
                              "(default: true)")
     parser.add_argument("--target",
-                        type=arguments.type.shell_split,
-                        action=arguments.action.concat,
+                        type=argparse.types.ShellSplitType,
+                        action=argparse.actions.AppendAction,
                         dest="targets",
                         help="stdlib deployment targets to test. Accept "
                              "multiple (default: " + host_target + ")")
@@ -143,8 +141,8 @@ def main():
                         choices=TEST_SUBSETS, default='primary',
                         help="test subset (default: primary)")
     parser.add_argument("--param",
-                        type=arguments.type.shell_split,
-                        action=arguments.action.concat,
+                        type=argparse.types.ShellSplitType,
+                        action=argparse.actions.AppendAction,
                         default=[],
                         help="key=value parameters they are directly passed "
                              "to lit command in addition to `mode` and "
@@ -161,7 +159,7 @@ def main():
     args = parser.parse_args()
 
     targets = args.targets
-    if targets is None:
+    if not targets:
         targets = [host_target]
 
     paths = []

@@ -261,11 +261,11 @@ void swift::performDebuggerTestingTransform(SourceFile &SF) {
   // Walk over all decls in the file to find the next available closure
   // discriminator.
   DiscriminatorFinder DF;
-  for (Decl *D : SF.Decls)
+  for (Decl *D : SF.getTopLevelDecls())
     D->walk(DF);
 
   // Instrument the decls with checkExpect() sanity-checks.
-  for (Decl *D : SF.Decls) {
+  for (Decl *D : SF.getTopLevelDecls()) {
     DebuggerTestingTransform Transform{D->getASTContext(), DF};
     D->walk(Transform);
     swift::verify(D);

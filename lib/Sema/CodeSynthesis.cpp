@@ -444,10 +444,8 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
       auto *gp = cast<GenericTypeParamType>(type);
       if (gp->getDepth() < superclassDepth)
         return Type(gp).subst(subMap);
-      return CanGenericTypeParamType::get(
-        gp->getDepth() - superclassDepth + depth,
-          gp->getIndex(),
-          ctx);
+      return genericParams->getParams()[gp->getIndex()]
+                 ->getDeclaredInterfaceType();
     };
 
     auto lookupConformanceFn =
@@ -1035,13 +1033,18 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 llvm::Expected<bool>
 InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
                                                 ClassDecl *decl) const {
+  // Check if we parsed the @_inheritsConvenienceInitializers attribute.
+  if (decl->getAttrs().hasAttribute<InheritsConvenienceInitializersAttr>())
+    return true;
+
   auto superclass = decl->getSuperclass();
   assert(superclass);
 
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.
   auto *superclassDecl = superclass->getClassOrBoundGenericClass();
-  if (superclassDecl->hasMissingDesignatedInitializers())
+  if (superclassDecl->getModuleContext() != decl->getParentModule() &&
+      superclassDecl->hasMissingDesignatedInitializers())
     return false;
 
   // If we're allowed to inherit designated initializers, then we can inherit
@@ -1104,8 +1107,11 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
   // FIXME: This entire request is a layering violation made of smaller,
   // finickier layering violations. See rdar://56844567
 
-  auto &Context = target->getASTContext();
-  auto tryToInstallCodingKeys = [&](ProtocolDecl *protocol) {
+  // Checks whether the target conforms to the given protocol. If the
+  // conformance is incomplete, force the conformance.
+  //
+  // Returns whether the target conforms to the protocol.
+  auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
     if (!protocol)
       return false;
 
@@ -1128,6 +1134,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     return true;
   };
 
+  auto &Context = target->getASTContext();
   switch (action) {
   case ImplicitMemberAction::ResolveImplicitInit:
     TypeChecker::addImplicitConstructors(target);
@@ -1145,9 +1152,28 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     // synthesized, it will be synthesized.
     auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
     auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-    if (!tryToInstallCodingKeys(decodableProto)) {
-      (void)tryToInstallCodingKeys(encodableProto);
+    if (!evaluateTargetConformanceTo(decodableProto)) {
+      (void)evaluateTargetConformanceTo(encodableProto);
     }
+  }
+    break;
+  case ImplicitMemberAction::ResolveEncodable: {
+    // encode(to:) may be synthesized as part of derived conformance to the
+    // Encodable protocol.
+    // If the target should conform to the Encodable protocol, check the
+    // conformance here to attempt synthesis.
+    auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
+    (void)evaluateTargetConformanceTo(encodableProto);
+  }
+    break;
+  case ImplicitMemberAction::ResolveDecodable: {
+    // init(from:) may be synthesized as part of derived conformance to the
+    // Decodable protocol.
+    // If the target should conform to the Decodable protocol, check the
+    // conformance here to attempt synthesis.
+    TypeChecker::addImplicitConstructors(target);
+    auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
+    (void)evaluateTargetConformanceTo(decodableProto);
   }
     break;
   }

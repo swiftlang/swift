@@ -24,6 +24,8 @@
 #include "swift/Runtime/MutexPThread.h"
 #elif defined(_WIN32)
 #include "swift/Runtime/MutexWin32.h"
+#elif defined(__wasi__)
+#include "swift/Runtime/MutexWASI.h"
 #else
 #error "Implement equivalent of MutexPThread.h/cpp for your platform."
 #endif

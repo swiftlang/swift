@@ -532,8 +532,9 @@ class ContextualFailure : public FailureDiagnostic {
 public:
   ContextualFailure(ConstraintSystem &cs, Type lhs, Type rhs,
                     ConstraintLocator *locator)
-      : ContextualFailure(cs, cs.getContextualTypePurpose(), lhs, rhs,
-                          locator) {}
+      : ContextualFailure(cs,
+                          cs.getContextualTypePurpose(locator->getAnchor()),
+                          lhs, rhs, locator) {}
 
   ContextualFailure(ConstraintSystem &cs, ContextualTypePurpose purpose,
                     Type lhs, Type rhs, ConstraintLocator *locator)
@@ -554,9 +555,12 @@ public:
 
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
+  
+  /// Diagnose failed conversion in a `CoerceExpr`.
+  bool diagnoseCoercionToUnrelatedType() const;
 
-  // If we're trying to convert something of type "() -> T" to T,
-  // then we probably meant to call the value.
+  /// If we're trying to convert something of type "() -> T" to T,
+  /// then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
 
   /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
@@ -649,7 +653,7 @@ protected:
   ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
 
   static Optional<Diag<Type, Type>>
-  getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+  getDiagnosticFor(ContextualTypePurpose context, Type contextualType);
 };
 
 /// Diagnose errors related to converting function type which
@@ -1207,6 +1211,8 @@ public:
 
   bool diagnoseAsError() override;
 
+  bool diagnoseAsNote() override;
+
   bool diagnoseSingleMissingArgument() const;
 
 private:
@@ -1371,11 +1377,11 @@ public:
   bool diagnoseAsError() override;
 };
 
-// Diagnose an attempt to use AnyObject as the root type of a KeyPath
-//
-// ```swift
-// let keyPath = \AnyObject.bar
-// ```
+/// Diagnose an attempt to use AnyObject as the root type of a KeyPath
+///
+/// ```swift
+/// let keyPath = \AnyObject.bar
+/// ```
 class AnyObjectKeyPathRootFailure final : public FailureDiagnostic {
 
 public:
@@ -1916,6 +1922,15 @@ class UnableToInferClosureReturnType final : public FailureDiagnostic {
 public:
   UnableToInferClosureReturnType(ConstraintSystem &cs,
                                  ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator) {}
+
+  bool diagnoseAsError();
+};
+
+class UnableToInferProtocolLiteralType final : public FailureDiagnostic {
+public:
+  UnableToInferProtocolLiteralType(ConstraintSystem &cs,
+                                   ConstraintLocator *locator)
       : FailureDiagnostic(cs, locator) {}
 
   bool diagnoseAsError();

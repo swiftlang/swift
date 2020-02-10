@@ -25,6 +25,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/Located.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
@@ -70,16 +71,13 @@ public:
   struct Convention {
     StringRef Name = {};
     DeclNameRef WitnessMethodProtocol = {};
-    StringRef ClangType = {};
-    // Carry the source location for diagnostics.
-    SourceLoc ClangTypeLoc = {};
-
+    Located<StringRef> ClangType = Located<StringRef>(StringRef(), {});
     /// Convenience factory function to create a Swift convention.
     ///
     /// Don't use this function if you are creating a C convention as you
     /// probably need a ClangType field as well.
     static Convention makeSwiftConvention(StringRef name) {
-      return {name, DeclNameRef(), "", {}};
+      return {name, DeclNameRef(), Located<StringRef>("", {})};
     }
   };
 
@@ -685,23 +683,6 @@ public:
   
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SwiftNativeObjCRuntimeBase;
-  }
-};
-
-/// Defines the @_implicitly_synthesizes_nested_requirement attribute.
-class ImplicitlySynthesizesNestedRequirementAttr : public DeclAttribute {
-public:
-  ImplicitlySynthesizesNestedRequirementAttr(StringRef Value, SourceLoc AtLoc,
-                                             SourceRange Range)
-    : DeclAttribute(DAK_ImplicitlySynthesizesNestedRequirement,
-                    AtLoc, Range, /*Implicit*/false),
-      Value(Value) {}
-
-  /// The name of the phantom requirement.
-  const StringRef Value;
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ImplicitlySynthesizesNestedRequirement;
   }
 };
 
@@ -1626,72 +1607,19 @@ public:
   /// Indicates when the symbol was moved here.
   const llvm::VersionTuple MovedVersion;
 
-  /// Returns true if this attribute is active given the current platform.
-  bool isActivePlatform(const ASTContext &ctx) const;
+  struct ActiveVersion {
+    StringRef ModuleName;
+    PlatformKind Platform;
+    bool IsSimulator;
+    llvm::VersionTuple Version;
+  };
+
+  /// Returns non-optional if this attribute is active given the current platform.
+  /// The value provides more details about the active platform.
+  Optional<ActiveVersion> isActivePlatform(const ASTContext &ctx) const;
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_OriginallyDefinedIn;
   }
-};
-
-/// Attribute that asks the compiler to generate a function that returns a
-/// quoted representation of the attributed declaration.
-///
-///     @quoted
-///     func identity(_ x: Int) -> Int {
-///         return x;
-///     }
-///
-/// The generated function, called "quote decl", looks along the following lines
-/// (the exact representation may change over time since quasiquotes are an
-/// experimental feature, e.g. the name may end up being mangled as per #13):
-///
-///     func _quotedIdentity() -> Tree {
-///         return #quote{
-///             func identity(_ x: Int) -> Int {
-///                 return x;
-///             }
-///         }
-///     }
-///
-/// Quote decls are not supposed to be called manually. Instead,  it is expected
-/// that #quote(...) will be used to obtain representations of @quoted
-/// declarations, by synthesizing calls to quote decls. This way users don't
-/// have to know the details of name mangling in the presence of overloads etc:
-///
-///     #quote(identity)
-///
-///     Unquote(
-///       Name(
-///         "foo",
-///         "s:4main3fooyS2fF",
-///         FunctionType(
-///           [],
-///           [TypeName("Int", "s:Si")],
-///           TypeName("Int", "s:Si"))),
-///       { () -> Tree in quotedIdentity() },
-///       FunctionType(
-///         [],
-///         [TypeName("Int", "s:Si")],
-///         TypeName("Int", "s:Si")))
-class QuotedAttr final : public DeclAttribute {
-  FuncDecl *QuoteDecl;
-
-  explicit QuotedAttr(FuncDecl *quoteDecl, SourceLoc atLoc, SourceRange range,
-                      bool implicit);
-
-public:
-  FuncDecl *getQuoteDecl() const { return QuoteDecl; }
-  void setQuoteDecl(FuncDecl *quoteDecl) { QuoteDecl = quoteDecl; }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Quoted;
-  }
-
-  static QuotedAttr *create(ASTContext &context, SourceLoc atLoc,
-                            SourceRange range, bool implicit);
-
-  static QuotedAttr *create(ASTContext &context, FuncDecl *quoteDecl,
-                            SourceLoc atLoc, SourceRange range, bool implicit);
 };
 
 /// A declaration name with location.
@@ -1711,15 +1639,12 @@ class DifferentiableAttr final
       private llvm::TrailingObjects<DifferentiableAttr,
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
-  // SWIFT_ENABLE_TENSORFLOW
-  friend class DifferentiableAttributeParameterIndicesRequest;
-  // SWIFT_ENABLE_TENSORFLOW END
+  friend class DifferentiableAttributeTypeCheckRequest;
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// The declaration on which the `@differentiable` attribute is declared.
+  /// May not be a valid declaration for `@differentiable` attributes.
   /// Resolved during parsing and deserialization.
   Decl *OriginalDeclaration = nullptr;
-  // SWIFT_ENABLE_TENSORFLOW END
   /// Whether this function is linear (optional).
   bool Linear;
   /// The number of parsed differentiability parameters specified in 'wrt:'.
@@ -1734,13 +1659,12 @@ class DifferentiableAttr final
   /// The VJP function (optional), resolved by the type checker if VJP name is
   /// specified.
   FuncDecl *VJPFunction = nullptr;
-  // SWIFT_ENABLE_TENSORFLOW
-  // NOTE: Parameter indices requestification is done on `tensorflow` branch but
-  // has not yet been upstreamed to `master` branch.
-  /// The differentiability parameter indices, resolved by the type checker.
   /// The bit stores whether the parameter indices have been computed.
+  ///
+  /// Note: it is necessary to use a bit instead of `nullptr` parameter indices
+  /// to represent "parameter indices not yet type-checked" because invalid
+  /// attributes have `nullptr` parameter indices but have been type-checked.
   llvm::PointerIntPair<IndexSubset *, 1, bool> ParameterIndicesAndBit;
-  // SWIFT_ENABLE_TENSORFLOW END
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
   /// The generic signature for autodiff associated functions. Resolved by the
@@ -1781,7 +1705,10 @@ public:
                                     GenericSignature derivativeGenSig);
 
   Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
-  void setOriginalDeclaration(Decl *decl);
+
+  /// Sets the original declaration on which this attribute is declared.
+  /// Should only be used by parsing and deserialization.
+  void setOriginalDeclaration(Decl *originalDeclaration);
 
   /// Get the optional 'jvp:' function name and location.
   /// Use this instead of `getJVPFunction` to check whether the attribute has a
@@ -1793,13 +1720,14 @@ public:
   /// registered VJP.
   Optional<DeclNameRefWithLoc> getVJP() const { return VJP; }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // NOTE: Parameter indices requestification is done on `tensorflow` branch but
-  // has not yet been upstreamed to `master` branch.
-  bool hasComputedParameterIndices() const;
+private:
+  /// Returns true if the given `@differentiable` attribute has been
+  /// type-checked.
+  bool hasBeenTypeChecked() const;
+
+public:
   IndexSubset *getParameterIndices() const;
-  void setParameterIndices(IndexSubset *paramIndices);
-  // SWIFT_ENABLE_TENSORFLOW END
+  void setParameterIndices(IndexSubset *parameterIndices);
 
   /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
@@ -1836,10 +1764,9 @@ public:
 
   // Print the attribute to the given stream.
   // If `omitWrtClause` is true, omit printing the `wrt:` clause.
-  // If `omitAssociatedFunctions` is true, omit printing associated functions.
-  void print(llvm::raw_ostream &OS, const Decl *D,
-             bool omitWrtClause = false,
-             bool omitAssociatedFunctions = false) const;
+  // If `omitDerivativeFunctions` is true, omit printing derivative functions.
+  void print(llvm::raw_ostream &OS, const Decl *D, bool omitWrtClause = false,
+             bool omitDerivativeFunctions = false) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
@@ -1870,7 +1797,7 @@ class DerivativeAttr final
       private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// The base type repr for the referenced original function. This field is
+  /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
   /// resolve the original declaration, which is serialized.
@@ -2074,6 +2001,11 @@ public:
   /// unavailable relative to the provided language version.
   bool
   isUnavailableInSwiftVersion(const version::Version &effectiveVersion) const;
+
+  /// Finds the most-specific platform-specific attribute that is
+  /// active for the current platform.
+  const AvailableAttr *
+  findMostSpecificActivePlatform(const ASTContext &ctx) const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or the first one that indicates it's

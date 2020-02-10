@@ -4,7 +4,7 @@ func test(_ b : Base) {
 }
 
 // REQUIRES: objc_interop
-// RUN: %sourcekitd-test -req=cursor -pos=3:7 %s -- %s %mcp_opt -F %S/Inputs -module-name Mixed -import-underlying-module | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=3:7 %s -- %s -F %S/Inputs -module-name Mixed -import-underlying-module | %FileCheck %s
 
 // CHECK: source.lang.swift.ref.function.method.instance ({{.*}}Mixed.framework/Headers/Mixed.h:5:9-5:23)
 // CHECK: doIt(_:)

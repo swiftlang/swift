@@ -132,14 +132,14 @@ enum class ResilienceStrategy : unsigned {
 /// \sa FileUnit
 class ModuleDecl : public DeclContext, public TypeDecl {
 public:
-  typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
+  typedef ArrayRef<Located<Identifier>> AccessPathTy;
   typedef std::pair<ModuleDecl::AccessPathTy, ModuleDecl*> ImportedModule;
   
   static bool matchesAccessPath(AccessPathTy AccessPath, DeclName Name) {
     assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
   
     return AccessPath.empty()
-      || DeclName(AccessPath.front().first).matchesRef(Name);
+      || DeclName(AccessPath.front().Item).matchesRef(Name);
   }
   
   /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.
@@ -582,7 +582,7 @@ public:
 private:
   // Make placement new and vanilla new/delete illegal for Modules.
   void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() SWIFT_DELETE_OPERATOR_DELETED;
+  void operator delete(void *Data) throw() = delete;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
 public:
   // Only allow allocation of Modules using the allocator in ASTContext

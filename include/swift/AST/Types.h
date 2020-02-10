@@ -59,6 +59,7 @@ class AssociatedTypeDecl;
 class ASTContext;
 enum BufferPointerTypeKind : unsigned;
 class ClassDecl;
+class ClangModuleLoader;
 class DependentMemberType;
 class GenericTypeParamDecl;
 class GenericTypeParamType;
@@ -1167,18 +1168,10 @@ public:
   /// object type.
   TypeTraitResult canBeClass();
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Return the associated tangent type. Return the null type if there is no
-  /// associated tangent type.
-  ///
-  /// If the type conforms to `Differentiable`, then the associated
-  /// tangent type is the associated `TangentVector` from the `Differentiable`
-  /// requirement. If the type is a tuple, then the associated tangent type is
-  /// the elementwise tangent type of its elements. If the type is a builtin
-  /// float, then the associated tangent type is itself. Otherwise, there is no
-  /// associated type.
-  Optional<VectorSpace>
-  getAutoDiffAssociatedTangentSpace(LookupConformanceFn lookupConformance);
+  /// Return the tangent space of the given type, if it exists. Otherwise,
+  /// return `None`.
+  Optional<TangentSpace>
+  getAutoDiffTangentSpace(LookupConformanceFn lookupConformance);
 
 private:
   // Make vanilla new/delete illegal for Types.
@@ -2974,6 +2967,11 @@ public:
 
       bool empty() const { return !ClangFunctionType; }
       Uncommon(const clang::Type *type) : ClangFunctionType(type) {}
+
+    public:
+      /// Use the ClangModuleLoader to print the Clang type as a string.
+      void printClangFunctionType(ClangModuleLoader *cml,
+                                  llvm::raw_ostream &os);
     };
 
   private:
@@ -3212,29 +3210,77 @@ public:
     return getExtInfo().getRepresentation();
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Given `indices` and `kind`, calculates the type of the corresponding
-  /// autodiff derivative function.
+  /// Returns the derivative function type for the given parameter indices,
+  /// result index, derivative function kind, derivative function generic
+  /// signature (optional), and other auxiliary parameters.
   ///
-  /// By default, if the original type has a self parameter list and parameter
-  /// indices include self, the computed derivative function type will return a
-  /// linear map taking/returning self's tangent *last* instead of first, for
+  /// Preconditions:
+  /// - Parameters corresponding to parameter indices must conform to
+  ///   `Differentiable`.
+  /// - The result corresponding to the result index must conform to
+  ///   `Differentiable`.
+  ///
+  /// Typing rules, given:
+  /// - Original function type. Three cases:
+  ///   - Top-level function: `(T0, T1, ...) -> R`
+  ///   - Static method: `(Self.Type) -> (T0, T1, ...) -> R`
+  ///   - Instance method: `(Self) -> (T0, T1, ...) -> R`
+  ///
+  /// Terminology:
+  /// - The derivative of a `Differentiable`-conforming type has the
+  ///   `TangentVector` associated type. `TangentVector` is abbreviated as `Tan`
+  ///   below.
+  /// - "wrt" parameters refers to differentiability parameters, identified by
+  ///   the parameter indices.
+  /// - "wrt" result refers to the result identified by the result index.
+  ///
+  /// JVP derivative type:
+  /// - Takes original parameters.
+  /// - Returns original result, followed by a differential function, which
+  ///   takes "wrt" parameter derivatives and returns a "wrt" result derivative.
+  ///
+  /// \verbatim
+  ///   (T0, T1, ...) -> (R,       (T0.Tan, T1.Tan, ...) -> R.Tan)
+  ///                     ^         ^~~~~~~~~~~~~~~~~~~     ^~~~~
+  ///           original result | derivatives wrt params | derivative wrt result
+  ///
+  ///   (Self) -> (T0, ...) -> (R, (Self.Tan, T0.Tan, ...) -> R.Tan)
+  ///                           ^   ^~~~~~~~~~~~~~~~~~~~~     ^~~~~
+  ///             original result  |  deriv. wrt params  |  deriv. wrt result
+  /// \endverbatim
+  ///
+  /// VJP derivative type:
+  /// - Takes original parameters.
+  /// - Returns original result, followed by a pullback function, which
+  ///   takes a "wrt" result derivative and returns "wrt" parameter derivatives.
+  ///
+  /// \verbatim
+  ///   (T0, T1, ...) -> (R,           (R.Tan)    ->     (T0.Tan, T1.Tan, ...))
+  ///                     ^             ^~~~~             ^~~~~~~~~~~~~~~~~~~
+  ///          original result | derivative wrt result | derivatives wrt params
+  ///
+  ///   (Self) -> (T0, ...) -> (R,     (R.Tan)    ->    (Self.Tan, T0.Tan, ...))
+  ///                           ^       ^~~~~            ^~~~~~~~~~~~~~~~~~~~~
+  ///              original result | deriv. wrt result | deriv. wrt params
+  /// \endverbatim
+  ///
+  /// By default, if the original type has a `self` parameter list and parameter
+  /// indices include `self`, the computed derivative function type will return
+  /// a linear map taking/returning self's tangent *last* instead of first, for
   /// consistency with SIL.
   ///
-  /// If `makeSelfParamFirst` is true, self's tangent is reordered to appear
-  /// first. This should be used during type-checking, e.g. type-checking
-  /// `@differentiable`, `@derivative`, and `@transpose` attributes.
-  ///
-  /// \note The original function type (`self`) need not be `@differentiable`.
-  /// The resulting function will preserve all `ExtInfo` of the original
-  /// function, including `@differentiable`.
+  /// If `makeSelfParamFirst` is true, `self`'s tangent is reordered to appear
+  /// first. `makeSelfParamFirst` should be true when working with user-facing
+  /// derivative function types, e.g. when type-checking `@differentiable` and
+  /// `@derivative` attributes.
   AnyFunctionType *getAutoDiffDerivativeFunctionType(
-      IndexSubset *indices, unsigned resultIndex,
+      IndexSubset *parameterIndices, unsigned resultIndex,
       AutoDiffDerivativeFunctionKind kind,
       LookupConformanceFn lookupConformance,
-      GenericSignature whereClauseGenericSignature = GenericSignature(),
+      GenericSignature derivativeGenericSignature = GenericSignature(),
       bool makeSelfParamFirst = false);
 
+  // SWIFT_ENABLE_TENSORFLOW
   AnyFunctionType *getWithoutDifferentiability() const;
 
   /// True if the parameter declaration it is attached to is guaranteed
@@ -3365,7 +3411,6 @@ END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 /// has a default argument.
 struct ParameterListInfo {
   SmallBitVector defaultArguments;
-  std::vector<Type> functionBuilderTypes;
 
 public:
   ParameterListInfo() { }
@@ -3383,9 +3428,6 @@ public:
 
   /// Retrieve the number of parameters for which we have information.
   unsigned size() const { return defaultArguments.size(); }
-
-  /// Retrieve the function builder type for the given parameter.
-  Type getFunctionBuilderType(unsigned paramIdx) const;
 };
 
 /// Turn a param list into a symbolic and printable representation that does not
@@ -3618,15 +3660,19 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
-/// Determines whether a differentiable function type is differentiable with
-/// respect to this parameter.
+/// The differentiability of a SIL function type parameter.
 enum class SILParameterDifferentiability : unsigned {
-  /// The function type is differentiable with respect to this parameter, or
-  /// differentiability is not applicable because the function is not
-  /// differentiable.
+  /// Either differentiable or not applicable.
+  ///
+  /// - If the function type is not `@differentiable`, parameter
+  ///   differentiability is not applicable. This case is the default value.
+  /// - If the function type is `@differentiable`, the function is
+  ///   differentiable with respect to this parameter.
   DifferentiableOrNotApplicable,
 
+  /// Not differentiable: a `@noDerivative` parameter.
+  ///
+  /// May be applied only to parameters of `@differentiable` function types.
   /// The function type is not differentiable with respect to this parameter.
   NotDifferentiable,
 };
@@ -3634,17 +3680,15 @@ enum class SILParameterDifferentiability : unsigned {
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
   llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
-
-  // SWIFT_ENABLE_TENSORFLOW
   SILParameterDifferentiability Differentiability : 1;
+
 public:
   SILParameterInfo() = default;//: Ty(), Convention((ParameterConvention)0) {}
-  // SWIFT_ENABLE_TENSORFLOW
   SILParameterInfo(
       CanType type, ParameterConvention conv,
       SILParameterDifferentiability differentiability =
           SILParameterDifferentiability::DifferentiableOrNotApplicable)
-    : TypeAndConvention(type, conv), Differentiability(differentiability) {
+      : TypeAndConvention(type, conv), Differentiability(differentiability) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
@@ -3699,14 +3743,14 @@ public:
     return isGuaranteedParameter(getConvention());
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   SILParameterDifferentiability getDifferentiability() const {
     return Differentiability;
   }
 
   SILParameterInfo getWithDifferentiability(
       SILParameterDifferentiability differentiability) const {
-    return SILParameterInfo(getInterfaceType(), getConvention(), differentiability);
+    return SILParameterInfo(getInterfaceType(), getConvention(),
+                            differentiability);
   }
 
   /// The SIL storage type determines the ABI for arguments based purely on the
@@ -3738,7 +3782,6 @@ public:
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(getInterfaceType().getPointer());
     id.AddInteger((unsigned)getConvention());
-    // SWIFT_ENABLE_TENSORFLOW
     id.AddInteger((unsigned)getDifferentiability());
   }
 
@@ -3753,7 +3796,6 @@ public:
   }
 
   bool operator==(SILParameterInfo rhs) const {
-    // SWIFT_ENABLE_TENSORFLOW
     return getInterfaceType() == rhs.getInterfaceType() &&
            getConvention() == rhs.getConvention() &&
            getDifferentiability() == rhs.getDifferentiability();
@@ -3941,7 +3983,7 @@ namespace Lowering {
 /// function parameter and result types.
 class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
     private llvm::TrailingObjects<SILFunctionType, SILParameterInfo,
-                                  SILResultInfo> {
+                                  SILResultInfo, SILYieldInfo, CanType> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<SILParameterInfo>) const {
@@ -3949,7 +3991,15 @@ class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
   }
 
   size_t numTrailingObjects(OverloadToken<SILResultInfo>) const {
-    return hasErrorResult() ? 1 : 0;
+    return getNumResults() + (hasErrorResult() ? 1 : 0);
+  }
+
+  size_t numTrailingObjects(OverloadToken<SILYieldInfo>) const {
+    return getNumYields();
+  }
+
+  size_t numTrailingObjects(OverloadToken<CanType>) const {
+    return hasResultCache() ? 2 : 0;
   }
 
 public:
@@ -3989,6 +4039,11 @@ public:
 
       bool empty() const { return !ClangFunctionType; }
       Uncommon(const clang::FunctionType *type) : ClangFunctionType(type) {}
+
+    public:
+      /// Analog of AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType.
+      void printClangFunctionType(ClangModuleLoader *cml,
+                                  llvm::raw_ostream &os) const;
     };
 
     Uncommon Other;
@@ -4042,6 +4097,11 @@ public:
       return getSILFunctionLanguage(getRepresentation());
     }
 
+    /// Return the underlying Uncommon value if it is not the default value.
+    Optional<Uncommon> getUncommonInfo() const {
+      return Other.empty() ? Optional<Uncommon>() : Other;
+    }
+
     bool hasSelfParam() const {
       switch (getRepresentation()) {
       case Representation::Thick:
@@ -4093,12 +4153,12 @@ public:
       return ExtInfo(NoEscape ? (Bits | NoEscapeMask) : (Bits & ~NoEscapeMask),
                      Other);
     }
-    // SWIFT_ENABLE_TENSORFLOW
-    ExtInfo withDifferentiabilityKind(
-        DifferentiabilityKind differentiability) const {
-      return ExtInfo((Bits & ~DifferentiabilityMask) |
-                     ((unsigned)differentiability <<
-                      DifferentiabilityMaskOffset), Other);
+    ExtInfo
+    withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
+      return ExtInfo(
+          (Bits & ~DifferentiabilityMask) |
+              ((unsigned)differentiability << DifferentiabilityMaskOffset),
+          Other);
     }
 
     std::pair<unsigned, const void *> getFuncAttrKey() const {
@@ -4121,12 +4181,13 @@ private:
   unsigned NumAnyResults : 16;         // Not including the ErrorResult.
   unsigned NumAnyIndirectFormalResults : 16; // Subset of NumAnyResults.
 
+  // [SILFunctionType-layout]
   // The layout of a SILFunctionType in memory is:
   //   SILFunctionType
   //   SILParameterInfo[NumParameters]
   //   SILResultInfo[isCoroutine() ? 0 : NumAnyResults]
-  //   SILYieldInfo[isCoroutine() ? NumAnyResults : 0]
   //   SILResultInfo?    // if hasErrorResult()
+  //   SILYieldInfo[isCoroutine() ? NumAnyResults : 0]
   //   CanType?          // if !isCoro && NumAnyResults > 1, formal result cache
   //   CanType?          // if !isCoro && NumAnyResults > 1, all result cache
 
@@ -4139,34 +4200,16 @@ private:
   }
 
   MutableArrayRef<SILResultInfo> getMutableResults() {
-    auto *ptr = reinterpret_cast<SILResultInfo *>(getMutableParameters().end());
-    return {ptr, getNumResults()};
+    return {getTrailingObjects<SILResultInfo>(), getNumResults()};
   }
 
   MutableArrayRef<SILYieldInfo> getMutableYields() {
-    auto *ptr = reinterpret_cast<SILYieldInfo *>(getMutableParameters().end());
-    return {ptr, getNumYields()};
-  }
-
-  /// Return a pointer past the end of the formal results, whether they
-  /// are yield-results or normal results.
-  void *getEndOfFormalResults() {
-    return isCoroutine() ? static_cast<void*>(getMutableYields().end())
-                         : static_cast<void*>(getMutableResults().end());
+    return {getTrailingObjects<SILYieldInfo>(), getNumYields()};
   }
 
   SILResultInfo &getMutableErrorResult() {
     assert(hasErrorResult());
-    return *reinterpret_cast<SILResultInfo*>(getEndOfFormalResults());
-  }
-
-  /// Return a pointer past the end of all of the results, including the
-  /// error result if one is present.
-  void *getEndOfAllResults() {
-    void *end = getEndOfFormalResults();
-    if (hasErrorResult())
-      end = reinterpret_cast<char*>(end) + sizeof(SILResultInfo);
-    return end;
+    return *(getTrailingObjects<SILResultInfo>() + getNumResults());
   }
 
   /// Do we have slots for caches of the normal-result tuple type?
@@ -4176,14 +4219,13 @@ private:
 
   CanType &getMutableFormalResultsCache() const {
     assert(hasResultCache());
-    auto *ptr = const_cast<SILFunctionType *>(this)->getEndOfAllResults();
-    return *reinterpret_cast<CanType*>(ptr);
+    return *const_cast<SILFunctionType *>(this)->getTrailingObjects<CanType>();
   }
 
   CanType &getMutableAllResultsCache() const {
     assert(hasResultCache());
-    auto *ptr = const_cast<SILFunctionType *>(this)->getEndOfAllResults();
-    return *(reinterpret_cast<CanType *>(ptr) + 1);
+    return *(const_cast<SILFunctionType *>(this)->getTrailingObjects<CanType>()
+             + 1);
   }
 
   SILFunctionType(GenericSignature genericSig, ExtInfo ext,

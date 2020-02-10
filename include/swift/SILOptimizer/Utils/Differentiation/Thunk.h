@@ -64,25 +64,29 @@ enum class DifferentiationThunkKind {
   IndexSubset
 };
 
-CanGenericSignature buildThunkSignature(
-    SILFunction *fn, bool inheritGenericSig,
-    OpenedArchetypeType *openedExistential, GenericEnvironment *&genericEnv,
-    SubstitutionMap &contextSubs, SubstitutionMap &interfaceSubs,
-    ArchetypeType *&newArchetype);
+CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
+                                        OpenedArchetypeType *openedExistential,
+                                        GenericEnvironment *&genericEnv,
+                                        SubstitutionMap &contextSubs,
+                                        SubstitutionMap &interfaceSubs,
+                                        ArchetypeType *&newArchetype);
 
 /// Build the type of a function transformation thunk.
-CanSILFunctionType buildThunkType(
-    SILFunction *fn, CanSILFunctionType &sourceType,
-    CanSILFunctionType &expectedType, GenericEnvironment *&genericEnv,
-    SubstitutionMap &interfaceSubs, bool withoutActuallyEscaping,
-    DifferentiationThunkKind thunkKind);
+CanSILFunctionType buildThunkType(SILFunction *fn,
+                                  CanSILFunctionType &sourceType,
+                                  CanSILFunctionType &expectedType,
+                                  GenericEnvironment *&genericEnv,
+                                  SubstitutionMap &interfaceSubs,
+                                  bool withoutActuallyEscaping,
+                                  DifferentiationThunkKind thunkKind);
 
 /// Get or create a reabstraction thunk from `fromType` to `toType`, to be
 /// called in `caller`.
-SILFunction *getOrCreateReabstractionThunk(
-    SILOptFunctionBuilder &fb, SILModule &module, SILLocation loc,
-    SILFunction *caller, CanSILFunctionType fromType,
-    CanSILFunctionType toType);
+SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
+                                           SILModule &module, SILLocation loc,
+                                           SILFunction *caller,
+                                           CanSILFunctionType fromType,
+                                           CanSILFunctionType toType);
 
 /// Get or create a derivative function parameter index subset thunk from
 /// `actualIndices` to `desiredIndices` for the given associated function
@@ -93,9 +97,9 @@ SILFunction *getOrCreateReabstractionThunk(
 /// map returned by the derivative function.
 std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForDerivativeFunction(
-    SILOptFunctionBuilder &fb, SILValue origFnOperand,
-    SILValue derivativeFn, AutoDiffDerivativeFunctionKind kind,
-    SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices);
+    SILOptFunctionBuilder &fb, SILValue origFnOperand, SILValue derivativeFn,
+    AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
+    SILAutoDiffIndices actualIndices);
 
 /// Get or create a derivative function parameter index subset thunk from
 /// `actualIndices` to `desiredIndices` for the given associated function

@@ -53,7 +53,7 @@ func otherExistential<T : EqualComparable>(_ t1: T) {
   otherEqComp2 = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
   _ = otherEqComp2
 
-  _ = t1 as EqualComparable & OtherEqualComparable // expected-error{{'T' is not convertible to 'EqualComparable & OtherEqualComparable'; did you mean to use 'as!' to force downcast?}} {{10-12=as!}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
+  _ = t1 as EqualComparable & OtherEqualComparable // expected-error{{value of type 'T' does not conform to 'EqualComparable & OtherEqualComparable' in coercion}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
 }
 
 protocol Runcible {

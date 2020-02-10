@@ -360,6 +360,23 @@ func projectTailElems<T>(h: Header, ty: T.Type) -> Builtin.RawPointer {
 }
 // CHECK: } // end sil function '$s8builtins16projectTailElems1h2tyBpAA6HeaderC_xmtlF'
 
+// Make sure we borrow if this is owned.
+//
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins21projectTailElemsOwned{{[_0-9a-zA-Z]*}}F
+func projectTailElemsOwned<T>(h: __owned Header, ty: T.Type) -> Builtin.RawPointer {
+  // CHECK: bb0([[ARG1:%.*]] : @owned $Header
+  // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
+  // CHECK:   [[TA:%.*]] = ref_tail_addr [[BORROWED_ARG1]] : $Header
+  //   -- Once we have passed the address through a2p, we no longer provide any guarantees.
+  //   -- We still need to make sure that the a2p itself is in the borrow site though.
+  // CHECK:   [[A2P:%.*]] = address_to_pointer [[TA]]
+  // CHECK:   end_borrow [[BORROWED_ARG1]]
+  // CHECK:   destroy_value [[ARG1]]
+  // CHECK:   return [[A2P]]
+  return Builtin.projectTailElems(h, ty)
+}
+// CHECK: } // end sil function '$s8builtins21projectTailElemsOwned{{[_0-9a-zA-Z]*}}F'
+
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins11getTailAddr{{[_0-9a-zA-Z]*}}F
 func getTailAddr<T1, T2>(start: Builtin.RawPointer, i: Builtin.Word, ty1: T1.Type, ty2: T2.Type) -> Builtin.RawPointer {
   // CHECK: [[P2A:%.*]] = pointer_to_address %0

@@ -40,6 +40,7 @@
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/Located.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -475,14 +476,10 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
-
-    /// Whether we have already added the phantom CodingKeys
-    /// nested requirement to this declaration.
-    AddedPhantomCodingKeys : 1,
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
     HasLazyConformances : 1,
@@ -539,7 +536,7 @@ protected:
     RawForeignKind : 2,
 
     /// \see ClassDecl::getEmittedMembers()
-    HasForcedEmittedMembers : 1,     
+    HasForcedEmittedMembers : 1,
 
     HasMissingDesignatedInitializers : 1,
     ComputedHasMissingDesignatedInitializers : 1,
@@ -756,6 +753,11 @@ public:
     return Attrs;
   }
 
+  /// Returns the introduced OS version in the given platform kind specified
+  /// by @available attribute.
+  /// This function won't consider the parent context to get the information.
+  Optional<llvm::VersionTuple> getIntroducedOSVersion(PlatformKind Kind) const;
+
   /// Returns the starting location of the entire declaration.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
 
@@ -874,6 +876,8 @@ public:
   LLVM_READONLY
   const GenericContext *getAsGenericContext() const;
 
+  bool hasUnderscoredNaming() const;
+
   bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   AvailabilityContext getAvailabilityForLinkage() const;
@@ -927,7 +931,7 @@ public:
 
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
-  void operator delete(void *Data) SWIFT_DELETE_OPERATOR_DELETED;
+  void operator delete(void *Data) = delete;
 
   // Only allow allocation of Decls using the allocator in ASTContext
   // or by doing a placement new.
@@ -1508,11 +1512,11 @@ enum class ImportKind : uint8_t {
 ///   import Swift
 ///   import typealias Swift.Int
 class ImportDecl final : public Decl,
-    private llvm::TrailingObjects<ImportDecl, std::pair<Identifier,SourceLoc>> {
+    private llvm::TrailingObjects<ImportDecl, Located<Identifier>> {
   friend TrailingObjects;
   friend class Decl;
 public:
-  typedef std::pair<Identifier, SourceLoc> AccessPathElement;
+  typedef Located<Identifier> AccessPathElement;
 
 private:
   SourceLoc ImportLoc;
@@ -1582,9 +1586,9 @@ public:
   }
 
   SourceLoc getStartLoc() const { return ImportLoc; }
-  SourceLoc getLocFromSource() const { return getFullAccessPath().front().second; }
+  SourceLoc getLocFromSource() const { return getFullAccessPath().front().Loc; }
   SourceRange getSourceRange() const {
-    return SourceRange(ImportLoc, getFullAccessPath().back().second);
+    return SourceRange(ImportLoc, getFullAccessPath().back().Loc);
   }
   SourceLoc getKindLoc() const { return KindLoc; }
 
@@ -2861,7 +2865,7 @@ public:
 /// code. One is formed implicitly when a declaration is written with an opaque
 /// result type, as in:
 ///
-/// func foo() -> opaque SignedInteger { return 1 }
+/// func foo() -> some SignedInteger { return 1 }
 ///
 /// The declared type is a special kind of ArchetypeType representing the
 /// abstracted underlying type.
@@ -3300,6 +3304,10 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   /// so that it can also be added to the lookup table (if needed).
   void addedMember(Decl *member);
 
+  /// Note that we have added an extension into the nominal type,
+  /// so that its members can eventually be added to the lookup table.
+  void addedExtension(ExtensionDecl *ext);
+
   /// A lookup table used to find the protocol conformances of
   /// a given nominal type.
   mutable ConformanceLookupTable *ConformanceTable = nullptr;
@@ -3318,6 +3326,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   friend class ExtensionDecl;
   friend class DeclContext;
   friend class IterableDeclContext;
+  friend class DirectLookupRequest;
   friend ArrayRef<ValueDecl *>
   ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
 
@@ -3333,7 +3342,6 @@ protected:
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
-    Bits.NominalTypeDecl.AddedPhantomCodingKeys = false;
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
     Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
@@ -3374,18 +3382,6 @@ public:
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
   }
 
-  /// Determine whether we have already attempted to add the
-  /// phantom CodingKeys type to this declaration.
-  bool addedPhantomCodingKeys() const {
-    return Bits.NominalTypeDecl.AddedPhantomCodingKeys;
-  }
-
-  /// Note that we have attempted to add the phantom CodingKeys type
-  /// to this declaration.
-  void setAddedPhantomCodingKeys() {
-    Bits.NominalTypeDecl.AddedPhantomCodingKeys = true;
-  }
-
   /// getDeclaredType - Retrieve the type declared by this entity, without
   /// any generic parameters bound if this is a generic type.
   Type getDeclaredType() const;
@@ -3405,6 +3401,12 @@ public:
     /// Whether to include @_implements members.
     /// Used by conformance-checking to find special @_implements members.
     IncludeAttrImplements = 1 << 0,
+    /// Whether to avoid loading lazy members from any new extensions that would otherwise be found
+    /// by deserialization.
+    ///
+    /// Used by the module loader to break recursion and as an optimization e.g. when it is known that a
+    /// particular member declaration will never appear in an extension.
+    IgnoreNewExtensions = 1 << 1,
   };
 
   /// Find all of the declarations with the given name within this nominal type
@@ -3853,6 +3855,25 @@ class ClassDecl final : public NominalTypeDecl {
     return None;
   }
 
+  Optional<bool> getCachedHasMissingDesignatedInitializers() const {
+    if (!Bits.ClassDecl.ComputedHasMissingDesignatedInitializers) {
+      // Force loading all the members, which will add this attribute if any of
+      // members are determined to be missing while loading.
+      auto mutableThis = const_cast<ClassDecl *>(this);
+      (void)mutableThis->lookupDirect(DeclBaseName::createConstructor());
+    }
+
+    if (Bits.ClassDecl.ComputedHasMissingDesignatedInitializers)
+      return Bits.ClassDecl.HasMissingDesignatedInitializers;
+
+    return None;
+  }
+
+  void setHasMissingDesignatedInitializers(bool value) {
+    Bits.ClassDecl.HasMissingDesignatedInitializers = value;
+    Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = true;
+  }
+
   /// Marks that this class inherits convenience initializers from its
   /// superclass.
   void setInheritsSuperclassInitializers(bool value) {
@@ -3863,6 +3884,7 @@ class ClassDecl final : public NominalTypeDecl {
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class EmittedMembersRequest;
+  friend class HasMissingDesignatedInitializersRequest;
   friend class InheritsSuperclassInitializersRequest;
   friend class TypeChecker;
 
@@ -3969,11 +3991,6 @@ public:
   /// initializers that cannot be represented in Swift.
   bool hasMissingDesignatedInitializers() const;
 
-  void setHasMissingDesignatedInitializers(bool newValue = true) {
-    Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = 1;
-    Bits.ClassDecl.HasMissingDesignatedInitializers = newValue;
-  }
-
   /// Returns true if the class has missing members that require vtable entries.
   ///
   /// In this case, the class cannot be subclassed, because we cannot construct
@@ -4012,7 +4029,7 @@ public:
 
   /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
-  bool inheritsSuperclassInitializers();
+  bool inheritsSuperclassInitializers() const;
 
   /// Walks the class hierarchy starting from this class, checking various
   /// conditions.
@@ -5738,8 +5755,6 @@ public:
 private:
   ParameterList *Params;
 
-// SWIFT_ENABLE_TENSORFLOW
-private:
   /// The generation at which we last loaded derivative function configurations.
   unsigned DerivativeFunctionConfigGeneration = 0;
   /// Prepare to traverse the list of derivative function configurations.
@@ -5753,14 +5768,6 @@ private:
   ///   configurations from imported modules.
   struct DerivativeFunctionConfigurationList;
   DerivativeFunctionConfigurationList *DerivativeFunctionConfigs = nullptr;
-
-public:
-  /// Get all derivative function configurations.
-  ArrayRef<AutoDiffConfig> getDerivativeFunctionConfigurations();
-
-  /// Add the given derivative function configuration.
-  void addDerivativeFunctionConfiguration(AutoDiffConfig config);
-// SWIFT_ENABLE_TENSORFLOW END
 
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
@@ -6085,6 +6092,12 @@ public:
   /// Tests if this is a function returning a DynamicSelfType, or a
   /// constructor.
   bool hasDynamicSelfResult() const;
+
+  /// Get all derivative function configurations.
+  ArrayRef<AutoDiffConfig> getDerivativeFunctionConfigurations();
+
+  /// Add the given derivative function configuration.
+  void addDerivativeFunctionConfiguration(AutoDiffConfig config);
 
   using DeclContext::operator new;
   using Decl::getASTContext;
@@ -7427,11 +7440,16 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   return result;
 }
 
-/// Retrieve the parameter list for a given declaration.
+/// Retrieve the parameter list for a given declaration, or nullputr if there
+/// is none.
 ParameterList *getParameterList(ValueDecl *source);
 
-/// Retrieve parameter declaration from the given source at given index.
+/// Retrieve parameter declaration from the given source at given index, or
+/// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
+
+void simple_display(llvm::raw_ostream &out,
+                    OptionSet<NominalTypeDecl::LookupDirectFlags> options);
 
 /// Display Decl subclasses.
 void simple_display(llvm::raw_ostream &out, const Decl *decl);

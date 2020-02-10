@@ -49,7 +49,7 @@ static void diagnoseScopedImports(DiagnosticEngine &diags,
   for (const ModuleDecl::ImportedModule &importPair : imports) {
     if (importPair.first.empty())
       continue;
-    diags.diagnose(importPair.first.front().second,
+    diags.diagnose(importPair.first.front().Loc,
                    diag::module_interface_scoped_import_unsupported);
   }
 }
@@ -119,7 +119,7 @@ static void printImports(raw_ostream &out, ModuleDecl *M) {
     if (!import.first.empty()) {
       out << "/*";
       for (const auto &accessPathElem : import.first)
-        out << "." << accessPathElem.first;
+        out << "." << accessPathElem.Item;
       out << "*/";
     }
 
@@ -440,7 +440,7 @@ bool swift::emitSwiftInterface(raw_ostream &out,
   printImports(out, M);
 
   const PrintOptions printOptions = PrintOptions::printSwiftInterfaceFile(
-      Opts.PreserveTypesAsWritten);
+      Opts.PreserveTypesAsWritten, Opts.PrintFullConvention);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;

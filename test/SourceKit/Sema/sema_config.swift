@@ -7,6 +7,6 @@ x = 2
 #endif
 
 // RUN: %sourcekitd-test -req=sema %s -- %s > %t.false.response
-// RUN: diff -u %s.false.response %t.false.response
+// RUN: diff --strip-trailing-cr -u %s.false.response %t.false.response
 // RUN: %sourcekitd-test -req=sema %s -- %s -D FOO > %t.true.response
-// RUN: diff -u %s.true.response %t.true.response
+// RUN: diff --strip-trailing-cr -u %s.true.response %t.true.response

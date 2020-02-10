@@ -66,6 +66,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_STRING_1 | %FileCheck %s -check-prefix=INFIX_STRING
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_EXT_STRING_1 | %FileCheck %s -check-prefix=INFIX_EXT_STRING
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONFORM_SEQUENCE | %FileCheck %s -check-prefix=CONFORM_SEQUENCE
+
 // NO_STDLIB_PRIVATE: Begin completions
 // NO_STDLIB_PRIVATE: End completions
 
@@ -133,7 +135,7 @@ func testArchetypeReplacement1<FOO : Equatable>(_ a: [FOO]) {
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   append({#(newElement): Equatable#})[#Void#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   insert({#(newElement): Equatable#}, {#at: Int#})[#Void#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceVar]/Super:            isEmpty[#Bool#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceVar]/CurrNominal:      first[#Equatable?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceVar]/Super:            first[#Equatable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/Super:         dropFirst({#(k): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/Super:         dropLast({#(k): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/Super:         prefix({#(maxLength): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
@@ -164,7 +166,7 @@ func testArchetypeReplacement3 (_ a : [Int]) {
 // PRIVATE_NOMINAL_MEMBERS_7: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/CurrNominal:   append({#(newElement): Int#})[#Void#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         removeLast()[#Int#]
-// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceVar]/CurrNominal:      first[#Int?#]
+// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceVar]/Super:            first[#Int?#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         map({#(transform): (Int) throws -> T##(Int) throws -> T#})[' rethrows'][#[T]#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         dropLast({#(k): Int#})[#ArraySlice<Int>#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         elementsEqual({#(other): Sequence#}, {#by: (Int, Sequence.Element) throws -> Bool##(Int, Sequence.Element) throws -> Bool#})[' rethrows'][#Bool#]; name=elementsEqual(other: Sequence, by: (Int, Sequence.Element) throws -> Bool) rethrows
@@ -286,3 +288,14 @@ func testInfixOperator4(_ x: String) {
 // INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  && {#Bool#}[#Bool#]
 // INFIX_EXT_STRING-NOT: ==
 // INFIX_EXT_STRING: End completions
+
+class TestSequence : Sequence {
+#^CONFORM_SEQUENCE^#
+// CONFORM_SEQUENCE: Begin completions
+// CONFORM_SEQUENCE-DAG: Decl[AssociatedType]/Super: typealias Element = {#(Type)#};
+// CONFORM_SEQUENCE-DAG: Decl[AssociatedType]/Super: typealias Iterator = {#(Type)#};
+// CONFORM_SEQUENCE-DAG: Decl[InstanceMethod]/Super: func makeIterator() -> some IteratorProtocol {|};
+// CONFORM_SEQUENCE-DAG: Decl[InstanceVar]/Super:    var underestimatedCount: Int;
+// CONFORM_SEQUENCE-DAG: Decl[InstanceMethod]/Super: func withContiguousStorageIfAvailable<R>(_ body: (UnsafeBufferPointer<Element>) throws -> R) rethrows -> R? {|};
+// CONFORM_SEQUENCE: End completions
+}

@@ -33,6 +33,7 @@
 #include "swift/Syntax/TokenSyntax.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/MD5.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -137,13 +138,17 @@ void Parser::performCodeCompletionSecondPassImpl(
   // Disable libSyntax creation in the delayed parsing.
   SyntaxContext->disable();
 
+  // Disable updating the interface hash
+  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> CurrentTokenHashSaver(
+      CurrentTokenHash, nullptr);
+
   auto BufferID = L->getBufferID();
   auto startLoc = SourceMgr.getLocForOffset(BufferID, info.StartOffset);
   SourceLoc prevLoc;
   if (info.PrevOffset != ~0U)
     prevLoc = SourceMgr.getLocForOffset(BufferID, info.PrevOffset);
   // Set the parser position to the start of the delayed decl or the body.
-  restoreParserPosition(getParserPosition({startLoc, prevLoc}));
+  restoreParserPosition(getParserPosition(startLoc, prevLoc));
 
   // Do not delay parsing in the second pass.
   llvm::SaveAndRestore<bool> DisableDelayedBody(DelayBodyParsing, false);
@@ -182,7 +187,7 @@ void Parser::performCodeCompletionSecondPassImpl(
                 } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
                   ED->addMember(D);
                 } else if (auto *SF = dyn_cast<SourceFile>(DC)) {
-                  SF->Decls.push_back(D);
+                  SF->addTopLevelDecl(D);
                 } else {
                   llvm_unreachable("invalid decl context kind");
                 }
@@ -521,6 +526,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     SIL(SIL),
     CurDeclContext(&SF),
     Context(SF.getASTContext()),
+    CurrentTokenHash(SF.getInterfaceHashPtr()),
     DelayBodyParsing(DelayBodyParsing),
     TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF, L->getBufferID()) :
@@ -537,13 +543,6 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
   // Set the token to a sentinel so that we know the lexer isn't primed yet.
   // This cannot be tok::unknown, since that is a token the lexer could produce.
   Tok.setKind(tok::NUM_TOKENS);
-
-  auto ParserPos = State->takeParserPosition();
-  if (ParserPos.isValid() &&
-      L->isStateForCurrentBuffer(ParserPos.LS)) {
-    restoreParserPosition(ParserPos);
-    InPoundLineEnvironment = State->InPoundLineEnvironment;
-  }
 }
 
 Parser::~Parser() {
@@ -551,6 +550,8 @@ Parser::~Parser() {
   delete TokReceiver;
   delete SyntaxContext;
 }
+
+bool Parser::isInSILMode() const { return SF.Kind == SourceFileKind::SIL; }
 
 bool Parser::allowTopLevelCode() const {
   return SF.isScriptMode();
@@ -564,12 +565,21 @@ SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
   SourceLoc Loc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
 
-  if (IsParsingInterfaceTokens && !Tok.getText().empty()) {
-    SF.recordInterfaceToken(Tok.getText());
-  }
+  recordTokenHash(Tok);
+
   L->lex(Tok, LeadingTrivia, TrailingTrivia);
   PreviousLoc = Loc;
   return Loc;
+}
+
+void Parser::recordTokenHash(StringRef token) {
+  assert(!token.empty());
+  if (llvm::MD5 *cth = CurrentTokenHash.getPtrOrNull()) {
+    cth->update(token);
+    // Add null byte to separate tokens.
+    uint8_t a[1] = {0};
+    cth->update(a);
+  }
 }
 
 void Parser::consumeExtraToken(Token Extra) {
@@ -698,7 +708,7 @@ SourceLoc Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
     // 'Self' can appear in types, skip it.
     if (Tok.is(tok::kw_Self))
       break;
-    if (isStartOfStmt() || isStartOfDecl() || Tok.is(tok::pound_endif))
+    if (isStartOfStmt() || isStartOfSwiftDecl() || Tok.is(tok::pound_endif))
       return lastLoc;
     break;
 
@@ -727,7 +737,7 @@ void Parser::skipUntilDeclRBrace() {
   while (Tok.isNot(tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif,
                    tok::code_complete) &&
-         !isStartOfDecl())
+         !isStartOfSwiftDecl())
     skipSingle();
 }
 
@@ -735,7 +745,7 @@ void Parser::skipUntilDeclStmtRBrace(tok T1) {
   while (Tok.isNot(T1, tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif,
                    tok::code_complete) &&
-         !isStartOfStmt() && !isStartOfDecl()) {
+         !isStartOfStmt() && !isStartOfSwiftDecl()) {
     skipSingle();
   }
 }
@@ -744,7 +754,7 @@ void Parser::skipUntilDeclStmtRBrace(tok T1, tok T2) {
   while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif,
                    tok::code_complete) &&
-         !isStartOfStmt() && !isStartOfDecl()) {
+         !isStartOfStmt() && !isStartOfSwiftDecl()) {
     skipSingle();
   }
 }
@@ -755,7 +765,7 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
     bool hasDelimiter = Tok.getLoc() == startLoc || consumeIf(tok::comma);
     bool possibleDeclStartsLine = Tok.isAtStartOfLine();
     
-    if (isStartOfDecl()) {
+    if (isStartOfSwiftDecl()) {
       
       // Could have encountered something like `_ var:` 
       // or `let foo:` or `var:`
@@ -785,7 +795,7 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
 void Parser::skipUntilDeclRBrace(tok T1, tok T2) {
   while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif) &&
-         !isStartOfDecl()) {
+         !isStartOfSwiftDecl()) {
     skipSingle();
   }
 }
@@ -1054,7 +1064,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   while (true) {
     while (Tok.is(tok::comma)) {
       diagnose(Tok, diag::unexpected_separator, ",")
-        .fixItRemove(SourceRange(Tok.getLoc()));
+        .fixItRemove(Tok.getLoc());
       consumeToken();
     }
     SourceLoc StartLoc = Tok.getLoc();
@@ -1084,14 +1094,14 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
         continue;
       if (!AllowSepAfterLast) {
         diagnose(Tok, diag::unexpected_separator, ",")
-          .fixItRemove(SourceRange(PreviousLoc));
+          .fixItRemove(PreviousLoc);
       }
       break;
     }
     // If we're in a comma-separated list, the next token is at the
     // beginning of a new line and can never start an element, break.
     if (Tok.isAtStartOfLine() &&
-        (Tok.is(tok::r_brace) || isStartOfDecl() || isStartOfStmt())) {
+        (Tok.is(tok::r_brace) || isStartOfSwiftDecl() || isStartOfStmt())) {
       break;
     }
     // If we found EOF or such, bailout.
@@ -1223,11 +1233,7 @@ ParserUnit::~ParserUnit() {
 
 OpaqueSyntaxNode ParserUnit::parse() {
   auto &P = getParser();
-  bool Done = false;
-  while (!Done) {
-    P.parseTopLevel();
-    Done = P.Tok.is(tok::eof);
-  }
+  P.parseTopLevel();
   return P.finalizeSyntaxTree();
 }
 

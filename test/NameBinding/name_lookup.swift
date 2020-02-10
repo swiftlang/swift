@@ -619,20 +619,18 @@ struct PatternBindingWithTwoVars2 { var x = y, y = 3 }
 // expected-error@-1 {{cannot use instance member 'y' within property initializer; property initializers run before 'self' is available}}
 
 struct PatternBindingWithTwoVars3 { var x = y, y = x }
-// expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
-// expected-error@-2 {{cannot use instance member 'y' within property initializer; property initializers run before 'self' is available}}
-// expected-error@-3 {{circular reference}}
+// expected-error@-1 {{circular reference}}
+// expected-note@-2 {{through reference here}}
+// expected-note@-3 {{through reference here}}
 // expected-note@-4 {{through reference here}}
 // expected-note@-5 {{through reference here}}
 // expected-note@-6 {{through reference here}}
-// expected-note@-7 {{through reference here}}
+// expected-error@-7 {{circular reference}}
 // expected-note@-8 {{through reference here}}
-// expected-error@-9 {{circular reference}}
+// expected-note@-9 {{through reference here}}
 // expected-note@-10 {{through reference here}}
 // expected-note@-11 {{through reference here}}
 // expected-note@-12 {{through reference here}}
-// expected-note@-13 {{through reference here}}
-// expected-note@-14 {{through reference here}}
 
 // https://bugs.swift.org/browse/SR-9015
 func sr9015() {

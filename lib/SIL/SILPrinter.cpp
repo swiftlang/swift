@@ -64,6 +64,10 @@ llvm::cl::opt<bool>
 SILPrintDebugInfo("sil-print-debuginfo", llvm::cl::init(false),
                 llvm::cl::desc("Include debug info in SIL output"));
 
+llvm::cl::opt<bool>
+SILPrintSourceInfo("sil-print-sourceinfo", llvm::cl::init(false),
+                   llvm::cl::desc("Include source annotation in SIL output"));
+
 llvm::cl::opt<bool> SILPrintGenericSpecializationInfo(
     "sil-print-generic-specialization-info", llvm::cl::init(false),
     llvm::cl::desc("Include generic specialization"
@@ -683,7 +687,22 @@ public:
     }
     *this << '\n';
 
+    const auto &SM = BB->getModule().getASTContext().SourceMgr;
+    Optional<SILLocation> PrevLoc;
     for (const SILInstruction &I : *BB) {
+      if (SILPrintSourceInfo) {
+        auto CurSourceLoc = I.getLoc().getSourceLoc();
+        if (CurSourceLoc.isValid()) {
+          if (!PrevLoc || SM.getLineNumber(CurSourceLoc) > SM.getLineNumber(PrevLoc->getSourceLoc())) {
+              auto Buffer = SM.findBufferContainingLoc(CurSourceLoc);
+              auto Line = SM.getLineNumber(CurSourceLoc);
+              auto LineLength = SM.getLineLength(Buffer, Line);
+              PrintState.OS << "  // " << SM.extractText({SM.getLocForLineCol(Buffer, Line, 0), LineLength.getValueOr(0)}) <<
+              "\tSourceLoc: " << SM.getDisplayNameForLoc(CurSourceLoc) << ":" << Line << "\n";
+              PrevLoc = I.getLoc();
+          }
+        }
+      }
       Ctx.printInstructionCallBack(&I);
       if (SILPrintGenericSpecializationInfo) {
         if (auto AI = ApplySite::isa(const_cast<SILInstruction *>(&I)))
@@ -2865,7 +2884,7 @@ void SILProperty::print(SILPrintContext &Ctx) const {
   printValueDecl(getDecl(), OS);
   if (auto sig = getDecl()->getInnermostDeclContext()
                           ->getGenericSignatureOfContext()) {
-    sig->getCanonicalSignature()->print(OS, Options);
+    sig.getCanonicalSignature()->print(OS, Options);
   }
   OS << " (";
   if (auto component = getComponent())
@@ -3368,6 +3387,11 @@ SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
                 bool SortedSIL) :
   OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
   DebugInfo(SILPrintDebugInfo) { }
+
+SILPrintContext::SILPrintContext(llvm::raw_ostream &OS,
+                                 const SILOptions &Opts) :
+  OutStream(OS), Verbose(Opts.EmitVerboseSIL), SortedSIL(Opts.EmitSortedSIL),
+  DebugInfo(SILPrintDebugInfo) {}
 
 SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
                                  bool SortedSIL, bool DebugInfo) :

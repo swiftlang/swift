@@ -252,3 +252,9 @@ let _ = b.bar()
 // CHECK: = "instance ok"
 let _ = b[42]
 // CHECK: = "subscript ok"
+
+let (pbd1, pbd2) = ({ _ in (1, 2)})(0)
+// CHECK: (pbd1, pbd2) : (Int, Int) = (1, 2)
+
+let (pbd3, pbd4) = ({ _ in ({ _ in (3, 4) })(0) })(0)
+// CHECK: (pbd3, pbd4) : (Int, Int) = (3, 4)

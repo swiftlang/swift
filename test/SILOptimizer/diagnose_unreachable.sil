@@ -782,3 +782,33 @@ bb1(%2 : @owned $Builtin.NativeObject):
 bb2:
   unreachable
 }
+
+// Test propagation of guaranteed phi arguments. The nested end_borrow
+// must be removed, even with the outer borrow is *not* a function
+// argument.
+
+enum EnumWithB {
+  case A(B)
+  func testit() -> Int
+}
+
+// CHECK-LABEL: sil hidden [ossa] @testPropagateGuaranteedPhi : $@convention(method) (@guaranteed EnumWithB) -> () {
+// CHECK: bb1([[PHI:%.*]] : @guaranteed $B):
+// CHECK:   br bb2
+// CHECK: bb2:
+// CHECK:   end_borrow [[PHI]] : $B
+// CHECK-NOT: end_borrow
+// CHECK-LABEL: } // end sil function 'testPropagateGuaranteedPhi'
+sil hidden [ossa] @testPropagateGuaranteedPhi : $@convention(method) (@guaranteed EnumWithB) -> () {
+bb0(%0 : @guaranteed $EnumWithB):
+  switch_enum %0 : $EnumWithB, case #EnumWithB.A!enumelt.1: bb1
+
+bb1(%2 : @guaranteed $B):
+  br bb3(%2 : $B)
+
+bb3(%4 : @guaranteed $B):
+  end_borrow %4 : $B
+  end_borrow %2 : $B
+  %99 = tuple ()
+  return %99 : $()
+}

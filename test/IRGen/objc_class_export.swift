@@ -81,7 +81,7 @@ struct BigStructWithNativeObjects {
 
   @objc func drawInRect(dirty dirty: NSRect) {
   }
-  // CHECK: define internal void @"$s17objc_class_export3FooC10drawInRect5dirtyySo6NSRectV_tFTo"([[OPAQUE:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
+  // CHECK: define internal void @"$s17objc_class_export3FooC10drawInRect5dirtyySo6NSRectV_tFTo"([[OPAQUE:%.*]]*, i8*, [[NSRECT]]* byval align 8) {{[#0-9]*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE]]* %0 to [[FOO]]*
   // CHECK:   call swiftcc void @"$s17objc_class_export3FooC10drawInRect5dirtyySo6NSRectV_tF"(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* swiftself [[CAST]])
   // CHECK: }
@@ -90,14 +90,14 @@ struct BigStructWithNativeObjects {
     return NSRect(origin: NSPoint(x: 0, y: 0), 
                   size: NSSize(width: 0, height: 0))
   }
-  // CHECK: define internal void @"$s17objc_class_export3FooC6boundsSo6NSRectVyFTo"([[NSRECT]]* noalias nocapture sret, [[OPAQUE4:%.*]]*, i8*) unnamed_addr {{.*}} {
+  // CHECK: define internal void @"$s17objc_class_export3FooC6boundsSo6NSRectVyFTo"([[NSRECT]]* noalias nocapture sret, [[OPAQUE4:%.*]]*, i8*) {{[#0-9]*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE4]]* %1 to [[FOO]]*
   // CHECK:   call swiftcc { double, double, double, double } @"$s17objc_class_export3FooC6boundsSo6NSRectVyF"([[FOO]]* swiftself [[CAST]])
 
   @objc func convertRectToBacking(r r: NSRect) -> NSRect {
     return r
   }
-  // CHECK: define internal void @"$s17objc_class_export3FooC20convertRectToBacking1rSo6NSRectVAG_tFTo"([[NSRECT]]* noalias nocapture sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
+  // CHECK: define internal void @"$s17objc_class_export3FooC20convertRectToBacking1rSo6NSRectVAG_tFTo"([[NSRECT]]* noalias nocapture sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) {{[#0-9]*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE5]]* %1 to [[FOO]]*
   // CHECK:   call swiftcc { double, double, double, double } @"$s17objc_class_export3FooC20convertRectToBacking1rSo6NSRectVAG_tF"(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* swiftself [[CAST]])
 

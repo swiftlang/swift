@@ -619,6 +619,6 @@ bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
 // SWIFT_ENABLE_TENSORFLOW
 /// Returns true if this SILType is a differentiable type.
 bool SILType::isDifferentiable(SILModule &M) const {
-  return getASTType()->getAutoDiffAssociatedTangentSpace(
+  return getASTType()->getAutoDiffTangentSpace(
       LookUpConformanceInModule(M.getSwiftModule())).hasValue();
 }

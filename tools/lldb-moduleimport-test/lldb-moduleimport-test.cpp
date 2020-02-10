@@ -325,14 +325,14 @@ int main(int argc, char **argv) {
       llvm::outs() << "Importing " << path << "... ";
 
 #ifdef SWIFT_SUPPORTS_SUBMODULES
-    std::vector<std::pair<swift::Identifier, swift::SourceLoc> > AccessPath;
+    std::vector<swift::Located<swift::Identifier>> AccessPath;
     for (auto i = llvm::sys::path::begin(path);
          i != llvm::sys::path::end(path); ++i)
       if (!llvm::sys::path::is_separator((*i)[0]))
           AccessPath.push_back({ CI.getASTContext().getIdentifier(*i),
                                  swift::SourceLoc() });
 #else
-    std::vector<std::pair<swift::Identifier, swift::SourceLoc> > AccessPath;
+    std::vector<swift::Located<swift::Identifier>> AccessPath;
     AccessPath.push_back({ CI.getASTContext().getIdentifier(path),
                            swift::SourceLoc() });
 #endif

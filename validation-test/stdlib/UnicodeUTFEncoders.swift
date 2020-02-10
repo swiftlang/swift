@@ -5,6 +5,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// With a non-optimized stdlib the test takes very long.
+// REQUIRES: optimized_stdlib
+
 import SwiftPrivate
 import StdlibUnittest
 

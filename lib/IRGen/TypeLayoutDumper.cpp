@@ -152,7 +152,7 @@ void TypeLayoutDumper::write(ArrayRef<ModuleDecl *> AllModules,
   }
 }
 
-bool swift::performDumpTypeInfo(IRGenOptions &Opts,
+bool swift::performDumpTypeInfo(const IRGenOptions &Opts,
                                 SILModule &SILMod,
                                 llvm::LLVMContext &LLVMContext) {
   auto &Ctx = SILMod.getASTContext();

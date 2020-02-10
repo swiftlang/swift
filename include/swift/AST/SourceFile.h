@@ -127,13 +127,44 @@ private:
 
   friend ASTContext;
   friend Impl;
+
 public:
+
+  //SWIFT_ENABLE_TENSORLFLOW
+  //For Tensorflow, keep this public because the SwiftCodeCompletion needs it
   /// The list of top-level declarations in the source file.
-  std::vector<Decl*> Decls;
+  std::vector<Decl *> Decls;
+  //SWIFT_ENABLE_TENSORLFLOW
+
+  /// Appends the given declaration to the end of the top-level decls list.
+  void addTopLevelDecl(Decl *d) {
+    Decls.push_back(d);
+  }
+
+  /// Prepends a declaration to the top-level decls list.
+  ///
+  /// FIXME: This entrypoint exists to support LLDB. Calls to this function are
+  /// always a mistake, and additional uses should not be added.
+  ///
+  /// See rdar://58355191
+  void prependTopLevelDecl(Decl *d) {
+    Decls.insert(Decls.begin(), d);
+  }
+
+  /// Retrieves an immutable view of the list of top-level decls in this file.
+  ArrayRef<Decl *> getTopLevelDecls() const {
+    return Decls;
+  }
+
+  /// Truncates the list of top-level decls so it contains \c count elements.
+  void truncateTopLevelDecls(unsigned count) {
+    assert(count <= Decls.size() && "Can only truncate top-level decls!");
+    Decls.resize(count);
+  }
 
   /// A cache of syntax nodes that can be reused when creating the syntax tree
   /// for this file.
-  SyntaxParsingCache *SyntaxParsingCache = nullptr;
+  swift::SyntaxParsingCache *SyntaxParsingCache = nullptr;
 
   /// The list of local type declarations in the source file.
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
@@ -399,12 +430,8 @@ public:
     return InterfaceHash.hasValue();
   }
 
-  void recordInterfaceToken(StringRef token) {
-    assert(!token.empty());
-    InterfaceHash->update(token);
-    // Add null byte to separate tokens.
-    uint8_t a[1] = {0};
-    InterfaceHash->update(a);
+  NullablePtr<llvm::MD5> getInterfaceHashPtr() {
+    return InterfaceHash ? InterfaceHash.getPointer() : nullptr;
   }
 
   void getInterfaceHash(llvm::SmallString<32> &str) const {

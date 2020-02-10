@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 533; // tensorflow merge
+const uint16_t SWIFTMODULE_VERSION_MINOR = 534; // add SIL parameter differentiability
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1121,6 +1121,7 @@ namespace decls_block {
     BCFixed<1>,             // implicit?
     BCFixed<1>,             // explicitly objc?
     BCFixed<1>,             // inherits convenience initializers from its superclass?
+    BCFixed<1>,             // has missing designated initializers?
     GenericSignatureIDField, // generic environment
     TypeIDField,            // superclass
     AccessLevelField,       // access level
@@ -1831,18 +1832,6 @@ namespace decls_block {
     BCFixed<1>,  // implicit flag
     TypeIDField // type referenced by this custom attribute
   >;
-
-  using ImplicitlySynthesizesNestedRequirementDeclAttrLayout = BCRecordLayout<
-    ImplicitlySynthesizesNestedRequirement_DECL_ATTR,
-    BCBlob      // member name
-  >;
-
-  // SWIFT_ENABLE_TENSORFLOW
-  using QuotedDeclAttrLayout = BCRecordLayout<Quoted_DECL_ATTR,
-                                              BCFixed<1>, // implicit flag
-                                              DeclIDField // quote decl
-                                              >;
-  // SWIFT_ENABLE_TENSORFLOW END
 }
 
 /// Returns the encoding kind for the given decl.

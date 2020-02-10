@@ -18,13 +18,13 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/SILOptimizer/Utils/Differentiation/VJPEmitter.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Utils/Differentiation/PullbackEmitter.h"
-#include "swift/SILOptimizer/Utils/Differentiation/VJPEmitter.h"
 #include "swift/SILOptimizer/Utils/Differentiation/Thunk.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 
 namespace swift {
 namespace autodiff {
@@ -151,7 +151,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
       origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
   pbParams.push_back(getTangentParameterInfoForOriginalResult(
       origResult.getInterfaceType()
-          ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+          ->getAutoDiffTangentSpace(lookupConformance)
           ->getCanonicalType(),
       origResult.getConvention()));
 
@@ -169,7 +169,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
         origParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
     adjResults.push_back(getTangentResultInfoForOriginalParameter(
         origParam.getInterfaceType()
-            ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+            ->getAutoDiffTangentSpace(lookupConformance)
             ->getCanonicalType(),
         origParam.getConvention()));
   }
@@ -378,7 +378,7 @@ void VJPEmitter::visitCondBranchInst(CondBranchInst *cbi) {
                                 createTrampolineBasicBlock(cbi->getFalseBB()));
 }
 
-void VJPEmitter::visitSwitchEnumInst(SwitchEnumInst *sei) {
+void VJPEmitter::visitSwitchEnumInstBase(SwitchEnumInstBase *sei) {
   // Build pullback struct value for original block.
   auto *origBB = sei->getParent();
   auto *pbStructVal = buildPullbackValueStructValue(sei);
@@ -423,8 +423,27 @@ void VJPEmitter::visitSwitchEnumInst(SwitchEnumInst *sei) {
     newDefaultBB = createTrampolineBasicBlock(defaultBB);
 
   // Create a new `switch_enum` instruction.
-  getBuilder().createSwitchEnum(sei->getLoc(), getOpValue(sei->getOperand()),
-                                newDefaultBB, caseBBs);
+  switch (sei->getKind()) {
+  case SILInstructionKind::SwitchEnumInst:
+    getBuilder().createSwitchEnum(sei->getLoc(), getOpValue(sei->getOperand()),
+                                  newDefaultBB, caseBBs);
+    break;
+  case SILInstructionKind::SwitchEnumAddrInst:
+    getBuilder().createSwitchEnumAddr(sei->getLoc(),
+                                      getOpValue(sei->getOperand()),
+                                      newDefaultBB, caseBBs);
+    break;
+  default:
+    llvm_unreachable("Expected `switch_enum` or `switch_enum_addr`");
+  }
+}
+
+void VJPEmitter::visitSwitchEnumInst(SwitchEnumInst *sei) {
+  visitSwitchEnumInstBase(sei);
+}
+
+void VJPEmitter::visitSwitchEnumAddrInst(SwitchEnumAddrInst *seai) {
+  visitSwitchEnumInstBase(seai);
 }
 
 void VJPEmitter::visitApplyInst(ApplyInst *ai) {
@@ -675,9 +694,8 @@ void VJPEmitter::visitDifferentiableFunctionInst(
 
 bool VJPEmitter::run() {
   PrettyStackTraceSILFunction trace("generating VJP for", original);
-  LLVM_DEBUG(getADDebugStream()
-             << "Cloning original @" << original->getName()
-             << " to vjp @" << vjp->getName() << '\n');
+  LLVM_DEBUG(getADDebugStream() << "Cloning original @" << original->getName()
+                                << " to vjp @" << vjp->getName() << '\n');
 
   // Create entry BB and arguments.
   auto *entry = vjp->createBasicBlock();
@@ -704,8 +722,9 @@ bool VJPEmitter::run() {
     errorOccurred = true;
     return true;
   }
-  LLVM_DEBUG(getADDebugStream() << "Generated VJP for "
-                                << original->getName() << ":\n" << *vjp);
+  LLVM_DEBUG(getADDebugStream()
+             << "Generated VJP for " << original->getName() << ":\n"
+             << *vjp);
   return errorOccurred;
 }
 

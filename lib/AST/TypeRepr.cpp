@@ -427,7 +427,7 @@ TupleTypeRepr::TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
 
   // Set ellipsis location and index.
   if (Ellipsis.isValid()) {
-    getTrailingObjects<SourceLocAndIdx>()[0] = {Ellipsis, EllipsisIdx};
+    getTrailingObjects<SourceLocAndIdx>()[0] = {EllipsisIdx, Ellipsis};
   }
 }
 

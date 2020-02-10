@@ -65,7 +65,7 @@ public:
   bool shouldAllPrivateDeclsBeVisibleFromOtherFiles() const {
     return HasMultipleIGMs;
   }
-  /// In case of multipe llvm modules, private lazy protocol
+  /// In case of multiple llvm modules, private lazy protocol
   /// witness table accessors could be emitted by two different IGMs during
   /// IRGen into different object files and the linker would complain about
   /// duplicate symbols.

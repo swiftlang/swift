@@ -470,6 +470,8 @@ ERROR(expected_precedencegroup_relation,none,
       (StringRef))
 
 // SIL
+ERROR(expected_sil_keyword,none,
+      "expected SIL keyword", ())
 ERROR(inout_not_attribute, none,
       "@inout is no longer an attribute", ())
 ERROR(only_allowed_in_sil,none,
@@ -944,6 +946,8 @@ ERROR(statement_same_line_without_semi,none,
       "consecutive statements on a line must be separated by ';'", ())
 ERROR(invalid_label_on_stmt,none,
       "labels are only valid on loops, if, and switch statements", ())
+ERROR(labeled_block_needs_do,none,
+      "labeled block needs 'do'", ())
 
 ERROR(snake_case_deprecated,none,
       "%0 has been replaced with %1 in Swift 3",
@@ -1048,7 +1052,11 @@ ERROR(expected_expr_repeat_while,PointsToFirstBadToken,
       "expected expression in 'repeat-while' condition", ())
 
 ERROR(do_while_now_repeat_while,none,
-      "'do-while' statement is not allowed; use 'repeat-while' instead", ())
+      "'do-while' statement is not allowed", ())
+NOTE(do_while_expected_repeat_while, none,
+      "did you mean 'repeat-while' statement?", ())
+NOTE(do_while_expected_separate_stmt, none,
+      "did you mean separate 'do' and 'while' statements?", ())
 
 // Do/Catch Statement
 ERROR(expected_lbrace_after_do,PointsToFirstBadToken,
@@ -1236,30 +1244,6 @@ ERROR(expected_arg_list_in_object_literal,PointsToFirstBadToken,
 ERROR(legacy_object_literal,none,
       "'%select{|[}0#%1(...)%select{|#]}0' has been renamed to '#%2(...)'",
       (bool, StringRef, StringRef))
-
-// Quote literal expressions.
-ERROR(expr_quote_enable_experimental_quasiquotes,PointsToFirstBadToken,
-      "'#quote' is unsupported; pass -enable-experimental-quasiquotes to "
-      "enable support for quasiquotes", ())
-ERROR(expr_quote_expected_lparen_or_lbrace,PointsToFirstBadToken,
-      "expected '(' or '}' following '#quote'", ())
-ERROR(expr_quote_expected_expr,PointsToFirstBadToken,
-      "expected expression within '#quote(...)'", ())
-ERROR(expr_quote_expected_closure,PointsToFirstBadToken,
-      "expected closure within '#quote{...}'", ())
-ERROR(expr_quote_expected_rparen,PointsToFirstBadToken,
-      "expected ')' to complete '#quote' expression", ())
-
-// Unquote expressions.
-ERROR(expr_unquote_enable_experimental_quasiquotes,PointsToFirstBadToken,
-      "'#unquote' is unsupported; pass -enable-experimental-quasiquotes to "
-      "enable support for quasiquotes", ())
-ERROR(expr_unquote_expected_lparen,PointsToFirstBadToken,
-      "expected '(' following '#unquote'", ())
-ERROR(expr_unquote_expected_expr,PointsToFirstBadToken,
-      "expected expression within '#unquote(...)'", ())
-ERROR(expr_unquote_expected_rparen,PointsToFirstBadToken,
-      "expected ')' to complete '#unquote' expression", ())
 
 // Unknown pound expression.
 ERROR(unknown_pound_expr,none,
@@ -1584,12 +1568,10 @@ ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
 ERROR(attr_differentiable_expected_label,none,
       "expected either 'wrt:' or a function specifier label, e.g. 'jvp:', "
       "or 'vjp:'", ())
-ERROR(differentiable_attribute_expected_rparen,none,
-      "expected ')' in '@differentiable' attribute", ())
-ERROR(unexpected_argument_differentiable,none,
+ERROR(attr_differentiable_unexpected_argument,none,
       "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
 // TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
-WARNING(differentiable_attr_jvp_vjp_deprecated_warning,none,
+WARNING(attr_differentiable_jvp_vjp_deprecated_warning,none,
         "'jvp:' and 'vjp:' arguments in '@differentiable' attribute are "
         "deprecated; use '@derivative' attribute for derivative registration "
         "instead", ())
@@ -1649,11 +1631,6 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
       "expected witness_generic signature '%0' does not have same generic "
       "parameters as original function generic signature '%1'",
       (StringRef, StringRef))
-
-// quoted
-ERROR(attr_quoted_enable_experimental_quasiquotes,PointsToFirstBadToken,
-      "'@quoted' is unsupported; pass -enable-experimental-quasiquotes to "
-      "enable support for quasiquotes", ())
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
@@ -1729,6 +1706,8 @@ ERROR(empty_version_string,none,
 WARNING(unknown_platform_condition_argument,none,
       "unknown %0 for build configuration '%1'",
       (StringRef, StringRef))
+WARNING(renamed_platform_condition_argument,none,
+      "'%0' has been renamed to '%1'", (StringRef, StringRef))
 WARNING(likely_simulator_platform_condition,none,
       "platform condition appears to be testing for simulator environment; "
       "use 'targetEnvironment(simulator)' instead",

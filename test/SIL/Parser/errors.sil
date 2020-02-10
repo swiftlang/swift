@@ -24,7 +24,7 @@ bb0:
 sil [ossa] @local_value_errors2 : $() -> () {
 bb0:
   %0 = builtin "cmp_eq_Int1"(%0 : $() // expected-error @+1 {{expected ')' or ',' in SIL instruction}}
-} // expected-error {{extraneous '}' at top level}}
+}
 
 sil [ossa] @global_value_errors : $() -> () {
 bb0:
@@ -49,5 +49,4 @@ sil_stage nonsense // expected-error {{expected 'raw' or 'canonical' after 'sil_
 sil [ossa] @missing_type : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   br bb3(%0) // expected-error {{expected ':' before type in SIL value reference}}
-  // FIXME: The next error is unexpected.
-} // expected-error {{extraneous '}' at top level}} {{1-3=}}
+}

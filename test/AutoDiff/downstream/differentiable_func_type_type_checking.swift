@@ -93,8 +93,9 @@ func foo<T: Differentiable, U: Differentiable>(x: T) -> U {
   let fn: (@differentiable (T) -> U)? = nil
   return fn!(x)
 }
-
+// expected-error @+1 {{result type '@differentiable (U) -> Float' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
 func test1<T: Differentiable, U: Differentiable>(_: @differentiable (T) -> @differentiable (U) -> Float) {}
+// expected-error @+1 {{result type '(U) -> Float' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
 func test2<T: Differentiable, U: Differentiable>(_: @differentiable (T) -> (U) -> Float) {}
 // expected-error @+2 {{result type 'Int' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
 // expected-error @+1 {{result type '@differentiable (U) -> Int' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}

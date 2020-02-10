@@ -40,14 +40,12 @@ SWIFT_REQUEST(TypeChecker, DefaultArgumentInitContextRequest,
               Initializer *(ParamDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultDefinitionTypeRequest,
               Type(AssociatedTypeDecl *), Cached, NoLocationInfo)
-// SWIFT_ENABLE_TENSORFLOW
-SWIFT_REQUEST(TypeChecker, DifferentiableAttributeParameterIndicesRequest,
-              IndexSubset *(DifferentiableAttr *, Decl *),
-              SeparatelyCached, NoLocationInfo)
-// SWIFT_ENABLE_TENSORFLOW END
 SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
               Type(KnownProtocolKind, const DeclContext *), SeparatelyCached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DifferentiableAttributeTypeCheckRequest,
+              IndexSubset *(DifferentiableAttr *),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DynamicallyReplacedDeclRequest,
               ValueDecl *(ValueDecl *),
               Cached, NoLocationInfo)
@@ -201,7 +199,7 @@ SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
 SWIFT_REQUEST(TypeChecker, HasMemberwiseInitRequest,
               bool(StructDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PreCheckFunctionBuilderRequest,
-              FunctionBuilderClosurePreCheck(ClosureExpr *),
+              FunctionBuilderClosurePreCheck(AnyFunctionRef),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
               bool(NominalTypeDecl *, ImplicitMemberAction), Uncached,
@@ -213,7 +211,7 @@ SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
 SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckSourceFileRequest,
-              bool(SouceFile *, unsigned), SeparatelyCached, NoLocationInfo)
+              bool(SouceFile *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeWitnessRequest,
               TypeWitnessAndDecl(NormalProtocolConformance *,
                                  AssociatedTypeDecl *),
@@ -221,3 +219,6 @@ SWIFT_REQUEST(TypeChecker, TypeWitnessRequest,
 SWIFT_REQUEST(TypeChecker, ValueWitnessRequest,
               Witness(NormalProtocolConformance *, ValueDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PatternTypeRequest,
+              Type(ContextualPattern),
+              Cached, HasNearestLocation)

@@ -478,7 +478,7 @@ GenericSignature TypeChecker::checkGenericSignature(
     sig->print(llvm::errs());
     llvm::errs() << "\n";
     llvm::errs() << "Canonical generic signature: ";
-    sig->getCanonicalSignature()->print(llvm::errs());
+    sig.getCanonicalSignature()->print(llvm::errs());
     llvm::errs() << "\n";
   }
 
@@ -596,7 +596,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       sig->print(llvm::errs());
       llvm::errs() << "\n";
       llvm::errs() << "Canonical generic signature: ";
-      sig->getCanonicalSignature()->print(llvm::errs());
+      sig.getCanonicalSignature()->print(llvm::errs());
       llvm::errs() << "\n";
     }
     return sig;

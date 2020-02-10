@@ -841,10 +841,11 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     // Diagnose invalid `some` after an ampersand.
     if (Tok.is(tok::identifier) && Tok.getRawText() == "some") {
       auto badLoc = consumeToken();
-      
-      // TODO: Fixit to move to beginning of composition.
-      diagnose(badLoc, diag::opaque_mid_composition);
-      
+
+      diagnose(badLoc, diag::opaque_mid_composition)
+          .fixItRemove(badLoc)
+          .fixItInsert(FirstTypeLoc, "some ");
+
       if (opaqueLoc.isInvalid())
         opaqueLoc = badLoc;
     }
@@ -1635,7 +1636,7 @@ bool Parser::canParseOldStyleProtocolComposition() {
 
 bool Parser::canParseTypeTupleBody() {
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
-      Tok.isNotEllipsis() && !isStartOfDecl()) {
+      Tok.isNotEllipsis() && !isStartOfSwiftDecl()) {
     do {
       // The contextual inout marker is part of argument lists.
       consumeIf(tok::kw_inout);
@@ -1660,8 +1661,7 @@ bool Parser::canParseTypeTupleBody() {
         if (consumeIf(tok::equal)) {
           while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_paren) &&
                  Tok.isNot(tok::r_brace) && Tok.isNotEllipsis() &&
-                 Tok.isNot(tok::comma) &&
-                 !isStartOfDecl()) {
+                 Tok.isNot(tok::comma) && !isStartOfSwiftDecl()) {
             skipSingle();
           }
         }

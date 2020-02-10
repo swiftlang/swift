@@ -350,7 +350,7 @@ SILInliner::inlineFullApply(FullApplySite apply,
                             SILOptFunctionBuilder &funcBuilder) {
   assert(apply.canOptimize());
   SmallVector<SILValue, 8> appliedArgs;
-  for (const auto &arg : apply.getArguments())
+  for (const auto arg : apply.getArguments())
     appliedArgs.push_back(arg);
 
   SILFunction *caller = apply.getFunction();

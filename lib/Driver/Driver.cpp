@@ -21,7 +21,9 @@
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/OutputFileMap.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaskQueue.h"
@@ -98,6 +100,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   .Case("swiftc", DriverKind::Batch)
   .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
   .Case("swift-indent", DriverKind::SwiftIndent)
+  .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
   .Default(None);
   
   if (Kind.hasValue())
@@ -251,8 +254,13 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   case llvm::Triple::MacOSX:
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
-  case llvm::Triple::WatchOS:
-    return llvm::make_unique<toolchains::Darwin>(*this, target);
+  case llvm::Triple::WatchOS: {
+    Optional<llvm::Triple> targetVariant;
+    if (const Arg *A = ArgList.getLastArg(options::OPT_target_variant))
+      targetVariant = llvm::Triple(llvm::Triple::normalize(A->getValue()));
+
+    return llvm::make_unique<toolchains::Darwin>(*this, target, targetVariant);
+  }
   case llvm::Triple::Linux:
     if (target.isAndroid())
       return llvm::make_unique<toolchains::Android>(*this, target);
@@ -713,7 +721,9 @@ static bool computeIncremental(const llvm::opt::InputArgList *ArgList,
     return false;
 
   const char *ReasonToDisable =
-      ArgList->hasArg(options::OPT_whole_module_optimization)
+      ArgList->hasFlag(options::OPT_whole_module_optimization,
+                       options::OPT_no_whole_module_optimization,
+                       false)
           ? "is not compatible with whole module optimization."
           : ArgList->hasArg(options::OPT_embed_bitcode)
                 ? "is not currently compatible with embedding LLVM IR bitcode."
@@ -823,7 +833,7 @@ Driver::buildCompilation(const ToolChain &TC,
   validateArgs(Diags, *TranslatedArgList, TC.getTriple());
     
   // Perform toolchain specific args validation.
-  TC.validateArguments(Diags, *TranslatedArgList);
+  TC.validateArguments(Diags, *TranslatedArgList, DefaultTargetTriple);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -957,8 +967,16 @@ Driver::buildCompilation(const ToolChain &TC,
                          options::OPT_disable_only_one_dependency_file, true);
 
     // relies on the new dependency graph
+    // Get the default from the initializer in LangOptions.
     const bool EnableFineGrainedDependencies =
-        ArgList->hasArg(options::OPT_enable_fine_grained_dependencies);
+        ArgList->hasFlag(options::OPT_enable_fine_grained_dependencies,
+                         options::OPT_disable_fine_grained_dependencies,
+                         LangOptions().EnableFineGrainedDependencies);
+
+    const bool EnableTypeFingerprints =
+        ArgList->hasFlag(options::OPT_enable_type_fingerprints,
+                         options::OPT_disable_type_fingerprints,
+                         LangOptions().EnableTypeFingerprints);
 
     const bool VerifyFineGrainedDependencyGraphAfterEveryImport = ArgList->hasArg(
         options::
@@ -991,6 +1009,7 @@ Driver::buildCompilation(const ToolChain &TC,
         std::move(StatsReporter),
         OnlyOneDependencyFile,
         EnableFineGrainedDependencies,
+        EnableTypeFingerprints,
         VerifyFineGrainedDependencyGraphAfterEveryImport,
         EmitFineGrainedDependencyDotFileAfterEveryImport,
         FineGrainedDependenciesIncludeIntrafileOnes,
@@ -1753,8 +1772,13 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
     return Inputs.empty() ? OutputInfo::Mode::REPL
                           : OutputInfo::Mode::Immediate;
 
+  bool UseWMO = Args.hasFlag(options::OPT_whole_module_optimization,
+                             options::OPT_no_whole_module_optimization,
+                             false);
+
   const Arg *ArgRequiringSingleCompile = Args.getLastArg(
-      options::OPT_whole_module_optimization, options::OPT_index_file);
+      options::OPT_index_file,
+      UseWMO ? options::OPT_whole_module_optimization : llvm::opt::OptSpecifier());
 
   BatchModeOut = Args.hasFlag(options::OPT_enable_batch_mode,
                               options::OPT_disable_batch_mode,
@@ -1769,8 +1793,7 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
   // user about this decision.
   // FIXME: AST dump also doesn't work with `-index-file`, but that fix is a bit
   // more complicated than this.
-  if (Args.hasArg(options::OPT_whole_module_optimization) &&
-      Args.hasArg(options::OPT_dump_ast)) {
+  if (UseWMO && Args.hasArg(options::OPT_dump_ast)) {
     Diags.diagnose(SourceLoc(), diag::warn_ignoring_wmo);
     return OutputInfo::Mode::StandardCompile;
   }
@@ -3252,6 +3275,7 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::Batch:
   case DriverKind::AutolinkExtract:
   case DriverKind::SwiftIndent:
+  case DriverKind::SymbolGraph:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

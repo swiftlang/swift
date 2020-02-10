@@ -285,7 +285,7 @@ public:
 
   // Make vanilla new/delete illegal for protocol conformances.
   void *operator new(size_t bytes) = delete;
-  void operator delete(void *data) SWIFT_DELETE_OPERATOR_DELETED;
+  void operator delete(void *data) = delete;
 
   // Only allow allocation of protocol conformances using the allocator in
   // ASTContext or by doing a placement new.

@@ -138,6 +138,23 @@ internal func _growArrayCapacity(_ capacity: Int) -> Int {
   return capacity * 2
 }
 
+@_alwaysEmitIntoClient
+internal func _growArrayCapacity(
+  oldCapacity: Int, minimumCapacity: Int, growForAppend: Bool
+) -> Int {
+  if growForAppend {
+    if oldCapacity < minimumCapacity {
+      // When appending to an array, grow exponentially.
+      return Swift.max(minimumCapacity, _growArrayCapacity(oldCapacity))
+    }
+    return oldCapacity
+  }
+  // If not for append, just use the specified capacity, ignoring oldCapacity.
+  // This means that we "shrink" the buffer in case minimumCapacity is less
+  // than oldCapacity.
+  return minimumCapacity
+}
+
 //===--- generic helpers --------------------------------------------------===//
 
 extension _ArrayBufferProtocol {

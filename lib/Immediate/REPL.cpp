@@ -37,7 +37,7 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
 
-#if HAVE_UNICODE_LIBEDIT
+#if HAVE_LIBEDIT
 #include <histedit.h>
 #include <wchar.h>
 #endif
@@ -120,8 +120,8 @@ public:
 };
 
 using Convert = ConvertForWcharSize<sizeof(wchar_t)>;
-  
-#if HAVE_UNICODE_LIBEDIT
+
+#if HAVE_LIBEDIT
 static void convertFromUTF8(llvm::StringRef utf8,
                             llvm::SmallVectorImpl<wchar_t> &out) {
   size_t reserve = out.size() + utf8.size();
@@ -135,7 +135,7 @@ static void convertFromUTF8(llvm::StringRef utf8,
   (void)res;
   out.set_size(wide_begin - out.begin());
 }
-  
+
 static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
                           llvm::SmallVectorImpl<char> &out) {
   size_t reserve = out.size() + wide.size()*4;
@@ -153,7 +153,7 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 
 } // end anonymous namespace
 
-#if HAVE_UNICODE_LIBEDIT
+#if HAVE_LIBEDIT
 
 static ModuleDecl *
 typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
@@ -187,11 +187,7 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
     REPLInputFile.addImports(ImportsWithOptions);
   }
 
-  bool Done;
-  do {
-    parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
-                        &PersistentState);
-  } while (!Done);
+  parseIntoSourceFile(REPLInputFile, BufferID, &PersistentState);
   performTypeChecking(REPLInputFile);
   return REPLModule;
 }
@@ -1000,10 +996,6 @@ public:
     IRGenOpts.IntegratedREPL = true;
     IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::None;
     IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::None;
-
-    // The very first module is a dummy.
-    CI.getMainModule()->getMainSourceFile(SourceFileKind::REPL).ASTStage =
-        SourceFile::TypeChecked;
 
     if (!ParseStdlib) {
       // Force standard library to be loaded immediately.  This forces any

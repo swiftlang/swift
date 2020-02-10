@@ -37,6 +37,8 @@ struct MyStruct {}
 // AVAILABILITY1-NEXT: Keyword/None:                       tvOSApplicationExtension[#Platform#]; name=tvOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       watchOSApplicationExtension[#Platform#]; name=watchOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       OSXApplicationExtension[#Platform#]; name=OSXApplicationExtension{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       macCatalyst[#Platform#]; name=macCatalyst
+// AVAILABILITY1-NEXT: Keyword/None:                       macCatalystApplicationExtension[#Platform#]; name=macCatalystApplicationExtension
 // AVAILABILITY1-NEXT: End completions
 
 @available(*, #^AVAILABILITY2^#)
@@ -67,9 +69,9 @@ struct MyStruct {}
 // KEYWORD2-NEXT:             Keyword/None:                       derivative[#Func Attribute#]; name=derivative
 // KEYWORD2-NEXT:             Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // SWIFT_ENABLE_TENSORFLOW
-// KEYWORD2-NEXT:             Keyword/None:                       quoted[#Func Attribute#]; name=quoted
 // KEYWORD2-NEXT:             Keyword/None:                       differentiating[#Func Attribute#]; name=differentiating
 // KEYWORD2-NEXT:             Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
+// KEYWORD2-NEXT:             Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // SWIFT_ENABLE_TENSORFLOW END
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2:                  Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -190,9 +192,9 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // ON_METHOD-DAG: Keyword/None:                       IBSegueAction[#Func Attribute#]; name=IBSegueAction
 // SWIFT_ENABLE_TENSORFLOW
-// ON_METHOD-DAG: Keyword/None:                       quoted[#Func Attribute#]; name=quoted
 // ON_METHOD-DAG: Keyword/None:                       differentiating[#Func Attribute#]; name=differentiating
 // ON_METHOD-DAG: Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
+// ON_METHOD-DAG: Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // SWIFT_ENABLE_TENSORFLOW END
 // ON_METHOD-NOT: Keyword
 // ON_METHOD: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -252,7 +254,6 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
 // ON_MEMBER_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // SWIFT_ENABLE_TENSORFLOW
-// ON_MEMBER_LAST-DAG: Keyword/None:                       quoted[#Declaration Attribute#]; name=quoted
 // ON_MEMBER_LAST-DAG: Keyword/None:                       differentiating[#Declaration Attribute#]; name=differentiating
 // ON_MEMBER_LAST-DAG: Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
@@ -304,7 +305,6 @@ func dummy2() {}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
 // KEYWORD_LAST-NEXT:             Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // SWIFT_ENABLE_TENSORFLOW
-// KEYWORD_LAST-NEXT:             Keyword/None:                       quoted[#Declaration Attribute#]; name=quoted
 // KEYWORD_LAST-NEXT:             Keyword/None:                       differentiating[#Declaration Attribute#]; name=differentiating
 // KEYWORD_LAST-NEXT:             Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative

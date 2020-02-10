@@ -61,12 +61,10 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
-endif()
 
-# Build differentiable programming support library only if enabled.
-if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING AND SWIFT_BUILD_STDLIB)
-  message(STATUS "Building Swift differentiable programming support library.")
-  add_subdirectory(Differentiation)
+  if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+    add_subdirectory(Differentiation)
+  endif()
 endif()
 
 # SWIFT_ENABLE_TENSORFLOW
@@ -75,9 +73,8 @@ if(SWIFT_BUILD_STDLIB)
 
   # Note: Python should be built before TensorFlow because Python is a
   # dependency for `numpy.ndarray` bridging to `ShapedArray`/`Tensor`.
-  if(SWIFT_ENABLE_TENSORFLOW)
+  if(SWIFT_ENABLE_TENSORFLOW AND TENSORFLOW_SWIFT_APIS)
     # TODO: Add TensorFlow support for iOS/Raspberry Pi.
-    add_subdirectory(CTensorFlow)
     add_subdirectory(TensorFlow)
   endif()
 endif()

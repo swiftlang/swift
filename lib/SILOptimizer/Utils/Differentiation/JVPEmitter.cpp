@@ -18,11 +18,11 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/SILOptimizer/Utils/Differentiation/JVPEmitter.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Utils/Differentiation/Thunk.h"
-#include "swift/SILOptimizer/Utils/Differentiation/JVPEmitter.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 
 namespace swift {
 namespace autodiff {
@@ -178,10 +178,10 @@ void JVPEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
   auto tangentSpace = getTangentSpace(type);
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case VectorSpace::Kind::Vector:
+  case TangentSpace::Kind::TangentVector:
     emitZeroIntoBuffer(builder, type, bufferAccess, loc);
     return;
-  case VectorSpace::Kind::Tuple: {
+  case TangentSpace::Kind::Tuple: {
     auto tupleType = tangentSpace->getTuple();
     SmallVector<SILValue, 8> zeroElements;
     for (unsigned i : range(tupleType->getNumElements())) {
@@ -190,10 +190,6 @@ void JVPEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
                        eltAddr, loc);
     }
     return;
-  }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting zero initialization");
   }
   }
 }
@@ -285,11 +281,11 @@ SILType JVPEmitter::remapSILTypeInDifferential(SILType ty) {
   return getDifferential().mapTypeIntoContext(ty);
 }
 
-Optional<VectorSpace> JVPEmitter::getTangentSpace(CanType type) {
+Optional<TangentSpace> JVPEmitter::getTangentSpace(CanType type) {
   // Use witness generic signature to remap types.
   if (auto witnessGenSig = witness->getDerivativeGenericSignature())
     type = witnessGenSig->getCanonicalTypeInContext(type);
-  return type->getAutoDiffAssociatedTangentSpace(
+  return type->getAutoDiffTangentSpace(
       LookUpConformanceInModule(getModule().getSwiftModule()));
 }
 
@@ -690,19 +686,19 @@ CLONE_AND_EMIT_TANGENT(TupleElementAddr, teai) {
     if (getTangentSpace(
             origTupleTy->getElement(i).getType()->getCanonicalType()))
       ++tanIndex;
-    }
-    auto tanType = getRemappedTangentType(teai->getType());
-    auto tanSource = getTangentBuffer(teai->getParent(), teai->getOperand());
-    SILValue tanBuf;
-    // If the tangent buffer of the source does not have a tuple type, then
-    // it must represent a "single element tuple type". Use it directly.
-    if (!tanSource->getType().is<TupleType>()) {
-      tanBuf = tanSource;
-    } else {
-      tanBuf = diffBuilder.createTupleElementAddr(
-          teai->getLoc(), tanSource, tanIndex, tanType);
-    }
-    bufferMap.try_emplace({teai->getParent(), teai}, tanBuf);
+  }
+  auto tanType = getRemappedTangentType(teai->getType());
+  auto tanSource = getTangentBuffer(teai->getParent(), teai->getOperand());
+  SILValue tanBuf;
+  // If the tangent buffer of the source does not have a tuple type, then
+  // it must represent a "single element tuple type". Use it directly.
+  if (!tanSource->getType().is<TupleType>()) {
+    tanBuf = tanSource;
+  } else {
+    tanBuf = diffBuilder.createTupleElementAddr(teai->getLoc(), tanSource,
+                                                tanIndex, tanType);
+  }
+  bufferMap.try_emplace({teai->getParent(), teai}, tanBuf);
 }
 
 /// Handle `destructure_tuple` instruction.
@@ -1045,7 +1041,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
       origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
   dfResults.push_back(
       SILResultInfo(origResult.getInterfaceType()
-                        ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+                        ->getAutoDiffTangentSpace(lookupConformance)
                         ->getCanonicalType(),
                     origResult.getConvention()));
 
@@ -1056,7 +1052,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
         origParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
     dfParams.push_back(SILParameterInfo(
         origParam.getInterfaceType()
-            ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+            ->getAutoDiffTangentSpace(lookupConformance)
             ->getCanonicalType(),
         origParam.getConvention()));
   }
@@ -1146,18 +1142,18 @@ void JVPEmitter::visit(SILInstruction *inst) {
   if (differentialInfo.shouldDifferentiateInstruction(inst)) {
     LLVM_DEBUG(getADDebugStream() << "JVPEmitter visited:\n[ORIG]" << *inst);
 #ifndef NDEBUG
-      auto beforeInsertion = std::prev(diffBuilder.getInsertionPoint());
+    auto beforeInsertion = std::prev(diffBuilder.getInsertionPoint());
 #endif
-      TypeSubstCloner::visit(inst);
-      LLVM_DEBUG({
-        auto &s = llvm::dbgs() << "[TAN] Emitted in differential:\n";
-        auto afterInsertion = diffBuilder.getInsertionPoint();
-        for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
-          s << *it;
-      });
-    } else {
-      TypeSubstCloner::visit(inst);
-    }
+    TypeSubstCloner::visit(inst);
+    LLVM_DEBUG({
+      auto &s = llvm::dbgs() << "[TAN] Emitted in differential:\n";
+      auto afterInsertion = diffBuilder.getInsertionPoint();
+      for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
+        s << *it;
+    });
+  } else {
+    TypeSubstCloner::visit(inst);
+  }
 }
 
 void JVPEmitter::visitSILInstruction(SILInstruction *inst) {

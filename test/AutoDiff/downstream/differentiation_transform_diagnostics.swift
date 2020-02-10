@@ -64,16 +64,6 @@ _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) {
 // Function composition
 //===----------------------------------------------------------------------===//
 
-func uses_optionals(_ x: Float) -> Float {
-  // expected-note @+1 {{differentiating enum values is not yet supported}}
-  var maybe: Float? = 10
-  maybe = x
-  return maybe!
-}
-
-// expected-error @+1 {{function is not differentiable}}
-_ = gradient(at: 0, in: uses_optionals)
-
 func base(_ x: Float) -> Float {
   // expected-error @+2 {{expression is not differentiable}}
   // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}}
@@ -104,6 +94,71 @@ func func_to_diff(_ x: Float) -> Float {
 func calls_grad_of_nested(_ x: Float) -> Float {
   // xpected-error @+1 {{function is not differentiable}}
   return gradient(at: x, in: func_to_diff)
+}
+
+//===----------------------------------------------------------------------===//
+// Enum differentiation
+//===----------------------------------------------------------------------===//
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func usesOptionals(_ x: Float) -> Float {
+  // expected-note @+1 {{differentiating enum values is not yet supported}}
+  var maybe: Float? = 10
+  maybe = x
+  return maybe!
+}
+
+enum DirectEnum: Differentiable & AdditiveArithmetic {
+  case leaf(Float)
+
+  typealias TangentVector = Self
+
+  static var zero: Self { fatalError() }
+  static func +(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+  static func -(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: e)
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{differentiating enum values is not yet supported}}
+func enum_active(_ e: DirectEnum, _ x: Float) -> Float {
+  switch e {
+  case let .leaf(y): return y
+  }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: e)
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{differentiating enum values is not yet supported}}
+func activeEnumValue(_ e: DirectEnum, _ x: Float) -> Float {
+  switch e {
+  case let .leaf(y): return y
+  }
+}
+
+enum IndirectEnum<T: Differentiable>: Differentiable & AdditiveArithmetic {
+  case leaf(T)
+
+  typealias TangentVector = Self
+
+  static func ==(_ lhs: Self, _ rhs: Self) -> Bool { fatalError() }
+  static var zero: Self { fatalError() }
+  static func +(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+  static func -(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: e)
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{differentiating enum values is not yet supported}}
+func activeEnumAddr(_ e: IndirectEnum<Float>, _ x: Float) -> Float {
+  switch e {
+  case let .leaf(y): return y
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -483,7 +538,7 @@ func testAccessorCoroutines(_ x: HasCoroutineAccessors) -> HasCoroutineAccessors
   return x
 }
 
-// TF-1078: `Array.subscript.modify` is a coroutine.
+// TF-1078: diagnose `_modify` accessor application with active `inout` argument.
 // expected-error @+1 {{function is not differentiable}}
 @differentiable
 // expected-note @+1 {{when differentiating this function definition}}
@@ -493,6 +548,41 @@ func TF_1078(array: [Float], x: Float) -> Float {
   // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
   array[0] = x
   return array[0]
+}
+
+// TF-1115: diagnose `_modify` accessor application with initially non-active `inout` argument.
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func TF_1115(_ x: Float) -> Float {
+  var array: [Float] = [0]
+  // Array subscript assignment below calls `Array.subscript.modify`.
+  // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
+  array[0] = x
+  return array[0]
+}
+
+// TF-1115: test `_modify` accessor application with initially non-active `inout` argument,
+// where the yielded value is not a projection from `self`.
+var global: Float = 1
+extension Float {
+  var projection: Float {
+    get { self }
+    // This `modify` accessor yields a global variable, not a projection from `self`.
+    // Diagnosing active applications is nonetheless a safe over-approximation.
+    _modify { yield &global }
+  }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func TF_1115_modifyNonSelfProjection(x: Float) -> Float {
+  var result: Float = 0
+  // Assignment below calls `Float.projection.modify`.
+  // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
+  result.projection = x
+  return result
 }
 
 //===----------------------------------------------------------------------===//

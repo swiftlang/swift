@@ -74,7 +74,6 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
 /// Passes for performing definite initialization. Must be run together in this
 /// order.
 static void addDefiniteInitialization(SILPassPipelinePlan &P) {
-  P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
   P.addRawSILInstLowering();
 }
@@ -497,7 +496,9 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.addStackPromotion();
 
   // Speculate virtual call targets.
-  P.addSpeculativeDevirtualization();
+  if (P.getOptions().EnableSpeculativeDevirtualization) {
+    P.addSpeculativeDevirtualization();
+  }
 
   // There should be at least one SILCombine+SimplifyCFG between the
   // ClosureSpecializer, etc. and the last inliner. Cleaning up after these
@@ -529,7 +530,9 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("LateLoopOpt");
 
   // Delete dead code and drop the bodies of shared functions.
-  P.addDeadFunctionElimination();
+  // Also, remove externally available witness tables. They are not needed
+  // anymore after the last devirtualizer run.
+  P.addLateDeadFunctionElimination();
 
   // Perform the final lowering transformations.
   P.addCodeSinking();

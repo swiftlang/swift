@@ -9,6 +9,10 @@ import Builtin
 //////////////////
 
 enum MyNever {}
+enum FakeOptional<T> {
+case none
+case some(T)
+}
 
 sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
@@ -24,6 +28,7 @@ sil @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
 
 class Klass {}
 sil @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+sil @guaranteed_fakeoptional_klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
 
 struct MyInt {
   var value: Builtin.Int32
@@ -38,11 +43,6 @@ struct StructMemberTest {
   var c : Klass
   var s : AnotherStruct
   var t : (Builtin.Int32, AnotherStruct)
-}
-
-enum FakeOptional<T> {
-case none
-case some(T)
 }
 
 class ClassLet {
@@ -589,6 +589,46 @@ bb0(%x : @owned $ClassLet):
   return undef : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_borrowed_base_that_dominates_projtestcase :
+// CHECK: load_borrow
+// CHECK: } // end sil function 'dont_copy_let_properties_with_borrowed_base_that_dominates_projtestcase'
+sil [ossa] @dont_copy_let_properties_with_borrowed_base_that_dominates_projtestcase : $@convention(thin) (@owned ClassLet) -> () {
+bb0(%x : @owned $ClassLet):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %a = begin_borrow %x : $ClassLet
+  %p = ref_element_addr %a : $ClassLet, #ClassLet.aLetTuple
+  %v = load [copy] %p : $*(Klass, Klass)
+  (%v1, %v2) = destructure_tuple %v : $(Klass, Klass)
+  apply %f(%v1) : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%v2) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %v1 : $Klass
+  destroy_value %v2 : $Klass
+  end_borrow %a : $ClassLet
+  destroy_value %x : $ClassLet
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_borrowed_base_that_dominates_projtestcase_2 :
+// CHECK: load_borrow
+// CHECK: } // end sil function 'dont_copy_let_properties_with_borrowed_base_that_dominates_projtestcase_2'
+sil [ossa] @dont_copy_let_properties_with_borrowed_base_that_dominates_projtestcase_2 : $@convention(thin) (@owned ClassLet) -> () {
+bb0(%x : @owned $ClassLet):
+  %f = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+  %a = begin_borrow %x : $ClassLet
+  %p = ref_element_addr %a : $ClassLet, #ClassLet.aLet
+  %v = load [copy] %p : $*Klass
+  %v_cast = unchecked_ref_cast %v : $Klass to $Builtin.NativeObject
+  apply %f(%v_cast) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %v_cast : $Builtin.NativeObject
+  end_borrow %a : $ClassLet
+  destroy_value %x : $ClassLet
+
+  return undef : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_multi_borrowed_base_that_dominates
 // CHECK:         [[OUTER:%.*]] = begin_borrow
 // CHECK-NEXT:    ref_element_addr
@@ -662,7 +702,7 @@ bb0(%x : @owned $ClassLet):
   return undef : $()
 }
 
-// CHECK-LABEL: sil [ossa] @do_or_dont_copy_let_properties_with_multi_borrowed_base_when_it_dominates
+// CHECK-LABEL: sil [ossa] @do_or_dont_copy_let_properties_with_multi_borrowed_base_when_it_dominates_2 :
 // CHECK:         [[OUTER:%.*]] = begin_borrow
 // CHECK-NEXT:    ref_element_addr
 // CHECK-NEXT:    [[INNER:%.*]] = load_borrow
@@ -672,12 +712,15 @@ bb0(%x : @owned $ClassLet):
 // CHECK-NEXT:    begin_borrow
 // CHECK-NEXT:    ref_element_addr
 // CHECK-NEXT:    load [copy]
-// CHECK-NEXT:    apply
 // CHECK-NEXT:    end_borrow
 // CHECK-NEXT:    destroy_value
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    function_ref
+// CHECK-NEXT:    enum
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    destroy_value
-sil [ossa] @do_or_dont_copy_let_properties_with_multi_borrowed_base_when_it_dominates : $@convention(thin) (@owned ClassLet) -> () {
+// CHECK: } // end sil function 'do_or_dont_copy_let_properties_with_multi_borrowed_base_when_it_dominates_2'
+sil [ossa] @do_or_dont_copy_let_properties_with_multi_borrowed_base_when_it_dominates_2 : $@convention(thin) (@owned ClassLet) -> () {
 bb0(%x : @owned $ClassLet):
   %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
 
@@ -693,18 +736,17 @@ bb0(%x : @owned $ClassLet):
   %b = begin_borrow %x : $ClassLet
   %q = ref_element_addr %b : $ClassLet, #ClassLet.aLet
   %w = load [copy] %q : $*Klass
-  %d = begin_borrow %w : $Klass
-  apply %f(%d) : $@convention(thin) (@guaranteed Klass) -> ()
 
   // End the lifetime of the base object first...
   end_borrow %b : $ClassLet
   destroy_value %x : $ClassLet
 
   // ...then end the lifetime of the copy.
-  apply %f(%d) : $@convention(thin) (@guaranteed Klass) -> ()
+  %f2 = function_ref @guaranteed_fakeoptional_klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  %w2 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt.1, %w : $Klass
+  apply %f2(%w2) : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
 
-  end_borrow %d : $Klass
-  destroy_value %w : $Klass
+  destroy_value %w2 : $FakeOptional<Klass>
 
   return undef : $()
 }

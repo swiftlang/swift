@@ -79,6 +79,13 @@ public:
   /// up.
   void trackIfDead(SILInstruction *inst);
 
+  /// If the instruction \p inst is dead, delete it immediately and record
+  /// its operands so that they can be cleaned up later.
+  void deleteIfDead(
+      SILInstruction *inst,
+      llvm::function_ref<void(SILInstruction *)> callback =
+          [](SILInstruction *) {});
+
   /// Delete the instruction \p inst and record instructions that may become
   /// dead because of the removal of \c inst. This function will add necessary
   /// ownership instructions to fix the lifetimes of the operands of \c inst to
@@ -130,6 +137,14 @@ public:
   void
   cleanUpDeadInstructions(llvm::function_ref<void(SILInstruction *)> callback =
                               [](SILInstruction *) {});
+
+  /// Recursively visit users of \c inst  (including \c inst)and delete
+  /// instructions that are dead (including \c inst). Invoke the \c callback on
+  /// instructions that are deleted.
+  void recursivelyDeleteUsersIfDead(
+      SILInstruction *inst,
+      llvm::function_ref<void(SILInstruction *)> callback =
+                                    [](SILInstruction *) {});
 };
 
 /// If \c inst is dead, delete it and recursively eliminate all code that
@@ -146,6 +161,9 @@ public:
 void eliminateDeadInstruction(
     SILInstruction *inst, llvm::function_ref<void(SILInstruction *)> callback =
                               [](SILInstruction *) {});
+
+/// Return the number of @inout arguments passed to the given apply site.
+unsigned getNumInOutArguments(FullApplySite applySite);
 
 /// For each of the given instructions, if they are dead delete them
 /// along with their dead operands. Note this utility must be phased out and

@@ -73,7 +73,14 @@ static void setDefaultPrebuiltCacheIfNecessary(
     return;
 
   SmallString<64> defaultPrebuiltPath{searchPathOpts.RuntimeResourcePath};
-  StringRef platform = getPlatformNameForTriple(triple);
+  StringRef platform;
+  if (tripleIsMacCatalystEnvironment(triple)) {
+    // The prebuilt cache for macCatalyst is the same as the one for macOS, not iOS
+    // or a separate location of its own.
+    platform = "macosx";
+  } else {
+    platform = getPlatformNameForTriple(triple);
+  }
   llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
   frontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPath.str();
 }
@@ -82,7 +89,11 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
                                       llvm::Triple &Triple) {
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
-  llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
+  StringRef LibSubDir = getPlatformNameForTriple(Triple);
+  if (tripleIsMacCatalystEnvironment(Triple))
+    LibSubDir = "maccatalyst";
+
+  llvm::sys::path::append(LibPath, LibSubDir);
   SearchPathOpts.RuntimeLibraryPaths.clear();
   SearchPathOpts.RuntimeLibraryPaths.push_back(LibPath.str());
   if (Triple.isOSDarwin())
@@ -101,6 +112,13 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
 
   if (!SearchPathOpts.SDKPath.empty()) {
+    if (tripleIsMacCatalystEnvironment(Triple)) {
+      LibPath = SearchPathOpts.SDKPath;
+      llvm::sys::path::append(LibPath, "System", "iOSSupport");
+      llvm::sys::path::append(LibPath, "usr", "lib", "swift");
+      SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
+    }
+
     LibPath = SearchPathOpts.SDKPath;
     llvm::sys::path::append(LibPath, "usr", "lib", "swift");
     if (!Triple.isOSDarwin()) {
@@ -109,6 +127,54 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
     }
     SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
   }
+}
+
+static void
+setIRGenOutputOptsFromFrontendOptions(IRGenOptions &IRGenOpts,
+                                      const FrontendOptions &FrontendOpts) {
+  // Set the OutputKind for the given Action.
+  IRGenOpts.OutputKind = [](FrontendOptions::ActionType Action) {
+    switch (Action) {
+    case FrontendOptions::ActionType::EmitIR:
+      return IRGenOutputKind::LLVMAssembly;
+    case FrontendOptions::ActionType::EmitBC:
+      return IRGenOutputKind::LLVMBitcode;
+    case FrontendOptions::ActionType::EmitAssembly:
+      return IRGenOutputKind::NativeAssembly;
+    case FrontendOptions::ActionType::Immediate:
+      return IRGenOutputKind::Module;
+    case FrontendOptions::ActionType::EmitObject:
+    default:
+      // Just fall back to emitting an object file. If we aren't going to run
+      // IRGen, it doesn't really matter what we put here anyways.
+      return IRGenOutputKind::ObjectFile;
+    }
+  }(FrontendOpts.RequestedAction);
+
+  // If we're in JIT mode, set the requisite flags.
+  if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate) {
+    IRGenOpts.UseJIT = true;
+    IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
+    IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+  }
+}
+
+static void
+setBridgingHeaderFromFrontendOptions(ClangImporterOptions &ImporterOpts,
+                                     const FrontendOptions &FrontendOpts) {
+  if (FrontendOpts.RequestedAction != FrontendOptions::ActionType::EmitPCH)
+    return;
+
+  // If there aren't any inputs, there's nothing to do.
+  if (!FrontendOpts.InputsAndOutputs.hasInputs())
+    return;
+
+  // If we aren't asked to output a bridging header, we don't need to set this.
+  if (ImporterOpts.PrecompiledHeaderOutputDir.empty())
+    return;
+
+  ImporterOpts.BridgingHeader =
+      FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
 }
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
@@ -227,6 +293,8 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
 
   Opts.PreserveTypesAsWritten |=
     Args.hasArg(OPT_module_interface_preserve_types_as_written);
+  Opts.PrintFullConvention |=
+    Args.hasArg(OPT_experimental_print_full_convention);
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
@@ -357,9 +425,25 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.BuildSyntaxTree = true;
     Opts.VerifySyntaxTree = true;
   }
-  
-  if (Args.hasArg(OPT_enable_fine_grained_dependencies))
-    Opts.EnableFineGrainedDependencies = true;
+
+  Opts.EnableFineGrainedDependencies =
+      Args.hasFlag(options::OPT_enable_fine_grained_dependencies,
+                   options::OPT_disable_fine_grained_dependencies,
+                   Opts.EnableFineGrainedDependencies);
+  Opts.EnableTypeFingerprints =
+      Args.hasFlag(options::OPT_enable_type_fingerprints,
+                   options::OPT_disable_type_fingerprints,
+                   LangOptions().EnableTypeFingerprints);
+
+  if (!Opts.EnableFineGrainedDependencies && Opts.EnableTypeFingerprints) {
+    Diags.diagnose(
+        SourceLoc(),
+        diag::warning_type_fingerprints_require_fine_grained_dependencies);
+    Opts.EnableTypeFingerprints = false;
+  }
+
+  if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
+    Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
 
   if (Args.hasArg(OPT_fine_grained_dependency_include_intrafile))
     Opts.FineGrainedDependenciesIncludeIntrafileOnes = true;
@@ -367,11 +451,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_differentiable_programming))
     Opts.EnableExperimentalDifferentiableProgramming = true;
 
-  // TODO: Ignore if enable-experimental-differentiable-programming is false
+  // TODO: Ignore differentiation-related flags if
+  // `enable-experimental-differentiable-programming` is false.
+  Opts.EnableExperimentalCrossFileDerivativeRegistration |=
+      Args.hasArg(OPT_enable_experimental_cross_file_derivative_registration);
   Opts.EnableExperimentalForwardModeDifferentiation |=
       Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
-  if (Args.hasArg(OPT_enable_experimental_quasiquotes))
-    Opts.EnableExperimentalQuasiquotes = true;
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
@@ -395,6 +480,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
+
+  if (Args.getLastArg(OPT_build_request_dependency_graph))
+    Opts.BuildRequestDependencyGraph = true;
 
   if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {
     Opts.RequestEvaluatorGraphVizPath = A->getValue();
@@ -467,6 +555,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
     TargetArg = A->getValue();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_target_variant)) {
+    Opts.TargetVariant = llvm::Triple(A->getValue());
   }
 
   Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_cxx_interop);
@@ -888,11 +980,13 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
+  Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   Opts.CrossModuleOptimization |= Args.hasArg(OPT_CrossModuleOptimization);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
+  Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);
   if (const Arg *A = Args.getLastArg(OPT_external_pass_pipeline_filename))
     Opts.ExternalPassPipelineFilename = A->getValue();
@@ -1018,6 +1112,9 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_tbd_current_version)) {
     Opts.CurrentVersion = A->getValue();
   }
+  if (const Arg *A = Args.getLastArg(OPT_previous_module_installname_map_file)) {
+    Opts.ModuleInstallNameMapPath = A->getValue();
+  }
   return false;
 }
 
@@ -1136,6 +1233,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.StackPromotionSizeLimit = limit;
   }
 
+  Opts.FunctionSections = Args.hasArg(OPT_function_sections);
+
   if (Args.hasArg(OPT_autolink_force_load))
     Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);
 
@@ -1247,6 +1346,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_disable_legacy_type_info)) {
     Opts.DisableLegacyTypeInfo = true;
+  }
+
+  if (Args.hasArg(OPT_prespecialize_generic_metadata)) {
+    Opts.PrespecializeGenericMetadata = true;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_read_legacy_type_info_path_EQ)) {
@@ -1476,6 +1579,10 @@ bool CompilerInvocation::parseArgs(
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
   setDefaultPrebuiltCacheIfNecessary(FrontendOpts, SearchPathOpts,
                                      LangOpts.Target);
+
+  // Now that we've parsed everything, setup some inter-option-dependent state.
+  setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
+  setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
 
   return false;
 }

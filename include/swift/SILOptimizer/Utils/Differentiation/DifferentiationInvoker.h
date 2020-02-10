@@ -19,8 +19,8 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_DIFFERENTIATIONINVOKER_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_DIFFERENTIATIONINVOKER_H
 
-#include <utility>
 #include "swift/Basic/SourceLoc.h"
+#include <utility>
 
 namespace swift {
 

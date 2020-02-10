@@ -17,6 +17,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -34,6 +35,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILProfiler.h"
+#include "swift/AST/SILGenRequests.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Strings.h"
@@ -49,15 +51,15 @@ using namespace Lowering;
 
 SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
     : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr) {
-  SILOptions &Opts = M.getOptions();
+  const SILOptions &Opts = M.getOptions();
   if (!Opts.UseProfile.empty()) {
     auto ReaderOrErr = llvm::IndexedInstrProfReader::create(Opts.UseProfile);
     if (auto E = ReaderOrErr.takeError()) {
       diagnose(SourceLoc(), diag::profile_read_error, Opts.UseProfile,
                llvm::toString(std::move(E)));
-      Opts.UseProfile.erase();
+    } else {
+      M.setPGOReader(std::move(ReaderOrErr.get()));
     }
-    M.setPGOReader(std::move(ReaderOrErr.get()));
   }
 }
 
@@ -551,7 +553,7 @@ static bool haveProfiledAssociatedFunction(SILDeclRef constant) {
 /// Set up the function for profiling instrumentation.
 static void setUpForProfiling(SILDeclRef constant, SILFunction *F,
                               ForDefinition_t forDefinition) {
-  if (!forDefinition)
+  if (!forDefinition || F->getProfiler())
     return;
 
   ASTNode profiledNode;
@@ -1789,7 +1791,7 @@ public:
 void SILGenModule::emitSourceFile(SourceFile *sf) {
   SourceFileScope scope(*this, sf);
   FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-file", sf);
-  for (Decl *D : sf->Decls) {
+  for (Decl *D : sf->getTopLevelDecls()) {
     FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-decl", D);
     visit(D);
   }
@@ -1810,7 +1812,7 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
 
 std::unique_ptr<SILModule>
 SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
-                        SILOptions &options, FileUnit *SF) {
+                        const SILOptions &options, FileUnit *SF) {
   FrontendStatsTracer tracer(mod->getASTContext().Stats, "SILGen");
   const DeclContext *DC;
   if (SF) {
@@ -1870,12 +1872,25 @@ SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(ModuleDecl *mod, Lowering::TypeConverter &tc,
-                            SILOptions &options) {
-  return SILModule::constructSIL(mod, tc, options, nullptr);
+                            const SILOptions &options) {
+  auto desc = SILGenDescriptor::forWholeModule(mod, tc, options);
+  return llvm::cantFail(mod->getASTContext().evaluator(GenerateSILRequest{desc}));
 }
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(FileUnit &sf, Lowering::TypeConverter &tc,
-                            SILOptions &options) {
-  return SILModule::constructSIL(sf.getParentModule(), tc, options, &sf);
+                            const SILOptions &options) {
+  auto desc = SILGenDescriptor::forFile(sf, tc, options);
+  return llvm::cantFail(sf.getASTContext().evaluator(GenerateSILRequest{desc}));
+}
+
+llvm::Expected<std::unique_ptr<SILModule>>
+GenerateSILRequest::evaluate(Evaluator &evaluator, SILGenDescriptor sgd) const {
+  if (auto *MD = sgd.context.dyn_cast<ModuleDecl *>()) {
+    return SILModule::constructSIL(MD, sgd.conv, sgd.opts, nullptr);
+  } else {
+    auto *SF = sgd.context.get<FileUnit *>();
+    return SILModule::constructSIL(SF->getParentModule(),
+                                   sgd.conv, sgd.opts, SF);
+  }
 }

@@ -930,7 +930,7 @@ static void flattenImportPath(const ModuleDecl::ImportedModule &import,
   outStream << '\0';
   assert(import.first.size() == 1 && "can only handle top-level decl imports");
   auto accessPathElem = import.first.front();
-  outStream << accessPathElem.first.str();
+  outStream << accessPathElem.Item.str();
 }
 
 uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {
@@ -1600,7 +1600,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     abbrCode = DeclTypeAbbrCodes[XRefExtensionPathPieceLayout::Code];
     CanGenericSignature genericSig(nullptr);
     if (ext->isConstrainedExtension()) {
-      genericSig = ext->getGenericSignature()->getCanonicalSignature();
+      genericSig = ext->getGenericSignature().getCanonicalSignature();
     }
     XRefExtensionPathPieceLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addContainingModuleRef(DC),
@@ -2412,26 +2412,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           origDeclID, indices);
       return;
     }
-
-    // SWIFT_ENABLE_TENSORFLOW
-    case DAK_Quoted: {
-      auto abbrCode = S.DeclTypeAbbrCodes[QuotedDeclAttrLayout::Code];
-      auto attr = cast<QuotedAttr>(DA);
-      assert(attr->getQuoteDecl());
-      QuotedDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                       attr->isImplicit(),
-                                       S.addDeclRef(attr->getQuoteDecl()));
-      return;
-    }
-    // SWIFT_ENABLE_TENSORFLOW END
-
-    case DAK_ImplicitlySynthesizesNestedRequirement: {
-      auto *theAttr = cast<ImplicitlySynthesizesNestedRequirementAttr>(DA);
-      auto abbrCode = S.DeclTypeAbbrCodes[ImplicitlySynthesizesNestedRequirementDeclAttrLayout::Code];
-      ImplicitlySynthesizesNestedRequirementDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                                          theAttr->Value);
-      return;
-    }
     }
   }
 
@@ -3178,9 +3158,7 @@ public:
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theClass->getFormalAccess());
 
-    bool inheritsSuperclassInitializers =
-        const_cast<ClassDecl *>(theClass)->
-          inheritsSuperclassInitializers();
+    auto mutableClass = const_cast<ClassDecl *>(theClass);
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ClassLayout::Code];
     ClassLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -3188,7 +3166,8 @@ public:
                             contextID.getOpaqueValue(),
                             theClass->isImplicit(),
                             theClass->isObjC(),
-                            inheritsSuperclassInitializers,
+                            mutableClass->inheritsSuperclassInitializers(),
+                            mutableClass->hasMissingDesignatedInitializers(),
                             S.addGenericSignatureRef(
                                              theClass->getGenericSignature()),
                             S.addTypeRef(theClass->getSuperclass()),
@@ -4134,7 +4113,6 @@ public:
       variableData.push_back(S.addTypeRef(param.getInterfaceType()));
       unsigned conv = getRawStableParameterConvention(param.getConvention());
       variableData.push_back(TypeID(conv));
-      // SWIFT_ENABLE_TENSORFLOW
       if (fnTy->isDifferentiable())
         variableData.push_back(TypeID(
             getRawSILParameterDifferentiability(param.getDifferentiability())));

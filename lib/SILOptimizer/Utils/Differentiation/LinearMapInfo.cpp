@@ -17,13 +17,13 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/SILOptimizer/Utils/Differentiation/LinearMapInfo.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
-#include "swift/SILOptimizer/Utils/Differentiation/LinearMapInfo.h"
 
 namespace swift {
 namespace autodiff {
@@ -39,9 +39,9 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
                                                 CanGenericSignature sig) {
   SmallVector<GenericTypeParamDecl *, 2> clonedParams;
   for (auto paramType : sig->getGenericParams()) {
-    auto clonedParam = new (ctx) GenericTypeParamDecl(
-        dc, paramType->getName(), SourceLoc(), paramType->getDepth(),
-        paramType->getIndex());
+    auto clonedParam = new (ctx)
+        GenericTypeParamDecl(dc, paramType->getName(), SourceLoc(),
+                             paramType->getDepth(), paramType->getIndex());
     clonedParam->setDeclContext(dc);
     clonedParam->setImplicit(true);
     clonedParams.push_back(clonedParam);
@@ -275,19 +275,18 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   SmallVector<SILValue, 4> allResults;
   SmallVector<unsigned, 8> activeParamIndices;
   SmallVector<unsigned, 8> activeResultIndices;
-  collectMinimalIndicesForFunctionCall(
-      ai, indices, activityInfo, allResults, activeParamIndices,
-      activeResultIndices);
+  collectMinimalIndicesForFunctionCall(ai, indices, activityInfo, allResults,
+                                       activeParamIndices, activeResultIndices);
 
   // Check if there are any active results or arguments. If not, skip
   // this instruction.
   auto hasActiveResults = llvm::any_of(allResults, [&](SILValue res) {
     return activityInfo.isActive(res, indices);
   });
-  auto hasActiveArguments = llvm::any_of(
-      ai->getArgumentsWithoutIndirectResults(), [&](SILValue arg) {
-    return activityInfo.isActive(arg, indices);
-  });
+  auto hasActiveArguments =
+      llvm::any_of(ai->getArgumentsWithoutIndirectResults(), [&](SILValue arg) {
+        return activityInfo.isActive(arg, indices);
+      });
   if (!hasActiveResults || !hasActiveArguments)
     return;
 
@@ -307,8 +306,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   } else {
     parameters = IndexSubset::get(
         original->getASTContext(),
-        ai->getArgumentsWithoutIndirectResults().size(),
-        activeParamIndices);
+        ai->getArgumentsWithoutIndirectResults().size(), activeParamIndices);
   }
   // Create autodiff indices for the `apply` instruction.
   SILAutoDiffIndices applyIndices(source, parameters);
@@ -319,14 +317,14 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
         // Check non-differentiable arguments.
         for (unsigned paramIndex : range(origFnTy->getNumParameters())) {
           auto remappedParamType = origFnTy->getParameters()[paramIndex]
-              .getSILStorageInterfaceType();
+                                       .getSILStorageInterfaceType();
           if (applyIndices.isWrtParameter(paramIndex) &&
               !remappedParamType.isDifferentiable(derivative->getModule()))
             return true;
         }
         // Check non-differentiable results.
         auto remappedResultType = origFnTy->getResults()[applyIndices.source]
-            .getSILStorageInterfaceType();
+                                      .getSILStorageInterfaceType();
         if (!remappedResultType.isDifferentiable(derivative->getModule()))
           return true;
         return false;
@@ -381,17 +379,16 @@ void LinearMapInfo::generateDifferentiationDataStructures(
     break;
   }
   for (auto &origBB : *original) {
-    auto *traceEnum = createBranchingTraceDecl(
-        &origBB, indices, derivativeFnGenSig, loopInfo);
+    auto *traceEnum = createBranchingTraceDecl(&origBB, indices,
+                                               derivativeFnGenSig, loopInfo);
     branchingTraceDecls.insert({&origBB, traceEnum});
     if (origBB.isEntry())
       continue;
     // Add branching trace enum field to corresponding linear map struct.
     auto *linearMapStruct = getLinearMapStruct(&origBB);
-    auto *traceEnumField =
-        addVarDecl(linearMapStruct,
-                   astCtx.getIdentifier(traceEnumFieldName).str(),
-                   traceEnum->getDeclaredInterfaceType());
+    auto *traceEnumField = addVarDecl(
+        linearMapStruct, astCtx.getIdentifier(traceEnumFieldName).str(),
+        traceEnum->getDeclaredInterfaceType());
     linearMapStructEnumFields.insert({linearMapStruct, traceEnumField});
   }
 
@@ -414,8 +411,8 @@ void LinearMapInfo::generateDifferentiationDataStructures(
         if (!shouldDifferentiateApplySite(ai) || isArrayLiteralIntrinsic(ai))
           continue;
 
-        LLVM_DEBUG(getADDebugStream() << "Adding linear map struct field for "
-                                      << *ai);
+        LLVM_DEBUG(getADDebugStream()
+                   << "Adding linear map struct field for " << *ai);
         addLinearMapToStruct(context, ai, indices);
       }
     }
@@ -435,11 +432,13 @@ void LinearMapInfo::generateDifferentiationDataStructures(
       << original->getName() << ":\n";
     for (auto &origBB : *original) {
       auto *linearMapStruct = getLinearMapStruct(&origBB);
-      linearMapStruct->print(s, printOptions); s << '\n';
+      linearMapStruct->print(s, printOptions);
+      s << '\n';
     }
     for (auto &origBB : *original) {
       auto *traceEnum = getBranchingTraceDecl(&origBB);
-      traceEnum->print(s, printOptions); s << '\n';
+      traceEnum->print(s, printOptions);
+      s << '\n';
     }
   });
 }
@@ -476,8 +475,9 @@ bool LinearMapInfo::shouldDifferentiateApplySite(FullApplySite applySite) {
     return true;
 
   auto arguments = applySite.getArgumentsWithoutIndirectResults();
-  bool hasActiveArguments = llvm::any_of(arguments,
-      [&](SILValue arg) { return activityInfo.isActive(arg, indices); });
+  bool hasActiveArguments = llvm::any_of(arguments, [&](SILValue arg) {
+    return activityInfo.isActive(arg, indices);
+  });
   return hasActiveResults && hasActiveArguments;
 }
 
@@ -500,18 +500,21 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
     return shouldDifferentiateApplySite(FullApplySite(inst));
   // Anything with an active result and an active operand should be
   // differentiated.
-  auto hasActiveOperands = llvm::any_of(inst->getAllOperands(),
-      [&](Operand &op) { return activityInfo.isActive(op.get(), indices); });
-  auto hasActiveResults = llvm::any_of(inst->getResults(),
-      [&](SILValue val) { return activityInfo.isActive(val, indices); });
+  auto hasActiveOperands =
+      llvm::any_of(inst->getAllOperands(), [&](Operand &op) {
+        return activityInfo.isActive(op.get(), indices);
+      });
+  auto hasActiveResults = llvm::any_of(inst->getResults(), [&](SILValue val) {
+    return activityInfo.isActive(val, indices);
+  });
   if (hasActiveOperands && hasActiveResults)
     return true;
-  // `store`-like instructions do not have an SSA result, but have two
-  // operands that represent the source and the destination. We treat them as
-  // the input and the output, respectively.
-  // For `store`-like instructions whose destination is an element address from
-  // an `array.uninitialized_intrinsic` application, return true if the
-  // intrinsic application (representing the semantic destination) is active.
+    // `store`-like instructions do not have an SSA result, but have two
+    // operands that represent the source and the destination. We treat them as
+    // the input and the output, respectively.
+    // For `store`-like instructions whose destination is an element address
+    // from an `array.uninitialized_intrinsic` application, return true if the
+    // intrinsic application (representing the semantic destination) is active.
 #define CHECK_INST_TYPE_ACTIVE_DEST(INST)                                      \
   if (auto *castInst = dyn_cast<INST##Inst>(inst))                             \
     return activityInfo.isActive(castInst->getDest(), indices);

@@ -17,9 +17,9 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/SILOptimizer/Utils/Differentiation/Common.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "swift/SILOptimizer/Utils/Differentiation/Common.h"
 
 namespace swift {
 namespace autodiff {
@@ -38,8 +38,7 @@ ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v) {
   return nullptr;
 }
 
-ApplyInst *
-getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v) {
+ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v) {
   // Find the `pointer_to_address` result, peering through `index_addr`.
   auto *ptai = dyn_cast<PointerToAddressInst>(v);
   if (auto *iai = dyn_cast<IndexAddrInst>(v))
@@ -221,11 +220,10 @@ void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
   auto silFnType = typeConverter.getConstantType(
       TypeExpansionContext::minimal(), accessorDeclRef);
   // %wm = witness_method ...
-  auto *getter = builder.createWitnessMethod(
-      loc, type, confRef, accessorDeclRef, silFnType);
+  auto *getter = builder.createWitnessMethod(loc, type, confRef,
+                                             accessorDeclRef, silFnType);
   // %metatype = metatype $T
-  auto metatypeType = CanMetatypeType::get(
-      type, MetatypeRepresentation::Thick);
+  auto metatypeType = CanMetatypeType::get(type, MetatypeRepresentation::Thick);
   auto metatype = builder.createMetatype(
       loc, SILType::getPrimitiveObjectType(metatypeType));
   auto subMap = SubstitutionMap::getProtocolSubstitutions(

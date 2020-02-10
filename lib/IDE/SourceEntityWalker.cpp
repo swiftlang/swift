@@ -74,7 +74,7 @@ private:
   bool passReference(ValueDecl *D, Type Ty, SourceLoc Loc, SourceRange Range,
                      ReferenceMetaData Data);
   bool passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data);
-  bool passReference(ModuleEntity Mod, std::pair<Identifier, SourceLoc> IdLoc);
+  bool passReference(ModuleEntity Mod, Located<Identifier> IdLoc);
 
   bool passSubscriptReference(ValueDecl *D, SourceLoc Loc,
                               ReferenceMetaData Data, bool IsOpenBracket);
@@ -270,7 +270,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
       if (!passReference(ModuleEntity(module),
-                         std::make_pair(module->getName(), E->getLoc())))
+                         {module->getName(), E->getLoc()}))
         return { false, nullptr };
     } else if (!passReference(DRE->getDecl(), DRE->getType(),
                               DRE->getNameLoc(),
@@ -491,7 +491,7 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
     if (ValueDecl *VD = IdT->getBoundDecl()) {
       if (auto *ModD = dyn_cast<ModuleDecl>(VD)) {
         auto ident = IdT->getNameRef().getBaseIdentifier();
-        return passReference(ModD, std::make_pair(ident, IdT->getLoc()));
+        return passReference(ModD, { ident, IdT->getLoc() });
       }
 
       return passReference(VD, Type(), IdT->getNameLoc(),
@@ -669,11 +669,11 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
 }
 
 bool SemaAnnotator::passReference(ModuleEntity Mod,
-                                  std::pair<Identifier, SourceLoc> IdLoc) {
-  if (IdLoc.second.isInvalid())
+                                  Located<Identifier> IdLoc) {
+  if (IdLoc.Loc.isInvalid())
     return true;
-  unsigned NameLen = IdLoc.first.getLength();
-  CharSourceRange Range{ IdLoc.second, NameLen };
+  unsigned NameLen = IdLoc.Item.getLength();
+  CharSourceRange Range{ IdLoc.Loc, NameLen };
   bool Continue = SEWalker.visitModuleReference(Mod, Range);
   if (!Continue)
     Cancelled = true;

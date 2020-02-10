@@ -59,26 +59,13 @@ public:
 /// Parser state persistent across multiple parses.
 class PersistentParserState {
 public:
-  struct ParserPos {
-    SourceLoc Loc;
-    SourceLoc PrevLoc;
-
-    bool isValid() const { return Loc.isValid(); }
-  };
-
-  bool InPoundLineEnvironment = false;
   // FIXME: When condition evaluation moves to a later phase, remove this bit
   // and adjust the client call 'performParseOnly'.
   bool PerformConditionEvaluation = true;
 private:
-  ScopeInfo ScopeInfo;
-
-  /// Parser sets this if it stopped parsing before the buffer ended.
-  ParserPosition MarkedPos;
+  swift::ScopeInfo ScopeInfo;
 
   std::unique_ptr<CodeCompletionDelayedDeclState> CodeCompletionDelayedDeclStat;
-
-  std::vector<IterableDeclContext *> DelayedDeclLists;
 
   /// The local context for all top-level code.
   TopLevelContext TopLevelCode;
@@ -112,25 +99,8 @@ public:
     return std::move(CodeCompletionDelayedDeclStat);
   }
 
-  void delayDeclList(IterableDeclContext *D);
-
-  void parseAllDelayedDeclLists();
-
   TopLevelContext &getTopLevelContext() {
     return TopLevelCode;
-  }
-
-  void markParserPosition(ParserPosition Pos,
-                          bool InPoundLineEnvironment) {
-    MarkedPos = Pos;
-    this->InPoundLineEnvironment = InPoundLineEnvironment;
-  }
-
-  /// Returns the marked parser position and resets it.
-  ParserPosition takeParserPosition() {
-    ParserPosition Pos = MarkedPos;
-    MarkedPos = ParserPosition();
-    return Pos;
   }
 };
 

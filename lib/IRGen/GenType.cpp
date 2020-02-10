@@ -1549,7 +1549,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
 
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
-  auto canGenericSig = genericSig->getCanonicalSignature();
+  auto canGenericSig = genericSig.getCanonicalSignature();
   auto canGenericEnv = canGenericSig->getGenericEnvironment();
   if (canGenericEnv == genericEnv) return t;
 
@@ -2256,7 +2256,7 @@ bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
 
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
-  auto canGenericSig = genericSig->getCanonicalSignature();
+  auto canGenericSig = genericSig.getCanonicalSignature();
   auto canGenericEnv = canGenericSig->getGenericEnvironment();
 
   // If this archetype is in the canonical generic environment, it's an

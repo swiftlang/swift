@@ -25,6 +25,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -63,6 +64,7 @@ namespace swift {
   class DeclContext;
   class DefaultArgumentInitializer;
   class DerivativeAttr;
+  class DifferentiableAttr;
   class ExtensionDecl;
   class ForeignRepresentationInfo;
   class FuncDecl;
@@ -115,9 +117,9 @@ namespace swift {
   // SWIFT_ENABLE_TENSORFLOW
   struct AutoDiffConfig;
   struct AutoDiffDerivativeFunctionKind;
+  struct SILAutoDiffDerivativeFunctionKey;
   class DerivativeAttr;
   class DifferentiableAttr;
-  class VectorSpace;
   // SWIFT_ENABLE_TENSORFLOW END
 
   enum class KnownProtocolKind : uint8_t;
@@ -290,19 +292,17 @@ public:
   /// across invocations of both the parser and the type-checker.
   unsigned NextAutoClosureDiscriminator = 0;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Cache of autodiff-associated vector spaces.
-  llvm::DenseMap<Type, Optional<VectorSpace>> AutoDiffVectorSpaces;
+  /// Cached mapping from types to their associated tangent spaces.
+  llvm::DenseMap<Type, Optional<TangentSpace>> AutoDiffTangentSpaces;
+  
+  /// A cache of derivative function types per configuration.
+  llvm::DenseMap<SILAutoDiffDerivativeFunctionKey, CanSILFunctionType>
+      SILAutoDiffDerivativeFunctions;
 
   /// Cache of `@differentiable` attributes keyed by parameter indices. Used to
   /// diagnose duplicate `@differentiable` attributes for the same key.
-  // NOTE(TF-680): relaxing the uniqueness condition to use derivative generic
-  // signature as a key is possible. It requires derivative generic signature
-  // mangling to avoid name collisions for SIL derivative functions with the
-  // same parameter indices but different derivative generic signatures.
   llvm::DenseMap<std::pair<Decl *, IndexSubset *>, DifferentiableAttr *>
       DifferentiableAttrs;
-  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Cache of `@derivative` attributes keyed by parameter indices and
   /// derivative function kind. Used to diagnose duplicate `@derivative`
@@ -541,6 +541,9 @@ public:
   /// Get the '+' function on two String.
   FuncDecl *getPlusFunctionOnString() const;
 
+  /// Get Sequence.makeIterator().
+  FuncDecl *getSequenceMakeIterator() const;
+
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.
   ///
@@ -661,6 +664,18 @@ public:
   /// Get the runtime availability of
   /// swift_getTypeByMangledNameInContextInMetadataState.
   AvailabilityContext getTypesInAbstractMetadataStateAvailability();
+
+  /// Get the runtime availability of support for prespecialized generic 
+  /// metadata.
+  AvailabilityContext getPrespecializedGenericMetadataAvailability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.2
+  /// compiler for the target platform.
+  AvailabilityContext getSwift52Availability();
+
+  /// Get the runtime availability of features that have been introduced in the
+  /// Swift compiler for future versions of the target platform.
+  AvailabilityContext getSwiftFutureAvailability();
 
 
   //===--------------------------------------------------------------------===//
@@ -785,12 +800,12 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModule(std::pair<Identifier, SourceLoc> ModulePath);
+  bool canImportModule(Located<Identifier> ModulePath);
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.
   ModuleDecl *getLoadedModule(
-      ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) const;
+      ArrayRef<Located<Identifier>> ModulePath) const;
 
   ModuleDecl *getLoadedModule(Identifier ModuleName) const;
 
@@ -800,7 +815,7 @@ public:
   /// be returned.
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  ModuleDecl *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath);
+  ModuleDecl *getModule(ArrayRef<Located<Identifier>> ModulePath);
 
   ModuleDecl *getModuleByName(StringRef ModuleName);
 

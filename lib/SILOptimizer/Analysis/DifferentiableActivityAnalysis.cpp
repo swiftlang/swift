@@ -129,7 +129,7 @@ void DifferentiableActivityInfo::propagateVaried(
   // Handle full apply sites: `apply`, `try_apply`, and `begin_apply`.
   if (FullApplySite::isa(inst)) {
     FullApplySite applySite(inst);
-    // If callee is non-varying, skip.
+    // Skip non-varying callees.
     if (isWithoutDerivative(applySite.getCallee()))
       return;
     // If operand is varied, set all direct/indirect results and inout arguments
@@ -207,8 +207,21 @@ void DifferentiableActivityInfo::propagateVaried(
   }
 }
 
+/// Returns the accessor kind of the given SIL function, if it is a lowered
+/// accessor. Otherwise, return `None`.
+static Optional<AccessorKind> getAccessorKind(SILFunction *fn) {
+  auto *dc = fn->getDeclContext();
+  if (!dc)
+    return None;
+  auto *accessor = dyn_cast_or_null<AccessorDecl>(dc->getAsDecl());
+  if (!accessor)
+    return None;
+  return accessor->getAccessorKind();
+}
+
 void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
     SILValue value, unsigned independentVariableIndex) {
+  auto i = independentVariableIndex;
   // Skip `@noDerivative` struct projections.
 #define SKIP_NODERIVATIVE(INST)                                                \
   if (auto *sei = dyn_cast<INST##Inst>(value))                                 \
@@ -218,14 +231,36 @@ void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
   SKIP_NODERIVATIVE(StructElementAddr)
 #undef SKIP_NODERIVATIVE
   // Set value as varied and propagate to users.
-  setVariedAndPropagateToUsers(value, independentVariableIndex);
+  setVariedAndPropagateToUsers(value, i);
   auto *inst = value->getDefiningInstruction();
-  if (!inst || ApplySite::isa(inst))
+  if (!inst)
     return;
-  // Standard propagation.
+  if (ApplySite::isa(inst)) {
+    ApplySite applySite(inst);
+    // If callee is non-varying, skip.
+    if (isWithoutDerivative(applySite.getCallee()))
+      return;
+    // If callee is a `modify` accessor, propagate variedness from yielded
+    // addresses to `inout` arguments. Semantically, yielded addresses can be
+    // viewed as a projection into the `inout` argument.
+    // Note: the assumption that yielded addresses are always a projection into
+    // the `inout` argument is a safe over-approximation but not always true.
+    if (auto *bai = dyn_cast<BeginApplyInst>(inst)) {
+      if (auto *calleeFn = bai->getCalleeFunction()) {
+        if (getAccessorKind(calleeFn) == AccessorKind::Modify) {
+          for (auto inoutArg : bai->getInoutArguments())
+            propagateVariedInwardsThroughProjections(inoutArg, i);
+        }
+      }
+    }
+    return;
+  }
+  // Default: propagate variedness through projections to the operands of their
+  // defining instructions. This handles projections like:
+  // - `struct_element_addr`
+  // - `tuple_element_addr`
   for (auto &op : inst->getAllOperands())
-    propagateVariedInwardsThroughProjections(op.get(),
-                                             independentVariableIndex);
+    propagateVariedInwardsThroughProjections(op.get(), i);
 }
 
 void DifferentiableActivityInfo::setUseful(SILValue value,
@@ -270,6 +305,18 @@ void DifferentiableActivityInfo::propagateUseful(
     // If callee is non-varying, skip.
     if (isWithoutDerivative(applySite.getCallee()))
       return;
+    // If callee is a `modify` accessor, propagate usefulness through yielded
+    // addresses. Semantically, yielded addresses can be viewed as a projection
+    // into the `inout` argument.
+    // Note: the assumption that yielded addresses are always a projection into
+    // the `inout` argument is a safe over-approximation but not always true.
+    if (auto *bai = dyn_cast<BeginApplyInst>(inst)) {
+      if (auto *calleeFn = bai->getCalleeFunction())
+        if (getAccessorKind(calleeFn) == AccessorKind::Modify)
+          for (auto yield : bai->getYieldedValues())
+            setUsefulAndPropagateToOperands(yield, i);
+    }
+    // Propagate usefulness through apply site arguments.
     for (auto arg : applySite.getArgumentsWithoutIndirectResults())
       setUsefulAndPropagateToOperands(arg, i);
   }
@@ -449,10 +496,18 @@ void DifferentiableActivityInfo::dump(SILValue value,
   s << '[';
   auto activity = getActivity(value, indices);
   switch (activity.toRaw()) {
-  case 0: s << "NONE"; break;
-  case (unsigned)ActivityFlags::Varied: s << "VARIED"; break;
-  case (unsigned)ActivityFlags::Useful: s << "USEFUL"; break;
-  case (unsigned)ActivityFlags::Active: s << "ACTIVE"; break;
+  case 0:
+    s << "NONE";
+    break;
+  case (unsigned)ActivityFlags::Varied:
+    s << "VARIED";
+    break;
+  case (unsigned)ActivityFlags::Useful:
+    s << "USEFUL";
+    break;
+  case (unsigned)ActivityFlags::Active:
+    s << "ACTIVE";
+    break;
   }
   s << "] " << value;
 }

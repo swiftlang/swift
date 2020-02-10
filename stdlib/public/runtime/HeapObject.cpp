@@ -42,6 +42,8 @@
 # include <objc/message.h>
 # include <objc/objc.h>
 # include "swift/Runtime/ObjCBridge.h"
+# include "swift/Runtime/Once.h"
+# include <dlfcn.h>
 #endif
 #include "Leaks.h"
 
@@ -83,7 +85,6 @@ static inline bool isValidPointerForNativeRetain(const void *p) {
       return _ ## name args; \
     return _ ## name ## _ args; \
 } while(0)
-
 
 static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
                                        size_t requiredSize,
@@ -609,13 +610,23 @@ void swift::swift_rootObjCDealloc(HeapObject *self) {
 }
 #endif
 
+#if SWIFT_OBJC_INTEROP
+static bool _check_fast_dealloc() {
+  return dlsym(RTLD_NEXT, "_objc_has_weak_formation_callout") != nullptr;
+}
+#endif
+
 void swift::swift_deallocClassInstance(HeapObject *object,
                                        size_t allocatedSize,
                                        size_t allocatedAlignMask) {
+  
 #if SWIFT_OBJC_INTEROP
   // We need to let the ObjC runtime clean up any associated objects or weak
   // references associated with this object.
-  objc_destructInstance((id)object);
+  const bool fastDeallocSupported = SWIFT_LAZY_CONSTANT(_check_fast_dealloc());
+  if (!fastDeallocSupported || !object->refCounts.getPureSwiftDeallocation()) {
+    objc_destructInstance((id)object);
+  }
 #endif
   swift_deallocObject(object, allocatedSize, allocatedAlignMask);
 }
