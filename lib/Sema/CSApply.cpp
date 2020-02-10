@@ -7227,6 +7227,49 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
   return diagnosedAnyErrors;
 }
 
+/// Apply the given solution to the initialization target.
+///
+/// \returns the resulting initialiation expression.
+static Expr *applySolutionToInitialization(
+    Solution &solution, SolutionApplicationTarget target, Expr *expr) {
+  auto wrappedVar = target.getInitializationWrappedVar();
+  Type initType;
+  if (wrappedVar) {
+    initType = solution.getType(expr);
+  } else {
+    initType = solution.getType(target.getInitializationPattern());
+  }
+
+  {
+    // Figure out what type the constraints decided on.
+    auto ty = solution.simplifyType(initType);
+    initType = ty->getRValueType()->reconstituteSugar(/*recursive =*/false);
+  }
+
+  // Convert the initializer to the type of the pattern.
+  auto &cs = solution.getConstraintSystem();
+  auto locator =
+      cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
+  expr = solution.coerceToType(expr, initType, locator);
+  if (!expr)
+    return nullptr;
+
+  // Record the property wrapper type and note that the initializer has
+  // been subsumed by the backing property.
+  if (wrappedVar) {
+    ASTContext &ctx = cs.getASTContext();
+    wrappedVar->getParentPatternBinding()->setInitializerSubsumed(0);
+    ctx.setSideCachedPropertyWrapperBackingPropertyType(
+        wrappedVar, initType->mapTypeOutOfContext());
+
+    // Record the semantic initializer on the outermost property wrapper.
+    wrappedVar->getAttachedPropertyWrappers().front()
+        ->setSemanticInit(expr);
+  }
+
+  return expr;
+}
+
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
 Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
@@ -7264,6 +7307,14 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     Expr *rewrittenExpr = expr->walk(walker);
     if (!rewrittenExpr)
       return None;
+
+    /// Handle application for initializations.
+    if (target.getExprContextualTypePurpose() == CTP_Initialization) {
+      rewrittenExpr = applySolutionToInitialization(
+          solution, target, rewrittenExpr);
+      if (!rewrittenExpr)
+        return None;
+    }
 
     result.setExpr(rewrittenExpr);
   } else {

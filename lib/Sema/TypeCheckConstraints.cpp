@@ -2413,79 +2413,14 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                    DeclContext *DC,
                                    Type patternType) {
-
-  /// Type checking listener for pattern binding initializers.
-  class BindingListener : public ExprTypeCheckListener {
-    ASTContext &context;
-
-    SolutionApplicationTarget target;
-
-    /// The locator we're using.
-    ConstraintLocator *Locator;
-
-    /// The variable to that has property wrappers that have been applied to the initializer expression.
-    VarDecl *wrappedVar = nullptr;
-
-  public:
-    explicit BindingListener(ASTContext &ctx, SolutionApplicationTarget target)
-        : context(ctx), target(target), Locator(nullptr) {
-      wrappedVar = target.getInitializationWrappedVar();
-    }
-
-    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
-      // The expression has been pre-checked; save it in case we fail later.
-      Locator = cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
-      return false;
-    }
-
-    Expr *appliedSolution(Solution &solution, Expr *expr) override {
-      Type initType;
-      if (wrappedVar) {
-        initType = solution.getType(expr);
-      } else {
-        initType = solution.getType(target.getInitializationPattern());
-      }
-
-      {
-        // Figure out what type the constraints decided on.
-        auto ty = solution.simplifyType(initType);
-        initType = ty->getRValueType()->reconstituteSugar(/*recursive =*/false);
-      }
-
-      // Convert the initializer to the type of the pattern.
-      expr = solution.coerceToType(expr, initType, Locator);
-      if (!expr)
-        return nullptr;
-
-      // Record the property wrapper type and note that the initializer has
-      // been subsumed by the backing property.
-      if (wrappedVar) {
-        wrappedVar->getParentPatternBinding()->setInitializerSubsumed(0);
-        context.setSideCachedPropertyWrapperBackingPropertyType(
-            wrappedVar, initType->mapTypeOutOfContext());
-
-        // Record the semantic initializer on the outermost property wrapper.
-        wrappedVar->getAttachedPropertyWrappers().front()
-            ->setSemanticInit(expr);
-      }
-
-      return expr;
-    }
-  };
-
   auto &Context = DC->getASTContext();
   auto target = SolutionApplicationTarget::forInitialization(
       initializer, DC, patternType, pattern);
   initializer = target.getAsExpr();
 
-  BindingListener listener(Context, target);
-  if (!initializer)
-    return true;
-
   // Type-check the initializer.
   bool unresolvedTypeExprs = false;
-  auto resultTarget = typeCheckExpression(target, unresolvedTypeExprs,
-                                          None, &listener);
+  auto resultTarget = typeCheckExpression(target, unresolvedTypeExprs);
 
   if (resultTarget) {
     initializer = resultTarget->getAsExpr();
