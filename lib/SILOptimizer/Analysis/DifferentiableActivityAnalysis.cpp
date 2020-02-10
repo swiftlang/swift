@@ -370,8 +370,8 @@ void DifferentiableActivityInfo::propagateUsefulThroughAddress(
     propagateUseful(use->getUser(), dependentVariableIndex);
     for (auto res : use->getUser()->getResults()) {
 #define SKIP_NODERIVATIVE(INST)                                                \
-  if (auto *projInst = dyn_cast<INST##Inst>(res))                                   \
-    if (projInst->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())          \
+  if (auto *projInst = dyn_cast<INST##Inst>(res))                              \
+    if (projInst->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())     \
       continue;
       SKIP_NODERIVATIVE(StructExtract)
       SKIP_NODERIVATIVE(StructElementAddr)

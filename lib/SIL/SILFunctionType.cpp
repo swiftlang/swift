@@ -278,9 +278,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
       if (tl.isAddressOnly()) {
         conv = ParameterConvention::Indirect_In_Guaranteed;
       } else {
-        conv = tl.isTrivial()
-            ? ParameterConvention::Direct_Unowned
-            : ParameterConvention::Direct_Guaranteed;
+        conv = tl.isTrivial() ? ParameterConvention::Direct_Unowned
+                              : ParameterConvention::Direct_Guaranteed;
       }
       break;
     case ResultConvention::Unowned:
