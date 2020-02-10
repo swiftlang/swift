@@ -1506,8 +1506,10 @@ void LoadableStorageAllocation::convertApplyResults() {
         (void)numFuncTy;
         continue;
       }
+      auto resultContextTy = origSILFunctionType->substInterfaceType(
+                                       pass.F->getModule(), resultStorageType);
       auto newSILType = pass.getNewSILType(origSILFunctionType,
-                                           resultStorageType);
+                                           resultContextTy);
       auto *newVal = allocateForApply(currIns, newSILType.getObjectType());
       if (auto apply = dyn_cast<ApplyInst>(currIns)) {
         apply->replaceAllUsesWith(newVal);
@@ -2386,7 +2388,7 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
     }
     return;
   }
-
+  
   StructLoweringState pass(F, *currIRMod, MapperCache);
 
   // Rewrite function args and insert allocs.
@@ -2834,7 +2836,7 @@ void LoadableByAddress::updateLoweredTypes(SILFunction *F) {
 }
 
 /// The entry point to this function transformation.
-void LoadableByAddress::run() {
+void LoadableByAddress::run() {  
   // Set the SIL state before the PassManager has a chance to run
   // verification.
   getModule()->setStage(SILStage::Lowered);
