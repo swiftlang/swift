@@ -3660,7 +3660,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   llvm::SmallVector<llvm::Value *, 8> Copy;
   emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), *VarInfo, IsAnonymous,
                          Copy);
-  bindArchetypes(RealTy);
+  bindArchetypes(DbgTy.getType());
   if (!IGM.DebugInfo)
     return;
 
@@ -3691,7 +3691,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
 
   auto DbgTy = DebugTypeInfo::getLocalVariable(
       Decl, RealType, getTypeInfo(SILVal->getType()));
-  bindArchetypes(RealType);
+  bindArchetypes(DbgTy.getType());
   if (!IGM.DebugInfo)
     return;
 
@@ -3991,7 +3991,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   auto RealType = SILTy.getASTType();
   auto DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type);
 
-  bindArchetypes(RealType);
+  bindArchetypes(DbgTy.getType());
   if (IGM.DebugInfo)
     emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, Decl, *VarInfo,
                                  Indirection);
