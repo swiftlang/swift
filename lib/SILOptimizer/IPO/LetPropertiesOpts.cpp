@@ -203,8 +203,8 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
     };
 
     // Look for any instructions accessing let properties.
-    if (isa<RefElementAddrInst>(Load) || isa<StructElementAddrInst>(Load)
-        || isa<BeginAccessInst>(Load) || isa<BeginBorrowInst>(Load)) {
+    if (isa<RefElementAddrInst>(Load) || isa<StructElementAddrInst>(Load) ||
+        isa<BeginAccessInst>(Load) || isa<BeginBorrowInst>(Load)) {
       auto proj = cast<SingleValueInstruction>(Load);
 
       // Copy the initializer into the function
@@ -520,8 +520,8 @@ void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
                           << *Property << "':\n";
              llvm::dbgs() << "The instructions are:\n"; I->dumpInContext());
 
-  if (isa<RefElementAddrInst>(I) || isa<StructElementAddrInst>(I)
-      || isa<BeginAccessInst>(I) || isa<CopyAddrInst>(I) ||
+  if (isa<RefElementAddrInst>(I) || isa<StructElementAddrInst>(I) ||
+      isa<BeginAccessInst>(I) || isa<CopyAddrInst>(I) ||
       isa<BeginBorrowInst>(I)) {
     // Check if there is a store to this property.
     auto projection = cast<SingleValueInstruction>(I);
@@ -581,9 +581,6 @@ void LetPropertiesOpt::run(SILModuleTransform *T) {
     // optimized, because they may contain access to the let
     // properties.
     bool NonRemovable = !F.shouldOptimize();
-
-//    // FIXME: We should be able to handle ownership.
-//    NonRemovable &= !F.hasOwnership();
 
     for (auto &BB : F) {
       for (auto &I : BB)
