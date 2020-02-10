@@ -1465,10 +1465,6 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         Identifier memberName = getIdentifier(IID);
         pathTrace.addValue(memberName);
 
-        llvm::PrettyStackTraceString message{
-          "If you're seeing a crash here, try passing "
-            "-Xfrontend -disable-serialization-nested-type-lookup-table"};
-
         auto *baseType = cast<NominalTypeDecl>(values.front());
         ModuleDecl *extensionModule = M;
         if (!extensionModule)
