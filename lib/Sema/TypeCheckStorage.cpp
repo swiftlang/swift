@@ -831,7 +831,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     lookupExpr = SubscriptExpr::create(
         ctx, wrapperMetatype, SourceLoc(), args,
         subscriptDecl->getFullName().getArgumentNames(), { }, SourceLoc(),
-        nullptr, subscriptDecl, /*Implicit=*/true);
+        /*trailingClosures=*/{}, subscriptDecl, /*Implicit=*/true);
 
     // FIXME: Since we're not resolving overloads or anything, we should be
     // building fully type-checked AST above; we already have all the

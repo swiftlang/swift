@@ -67,6 +67,18 @@ namespace swift {
   class KeyPathExpr;
   class CaptureListExpr;
 
+struct TrailingClosure {
+  Identifier Label;
+  SourceLoc LabelLoc;
+  Expr *ClosureExpr;
+
+  TrailingClosure(Expr *closure)
+      : TrailingClosure(Identifier(), SourceLoc(), closure) {}
+
+  TrailingClosure(Identifier label, SourceLoc labelLoc, Expr *closure)
+      : Label(label), LabelLoc(labelLoc), ClosureExpr(closure) {}
+};
+
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
 #define LAST_EXPR(Id) Last_Expr = Id,
@@ -1194,7 +1206,7 @@ public:
                                    ArrayRef<Identifier> argLabels,
                                    ArrayRef<SourceLoc> argLabelLocs,
                                    SourceLoc rParenLoc,
-                                   ArrayRef<Expr *> trailingClosures,
+                                   ArrayRef<TrailingClosure> trailingClosures,
                                    bool implicit);
 
   LiteralKind getLiteralKind() const {
@@ -1822,7 +1834,7 @@ public:
                                       ArrayRef<Identifier> argLabels,
                                       ArrayRef<SourceLoc> argLabelLocs,
                                       SourceLoc rParenLoc,
-                                      ArrayRef<Expr *> trailingClosures,
+                                      ArrayRef<TrailingClosure> trailingClosures,
                                       bool implicit);
 
   DeclNameRef getName() const { return Name; }
@@ -2373,7 +2385,7 @@ public:
                                ArrayRef<Identifier> indexArgLabels,
                                ArrayRef<SourceLoc> indexArgLabelLocs,
                                SourceLoc rSquareLoc,
-                               ArrayRef<Expr *> trailingClosures,
+                               ArrayRef<TrailingClosure> trailingClosures,
                                ConcreteDeclRef decl = ConcreteDeclRef(),
                                bool implicit = false,
                                AccessSemantics semantics
@@ -4252,7 +4264,7 @@ public:
   static CallExpr *
   create(ASTContext &ctx, Expr *fn, SourceLoc lParenLoc, ArrayRef<Expr *> args,
          ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
-         SourceLoc rParenLoc, ArrayRef<Expr *> trailingClosures, bool implicit,
+         SourceLoc rParenLoc, ArrayRef<TrailingClosure> trailingClosures, bool implicit,
          llvm::function_ref<Type(const Expr *)> getType =
              [](const Expr *E) -> Type { return E->getType(); });
 
@@ -5146,7 +5158,7 @@ public:
                                      ArrayRef<Identifier> indexArgLabels,
                                      ArrayRef<SourceLoc> indexArgLabelLocs,
                                      SourceLoc rSquareLoc,
-                                     ArrayRef<Expr *> trailingClosures);
+                                     ArrayRef<TrailingClosure> trailingClosures);
     
     /// Create an unresolved component for a subscript.
     ///
@@ -5198,7 +5210,7 @@ public:
                               ArrayRef<Identifier> indexArgLabels,
                               ArrayRef<SourceLoc> indexArgLabelLocs,
                               SourceLoc rSquareLoc,
-                              Expr *trailingClosure,
+                              ArrayRef<TrailingClosure> trailingClosures,
                               Type elementType,
                               ArrayRef<ProtocolConformanceRef> indexHashables);
 
@@ -5588,7 +5600,8 @@ Expr *packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
                          ArrayRef<Identifier> &argLabels,
                          ArrayRef<SourceLoc> &argLabelLocs,
                          SourceLoc rParenLoc,
-                         ArrayRef<Expr *> trailingClosures, bool implicit,
+                         ArrayRef<TrailingClosure> trailingClosures,
+                         bool implicit,
                          SmallVectorImpl<Identifier> &argLabelsScratch,
                          SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
                          llvm::function_ref<Type(const Expr *)> getType =
