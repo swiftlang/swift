@@ -139,7 +139,12 @@ void SymbolGraph::recordEdge(const ValueDecl *Source,
   }
 
   Nodes.insert(Source);
-  Nodes.insert(Target);
+  if (Target->getModuleContext() != &M) {
+    // Don't claim a symbol just because we have a relationship to it.
+    // For example, if we conform to `Sequence`, that symbol's node should be
+    // under Swift, not this module.
+    Nodes.insert(Target);
+  }
 
   Edges.insert({this, Kind, Source, Target});
 }
