@@ -346,7 +346,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     // Setup the callbacks for serialization, which can occur during the
     // optimization pipeline.
     SerializationOptions SerializationOpts;
-    std::string OutPathStr = OutPath;
+    std::string OutPathStr = OutPath.str();
     SerializationOpts.EnableNestedTypeLookupTable
         = FEOpts.EnableSerializationNestedTypeLookupTable;
     SerializationOpts.OutputPath = OutPathStr.c_str();
