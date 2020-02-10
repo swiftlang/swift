@@ -37,7 +37,8 @@ struct _RangeSetStorage<T: Comparable> {
   }
   
   func unsafeRange(low: Int32, high: Int) -> Range<T> {
-    unsafeBitCast(Int(low)..<high, to: Range<T>.self)
+    _precondition(T.self == Int.self)
+    return unsafeBitCast(Int(low)..<high, to: Range<T>.self)
   }
 }
 
@@ -97,7 +98,7 @@ extension _RangeSetStorage: RandomAccessCollection, MutableCollection {
       switch _storage {
       case .empty: fatalError("Can't access elements of empty storage")
       case let .singleRange(high, low):
-        assert(T.self == Int.self)
+        _precondition(T.self == Int.self)
         return unsafeRange(low: low, high: high)
       case let .variadic(ranges):
         return ranges[i]
@@ -107,7 +108,7 @@ extension _RangeSetStorage: RandomAccessCollection, MutableCollection {
       switch _storage {
       case .empty: fatalError("Can't access elements of empty storage")
       case .singleRange:
-        assert(T.self == Int.self)
+        _precondition(T.self == Int.self)
         let intRange = newValue as! Range<Int>
         if let lowerBound = Int32(exactly: intRange.lowerBound) {
           _storage = .singleRange(high: intRange.upperBound, low: lowerBound)
