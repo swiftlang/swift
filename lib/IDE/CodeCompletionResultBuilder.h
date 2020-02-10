@@ -65,7 +65,7 @@ class CodeCompletionResultBuilder {
       CurrentModule;
   ExpectedTypeContext declTypeContext;
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
-      CodeCompletionResult::Unrelated;
+      CodeCompletionResult::Unknown;
   bool Cancelled = false;
   ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
   bool IsNotRecommended = false;
@@ -344,7 +344,7 @@ public:
   }
 
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
-                        bool IsVarArg, bool IsInOut, bool IsIUO,
+                        Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
                         bool isAutoClosure) {
     CurrentNestingLevel++;
 
@@ -388,6 +388,8 @@ public:
     PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+    if (ContextTy)
+      PO.setBaseType(ContextTy);
     std::string TypeName = Ty->getString(PO);
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
                      TypeName);
@@ -398,10 +400,13 @@ public:
     if (auto AFT = Ty->getAs<AnyFunctionType>()) {
       // If this is a closure type, add ChunkKind::CallParameterClosureType.
       PrintOptions PO;
-      PO.PrintFunctionRepresentationAttrs = false;
+      PO.PrintFunctionRepresentationAttrs =
+        PrintOptions::FunctionRepresentationMode::None;
       PO.SkipAttributes = true;
       PO.OpaqueReturnTypePrinting =
           PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+      if (ContextTy)
+        PO.setBaseType(ContextTy);
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType,
           AFT->getString(PO));
@@ -412,10 +417,10 @@ public:
     CurrentNestingLevel--;
   }
 
-  void addCallParameter(Identifier Name, Type Ty, bool IsVarArg, bool IsInOut,
-                        bool IsIUO, bool isAutoClosure) {
-    addCallParameter(Name, Identifier(), Ty, IsVarArg, IsInOut, IsIUO,
-                     isAutoClosure);
+  void addCallParameter(Identifier Name, Type Ty, Type ContextTy = Type()) {
+    addCallParameter(Name, Identifier(), Ty, ContextTy,
+                     /*IsVarArg=*/false, /*IsInOut=*/false, /*isIUO=*/false,
+                     /*isAutoClosure=*/false);
   }
 
   void addGenericParameter(StringRef Name) {

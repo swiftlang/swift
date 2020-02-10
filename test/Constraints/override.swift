@@ -9,8 +9,8 @@ class Sub: Base {
 }
 
 func removeOverrides<SomeSub: Sub>(concrete: Sub, generic: SomeSub) {
-  _ = concrete.foo()
-  _ = generic.foo()
+  concrete.foo()
+  generic.foo()
 }
 
 class Base1 {

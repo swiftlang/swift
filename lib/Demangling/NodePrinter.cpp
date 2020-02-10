@@ -390,6 +390,8 @@ private:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplFunctionAttribute:
     case Node::Kind::ImplFunctionType:
+    case Node::Kind::ImplImpliedSubstitutions:
+    case Node::Kind::ImplSubstitutions:
     case Node::Kind::ImplicitClosure:
     case Node::Kind::ImplParameter:
     case Node::Kind::ImplResult:
@@ -979,7 +981,7 @@ static bool needSpaceBeforeType(NodePointer Type) {
 }
 
 NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
-  switch (Node->getKind()) {
+  switch (auto kind = Node->getKind()) {
   case Node::Kind::Static:
     Printer << "static ";
     print(Node->getChild(0));
@@ -2015,6 +2017,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ImplFunctionType:
     printImplFunctionType(Node);
+    return nullptr;
+  case Node::Kind::ImplSubstitutions:
+  case Node::Kind::ImplImpliedSubstitutions:
+    Printer << "for <";
+    printChildren(Node->getChild(0), ", ");
+    Printer << '>';
+    if (kind == Node::Kind::ImplImpliedSubstitutions)
+      Printer << " in";
     return nullptr;
   case Node::Kind::ErrorType:
     Printer << "<ERROR TYPE>";

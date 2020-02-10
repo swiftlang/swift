@@ -538,6 +538,8 @@ static void lookupVisibleMemberDeclsImpl(
     // The metatype represents an arbitrary named type: dig through to the
     // declared type to see what we're dealing with.
     Type Ty = MTT->getInstanceType();
+    if (auto dynSelfTy = Ty->getAs<DynamicSelfType>())
+      Ty = dynSelfTy->getSelfType();
     if (Ty->is<AnyMetatypeType>())
       return;
 
@@ -986,15 +988,14 @@ static void lookupVisibleDynamicMemberLookupDecls(
   if (!seenDynamicLookup.insert(baseType.getPointer()).second)
     return;
 
-  if (!evaluateOrDefault(dc->getASTContext().evaluator,
-         HasDynamicMemberLookupAttributeRequest{baseType.getPointer()}, false))
+  if (!baseType->hasDynamicMemberLookupAttribute())
     return;
 
   auto &ctx = dc->getASTContext();
 
   // Lookup the `subscript(dynamicMember:)` methods in this type.
-  auto subscriptName =
-      DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
+  DeclNameRef subscriptName(
+      { ctx, DeclBaseName::createSubscript(), { ctx.Id_dynamicMember} });
 
   SmallVector<ValueDecl *, 2> subscripts;
   dc->lookupQualified(baseType, subscriptName, NL_QualifiedDefault,
@@ -1089,8 +1090,8 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
       // FIXME: when we can parse and typecheck the function body partially for
       // code completion, AFD->getBody() check can be removed.
       if (Loc.isValid() &&
-          AFD->getSourceRange().isValid() &&
-          SM.rangeContainsTokenLoc(AFD->getSourceRange(), Loc) &&
+          AFD->getBodySourceRange().isValid() &&
+          SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc) &&
           AFD->getBody()) {
         namelookup::FindLocalVal(SM, Loc, Consumer).visit(AFD->getBody());
       }

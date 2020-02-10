@@ -111,7 +111,7 @@ void swift::ide::typeCheckContextUntil(DeclContext *DC, SourceLoc Loc) {
     // Here, 'value' is '<error type>' unless we explicitly typecheck the
     // 'guard' statement.
     SourceFile *SF = DC->getParentSourceFile();
-    for (auto *D : SF->Decls) {
+    for (auto *D : SF->getTopLevelDecls()) {
       if (auto Code = dyn_cast<TopLevelCodeDecl>(D)) {
         typeCheckTopLevelCodeDecl(Code);
         if (Code == TLCD)
@@ -160,8 +160,6 @@ public:
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     return {isInterstingRange(S), S};
   }
-
-  bool walkToDeclPre(Decl *D) override { return isInterstingRange(D); }
 
   bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
@@ -278,12 +276,13 @@ public:
 
 /// Collect function (or subscript) members with the given \p name on \p baseTy.
 static void collectPossibleCalleesByQualifiedLookup(
-    DeclContext &DC, Type baseTy, DeclBaseName name,
+    DeclContext &DC, Type baseTy, DeclNameRef name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
   SmallVector<ValueDecl *, 2> decls;
-  if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(), name,
+  if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(),
+                          name.withoutArgumentLabels(),
                           NL_QualifiedDefault | NL_ProtocolMembers,
                           decls))
     return;
@@ -341,7 +340,7 @@ static void collectPossibleCalleesByQualifiedLookup(
 /// Collect function (or subscript) members with the given \p name on
 /// \p baseExpr expression.
 static void collectPossibleCalleesByQualifiedLookup(
-    DeclContext &DC, Expr *baseExpr, DeclBaseName name,
+    DeclContext &DC, Expr *baseExpr, DeclNameRef name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   ConcreteDeclRef ref = nullptr;
   auto baseTyOpt = getTypeOfCompletionContextExpr(
@@ -388,11 +387,12 @@ static bool collectPossibleCalleesForApply(
     }
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
-        DC, UDE->getBase(), UDE->getName().getBaseName(), candidates);
+        DC, UDE->getBase(), UDE->getName(), candidates);
   } else if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(fnExpr)) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
     collectPossibleCalleesByQualifiedLookup(
-        DC, DSCE->getArg(), DRE->getDecl()->getBaseName(), candidates);
+        DC, DSCE->getArg(), DeclNameRef(DRE->getDecl()->getFullName()),
+                                            candidates);
     }
   }
 
@@ -409,7 +409,7 @@ static bool collectPossibleCalleesForApply(
       auto baseTy = AMT->getInstanceType();
       if (baseTy->mayHaveMembers())
         collectPossibleCalleesByQualifiedLookup(
-            DC, AMT, DeclBaseName::createConstructor(), candidates);
+            DC, AMT, DeclNameRef::createConstructor(), candidates);
     }
   }
 
@@ -430,7 +430,7 @@ static bool collectPossibleCalleesForSubscript(
     }
   } else {
     collectPossibleCalleesByQualifiedLookup(DC, subscriptExpr->getBase(),
-                                            DeclBaseName::createSubscript(),
+                                            DeclNameRef::createSubscript(),
                                             candidates);
   }
   return !candidates.empty();
@@ -442,7 +442,6 @@ static bool collectPossibleCalleesForUnresolvedMember(
     DeclContext &DC, UnresolvedMemberExpr *unresolvedMemberExpr,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   auto currModule = DC.getParentModule();
-  auto baseName = unresolvedMemberExpr->getName().getBaseName();
 
   // Get the context of the expression itself.
   ExprContextInfo contextInfo(&DC, unresolvedMemberExpr);
@@ -451,7 +450,8 @@ static bool collectPossibleCalleesForUnresolvedMember(
       continue;
     SmallVector<FunctionTypeAndDecl, 2> members;
     collectPossibleCalleesByQualifiedLookup(DC, MetatypeType::get(expectedTy),
-                                            baseName, members);
+                                            unresolvedMemberExpr->getName(),
+                                            members);
     for (auto member : members) {
       if (isReferenceableByImplicitMemberExpr(currModule, &DC, expectedTy,
                                               member.second))
@@ -602,10 +602,59 @@ class ExprContextAnalyzer {
       // Check context types of the array literal expression.
       ExprContextInfo arrayCtxtInfo(DC, Parent);
       for (auto arrayT : arrayCtxtInfo.getPossibleTypes()) {
-        if (auto boundGenericT = arrayT->getAs<BoundGenericType>())
+        if (auto boundGenericT = arrayT->getAs<BoundGenericType>()) {
+          // let _: [Element] = [#HERE#]
+          // In this case, 'Element' is the expected type.
           if (boundGenericT->getDecl() == Context.getArrayDecl())
             recordPossibleType(boundGenericT->getGenericArgs()[0]);
+
+          // let _: [Key : Value] = [#HERE#]
+          // In this case, 'Key' is the expected type.
+          if (boundGenericT->getDecl() == Context.getDictionaryDecl())
+            recordPossibleType(boundGenericT->getGenericArgs()[0]);
+        }
       }
+      break;
+    }
+    case ExprKind::Dictionary: {
+      // Check context types of the dictionary literal expression.
+      ExprContextInfo dictCtxtInfo(DC, Parent);
+
+      for (auto dictT : dictCtxtInfo.getPossibleTypes()) {
+        if (auto boundGenericT = dictT->getAs<BoundGenericType>()) {
+          if (boundGenericT->getDecl() == Context.getDictionaryDecl()) {
+            if (ParsedExpr->isImplicit() && isa<TupleExpr>(ParsedExpr)) {
+              // let _: [Key : Value] = [#HERE#:]
+              // let _: [Key : Value] = [#HERE#:val]
+              // let _: [Key : Value] = [key:#HERE#]
+              // In this case, this is called by 'ExprKind::Tuple' case. Return
+              // '(Key,Value)' here, 'ExprKind::Tuple' branch can decide which
+              // type in the tuple type is the exprected type.
+              SmallVector<TupleTypeElt, 2> elts;
+              for (auto genericArg : boundGenericT->getGenericArgs())
+                elts.emplace_back(genericArg);
+              recordPossibleType(TupleType::get(elts, DC->getASTContext()));
+            } else {
+              // let _: [Key : Value] = [key: val, #HERE#]
+              // In this case, assume 'Key' is the expected type.
+              if (boundGenericT->getDecl() == Context.getDictionaryDecl())
+                recordPossibleType(boundGenericT->getGenericArgs()[0]);
+            }
+          }
+        }
+      }
+      break;
+    }
+    case ExprKind::If: {
+      auto *IE = cast<IfExpr>(Parent);
+      if (SM.rangeContains(IE->getCondExpr()->getSourceRange(),
+                           ParsedExpr->getSourceRange())) {
+        recordPossibleType(Context.getBoolDecl()->getDeclaredInterfaceType());
+        break;
+      }
+      ExprContextInfo ternaryCtxtInfo(DC, Parent);
+      for (auto ternaryT : ternaryCtxtInfo.getPossibleTypes())
+        recordPossibleType(ternaryT);
       break;
     }
     case ExprKind::Assign: {
@@ -629,13 +678,25 @@ class ExprContextAnalyzer {
       break;
     }
     case ExprKind::Tuple: {
-      if (!Parent->getType() || !Parent->getType()->is<TupleType>())
-        return;
+      TupleType *tupleT = nullptr;
+      if (Parent->getType() && Parent->getType()->is<TupleType>()) {
+        tupleT = Parent->getType()->castTo<TupleType>();
+      } else {
+        ExprContextInfo tupleCtxtInfo(DC, Parent);
+        for (auto possibleT : tupleCtxtInfo.getPossibleTypes()) {
+          if (auto possibleTupleT = possibleT->getAs<TupleType>()) {
+            tupleT = possibleTupleT;
+            break;
+          }
+        }
+        if (!tupleT)
+          return;
+      }
+
       unsigned Position = 0;
       bool HasName;
       if (getPositionInArgs(*DC, Parent, ParsedExpr, Position, HasName)) {
-        recordPossibleType(
-            Parent->getType()->castTo<TupleType>()->getElementType(Position));
+        recordPossibleType(tupleT->getElementType(Position));
       }
       break;
     }
@@ -811,7 +872,8 @@ public:
         case ExprKind::PrefixUnary:
         case ExprKind::Assign:
         case ExprKind::Array:
-          return true;
+        case ExprKind::Dictionary:
+        case ExprKind::If:
         case ExprKind::UnresolvedMember:
           return true;
         case ExprKind::Tuple: {

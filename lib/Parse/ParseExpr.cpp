@@ -189,8 +189,13 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       if (CodeCompletion)
         CodeCompletion->setLeadingSequenceExprs(SequencedExprs);
     }
-    if (Primary.isNull())
+    if (Primary.isNull()) {
+      if (HasCodeCompletion) {
+        SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
+        break;
+      }
       return Primary;
+    }
 
     SequencedExprs.push_back(Primary.get());
 
@@ -242,16 +247,23 @@ parse_operator:
         HasCodeCompletion = true;
       if (middle.isNull())
         return nullptr;
-      
+
       // Make sure there's a matching ':' after the middle expr.
       if (!Tok.is(tok::colon)) {
+        if (middle.hasCodeCompletion()) {
+          SequencedExprs.push_back(new (Context) IfExpr(questionLoc,
+                                                        middle.get(),
+                                                        PreviousLoc));
+          SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
+          goto done;
+        }
+        
         diagnose(questionLoc, diag::expected_colon_after_if_question);
-
-      Status.setIsParseError();
-      return makeParserResult(Status, new (Context) ErrorExpr(
-          {startLoc, middle.get()->getSourceRange().End}));
+        Status.setIsParseError();
+        return makeParserResult(Status, new (Context) ErrorExpr(
+            {startLoc, middle.get()->getSourceRange().End}));
       }
-      
+
       SourceLoc colonLoc = consumeToken();
       
       auto *unresolvedIf
@@ -644,6 +656,7 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
   // Parse the sequence of unqualified-names.
   ParserStatus status;
   SourceLoc LastDotLoc;
+  DeclNameOptions flags = DeclNameFlag::AllowCompoundNames;
   while (true) {
     SyntaxParsingContext NamePieceCtx(SyntaxContext, SyntaxKind::ObjcNamePiece);
     // Handle code completion.
@@ -652,10 +665,8 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
 
     // Parse the next name.
     DeclNameLoc nameLoc;
-    bool afterDot = !components.empty();
-    auto name = parseUnqualifiedDeclName(
-                  afterDot, nameLoc, 
-                  diag::expr_keypath_expected_property_or_type);
+    DeclNameRef name = parseDeclNameRef(nameLoc,
+        diag::expr_keypath_expected_property_or_type, flags);
     if (!name) {
       status.setIsParseError();
       break;
@@ -665,6 +676,9 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
     auto component = KeyPathExpr::Component::forUnresolvedProperty(name,
                                                       nameLoc.getBaseNameLoc());
     components.push_back(component);
+
+    // After the first component, we can start parsing keywords.
+    flags |= DeclNameFlag::AllowKeywords;
 
     // Handle code completion.
     if (Tok.is(tok::code_complete))
@@ -806,7 +820,7 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
   assert(Tok.isAnyOperator());
   DeclRefKind refKind = getDeclRefKindForOperator(Tok.getKind());
   SourceLoc loc = Tok.getLoc();
-  Identifier name = Context.getIdentifier(Tok.getText());
+  DeclNameRef name(Context.getIdentifier(Tok.getText()));
   consumeToken();
   // Bypass local lookup.
   return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
@@ -823,7 +837,7 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
 
   // Do an actual lookup for 'self' in case it shows up in a capture list.
   auto *methodSelf = methodContext->getImplicitSelfDecl();
-  auto *lookupSelf = P.lookupInScope(P.Context.Id_self);
+  auto *lookupSelf = P.lookupInScope(DeclNameRef(P.Context.Id_self));
   if (lookupSelf && lookupSelf != methodSelf) {
     // FIXME: This is the wrong diagnostic for if someone manually declares a
     // variable named 'self' using backticks.
@@ -1014,6 +1028,8 @@ getMagicIdentifierLiteralKind(tok Kind) {
   case tok::kw___FILE__:
   case tok::pound_file:
     return MagicIdentifierLiteralExpr::Kind::File;
+  case tok::pound_filePath:
+    return MagicIdentifierLiteralExpr::Kind::FilePath;
   case tok::kw___FUNCTION__:
   case tok::pound_function:
     return MagicIdentifierLiteralExpr::Kind::Function;
@@ -1071,7 +1087,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 
       // Handle "x.42" - a tuple index.
       if (Tok.is(tok::integer_literal)) {
-        DeclName name = Context.getIdentifier(Tok.getText());
+        DeclNameRef name(Context.getIdentifier(Tok.getText()));
         SourceLoc nameLoc = consumeToken(tok::integer_literal);
         SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
@@ -1128,7 +1144,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       Diag<> D = isa<SuperRefExpr>(Result.get())
                      ? diag::expected_identifier_after_super_dot_expr
                      : diag::expected_member_name;
-      DeclName Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc, D);
+      auto Name = parseDeclNameRef(NameLoc, D,
+          DeclNameFlag::AllowKeywords | DeclNameFlag::AllowCompoundNames);
       if (!Name)
         return nullptr;
       SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
@@ -1446,6 +1463,15 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       .fixItReplace(Tok.getLoc(), replacement);
     LLVM_FALLTHROUGH;
   }
+
+  case tok::pound_filePath:
+    // Check twice because of fallthrough--this is ugly but temporary.
+    if (Tok.is(tok::pound_filePath) && !Context.LangOpts.EnableConcisePoundFile)
+      diagnose(Tok.getLoc(), diag::unknown_pound_expr, "filePath");
+    // Continue since we actually do know how to handle it. This avoids extra
+    // diagnostics.
+    LLVM_FALLTHROUGH;
+
   case tok::pound_column:
   case tok::pound_file:
   case tok::pound_function:
@@ -1455,6 +1481,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     switch (Tok.getKind()) {
     case tok::pound_column: SKind = SyntaxKind::PoundColumnExpr; break;
     case tok::pound_file: SKind = SyntaxKind::PoundFileExpr; break;
+    case tok::pound_filePath: SKind = SyntaxKind::PoundFilePathExpr; break;
     case tok::pound_function: SKind = SyntaxKind::PoundFunctionExpr; break;
     // FIXME: #line was renamed to #sourceLocation
     case tok::pound_line: SKind = SyntaxKind::PoundLineExpr; break;
@@ -1554,7 +1581,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                                    /*Implicit=*/false));
     }
     
-    DeclName Name;
+    DeclNameRef Name;
     DeclNameLoc NameLoc;
 
     if (Tok.is(tok::code_complete)) {
@@ -1568,8 +1595,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       return Result;
     }
 
-    Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc,
-                                    diag::expected_identifier_after_dot_expr);
+    Name = parseDeclNameRef(NameLoc, diag::expected_identifier_after_dot_expr,
+        DeclNameFlag::AllowKeywords | DeclNameFlag::AllowCompoundNames);
     if (!Name) return nullptr;
     SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
@@ -1740,8 +1767,9 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
   ParsedTrivia EmptyTrivia;
   bool First = true;
 
-  DeclName appendLiteral(Context, Context.Id_appendLiteral, { Identifier() });
-  DeclName appendInterpolation(Context.Id_appendInterpolation);
+  DeclNameRef appendLiteral(
+      { Context, Context.Id_appendLiteral, { Identifier() } });
+  DeclNameRef appendInterpolation(Context.Id_appendInterpolation);
 
   for (auto Segment : Segments) {
     auto InterpolationVarRef =
@@ -2065,12 +2093,87 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
   }
 }
 
-DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
-                                          DeclNameLoc &loc,
-                                          const Diagnostic &diag,
-                                          bool allowOperators,
-                                          bool allowZeroArgCompoundNames,
-                                          bool allowDeinitAndSubscript) {
+static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
+                                 SourceLoc &lparenLoc,
+                                 SmallVectorImpl<Identifier> &argumentLabels,
+                                 SmallVectorImpl<SourceLoc> &argumentLabelLocs,
+                                 SourceLoc &rparenLoc) {
+  if (!flags.contains(Parser::DeclNameFlag::AllowCompoundNames))
+    return false;
+
+  // Is the current token a left paren?
+  if (!P.Tok.isFollowingLParen())
+    return false;
+
+  // Okay, let's look ahead and see if the next token is something that could
+  // be in an arg label list...
+  const Token &next = P.peekToken();
+
+  // A close parenthesis, if empty lists are allowed.
+  bool nextIsRParen =
+      flags.contains(Parser::DeclNameFlag::AllowZeroArgCompoundNames) &&
+      next.is(tok::r_paren);
+  // An argument label.
+  bool nextIsArgLabel = next.canBeArgumentLabel() || next.is(tok::colon);
+  // An editor placeholder.
+  bool nextIsPlaceholder = Identifier::isEditorPlaceholder(next.getText());
+
+  if (!(nextIsRParen || nextIsArgLabel || nextIsPlaceholder))
+    return false;
+
+  // Try to parse a compound name.
+  SyntaxParsingContext ArgsCtxt(P.SyntaxContext, SyntaxKind::DeclNameArguments);
+  Parser::BacktrackingScope backtrack(P);
+
+  lparenLoc = P.consumeToken(tok::l_paren);
+  while (P.Tok.isNot(tok::r_paren)) {
+    SyntaxParsingContext ArgCtxt(P.SyntaxContext, SyntaxKind::DeclNameArgument);
+
+    // If we see a ':', the user forgot the '_';
+    if (P.Tok.is(tok::colon)) {
+      P.diagnose(P.Tok, diag::empty_arg_label_underscore)
+          .fixItInsert(P.Tok.getLoc(), "_");
+      argumentLabels.push_back(Identifier());
+      argumentLabelLocs.push_back(P.consumeToken(tok::colon));
+    }
+
+    Identifier argName;
+    SourceLoc argLoc;
+    P.parseOptionalArgumentLabel(argName, argLoc);
+    if (argLoc.isValid()) {
+      argumentLabels.push_back(argName);
+      argumentLabelLocs.push_back(argLoc);
+      continue;
+    }
+
+    // This is not a compound name.
+    // FIXME: Could recover better if we "know" it's a compound name.
+    ArgCtxt.setBackTracking();
+    ArgsCtxt.setBackTracking();
+
+    return false;
+  }
+
+  // We have a compound name. Cancel backtracking and build that name.
+  backtrack.cancelBacktrack();
+
+  if (argumentLabels.empty() && P.SyntaxContext->isEnabled())
+    P.SyntaxContext->addSyntax(
+        ParsedSyntaxRecorder::makeBlankDeclNameArgumentList(
+            P.leadingTriviaLoc(), *P.SyntaxContext));
+  else
+    ArgsCtxt.collectNodesInPlace(SyntaxKind::DeclNameArgumentList);
+
+  rparenLoc = P.consumeToken(tok::r_paren);
+
+  assert(argumentLabels.size() == argumentLabelLocs.size());
+
+  return true;
+}
+
+DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
+                                     const Diagnostic &diag,
+                                     DeclNameOptions flags) {
   // Consume the base name.
   DeclBaseName baseName;
   SourceLoc baseNameLoc;
@@ -2079,17 +2182,21 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     baseNameLoc = consumeIdentifier(
         &baseNameId, /*allowDollarIdentifier=*/true);
     baseName = baseNameId;
-  } else if (allowOperators && Tok.isAnyOperator()) {
+  } else if (flags.contains(DeclNameFlag::AllowOperators) &&
+             Tok.isAnyOperator()) {
     baseName = Context.getIdentifier(Tok.getText());
     baseNameLoc = consumeToken();
-  } else if (afterDot && Tok.isKeyword()) {
+  } else if (flags.contains(DeclNameFlag::AllowKeywords) && Tok.isKeyword()) {
+    bool specialDeinitAndSubscript =
+        flags.contains(DeclNameFlag::AllowKeywordsUsingSpecialNames);
+
     // Syntax highlighting should treat this token as an identifier and
     // not as a keyword.
     if (Tok.is(tok::kw_init))
       baseName = DeclBaseName::createConstructor();
-    else if (allowDeinitAndSubscript &&Tok.is(tok::kw_deinit))
+    else if (specialDeinitAndSubscript && Tok.is(tok::kw_deinit))
       baseName = DeclBaseName::createDestructor();
-    else if (allowDeinitAndSubscript &&Tok.is(tok::kw_subscript))
+    else if (specialDeinitAndSubscript && Tok.is(tok::kw_subscript))
       baseName = DeclBaseName::createSubscript();
     else
       baseName = Context.getIdentifier(Tok.getText());
@@ -2099,88 +2206,29 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     baseName = Context.getIdentifier(Tok.getText());
     checkForInputIncomplete();
     diagnose(Tok, diag);
-    return DeclName();
+    return DeclNameRef();
   }
 
-  // If the next token isn't a following '(', we don't have a compound name.
-  if (!Tok.isFollowingLParen()) {
-    loc = DeclNameLoc(baseNameLoc);
-    return baseName;
-  }
-
-
-  // If the next token is a ')' then we have a 0-arg compound name. This is
-  // explicitly differentiated from "simple" (non-compound) name in DeclName.
-  // Unfortunately only some places in the grammar are ok with accepting this
-  // kind of name; in other places it's ambiguous with trailing calls.
-  if (allowZeroArgCompoundNames && peekToken().is(tok::r_paren)) {
-    SyntaxParsingContext ArgsCtxt(SyntaxContext, SyntaxKind::DeclNameArguments);
-    consumeToken(tok::l_paren);
-    if (SyntaxContext->isEnabled())
-      SyntaxContext->addSyntax(
-          ParsedSyntaxRecorder::makeBlankDeclNameArgumentList(
-              leadingTriviaLoc(), *SyntaxContext));
-    consumeToken(tok::r_paren);
-    loc = DeclNameLoc(baseNameLoc);
-    SmallVector<Identifier, 2> argumentLabels;
-    return DeclName(Context, baseName, argumentLabels);
-  }
-
-  // If the token after that isn't an argument label or ':', we don't have a
-  // compound name.
-  if ((!peekToken().canBeArgumentLabel() && !peekToken().is(tok::colon)) ||
-      Identifier::isEditorPlaceholder(peekToken().getText())) {
-    loc = DeclNameLoc(baseNameLoc);
-    return baseName;
-  }
-
-  // Try to parse a compound name.
-  SyntaxParsingContext ArgsCtxt(SyntaxContext, SyntaxKind::DeclNameArguments);
-  BacktrackingScope backtrack(*this);
-
+  // Parse an argument list, if the flags allow it and it's present.
   SmallVector<Identifier, 2> argumentLabels;
   SmallVector<SourceLoc, 2> argumentLabelLocs;
-  SourceLoc lparenLoc = consumeToken(tok::l_paren);
+  SourceLoc lparenLoc;
   SourceLoc rparenLoc;
-  while (Tok.isNot(tok::r_paren)) {
-    SyntaxParsingContext ArgCtxt(SyntaxContext, SyntaxKind::DeclNameArgument);
 
-    // If we see a ':', the user forgot the '_';
-    if (Tok.is(tok::colon)) {
-      diagnose(Tok, diag::empty_arg_label_underscore)
-          .fixItInsert(Tok.getLoc(), "_");
-      argumentLabels.push_back(Identifier());
-      argumentLabelLocs.push_back(consumeToken(tok::colon));
-    }
+  bool hadArgList = tryParseArgLabelList(*this, flags, lparenLoc,
+                                         argumentLabels, argumentLabelLocs,
+                                         rparenLoc);
 
-    Identifier argName;
-    SourceLoc argLoc;
-    parseOptionalArgumentLabel(argName, argLoc);
-    if (argLoc.isValid()) {
-      argumentLabels.push_back(argName);
-      argumentLabelLocs.push_back(argLoc);
-      continue;
-    }
-
-    // This is not a compound name.
-    // FIXME: Could recover better if we "know" it's a compound name.
+  if (argumentLabelLocs.empty() || !hadArgList)
     loc = DeclNameLoc(baseNameLoc);
-    ArgCtxt.setBackTracking();
-    ArgsCtxt.setBackTracking();
-    return baseName;
-  }
-  // We have a compound name. Cancel backtracking and build that name.
-  backtrack.cancelBacktrack();
+  else
+    loc = DeclNameLoc(Context, baseNameLoc, lparenLoc, argumentLabelLocs,
+                      rparenLoc);
 
-  ArgsCtxt.collectNodesInPlace(SyntaxKind::DeclNameArgumentList);
-  rparenLoc = consumeToken(tok::r_paren);
+  if (!hadArgList)
+    return DeclNameRef(baseName);
 
-  assert(!argumentLabels.empty() && "Logic above should prevent this");
-  assert(argumentLabels.size() == argumentLabelLocs.size());
-
-  loc = DeclNameLoc(Context, baseNameLoc, lparenLoc, argumentLabelLocs,
-                    rparenLoc);
-  return DeclName(Context, baseName, argumentLabels);
+  return DeclNameRef({ Context, baseName, argumentLabels });
 }
 
 ///   expr-identifier:
@@ -2193,8 +2241,8 @@ Expr *Parser::parseExprIdentifier() {
 
   // Parse the unqualified-decl-name.
   DeclNameLoc loc;
-  DeclName name = parseUnqualifiedDeclName(/*afterDot=*/false, loc,
-                                           diag::expected_expr);
+  DeclNameRef name = parseDeclNameRef(loc, diag::expected_expr,
+                                      DeclNameFlag::AllowCompoundNames);
 
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
@@ -2232,7 +2280,7 @@ Expr *Parser::parseExprIdentifier() {
       }
     } else {
       for (auto activeVar : DisabledVars) {
-        if (activeVar->getFullName() == name) {
+        if (activeVar->getFullName() == name.getFullName()) {
           diagnose(loc.getBaseNameLoc(), DisabledVarReason);
           return new (Context) ErrorExpr(loc.getSourceRange());
         }
@@ -2256,8 +2304,7 @@ Expr *Parser::parseExprIdentifier() {
     // global or local declarations here.
     assert(!TD->getDeclContext()->isTypeContext() ||
            isa<GenericTypeParamDecl>(TD));
-    E = TypeExpr::createForDecl(loc.getBaseNameLoc(), TD, /*DC*/nullptr,
-                                /*implicit*/false);
+    E = TypeExpr::createForDecl(loc, TD, /*DC*/nullptr, /*implicit*/false);
   } else {
     E = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
   }
@@ -2368,11 +2415,15 @@ static void printTupleNames(const TypeRepr *typeRepr, llvm::raw_ostream &OS) {
 }
 
 bool Parser::
-parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
+parseClosureSignatureIfPresent(SourceRange &bracketRange,
+                               SmallVectorImpl<CaptureListEntry> &captureList,
+                               VarDecl *&capturedSelfDecl,
                                ParameterList *&params, SourceLoc &throwsLoc,
                                SourceLoc &arrowLoc,
                                TypeRepr *&explicitResultType, SourceLoc &inLoc){
   // Clear out result parameters.
+  bracketRange = SourceRange();
+  capturedSelfDecl = nullptr;
   params = nullptr;
   throwsLoc = SourceLoc();
   arrowLoc = SourceLoc();
@@ -2441,14 +2492,16 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
   }
   SyntaxParsingContext ClosureSigCtx(SyntaxContext, SyntaxKind::ClosureSignature);
   if (Tok.is(tok::l_square) && peekToken().is(tok::r_square)) {
+    
     SyntaxParsingContext CaptureCtx(SyntaxContext,
                                     SyntaxKind::ClosureCaptureSignature);
-    consumeToken(tok::l_square);
-    consumeToken(tok::r_square);
+    SourceLoc lBracketLoc = consumeToken(tok::l_square);
+    SourceLoc rBracketLoc = consumeToken(tok::r_square);
+    bracketRange = SourceRange(lBracketLoc, rBracketLoc);
   } else if (Tok.is(tok::l_square) && !peekToken().is(tok::r_square)) {
     SyntaxParsingContext CaptureCtx(SyntaxContext,
                                     SyntaxKind::ClosureCaptureSignature);
-    consumeToken(tok::l_square);
+    SourceLoc lBracketLoc = consumeToken(tok::l_square);
     // At this point, we know we have a closure signature. Parse the capture list
     // and parameters.
     bool HasNext;
@@ -2538,6 +2591,10 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       auto *VD = new (Context) VarDecl(/*isStatic*/false, introducer,
                                        /*isCaptureList*/true,
                                        nameLoc, name, CurDeclContext);
+        
+      // If we captured something under the name "self", remember that.
+      if (name == Context.Id_self)
+        capturedSelfDecl = VD;
 
       // Attributes.
       if (ownershipKind != ReferenceOwnership::Strong)
@@ -2551,17 +2608,22 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
           /*VarLoc*/ nameLoc, pattern, /*EqualLoc*/ equalLoc, initializer,
           CurDeclContext);
 
-      captureList.push_back(CaptureListEntry(VD, PBD));
+        auto CLE = CaptureListEntry(VD, PBD);
+        if (CLE.isSimpleSelfCapture())
+          VD->setIsSelfParamCapture();
+      captureList.push_back(CLE);
     } while (HasNext);
 
     SyntaxContext->collectNodesInPlace(SyntaxKind::ClosureCaptureItemList);
     // The capture list needs to be closed off with a ']'.
+    SourceLoc rBracketLoc = Tok.getLoc();
     if (!consumeIf(tok::r_square)) {
       diagnose(Tok, diag::expected_capture_list_end_rsquare);
       skipUntil(tok::r_square);
       if (Tok.is(tok::r_square))
-        consumeToken(tok::r_square);
+        rBracketLoc = consumeToken(tok::r_square);
     }
+    bracketRange = SourceRange(lBracketLoc, rBracketLoc);
   }
   
   bool invalid = false;
@@ -2719,14 +2781,17 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SourceLoc leftBrace = consumeToken();
 
   // Parse the closure-signature, if present.
+  SourceRange bracketRange;
+  SmallVector<CaptureListEntry, 2> captureList;
+  VarDecl *capturedSelfDecl;
   ParameterList *params = nullptr;
   SourceLoc throwsLoc;
   SourceLoc arrowLoc;
   TypeRepr *explicitResultType;
   SourceLoc inLoc;
-  SmallVector<CaptureListEntry, 2> captureList;
-  parseClosureSignatureIfPresent(captureList, params, throwsLoc, arrowLoc,
-                                 explicitResultType, inLoc);
+  parseClosureSignatureIfPresent(bracketRange, captureList,
+                                 capturedSelfDecl, params, throwsLoc,
+                                 arrowLoc, explicitResultType, inLoc);
 
   // If the closure was created in the context of an array type signature's
   // size expression, there will not be a local context. A parse error will
@@ -2741,9 +2806,10 @@ ParserResult<Expr> Parser::parseExprClosure() {
   unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
 
   // Create the closure expression and enter its context.
-  auto *closure = new (Context) ClosureExpr(params, throwsLoc, arrowLoc, inLoc,
-                                            explicitResultType,
-                                            discriminator, CurDeclContext);
+  auto *closure = new (Context) ClosureExpr(bracketRange, capturedSelfDecl,
+                                            params, throwsLoc, arrowLoc, inLoc,
+                                            explicitResultType, discriminator,
+                                            CurDeclContext);
   // The arguments to the func are defined in their own scope.
   Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);
@@ -2758,7 +2824,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
     // FIXME: We could do this all the time, and then provide Fix-Its
     // to map $i -> the appropriately-named argument. This might help
     // users who are refactoring code by adding names.
-    AnonClosureVars.push_back({ leftBrace, {}});
+    AnonClosureVars.push_back({{}, leftBrace});
   }
   
   // Add capture list variables to scope.
@@ -2782,7 +2848,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // anonymous closure arguments.
   if (!params) {
     // Create a parameter pattern containing the anonymous variables.
-    auto &anonVars = AnonClosureVars.back().second;
+    auto &anonVars = AnonClosureVars.back().Item;
     SmallVector<ParamDecl*, 4> elements;
     for (auto anonVar : anonVars)
       elements.push_back(anonVar);
@@ -2874,8 +2940,8 @@ Expr *Parser::parseExprAnonClosureArg() {
     if (Context.LangOpts.DebuggerSupport) {
       auto refKind = DeclRefKind::Ordinary;
       auto identifier = Context.getIdentifier(Name);
-      return new (Context) UnresolvedDeclRefExpr(DeclName(identifier), refKind,
-                                                 DeclNameLoc(Loc));
+      return new (Context) UnresolvedDeclRefExpr(DeclNameRef(identifier),
+                                                 refKind, DeclNameLoc(Loc));
     }
     diagnose(Loc, diag::anon_closure_arg_not_in_closure);
     return new (Context) ErrorExpr(Loc);
@@ -2895,8 +2961,8 @@ Expr *Parser::parseExprAnonClosureArg() {
     }
   }
 
-  auto leftBraceLoc = AnonClosureVars.back().first;
-  auto &decls = AnonClosureVars.back().second;
+  auto leftBraceLoc = AnonClosureVars.back().Loc;
+  auto &decls = AnonClosureVars.back().Item;
   while (ArgNo >= decls.size()) {
     unsigned nextIdx = decls.size();
     SmallVector<char, 4> StrBuf;
@@ -3008,17 +3074,17 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     if (Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma)) {
       SyntaxParsingContext operatorContext(SyntaxContext,
                                            SyntaxKind::IdentifierExpr);
-      SourceLoc Loc;
-      Identifier OperName;
-      if (parseAnyIdentifier(OperName, Loc, diag::expected_operator_ref)) {
+      DeclNameLoc Loc;
+      auto OperName = parseDeclNameRef(Loc, diag::expected_operator_ref,
+                                       DeclNameFlag::AllowOperators);
+      if (!OperName) {
         return makeParserError();
       }
       // Bypass local lookup. Use an 'Ordinary' reference kind so that the
       // reference may resolve to any unary or binary operator based on
       // context.
       SubExpr = new(Context) UnresolvedDeclRefExpr(OperName,
-                                                   DeclRefKind::Ordinary,
-                                                   DeclNameLoc(Loc));
+                                                   DeclRefKind::Ordinary, Loc);
     } else if (isPostfix && Tok.is(tok::code_complete)) {
       // Handle call arguments specially because it may need argument labels.
       auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
@@ -3397,7 +3463,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
       // If The next token is at the beginning of a new line and can never start
       // an element, break.
       if (Tok.isAtStartOfLine() && (Tok.isAny(tok::r_brace, tok::pound_endif) ||
-                                    isStartOfDecl() || isStartOfStmt()))
+                                    isStartOfSwiftDecl() || isStartOfStmt()))
         break;
 
       diagnose(Tok, diag::expected_separator, ",")
@@ -3459,6 +3525,11 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
 
   // Parse the ':'.
   if (!consumeIf(tok::colon)) {
+    if (Element.hasCodeCompletion()) {
+      // Return the completion expression itself so we can analyze the type
+      // later.
+      return Element;
+    }
     diagnose(Tok, diag::expected_colon_in_dictionary_literal);
     return ParserStatus(Element) | makeParserError();
   }
@@ -3466,8 +3537,14 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
   // Parse the value.
   auto Value = parseExpr(diag::expected_value_in_dictionary_literal);
 
-  if (Value.isNull())
-    Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+  if (Value.isNull()) {
+    if (!Element.hasCodeCompletion()) {
+      Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+    } else {
+      Value = makeParserResult(Value,
+                               new (Context) CodeCompletionExpr(PreviousLoc));
+    }
+  }
 
   // Make a tuple of Key Value pair.
   return makeParserResult(

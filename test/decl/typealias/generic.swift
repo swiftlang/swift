@@ -45,7 +45,7 @@ typealias Tuple3<T1> = (T1, T1) where T1 : Hashable
 
 let _ : Tuple2<Int, String> = (1, "foo")
 let _ : Tuple2 = (1, "foo")
-let _ : Tuple2<Int, String> = ("bar",  // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
+let _ : Tuple2<Int, String> = ("bar",  // expected-error {{cannot convert value of type '(String, String)' to specified type 'Tuple2<Int, String>' (aka '(Int, String)')}}
                                "foo")
 
 func f() {

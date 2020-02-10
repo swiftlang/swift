@@ -5,6 +5,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/Main.swift %t/Library.swift -code-completion-token=POINT_DOT | %FileCheck --check-prefix=POINT_DOT %s
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/Main.swift %t/Library.swift -code-completion-token=LENS_DOT | %FileCheck --check-prefix=LENS_DOT %s
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/Main.swift %t/Library.swift -code-completion-token=MYENUM_DOT | %FileCheck --check-prefix=MYENUM_DOT %s
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/Main.swift %t/Library.swift -code-completion-token=MYENUM_INSTANCE_DOT | %FileCheck --check-prefix=MYENUM_INSTANCE_DOT %s
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/Main.swift %t/Library.swift -code-completion-token=HASWRAPPED_DOT| %FileCheck --check-prefix=HASWRAPPED_DOT %s
 
 // BEGIN Library.swift
@@ -84,7 +85,15 @@ func testRawRepresentable() {
 // MYENUM_DOT-DAG: Decl[InstanceMethod]/Super:         hash({#(self): MyEnum#})[#(into: inout Hasher) -> Void#];
 // MYENUM_DOT: End completions
 }
-
+func testRawRepesentableInstance(value: MyEnum) {
+  value.#^MYENUM_INSTANCE_DOT^#
+// MYENUM_INSTANCE_DOT: Begin completions, 4 items
+// MYENUM_INSTANCE_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyEnum#];
+// MYENUM_INSTANCE_DOT-DAG: Decl[InstanceVar]/CurrNominal:      rawValue[#String#];
+// MYENUM_INSTANCE_DOT-DAG: Decl[InstanceVar]/Super:            hashValue[#Int#];
+// MYENUM_INSTANCE_DOT-DAG: Decl[InstanceMethod]/Super:         hash({#into: &Hasher#})[#Void#];
+// MYENUM_INSTANCE_DOT: End completions
+}
 func testHasWrappedValue(value: HasWrapped) {
   value.#^HASWRAPPED_DOT^#
 // HASWRAPPED_DOT: Begin completions, 3 items

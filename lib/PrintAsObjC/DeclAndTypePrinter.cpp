@@ -827,6 +827,9 @@ private:
       case PlatformKind::iOS:
         plat = "ios";
         break;
+      case PlatformKind::macCatalyst:
+        plat = "maccatalyst";
+        break;
       case PlatformKind::tvOS:
         plat = "tvos";
         break;
@@ -838,6 +841,9 @@ private:
         break;
       case PlatformKind::iOSApplicationExtension:
         plat = "ios_app_extension";
+        break;
+      case PlatformKind::macCatalystApplicationExtension:
+        plat = "maccatalyst_app_extension";
         break;
       case PlatformKind::tvOSApplicationExtension:
         plat = "tvos_app_extension";
@@ -895,7 +901,7 @@ private:
                                  const ParsedDeclName renamedParsedDeclName) {
     auto declContext = D->getDeclContext();
     ASTContext &astContext = D->getASTContext();
-    auto renamedDeclName = renamedParsedDeclName.formDeclName(astContext);
+    auto renamedDeclName = renamedParsedDeclName.formDeclNameRef(astContext);
 
     if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
       if (!renamedParsedDeclName.ContextName.empty()) {
@@ -903,7 +909,7 @@ private:
       }
       SmallVector<ValueDecl *, 1> decls;
       declContext->lookupQualified(declContext->getParentModule(),
-                                   renamedDeclName.getBaseIdentifier(),
+                                   renamedDeclName.withoutArgumentLabels(),
                                    NL_OnlyTypes,
                                    decls);
       if (decls.size() == 1)
@@ -1881,8 +1887,8 @@ private:
       assert(extension->getGenericParams()->size() ==
              extendedClass->getGenericParams()->size() &&
              "extensions with custom generic parameters?");
-      assert(extension->getGenericSignature()->getCanonicalSignature() ==
-             extendedClass->getGenericSignature()->getCanonicalSignature() &&
+      assert(extension->getGenericSignature().getCanonicalSignature() ==
+                 extendedClass->getGenericSignature().getCanonicalSignature() &&
              "constrained extensions or custom generic parameters?");
       type = extendedClass->getGenericEnvironment()->getSugaredType(type);
       decl = type->getDecl();

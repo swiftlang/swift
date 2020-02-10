@@ -234,8 +234,7 @@ public func _getErrorDefaultUserInfo<T: Error>(_ error: T)
     if domain != NSCocoaErrorDomain {
       _errorDomainUserInfoProviderQueue.sync {
         if NSError.userInfoValueProvider(forDomain: domain) != nil { return }
-        NSError.setUserInfoValueProvider(forDomain: domain) { (nsError, key) in
-          let error = nsError as Error
+        NSError.setUserInfoValueProvider(forDomain: domain) { (error, key) in
 
           switch key {
           case NSLocalizedDescriptionKey:

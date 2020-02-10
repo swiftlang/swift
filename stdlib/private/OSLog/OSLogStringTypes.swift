@@ -37,7 +37,7 @@ extension OSLogInterpolation {
   @_optimize(none)
   public mutating func appendInterpolation(
     _ argumentString: @autoclosure @escaping () -> String,
-    privacy: Privacy = .private
+    privacy: OSLogPrivacy = .private
   ) {
     guard argumentCount < maxOSLogArgumentCount else { return }
 
@@ -60,7 +60,7 @@ extension OSLogInterpolation {
     arguments.append(header)
 
     // Append number of bytes needed to serialize the argument.
-    let byteCount = sizeForEncoding()
+    let byteCount = pointerSizeInBytes()
     arguments.append(UInt8(byteCount))
 
     // Increment total byte size by the number of bytes needed for this
@@ -101,11 +101,11 @@ extension OSLogArguments {
 /// bitWidth property, and since MemoryLayout is not supported by the constant
 /// evaluator, this function returns the byte size of Int, which must equal the
 /// word length of the target architecture and hence the pointer size.
-/// This function must be constant evaluable.
-@_semantics("constant_evaluable")
-@inlinable
-@_optimize(none)
-internal func sizeForEncoding() -> Int {
+/// This function must be constant evaluable. Note that it is marked transparent
+/// instead of @inline(__always) as it is used in optimize(none) functions.
+@_transparent
+@usableFromInline
+internal func pointerSizeInBytes() -> Int {
   return Int.bitWidth &>> logBitsPerByte
 }
 
@@ -129,7 +129,7 @@ internal func serialize(
     storageObjects.append(storage)
   }
 
-  let byteCount = sizeForEncoding()
+  let byteCount = pointerSizeInBytes()
   let dest =
     UnsafeMutableRawBufferPointer(start: bufferPosition, count: byteCount)
   withUnsafeBytes(of: bytePointer) { dest.copyMemory(from: $0) }

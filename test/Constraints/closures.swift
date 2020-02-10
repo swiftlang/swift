@@ -186,7 +186,7 @@ func testMap() {
 }
 
 // <rdar://problem/22414757> "UnresolvedDot" "in wrong phase" assertion from verifier
-[].reduce { $0 + $1 }  // expected-error {{cannot invoke 'reduce' with an argument list of type '(@escaping (_, _) -> _)'}}
+[].reduce { $0 + $1 }  // expected-error {{cannot invoke 'reduce' with an argument list of type '(_)'}}
 
 
 
@@ -249,10 +249,10 @@ var _: (Int,Int) -> Int = {$0+$1+$2}  // expected-error {{contextual closure typ
 // Crash when re-typechecking bodies of non-single expression closures
 
 struct CC {}
-func callCC<U>(_ f: (CC) -> U) -> () {} // expected-note {{in call to function 'callCC'}}
+func callCC<U>(_ f: (CC) -> U) -> () {}
 
 func typeCheckMultiStmtClosureCrash() {
-  callCC { // expected-error {{generic parameter 'U' could not be inferred}}
+  callCC { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{none}}
     _ = $0
     return 1
   }
@@ -313,7 +313,7 @@ struct Thing {
   init?() {}
 }
 // This throws a compiler error
-let things = Thing().map { thing in  // expected-error {{generic parameter 'U' could not be inferred}}
+let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> <#Result#> }}
   // Commenting out this makes it compile
   _ = thing
   return thing
@@ -322,7 +322,7 @@ let things = Thing().map { thing in  // expected-error {{generic parameter 'U' c
 
 // <rdar://problem/21675896> QoI: [Closure return type inference] Swift cannot find members for the result of inlined lambdas with branches
 func r21675896(file : String) {
-  let x: String = { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{20-20= () -> String in }}
+  let x: String = { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{20-20= () -> <#Result#> in }}
     if true {
       return "foo"
     }
@@ -360,7 +360,7 @@ func someGeneric19997471<T>(_ x: T) {
 
 
 // <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
-[0].map {  // expected-error {{generic parameter 'T' could not be inferred}}
+[0].map {  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{5-5=-> <#Result#> }}
   _ in
   let r =  (1,2).0
   return r
@@ -371,7 +371,7 @@ func someGeneric19997471<T>(_ x: T) {
 func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> U' expects 1 argument, but 2 were used in closure body}}
+  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '(Dictionary<String, String>) throws -> (Dictionary<String, String>, _)' expects 1 argument, but 2 were used in closure body}}
 }
 
 
@@ -408,7 +408,7 @@ func r20789423() {
   print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
   // expected-error@-1:11 {{cannot call value of non-function type '()'}}
   
-  let _f = { (v: Int) in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{23-23=-> String }}
+  let _f = { (v: Int) in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{23-23=-> <#Result#> }}
     print("a")
     return "hi"
   }
@@ -443,7 +443,7 @@ class C_SR_2505 : P_SR_2505 {
   func call(_ c: C_SR_2505) -> Bool {
     // Note: the diagnostic about capturing 'self', indicates that we have
     // selected test(_) rather than test(it:)
-    return c.test { o in test(o) } // expected-error{{call to method 'test' in closure requires explicit 'self.' to make capture semantics explicit}}
+    return c.test { o in test(o) } // expected-error{{call to method 'test' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} expected-note{{reference 'self.' explicitly}}
   }
 }
 
@@ -456,7 +456,13 @@ extension Collection {
   }
 }
 func fn_r28909024(n: Int) {
-  return (0..<10).r28909024 { // expected-error {{unexpected non-void return value in void function}}
+  // FIXME(diagnostics): Unfortunately there is no easy way to fix this diagnostic issue at the moment
+  // because the problem is related to ordering of the bindings - we'd attempt to bind result of the expression
+  // to contextual type of `Void` which prevents solver from discovering correct types for range - 0..<10
+  // (since both arguments are literal they are ranked lower than contextual type).
+  //
+  // Good diagnostic for this is - `unexpected non-void return value in void function`
+  return (0..<10).r28909024 { // expected-error {{expression type 'Range<Int>.Index' (aka 'Int') is ambiguous without more context}}
     _ in true
   }
 }
@@ -484,7 +490,7 @@ let _ = { $0 = $0 = 42 } // expected-error {{assigning a variable to itself}}
 let mismatchInClosureResultType : (String) -> ((Int) -> Void) = {
   (String) -> ((Int) -> Void) in
     return { }
-    // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}}
+    // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{13-13= _ in}}
 }
 
 // SR-3520: Generic function taking closure with inout parameter can result in a variety of compiler errors or EXC_BAD_ACCESS
@@ -763,6 +769,7 @@ overloaded { print("hi"); print("bye") } // multiple expression closure without 
 // expected-error@-1 {{ambiguous use of 'overloaded'}}
 
 func not_overloaded(_ handler: () -> Int) {}
+// expected-note@-1 {{'not_overloaded' declared here}}
 
 not_overloaded { } // empty body
 // expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
@@ -914,4 +921,53 @@ func test_trailing_closure_with_defaulted_last() {
   func foo<T>(fn: () -> T, value: Int = 0) {}
   foo { 42 } // Ok
   foo(fn: { 42 }) // Ok
+}
+
+// Test that even in multi-statement closure case we still pick up `(Action) -> Void` over `Optional<(Action) -> Void>`.
+// Such behavior used to rely on ranking of partial solutions but with delayed constraint generation of closure bodies
+// it's no longer the case, so we need to make sure that even in case of complete solutions we still pick the right type.
+
+protocol Action { }
+protocol StateType { }
+
+typealias Fn = (Action) -> Void
+typealias Middleware<State> = (@escaping Fn, @escaping () -> State?) -> (@escaping Fn) -> Fn
+
+class Foo<State: StateType> {
+  var state: State!
+  var fn: Fn!
+
+  init(middleware: [Middleware<State>]) {
+    self.fn = middleware
+               .reversed()
+               .reduce({ action in },
+                       { (fun, middleware) in // Ok, to type-check result type has to be `(Action) -> Void`
+                         let dispatch: (Action) -> Void = { _ in }
+                         let getState = { [weak self] in self?.state }
+                         return middleware(dispatch, getState)(fun)
+                       })
+  }
+}
+
+// Make sure that `String...` is translated into `[String]` in the body
+func test_explicit_variadic_is_interpreted_correctly() {
+  _ = { (T: String...) -> String in T[0] + "" } // Ok
+}
+
+// rdar://problem/59208419 - closure result type is incorrectly inferred to be a supertype
+func test_correct_inference_of_closure_result_in_presence_of_optionals() {
+  class A {}
+  class B : A {}
+
+  func foo(_: B) -> Int? { return 42 }
+
+  func bar<T: A>(_: (A) -> T?) -> T? {
+    return .none
+  }
+
+  guard let v = bar({ $0 as? B }),
+        let _ = foo(v) // Ok, v is inferred as `B`
+  else {
+    return;
+  }
 }

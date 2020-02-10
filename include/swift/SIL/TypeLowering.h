@@ -946,44 +946,30 @@ public:
   CaptureInfo getLoweredLocalCaptures(SILDeclRef fn);
   bool hasLoweredLocalCaptures(SILDeclRef fn);
 
-#ifndef NDEBUG
-  /// If \c false, \c childDC is in a context it cannot capture variables from,
-  /// so it is expected that Sema may not have computed its \c CaptureInfo.
-  ///
-  /// This call exists for use in assertions; do not use it to skip capture
-  /// processing.
-  static bool canCaptureFromParent(DeclContext *childDC) {
-    // This call was added because Sema leaves the captures of functions that
-    // cannot capture anything uncomputed.
-    // TODO: Make Sema set them to CaptureInfo::empty() instead.
-
-    if (childDC)
-      if (auto decl = childDC->getAsDecl())
-         return decl->getDeclContext()->isLocalContext();
-    return true;
-  }
-#endif
-
   enum class ABIDifference : uint8_t {
     // Types have compatible calling conventions and representations, so can
     // be trivially bitcast.
+    //
+    // Furthermore, if two function types have
+    // arguments of function type that differ only in
+    // `CompatibleRepresentation`, those outer function types are transitively
+    // `CompatibleRepresentation`. (In all other cases, the outer function types
+    // would fall into the `NeedsThunk` case, because a thunk would be needed
+    // to change the representation of the function argument.)
     CompatibleRepresentation,
     
-    // No convention differences, function can be cast via `convert_function`
-    // without a thunk.
-    //
-    // There may still be a representation difference between values of the
-    // compared function types. This means that, if two function types
-    // have a matching argument or return of function type with
-    // `SameCallingConvention`, then the outer function types may not themselves
-    // have the `SameCallingConvention` because they need a thunk to convert
-    // the inner function value representation.
+    // No convention differences, but there may still be a representation
+    // difference between values of the compared function types, such as a
+    // different ptrauth discriminator. The conversion can be performed by a
+    // `convert_function` instruction.
     CompatibleCallingConvention,
     
-    // Representation difference requires thin-to-thick conversion.
+    // Representation difference requires thin-to-thick conversion with a
+    // `thin_to_thick_function` conversion.
     CompatibleRepresentation_ThinToThick,
-    // Function types have the `SameCallingConvention` but additionally need
-    // a thin-to-thick conversion.
+    // Function types have `CompatibleCallingConvention` but additionally need
+    // a thin-to-thick conversion, so a `convert_function` followed by a
+    // `thin_to_thick_function` sequence is necessary to convert.
     CompatibleCallingConvention_ThinToThick,
     
     // Non-trivial difference requires thunk.

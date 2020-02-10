@@ -1,8 +1,8 @@
 set(swiftDriver_sources
   Action.cpp
+  CoarseGrainedDependencyGraph.cpp
   Compilation.cpp
   DarwinToolChains.cpp
-  DependencyGraph.cpp
   SourceComparator.cpp
   Driver.cpp
   DriverIncrementalRanges.cpp

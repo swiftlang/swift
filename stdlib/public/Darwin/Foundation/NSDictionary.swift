@@ -64,7 +64,7 @@ extension Dictionary {
 extension Dictionary : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSDictionary {
-    return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject,
+    return unsafeBitCast(_bridgeToObjectiveCImpl(),
                          to: NSDictionary.self)
   }
 

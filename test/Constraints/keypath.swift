@@ -102,3 +102,16 @@ func rdar56131416() {
   // This type should be selected correctly.
   Rdar56131416.takesCorrectType(result)
 }
+
+func test_mismatch_with_contextual_optional_result() {
+  struct A<T> {
+    init<U: Collection>(_ data: T, keyPath: KeyPath<T, U?>) {}
+  }
+
+  struct B {
+    var arr: [Int] = []
+  }
+
+  let _ = A(B(), keyPath: \.arr)
+  // expected-error@-1 {{key path value type '[Int]' cannot be converted to contextual type '[Int]?'}}
+}

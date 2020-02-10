@@ -36,6 +36,12 @@ enum class PropertyWrapperInitKind {
   Default
 };
 
+static bool isDeclNotAsAccessibleAsParent(ValueDecl *decl,
+                                          NominalTypeDecl *parent) {
+  return decl->getFormalAccess() <
+         std::min(parent->getFormalAccess(), AccessLevel::Public);
+}
+
 /// Find the named property in a property wrapper to which access will
 /// be delegated.
 static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
@@ -43,7 +49,8 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   SmallVector<VarDecl *, 2> vars;
   {
     SmallVector<ValueDecl *, 2> decls;
-    nominal->lookupQualified(nominal, name, NL_QualifiedDefault, decls);
+    nominal->lookupQualified(nominal, DeclNameRef(name), NL_QualifiedDefault,
+                             decls);
     for (const auto &foundDecl : decls) {
       auto foundVar = dyn_cast<VarDecl>(foundDecl);
       if (!foundVar || foundVar->isStatic() ||
@@ -78,7 +85,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 
   // The property must be as accessible as the nominal type.
   VarDecl *var = vars.front();
-  if (var->getFormalAccess() < nominal->getFormalAccess()) {
+  if (isDeclNotAsAccessibleAsParent(var, nominal)) {
     var->diagnose(diag::property_wrapper_type_requirement_not_accessible,
                   var->getFormalAccess(), var->getDescriptiveKind(),
                   var->getFullName(), nominal->getDeclaredType(),
@@ -117,7 +124,7 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     break;
   }
 
-  nominal->lookupQualified(nominal, DeclBaseName::createConstructor(),
+  nominal->lookupQualified(nominal, DeclNameRef::createConstructor(),
                            NL_QualifiedDefault, decls);
   for (const auto &decl : decls) {
     auto init = dyn_cast<ConstructorDecl>(decl);
@@ -156,7 +163,7 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     }
 
     // Check accessibility.
-    if (init->getFormalAccess() < nominal->getFormalAccess()) {
+    if (isDeclNotAsAccessibleAsParent(init, nominal)) {
       nonviable.push_back(
           std::make_tuple(init, NonViableReason::Inaccessible, Type()));
       continue;
@@ -272,7 +279,7 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
 
   auto subscript = subscripts.front();
   // the subscript must be as accessible as the nominal type.
-  if (subscript->getFormalAccess() < nominal->getFormalAccess()) {
+  if (isDeclNotAsAccessibleAsParent(subscript, nominal)) {
     subscript->diagnose(diag::property_wrapper_type_requirement_not_accessible,
                         subscript->getFormalAccess(),
                         subscript->getDescriptiveKind(),

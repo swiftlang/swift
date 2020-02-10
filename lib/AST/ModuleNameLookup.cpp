@@ -15,6 +15,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -228,23 +229,32 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
               decls.end());
 }
 
+llvm::Expected<QualifiedLookupResult> LookupInModuleRequest::evaluate(
+    Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
+    NLKind lookupKind, ResolutionKind resolutionKind,
+    const DeclContext *moduleScopeContext) const {
+  assert(moduleScopeContext->isModuleScopeContext());
+
+  auto &ctx = moduleOrFile->getASTContext();
+  FrontendStatsTracer tracer(ctx.Stats, "lookup-in-module");
+
+  QualifiedLookupResult decls;
+  LookupByName lookup(ctx, resolutionKind, name, lookupKind);
+  lookup.lookupInModule(decls, moduleOrFile, {}, moduleScopeContext);
+  return decls;
+}
+
 void namelookup::lookupInModule(const DeclContext *moduleOrFile,
                                 DeclName name,
                                 SmallVectorImpl<ValueDecl *> &decls,
                                 NLKind lookupKind,
                                 ResolutionKind resolutionKind,
                                 const DeclContext *moduleScopeContext) {
-  assert(moduleScopeContext->isModuleScopeContext());
-
   auto &ctx = moduleOrFile->getASTContext();
-  auto *stats = ctx.Stats;
-  if (stats)
-    stats->getFrontendCounters().NumLookupInModule++;
-
-  FrontendStatsTracer tracer(stats, "lookup-in-module");
-
-  LookupByName lookup(ctx, resolutionKind, name, lookupKind);
-  lookup.lookupInModule(decls, moduleOrFile, {}, moduleScopeContext);
+  LookupInModuleRequest req(moduleOrFile, name, lookupKind, resolutionKind,
+                            moduleScopeContext);
+  auto results = evaluateOrDefault(ctx.evaluator, req, {});
+  decls.append(results.begin(), results.end());
 }
 
 void namelookup::lookupVisibleDeclsInModule(
@@ -260,3 +270,14 @@ void namelookup::lookupVisibleDeclsInModule(
   lookup.lookupInModule(decls, moduleOrFile, accessPath, moduleScopeContext);
 }
 
+void namelookup::simple_display(llvm::raw_ostream &out, ResolutionKind kind) {
+  switch (kind) {
+  case ResolutionKind::Overloadable:
+    out << "Overloadable";
+    return;
+  case ResolutionKind::TypesOnly:
+    out << "TypesOnly";
+    return;
+  }
+  llvm_unreachable("Unhandled case in switch");
+}

@@ -75,7 +75,7 @@ struct REPLContext {
 
     auto *stdlib = TypeChecker::getStdlibModule(&SF);
     {
-      Identifier Id(Context.getIdentifier("_replPrintLiteralString"));
+      DeclNameRef Id(Context.getIdentifier("_replPrintLiteralString"));
       auto lookup = TypeChecker::lookupUnqualified(stdlib, Id, SourceLoc());
       if (!lookup)
         return true;
@@ -83,7 +83,7 @@ struct REPLContext {
         PrintDecls.push_back(result.getValueDecl());
     }
     {
-      Identifier Id(Context.getIdentifier("_replDebugPrintln"));
+      DeclNameRef Id(Context.getIdentifier("_replDebugPrintln"));
       auto lookup = TypeChecker::lookupUnqualified(stdlib, Id, SourceLoc());
       if (!lookup)
         return true;
@@ -256,8 +256,9 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   unsigned discriminator = DF.getNextDiscriminator();
 
   ClosureExpr *CE =
-      new (Context) ClosureExpr(params, SourceLoc(), SourceLoc(), SourceLoc(),
-                                TypeLoc(), discriminator, newTopLevel);
+      new (Context) ClosureExpr(SourceRange(), nullptr, params, SourceLoc(),
+                                SourceLoc(), SourceLoc(), TypeLoc(),
+                                discriminator, newTopLevel);
 
   SmallVector<AnyFunctionType::Param, 1> args;
   params->getParams(args);
@@ -299,7 +300,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   newTopLevel->setBody(BS);
   TypeChecker::checkTopLevelErrorHandling(newTopLevel);
 
-  SF.Decls.push_back(newTopLevel);
+  SF.addTopLevelDecl(newTopLevel);
 }
 
 /// When we see an expression in a TopLevelCodeDecl in the REPL, process it,
@@ -322,7 +323,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
 
   // Remove the expression from being in the list of decls to execute, we're
   // going to reparent it.
-  auto TLCD = cast<TopLevelCodeDecl>(SF.Decls.back());
+  auto TLCD = cast<TopLevelCodeDecl>(SF.getTopLevelDecls().back());
 
   E = TypeChecker::coerceToRValue(Context, E);
 
@@ -332,7 +333,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
                                       /*IsCaptureList*/false, E->getStartLoc(),
                                       name, &SF);
   vd->setInterfaceType(E->getType());
-  SF.Decls.push_back(vd);
+  SF.addTopLevelDecl(vd);
 
   // Create a PatternBindingDecl to bind the expression into the decl.
   Pattern *metavarPat = new (Context) NamedPattern(vd);
@@ -396,8 +397,8 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     //   replPrint(r123)
 
     // Remove PBD from the list of Decls so we can insert before it.
-    auto PBTLCD = cast<TopLevelCodeDecl>(SF.Decls.back());
-    SF.Decls.pop_back();
+    auto PBTLCD = cast<TopLevelCodeDecl>(SF.getTopLevelDecls().back());
+    SF.truncateTopLevelDecls(SF.getTopLevelDecls().size() - 1);
 
     // Create the meta-variable, let the typechecker name it.
     Identifier name = getNextResponseVariableName(SF.getParentModule());
@@ -406,7 +407,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
                                         /*IsCaptureList*/false,
                                         PBD->getStartLoc(), name, &SF);
     vd->setInterfaceType(pattern->getType());
-    SF.Decls.push_back(vd);
+    SF.addTopLevelDecl(vd);
 
     // Create a PatternBindingDecl to bind the expression into the decl.
     Pattern *metavarPat = new (Context) NamedPattern(vd);
@@ -421,7 +422,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
                                      metavarBinding->getEndLoc());
     
     auto *MVTLCD = new (Context) TopLevelCodeDecl(&SF, MVBrace);
-    SF.Decls.push_back(MVTLCD);
+    SF.addTopLevelDecl(MVTLCD);
     
     
     // Replace the initializer of PBD with a reference to our repl temporary.
@@ -430,7 +431,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
                                                /*Implicit=*/true);
     E = TypeChecker::coerceToRValue(Context, E);
     PBD->setInit(entryIdx, E);
-    SF.Decls.push_back(PBTLCD);
+    SF.addTopLevelDecl(PBTLCD);
     
     // Finally, print out the result, by referring to the repl temp.
     E = TypeChecker::buildCheckedRefExpr(vd, &SF,
@@ -451,7 +452,8 @@ Identifier REPLChecker::getNextResponseVariableName(DeclContext *DC) {
     names << "r" << NextResponseVariableIndex++;
 
     ident = Context.getIdentifier(names.str());
-    nameUsed = (bool)TypeChecker::lookupUnqualified(DC, ident, SourceLoc());
+    nameUsed = (bool)TypeChecker::lookupUnqualified(DC, DeclNameRef(ident),
+                                                    SourceLoc());
   } while (nameUsed);
 
   return ident;
@@ -460,23 +462,24 @@ Identifier REPLChecker::getNextResponseVariableName(DeclContext *DC) {
 /// processREPLTopLevel - This is called after we've parsed and typechecked some
 /// new decls at the top level.  We inject code to print out expressions and
 /// pattern bindings the are evaluated.
-void TypeChecker::processREPLTopLevel(SourceFile &SF, unsigned FirstDecl) {
+void TypeChecker::processREPLTopLevel(SourceFile &SF) {
   // Walk over all decls in the file to find the next available closure
   // discriminator.
   DiscriminatorFinder DF;
-  for (Decl *D : SF.Decls)
+  for (Decl *D : SF.getTopLevelDecls())
     D->walk(DF);
 
-  // Move new declarations out.
-  std::vector<Decl *> NewDecls(SF.Decls.begin()+FirstDecl, SF.Decls.end());
-  SF.Decls.resize(FirstDecl);
+  // Move the new declarations out of the source file.
+  std::vector<Decl *> NewDecls(SF.getTopLevelDecls().begin(),
+                               SF.getTopLevelDecls().end());
+  SF.truncateTopLevelDecls(0);
 
   REPLChecker RC(SF, DF);
 
   // Loop over each of the new decls, processing them, adding them back to
   // the Decls list.
   for (Decl *D : NewDecls) {
-    SF.Decls.push_back(D);
+    SF.addTopLevelDecl(D);
 
     auto *TLCD = dyn_cast<TopLevelCodeDecl>(D);
     if (!TLCD || TLCD->getBody()->getElements().empty())

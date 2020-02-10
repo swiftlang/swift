@@ -77,15 +77,17 @@ class MandatoryCombiner final
   SmallVector<SILInstruction *, 16> instructionsPendingDeletion;
 
 public:
-  MandatoryCombiner(
-      SmallVectorImpl<SILInstruction *> &createdInstructions)
+  MandatoryCombiner(SmallVectorImpl<SILInstruction *> &createdInstructions)
       : worklist("MC"), madeChange(false), iteration(0),
         instModCallbacks(
             [&](SILInstruction *instruction) {
               worklist.erase(instruction);
               instructionsPendingDeletion.push_back(instruction);
             },
-            [&](SILInstruction *instruction) { worklist.add(instruction); }),
+            [&](SILInstruction *instruction) { worklist.add(instruction); },
+            [this](SILValue oldValue, SILValue newValue) {
+              worklist.replaceValueUsesWith(oldValue, newValue);
+            }),
         createdInstructions(createdInstructions){};
 
   void addReachableCodeToWorklist(SILFunction &function);
@@ -216,6 +218,7 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
 //===----------------------------------------------------------------------===//
 
 SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
+
   // Apply this pass only to partial applies all of whose arguments are
   // trivial.
   auto calledValue = instruction->getCallee();

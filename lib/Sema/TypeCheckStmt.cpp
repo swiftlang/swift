@@ -144,10 +144,10 @@ namespace {
           }
         }
 
-        // If the closure has a single expression body, we need to walk into it
-        // with a new sequence.  Otherwise, it'll have been separately
-        // type-checked.
-        if (CE->hasSingleExpressionBody())
+        // If the closure has a single expression body or has had a function
+        // builder applied to it, we need to walk into it with a new sequence.
+        // Otherwise, it'll have been separately type-checked.
+        if (CE->hasSingleExpressionBody() || CE->hasAppliedFunctionBuilder())
           CE->getBody()->walk(ContextualizeClosures(CE));
 
         TypeChecker::computeCaptures(CE);
@@ -198,7 +198,7 @@ namespace {
       ASTContext &ctx = Function.getAsDeclContext()->getASTContext();
       auto *AFD = Function.getAbstractFunctionDecl();
 
-      if (ctx.TypeCheckerOpts.WarnLongFunctionBodies) {
+      if (ctx.TypeCheckerOpts.DebugTimeFunctionBodies) {
         // Round up to the nearest 100th of a millisecond.
         llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100) << "ms\t";
         Function.getLoc().print(llvm::errs(), ctx.SourceMgr);
@@ -213,7 +213,7 @@ namespace {
         llvm::errs() << "\n";
       }
 
-      const auto WarnLimit = ctx.TypeCheckerOpts.DebugTimeFunctionBodies;
+      const auto WarnLimit = ctx.TypeCheckerOpts.WarnLongFunctionBodies;
       if (WarnLimit != 0 && elapsedMS >= WarnLimit) {
         if (AFD) {
           ctx.Diags.diagnose(AFD, diag::debug_long_function_body,
@@ -517,23 +517,6 @@ public:
     
     TypeCheckExprOptions options = {};
     
-    // If the result type is an opaque type, this is an opportunity to resolve
-    // the underlying type.
-    auto isOpaqueReturnTypeOfCurrentFunc = [&](OpaqueTypeDecl *opaque) -> bool {
-      // Closures currently don't support having opaque types.
-      auto funcDecl = TheFunc->getAbstractFunctionDecl();
-      if (!funcDecl)
-        return false;
-
-      return opaque->isOpaqueReturnTypeOfFunction(funcDecl);
-    };
-    
-    if (auto opaque = ResultTy->getAs<OpaqueTypeArchetypeType>()) {
-      if (isOpaqueReturnTypeOfCurrentFunc(opaque->getDecl())) {
-        options |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
-      }
-    }
-
     if (EndTypeCheckLoc.isValid()) {
       assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
              "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
@@ -627,13 +610,6 @@ public:
   }
   
   Stmt *visitThrowStmt(ThrowStmt *TS) {
-    // If the throw is in a defer, then it isn't valid.
-    if (isInDefer()) {
-      getASTContext().Diags.diagnose(TS->getThrowLoc(),
-                                     diag::jump_out_of_defer, "throw");
-      return nullptr;
-    }
-
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
 
@@ -731,165 +707,8 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    TypeResolutionOptions options(TypeResolverContext::InExpression);
-    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-
-    if (auto *P = TypeChecker::resolvePattern(S->getPattern(), DC,
-                                              /*isStmtCondition*/false)) {
-      S->setPattern(P);
-    } else {
-      S->getPattern()->setType(ErrorType::get(getASTContext()));
-      return nullptr;
-    }
-
-    if (TypeChecker::typeCheckPattern(S->getPattern(), DC, options)) {
-      // FIXME: Handle errors better.
-      S->getPattern()->setType(ErrorType::get(getASTContext()));
-      return nullptr;
-    }
-
     if (TypeChecker::typeCheckForEachBinding(DC, S))
       return nullptr;
-
-    if (auto *Where = S->getWhere()) {
-      if (TypeChecker::typeCheckCondition(Where, DC))
-        return nullptr;
-      S->setWhere(Where);
-    }
-
-
-    // Retrieve the 'Sequence' protocol.
-    ProtocolDecl *sequenceProto = TypeChecker::getProtocol(
-        getASTContext(), S->getForLoc(), KnownProtocolKind::Sequence);
-    if (!sequenceProto) {
-      return nullptr;
-    }
-
-    // Retrieve the 'Iterator' protocol.
-    ProtocolDecl *iteratorProto = TypeChecker::getProtocol(
-        getASTContext(), S->getForLoc(), KnownProtocolKind::IteratorProtocol);
-    if (!iteratorProto) {
-      return nullptr;
-    }
-
-    Expr *sequence = S->getSequence();
-
-    // Invoke iterator() to get an iterator from the sequence.
-    Type iteratorTy;
-    VarDecl *iterator;
-    {
-      Type sequenceType = sequence->getType();
-      auto conformance =
-        TypeChecker::conformsToProtocol(sequenceType, sequenceProto, DC,
-                                        ConformanceCheckFlags::InExpression,
-                                        sequence->getLoc());
-      if (conformance.isInvalid())
-        return nullptr;
-      S->setSequenceConformance(conformance);
-
-      iteratorTy =
-          conformance.getTypeWitnessByName(sequenceType,
-                                           getASTContext().Id_Iterator);
-      if (iteratorTy->hasError())
-        return nullptr;
-
-      auto witness =
-          conformance.getWitnessByName(sequenceType,
-                                       getASTContext().Id_makeIterator);
-      if (!witness)
-        return nullptr;
-      S->setMakeIterator(witness);
-
-      // Create a local variable to capture the iterator.
-      std::string name;
-      if (auto np = dyn_cast_or_null<NamedPattern>(S->getPattern()))
-        name = "$"+np->getBoundName().str().str();
-      name += "$generator";
-
-      iterator = new (getASTContext()) VarDecl(
-          /*IsStatic*/ false, VarDecl::Introducer::Var,
-          /*IsCaptureList*/ false, S->getInLoc(),
-          getASTContext().getIdentifier(name), DC);
-      iterator->setInterfaceType(iteratorTy->mapTypeOutOfContext());
-      iterator->setImplicit();
-      S->setIteratorVar(iterator);
-
-      auto genPat = new (getASTContext()) NamedPattern(iterator);
-      genPat->setImplicit();
-
-      // TODO: test/DebugInfo/iteration.swift requires this extra info to
-      // be around.
-      auto nextResultType = OptionalType::get(conformance.getTypeWitnessByName(
-          sequenceType, getASTContext().Id_Element));
-      PatternBindingDecl::createImplicit(
-          getASTContext(), StaticSpellingKind::None, genPat,
-          new (getASTContext()) OpaqueValueExpr(S->getInLoc(), nextResultType),
-          DC, /*VarLoc*/ S->getForLoc());
-
-      Type newSequenceType = cast<AbstractFunctionDecl>(witness.getDecl())
-            ->getInterfaceType()
-            ->castTo<AnyFunctionType>()
-            ->getParams()[0].getPlainType().subst(witness.getSubstitutions());
-
-      // Necessary type coersion for method application.
-      if (TypeChecker::convertToType(sequence, newSequenceType, DC, None)) {
-        return nullptr;
-      }
-      S->setSequence(sequence);
-    }
-
-    // Working with iterators requires Optional.
-    if (TypeChecker::requireOptionalIntrinsics(getASTContext(), S->getForLoc()))
-      return nullptr;
-
-    // Gather the witnesses from the Iterator protocol conformance, which
-    // we'll use to drive the loop.
-    // FIXME: Would like to customize the diagnostic emitted in
-    // conformsToProtocol().
-    auto genConformance = TypeChecker::conformsToProtocol(
-        iteratorTy, iteratorProto, DC, ConformanceCheckFlags::InExpression,
-        sequence->getLoc());
-    if (genConformance.isInvalid())
-      return nullptr;
-
-    Type elementTy =
-        genConformance.getTypeWitnessByName(iteratorTy,
-                                            getASTContext().Id_Element);
-    if (elementTy->hasError())
-      return nullptr;
-
-    auto *varRef = TypeChecker::buildCheckedRefExpr(iterator, DC,
-                                                    DeclNameLoc(S->getInLoc()),
-                                                    /*implicit*/ true);
-    if (!varRef)
-      return nullptr;
-
-    S->setIteratorVarRef(varRef);
-
-    auto witness =
-        genConformance.getWitnessByName(iteratorTy, getASTContext().Id_next);
-    if (!witness)
-      return nullptr;
-    S->setIteratorNext(witness);
-
-    auto nextResultType = cast<FuncDecl>(S->getIteratorNext().getDecl())
-                              ->getResultInterfaceType()
-                              .subst(S->getIteratorNext().getSubstitutions());
-
-    // Convert that Optional<T> value to Optional<Element>.
-    auto optPatternType = OptionalType::get(S->getPattern()->getType());
-    if (!optPatternType->isEqual(nextResultType)) {
-      OpaqueValueExpr *elementExpr =
-          new (getASTContext()) OpaqueValueExpr(S->getInLoc(), nextResultType);
-      Expr *convertElementExpr = elementExpr;
-      if (TypeChecker::convertToType(convertElementExpr, optPatternType, DC,
-                                     S->getPattern())) {
-        return nullptr;
-      }
-      S->setElementExpr(elementExpr);
-      S->setConvertElementExpr(convertElementExpr);
-    }
 
     // Type-check the body of the loop.
     AddLabeledStmt loopNest(*this, S);
@@ -925,7 +744,7 @@ public:
         } else {
           unsigned distance =
             TypeChecker::getCallEditDistance(
-                S->getTargetName(), (*I)->getLabelInfo().Name,
+                DeclNameRef(S->getTargetName()), (*I)->getLabelInfo().Name,
                 TypeChecker::UnreasonableCallEditDistance);
           if (distance < TypeChecker::UnreasonableCallEditDistance)
             labelCorrections.insert(distance, std::move(*I));
@@ -990,7 +809,7 @@ public:
         } else {
           unsigned distance =
             TypeChecker::getCallEditDistance(
-                S->getTargetName(), (*I)->getLabelInfo().Name,
+                DeclNameRef(S->getTargetName()), (*I)->getLabelInfo().Name,
                 TypeChecker::UnreasonableCallEditDistance);
           if (distance < TypeChecker::UnreasonableCallEditDistance)
             labelCorrections.insert(distance, std::move(*I));
@@ -1088,12 +907,21 @@ public:
     }
 
     pattern = newPattern;
+
     // Coerce the pattern to the subject's type.
-    TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-    if (!subjectType ||
-        TypeChecker::coercePatternToType(pattern,
-                                         TypeResolution::forContextual(DC),
-                                         subjectType, patternOptions)) {
+    bool coercionError = false;
+    if (subjectType) {
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
+      TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+      auto coercedPattern = TypeChecker::coercePatternToType(
+          contextualPattern, subjectType, patternOptions);
+      if (coercedPattern)
+        pattern = coercedPattern;
+      else
+        coercionError = true;
+    }
+
+    if (!subjectType || coercionError) {
       limitExhaustivityChecks = true;
 
       // If that failed, mark any variables binding pieces of the pattern
@@ -1497,10 +1325,19 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
     pattern = newPattern;
 
     // Coerce the pattern to the exception type.
-    TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-    if (!exnType ||
-        coercePatternToType(pattern, TypeResolution::forContextual(DC), exnType,
-                            patternOptions)) {
+    bool coercionError = false;
+    if (exnType) {
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
+      TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+      auto coercedPattern = coercePatternToType(
+          contextualPattern, exnType, patternOptions);
+      if (coercedPattern)
+        pattern = coercedPattern;
+      else
+        coercionError = true;
+    }
+
+    if (!exnType || coercionError) {
       // If that failed, be sure to give the variables error types
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)
@@ -1529,13 +1366,8 @@ static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
     case ExprKind::StringLiteral: return "string";
     case ExprKind::InterpolatedStringLiteral: return "string";
     case ExprKind::MagicIdentifierLiteral:
-      switch (cast<MagicIdentifierLiteralExpr>(LE)->getKind()) {
-      case MagicIdentifierLiteralExpr::Kind::File: return "#file";
-      case MagicIdentifierLiteralExpr::Kind::Line: return "#line";
-      case MagicIdentifierLiteralExpr::Kind::Column: return "#column";
-      case MagicIdentifierLiteralExpr::Kind::Function: return "#function";
-      case MagicIdentifierLiteralExpr::Kind::DSOHandle: return "#dsohandle";
-      }
+      return MagicIdentifierLiteralExpr::getKindString(
+          cast<MagicIdentifierLiteralExpr>(LE)->getKind());
     case ExprKind::NilLiteral: return "nil";
     case ExprKind::ObjectLiteral: return "object";
 
@@ -1904,10 +1736,8 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
   ASTContext &Context = ctor->getASTContext();
   Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
                                               SourceLoc(), /*Implicit=*/true);
-  Expr *r = new (Context) UnresolvedDotExpr(superRef, SourceLoc(),
-                                            DeclBaseName::createConstructor(),
-                                            DeclNameLoc(),
-                                            /*Implicit=*/true);
+  Expr *r = UnresolvedDotExpr::createImplicit(
+      Context, superRef, DeclBaseName::createConstructor());
   r = CallExpr::createImplicit(Context, r, { }, { });
 
   if (ctor->hasThrows())
@@ -2120,12 +1950,17 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (!body || AFD->isBodyTypeChecked())
     return false;
 
+  bool alreadyTypeChecked = false;
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
     if (Type builderType = getFunctionBuilderType(func)) {
-      body = TypeChecker::applyFunctionBuilderBodyTransform(func, body,
-                                                            builderType);
-      if (!body)
-        return true;
+      if (auto optBody =
+            TypeChecker::applyFunctionBuilderBodyTransform(func, builderType)) {
+        if (!*optBody)
+          return true;
+
+        body = *optBody;
+        alreadyTypeChecked = true;
+      }
     } else if (func->hasSingleExpressionBody() &&
                func->getResultInterfaceType()->isVoid()) {
       // The function returns void.  We don't need an explicit return, no matter
@@ -2153,9 +1988,13 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (ctx.LangOpts.EnableASTScopeLookup)
     ASTScope::expandFunctionBody(AFD);
 
-  StmtChecker SC(AFD);
-  SC.EndTypeCheckLoc = endTypeCheckLoc;
-  bool hadError = SC.typeCheckBody(body);
+  // Type check the function body if needed.
+  bool hadError = false;
+  if (!alreadyTypeChecked) {
+    StmtChecker SC(AFD);
+    SC.EndTypeCheckLoc = endTypeCheckLoc;
+    hadError = SC.typeCheckBody(body);
+  }
 
   // If this was a function with a single expression body, let's see
   // if implicit return statement came out to be `Never` which means

@@ -85,7 +85,8 @@ PrintOptions PrintOptions::printDocInterface() {
       PrintOptions::ArgAndParamPrintingMode::BothAlways;
   result.PrintDocumentationComments = false;
   result.PrintRegularClangComments = false;
-  result.PrintFunctionRepresentationAttrs = false;
+  result.PrintFunctionRepresentationAttrs =
+    PrintOptions::FunctionRepresentationMode::None;
   return result;
 }
 
@@ -758,9 +759,4 @@ Type swift::getResultTypeOfKeypathDynamicMember(SubscriptDecl *SD) {
   return evaluateOrDefault(SD->getASTContext().evaluator,
     RootAndResultTypeOfKeypathDynamicMemberRequest{SD}, TypePair()).
       SecondTy;
-}
-
-bool swift::hasDynamicMemberLookupAttribute(Type ty) {
-  return evaluateOrDefault(ty->getASTContext().evaluator,
-    HasDynamicMemberLookupAttributeRequest{ty.getPointer()}, false);
 }

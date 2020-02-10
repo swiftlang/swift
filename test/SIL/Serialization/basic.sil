@@ -38,12 +38,24 @@ struct Int32 {
   var x: Builtin.Int32
 }
 
+// CHECK-LABEL: sil [serialized] [ossa] @test_subst_function_type : $@convention(thin) (@guaranteed @callee_guaranteed <τ_0_0, τ_0_1> in (@in τ_0_0, @in τ_0_1) -> () for <Builtin.Int32, Builtin.Int64>) -> ()
+sil [serialized] [ossa] @test_subst_function_type : $@convention(thin) (@guaranteed @callee_guaranteed <A, B> in (@in A, @in B) -> () for <Builtin.Int32, Builtin.Int64>) -> () {
+entry(%0 : @guaranteed $@callee_guaranteed <C, D> in (@in C, @in D) -> () for <Builtin.Int32, Builtin.Int64>):
+  return undef : $()
+}
+
 sil [ossa] @test_destructure_struct_tuple : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage) {
 bb0(%0 : @owned $(Builtin.NativeObject, Builtin.Int32), %1 : @owned $TestArray2):
   (%2, %3) = destructure_tuple %0 : $(Builtin.NativeObject, Builtin.Int32)
   (%4, %5, %6) = destructure_struct %1 : $TestArray2
   %7 = tuple(%2 : $Builtin.NativeObject, %3 : $Builtin.Int32, %4 : $TestArrayStorage, %5 : $Int32, %6 : $TestArrayStorage)
   return %7 : $(Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage)
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @test_subst_function_type_generic_context : $@convention(thin) <X, Y> (@guaranteed @callee_guaranteed <τ_0_0, τ_0_1> in (@in τ_0_0, @in τ_0_1) -> () for <X, Y>) -> ()
+sil [serialized] [ossa] @test_subst_function_type_generic_context : $@convention(thin) <X, Y> (@guaranteed @callee_guaranteed <A, B> in (@in A, @in B) -> () for <X, Y>) -> () {
+entry(%0 : @guaranteed $@callee_guaranteed <C, D> in (@in C, @in D) -> () for <X, Y>):
+  return undef : $()
 }
 
 struct EmptyStruct {}

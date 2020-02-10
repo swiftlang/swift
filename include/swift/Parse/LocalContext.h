@@ -19,6 +19,7 @@
 #define SWIFT_PARSE_LOCALCONTEXT_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "swift/AST/Identifier.h"
 #include <cassert>
 
 namespace swift {

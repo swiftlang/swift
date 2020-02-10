@@ -31,7 +31,7 @@ protocol FakeExpressibleByFloatLiteral {}
 protocol FakeBinaryFloatingPoint : FakeFloatingPoint, FakeExpressibleByFloatLiteral {}
 
 func expectEqualType<T>(_: T.Type, _: T.Type) {}
-func commonSupertype<T>(_: T, _: T) -> T {}
+func commonSupertype<T>(_: T, _: T) -> T {} // expected-note 2 {{generic parameters are always considered '@escaping'}}
 
 expectEqualType(Builtin.type_join(Int.self, Int.self), Int.self)
 expectEqualType(Builtin.type_join_meta(D.self, C.self), C.self)
@@ -90,9 +90,9 @@ func joinFunctions(
 ) {
   _ = commonSupertype(escaping, escaping)
   _ = commonSupertype(nonescaping, escaping)
-  // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
+  // expected-error@-1 {{converting non-escaping parameter 'nonescaping' to generic parameter 'T' may allow it to escape}}
   _ = commonSupertype(escaping, nonescaping)
-  // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
+  // expected-error@-1 {{converting non-escaping parameter 'nonescaping' to generic parameter 'T' may allow it to escape}}
   let x: Int = 1
   // FIXME: We emit these diagnostics here because we refuse to allow
   //        Any to be inferred for the generic type. That's pretty

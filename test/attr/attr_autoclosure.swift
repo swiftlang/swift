@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
 
 // Simple case.
-var fn : @autoclosure () -> Int = 4  // expected-error {{'@autoclosure' may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
+var fn : @autoclosure () -> Int = 4  // expected-error {{'@autoclosure' may only be used on parameters}}
 
 @autoclosure func func1() {}  // expected-error {{attribute can only be applied to types, not declarations}}
 
@@ -98,9 +98,9 @@ class TestFunc12 {
 
   func test() {
     func12a(x + foo()) // okay
-    func12c(x + foo()) 
-    // expected-error@-1{{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{13-13=self.}}
-    // expected-error@-2{{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{17-17=self.}}
+    func12c(x + foo())
+    // expected-error@-1{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note@-1{{reference 'self.' explicitly}} {{13-13=self.}}
+    // expected-error@-2{{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note@-2{{reference 'self.' explicitly}} {{17-17=self.}}
   }
 }
 
@@ -183,10 +183,10 @@ func passAutoClosureToEnumCase(_ fn: @autoclosure () -> Int) {
 func rdar_20591571() {
   func foo(_ g: @autoclosure () -> Int) {
     typealias G = ()->Int
-    let _ = unsafeBitCast(g, to: G.self) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+    let _ = unsafeBitCast(g, to: G.self) // expected-error {{converting non-escaping parameter 'g' to generic parameter 'T' may allow it to escape}}
   }
 
-  func id<T>(_: T) -> T {}
+  func id<T>(_: T) -> T {} // expected-note {{eneric parameters are always considered '@escaping'}}
   func same<T>(_: T, _: T) {}
   // expected-note@-1 2 {{generic parameters are always considered '@escaping'}}
 
@@ -198,7 +198,7 @@ func rdar_20591571() {
     var _ = efn
     let _ = efn
 
-    _ = id(fn)          // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+    _ = id(fn)          // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
     _ = same(fn, { 3 }) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
     _ = same({ 3 }, fn) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
 
@@ -251,7 +251,7 @@ func overloaded_autoclj(_: @autoclosure () -> Int) {}
 
 func autoclosure_param_returning_func_type() {
   func foo(_ fn: @autoclosure () -> (() -> Int)) {}
-  func generic_foo<T>(_ fn: @autoclosure () -> T) {}
+  func generic_foo<T>(_ fn: @autoclosure () -> T) {} // expected-note {{generic parameters are always considered '@escaping'}}
 
   func bar_1(_ fn: @autoclosure @escaping () -> Int) { foo(fn) } // Ok
   func bar_2(_ fn: @autoclosure () -> Int) { foo(fn) } // expected-note {{parameter 'fn' is implicitly non-escaping}}
@@ -259,7 +259,7 @@ func autoclosure_param_returning_func_type() {
   func baz_1(_ fn: @autoclosure @escaping () -> Int) { generic_foo(fn) }   // Ok (T is inferred as () -> Int)
   func baz_2(_ fn: @autoclosure @escaping () -> Int) { generic_foo(fn()) } // Ok (T is inferred as Int)
   func baz_3(_ fn: @autoclosure () -> Int) { generic_foo(fn) } // Fails because fn is not marked as @escaping
-  // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
+  // expected-error@-1 {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
 
   // Let's make sure using `fn` as value works fine in presence of overloading
   func biz_1(_ fn: @autoclosure @escaping () -> Int) { overloaded_autoclj(fn) }   // Ok
@@ -281,3 +281,17 @@ func test_autoclosure_with_generic_argument_mismatch() {
 
   foo(S<String>()) // expected-error {{cannot convert value of type 'S<String>' to expected argument type 'S<Int>'}}
 }
+
+// SR-11934
+func sr_11934(_ x: @autoclosure String...) {} // expected-error {{'@autoclosure' must not be used on variadic parameters}}
+
+// SR-11938
+let sr_11938_1: Array<@autoclosure String> = [] // expected-error {{'@autoclosure' may only be used on parameters}}
+func sr_11938_2() -> @autoclosure String { "" } // expected-error {{'@autoclosure' may only be used on parameters}}
+func sr_11938_3(_ x: [@autoclosure String]) {} // expected-error {{'@autoclosure' may only be used on parameters}}
+
+protocol SR_11938_P {}
+struct SR_11938_S : @autoclosure SR_11938_P {} // expected-error {{'@autoclosure' may only be used on parameters}}
+
+// SR-9178
+func bar<T>(_ x: @autoclosure T) {} // expected-error 1{{@autoclosure attribute only applies to function types}}

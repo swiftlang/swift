@@ -74,7 +74,6 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
 /// Passes for performing definite initialization. Must be run together in this
 /// order.
 static void addDefiniteInitialization(SILPassPipelinePlan &P) {
-  P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
   P.addRawSILInstLowering();
 }
@@ -111,7 +110,6 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
 #endif
 
   if (Options.shouldOptimize()) {
-    P.addSemanticARCOpts();
     P.addDestroyHoisting();
   }
   if (!Options.StripOwnershipAfterSerialization)
@@ -413,6 +411,12 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.addOutliner();
 
   P.addCrossModuleSerializationSetup();
+  
+  // In case of cross-module-optimization, we need to serialize right after
+  // CrossModuleSerializationSetup. Eventually we want to serialize early
+  // anyway, but for now keep the SerializeSILPass at the later stage of the
+  // pipeline in case cross-module-optimization is not enabled.
+  P.addCMOSerializeSILPass();
 }
 
 static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
@@ -483,7 +487,9 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.addStackPromotion();
 
   // Speculate virtual call targets.
-  P.addSpeculativeDevirtualization();
+  if (P.getOptions().EnableSpeculativeDevirtualization) {
+    P.addSpeculativeDevirtualization();
+  }
 
   // There should be at least one SILCombine+SimplifyCFG between the
   // ClosureSpecializer, etc. and the last inliner. Cleaning up after these
@@ -515,7 +521,9 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("LateLoopOpt");
 
   // Delete dead code and drop the bodies of shared functions.
-  P.addDeadFunctionElimination();
+  // Also, remove externally available witness tables. They are not needed
+  // anymore after the last devirtualizer run.
+  P.addLateDeadFunctionElimination();
 
   // Perform the final lowering transformations.
   P.addCodeSinking();
@@ -606,6 +614,7 @@ SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
   }
 
   P.startPipeline("SILOpt Prepare Passes");
+  P.addForEachLoopUnroll();
   P.addMandatoryCombine();
   P.addAccessMarkerElimination();
 
@@ -665,6 +674,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
 
   P.startPipeline("Mandatory Combines");
+  P.addForEachLoopUnroll();
   P.addMandatoryCombine();
 
   // First serialize the SIL if we are asked to.

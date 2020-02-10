@@ -204,11 +204,7 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     
     /// Returns a `Date` calculated from the current components using the `calendar` property.
     public var date: Date? {
-        if let d = _handle.map({$0.date}) {
-            return d as Date
-        } else {
-            return nil
-        }
+        return _handle.map { $0.date } 
     }
     
     // MARK: - Generic Setter/Getters

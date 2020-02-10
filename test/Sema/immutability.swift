@@ -457,6 +457,7 @@ func assignmentsToFuncs() {
 
   var x = 0
   (x, func1() = 0) = (4, 5) // expected-error {{expression is not assignable: 'func1' returns immutable value}}
+  // expected-error@-1 {{cannot assign value of type '(Int, Int)' to type '(Int, ())'}}
 }
 
 // <rdar://problem/17051675> Structure initializers in an extension cannot assign to constant properties

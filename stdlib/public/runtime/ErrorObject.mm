@@ -24,20 +24,20 @@
 #include "swift/Runtime/Config.h"
 
 #if SWIFT_OBJC_INTEROP
+#include "ErrorObject.h"
+#include "Private.h"
+#include "SwiftObject.h"
+#include "swift/Basic/Lazy.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/ObjCBridge.h"
-#include "swift/Basic/Lazy.h"
-#include "swift/Demangling/ManglingMacros.h"
-#include "ErrorObject.h"
-#include "Private.h"
+#include <Foundation/Foundation.h>
 #include <dlfcn.h>
 #include <objc/NSObject.h>
-#include <objc/runtime.h>
 #include <objc/message.h>
 #include <objc/objc.h>
-#include <Foundation/Foundation.h>
-#include "../Darwin/Foundation/NSError.h"
+#include <objc/runtime.h>
 
 using namespace swift;
 using namespace swift::hashable_support;
@@ -98,6 +98,12 @@ using namespace swift::hashable_support;
          && "Error box used as NSError before initialization");
   // Don't need to .retain.autorelease since it's immutable.
   return cf_const_cast<id>(domain);
+}
+
+- (id /* NSString */)description {
+  auto error = (const SwiftError *)self;
+  return getDescription(const_cast<OpaqueValue *>(error->getValue()),
+                        error->type);
 }
 
 - (NSInteger)code {
@@ -177,6 +183,31 @@ Class swift::getNSErrorClass() {
 const Metadata *swift::getNSErrorMetadata() {
   return SWIFT_LAZY_CONSTANT(
     swift_getObjCClassMetadata((const ClassMetadata *)getNSErrorClass()));
+}
+
+extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s5Error);
+
+const WitnessTable *swift::findErrorWitness(const Metadata *srcType) {
+  return swift_conformsToProtocol(srcType, &PROTOCOL_DESCR_SYM(s5Error));
+}
+
+id swift::dynamicCastValueToNSError(OpaqueValue *src,
+                                    const Metadata *srcType,
+                                    const WitnessTable *srcErrorWitness,
+                                    DynamicCastFlags flags) {
+  // Check whether there is an embedded NSError.
+  if (id embedded = getErrorEmbeddedNSErrorIndirect(src, srcType,
+                                                    srcErrorWitness)) {
+    if (flags & DynamicCastFlags::TakeOnSuccess)
+      srcType->vw_destroy(src);
+
+    return embedded;
+  }
+
+  BoxPair errorBox = swift_allocError(srcType, srcErrorWitness, src,
+                            /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
+  auto *error = (SwiftError *)errorBox.object;
+  return _swift_stdlib_bridgeErrorToNSError(error);
 }
 
 static Class getAndBridgeSwiftNativeNSErrorClass() {
@@ -260,19 +291,6 @@ swift::swift_deallocError(SwiftError *error, const Metadata *type) {
   object_dispose((id)error);
 }
 
-/// Get the error bridging info from the Foundation overlay. If it can't
-/// be loaded, return all NULLs.
-static ErrorBridgingInfo getErrorBridgingInfo() {
-  auto *info = SWIFT_LAZY_CONSTANT(
-    reinterpret_cast<ErrorBridgingInfo *>(
-      dlsym(RTLD_DEFAULT, ERROR_BRIDGING_SYMBOL_NAME_STRING)));
-  if (!info) {
-    ErrorBridgingInfo nulls = {};
-    return nulls;
-  }
-  return *info;
-}
-
 static const WitnessTable *getNSErrorConformanceToError() {
   // CFError and NSError are toll-free-bridged, so we can use either type's
   // witness table interchangeably. CFError's is potentially slightly more
@@ -281,7 +299,10 @@ static const WitnessTable *getNSErrorConformanceToError() {
   // safe to assume that that's been linked in if a user is using NSError in
   // their Swift source.
 
-  auto conformance = getErrorBridgingInfo().CFErrorErrorConformance;
+  auto *conformance = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<const ProtocolConformanceDescriptor *>(
+      dlsym(RTLD_DEFAULT,
+            MANGLE_AS_STRING(MANGLE_SYM(So10CFErrorRefas5Error10FoundationMc)))));
   assert(conformance &&
          "Foundation overlay not loaded, or 'CFError : Error' conformance "
          "not available");
@@ -291,7 +312,10 @@ static const WitnessTable *getNSErrorConformanceToError() {
 }
 
 static const HashableWitnessTable *getNSErrorConformanceToHashable() {
-  auto conformance = getErrorBridgingInfo().NSObjectHashableConformance;
+  auto *conformance = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<const ProtocolConformanceDescriptor *>(
+      dlsym(RTLD_DEFAULT,
+            MANGLE_AS_STRING(MANGLE_SYM(So8NSObjectCSH10ObjectiveCMc)))));
   assert(conformance &&
          "ObjectiveC overlay not loaded, or 'NSObject : Hashable' conformance "
          "not available");
@@ -427,7 +451,15 @@ id _swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
                                          const WitnessTable *Error) {
   // public func Foundation._getErrorDefaultUserInfo<T: Error>(_ error: T)
   //   -> AnyObject?
-  auto foundationGetDefaultUserInfo = getErrorBridgingInfo().GetErrorDefaultUserInfo;
+  typedef SWIFT_CC(swift) NSDictionary *(*GetErrorDefaultUserInfoFunction)(
+    const OpaqueValue *error,
+    const Metadata *T,
+    const WitnessTable *Error);
+  auto foundationGetDefaultUserInfo = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<GetErrorDefaultUserInfoFunction>(
+      dlsym(RTLD_DEFAULT,
+            MANGLE_AS_STRING(MANGLE_SYM(10Foundation24_getErrorDefaultUserInfoyyXlSgxs0C0RzlF)))));
+
   if (!foundationGetDefaultUserInfo) {
     return nullptr;
   }
@@ -533,9 +565,19 @@ swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
   // public func Foundation._bridgeNSErrorToError<
   //   T : _ObjectiveCBridgeableError
   // >(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
-  auto bridgeNSErrorToError = getErrorBridgingInfo().BridgeErrorToNSError;
+  typedef SWIFT_CC(swift) bool (*BridgeErrorToNSErrorFunction)(
+    NSError *, OpaqueValue*, const Metadata *,
+    const WitnessTable *);
+  auto bridgeNSErrorToError = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<BridgeErrorToNSErrorFunction>(
+      dlsym(RTLD_DEFAULT,
+            MANGLE_AS_STRING(MANGLE_SYM(10Foundation21_bridgeNSErrorToError_3outSbSo0C0C_SpyxGtAA021_ObjectiveCBridgeableE0RzlF)))));
+  
   // protocol _ObjectiveCBridgeableError
-  auto TheObjectiveCBridgeableError = getErrorBridgingInfo().ObjectiveCBridgeableError;
+  auto TheObjectiveCBridgeableError = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<ProtocolDescriptor *>(
+      dlsym(RTLD_DEFAULT,
+            MANGLE_AS_STRING(MANGLE_SYM(10Foundation26_ObjectiveCBridgeableErrorMp)))));
 
   // If the Foundation overlay isn't loaded, then arbitrary NSErrors can't be
   // bridged.

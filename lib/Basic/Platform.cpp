@@ -21,6 +21,7 @@ using namespace swift;
 bool swift::tripleIsiOSSimulator(const llvm::Triple &triple) {
   llvm::Triple::ArchType arch = triple.getArch();
   return (triple.isiOS() &&
+          !tripleIsMacCatalystEnvironment(triple) &&
           // FIXME: transitional, this should eventually stop testing arch, and
           // switch to only checking the -environment field.
           (triple.isSimulatorEnvironment() ||
@@ -52,6 +53,38 @@ bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
     tripleIsiOSSimulator(triple) ||
     tripleIsWatchSimulator(triple) ||
     tripleIsAppleTVSimulator(triple);
+}
+
+bool swift::tripleIsMacCatalystEnvironment(const llvm::Triple &triple) {
+  return triple.isiOS() && !triple.isTvOS() &&
+      triple.getEnvironment() == llvm::Triple::MacABI;
+}
+
+bool swift::triplesAreValidForZippering(const llvm::Triple &target,
+                                        const llvm::Triple &targetVariant) {
+  // The arch and vendor must match.
+  if (target.getArchName() != targetVariant.getArchName() ||
+      target.getArch() != targetVariant.getArch() ||
+      target.getSubArch() != targetVariant.getSubArch() ||
+      target.getVendor() != targetVariant.getVendor()) {
+    return false;
+  }
+
+  // Allow a macOS target and an iOS-macabi target variant
+  // This is typically the case when zippering a library originally
+  // developed for macOS.
+  if (target.isMacOSX() && tripleIsMacCatalystEnvironment(targetVariant)) {
+    return true;
+  }
+
+  // Allow an iOS-macabi target and a macOS target variant. This would
+  // be the case when zippering a library originally developed for
+  // iOS.
+  if (targetVariant.isMacOSX() && tripleIsMacCatalystEnvironment(target)) {
+    return true;
+  }
+
+  return false;
 }
 
 bool swift::tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple) {
@@ -163,7 +196,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::AMDPAL:
   case llvm::Triple::HermitCore:
   case llvm::Triple::Hurd:
-  case llvm::Triple::WASI:
     return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
@@ -191,6 +223,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "ps4";
   case llvm::Triple::Haiku:
     return "haiku";
+  case llvm::Triple::WASI:
+    return "wasi";
   }
   llvm_unreachable("unsupported OS");
 }
@@ -303,6 +337,7 @@ getEnvironmentForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
               .Cases("unknown", "", None)
   // These values are also supported, but are handled by the default case below:
   //          .Case ("simulator", StringRef("simulator"))
+  //          .Case ("macabi", StringRef("macabi"))
               .Default(tripleEnvironment);
 }
 
@@ -339,6 +374,20 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
 
   // Other platforms get no normalization.
   return triple;
+}
+
+llvm::Triple swift::getUnversionedTriple(const llvm::Triple &triple) {
+  StringRef unversionedOSName = triple.getOSName().take_until(llvm::isDigit);
+  if (triple.getEnvironment()) {
+    StringRef environment =
+        llvm::Triple::getEnvironmentTypeName(triple.getEnvironment());
+
+    return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+                        unversionedOSName, environment);
+  }
+
+  return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+                      unversionedOSName);
 }
 
 Optional<llvm::VersionTuple>

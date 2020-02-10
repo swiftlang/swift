@@ -227,29 +227,6 @@ public:
   SourceLoc getNearestLoc() const { return SourceLoc(); };
 };
 
-//----------------------------------------------------------------------------//
-// HasDynamicMemberLookupAttributeRequest
-//----------------------------------------------------------------------------//
-class HasDynamicMemberLookupAttributeRequest:
-    public SimpleRequest<HasDynamicMemberLookupAttributeRequest,
-                         bool(TypeBase*),
-                         CacheKind::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, TypeBase *ty) const;
-
-public:
-  // Caching
-  bool isCached() const { return true; }
-  // Source location
-  SourceLoc getNearestLoc() const { return SourceLoc(); };
-};
-
 /// The zone number for the IDE.
 #define SWIFT_TYPEID_ZONE IDETypeChecking
 #define SWIFT_TYPEID_HEADER "swift/Sema/IDETypeCheckingRequestIDZone.def"

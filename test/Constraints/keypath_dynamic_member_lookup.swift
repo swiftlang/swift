@@ -439,7 +439,6 @@ struct SR_11896_Immutable {
   }
 }
 
-
 // CHECK-LABEL: sil hidden @$s29keypath_dynamic_member_lookup21testKeyPathMutabilityyyF : $@convention(thin) () -> ()
 func testKeyPathMutability() {
   // CHECK: keypath $KeyPath<SR_11896_Base, Int>, (root $SR_11896_Base; stored_property #SR_11896_Base.mutable : $Int)
@@ -457,4 +456,30 @@ func testKeyPathMutability() {
   // CHECK: keypath $KeyPath<SR_11896_Base, Int>, (root $SR_11896_Base; stored_property #SR_11896_Base.immutable : $Int)
   // CHECK: keypath $KeyPath<SR_11896_Immutable, Int>, (root $SR_11896_Immutable; gettable_property $Int
   _ = \SR_11896_Immutable.immutable
+}
+
+// SR-11933: Make sure we properly handle default arguments.
+struct HasDefaultedSubscript {
+  subscript(_ x: Int = 0) -> Int { x }
+}
+
+@dynamicMemberLookup
+struct SR_11933 {
+  subscript(dynamicMember kp: KeyPath<HasDefaultedSubscript, Int>) -> Int { 0 }
+}
+
+// CHECK-LABEL: sil hidden @$s29keypath_dynamic_member_lookup28testDynamicMemberWithDefaultyyAA8SR_11933VF : $@convention(thin) (SR_11933) -> ()
+func testDynamicMemberWithDefault(_ x: SR_11933) {
+  // CHECK: [[DEF_FN:%[0-9]+]] = function_ref @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icipfA_ : $@convention(thin) () -> Int
+  // CHECK: [[DEF_ARG:%[0-9]+]] = apply [[DEF_FN]]()
+  // CHECK: [[KP:%[0-9]+]] = keypath $KeyPath<HasDefaultedSubscript, Int>, (root $HasDefaultedSubscript; gettable_property $Int,  id @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icig : $@convention(method) (Int, HasDefaultedSubscript) -> Int, getter @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icipACTK : $@convention(thin) (@in_guaranteed HasDefaultedSubscript, UnsafeRawPointer) -> @out Int, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSiTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[DEF_ARG]])
+  // CHECK: [[SUB_GET:%[0-9]+]] = function_ref @$s29keypath_dynamic_member_lookup8SR_11933V0B6MemberSis7KeyPathCyAA21HasDefaultedSubscriptVSiG_tcig : $@convention(method) (@guaranteed KeyPath<HasDefaultedSubscript, Int>, SR_11933) -> Int
+  // CHECK: apply [[SUB_GET]]([[KP]], {{%[0-9]+}})
+  _ = x[]
+
+  // CHECK: [[DEF_FN:%[0-9]+]] = function_ref @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icipfA_ : $@convention(thin) () -> Int
+  // CHECK: [[DEF_ARG:%[0-9]+]] = apply [[DEF_FN]]()
+  // CHECK: [[INNER_KP:%[0-9]+]] = keypath $KeyPath<HasDefaultedSubscript, Int>, (root $HasDefaultedSubscript; gettable_property $Int,  id @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icig : $@convention(method) (Int, HasDefaultedSubscript) -> Int, getter @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icipACTK : $@convention(thin) (@in_guaranteed HasDefaultedSubscript, UnsafeRawPointer) -> @out Int, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSiTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[DEF_ARG]])
+  // CHECK: [[OUTER_KP:%[0-9]+]] = keypath $KeyPath<SR_11933, Int>, (root $SR_11933; gettable_property $Int,  id @$s29keypath_dynamic_member_lookup8SR_11933V0B6MemberSis7KeyPathCyAA21HasDefaultedSubscriptVSiG_tcig : $@convention(method) (@guaranteed KeyPath<HasDefaultedSubscript, Int>, SR_11933) -> Int, getter @$s29keypath_dynamic_member_lookup8SR_11933V0B6MemberSis7KeyPathCyAA21HasDefaultedSubscriptVSiG_tcipACTK : $@convention(thin) (@in_guaranteed SR_11933, UnsafeRawPointer) -> @out Int, indices [%$0 : $KeyPath<HasDefaultedSubscript, Int> : $KeyPath<HasDefaultedSubscript, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup21HasDefaultedSubscriptVSiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup21HasDefaultedSubscriptVSiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[INNER_KP]])
+  _ = \SR_11933.[]
 }

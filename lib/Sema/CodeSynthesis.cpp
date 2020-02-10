@@ -145,7 +145,8 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
     var->getAttrs().hasAttribute<LazyAttr>() ||
     (!isExplicitlyInitialized && isDefaultInitializable &&
      var->getValueInterfaceType()->getAnyNominal() == ctx.getOptionalDecl() &&
-     !var->getAttachedPropertyWrapperTypeInfo(0).defaultInit);
+     (var->getAttachedPropertyWrappers().empty() ||
+      var->isPropertyMemberwiseInitializedWithWrappedType()));
   if (isNilInitialized) {
     arg->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
     return;
@@ -410,10 +411,8 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
       auto *gp = cast<GenericTypeParamType>(type);
       if (gp->getDepth() < superclassDepth)
         return Type(gp).subst(subMap);
-      return CanGenericTypeParamType::get(
-        gp->getDepth() - superclassDepth + depth,
-          gp->getIndex(),
-          ctx);
+      return genericParams->getParams()[gp->getIndex()]
+                 ->getDeclaredInterfaceType();
     };
 
     auto lookupConformanceFn =
@@ -641,7 +640,8 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options
     = (ParameterList::Implicit |
-       ParameterList::Inherited);
+       ParameterList::Inherited |
+       ParameterList::NamedArguments);
   auto *superclassParams = superclassCtor->getParameters();
   auto *bodyParams = superclassParams->clone(ctx, options);
 
@@ -1000,13 +1000,18 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 llvm::Expected<bool>
 InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
                                                 ClassDecl *decl) const {
+  // Check if we parsed the @_inheritsConvenienceInitializers attribute.
+  if (decl->getAttrs().hasAttribute<InheritsConvenienceInitializersAttr>())
+    return true;
+
   auto superclass = decl->getSuperclass();
   assert(superclass);
 
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.
   auto *superclassDecl = superclass->getClassOrBoundGenericClass();
-  if (superclassDecl->hasMissingDesignatedInitializers())
+  if (superclassDecl->getModuleContext() != decl->getParentModule() &&
+      superclassDecl->hasMissingDesignatedInitializers())
     return false;
 
   // If we're allowed to inherit designated initializers, then we can inherit

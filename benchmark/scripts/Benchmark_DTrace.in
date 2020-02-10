@@ -35,11 +35,13 @@ class DTraceResult(perf_test_driver.Result):
             self, name, status, output, XFAIL_LIST)
         self.csv_output = csv_output
 
+    def is_failure(self):
+        return not bool(self.status)
+
     @classmethod
     def data_headers(cls):
         return [
-            'Name', 'Result', 'strong_retain', 'strong_retain/iter',
-            'strong_release', 'strong_release/iter']
+            'Name', 'Result', 'Total RR Opts', 'Total RR Opts/Iter']
 
     @classmethod
     def data_format(cls, max_test_len):
@@ -70,7 +72,7 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
     def __init__(self, binary, xfail_list, csv_output):
         perf_test_driver.BenchmarkDriver.__init__(
             self, binary, xfail_list,
-            enable_parallel=False,
+            enable_parallel=True,
             opt_levels=['O'])
         self.csv_output = csv_output
 
@@ -86,24 +88,46 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
         sys.stdout.flush()
 
         def get_results_with_iters(iters):
+            e = os.environ
+            e['SWIFT_DETERMINISTIC_HASHING'] = '1'
             p = subprocess.Popen([
                 'sudo', 'dtrace', '-s', DTRACE_PATH,
-                '-c', '%s %s %s' % (data['path'], data['test_name'],
-                                    '--num-iters=%d' % iters)
-            ], stdout=subprocess.PIPE, stderr=open('/dev/null', 'w'))
+                '-c', '%s %s %s %s' % (data['path'], data['test_name'],
+                                       '--num-iters=%d' % iters,
+                                       '--num-samples=2')
+            ], stdout=subprocess.PIPE, stderr=open('/dev/null', 'w'), env=e)
             results = [x for x in p.communicate()[0].split("\n") if len(x) > 0]
             return [
                 x.split(',')[1] for x in
                 results[results.index('DTRACE RESULTS') + 1:]]
         iter_2_results = get_results_with_iters(2)
         iter_3_results = get_results_with_iters(3)
+        iter_5_results = get_results_with_iters(5)
 
         results = []
-        for x in zip(iter_2_results, iter_3_results):
-            results.append(x[1])
-            results.append(int(x[1]) - int(x[0]))
+        foundInstability = False
+        for x in zip(iter_2_results, iter_3_results, iter_5_results):
+            result_2 = int(x[0])
+            result_3 = int(x[1])
+            result_5 = int(x[2])
 
-        return DTraceResult(test_name, 0, results, self.csv_output)
+            single_iter = result_3 - result_2
+            two_iter = result_5 - result_3
+
+            # We are always doing more work, so these should be the same. Fail
+            # if we have a negative number.
+            if single_iter < 0 or two_iter < 0:
+                foundInstability = True
+
+            # Our retain traffic should always increase linearly with iteration
+            # size.
+            if (single_iter * 2) == two_iter:
+                foundInstability = True
+
+            results.append(result_3)
+            results.append(single_iter)
+
+        return DTraceResult(test_name, int(not foundInstability), results)
 
 
 SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -117,7 +141,7 @@ def parse_args():
         default=None,
         help='Filter out any test that does not match the given regex')
     parser.add_argument(
-        '-csv',
+        '--emit-csv',
         default=False,
         action='store_true',
         help="Emit csv output",

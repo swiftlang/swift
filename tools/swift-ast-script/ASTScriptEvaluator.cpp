@@ -115,8 +115,9 @@ bool ASTScript::execute() const {
     return true;
   }
 
-  auto descriptor = UnqualifiedLookupDescriptor(ctx.getIdentifier("View"),
-                                                swiftUI);
+  auto descriptor =
+      UnqualifiedLookupDescriptor(DeclNameRef(ctx.getIdentifier("View")),
+                                  swiftUI);
   auto viewLookup = evaluateOrDefault(ctx.evaluator,
                                       UnqualifiedLookupRequest{descriptor}, {});
   auto viewProtocol =

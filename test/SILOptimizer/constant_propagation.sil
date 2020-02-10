@@ -1046,3 +1046,28 @@ bb0(%0 : $@thin T.Type):
   %1 = builtin "isConcrete"(%0 : $@thin T.Type) : $Builtin.Int1
   return %1 : $Builtin.Int1
 }
+
+class AClass {}
+class BClass : AClass {}
+
+// CHECK-LABEL: sil @test_checked_cast_br_thick_class_type
+// CHECK:  [[METATYPE:%.*]] = metatype $@thick BClass.Type
+// CHECK:  [[SUPER:%.*]] = upcast [[METATYPE]] : $@thick BClass.Type to $@thick AClass.Type
+// CHECK:  br bb1([[SUPER]] : $@thick AClass.Type)
+sil @test_checked_cast_br_thick_class_type : $@convention(thin) (@thin P.Protocol) -> Builtin.Int1 {
+bb0(%0 : $@thin P.Protocol):
+  %2 = metatype $@thick BClass.Type
+  checked_cast_br %2 : $@thick BClass.Type to AClass.Type, bb1, bb2
+
+bb1(%5 : $@thick AClass.Type):
+  debug_value %5 : $@thick AClass.Type, let, name "type"
+  %6 = integer_literal $Builtin.Int1, -1
+  br bb3(%6 : $Builtin.Int1)
+
+bb2:
+  %9 = integer_literal $Builtin.Int1, 0
+  br bb3(%9 : $Builtin.Int1)
+
+bb3(%11 : $Builtin.Int1):
+  return %11 : $Builtin.Int1
+}

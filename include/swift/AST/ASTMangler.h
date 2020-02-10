@@ -153,7 +153,15 @@ public:
                                              Type FromType, Type ToType,
                                              Type SelfType,
                                              ModuleDecl *Module);
-  
+
+  /// Mangle a SIL differentiability witness key:
+  /// - Mangled original function name.
+  /// - Parameter indices.
+  /// - Result indices.
+  /// - Derivative generic signature (optional).
+  std::string
+  mangleSILDifferentiabilityWitnessKey(SILDifferentiabilityWitnessKey key);
+
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature signature,
                                              CanType baseType,
@@ -245,6 +253,9 @@ protected:
   unsigned appendBoundGenericArgs(DeclContext *dc,
                                   SubstitutionMap subs,
                                   bool &isFirstArgList);
+  
+  /// Append the bound generic arguments as a flat list, disregarding depth.
+  void appendFlatGenericArgs(SubstitutionMap subs);
 
   /// Append any retroactive conformances.
   void appendRetroactiveConformances(Type type);

@@ -349,12 +349,14 @@ func testUnresolvedMemberSubscriptFixit(_ s0: GenSubscriptFixitTest) {
 
 struct SubscriptTest1 {
   subscript(keyword:String) -> Bool { return true }
-  // expected-note@-1 3 {{found this candidate}} expected-note@-1 {{found candidate with type 'Bool'}}
+  // expected-note@-1 5 {{found this candidate}} expected-note@-1 {{found candidate with type 'Bool'}}
   subscript(keyword:String) -> String? {return nil }
-  // expected-note@-1 3 {{found this candidate}} expected-note@-1 {{found candidate with type 'String?'}}
+  // expected-note@-1 5 {{found this candidate}} expected-note@-1 {{found candidate with type 'String?'}}
 
   subscript(arg: SubClass) -> Bool { return true } // expected-note {{declared here}}
+  // expected-note@-1 2 {{found this candidate}}
   subscript(arg: Protocol) -> Bool { return true } // expected-note 2 {{declared here}}
+  // expected-note@-1 2 {{found this candidate}}
 
   subscript(arg: (foo: Bool, bar: (Int, baz: SubClass)), arg2: String) -> Bool { return true }
   // expected-note@-1 3 {{declared here}}
@@ -379,11 +381,9 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   _ = s1.subscript(ClassConformingToRefinedProtocol())
   // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{54-55=]}}
   _ = s1.subscript(true)
-  // expected-error@-1 {{cannot invoke 'subscript' with an argument list of type '(Bool)'}}
-  // expected-note@-2 {{overloads for 'subscript' exist with these partially matching parameter lists: (Protocol), (String), (SubClass)}}
+  // expected-error@-1 {{no exact matches in call to subscript}}
   _ = s1.subscript(SuperClass())
-  // expected-error@-1 {{cannot invoke 'subscript' with an argument list of type '(SuperClass)'}}
-  // expected-note@-2 {{overloads for 'subscript' exist with these partially matching parameter lists: (Protocol), (String), (SubClass)}}
+  // expected-error@-1 {{no exact matches in call to subscript}}
   _ = s1.subscript("hello")
   // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
   _ = s1.subscript("hello"
@@ -398,12 +398,13 @@ func testSubscript1(_ s1 : SubscriptTest1) {
 struct SubscriptTest2 {
   subscript(a : String, b : Int) -> Int { return 0 } // expected-note {{candidate expects value of type 'Int' for parameter #2}}
   // expected-note@-1 {{declared here}}
+  // expected-note@-2 {{candidate has partially matching parameter list (String, Int)}}
     subscript(a : String, b : String) -> Int { return 0 } // expected-note {{candidate expects value of type 'String' for parameter #2}}
+  // expected-note@-1 {{candidate has partially matching parameter list (String, String)}}
 }
 
 func testSubscript1(_ s2 : SubscriptTest2) {
-  _ = s2["foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an argument of type 'String'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
+  _ = s2["foo"] // expected-error {{no exact matches in call to subscript}}
 
   let a = s2["foo", 1.0] // expected-error {{no exact matches in call to subscript}}
 

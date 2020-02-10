@@ -58,6 +58,11 @@ namespace swift {
     MutableArrayRef<ModuleFile::PartiallySerialized<SILProperty *>>
     Properties;
 
+    std::unique_ptr<SerializedFuncTable> DifferentiabilityWitnessList;
+    MutableArrayRef<
+        ModuleFile::PartiallySerialized<SILDifferentiabilityWitness *>>
+        DifferentiabilityWitnesses;
+
     /// A declaration will only
     llvm::DenseMap<NormalProtocolConformance *, SILWitnessTable *>
     ConformanceToWitnessTableMap;
@@ -113,6 +118,9 @@ namespace swift {
     SILType getSILType(Type ty, SILValueCategory category,
                        SILFunction *inContext);
 
+    SILDifferentiabilityWitness *
+    getSILDifferentiabilityWitnessForReference(StringRef mangledKey);
+
     SILFunction *getFuncForReference(StringRef Name, SILType Ty);
     SILFunction *getFuncForReference(StringRef Name);
     SILVTable *readVTable(serialization::DeclID);
@@ -129,6 +137,8 @@ namespace swift {
     SILDefaultWitnessTable *
     readDefaultWitnessTable(serialization::DeclID,
                             SILDefaultWitnessTable *existingWt);
+    SILDifferentiabilityWitness *
+        readDifferentiabilityWitness(serialization::DeclID);
 
     Optional<KeyPathPatternComponent>
     readKeyPathComponent(ArrayRef<uint64_t> ListOfValues, unsigned &nextValue);
@@ -148,6 +158,8 @@ public:
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
     SILDefaultWitnessTable *
     lookupDefaultWitnessTable(SILDefaultWitnessTable *wt);
+    SILDifferentiabilityWitness *
+    lookupDifferentiabilityWitness(StringRef mangledDiffWitnessKey);
 
     /// Invalidate all cached SILFunctions.
     void invalidateFunctionCache();
@@ -172,6 +184,7 @@ public:
       getAllWitnessTables();
       getAllDefaultWitnessTables();
       getAllProperties();
+      getAllDifferentiabilityWitnesses();
     }
 
     /// Deserialize all SILFunctions inside the module and add them to SILMod.
@@ -194,6 +207,10 @@ public:
     /// Deserialize all Property descriptors inside the module and add them
     /// to SILMod.
     void getAllProperties();
+
+    /// Deserialize all DifferentiabilityWitnesses inside the module and add
+    /// them to SILMod.
+    void getAllDifferentiabilityWitnesses();
 
     SILDeserializer(ModuleFile *MF, SILModule &M,
                     DeserializationNotificationHandlerSet *callback);

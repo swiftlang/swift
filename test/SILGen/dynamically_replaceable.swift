@@ -404,3 +404,17 @@ public func testWithLocalFun() {
   let unamedClosure = { print("foo") }
   unamedClosure()
 }
+
+@propertyWrapper
+struct WrapperWithInitialValue<T> {
+  var wrappedValue: T
+
+  init(wrappedValue initialValue: T) {
+    self.wrappedValue = initialValue
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s23dynamically_replaceable10SomeStructV1tSbvpfP
+public struct SomeStruct {
+  @WrapperWithInitialValue var t = false
+}

@@ -15,6 +15,7 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/MD5.h"
@@ -139,6 +140,11 @@ public:
     return iter2 == iter->second.end() ? None : Optional<Value>(iter2->second);
   }
 
+  NullablePtr<const InnerMap> find(const Key1 &k1) const {
+    auto iter = map.find(k1);
+    return iter == map.end() ? nullptr : &iter->second;
+  }
+
   /// The sought value must be present.
   Value findAndErase(const Key1 &k1, const Key2 &k2) {
     auto &submap = map[k1];
@@ -237,6 +243,20 @@ public:
   }
   Optional<Value> find(const Key2 &k2, Key1 &k1) const { return find(k1, k2); }
 
+  /// Return the submap for a given Key1. May create one, after the fashion of
+  /// the standard libary.
+  const Key2Map &operator[](const Key1 &k1) { return map1[k1]; }
+  /// Return the submap for a given Key2. May create one, after the fashion of
+  /// the standard libary.
+  const Key1Map &operator[](const Key2 &k2) { return map2[k2]; }
+
+  NullablePtr<const Key2Map> find(const Key1 &k1) const {
+    return map1.find(k1);
+  }
+  NullablePtr<const Key1Map> find(const Key2 &k2) const {
+    return map2.find(k2);
+  }
+
   /// Element must be present.
   /// Return the erased value.
   Value findAndErase(const Key1 &k1, const Key2 &k2) {
@@ -250,12 +270,6 @@ public:
   Value findAndErase(const Key2 &k2, const Key1 &k1) {
     return findAndErase(k1, k2);
   }
-  /// Return the submap for a given Key1. May create one, after the fashion of
-  /// the standard libary.
-  const Key2Map &operator[](const Key1 &k1) { return map1[k1]; }
-  /// Return the submap for a given Key2. May create one, after the fashion of
-  /// the standard libary.
-  const Key1Map &operator[](const Key2 &k2) { return map2[k2]; }
 
   /// Invoke \p fn on each Key2 and Value matching (\p k1, *)
   void forEachValueMatching(
@@ -325,7 +339,7 @@ private:
 /// Write out the .swiftdeps file for a frontend compilation of a primary file.
 bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                const DependencyTracker &depTracker,
-                               StringRef outputPath);
+                               StringRef outputPath, bool alsoEmitDotFile);
 //==============================================================================
 // MARK: Enums
 //==============================================================================
@@ -438,8 +452,8 @@ public:
         name() {}
 
   /// For constructing a key in the frontend.
-  DependencyKey(NodeKind kind, DeclAspect aspect, std::string context,
-                std::string name)
+  DependencyKey(NodeKind kind, DeclAspect aspect, const std::string &context,
+                const std::string &name)
       : kind(kind), aspect(aspect), context(context), name(name) {
     assert(verify());
   }
@@ -449,7 +463,7 @@ public:
   StringRef getContext() const { return context; }
   StringRef getName() const { return name; }
 
-  StringRef getSwiftDepsFromSourceFileProvide() const {
+  StringRef getSwiftDepsFromASourceFileProvideNodeKey() const {
     assert(getKind() == NodeKind::sourceFileProvide &&
            "Receiver must be sourceFileProvide.");
     return getName();
@@ -494,10 +508,17 @@ public:
   static std::string computeNameForProvidedEntity(Entity);
 
   /// Given some type of depended-upon entity create the key.
-  template <NodeKind kind, typename Entity>
-  static DependencyKey createDependedUponKey(const Entity &);
+  static DependencyKey createDependedUponKey(StringRef mangledHolderName,
+                                             StringRef memberBaseName);
+
+  template <NodeKind kind>
+  static DependencyKey createDependedUponKey(StringRef);
+
+  static DependencyKey createKeyForWholeSourceFile(StringRef swiftDeps);
 
   std::string humanReadableName() const;
+
+  StringRef aspectName() const { return DeclAspectNames[size_t(aspect)]; }
 
   void dump(llvm::raw_ostream &os) const { os << asString() << "\n"; }
   SWIFT_DEBUG_DUMP { dump(llvm::errs()); }
@@ -534,6 +555,13 @@ struct std::hash<typename swift::fine_grained_dependencies::DeclAspect> {
     return size_t(aspect);
   }
 };
+
+namespace swift {
+namespace fine_grained_dependencies {
+using ContextNameFingerprint =
+    std::tuple<std::string, std::string, Optional<std::string>>;
+}
+} // namespace swift
 
 //==============================================================================
 // MARK: DepGraphNode
@@ -684,20 +712,45 @@ public:
   }
 
   /// Record the sequence number, \p n, of another use.
+  /// The relationship between an interface and its implementation is NOT
+  /// included here. See \c
+  /// SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew.
   void addDefIDependUpon(size_t n) {
     if (n != getSequenceNumber())
       defsIDependUpon.insert(n);
   }
 
   std::string humanReadableName() const {
-    return DepGraphNode::humanReadableName("here");
+    return DepGraphNode::humanReadableName(getIsProvides() ? "here"
+                                                           : "somewhere else");
   }
 
   bool verify() const {
     DepGraphNode::verify();
     assert(getIsProvides() || isDepends());
+    assert(verifySequenceNumber());
     return true;
   }
+
+  bool verifySequenceNumber() const {
+    const auto &k = getKey();
+    if (k.getKind() != NodeKind::sourceFileProvide)
+      return true;
+    switch (k.getAspect()) {
+    case DeclAspect::interface:
+      assert(getSequenceNumber() == sourceFileProvidesInterfaceSequenceNumber);
+      return true;
+    case DeclAspect::implementation:
+      assert(getSequenceNumber() ==
+             sourceFileProvidesImplementationSequenceNumber);
+      return true;
+    default:
+      llvm_unreachable("neither interface nor implementation");
+    }
+  }
+  static constexpr const size_t sourceFileProvidesInterfaceSequenceNumber = 0;
+  static constexpr const size_t sourceFileProvidesImplementationSequenceNumber =
+      1;
 };
 
 //==============================================================================
@@ -727,6 +780,34 @@ public:
   SourceFileDepGraph(const SourceFileDepGraph &g) = delete;
   SourceFileDepGraph(SourceFileDepGraph &&g) = default;
 
+  /// Simulate loading for unit testing:
+  /// \param swiftDepsFileName The name of the swiftdeps file of the phony job
+  /// \param includePrivateDeps Whether the graph includes intra-file arcs
+  /// \param hadCompilationError Simulate a compilation error
+  /// \param interfaceHash The interface hash of the simulated graph
+  /// \param simpleNamesByRDK A map of vectors of names keyed by reference
+  /// dependency key \param compoundNamesByRDK A map of (mangledHolder,
+  /// baseName) pairs keyed by reference dependency key. For single-name
+  /// dependencies, an initial underscore indicates that the name does not
+  /// cascade. For compound names, it is the first name, the holder which
+  /// indicates non-cascading. For member names, an initial underscore indicates
+  /// file-privacy.
+  static SourceFileDepGraph
+  simulateLoad(std::string swiftDepsFileName, const bool includePrivateDeps,
+               const bool hadCompilationError, std::string interfaceHash,
+               llvm::StringMap<std::vector<std::string>> simpleNamesByRDK,
+               llvm::StringMap<std::vector<std::pair<std::string, std::string>>>
+                   compoundNamesByRDK);
+
+  static constexpr char noncascadingOrPrivatePrefix = '#';
+  static constexpr char nameFingerprintSeparator = ',';
+
+  static std::string noncascading(std::string name);
+
+  LLVM_ATTRIBUTE_UNUSED
+  static std::string privatize(std::string name);
+
+
   /// Nodes are owned by the graph.
   ~SourceFileDepGraph() {
     forEachNode([&](SourceFileDepGraphNode *n) { delete n; });
@@ -735,7 +816,7 @@ public:
   /// Goes at the start of an emitted YAML file to help tools recognize it.
   /// May vary in the future according to version, etc.
   std::string yamlProlog(const bool hadCompilationError) const {
-    return std::string("# Experimental\n") +
+    return std::string("# Fine-grained v0\n") +
            (!hadCompilationError ? ""
                                  : "# Dependencies are unknown because a "
                                    "compilation error occurred.\n");
@@ -746,7 +827,7 @@ public:
   InterfaceAndImplementationPair<SourceFileDepGraphNode>
   getSourceFileNodePair() const;
 
-  StringRef getSwiftDepsFromSourceFileProvide() const;
+  StringRef getSwiftDepsOfJobThatProducedThisGraph() const;
 
   std::string getGraphID() const {
     return getSourceFileNodePair().getInterface()->getKey().humanReadableName();
@@ -770,12 +851,13 @@ public:
   /// The frontend creates a pair of nodes for every tracked Decl and the source
   /// file itself.
   InterfaceAndImplementationPair<SourceFileDepGraphNode>
-  findExistingNodePairOrCreateAndAddIfNew(NodeKind k, StringRef context,
-                                          StringRef name,
-                                          Optional<std::string> fingerprint);
+  findExistingNodePairOrCreateAndAddIfNew(
+      NodeKind k, const ContextNameFingerprint &contextNameFingerprint);
 
-  SourceFileDepGraphNode *findExistingNodeOrCreateIfNew(
-      DependencyKey key, Optional<std::string> fingerprint, bool isProvides);
+  SourceFileDepGraphNode *
+  findExistingNodeOrCreateIfNew(DependencyKey key,
+                                const Optional<std::string> &fingerprint,
+                                bool isProvides);
 
   /// \p Use is the Node that must be rebuilt when \p def changes.
   /// Record that fact in the graph.
@@ -800,14 +882,16 @@ public:
   /// Ensure that when read, the graph is the same as what was written.
   bool verifyReadsWhatIsWritten(StringRef path) const;
 
+  bool verifySequenceNumber() const;
+
+  void emitDotFile(StringRef outputPath, DiagnosticEngine &diags);
+
 private:
   void addNode(SourceFileDepGraphNode *n) {
     n->setSequenceNumber(allNodes.size());
-    assert(allNodes.size() < 2 ==
-               (n->getKey().getKind() == NodeKind::sourceFileProvide) &&
-           "First two and only first two nodes should be sourceFileProvide "
-           "nodes.");
     allNodes.push_back(n);
+    assert(n->verifySequenceNumber() &&
+           "Certain nodes must be in certain places");
   }
 };
 
@@ -892,7 +976,7 @@ private:
   }
   void emitArcs() {
     g.forEachArc([&](const NodeT *def, const NodeT *use) {
-      if (includeGraphArc(use, def))
+      if (includeGraphArc(def, use))
         emitGraphArc(def, use);
     });
   }

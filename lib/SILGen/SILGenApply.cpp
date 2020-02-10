@@ -4470,8 +4470,8 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   // Otherwise, the substitutions should match the generic signature.
   } else {
-    assert(genericSig->getCanonicalSignature() ==
-           subs.getGenericSignature()->getCanonicalSignature());
+    assert(genericSig.getCanonicalSignature() ==
+           subs.getGenericSignature().getCanonicalSignature());
   }
 
   auto rawDirectResult = [&] {
@@ -4865,15 +4865,32 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                    finalArgs, calleeTypeInfo, ApplyOptions::None, ctx);
 }
 
-static StringRef
-getMagicFunctionString(SILGenFunction &SGF) {
-  assert(SGF.MagicFunctionName
+StringRef SILGenFunction::getMagicFunctionString() {
+  assert(MagicFunctionName
          && "asking for #function but we don't have a function name?!");
-  if (SGF.MagicFunctionString.empty()) {
-    llvm::raw_string_ostream os(SGF.MagicFunctionString);
-    SGF.MagicFunctionName.print(os);
+  if (MagicFunctionString.empty()) {
+    llvm::raw_string_ostream os(MagicFunctionString);
+    MagicFunctionName.print(os);
   }
-  return SGF.MagicFunctionString;
+  return MagicFunctionString;
+}
+
+StringRef SILGenFunction::getMagicFilePathString(SourceLoc loc) {
+  assert(loc.isValid());
+  return getSourceManager().getDisplayNameForLoc(loc);
+}
+
+std::string SILGenFunction::getMagicFileString(SourceLoc loc) {
+  auto path = getMagicFilePathString(loc);
+
+  if (!getASTContext().LangOpts.EnableConcisePoundFile)
+    return path;
+
+  auto value = llvm::sys::path::filename(path).str();
+  value += " (";
+  value += getModule().getSwiftModule()->getNameStr();
+  value += ")";
+  return value;
 }
 
 /// Emit an application of the given allocating initializer.
@@ -5131,9 +5148,16 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     auto magicLiteral = cast<MagicIdentifierLiteralExpr>(literal);
     switch (magicLiteral->getKind()) {
     case MagicIdentifierLiteralExpr::File: {
-      std::string value;
-      if (loc.isValid())
-        value = ctx.SourceMgr.getDisplayNameForLoc(loc);
+      std::string value = loc.isValid() ? getMagicFileString(loc) : "";
+      builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
+                                             magicLiteral->getStringEncoding());
+      builtinInit = magicLiteral->getBuiltinInitializer();
+      init = magicLiteral->getInitializer();
+      break;
+    }
+
+    case MagicIdentifierLiteralExpr::FilePath: {
+      StringRef value = loc.isValid() ? getMagicFilePathString(loc) : "";
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
                                              magicLiteral->getStringEncoding());
       builtinInit = magicLiteral->getBuiltinInitializer();
@@ -5142,9 +5166,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     }
 
     case MagicIdentifierLiteralExpr::Function: {
-      StringRef value = "";
-      if (loc.isValid())
-        value = getMagicFunctionString(*this);
+      StringRef value = loc.isValid() ? getMagicFunctionString() : "";
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
                                              magicLiteral->getStringEncoding());
       builtinInit = magicLiteral->getBuiltinInitializer();

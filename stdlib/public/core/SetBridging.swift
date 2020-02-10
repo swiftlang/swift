@@ -20,7 +20,7 @@ internal func _stdlib_NSSet_allObjects(_ object: AnyObject) -> _BridgingBuffer {
   let nss = unsafeBitCast(object, to: _NSSet.self)
   let count = nss.count
   let storage = _BridgingBuffer(count)
-  nss.getObjects(storage.baseAddress, count: count)
+  nss.getObjects(storage.baseAddress)
   return storage
 }
 

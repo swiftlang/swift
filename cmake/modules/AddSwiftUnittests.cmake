@@ -40,8 +40,8 @@ function(add_swift_unittest test_dirname)
   endif()
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
-      LINK_FLAGS " -Xlinker -rpath -Xlinker ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx")
+    set_target_properties(${test_dirname} PROPERTIES
+      BUILD_RPATH ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx)
   elseif("${SWIFT_HOST_VARIANT}" STREQUAL "android")
     swift_android_lib_for_arch(${SWIFT_HOST_VARIANT_ARCH} android_system_libs)
     set_property(TARGET "${test_dirname}" APPEND PROPERTY LINK_DIRECTORIES

@@ -65,6 +65,7 @@ namespace swift {
   class EnumElementDecl;
   class CallExpr;
   class KeyPathExpr;
+  class CaptureListExpr;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -283,6 +284,12 @@ protected:
     Discriminator : 16
   );
 
+  SWIFT_INLINE_BITFIELD(AutoClosureExpr, AbstractClosureExpr, 1,
+    /// True if this autoclosure was built for a function conversion, and
+    /// not an actual @autoclosure parameter.
+    IsThunk : 1
+  );
+
   SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
@@ -496,7 +503,7 @@ public:
 
   /// Retrieves the declaration that is being referenced by this
   /// expression, if any.
-  ConcreteDeclRef getReferencedDecl() const;
+  ConcreteDeclRef getReferencedDecl(bool stopAtParenExpr = false) const;
 
   /// Determine whether this expression is 'super', possibly converted to
   /// a base class.
@@ -1040,8 +1047,22 @@ public:
 class MagicIdentifierLiteralExpr : public LiteralExpr {
 public:
   enum Kind : unsigned {
-    File, Line, Column, Function, DSOHandle
+    File, FilePath, Line, Column, Function, DSOHandle
   };
+
+  static StringRef getKindString(MagicIdentifierLiteralExpr::Kind value) {
+    switch (value) {
+      case File: return "#file";
+      case FilePath: return "#filePath";
+      case Function: return "#function";
+      case Line: return "#line";
+      case Column: return "#column";
+      case DSOHandle: return "#dsohandle";
+    }
+
+    llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in getKindString.");
+  }
+
 private:
   SourceLoc Loc;
   ConcreteDeclRef BuiltinInitializer;
@@ -1067,6 +1088,7 @@ public:
   bool isString() const {
     switch (getKind()) {
     case File:
+    case FilePath:
     case Function:
       return true;
     case Line:
@@ -1339,19 +1361,19 @@ public:
 
   
   /// Create a TypeExpr for a TypeDecl at the specified location.
-  static TypeExpr *createForDecl(SourceLoc Loc, TypeDecl *D,
+  static TypeExpr *createForDecl(DeclNameLoc Loc, TypeDecl *D,
                                  DeclContext *DC,
                                  bool isImplicit);
 
   /// Create a TypeExpr for a member TypeDecl of the given parent TypeDecl.
-  static TypeExpr *createForMemberDecl(SourceLoc ParentNameLoc,
+  static TypeExpr *createForMemberDecl(DeclNameLoc ParentNameLoc,
                                        TypeDecl *Parent,
-                                       SourceLoc NameLoc,
+                                       DeclNameLoc NameLoc,
                                        TypeDecl *Decl);
 
   /// Create a TypeExpr for a member TypeDecl of the given parent IdentTypeRepr.
   static TypeExpr *createForMemberDecl(IdentTypeRepr *ParentTR,
-                                       SourceLoc NameLoc,
+                                       DeclNameLoc NameLoc,
                                        TypeDecl *Decl);
 
   /// Create a TypeExpr from an IdentTypeRepr with the given arguments applied
@@ -1486,11 +1508,11 @@ public:
 /// sema), or may just be a use of an unknown identifier.
 ///
 class UnresolvedDeclRefExpr : public Expr {
-  DeclName Name;
+  DeclNameRef Name;
   DeclNameLoc Loc;
 
 public:
-  UnresolvedDeclRefExpr(DeclName name, DeclRefKind refKind, DeclNameLoc loc)
+  UnresolvedDeclRefExpr(DeclNameRef name, DeclRefKind refKind, DeclNameLoc loc)
       : Expr(ExprKind::UnresolvedDeclRef, /*Implicit=*/loc.isInvalid()),
         Name(name), Loc(loc) {
     Bits.UnresolvedDeclRefExpr.DeclRefKind = static_cast<unsigned>(refKind);
@@ -1498,9 +1520,28 @@ public:
       static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
                                              : FunctionRefKind::Unapplied);
   }
-  
+
+  static UnresolvedDeclRefExpr *createImplicit(
+      ASTContext &C, DeclName name,
+      DeclRefKind refKind = DeclRefKind::Ordinary) {
+    return new (C) UnresolvedDeclRefExpr(DeclNameRef(name), refKind,
+                                         DeclNameLoc());
+  }
+
+  static UnresolvedDeclRefExpr *createImplicit(
+      ASTContext &C, DeclBaseName baseName, ArrayRef<Identifier> argLabels) {
+    return UnresolvedDeclRefExpr::createImplicit(C,
+        DeclName(C, baseName, argLabels));
+  }
+
+  static UnresolvedDeclRefExpr *createImplicit(
+      ASTContext &C, DeclBaseName baseName, ParameterList *paramList) {
+    return UnresolvedDeclRefExpr::createImplicit(C,
+        DeclName(C, baseName, paramList));
+  }
+
   bool hasName() const { return static_cast<bool>(Name); }
-  DeclName getName() const { return Name; }
+  DeclNameRef getName() const { return Name; }
 
   DeclRefKind getRefKind() const {
     return static_cast<DeclRefKind>(Bits.UnresolvedDeclRefExpr.DeclRefKind);
@@ -1721,17 +1762,6 @@ public:
          llvm::function_ref<Type(const Expr *)> getType =
              [](const Expr *E) -> Type { return E->getType(); });
 
-  /// Create a new dynamic subscript.
-  static DynamicSubscriptExpr *create(ASTContext &ctx, Expr *base,
-                                      SourceLoc lSquareLoc,
-                                      ArrayRef<Expr *> indexArgs,
-                                      ArrayRef<Identifier> indexArgLabels,
-                                      ArrayRef<SourceLoc> indexArgLabelLocs,
-                                      SourceLoc rSquareLoc,
-                                      Expr *trailingClosure,
-                                      ConcreteDeclRef decl,
-                                      bool implicit);
-
   /// getIndex - Retrieve the index of the subscript expression, i.e., the
   /// "offset" into the base value.
   Expr *getIndex() const { return Index; }
@@ -1768,11 +1798,11 @@ class UnresolvedMemberExpr final
       public TrailingCallArguments<UnresolvedMemberExpr> {
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
-  DeclName Name;
+  DeclNameRef Name;
   Expr *Argument;
 
   UnresolvedMemberExpr(SourceLoc dotLoc, DeclNameLoc nameLoc,
-                       DeclName name, Expr *argument,
+                       DeclNameRef name, Expr *argument,
                        ArrayRef<Identifier> argLabels,
                        ArrayRef<SourceLoc> argLabelLocs,
                        bool hasTrailingClosure,
@@ -1781,12 +1811,12 @@ class UnresolvedMemberExpr final
 public:
   /// Create a new unresolved member expression with no arguments.
   static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
-                                      DeclNameLoc nameLoc, DeclName name,
+                                      DeclNameLoc nameLoc, DeclNameRef name,
                                       bool implicit);
 
   /// Create a new unresolved member expression.
   static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
-                                      DeclNameLoc nameLoc, DeclName name,
+                                      DeclNameLoc nameLoc, DeclNameRef name,
                                       SourceLoc lParenLoc,
                                       ArrayRef<Expr *> args,
                                       ArrayRef<Identifier> argLabels,
@@ -1795,7 +1825,7 @@ public:
                                       Expr *trailingClosure,
                                       bool implicit);
 
-  DeclName getName() const { return Name; }
+  DeclNameRef getName() const { return Name; }
   DeclNameLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
   Expr *getArgument() const { return Argument; }
@@ -2391,12 +2421,12 @@ class UnresolvedDotExpr : public Expr {
   Expr *SubExpr;
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
-  DeclName Name;
+  DeclNameRef Name;
   ArrayRef<ValueDecl *> OuterAlternatives;
 
 public:
   UnresolvedDotExpr(
-      Expr *subexpr, SourceLoc dotloc, DeclName name, DeclNameLoc nameloc,
+      Expr *subexpr, SourceLoc dotloc, DeclNameRef name, DeclNameLoc nameloc,
       bool Implicit,
       ArrayRef<ValueDecl *> outerAlternatives = ArrayRef<ValueDecl *>())
       : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr),
@@ -2406,7 +2436,28 @@ public:
       static_cast<unsigned>(NameLoc.isCompound() ? FunctionRefKind::Compound
                                                  : FunctionRefKind::Unapplied);
   }
-  
+
+  static UnresolvedDotExpr *createImplicit(
+      ASTContext &C, Expr *base, DeclName name) {
+    return new (C) UnresolvedDotExpr(base, SourceLoc(),
+                                     DeclNameRef(name), DeclNameLoc(),
+                                     /*implicit=*/true);
+  }
+
+  static UnresolvedDotExpr *createImplicit(
+      ASTContext &C, Expr *base,
+      DeclBaseName baseName, ArrayRef<Identifier> argLabels) {
+    return UnresolvedDotExpr::createImplicit(C, base,
+                                             DeclName(C, baseName, argLabels));
+  }
+
+  static UnresolvedDotExpr *createImplicit(
+      ASTContext &C, Expr *base,
+      DeclBaseName baseName, ParameterList *paramList) {
+    return UnresolvedDotExpr::createImplicit(C, base,
+                                             DeclName(C, baseName, paramList));
+  }
+
   SourceLoc getLoc() const {
     if (NameLoc.isValid())
       return NameLoc.getBaseNameLoc();
@@ -2438,7 +2489,7 @@ public:
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *e) { SubExpr = e; }
 
-  DeclName getName() const { return Name; }
+  DeclNameRef getName() const { return Name; }
   DeclNameLoc getNameLoc() const { return NameLoc; }
 
   ArrayRef<ValueDecl *> getOuterAlternatives() const {
@@ -3552,6 +3603,21 @@ public:
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
 
+  /// The range of the brackets of the capture list, if present.
+  SourceRange BracketRange;
+    
+  /// The (possibly null) VarDecl captured by this closure with the literal name
+  /// "self". In order to recover this information at the time of name lookup,
+  /// we must be able to access it from the associated DeclContext.
+  /// Because the DeclContext inside a closure is the closure itself (and not
+  /// the CaptureListExpr which would normally maintain this sort of
+  /// information about captured variables), we need to have some way to access
+  /// this information directly on the ClosureExpr.
+  ///
+  /// The bit indicates whether this closure has had a function builder
+  /// applied to it.
+  llvm::PointerIntPair<VarDecl *, 1, bool> CapturedSelfDeclAndAppliedBuilder;
+  
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
   
@@ -3568,16 +3634,17 @@ class ClosureExpr : public AbstractClosureExpr {
   /// The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
-  
 public:
-  ClosureExpr(ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
+  ClosureExpr(SourceRange bracketRange, VarDecl *capturedSelfDecl,
+              ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
               SourceLoc inLoc, TypeLoc explicitResultType,
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
+      BracketRange(bracketRange),
+      CapturedSelfDeclAndAppliedBuilder(capturedSelfDecl, false),
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
-      ExplicitResultType(explicitResultType),
-      Body(nullptr) {
+      ExplicitResultType(explicitResultType), Body(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
   }
@@ -3609,6 +3676,8 @@ public:
   /// explicitly-specified result type.
   bool hasExplicitResultType() const { return ArrowLoc.isValid(); }
 
+  /// Retrieve the range of the \c '[' and \c ']' that enclose the capture list.
+  SourceRange getBracketRange() const { return BracketRange; }
   
   /// Retrieve the location of the \c '->' for closures with an
   /// explicit result type.
@@ -3674,6 +3743,24 @@ public:
   /// Is this a completely empty closure?
   bool hasEmptyBody() const;
 
+  /// VarDecl captured by this closure under the literal name \c self , if any.
+  VarDecl *getCapturedSelfDecl() const {
+    return CapturedSelfDeclAndAppliedBuilder.getPointer();
+  }
+  
+  /// Whether this closure captures the \c self param in its body in such a
+  /// way that implicit \c self is enabled within its body (i.e. \c self is
+  /// captured non-weakly).
+  bool capturesSelfEnablingImplictSelf() const;
+
+  bool hasAppliedFunctionBuilder() const {
+    return CapturedSelfDeclAndAppliedBuilder.getInt();
+  }
+
+  void setAppliedFunctionBuilder(bool flag = true) {
+    CapturedSelfDeclAndAppliedBuilder.setInt(flag);
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
   }
@@ -3707,7 +3794,18 @@ public:
                   DeclContext *Parent)
       : AbstractClosureExpr(ExprKind::AutoClosure, ResultTy, /*Implicit=*/true,
                             Discriminator, Parent) {
-    setBody(Body);
+    if (Body != nullptr)
+      setBody(Body);
+
+    Bits.AutoClosureExpr.IsThunk = false;
+  }
+
+  bool isThunk() const {
+    return Bits.AutoClosureExpr.IsThunk;
+  }
+
+  void setIsThunk(bool isThunk) {
+    Bits.AutoClosureExpr.IsThunk = isThunk;
   }
 
   SourceRange getSourceRange() const;
@@ -3747,6 +3845,8 @@ struct CaptureListEntry {
   CaptureListEntry(VarDecl *Var, PatternBindingDecl *Init)
   : Var(Var), Init(Init) {
   }
+
+  bool isSimpleSelfCapture() const;
 };
 
 /// CaptureListExpr - This expression represents the capture list on an explicit
@@ -3851,6 +3951,10 @@ public:
   /// is injected before type checking to act as a placeholder for some
   /// value to be specified later.
   bool isPlaceholder() const { return Bits.OpaqueValueExpr.IsPlaceholder; }
+
+  void setIsPlaceholder(bool value) {
+    Bits.OpaqueValueExpr.IsPlaceholder = value;
+  }
 
   SourceRange getSourceRange() const { return Range; }
 
@@ -4851,7 +4955,7 @@ class KeyPathExpr : public Expr {
 
 public:
   /// A single stored component, which will be one of:
-  /// - an unresolved DeclName, which has to be type-checked
+  /// - an unresolved DeclNameRef, which has to be type-checked
   /// - a resolved ValueDecl, referring to
   /// - a subscript index expression, which may or may not be resolved
   /// - an optional chaining, forcing, or wrapping component
@@ -4872,11 +4976,11 @@ public:
   
   private:
     union DeclNameOrRef {
-      DeclName UnresolvedName;
+      DeclNameRef UnresolvedName;
       ConcreteDeclRef ResolvedDecl;
       
       DeclNameOrRef() : UnresolvedName{} {}
-      DeclNameOrRef(DeclName un) : UnresolvedName(un) {}
+      DeclNameOrRef(DeclNameRef un) : UnresolvedName(un) {}
       DeclNameOrRef(ConcreteDeclRef rd) : ResolvedDecl(rd) {}
     } Decl;
     
@@ -4917,7 +5021,7 @@ public:
     {}
     
     /// Create an unresolved component for a property.
-    static Component forUnresolvedProperty(DeclName UnresolvedName,
+    static Component forUnresolvedProperty(DeclNameRef UnresolvedName,
                                            SourceLoc Loc) {
       return Component(nullptr,
                        UnresolvedName, nullptr, {}, {},
@@ -5132,7 +5236,7 @@ public:
     void setSubscriptIndexHashableConformances(
       ArrayRef<ProtocolConformanceRef> hashables);
 
-    DeclName getUnresolvedDeclName() const {
+    DeclNameRef getUnresolvedDeclName() const {
       switch (getKind()) {
       case Kind::UnresolvedProperty:
         return Decl.UnresolvedName;

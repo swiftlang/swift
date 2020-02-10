@@ -488,13 +488,20 @@ public:
   /// Keep track of initializer declarations that correspond to
   /// imported methods.
   llvm::DenseMap<
-      std::tuple<const clang::ObjCMethodDecl *, DeclContext *, Version>,
+      std::tuple<const clang::ObjCMethodDecl *, const DeclContext *, Version>,
       ConstructorDecl *> Constructors;
 
   /// Keep track of all initializers that have been imported into a
   /// nominal type.
   llvm::DenseMap<const NominalTypeDecl *, TinyPtrVector<ConstructorDecl *>>
       ConstructorsForNominal;
+
+  /// Keep track of all member declarations that have been imported into
+  /// a nominal type.
+  llvm::DenseMap<const NominalTypeDecl *,
+                 llvm::DenseMap<DeclBaseName,
+                                TinyPtrVector<ValueDecl *>>>
+      MembersForNominal;
 
   /// Keep track of the nested 'Code' enum for imported error wrapper
   /// structs.
@@ -601,6 +608,10 @@ public:
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
 
 private:
+  /// When set, ClangImporter is disabled, and all requests go to the
+  /// DWARFImporter delegate.
+  bool DisableSourceImport;
+  
   /// The DWARF importer delegate, if installed.
   DWARFImporterDelegate *DWARFImporter = nullptr;
 public:
@@ -610,17 +621,21 @@ public:
 private:
   /// The list of Clang modules found in the debug info.
   llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
-public:
+
   /// Load a module using the clang::CompilerInstance.
   ModuleDecl *loadModuleClang(SourceLoc importLoc,
-                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+                              ArrayRef<Located<Identifier>> path);
   
   /// "Load" a module from debug info. Because debug info types are read on
   /// demand, this doesn't really do any work.
   ModuleDecl *loadModuleDWARF(SourceLoc importLoc,
-                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+                              ArrayRef<Located<Identifier>> path);
 
-  
+public:
+  /// Load a module using either method.
+  ModuleDecl *loadModule(SourceLoc importLoc,
+                         ArrayRef<Located<Identifier>> path);
+
   void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
     if (!isIUO)
       return;
@@ -800,6 +815,13 @@ public:
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
                            Version version, ProtocolDecl *proto);
 
+  void importInheritedConstructors(const clang::ObjCInterfaceDecl *curObjCClass,
+                                   const ClassDecl *classDecl,
+                                   SmallVectorImpl<Decl *> &newMembers);
+  void importMirroredProtocolMembers(const clang::ObjCContainerDecl *decl,
+                                     DeclContext *dc, Optional<DeclBaseName> name,
+                                     SmallVectorImpl<Decl *> &members);
+
   /// Utility function for building simple generic signatures.
   GenericSignature buildGenericSignature(GenericParamList *genericParams,
                                           DeclContext *dc);
@@ -940,6 +962,22 @@ public:
   /// is over-aligned.
   bool isOverAligned(const clang::TypeDecl *typeDecl);
   bool isOverAligned(clang::QualType type);
+
+  /// Determines whether the given Clang type is serializable in a
+  /// Swift AST.  This should only be called after successfully importing
+  /// the type, because it will look for a stable serialization path for any
+  /// referenced declarations, which may depend on whether there's a known
+  /// import of it.  (It will not try to import the declaration to avoid
+  /// circularity problems.)
+  ///
+  /// Note that this will only check the requested sugaring of the given
+  /// type (depending on \c checkCanonical); the canonical type may be
+  /// serializable even if the non-canonical type is not, or vice-versa.
+  bool isSerializable(clang::QualType type, bool checkCanonical);
+
+  /// Try to find a stable Swift serialization path for the given Clang
+  /// declaration.
+  StableSerializationPath findStableSerializationPath(const clang::Decl *decl);
 
   /// Look up and attempt to import a Clang declaration with
   /// the given name.
@@ -1164,12 +1202,22 @@ public:
   ///
   /// FIXME: This is all a hack; we should have lazier deserialization
   /// of protocols separate from their conformances.
-  void recordImportedProtocols(const Decl *decl,
+  void recordImportedProtocols(Decl *decl,
                                ArrayRef<ProtocolDecl *> protocols) {
+    // Nothing to do for protocols.
+    if (isa<ProtocolDecl>(decl)) return;
+
     if (protocols.empty())
       return;
 
     ImportedProtocols[decl] = SwiftContext.AllocateCopy(protocols);
+
+    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      nominal->setConformanceLoader(this, 0);
+    } else {
+      auto ext = cast<ExtensionDecl>(decl);
+      ext->setConformanceLoader(this, 0);
+    }
   }
 
   /// Retrieve the imported protocols for the given declaration.
@@ -1269,6 +1317,13 @@ public:
   /// \returns \c true if the \c visitor ever returns \c true, \c
   /// false otherwise.
   bool forEachLookupTable(llvm::function_ref<bool(SwiftLookupTable &table)> fn);
+
+  /// Determine whether the given Clang entry is visible.
+  ///
+  /// FIXME: this is an elaborate hack to badly reflect Clang's
+  /// submodule visibility into Swift.
+  bool isVisibleClangEntry(const clang::NamedDecl *clangDecl);
+  bool isVisibleClangEntry(SwiftLookupTable::SingleEntry entry);
 
   /// Look for namespace-scope values with the given name in the given
   /// Swift lookup table.

@@ -101,7 +101,7 @@ struct SS: PPP {
 // CHECK-LABEL: } // end sil function '$s32sil_combine_concrete_existential37testWitnessReturnOptionalIndirectSelfyyF'
 public func testWitnessReturnOptionalIndirectSelf() {
   let p: PPP = S()
-  p.returnsOptionalIndirect()?.returnsOptionalIndirect()
+  _ = p.returnsOptionalIndirect()?.returnsOptionalIndirect()
 }
 
 //===----------------------------------------------------------------------===//

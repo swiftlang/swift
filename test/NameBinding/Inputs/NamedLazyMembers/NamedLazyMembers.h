@@ -26,6 +26,8 @@
 // Don't conform to the protocol; that loads all protocol members.
 @interface SimpleDoer
 
+- (instancetype)initWithValue: (int)value;
+
 // These are names we're hoping don't interfere with Doer, above.
 + (SimpleDoer*)Doer;
 + (SimpleDoer*)DoerOfNoWork;
@@ -36,6 +38,10 @@
   NS_SWIFT_NAME(simplyDoVeryImportantWork(speed:thoroughness:));
 - (void)simplyDoSomeWorkWithSpeed:(int)s alacrity:(int)a
   NS_SWIFT_NAME(simplyDoSomeWorkWithSpeed(speed:levelOfAlacrity:));
+
+// Make sure that swift_private correctly adds the '__' prefix.
+- (void)count __attribute__((swift_private));
+- (void)objectForKey:(NSObject *)key __attribute__((swift_private));
 
 // These we are generally trying to not-import, via laziness.
 - (void)simplyGoForWalk;
@@ -70,6 +76,7 @@
 - (void)categoricallyReadBook;
 - (void)categoricallyAttendLecture;
 - (void)categoricallyWriteLetter;
+
 @end
 
 
@@ -107,4 +114,27 @@
 @interface SimpleDoerSubclass : SimpleDoer
 - (void)simplyDoSomeWorkWithSpeed:(int)s thoroughness:(int)t
   NS_SWIFT_NAME(simplyDoVeryImportantWork(speed:thoroughness:));
+
+- (void)exuberantlyGoForWalk;
+- (void)exuberantlyTakeNap;
+- (void)exuberantlyEatMeal;
+- (void)exuberantlyTidyHome;
+- (void)exuberantlyCallFamily;
+- (void)exuberantlySingSong;
+- (void)exuberantlyReadBook;
+- (void)exuberantlyAttendLecture;
+- (void)exuberantlyWriteLetter;
+@end
+
+@protocol PrivateMethods <NSObject>
+- (void)count;
+- (void)objectForKey:(NSObject *)key;
+@end
+
+@interface PrivateDoer
+- (void)count;
+- (void)objectForKey:(NSObject *)key;
+@end
+
+@interface PrivateDoer(Category) <PrivateMethods>
 @end

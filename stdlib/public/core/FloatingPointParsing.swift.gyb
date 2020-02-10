@@ -126,25 +126,38 @@ extension ${Self}: LosslessStringConvertible {
   ///   is `nil`.
   @inlinable // FIXME(sil-serialize-all)
   public init?<S: StringProtocol>(_ text: S) {
-    let u8 = text.utf8
-
-    let (result, n): (${Self}, Int) = text.withCString { chars in
+    let result: ${Self}? = text.withCString { chars in
+      // TODO: We should change the ABI for
+      // _swift_stdlib_strtoX_clocale so that it returns
+      // a boolean `false` for leading whitespace, empty
+      // string, or invalid character.  Then we could avoid
+      // inlining these checks into every single client.
+      switch chars[0] {
+      case 9, 10, 11, 12, 13, 32:
+        // Reject any input with leading whitespace.
+        return nil
+      case 0:
+        // Reject the empty string
+        return nil
+      default:
+        break
+      }
       var result: ${Self} = 0
       let endPtr = withUnsafeMutablePointer(to: &result) {
         _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, $0)
       }
-      return (result, endPtr == nil ? 0 : endPtr! - chars)
+			// Verify that all the characters were consumed.
+      if endPtr == nil || endPtr![0] != 0 {
+        return nil
+      }
+      return result
     }
 
-    if n == 0 || n != u8.count
-    || u8.contains(where: { codeUnit in
-        // Check if the code unit is either non-ASCII or if isspace(codeUnit)
-        // would return nonzero when the current locale is the C locale.
-        codeUnit > 127 || "\t\n\u{b}\u{c}\r ".utf8.contains(codeUnit) 
-      }) {
+    if let result = result {
+      self = result
+    } else {
       return nil
     }
-    self = result
   }
 }
 

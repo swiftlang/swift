@@ -670,12 +670,10 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
   // Check which parameters and results can be converted from
   // indirect to direct ones.
   NumFormalIndirectResults = SubstitutedType->getNumIndirectFormalResults();
-  Conversions.resize(NumFormalIndirectResults +
-                     SubstitutedType->getParameters().size());
-
-  CanGenericSignature CanSig;
-  if (SpecializedGenericSig)
-    CanSig = SpecializedGenericSig->getCanonicalSignature();
+  unsigned NumArgs = NumFormalIndirectResults +
+    SubstitutedType->getParameters().size();
+  Conversions.resize(NumArgs);
+  TrivialArgs.resize(NumArgs);
 
   SILFunctionConventions substConv(SubstitutedType, M);
 
@@ -696,6 +694,8 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
       if (TL.isLoadable() && !RI.getReturnValueType(M, SubstitutedType)->isVoid() &&
           shouldExpand(M, ResultTy)) {
         Conversions.set(IdxForResult);
+        if (TL.isTrivial())
+          TrivialArgs.set(IdxForResult);
         break;
       }
       ++IdxForResult;
@@ -721,6 +721,8 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed:
       Conversions.set(IdxToInsert);
+      if (TL.isTrivial())
+        TrivialArgs.set(IdxToInsert);
       break;
     case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
@@ -751,9 +753,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
     SpecializedGenericEnv = nullptr;
   }
 
-  CanGenericSignature CanSpecializedGenericSig;
-  if (SpecializedGenericSig)
-    CanSpecializedGenericSig = SpecializedGenericSig->getCanonicalSignature();
+  auto CanSpecializedGenericSig = SpecializedGenericSig.getCanonicalSignature();
 
   // First substitute concrete types into the existing function type.
   CanSILFunctionType FnTy;
@@ -796,14 +796,12 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   unsigned IndirectResultIdx = 0;
   for (SILResultInfo RI : SubstFTy->getResults()) {
     if (RI.isFormalIndirect()) {
+      bool isTrivial = TrivialArgs.test(IndirectResultIdx);
       if (isFormalResultConverted(IndirectResultIdx++)) {
         // Convert the indirect result to a direct result.
-        SILType SILResTy =
-          SILType::getPrimitiveObjectType(RI.getReturnValueType(M, SubstFTy));
-
         // Indirect results are passed as owned, so we also need to pass the
         // direct result as owned (except it's a trivial type).
-        auto C = (SILResTy.isTrivial(*Callee)
+        auto C = (isTrivial
                   ? ResultConvention::Unowned
                   : ResultConvention::Owned);
         SpecializedResults.push_back(SILResultInfo(RI.getReturnValueType(M, SubstFTy), C));
@@ -815,6 +813,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   }
   unsigned ParamIdx = 0;
   for (SILParameterInfo PI : SubstFTy->getParameters()) {
+    bool isTrivial = TrivialArgs.test(param2ArgIndex(ParamIdx));
     if (!isParamConverted(ParamIdx++)) {
       // No conversion: re-use the original, substituted parameter info.
       SpecializedParams.push_back(PI);
@@ -822,14 +821,11 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
     }
 
     // Convert the indirect parameter to a direct parameter.
-    SILType SILParamTy =
-      SILType::getPrimitiveObjectType(PI.getArgumentType(M, SubstFTy));
-
     // Indirect parameters are passed as owned/guaranteed, so we also
     // need to pass the direct/guaranteed parameter as
     // owned/guaranteed (except it's a trivial type).
     auto C = ParameterConvention::Direct_Unowned;
-    if (!SILParamTy.isTrivial(*Callee)) {
+    if (!isTrivial) {
       if (PI.isGuaranteed()) {
         C = ParameterConvention::Direct_Guaranteed;
       } else {
@@ -1603,7 +1599,7 @@ void FunctionSignaturePartialSpecializer::
       CalleeGenericSig, CalleeGenericEnv, Requirements, M);
 
   if (GenPair.second) {
-    SpecializedGenericSig = GenPair.second->getCanonicalSignature();
+    SpecializedGenericSig = GenPair.second.getCanonicalSignature();
     SpecializedGenericEnv = GenPair.first;
   }
 
@@ -1644,7 +1640,7 @@ void FunctionSignaturePartialSpecializer::createSpecializedGenericSignature(
 
   auto GenPair = getSpecializedGenericEnvironmentAndSignature();
   if (GenPair.second) {
-    SpecializedGenericSig = GenPair.second->getCanonicalSignature();
+    SpecializedGenericSig = GenPair.second.getCanonicalSignature();
     SpecializedGenericEnv = GenPair.first;
     computeSpecializedInterfaceToCallerArchetypeMap();
   }

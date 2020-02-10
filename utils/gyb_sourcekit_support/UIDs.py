@@ -65,6 +65,7 @@ UID_KEYS = [
         'key.fully_annotated_generic_signature'),
     KEY('DocBrief', 'key.doc.brief'),
     KEY('Context', 'key.context'),
+    KEY('TypeRelation', 'key.typerelation'),
     KEY('ModuleImportDepth', 'key.moduleimportdepth'),
     KEY('NumBytesToErase', 'key.num_bytes_to_erase'),
     KEY('NotRecommended', 'key.not_recommended'),
@@ -174,6 +175,7 @@ UID_KEYS = [
     KEY('VFSName', 'key.vfs.name'),
     KEY('VFSOptions', 'key.vfs.options'),
     KEY('Files', 'key.files'),
+    KEY('OptimizeForIDE', 'key.optimize_for_ide'),
 ]
 
 
@@ -231,6 +233,7 @@ UID_REQUESTS = [
             'source.request.enable-compile-notifications'),
     REQUEST('TestNotification', 'source.request.test_notification'),
     REQUEST('CollectExpressionType', 'source.request.expression.type'),
+    REQUEST('GlobalConfiguration', 'source.request.configuration.global')
 ]
 
 

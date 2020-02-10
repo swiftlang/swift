@@ -27,9 +27,9 @@ func *(x: Whatever, y: Whatever) {}
 // This works even for single-character identifiers.
 func test_very_short() {
   // Note that we don't suggest operators.
-  let x = 0 // expected-note {{'x' declared here}}
+  let x = 0 // expected-note {{did you mean 'x'?}}
   let longer = y
-  // expected-error@-1 {{use of unresolved identifier 'y'; did you mean 'x'?}}
+  // expected-error@-1 {{use of unresolved identifier 'y'}}
 }
 
 // It does not trigger in a variable's own initializer.
@@ -113,12 +113,14 @@ struct Generic<T> { // expected-note {{'T' declared as parameter to type 'Generi
 }
 
 protocol P { // expected-note {{'P' previously declared here}}
-  // expected-note@-1 {{did you mean 'P'?}}
+  // expected-note@-1 2{{did you mean 'P'?}}
+  // expected-note@-2 {{'P' declared here}}
   typealias a = Generic
 }
 
 protocol P {} // expected-error {{invalid redeclaration of 'P'}}
-// expected-note@-1 {{did you mean 'P'?}}
+// expected-note@-1 2{{did you mean 'P'?}}
+// expected-note@-2 {{'P' declared here}}
 
 func hasTypo() {
   _ = P.a.a // expected-error {{type 'Generic<T>' has no member 'a'}}
@@ -141,7 +143,7 @@ enum Foo {
   case flashing // expected-note {{'flashing' declared here}}
 }
 
-func foo(_ a: Foo) {
+func foo(_ a: Foo) { // expected-note {{'foo' declared here}}
 }
 
 func bar() {

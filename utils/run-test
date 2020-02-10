@@ -11,16 +11,14 @@
 
 from __future__ import print_function
 
-import argparse
 import multiprocessing
 import os
 import shutil
 import sys
 
-from swift_build_support.swift_build_support import (
-    arguments,
-    shell
-)
+from build_swift.build_swift import argparse
+
+from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support.SwiftBuildSupport import \
     SWIFT_SOURCE_ROOT
 from swift_build_support.swift_build_support.targets import \
@@ -47,8 +45,19 @@ SWIFT_SOURCE_DIR = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
 TEST_SOURCE_DIR = os.path.join(SWIFT_SOURCE_DIR, 'test')
 VALIDATION_TEST_SOURCE_DIR = os.path.join(SWIFT_SOURCE_DIR, 'validation-test')
 
-LIT_BIN_DEFAULT = os.path.join(SWIFT_SOURCE_ROOT, 'llvm',
+
+def _get_default_llvm_source_dir():
+    legacy_llvm_dir_path = os.path.join(SWIFT_SOURCE_ROOT, 'llvm')
+    if os.path.isdir(legacy_llvm_dir_path):
+        return legacy_llvm_dir_path
+    return os.path.join(SWIFT_SOURCE_ROOT, 'llvm-project', 'llvm')
+
+
+# Default path for "lit.py" executable.
+LIT_BIN_DEFAULT = os.path.join(os.environ.get("LLVM_SOURCE_DIR",
+                                              _get_default_llvm_source_dir()),
                                'utils', 'lit', 'lit.py')
+
 host_target = StdlibDeploymentTarget.host_target().name
 
 
@@ -120,8 +129,8 @@ def main():
                         help="build test dependencies before running tests "
                              "(default: true)")
     parser.add_argument("--target",
-                        type=arguments.type.shell_split,
-                        action=arguments.action.concat,
+                        type=argparse.types.ShellSplitType(),
+                        action=argparse.actions.AppendAction,
                         dest="targets",
                         help="stdlib deployment targets to test. Accept "
                              "multiple (default: " + host_target + ")")
@@ -132,8 +141,8 @@ def main():
                         choices=TEST_SUBSETS, default='primary',
                         help="test subset (default: primary)")
     parser.add_argument("--param",
-                        type=arguments.type.shell_split,
-                        action=arguments.action.concat,
+                        type=argparse.types.ShellSplitType(),
+                        action=argparse.actions.AppendAction,
                         default=[],
                         help="key=value parameters they are directly passed "
                              "to lit command in addition to `mode` and "
@@ -150,7 +159,7 @@ def main():
     args = parser.parse_args()
 
     targets = args.targets
-    if targets is None:
+    if not targets:
         targets = [host_target]
 
     paths = []

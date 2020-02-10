@@ -5,7 +5,8 @@
 // RUN: %target-swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -c | %FileCheck -check-prefix=OBJECT %s
 // RUN: cd %t && %target-swiftc_driver -parseable-output -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -c 2> %t/parseable-output
 // RUN: cat %t/parseable-output | %FileCheck -check-prefix=PARSEABLE %s
-// RUN: cd %t && env TMPDIR=/tmp %swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -o a.out | %FileCheck -check-prefix=EXEC %s
+// RUN: %empty-directory(%t/tmp)
+// RUN: cd %t && env TMPDIR=%t/tmp/ %swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -o a.out | %FileCheck -check-prefix=EXEC %s
 // RUN: echo "{\"%/s\": {\"llvm-bc\": \"%/t/multi-threaded.bc\", \"object\": \"%/t/multi-threaded.o\"}, \"%/S/Inputs/main.swift\": {\"llvm-bc\": \"%/t/main.bc\", \"object\": \"%/t/main.o\"}}" > %t/ofmo.json
 // RUN: %target-swiftc_driver -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s  -emit-dependencies -output-file-map %t/ofmo.json -c
 // RUN: cat %t/*.d | %FileCheck -check-prefix=DEPENDENCIES %s
@@ -54,9 +55,9 @@
 // EXEC: -frontend
 // EXEC-DAG: -num-threads 4
 // EXEC-DAG: {{[^ ]*[/\\]}}Inputs{{/|\\\\}}main.swift{{"?}} {{[^ ]*[/\\]}}multi-threaded.swift 
-// EXEC-DAG:  -o {{.*te?mp.*[/\\]}}main{{[^ ]*}}.o{{"?}} -o {{.*te?mp.*[/\\]}}multi-threaded{{[^ ]*}}.o
+// EXEC-DAG:  -o {{.*[tT]e?mp.*[/\\]}}main{{[^ ]*}}.o{{"?}} -o {{.*[tT]e?mp.*[/\\]}}multi-threaded{{[^ ]*}}.o
 // EXEC: {{ld|clang}}
-// EXEC:  {{.*te?mp.*[/\\]}}main{{[^ ]*}}.o{{"?}} {{.*te?mp.*[/\\]}}multi-threaded{{[^ ]*}}.o
+// EXEC:  {{.*[tT]e?mp.*[/\\]}}main{{[^ ]*}}.o{{"?}} {{.*[tT]e?mp.*[/\\]}}multi-threaded{{[^ ]*}}.o
 
 // DEPENDENCIES-DAG: {{.*}}multi-threaded.o : {{.*[/\\]}}multi-threaded.swift {{.*[/\\]}}Inputs{{[/\\]}}main.swift
 // DEPENDENCIES-DAG: {{.*}}main.o : {{.*[/\\]}}multi-threaded.swift {{.*[/\\]}}Inputs{{[/\\]}}main.swift

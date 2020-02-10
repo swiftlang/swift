@@ -17,7 +17,7 @@ extension Progress {
     public var estimatedTimeRemaining: TimeInterval? {
         get {
             guard let v = self.__estimatedTimeRemaining else { return nil }
-            return v.doubleValue as TimeInterval
+            return v.doubleValue
         }
         set {
             guard let nv = newValue else {

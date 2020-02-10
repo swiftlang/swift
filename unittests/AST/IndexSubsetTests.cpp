@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -186,4 +186,27 @@ TEST(IndexSubset, Insertion) {
             IndexSubset::get(ctx.Ctx, 5, {0, 1, 2, 4}));
   EXPECT_EQ(indices1->adding(3, ctx.Ctx),
             IndexSubset::get(ctx.Ctx, 5, {0, 2, 3, 4}));
+}
+
+TEST(IndexSubset, FindNext) {
+  TestContext ctx;
+  auto *indices1 = IndexSubset::get(ctx.Ctx, 5, {1, 2, 4});
+  EXPECT_EQ(indices1->findFirst(), 1);
+  EXPECT_EQ(indices1->findNext(/*startIndex*/ -1), 1);
+  EXPECT_EQ(indices1->findNext(/*startIndex*/ 0), 1);
+  EXPECT_EQ(indices1->findNext(/*startIndex*/ 1), 2);
+  EXPECT_EQ(indices1->findNext(/*startIndex*/ 2), 4);
+  EXPECT_EQ(indices1->findNext(/*startIndex*/ 3), 4);
+}
+
+TEST(IndexSubset, FindPrevious) {
+  TestContext ctx;
+  auto *indices1 = IndexSubset::get(ctx.Ctx, 5, {0, 2, 4});
+  EXPECT_EQ(indices1->findLast(), 4);
+  EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 5), 4);
+  EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 4), 2);
+  EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 3), 2);
+  EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 2), 0);
+  EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 1), 0);
+  EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 0), -1);
 }

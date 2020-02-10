@@ -11,21 +11,23 @@ public class MyGizmo {
 
    init() {
      gizmo = Gizmo()
-   }
-	 // CHECK-LABEL: sil @$s8outliner7MyGizmoC11usePropertyyyF
-	 // CHECK: [[A_FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTeab_
-	 // CHECK: apply [[A_FUN]]({{.*}}) : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
-	 // CHECK-NOT: return
-         // CHECK: [[P_FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTepb_
-	 // CHECK: apply [[P_FUN]]({{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
-	 // CHECK: return
+  }
+
+   // CHECK-LABEL: sil @$s8outliner7MyGizmoC11usePropertyyyF :
+   // CHECK: [[A_FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTeab_
+   // CHECK: apply [[A_FUN]]({{.*}}) : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
+   // CHECK-NOT: return
+   // CHECK: [[P_FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTepb_
+   // CHECK: apply [[P_FUN]]({{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
+   // CHECK: return
+   // CHECK: } // end sil function '$s8outliner7MyGizmoC11usePropertyyyF'
    public func useProperty() {
      print(gizmo.stringProperty)
      print(optionalGizmo!.stringProperty)
-	 }
+   }
 }
 
-// CHECK-LABEL: sil @$s8outliner13testOutliningyyF
+// CHECK-LABEL: sil @$s8outliner13testOutliningyyF :
 // CHECK:  [[FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTepb_
 // CHECK:  apply [[FUN]](%{{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
 // CHECK:  apply [[FUN]](%{{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
@@ -35,10 +37,11 @@ public class MyGizmo {
 // CHECK:  [[FUN:%.*]] = function_ref @$sSo5GizmoC12modifyString_10withNumber0D6FoobarSSSgAF_SiypSgtFToTembnnnb_
 // CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@owned String, Int, Optional<AnyObject>, Gizmo) -> @owned Optional<String>
 // CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@owned String, Int, Optional<AnyObject>, Gizmo) -> @owned Optional<String>
-// CHECK:  [[FUN:%.*]] = function_ref @$sSo5GizmoC11doSomethingyypSgSaySSGSgFToTembnn_
-// CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@owned Array<String>, Gizmo) -> @owned Optional<AnyObject>
-// CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@owned Array<String>, Gizmo) -> @owned Optional<AnyObject>
+// CHECK:  [[FUN:%.*]] = function_ref @$sSo5GizmoC11doSomethingyypSgSaySSGSgFToTembgnn_
+// CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@guaranteed Array<String>, Gizmo) -> @owned Optional<AnyObject>
+// CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@guaranteed Array<String>, Gizmo) -> @owned Optional<AnyObject>
 // CHECK: return
+// CHECK: } // end sil function '$s8outliner13testOutliningyyF'
 public func testOutlining() {
   let gizmo = Gizmo()
   let foobar = Gizmo()
@@ -59,6 +62,7 @@ public func testOutlining() {
 // CHECK:  [[METH:%.*]] = objc_method [[OBJ]] : $@opened("{{.*}}") (AnyObject), #Treeish.treeishChildren!1.foreign : <Self where Self : Treeish> (Self) -> () -> [Any]?
 // CHECK:  [[RES:%.*]] = apply [[METH]]([[OBJ]]) : $@convention(objc_method)
 // CHECK:  switch_enum [[RES]]
+// CHECK: } // end sil function '$s8outliner9dontCrash1ayyp_tF'
 
 // CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC14stringPropertySSSgvgToTeab_ : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
 // CHECK: bb0(%0 : $*Gizmo):
@@ -78,6 +82,7 @@ public func testOutlining() {
 // CHECK:   br bb3(%12 : $Optional<String>)
 // CHECK: bb3(%14 : $Optional<String>):
 // CHECK:   return %14 : $Optional<String>
+// CHECK: } // end sil function '$sSo5GizmoC14stringPropertySSSgvgToTeab_'
 
 // CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC14stringPropertySSSgvgToTepb_ : $@convention(thin) (Gizmo) -> @owned Optional<String>
 // CHECK: bb0(%0 : $Gizmo):
@@ -96,6 +101,7 @@ public func testOutlining() {
 // CHECK:  br bb3(%11 : $Optional<String>)
 // CHECK:bb3(%13 : $Optional<String>):
 // CHECK:  return %13 : $Optional<String>
+// CHECK: } // end sil function '$sSo5GizmoC14stringPropertySSSgvgToTepb_'
 
 // CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC14stringPropertySSSgvsToTembnn_ : $@convention(thin) (@owned String, Gizmo) -> () {
 // CHECK: bb0(%0 : $String, %1 : $Gizmo):
@@ -107,6 +113,7 @@ public func testOutlining() {
 // CHECK:   %7 = apply %2(%6, %1) : $@convention(objc_method) (Optional<NSString>, Gizmo) -> ()
 // CHECK:   strong_release %4 : $NSString
 // CHECK:   return %7 : $()
+// CHECK: } // end sil function '$sSo5GizmoC14stringPropertySSSgvsToTembnn_'
 
 // CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC12modifyString_10withNumber0D6FoobarSSSgAF_SiypSgtFToTembnnnb_ : $@convention(thin) (@owned String, Int, Optional<AnyObject>, Gizmo) -> @owned Optional<String> {
 // CHECK: bb0(%0 : $String, %1 : $Int, %2 : $Optional<AnyObject>, %3 : $Gizmo):
@@ -133,17 +140,19 @@ public func testOutlining() {
 //
 // CHECK: bb3(%21 : $Optional<String>):
 // CHECK:   return %21 : $Optional<String>
+// CHECK: } // end sil function '$sSo5GizmoC12modifyString_10withNumber0D6FoobarSSSgAF_SiypSgtFToTembnnnb_'
 
-// CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC11doSomethingyypSgSaySSGSgFToTembnn_ : $@convention(thin) (@owned Array<String>, Gizmo) -> @owned Optional<AnyObject> {
+// CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC11doSomethingyypSgSaySSGSgFToTembgnn_ : $@convention(thin) (@guaranteed Array<String>, Gizmo) -> @owned Optional<AnyObject> {
 // CHECK: bb0(%0 : $Array<String>, %1 : $Gizmo):
 // CHECK:   %2 = objc_method %1 : $Gizmo, #Gizmo.doSomething!1.foreign : (Gizmo) -> ([String]?) -> Any?
 // CHECK:   %3 = function_ref @$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF : $@convention(method) <{{.*}}> (@guaranteed Array<{{.*}}>) -> @owned NSArray
 // CHECK:   %4 = apply %3<String>(%0) : $@convention(method) <{{.*}}> (@guaranteed Array<{{.*}}>) -> @owned NSArray
-// CHECK:   release_value %0 : $Array<String>
-// CHECK:   %6 = enum $Optional<NSArray>, #Optional.some!enumelt.1, %4 : $NSArray
-// CHECK:   %7 = apply %2(%6, %1) : $@convention(objc_method) (Optional<NSArray>, Gizmo) -> @autoreleased Optional<AnyObject>
+// CHECK-NOT:   release_value
+// CHECK:   %5 = enum $Optional<NSArray>, #Optional.some!enumelt.1, %4 : $NSArray
+// CHECK:   %6 = apply %2(%5, %1) : $@convention(objc_method) (Optional<NSArray>, Gizmo) -> @autoreleased Optional<AnyObject>
 // CHECK:   strong_release %4 : $NSArray
-// CHECK:   return %7 : $Optional<AnyObject>
+// CHECK:   return %6 : $Optional<AnyObject>
+// CHECK: } // end sil function '$sSo5GizmoC11doSomethingyypSgSaySSGSgFToTembgnn_'
 
 public func dontCrash<T: Proto>(x : Gizmo2<T>) {
   let s = x.doSomething()
@@ -206,5 +215,44 @@ public class Foo : NSObject {
     }
     print(event)
     return true
+  }
+}
+
+public func testCalendar() {
+   let formatter = DateFormatter()
+   formatter.calendar = Calendar(identifier: .gregorian)
+}
+
+open class Test
+{
+   @inline(never)
+   public func getWindow() -> MyWindow
+   {
+       return MyWindow()
+   }
+
+   public func testDontCrash() -> MyView
+   {
+
+     let view = MyView()
+     view.window2 = getWindow()
+     return view
+   }
+}
+
+internal extension NSError {
+   convenience init(myError code: Int) {
+     self.init(domain: "error", code: code, userInfo: [:])
+   }
+}
+
+public class AnotherTest {
+  public let obj: MyObject
+  public init(obj: MyObject) {
+    self.obj = obj
+  }
+
+  public func dontCrash() {
+      self.obj.error = NSError(myError: 10)
   }
 }

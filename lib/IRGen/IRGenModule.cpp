@@ -50,6 +50,7 @@
 #include "llvm/Support/MD5.h"
 
 #include "ConformanceDescription.h"
+#include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenIntegerLiteral.h"
 #include "GenType.h"
@@ -86,8 +87,9 @@ static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
 
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                  llvm::LLVMContext &LLVMContext,
-                                                      IRGenOptions &Opts,
-                                                      StringRef ModuleName) {
+                                                      const IRGenOptions &Opts,
+                                                      StringRef ModuleName,
+                                                      StringRef PD) {
   auto Loader = Context.getClangModuleLoader();
   auto *Importer = static_cast<ClangImporter*>(&*Loader);
   assert(Importer && "No clang module loader!");
@@ -118,13 +120,13 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   case IRGenDebugInfoFormat::DWARF:
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     CGO.DwarfVersion = Opts.DWARFVersion;
-    CGO.DwarfDebugFlags = Opts.DebugFlags;
+    CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
     break;
   case IRGenDebugInfoFormat::CodeView:
     CGO.EmitCodeView = true;
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     // This actually contains the debug flags for codeview.
-    CGO.DwarfDebugFlags = Opts.DebugFlags;
+    CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
     break;
   }
 
@@ -143,10 +145,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
                          SourceFile *SF, llvm::LLVMContext &LLVMContext,
                          StringRef ModuleName, StringRef OutputFilename,
-                         StringRef MainInputFilenameForDebugInfo)
+                         StringRef MainInputFilenameForDebugInfo,
+                         StringRef PrivateDiscriminator)
     : IRGen(irgen), Context(irgen.SIL.getASTContext()),
       ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
-                                            ModuleName)),
+                                            ModuleName, PrivateDiscriminator)),
       Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
       DataLayout(irgen.getClangDataLayout()),
       Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
@@ -490,7 +493,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
                                                      Module,
-                                                 MainInputFilenameForDebugInfo);
+                                                 MainInputFilenameForDebugInfo,
+                                                     PrivateDiscriminator);
 
   initClangTypeConverter();
 
@@ -520,6 +524,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
+
+  DifferentiabilityWitnessTy = createStructType(
+      *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 }
 
 IRGenModule::~IRGenModule() {
@@ -1153,21 +1160,17 @@ void IRGenModule::emitAutolinkInfo() {
                                        }),
                         AutolinkEntries.end());
 
-  if ((TargetInfo.OutputObjectFormat == llvm::Triple::COFF &&
-       !Triple.isOSCygMing()) ||
-      TargetInfo.OutputObjectFormat == llvm::Triple::MachO || Triple.isPS4()) {
+  const bool AutolinkExtractRequired =
+      (TargetInfo.OutputObjectFormat == llvm::Triple::ELF && !Triple.isPS4()) ||
+      TargetInfo.OutputObjectFormat == llvm::Triple::Wasm ||
+      Triple.isOSCygMing();
 
+  if (!AutolinkExtractRequired) {
     // On platforms that support autolinking, continue to use the metadata.
     Metadata->clearOperands();
     for (auto *Entry : AutolinkEntries)
       Metadata->addOperand(Entry);
-
   } else {
-    assert((TargetInfo.OutputObjectFormat == llvm::Triple::ELF ||
-            TargetInfo.OutputObjectFormat == llvm::Triple::Wasm ||
-            Triple.isOSCygMing()) &&
-           "expected ELF output format or COFF format for Cygwin/MinGW");
-
     // Merge the entries into null-separated string.
     llvm::SmallString<64> EntriesString;
     for (auto &EntryNode : AutolinkEntries) {
@@ -1194,6 +1197,7 @@ void IRGenModule::emitAutolinkInfo() {
     var->setSection(".swift1_autolink_entries");
     var->setAlignment(getPointerAlignment().getValue());
 
+    disableAddressSanitizer(*this, var);
     addUsedGlobal(var);
   }
 
@@ -1269,6 +1273,7 @@ bool IRGenModule::finalize() {
       ModuleHash->setSection("__LLVM,__swift_modhash");
       break;
     case llvm::Triple::ELF:
+    case llvm::Triple::Wasm:
       ModuleHash->setSection(".swift_modhash");
       break;
     case llvm::Triple::COFF:
@@ -1331,6 +1336,16 @@ void IRGenModule::error(SourceLoc loc, const Twine &message) {
 }
 
 bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
+
+bool IRGenModule::shouldPrespecializeGenericMetadata() {
+  auto &context = getSwiftModule()->getASTContext();
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(context);
+  return IRGen.Opts.PrespecializeGenericMetadata && 
+    deploymentAvailability.isContainedIn(
+      context.getPrespecializedGenericMetadataAvailability()) &&
+    (Triple.isOSDarwin() || Triple.isTvOS() || Triple.isOSLinux());
+}
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
   assert(GenModules.count(SF) == 0);

@@ -160,7 +160,7 @@ class SR_10146_3 {
   }
 
   func doNotCrash_1(_ obj: AnyObject, _ kp: KeyPath<AnyObject, Int>) {
-    let _ = obj[keyPath: \.abc] // expected-error 2{{the root type of a Swift key path cannot be 'AnyObject'}}
+    let _ = obj[keyPath: \.abc] // expected-error {{the root type of a Swift key path cannot be 'AnyObject'}}
     let _ = obj[keyPath: kp] // expected-error {{the root type of a Swift key path cannot be 'AnyObject'}}
   }
 }

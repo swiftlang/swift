@@ -14,6 +14,7 @@
 
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
@@ -659,4 +660,65 @@ SILBasicBlock::iterator swift::removeBeginAccess(BeginAccessInst *beginAccess) {
     }
   }
   return beginAccess->getParent()->erase(beginAccess);
+}
+
+bool swift::isSingleInitAllocStack(
+    AllocStackInst *asi, SmallVectorImpl<SILInstruction *> &destroyingUsers) {
+  // For now, we just look through projections and rely on memInstMustInitialize
+  // to classify all other uses as init or not.
+  SmallVector<Operand *, 32> worklist(asi->getUses());
+  bool foundInit = false;
+
+  while (!worklist.empty()) {
+    auto *use = worklist.pop_back_val();
+    auto *user = use->getUser();
+
+    if (Projection::isAddressProjection(user) ||
+        isa<OpenExistentialAddrInst>(user)) {
+      // Look through address projections.
+      for (SILValue r : user->getResults()) {
+        llvm::copy(r->getUses(), std::back_inserter(worklist));
+      }
+      continue;
+    }
+
+    if (auto *li = dyn_cast<LoadInst>(user)) {
+      // If we are not taking,
+      if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Take) {
+        continue;
+      }
+      // Treat load [take] as a write.
+      return false;
+    }
+
+    switch (user->getKind()) {
+    default:
+      break;
+    case SILInstructionKind::DestroyAddrInst:
+      destroyingUsers.push_back(user);
+      continue;
+    case SILInstructionKind::DeallocStackInst:
+    case SILInstructionKind::LoadBorrowInst:
+    case SILInstructionKind::DebugValueAddrInst:
+      continue;
+    }
+
+    // See if we have an initializer and that such initializer is in the same
+    // block.
+    if (memInstMustInitialize(use)) {
+      if (user->getParent() != asi->getParent() || foundInit) {
+        return false;
+      }
+
+      foundInit = true;
+      continue;
+    }
+
+    // Otherwise, if we have found something not in our whitelist, return false.
+    return false;
+  }
+
+  // We did not find any users that we did not understand. So we can
+  // conservatively return true here.
+  return true;
 }

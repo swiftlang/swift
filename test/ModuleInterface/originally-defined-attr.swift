@@ -9,6 +9,7 @@
 // RUN: %FileCheck %s < %t/printed-module.txt
 
 // CHECK: @_originallyDefinedIn(module: "another", OSX 13.13)
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "another", OSX 13.13)
 public protocol SimpleProto { }
 
@@ -16,6 +17,7 @@ public protocol SimpleProto { }
 // CHECK: @_originallyDefinedIn(module: "another_original", OSX 2.0)
 // CHECK: @_originallyDefinedIn(module: "another_original", iOS 3.0)
 // CHECK: @_originallyDefinedIn(module: "another_original", watchOS 4.0)
+@available(tvOS 0.7, OSX 1.1, iOS 2.1, watchOS 3.2, *)
 @_originallyDefinedIn(module: "original", tvOS 1.0)
 @_originallyDefinedIn(module: "another_original", OSX 2.0, iOS 3.0, watchOS 4.0)
 public struct SimpleStruct {}

@@ -362,10 +362,10 @@ private:
   }
 
   void handleMemberwiseInitRefs(Expr *E) {
-    if (!isa<ConstructorRefCallExpr>(E))
+    if (!isa<ApplyExpr>(E))
       return;
 
-    auto *DeclRef = dyn_cast<DeclRefExpr>(cast<ConstructorRefCallExpr>(E)->getFn());
+    auto *DeclRef = dyn_cast<DeclRefExpr>(cast<ApplyExpr>(E)->getFn());
     if (!DeclRef || !isMemberwiseInit(DeclRef->getDecl()))
       return;
 
@@ -919,7 +919,7 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
 
   if (auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty.getTypeRepr())) {
     auto Comps = T->getComponentRange();
-    SourceLoc IdLoc = Comps.back()->getIdLoc();
+    SourceLoc IdLoc = Comps.back()->getLoc();
     NominalTypeDecl *NTD = nullptr;
     bool isImplicit = false;
     if (auto *VD = Comps.back()->getBoundDecl()) {

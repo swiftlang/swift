@@ -145,7 +145,8 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
       evaluatedFunctions.insert(callee);
 
       SILModule &calleeModule = callee->getModule();
-      if (callee->isAvailableExternally() && isConstantEvaluable(callee) &&
+      if (callee->isAvailableExternally() &&
+          hasConstantEvaluableAnnotation(callee) &&
           callee->getOptimizationMode() != OptimizationMode::NoOptimization) {
         diagnose(calleeModule.getASTContext(),
                  callee->getLocation().getSourceLoc(),
@@ -161,7 +162,7 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
 
     for (SILFunction &fun : *module) {
       // Record functions annotated as constant evaluable.
-      if (isConstantEvaluable(&fun)) {
+      if (hasConstantEvaluableAnnotation(&fun)) {
         constantEvaluableFunctions.insert(&fun);
         continue;
       }

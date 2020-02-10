@@ -14,6 +14,7 @@ silopt_register_sources(
   LoadStoreOptUtils.cpp
   LoopUtils.cpp
   OptimizerStatsUtils.cpp
+  PartialApplyCombiner.cpp
   PerformanceInlinerUtils.cpp
   SILInliner.cpp
   SILSSAUpdater.cpp

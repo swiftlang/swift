@@ -95,6 +95,7 @@ namespace swift {
   class RootProtocolConformance;
   struct SILDeclRef;
   class SILDefaultWitnessTable;
+  class SILDifferentiabilityWitness;
   class SILGlobalVariable;
   class SILModule;
   class SILProperty;
@@ -194,7 +195,7 @@ enum RequireMetadata_t : bool {
 /// IRGenModules - one for each LLVM module (= one for each input/output file).
 class IRGenerator {
 public:
-  IRGenOptions &Opts;
+  const IRGenOptions &Opts;
 
   SILModule &SIL;
 
@@ -204,7 +205,13 @@ private:
   // Stores the IGM from which a function is referenced the first time.
   // It is used if a function has no source-file association.
   llvm::DenseMap<SILFunction *, IRGenModule *> DefaultIGMForFunction;
-  
+
+  // The IGMs where sepecializations of functions are emitted. The key is the
+  // non-specialized function.
+  // Storing all specializations of a function in the same IGM increases the
+  // chances of function merging.
+  llvm::DenseMap<const SILFunction *, IRGenModule *> IGMForSpecializations;
+
   // The IGM of the first source file.
   IRGenModule *PrimaryIGM = nullptr;
 
@@ -243,6 +250,21 @@ private:
   /// Field metadata records that have already been lazily emitted, or are
   /// queued up.
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
+
+  /// Maps every generic type that is specialized within the module to its
+  /// specializations.
+  llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<CanType, 4>>
+      SpecializationsForGenericTypes;
+
+  /// The queue of specialized generic types whose prespecialized metadata to
+  /// emit.
+  llvm::SmallVector<CanType, 4> LazySpecializedTypeMetadataRecords;
+
+  /// The queue of metadata accessors to emit.
+  ///
+  /// The accessors must be emitted after everything else which might result in
+  /// a statically-known-canonical prespecialization.
+  llvm::SmallSetVector<NominalTypeDecl *, 4> LazyMetadataAccessors;
 
   struct LazyOpaqueInfo {
     bool IsDescriptorUsed = false;
@@ -283,7 +305,7 @@ private:
   
   friend class CurrentIGMPtr;  
 public:
-  explicit IRGenerator(IRGenOptions &opts, SILModule &module);
+  explicit IRGenerator(const IRGenOptions &opts, SILModule &module);
 
   /// Attempt to create an llvm::TargetMachine for the current target.
   std::unique_ptr<llvm::TargetMachine> createTargetMachine();
@@ -331,7 +353,7 @@ public:
   
   /// Emit functions, variables and tables which are needed anyway, e.g. because
   /// they are externally visible.
-  void emitGlobalTopLevel();
+  void emitGlobalTopLevel(llvm::StringSet<> *LinkerDirectives);
 
   /// Emit references to each of the protocol descriptors defined in this
   /// IR module.
@@ -375,9 +397,21 @@ public:
 
   void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
 
+  llvm::SmallVector<CanType, 4> specializationsForType(NominalTypeDecl *type) {
+    return SpecializationsForGenericTypes.lookup(type);
+  }
+
+  void noteUseOfMetadataAccessor(NominalTypeDecl *decl) {
+    if (LazyMetadataAccessors.count(decl) == 0) {
+      LazyMetadataAccessors.insert(decl);
+    }
+  }
+
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
     noteUseOfTypeGlobals(type, true, RequireMetadata);
   }
+
+  void noteUseOfSpecializedGenericTypeMetadata(CanType type);
 
   void noteUseOfTypeMetadata(CanType type) {
     type.visit([&](Type t) {
@@ -510,6 +544,7 @@ public:
   ModuleDecl *ClangImporterModule = nullptr;
   SourceFile *CurSourceFile = nullptr;
 
+  llvm::StringMap<ModuleDecl*> OriginalModules;
   llvm::SmallString<128> OutputFilename;
   llvm::SmallString<128> MainInputFilenameForDebugInfo;
 
@@ -638,6 +673,8 @@ public:
       *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
+  llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
+
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   /// Used to create unique names for class layout types with tail allocated
@@ -743,6 +780,8 @@ public:
   void error(SourceLoc loc, const Twine &message);
 
   bool useDllStorage();
+
+  bool shouldPrespecializeGenericMetadata();
   
   Size getAtomicBoolSize() const { return AtomicBoolSize; }
   Alignment getAtomicBoolAlignment() const { return AtomicBoolAlign; }
@@ -1122,7 +1161,8 @@ public:
                                          CanGenericSignature genericSig);
 
   /// Produce an associated type witness that refers to the given type.
-  llvm::Constant *getAssociatedTypeWitness(Type type, bool inProtocolContext);
+  llvm::Constant *getAssociatedTypeWitness(Type type, GenericSignature sig,
+                                           bool inProtocolContext);
 
   void emitAssociatedTypeMetadataRecord(const RootProtocolConformance *C);
   void emitFieldDescriptor(const NominalTypeDecl *Decl);
@@ -1194,14 +1234,15 @@ public:
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
               SourceFile *SF, llvm::LLVMContext &LLVMContext,
               StringRef ModuleName, StringRef OutputFilename,
-              StringRef MainInputFilenameForDebugInfo);
+              StringRef MainInputFilenameForDebugInfo,
+              StringRef PrivateDiscriminator);
 
   /// The constructor used when we just need an IRGenModule for type lowering.
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
               llvm::LLVMContext &LLVMContext)
     : IRGenModule(irgen, std::move(target), /*SF=*/nullptr, LLVMContext,
                   "<fake module name>", "<fake output filename>",
-                  "<fake main input filename>") {}
+                  "<fake main input filename>", "") {}
 
   ~IRGenModule();
 
@@ -1234,6 +1275,7 @@ public:
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
   void emitSILProperty(SILProperty *prop);
+  void emitSILDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
   void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
   void emitProtocolConformance(const ConformanceDescription &record);
@@ -1281,6 +1323,9 @@ public:
                                         ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
                                              ConstantInit init = ConstantInit());
+  llvm::Constant *
+  getAddrOfEffectiveValueWitnessTable(CanType concreteType,
+                                      ConstantInit init = ConstantInit());
   Optional<llvm::Function*> getAddrOfIVarInitDestroy(ClassDecl *cd,
                                                      bool isDestroyer,
                                                      bool isForeign,
@@ -1340,6 +1385,7 @@ public:
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfObjCModuleContextDescriptor();
   llvm::Constant *getAddrOfClangImporterModuleContextDescriptor();
+  llvm::Constant *getAddrOfOriginalModuleContextDescriptor(StringRef Name);
   ConstantReference getAddrOfParentContextDescriptor(DeclContext *from,
                                                      bool fromAnonymousContext);
   ConstantReference getAddrOfContextDescriptorForParent(DeclContext *parent,
@@ -1420,6 +1466,10 @@ public:
                                      const AssociatedConformance &association);
   llvm::Function *getAddrOfDefaultAssociatedConformanceAccessor(
                                            AssociatedConformance requirement);
+
+  llvm::Constant *
+  getAddrOfDifferentiabilityWitness(const SILDifferentiabilityWitness *witness,
+                                    ConstantInit definition = ConstantInit());
 
   Address getAddrOfObjCISAMask();
 

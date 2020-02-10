@@ -56,6 +56,8 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -Xclang-linker -foo -Xclang-linker foopath %s 2>&1 > %t.windows.txt
 // RUN: %FileCheck -check-prefix WINDOWS-clang-linker-order %s < %t.windows.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -target wasm32-unknown-wasi -Xclang-linker -flag -Xclang-linker arg %s 2>&1 | %FileCheck -check-prefix WASI-clang-linker-order %s
+
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | %FileCheck -check-prefix DEBUG %s
 
 // RUN: %empty-directory(%t)
@@ -83,6 +85,7 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_LINUX %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WINDOWS %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WINDOWS %s
+// RUN: %swiftc_driver -driver-print-jobs -target wasm32-unknown-wasi -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WASI %s
 
 // Here we specify an output file name using '-o'. For ease of writing these
 // tests, we happen to specify the same file name as is inferred in the
@@ -322,6 +325,13 @@
 // WINDOWS-clang-linker-order: -foo foopath
 // WINDOWS-clang-linker-order: -o {{.*}}
 
+// WASI-clang-linker-order: swift
+// WASI-clang-linker-order: -o [[OBJECTFILE:.*]]
+
+// WASI-clang-linker-order: clang{{"? }}
+// WASI-clang-linker-order: -flag arg
+// WASI-clang-linker-order: -o {{.*}}
+
 // DEBUG: bin{{/|\\\\}}swift{{c?(\.EXE)?}}
 // DEBUG-NEXT: bin{{/|\\\\}}swift{{c?(\.EXE)?}}
 // DEBUG-NEXT: {{(bin/)?}}ld{{"? }}
@@ -362,7 +372,7 @@
 // INFERRED_NAME_DARWIN:  -o libLINKER.dylib
 // INFERRED_NAME_LINUX:   -o libLINKER.so
 // INFERRED_NAME_WINDOWS: -o LINKER.dll
-
+// INFERRED_NAME_WASI: -o libLINKER.so
 
 // Test ld detection. We use hard links to make sure
 // the Swift driver really thinks it's been moved.

@@ -240,7 +240,7 @@ class NameMatcher: public ASTWalker {
 
   /// The \c Expr argument of a parent \c CustomAttr (if one exists) and
   /// the \c SourceLoc of the type name it applies to.
-  llvm::Optional<std::pair<SourceLoc, Expr *>> CustomAttrArg;
+  llvm::Optional<Located<Expr *>> CustomAttrArg;
   unsigned InactiveConfigRegionNestings = 0;
   unsigned SelectorNestings = 0;
 
@@ -583,6 +583,11 @@ ClangNode getEffectiveClangNode(const Decl *decl);
 
 /// Retrieve the Clang node for the given extension, if it has one.
 ClangNode extensionGetClangNode(const ExtensionDecl *ext);
+
+/// Utility for finding the referenced declaration from a call, which might
+/// include a second level of function application for a 'self.' expression,
+/// or a curry thunk, etc.
+std::pair<Type, ConcreteDeclRef> getReferencedDecl(Expr *expr);
 
 } // namespace ide
 } // namespace swift

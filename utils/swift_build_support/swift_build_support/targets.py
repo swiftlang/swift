@@ -70,7 +70,7 @@ class DarwinPlatform(Platform):
     @property
     def is_embedded(self):
         """Check if this is a Darwin platform for embedded devices."""
-        return self.name != "macosx"
+        return self.name != "macosx" and self.name != "maccatalyst"
 
     @property
     def supports_benchmark(self):
@@ -186,6 +186,14 @@ class StdlibDeploymentTarget(object):
         machine = platform.machine()
 
         if system == 'Linux':
+            if 'ANDROID_DATA' in os.environ:
+                if machine.startswith('armv7'):
+                    return StdlibDeploymentTarget.Android.armv7
+                elif machine == 'aarch64':
+                    return StdlibDeploymentTarget.Android.aarch64
+                raise NotImplementedError('Android System with architecture '
+                                          '"%s" is not supported' % machine)
+
             if machine == 'x86_64':
                 return StdlibDeploymentTarget.Linux.x86_64
             elif machine == 'i686':
@@ -235,6 +243,11 @@ class StdlibDeploymentTarget(object):
     @classmethod
     def get_targets_by_name(cls, names):
         return [cls.get_target_for_name(name) for name in names]
+
+    @classmethod
+    def get_target_names(cls):
+        return sorted([name for (name, target) in
+                       cls._targets_by_name.items()])
 
 
 def install_prefix():

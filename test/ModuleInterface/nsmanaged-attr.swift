@@ -16,7 +16,7 @@
 import CoreData
 import Foundation
 
-// CHECK: @objc public class MyObject : CoreData.NSManagedObject {
+// CHECK: @objc @_inheritsConvenienceInitializers public class MyObject : CoreData.NSManagedObject {
 public class MyObject: NSManagedObject {
   // CHECK: @objc @NSManaged dynamic public var myVar: Swift.String {
   // CHECK-NEXT: @objc get

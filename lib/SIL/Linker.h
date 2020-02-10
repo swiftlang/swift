@@ -33,10 +33,6 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, void> {
   /// Worklist of SILFunctions we are processing.
   llvm::SmallVector<SILFunction *, 128> Worklist;
 
-  /// A list of callees of the current instruction being visited. cleared after
-  /// every instruction is visited.
-  llvm::SmallVector<SILFunction *, 4> FunctionDeserializationWorklist;
-
   /// The current linking mode.
   LinkingMode Mode;
 
@@ -45,8 +41,7 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, void> {
 
 public:
   SILLinkerVisitor(SILModule &M, SILModule::LinkingMode LinkingMode)
-      : Mod(M), Worklist(), FunctionDeserializationWorklist(),
-        Mode(LinkingMode), Changed(false) {}
+      : Mod(M), Worklist(), Mode(LinkingMode), Changed(false) {}
 
   /// Process F, recursively deserializing any thing F may reference.
   /// Returns true if any deserialization was performed.

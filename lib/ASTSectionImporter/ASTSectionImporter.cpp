@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
+#include "../Serialization/ModuleFormat.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
@@ -63,7 +64,8 @@ bool swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
       return false;
     }
 
-    buf = buf.substr(info.bytes);
+    buf = buf.substr(
+      llvm::alignTo(info.bytes, swift::serialization::SWIFTMODULE_ALIGNMENT));
   }
 
   return true;

@@ -383,7 +383,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     //      happen; might as well eagerly bridge it in.
     //   3) If it's mutable with associated information, must make the call
     let immutableCopy
-      = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
+      = _stdlib_binary_CFStringCreateCopy(cocoaString)
 
 #if !(arch(i386) || arch(arm))
     if _isObjCTaggedPointer(immutableCopy) {

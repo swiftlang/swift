@@ -318,18 +318,9 @@ public:
     return CodeCompletionOffset != ~0U;
   }
 
-  void setCodeCompletionFactory(CodeCompletionCallbacksFactory *Factory) {
-    CodeCompletionFactory = Factory;
-    disableASTScopeLookup();
-  }
-  
   /// Called from lldb, see rdar://53971116
   void disableASTScopeLookup() {
     LangOpts.EnableASTScopeLookup = false;
-  }
-
-  CodeCompletionCallbacksFactory *getCodeCompletionFactory() const {
-    return CodeCompletionFactory;
   }
 
   /// Retrieve a module hash string that is suitable for uniquely
@@ -337,7 +328,7 @@ public:
   /// in generating a cached PCH file for the bridging header.
   std::string getPCHHash() const;
 
-  SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() {
+  SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() const {
     if (getInputKind() == InputFileKind::SIL) {
       return SourceFile::ImplicitModuleImportKind::None;
     }
@@ -385,9 +376,11 @@ public:
   /// fail an assert if not in that mode.
   std::string getModuleInterfaceOutputPathForWholeModule() const;
 
+  std::string getLdAddCFileOutputPathForWholeModule() const;
+
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
-                              bool moduleIsPublic);
+                              bool moduleIsPublic) const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -411,7 +404,7 @@ class CompilerInstance {
   /// Null if no tracker.
   std::unique_ptr<DependencyTracker> DepTracker;
 
-  ModuleDecl *MainModule = nullptr;
+  mutable ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
   MemoryBufferSerializedModuleLoader *MemoryBufferLoader = nullptr;
 
@@ -460,14 +453,16 @@ public:
   void operator=(CompilerInstance &&) = delete;
 
   SourceManager &getSourceMgr() { return SourceMgr; }
+  const SourceManager &getSourceMgr() const { return SourceMgr; }
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
+  const DiagnosticEngine &getDiags() const { return Diagnostics; }
 
   llvm::vfs::FileSystem &getFileSystem() { return *SourceMgr.getFileSystem(); }
 
-  ASTContext &getASTContext() {
-    return *Context;
-  }
+  ASTContext &getASTContext() { return *Context; }
+  const ASTContext &getASTContext() const { return *Context; }
+
   bool hasASTContext() const { return Context != nullptr; }
 
   SILOptions &getSILOptions() { return Invocation.getSILOptions(); }
@@ -481,16 +476,16 @@ public:
     Diagnostics.addConsumer(*DC);
   }
 
+  void removeDiagnosticConsumer(DiagnosticConsumer *DC) {
+    Diagnostics.removeConsumer(*DC);
+  }
+
   void createDependencyTracker(bool TrackSystemDeps) {
     assert(!Context && "must be called before setup()");
     DepTracker = llvm::make_unique<DependencyTracker>(TrackSystemDeps);
   }
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
-
-  /// Set the SIL module for this compilation instance.
-  ///
-  /// The CompilerInstance takes ownership of the given SILModule object.
-  void setSILModule(std::unique_ptr<SILModule> M);
+  const DependencyTracker *getDependencyTracker() const { return DepTracker.get(); }
 
   SILModule *getSILModule() {
     return TheSILModule.get();
@@ -502,7 +497,7 @@ public:
     return static_cast<bool>(TheSILModule);
   }
 
-  ModuleDecl *getMainModule();
+  ModuleDecl *getMainModule() const;
 
   MemoryBufferSerializedModuleLoader *
   getMemoryBufferSerializedModuleLoader() const {
@@ -523,7 +518,7 @@ public:
 
   /// Gets the set of SourceFiles which are the primary inputs for this
   /// CompilerInstance.
-  ArrayRef<SourceFile *> getPrimarySourceFiles() {
+  ArrayRef<SourceFile *> getPrimarySourceFiles() const {
     return PrimarySourceFiles;
   }
 
@@ -533,7 +528,7 @@ public:
   ///
   /// FIXME: This should be removed eventually, once there are no longer any
   /// codepaths that rely on a single primary file.
-  SourceFile *getPrimarySourceFile() {
+  SourceFile *getPrimarySourceFile() const {
     if (PrimarySourceFiles.empty()) {
       return nullptr;
     } else {
@@ -544,6 +539,18 @@ public:
 
   /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
+
+  const CompilerInvocation &getInvocation() {
+    return Invocation;
+  }
+
+  bool hasPersistentParserState() const {
+    return bool(PersistentState);
+  }
+
+  PersistentParserState &getPersistentParserState() {
+    return *PersistentState.get();
+  }
 
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML
@@ -598,14 +605,13 @@ public:
   void performSema();
 
   /// Parses the input file but does no type-checking or module imports.
-  /// Note that this only supports parsing an invocation with a single file.
   void performParseOnly(bool EvaluateConditionals = false,
-                        bool ParseDelayedBodyOnEnd = false);
+                        bool CanDelayBodies = true);
 
   /// Parses and performs name binding on all input files.
   ///
-  /// Like a parse-only invocation, a single file is required. Unlike a
-  /// parse-only invocation, module imports will be processed.
+  /// This is similar to a parse-only invocation, but module imports will also
+  /// be processed.
   void performParseAndResolveImportsOnly();
 
   /// Performs mandatory, diagnostic, and optimization passes over the SIL.
@@ -647,8 +653,6 @@ public: // for static functions in Frontend.cpp
   };
 
 private:
-  void createREPLFile(const ImplicitImports &implicitImports);
-
   void addMainFileToModule(const ImplicitImports &implicitImports);
 
   void performSemaUpTo(SourceFile::ASTStage_t LimitStage);

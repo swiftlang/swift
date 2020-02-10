@@ -1451,7 +1451,9 @@ namespace {
         if (!SP) {
           // If there's no sub-pattern then there's no further recursive
           // structure here.  Yield the constructor space.
-          return Space::forConstructor(item->getType(), VP->getName(), None);
+          // FIXME: Compound names.
+          return Space::forConstructor(item->getType(),
+                                       VP->getName().getBaseIdentifier(), None);
         }
 
         SmallVector<Space, 4> conArgSpace;
@@ -1463,7 +1465,9 @@ namespace {
                          [&](TuplePatternElt pate) {
                            return projectPattern(pate.getPattern());
                          });
-          return Space::forConstructor(item->getType(), VP->getName(),
+          // FIXME: Compound names.
+          return Space::forConstructor(item->getType(),
+                                       VP->getName().getBaseIdentifier(),
                                        conArgSpace);
         }
         case PatternKind::Paren: {
@@ -1497,7 +1501,9 @@ namespace {
           } else {
             conArgSpace.push_back(projectPattern(SP));
           }
-          return Space::forConstructor(item->getType(), VP->getName(),
+          // FIXME: Compound names.
+          return Space::forConstructor(item->getType(),
+                                       VP->getName().getBaseIdentifier(),
                                        conArgSpace);
         }
         default:

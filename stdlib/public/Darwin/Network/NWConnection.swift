@@ -479,7 +479,7 @@ public final class NWConnection : CustomDebugStringConvertible {
 											   _ isComplete: Bool, _ error: NWError?) -> Void) {
 		nw_connection_receive(self.nw, UInt32(minimumIncompleteLength), UInt32(maximumLength)) {
 			(content, context, complete, nwError) in
-			completion(NWCreateNSDataFromDispatchData(content) as Data?, ContentContext(context), complete, NWError(nwError));
+			completion(NWCreateNSDataFromDispatchData(content), ContentContext(context), complete, NWError(nwError));
 		}
 	}
 
@@ -491,7 +491,7 @@ public final class NWConnection : CustomDebugStringConvertible {
                                                       _ contentContext: NWConnection.ContentContext?,
                                                       _ isComplete: Bool, _ error: NWError?) -> Void) {
 		nw_connection_receive_message(self.nw) { (content, context, complete, nwError) in
-			completion(NWCreateNSDataFromDispatchData(content) as Data?, ContentContext(context), complete, NWError(nwError))
+			completion(NWCreateNSDataFromDispatchData(content), ContentContext(context), complete, NWError(nwError))
 		}
 	}
 

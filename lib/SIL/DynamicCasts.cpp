@@ -874,7 +874,7 @@ namespace {
       }
       auto targetFormalTy = target.FormalType;
       auto targetLoweredTy =
-          SILType::getPrimitiveObjectType(targetFormalTy);
+          SILType::getPrimitiveObjectType(target.LoweredType.getASTType());
       if (isCFBridgingConversion(SwiftModule,
                                  source.FormalType,
                                  targetFormalTy)) {
@@ -1161,9 +1161,9 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
     if (!objectType.isAnyClassReferenceType())
       return false;
     
-      auto super = archetype->getSuperclass();
-      if (super.isNull())
-        return false;
+    auto super = archetype->getSuperclass();
+    if (super.isNull())
+      return false;
 
     // A base class constraint that isn't NSError rules out the archetype being
     // bound to NSError.
@@ -1254,9 +1254,7 @@ void swift::emitIndirectConditionalCastWithScalar(
     case CastConsumptionKind::TakeOnSuccess:
       break;
     case CastConsumptionKind::CopyOnSuccess: {
-      SILValue originalSuccValue = succValue;
       succValue = B.emitCopyValueOperation(loc, succValue);
-      B.emitEndBorrowOperation(loc, originalSuccValue);
       B.emitEndBorrowOperation(loc, srcValue);
       break;
     }
@@ -1295,7 +1293,6 @@ void swift::emitIndirectConditionalCastWithScalar(
                                 StoreOwnershipQualifier::Init);
       break;
     case CastConsumptionKind::CopyOnSuccess:
-      B.emitEndBorrowOperation(loc, failValue);
       B.emitEndBorrowOperation(loc, srcValue);
       break;
     case CastConsumptionKind::BorrowAlways:

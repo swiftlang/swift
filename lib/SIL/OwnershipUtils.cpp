@@ -66,6 +66,15 @@ bool swift::isGuaranteedForwardingValueKind(SILNodeKind kind) {
 }
 
 bool swift::isGuaranteedForwardingValue(SILValue value) {
+  // If we have an argument from a transforming terminator, we can forward
+  // guaranteed.
+  if (auto *arg = dyn_cast<SILArgument>(value)) {
+    if (auto *ti = arg->getSingleTerminator()) {
+      if (ti->isTransformationTerminator()) {
+        return true;
+      }
+    }
+  }
   return isGuaranteedForwardingValueKind(
       value->getKindOfRepresentativeSILNodeInObject());
 }
@@ -173,9 +182,18 @@ bool swift::getUnderlyingBorrowIntroducingValues(
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isGuaranteedForwardingValue(v)) {
-      auto *i = v->getDefiningInstruction();
-      assert(i);
-      llvm::transform(i->getAllOperands(), std::back_inserter(worklist),
+      if (auto *i = v->getDefiningInstruction()) {
+        llvm::transform(i->getAllOperands(), std::back_inserter(worklist),
+                        [](const Operand &op) -> SILValue { return op.get(); });
+        continue;
+      }
+
+      // Otherwise, we should have a block argument that is defined by a single
+      // predecessor terminator.
+      auto *arg = cast<SILPhiArgument>(v);
+      auto *termInst = arg->getSingleTerminator();
+      assert(termInst && termInst->isTransformationTerminator());
+      llvm::transform(termInst->getAllOperands(), std::back_inserter(worklist),
                       [](const Operand &op) -> SILValue { return op.get(); });
       continue;
     }
@@ -195,8 +213,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 }
 
 bool BorrowScopeIntroducingValue::areInstructionsWithinScope(
-    ArrayRef<BranchPropagatedUser> instructions,
-    SmallVectorImpl<BranchPropagatedUser> &scratchSpace,
+    ArrayRef<SILInstruction *> instructions,
+    SmallVectorImpl<SILInstruction *> &scratchSpace,
     SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
     DeadEndBlocks &deadEndBlocks) const {
   // Make sure that we clear our scratch space/utilities before we exit.
@@ -214,8 +232,9 @@ bool BorrowScopeIntroducingValue::areInstructionsWithinScope(
     return true;
 
   // Otherwise, gather up our local scope ending instructions.
-  visitLocalScopeEndingUses(
-      [&scratchSpace](Operand *op) { scratchSpace.emplace_back(op); });
+  visitLocalScopeEndingUses([&scratchSpace](Operand *op) {
+    scratchSpace.emplace_back(op->getUser());
+  });
 
   LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
   return checker.validateLifetime(value, scratchSpace, instructions);

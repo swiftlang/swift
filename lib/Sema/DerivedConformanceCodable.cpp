@@ -460,17 +460,13 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
   keyedByDecl->setSpecifier(ParamSpecifier::Default);
   keyedByDecl->setInterfaceType(returnType);
 
-  // container(keyedBy:) method name
-  auto *paramList = ParameterList::createWithoutLoc(keyedByDecl);
-  DeclName callName(C, C.Id_container, paramList);
-
   // base.container(keyedBy:) expr
-  auto *unboundCall = new (C) UnresolvedDotExpr(base, SourceLoc(), callName,
-                                                DeclNameLoc(),
-                                                /*Implicit=*/true);
+  auto *paramList = ParameterList::createWithoutLoc(keyedByDecl);
+  auto *unboundCall = UnresolvedDotExpr::createImplicit(C, base, C.Id_container,
+                                                        paramList);
 
   // CodingKeys.self expr
-  auto *codingKeysExpr = TypeExpr::createForDecl(SourceLoc(),
+  auto *codingKeysExpr = TypeExpr::createForDecl(DeclNameLoc(),
                                                  param,
                                                  param->getDeclContext(),
                                                  /*Implicit=*/true);
@@ -628,12 +624,10 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
 
     // encode(_:forKey:)/encodeIfPresent(_:forKey:)
     auto methodName = useIfPresentVariant ? C.Id_encodeIfPresent : C.Id_encode;
-
     SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
-    DeclName name(C, methodName, argNames);
-    auto *encodeCall = new (C) UnresolvedDotExpr(containerExpr, SourceLoc(),
-                                                 name, DeclNameLoc(),
-                                                 /*Implicit=*/true);
+
+    auto *encodeCall = UnresolvedDotExpr::createImplicit(C, containerExpr,
+                                                         methodName, argNames);
 
     // container.encode(self.x, forKey: CodingKeys.x)
     Expr *args[2] = {varExpr, keyExpr};
@@ -653,9 +647,7 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
     // Need to generate `try super.encode(to: container.superEncoder())`
 
     // superEncoder()
-    auto *method = new (C) UnresolvedDeclRefExpr(DeclName(C.Id_superEncoder),
-                                                 DeclRefKind::Ordinary,
-                                                 DeclNameLoc());
+    auto *method = UnresolvedDeclRefExpr::createImplicit(C, C.Id_superEncoder);
 
     // container.superEncoder()
     auto *superEncoderRef = new (C) DotSyntaxCallExpr(containerExpr,
@@ -859,10 +851,8 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
 
       // decode(_:forKey:)/decodeIfPresent(_:forKey:)
       SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
-      DeclName name(C, methodName, argNames);
-      auto *decodeCall = new (C) UnresolvedDotExpr(containerExpr, SourceLoc(),
-                                                   name, DeclNameLoc(),
-                                                   /*Implicit=*/true);
+      auto *decodeCall = UnresolvedDotExpr::createImplicit(
+          C, containerExpr, methodName, argNames);
 
       // container.decode(Type.self, forKey: CodingKeys.x)
       Expr *args[2] = {targetExpr, keyExpr};
@@ -875,10 +865,8 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
                                       /*Implicit=*/true);
 
       auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
-      auto *varExpr = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
-                                                DeclName(varDecl->getName()),
-                                                DeclNameLoc(),
-                                                /*implicit=*/true);
+      auto *varExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
+                                                        varDecl->getFullName());
       auto *assignExpr = new (C) AssignExpr(varExpr, SourceLoc(), tryExpr,
                                             /*Implicit=*/true);
       statements.push_back(assignExpr);
@@ -894,9 +882,8 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
 
         // container.superDecoder
         auto *superDecoderRef =
-          new (C) UnresolvedDotExpr(containerExpr, SourceLoc(),
-                                    DeclName(C.Id_superDecoder),
-                                    DeclNameLoc(), /*Implicit=*/true);
+          UnresolvedDotExpr::createImplicit(C, containerExpr,
+                                            C.Id_superDecoder);
 
         // container.superDecoder()
         auto *superDecoderCall =
@@ -908,10 +895,8 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
                                               SourceLoc(), /*Implicit=*/true);
 
         // super.init(from:)
-        auto initName = DeclName(C, DeclBaseName::createConstructor(), C.Id_from);
-        auto *initCall = new (C) UnresolvedDotExpr(superRef, SourceLoc(),
-                                                   initName, DeclNameLoc(),
-                                                   /*Implicit=*/true);
+        auto *initCall = UnresolvedDotExpr::createImplicit(
+            C, superRef, DeclBaseName::createConstructor(), {C.Id_from});
 
         // super.decode(from: container.superDecoder())
         Expr *args[1] = {superDecoderCall};
@@ -944,9 +929,8 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
                                               SourceLoc(), /*Implicit=*/true);
 
         // super.init()
-        auto *superInitRef = new (C) UnresolvedDotExpr(superRef, SourceLoc(),
-                                                       initName, DeclNameLoc(),
-                                                       /*Implicit=*/true);
+        auto *superInitRef = UnresolvedDotExpr::createImplicit(C, superRef,
+                                                               initName);
         // super.init() call
         Expr *callExpr = CallExpr::createImplicit(C, superInitRef,
                                                   ArrayRef<Expr *>(),
@@ -1060,7 +1044,8 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
       }
 
       auto result =
-          TypeChecker::lookupMember(superclassDecl, superType, memberName);
+          TypeChecker::lookupMember(superclassDecl, superType,
+                                    DeclNameRef(memberName));
 
       if (result.empty()) {
         // No super initializer for us to call.

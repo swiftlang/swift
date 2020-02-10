@@ -1526,7 +1526,7 @@ func r32214649_3<X>(_ a: [X]) -> [X] {
 
 func rdar32301091_1(_ :((Int, Int) -> ())!) {}
 rdar32301091_1 { _ in }
-// expected-error@-1 {{cannot convert value of type '(_) -> ()' to expected argument type '((Int, Int) -> ())?'}}
+// expected-error@-1 {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}} {{19-19=,_ }}
 
 func rdar32301091_2(_ :(Int, Int) -> ()) {}
 rdar32301091_2 { _ in }
@@ -1695,13 +1695,15 @@ class Mappable<T> {
 }
 
 let x = Mappable(())
-_ = x.map { (_: Void) in return () }
-_ = x.map { (_: ()) in () }
+// expected-note@-1 2{{'x' declared here}}
+x.map { (_: Void) in return () }
+x.map { (_: ()) in () }
 
 // https://bugs.swift.org/browse/SR-9470
 do {
   func f(_: Int...) {}
-  let _ = [(1, 2, 3)].map(f) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping (Int...) -> ())'}}
+  let _ = [(1, 2, 3)].map(f) // expected-error {{cannot convert value of type '(Int...) -> ()' to expected argument type '((Int, Int, Int)) throws -> T'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 }
 
 // rdar://problem/48443263 - cannot convert value of type '() -> Void' to expected argument type '(_) -> Void'
@@ -1735,7 +1737,8 @@ func autoclosureSplat() {
   // wrap the closure in a function conversion.
 
   takeFn { (fn: @autoclosure () -> Int, x: Int) in }
-  // expected-error@-1 {{contextual closure type '(@escaping () -> Int) -> ()' expects 1 argument, but 2 were used in closure body}}
+  // expected-error@-1 {{contextual closure type '(() -> Int) -> ()' expects 1 argument, but 2 were used in closure body}}
+  // expected-error@-2 {{converting non-escaping value to 'T' may allow it to escape}}
 
   takeFn { (fn: @autoclosure @escaping () -> Int) in }
   // FIXME: It looks like matchFunctionTypes() does not check @autoclosure at all.

@@ -623,9 +623,9 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(dc))
     lookupOptions |= NameLookupFlags::KnownPrivate;
+  DeclNameRef nameRef(ctx.getIdentifier(name));
   auto lookup = TypeChecker::lookupUnqualified(dc->getModuleScopeContext(),
-                                               ctx.getIdentifier(name),
-                                               SourceLoc(),
+                                               nameRef, SourceLoc(),
                                                lookupOptions);
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
@@ -728,6 +728,11 @@ static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
   case DefaultArgumentKind::File:
     return new (ctx)
         MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::File, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::FilePath:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::FilePath, loc,
                                    /*implicit=*/true);
 
   case DefaultArgumentKind::Line:

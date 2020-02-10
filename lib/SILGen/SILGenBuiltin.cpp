@@ -649,13 +649,14 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   auto &toTL = SGF.getTypeLowering(toTy);
   assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
 
+  auto arg = args[0];
+
   // TODO: Fix this API.
   if (!fromTL.isAddress() || !toTL.isAddress()) {
-    if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, args[0],
-                                                       toTL.getLoweredType())) {
+    if (SILType::canRefCast(arg.getType(), toTL.getLoweredType(), SGF.SGM.M)) {
       // Create a reference cast, forwarding the cleanup.
       // The cast takes the source reference.
-      return refCast;
+      return SGF.B.createUncheckedRefCast(loc, arg, toTL.getLoweredType());
     }
   }
 
@@ -670,7 +671,7 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   // TODO: For now, we leave invalid casts in address form so that the runtime
   // will trap. We could emit a noreturn call here instead which would provide
   // more information to the optimizer.
-  SILValue srcVal = args[0].ensurePlusOne(SGF, loc).forward(SGF);
+  SILValue srcVal = arg.ensurePlusOne(SGF, loc).forward(SGF);
   SILValue fromAddr;
   if (!fromTL.isAddress()) {
     // Move the loadable value into a "source temp".  Since the source and
@@ -745,17 +746,9 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
   }
   // Create the appropriate bitcast based on the source and dest types.
   ManagedValue in = args[0];
+
   SILType resultTy = toTL.getLoweredType();
-  if (resultTy.isTrivial(SGF.F))
-    return SGF.B.createUncheckedTrivialBitCast(loc, in, resultTy);
-
-  // If we can perform a ref cast, just return.
-  if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, in, resultTy))
-    return refCast;
-
-  // Otherwise leave the original cleanup and retain the cast value.
-  SILValue out = SGF.B.createUncheckedBitwiseCast(loc, in.getValue(), resultTy);
-  return SGF.emitManagedRetain(loc, out, toTL);
+  return SGF.B.createUncheckedBitCast(loc, in, resultTy);
 }
 
 /// Specialized emitter for Builtin.castToBridgeObject.
@@ -976,8 +969,8 @@ static ManagedValue emitBuiltinProjectTailElems(SILGenFunction &SGF,
   SILType ElemType = SGF.getLoweredType(subs.getReplacementTypes()[1]->
                                         getCanonicalType()).getObjectType();
 
-  SILValue result = SGF.B.createRefTailAddr(loc, args[0].getValue(),
-                                            ElemType.getAddressType());
+  SILValue result = SGF.B.createRefTailAddr(
+      loc, args[0].borrow(SGF, loc).getValue(), ElemType.getAddressType());
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
   result = SGF.B.createAddressToPointer(loc, result, rawPointerType);
   return ManagedValue::forUnmanaged(result);
@@ -1050,6 +1043,123 @@ emitBuiltinGlobalStringTablePointer(SILGenFunction &SGF, SILLocation loc,
                                        SILType::getRawPointerType(astContext),
                                        subs, ArrayRef<SILValue>(argValue));
   return SGF.emitManagedRValueWithCleanup(resultVal);
+}
+
+/// Emit SIL for the named builtin:
+/// convertStrongToUnownedUnsafe. Unlike the default ownership
+/// convention for named builtins, which is to take (non-trivial)
+/// arguments as Owned, this builtin accepts owned as well as
+/// guaranteed arguments, and hence doesn't require the arguments to
+/// be at +1. Therefore, this builtin is emitted specially.
+///
+/// We assume our convention is (T, @inout @unmanaged Optional<T>) -> ()
+static ManagedValue emitBuiltinConvertStrongToUnownedUnsafe(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 2);
+  if (!argsOrError)
+    return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+
+  auto args = *argsOrError;
+
+  // First get our object at +0 if we can.
+  auto object = SGF.emitRValue(args[0], SGFContext::AllowGuaranteedPlusZero)
+                    .getAsSingleValue(SGF, args[0]);
+
+  // Borrow it and get the value.
+  SILValue objectSrcValue = object.borrow(SGF, loc).getValue();
+
+  // Then create our inout.
+  auto inout = cast<InOutExpr>(args[1]->getSemanticsProvidingExpr());
+  auto lv =
+      SGF.emitLValue(inout->getSubExpr(), SGFAccessKind::BorrowedAddressRead);
+  lv.unsafelyDropLastComponent(PathComponent::OwnershipKind);
+  if (!lv.isPhysical() || !lv.isLoadingPure()) {
+    llvm::report_fatal_error("Builtin.convertStrongToUnownedUnsafe passed "
+                             "non-physical, non-pure lvalue as 2nd arg");
+  }
+
+  SILValue inoutDest =
+      SGF.emitAddressOfLValue(args[1], std::move(lv)).getLValueAddress();
+  SILType destType = inoutDest->getType().getObjectType();
+
+  // Make sure our types match up as we expect.
+  if (objectSrcValue->getType() !=
+      destType.getReferenceStorageReferentType().getOptionalObjectType()) {
+    llvm::errs()
+        << "Invalid usage of Builtin.convertStrongToUnownedUnsafe. lhsType "
+           "must be T and rhsType must be inout unsafe(unowned) Optional<T>"
+        << "lhsType: " << objectSrcValue->getType() << "\n"
+        << "rhsType: " << inoutDest->getType() << "\n";
+    llvm::report_fatal_error("standard fatal error msg");
+  }
+
+  // Ok. We have the right types. First convert objectSrcValue to its
+  // unowned representation.
+  SILType optionalType = SILType::getOptionalType(objectSrcValue->getType());
+  SILValue someVal =
+      SGF.B.createOptionalSome(loc, objectSrcValue, optionalType);
+
+  SILType unmanagedOptType = someVal->getType().getReferenceStorageType(
+      SGF.getASTContext(), ReferenceOwnership::Unmanaged);
+  SILValue unownedObjectSrcValue = SGF.B.createRefToUnmanaged(
+      loc, someVal, unmanagedOptType.getObjectType());
+  SGF.B.emitStoreValueOperation(loc, unownedObjectSrcValue, inoutDest,
+                                StoreOwnershipQualifier::Trivial);
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+}
+
+/// Emit SIL for the named builtin: convertUnownedUnsafeToGuaranteed.
+///
+/// We assume our convention is:
+///
+/// <BaseT, T> (BaseT, @in_guaranteed @unmanaged Optional<T>) -> @guaranteed T
+///
+static ManagedValue emitBuiltinConvertUnownedUnsafeToGuaranteed(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 2);
+  if (!argsOrError)
+    return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+
+  auto args = *argsOrError;
+
+  // First grab our base and borrow it.
+  auto baseMV =
+      SGF.emitRValueAsSingleValue(args[0], SGFContext::AllowGuaranteedPlusZero)
+          .borrow(SGF, args[0]);
+
+  // Then grab our LValue operand, drop the last ownership component.
+  auto srcLV = SGF.emitLValue(args[1]->getSemanticsProvidingExpr(),
+                              SGFAccessKind::BorrowedAddressRead);
+  srcLV.unsafelyDropLastComponent(PathComponent::OwnershipKind);
+  if (!srcLV.isPhysical() || !srcLV.isLoadingPure()) {
+    llvm::report_fatal_error("Builtin.convertUnownedUnsafeToGuaranteed passed "
+                             "non-physical, non-pure lvalue as 2nd arg");
+  }
+
+  // Grab our address and load our unmanaged and convert it to a ref.
+  SILValue srcAddr =
+      SGF.emitAddressOfLValue(args[1], std::move(srcLV)).getLValueAddress();
+  SILValue srcValue = SGF.B.emitLoadValueOperation(
+      loc, srcAddr, LoadOwnershipQualifier::Trivial);
+  SILValue unownedNonTrivialRef = SGF.B.createUnmanagedToRef(
+      loc, srcValue, srcValue->getType().getReferenceStorageReferentType());
+
+  // Now convert our unownedNonTrivialRef from unowned ownership to guaranteed
+  // ownership and create a cleanup for it.
+  SILValue guaranteedNonTrivialRef = SGF.B.createUncheckedOwnershipConversion(
+      loc, unownedNonTrivialRef, ValueOwnershipKind::Guaranteed);
+  auto guaranteedNonTrivialRefMV =
+      SGF.emitManagedBorrowedRValueWithCleanup(guaranteedNonTrivialRef);
+  auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
+
+  // Then unsafely extract from the optional.
+  auto extMV =
+      SGF.B.createUncheckedEnumData(loc, guaranteedNonTrivialRefMV, someDecl);
+
+  // Now create a mark dependence on our base and return the result.
+  return SGF.B.createMarkDependence(loc, extMV, baseMV);
 }
 
 Optional<SpecializedEmitter>

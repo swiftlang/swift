@@ -505,7 +505,7 @@ public:
   /// lookup.
   ///
   /// \returns true if anything was found.
-  bool lookupQualified(Type type, DeclName member, NLOptions options,
+  bool lookupQualified(Type type, DeclNameRef member, NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
   /// Look for the set of declarations with the given name within the
@@ -522,16 +522,13 @@ public:
   /// lookup.
   ///
   /// \returns true if anything was found.
-  bool lookupQualified(ArrayRef<NominalTypeDecl *> types, DeclName member,
+  bool lookupQualified(ArrayRef<NominalTypeDecl *> types, DeclNameRef member,
                        NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
   /// Perform qualified lookup for the given member in the given module.
-  bool lookupQualified(ModuleDecl *module, DeclName member, NLOptions options,
-                       SmallVectorImpl<ValueDecl *> &decls) const;
-
-  /// Perform \c AnyObject lookup for the given member.
-  bool lookupAnyObject(DeclName member, NLOptions options,
+  bool lookupQualified(ModuleDecl *module, DeclNameRef member,
+                       NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
   /// Look up all Objective-C methods with the given selector visible
@@ -684,18 +681,9 @@ enum class IterableDeclContextKind : uint8_t {
 /// Note that an iterable declaration context must inherit from both
 /// \c IterableDeclContext and \c DeclContext.
 class IterableDeclContext {
-  enum LazyMembers : unsigned {
-    Present = 1 << 0,
-
-    /// Lazy member loading has a variety of feedback loops that need to
-    /// switch to pseudo-empty-member behaviour to avoid infinite recursion;
-    /// we use this flag to control them.
-    InProgress = 1 << 1,
-  };
-
   /// The first declaration in this context along with a bit indicating whether
   /// the members of this context will be lazily produced.
-  mutable llvm::PointerIntPair<Decl *, 2, LazyMembers> FirstDeclAndLazyMembers;
+  mutable llvm::PointerIntPair<Decl *, 1, bool> FirstDeclAndLazyMembers;
 
   /// The last declaration in this context, used for efficient insertion,
   /// along with the kind of iterable declaration context.
@@ -783,20 +771,7 @@ public:
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {
-    return FirstDeclAndLazyMembers.getInt() & LazyMembers::Present;
-  }
-
-  bool isLoadingLazyMembers() {
-    return FirstDeclAndLazyMembers.getInt() & LazyMembers::InProgress;
-  }
-
-  void setLoadingLazyMembers(bool inProgress) {
-    LazyMembers status = FirstDeclAndLazyMembers.getInt();
-    if (inProgress)
-      status = LazyMembers(status | LazyMembers::InProgress);
-    else
-      status = LazyMembers(status & ~LazyMembers::InProgress);
-    FirstDeclAndLazyMembers.setInt(status);
+    return FirstDeclAndLazyMembers.getInt();
   }
 
   /// Setup the loader for lazily-loaded members.
@@ -826,6 +801,12 @@ public:
 
   // Some Decls are IterableDeclContexts, but not all.
   static bool classof(const Decl *D);
+
+  /// Return a hash of all tokens in the body for dependency analysis, if
+  /// available.
+  Optional<std::string> getBodyFingerprint() const;
+
+  bool areDependenciesUsingTokenHashesForTypeBodies() const;
 
 private:
   /// Add a member to the list for iteration purposes, but do not notify the

@@ -19,7 +19,6 @@
 
 // RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil | %FileCheck %s -check-prefix=CHECK-SIL
 
-
 import Test
 
 
@@ -84,6 +83,8 @@ func testProtocolsAndClasses() {
   callFoo_gen(27)
   // CHECK-OUTPUT: 55
   callClassMethod(55)
+  // CHECK-OUTPUT: 321
+  callFooViaConformance(0)
 }
 
 func testSubModule() {
@@ -112,6 +113,13 @@ func testKeypath() {
   print(useClassKeypath(0))
 }
 
+func testMisc() {
+  // CHECK-OUTPUT: 43
+  // CHECK-OUTPUT: 42
+  // CHECK-SIL-DAG: sil shared {{.*}} @$s4Test13callUnrelatedyxxlFSi_Tg5
+  print(callUnrelated(42))
+}
+
 testNestedTypes()
 testClass()
 testError()
@@ -119,3 +127,4 @@ testProtocolsAndClasses()
 testSubModule()
 testClosures()
 testKeypath()
+testMisc()

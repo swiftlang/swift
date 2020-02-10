@@ -698,9 +698,10 @@ emitKeyPathComponent(IRGenModule &IGM,
   loweredBaseTy = IGM.getLoweredType(AbstractionPattern::getOpaque(),
                                      baseTy->getWithoutSpecifierType());
   // TODO: Eliminate GenericContextScope entirely
-  GenericContextScope scope(IGM,
-         genericEnv ? genericEnv->getGenericSignature()->getCanonicalSignature()
-                    : nullptr);
+  GenericContextScope scope(
+      IGM, genericEnv
+               ? genericEnv->getGenericSignature().getCanonicalSignature()
+               : nullptr);
   switch (auto kind = component.getKind()) {
   case KeyPathPatternComponent::Kind::StoredProperty: {
     auto property = cast<VarDecl>(component.getStoredPropertyDecl());
@@ -838,31 +839,28 @@ emitKeyPathComponent(IRGenModule &IGM,
       SmallVector<llvm::Constant *, 4> externalSubArgs;
       auto componentSig = externalDecl->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
-      
-      auto componentCanSig = componentSig
-        ? componentSig->getCanonicalSignature()
-        : CanGenericSignature();
+
+      auto componentCanSig = componentSig.getCanonicalSignature();
       auto subs = component.getExternalSubstitutions();
       if (!subs.empty()) {
         enumerateGenericSignatureRequirements(
-          componentSig->getCanonicalSignature(),
-          [&](GenericRequirement reqt) {
-            auto substType = reqt.TypeParameter.subst(subs)
-              ->getCanonicalType();
-            if (!reqt.Protocol) {
-              // Type requirement.
-              externalSubArgs.push_back(
-                emitMetadataTypeRefForKeyPath(IGM, substType, componentCanSig));
-            } else {
-              // Protocol requirement.
-              auto conformance = subs.lookupConformance(
-                           reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
-              externalSubArgs.push_back(IGM.emitWitnessTableRefString(
-                  substType, conformance,
-                  genericEnv ? genericEnv->getGenericSignature() : nullptr,
-                  /*shouldSetLowBit*/ true));
-            }
-          });
+            componentCanSig, [&](GenericRequirement reqt) {
+              auto substType =
+                  reqt.TypeParameter.subst(subs)->getCanonicalType();
+              if (!reqt.Protocol) {
+                // Type requirement.
+                externalSubArgs.push_back(emitMetadataTypeRefForKeyPath(
+                    IGM, substType, componentCanSig));
+              } else {
+                // Protocol requirement.
+                auto conformance = subs.lookupConformance(
+                    reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
+                externalSubArgs.push_back(IGM.emitWitnessTableRefString(
+                    substType, conformance,
+                    genericEnv ? genericEnv->getGenericSignature() : nullptr,
+                    /*shouldSetLowBit*/ true));
+              }
+            });
       }
       fields.addInt32(
         KeyPathComponentHeader::forExternalComponent(externalSubArgs.size())
@@ -1333,9 +1331,10 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
   SmallVector<GenericRequirement, 4> requirements;
   CanGenericSignature genericSig;
   if (genericEnv) {
-    genericSig = prop->getDecl()->getInnermostDeclContext()
-                                ->getGenericSignatureOfContext()
-                                ->getCanonicalSignature();
+    genericSig = prop->getDecl()
+                     ->getInnermostDeclContext()
+                     ->getGenericSignatureOfContext()
+                     .getCanonicalSignature();
     enumerateGenericSignatureRequirements(genericSig,
       [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   }

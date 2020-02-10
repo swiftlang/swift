@@ -5,3 +5,7 @@ sil [_semantics "123"] [_semantics "456"] @foo : $@convention(thin) () -> () {
 bb0:
   return undef : $()
 }
+
+// Make sure we don't try to parse the Swift decl as '@owned() func baz()'.
+sil @bar : $@convention(thin) () -> @owned ()
+func baz()

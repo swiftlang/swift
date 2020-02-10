@@ -65,7 +65,7 @@ public:
   bool shouldAllPrivateDeclsBeVisibleFromOtherFiles() const {
     return HasMultipleIGMs;
   }
-  /// In case of multipe llvm modules, private lazy protocol
+  /// In case of multiple llvm modules, private lazy protocol
   /// witness table accessors could be emitted by two different IGMs during
   /// IRGen into different object files and the linker would complain about
   /// duplicate symbols.
@@ -346,6 +346,9 @@ class LinkEntity {
     /// ProtocolConformance*.
     ProtocolWitnessTableLazyCacheVariable,
 
+    /// A SIL differentiability witness.
+    DifferentiabilityWitness,
+
     // Everything following this is a type kind.
 
     /// A value witness for a type.
@@ -533,6 +536,14 @@ class LinkEntity {
   getAssociatedConformanceByIndex(const ProtocolConformance *conformance,
                                   unsigned index) {
     return getAssociatedConformanceByIndex(conformance->getProtocol(), index);
+  }
+
+  void
+  setForDifferentiabilityWitness(Kind kind,
+                                 const SILDifferentiabilityWitness *witness) {
+    Pointer = const_cast<void *>(static_cast<const void *>(witness));
+    SecondaryPointer = nullptr;
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
 
   void setForType(Kind kind, CanType type) {
@@ -835,6 +846,14 @@ public:
     return entity;
   }
 
+  static LinkEntity
+  forDifferentiabilityWitness(const SILDifferentiabilityWitness *witness) {
+    LinkEntity entity;
+    entity.setForDifferentiabilityWitness(Kind::DifferentiabilityWitness,
+                                          witness);
+    return entity;
+  }
+
   static LinkEntity forProtocolWitnessTable(const RootProtocolConformance *C) {
     LinkEntity entity;
     entity.setForProtocolConformance(Kind::ProtocolWitnessTable, C);
@@ -1041,6 +1060,11 @@ public:
   SILGlobalVariable *getSILGlobalVariable() const {
     assert(getKind() == Kind::SILGlobalVariable);
     return reinterpret_cast<SILGlobalVariable*>(Pointer);
+  }
+
+  SILDifferentiabilityWitness *getSILDifferentiabilityWitness() const {
+    assert(getKind() == Kind::DifferentiabilityWitness);
+    return reinterpret_cast<SILDifferentiabilityWitness *>(Pointer);
   }
 
   const RootProtocolConformance *getRootProtocolConformance() const {

@@ -118,32 +118,38 @@ const clang::Type *ClangTypeConverter::getFunctionType(
     ArrayRef<AnyFunctionType::Param> params, Type resultTy,
     AnyFunctionType::Representation repr) {
 
-  SmallVector<Type, 4> paramsTy;
-  for (auto p : params)
-    paramsTy.push_back(p.getPlainType());
-
   auto resultClangTy = convert(resultTy);
   if (resultClangTy.isNull())
     return nullptr;
 
-  SmallVector<clang::QualType, 8> paramsClangTy;
-  for (auto p : paramsTy) {
-    auto pc = convert(p);
+  SmallVector<clang::FunctionProtoType::ExtParameterInfo, 4> extParamInfos;
+  SmallVector<clang::QualType, 4> paramsClangTy;
+  bool someParamIsConsumed = false;
+  for (auto p : params) {
+    auto pc = convert(p.getPlainType());
     if (pc.isNull())
       return nullptr;
+    clang::FunctionProtoType::ExtParameterInfo extParamInfo;
+    if (p.getParameterFlags().isOwned()) {
+      someParamIsConsumed = true;
+      extParamInfo = extParamInfo.withIsConsumed(true);
+    }
+    extParamInfos.push_back(extParamInfo);
     paramsClangTy.push_back(pc);
   }
 
   clang::FunctionProtoType::ExtProtoInfo info(clang::CallingConv::CC_C);
+  if (someParamIsConsumed)
+    info.ExtParameterInfos = extParamInfos.begin();
   auto fn = ClangASTContext.getFunctionType(resultClangTy, paramsClangTy, info);
   if (fn.isNull())
     return nullptr;
 
   switch (repr) {
   case AnyFunctionType::Representation::CFunctionPointer:
-    return fn.getTypePtr();
+    return ClangASTContext.getPointerType(fn).getTypePtr();
   case AnyFunctionType::Representation::Block:
-    return ClangASTContext.getBlockPointerType(fn).getTypePtrOrNull();
+    return ClangASTContext.getBlockPointerType(fn).getTypePtr();
   case AnyFunctionType::Representation::Swift:
   case AnyFunctionType::Representation::Thin:
     llvm_unreachable("Expected a C-compatible representation.");
@@ -391,6 +397,8 @@ clang::QualType ClangTypeConverter::visitProtocolType(ProtocolType *type) {
                    PDecl->getASTContext(),
                    proto->getObjCRuntimeName(runtimeNameBuffer)));
 
+  registerExportedClangDecl(proto, PDecl);
+
   auto clangType  = clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
                                                &PDecl, 1);
   return clangCtx.getObjCObjectPointerType(clangType);
@@ -439,6 +447,8 @@ clang::QualType ClangTypeConverter::visitClassType(ClassType *type) {
   CDecl->addAttr(clang::ObjCRuntimeNameAttr::CreateImplicit(
                    CDecl->getASTContext(),
                    swiftDecl->getObjCRuntimeName(runtimeNameBuffer)));
+
+  registerExportedClangDecl(swiftDecl, CDecl);
 
   auto clangType  = clangCtx.getObjCInterfaceType(CDecl);
   return clangCtx.getObjCObjectPointerType(clangType);
@@ -719,4 +729,20 @@ clang::QualType ClangTypeConverter::convert(Type type) {
   clang::QualType result = visit(type);
   Cache.insert({type, result});
   return result;
+}
+
+void ClangTypeConverter::registerExportedClangDecl(Decl *swiftDecl,
+                                             const clang::Decl *clangDecl) {
+  assert(clangDecl->isCanonicalDecl() &&
+         "generated Clang declaration for Swift declaration should not "
+         "have multiple declarations");
+  ReversedExportMap.insert({clangDecl, swiftDecl});
+}
+
+Decl *ClangTypeConverter::getSwiftDeclForExportedClangDecl(
+                                             const clang::Decl *decl) const {
+  // We don't need to canonicalize the declaration because these exported
+  // declarations are never redeclarations.
+  auto it = ReversedExportMap.find(decl);
+  return (it != ReversedExportMap.end() ? it->second : nullptr);
 }

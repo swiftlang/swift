@@ -15,6 +15,7 @@
 #include "SwiftEditorDiagConsumer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
@@ -24,76 +25,38 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
-static bool swiftTypeContextInfoImpl(SwiftLangSupport &Lang,
-                                     llvm::MemoryBuffer *UnresolvedInputFile,
-                                     unsigned Offset,
-                                     ArrayRef<const char *> Args,
-                                     ide::TypeContextInfoConsumer &Consumer,
-                                     std::string &Error) {
-  auto bufferIdentifier =
-      Lang.resolvePathSymlinks(UnresolvedInputFile->getBufferIdentifier());
+static bool swiftTypeContextInfoImpl(
+    SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
+    unsigned Offset, ide::TypeContextInfoConsumer &Consumer,
+    ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    bool EnableASTCaching, std::string &Error) {
+  return Lang.performCompletionLikeOperation(
+      UnresolvedInputFile, Offset, Args, FileSystem, EnableASTCaching, Error,
+      [&](CompilerInstance &CI) {
+        // Create a factory for code completion callbacks that will feed the
+        // Consumer.
+        std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+            ide::makeTypeContextInfoCallbacksFactory(Consumer));
 
-  auto origOffset = Offset;
-  auto newBuffer = SwiftLangSupport::makeCodeCompletionMemoryBuffer(
-      UnresolvedInputFile, Offset, bufferIdentifier);
-
-  CompilerInstance CI;
-  PrintingDiagnosticConsumer PrintDiags;
-  CI.addDiagnosticConsumer(&PrintDiags);
-
-  EditorDiagConsumer TraceDiags;
-  trace::TracedOperation TracedOp(trace::OperationKind::CodeCompletion);
-  if (TracedOp.enabled()) {
-    CI.addDiagnosticConsumer(&TraceDiags);
-    trace::SwiftInvocation SwiftArgs;
-    trace::initTraceInfo(SwiftArgs, bufferIdentifier, Args);
-    TracedOp.setDiagnosticProvider(
-        [&TraceDiags](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
-          TraceDiags.getAllDiagnostics(diags);
-        });
-    TracedOp.start(
-        SwiftArgs,
-        {std::make_pair("OriginalOffset", std::to_string(origOffset)),
-         std::make_pair("Offset", std::to_string(Offset))});
-  }
-
-  CompilerInvocation Invocation;
-  bool Failed = Lang.getASTManager()->initCompilerInvocation(
-      Invocation, Args, CI.getDiags(), bufferIdentifier, Error);
-  if (Failed)
-    return false;
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-    Error = "no input filenames specified";
-    return false;
-  }
-
-  // Disable source location resolutions from .swiftsourceinfo file because
-  // they are somewhat heavy operations and are not needed for completions.
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
-
-  Invocation.setCodeCompletionPoint(newBuffer.get(), Offset);
-
-  // Create a factory for code completion callbacks that will feed the
-  // Consumer.
-  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-      ide::makeTypeContextInfoCallbacksFactory(Consumer));
-
-  Invocation.setCodeCompletionFactory(callbacksFactory.get());
-
-  if (CI.setup(Invocation)) {
-    // FIXME: error?
-    return true;
-  }
-  registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
-  CI.performParseAndResolveImportsOnly();
-
-  return true;
+        performCodeCompletionSecondPass(CI.getPersistentParserState(),
+                                        *callbacksFactory);
+      });
 }
 
 void SwiftLangSupport::getExpressionContextInfo(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     ArrayRef<const char *> Args,
-    SourceKit::TypeContextInfoConsumer &SKConsumer) {
+    SourceKit::TypeContextInfoConsumer &SKConsumer,
+    Optional<VFSOptions> vfsOptions) {
+  std::string error;
+
+  // FIXME: the use of None as primary file is to match the fact we do not read
+  // the document contents using the editor documents infrastructure.
+  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/None, error);
+  if (!fileSystem)
+    return SKConsumer.failed(error);
+
   class Consumer : public ide::TypeContextInfoConsumer {
     SourceKit::TypeContextInfoConsumer &SKConsumer;
 
@@ -187,9 +150,9 @@ void SwiftLangSupport::getExpressionContextInfo(
     }
   } Consumer(SKConsumer);
 
-  std::string Error;
-  if (!swiftTypeContextInfoImpl(*this, UnresolvedInputFile, Offset, Args,
-                                Consumer, Error)) {
-    SKConsumer.failed(Error);
+  if (!swiftTypeContextInfoImpl(*this, UnresolvedInputFile, Offset, Consumer,
+                                Args, fileSystem, /*EnableASTCaching=*/false,
+                                error)) {
+    SKConsumer.failed(error);
   }
 }

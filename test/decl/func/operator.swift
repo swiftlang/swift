@@ -168,7 +168,7 @@ prefix operator ++
 prefix postfix func ++(x: Int) {} // expected-error {{'postfix' contradicts previous modifier 'prefix'}} {{8-16=}}
 postfix prefix func ++(x: Float) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}}
 postfix prefix infix func ++(x: Double) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}} expected-error {{'infix' contradicts previous modifier 'postfix'}} {{16-22=}}
-infix prefix func +-+(x: Int, y: Int) {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}} expected-error{{'prefix' contradicts previous modifier 'infix'}} {{7-14=}}
+infix prefix func +-+(x: Double, y: Double) {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}} expected-error{{'prefix' contradicts previous modifier 'infix'}} {{7-14=}}
 
 // Don't allow one to define a postfix '!'; it's built into the
 // language. Also illegal to have any postfix operator starting with '!'.
@@ -391,10 +391,10 @@ func testPrefixOperatorOnTuple() {
   _ = (∫)foo
   // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
   // expected-warning@-2 {{expression of type '(Int, Int)' is unused}}
-  _ = (∫)(foo)
+  (∫)(foo)
   _ = ∫(1, 2)
   _ = (∫)(1, 2) // expected-error {{operator function '∫' expects a single parameter of type '(Int, Int)'}}
-  _ = (∫)((1, 2))
+  (∫)((1, 2))
 }
 
 postfix operator §
@@ -412,9 +412,9 @@ func testPostfixOperatorOnTuple<A, B>(a: A, b: B) {
   // expected-error@-2 {{generic parameter 'T' could not be inferred}}
   // expected-error@-3 {{generic parameter 'U' could not be inferred}}
   // expected-warning@-4 {{expression of type '(A, (B, B), A)' is unused}}
-  _ = (§)(foo)
+  (§)(foo)
   _ = (a, (b, b), a)§
   _ = (§)(a, (b, b), a) // expected-error {{operator function '§' expects a single parameter of type '(T, (U, U), T)'}}
-  _ = (§)((a, (b, b), a))
+  (§)((a, (b, b), a))
   _ = (a, ((), (b, (a, a), b)§), a)§
 }

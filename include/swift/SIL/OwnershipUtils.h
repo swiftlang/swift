@@ -183,6 +183,14 @@ public:
                        nullptr /*leakingBlocks*/)
                 .getFoundError();
   }
+
+  bool validateLifetime(SILValue value,
+                        ArrayRef<SILInstruction *> consumingUses,
+                        ArrayRef<SILInstruction *> nonConsumingUses) {
+    return validateLifetime(
+        value, BranchPropagatedUser::convertFromInstArray(consumingUses),
+        BranchPropagatedUser::convertFromInstArray(nonConsumingUses));
+  }
 };
 
 /// Returns true if v is an address or trivial.
@@ -405,11 +413,11 @@ struct BorrowScopeIntroducingValue {
   ///
   /// NOTE: Scratch space is used internally to this method to store the end
   /// borrow scopes if needed.
-  bool areInstructionsWithinScope(
-      ArrayRef<BranchPropagatedUser> instructions,
-      SmallVectorImpl<BranchPropagatedUser> &scratchSpace,
-      SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-      DeadEndBlocks &deadEndBlocks) const;
+  bool
+  areInstructionsWithinScope(ArrayRef<SILInstruction *> instructions,
+                             SmallVectorImpl<SILInstruction *> &scratchSpace,
+                             SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
+                             DeadEndBlocks &deadEndBlocks) const;
 
 private:
   /// Internal constructor for failable static constructor. Please do not expand

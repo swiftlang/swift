@@ -213,8 +213,9 @@ protected:
     CS.CG.addConstraint(constraint);
   }
 
-  ResolvedOverloadSetListItem *getResolvedOverloads() const {
-    return CS.resolvedOverloadSets;
+  const llvm::MapVector<ConstraintLocator *, SelectedOverload> &
+  getResolvedOverloads() const {
+    return CS.ResolvedOverloads;
   }
 
   void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
@@ -710,12 +711,12 @@ private:
     if (!repr || repr == typeVar)
       return;
 
-    for (auto *resolved = getResolvedOverloads(); resolved;
-         resolved = resolved->Previous) {
-      if (!resolved->BoundType->isEqual(repr))
+    for (auto elt : getResolvedOverloads()) {
+      auto resolved = elt.second;
+      if (!resolved.boundType->isEqual(repr))
         continue;
 
-      auto &representative = resolved->Choice;
+      auto &representative = resolved.choice;
       if (!representative.isDecl())
         return;
 

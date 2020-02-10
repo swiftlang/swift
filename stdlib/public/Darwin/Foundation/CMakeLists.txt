@@ -32,7 +32,6 @@ add_swift_target_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   NSCoder.swift
   NSDate.swift
   NSDictionary.swift
-  NSError.mm
   NSError.swift
   NSExpression.swift
   NSFastEnumeration.swift

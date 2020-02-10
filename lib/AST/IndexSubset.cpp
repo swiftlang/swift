@@ -1,8 +1,8 @@
-//===-------- IndexSubset.cpp - Swift Differentiable Programming ----------===//
+//===--- IndexSubset.cpp - Fixed-size subset of indices -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -125,7 +125,7 @@ int IndexSubset::findPrevious(int endIndex) const {
     offset = (int)indexAndOffset.second - 1;
   }
   for (; bitWordIndex >= 0; --bitWordIndex, offset = numBitsPerBitWord - 1) {
-    for (; offset < (int)numBitsPerBitWord; --offset) {
+    for (; offset >= 0; --offset) {
       auto index = bitWordIndex * (int)numBitsPerBitWord + offset;
       auto bitWord = getBitWord(bitWordIndex);
       if (!bitWord)

@@ -175,6 +175,10 @@ internal protocol _NSSet: _NSSetCore {
     _ buffer: UnsafeMutablePointer<AnyObject>,
     count: Int
   )
+
+  @objc(getObjects:) func getObjects(
+    _ buffer: UnsafeMutablePointer<AnyObject>
+  )
 }
 
 /// A shadow for the API of NSNumber we will use in the core

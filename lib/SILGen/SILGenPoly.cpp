@@ -569,7 +569,7 @@ ManagedValue Transform::transform(ManagedValue v,
       instanceType = metatypeType.getInstanceType();
 
     auto layout = instanceType.getExistentialLayout();
-    if (layout.explicitSuperclass) {
+    if (layout.getSuperclass()) {
       CanType openedType = OpenedArchetypeType::getAny(inputSubstType);
       SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
@@ -2934,7 +2934,7 @@ buildThunkSignature(SILGenFunction &SGF,
 
   // Add the existing generic signature.
   int depth = 0;
-  GenericSignature baseGenericSig = GenericSignature();
+  GenericSignature baseGenericSig;
   if (inheritGenericSig) {
     if (auto genericSig = SGF.F.getLoweredFunctionType()->getSubstGenericSignature()) {
       baseGenericSig = genericSig;
@@ -2979,7 +2979,7 @@ buildThunkSignature(SILGenFunction &SGF,
     },
     MakeAbstractConformanceForGenericType());
 
-  return genericSig->getCanonicalSignature();
+  return genericSig.getCanonicalSignature();
 }
 
 /// Build the type of a function transformation thunk.
@@ -3602,10 +3602,10 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
         SGM.Types.getConstantInfo(getTypeExpansionContext(), derived).SILFnType;
   }
 
-  SubstitutionMap subs;
-  if (auto *genericEnv = fd->getGenericEnvironment()) {
-    F.setGenericEnvironment(genericEnv);
-    subs = getForwardingSubstitutionMap();
+  auto subs = getForwardingSubstitutionMap();
+  if (auto genericSig = derivedFTy->getSubstGenericSignature()) {
+    subs = SubstitutionMap::get(genericSig, subs);
+
     derivedFTy =
         derivedFTy->substGenericArgs(SGM.M, subs, getTypeExpansionContext());
 

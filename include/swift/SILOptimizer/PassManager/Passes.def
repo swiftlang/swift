@@ -200,6 +200,8 @@ PASS(LICM, "licm",
      "Loop Invariant Code Motion")
 PASS(LateCodeMotion, "late-codemotion",
      "Late Code Motion with Release Hoisting")
+PASS(LateDeadFunctionElimination, "late-deadfuncelim",
+     "Late Dead Function Elimination")
 PASS(LateInliner, "late-inline",
      "Late Function Inlining")
 PASS(LoopCanonicalizer, "loop-canonicalizer",
@@ -305,18 +307,20 @@ PASS(OwnershipDumper, "ownership-dumper",
      "Print Ownership information for Testing")
 PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
-PASS(MarkUninitializedFixup, "mark-uninitialized-fixup",
-     "Temporary pass for staging in mark_uninitialized changes.")
 PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-blocks",
      "Utility pass. Removes all non-term insts from blocks with unreachable terms")
 PASS(SerializeSILPass, "serialize-sil",
      "Utility pass. Serializes the current SILModule")
+PASS(CMOSerializeSILPass, "cmo-serialize-sil",
+     "Utility pass. Serializes the current SILModule for cross-module-optimization")
 PASS(NonInlinableFunctionSkippingChecker, "check-non-inlinable-function-skipping",
      "Utility pass to ensure -experimental-skip-non-inlinable-function-bodies "
      "skips everything it should")
 PASS(YieldOnceCheck, "yield-once-check",
     "Check correct usage of yields in yield-once coroutines")
 PASS(OSLogOptimization, "os-log-optimization", "Optimize os log calls")
+PASS(ForEachLoopUnroll, "for-each-loop-unroll",
+     "Unroll forEach loops over array literals")
 PASS(MandatoryCombine, "mandatory-combine",
     "Perform mandatory peephole combines")
 PASS(BugReducerTester, "bug-reducer-tester",

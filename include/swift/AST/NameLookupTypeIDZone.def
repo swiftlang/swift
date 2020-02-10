@@ -15,8 +15,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+SWIFT_REQUEST(NameLookup, AnyObjectLookupRequest,
+              QualifiedLookupResult(const DeclContext *, DeclName, NLOptions),
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, CustomAttrNominalRequest,
               NominalTypeDecl *(CustomAttr *, DeclContext *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, DirectLookupRequest,
+              TinyPtrVector<ValueDecl *>(DirectLookupDescriptor), Uncached,
               NoLocationInfo)
 SWIFT_REQUEST(NameLookup, ExpandASTScopeRequest,
               ast_scope::ASTScopeImpl* (ast_scope::ASTScopeImpl*, ast_scope::ScopeCreator*),
@@ -34,10 +40,27 @@ SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest,
               DirectlyReferencedTypeDecls(
                   llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned),
               Uncached, HasNearestLocation)
+SWIFT_REQUEST(NameLookup, LookupInModuleRequest,
+              QualifiedLookupResult(const DeclContext *, DeclName, NLKind,
+                                    namelookup::ResolutionKind,
+                                    const DeclContext *),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, ModuleQualifiedLookupRequest,
+              QualifiedLookupResult(
+                  const DeclContext *, ModuleDecl *, DeclNameRef, NLOptions),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, QualifiedLookupRequest,
+              QualifiedLookupResult(
+                  const DeclContext *, SmallVector<NominalTypeDecl *, 4>,
+                  DeclNameRef, NLOptions),
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, SelfBoundsFromWhereClauseRequest,
               SelfBounds(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, SuperclassDeclRequest, ClassDecl *(NominalTypeDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, HasMissingDesignatedInitializersRequest,
+              bool(ClassDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, TypeDeclsFromWhereClauseRequest,
               DirectlyReferencedTypeDecls(ExtensionDecl *), Uncached,

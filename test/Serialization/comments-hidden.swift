@@ -18,7 +18,7 @@
 //
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-testing -module-name comments -emit-module -emit-module-path %t/comments.swiftmodule -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc -emit-module-source-info-path %t/comments.swiftsourceinfo %s
-// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t > %t.testing.txt
+// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -enable-swiftsourceinfo  -source-filename %s -I %t > %t.testing.txt
 // RUN: %FileCheck %s -check-prefix=SOURCE-LOC < %t.testing.txt
 
 /// PublicClass Documentation

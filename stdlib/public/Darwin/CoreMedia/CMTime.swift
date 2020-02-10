@@ -62,7 +62,7 @@ extension CMTime {
   }
 
   public var seconds: Double {
-    return CMTimeGetSeconds(self) as Double
+    return CMTimeGetSeconds(self)
   }
 
   public func convertScale(_ newTimescale: Int32, method: CMTimeRoundingMethod)

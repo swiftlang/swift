@@ -13,12 +13,13 @@
 #define DEBUG_TYPE "ConstExpr"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/NullablePtr.h"
-#include "swift/AST/SemanticAttrs.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
@@ -55,6 +56,8 @@ enum class WellKnownFunction {
   StringEquals,
   // String.percentEscapedString.getter
   StringEscapePercent,
+  // BinaryInteger.description.getter
+  BinaryIntegerDescription,
   // _assertionFailure(_: StaticString, _: StaticString, file: StaticString,...)
   AssertionFailure,
   // A function taking one argument that prints the symbolic value of the
@@ -82,6 +85,8 @@ static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
     return WellKnownFunction::StringEquals;
   if (fn->hasSemanticsAttr(semantics::STRING_ESCAPE_PERCENT_GET))
     return WellKnownFunction::StringEscapePercent;
+  if (fn->hasSemanticsAttr(semantics::BINARY_INTEGER_DESCRIPTION))
+    return WellKnownFunction::BinaryIntegerDescription;
   if (fn->hasSemanticsAttrThatStartsWith("programtermination_point"))
     return WellKnownFunction::AssertionFailure;
   // A call to a function with the following semantics annotation will be
@@ -476,6 +481,9 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
                                      evaluator.getAllocator());
   }
 
+  if (auto *convertEscapeInst = dyn_cast<ConvertEscapeToNoEscapeInst>(value))
+    return getConstantValue(convertEscapeInst->getOperand());
+
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
   // Otherwise, we don't know how to handle this.
@@ -779,6 +787,13 @@ extractStaticStringValue(SymbolicValue staticString) {
   return staticStringProps[0].getStringValue();
 }
 
+static Optional<StringRef>
+extractStringOrStaticStringValue(SymbolicValue stringValue) {
+  if (stringValue.getKind() == SymbolicValue::String)
+    return stringValue.getStringValue();
+  return extractStaticStringValue(stringValue);
+}
+
 /// If the specified type is a Swift.Array of some element type, then return the
 /// element type.  Otherwise, return a null Type.
 static Type getArrayElementType(Type ty) {
@@ -786,6 +801,28 @@ static Type getArrayElementType(Type ty) {
     if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
       return bgst->getGenericArgs()[0];
   return Type();
+}
+
+/// Check if the given type \p ty is a stdlib integer type and if so return
+/// whether the type is signed. Returns \c None if \p ty is not a stdlib integer
+/// type, \c true if it is a signed integer type and \c false if it is an
+/// unsigned integer type.
+static Optional<bool> getSignIfStdlibIntegerType(Type ty) {
+  StructDecl *decl = ty->getStructOrBoundGenericStruct();
+  if (!decl)
+    return None;
+  ASTContext &astCtx = ty->getASTContext();
+  if (decl == astCtx.getIntDecl() || decl == astCtx.getInt8Decl() ||
+      decl == astCtx.getInt16Decl() || decl == astCtx.getInt32Decl() ||
+      decl == astCtx.getInt64Decl()) {
+    return true;
+  }
+  if (decl == astCtx.getUIntDecl() || decl == astCtx.getUInt8Decl() ||
+      decl == astCtx.getUInt16Decl() || decl == astCtx.getUInt32Decl() ||
+      decl == astCtx.getUInt64Decl()) {
+    return false;
+  }
+  return None;
 }
 
 /// Given a call to a well known function, collect its arguments as constants,
@@ -802,8 +839,8 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     for (unsigned i = 0; i < apply->getNumArguments(); i++) {
       SILValue argument = apply->getArgument(i);
       SymbolicValue argValue = getConstantValue(argument);
-      Optional<StringRef> stringOpt = extractStaticStringValue(argValue);
-
+      Optional<StringRef> stringOpt =
+          extractStringOrStaticStringValue(argValue);
       // The first argument is a prefix that specifies the kind of failure
       // this is.
       if (i == 0) {
@@ -815,7 +852,6 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
         }
         continue;
       }
-
       if (stringOpt) {
         message += ": ";
         message += stringOpt.getValue();
@@ -1063,6 +1099,42 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     setValue(apply, resultVal);
     return None;
   }
+  case WellKnownFunction::BinaryIntegerDescription: {
+    // BinaryInteger.description.getter
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           conventions.getNumParameters() == 1 && apply->hasSubstitutions() &&
+           "unexpected BinaryInteger.description.getter signature");
+    // Get the type of the argument and check if it is a signed or
+    // unsigned integer.
+    SILValue integerArgument = apply->getOperand(1);
+    CanType argumentType = substituteGenericParamsAndSimpify(
+        integerArgument->getType().getASTType());
+    Optional<bool> isSignedIntegerType =
+        getSignIfStdlibIntegerType(argumentType);
+    if (!isSignedIntegerType.hasValue()) {
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::InvalidOperandValue);
+    }
+    // Load the stdlib integer's value and convert it to a string.
+    SymbolicValue stdlibIntegerValue =
+        getConstAddrAndLoadResult(integerArgument);
+    if (!stdlibIntegerValue.isConstant()) {
+      return stdlibIntegerValue;
+    }
+    SymbolicValue builtinIntegerValue =
+        stdlibIntegerValue.lookThroughSingleElementAggregates();
+    assert(builtinIntegerValue.getKind() == SymbolicValue::Integer &&
+           "stdlib integer type must store only a builtin integer");
+    APInt integer = builtinIntegerValue.getIntegerValue();
+    SmallString<8> integerString;
+    isSignedIntegerType.getValue() ? integer.toStringSigned(integerString)
+                                   : integer.toStringUnsigned(integerString);
+    SymbolicValue resultVal =
+        SymbolicValue::getString(integerString.str(), evaluator.getAllocator());
+    setValue(apply, resultVal);
+    return None;
+  }
   case WellKnownFunction::DebugPrint: {
     assert(apply->getNumArguments() == 1 &&
            "debug_print function must take exactly one argument");
@@ -1147,8 +1219,10 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
           calleeFnType->getWitnessMethodConformanceOrInvalid().getRequirement();
       // Compute a mapping that maps the Self type of the protocol given by
       // 'requirement' to the concrete type available in the substitutionMap.
-      auto protoSelfToConcreteType =
-          apply->getSubstitutionMap().subst(substitutionMap);
+      SubstitutionMap applySubstMap = apply->getSubstitutionMap();
+      auto protoSelfToConcreteType = substitutionMap.empty()
+                                         ? applySubstMap
+                                         : applySubstMap.subst(substitutionMap);
       // Get a concrete protocol conformance by using the mapping for the
       // Self type of the requirement.
       auto conf = protoSelfToConcreteType.lookupConformance(
@@ -1174,7 +1248,8 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     // or conformance, with the mapping introduced by the call itself.  This
     // ensures that the callee's substitution map can map from its type
     // namespace back to concrete types and conformances.
-    calleeSubMap = callSubMap.subst(substitutionMap);
+    calleeSubMap = substitutionMap.empty() ? callSubMap
+                                           : callSubMap.subst(substitutionMap);
   }
 
   // Now that we have successfully folded all of the parameters, we can evaluate
@@ -1606,13 +1681,14 @@ llvm::Optional<SymbolicValue> ConstExprFunctionState::evaluateClosureCreation(
       }
       captures.push_back({capturedSILValue, capturedSymbolicValue});
     }
-    callSubstMap = papply->getSubstitutionMap().subst(this->substitutionMap);
+    SubstitutionMap applySubstMap = papply->getSubstitutionMap();
+    callSubstMap = substitutionMap.empty()
+                       ? applySubstMap
+                       : applySubstMap.subst(substitutionMap);
   }
 
-  SILType closureType = closureInst->getType();
-  assert(closureType.is<SILFunctionType>());
   auto closureVal = SymbolicValue::makeClosure(
-      target, captures, callSubstMap, closureType, evaluator.getAllocator());
+      target, captures, callSubstMap, closureInst, evaluator.getAllocator());
   setValue(closureInst, closureVal);
   return None;
 }
@@ -1680,7 +1756,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   if (auto apply = dyn_cast<ApplyInst>(inst))
     return computeCallResult(apply);
 
-  if (isa<StoreInst>(inst)) {
+  if (isa<StoreInst>(inst) || isa<StoreBorrowInst>(inst)) {
     auto stored = getConstantValue(inst->getOperand(0));
     if (!stored.isConstant())
       return stored;
@@ -1831,6 +1907,50 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
     setValue(caseBB->getArgument(0), argument);
 
     return {caseBB->begin(), None};
+  }
+
+  if (isa<CheckedCastBranchInst>(inst)) {
+    CheckedCastBranchInst *checkedCastInst =
+        dyn_cast<CheckedCastBranchInst>(inst);
+    SymbolicValue value = getConstantValue(checkedCastInst->getOperand());
+    if (!value.isConstant())
+      return {None, value};
+
+    // Determine success or failure of this cast.
+    CanType sourceType;
+    if (value.getKind() == SymbolicValue::Array) {
+      sourceType = value.getArrayType()->getCanonicalType();
+    } else {
+      // Here, the source type cannot be an address-only type as this is
+      // not a CheckedCastBranchAddr inst. Therefore, it has to be a struct
+      // type or String or Metatype. Since the types of aggregates are not
+      // tracked, we recover it from the declared type of the source operand
+      // and generic parameter subsitutions in the interpreter state.
+      sourceType = substituteGenericParamsAndSimpify(
+                                      checkedCastInst->getSourceFormalType());
+    }
+    CanType targetType = substituteGenericParamsAndSimpify(
+        checkedCastInst->getTargetFormalType());
+    DynamicCastFeasibility castResult = classifyDynamicCast(
+        inst->getModule().getSwiftModule(), sourceType, targetType);
+    if (castResult == DynamicCastFeasibility::MaySucceed) {
+      return {None,
+              getUnknown(evaluator, inst, UnknownReason::UnknownCastResult)};
+    }
+    // Determine the basic block to jump to.
+    SILBasicBlock *resultBB =
+        (castResult == DynamicCastFeasibility::WillSucceed)
+            ? checkedCastInst->getSuccessBB()
+            : checkedCastInst->getFailureBB();
+    // Set up the arguments of the basic block, if any.
+    if (resultBB->getNumArguments() == 0)
+      return {resultBB->begin(), None};
+    // There should be at most one argument to the basic block, which is the
+    // casted value with the right type, or the input value if the cast fails,
+    // and inst is in OSSA.
+    assert(resultBB->getNumArguments() == 1);
+    setValue(resultBB->getArgument(0), value);
+    return {resultBB->begin(), None};
   }
 
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr: Unknown Branch Instruction: " << *inst
@@ -2125,7 +2245,12 @@ bool swift::isKnownConstantEvaluableFunction(SILFunction *fun) {
   return classifyFunction(fun).hasValue();
 }
 
-bool swift::isConstantEvaluable(SILFunction *fun) {
+bool swift::hasConstantEvaluableAnnotation(SILFunction *fun) {
   assert(fun && "fun should not be nullptr");
   return fun->hasSemanticsAttr("constant_evaluable");
+}
+
+bool swift::isConstantEvaluable(SILFunction *fun) {
+  return hasConstantEvaluableAnnotation(fun) ||
+         isKnownConstantEvaluableFunction(fun);
 }

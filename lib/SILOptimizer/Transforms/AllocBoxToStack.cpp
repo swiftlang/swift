@@ -634,7 +634,7 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
   auto *Fn = FuncBuilder.createFunction(
       SILLinkage::Shared, ClonedName, ClonedTy, Orig->getGenericEnvironment(),
-      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
+      Orig->getLocation(), Orig->isBare(), Orig->isTransparent(), Serialized,
       IsNotDynamic, Orig->getEntryCount(), Orig->isThunk(),
       Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());

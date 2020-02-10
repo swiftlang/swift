@@ -64,6 +64,7 @@ _ = PrivateInit() // expected-error {{'PrivateInit' initializer is inaccessible 
 // TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' initializer is inaccessible due to 'private' protection level
 
 var s = StructWithPrivateSetter()
+// expected-note@-1 3{{did you mean 's'?}}
 s.x = 42 // expected-error {{cannot assign to property: 'x' setter is inaccessible}}
 
 class Sub : Base {

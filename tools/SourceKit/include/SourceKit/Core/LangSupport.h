@@ -89,6 +89,7 @@ struct CodeCompletionInfo {
   StringRef DocBrief;
   StringRef AssocUSRs;
   UIdent SemanticContext;
+  UIdent TypeRelation;
   Optional<uint8_t> ModuleImportDepth;
   bool NotRecommended;
   unsigned NumBytesToErase;
@@ -653,6 +654,7 @@ public:
 
   virtual void
   codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
+               OptionsDictionary *options,
                CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
                Optional<VFSOptions> vfsOptions) = 0;
 
@@ -801,13 +803,15 @@ public:
   virtual void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf,
                                         unsigned Offset,
                                         ArrayRef<const char *> Args,
-                                        TypeContextInfoConsumer &Consumer) = 0;
+                                        TypeContextInfoConsumer &Consumer,
+                                        Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void getConformingMethodList(llvm::MemoryBuffer *inputBuf,
                                        unsigned Offset,
                                        ArrayRef<const char *> Args,
                                        ArrayRef<const char *> ExpectedTypes,
-                                       ConformingMethodListConsumer &Consumer) = 0;
+                                       ConformingMethodListConsumer &Consumer,
+                                       Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void getStatistics(StatisticsReceiver) = 0;
 };

@@ -39,6 +39,9 @@ using llvm::BCVBR;
 /// Magic number for serialized module files.
 const unsigned char SWIFTMODULE_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x0E };
 
+/// Alignment of each serialized modules inside a .swift_ast section.
+const unsigned char SWIFTMODULE_ALIGNMENT = 4;
+
 /// Serialized module format major version number.
 ///
 /// Always 0 for Swift 1.x - 4.x.
@@ -52,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 526; // @_dynamicReplacement adjustments
+const uint16_t SWIFTMODULE_VERSION_MINOR = 538; // swiftmodules from swiftinterfaces have nested types tables
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -67,6 +70,10 @@ using TypeID = DeclID;
 using TypeIDField = DeclIDField;
 
 using TypeIDWithBitField = BCFixed<32>;
+
+// ClangTypeID must be the same as DeclID because it is stored in the same way.
+using ClangTypeID = TypeID;
+using ClangTypeIDField = TypeIDField;
 
 // IdentifierID must be the same as DeclID because it is stored in the same way.
 using IdentifierID = DeclID;
@@ -232,6 +239,14 @@ enum class DifferentiabilityKind : uint8_t {
 };
 using DifferentiabilityKindField = BCFixed<2>;
 
+// These IDs must \em not be renumbered or reordered without incrementing the
+// module version.
+enum class AutoDiffDerivativeFunctionKind : uint8_t {
+  JVP = 0,
+  VJP
+};
+using AutoDiffDerivativeFunctionKindField = BCFixed<1>;
+
 enum class ForeignErrorConventionKind : uint8_t {
   ZeroResult,
   NonZeroResult,
@@ -338,6 +353,13 @@ using ParameterConventionField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
+enum class SILParameterDifferentiability : uint8_t {
+  DifferentiableOrNotApplicable,
+  NotDifferentiable,
+};
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
 enum class ResultConvention : uint8_t {
   Indirect,
   Owned,
@@ -437,6 +459,7 @@ enum class DefaultArgumentKind : uint8_t {
   None = 0,
   Normal,
   File,
+  FilePath,
   Line,
   Column,
   Function,
@@ -529,6 +552,18 @@ enum class ImportControl : uint8_t {
   ImplementationOnly
 };
 using ImportControlField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class ClangDeclPathComponentKind : uint8_t {
+  Record = 0,
+  Enum,
+  Namespace,
+  Typedef,
+  TypedefAnonDecl,
+  ObjCInterface,
+  ObjCProtocol,
+};
 
 // Encodes a VersionTuple:
 //
@@ -833,6 +868,11 @@ namespace decls_block {
 #include "DeclTypeRecordNodes.def"
   };
 
+  using ClangTypeLayout = BCRecordLayout<
+    CLANG_TYPE,
+    BCArray<BCVBR<6>>
+  >;
+
   using BuiltinAliasTypeLayout = BCRecordLayout<
     BUILTIN_ALIAS_TYPE,
     DeclIDField, // typealias decl
@@ -884,6 +924,7 @@ namespace decls_block {
     FUNCTION_TYPE,
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
+    ClangTypeIDField, // type
     BCFixed<1>,  // noescape?
     BCFixed<1>,   // throws?
     DifferentiabilityKindField // differentiability kind
@@ -893,12 +934,13 @@ namespace decls_block {
 
   using FunctionParamLayout = BCRecordLayout<
     FUNCTION_PARAM,
-    IdentifierIDField,  // name
-    TypeIDField,        // type
-    BCFixed<1>,         // vararg?
-    BCFixed<1>,         // autoclosure?
-    BCFixed<1>,         // non-ephemeral?
-    ValueOwnershipField // inout, shared or owned?
+    IdentifierIDField,   // name
+    TypeIDField,         // type
+    BCFixed<1>,          // vararg?
+    BCFixed<1>,          // autoclosure?
+    BCFixed<1>,          // non-ephemeral?
+    ValueOwnershipField, // inout, shared or owned?
+    BCFixed<1>           // noDerivative?
   >;
 
   using MetatypeTypeLayout = BCRecordLayout<
@@ -978,11 +1020,15 @@ namespace decls_block {
     BCVBR<6>,              // number of parameters
     BCVBR<5>,              // number of yields
     BCVBR<5>,              // number of results
+    BCFixed<1>,            // generic signature implied
     GenericSignatureIDField, // generic signature
+    SubstitutionMapIDField, // substitutions
+    ClangTypeIDField,      // clang function type, for foreign conventions
     BCArray<TypeIDField>   // parameter types/conventions, alternating
                            // followed by result types/conventions, alternating
                            // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
+    // Optionally a substitution map (for substituted function types)
   >;
   
   using SILBlockStorageTypeLayout = BCRecordLayout<
@@ -1098,6 +1144,7 @@ namespace decls_block {
     BCFixed<1>,             // implicit?
     BCFixed<1>,             // explicitly objc?
     BCFixed<1>,             // inherits convenience initializers from its superclass?
+    BCFixed<1>,             // has missing designated initializers?
     GenericSignatureIDField, // generic environment
     TypeIDField,            // superclass
     AccessLevelField,       // access level
@@ -1167,6 +1214,7 @@ namespace decls_block {
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
     BCFixed<1>,   // is this the backing storage for a lazy property?
+    BCFixed<1>,   // top level global?
     DeclIDField,  // if this is a lazy property, this is the backing storage
     OpaqueReadOwnershipField,   // opaque read ownership
     ReadImplKindField,   // read implementation
@@ -1766,6 +1814,23 @@ namespace decls_block {
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
+  using DerivativeDeclAttrLayout = BCRecordLayout<
+    Derivative_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
+    IdentifierIDField, // Original name.
+    DeclIDField, // Original function declaration.
+    AutoDiffDerivativeFunctionKindField, // Derivative function kind.
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+  >;
+
+  using TransposeDeclAttrLayout = BCRecordLayout<
+    Transpose_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
+    IdentifierIDField, // Original name.
+    DeclIDField, // Original function declaration.
+    BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
+  >;
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
   using CLASS##DeclAttrLayout = BCRecordLayout< \
     CLASS##_DECL_ATTR, \
@@ -1872,7 +1937,8 @@ namespace index_block {
     ORDERED_TOP_LEVEL_DECLS,
 
     SUBSTITUTION_MAP_OFFSETS,
-    LastRecordKind = SUBSTITUTION_MAP_OFFSETS,
+    CLANG_TYPE_OFFSETS,
+    LastRecordKind = CLANG_TYPE_OFFSETS,
   };
   
   constexpr const unsigned RecordIDFieldWidth = 5;

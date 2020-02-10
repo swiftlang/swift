@@ -131,6 +131,7 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
   if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
     switch (E->getKind()) {
     case MagicIdentifierLiteralExpr::File:
+    case MagicIdentifierLiteralExpr::FilePath:
     case MagicIdentifierLiteralExpr::Function:
       return TypeChecker::getProtocol(
           Context, expr->getLoc(),
@@ -262,7 +263,7 @@ static void bindExtensions(SourceFile &SF) {
       if (!SF)
         continue;
 
-      for (auto D : SF->Decls) {
+      for (auto D : SF->getTopLevelDecls()) {
         if (auto ED = dyn_cast<ExtensionDecl>(D))
           if (!tryBindExtension(ED))
             worklist.push_back(ED);
@@ -322,15 +323,13 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   TC.definedFunctions.clear();
 }
 
-void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
+void swift::performTypeChecking(SourceFile &SF) {
   return (void)evaluateOrDefault(SF.getASTContext().evaluator,
-                                 TypeCheckSourceFileRequest{&SF, StartElem},
-                                 false);
+                                 TypeCheckSourceFileRequest{&SF}, false);
 }
 
 llvm::Expected<bool>
-TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
-                                     SourceFile *SF, unsigned StartElem) const {
+TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   assert(SF && "Source file cannot be null!");
   assert(SF->ASTStage != SourceFile::TypeChecked &&
          "Should not be re-typechecking this file!");
@@ -351,7 +350,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
 
   // Make sure that name binding has been completed before doing any type
   // checking.
-  performNameBinding(*SF, StartElem);
+  performNameBinding(*SF);
                                   
   // Could build scope maps here because the AST is stable now.
 
@@ -368,7 +367,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
     if (!Ctx.LangOpts.DisableAvailabilityChecking) {
       // Build the type refinement hierarchy for the primary
       // file before type checking.
-      TypeChecker::buildTypeRefinementContextHierarchy(*SF, StartElem);
+      TypeChecker::buildTypeRefinementContextHierarchy(*SF);
     }
 
     // Resolve extensions. This has to occur first during type checking,
@@ -377,7 +376,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
     ::bindExtensions(*SF);
 
     // Type check the top-level elements of the source file.
-    for (auto D : llvm::makeArrayRef(SF->Decls).slice(StartElem)) {
+    for (auto D : SF->getTopLevelDecls()) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         // Immediately perform global name-binding etc.
         TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
@@ -390,7 +389,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
     // If we're in REPL mode, inject temporary result variables and other stuff
     // that the REPL needs to synthesize.
     if (SF->Kind == SourceFileKind::REPL && !Ctx.hadError())
-      TypeChecker::processREPLTopLevel(*SF, StartElem);
+      TypeChecker::processREPLTopLevel(*SF);
 
     typeCheckFunctionsAndExternalDecls(*SF, TC);
   }
@@ -464,7 +463,7 @@ void swift::checkInconsistentImplementationOnlyImports(ModuleDecl *MainModule) {
     if (!SF)
       continue;
 
-    for (auto *topLevelDecl : SF->Decls) {
+    for (auto *topLevelDecl : SF->getTopLevelDecls()) {
       auto *nextImport = dyn_cast<ImportDecl>(topLevelDecl);
       if (!nextImport)
         continue;
@@ -574,6 +573,8 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
   auto &Ctx = PBD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
   (void)createTypeChecker(Ctx);
+  (void)evaluateOrDefault(
+      Ctx.evaluator, PatternBindingEntryRequest{PBD, bindingIndex}, nullptr);
   TypeChecker::typeCheckPatternBinding(PBD, bindingIndex);
 }
 
@@ -710,4 +711,9 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
 
 void swift::bindExtensions(SourceFile &SF) {
   ::bindExtensions(SF);
+}
+
+LookupResult
+swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
+  return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
 }

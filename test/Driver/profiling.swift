@@ -20,6 +20,8 @@
 // RUN: %swiftc_driver -driver-print-jobs -profile-generate -target x86_64-unknown-linux-gnu %s | %FileCheck -check-prefix=CHECK -check-prefix=LINUX %s
 // RUN: %swiftc_driver -driver-print-jobs -profile-generate -target x86_64-unknown-windows-msvc %s | %FileCheck -check-prefix=CHECK -check-prefix=WINDOWS %s
 
+// RUN: %swiftc_driver -driver-print-jobs -profile-generate -target wasm32-unknown-wasi %s | %FileCheck -check-prefix CHECK -check-prefix WASI %s
+
 // CHECK: swift
 // CHECK: -profile-generate
 
@@ -51,6 +53,10 @@
 // WINDOWS: clang{{(\.exe)?"? }}
 // WINDOWS: lib{{(\\\\|/)}}swift{{(\\\\|/)}}clang{{(\\\\|/)}}lib{{(\\\\|/)}}windows{{(\\\\|/)}}clang_rt.profile-x86_64.lib
 // WINDOWS: -u__llvm_profile_runtime
+
+// WASI: clang{{(\.exe)?"? }}
+// WASI: lib{{(\\\\|/)}}swift{{(\\\\|/)}}clang{{(\\\\|/)}}lib{{(\\\\|/)}}wasi{{(\\\\|/)}}libclang_rt.profile-wasm32.a
+// WASI: -u__llvm_profile_runtime
 
 // RUN: not %swiftc_driver -driver-print-jobs -profile-generate -profile-use=/dev/null %s 2>&1 | %FileCheck -check-prefix=MIX_GEN_USE %s
 // MIX_GEN_USE: conflicting options '-profile-generate' and '-profile-use'

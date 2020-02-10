@@ -314,18 +314,20 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       super::noteStartOfGenericRequirements(forClass);
     }
 
-    void addGenericWitnessTable(ClassDecl *forClass) {
+    void addGenericWitnessTable(GenericRequirement requirement,
+                                ClassDecl *forClass) {
       if (forClass == Target) {
         Layout.NumImmediateMembers++;
       }
-      super::addGenericWitnessTable(forClass);
+      super::addGenericWitnessTable(requirement, forClass);
     }
 
-    void addGenericArgument(ClassDecl *forClass) {
+    void addGenericArgument(GenericRequirement requirement,
+                            ClassDecl *forClass) {
       if (forClass == Target) {
         Layout.NumImmediateMembers++;
       }
-      super::addGenericArgument(forClass);
+      super::addGenericArgument(requirement, forClass);
     }
 
     void addMethod(SILDeclRef fn) {

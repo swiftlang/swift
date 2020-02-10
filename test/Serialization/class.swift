@@ -46,9 +46,9 @@ var p = Pair(a: 1, b: 2.5)
 p.first = 2
 p.second = 5.0
 
-struct Int {}
+struct MyInt {}
 
-var gc = GenericCtor<Int>(42)
+var gc = GenericCtor<MyInt>(42)
 gc.doSomething(42)
 
 

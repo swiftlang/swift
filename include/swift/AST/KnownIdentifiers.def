@@ -142,7 +142,10 @@ IDENTIFIER_WITH_NAME(NativeClassLayout, "_NativeClass")
 
 // Operators
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")
+IDENTIFIER_WITH_NAME(LessThanOperator, "<")
 IDENTIFIER_WITH_NAME(EqualsOperator, "==")
+IDENTIFIER_WITH_NAME(NegationOperator, "!")
+IDENTIFIER_WITH_NAME(derived_enum_less_than, "__derived_enum_less_than")
 IDENTIFIER_WITH_NAME(derived_enum_equals, "__derived_enum_equals")
 IDENTIFIER_WITH_NAME(derived_struct_equals, "__derived_struct_equals")
 
@@ -196,6 +199,9 @@ IDENTIFIER_(nsError)
 
 // Custom string interpolation type used by os log APIs.
 IDENTIFIER(OSLogMessage)
+
+// Differentiable programming
+IDENTIFIER(TangentVector)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

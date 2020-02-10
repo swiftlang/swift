@@ -30,7 +30,7 @@ static void declareOptionalType(ASTContext &ctx, SourceFile *fileForLookups,
   auto decl = new (ctx) EnumDecl(SourceLoc(), name, SourceLoc(),
                                  /*inherited*/{}, params, fileForLookups);
   wrapped->setDeclContext(decl);
-  fileForLookups->Decls.push_back(decl);
+  fileForLookups->addTopLevelDecl(decl);
 }
 
 TestContext::TestContext(ShouldDeclareOptionalTypes optionals)

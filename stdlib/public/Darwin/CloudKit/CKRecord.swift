@@ -58,17 +58,17 @@ extension CKRecord {
 
     @available(swift 4.2)
     public enum SystemType {
-        public static let userRecord: CKRecord.RecordType = __CKRecordTypeUserRecord as CKRecord.RecordType
+        public static let userRecord: CKRecord.RecordType = __CKRecordTypeUserRecord
         @available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
-        public static let share: CKRecord.RecordType = __CKRecordTypeShare as CKRecord.RecordType
+        public static let share: CKRecord.RecordType = __CKRecordTypeShare
     }
     
     @available(swift 4.2)
     public enum SystemFieldKey {
         @available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
-        public static let parent: CKRecord.FieldKey = __CKRecordParentKey as CKRecord.RecordType
+        public static let parent: CKRecord.FieldKey = __CKRecordParentKey
         @available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
-        public static let share: CKRecord.FieldKey = __CKRecordShareKey as CKRecord.RecordType
+        public static let share: CKRecord.FieldKey = __CKRecordShareKey
     }
 }
 

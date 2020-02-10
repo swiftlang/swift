@@ -45,15 +45,21 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_34 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_35 | %FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_36 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_37 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_38 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_37 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_38 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_39 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_40 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_41 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_42 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_43 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_44 | %FileCheck %s -check-prefix=UNRESOLVED_3
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_AVAIL_1 | %FileCheck %s -check-prefix=ENUM_AVAIL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OPTIONS_AVAIL_1 | %FileCheck %s -check-prefix=OPTIONS_AVAIL_1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_LITERAL_1 | %FileCheck %s -check-prefix=WITH_LITERAL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_LITERAL_2 | %FileCheck %s -check-prefix=WITH_LITERAL_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_LITERAL_3 | %FileCheck %s -check-prefix=WITH_LITERAL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_LITERAL_3 | %FileCheck %s -check-prefix=WITH_LITERAL_3
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INVALID_1
 
@@ -109,6 +115,14 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPEPARAM_IN_CONTEXTTYPE_1 | %FileCheck %s -check-prefix=TYPEPARAM_IN_CONTEXTTYPE_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_2 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_3 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_4 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_5 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_6 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_CONDITION | %FileCheck %s -check-prefix=TERNARY_CONDITION
+
 enum SomeEnum1 {
   case South
   case North
@@ -119,7 +133,7 @@ enum SomeEnum2 {
   case West
 }
 
-enum SomeEnum3 {
+enum SomeEnum3: Hashable {
   case Payload(SomeEnum1)
 }
 
@@ -248,25 +262,25 @@ class C4 {
   }
 }
 // UNRESOLVED_3: Begin completions, 2 items
-// UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#]; name=North
-// UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#]; name=South
+// UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
+// UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
 // UNRESOLVED_3-NOT: SomeOptions1
 // UNRESOLVED_3-NOT: SomeOptions2
 // UNRESOLVED_3-NOT: none
 // UNRESOLVED_3-NOT: some(
 
 // UNRESOLVED_3_OPT: Begin completions, 5 items
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#];
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#SomeEnum1?#]; name=nil
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<SomeEnum1>#]; name=none
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#SomeEnum1#})[#Optional<SomeEnum1>#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific: none[#Optional<SomeEnum1>#]; name=none
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
 // UNRESOLVED_3_OPT-NOT: init({#(some):
 // UNRESOLVED_3_OPT-NOT: init({#nilLiteral:
 
 // UNRESOLVED_3_OPTOPTOPT: Begin completions, 5 items
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#SomeEnum1???#]; name=nil
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<SomeEnum1??>#]; name=none
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
@@ -283,8 +297,8 @@ extension Optional where Wrapped == Somewhere {
 func testOptionalWithCustomExtension() {
   var _: Somewhere? = .#^UNRESOLVED_OPT_4^#
 // UNRESOLVED_OPT_4: Begin completions, 7 items
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     earth[#Somewhere#];
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     mars[#Somewhere#];
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     earth[#Somewhere#];
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     mars[#Somewhere#];
 // UNRESOLVED_OPT_4-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#Somewhere?#]; name=nil
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<Somewhere>#]; name=none
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     some({#Somewhere#})[#Optional<Somewhere>#];
@@ -388,14 +402,20 @@ let _: [SomeEnum1:SomeOptions1] = [.South:.Option1, .South:.#^UNRESOLVED_35^#]
 let _: [SomeEnum1:SomeOptions1] = [.South:.Option1, .#^UNRESOLVED_36^#:.Option1]
 let _: [SomeEnum1:SomeOptions1] = [.South:.Option1, .#^UNRESOLVED_37^#]
 let _: [SomeEnum1:SomeOptions1] = [.South:.Option1, .#^UNRESOLVED_38^#:]
+let _: [SomeEnum1:SomeOptions1] = [.#^UNRESOLVED_39^#]
+let _: [SomeEnum1:SomeOptions1] = [.#^UNRESOLVED_40^#:]
+let _: [SomeEnum1:SomeEnum3] = [.South:.Payload(.South), .South: .Payload(.#^UNRESOLVED_41^#)]
+let _: [SomeEnum3:SomeEnum1] = [.Payload(.South):.South, .Payload(.#^UNRESOLVED_42^#):.South]
+let _: [SomeEnum3:SomeEnum1] = [.Payload(.South):.South, .Payload(.#^UNRESOLVED_43^#):]
+let _: [SomeEnum3:SomeEnum1] = [.Payload(.South):.South, .Payload(.#^UNRESOLVED_44^#)]
 
 func testAvail1(_ x: EnumAvail1) {
   testAvail1(.#^ENUM_AVAIL_1^#)
 }
 // ENUM_AVAIL_1: Begin completions, 2 items
 // ENUM_AVAIL_1-NOT: AAA
-// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific:     aaa[#EnumAvail1#];
-// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific/NotRecommended: BBB[#EnumAvail1#];
+// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: aaa[#EnumAvail1#];
+// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific/NotRecommended/TypeRelation[Identical]: BBB[#EnumAvail1#];
 // ENUM_AVAIL_1-NOT: AAA
 // ENUM_AVAIL_1: End completions
 
@@ -420,7 +440,7 @@ func testWithLiteral1() {
   let s: S
   _ = s.takeEnum(thing: .#^WITH_LITERAL_1^#, other: 1.0)
 // WITH_LITERAL_1: Begin completions, 1 items
-// WITH_LITERAL_1-NEXT: Decl[EnumElement]/ExprSpecific:     myCase[#S.MyEnum#];
+// WITH_LITERAL_1-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myCase[#S.MyEnum#];
 // WITH_LITERAL_1-NEXT: End completions
 }
 func testWithLiteral2() {
@@ -443,6 +463,9 @@ func testWithLiteral3() {
     func takeEnum(thing: MyEnum, other: Double) {}
     func test(s: S) {
       _ = s.takeEnum(thing: .#^WITH_LITERAL_3^#, other: 1.0)
+// WITH_LITERAL_3: Begin completions, 1 items
+// WITH_LITERAL_3-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myCase[#MyEnum#];
+// WITH_LITERAL_3-NEXT: End completions
     }
   }
 }
@@ -457,9 +480,9 @@ func enumFromOtherFile() -> EnumFromOtherFile {
   return .#^OTHER_FILE_1^# // Don't crash.
 }
 // OTHER_FILE_1: Begin completions
-// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     b({#String#})[#EnumFromOtherFile#];
-// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     a({#Int#})[#EnumFromOtherFile#];
-// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     c[#EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: b({#String#})[#EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: a({#Int#})[#EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: c[#EnumFromOtherFile#];
 // OTHER_FILE_1: End completions
 
 struct NonOptSet {
@@ -499,8 +522,8 @@ func testInStringInterpolation() {
   let y = "enum: \(.#^STRING_INTERPOLATION_INVALID^#)" // Dont'crash.
 }
 // STRING_INTERPOLATION_1: Begin completions
-// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific:     foo[#MyEnum#];
-// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific:     bar[#MyEnum#];
+// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: foo[#MyEnum#];
+// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: bar[#MyEnum#];
 // STRING_INTERPOLATION_1: End completions
 
 class BaseClass {
@@ -584,10 +607,10 @@ struct HasOverloaded {
 func testOverload(val: HasOverloaded) {
   let _ = val.takeEnum(.#^OVERLOADED_METHOD_1^#)
 // OVERLOADED_METHOD_1: Begin completions, 4 items
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#]; name=South
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#]; name=North
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     East[#SomeEnum2#]; name=East
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     West[#SomeEnum2#]; name=West
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: East[#SomeEnum2#]; name=East
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: West[#SomeEnum2#]; name=West
 // OVERLOADED_METHOD_1: End completions
 
   let _ = HasOverloaded.init(e: .#^OVERLOADED_INIT_1^#)
@@ -716,4 +739,25 @@ func testTypeParamInContextType() {
 // TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[Constructor]/CurrNominal:      init()[#MyStruct<MyProtocol>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: myProtocolOption[#MyStruct<ConcreteMyProtocol>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1: End completions
+}
+
+func testTernaryOperator(cond: Bool) {
+  let _: SomeEnum1 = cond ? .#^TERNARY_1^#
+  func sync(){}
+  let _: SomeEnum1 = cond ? .#^TERNARY_2^# :
+  func sync(){}
+  let _: SomeEnum1 = cond ? .#^TERNARY_3^# : .South
+  func sync(){}
+  let _: SomeEnum1 = cond ? .South : .#^TERNARY_4^#
+}
+
+func testTernaryOperator2(cond: Bool) {
+  let _: SomeEnum1 = cond ? .#^TERNARY_5^# : .bogus
+  func sync(){}
+  let _: SomeEnum1 = cond ? .bogus : .#^TERNARY_6^#
+  func sync(){}
+  let _: SomeEnum1 = .#^TERNARY_CONDITION^# ? .bogus : .bogus
+// TERNARY_CONDITION: Begin completions
+// TERNARY_CONDITION-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#Bool#]; name=init()
+// TERNARY_CONDITION: End completions
 }

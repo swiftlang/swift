@@ -600,7 +600,7 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
                     stop.pointee = true
                     return false
                 }
-            }) as IndexSet
+            })
             if let e = error {
                 throw e
             } else {

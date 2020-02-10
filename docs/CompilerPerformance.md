@@ -793,7 +793,7 @@ performance between two compilers, say `${OLD}/swiftc` and `${NEW}/swiftc`:
 ```
 $ mkdir stats-old stats-new
 $ ${OLD}/swiftc -stats-output-dir stats-old test.swift
-$ ${OLD}/swiftc -stats-output-dir stats-new test.swift
+$ ${NEW}/swiftc -stats-output-dir stats-new test.swift
 $ utils/process-stats-dir.py --compare-stats-dirs stats-old stats-new
 old     new     delta_pct       name
 1402939 1430732 1.98    AST.NumASTBytesAllocated

@@ -431,3 +431,13 @@ func testCallableWithDefault(_ x: CallableWithDefault) {
   // CHECK: apply [[CALL_AS_FN]]([[I]], [[STR]], {{%[0-9]+}})
   x(y: 5)
 }
+
+// FIXME: Arguably we shouldn't allow calling a constructor like this, as
+// we usually require the user write an explicit '.init'.
+struct WeirdUMEInitCase {
+  static let ty = WeirdUMEInitCase.self
+  init(_ x: Int = 0) {}
+}
+
+let _: WeirdUMEInitCase = .ty()
+let _: WeirdUMEInitCase = .ty(5)

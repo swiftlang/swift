@@ -163,7 +163,7 @@ NOTE(kind_declname_declared_here,none,
 WARNING(warn_property_wrapper_module_scope,none,
         "ignoring associated type %0 in favor of module-scoped property "
         "wrapper %0; please qualify the reference with %1",
-        (DeclName, Identifier))
+        (DeclNameRef, Identifier))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

@@ -91,10 +91,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     // a bitcast.
 
     // return unsafeBitCast(self, to: RawType.self)
-    DeclName name(C, C.getIdentifier("unsafeBitCast"), {Identifier(), C.Id_to});
-    auto functionRef = new (C) UnresolvedDeclRefExpr(name,
-                                                     DeclRefKind::Ordinary,
-                                                     DeclNameLoc());
+    auto functionRef = UnresolvedDeclRefExpr::createImplicit(
+        C, C.getIdentifier("unsafeBitCast"), {Identifier(), C.Id_to});
     auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
     auto bareTypeExpr = TypeExpr::createImplicit(rawTy, C);
     auto typeExpr = new (C) DotSelfExpr(bareTypeExpr, SourceLoc(), SourceLoc());
@@ -111,8 +109,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
   SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), SourceLoc(),
-                                          Identifier(), elt, nullptr);
+                                          SourceLoc(), DeclNameLoc(),
+                                          DeclNameRef(), elt, nullptr);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);
@@ -374,9 +372,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   Expr *switchArg = rawRef;
   if (isStringEnum) {
     // Call _findStringSwitchCase with an array of strings as argument.
-    auto *Fun = new (C) UnresolvedDeclRefExpr(
-                  C.getIdentifier("_findStringSwitchCase"),
-                  DeclRefKind::Ordinary, DeclNameLoc());
+    auto *Fun = UnresolvedDeclRefExpr::createImplicit(
+        C, C.getIdentifier("_findStringSwitchCase"));
     auto *strArray = ArrayExpr::create(C, SourceLoc(), stringExprs, {},
                                        SourceLoc());;
     Identifier tableId = C.getIdentifier("cases");
@@ -441,14 +438,17 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   return initDecl;
 }
 
-static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
-  auto enumDecl = cast<EnumDecl>(derived.Nominal);
+bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
+                                                   NominalTypeDecl *type) {
+  auto enumDecl = dyn_cast<EnumDecl>(type);
+  if (!enumDecl)
+    return false;
 
   Type rawType = enumDecl->getRawType();
   if (!rawType)
     return false;
-  auto parentDC = cast<DeclContext>(derived.ConformanceDecl);
-  rawType       = parentDC->mapTypeIntoContext(rawType);
+
+  rawType = DC->mapTypeIntoContext(rawType);
 
   auto inherited = enumDecl->getInherited();
   if (!inherited.empty() && inherited.front().wasValidated() &&
@@ -463,7 +463,7 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
   if (!equatableProto)
     return false;
 
-  if (TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl, None)
+  if (TypeChecker::conformsToProtocol(rawType, equatableProto, DC, None)
           .isInvalid())
     return false;
   
@@ -491,12 +491,8 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
 
 ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
 
-  // We can only synthesize RawRepresentable for enums.
-  if (!isa<EnumDecl>(Nominal))
-    return nullptr;
-
-  // Check other preconditions for synthesized conformance.
-  if (!canSynthesizeRawRepresentable(*this))
+  // Check preconditions for synthesized conformance.
+  if (!canDeriveRawRepresentable(cast<DeclContext>(ConformanceDecl), Nominal))
     return nullptr;
 
   if (requirement->getBaseName() == Context.Id_rawValue)
@@ -512,12 +508,8 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
 
 Type DerivedConformance::deriveRawRepresentable(AssociatedTypeDecl *assocType) {
 
-  // We can only synthesize RawRepresentable for enums.
-  if (!isa<EnumDecl>(Nominal))
-    return nullptr;
-
-  // Check other preconditions for synthesized conformance.
-  if (!canSynthesizeRawRepresentable(*this))
+  // Check preconditions for synthesized conformance.
+  if (!canDeriveRawRepresentable(cast<DeclContext>(ConformanceDecl), Nominal))
     return nullptr;
 
   if (assocType->getName() == Context.Id_RawValue) {

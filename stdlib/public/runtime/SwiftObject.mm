@@ -35,6 +35,7 @@
 #include "../SwiftShims/RuntimeShims.h"
 #include "../SwiftShims/AssertionReporting.h"
 #include "CompatibilityOverride.h"
+#include "ErrorObject.h"
 #include "Private.h"
 #include "SwiftObject.h"
 #include "WeakReference.h"
@@ -263,33 +264,7 @@ static id _getClassDescription(Class cls) {
              class_getName(cls), sel_getName(sel));
 }
 
-- (id)retain {
-  auto SELF = reinterpret_cast<HeapObject *>(self);
-  swift_retain(SELF);
-  return self;
-}
-- (void)release {
-  auto SELF = reinterpret_cast<HeapObject *>(self);
-  swift_release(SELF);
-}
-- (id)autorelease {
-  return _objc_rootAutorelease(self);
-}
-- (NSUInteger)retainCount {
-  return swift::swift_retainCount(reinterpret_cast<HeapObject *>(self));
-}
-- (BOOL)_isDeallocating {
-  return swift_isDeallocating(reinterpret_cast<HeapObject *>(self));
-}
-- (BOOL)_tryRetain {
-  return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr;
-}
-- (BOOL)allowsWeakReference {
-  return !swift_isDeallocating(reinterpret_cast<HeapObject *>(self));
-}
-- (BOOL)retainWeakReference {
-  return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr;
-}
+STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 
 // Retaining the class object itself is a no-op.
 + (id)retain {
@@ -315,10 +290,6 @@ static id _getClassDescription(Class cls) {
 }
 + (BOOL)retainWeakReference {
   return YES;
-}
-
-- (void)dealloc {
-  swift_rootObjCDealloc(reinterpret_cast<HeapObject *>(self));
 }
 
 - (BOOL)isKindOfClass:(Class)someClass {
@@ -1098,6 +1069,20 @@ swift_dynamicCastObjCClassImpl(const void *object,
     return object;
   }
 
+  // For casts to NSError or NSObject, we might need to bridge via the Error
+  // protocol. Try it now.
+  if (targetType == reinterpret_cast<const ClassMetadata*>(getNSErrorClass()) ||
+      targetType == reinterpret_cast<const ClassMetadata*>([NSObject class])) {
+    auto srcType = swift_getObjCClassMetadata(
+        reinterpret_cast<const ClassMetadata*>(
+          object_getClass(id_const_cast(object))));
+    if (auto srcErrorWitness = findErrorWitness(srcType)) {
+      return dynamicCastValueToNSError((OpaqueValue*)&object, srcType,
+                                       srcErrorWitness,
+                                       DynamicCastFlags::TakeOnSuccess);
+    }
+  }
+
   return nullptr;
 }
 
@@ -1112,6 +1097,20 @@ swift_dynamicCastObjCClassUnconditionalImpl(const void *object,
 
   if ([id_const_cast(object) isKindOfClass:class_const_cast(targetType)]) {
     return object;
+  }
+
+  // For casts to NSError or NSObject, we might need to bridge via the Error
+  // protocol. Try it now.
+  if (targetType == reinterpret_cast<const ClassMetadata*>(getNSErrorClass()) ||
+      targetType == reinterpret_cast<const ClassMetadata*>([NSObject class])) {
+    auto srcType = swift_getObjCClassMetadata(
+        reinterpret_cast<const ClassMetadata*>(
+          object_getClass(id_const_cast(object))));
+    if (auto srcErrorWitness = findErrorWitness(srcType)) {
+      return dynamicCastValueToNSError((OpaqueValue*)&object, srcType,
+                                       srcErrorWitness,
+                                       DynamicCastFlags::TakeOnSuccess);
+    }
   }
 
   Class sourceType = object_getClass(id_const_cast(object));

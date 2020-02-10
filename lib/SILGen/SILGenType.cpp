@@ -165,12 +165,16 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   if (auto existingThunk = M.lookUpFunction(name))
     return SILVTable::Entry(base, existingThunk, implKind);
 
+  GenericEnvironment *genericEnv = nullptr;
+  if (auto genericSig = overrideInfo.FormalType.getOptGenericSignature())
+    genericEnv = genericSig->getGenericEnvironment();
+
   // Emit the thunk.
   SILLocation loc(derivedDecl);
   SILGenFunctionBuilder builder(*this);
   auto thunk = builder.createFunction(
       SILLinkage::Private, name, overrideInfo.SILFnType,
-      cast<AbstractFunctionDecl>(derivedDecl)->getGenericEnvironment(), loc,
+      genericEnv, loc,
       IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
       ProfileCounter(), IsThunk);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
@@ -619,7 +623,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto *genericEnv = witness.getSyntheticEnvironment();
   CanGenericSignature genericSig;
   if (genericEnv)
-    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
+    genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
 
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(

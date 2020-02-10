@@ -42,3 +42,19 @@ public extension Differentiable where TangentVector == Self {
     self += direction
   }
 }
+
+//===----------------------------------------------------------------------===//
+// `Differentiable` conformances
+//===----------------------------------------------------------------------===//
+
+extension Float: Differentiable {
+  public typealias TangentVector = Self
+}
+extension Double: Differentiable {
+  public typealias TangentVector = Self
+}
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
+extension Float80: Differentiable {
+  public typealias TangentVector = Self
+}
+#endif
