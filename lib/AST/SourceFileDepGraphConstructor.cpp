@@ -25,6 +25,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/SourceFileDepGraphConstructor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
@@ -300,6 +301,14 @@ private:
 };
 } // namespace
 
+template <NodeKind kindArg, typename Entity>
+DependencyKey DependencyKey::createForProvidedEntityInterface(Entity entity) {
+  return DependencyKey(
+      kindArg, DeclAspect::interface,
+      DependencyKey::computeContextForProvidedEntity<kindArg>(entity),
+      DependencyKey::computeNameForProvidedEntity<kindArg>(entity));
+}
+
 //==============================================================================
 // MARK: computeContextForProvidedEntity
 //==============================================================================
@@ -327,12 +336,19 @@ DependencyKey::computeContextForProvidedEntity<NodeKind::potentialMember,
   return mangleTypeAsContext(D);
 }
 
+template <>
+std::string DependencyKey::computeContextForProvidedEntity<
+    NodeKind::member, const NominalTypeDecl *>(const NominalTypeDecl *holder) {
+  return mangleTypeAsContext(holder);
+}
+
 /// \ref member dependencies are created from a pair and use the context field.
 template <>
 std::string DependencyKey::computeContextForProvidedEntity<
     NodeKind::member, std::pair<const NominalTypeDecl *, const ValueDecl *>>(
     std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember) {
-  return mangleTypeAsContext(holderAndMember.first);
+  return computeContextForProvidedEntity<NodeKind::member>(
+      holderAndMember.first);
 }
 
 // Linux compiler requires the following:
@@ -449,333 +465,235 @@ DependencyKey DependencyKey::createDependedUponKey(StringRef mangledHolderName,
 // MARK: SourceFileDepGraphConstructor
 //==============================================================================
 
-namespace {
-
-/// Reads the information provided by the frontend and builds the
-/// SourceFileDepGraph
-class SourceFileDepGraphConstructor {
-  /// Name of the swiftDeps file, for inclusion in the constructed graph.
-  StringRef swiftDeps; // TODO rm?
-
-  /// To match the existing system, set this to false.
-  /// To include even private entities and get intra-file info, set to true.
-  const bool includePrivateDeps;
-
-  /// If there was an error, cannot get accurate info.
-  const bool hadCompilationError;
-
-  /// Functions as the fingerprint of the entire file
-  const std::string interfaceHash;
-
-  /// Top-level base names of decls that are depended-upon and a flag indicating
-  /// if the dependency "cascades"
-  const std::vector<std::pair<std::string, bool>> topLevelDepends;
-
-  /// A mangled nominal name and the member base name that are depended-upon,
-  /// a flag indicating if the member is private to its enclosing file, and
-  /// a flag indicating if the dependency cascades.
-  const std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>>
-      dependsWithContexts;
-
-  /// The base name of a class member depended-upon for dynamic lookup, and a
-  /// cascades flag.
-  const std::vector<std::pair<std::string, bool>> dynamicLookupDepends;
-
-  /// The paths of swiftdeps files of other modules that are depended-upon.
-  const std::vector<std::string> externalDependencies;
-
-  /// Provided names
-  std::vector<ContextNameFingerprint> precedenceGroups;
-  std::vector<ContextNameFingerprint> memberOperatorDecls;
-  std::vector<ContextNameFingerprint> operators;
-  std::vector<ContextNameFingerprint> topNominals;
-  std::vector<ContextNameFingerprint> topValues;
-  std::vector<ContextNameFingerprint> allNominals;
-  std::vector<ContextNameFingerprint> potentialMemberHolders;
-  std::vector<ContextNameFingerprint> valuesInExtensions;
-  std::vector<ContextNameFingerprint> classMembers;
-
-  /// Graph under construction
-  SourceFileDepGraph g;
-
-public:
-  /// Expose this layer to enable faking up a constructor for testing.
-  /// See the instance variable comments for explanation.
-  // clang-format off
-  SourceFileDepGraphConstructor(
-    StringRef swiftDeps,
-    bool includePrivateDeps,
-    bool hadCompilationError,
-    const std::string &interfaceHash,
-    ArrayRef<std::pair<std::string, bool>> topLevelDepends,
-    ArrayRef<std::pair<std::tuple<std::string, std::string, bool>, bool>>
-      dependsWithContexts,
-    ArrayRef<std::pair<std::string, bool>> dynamicLookupDepends,
-    ArrayRef<std::string> externalDependencies,
-
-    ArrayRef<ContextNameFingerprint> precedenceGroups,
-    ArrayRef<ContextNameFingerprint> memberOperatorDecls,
-    ArrayRef<ContextNameFingerprint> operators,
-    ArrayRef<ContextNameFingerprint> topNominals,
-    ArrayRef<ContextNameFingerprint> topValues,
-    ArrayRef<ContextNameFingerprint> allNominals,
-    ArrayRef<ContextNameFingerprint> potentialMemberHolders,
-    ArrayRef<ContextNameFingerprint> valuesInExtensions,
-    ArrayRef<ContextNameFingerprint> classMembers
-    ) :
-    swiftDeps(swiftDeps),
-    includePrivateDeps(includePrivateDeps),
-    hadCompilationError(hadCompilationError),
-
-    interfaceHash(interfaceHash),
-    topLevelDepends(topLevelDepends),
-    dependsWithContexts(dependsWithContexts),
-    dynamicLookupDepends(dynamicLookupDepends),
-    externalDependencies(externalDependencies),
-
-    precedenceGroups(precedenceGroups),
-    memberOperatorDecls(memberOperatorDecls),
-    operators(operators),
-    topNominals(topNominals),
-    topValues(topValues),
-    allNominals(allNominals),
-    potentialMemberHolders(potentialMemberHolders),
-    valuesInExtensions(valuesInExtensions),
-    classMembers(classMembers)
-    {}
-
-// clang-format off
-static SourceFileDepGraphConstructor
-forSourceFile(
-  SourceFile *SF,
-  const DependencyTracker &depTracker,
-  StringRef swiftDeps,
-  const bool includePrivateDeps,
-  const bool hadCompilationError) {
-// clang-format on
-
-  SourceFileDeclFinder declFinder(SF, includePrivateDeps);
-    std::vector<std::pair<std::string, bool>> topLevelDepends;
-    for (const auto &p: SF->getReferencedNameTracker()->getTopLevelNames())
-      topLevelDepends.push_back(std::make_pair(p.getFirst().userFacingName(), p.getSecond()));
-
-    std::vector<std::pair<std::string, bool>> dynamicLookupDepends;
-    for (const auto &p: SF->getReferencedNameTracker()->getDynamicLookupNames())
-      dynamicLookupDepends.push_back(std::make_pair(p.getFirst().userFacingName(), p.getSecond()));
-
-    std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>> dependsWithContexts;
-    for (const auto &p: SF->getReferencedNameTracker()->getUsedMembers()) {
-      const auto &member = p.getFirst().second;
-      StringRef emptyOrUserFacingName = member.empty() ? "" : member.userFacingName();
-      dependsWithContexts.push_back(
-        std::make_pair(
-          std::make_tuple(
-            mangleTypeAsContext(p.getFirst().first),
-            emptyOrUserFacingName,
-            declIsPrivate(p.getFirst().first)),
-          p.getSecond()));
-    }
-
-    return SourceFileDepGraphConstructor(
-      swiftDeps,
-      includePrivateDeps,
-      hadCompilationError,
-
-      getInterfaceHash(SF),
-      topLevelDepends,
-      dependsWithContexts,
-      dynamicLookupDepends,
-      depTracker.getDependencies(),
-
-      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.precedenceGroups),
-      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.memberOperatorDecls),
-      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.operators),
-      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.topNominals),
-      namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.topValues),
-      namesForProvidersOfAGivenType<NodeKind::nominal>(declFinder.allNominals),
-      namesForProvidersOfAGivenType<NodeKind::potentialMember>(declFinder.potentialMemberHolders),
-      namesForProvidersOfAGivenType<NodeKind::member>(declFinder.valuesInExtensions),
-      namesForProvidersOfAGivenType<NodeKind::dynamicLookup>(declFinder.classMembers)
-      );
-  }
-  // clang-format on
-
-  /// Construct the graph and return it.
-  SourceFileDepGraph construct() {
-    // Order matters here, each function adds state used by the next one.
-    addSourceFileNodesToGraph();
-    if (!hadCompilationError) {
-      addProviderNodesToGraph();
-      addDependencyArcsToGraph();
-    }
-    assert(g.verify());
-    return std::move(g);
-  }
-
-private:
-  std::string getSourceFileFingerprint() const { return interfaceHash; }
-
-  static std::string getInterfaceHash(SourceFile *SF) {
-    llvm::SmallString<32> interfaceHash;
-    SF->getInterfaceHash(interfaceHash);
-    return interfaceHash.str().str();
-  }
-
-  /// Also sets sourceFileNodes
-  void addSourceFileNodesToGraph();
-  /// Uses sourceFileNodes
-  void addProviderNodesToGraph();
-  /// Uses provides nodes for intra-graph dependences
-  void addDependencyArcsToGraph();
-
-  /// Given an array of Decls or pairs of them in \p declsOrPairs
-  /// create string pairs for context and name
-  template <NodeKind kind, typename ContentsT>
-  static std::vector<ContextNameFingerprint>
-  namesForProvidersOfAGivenType(std::vector<ContentsT> &contentsVec) {
-    std::vector<ContextNameFingerprint> result;
-    for (const auto declOrPair : contentsVec)
-      result.push_back(
-        std::make_tuple(
-          DependencyKey::computeContextForProvidedEntity<kind>(declOrPair),
-          DependencyKey::computeNameForProvidedEntity<kind>(declOrPair),
-          getFingerprintIfAny(declOrPair)));
-    return result;
-  }
-
-  static Optional<std::string>
-  getFingerprintIfAny(std::pair<const NominalTypeDecl *, const ValueDecl *>) {
-    return None;
-  }
-  static Optional<std::string> getFingerprintIfAny(const Decl *d) {
-    if (const auto *idc = dyn_cast<IterableDeclContext>(d))
-      return idc->getBodyFingerprint();
-    return None;
-  }
-
-  template <NodeKind kind>
-  void addAllProviderNodesOfAGivenType(
-      ArrayRef<ContextNameFingerprint> contextNameFingerprints) {
-    for (const auto &contextNameFingerprint : contextNameFingerprints) {
-      auto p = g.findExistingNodePairOrCreateAndAddIfNew(
-          kind, contextNameFingerprint);
-      // Since the current type fingerprints only include tokens in the body,
-      // when the interface hash changes, it is possible that the type in the
-      // file has changed.
-      g.addArc(g.getSourceFileNodePair().getInterface(), p.getInterface());
-    }
-  }
-
-  /// Given a map of names and isCascades, add the resulting dependencies to the
-  /// graph.
-  template <NodeKind kind>
-  void addAllDependenciesFrom(ArrayRef<std::pair<std::string, bool>> names) {
-    for (const auto &p : names)
-      recordThatThisWholeFileDependsOn(
-          DependencyKey::createDependedUponKey<kind>(p.first), p.second);
-  }
-
-  /// Given a map of holder-and-member-names and isCascades, add the resulting
-  /// dependencies to the graph.
-  void addAllDependenciesFrom(
-      ArrayRef<std::pair<std::tuple<std::string, std::string, bool>, bool>>);
-
-  /// Given an array of external swiftDeps files, add the resulting external
-  /// dependencies to the graph.
-  void addAllDependenciesFrom(ArrayRef<std::string> externals) {
-    for (const auto &s : externals)
-      recordThatThisWholeFileDependsOn(
-          DependencyKey::createDependedUponKey<NodeKind::externalDepend>(s),
-          true);
-  }
-
-  /// In the status quo, we don't get to know which provided entities are
-  /// affected by a particular dependency; we only get to know that the whole
-  /// file must be recompiled if said def changes. However if \p cascades is
-  /// true, then every other file that depends upon something provided here must
-  /// be recompiled, too.
-  void recordThatThisWholeFileDependsOn(const DependencyKey &, bool cascades);
-};
-} // namespace
-
-void SourceFileDepGraphConstructor::addAllDependenciesFrom(
-    ArrayRef<std::pair<std::tuple<std::string, std::string, bool>, bool>>
-        members) {
-
-  llvm::StringSet<> holdersOfCascadingMembers;
-  for (const auto &entry : members) {
-    if (!includePrivateDeps && std::get<2>(entry.first))
-      continue;
-    if (entry.second)
-      holdersOfCascadingMembers.insert(std::get<0>(entry.first));
-  }
-  for (const auto &entry : members) {
-    if (!includePrivateDeps && std::get<2>(entry.first))
-      continue;
-    recordThatThisWholeFileDependsOn(
-        DependencyKey::createDependedUponKey<NodeKind::nominal>(
-            std::get<0>(entry.first)),
-        holdersOfCascadingMembers.count(std::get<0>(entry.first)) != 0);
-    recordThatThisWholeFileDependsOn(
-        DependencyKey::createDependedUponKey(std::get<0>(entry.first),
-                                             std::get<1>(entry.first)),
-        entry.second);
-  }
-}
 
 //==============================================================================
 // MARK: SourceFileDepGraphConstructor: Adding nodes to the graph
 //==============================================================================
 
-void SourceFileDepGraphConstructor::addSourceFileNodesToGraph() {
-  g.findExistingNodePairOrCreateAndAddIfNew(
-      NodeKind::sourceFileProvide,
-      ContextNameFingerprint(DependencyKey::computeContextForProvidedEntity<
-                                 NodeKind::sourceFileProvide>(swiftDeps),
-                             DependencyKey::computeNameForProvidedEntity<
-                                 NodeKind::sourceFileProvide>(swiftDeps),
-                             getSourceFileFingerprint()));
+SourceFileDepGraph SourceFileDepGraphConstructor::addSourceFileNodesAndThen(
+    StringRef name, StringRef fingerprint, function_ref<void()> doTheRest) {
+  // Order matters here, each function adds state used by the next one.
+  addSourceFileNodesToGraph(name, fingerprint);
+  if (!hadCompilationError)
+    doTheRest();
+  assert(g.verify());
+  return std::move(g);
 }
 
-void SourceFileDepGraphConstructor::addProviderNodesToGraph() {
+/// Centralize the invariant that the fingerprint of the whole file is the
+/// interface hash
+std::string SourceFileDepGraphConstructor::getFingerprint(SourceFile *SF) {
+  return getInterfaceHash(SF);
+}
+
+/// At present, only nominals, protocols, and extensions have (body)
+/// fingerprints
+Optional<std::string> SourceFileDepGraphConstructor::getFingerprintIfAny(
+    std::pair<const NominalTypeDecl *, const ValueDecl *>) {
+  return None;
+}
+Optional<std::string>
+SourceFileDepGraphConstructor::getFingerprintIfAny(const Decl *d) {
+  if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
+    auto result = idc->getBodyFingerprint();
+    assert((!result || !result->empty()) && "Fingerprint should never be empty");
+    return result;
+  }
+  return None;
+}
+
+std::string SourceFileDepGraphConstructor::getInterfaceHash(SourceFile *SF) {
+  llvm::SmallString<32> interfaceHash;
+  SF->getInterfaceHash(interfaceHash);
+  return interfaceHash.str().str();
+}
+
+void SourceFileDepGraphConstructor::addSourceFileNodesToGraph(
+    StringRef swiftDeps, StringRef fingerprint) {
+  g.findExistingNodePairOrCreateAndAddIfNew(
+      DependencyKey::createKeyForWholeSourceFile(DeclAspect::interface,
+                                                 swiftDeps),
+      fingerprint);
+}
+
+void SourceFileDepGraphConstructor::enumerateDefinedDecls(
+    SourceFile *SF, AddDefinedDecl addDefinedDeclFn) {
   // TODO: express the multiple provides and depends streams with variadic
   // templates
 
   // Many kinds of Decls become top-level depends.
-  addAllProviderNodesOfAGivenType<NodeKind::topLevel>(precedenceGroups);
-  addAllProviderNodesOfAGivenType<NodeKind::topLevel>(memberOperatorDecls);
-  addAllProviderNodesOfAGivenType<NodeKind::topLevel>(operators);
-  addAllProviderNodesOfAGivenType<NodeKind::topLevel>(topNominals);
-  addAllProviderNodesOfAGivenType<NodeKind::topLevel>(topValues);
 
-  addAllProviderNodesOfAGivenType<NodeKind::nominal>(allNominals);
+  SourceFileDeclFinder declFinder(SF, includePrivateDeps);
 
-  addAllProviderNodesOfAGivenType<NodeKind::potentialMember>(
-      potentialMemberHolders);
-  addAllProviderNodesOfAGivenType<NodeKind::member>(valuesInExtensions);
-
-  addAllProviderNodesOfAGivenType<NodeKind::dynamicLookup>(classMembers);
+  enumerateAllProviderNodesOfAGivenType<NodeKind::topLevel>(
+      declFinder.precedenceGroups, addDefinedDeclFn);
+  enumerateAllProviderNodesOfAGivenType<NodeKind::topLevel>(
+      declFinder.memberOperatorDecls, addDefinedDeclFn);
+  enumerateAllProviderNodesOfAGivenType<NodeKind::topLevel>(
+      declFinder.operators, addDefinedDeclFn);
+  enumerateAllProviderNodesOfAGivenType<NodeKind::topLevel>(
+      declFinder.topNominals, addDefinedDeclFn);
+  enumerateAllProviderNodesOfAGivenType<NodeKind::topLevel>(
+      declFinder.topValues, addDefinedDeclFn);
+  enumerateAllProviderNodesOfAGivenType<NodeKind::nominal>(
+      declFinder.allNominals, addDefinedDeclFn);
+  enumerateAllProviderNodesOfAGivenType<NodeKind::potentialMember>(
+      declFinder.potentialMemberHolders, addDefinedDeclFn);
+  enumerateAllProviderNodesOfAGivenType<NodeKind::member>(
+      declFinder.valuesInExtensions, addDefinedDeclFn);
+  enumerateAllProviderNodesOfAGivenType<NodeKind::dynamicLookup>(
+      declFinder.classMembers, addDefinedDeclFn);
 }
 
-void SourceFileDepGraphConstructor::addDependencyArcsToGraph() {
-  // TODO: express the multiple provides and depends streams with variadic
-  // templates
-  addAllDependenciesFrom<NodeKind::topLevel>(topLevelDepends);
-  addAllDependenciesFrom(dependsWithContexts);
-  addAllDependenciesFrom<NodeKind::dynamicLookup>(dynamicLookupDepends);
-  addAllDependenciesFrom(externalDependencies);
+/// Given an array of Decls or pairs of them in \p declsOrPairs
+/// create node pairs for context and name
+template <NodeKind kind, typename ContentsT>
+void SourceFileDepGraphConstructor::enumerateAllProviderNodesOfAGivenType(
+    std::vector<ContentsT> &contentsVec, AddDefinedDecl addDefinedDeclFn) {
+  for (const auto declOrPair : contentsVec) {
+    Optional<std::string> fp = getFingerprintIfAny(declOrPair);
+    addDefinedDeclFn(
+        DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
+        fp ? StringRef(fp.getValue()) : Optional<StringRef>());
+  }
 }
 
-void SourceFileDepGraphConstructor::recordThatThisWholeFileDependsOn(
-    const DependencyKey &key, bool cascades) {
-  SourceFileDepGraphNode *def =
-      g.findExistingNodeOrCreateIfNew(key, None, false /* = !isProvides */);
-  g.addArc(def, g.getSourceFileNodePair().useDependingOnCascading(cascades));
+void SourceFileDepGraphConstructor::addDefinedDecl(
+    const DependencyKey &interfaceKey, Optional<StringRef> fingerprint) {
+
+  auto nodePair =
+      g.findExistingNodePairOrCreateAndAddIfNew(interfaceKey, fingerprint);
+  // Since the current type fingerprints only include tokens in the body,
+  // when the interface hash changes, it is possible that the type in the
+  // file has changed.
+  g.addArc(g.getSourceFileNodePair().getInterface(), nodePair.getInterface());
 }
 
 //==============================================================================
 // Entry point from the Frontend to this whole system
 //==============================================================================
+
+namespace {
+/// Extracts uses out of a SourceFile
+class UsedDeclEnumerator {
+  SourceFile *SF;
+  const DependencyTracker &depTracker;
+  StringRef swiftDeps;
+
+  /// Cache these for efficiency
+  const DependencyKey sourceFileInterface;
+  const DependencyKey sourceFileImplementation;
+
+  function_ref<void(const DependencyKey &, const DependencyKey &)> createUseDef;
+
+  const bool includeIntrafileDeps;
+
+public:
+  UsedDeclEnumerator(
+      SourceFile *SF, const DependencyTracker &depTracker, StringRef swiftDeps,
+      function_ref<void(const DependencyKey &, const DependencyKey &)>
+          createUseDef,
+      bool includeIntrafileDeps)
+      : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps),
+        sourceFileInterface(DependencyKey::createKeyForWholeSourceFile(
+            DeclAspect::interface, swiftDeps)),
+        sourceFileImplementation(DependencyKey::createKeyForWholeSourceFile(
+            DeclAspect::implementation, swiftDeps)),
+        createUseDef(createUseDef), includeIntrafileDeps(includeIntrafileDeps) {
+  }
+
+public:
+  void enumerateAllUses() {
+    enumerateSimpleUses<NodeKind::topLevel>(
+        SF->getReferencedNameTracker()->getTopLevelNames());
+    enumerateSimpleUses<NodeKind::dynamicLookup>(
+        SF->getReferencedNameTracker()->getDynamicLookupNames());
+    enumerateExternalUses();
+    enumerateCompoundUses();
+  }
+
+private:
+  void enumerateUse(NodeKind kind, StringRef context, StringRef name,
+                    bool isCascadingUse) {
+    // Assume that what is depended-upon is the interface
+    createUseDef(DependencyKey(kind, DeclAspect::interface, context, name),
+                 isCascadingUse ? sourceFileInterface
+                                : sourceFileImplementation);
+  }
+  template <NodeKind kind>
+  void enumerateSimpleUses(llvm::DenseMap<DeclBaseName, bool> cascadesByName) {
+    for (const auto &p : cascadesByName)
+      enumerateUse(kind, "", p.getFirst().userFacingName(), p.getSecond());
+  }
+
+  void enumerateCompoundUses() {
+    enumerateNominalUses(std::move(computeHoldersOfCascadingMembers()));
+    enumerateMemberUses();
+  }
+
+  llvm::StringSet<> computeHoldersOfCascadingMembers() {
+    llvm::StringSet<> holdersOfCascadingMembers;
+    for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
+      {
+        bool isPrivate = declIsPrivate(p.getFirst().first);
+        if (isPrivate && !includeIntrafileDeps)
+          continue;
+      }
+      StringRef context =
+          DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
+              p.getFirst().first);
+      bool isCascading = p.getSecond();
+      if (isCascading)
+        holdersOfCascadingMembers.insert(context);
+    }
+    return holdersOfCascadingMembers;
+  }
+
+  void
+  enumerateNominalUses(const llvm::StringSet<> &&holdersOfCascadingMembers) {
+    for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
+      {
+        bool isPrivate = declIsPrivate(p.getFirst().first);
+        if (isPrivate && !includeIntrafileDeps)
+          continue;
+      }
+      const NominalTypeDecl *nominal = p.getFirst().first;
+
+      StringRef context =
+          DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
+              nominal);
+      const bool isCascadingUse = holdersOfCascadingMembers.count(context) != 0;
+      enumerateUse(NodeKind::nominal, context, "", isCascadingUse);
+    }
+  }
+
+  void enumerateMemberUses() {
+    for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
+      const NominalTypeDecl *nominal = p.getFirst().first;
+      const auto rawName = p.getFirst().second;
+      const bool isPotentialMember = rawName.empty();
+      const bool isCascadingUse = p.getSecond();
+      if (isPotentialMember) {
+        StringRef context = DependencyKey::computeContextForProvidedEntity<
+            NodeKind::potentialMember>(nominal);
+        enumerateUse(NodeKind::potentialMember, context, "", isCascadingUse);
+      } else {
+        StringRef context =
+            DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
+                nominal);
+        StringRef name = rawName.userFacingName();
+        enumerateUse(NodeKind::member, context, name, isCascadingUse);
+      }
+    }
+  }
+
+  void enumerateExternalUses() {
+    // external dependencies always cascade
+    for (StringRef s : depTracker.getDependencies())
+      enumerateUse(NodeKind::externalDepend, "", s, true);
+  }
+};
+} // end namespace
 
 bool fine_grained_dependencies::emitReferenceDependencies(
     DiagnosticEngine &diags, SourceFile *const SF,
@@ -797,9 +715,24 @@ bool fine_grained_dependencies::emitReferenceDependencies(
           .LangOpts.FineGrainedDependenciesIncludeIntrafileOnes ||
       SF->getASTContext().LangOpts.EnableTypeFingerprints;
   const bool hadCompilationError = SF->getASTContext().hadError();
-  auto gc = SourceFileDepGraphConstructor::forSourceFile(
-      SF, depTracker, outputPath, includeIntrafileDeps, hadCompilationError);
-  SourceFileDepGraph g = gc.construct();
+  auto gc =
+      SourceFileDepGraphConstructor(includeIntrafileDeps, hadCompilationError);
+
+  auto forEachDefinedDecl =
+      [&](SourceFileDepGraphConstructor::AddDefinedDecl addDefinedDeclFn) {
+        gc.enumerateDefinedDecls(SF, addDefinedDeclFn);
+      };
+
+  auto forEachUsedDecl =
+      [&](function_ref<void(const DependencyKey &, const DependencyKey &)>
+              createDefUse) {
+        UsedDeclEnumerator(SF, depTracker, outputPath, createDefUse,
+                           includeIntrafileDeps)
+            .enumerateAllUses();
+      };
+
+  SourceFileDepGraph g = gc.construct(outputPath, gc.getFingerprint(SF),
+                                      forEachDefinedDecl, forEachUsedDecl);
 
   const bool hadError =
       withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
@@ -818,135 +751,29 @@ bool fine_grained_dependencies::emitReferenceDependencies(
   return hadError;
 }
 
-//==============================================================================
-// Entry point from the unit tests
-//==============================================================================
-static StringRef stripPrefix(const StringRef name) {
-  return name.ltrim(SourceFileDepGraph::noncascadingOrPrivatePrefix);
-}
-static StringRef stripFingerprint(const StringRef nameAndFingerprint) {
-  return nameAndFingerprint.split(SourceFileDepGraph::nameFingerprintSeparator)
-           .first;
-}
-static StringRef stripName(const StringRef nameAndFingerprint) {
-  return nameAndFingerprint.split(SourceFileDepGraph::nameFingerprintSeparator)
-           .second;
-}
-static std::string extractName(const StringRef prefixNameFingerprint) {
-  return stripFingerprint(stripPrefix(prefixNameFingerprint)).str();
-}
-static Optional<std::string> extractFingerprint(
-         const StringRef prefixNameFingerprint) {
-  const auto fp = stripName(stripPrefix(prefixNameFingerprint));
-  return fp.empty() ? None : Optional<std::string>(fp.str());
+  //==============================================================================
+  // For the unit tests
+  //==============================================================================
+
+#warning dmu kmove out of this mark
+void SourceFileDepGraphConstructor::addAllDefinedDecls(
+    ForEachDefinedDecl forEachDefinedDecl) {
+  forEachDefinedDecl(
+      [&](const DependencyKey &interfaceKey, Optional<StringRef> fingerprint) {
+        addDefinedDecl(interfaceKey, fingerprint);
+      });
 }
 
-static std::vector<ContextNameFingerprint>
-getBaseNameProvides(ArrayRef<std::string> simpleNames) {
-  std::vector<ContextNameFingerprint> result;
-  for (StringRef n : simpleNames)
-    result.push_back(ContextNameFingerprint("", extractName(n),
-                     extractFingerprint(n)));
-  return result;
-}
-
-static std::vector<ContextNameFingerprint>
-getMangledHolderProvides(ArrayRef<std::string> simpleNames) {
-  std::vector<ContextNameFingerprint> result;
-  for (StringRef n : simpleNames)
-    result.push_back(ContextNameFingerprint(extractName(n), "",
-                     extractFingerprint(n)));
-  return result;
-}
-
-static std::vector<ContextNameFingerprint> getCompoundProvides(
-    ArrayRef<std::pair<std::string, std::string>> compoundNames) {
-  std::vector<ContextNameFingerprint> result;
-  for (const auto &p : compoundNames)
-    result.push_back(ContextNameFingerprint(extractName(p.first),
-                                            extractName(p.second),
-                                            extractFingerprint(p.second)));
-  return result;
-}
-
-static bool cascades(const std::string &s) {
-  return s.empty() || s[0] != SourceFileDepGraph::noncascadingOrPrivatePrefix;
-}
-
-// Use '_' as a prefix for a file-private member
-static bool isPrivate(const std::string &s) {
-  return !s.empty() && s[0] == SourceFileDepGraph::noncascadingOrPrivatePrefix;
-}
-
-static std::vector<std::pair<std::string, bool>>
-getSimpleDepends(ArrayRef<std::string> simpleNames) {
-  std::vector<std::pair<std::string, bool>> result;
-  for (std::string n : simpleNames)
-    result.push_back({stripPrefix(n), cascades((n))});
-  return result;
-}
-
-static std::vector<std::string>
-getExternalDepends(ArrayRef<std::string> simpleNames) {
-  return simpleNames;
-}
-
-static std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>>
-getCompoundDepends(
-    ArrayRef<std::string> simpleNames,
-    ArrayRef<std::pair<std::string, std::string>> compoundNames) {
-  std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>>
-      result;
-  for (std::string n : simpleNames) {
-    // (On Linux, the compiler needs more verbosity than:
-    //  result.push_back({{n, "", false}, cascades(n)});
-    result.push_back(
-        std::make_pair(std::make_tuple(stripPrefix(n), std::string(), false),
-                       cascades(n)));
-  }
-  for (auto &p : compoundNames) {
-    // Likewise, for Linux expand the following out:
-    //    result.push_back(
-    //        {{p.first, p.second, isPrivate(p.second)}, cascades(p.first)});
-    result.push_back(
-        std::make_pair(std::make_tuple(stripPrefix(p.first),
-                                       stripPrefix(p.second),
-                                       isPrivate(p.second)),
-                       cascades(p.first)));
-  }
-  return result;
-}
-
-SourceFileDepGraph SourceFileDepGraph::simulateLoad(
-    std::string swiftDepsFilename, const bool includePrivateDeps,
-    const bool hadCompilationError, std::string interfaceHash,
-    llvm::StringMap<std::vector<std::string>> simpleNamesByRDK,
-    llvm::StringMap<std::vector<std::pair<std::string, std::string>>>
-        compoundNamesByRDK) {
-
-  using namespace reference_dependency_keys;
-
-  // clang-format off
-  SourceFileDepGraphConstructor c(
-    swiftDepsFilename,
-    includePrivateDeps,
-    hadCompilationError,
-    interfaceHash,
-    getSimpleDepends(simpleNamesByRDK[dependsTopLevel]),
-    getCompoundDepends(simpleNamesByRDK[dependsNominal],
-                       compoundNamesByRDK[dependsMember]),
-    getSimpleDepends(simpleNamesByRDK[dependsDynamicLookup]),
-    getExternalDepends(simpleNamesByRDK[dependsExternal]),
-    {}, // precedence groups
-    {}, // memberOperatorDecls
-    {}, // operators
-    {}, // topNominals
-    getBaseNameProvides(simpleNamesByRDK[providesTopLevel]), // topValues
-    getMangledHolderProvides(simpleNamesByRDK[providesNominal]), // allNominals
-    getMangledHolderProvides(simpleNamesByRDK[providesNominal]), // potentialMemberHolders
-    getCompoundProvides(compoundNamesByRDK[providesMember]), // valuesInExtensions
-    getBaseNameProvides(simpleNamesByRDK[providesDynamicLookup]) // classMembers
-    );
-  // clang-format on
-  return c.construct();
+void SourceFileDepGraphConstructor::addAllUsedDecls(
+    ForEachUsedDecl forEachUsedDecl) {
+  forEachUsedDecl([&](const DependencyKey &defKey,
+                      const DependencyKey &useKey) {
+    auto *defNode = g.findExistingNodeOrCreateIfNew(defKey, None,
+                                                    false /* = !isProvides */);
+    auto nullableUse = g.findExistingNode(useKey);
+    assert(nullableUse.isNonNull() && "Use must be an already-added provides");
+    auto *useNode = nullableUse.get();
+    assert(useNode->getIsProvides() && "Use (using node) must be a provides");
+    g.addArc(defNode, useNode);
+  });
 }

@@ -43,44 +43,6 @@ using namespace swift::driver;
 //==============================================================================
 // MARK: Affordances to unit tests
 //==============================================================================
-/// Initial underscore makes non-cascading, on member means private.
- ModuleDepGraph::Changes
-ModuleDepGraph::simulateLoad(const Job *cmd,
-             llvm::StringMap<std::vector<std::string>> simpleNames,
-             llvm::StringMap<std::vector<std::pair<std::string, std::string>>>
-                 compoundNames,
-             const bool includePrivateDeps,
-             const bool hadCompilationError) {
-  StringRef swiftDeps =
-      cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
-  assert(!swiftDeps.empty());
-  StringRef interfaceHash = swiftDeps;
-  auto sfdg = SourceFileDepGraph::simulateLoad(
-      swiftDeps, includePrivateDeps, hadCompilationError, interfaceHash,
-      simpleNames, compoundNames);
-
-  SourceManager sm;
-  DiagnosticEngine diags(sm);
-  // help for debugging: emit imported file, too
-  if (emitFineGrainedDependencyDotFileAfterEveryImport) {
-    sfdg.emitDotFile(swiftDeps, diags);
-  }
-
-  return loadFromSourceFileDepGraph(cmd, sfdg, diags);
-}
-
-std::string SourceFileDepGraph::noncascading(std::string name) {
-  std::string s{SourceFileDepGraph::noncascadingOrPrivatePrefix};
-  s += name;
-  return s;
-}
-
-LLVM_ATTRIBUTE_UNUSED
-std::string SourceFileDepGraph::privatize(std::string name) {
-  std::string s{SourceFileDepGraph::noncascadingOrPrivatePrefix};
-  s += name;
-  return s;
-}
 
 LLVM_ATTRIBUTE_UNUSED
 std::vector<const Job *>
@@ -148,7 +110,8 @@ bool ModuleDepGraph::haveAnyNodesBeenTraversedIn(const Job *cmd) const {
   const StringRef swiftDeps = getSwiftDeps(cmd);
 
   // optimization
-  const auto fileKey = DependencyKey::createKeyForWholeSourceFile(swiftDeps);
+  const auto fileKey = DependencyKey::createKeyForWholeSourceFile(
+      DeclAspect::interface, swiftDeps);
   if (const auto fileNode = nodeMap.find(swiftDeps, fileKey)) {
     if (fileNode && fileNode.getValue()->getHasBeenTraced())
       return true;
@@ -216,6 +179,13 @@ void ModuleDepGraph::registerJob(const Job *job) {
   // No need to create any nodes; that will happen when the swiftdeps file is
   // read. Just record the correspondence.
   jobsBySwiftDeps.insert(std::make_pair(getSwiftDeps(job), job));
+}
+
+std::vector<const Job *> ModuleDepGraph::getAllJobs() const {
+  std::vector<const Job *> jobs;
+  for (auto const &entry : jobsBySwiftDeps)
+    jobs.push_back(entry.second);
+  return jobs;
 }
 
 std::vector<StringRef> ModuleDepGraph::getExternalDependencies() const {

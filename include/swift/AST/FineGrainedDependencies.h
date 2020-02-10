@@ -93,14 +93,20 @@ template <typename KeyT, typename ValueT> class Memoizer {
 public:
   Memoizer() = default;
 
+  Optional<ValueT> findExisting(KeyT key) {
+    auto iter = memos.find(key);
+    if (iter != memos.end())
+      return iter->second;
+    return None;
+  }
+
   /// \p createFn must create a \ref ValueT that corresponds to the \ref KeyT
   /// passed into it.
   ValueT
   findExistingOrCreateIfNew(KeyT key,
                             function_ref<ValueT(const KeyT &)> createFn) {
-    auto iter = memos.find(key);
-    if (iter != memos.end())
-      return iter->second;
+    if (auto existing = findExisting(key))
+      return existing.getValue();
     ValueT v = createFn(key);
     (void)insert(key, v);
     return v;
@@ -499,9 +505,22 @@ public:
   }
   bool isInterface() const { return getAspect() == DeclAspect::interface; }
 
+  /// Create just the interface half of the keys for a provided Decl or Decl
+  /// pair
+  template <NodeKind kind, typename Entity>
+  static DependencyKey createForProvidedEntityInterface(Entity);
+
   /// Given some type of provided entity compute the context field of the key.
   template <NodeKind kind, typename Entity>
   static std::string computeContextForProvidedEntity(Entity);
+
+  DependencyKey correspondingImplementation() const {
+    return withAspect(DeclAspect::implementation);
+  }
+
+  DependencyKey withAspect(DeclAspect aspect) const {
+    return DependencyKey(kind, aspect, context, name);
+  }
 
   /// Given some type of provided entity compute the name field of the key.
   template <NodeKind kind, typename Entity>
@@ -514,7 +533,8 @@ public:
   template <NodeKind kind>
   static DependencyKey createDependedUponKey(StringRef);
 
-  static DependencyKey createKeyForWholeSourceFile(StringRef swiftDeps);
+  static DependencyKey createKeyForWholeSourceFile(DeclAspect,
+                                                   StringRef swiftDeps);
 
   std::string humanReadableName() const;
 
@@ -616,6 +636,10 @@ public:
   /// See SourceFileDepGraphNode::SourceFileDepGraphNode(...) and
   /// ModuleDepGraphNode::ModuleDepGraphNode(...) Don't set swiftDeps on
   /// creation because this field can change if a node is moved.
+  DepGraphNode(DependencyKey key, Optional<StringRef> fingerprint)
+      : DepGraphNode(key, fingerprint ? fingerprint->str()
+                                      : Optional<std::string>()) {}
+
   DepGraphNode(DependencyKey key, Optional<std::string> fingerprint)
       : key(key), fingerprint(fingerprint) {}
   DepGraphNode(const DepGraphNode &other) = default;
@@ -627,8 +651,12 @@ public:
 
   const DependencyKey &getKey() const { return key; }
 
-  const Optional<std::string> &getFingerprint() const { return fingerprint; }
-
+  const Optional<StringRef> getFingerprint() const {
+    if (fingerprint) {
+      return StringRef(fingerprint.getValue());
+    }
+    return None;
+  }
   /// When driver reads a SourceFileDepGraphNode, it may be a node that was
   /// created to represent a name-lookup (a.k.a a "depend") in the frontend. In
   /// that case, the node represents an entity that resides in some other file
@@ -637,7 +665,9 @@ public:
   /// (someday) have a fingerprint. In order to preserve the
   /// ModuleDepGraphNode's identity but bring its fingerprint up to date, it
   /// needs to set the fingerprint *after* the node has been created.
-  void setFingerprint(Optional<std::string> fp) { fingerprint = fp; }
+  void setFingerprint(Optional<StringRef> fp) {
+    fingerprint = fp ? fp->str() : Optional<std::string>();
+  }
 
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &os) const;
@@ -684,7 +714,7 @@ public:
   SourceFileDepGraphNode() : DepGraphNode(), sequenceNumber(~0) {}
 
   /// Used by the frontend to build nodes.
-  SourceFileDepGraphNode(DependencyKey key, Optional<std::string> fingerprint,
+  SourceFileDepGraphNode(DependencyKey key, Optional<StringRef> fingerprint,
                          bool isProvides)
       : DepGraphNode(key, fingerprint), isProvides(isProvides) {
     assert(key.verify());
@@ -780,34 +810,6 @@ public:
   SourceFileDepGraph(const SourceFileDepGraph &g) = delete;
   SourceFileDepGraph(SourceFileDepGraph &&g) = default;
 
-  /// Simulate loading for unit testing:
-  /// \param swiftDepsFileName The name of the swiftdeps file of the phony job
-  /// \param includePrivateDeps Whether the graph includes intra-file arcs
-  /// \param hadCompilationError Simulate a compilation error
-  /// \param interfaceHash The interface hash of the simulated graph
-  /// \param simpleNamesByRDK A map of vectors of names keyed by reference
-  /// dependency key \param compoundNamesByRDK A map of (mangledHolder,
-  /// baseName) pairs keyed by reference dependency key. For single-name
-  /// dependencies, an initial underscore indicates that the name does not
-  /// cascade. For compound names, it is the first name, the holder which
-  /// indicates non-cascading. For member names, an initial underscore indicates
-  /// file-privacy.
-  static SourceFileDepGraph
-  simulateLoad(std::string swiftDepsFileName, const bool includePrivateDeps,
-               const bool hadCompilationError, std::string interfaceHash,
-               llvm::StringMap<std::vector<std::string>> simpleNamesByRDK,
-               llvm::StringMap<std::vector<std::pair<std::string, std::string>>>
-                   compoundNamesByRDK);
-
-  static constexpr char noncascadingOrPrivatePrefix = '#';
-  static constexpr char nameFingerprintSeparator = ',';
-
-  static std::string noncascading(std::string name);
-
-  LLVM_ATTRIBUTE_UNUSED
-  static std::string privatize(std::string name);
-
-
   /// Nodes are owned by the graph.
   ~SourceFileDepGraph() {
     forEachNode([&](SourceFileDepGraphNode *n) { delete n; });
@@ -851,12 +853,15 @@ public:
   /// The frontend creates a pair of nodes for every tracked Decl and the source
   /// file itself.
   InterfaceAndImplementationPair<SourceFileDepGraphNode>
-  findExistingNodePairOrCreateAndAddIfNew(
-      NodeKind k, const ContextNameFingerprint &contextNameFingerprint);
+  findExistingNodePairOrCreateAndAddIfNew(const DependencyKey &interfaceKey,
+                                          Optional<StringRef> fingerprint);
+
+  NullablePtr<SourceFileDepGraphNode>
+  findExistingNode(const DependencyKey &key);
 
   SourceFileDepGraphNode *
-  findExistingNodeOrCreateIfNew(DependencyKey key,
-                                const Optional<std::string> &fingerprint,
+  findExistingNodeOrCreateIfNew(const DependencyKey &key,
+                                const Optional<StringRef> fingerprint,
                                 bool isProvides);
 
   /// \p Use is the Node that must be rebuilt when \p def changes.
