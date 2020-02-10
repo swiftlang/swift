@@ -900,15 +900,18 @@ public:
   /// - The `upperBound` archetype, which if set, indicates the minimum set of constraints
   ///  that any type substituted in this structural position must conform to. May be null,
   ///  indicating an unconstrained context.
+  /// - If `upperBound` is set, then the `substConformances` array will contain the
+  ///  protocol conformances for `subst` to each of the protocol requirements
+  ///  on `upperBound` in `getConformsTo` order.
   ///
   /// Returns the substituted type, or a null CanType() if this type
   /// is not bindable to the substituted type, or the callback returns
   /// CanType().
   CanType substituteBindingsTo(Type ty,
          llvm::function_ref<CanType(ArchetypeType *orig,
-                                    CanType subst,
-                                    ArchetypeType *upperBound)> substFn);
-
+                CanType subst,
+                ArchetypeType *upperBound,
+                ArrayRef<ProtocolConformanceRef> substConformances)> substFn);
   
   /// Determines whether this type is similar to \p other as defined by
   /// \p matchOptions.

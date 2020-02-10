@@ -745,7 +745,8 @@ public:
   // type and layout constraint.
   CanType addSubstitution(LayoutConstraint layout,
                           CanType substType,
-                          ArchetypeType *upperBound) {
+                          ArchetypeType *upperBound,
+                      ArrayRef<ProtocolConformanceRef> substTypeConformances) {
     auto paramIndex = substGenericParams.size();
     auto param = CanGenericTypeParamType::get(0, paramIndex, TC.Context);
     
@@ -823,21 +824,15 @@ public:
         substRequirements.push_back(
                       Requirement(RequirementKind::Layout, param, layout));
       }
+    } else {
+      (void)0;
     }
     
-    for (auto proto : upperBoundConformances) {
+    for (unsigned i : indices(upperBoundConformances)) {
+      auto proto = upperBoundConformances[i];
+      auto conformance = substTypeConformances[i];
       substRequirements.push_back(Requirement(RequirementKind::Conformance,
                                               param, proto->getDeclaredType()));
-      // TODO: We ought to get this conformance from the original type instead
-      // of searching for it again
-      ProtocolConformanceRef conformance;
-      if (substType->isTypeParameter() || substType->is<ArchetypeType>()) {
-        conformance = ProtocolConformanceRef(proto);
-      } else {
-        conformance = substType->getAnyNominal()->getModuleContext()
-                               ->lookupConformance(substType, proto);
-      }
-      assert(conformance);
       substConformances.push_back(conformance);
     }
     
@@ -859,7 +854,7 @@ public:
     // The entire original context could be a generic parameter.
     if (origType.isTypeParameter()) {
       return addSubstitution(origType.getLayoutConstraint(), substType,
-                             nullptr);
+                             nullptr, {});
     }
     
     auto origContextType = origType.getType();
@@ -916,10 +911,17 @@ public:
       ->substituteBindingsTo(substType,
         [&](ArchetypeType *archetype,
             CanType binding,
-            ArchetypeType *upperBound) -> CanType {
-          return addSubstitution(archetype->getLayoutConstraint(),
+            ArchetypeType *upperBound,
+            ArrayRef<ProtocolConformanceRef> bindingConformances) -> CanType {
+          // TODO: ArchetypeType::getLayoutConstraint sometimes misses out on
+          // implied layout constraints. For now AnyObject is the only one we
+          // care about.
+          return addSubstitution(archetype->requiresClass()
+                                   ? LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Class)
+                                   : LayoutConstraint(),
                                  binding,
-                                 upperBound);
+                                 upperBound,
+                                 bindingConformances);
         });
     
     assert(result && "substType was not bindable to abstraction pattern type?");

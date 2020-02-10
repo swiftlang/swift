@@ -1556,20 +1556,24 @@ bool TypeBase::isExactSuperclassOf(Type ty) {
 
 namespace {
 class IsBindableVisitor
-  : public TypeVisitor<IsBindableVisitor, CanType, CanType, ArchetypeType*>
+  : public TypeVisitor<IsBindableVisitor, CanType,
+                     CanType, ArchetypeType *, ArrayRef<ProtocolConformanceRef>>
 {
 public:
-  llvm::function_ref<CanType (ArchetypeType *, CanType, ArchetypeType *)>
-    VisitBinding;
+  using VisitBindingCallback =
+    llvm::function_ref<CanType (ArchetypeType *, CanType,
+                            ArchetypeType *, ArrayRef<ProtocolConformanceRef>)>;
+    
+  VisitBindingCallback VisitBinding;
   
-  IsBindableVisitor(
-    llvm::function_ref<CanType(ArchetypeType *,CanType,ArchetypeType*)> visit)
+  IsBindableVisitor(VisitBindingCallback visit)
     : VisitBinding(visit)
   {}
 
   CanType visitArchetypeType(ArchetypeType *orig,
                              CanType subst,
-                             ArchetypeType *upperBound) {
+                             ArchetypeType *upperBound,
+                             ArrayRef<ProtocolConformanceRef> substConformances) {
     if (!subst->isTypeParameter()) {
       // Check that the archetype isn't constrained in a way that makes the
       // binding impossible.
@@ -1593,10 +1597,11 @@ public:
       // allows the binding.
     }
     // Let the binding succeed.
-    return VisitBinding(orig, subst, upperBound);
+    return VisitBinding(orig, subst, upperBound, substConformances);
   }
   
-  CanType visitType(TypeBase *orig, CanType subst, ArchetypeType*) {
+  CanType visitType(TypeBase *orig, CanType subst,
+                    ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     if (CanType(orig) == subst)
       return subst;
     
@@ -1604,12 +1609,12 @@ public:
   }
   
   CanType visitDynamicSelfType(DynamicSelfType *orig, CanType subst,
-                               ArchetypeType *) {
+                               ArchetypeType *, ArrayRef<ProtocolConformanceRef>) {
     // A "dynamic self" type can be bound to another dynamic self type, or the
     // non-dynamic base class type.
     if (auto dynSubst = dyn_cast<DynamicSelfType>(subst)) {
       if (auto newBase = visit(orig->getSelfType(), dynSubst.getSelfType(),
-                               nullptr)) {
+                               nullptr, {})) {
         return CanDynamicSelfType::get(newBase, orig->getASTContext())
                                  ->getCanonicalType();
       }
@@ -1617,13 +1622,14 @@ public:
     }
     
     if (auto newNonDynBase = visit(orig->getSelfType(), subst,
-                                   nullptr)) {
+                                   nullptr, {})) {
       return newNonDynBase;
     }
     return CanType();
   }
   
-  CanType visitNominalType(NominalType *nom, CanType subst, ArchetypeType*) {
+  CanType visitNominalType(NominalType *nom, CanType subst,
+                           ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     if (auto substNom = dyn_cast<NominalType>(subst)) {
       if (nom->getDecl() != substNom->getDecl())
         return CanType();
@@ -1637,7 +1643,7 @@ public:
       if (nom->getParent()) {
         auto substParent = visit(nom->getParent()->getCanonicalType(),
                                  substNom->getParent()->getCanonicalType(),
-                                 nullptr);
+                                 nullptr, {});
         if (substParent == substNom.getParent())
           return subst;
         return NominalType::get(nom->getDecl(), substParent,
@@ -1650,14 +1656,14 @@ public:
   }
   
   CanType visitAnyMetatypeType(AnyMetatypeType *meta, CanType subst,
-                               ArchetypeType*) {
+                             ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     if (auto substMeta = dyn_cast<AnyMetatypeType>(subst)) {
       if (substMeta->getKind() != meta->getKind())
         return CanType();
       
       auto substInstance = visit(meta->getInstanceType()->getCanonicalType(),
                                substMeta->getInstanceType()->getCanonicalType(),
-                               nullptr);
+                               nullptr, {});
       if (!substInstance)
         return CanType();
       
@@ -1671,7 +1677,8 @@ public:
     return CanType();
   }
   
-  CanType visitTupleType(TupleType *tuple, CanType subst, ArchetypeType*) {
+  CanType visitTupleType(TupleType *tuple, CanType subst,
+                         ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     if (auto substTuple = dyn_cast<TupleType>(subst)) {
       // Tuple elements must match.
       if (tuple->getNumElements() != substTuple->getNumElements())
@@ -1686,7 +1693,7 @@ public:
           return CanType();
         auto newElt = visit(elt.getType(),
                             substElt.getType()->getCanonicalType(),
-                            nullptr);
+                            nullptr, {});
         if (!newElt)
           return CanType();
         newElements.push_back(substElt.getWithType(newElt));
@@ -1701,15 +1708,16 @@ public:
   }
   
   CanType visitDependentMemberType(DependentMemberType *dt, CanType subst,
-                                   ArchetypeType*) {
+                             ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     return subst;
   }
   CanType visitGenericTypeParamType(GenericTypeParamType *dt, CanType subst,
-                                    ArchetypeType*) {
+                             ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     return subst;
   }
   
-  CanType visitFunctionType(FunctionType *func, CanType subst, ArchetypeType*) {
+  CanType visitFunctionType(FunctionType *func, CanType subst,
+                            ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     if (auto substFunc = dyn_cast<FunctionType>(subst)) {
       if (func->getExtInfo() != substFunc->getExtInfo())
         return CanType();
@@ -1726,7 +1734,7 @@ public:
           return CanType();
         
         auto newParamTy =
-          visit(param.getPlainType(), substParam.getPlainType(), nullptr);
+          visit(param.getPlainType(), substParam.getPlainType(), nullptr, {});
         if (!newParamTy)
           return CanType();
         
@@ -1736,7 +1744,7 @@ public:
       
       auto newReturn = visit(func->getResult()->getCanonicalType(),
                              substFunc->getResult()->getCanonicalType(),
-                             nullptr);
+                             nullptr, {});
       if (!newReturn)
         return CanType();
       if (!didChange && newReturn == substFunc.getResult())
@@ -1748,7 +1756,7 @@ public:
   }
   
   CanType visitSILFunctionType(SILFunctionType *func, CanType subst,
-                               ArchetypeType*) {
+                             ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
     if (auto substFunc = dyn_cast<SILFunctionType>(subst)) {
       if (func->getExtInfo() != substFunc->getExtInfo())
         return CanType();
@@ -1774,7 +1782,7 @@ public:
           auto substType =
             substSubs.getReplacementTypes()[i]->getCanonicalType(sig);
           
-          auto newType = visit(origType, substType, nullptr);
+          auto newType = visit(origType, substType, nullptr, {});
           
           if (!newType)
             return CanType();
@@ -1800,7 +1808,7 @@ public:
         
         auto origParam = func->getParameters()[i].getInterfaceType();
         auto substParam = substFunc->getParameters()[i].getInterfaceType();
-        auto newParam = visit(origParam, substParam, nullptr);
+        auto newParam = visit(origParam, substParam, nullptr, {});
         if (!newParam)
           return CanType();
         
@@ -1817,7 +1825,7 @@ public:
 
         auto origResult = func->getResults()[i].getInterfaceType();
         auto substResult = substFunc->getResults()[i].getInterfaceType();
-        auto newResult = visit(origResult, substResult, nullptr);
+        auto newResult = visit(origResult, substResult, nullptr, {});
         if (!newResult)
           return CanType();
 
@@ -1834,7 +1842,7 @@ public:
   }
   
   CanType visitBoundGenericType(BoundGenericType *bgt, CanType subst,
-                                ArchetypeType *) {
+                            ArchetypeType *, ArrayRef<ProtocolConformanceRef>) {
     auto substBGT = dyn_cast<BoundGenericType>(subst);
     if (!substBGT)
       return CanType();
@@ -1860,7 +1868,7 @@ public:
     if (bgt->getParent()) {
       newParent = visit(bgt->getParent()->getCanonicalType(),
                         substBGT.getParent(),
-                        nullptr);
+                        nullptr, {});
       if (!newParent)
         return CanType();
     }
@@ -1876,9 +1884,23 @@ public:
       auto gp = genericSig->getGenericParams()[depthStart + i];
       
       // The new type is upper-bounded by the constraints the nominal type
-      // requires.
-      auto newParam = visit(orig, subst,
-                        decl->mapTypeIntoContext(gp)->getAs<ArchetypeType>());
+      // requires. The substitution operation may be interested in transforming
+      // the substituted type's conformances to these protocols.
+      auto upperBoundArchetype = decl->mapTypeIntoContext(gp)
+                                     ->getAs<ArchetypeType>();
+      SmallVector<ProtocolConformanceRef, 4> substConformances;
+      if (upperBoundArchetype) {
+        for (auto proto : upperBoundArchetype->getConformsTo()) {
+          auto conformance = substSubMap.lookupConformance(gp->getCanonicalType(),
+                                                           proto);
+          if (!conformance)
+            return CanType();
+          substConformances.push_back(conformance);
+        }
+      }
+      
+      auto newParam = visit(orig, subst, upperBoundArchetype,
+                            substConformances);
       if (!newParam)
         return CanType();
       
@@ -1920,9 +1942,9 @@ public:
 }
 
 CanType TypeBase::substituteBindingsTo(Type ty,
- llvm::function_ref<CanType(ArchetypeType*, CanType, ArchetypeType*)> substFn) {
+                             IsBindableVisitor::VisitBindingCallback substFn) {
   return IsBindableVisitor(substFn)
-    .visit(getCanonicalType(), ty->getCanonicalType(), nullptr);
+    .visit(getCanonicalType(), ty->getCanonicalType(), nullptr, {});
 }
 
 bool TypeBase::isBindableTo(Type ty) {
@@ -1932,7 +1954,8 @@ bool TypeBase::isBindableTo(Type ty) {
   llvm::DenseMap<ArchetypeType *, CanType> Bindings;
   
   return !substituteBindingsTo(ty,
-    [&](ArchetypeType *archetype, CanType binding, ArchetypeType*) -> CanType {
+    [&](ArchetypeType *archetype, CanType binding,
+        ArchetypeType*, ArrayRef<ProtocolConformanceRef>) -> CanType {
       // If we already bound this archetype, make sure the new binding candidate
       // is the same type.
       auto bound = Bindings.find(archetype);
