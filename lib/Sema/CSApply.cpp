@@ -7265,10 +7265,6 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     if (!rewrittenExpr)
       return None;
 
-    if (target.getExprContextualTypePurpose() == CTP_Initialization) {
-
-    }
-
     result.setExpr(rewrittenExpr);
   } else {
     auto fn = *target.getAsFunction();
