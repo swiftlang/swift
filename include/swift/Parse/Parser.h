@@ -1567,7 +1567,7 @@ public:
                              SmallVectorImpl<Identifier> &exprLabels,
                              SmallVectorImpl<SourceLoc> &exprLabelLocs,
                              SourceLoc &rightLoc,
-                             SmallVectorImpl<Expr *> &trailingClosures,
+                             SmallVectorImpl<TrailingClosure> &trailingClosures,
                              syntax::SyntaxKind Kind);
 
   ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);

@@ -2001,9 +2001,9 @@ namespace {
             arguments.push_back(SE->getIndex()->getSemanticsProvidingExpr());
           }
 
-          SmallVector<Expr *, 2> trailingClosures;
+          SmallVector<TrailingClosure, 2> trailingClosures;
           if (SE->hasTrailingClosure())
-            trailingClosures.push_back(arguments.back());
+            trailingClosures.push_back({arguments.back()});
 
           componentExpr = SubscriptExpr::create(
               ctx, dotExpr, SE->getStartLoc(), arguments,
