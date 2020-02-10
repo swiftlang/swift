@@ -22,6 +22,7 @@
 #include "MiscDiagnostics.h"
 #include "SolutionResult.h"
 #include "TypeCheckProtocol.h"
+#include "TypeCheckType.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -7230,12 +7231,13 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 /// Apply the given solution to the initialization target.
 ///
 /// \returns the resulting initialiation expression.
-static Expr *applySolutionToInitialization(
-    Solution &solution, SolutionApplicationTarget target, Expr *expr) {
+static Optional<SolutionApplicationTarget> applySolutionToInitialization(
+    Solution &solution, SolutionApplicationTarget target,
+    Expr *initializer) {
   auto wrappedVar = target.getInitializationWrappedVar();
   Type initType;
   if (wrappedVar) {
-    initType = solution.getType(expr);
+    initType = solution.getType(initializer);
   } else {
     initType = solution.getType(target.getInitializationPattern());
   }
@@ -7249,10 +7251,13 @@ static Expr *applySolutionToInitialization(
   // Convert the initializer to the type of the pattern.
   auto &cs = solution.getConstraintSystem();
   auto locator =
-      cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
-  expr = solution.coerceToType(expr, initType, locator);
-  if (!expr)
-    return nullptr;
+      cs.getConstraintLocator(initializer, LocatorPathElt::ContextualType());
+  initializer = solution.coerceToType(initializer, initType, locator);
+  if (!initializer)
+    return None;
+
+  SolutionApplicationTarget resultTarget = target;
+  resultTarget.setExpr(initializer);
 
   // Record the property wrapper type and note that the initializer has
   // been subsumed by the backing property.
@@ -7264,10 +7269,40 @@ static Expr *applySolutionToInitialization(
 
     // Record the semantic initializer on the outermost property wrapper.
     wrappedVar->getAttachedPropertyWrappers().front()
-        ->setSemanticInit(expr);
+        ->setSemanticInit(initializer);
   }
 
-  return expr;
+  // Coerce the pattern to the type of the initializer.
+  TypeResolutionOptions options =
+      isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())
+      ? TypeResolverContext::EditorPlaceholderExpr
+      : TypeResolverContext::InExpression;
+  options |= TypeResolutionFlags::OverrideType;
+
+  // Determine the type of the pattern.
+  Type finalPatternType = initializer->getType();
+  if (wrappedVar) {
+    if (!finalPatternType->hasError() && !finalPatternType->is<TypeVariableType>())
+      finalPatternType = computeWrappedValueType(wrappedVar, finalPatternType);
+  }
+
+  if (finalPatternType->hasDependentMember())
+    return None;
+
+  finalPatternType = finalPatternType->reconstituteSugar(/*recursive =*/false);
+
+  // Apply the solution to the pattern as well.
+  auto contextualPattern =
+      ContextualPattern::forRawPattern(target.getInitializationPattern(),
+                                       target.getDeclContext());
+  if (auto coercedPattern = TypeChecker::coercePatternToType(
+          contextualPattern, finalPatternType, options)) {
+    resultTarget.setPattern(coercedPattern);
+  } else {
+    return None;
+  }
+
+  return resultTarget;
 }
 
 /// Apply a given solution to the expression, producing a fully
@@ -7310,13 +7345,15 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
 
     /// Handle application for initializations.
     if (target.getExprContextualTypePurpose() == CTP_Initialization) {
-      rewrittenExpr = applySolutionToInitialization(
+      auto initResultTarget = applySolutionToInitialization(
           solution, target, rewrittenExpr);
-      if (!rewrittenExpr)
+      if (!initResultTarget)
         return None;
-    }
 
-    result.setExpr(rewrittenExpr);
+      result = *initResultTarget;
+    } else {
+      result.setExpr(rewrittenExpr);
+    }
   } else {
     auto fn = *target.getAsFunction();
 

@@ -2413,10 +2413,8 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                    DeclContext *DC,
                                    Type patternType) {
-  auto &Context = DC->getASTContext();
   auto target = SolutionApplicationTarget::forInitialization(
       initializer, DC, patternType, pattern);
-  initializer = target.getAsExpr();
 
   // Type-check the initializer.
   bool unresolvedTypeExprs = false;
@@ -2424,46 +2422,20 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   if (resultTarget) {
     initializer = resultTarget->getAsExpr();
-
-    TypeResolutionOptions options =
-        isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())
-        ? TypeResolverContext::EditorPlaceholderExpr
-        : TypeResolverContext::InExpression;
-    options |= TypeResolutionFlags::OverrideType;
-
-    Type initTy = initializer->getType();
-    if (auto wrappedVar = target.getInitializationWrappedVar()) {
-      if (!initTy->hasError() && !initTy->is<TypeVariableType>())
-        initTy = computeWrappedValueType(wrappedVar, initTy);
-    }
-
-    if (initTy->hasDependentMember())
-      return true;
-
-    initTy = initTy->reconstituteSugar(/*recursive =*/false);
-
-    // Apply the solution to the pattern as well.
-    auto contextualPattern =
-        ContextualPattern::forRawPattern(pattern, DC);
-    if (auto coercedPattern = TypeChecker::coercePatternToType(
-            contextualPattern, initTy, options)) {
-      pattern = coercedPattern;
-    } else {
-      return true;
-    }
-  } else {
-    initializer = target.getAsExpr();
+    return false;
   }
 
-  if (!resultTarget && !initializer->getType())
+  auto &Context = DC->getASTContext();
+  initializer = target.getAsExpr();
+
+  if (!initializer->getType())
     initializer->setType(ErrorType::get(Context));
 
   // If the type of the pattern is inferred, assign error types to the pattern
   // and its variables, to prevent it from being referenced by the constraint
   // system.
-  if (!resultTarget &&
-      (patternType->hasUnresolvedType() ||
-       patternType->hasUnboundGenericType())) {
+  if (patternType->hasUnresolvedType() ||
+      patternType->hasUnboundGenericType()) {
     pattern->setType(ErrorType::get(Context));
     pattern->forEachVariable([&](VarDecl *var) {
       // Don't change the type of a variable that we've been able to
@@ -2476,8 +2448,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       var->setInvalid();
     });
   }
-
-  return !resultTarget;
+  return true;
 }
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,

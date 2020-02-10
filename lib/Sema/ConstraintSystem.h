@@ -1314,6 +1314,12 @@ public:
     expression.expression = expr;
   }
 
+  void setPattern(Pattern *pattern) {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_Initialization);
+    expression.pattern = pattern;
+  }
+
   Optional<AnyFunctionRef> getAsFunction() const {
     switch (kind) {
     case Kind::expression:
