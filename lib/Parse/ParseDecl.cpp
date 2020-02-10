@@ -2539,7 +2539,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
     SmallVector<Expr *, 2> args;
     SmallVector<Identifier, 2> argLabels;
     SmallVector<SourceLoc, 2> argLabelLocs;
-    SmallVector<Expr *, 2> trailingClosures;
+    SmallVector<TrailingClosure, 2> trailingClosures;
     bool hasInitializer = false;
     ParserStatus status;
 
