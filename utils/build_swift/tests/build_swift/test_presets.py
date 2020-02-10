@@ -39,6 +39,7 @@ PRESET_DEFAULTS = {
     'install_destdir': '/tmp/install',
     'install_symroot': '/tmp/install/symroot',
     'install_toolchain_dir': '/tmp/install/toolchain',
+    'install_prefix': '/usr',
     'installable_package': '/tmp/install/pkg',
     'swift_install_destdir': '/tmp/install/swift',
     'symbols_package': '/path/to/symbols/package',
