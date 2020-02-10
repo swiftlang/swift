@@ -37,6 +37,7 @@ private:
   raw_ostream &os;
   const DelayedMemberSet &delayedMembers;
   AccessLevel minRequiredAccess;
+  AccessLevel maxRequiredAccess;
 
   struct CTypeInfo {
     StringRef name;
@@ -60,8 +61,10 @@ private:
 
 public:
   DeclAndTypePrinter(ModuleDecl &mod, raw_ostream &out,
-                     DelayedMemberSet &delayed, AccessLevel access)
-    : M(mod), os(out), delayedMembers(delayed), minRequiredAccess(access) {}
+                     DelayedMemberSet &delayed, AccessLevel minAccess,
+                     AccessLevel maxAccess)
+    : M(mod), os(out), delayedMembers(delayed), minRequiredAccess(minAccess),
+      maxRequiredAccess(maxAccess) {}
 
   /// Returns true if \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.

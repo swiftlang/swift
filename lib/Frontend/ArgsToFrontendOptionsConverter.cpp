@@ -86,6 +86,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.RemarkOnRebuildFromModuleInterface |=
     Args.hasArg(OPT_Rmodule_interface_rebuild);
 
+  if (!Args.hasArg(OPT_disable_emit_single_objc_header)) {
+    Opts.EmitSingleObjcHeader |= Args.hasArg(OPT_emit_single_objc_header);
+  }
   computePrintStatsOptions();
   computeDebugTimeOptions();
   computeTBDOptions();

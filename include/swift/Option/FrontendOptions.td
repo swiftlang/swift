@@ -669,4 +669,11 @@ def emit_ldadd_cfile_path
 def previous_module_installname_map_file
   : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,
     HelpText<"Path to a Json file indicating module name to installname map for @_originallyDefinedIn">;
+
+def emit_single_objc_header : Flag<["-"], "emit-single-objc-header">,
+  HelpText<"Emit a single objc header including both internal and public"
+           "declarations">;
+
+def disable_emit_single_objc_header : Flag<["-"], "disable-emit-single-objc-header">,
+  HelpText<"Disable -emit-single-objc-header flag">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

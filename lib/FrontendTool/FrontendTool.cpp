@@ -524,15 +524,53 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
 ///
 /// \see swift::printAsObjC
 static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
-                                StringRef bridgingHeader, bool moduleIsPublic) {
+                                StringRef bridgingHeader,
+                                bool moduleIsPublic, bool singleHeader) {
   if (outputPath.empty())
     return false;
-  return withOutputFile(M->getDiags(), outputPath,
-                        [&](raw_ostream &out) -> bool {
-    auto requiredAccess = moduleIsPublic ? AccessLevel::Public
-                                         : AccessLevel::Internal;
-    return printAsObjC(out, M, bridgingHeader, requiredAccess);
-  });
+
+  if (singleHeader) {
+    // The legacy mode where we print everything in a single header.
+    return withOutputFile(M->getDiags(), outputPath, [&](raw_ostream &out) -> bool {
+      return printAsObjC(out, M, bridgingHeader,
+        moduleIsPublic? ObjcHeaderKind::Public: ObjcHeaderKind::Single_All, {});
+    });
+  }
+  llvm::SmallString<128> Path(outputPath);
+  auto internalHeaderName = llvm::sys::path::filename(outputPath);
+  auto baseHeaderName = llvm::sys::path::stem(internalHeaderName);
+  auto publicHeaderName = (llvm::Twine(baseHeaderName) + "-public.h").str();
+  auto privateHeaderName = (llvm::Twine(baseHeaderName) + "-private.h").str();
+  {
+    // Print the public header
+    llvm::sys::path::remove_filename(Path);
+    llvm::sys::path::append(Path, publicHeaderName);
+    if (withOutputFile(M->getDiags(), Path, [&](raw_ostream &out) -> bool {
+      return printAsObjC(out, M, bridgingHeader, ObjcHeaderKind::Public, {});
+    })) { return true; }
+  }
+  {
+    // Print the private header
+    llvm::sys::path::remove_filename(Path);
+    llvm::sys::path::append(Path, privateHeaderName);
+    if (withOutputFile(M->getDiags(), Path, [&](raw_ostream &out) -> bool {
+      return printAsObjC(out, M, bridgingHeader, ObjcHeaderKind::Private,
+                         // Private header includes the public header.
+                         { publicHeaderName });
+    })) { return true; }
+  }
+  {
+    // Print the internal header
+    llvm::sys::path::remove_filename(Path);
+    llvm::sys::path::append(Path, internalHeaderName);
+    if (withOutputFile(M->getDiags(), Path, [&](raw_ostream &out) -> bool {
+      return printAsObjC(out, M, bridgingHeader, ObjcHeaderKind::Internal,
+                         // Internal header includes the public header and the
+                         // private header.
+                         {publicHeaderName, privateHeaderName});
+    })) { return true; }
+  }
+  return false;
 }
 
 /// Prints the stable module interface for \p M to \p outputPath.
@@ -1185,7 +1223,8 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   if (opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
     hadAnyError |= printAsObjCIfNeeded(
         Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
+        Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
+        moduleIsPublic, opts.EmitSingleObjcHeader);
   }
 
   if (opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {

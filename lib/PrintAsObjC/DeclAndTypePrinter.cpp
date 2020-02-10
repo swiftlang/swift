@@ -1112,7 +1112,8 @@ private:
     bool isSettable = VD->isSettable(nullptr);
     if (isSettable && !ctx.isAccessControlDisabled()) {
       isSettable =
-          (VD->getSetterFormalAccess() >= owningPrinter.minRequiredAccess);
+          (VD->getSetterFormalAccess() >= owningPrinter.minRequiredAccess &&
+           VD->getSetterFormalAccess() <= owningPrinter.maxRequiredAccess);
     }
     if (!isSettable)
       os << ", readonly";
@@ -2046,7 +2047,7 @@ auto DeclAndTypePrinter::getImpl() -> Implementation {
 }
 
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
-  return isVisibleToObjC(VD, minRequiredAccess) &&
+  return isVisibleToObjC(VD, minRequiredAccess, maxRequiredAccess) &&
          !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>();
 }
 

@@ -384,17 +384,51 @@ static void writeEpilogue(raw_ostream &os) {
 
 bool swift::printAsObjC(raw_ostream &os, ModuleDecl *M,
                         StringRef bridgingHeader,
-                        AccessLevel minRequiredAccess) {
+                        ObjcHeaderKind Kind,
+                        ArrayRef<StringRef> Includes) {
   llvm::PrettyStackTraceString trace("While generating Objective-C header");
 
   SmallPtrSet<ImportModuleTy, 8> imports;
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleContents{moduleContentsBuf};
-  printModuleContentsAsObjC(moduleContents, imports, *M, minRequiredAccess);
-  std::string macroGuard = (llvm::Twine(M->getNameStr().upper()) + "_SWIFT_H").str();
+  AccessLevel minlevel, maxLevel;
+  StringRef macroExtend;
+  switch (Kind) {
+  case ObjcHeaderKind::Public:
+    // We only include public decls.
+    minlevel = AccessLevel::Public;
+    maxLevel = AccessLevel::Open;
+    macroExtend = "_SWIFT_PUBLIC_H";
+    break;
+  case ObjcHeaderKind::Private:
+    // FIXME: we should print SPI here when SPI support is ready.
+    // Currently, the invalid range is on purpose to print nothing in the header.
+    minlevel = AccessLevel::Public;
+    maxLevel = AccessLevel::Internal;
+    macroExtend = "_SWIFT_PRIVATE_H";
+    break;
+  case ObjcHeaderKind::Internal:
+    // We only include internal decls.
+    // FIXME: we should print internal members of public decls too, as category.
+    minlevel = AccessLevel::Internal;
+    maxLevel = AccessLevel::Internal;
+    macroExtend = "_SWIFT_INTERNAL_H";
+    break;
+  case ObjcHeaderKind::Single_All:
+    minlevel = AccessLevel::Internal;
+    maxLevel = AccessLevel::Open;
+    macroExtend = "_SWIFT_ALL_H";
+    break;
+  }
+  printModuleContentsAsObjC(moduleContents, imports, *M, minlevel, maxLevel);
+  std::string macroGuard = (llvm::Twine(M->getNameStr().upper()) +
+                            macroExtend).str();
   writePrologue(os, M->getASTContext(), macroGuard);
   writeImports(os, imports, *M, bridgingHeader);
   writePostImportPrologue(os, *M);
+  for (auto header: Includes) {
+    os << "#include \"" << header << "\"\n";
+  }
   os << moduleContents.str();
   writeEpilogue(os);
 

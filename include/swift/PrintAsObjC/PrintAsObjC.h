@@ -21,12 +21,26 @@ namespace swift {
   class ModuleDecl;
   class ValueDecl;
 
+  enum class ObjcHeaderKind {
+    /// The header contains only public/open declarations from the module
+    Public,
+    /// The header contains only SPI declarations from the module. The header
+    /// includes the public header.
+    Private,
+    /// The header contains only internal declarations from the module. The header
+    /// includes both the public header and the private header.
+    Internal,
+
+    /// The legacy mode where we print only one header that contains everything.
+    Single_All,
+  };
+
   /// Print the Objective-C-compatible declarations in a module as a Clang
   /// header.
   ///
   /// Returns true on error.
   bool printAsObjC(raw_ostream &out, ModuleDecl *M, StringRef bridgingHeader,
-                   AccessLevel minRequiredAccess);
+                   ObjcHeaderKind Kind, ArrayRef<StringRef> Includes);
 }
 
 #endif

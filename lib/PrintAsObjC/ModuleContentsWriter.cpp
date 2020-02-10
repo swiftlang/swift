@@ -124,8 +124,9 @@ class ModuleWriter {
   DeclAndTypePrinter printer;
 public:
   ModuleWriter(raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-               ModuleDecl &mod, AccessLevel access)
-    : os(os), imports(imports), M(mod), printer(M, os, delayedMembers, access){}
+               ModuleDecl &mod, AccessLevel minAccess, AccessLevel maxAccess)
+    : os(os), imports(imports), M(mod),
+      printer(M, os, delayedMembers, minAccess, maxAccess){}
 
   /// Returns true if we added the decl's module to the import set, false if
   /// the decl is a local decl.
@@ -585,6 +586,7 @@ public:
 void
 swift::printModuleContentsAsObjC(raw_ostream &os,
                                  llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-                                 ModuleDecl &M, AccessLevel minRequiredAccess) {
-  ModuleWriter(os, imports, M, minRequiredAccess).write();
+                                 ModuleDecl &M, AccessLevel minRequiredAccess,
+                                 AccessLevel maxRequiredAccess) {
+  ModuleWriter(os, imports, M, minRequiredAccess, maxRequiredAccess).write();
 }

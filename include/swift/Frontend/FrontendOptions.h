@@ -265,6 +265,10 @@ public:
   /// module interface file?
   bool RemarkOnRebuildFromModuleInterface = false;
 
+  /// Should we emit a single objc header intead of three (private, public,
+  /// and internal header).
+  bool EmitSingleObjcHeader = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.

@@ -31,7 +31,8 @@ using ImportModuleTy = PointerUnion<ModuleDecl*, const clang::Module*>;
 /// and collecting imports in \p imports along the way.
 void printModuleContentsAsObjC(raw_ostream &os,
                                llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-                               ModuleDecl &M, AccessLevel minRequiredAccess);
+                               ModuleDecl &M, AccessLevel minRequiredAccess,
+                               AccessLevel maxRequiredAccess);
 
 } // end namespace swift
 
