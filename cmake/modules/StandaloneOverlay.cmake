@@ -93,6 +93,12 @@ set(SWIFT_BUILD_STANDALONE_OVERLAY TRUE)
 set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES "SHARED")
 set(SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES "SHARED")
 
+option(SWIFT_ENABLE_MACCATALYST
+  "Build the overlays with macCatalyst support"
+  FALSE)
+
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST "13.0" CACHE STRING
+  "Minimum deployment target version for macCatalyst")
 
 # -----------------------------------------------------------------------------
 

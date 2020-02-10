@@ -7,12 +7,13 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+from __future__ import absolute_import, unicode_literals
+
 import multiprocessing
 import os
 
 import android.adb.commands
 
-from swift_build_support.swift_build_support import host
 from swift_build_support.swift_build_support import targets
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
@@ -128,28 +129,6 @@ def _apply_default_arguments(args):
     if args.watchos_all:
         raise ValueError('error: --watchos-all is unavailable in open-source '
                          'Swift.\nUse --watchos to skip watchOS device tests.')
-
-    # Propagate global --skip-build
-    if args.skip_build:
-        args.build_linux = False
-        args.build_freebsd = False
-        args.build_cygwin = False
-        args.build_osx = False
-        args.build_ios = False
-        args.build_tvos = False
-        args.build_watchos = False
-        args.build_android = False
-        args.build_benchmarks = False
-        args.build_external_benchmarks = False
-        args.build_lldb = False
-        args.build_llbuild = False
-        args.build_libcxx = False
-        args.build_swiftpm = False
-        args.build_xctest = False
-        args.build_foundation = False
-        args.build_libdispatch = False
-        args.build_libicu = False
-        args.build_playgroundsupport = False
 
     # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
     # merely shorthands for --skip-build-{**os}-{device,simulator}
@@ -333,6 +312,13 @@ def create_argument_parser():
     option('--skip-watchos', store_false('watchos'),
            help='set to skip everything watchOS-related')
 
+    option('--maccatalyst', toggle_true,
+           help='Enable building Swift with macCatalyst support')
+
+    option('--maccatalyst-ios-tests', toggle_true,
+           help='When building for macCatalyst run tests with iOS-like '
+                'target triple')
+
     option('--android', toggle_true,
            help='also build for Android')
 
@@ -391,6 +377,7 @@ def create_argument_parser():
     option('--host-libtool', store_path(executable=True),
            help='the absolute path to libtool. Default is auto detected.')
     option('--distcc', toggle_true,
+           default=os.environ.get('USE_DISTCC') == '1',
            help='use distcc in pump mode')
     option('--enable-asan', toggle_true,
            help='enable Address Sanitizer')
@@ -476,15 +463,14 @@ def create_argument_parser():
     option('--clang-profile-instr-use', store_path,
            help='profile file to use for clang PGO')
 
-    default_max_lto_link_job_counts = host.max_lto_link_job_counts()
     option('--llvm-max-parallel-lto-link-jobs', store_int,
-           default=default_max_lto_link_job_counts['llvm'],
+           default=defaults.LLVM_MAX_PARALLEL_LTO_LINK_JOBS,
            metavar='COUNT',
            help='the maximum number of parallel link jobs to use when '
                 'compiling llvm')
 
     option('--swift-tools-max-parallel-lto-link-jobs', store_int,
-           default=default_max_lto_link_job_counts['swift'],
+           default=defaults.SWIFT_MAX_PARALLEL_LTO_LINK_JOBS,
            metavar='COUNT',
            help='the maximum number of parallel link jobs to use when '
                 'compiling swift tools.')
@@ -525,8 +511,10 @@ def create_argument_parser():
     option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
            default=None,
-           help='list of targets to compile or cross-compile the Swift '
-                'standard library for. %(default)s by default.')
+           help='The targets to compile or cross-compile the Swift standard '
+                'library for. %(default)s by default.'
+                ' Comma separated list: {}'.format(
+                    ' '.join(StdlibDeploymentTarget.get_target_names())))
 
     option('--build-stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
@@ -583,6 +571,8 @@ def create_argument_parser():
            toggle_true('swiftsyntax_verify_generated_files'),
            help='set to verify that the generated files in the source tree '
                 'match the ones that would be generated from current master')
+    option(['--install-pythonkit'], toggle_true('install_pythonkit'),
+           help='install PythonKit')
     option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),
            help='install SourceKitLSP')
     option(['--install-skstresstester'], toggle_true('install_skstresstester'),
@@ -608,6 +598,9 @@ def create_argument_parser():
 
     option('--playgroundsupport', store_true('build_playgroundsupport'),
            help='build PlaygroundSupport')
+
+    option('--pythonkit', store_true('build_pythonkit'),
+           help='build PythonKit')
 
     option('--build-ninja', toggle_true,
            help='build the Ninja tool')
@@ -857,6 +850,9 @@ def create_argument_parser():
            help='skip testing Swift stdlibs for FreeBSD')
     option('--skip-test-cygwin', toggle_false('test_cygwin'),
            help='skip testing Swift stdlibs for Cygwin')
+
+    option('--test-pythonkit', toggle_true('test_pythonkit'),
+           help='skip testing PythonKit')
 
     # -------------------------------------------------------------------------
     in_group('Run build')

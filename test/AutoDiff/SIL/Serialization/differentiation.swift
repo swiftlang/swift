@@ -26,3 +26,23 @@ bb0(%0 : $@differentiable(linear) (Float) -> Float):
 // CHECK: bb0([[ARG:%.*]] : $@differentiable(linear) (Float) -> Float):
 // CHECK:   return [[ARG]] : $@differentiable(linear) (Float) -> Float
 // CHECK: }
+
+sil @c : $@convention(thin) (@differentiable (Float, @noDerivative Float) -> Float) -> @differentiable (Float, @noDerivative Float) -> Float {
+bb0(%0 : $@differentiable (Float, @noDerivative Float) -> Float):
+  return %0 : $@differentiable (Float, @noDerivative Float) -> Float
+}
+
+// CHECK-LABEL: sil @c : $@convention(thin) (@differentiable (Float, @noDerivative Float) -> Float) -> @differentiable (Float, @noDerivative Float) -> Float {
+// CHECK: bb0(%0 : $@differentiable (Float, @noDerivative Float) -> Float):
+// CHECK:   return %0 : $@differentiable (Float, @noDerivative Float) -> Float
+// CHECK: }
+
+sil @d : $@convention(thin) (@differentiable(linear) (Float, @noDerivative Float) -> Float) -> @differentiable(linear) (Float, @noDerivative Float) -> Float {
+bb0(%0 : $@differentiable(linear) (Float, @noDerivative Float) -> Float):
+  return %0 : $@differentiable(linear) (Float, @noDerivative Float) -> Float
+}
+
+// CHECK-LABEL: sil @d : $@convention(thin) (@differentiable(linear) (Float, @noDerivative Float) -> Float) -> @differentiable(linear) (Float, @noDerivative Float) -> Float {
+// CHECK: bb0(%0 : $@differentiable(linear) (Float, @noDerivative Float) -> Float):
+// CHECK:   return %0 : $@differentiable(linear) (Float, @noDerivative Float) -> Float
+// CHECK: }

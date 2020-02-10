@@ -108,6 +108,18 @@ public:
         llvm::PointerLikeTypeTraits<InnerTy>::NumLowBitsAvailable
   };
 
+  static ArrayRef<BranchPropagatedUser>
+  convertFromInstArray(ArrayRef<SILInstruction *> instArray) {
+    assert(llvm::all_of(
+               instArray,
+               [](SILInstruction *i) { return !isa<CondBranchInst>(i); }) &&
+           "Passed cond branch to a non-BranchPropagatedUser API");
+    auto *castData =
+        reinterpret_cast<const BranchPropagatedUser *>(instArray.data());
+    ArrayRef<BranchPropagatedUser> castArray(castData, instArray.size());
+    return castArray;
+  }
+
 private:
   BranchPropagatedUser(SILInstruction *inst) : user(inst) {
     assert(!isa<CondBranchInst>(inst));

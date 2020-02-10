@@ -499,20 +499,20 @@ static bool emitSyntax(SourceFile *SF, StringRef OutputFilename) {
 }
 
 /// Writes SIL out to the given file.
-static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
-                     StringRef OutputFilename, bool SortSIL) {
+static bool writeSIL(SILModule &SM, ModuleDecl *M, const SILOptions &Opts,
+                     StringRef OutputFilename) {
   auto OS = getFileOutputStream(OutputFilename, M->getASTContext());
   if (!OS) return true;
-  SM.print(*OS, EmitVerboseSIL, M, SortSIL);
+  SM.print(*OS, M, Opts);
 
   return M->getASTContext().hadError();
 }
 
 static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
                      const CompilerInstance &Instance,
-                     const SILOptions &opts) {
-  return writeSIL(SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                  PSPs.OutputFilename, opts.EmitSortedSIL);
+                     const SILOptions &Opts) {
+  return writeSIL(SM, Instance.getMainModule(), Opts,
+                  PSPs.OutputFilename);
 }
 
 /// Prints the Objective-C "generated header" interface for \p M to \p
@@ -1609,6 +1609,9 @@ static bool performCompileStepsPostSILGen(
 
   llvm::StringSet<> LinkerDirectives;
   collectLinkerDirectives(Invocation, MSF, LinkerDirectives);
+  // Don't proceed to IRGen if collecting linker directives failed.
+  if (Context.hadError())
+    return true;
   StringRef OutputFilename = PSPs.OutputFilename;
   std::vector<std::string> ParallelOutputFilenames =
     Invocation.getFrontendOptions().InputsAndOutputs.copyOutputFilenames();
@@ -1891,39 +1894,54 @@ createJSONFixItDiagnosticConsumerIfNeeded(
   });
 }
 
-/// Print information about the selected target in JSON.
-static void printTargetInfo(const CompilerInvocation &invocation,
+/// Print information about the target triple in JSON.
+static void printTripleInfo(const llvm::Triple &triple,
                             llvm::raw_ostream &out) {
   out << "{\n";
 
-  // Target information.
-  auto &langOpts = invocation.getLangOptions();
-  out << "  \"target\": {\n";
-
   out << "    \"triple\": \"";
-  out.write_escaped(langOpts.Target.getTriple());
+  out.write_escaped(triple.getTriple());
   out << "\",\n";
 
   out << "    \"unversionedTriple\": \"";
-  out.write_escaped(getUnversionedTriple(langOpts.Target).getTriple());
+  out.write_escaped(getUnversionedTriple(triple).getTriple());
   out << "\",\n";
 
   out << "    \"moduleTriple\": \"";
-  out.write_escaped(getTargetSpecificModuleTriple(langOpts.Target).getTriple());
+  out.write_escaped(getTargetSpecificModuleTriple(triple).getTriple());
   out << "\",\n";
 
   if (auto runtimeVersion = getSwiftRuntimeCompatibilityVersionForTarget(
-          langOpts.Target)) {
+          triple)) {
     out << "    \"swiftRuntimeCompatibilityVersion\": \"";
     out.write_escaped(runtimeVersion->getAsString());
     out << "\",\n";
   }
 
   out << "    \"librariesRequireRPath\": "
-      << (tripleRequiresRPathForSwiftInOS(langOpts.Target) ? "true" : "false")
+      << (tripleRequiresRPathForSwiftInOS(triple) ? "true" : "false")
       << "\n";
 
-  out << "  },\n";
+  out << "  }";
+
+}
+
+/// Print information about the selected target in JSON.
+static void printTargetInfo(const CompilerInvocation &invocation,
+                            llvm::raw_ostream &out) {
+  out << "{\n";
+
+  // Target triple and target variant triple.
+  auto &langOpts = invocation.getLangOptions();
+  out << "  \"target\": ";
+  printTripleInfo(langOpts.Target, out);
+  out << ",\n";
+
+  if (auto &variant = langOpts.TargetVariant) {
+    out << "  \"targetVariant\": ";
+    printTripleInfo(*variant, out);
+    out << ",\n";
+  }
 
   // Various paths.
   auto &searchOpts = invocation.getSearchPathOptions();

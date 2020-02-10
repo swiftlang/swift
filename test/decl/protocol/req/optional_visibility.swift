@@ -11,5 +11,5 @@ class Conforms : Opt {
 }
 
 func g(x: Conforms) {
-  _ = x.f(callback: {})
+  x.f(callback: {})
 }

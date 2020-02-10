@@ -95,6 +95,7 @@ namespace swift {
   class RootProtocolConformance;
   struct SILDeclRef;
   class SILDefaultWitnessTable;
+  class SILDifferentiabilityWitness;
   class SILGlobalVariable;
   class SILModule;
   class SILProperty;
@@ -204,7 +205,13 @@ private:
   // Stores the IGM from which a function is referenced the first time.
   // It is used if a function has no source-file association.
   llvm::DenseMap<SILFunction *, IRGenModule *> DefaultIGMForFunction;
-  
+
+  // The IGMs where sepecializations of functions are emitted. The key is the
+  // non-specialized function.
+  // Storing all specializations of a function in the same IGM increases the
+  // chances of function merging.
+  llvm::DenseMap<const SILFunction *, IRGenModule *> IGMForSpecializations;
+
   // The IGM of the first source file.
   IRGenModule *PrimaryIGM = nullptr;
 
@@ -665,6 +672,8 @@ public:
   llvm::PointerType
       *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
+
+  llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
@@ -1266,6 +1275,7 @@ public:
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
   void emitSILProperty(SILProperty *prop);
+  void emitSILDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
   void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
   void emitProtocolConformance(const ConformanceDescription &record);
@@ -1456,6 +1466,10 @@ public:
                                      const AssociatedConformance &association);
   llvm::Function *getAddrOfDefaultAssociatedConformanceAccessor(
                                            AssociatedConformance requirement);
+
+  llvm::Constant *
+  getAddrOfDifferentiabilityWitness(const SILDifferentiabilityWitness *witness,
+                                    ConstantInit definition = ConstantInit());
 
   Address getAddrOfObjCISAMask();
 

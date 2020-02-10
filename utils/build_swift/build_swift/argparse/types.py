@@ -13,16 +13,19 @@ arguments.
 """
 
 
+from __future__ import absolute_import, unicode_literals
+
 import os.path
 import re
 import shlex
 
+import six
+
 from . import ArgumentTypeError
+from ..versions import Version
 
 
 __all__ = [
-    'CompilerVersion',
-
     'BoolType',
     'PathType',
     'RegexType',
@@ -34,37 +37,12 @@ __all__ = [
 
 # -----------------------------------------------------------------------------
 
-class CompilerVersion(object):
-    """Wrapper type around compiler version strings.
-    """
-
-    def __init__(self, *components):
-        if len(components) == 1:
-            if isinstance(components[0], str):
-                components = components[0].split('.')
-            elif isinstance(components[0], (list, tuple)):
-                components = components[0]
-
-        if len(components) == 0:
-            raise ValueError('compiler version cannot be empty')
-
-        self.components = tuple(int(part) for part in components)
-
-    def __eq__(self, other):
-        return self.components == other.components
-
-    def __str__(self):
-        return '.'.join([str(part) for part in self.components])
-
-
-# -----------------------------------------------------------------------------
-
 def _repr(cls, args):
     """Helper function for implementing __repr__ methods on *Type classes.
     """
 
     _args = []
-    for key, value in args.viewitems():
+    for key, value in six.iteritems(args):
         _args.append('{}={}'.format(key, repr(value)))
 
     return '{}({})'.format(type(cls).__name__, ', '.join(_args))
@@ -171,10 +149,8 @@ class ClangVersionType(RegexType):
             ClangVersionType.ERROR_MESSAGE)
 
     def __call__(self, value):
-        matches = super(ClangVersionType, self).__call__(value)
-        components = filter(lambda x: x is not None, matches.group(1, 2, 3, 5))
-
-        return CompilerVersion(components)
+        super(ClangVersionType, self).__call__(value)
+        return Version(value)
 
 
 class SwiftVersionType(RegexType):
@@ -182,8 +158,8 @@ class SwiftVersionType(RegexType):
     """
 
     ERROR_MESSAGE = ('Invalid version value, must be "MAJOR.MINOR" '
-                     'or "MAJOR.MINOR.PATCH"')
-    VERSION_REGEX = r'^(\d+)\.(\d+)(\.(\d+))?$'
+                     ', "MAJOR.MINOR.PATCH" or "MAJOR.MINOR.PATCH.PATCH"')
+    VERSION_REGEX = r'^(\d+)\.(\d+)(\.(\d+))?(\.(\d+))?$'
 
     def __init__(self):
         super(SwiftVersionType, self).__init__(
@@ -191,10 +167,8 @@ class SwiftVersionType(RegexType):
             SwiftVersionType.ERROR_MESSAGE)
 
     def __call__(self, value):
-        matches = super(SwiftVersionType, self).__call__(value)
-        components = filter(lambda x: x is not None, matches.group(1, 2, 4))
-
-        return CompilerVersion(components)
+        super(SwiftVersionType, self).__call__(value)
+        return Version(value)
 
 
 class ShellSplitType(object):

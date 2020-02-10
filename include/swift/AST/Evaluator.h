@@ -208,7 +208,7 @@ class Evaluator {
 
   /// A vector containing all of the active evaluation requests, which
   /// is treated as a stack and is used to detect cycles.
-  llvm::SetVector<AnyRequest> activeRequests;
+  llvm::SetVector<ActiveRequest> activeRequests;
 
   /// A cache that stores the results of requests.
   llvm::DenseMap<AnyRequest, AnyValue> cache;
@@ -308,7 +308,7 @@ public:
            typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
   void cacheOutput(const Request &request,
                    typename Request::OutputType &&output) {
-    cache.insert({getCanonicalRequest(request), std::move(output)});
+    cache.insert({AnyRequest(request), std::move(output)});
   }
 
   /// Clear the cache stored within this evaluator.
@@ -320,24 +320,13 @@ public:
   /// Is the given request, or an equivalent, currently being evaluated?
   template <typename Request>
   bool hasActiveRequest(const Request &request) const {
-    return activeRequests.count(AnyRequest(request));
+    return activeRequests.count(ActiveRequest(request));
   }
 
 private:
-  template <typename Request>
-  const AnyRequest &getCanonicalRequest(const Request &request) {
-    // FIXME: DenseMap ought to let us do this with one hash lookup.
-    auto iter = dependencies.find_as(request);
-    if (iter != dependencies.end())
-      return iter->first;
-    auto insertResult = dependencies.insert({AnyRequest(request), {}});
-    assert(insertResult.second && "just checked if the key was already there");
-    return insertResult.first->first;
-  }
-
   /// Diagnose a cycle detected in the evaluation of the given
   /// request.
-  void diagnoseCycle(const AnyRequest &request);
+  void diagnoseCycle(const ActiveRequest &request);
 
   /// Check the dependency from the current top of the stack to
   /// the given request, including cycle detection and diagnostics.
@@ -345,14 +334,16 @@ private:
   /// \returns true if a cycle was detected, in which case this function has
   /// already diagnosed the cycle. Otherwise, returns \c false and adds this
   /// request to the \c activeRequests stack.
-  bool checkDependency(const AnyRequest &request);
+  bool checkDependency(const ActiveRequest &request);
 
   /// Produce the result of the request without caching.
   template<typename Request>
   llvm::Expected<typename Request::OutputType>
   getResultUncached(const Request &request) {
+    auto activeReq = ActiveRequest(request);
+
     // Check for a cycle.
-    if (checkDependency(getCanonicalRequest(request))) {
+    if (checkDependency(activeReq)) {
       return llvm::Error(
         llvm::make_unique<CyclicalRequestError<Request>>(request, *this));
     }
@@ -360,7 +351,7 @@ private:
     // Make sure we remove this from the set of active requests once we're
     // done.
     SWIFT_DEFER {
-      assert(activeRequests.back().castTo<Request>() == request);
+      assert(activeRequests.back() == activeReq);
       activeRequests.pop_back();
     };
 
@@ -421,7 +412,7 @@ private:
       return result;
 
     // Cache the result.
-    cache.insert({getCanonicalRequest(request), *result});
+    cache.insert({AnyRequest(request), *result});
     return result;
   }
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -64,6 +64,7 @@ namespace swift {
   class DeclContext;
   class DefaultArgumentInitializer;
   class DerivativeAttr;
+  class DifferentiableAttr;
   class ExtensionDecl;
   class ForeignRepresentationInfo;
   class FuncDecl;
@@ -286,6 +287,11 @@ public:
 
   /// Cached mapping from types to their associated tangent spaces.
   llvm::DenseMap<Type, Optional<TangentSpace>> AutoDiffTangentSpaces;
+
+  /// Cache of `@differentiable` attributes keyed by parameter indices. Used to
+  /// diagnose duplicate `@differentiable` attributes for the same key.
+  llvm::DenseMap<std::pair<Decl *, IndexSubset *>, DifferentiableAttr *>
+      DifferentiableAttrs;
 
   /// Cache of `@derivative` attributes keyed by parameter indices and
   /// derivative function kind. Used to diagnose duplicate `@derivative`
@@ -532,6 +538,9 @@ public:
   ConcreteDeclRef getBuiltinInitDecl(NominalTypeDecl *decl,
                                      KnownProtocolKind builtinProtocol,
                 llvm::function_ref<DeclName (ASTContext &ctx)> initName) const;
+  
+  /// Retrieve the declaration of Swift.<(Int, Int) -> Bool.
+  FuncDecl *getLessThanIntDecl() const;
 
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
@@ -589,6 +598,10 @@ public:
                        const FunctionType::ExtInfo incompleteExtInfo,
                        FunctionTypeRepresentation trueRep);
 
+  /// Get the Swift declaration that a Clang declaration was exported from,
+  /// if applicable.
+  const Decl *getSwiftDeclForExportedClangDecl(const clang::Decl *decl);
+
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.
   ForeignRepresentationInfo
@@ -624,6 +637,14 @@ public:
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.3
+  /// compiler for the target platform.
+  AvailabilityContext getSwift53Availability();
+
+  /// Get the runtime availability of features that have been introduced in the
+  /// Swift compiler for future versions of the target platform.
+  AvailabilityContext getSwiftFutureAvailability();
 
 
   //===--------------------------------------------------------------------===//

@@ -189,8 +189,13 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       if (CodeCompletion)
         CodeCompletion->setLeadingSequenceExprs(SequencedExprs);
     }
-    if (Primary.isNull())
+    if (Primary.isNull()) {
+      if (HasCodeCompletion) {
+        SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
+        break;
+      }
       return Primary;
+    }
 
     SequencedExprs.push_back(Primary.get());
 
@@ -242,16 +247,23 @@ parse_operator:
         HasCodeCompletion = true;
       if (middle.isNull())
         return nullptr;
-      
+
       // Make sure there's a matching ':' after the middle expr.
       if (!Tok.is(tok::colon)) {
+        if (middle.hasCodeCompletion()) {
+          SequencedExprs.push_back(new (Context) IfExpr(questionLoc,
+                                                        middle.get(),
+                                                        PreviousLoc));
+          SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
+          goto done;
+        }
+        
         diagnose(questionLoc, diag::expected_colon_after_if_question);
-
-      Status.setIsParseError();
-      return makeParserResult(Status, new (Context) ErrorExpr(
-          {startLoc, middle.get()->getSourceRange().End}));
+        Status.setIsParseError();
+        return makeParserResult(Status, new (Context) ErrorExpr(
+            {startLoc, middle.get()->getSourceRange().End}));
       }
-      
+
       SourceLoc colonLoc = consumeToken();
       
       auto *unresolvedIf
@@ -3451,7 +3463,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
       // If The next token is at the beginning of a new line and can never start
       // an element, break.
       if (Tok.isAtStartOfLine() && (Tok.isAny(tok::r_brace, tok::pound_endif) ||
-                                    isStartOfDecl() || isStartOfStmt()))
+                                    isStartOfSwiftDecl() || isStartOfStmt()))
         break;
 
       diagnose(Tok, diag::expected_separator, ",")
@@ -3513,6 +3525,11 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
 
   // Parse the ':'.
   if (!consumeIf(tok::colon)) {
+    if (Element.hasCodeCompletion()) {
+      // Return the completion expression itself so we can analyze the type
+      // later.
+      return Element;
+    }
     diagnose(Tok, diag::expected_colon_in_dictionary_literal);
     return ParserStatus(Element) | makeParserError();
   }
@@ -3520,8 +3537,14 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
   // Parse the value.
   auto Value = parseExpr(diag::expected_value_in_dictionary_literal);
 
-  if (Value.isNull())
-    Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+  if (Value.isNull()) {
+    if (!Element.hasCodeCompletion()) {
+      Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+    } else {
+      Value = makeParserResult(Value,
+                               new (Context) CodeCompletionExpr(PreviousLoc));
+    }
+  }
 
   // Make a tuple of Key Value pair.
   return makeParserResult(

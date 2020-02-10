@@ -1073,7 +1073,21 @@ void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
     CurrentIGMPtr IGM = getGenModule(prop.getDecl()->getInnermostDeclContext());
     IGM->emitSILProperty(&prop);
   }
-  
+
+  // Emit differentiability witnesses.
+  for (auto &dw :
+           PrimaryIGM->getSILModule().getDifferentiabilityWitnessList()) {
+    // Emit into same IRGenModule as the original function.
+    // NOTE(TF-894): Investigate whether `getGenModule(dw.getVJP())` is
+    // significant/desirable; `getGenModule` seems relevant for multi-threaded
+    // compilation. When the differentiation transform canonicalizes all
+    // differentiability witnesses to have JVP/VJP functions, we can assert
+    // that JVP/VJP functions exist and use `getGenModule(dw.getVJP())`.
+    CurrentIGMPtr IGM = getGenModule(dw.getOriginalFunction());
+
+    IGM->emitSILDifferentiabilityWitness(&dw);
+  }
+
   // Emit code coverage mapping data.
   PrimaryIGM->emitCoverageMapping();
 
@@ -1208,6 +1222,16 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
 
   assert(!FinishedEmittingLazyDefinitions);
   LazyFunctionDefinitions.push_back(f);
+
+  if (const SILFunction *orig = f->getOriginOfSpecialization()) {
+    // f is a specialization. Try to emit all specializations of the same
+    // original function into the same IGM. This increases the chances that
+    // specializations are merged by LLVM's function merging.
+    auto iter =
+      IGMForSpecializations.insert(std::make_pair(orig, CurrentIGM)).first;
+    DefaultIGMForFunction.insert(std::make_pair(f, iter->second));
+    return;
+  }
 
   if (auto *dc = f->getDeclContext())
     if (dc->getParentSourceFile())
@@ -4482,6 +4506,13 @@ IRGenModule::getAddrOfWitnessTablePattern(const NormalProtocolConformance *conf,
   IRGen.addLazyWitnessTable(conf);
 
   auto entity = LinkEntity::forProtocolWitnessTablePattern(conf);
+  return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
+}
+
+/// Look up the address of a differentiability witness.
+llvm::Constant *IRGenModule::getAddrOfDifferentiabilityWitness(
+    const SILDifferentiabilityWitness *witness, ConstantInit definition) {
+  auto entity = LinkEntity::forDifferentiabilityWitness(witness);
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
 

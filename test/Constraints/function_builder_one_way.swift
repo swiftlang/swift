@@ -49,17 +49,16 @@ func tuplify<C: Collection, T>(_ collection: C, @TupleBuilder body: (C.Element) 
 }
 
 // CHECK: ---Connected components---
-// CHECK-NEXT: 0: $T1 $T2 $T3 $T5 $T6 $T7 $T8 $T10 $T11 $T69 depends on 1
-// CHECK-NEXT: 1: $T12 $T14 $T19 $T30 $T62 $T63 $T64 $T65 $T66 $T67 $T68 depends on 2, 3, 4, 5
-// CHECK-NEXT: 5: $T32 $T43 $T44 $T45 $T46 $T47 $T57 $T58 $T59 $T60 $T61 depends on 6, 9
-// CHECK-NEXT: 9: $T48 $T54 $T55 $T56 depends on 10
-// CHECK-NEXT: 10: $T49 $T50 $T51 $T52 $T53
-// CHECK-NEXT: 6: $T33 $T35 $T39 $T40 $T41 $T42 depends on 7, 8
-// CHECK-NEXT: 8: $T36 $T37 $T38
-// CHECK-NEXT: 7: $T34
-// CHECK-NEXT: 4: $T20 $T21 $T22 $T23 $T24 $T25 $T26 $T27 $T28 $T29
-// CHECK-NEXT: 3: $T17 $T18
-// CHECK-NEXT: 2: $T13
+// CHECK-NEXT:  0: $T1 $T2 $T3 $T5 $T6 $T7 $T8 $T10 $T11 $T78 $T79 depends on 2
+// CHECK-NEXT:  2: $T13 $T18 $T29 $T42 $T53 $T55 $T56 $T57 $T58 $T59 $T60 $T61 $T62 $T63 $T64 $T65 $T66 $T67 $T69 $T70 $T71 $T72 $T73 $T74 $T75 $T76 $T77 depends on 1, 3, 4, 6, 9
+// CHECK-NEXT:  9: $T48 $T49 $T50 $T51 $T52 depends on 8
+// CHECK-NEXT:  8: $T43 $T44 $T45 $T46 $T47
+// CHECK-NEXT:  6: $T31 $T35 $T36 $T37 $T38 $T39 $T40 $T41 depends on 5, 7
+// CHECK-NEXT:  7: $T32 $T33 $T34
+// CHECK-NEXT:  5: $T30
+// CHECK-NEXT:  4: $T19 $T20 $T21 $T22 $T23 $T24 $T25 $T26 $T27 $T28
+// CHECK-NEXT:  3: $T16 $T17
+// CHECK-NEXT:  1: $T12
 let names = ["Alice", "Bob", "Charlie"]
 let b = true
 var number = 17

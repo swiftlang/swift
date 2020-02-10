@@ -19,7 +19,7 @@ class OuterGenericClass<T> {
   }
 }
 
-protocol OuterProtocol { // expected-note{{'OuterProtocol' declared here}}
+protocol OuterProtocol {
   associatedtype Hen
   protocol InnerProtocol { // expected-error{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
     associatedtype Rooster
@@ -32,7 +32,7 @@ struct ConformsToOuterProtocol : OuterProtocol {
   typealias Hen = Int
 
   func f() { let _ = InnerProtocol.self }
-  // expected-error@-1 {{use of unresolved identifier 'InnerProtocol'}}
+  // expected-error@-1 {{protocol 'InnerProtocol' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
 
 protocol Racoon {

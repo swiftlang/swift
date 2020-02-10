@@ -256,3 +256,74 @@ struct MyTuplifiedStruct {
     }
   }
 }
+
+// Check that we're performing syntactic use diagnostics.
+func acceptMetatype<T>(_: T.Type) -> Bool { true }
+
+func syntacticUses<T>(_: T) {
+  tuplify(true) { x in
+    if x && acceptMetatype(T) { // expected-error{{expected member name or constructor call after type name}}
+      // expected-note@-1{{use '.self' to reference the type object}}
+      acceptMetatype(T) // expected-error{{expected member name or constructor call after type name}}
+      // expected-note@-1{{use '.self' to reference the type object}}
+    }
+  }
+}
+
+// Check custom diagnostics within "if" conditions.
+struct HasProperty {
+  var property: Bool = false
+}
+
+func checkConditions(cond: Bool) {
+  var x = HasProperty()
+
+  tuplify(cond) { value in
+    if x.property = value { // expected-error{{use of '=' in a boolean context, did you mean '=='?}}
+      "matched it"
+    }
+  }
+}
+
+// Check that a closure with a single "return" works with function builders.
+func checkSingleReturn(cond: Bool) {
+  tuplify(cond) { value in
+    return (value, 17)
+  }
+
+  tuplify(cond) { value in
+    (value, 17)
+  }
+
+  tuplify(cond) {
+    ($0, 17)
+  }
+}
+
+// rdar://problem/59116520
+func checkImplicitSelfInClosure() {
+  @_functionBuilder
+  struct Builder {
+    static func buildBlock(_ children: String...) -> Element { Element() }
+  }
+
+  struct Element {
+    static func nonEscapingClosure(@Builder closure: (() -> Element)) {}
+    static func escapingClosure(@Builder closure: @escaping (() -> Element)) {}
+  }
+
+  class C {
+    let identifier: String = ""
+
+    func testImplicitSelf() {
+      Element.nonEscapingClosure {
+        identifier // okay
+      }
+
+      Element.escapingClosure { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+        identifier // expected-error {{reference to property 'identifier' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        // expected-note@-1 {{reference 'self.' explicitly}}
+      }
+    }
+  }
+}

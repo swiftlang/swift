@@ -88,7 +88,7 @@
 
 
 // RUN: %empty-directory(%t/d)
-// RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -emit-executable -emit-module -serialize-diagnostics -emit-dependencies %/s %/S/Inputs/main.swift %/S/Inputs/lib.swift -g -o ./advanced_output_file_map.out -emit-module-path ./OutputFileMap.swiftmodule -module-name OutputFileMap -output-file-map %t/ofm.json 2>&1 | tee /tmp/out | %FileCheck %/s -check-prefix=BINDINGS-ENA
+// RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -emit-executable -emit-module -serialize-diagnostics -emit-dependencies %/s %/S/Inputs/main.swift %/S/Inputs/lib.swift -g -o ./advanced_output_file_map.out -emit-module-path ./OutputFileMap.swiftmodule -module-name OutputFileMap -output-file-map %t/ofm.json 2>&1 | %FileCheck %/s -check-prefix=BINDINGS-ENA
 // RUN: test ! -e %t/d/advanced_output_file_map.d
 // RUN: test -e %t/d/main.d -a ! -s %t/d/main.d
 // RUN: test -e %t/d/lib.d  -a ! -s %t/d/lib.d

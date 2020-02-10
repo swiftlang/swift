@@ -200,6 +200,8 @@ PASS(LICM, "licm",
      "Loop Invariant Code Motion")
 PASS(LateCodeMotion, "late-codemotion",
      "Late Code Motion with Release Hoisting")
+PASS(LateDeadFunctionElimination, "late-deadfuncelim",
+     "Late Dead Function Elimination")
 PASS(LateInliner, "late-inline",
      "Late Function Inlining")
 PASS(LoopCanonicalizer, "loop-canonicalizer",
@@ -317,6 +319,8 @@ PASS(NonInlinableFunctionSkippingChecker, "check-non-inlinable-function-skipping
 PASS(YieldOnceCheck, "yield-once-check",
     "Check correct usage of yields in yield-once coroutines")
 PASS(OSLogOptimization, "os-log-optimization", "Optimize os log calls")
+PASS(ForEachLoopUnroll, "for-each-loop-unroll",
+     "Unroll forEach loops over array literals")
 PASS(MandatoryCombine, "mandatory-combine",
     "Perform mandatory peephole combines")
 PASS(BugReducerTester, "bug-reducer-tester",

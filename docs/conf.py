@@ -13,6 +13,7 @@
 
 import sys
 from datetime import date
+
 from sphinx.highlighting import lexers
 
 # If extensions (or modules to document with autodoc) are in another directory,

@@ -1316,6 +1316,66 @@ variable cannot be used as l-value, i.e. the reference to the object cannot be
 modified. As a consequence the variable cannot be accessed with ``global_addr``
 but only with ``global_value``.
 
+Differentiability Witnesses
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+::
+
+  decl ::= sil-differentiability-witness
+  sil-differentiability-witness ::=
+      'sil_differentiability_witness'
+      sil-linkage?
+      '[' 'parameters' sil-differentiability-witness-function-index-list ']'
+      '[' 'results' sil-differentiability-witness-function-index-list ']'
+      generic-parameter-clause?
+      sil-function-name ':' sil-type
+      sil-differentiability-witness-body?
+
+  sil-differentiability-witness-body ::=
+      '{' sil-differentiability-witness-entry?
+          sil-differentiability-witness-entry? '}'
+
+  sil-differentiability-witness-entry ::=
+      sil-differentiability-witness-entry-kind ':'
+      sil-entry-name ':' sil-type
+
+  sil-differentiability-witness-entry-kind ::= 'jvp' | 'vjp'
+
+SIL encodes function differentiability via differentiability witnesses.
+
+Differentiability witnesses map a "key" (including an "original" SIL function)
+to derivative SIL functions.
+
+Differentiability witnesses are keyed by the following:
+
+- An "original" SIL function name.
+- Differentiability parameter indices.
+- Differentiability result indices.
+- A generic parameter clause, representing differentiability generic
+  requirements.
+
+Differentiability witnesses may have a body, specifying derivative functions for
+the key. Verification checks that derivative functions have the expected type
+based on the key.
+
+::
+
+  sil_differentiability_witness hidden [parameters 0] [results 0] <T where T : Differentiable> @id : $@convention(thin) (T) -> T {
+    jvp: @id_jvp : $@convention(thin) (T) -> (T, @owned @callee_guaranteed (T.TangentVector) -> T.TangentVector)
+    vjp: @id_vjp : $@convention(thin) (T) -> (T, @owned @callee_guaranteed (T.TangentVector) -> T.TangentVector)
+  }
+
+During SILGen, differentiability witnesses are emitted for the following:
+
+- `@differentiable` declaration attributes.
+- `@derivative` declaration attributes. Registered derivative functions
+  become differentiability witness entries.
+
+The SIL differentiation transform canonicalizes differentiability witnesses,
+filling in missing entries.
+
+Differentiability witness entries are accessed via the
+`differentiability_witness_function` instruction.
+
 Dataflow Errors
 ---------------
 
@@ -3495,46 +3555,8 @@ partial_apply
   // %r will be of the substituted thick function type $(Z'...) -> R'
 
 Creates a closure by partially applying the function ``%0`` to a partial
-sequence of its arguments. In the instruction syntax, the type of the callee is
-specified after the argument list; the types of the argument and of the defined
-value are derived from the function type of the callee. If the ``partial_apply``
-has an escaping function type (not ``[on_stack]``) the closure context will be
-allocated with retain count 1 and initialized to contain the values ``%1``,
-``%2``, etc.  The closed-over values will not be retained; that must be done
-separately before the ``partial_apply``. The closure does however take ownership
-of the partially applied arguments (except for ``@inout_aliasable`` parameters);
-when the closure reference count reaches zero, the contained values will be
-destroyed. If the ``partial_apply`` has a ``@noescape`` function type
-(``partial_apply [on_stack]``) the closure context is allocated on the stack and
-initialized to contain the closed-over values. The closed-over values are not
-retained, lifetime of the closed-over values must be managed separately. The
-lifetime of the stack context of a ``partial_apply [on_stack]`` must be
-terminated with a ``dealloc_stack``.
-
-If the callee is generic, all of its generic parameters must be bound by the
-given substitution list. The arguments are given with these generic
-substitutions applied, and the resulting closure is of concrete function
-type with the given substitutions applied. The generic parameters themselves
-cannot be partially applied; all of them must be bound. The result is always
-a concrete function.
-
-If an address argument has ``@inout_aliasable`` convention, the closure
-obtained from ``partial_apply`` will not own its underlying value.
-The ``@inout_aliasable`` parameter convention is used when a ``@noescape``
-closure captures an ``inout`` argument.
-
-TODO: The instruction, when applied to a generic function,
-currently implicitly performs abstraction difference transformations enabled
-by the given substitutions, such as promoting address-only arguments and returns
-to register arguments. This should be fixed.
-
-By default, ``partial_apply`` creates a closure whose invocation takes ownership
-of the context, meaning that a call implicitly releases the closure. The
-``[callee_guaranteed]`` change this to a caller-guaranteed model, where the
-caller promises not to release the closure while the function is being called.
-
-This instruction is used to implement both curry thunks and closures. A
-curried function in Swift::
+sequence of its arguments. This instruction is used to implement both curry
+thunks and closures. A curried function in Swift::
 
   func foo(_ a:A)(b:B)(c:C)(d:D) -> E { /* body of foo */ }
 
@@ -3606,6 +3628,54 @@ lowers to an uncurried entry point and is curried in the enclosing function::
     release %bar : $(Int) -> Int
     return %ret : $Int
   }
+
+**Ownership Semantics of Closure Context during Invocation**: By default, an
+escaping ``partial_apply`` (``partial_apply`` without ``[on_stack]]`` creates a
+closure whose invocation takes ownership of the context, meaning that a call
+implicitly releases the closure. If the ``partial_apply`` is marked with the
+flag ``[callee_guaranteed]`` the invocation instead uses a caller-guaranteed
+model, where the caller promises not to release the closure while the function
+is being called.
+
+**Captured Value Ownership Semantics**: In the instruction syntax, the type of
+the callee is specified after the argument list; the types of the argument and
+of the defined value are derived from the function type of the callee. Even so,
+the ownership requirements of the partial apply are not the same as that of the
+callee function (and thus said signature). Instead:
+
+1. If the ``partial_apply`` has a ``@noescape`` function type (``partial_apply
+   [on_stack]``) the closure context is allocated on the stack and is
+   initialized to contain the closed-over values without taking ownership of
+   those values. The closed-over values are not retained and the lifetime of the
+   closed-over values must be managed by other instruction independently of the
+   ``partial_apply``. The lifetime of the stack context of a ``partial_apply
+   [on_stack]`` must be terminated with a ``dealloc_stack``.
+
+2. If the ``partial_apply`` has an escaping function type (not ``[on_stack]``)
+   then the closure context will be heap allocated with a retain count of 1. Any
+   closed over parameters (except for ``@inout`` parameters) will be consumed by
+   the partial_apply. This ensures that no matter when the ``partial_apply`` is
+   called, the captured arguments are alive. When the closure context's
+   reference count reaches zero, the contained values are destroyed. If the
+   callee requires an owned parameter, then the implicit partial_apply forwarder
+   created by IRGen will copy the underlying argument and pass it to the callee.
+
+3. If an address argument has ``@inout_aliasable`` convention, the closure
+   obtained from ``partial_apply`` will not own its underlying value.  The
+   ``@inout_aliasable`` parameter convention is used when a ``@noescape``
+   closure captures an ``inout`` argument.
+
+**NOTE:** If the callee is generic, all of its generic parameters must be bound
+by the given substitution list. The arguments are given with these generic
+substitutions applied, and the resulting closure is of concrete function type
+with the given substitutions applied. The generic parameters themselves cannot
+be partially applied; all of them must be bound. The result is always a concrete
+function.
+
+**TODO:** The instruction, when applied to a generic function, currently
+implicitly performs abstraction difference transformations enabled by the given
+substitutions, such as promoting address-only arguments and returns to register
+arguments. This should be fixed.
 
 builtin
 ```````

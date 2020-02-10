@@ -131,7 +131,6 @@ bb0(%0 : $*S, %1 : @owned $S, %2 : @guaranteed $TwoCases):
 bb1(%4 : @guaranteed $X):
   %5 = enum $TwoCases, #TwoCases.B!enumelt
   store %1 to [assign] %0 : $*S
-  end_borrow %4 : $X
   br bb3
 
 bb2:

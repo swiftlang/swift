@@ -56,6 +56,8 @@ template <typename Range>
 unsigned findIndexInRange(Decl *D, const Range &Decls) {
   unsigned N = 0;
   for (auto I = Decls.begin(), E = Decls.end(); I != E; ++I) {
+    if ((*I)->isImplicit())
+      continue;
     if (*I == D)
       return N;
     ++N;
@@ -65,10 +67,14 @@ unsigned findIndexInRange(Decl *D, const Range &Decls) {
 
 /// Return the element at \p N in \p Decls .
 template <typename Range> Decl *getElementAt(const Range &Decls, unsigned N) {
-  assert(std::distance(Decls.begin(), Decls.end()) > N);
-  auto I = Decls.begin();
-  std::advance(I, N);
-  return *I;
+  for (auto I = Decls.begin(), E = Decls.end(); I != E; ++I) {
+    if ((*I)->isImplicit())
+      continue;
+    if (N == 0)
+      return *I;
+    --N;
+  }
+  return nullptr;
 }
 
 /// Find the equivalent \c DeclContext with \p DC from \p SF AST.
@@ -86,8 +92,24 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
   SmallVector<unsigned, 4> IndexStack;
   do {
     auto *D = newDC->getAsDecl();
+    if (!D)
+      return nullptr;
     auto *parentDC = newDC->getParent();
     unsigned N;
+
+    if (auto accessor = dyn_cast<AccessorDecl>(D)) {
+      // The AST for accessors is like:
+      //   DeclContext -> AbstractStorageDecl -> AccessorDecl
+      // We need to push the index of the accessor within the accessor list
+      // of the storage.
+      auto *storage = accessor->getStorage();
+      if (!storage)
+        return nullptr;
+      auto accessorN = findIndexInRange(accessor, storage->getAllAccessors());
+      IndexStack.push_back(accessorN);
+      D = storage;
+    }
+
     if (auto parentSF = dyn_cast<SourceFile>(parentDC))
       N = findIndexInRange(D, parentSF->getTopLevelDecls());
     else if (auto parentIDC =
@@ -120,7 +142,17 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       D = getElementAt(parentIDC->getMembers(), N);
     else
       llvm_unreachable("invalid DC kind for finding equivalent DC (query)");
+
+    if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
+      if (IndexStack.empty())
+        return nullptr;
+      auto accessorN = IndexStack.pop_back_val();
+      D = getElementAt(storage->getAllAccessors(), accessorN);
+    }
+
     newDC = dyn_cast<DeclContext>(D);
+    if (!newDC)
+      return nullptr;
   } while (!IndexStack.empty());
 
   assert(newDC->getContextKind() == DC->getContextKind());
@@ -145,6 +177,8 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
 
   auto &CI = *CachedCI;
 
+  if (!CI.hasPersistentParserState())
+    return false;
   auto &oldState = CI.getPersistentParserState();
   if (!oldState.hasCodeCompletionDelayedDeclState())
     return false;
@@ -174,13 +208,16 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
       ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
   registerIDERequestFunctions(Ctx->evaluator);
   registerTypeCheckerRequestFunctions(Ctx->evaluator);
+  registerSILGenRequestFunctions(Ctx->evaluator);
   ModuleDecl *M = ModuleDecl::create(Identifier(), *Ctx);
   PersistentParserState newState;
   SourceFile *newSF =
       new (*Ctx) SourceFile(*M, SourceFileKind::Library, tmpBufferID,
                             SourceFile::ImplicitModuleImportKind::None);
   newSF->enableInterfaceHash();
-  parseIntoSourceFileFull(*newSF, tmpBufferID, &newState);
+  // Ensure all non-function-body tokens are hashed into the interface hash
+  Ctx->LangOpts.EnableTypeFingerprints = false;
+  parseIntoSourceFile(*newSF, tmpBufferID, &newState);
   // Couldn't find any completion token?
   if (!newState.hasCodeCompletionDelayedDeclState())
     return false;
@@ -295,7 +332,8 @@ bool CompletionInstance::performNewOperation(
   registerIDERequestFunctions(CI.getASTContext().evaluator);
 
   CI.performParseAndResolveImportsOnly();
-  Callback(CI);
+  if (CI.hasPersistentParserState())
+    Callback(CI);
 
   if (DiagC)
     CI.removeDiagnosticConsumer(DiagC);
@@ -323,6 +361,10 @@ bool swift::ide::CompletionInstance::performOperation(
   // Disable to build syntax tree because code-completion skips some portion of
   // source text. That breaks an invariant of syntax tree building.
   Invocation.getLangOptions().BuildSyntaxTree = false;
+
+  // Since caching uses the interface hash, and since per type fingerprints
+  // weaken that hash, disable them here:
+  Invocation.getLangOptions().EnableTypeFingerprints = false;
 
   // FIXME: ASTScopeLookup doesn't support code completion yet.
   Invocation.disableASTScopeLookup();

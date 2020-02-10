@@ -456,7 +456,13 @@ extension Collection {
   }
 }
 func fn_r28909024(n: Int) {
-  return (0..<10).r28909024 { // expected-error {{unexpected non-void return value in void function}}
+  // FIXME(diagnostics): Unfortunately there is no easy way to fix this diagnostic issue at the moment
+  // because the problem is related to ordering of the bindings - we'd attempt to bind result of the expression
+  // to contextual type of `Void` which prevents solver from discovering correct types for range - 0..<10
+  // (since both arguments are literal they are ranked lower than contextual type).
+  //
+  // Good diagnostic for this is - `unexpected non-void return value in void function`
+  return (0..<10).r28909024 { // expected-error {{expression type 'Range<Int>.Index' (aka 'Int') is ambiguous without more context}}
     _ in true
   }
 }
@@ -940,5 +946,28 @@ class Foo<State: StateType> {
                          let getState = { [weak self] in self?.state }
                          return middleware(dispatch, getState)(fun)
                        })
+  }
+}
+
+// Make sure that `String...` is translated into `[String]` in the body
+func test_explicit_variadic_is_interpreted_correctly() {
+  _ = { (T: String...) -> String in T[0] + "" } // Ok
+}
+
+// rdar://problem/59208419 - closure result type is incorrectly inferred to be a supertype
+func test_correct_inference_of_closure_result_in_presence_of_optionals() {
+  class A {}
+  class B : A {}
+
+  func foo(_: B) -> Int? { return 42 }
+
+  func bar<T: A>(_: (A) -> T?) -> T? {
+    return .none
+  }
+
+  guard let v = bar({ $0 as? B }),
+        let _ = foo(v) // Ok, v is inferred as `B`
+  else {
+    return;
   }
 }

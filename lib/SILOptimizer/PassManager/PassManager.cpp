@@ -58,8 +58,8 @@ llvm::cl::opt<std::string> SILBreakOnPass(
     "sil-break-on-pass", llvm::cl::init(""),
     llvm::cl::desc("Break before running a particular function pass"));
 
-llvm::cl::opt<std::string>
-    SILPrintOnlyFun("sil-print-only-function", llvm::cl::init(""),
+llvm::cl::list<std::string>
+    SILPrintOnlyFun("sil-print-only-function", llvm::cl::CommaSeparated,
                     llvm::cl::desc("Only print out the sil for this function"));
 
 llvm::cl::opt<std::string>
@@ -144,7 +144,8 @@ static llvm::cl::opt<DebugOnlyPassNumberOpt, true,
               llvm::cl::ValueRequired);
 
 static bool doPrintBefore(SILTransform *T, SILFunction *F) {
-  if (!SILPrintOnlyFun.empty() && F && F->getName() != SILPrintOnlyFun)
+  if (!SILPrintOnlyFun.empty() && F && SILPrintOnlyFun.end() ==
+      std::find(SILPrintOnlyFun.begin(), SILPrintOnlyFun.end(), F->getName()))
     return false;
 
   if (!SILPrintOnlyFuns.empty() && F &&
@@ -168,7 +169,8 @@ static bool doPrintBefore(SILTransform *T, SILFunction *F) {
 }
 
 static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
-  if (!SILPrintOnlyFun.empty() && F && F->getName() != SILPrintOnlyFun)
+  if (!SILPrintOnlyFun.empty() && F && SILPrintOnlyFun.end() ==
+      std::find(SILPrintOnlyFun.begin(), SILPrintOnlyFun.end(), F->getName()))
     return false;
 
   if (!SILPrintOnlyFuns.empty() && F &&
@@ -207,7 +209,8 @@ static void printModule(SILModule *Mod, bool EmitVerboseSIL) {
     return;
   }
   for (auto &F : *Mod) {
-    if (!SILPrintOnlyFun.empty() && F.getName().str() == SILPrintOnlyFun)
+    if (!SILPrintOnlyFun.empty() && SILPrintOnlyFun.end() !=
+        std::find(SILPrintOnlyFun.begin(), SILPrintOnlyFun.end(), F.getName()))
       F.dump(EmitVerboseSIL);
 
     if (!SILPrintOnlyFuns.empty() &&

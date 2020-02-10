@@ -45,3 +45,16 @@ func test1() { // CHECK: [[@LINE]]:6 | function/Swift | test1() | [[test1_USR:.*
     }
   }
 }
+
+protocol AP {
+  // CHECK: [[@LINE+1]]:18 | type-alias/associated-type/Swift | A | [[AP_P_USR:.*]] | Def,RelChild | rel: 1
+  associatedtype A
+}
+// CHECK: [[@LINE+1]]:19 | param/Swift | x | [[TEST2_X_USR:.*]] | Def,RelChild | rel: 1
+func test2<X: AP>(x: X) {
+  // CHECK: [[@LINE+1]]:9 | type-alias/associated-type/Swift | A | [[AP_P_USR]] | Ref,RelCont | rel: 1
+  _ = X.A.self
+  // CHECK: [[@LINE+2]]:16 | param/Swift | x | [[TEST2_X_USR]] | Ref,Read,RelCont | rel: 1
+  // CHECK: [[@LINE+1]]:19 | type-alias/associated-type/Swift | A | [[AP_P_USR]] | Ref,RelCont | rel: 1
+  _ = type(of: x).A.self
+}

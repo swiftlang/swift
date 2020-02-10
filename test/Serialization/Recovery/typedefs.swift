@@ -1,4 +1,7 @@
 // RUN: %empty-directory(%t)
+
+// Cannot use -parse-as-library here because that would compile also the
+// #if VERIFY path, which contains top-level code.
 // RUN: %target-swift-frontend -emit-sil -o - -emit-module-path %t/Lib.swiftmodule -module-name Lib -I %S/Inputs/custom-modules -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck -check-prefix CHECK-VTABLE %s
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules | %FileCheck %s
@@ -23,9 +26,9 @@ import Lib
 // CHECK-SIL-LABEL: sil hidden [ossa] @$s8typedefs11testSymbolsyyF
 func testSymbols() {
   // Check that the symbols are not using 'Bool'.
-  // CHECK-SIL: function_ref @$s3Lib1xs5Int32Vvau
+  // CHECK-SIL: global_addr @$s3Lib9usesAssocs5Int32VSgvp
   _ = Lib.x
-  // CHECK-SIL: function_ref @$s3Lib9usesAssocs5Int32VSgvau
+  // CHECK-SIL: global_addr @$s3Lib1xs5Int32Vvp
   _ = Lib.usesAssoc
 } // CHECK-SIL: end sil function '$s8typedefs11testSymbolsyyF'
 
@@ -36,7 +39,7 @@ public func testVTableBuilding(user: User) {
   // changes, please check that offset is still correct.
   // CHECK-IR-NOT: ret
   // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 28|i32 31}}
-  _ = user.lastMethod()
+  user.lastMethod()
 } // CHECK-IR: ret void
 
 #if VERIFY

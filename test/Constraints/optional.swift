@@ -391,8 +391,8 @@ func sr8411() {
 
   _ = S(&foo)      // Ok
   _ = S.init(&foo) // Ok
-  _ = S.foo(&foo)  // Ok
-  _ = S.bar(&foo, 42) // Ok
+  S.foo(&foo)  // Ok
+  S.bar(&foo, 42) // Ok
 }
 
 // SR-11104 - Slightly misleading diagnostics for contextual failures with multiple fixes

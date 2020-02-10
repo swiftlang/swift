@@ -7,13 +7,14 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+from __future__ import absolute_import, unicode_literals
+
 import multiprocessing
 
-from swift_build_support.swift_build_support import host
-from swift_build_support.swift_build_support import targets
+from build_swift import argparse
+from build_swift import defaults
 
-from ..build_swift import argparse
-from ..build_swift import defaults
+from swift_build_support.swift_build_support import targets
 
 
 __all__ = [
@@ -74,6 +75,7 @@ EXPECTED_DEFAULTS = {
     'build_ninja': False,
     'build_osx': True,
     'build_playgroundsupport': False,
+    'build_pythonkit': False,
     'build_runtime_with_host_compiler': False,
     'build_stdlib_deployment_targets': ['all'],
     'build_subdir': None,
@@ -92,6 +94,7 @@ EXPECTED_DEFAULTS = {
     'install_swiftpm': False,
     'install_swiftsyntax': False,
     'swiftsyntax_verify_generated_files': False,
+    'install_pythonkit': False,
     'install_sourcekitlsp': False,
     'install_skstresstester': False,
     'install_swiftevolve': False,
@@ -165,11 +168,13 @@ EXPECTED_DEFAULTS = {
     'llvm_assertions': True,
     'llvm_build_variant': 'Debug',
     'llvm_max_parallel_lto_link_jobs':
-        host.max_lto_link_job_counts()['llvm'],
+        defaults.LLVM_MAX_PARALLEL_LTO_LINK_JOBS,
     'llvm_targets_to_build': 'X86;ARM;AArch64;PowerPC;SystemZ;Mips',
     'tsan_libdispatch_test': False,
     'long_test': False,
     'lto_type': None,
+    'maccatalyst': False,
+    'maccatalyst_ios_tests': False,
     'dump_config': False,
     'show_sdks': False,
     'skip_build': False,
@@ -185,7 +190,7 @@ EXPECTED_DEFAULTS = {
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
     'swift_tools_max_parallel_lto_link_jobs':
-        host.max_lto_link_job_counts()['swift'],
+        defaults.SWIFT_MAX_PARALLEL_LTO_LINK_JOBS,
     'swift_user_visible_version': defaults.SWIFT_USER_VISIBLE_VERSION,
     'symbols_package': None,
     'test': None,
@@ -203,6 +208,7 @@ EXPECTED_DEFAULTS = {
     'test_optimized': None,
     'test_osx': False,
     'test_paths': [],
+    'test_pythonkit': False,
     'test_tvos': False,
     'test_tvos_host': False,
     'test_tvos_simulator': False,
@@ -439,7 +445,12 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--llbuild', dest='build_llbuild'),
     SetTrueOption('--lldb', dest='build_lldb'),
     SetTrueOption('--libcxx', dest='build_libcxx'),
+    SetTrueOption('--maccatalyst', dest='maccatalyst'),
+    SetTrueOption('--maccatalyst-ios-tests', dest='maccatalyst_ios_tests'),
     SetTrueOption('--playgroundsupport', dest='build_playgroundsupport'),
+    SetTrueOption('--pythonkit', dest='build_pythonkit'),
+    SetTrueOption('--install-pythonkit', dest='install_pythonkit'),
+    SetTrueOption('--test-pythonkit', dest='test_pythonkit'),
     SetTrueOption('--skip-build'),
     SetTrueOption('--swiftpm', dest='build_swiftpm'),
     SetTrueOption('--swiftsyntax', dest='build_swiftsyntax'),

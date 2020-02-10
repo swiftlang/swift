@@ -347,6 +347,8 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     // optimization pipeline.
     SerializationOptions SerializationOpts;
     std::string OutPathStr = OutPath;
+    SerializationOpts.EnableNestedTypeLookupTable
+        = FEOpts.EnableSerializationNestedTypeLookupTable;
     SerializationOpts.OutputPath = OutPathStr.c_str();
     SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
     SerializationOpts.AutolinkForceLoad =

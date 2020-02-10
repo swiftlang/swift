@@ -14,6 +14,7 @@ constructing parsers and more argument types. This module exposes a strict
 super-set of the argparse API and is meant to be used as a drop-in replacement.
 """
 
+from __future__ import absolute_import, unicode_literals
 
 from argparse import (ArgumentDefaultsHelpFormatter, ArgumentError,
                       ArgumentTypeError, FileType, HelpFormatter,
@@ -23,8 +24,8 @@ from argparse import ONE_OR_MORE, OPTIONAL, SUPPRESS, ZERO_OR_MORE
 
 from .actions import Action, Nargs
 from .parser import ArgumentParser
-from .types import (BoolType, ClangVersionType, CompilerVersion, PathType,
-                    RegexType, ShellSplitType, SwiftVersionType)
+from .types import (BoolType, ClangVersionType, PathType, RegexType,
+                    ShellSplitType, SwiftVersionType)
 
 
 __all__ = [
@@ -39,7 +40,6 @@ __all__ = [
     'RawDescriptionHelpFormatter',
     'RawTextHelpFormatter',
 
-    'CompilerVersion',
     'BoolType',
     'FileType',
     'PathType',

@@ -282,6 +282,9 @@ def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
 
+def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
+  HelpText<"Enable speculative devirtualization pass.">;
+
 def enable_ownership_stripping_after_serialization
   : Flag<["-"], "enable-ownership-stripping-after-serialization">,
   HelpText<"Strip ownership after serialization">;
@@ -648,9 +651,9 @@ def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
 def disable_legacy_type_info : Flag<["-"], "disable-legacy-type-info">,
   HelpText<"Completely disable legacy type layout">;
 
-def prespecialize_generic_metadata : Flag<["-"], "prespecialize-generic-metadata">,
-  HelpText<"Statically specialize metadata for generic types at types that "
-           "are known to be used in source.">;
+def disable_generic_metadata_prespecialization : Flag<["-"], "disable-generic-metadata-prespecialization">,
+  HelpText<"Do not statically specialize metadata for generic types at types "
+           "that are known to be used in source.">;
 
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;

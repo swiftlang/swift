@@ -375,7 +375,9 @@ struct WhereClauseOwner {
 
   /// The source of the where clause, which can be a generic parameter list
   /// or a declaration that can have a where clause.
-  llvm::PointerUnion<GenericParamList *, TrailingWhereClause *, SpecializeAttr *> source;
+  llvm::PointerUnion<GenericParamList *, TrailingWhereClause *,
+                     SpecializeAttr *, DifferentiableAttr *>
+      source;
 
   WhereClauseOwner(GenericContext *genCtx);
   WhereClauseOwner(AssociatedTypeDecl *atd);
@@ -384,6 +386,9 @@ struct WhereClauseOwner {
       : dc(dc), source(genericParams) {}
 
   WhereClauseOwner(DeclContext *dc, SpecializeAttr *attr)
+      : dc(dc), source(attr) {}
+
+  WhereClauseOwner(DeclContext *dc, DifferentiableAttr *attr)
       : dc(dc), source(attr) {}
 
   SourceLoc getLoc() const;
@@ -1750,7 +1755,7 @@ public:
   void cacheResult(Witness value) const;
 };
 
-enum class FunctionBuilderClosurePreCheck : uint8_t {
+enum class FunctionBuilderBodyPreCheck : uint8_t {
   /// There were no problems pre-checking the closure.
   Okay,
 
@@ -1763,7 +1768,7 @@ enum class FunctionBuilderClosurePreCheck : uint8_t {
 
 class PreCheckFunctionBuilderRequest
     : public SimpleRequest<PreCheckFunctionBuilderRequest,
-                           FunctionBuilderClosurePreCheck(AnyFunctionRef),
+                           FunctionBuilderBodyPreCheck(AnyFunctionRef),
                            CacheKind::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1772,7 +1777,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<FunctionBuilderClosurePreCheck>
+  llvm::Expected<FunctionBuilderBodyPreCheck>
   evaluate(Evaluator &evaluator, AnyFunctionRef fn) const;
 
 public:
@@ -1954,8 +1959,7 @@ public:
 
 class TypeCheckSourceFileRequest :
     public SimpleRequest<TypeCheckSourceFileRequest,
-                         bool (SourceFile *, unsigned),
-                         CacheKind::SeparatelyCached> {
+                         bool (SourceFile *), CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1963,8 +1967,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator,
-                                SourceFile *SF, unsigned StartElem) const;
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, SourceFile *SF) const;
 
 public:
   // Separate caching.
@@ -2022,6 +2025,35 @@ public:
   }
 };
 
+/// Type-checks a `@differentiable` attribute and returns the resolved parameter
+/// indices on success. On failure, emits diagnostics and returns `nullptr`.
+///
+/// Currently, this request resolves other `@differentiable` attribute
+/// components but mutates them in place:
+/// - `JVPFunction`
+/// - `VJPFunction`
+/// - `DerivativeGenericSignature`
+class DifferentiableAttributeTypeCheckRequest
+    : public SimpleRequest<DifferentiableAttributeTypeCheckRequest,
+                           IndexSubset *(DifferentiableAttr *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<IndexSubset *> evaluate(Evaluator &evaluator,
+                                         DifferentiableAttr *attr) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<IndexSubset *> getCachedResult() const;
+  void cacheResult(IndexSubset *value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
@@ -2044,7 +2076,7 @@ AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
-void simple_display(llvm::raw_ostream &out, FunctionBuilderClosurePreCheck pck);
+void simple_display(llvm::raw_ostream &out, FunctionBuilderBodyPreCheck pck);
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

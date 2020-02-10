@@ -44,7 +44,7 @@ public func testGenericDispatch<T: Proto>(user: T) {
   // CHECK-IR: [[METHOD:%.+]] = bitcast i8* [[RAW_METHOD]] to void (%swift.opaque*, %swift.type*, i8**)*
   // CHECK-IR-NOT: ret
   // CHECK-IR: call swiftcc void [[METHOD]](
-  _ = user.lastMethod()
+  user.lastMethod()
 } // CHECK-IR: ret void
 
 #if VERIFY
