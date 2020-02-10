@@ -1,7 +1,19 @@
+//===--- RangeSet.swift ---------------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 /// A set of ranges of any comparable value.
 public struct RangeSet<Bound: Comparable> {
-  internal var _ranges: [Range<Bound>] = []
-  
+  internal var _ranges = _RangeSetStorage<Bound>()
+
   /// Creates an empty range set.
   public init() {}
   
@@ -10,7 +22,7 @@ public struct RangeSet<Bound: Comparable> {
   /// - Parameter range: The range to use for the new range set.
   public init(_ range: Range<Bound>) {
     if !range.isEmpty {
-      self._ranges = [range]
+      self._ranges = _RangeSetStorage(range)
     }
   }
   
@@ -44,10 +56,10 @@ public struct RangeSet<Bound: Comparable> {
     }
   }
   
-  /// Creates a new range set from `_ranges`, which satisfies the range set
+  /// Creates a new range set from `ranges`, which satisfies the range set
   /// invariants.
-  internal init(_ranges: [Range<Bound>]) {
-    self._ranges = _ranges
+  internal init(_orderedRanges ranges: [Range<Bound>]) {
+    self._ranges = _RangeSetStorage(ranges)
     _checkInvariants()
   }
   
@@ -218,7 +230,7 @@ public struct RangeSet<Bound: Comparable> {
       let newRange = _ranges[indices.lowerBound].lowerBound..<range.lowerBound
       _ranges.replaceSubrange(indices, with: CollectionOfOne(newRange))
     case (true, true):
-      _ranges.replaceSubrange(indices, with: Pair(
+      _ranges.replaceSubrange(indices, with: _Pair(
         _ranges[indices.lowerBound].lowerBound..<range.lowerBound,
         range.upperBound..<_ranges[indices.upperBound - 1].upperBound
       ))
@@ -240,7 +252,7 @@ extension RangeSet: ExpressibleByArrayLiteral {
 
 extension RangeSet {
   public struct Ranges: RandomAccessCollection {
-    var _ranges: [Range<Bound>]
+    var _ranges: _RangeSetStorage<Bound>
     
     public var startIndex: Int { _ranges.startIndex }
     public var endIndex: Int { _ranges.endIndex }
@@ -319,13 +331,25 @@ extension RangeSet {
   internal func _inverted<C>(within collection: C) -> RangeSet
     where C: Collection, C.Index == Bound
   {
-    var result: RangeSet = []
-    var low = collection.startIndex
-    for range in _ranges {
+    return _gaps(
+      boundedBy: collection.startIndex..<collection.endIndex)
+  }
+  
+  /// Returns a range set that represents the ranges of values within the
+  /// given bounds that aren't represented by this range set.
+  internal func _gaps(boundedBy bounds: Range<Bound>) -> RangeSet {
+    guard let start = _ranges.firstIndex(where: { $0.lowerBound >= bounds.lowerBound })
+      else { return RangeSet() }
+    guard let end = _ranges.lastIndex(where: { $0.upperBound <= bounds.upperBound })
+      else { return RangeSet() }
+    
+    var result = RangeSet()
+    var low = bounds.lowerBound
+    for range in _ranges[start...end] {
       result.insert(contentsOf: low..<range.lowerBound)
       low = range.upperBound
     }
-    result.insert(contentsOf: low..<collection.endIndex)
+    result.insert(contentsOf: low..<bounds.upperBound)
     return result
   }
 }
@@ -426,7 +450,7 @@ extension RangeSet {
       }
     }
     
-    return RangeSet(_ranges: result)
+    return RangeSet(_orderedRanges: result)
   }
   
   public __consuming func symmetricDifference(
@@ -469,7 +493,7 @@ extension RangeSet: CustomStringConvertible {
 
 /// A collection of two elements, to avoid heap allocation when calling
 /// `replaceSubrange` with just two elements.
-internal struct Pair<Element>: RandomAccessCollection {
+internal struct _Pair<Element>: RandomAccessCollection {
   var pair: (first: Element, second: Element)
   
   init(_ first: Element, _ second: Element) {

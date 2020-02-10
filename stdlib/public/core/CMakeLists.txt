@@ -212,6 +212,7 @@ set(SWIFTLIB_SOURCES
   PlaygroundDisplay.swift
   CommandLine.swift
   RangeSet.swift
+  RangeSetStorage.swift
   SliceBuffer.swift
   SIMDVector.swift
   UnfoldSequence.swift

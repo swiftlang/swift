@@ -71,6 +71,7 @@
     "Range.swift",
     "ClosedRange.swift",
     "RangeSet.swift",
+    "RangeSetStorage.swift",
     "CollectionOfOne.swift",
     "BridgingBuffer.swift",
     "Sequence.swift",
