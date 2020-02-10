@@ -891,6 +891,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     lookupExpr = SubscriptExpr::create(
         ctx, wrapperMetatype, SourceLoc(), args,
         subscriptDecl->getName().getArgumentNames(), { }, SourceLoc(),
+        /*trailingLBrace=*/SourceLoc(), /*trailingRBrace=*/SourceLoc(),
         /*trailingClosures=*/{}, subscriptDecl, /*Implicit=*/true);
 
     // FIXME: Since we're not resolving overloads or anything, we should be

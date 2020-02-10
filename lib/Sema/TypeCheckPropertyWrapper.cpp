@@ -749,10 +749,12 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
       if (endLoc.isInvalid() && startLoc.isValid())
         endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
 
-      auto *init = CallExpr::create(
-         ctx, typeExpr, startLoc, {initializer}, {argName},
-         {initializer->getStartLoc()}, endLoc,
-         /*trailingClosures=*/{}, /*implicit=*/true);
+      auto *init =
+          CallExpr::create(ctx, typeExpr, startLoc, {initializer}, {argName},
+                           {initializer->getStartLoc()}, endLoc,
+                           /*trailingLBrace=*/SourceLoc(),
+                           /*trailingRBrace=*/SourceLoc(),
+                           /*trailingClosures=*/{}, /*implicit=*/true);
       initializer = init;
 
       if (!innermostInit)
@@ -785,9 +787,11 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
     if (endLoc.isInvalid() && startLoc.isValid())
       endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
 
-    auto *init = CallExpr::create(
-        ctx, typeExpr, startLoc, elements, elementNames, elementLocs,
-        endLoc, /*trailingClosures=*/{}, /*implicit=*/true);
+    auto *init = CallExpr::create(ctx, typeExpr, startLoc, elements,
+                                   elementNames, elementLocs, endLoc,
+                                   /*trailingLBrace=*/SourceLoc(),
+                                   /*trailingRBrace=*/SourceLoc(),
+                                   /*trailingClosures=*/{}, /*implicit=*/true);
     initializer = init;
 
     if (!innermostInit)

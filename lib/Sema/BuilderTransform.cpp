@@ -100,6 +100,8 @@ class BuilderClosureVisitor
     SourceLoc closeLoc = args.empty() ? loc : args.back()->getEndLoc();
     Expr *result = CallExpr::create(ctx, memberRef, openLoc, args,
                                     argLabels, argLabelLocs, closeLoc,
+                                    /*trailingLBrace=*/SourceLoc(),
+                                    /*trailingRBrace=*/SourceLoc(),
                                     /*trailing closures*/{},
                                     /*implicit*/true);
 

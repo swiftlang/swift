@@ -2539,6 +2539,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
     SmallVector<Expr *, 2> args;
     SmallVector<Identifier, 2> argLabels;
     SmallVector<SourceLoc, 2> argLabelLocs;
+    SourceLoc trailingLBrace, trailingRBrace;
     SmallVector<TrailingClosure, 2> trailingClosures;
     bool hasInitializer = false;
     ParserStatus status;
@@ -2577,7 +2578,8 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
         status |= parseExprList(tok::l_paren, tok::r_paren,
                                 /*isPostfix=*/false, /*isExprBasic=*/true,
                                 lParenLoc, args, argLabels, argLabelLocs,
-                                rParenLoc, trailingClosures,
+                                rParenLoc, trailingLBrace, trailingRBrace,
+                                trailingClosures,
                                 SyntaxKind::TupleExprElementList);
         assert(trailingClosures.empty() && "Cannot parse a trailing closure here");
         hasInitializer = true;
