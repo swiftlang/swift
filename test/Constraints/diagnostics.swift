@@ -1315,3 +1315,53 @@ takesGenericFunction(true) // expected-error {{cannot convert value of type 'Boo
 func takesTuple<T>(_ x: ([T], [T])) {} // expected-note {{in call to function 'takesTuple'}}
 takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([T], [T])'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+
+// Void function returns non-void result fix-it
+
+func voidFunc() {
+  return 1 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{15-15= -> <# Return Type #>}}
+}
+
+func voidFuncWithArgs(arg1: Int) {
+  return 1 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{33-33= -> <# Return Type #>}}
+}
+
+func voidFuncWithCondFlow() {
+  if Bool.random() {
+    return 1
+    // expected-error@-1 {{unexpected non-void return value in void function}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{28-28= -> <# Return Type #>}}
+  } else {
+    return 2
+    // expected-error@-1 {{unexpected non-void return value in void function}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{28-28= -> <# Return Type #>}}
+  }
+}
+
+func voidFuncWithNestedVoidFunc() {
+  func nestedVoidFunc() {
+    return 1
+    // expected-error@-1 {{unexpected non-void return value in void function}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{24-24= -> <# Return Type #>}}
+  }
+}
+
+// Special cases: These should not offer a note + fix-it
+
+func voidFuncExplicitType() -> Void {
+  return 1 // expected-error {{unexpected non-void return value in void function}}
+}
+
+class ClassWithDeinit {
+  deinit {
+    return 0 // expected-error {{unexpected non-void return value in void function}}
+  }
+}
+
+class ClassWithVoidProp {
+  var propertyWithVoidType: () { return 5 } // expected-error {{unexpected non-void return value in void function}}
+}

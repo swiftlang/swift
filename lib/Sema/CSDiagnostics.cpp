@@ -4792,6 +4792,21 @@ bool InvalidUseOfAddressOf::diagnoseAsError() {
 bool ExtraneousReturnFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
   emitDiagnostic(anchor->getLoc(), diag::cannot_return_value_from_void_func);
+  if (auto FD = dyn_cast<FuncDecl>(getDC())) {
+    // We only want to emit the note + fix-it if the function does not
+    // have an explicit return type. The reason we also need to check
+    // whether the parameter list has a valid loc is to guard against
+    // cases like like 'var foo: () { return 1 }' as here that loc will
+    // be invalid.
+    if (FD->getBodyResultTypeLoc().getLoc().isInvalid() &&
+        FD->getParameters()->getStartLoc().isValid()) {
+      auto fixItLoc = Lexer::getLocForEndOfToken(
+          getASTContext().SourceMgr, FD->getParameters()->getEndLoc());
+      emitDiagnostic(anchor->getLoc(), diag::add_return_type_note)
+          .fixItInsert(fixItLoc, " -> <# Return Type #>");
+    }
+  }
+
   return true;
 }
 
