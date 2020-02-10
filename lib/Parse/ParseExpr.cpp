@@ -1221,16 +1221,17 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
                 leadingTriviaLoc(), *SyntaxContext));
       }
 
-      ParserResult<Expr> closure =
-          parseTrailingClosure(callee->getSourceRange());
-      if (closure.isNull())
+      SmallVector<TrailingClosure, 2> trailingClosures;
+      auto trailingResult =
+          parseTrailingClosures(callee->getSourceRange(), trailingClosures);
+      if (trailingClosures.empty())
         return nullptr;
 
       // Trailing closure implicitly forms a call.
       Result = makeParserResult(
-          ParserStatus(closure) | ParserStatus(Result),
+          ParserStatus(Result) | trailingResult,
           CallExpr::create(Context, Result.get(), SourceLoc(), {}, {}, {},
-                           SourceLoc(), {closure.get()}, /*implicit=*/false));
+                           SourceLoc(), trailingClosures, /*implicit=*/false));
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
 
       // We only allow a single trailing closure on a call.  This could be
@@ -1634,18 +1635,19 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                 leadingTriviaLoc(), *SyntaxContext));
       }
 
-      ParserResult<Expr> closure =
-        parseTrailingClosure(NameLoc.getSourceRange());
-      if (closure.isNull()) return nullptr;
+      SmallVector<TrailingClosure, 2> trailingClosures;
+      auto result =
+          parseTrailingClosures(NameLoc.getSourceRange(), trailingClosures);
+      if (trailingClosures.empty())
+        return nullptr;
 
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       // Handle .foo by just making an AST node.
       return makeParserResult(
-                 ParserStatus(closure),
-                 UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
-                                              SourceLoc(), { }, { }, { },
-                                              SourceLoc(), {closure.get()},
-                                              /*implicit=*/false));
+          result, UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
+                                               SourceLoc(), {}, {}, {},
+                                               SourceLoc(), trailingClosures,
+                                               /*implicit=*/false));
     }
 
     // Handle .foo by just making an AST node.
@@ -3138,19 +3140,14 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     return status;
 
   // Parse the closure.
-  ParserResult<Expr> closure =
-    parseTrailingClosure(SourceRange(leftLoc, rightLoc));
-  status |= closure;
-  if (closure.isNull())
-    return status;
-
-  // Record the trailing closure.
-  trailingClosures.push_back({closure.get()});
-
+  status |=
+      parseTrailingClosures(SourceRange(leftLoc, rightLoc), trailingClosures);
   return status;
 }
 
-ParserResult<Expr> Parser::parseTrailingClosure(SourceRange calleeRange) {
+ParserStatus
+Parser::parseTrailingClosures(SourceRange calleeRange,
+                              SmallVectorImpl<TrailingClosure> &closures) {
   SourceLoc braceLoc = Tok.getLoc();
 
   // Record the line numbers for the diagnostics below.
@@ -3179,9 +3176,10 @@ ParserResult<Expr> Parser::parseTrailingClosure(SourceRange calleeRange) {
     }
   }
 
+  closures.push_back({closure.get()});
   return closure;
 }
- 
+
 /// Parse an object literal expression.
 ///
 /// expr-literal:

@@ -1570,7 +1570,9 @@ public:
                              SmallVectorImpl<TrailingClosure> &trailingClosures,
                              syntax::SyntaxKind Kind);
 
-  ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
+  ParserStatus
+  parseTrailingClosures(SourceRange calleeRange,
+                        SmallVectorImpl<TrailingClosure> &closures);
 
   /// Parse an object literal.
   ///
