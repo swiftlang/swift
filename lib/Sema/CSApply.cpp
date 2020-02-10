@@ -2001,14 +2001,19 @@ namespace {
             arguments.push_back(SE->getIndex()->getSemanticsProvidingExpr());
           }
 
+          SourceLoc trailingLBrace, trailingRBrace;
           SmallVector<TrailingClosure, 2> trailingClosures;
-          if (SE->hasTrailingClosure())
-            trailingClosures.push_back({arguments.back()});
+          if (SE->hasTrailingClosure()) {
+            auto *closure = arguments.back();
+            trailingLBrace = closure->getStartLoc();
+            trailingRBrace = closure->getEndLoc();
+            trailingClosures.push_back({closure});
+          }
 
           componentExpr = SubscriptExpr::create(
               ctx, dotExpr, SE->getStartLoc(), arguments,
               SE->getArgumentLabels(), SE->getArgumentLabelLocs(),
-              SE->getEndLoc(), trailingClosures,
+              SE->getEndLoc(), trailingLBrace, trailingRBrace, trailingClosures,
               SE->hasDecl() ? SE->getDecl() : ConcreteDeclRef(),
               /*implicit=*/true, SE->getAccessSemantics());
         }

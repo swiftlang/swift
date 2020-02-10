@@ -1567,12 +1567,19 @@ public:
                              SmallVectorImpl<Identifier> &exprLabels,
                              SmallVectorImpl<SourceLoc> &exprLabelLocs,
                              SourceLoc &rightLoc,
+                             SourceLoc &trailingLBrace,
+                             SourceLoc &trailingRBrace,
                              SmallVectorImpl<TrailingClosure> &trailingClosures,
                              syntax::SyntaxKind Kind);
 
   ParserStatus
-  parseTrailingClosures(SourceRange calleeRange,
+  parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
+                        SourceLoc &LBrace, SourceLoc &RBrace,
                         SmallVectorImpl<TrailingClosure> &closures);
+
+  ParserStatus
+  parseMultipleTrailingClosures(SourceLoc &LBrace, SourceLoc &RBrace,
+                                SmallVectorImpl<TrailingClosure> &closures);
 
   /// Parse an object literal.
   ///

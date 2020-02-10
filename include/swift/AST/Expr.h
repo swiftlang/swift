@@ -1207,6 +1207,8 @@ public:
                                    ArrayRef<Identifier> argLabels,
                                    ArrayRef<SourceLoc> argLabelLocs,
                                    SourceLoc rParenLoc,
+                                   SourceLoc trailingLBrace,
+                                   SourceLoc trailingRBrace,
                                    ArrayRef<TrailingClosure> trailingClosures,
                                    bool implicit);
 
@@ -1857,6 +1859,8 @@ public:
                                       ArrayRef<Identifier> argLabels,
                                       ArrayRef<SourceLoc> argLabelLocs,
                                       SourceLoc rParenLoc,
+                                      SourceLoc trailingLBrace,
+                                      SourceLoc trailingRBrace,
                                       ArrayRef<TrailingClosure> trailingClosures,
                                       bool implicit);
 
@@ -2078,8 +2082,8 @@ class TupleExpr final : public Expr,
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
 
-  SourceLoc TrailingBlockLBrace;
-  SourceLoc TrailingBlockRBrace;
+  SourceLoc TrailingLBraceLoc;
+  SourceLoc TrailingRBraceLoc;
 
   Optional<unsigned> FirstTrailingArgumentAt;
 
@@ -2150,6 +2154,9 @@ public:
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
   SourceRange getSourceRange() const;
+
+  SourceLoc getTrailingLBraceLoc() const { return TrailingLBraceLoc; }
+  SourceLoc getTrailingRBraceLoc() const { return TrailingRBraceLoc; }
 
   /// Whether this expression has a trailing closure as its argument.
   bool hasTrailingClosure() const {
@@ -2409,6 +2416,8 @@ public:
                                ArrayRef<Identifier> indexArgLabels,
                                ArrayRef<SourceLoc> indexArgLabelLocs,
                                SourceLoc rSquareLoc,
+                               SourceLoc trailingLBrace,
+                               SourceLoc trailingRBrace,
                                ArrayRef<TrailingClosure> trailingClosures,
                                ConcreteDeclRef decl = ConcreteDeclRef(),
                                bool implicit = false,
@@ -4322,8 +4331,9 @@ public:
       llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
         return E->getType();
       }) {
-    return create(ctx, fn, SourceLoc(), args, argLabels, { }, SourceLoc(),
-                  /*trailingClosures=*/{}, /*implicit=*/true, getType);
+    return create(ctx, fn, SourceLoc(), args, argLabels, {}, SourceLoc(),
+                  SourceLoc(), SourceLoc(), /*trailingClosures=*/{},
+                  /*implicit=*/true, getType);
   }
 
   /// Create a new call expression.
@@ -4338,7 +4348,8 @@ public:
   static CallExpr *create(
       ASTContext &ctx, Expr *fn, SourceLoc lParenLoc, ArrayRef<Expr *> args,
       ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
-      SourceLoc rParenLoc, ArrayRef<TrailingClosure> trailingClosures, bool implicit,
+      SourceLoc rParenLoc, SourceLoc trailingLBrace, SourceLoc trailingRBrace,
+      ArrayRef<TrailingClosure> trailingClosures, bool implicit,
       llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
         return E->getType();
       });
@@ -5226,6 +5237,8 @@ public:
                                      ArrayRef<Identifier> indexArgLabels,
                                      ArrayRef<SourceLoc> indexArgLabelLocs,
                                      SourceLoc rSquareLoc,
+                                     SourceLoc trailingLBrace,
+                                     SourceLoc trailingRBrace,
                                      ArrayRef<TrailingClosure> trailingClosures);
     
     /// Create an unresolved component for a subscript.
@@ -5278,6 +5291,8 @@ public:
                               ArrayRef<Identifier> indexArgLabels,
                               ArrayRef<SourceLoc> indexArgLabelLocs,
                               SourceLoc rSquareLoc,
+                              SourceLoc trailingLBrace,
+                              SourceLoc trailingRBrace,
                               ArrayRef<TrailingClosure> trailingClosures,
                               Type elementType,
                               ArrayRef<ProtocolConformanceRef> indexHashables);
@@ -5666,8 +5681,8 @@ inline const SourceLoc *CollectionExpr::getTrailingSourceLocs() const {
 Expr *packSingleArgument(
     ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
     ArrayRef<Identifier> &argLabels, ArrayRef<SourceLoc> &argLabelLocs,
-    SourceLoc rParenLoc, ArrayRef<TrailingClosure> trailingClosures,
-    bool implicit,
+    SourceLoc rParenLoc, SourceLoc trailingLBrace, SourceLoc trailingRBrace,
+    ArrayRef<TrailingClosure> trailingClosures, bool implicit,
     SmallVectorImpl<Identifier> &argLabelsScratch,
     SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
     llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
