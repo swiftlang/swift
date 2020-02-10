@@ -935,7 +935,7 @@ class CacheValue {
 
 func valueForKey<K>(_ key: K) -> CacheValue? {
   let cache = NSCache<K, CacheValue>()
-  return cache.object(forKey: key)?.value // expected-error {{no exact matches in call to instance method 'value'}}
+  return cache.object(forKey: key)?.value // expected-error {{no exact matches in reference to instance method 'value'}}
 }
 
 // SR-2242: poor diagnostic when argument label is omitted

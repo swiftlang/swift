@@ -2807,6 +2807,8 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     DiagnosticTransaction transaction(getASTContext().Diags);
 
     auto *commonAnchor = commonCalleeLocator->getAnchor();
+    if (auto *callExpr = dyn_cast<CallExpr>(commonAnchor))
+      commonAnchor = callExpr->getDirectCallee();
     auto &DE = getASTContext().Diags;
     auto name = decl->getFullName();
 
@@ -2825,8 +2827,13 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       DE.diagnose(commonAnchor->getLoc(), diag::no_candidates_match_result_type,
                   baseName.userFacingName(), getContextualType(anchor));
     } else {
+      bool isApplication = llvm::find_if(ArgumentInfos, [&](const auto argInfo) {
+        return argInfo.first->getAnchor() == commonAnchor;
+      }) != ArgumentInfos.end();
+
       DE.diagnose(commonAnchor->getLoc(),
                   diag::no_overloads_match_exactly_in_call,
+                  isApplication,
                   decl->getDescriptiveKind(), name.isSpecial(),
                   name.getBaseName());
     }
