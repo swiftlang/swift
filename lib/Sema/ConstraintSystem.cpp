@@ -2811,7 +2811,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
     if (fixes.size() == 1) {
       // Attempt to disambiguite in cases where all the solutions
-      // produces the same fixes for diferent generic arguments e.g.
+      // produces the same fixes for different generic arguments e.g.
       //   func f<T>(_: T, _: T) {}
       //   f(Int(1), Float(1))
       //
