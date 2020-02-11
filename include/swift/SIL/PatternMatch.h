@@ -397,7 +397,12 @@ template <typename LTy> struct tupleextractoperation_ty {
   unsigned index;
   tupleextractoperation_ty(const LTy &Left, unsigned i) : L(Left), index(i) {}
 
-  bool match(SILValue v) { return match(v->getDefiningInstruction()); }
+  bool match(SILValue v) {
+    auto *inst = v->getDefiningInstruction();
+    if (!inst)
+      return false;
+    return match(inst);
+  }
 
   template <typename ITy> bool match(ITy *V) {
     if (auto *TEI = dyn_cast<TupleExtractInst>(V)) {

@@ -405,7 +405,16 @@ public:
     assert(&component == Path.back().get());
     Path.pop_back();
   }
-  
+
+  /// Pop the last component off this LValue unsafely. Validates that the
+  /// component is of kind \p kind as a sanity check.
+  ///
+  /// Please be careful when using this!
+  void unsafelyDropLastComponent(PathComponent::KindTy kind) & {
+    assert(kind == Path.back()->getKind());
+    Path.pop_back();
+  }
+
   /// Add a new component at the end of the access path of this lvalue.
   template <class T, class... As>
   void add(As &&... args) {

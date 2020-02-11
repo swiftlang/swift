@@ -21,8 +21,8 @@ function(generate_revision_inc revision_inc_var name dir)
 
   add_custom_command(OUTPUT "${version_inc}"
     DEPENDS "${${name}_vc}" "${generate_vcs_version_script}"
-    COMMAND ${CMAKE_COMMAND} "-DNAMES=$<UPPER_CASE:name>"
-                             "-D$<UPPER_CASE:name>_SOURCE_DIR=${dir}"
+    COMMAND ${CMAKE_COMMAND} "-DNAMES=$<UPPER_CASE:${name}>"
+                             "-D$<UPPER_CASE:${name}>_SOURCE_DIR=${dir}"
                              "-DHEADER_FILE=${version_inc}"
                              -P "${generate_vcs_version_script}")
 

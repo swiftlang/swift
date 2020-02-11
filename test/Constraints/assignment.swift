@@ -72,3 +72,8 @@ func f23798944() {
 }
 
 .sr_3506 = 0 // expected-error {{type 'Int' has no member 'sr_3506'}}
+
+// SR-1553
+
+func returnsVoid() {}
+_ = returnsVoid() // expected-warning {{using '_' to ignore the result of a Void-returning function is redundant}}{{1-5=}}

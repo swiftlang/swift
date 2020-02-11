@@ -16,6 +16,7 @@ add_swift_host_library(swiftIRGen STATIC
   GenControl.cpp
   GenCoverage.cpp
   GenDecl.cpp
+  GenDiffWitness.cpp
   GenEnum.cpp
   GenExistential.cpp
   GenFunc.cpp

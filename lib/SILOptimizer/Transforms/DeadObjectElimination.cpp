@@ -641,7 +641,8 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
 /// side effect?
 static bool isAllocatingApply(SILInstruction *Inst) {
   ArraySemanticsCall ArrayAlloc(Inst);
-  return ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitialized;
+  return ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitialized ||
+         ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitializedIntrinsic;
 }
 
 namespace {
@@ -832,7 +833,9 @@ static bool getDeadInstsAfterInitializerRemoved(
 bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
                                               DeadEndBlocks &DEBlocks) {
   // Currently only handle array.uninitialized
-  if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized)
+  if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized &&
+      ArraySemanticsCall(AI).getKind() !=
+          ArrayCallKind::kArrayUninitializedIntrinsic)
     return false;
 
   llvm::SmallVector<SILInstruction *, 8> instsDeadAfterInitializerRemoved;

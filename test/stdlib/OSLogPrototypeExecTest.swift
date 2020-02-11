@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -swift-version 5 -DPTR_SIZE_%target-ptrsize -o %t/OSLogPrototypeExecTest
 // RUN: %target-run %t/OSLogPrototypeExecTest
+//
+// RUN: %target-build-swift %s -O -swift-version 5 -DPTR_SIZE_%target-ptrsize -o %t/OSLogPrototypeExecTest
+// RUN: %target-run %t/OSLogPrototypeExecTest
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
 
@@ -26,16 +29,16 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     h.log("A message with no data")
 
     // Test logging at specific levels.
-    h.debug("Minimum integer value: \(Int.min, format: .hex)")
-    h.info("Maximum integer value: \(Int.max, format: .hex)")
+    h.debug("Minimum integer value: \(Int.min)")
+    h.info("Maximum unsigned integer value: \(UInt.max, format: .hex)")
 
-    let privateID = 0x79abcdef
+    let privateID: UInt = 0x79abcdef
     h.error("Private Identifier: \(privateID, format: .hex, privacy: .private)")
-    let addr = 0x7afebabe
+    let addr: UInt = 0x7afebabe
     h.fault("Invalid address: 0x\(addr, format: .hex, privacy: .public)")
 
     // Test logging with multiple arguments.
-    let filePermissions = 0o777
+    let filePermissions: UInt = 0o777
     let pid = 122225
     h.error(
       """
@@ -107,7 +110,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
   OSLogTestSuite.test("integer types") {
     let h = Logger()
-    h.log("Smallest 32-bit integer value: \(Int32.min, format: .hex)")
+    h.log("Smallest 32-bit integer value: \(Int32.min)")
   }
 
   OSLogTestSuite.test("dynamic strings") {
@@ -149,7 +152,6 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 // be available.
 
 internal var InterpolationTestSuite = TestSuite("OSLogInterpolationTest")
-internal let intPrefix = Int.bitWidth == CLongLong.bitWidth ? "ll" : ""
 internal let bitsPerByte = 8
 
 /// A struct that exposes methods for checking whether a given byte buffer
@@ -343,7 +345,7 @@ InterpolationTestSuite.test("integer literal") {
     "An integer literal \(10)",
     with: { (formatString, buffer) in
     expectEqual(
-      "An integer literal %{public}\(intPrefix)d",
+      "An integer literal %{public}ld",
       formatString)
 
     let bufferChecker = OSLogBufferChecker(buffer)
@@ -360,10 +362,10 @@ InterpolationTestSuite.test("integer literal") {
 
 InterpolationTestSuite.test("integer with formatting") {
   _checkFormatStringAndBuffer(
-    "Minimum integer value: \(Int.min, format: .hex)",
+    "Minimum integer value: \(UInt.max, format: .hex)",
     with: { (formatString, buffer) in
       expectEqual(
-        "Minimum integer value: %{public}\(intPrefix)x",
+        "Minimum integer value: %{public}lx",
         formatString)
 
       let bufferChecker = OSLogBufferChecker(buffer)
@@ -376,18 +378,18 @@ InterpolationTestSuite.test("integer with formatting") {
         bufferChecker.checkInt(
           startIndex: $0,
           flag: .publicFlag,
-          expectedInt: Int.min)
+          expectedInt: UInt.max)
       })
   })
 }
 
 InterpolationTestSuite.test("integer with privacy and formatting") {
-  let addr = 0x7afebabe
+  let addr: UInt = 0x7afebabe
   _checkFormatStringAndBuffer(
     "Access to invalid address: \(addr, format: .hex, privacy: .private)",
     with: { (formatString, buffer) in
       expectEqual(
-        "Access to invalid address: %{private}\(intPrefix)x",
+        "Access to invalid address: %{private}lx",
         formatString)
 
       let bufferChecker = OSLogBufferChecker(buffer)
@@ -405,32 +407,8 @@ InterpolationTestSuite.test("integer with privacy and formatting") {
   })
 }
 
-InterpolationTestSuite.test("integer with privacy and formatting") {
-  let addr = 0x7afebabe
-  _checkFormatStringAndBuffer(
-    "Access to invalid address: \(addr, format: .hex, privacy: .private)",
-    with: { (formatString, buffer) in
-      expectEqual(
-        "Access to invalid address: %{private}\(intPrefix)x",
-        formatString)
-
-      let bufferChecker = OSLogBufferChecker(buffer)
-      bufferChecker.checkSummaryBytes(
-        argumentCount: 1,
-        hasPrivate: true,
-        hasNonScalar: false)
-
-      bufferChecker.checkArguments({
-        bufferChecker.checkInt(
-            startIndex: $0,
-            flag: .privateFlag,
-            expectedInt: addr)
-      })
-  })
-}
-
 InterpolationTestSuite.test("test multiple arguments") {
-  let filePerms = 0o777
+  let filePerms: UInt = 0o777
   let pid = 122225
   let privateID = 0x79abcdef
 
@@ -443,9 +421,9 @@ InterpolationTestSuite.test("test multiple arguments") {
     with: { (formatString, buffer) in
       expectEqual(
         """
-        Access prevented: process %{public}\(intPrefix)d initiated by \
-        user: %{private}\(intPrefix)d attempted resetting permissions \
-        to %{public}\(intPrefix)o
+        Access prevented: process %{public}ld initiated by \
+        user: %{private}ld attempted resetting permissions \
+        to %{public}lo
         """,
         formatString)
 
@@ -490,7 +468,7 @@ InterpolationTestSuite.test("interpolation of too many arguments") {
     with: { (formatString, buffer) in
       expectEqual(
         String(
-          repeating: "%{public}\(intPrefix)d ",
+          repeating: "%{public}ld ",
           count: Int(maxOSLogArgumentCount)),
         formatString)
 
@@ -654,11 +632,65 @@ protocol TestProto {
 InterpolationTestSuite.test("Interpolation of complex expressions") {
   class TestClass<T: TestProto>: NSObject {
     func testFunction() {
-      // The following call should no crash.
+      // The following call should not crash.
       _checkFormatStringAndBuffer("A complex expression \(toString(self))") {
         (formatString, _) in
         expectEqual("A complex expression %s", formatString)
       }
     }
+  }
+}
+
+InterpolationTestSuite.test("Include prefix formatting option") {
+  let unsignedValue: UInt = 0o171
+  _checkFormatStringAndBuffer(
+  "Octal with prefix: \(unsignedValue, format: .octal(includePrefix: true))") {
+    (formatString, buffer) in
+    expectEqual("Octal with prefix: 0o%{public}lo", formatString)
+  }
+}
+
+InterpolationTestSuite.test("Hex with uppercase formatting option") {
+  let unsignedValue: UInt = 0xcafebabe
+  _checkFormatStringAndBuffer(
+  "Hex with uppercase: \(unsignedValue, format: .hex(uppercase: true))") {
+    (formatString, buffer) in
+    expectEqual("Hex with uppercase: %{public}lX", formatString)
+  }
+}
+
+InterpolationTestSuite.test("Integer with explicit positive sign") {
+  let posValue = Int.max
+  _checkFormatStringAndBuffer(
+  "\(posValue, format: .decimal(explicitPositiveSign: true))") {
+    (formatString, buffer) in
+    expectEqual("%{public}+ld", formatString)
+  }
+}
+
+InterpolationTestSuite.test("Unsigned integer with explicit positive sign") {
+  let posValue = UInt.max
+  _checkFormatStringAndBuffer(
+  "\(posValue, format: .decimal(explicitPositiveSign: true))") {
+    (formatString, buffer) in
+    expectEqual("+%{public}lu", formatString)
+  }
+}
+
+InterpolationTestSuite.test("Integer formatting with precision") {
+  let intValue = 10
+  _checkFormatStringAndBuffer(
+  "\(intValue, format: .decimal(minDigits: 10))") {
+    (formatString, buffer) in
+    expectEqual("%{public}.10ld", formatString)
+  }
+}
+
+InterpolationTestSuite.test("Integer formatting with alignment") {
+  let intValue = 10
+  _checkFormatStringAndBuffer(
+  "\(intValue, align: .right(columns: 10)) \(intValue, align: .left(columns: 5))") {
+    (formatString, buffer) in
+    expectEqual("%{public}10ld %{public}-5ld", formatString)
   }
 }

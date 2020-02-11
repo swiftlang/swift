@@ -191,34 +191,54 @@ SILFunctionType::getWitnessMethodClass(SILModule &M) const {
   return nullptr;
 }
 
-// Returns the canonical generic signature for an autodiff derivative function
-// given an existing derivative function generic signature. All
-// differentiability parameters are required to conform to `Differentiable`.
-static CanGenericSignature getAutoDiffDerivativeFunctionGenericSignature(
-    CanGenericSignature derivativeFnGenSig,
-    ArrayRef<SILParameterInfo> originalParameters,
-    IndexSubset *parameterIndices, ModuleDecl *module) {
-  if (!derivativeFnGenSig)
-    return nullptr;
-  auto &ctx = module->getASTContext();
-  GenericSignatureBuilder builder(ctx);
-  // Add derivative function generic signature.
-  builder.addGenericSignature(derivativeFnGenSig);
-  // All differentiability parameters are required to conform to
-  // `Differentiable`.
-  auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-  auto *differentiableProtocol =
-      ctx.getProtocol(KnownProtocolKind::Differentiable);
-  for (unsigned paramIdx : parameterIndices->getIndices()) {
-    auto paramType = originalParameters[paramIdx].getInterfaceType();
-    Requirement req(RequirementKind::Conformance, paramType,
-                    differentiableProtocol->getDeclaredType());
-    builder.addRequirement(req, source, module);
+IndexSubset *
+SILFunctionType::getDifferentiabilityParameterIndices() {
+  assert(isDifferentiable() && "Must be a differentiable function");
+  SmallVector<unsigned, 8> result;
+  for (auto valueAndIndex : enumerate(getParameters()))
+    if (valueAndIndex.value().getDifferentiability() !=
+            SILParameterDifferentiability::NotDifferentiable)
+      result.push_back(valueAndIndex.index());
+  return IndexSubset::get(getASTContext(), getNumParameters(), result);
+}
+
+CanSILFunctionType
+SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
+                                          IndexSubset *parameterIndices) {
+  assert(kind != DifferentiabilityKind::NonDifferentiable &&
+         "Differentiability kind must be normal or linear");
+  SmallVector<SILParameterInfo, 8> newParameters;
+  for (auto paramAndIndex : enumerate(getParameters())) {
+    auto &param = paramAndIndex.value();
+    unsigned index = paramAndIndex.index();
+    newParameters.push_back(param.getWithDifferentiability(
+        index < parameterIndices->getCapacity() &&
+                parameterIndices->contains(index)
+            ? SILParameterDifferentiability::DifferentiableOrNotApplicable
+            : SILParameterDifferentiability::NotDifferentiable));
   }
-  return std::move(builder)
-      .computeGenericSignature(SourceLoc(), /*allowConcreteGenericParams*/ true)
-      ->getCanonicalSignature();
+  auto newExtInfo = getExtInfo().withDifferentiabilityKind(kind);
+  return get(getSubstGenericSignature(), newExtInfo, getCoroutineKind(),
+             getCalleeConvention(), newParameters, getYields(), getResults(),
+             getOptionalErrorResult(), getSubstitutions(),
+             isGenericSignatureImplied(), getASTContext(),
+             getWitnessMethodConformanceOrInvalid());
+}
+
+CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
+  if (!isDifferentiable())
+    return CanSILFunctionType(this);
+  auto nondiffExtInfo = getExtInfo().withDifferentiabilityKind(
+      DifferentiabilityKind::NonDifferentiable);
+  SmallVector<SILParameterInfo, 8> newParams;
+  for (auto &param : getParameters())
+    newParams.push_back(param.getWithDifferentiability(
+        SILParameterDifferentiability::DifferentiableOrNotApplicable));
+  return SILFunctionType::get(getSubstGenericSignature(), nondiffExtInfo,
+                              getCoroutineKind(), getCalleeConvention(),
+                              newParams, getYields(), getResults(),
+                              getOptionalErrorResult(), getSubstitutions(),
+                              isGenericSignatureImplied(), getASTContext());
 }
 
 CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
@@ -243,8 +263,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // Get the canonical derivative function generic signature.
   if (!derivativeFnGenSig)
     derivativeFnGenSig = getSubstGenericSignature();
-  derivativeFnGenSig = getAutoDiffDerivativeFunctionGenericSignature(
-      derivativeFnGenSig, getParameters(), parameterIndices, &TC.M);
+  derivativeFnGenSig = autodiff::getConstrainedDerivativeGenericSignature(
+      this, parameterIndices, derivativeFnGenSig).getCanonicalSignature();
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult =
@@ -983,10 +1003,8 @@ private:
         for (auto i : indices(substTupleTy.getElementTypes())) {
           auto &elt = substTupleTy->getElement(i);
           auto ownership = elt.getParameterFlags().getValueOwnership();
-          // FIXME(swift3): Once the entire parameter list is no longer a
-          // target for substitution, re-enable this.
-          // assert(ownership == ValueOwnership::Default);
-          // assert(!elt.isVararg());
+          assert(ownership == ValueOwnership::Default);
+          assert(!elt.isVararg());
           visit(ownership, forSelf,
                 origType.getTupleElementType(i),
                 CanType(elt.getRawType()), rep);

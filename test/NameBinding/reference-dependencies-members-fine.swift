@@ -4,9 +4,11 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -enable-fine-grained-dependencies -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-members-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
 
-// RUN: %target-swift-frontend -enable-fine-grained-dependencies -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-members-helper.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
+// Need -fine-grained-dependency-include-intrafile to be invarient wrt type-body-fingerprints enabled/disabled
+// RUN: %target-swift-frontend -enable-fine-grained-dependencies -fine-grained-dependency-include-intrafile -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-members-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
+
+// RUN: %target-swift-frontend -enable-fine-grained-dependencies -fine-grained-dependency-include-intrafile -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-members-helper.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
 // RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh <%t.swiftdeps >%t-processed.swiftdeps
 // RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh <%t-2.swiftdeps >%t-2-processed.swiftdeps
 
@@ -14,7 +16,6 @@
 
 // RUN: %FileCheck -check-prefix=PROVIDES-NOMINAL %s < %t-processed.swiftdeps
 // RUN: %FileCheck -check-prefix=PROVIDES-NOMINAL-2 %s < %t-processed.swiftdeps
-// RUN: %FileCheck -check-prefix=PROVIDES-NOMINAL-NEGATIVE %s < %t-processed.swiftdeps
 // RUN: %FileCheck -check-prefix=PROVIDES-MEMBER %s < %t-processed.swiftdeps
 // RUN: %FileCheck -check-prefix=PROVIDES-MEMBER-NEGATIVE %s < %t-processed.swiftdeps
 // RUN: %FileCheck -check-prefix=DEPENDS-NOMINAL %s < %t-processed.swiftdeps
@@ -54,15 +55,13 @@ protocol SomeProto {}
 // DEPENDS-MEMBER-DAG:  member interface  4main10OtherClassC deinit false
 extension OtherClass : SomeProto {}
 
-// PROVIDES-NOMINAL-NEGATIVE-NOT:  nominal implementation  4main11OtherStructV '' true
-// PROVIDES-NOMINAL-NEGATIVE-NOT:  nominal interface  4main11OtherStructV '' true
-// DEPENDS-NOMINAL-DAG:  nominal interface  4main11OtherStructV '' false
+// PROVIDES-NOMINAL-DAG:  nominal implementation  4main11OtherStructV '' true
+// PROVIDES-NOMINAL-DAG:  nominal interface  4main11OtherStructV '' true
 extension OtherStruct {
   // PROVIDES-MEMBER-DAG:  potentialMember interface  4main11OtherStructV '' true
   // PROVIDES-MEMBER-DAG:  member interface  4main11OtherStructV foo true
   // PROVIDES-MEMBER-DAG:  member interface  4main11OtherStructV bar true
-  // PROVIDES-MEMBER-NEGATIVE-NOT:  member interface  4main11OtherStructV baz true
-  // DEPENDS-MEMBER-DAG:  member interface  4main11OtherStructV baz false
+  // PROVIDES-MEMBER-DAG:  member interface  4main11OtherStructV baz true
   // DEPENDS-MEMBER-NEGATIVE-NOT::  potentialMember interface  4main11OtherStructV baz false
   func foo() {}
   var bar: () { return () }

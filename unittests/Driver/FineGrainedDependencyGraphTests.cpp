@@ -808,3 +808,19 @@ TEST(ModuleDepGraph, MutualInterfaceHash) {
   const auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
   EXPECT_TRUE(contains(jobs, &job1));
 }
+
+TEST(ModuleDepGraph, DisabledTypeBodyFingerprints) {
+  ModuleDepGraph graph(/*EnableTypeFingerprints=*/ false);
+
+  graph.simulateLoad(&job0, {{dependsNominal, {"B2"}}});
+  graph.simulateLoad(&job1, {{providesNominal, {"B1", "B2"}}});
+  graph.simulateLoad(&job2, {{dependsNominal, {"B1"}}});
+
+  {
+  const auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job1);
+  EXPECT_EQ(3u, jobs.size());
+  EXPECT_TRUE(contains(jobs, &job0));
+  EXPECT_TRUE(contains(jobs, &job1));
+  EXPECT_TRUE(contains(jobs, &job2));
+  }
+}

@@ -127,6 +127,15 @@ public:
   ManagedValue createOwnedPhiArgument(SILType type);
   ManagedValue createGuaranteedPhiArgument(SILType type);
 
+  /// For arguments from terminators that are "transforming terminators". These
+  /// types of guaranteed arguments are validated as part of the operand of the
+  /// transforming terminator since transforming terminators are guaranteed to
+  /// be the only predecessor of our parent block.
+  ///
+  /// NOTE: Two examples of transforming terminators are switch_enum,
+  /// checked_cast_br.
+  ManagedValue createGuaranteedTransformingTerminatorArgument(SILType type);
+
   using SILBuilder::createMarkUninitialized;
   ManagedValue createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
                                        MarkUninitializedInst::Kind muKind);
@@ -359,6 +368,10 @@ public:
   using SILBuilder::createProjectBox;
   ManagedValue createProjectBox(SILLocation loc, ManagedValue mv,
                                 unsigned index);
+
+  using SILBuilder::createMarkDependence;
+  ManagedValue createMarkDependence(SILLocation loc, ManagedValue value,
+                                    ManagedValue base);
 };
 
 } // namespace Lowering

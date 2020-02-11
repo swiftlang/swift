@@ -1085,3 +1085,58 @@ bb0(%0 : @owned $Klass):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_1 : $@convention(thin) (@inout NativeObjectPair) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'inout_argument_never_written_to_1'
+sil [ossa] @inout_argument_never_written_to_1 : $@convention(thin) (@inout NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %2 = load [copy] %0 : $*NativeObjectPair
+  (%3, %4) = destructure_struct %2 : $NativeObjectPair
+
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+  destroy_value %3 : $Builtin.NativeObject
+  destroy_value %4 : $Builtin.NativeObject
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_2 : $@convention(thin) (@inout NativeObjectPair) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'inout_argument_never_written_to_2'
+sil [ossa] @inout_argument_never_written_to_2 : $@convention(thin) (@inout NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We should be able to handle this, but we can not until we teach the ARC
+// optimizer to avoid writes not within the load [copy] region.
+//
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_3 : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'inout_argument_never_written_to_3'
+sil [ossa] @inout_argument_never_written_to_3 : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @owned $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %3 : $Builtin.NativeObject
+  store %1 to [assign] %2 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

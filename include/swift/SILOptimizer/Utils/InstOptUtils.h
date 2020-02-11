@@ -145,6 +145,15 @@ public:
       SILInstruction *inst,
       llvm::function_ref<void(SILInstruction *)> callback =
                                     [](SILInstruction *) {});
+
+  /// Recursively visit users of \c inst  (including \c inst)and force delete
+  /// them. Also, destroy the consumed operands of the deleted instructions
+  /// whenever necessary. Invoke the \c callback on instructions that are
+  /// deleted.
+  void recursivelyForceDeleteUsersAndFixLifetimes(
+      SILInstruction *inst,
+      llvm::function_ref<void(SILInstruction *)> callback =
+          [](SILInstruction *) {});
 };
 
 /// If \c inst is dead, delete it and recursively eliminate all code that

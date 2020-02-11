@@ -191,7 +191,7 @@ HelpText<"Emit dot files every time driver imports an fine-grained swiftdeps fil
 
 def fine_grained_dependency_include_intrafile :
 Flag<["-"], "fine-grained-dependency-include-intrafile">,
-InternalDebugOpt,
+Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Include within-file dependencies.">;
 
 def emit_fine_grained_dependency_sourcefile_dot_files :
@@ -418,6 +418,11 @@ def emit_module_interface_path :
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
+
+def avoid_emit_module_source_info :
+  Flag<["-"], "avoid-emit-module-source-info">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"don't emit Swift source info file">;
 
 def emit_module_source_info_path :
   Separate<["-"], "emit-module-source-info-path">,

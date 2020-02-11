@@ -49,6 +49,7 @@ namespace constraints {
   enum class ConstraintKind : char;
   class ConstraintSystem;
   class Solution;
+  class SolutionApplicationTarget;
   class SolutionResult;
 }
 
@@ -133,6 +134,10 @@ enum ContextualTypePurpose {
   CTP_EnumCaseRawValue, ///< Raw value specified for "case X = 42" in enum.
   CTP_DefaultParameter, ///< Default value in parameter 'foo(a : Int = 42)'.
 
+  /// Default value in @autoclosure parameter
+  /// 'foo(a : @autoclosure () -> Int = 42)'.
+  CTP_AutoclosureDefaultParameter,
+
   CTP_CalleeResult,     ///< Constraint is placed on the result of a callee.
   CTP_CallArgument,     ///< Call to function or operator requires type.
   CTP_ClosureResult,    ///< Closure result expects a specific type.
@@ -159,10 +164,6 @@ enum class TypeCheckExprFlags {
   /// disables constraints forcing an lvalue result to be loadable.
   IsDiscarded = 0x01,
 
-  /// Whether the client wants to disable the structural syntactic restrictions
-  /// that we force for style or other reasons.
-  DisableStructuralChecks = 0x02,
-
   /// If set, the client wants a best-effort solution to the constraint system,
   /// but can tolerate a solution where all of the constraints are solved, but
   /// not all type variables have been determined.  In this case, the constraint
@@ -170,23 +171,10 @@ enum class TypeCheckExprFlags {
   /// left in-tact.
   AllowUnresolvedTypeVariables = 0x08,
 
-  /// If set, the 'convertType' specified to typeCheckExpression should not
-  /// produce a conversion constraint, but it should be used to guide the
-  /// solution in terms of performance optimizations of the solver, and in terms
-  /// of guiding diagnostics.
-  ConvertTypeIsOnlyAHint = 0x10,
-
   /// If set, this expression isn't embedded in a larger expression or
   /// statement. This should only be used for syntactic restrictions, and should
   /// not affect type checking itself.
   IsExprStmt = 0x20,
-
-  /// This is an inout yield.
-  IsInOutYield = 0x100,
-
-  /// If set, a conversion constraint should be specified so that the result of
-  /// the expression is an optional type.
-  ExpressionTypeMustBeOptional = 0x200,
 
   /// FIXME(diagnostics): Once diagnostics are completely switched to new
   /// framework, this flag could be removed as obsolete.
@@ -195,13 +183,6 @@ enum class TypeCheckExprFlags {
   /// as part of the expression diagnostics, which is attempting to narrow
   /// down failure location.
   SubExpressionDiagnostics = 0x400,
-  
-  /// If set, the 'convertType' specified to typeCheckExpression is the opaque
-  /// return type of the declaration being checked. The archetype should be
-  /// opened into a type variable to provide context to the expression, and
-  /// the resulting type will be a candidate for binding the underlying
-  /// type.
-  ConvertTypeIsOpaqueReturnType = 0x800,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -305,13 +286,6 @@ public:
   /// constraint system, or false otherwise.
   virtual bool builtConstraints(constraints::ConstraintSystem &cs, Expr *expr);
 
-  /// Callback invoked once a solution has been found.
-  ///
-  /// The callback may further alter the expression, returning either a
-  /// new expression (to replace the result) or a null pointer to indicate
-  /// failure.
-  virtual Expr *foundSolution(constraints::Solution &solution, Expr *expr);
-
   /// Callback invokes once the chosen solution has been applied to the
   /// expression.
   ///
@@ -320,18 +294,6 @@ public:
   /// failure.
   virtual Expr *appliedSolution(constraints::Solution &solution,
                                 Expr *expr);
-
-  /// Callback invoked if expression is structurally unsound and can't
-  /// be correctly processed by the constraint solver.
-  virtual void preCheckFailed(Expr *expr);
-
-  /// Callback invoked if constraint system failed to generate
-  /// constraints for a given expression.
-  virtual void constraintGenerationFailed(Expr *expr);
-
-  /// Callback invoked if application of chosen solution to
-  /// expression has failed.
-  virtual void applySolutionFailed(constraints::Solution &solution, Expr *expr);
 };
 
 /// A conditional conformance that implied some other requirements. That is, \c
@@ -718,7 +680,7 @@ public:
 
   static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  static void processREPLTopLevel(SourceFile &SF, unsigned StartElem);
+  static void processREPLTopLevel(SourceFile &SF);
 
   static void typeCheckDecl(Decl *D);
 
@@ -836,11 +798,9 @@ public:
   /// to be possible.
   ///
   /// \param convertType The type that the expression is being converted to,
-  /// or null if the expression is standalone.  If the 'ConvertTypeIsOnlyAHint'
-  /// option is specified, then this is only a hint, it doesn't produce a full
-  /// conversion constraint. The location information is only used for
-  /// diagnostics should the conversion fail; it is safe to pass a TypeLoc
-  /// without location information.
+  /// or null if the expression is standalone. The location information is
+  /// only used for diagnostics should the conversion fail; it is safe to pass
+  /// a TypeLoc without location information.
   ///
   /// \param options Options that control how type checking is performed.
   ///
@@ -862,21 +822,13 @@ public:
                       ExprTypeCheckListener *listener = nullptr,
                       constraints::ConstraintSystem *baseCS = nullptr);
 
-  static Type typeCheckExpression(Expr *&expr, DeclContext *dc,
-                                  ExprTypeCheckListener *listener) {
-    return TypeChecker::typeCheckExpression(expr, dc, TypeLoc(), CTP_Unused,
-                                            TypeCheckExprOptions(), listener);
-  }
+  static Optional<constraints::SolutionApplicationTarget>
+  typeCheckExpression(constraints::SolutionApplicationTarget &target,
+                      bool &unresolvedTypeExprs,
+                      TypeCheckExprOptions options = TypeCheckExprOptions(),
+                      ExprTypeCheckListener *listener = nullptr,
+                      constraints::ConstraintSystem *baseCS = nullptr);
 
-private:
-  static Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
-                                      TypeLoc convertType,
-                                      ContextualTypePurpose convertTypePurpose,
-                                      TypeCheckExprOptions options,
-                                      ExprTypeCheckListener &listener,
-                                      constraints::ConstraintSystem *baseCS);
-
-public:
   /// Type check the given expression and return its type without
   /// applying the solution.
   ///
@@ -1122,10 +1074,13 @@ public:
   /// more complicated than simplify wrapping given root in newly created
   /// `LoadExpr`, because `ForceValueExpr` and `ParenExpr` supposed to appear
   /// only at certain positions in AST.
-  static Expr *
-  addImplicitLoadExpr(ASTContext &Context, Expr *expr,
-                      std::function<Type(Expr *)> getType,
-                      std::function<void(Expr *, Type)> setType);
+  static Expr *addImplicitLoadExpr(ASTContext &Context, Expr *expr,
+                                   std::function<Type(Expr *)> getType =
+                                       [](Expr *E) { return E->getType(); },
+                                   std::function<void(Expr *, Type)> setType =
+                                       [](Expr *E, Type type) {
+                                         E->setType(type);
+                                       });
 
   /// Determine whether the given type contains the given protocol.
   ///
@@ -1421,11 +1376,7 @@ public:
                                         const TypeRefinementContext **MostRefined=nullptr);
 
   /// Walk the AST to build the hierarchy of TypeRefinementContexts
-  ///
-  /// \param StartElem Where to start for incremental building of refinement
-  /// contexts
-  static void buildTypeRefinementContextHierarchy(SourceFile &SF,
-                                                  unsigned StartElem);
+  static void buildTypeRefinementContextHierarchy(SourceFile &SF);
 
   /// Build the hierarchy of TypeRefinementContexts for the entire
   /// source file, if it has not already been built. Returns the root

@@ -72,6 +72,45 @@ public func single_concrete() {
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
 
+// CHECK-PRESPECIALIZED: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s42conditional_conformance_basic_conformances15single_concreteyyF"()
+// CHECK-PRESPECIALIZED-NEXT:  entry:
+// CHECK-PRESPECIALIZED-NEXT:    [[Single_P1:%.*]] = call i8** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWl"()
+// CHECK-PRESPECIALIZED-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances8takes_p1yyxmAA2P1RzlF"(
+// CHECK-PRESPECIALIZED-SAME:      %swift.type* getelementptr inbounds (
+// CHECK-PRESPECIALIZED-SAME:        %swift.full_type, 
+// CHECK-PRESPECIALIZED-SAME:        %swift.full_type* bitcast (
+// CHECK-PRESPECIALIZED-SAME:          <{ 
+// CHECK-PRESPECIALIZED-SAME:            i8**, 
+// CHECK-PRESPECIALIZED-SAME:            [[INT]], 
+// CHECK-PRESPECIALIZED-SAME:            %swift.type_descriptor*, 
+// CHECK-PRESPECIALIZED-SAME:            %swift.type*, 
+// CHECK-PRESPECIALIZED-SAME:            i64 
+// CHECK-PRESPECIALIZED-SAME:          }>* @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMf" 
+// CHECK-PRESPECIALIZED-SAME:          to %swift.full_type*
+// CHECK-PRESPECIALIZED-SAME:        ), 
+// CHECK-PRESPECIALIZED-SAME:        i32 0, 
+// CHECK-PRESPECIALIZED-SAME:        i32 1
+// CHECK-PRESPECIALIZED-SAME:      ), 
+// CHECK-PRESPECIALIZED-SAME:      %swift.type* getelementptr inbounds (
+// CHECK-PRESPECIALIZED-SAME:        %swift.full_type, 
+// CHECK-PRESPECIALIZED-SAME:        %swift.full_type* bitcast (
+// CHECK-PRESPECIALIZED-SAME:          <{ 
+// CHECK-PRESPECIALIZED-SAME:            i8**, 
+// CHECK-PRESPECIALIZED-SAME:            [[INT]], 
+// CHECK-PRESPECIALIZED-SAME:            %swift.type_descriptor*, 
+// CHECK-PRESPECIALIZED-SAME:            %swift.type*, 
+// CHECK-PRESPECIALIZED-SAME:            i64 
+// CHECK-PRESPECIALIZED-SAME:          }>* @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMf" 
+// CHECK-PRESPECIALIZED-SAME:          to %swift.full_type*
+// CHECK-PRESPECIALIZED-SAME:        ), 
+// CHECK-PRESPECIALIZED-SAME:        i32 0, 
+// CHECK-PRESPECIALIZED-SAME:        i32 1
+// CHECK-PRESPECIALIZED-SAME:      ), 
+// CHECK-PRESPECIALIZED-SAME:      i8** [[Single_P1]]
+// CHECK-PRESPECIALIZED-SAME:    )
+// CHECK-PRESPECIALIZED-NEXT:    ret void
+// CHECK-PRESPECIALIZED-NEXT:  }
+
 
 // Lazy witness table accessor for the concrete Single<IsP2> : P1.
 
@@ -133,6 +172,27 @@ public func single_concrete() {
 // TYPEBYNAME-NEXT:    [[T0:%.*]] = phi i8** [ [[CACHE]], %entry ], [ [[Single_P1]], %cacheIsNull ]
 // TYPEBYNAME-NEXT:    ret i8** [[T0]]
 // TYPEBYNAME-NEXT:  }
+
+// TYPEBYNAME_PRESPECIALIZED-LABEL: define linkonce_odr hidden i8** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWl"()
+// TYPEBYNAME_PRESPECIALIZED-NEXT:  entry:
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    %conditional.requirement.buffer = alloca [1 x i8**], align 8
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[CACHE:%.*]] = load i8**, i8*** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWL", align 8
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[IS_NULL:%.*]] = icmp eq i8** [[CACHE]], null
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
+
+// TYPEBYNAME_PRESPECIALIZED:       cacheIsNull:
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$s42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
+
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[Single_P1:%.*]] = call i8** @swift_getWitnessTable
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    store atomic i8** [[Single_P1]], i8*** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWL" release, align 8
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    br label %cont
+
+// TYPEBYNAME_PRESPECIALIZED:       cont:
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[T0:%.*]] = phi i8** [ [[CACHE]], %entry ], [ [[Single_P1]], %cacheIsNull ]
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    ret i8** [[T0]]
+// TYPEBYNAME_PRESPECIALIZED-NEXT:  }
 
 
 public struct Double<B, C> {}

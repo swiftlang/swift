@@ -90,29 +90,38 @@ bool PartialApplyCombiner::allocateTemporaries() {
   for (unsigned i : indices(argList)) {
     SILValue arg = argList[i];
     SILParameterInfo param = paramList[i];
+    // If we do not have an indirect parameter, we do not need to do any further
+    // work here.
+    if (!pai->getSubstCalleeConv().isSILIndirect(param))
+      continue;
+
+    // If our indirect parameter is mutating, we can just skip it as well.
     if (param.isIndirectMutating())
       continue;
 
-    // Create a temporary and copy the argument into it, if:
-    // - the argument stems from an alloc_stack
-    // - the argument is consumed by the callee and is indirect
-    //   (e.g. it is an @in argument)
-    if (isa<AllocStackInst>(arg) ||
-        (param.isConsumed() &&
-         pai->getSubstCalleeConv().isSILIndirect(param))) {
-      // If the argument has a dependent type, then we can not create a
-      // temporary for it at the beginning of the function, so we must bail.
-      //
-      // TODO: This is because we are inserting alloc_stack at the beginning/end
-      // of functions where the dependent type may not exist yet.
-      if (arg->getType().hasOpenedExistential())
-        return false;
-
-      // If the temporary is non-trivial, we need to destroy it later.
-      if (!arg->getType().isTrivial(*pai->getFunction()))
-        needsDestroys = true;
-      argsToHandle.push_back(std::make_pair(arg, i));
+    // If we are consuming an indirect parameter. Bail! We do not support that
+    // today!
+    if (param.isConsumed()) {
+      return false;
     }
+
+    // Otherwise, we must have a guaranteed parameter. If we don't, bail.
+    if (!param.isGuaranteed()) {
+      return false;
+    }
+
+    // If the argument has a dependent type, then we can not create a
+    // temporary for it at the beginning of the function, so we must bail.
+    //
+    // TODO: This is because we are inserting alloc_stack at the beginning/end
+    // of functions where the dependent type may not exist yet.
+    if (arg->getType().hasOpenedExistential())
+      return false;
+
+    // If the temporary is non-trivial, we need to destroy it later.
+    if (!arg->getType().isTrivial(*pai->getFunction()))
+      needsDestroys = true;
+    argsToHandle.push_back(std::make_pair(arg, i));
   }
 
   if (needsDestroys) {

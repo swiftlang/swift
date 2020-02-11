@@ -334,9 +334,55 @@ bool SILValueOwnershipChecker::gatherUsers(
       continue;
     }
 
-    // Otherwise if we have a terminator, add any as uses any end_borrow to
-    // ensure that the subscope is completely enclsed within the super scope. We
-    // require all of our arguments to be either trivial or guaranteed.
+    // See if our forwarding terminator is a transformation terminator. If so,
+    // just add all of the uses of its successors to the worklist to visit as
+    // users.
+    if (ti->isTransformationTerminator()) {
+      for (auto &succ : ti->getSuccessors()) {
+        auto *succBlock = succ.getBB();
+
+        // If we do not have any arguments, then continue.
+        if (succBlock->args_empty())
+          continue;
+
+        // Otherwise, make sure that all arguments are trivial or guaranteed. If
+        // we fail, emit an error.
+        //
+        // TODO: We could ignore this error and emit a more specific error on
+        // the actual terminator.
+        for (auto *succArg : succBlock->getSILPhiArguments()) {
+          // *NOTE* We do not emit an error here since we want to allow for more
+          // specific errors to be found during use_verification.
+          //
+          // TODO: Add a flag that associates the terminator instruction with
+          // needing to be verified. If it isn't verified appropriately, assert
+          // when the verifier is destroyed.
+          auto succArgOwnershipKind = succArg->getOwnershipKind();
+          if (!succArgOwnershipKind.isCompatibleWith(ownershipKind)) {
+            // This is where the error would go.
+            continue;
+          }
+
+          // If we have an any value, just continue.
+          if (succArgOwnershipKind == ValueOwnershipKind::None)
+            continue;
+
+          // Otherwise add all users of this BBArg to the worklist to visit
+          // recursively.
+          llvm::copy(succArg->getUses(), std::back_inserter(users));
+        }
+      }
+      continue;
+    }
+
+    // Otherwise, we are dealing with the merging of true phis. To work with
+    // this we will eventually need to create a notion of forwarding borrow
+    // scopes.
+
+    // But until then, we validate that the argument has an end_borrow that acts
+    // as a subscope that is compeltely enclosed within the scopes of all
+    // incoming values. We require all of our arguments to be either trivial or
+    // guaranteed.
     for (auto &succ : ti->getSuccessors()) {
       auto *succBlock = succ.getBB();
 

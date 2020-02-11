@@ -136,7 +136,24 @@ public func generic_concrete<T: P2>(_: T.Type)
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s34conditional_conformance_with_assoc16generic_concreteyyxmAA2P2RzAaC3AT2RpzAA2P3AD_AdaCP3AT3RPzlF"(%swift.type*, %swift.type* %T, i8** %T.P2, i8** %T.AT2.P2, i8** %T.AT2.AT2.AT3.P3)
 // CHECK-NEXT:  entry:
 // CHECK:         %conditional.requirement.buffer = alloca [3 x i8**], align 8
-// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVMa"(i64 0, %swift.type* %T, %swift.type* bitcast (i64* getelementptr inbounds (<{ i8**, i64, <{ {{.*}} }>* }>, <{ {{.*}} }>* @"$s34conditional_conformance_with_assoc4IsP3VMf", i32 0, i32 1) to %swift.type*), i8** %T.P2)
+// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVMa"(
+// CHECK-SAME:           i64 0, 
+// CHECK-SAME:           %swift.type* 
+// CHECK-SAME:           %T, 
+// CHECK-SAME:           %swift.type* bitcast (
+// CHECK-SAME:             i64* getelementptr inbounds (
+// CHECK-SAME:               <{ 
+// CHECK-SAME:                 i8**, 
+// CHECK-SAME:                 i64, 
+// CHECK-SAME:                 <{ {{[^}]*}} }>* 
+// CHECK-SAME:               }>, 
+// CHECK-SAME:               <{ {{.*}} }>* @"$s34conditional_conformance_with_assoc4IsP3VMf", 
+// CHECK-SAME:               i32 0, 
+// CHECK-SAME:               i32 1
+// CHECK-SAME:             ) to %swift.type*
+// CHECK-SAME:           ), 
+// CHECK-SAME:           i8** %T.P2
+// CHECK-SAME:         )
 // CHECK-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [3 x i8**], [3 x i8**]* %conditional.requirement.buffer, i32 0, i32 0

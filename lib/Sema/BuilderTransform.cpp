@@ -244,7 +244,15 @@ protected:
       expressions.push_back(buildVarRef(childVar, childVar->getLoc()));
     };
 
-    for (const auto &node : braceStmt->getElements()) {
+    for (auto node : braceStmt->getElements()) {
+      // Implicit returns in single-expression function bodies are treated
+      // as the expression.
+      if (auto returnStmt =
+              dyn_cast_or_null<ReturnStmt>(node.dyn_cast<Stmt *>())) {
+        assert(returnStmt->isImplicit());
+        node = returnStmt->getResult();
+      }
+
       if (auto stmt = node.dyn_cast<Stmt *>()) {
         addChild(visit(stmt));
         continue;
@@ -291,14 +299,9 @@ protected:
   }
 
   VarDecl *visitReturnStmt(ReturnStmt *stmt) {
-    // Allow implicit returns due to 'return' elision.
-    if (!stmt->isImplicit() || !stmt->hasResult()) {
-      if (!unhandledNode)
-        unhandledNode = stmt;
-      return nullptr;
-    }
-
-    return captureExpr(stmt->getResult(), /*oneWay=*/true);
+    if (!unhandledNode)
+      unhandledNode = stmt;
+    return nullptr;
   }
 
   VarDecl *visitDoStmt(DoStmt *doStmt) {
@@ -624,7 +627,7 @@ class BuilderClosureRewriter
   const Solution &solution;
   DeclContext *dc;
   AppliedBuilderTransform builderTransform;
-  std::function<Expr *(Expr *)> rewriteExprFn;
+  std::function<Expr *(Expr *)> rewriteExpr;
   std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType;
 
   /// Retrieve the temporary variable that will be used to capture the
@@ -693,9 +696,9 @@ private:
       declRef->setType(LValueType::get(temporaryVar->getType()));
 
       // Load the right-hand side if needed.
-      if (finalCapturedExpr->getType()->is<LValueType>()) {
-        auto &cs = solution.getConstraintSystem();
-        finalCapturedExpr = cs.addImplicitLoadExpr(finalCapturedExpr);
+      if (finalCapturedExpr->getType()->hasLValueType()) {
+        finalCapturedExpr =
+            TypeChecker::addImplicitLoadExpr(ctx, finalCapturedExpr);
       }
 
       auto assign = new (ctx) AssignExpr(
@@ -726,13 +729,6 @@ private:
     elements.push_back(pbd);
   }
 
-  Expr *rewriteExpr(Expr *expr) {
-    Expr *result = rewriteExprFn(expr);
-    if (result)
-      performSyntacticExprDiagnostics(expr, dc, /*isExprStmt=*/false);
-    return result;
-  }
-
 public:
   BuilderClosureRewriter(
       const Solution &solution,
@@ -742,7 +738,7 @@ public:
       std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType
     ) : ctx(solution.getConstraintSystem().getASTContext()),
         solution(solution), dc(dc), builderTransform(builderTransform),
-        rewriteExprFn(rewriteExpr),
+        rewriteExpr(rewriteExpr),
         coerceToType(coerceToType){ }
 
   Stmt *visitBraceStmt(BraceStmt *braceStmt, FunctionBuilderTarget target,
@@ -839,9 +835,8 @@ public:
         auto finalCondExpr = rewriteExpr(condExpr);
 
         // Load the condition if needed.
-        if (finalCondExpr->getType()->is<LValueType>()) {
-          auto &cs = solution.getConstraintSystem();
-          finalCondExpr = cs.addImplicitLoadExpr(finalCondExpr);
+        if (finalCondExpr->getType()->hasLValueType()) {
+          finalCondExpr = TypeChecker::addImplicitLoadExpr(ctx, finalCondExpr);
         }
 
         condElement.setBoolean(finalCondExpr);
@@ -1107,11 +1102,18 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   }
 
   // Apply the solution to the function body.
-  return cast_or_null<BraceStmt>(
-     cs.applySolutionToBody(solutions.front(), func));
+  if (auto result = cs.applySolution(
+          solutions.front(),
+          SolutionApplicationTarget(func),
+          /*performingDiagnostics=*/false)) {
+    return result->getFunctionBody();
+  }
+
+  return nullptr;
 }
 
-ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
+Optional<ConstraintSystem::TypeMatchResult>
+ConstraintSystem::matchFunctionBuilder(
     AnyFunctionRef fn, Type builderType, Type bodyResultType,
     ConstraintKind bodyResultConstraintKind,
     ConstraintLocator *calleeLocator, ConstraintLocatorBuilder locator) {
@@ -1135,7 +1137,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
   case FunctionBuilderBodyPreCheck::HasReturnStmt:
     // If the body has a return statement, suppress the transform but
     // continue solving the constraint system.
-    return getTypeMatchSuccess();
+    return None;
   }
 
   // Check the form of this body to see if we can apply the
@@ -1281,12 +1283,6 @@ public:
 llvm::Expected<FunctionBuilderBodyPreCheck>
 PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
                                          AnyFunctionRef fn) const {
-  // Single-expression closures should already have been pre-checked.
-  if (auto closure = fn.getAbstractClosureExpr()) {
-    if (closure->hasSingleExpressionBody())
-      return FunctionBuilderBodyPreCheck::Okay;
-  }
-
   return PreCheckFunctionBuilderApplication(fn, false).run();
 }
 
