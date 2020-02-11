@@ -4542,6 +4542,42 @@ public:
       CanGenericSignature derivativeFunctionGenericSignature = nullptr,
       bool isReabstractionThunk = false);
 
+  /// Returns the type of the transpose function for the given parameter
+  /// indices, transpose function generic signature (optional), and other
+  /// auxiliary parameters.
+  ///
+  /// Preconditions:
+  /// - Linearity parameters corresponding to parameter indices must conform to
+  ///   `Differentiable` and satisfy `Self == Self.TangentVector`.
+  ///
+  /// Typing rules, given:
+  /// - Original function type: $(T0, T1, ...) -> (R0, R1, ...)
+  ///
+  /// Transpose function type:
+  /// - Takes non-linearity parameters, followed by original results, as
+  ///   parameters.
+  /// - Returns linearity parameters.
+  ///
+  /// A "constrained transpose generic signature" is computed from
+  /// `transposeFunctionGenericSignature`, if specified. Otherwise, it is
+  /// computed from the original generic signature. A "constrained transpose
+  /// generic signature" requires all linearity parameters to conform to
+  /// `Differentiable` and to satisfy `Self == Self.TangentVector`; this is
+  /// important for correctness.
+  ///
+  /// This "constrained transpose generic signature" is used for
+  /// parameter/result type lowering. It is used as the actual generic signature
+  /// of the transpose function type iff the original function type has a
+  /// generic signature and not all generic parameters are bound to concrete
+  /// types. Otherwise, no transpose generic signature is used.
+  ///
+  /// Other properties of the original function type are copied exactly:
+  /// `ExtInfo`, callee convention, witness method conformance, etc.
+  CanSILFunctionType getAutoDiffTransposeFunctionType(
+      IndexSubset *parameterIndices, Lowering::TypeConverter &TC,
+      LookupConformanceFn lookupConformance,
+      CanGenericSignature transposeFunctionGenericSignature = nullptr);
+
   ExtInfo getExtInfo() const {
     return ExtInfo(Bits.SILFunctionType.ExtInfoBits, getClangFunctionType());
   }
