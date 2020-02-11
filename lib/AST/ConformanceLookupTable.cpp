@@ -1265,8 +1265,13 @@ void ConformanceLookupTable::addExtendedConformances(const ExtensionDecl *ext,
 
 void ConformanceLookupTable::invalidate(NominalTypeDecl *nomimal) {
   for (auto &extInfo : NominalConformancesFromExtension)
-    for (auto &toInvalidate : extInfo.second)
-      toInvalidate.first->prepareConformanceTable()->invalidate(toInvalidate.first);
+    for (auto &toInvalidate : extInfo.second) {
+      NominalTypeDecl *nominal = toInvalidate.first;
+      if (auto *proto = dyn_cast<ProtocolDecl>(nominal))
+        proto->inheritedProtocolsChanged();
+      else
+        nominal->prepareConformanceTable()->invalidate(nominal);
+    }
 
   LastProcessed.clear();
 }
@@ -1274,6 +1279,7 @@ void ConformanceLookupTable::invalidate(NominalTypeDecl *nomimal) {
 void ProtocolDecl::inheritedProtocolsChanged() {
   Bits.ProtocolDecl.InheritedProtocolsValid = false;
   prepareConformanceTable()->invalidate(this);
+  RequirementSignature = nullptr;
 }
 
 void ExtensionDecl::setInherited(MutableArrayRef<TypeLoc> i) {

@@ -3838,6 +3838,22 @@ static ConstraintResult visitInherited(
     visitInherited(inheritedType, inherited.getTypeRepr());
   }
 
+  if (auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl))
+    for (auto *ext : protoDecl->getExtensions()) {
+      ArrayRef<TypeLoc> inheritedTypes = ext->getInherited();
+      for (unsigned index : indices(inheritedTypes)) {
+        Type inheritedType
+          = evaluateOrDefault(evaluator,
+                              InheritedTypeRequest{ext, index,
+                                TypeResolutionStage::Structural},
+                              Type());
+        if (!inheritedType) continue;
+
+        const auto &inherited = inheritedTypes[index];
+        visitInherited(inheritedType, inherited.getTypeRepr());
+      }
+    }
+
   return result;
 }
 
@@ -4457,15 +4473,21 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     }
 
     // Protocol extensions with conformances.
-    if (auto *protoTy = dyn_cast_or_null<ProtocolDecl>(constraintType->getAnyNominal()))
-      for (auto *ext : protoTy->getExtensions())
-        for (auto inheritedTy : ext->getInherited())
-          if (auto ty = inheritedTy.getType())
-            if (auto *nomial = ty->getAnyNominal())
-              if (auto *protoDecl = dyn_cast<ProtocolDecl>(nomial))
-                if (isErrorResult(addConformanceRequirement(resolvedSubject,
-                                                            protoDecl, source)))
-                  anyErrors = true;
+    if (auto *protoDecl =
+        dyn_cast_or_null<ProtocolDecl>(constraintType->getAnyNominal())) {
+      auto &conforms = resolvedSubject.getEquivalenceClass(*this)->conformsTo;
+
+      for (auto *ext : protoDecl->getExtensions())
+        for (auto &typeLoc : ext->getInherited())
+          if (auto inheritedTy = typeLoc.getType())
+            if (auto *inheritedProto =
+                dyn_cast_or_null<ProtocolDecl>(inheritedTy->getAnyNominal()))
+              if (conforms.find(inheritedProto) == conforms.end() &&
+                  isErrorResult(addConformanceRequirement(resolvedSubject,
+                                                          inheritedProto,
+                                                          source)))
+                anyErrors = true;
+    }
 
     return anyErrors ? ConstraintResult::Conflicting
                      : ConstraintResult::Resolved;

@@ -88,6 +88,10 @@ static void checkInheritanceClause(
         // Force recalculation conformance table
         ext->setInherited(inheritedClause);
 
+        auto *attr = ext->getAttrs().getAttribute<AccessControlAttr>();
+        if (!attr || attr->getAccess() < AccessLevel::Public)
+          ext->diagnose(diag::protocol_extension_access_with_conformances);
+
         // Warning (eventually error?) here is now gated
         if (!ext->getASTContext().LangOpts.EnableConformingExtensions)
           ext->diagnose(diag::extension_protocol_inheritance, proto->getName())

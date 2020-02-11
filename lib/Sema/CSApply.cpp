@@ -6883,8 +6883,12 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     // Extract the literal type.
     Type builtinLiteralType =
         conformance.getTypeWitnessByName(type, literalType);
-    if (builtinLiteralType->hasError())
+    if (builtinLiteralType->hasError()) {
+      cs.getASTContext().Diags.diagnose(literal->getLoc(),
+                                        diag::type_does_not_conform,
+                                        type, protocol->getDeclaredType());
       return nullptr;
+    }
 
     // Perform the builtin conversion.
     if (!convertLiteralInPlace(literal, builtinLiteralType, nullptr,
