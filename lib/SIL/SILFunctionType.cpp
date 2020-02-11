@@ -240,12 +240,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   if (!insertion.second)
     return cachedResult;
 
-  // JVP: (T...) -> ((R...),
-  //                 (T.TangentVector...) -> (R.TangentVector...))
-  // VJP: (T...) -> ((R...),
-  //                 (R.TangentVector...) -> (T.TangentVector...))
-
-
   // Helper function testing if we are differentiating wrt this index.
   auto isWrtIndex = [&](unsigned index) -> bool {
     return index < parameterIndices->getCapacity() &&
@@ -258,12 +252,13 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     if (isWrtIndex(valueAndIndex.index()))
       diffParams.push_back(valueAndIndex.value());
 
-  // Get the canonical derivative function generic signature.
+  // Get the "constrained" derivative function generic signature.
   if (!derivativeFnGenSig)
     derivativeFnGenSig = getSubstGenericSignature();
-  derivativeFnGenSig = autodiff::getConstrainedDerivativeGenericSignature(
-                           this, parameterIndices, derivativeFnGenSig)
-                           .getCanonicalSignature();
+  derivativeFnGenSig =
+      autodiff::getConstrainedDerivativeGenericSignature(
+          this, parameterIndices, derivativeFnGenSig, lookupConformance)
+          .getCanonicalSignature();
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult =
@@ -427,27 +422,28 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
 
 CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
     IndexSubset *parameterIndices, Lowering::TypeConverter &TC,
-    LookupConformanceFn lookupConformance, CanGenericSignature genSig) {
-  // Get the canonical transpose function generic signature.
-  if (!genSig)
-    genSig = getSubstGenericSignature();
-  genSig = autodiff::getConstrainedDerivativeGenericSignature(
-               this, parameterIndices, genSig)
-               .getCanonicalSignature();
+    LookupConformanceFn lookupConformance,
+    CanGenericSignature transposeFnGenSig) {
+  // Get the "constrained" transpose function generic signature.
+  if (!transposeFnGenSig)
+    transposeFnGenSig = getSubstGenericSignature();
+  transposeFnGenSig = autodiff::getConstrainedDerivativeGenericSignature(
+                          this, parameterIndices, transposeFnGenSig,
+                          lookupConformance, /*isLinear*/ true)
+                          .getCanonicalSignature();
 
   // Given a type, returns its formal SIL parameter info.
   auto getParameterInfoForOriginalResult =
       [&](const SILResultInfo &result) -> SILParameterInfo {
-    AbstractionPattern pattern(genSig, result.getInterfaceType());
+    AbstractionPattern pattern(transposeFnGenSig, result.getInterfaceType());
     auto &tl = TC.getTypeLowering(pattern, result.getInterfaceType(),
                                   TypeExpansionContext::minimal());
     ParameterConvention newConv;
     switch (result.getConvention()) {
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
-      newConv = tl.isTrivial()
-          ? ParameterConvention::Direct_Unowned
-          : ParameterConvention::Direct_Guaranteed;
+      newConv = tl.isTrivial() ? ParameterConvention::Direct_Unowned
+                               : ParameterConvention::Direct_Guaranteed;
       break;
     case ResultConvention::Unowned:
     case ResultConvention::UnownedInnerPointer:
@@ -457,13 +453,14 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
       newConv = ParameterConvention::Indirect_In_Guaranteed;
       break;
     }
-    return {result.getInterfaceType()->getCanonicalType(genSig), newConv};
+    return {result.getInterfaceType()->getCanonicalType(transposeFnGenSig),
+            newConv};
   };
 
   // Given a type, returns its formal SIL result info.
   auto getResultInfoForOriginalParameter =
       [&](const SILParameterInfo &param) -> SILResultInfo {
-    AbstractionPattern pattern(genSig, param.getInterfaceType());
+    AbstractionPattern pattern(transposeFnGenSig, param.getInterfaceType());
     auto &tl = TC.getTypeLowering(pattern, param.getInterfaceType(),
                                   TypeExpansionContext::minimal());
     ResultConvention newConv;
@@ -471,9 +468,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Direct_Unowned:
-      newConv = tl.isTrivial()
-          ? ResultConvention::Unowned
-          : ResultConvention::Owned;
+      newConv =
+          tl.isTrivial() ? ResultConvention::Unowned : ResultConvention::Owned;
       break;
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
@@ -483,7 +479,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
       newConv = ResultConvention::Indirect;
       break;
     }
-    return {param.getInterfaceType()->getCanonicalType(genSig), newConv};
+    return {param.getInterfaceType()->getCanonicalType(transposeFnGenSig),
+            newConv};
   };
 
   SmallVector<SILParameterInfo, 4> newParameters;
@@ -497,10 +494,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
   for (auto &res : getResults())
     newParameters.push_back(getParameterInfoForOriginalResult(res));
   // Transpose function type has a generic signature only if the original
-  // function type does.
+  // function type does, and if `transposeFnGenSig` does not have all concrete
+  // generic parameters.
   CanGenericSignature canGenSig;
-  if (getSubstGenericSignature())
-    canGenSig = genSig;
+  if (getSubstGenericSignature() && transposeFnGenSig &&
+      !transposeFnGenSig->areAllParamsConcrete())
+    canGenSig = transposeFnGenSig;
   return SILFunctionType::get(
       canGenSig, getExtInfo(), getCoroutineKind(), getCalleeConvention(),
       newParameters, getYields(), newResults, getOptionalErrorResult(),
