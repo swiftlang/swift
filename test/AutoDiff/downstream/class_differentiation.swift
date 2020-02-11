@@ -92,6 +92,7 @@ ClassTests.test("AddressOnlyTangentVector") {
     @differentiable
     var stored: T
 
+    @differentiable
     init(_ stored: T) {
       self.stored = stored
     }

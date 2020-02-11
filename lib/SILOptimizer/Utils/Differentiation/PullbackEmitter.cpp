@@ -1672,6 +1672,26 @@ void PullbackEmitter::visitUnconditionalCheckedCastAddrInst(
   emitZeroIndirect(destType.getASTType(), adjDest, uccai->getLoc());
 }
 
+void PullbackEmitter::visitUncheckedRefCastInst(UncheckedRefCastInst *urci) {
+  auto *bb = urci->getParent();
+  assert(urci->getOperand()->getType().isObject());
+  assert(getRemappedTangentType(urci->getOperand()->getType()) ==
+             getRemappedTangentType(urci->getType()) &&
+         "Operand/result must have the same `TangentVector` type");
+  auto adj = getAdjointValue(bb, urci);
+  addAdjointValue(bb, urci->getOperand(), adj, urci->getLoc());
+}
+
+void PullbackEmitter::visitUpcastInst(UpcastInst *ui) {
+  auto *bb = ui->getParent();
+  assert(ui->getOperand()->getType().isObject());
+  assert(getRemappedTangentType(ui->getOperand()->getType()) ==
+             getRemappedTangentType(ui->getType()) &&
+         "Operand/result must have the same `TangentVector` type");
+  auto adj = getAdjointValue(bb, ui);
+  addAdjointValue(bb, ui->getOperand(), adj, ui->getLoc());
+}
+
 #define NOT_DIFFERENTIABLE(INST, DIAG)                                         \
   void PullbackEmitter::visit##INST##Inst(INST##Inst *inst) {                  \
     getContext().emitNondifferentiabilityError(inst, getInvoker(),             \

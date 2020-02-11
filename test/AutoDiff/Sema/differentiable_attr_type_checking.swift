@@ -1080,8 +1080,6 @@ class Super: Differentiable {
 
   var base: Float
 
-  // NOTE(TF-654): Class initializers are not yet supported.
-  // expected-error @+1 {{'@differentiable' attribute does not yet support class initializers}}
   @differentiable
   init(base: Float) {
     self.base = base

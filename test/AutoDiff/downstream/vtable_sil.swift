@@ -10,13 +10,9 @@ class Super : Differentiable {
   // FIXME(TF-648): Dummy to make `Super.TangentVector` be nontrivial.
   var _nontrivial: [Float] = []
 
-  // TODO(TF-654): Remove attribute when differentiation supports class initializers.
-  // @differentiable(vjp: vjpInit)
+  @differentiable
   init(base: Float) {
     self.base = base
-  }
-  static func vjpInit(base: Float) -> (Super, (TangentVector) -> Float) {
-    return (Super(base: base), { x in x.base })
   }
 
   @differentiable
@@ -54,14 +50,10 @@ class Super : Differentiable {
 }
 
 class Sub : Super {
-  // TODO(TF-654): Remove attribute when differentiation supports class initializers.
-  // @differentiable(vjp: vjpInit2)
+  @differentiable
   override init(base: Float) {
     super.init(base: base)
     self.base = base
-  }
-  static func vjpInit2(base: Float) -> (Sub, (TangentVector) -> Float) {
-    return (Sub(base: base), { x in x.base })
   }
 
   @differentiable
@@ -105,6 +97,8 @@ class SubSub : Sub {}
 // CHECK-NEXT:   #Super._nontrivial!setter.1: (Super) -> ([Float]) -> () : @$s10vtable_sil5SuperC11_nontrivialSaySfGvs
 // CHECK-NEXT:   #Super._nontrivial!modify.1: (Super) -> () -> () : @$s10vtable_sil5SuperC11_nontrivialSaySfGvM
 // CHECK-NEXT:   #Super.init!allocator.1: (Super.Type) -> (Float) -> Super : @$s10vtable_sil5SuperC4baseACSf_tcfC
+// CHECK-NEXT:   #Super.init!allocator.1.jvp.SU: (Super.Type) -> (Float) -> Super : @AD__$s10vtable_sil5SuperC4baseACSf_tcfC__jvp_src_0_wrt_0_vtable_entry_thunk
+// CHECK-NEXT:   #Super.init!allocator.1.vjp.SU: (Super.Type) -> (Float) -> Super : @AD__$s10vtable_sil5SuperC4baseACSf_tcfC__vjp_src_0_wrt_0_vtable_entry_thunk
 // CHECK-NEXT:   #Super.property!getter.1: (Super) -> () -> Float : @$s10vtable_sil5SuperC8propertySfvg
 // CHECK-NEXT:   #Super.property!getter.1.jvp.S: (Super) -> () -> Float : @AD__$s10vtable_sil5SuperC8propertySfvg__jvp_src_0_wrt_0_vtable_entry_thunk
 // CHECK-NEXT:   #Super.property!getter.1.vjp.S: (Super) -> () -> Float : @AD__$s10vtable_sil5SuperC8propertySfvg__vjp_src_0_wrt_0_vtable_entry_thunk
@@ -129,6 +123,8 @@ class SubSub : Sub {}
 // CHECK-NEXT:   #Super._nontrivial!setter.1: (Super) -> ([Float]) -> () : @$s10vtable_sil5SuperC11_nontrivialSaySfGvs [inherited]
 // CHECK-NEXT:   #Super._nontrivial!modify.1: (Super) -> () -> () : @$s10vtable_sil5SuperC11_nontrivialSaySfGvM [inherited]
 // CHECK-NEXT:   #Super.init!allocator.1: (Super.Type) -> (Float) -> Super : @$s10vtable_sil3SubC4baseACSf_tcfC [override]
+// CHECK-NEXT:   #Super.init!allocator.1.jvp.SU: (Super.Type) -> (Float) -> Super : @AD__$s10vtable_sil3SubC4baseACSf_tcfC__jvp_src_0_wrt_0_vtable_entry_thunk [override]
+// CHECK-NEXT:   #Super.init!allocator.1.vjp.SU: (Super.Type) -> (Float) -> Super : @AD__$s10vtable_sil3SubC4baseACSf_tcfC__vjp_src_0_wrt_0_vtable_entry_thunk [override]
 // CHECK-NEXT:   #Super.property!getter.1: (Super) -> () -> Float : @$s10vtable_sil3SubC8propertySfvg [override]
 // CHECK-NEXT:   #Super.property!getter.1.jvp.S: (Super) -> () -> Float : @AD__$s10vtable_sil3SubC8propertySfvg__jvp_src_0_wrt_0_vtable_entry_thunk [override]
 // CHECK-NEXT:   #Super.property!getter.1.vjp.S: (Super) -> () -> Float : @AD__$s10vtable_sil3SubC8propertySfvg__vjp_src_0_wrt_0_vtable_entry_thunk [override]
@@ -155,6 +151,8 @@ class SubSub : Sub {}
 // CHECK-NEXT:   #Super._nontrivial!setter.1: (Super) -> ([Float]) -> () : @$s10vtable_sil5SuperC11_nontrivialSaySfGvs [inherited]
 // CHECK-NEXT:   #Super._nontrivial!modify.1: (Super) -> () -> () : @$s10vtable_sil5SuperC11_nontrivialSaySfGvM [inherited]
 // CHECK-NEXT:   #Super.init!allocator.1: (Super.Type) -> (Float) -> Super : @$s10vtable_sil03SubC0C4baseACSf_tcfC [override]
+// CHECK-NEXT:   #Super.init!allocator.1.jvp.SU: (Super.Type) -> (Float) -> Super : @AD__$s10vtable_sil3SubC4baseACSf_tcfC__jvp_src_0_wrt_0_vtable_entry_thunk [inherited]
+// CHECK-NEXT:   #Super.init!allocator.1.vjp.SU: (Super.Type) -> (Float) -> Super : @AD__$s10vtable_sil3SubC4baseACSf_tcfC__vjp_src_0_wrt_0_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #Super.property!getter.1: (Super) -> () -> Float : @$s10vtable_sil3SubC8propertySfvg [inherited]
 // CHECK-NEXT:   #Super.property!getter.1.jvp.S: (Super) -> () -> Float : @AD__$s10vtable_sil3SubC8propertySfvg__jvp_src_0_wrt_0_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #Super.property!getter.1.vjp.S: (Super) -> () -> Float : @AD__$s10vtable_sil3SubC8propertySfvg__vjp_src_0_wrt_0_vtable_entry_thunk [inherited]

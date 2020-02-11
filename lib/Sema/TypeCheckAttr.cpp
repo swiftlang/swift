@@ -3975,25 +3975,15 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
   // Diagnose if original function is an invalid class member.
   if (isOriginalClassMember) {
     // Class methods returning dynamic `Self` are not supported.
-    // (For class methods, dynamic `Self` is supported only as the single
-    // result - tuple-returning JVPs/VJPs would not type-check.)
-    if (auto *originalFn = dyn_cast<FuncDecl>(original)) {
-      if (originalFn->hasDynamicSelfResult()) {
+    // For class methods, dynamic `Self` is supported only as the single
+    // result - tuple-returning JVPs/VJPs would not type-check.
+    if (auto *originalFD = dyn_cast<FuncDecl>(original)) {
+      if (originalFD->hasDynamicSelfResult()) {
         diags.diagnose(attr->getLocation(),
                        diag::differentiable_attr_class_member_no_dynamic_self);
         attr->setInvalid();
         return nullptr;
       }
-    }
-
-    // TODO(TF-654): Class initializers are not yet supported.
-    // Extra JVP/VJP type calculation logic is necessary because classes have
-    // both allocators and initializers.
-    if (auto *initDecl = dyn_cast<ConstructorDecl>(original)) {
-      diags.diagnose(attr->getLocation(),
-                     diag::differentiable_attr_class_init_not_yet_supported);
-      attr->setInvalid();
-      return nullptr;
     }
   }
 

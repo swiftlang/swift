@@ -792,6 +792,20 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
       return OptionalType::get(
           objectType->replaceCovariantResultType(newResultType, uncurryLevel));
     }
+    // SWIFT_ENABLE_TENSORFLOW
+    // Special logic to handle JVP/VJP derivative functions of `Self`-returning
+    // methods. This logic is hacky and not robust at all.
+    // Consider adding a `bool isAutoDiffDerivative` flag for triggering this
+    // logic, or creating a separate dedicated helper
+    // `TypeBase::replaceCovariantResultTypeForAutoDiffDerivative`.
+    if (auto tupleType = dyn_cast<TupleType>(this)) {
+      assert(tupleType->getNumElements() == 2 &&
+             "Tuple result is expected only for derivative functions, which "
+             "return a two-element tuple");
+      return TupleType::get({newResultType, tupleType->getElement(1)},
+                            getASTContext());
+    }
+    // SWIFT_ENABLE_TENSORFLOW END
 
     return newResultType;
   }

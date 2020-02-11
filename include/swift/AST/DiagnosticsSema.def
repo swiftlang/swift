@@ -3004,10 +3004,6 @@ ERROR(differentiable_attr_stored_property_variable_unsupported,none,
 ERROR(differentiable_attr_class_member_no_dynamic_self,none,
       "'@differentiable' attribute cannot be declared on class methods "
       "returning 'Self'", ())
-// TODO(TF-654): Remove when differentiation supports class initializers.
-ERROR(differentiable_attr_class_init_not_yet_supported,none,
-      "'@differentiable' attribute does not yet support class initializers",
-      ())
 ERROR(differentiable_attr_empty_where_clause,none,
       "empty 'where' clause in '@differentiable' attribute", ())
 // SWIFT_ENABLE_TENSORFLOW
