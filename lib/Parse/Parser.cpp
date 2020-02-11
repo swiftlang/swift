@@ -1174,7 +1174,8 @@ struct ParserUnit::Implementation {
         SF(new (Ctx) SourceFile(
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx), SFKind,
             BufferID, SourceFile::ImplicitModuleImportKind::None,
-            Opts.CollectParsedToken, Opts.BuildSyntaxTree)) {}
+            Opts.CollectParsedToken, Opts.BuildSyntaxTree,
+            SourceFile::ParsingFlags::DisableDelayedBodies)) {}
 
   ~Implementation() {
     // We need to delete the parser before the context so that it can finalize
