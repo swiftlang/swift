@@ -119,8 +119,7 @@ static void deletePersistentParserState(PersistentParserState *state) {
   delete state;
 }
 
-void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
-                                bool EvaluateConditionals) {
+void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID) {
   auto &ctx = SF.getASTContext();
   std::shared_ptr<SyntaxTreeCreator> STreeCreator;
   if (SF.shouldBuildSyntaxTree()) {
@@ -139,8 +138,7 @@ void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
 
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "Parsing");
-  Parser P(BufferID, SF, /*SIL*/ nullptr, state, STreeCreator,
-           EvaluateConditionals);
+  Parser P(BufferID, SF, /*SIL*/ nullptr, state, STreeCreator);
   PrettyStackTraceParser StackTrace(P);
 
   llvm::SaveAndRestore<NullablePtr<llvm::MD5>> S(P.CurrentTokenHash,
