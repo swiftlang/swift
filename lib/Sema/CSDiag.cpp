@@ -182,12 +182,6 @@ public:
     return type;
   }
 
-  /// Diagnose common failures due to applications of an argument list to an
-  /// ApplyExpr or SubscriptExpr.
-  bool diagnoseParameterErrors(CalleeCandidateInfo &CCI,
-                               Expr *fnExpr, Expr *argExpr,
-                               ArrayRef<Identifier> argLabels);
-
   /// Attempt to diagnose a specific failure from the info we've collected from
   /// the failed constraint system.
   bool diagnoseExprFailure();
@@ -918,48 +912,6 @@ static Expr *getFailedArgumentExpr(CalleeCandidateInfo CCI, Expr *argExpr) {
   }
 }
 
-/// If the candidate set has been narrowed down to a specific structural
-/// problem, e.g. that there are too few parameters specified or that argument
-/// labels don't match up, diagnose that error and return true.
-bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
-                                               Expr *fnExpr, Expr *argExpr,
-                                               ArrayRef<Identifier> argLabels) {
-  // If we have a failure where the candidate set differs on exactly one
-  // argument, and where we have a consistent mismatch across the candidate set
-  // (often because there is only one candidate in the set), then diagnose this
-  // as a specific problem of passing something of the wrong type into a
-  // parameter.
-  //
-  // We don't generally want to use this path to diagnose calls to
-  // symmetrically-typed binary operators because it's likely that both
-  // operands contributed to the type.
-  if ((CCI.closeness == CC_OneArgumentMismatch ||
-       CCI.closeness == CC_OneArgumentNearMismatch ||
-       CCI.closeness == CC_OneGenericArgumentMismatch ||
-       CCI.closeness == CC_OneGenericArgumentNearMismatch ||
-       CCI.closeness == CC_GenericNonsubstitutableMismatch) &&
-      CCI.failedArgument.isValid() &&
-      !isSymmetricBinaryOperator(CCI)) {
-    // Map the argument number into an argument expression.
-    TCCOptions options = TCC_ForceRecheck;
-    if (CCI.failedArgument.parameterType->is<InOutType>())
-      options |= TCC_AllowLValue;
-
-    // It could be that the argument doesn't conform to an archetype.
-    Expr *badArgExpr = getFailedArgumentExpr(CCI, argExpr);
-
-    // Re-type-check the argument with the expected type of the candidate set.
-    // This should produce a specific and tailored diagnostic saying that the
-    // type mismatches with expectations.
-    Type paramType = CCI.failedArgument.parameterType;
-    if (!typeCheckChildIndependently(badArgExpr, paramType,
-                                     CTP_CallArgument, options))
-      return true;
-  }
-  
-  return false;
-}
-
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   auto *fnExpr = callExpr->getFn();
   auto fnType = CS.getType(fnExpr)->getRValueType();
@@ -997,9 +949,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   SmallVector<Identifier, 2> argLabelsScratch;
   ArrayRef<Identifier> argLabels =
     callExpr->getArgumentLabels(argLabelsScratch);
-  if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(),
-                              callExpr->getArg(), argLabels))
-    return true;
 
   Type argType;  // argument list, if known.
   if (auto FTy = fnType->getAs<AnyFunctionType>()) {
@@ -1024,10 +973,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     return true; // already diagnosed.
 
   calleeInfo.filterListArgs(decomposeArgType(CS.getType(argExpr), argLabels));
-
-  if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(), argExpr,
-                              argLabels))
-    return true;
 
   // Force recheck of the arg expression because we allowed unresolved types
   // before, and that turned out not to help, and now we want any diagnoses
