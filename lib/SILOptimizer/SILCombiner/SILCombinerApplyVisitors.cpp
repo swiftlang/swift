@@ -104,10 +104,8 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   if (foldInverseReabstractionThunks(PAI, this))
     return nullptr;
 
-  SILBuilderContext BuilderCtxt(Builder.getModule(), Builder.getTrackingList());
-  BuilderCtxt.setOpenedArchetypesTracker(Builder.getOpenedArchetypesTracker());
-  bool argsAreKeptAlive =
-      tryOptimizeApplyOfPartialApply(PAI, BuilderCtxt, getInstModCallbacks());
+  bool argsAreKeptAlive = tryOptimizeApplyOfPartialApply(
+      PAI, Builder.getBuilderContext(), getInstModCallbacks());
   if (argsAreKeptAlive)
     needUpdateStackNesting = true;
 
