@@ -1052,7 +1052,7 @@ emitBuiltinGlobalStringTablePointer(SILGenFunction &SGF, SILLocation loc,
 /// guaranteed arguments, and hence doesn't require the arguments to
 /// be at +1. Therefore, this builtin is emitted specially.
 ///
-/// We assume our convention is (T, @inout @unmanaged Optional<T>) -> ()
+/// We assume our convention is (T, @inout @unmanaged T) -> ()
 static ManagedValue emitBuiltinConvertStrongToUnownedUnsafe(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     PreparedArguments &&preparedArgs, SGFContext C) {
@@ -1085,25 +1085,19 @@ static ManagedValue emitBuiltinConvertStrongToUnownedUnsafe(
 
   // Make sure our types match up as we expect.
   if (objectSrcValue->getType() !=
-      destType.getReferenceStorageReferentType().getOptionalObjectType()) {
+      destType.getReferenceStorageReferentType().getObjectType()) {
     llvm::errs()
         << "Invalid usage of Builtin.convertStrongToUnownedUnsafe. lhsType "
-           "must be T and rhsType must be inout unsafe(unowned) Optional<T>"
+           "must be T and rhsType must be inout unsafe(unowned) T"
         << "lhsType: " << objectSrcValue->getType() << "\n"
         << "rhsType: " << inoutDest->getType() << "\n";
     llvm::report_fatal_error("standard fatal error msg");
   }
 
-  // Ok. We have the right types. First convert objectSrcValue to its
-  // unowned representation.
-  SILType optionalType = SILType::getOptionalType(objectSrcValue->getType());
-  SILValue someVal =
-      SGF.B.createOptionalSome(loc, objectSrcValue, optionalType);
-
-  SILType unmanagedOptType = someVal->getType().getReferenceStorageType(
+  SILType unmanagedOptType = objectSrcValue->getType().getReferenceStorageType(
       SGF.getASTContext(), ReferenceOwnership::Unmanaged);
   SILValue unownedObjectSrcValue = SGF.B.createRefToUnmanaged(
-      loc, someVal, unmanagedOptType.getObjectType());
+      loc, objectSrcValue, unmanagedOptType.getObjectType());
   SGF.B.emitStoreValueOperation(loc, unownedObjectSrcValue, inoutDest,
                                 StoreOwnershipQualifier::Trivial);
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
@@ -1113,7 +1107,7 @@ static ManagedValue emitBuiltinConvertStrongToUnownedUnsafe(
 ///
 /// We assume our convention is:
 ///
-/// <BaseT, T> (BaseT, @in_guaranteed @unmanaged Optional<T>) -> @guaranteed T
+/// <BaseT, T> (BaseT, @inout @unowned(unsafe) T) -> @guaranteed T
 ///
 static ManagedValue emitBuiltinConvertUnownedUnsafeToGuaranteed(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
@@ -1152,14 +1146,8 @@ static ManagedValue emitBuiltinConvertUnownedUnsafeToGuaranteed(
       loc, unownedNonTrivialRef, ValueOwnershipKind::Guaranteed);
   auto guaranteedNonTrivialRefMV =
       SGF.emitManagedBorrowedRValueWithCleanup(guaranteedNonTrivialRef);
-  auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
-
-  // Then unsafely extract from the optional.
-  auto extMV =
-      SGF.B.createUncheckedEnumData(loc, guaranteedNonTrivialRefMV, someDecl);
-
   // Now create a mark dependence on our base and return the result.
-  return SGF.B.createMarkDependence(loc, extMV, baseMV);
+  return SGF.B.createMarkDependence(loc, guaranteedNonTrivialRefMV, baseMV);
 }
 
 Optional<SpecializedEmitter>
