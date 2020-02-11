@@ -6,11 +6,12 @@ filename =
     ./benchmark/scripts/Benchmark_Driver,
     ./benchmark/scripts/Benchmark_DTrace.in,
     ./benchmark/scripts/Benchmark_GuardMalloc.in,
+    ./benchmark/scripts/Benchmark_QuickCheck.in,
     ./benchmark/scripts/Benchmark_RuntimeLeaksRunner.in,
+    ./benchmark/scripts/run_smoke_bench,
 
     ./docs/scripts/ns-html2rst,
 
-    ./test/Driver/Inputs/fake-toolchain/clang++,
     ./test/Driver/Inputs/fake-toolchain/ld,
 
     ./utils/80+-check,
@@ -30,7 +31,6 @@ filename =
     ./utils/recursive-lipo,
     ./utils/round-trip-syntax-test,
     ./utils/rth,
-    ./utils/run-remote,
     ./utils/run-test,
     ./utils/scale-test,
     ./utils/submit-benchmark-results,

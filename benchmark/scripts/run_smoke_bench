@@ -28,14 +28,15 @@ import glob
 import os
 import subprocess
 import sys
+from imp import load_source
 
 from compare_perf_tests import LogParser, TestComparator, create_report
 
-from imp import load_source
 # import Benchmark_Driver  # doesn't work because it misses '.py' extension
 Benchmark_Driver = load_source(
-    'Benchmark_Driver', os.path.join(os.path.dirname(
-        os.path.abspath(__file__)), 'Benchmark_Driver'))
+    "Benchmark_Driver",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "Benchmark_Driver"),
+)
 # from Benchmark_Driver import BenchmarkDriver, BenchmarkDoctor, ...
 BenchmarkDriver = Benchmark_Driver.BenchmarkDriver
 BenchmarkDoctor = Benchmark_Driver.BenchmarkDoctor
@@ -46,11 +47,12 @@ VERBOSE = False
 
 class DriverArgs(object):
     """Arguments for BenchmarkDriver."""
-    def __init__(self, tests, optimization='O'):
+
+    def __init__(self, tests, optimization="O"):
         """Initialize with path to the build-dir and optimization level."""
         self.benchmarks = None
         self.filters = None
-        self.tests = os.path.join(tests, 'bin')
+        self.tests = os.path.join(tests, "bin")
         self.optimization = optimization
 
 
@@ -63,49 +65,76 @@ def main():
     global VERBOSE
     argparser = argparse.ArgumentParser()
     argparser.add_argument(
-        '-verbose', action='store_true',
-        help='print verbose messages')
+        "-verbose", action="store_true", help="print verbose messages"
+    )
     argparser.add_argument(
-        '-O', action='append_const', const='O', dest='opt_levels',
-        help='test -O benchmarks')
+        "-O",
+        action="append_const",
+        const="O",
+        dest="opt_levels",
+        help="test -O benchmarks",
+    )
     argparser.add_argument(
-        '-Osize', action='append_const', const='Osize', dest='opt_levels',
-        help='test -Osize benchmarks')
+        "-Osize",
+        action="append_const",
+        const="Osize",
+        dest="opt_levels",
+        help="test -Osize benchmarks",
+    )
     argparser.add_argument(
-        '-Onone', action='append_const', const='Onone', dest='opt_levels',
-        help='test -Onone benchmarks (except code size)')
+        "-Onone",
+        action="append_const",
+        const="Onone",
+        dest="opt_levels",
+        help="test -Onone benchmarks (except code size)",
+    )
     argparser.add_argument(
-        '-skip-code-size', action='store_true',
-        help="Don't report code size differences")
+        "-skip-code-size",
+        action="store_true",
+        help="Don't report code size differences",
+    )
     argparser.add_argument(
-        '-skip-performance', action='store_true',
-        help="Don't report performance differences")
+        "-skip-performance",
+        action="store_true",
+        help="Don't report performance differences",
+    )
     argparser.add_argument(
-        '-skip-check-added', action='store_true',
-        help="Don't validate newly added benchmarks")
+        "-skip-check-added",
+        action="store_true",
+        help="Don't validate newly added benchmarks",
+    )
     argparser.add_argument(
-        '-o', type=str,
-        help='In addition to stdout, write the results into a markdown file')
+        "-o",
+        type=str,
+        help="In addition to stdout, write the results into a markdown file",
+    )
     argparser.add_argument(
-        '-threshold', type=float,
-        help='The performance threshold in %% which triggers a re-run',
-        default=5)
+        "-threshold",
+        type=float,
+        help="The performance threshold in %% which triggers a re-run",
+        default=5,
+    )
     argparser.add_argument(
-        '-num-samples', type=int,
-        help='The (minimum) number of samples to run', default=3)
+        "-num-samples",
+        type=int,
+        help="The (minimum) number of samples to run",
+        default=3,
+    )
     argparser.add_argument(
-        '-num-reruns', type=int,
+        "-num-reruns",
+        type=int,
         help="The number of re-runs until it's assumed to be a real change",
-        default=8)
+        default=8,
+    )
     argparser.add_argument(
-        '-platform', type=str,
-        help='The benchmark build platform', default='macosx')
+        "-platform", type=str, help="The benchmark build platform", default="macosx"
+    )
     argparser.add_argument(
-        'oldbuilddir', nargs=1, type=str,
-        help='old benchmark build directory')
+        "oldbuilddir", nargs=1, type=str, help="old benchmark build directory"
+    )
     argparser.add_argument(
-        'newbuilddir', nargs=1, type=str,
-        help='new benchmark build directory')
+        "newbuilddir", nargs=1, type=str, help="new benchmark build directory"
+    )
     args = argparser.parse_args()
     VERBOSE = args.verbose
 
@@ -115,29 +144,42 @@ def main():
 def test_opt_levels(args):
     output_file = None
     if args.o:
-        output_file = open(args.o, 'w')
+        output_file = open(args.o, "w")
 
     changes = False
-    for opt_level in args.opt_levels or ['O', 'Osize', 'Onone']:
-        log('####### Testing optimization level -' + opt_level + ' #######')
+    for opt_level in args.opt_levels or ["O", "Osize", "Onone"]:
+        log("####### Testing optimization level -" + opt_level + " #######")
         if not args.skip_performance:
-            if test_performance(opt_level, args.oldbuilddir[0],
-                                args.newbuilddir[0],
-                                float(args.threshold) / 100, args.num_samples,
-                                args.num_reruns, output_file):
+            if test_performance(
+                opt_level,
+                args.oldbuilddir[0],
+                args.newbuilddir[0],
+                float(args.threshold) / 100,
+                args.num_samples,
+                args.num_reruns,
+                output_file,
+            ):
                 changes = True
 
         # There is no point in reporting code size for Onone.
-        if not args.skip_code_size and opt_level != 'Onone':
-            if report_code_size(opt_level, args.oldbuilddir[0],
-                                args.newbuilddir[0],
-                                args.platform, output_file):
+        if not args.skip_code_size and opt_level != "Onone":
+            if report_code_size(
+                opt_level,
+                args.oldbuilddir[0],
+                args.newbuilddir[0],
+                args.platform,
+                output_file,
+            ):
                 changes = True
 
     if not args.skip_code_size:
-        if report_code_size('swiftlibs', args.oldbuilddir[0],
-                            args.newbuilddir[0],
-                            args.platform, output_file):
+        if report_code_size(
+            "swiftlibs",
+            args.oldbuilddir[0],
+            args.newbuilddir[0],
+            args.platform,
+            output_file,
+        ):
             changes = True
 
     if not args.skip_check_added:
@@ -158,10 +200,14 @@ def measure(driver, tests, i):
     Collect increasing number of samples, depending on the iteration.
     """
     num_samples = min(i + 3, 10)
-    msg = '    Iteration {0} for {1}: num samples = {2}, '.format(
-        i, driver.args.tests, num_samples)
-    msg += ('running all tests' if driver.all_tests == tests else
-            're-testing {0} tests'.format(len(tests)))
+    msg = "    Iteration {0} for {1}: num samples = {2}, ".format(
+        i, driver.args.tests, num_samples
+    )
+    msg += (
+        "running all tests"
+        if driver.all_tests == tests
+        else "re-testing {0} tests".format(len(tests))
+    )
     log(msg)
     driver.tests = tests
     return driver.run(num_samples=num_samples, sample_time=0.0025)
@@ -174,8 +220,9 @@ def merge(results, other_results):
     return results
 
 
-def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
-                     num_reruns, output_file):
+def test_performance(
+    opt_level, old_dir, new_dir, threshold, num_samples, num_reruns, output_file
+):
     """Detect performance changes in benchmarks.
 
     Start fast with few samples per benchmark and gradually spend more time
@@ -183,8 +230,10 @@ def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
     """
 
     i, unchanged_length_count = 0, 0
-    old, new = [BenchmarkDriver(DriverArgs(dir, optimization=opt_level))
-                for dir in [old_dir, new_dir]]
+    old, new = [
+        BenchmarkDriver(DriverArgs(dir, optimization=opt_level))
+        for dir in [old_dir, new_dir]
+    ]
     results = [measure(driver, driver.tests, i) for driver in [old, new]]
     tests = TestComparator(results[0], results[1], threshold)
     changed = tests.decreased + tests.increased
@@ -192,10 +241,11 @@ def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
     while len(changed) > 0 and unchanged_length_count < num_reruns:
         i += 1
         if VERBOSE:
-            log('        test again: ' + str([test.name for test in changed]))
-        results = [merge(the_results,
-                         measure(driver, [test.name for test in changed], i))
-                   for the_results, driver in zip(results, [old, new])]
+            log("        test again: " + str([test.name for test in changed]))
+        results = [
+            merge(the_results, measure(driver, [test.name for test in changed], i))
+            for the_results, driver in zip(results, [old, new])
+        ]
         tests = TestComparator(results[0], results[1], threshold)
         changed = tests.decreased + tests.increased
 
@@ -204,19 +254,19 @@ def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
         else:
             unchanged_length_count = 0
 
-    log('')
-    return report_results("Performance: -" + opt_level, None, None,
-                          threshold * 1.4, output_file, *results)
+    log("")
+    return report_results(
+        "Performance: -" + opt_level, None, None, threshold * 1.4, output_file, *results
+    )
 
 
 def report_code_size(opt_level, old_dir, new_dir, platform, output_file):
-    if opt_level == 'swiftlibs':
-        files = glob.glob(os.path.join(old_dir, 'lib', 'swift', platform,
-                                       '*.dylib'))
+    if opt_level == "swiftlibs":
+        files = glob.glob(os.path.join(old_dir, "lib", "swift", platform, "*.dylib"))
     else:
-        files = glob.glob(os.path.join(old_dir,
-                                       opt_level + '-*' + platform + '*',
-                                       '*.o'))
+        files = glob.glob(
+            os.path.join(old_dir, opt_level + "-*" + platform + "*", "*.o")
+        )
 
     idx = 1
     old_lines = ""
@@ -229,37 +279,44 @@ def report_code_size(opt_level, old_dir, new_dir, platform, output_file):
             bname = os.path.basename(oldfile)
 
             def result_line(value):
-                v = ',' + str(value)
-                return (str(idx) + ',' + bname + ',1' + (v * 3) +
-                        ',0' + v + '\n')
+                v = "," + str(value)
+                return str(idx) + "," + bname + ",1" + (v * 3) + ",0" + v + "\n"
 
             old_lines += result_line(oldsize)
             new_lines += result_line(newsize)
             idx += 1
 
-    return report_results("Code size: -" + opt_level,
-                          old_lines, new_lines, 0.01, output_file)
+    return report_results(
+        "Code size: -" + opt_level, old_lines, new_lines, 0.01, output_file
+    )
 
 
 def get_codesize(filename):
-    output = subprocess.check_output(['size', filename]).splitlines()
+    output = subprocess.check_output(["size", filename]).splitlines()
     header_line = output[0]
     data_line = output[1]
-    if header_line.find('__TEXT') != 0:
-        sys.exit('unexpected output from size command:\n' + output)
-    return int(data_line.split('\t')[0])
+    if header_line.find("__TEXT") != 0:
+        sys.exit("unexpected output from size command:\n" + output)
+    return int(data_line.split("\t")[0])
 
 
-def report_results(title, old_lines, new_lines, threshold, output_file,
-                   old_results=None, new_results=None):
+def report_results(
+    title,
+    old_lines,
+    new_lines,
+    threshold,
+    output_file,
+    old_results=None,
+    new_results=None,
+):
     old_results = old_results or LogParser.results_from_string(old_lines)
     new_results = new_results or LogParser.results_from_string(new_lines)
 
     print("------- " + title + " -------")
-    print(create_report(old_results, new_results, threshold, 'git'))
+    print(create_report(old_results, new_results, threshold, "git"))
 
     if output_file:
-        report = create_report(old_results, new_results, threshold, 'markdown')
+        report = create_report(old_results, new_results, threshold, "markdown")
         if report != "":
             output_file.write("### " + title + "\n")
             output_file.write(report)
@@ -289,17 +346,19 @@ performance team (@eeckstein).
   <summary><strong>Hardware Overview</strong></summary>
 
 """
-    po = subprocess.check_output(['system_profiler', 'SPHardwareDataType'])
+    po = subprocess.check_output(["system_profiler", "SPHardwareDataType"])
     for line in po.splitlines():
-        selection = ['Model Name',
-                     'Model Identifier',
-                     'Processor Name',
-                     'Processor Speed',
-                     'Number of Processors',
-                     'Total Number of Cores',
-                     'L2 Cache',
-                     'L3 Cache',
-                     'Memory:']
+        selection = [
+            "Model Name",
+            "Model Identifier",
+            "Processor Name",
+            "Processor Speed",
+            "Number of Processors",
+            "Total Number of Cores",
+            "L2 Cache",
+            "L3 Cache",
+            "Memory:",
+        ]
 
         if any(s in line for s in selection):
             text += line + "\n"
@@ -320,5 +379,5 @@ def check_added(args, output_file=None):
     doctor.check()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
