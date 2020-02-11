@@ -1073,7 +1073,21 @@ void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
     CurrentIGMPtr IGM = getGenModule(prop.getDecl()->getInnermostDeclContext());
     IGM->emitSILProperty(&prop);
   }
-  
+
+  // Emit differentiability witnesses.
+  for (auto &dw :
+           PrimaryIGM->getSILModule().getDifferentiabilityWitnessList()) {
+    // Emit into same IRGenModule as the original function.
+    // NOTE(TF-894): Investigate whether `getGenModule(dw.getVJP())` is
+    // significant/desirable; `getGenModule` seems relevant for multi-threaded
+    // compilation. When the differentiation transform canonicalizes all
+    // differentiability witnesses to have JVP/VJP functions, we can assert
+    // that JVP/VJP functions exist and use `getGenModule(dw.getVJP())`.
+    CurrentIGMPtr IGM = getGenModule(dw.getOriginalFunction());
+
+    IGM->emitSILDifferentiabilityWitness(&dw);
+  }
+
   // Emit code coverage mapping data.
   PrimaryIGM->emitCoverageMapping();
 
@@ -4497,6 +4511,13 @@ IRGenModule::getAddrOfWitnessTablePattern(const NormalProtocolConformance *conf,
   IRGen.addLazyWitnessTable(conf);
 
   auto entity = LinkEntity::forProtocolWitnessTablePattern(conf);
+  return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
+}
+
+/// Look up the address of a differentiability witness.
+llvm::Constant *IRGenModule::getAddrOfDifferentiabilityWitness(
+    const SILDifferentiabilityWitness *witness, ConstantInit definition) {
+  auto entity = LinkEntity::forDifferentiabilityWitness(witness);
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
 

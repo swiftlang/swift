@@ -73,13 +73,12 @@ public func _stdlib_thread_barrier_init(
   // WASI environment has a only single thread
 #else
   barrier.pointee.mutex = UnsafeMutablePointer.allocate(capacity: 1)
-  if pthread_mutex_init(barrier.pointee.mutex!, nil) != 0 {
-    // FIXME: leaking memory.
-    return -1
-  }
   barrier.pointee.cond = UnsafeMutablePointer.allocate(capacity: 1)
-  if pthread_cond_init(barrier.pointee.cond!, nil) != 0 {
-    // FIXME: leaking memory, leaking a mutex.
+  guard _stdlib_thread_barrier_mutex_and_cond_init(barrier) == 0 else {
+    barrier.pointee.mutex!.deinitialize(count: 1)
+    barrier.pointee.mutex!.deallocate()
+    barrier.pointee.cond!.deinitialize(count: 1)
+    barrier.pointee.cond!.deallocate()
     return -1
   }
 #endif
@@ -102,20 +101,16 @@ private func _stdlib_thread_barrier_mutex_and_cond_init(_ barrier: UnsafeMutable
 
 public func _stdlib_thread_barrier_destroy(
   _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>
-) -> CInt {
+) {
 #if os(Windows)
   // Condition Variables do not need to be explicitly destroyed
   // Mutexes do not need to be explicitly destroyed
 #elseif os(WASI)
   // WASI environment has a only single thread
 #else
-  if pthread_cond_destroy(barrier.pointee.cond!) != 0 {
-    // FIXME: leaking memory, leaking a mutex.
-    return -1
-  }
-  if pthread_mutex_destroy(barrier.pointee.mutex!) != 0 {
-    // FIXME: leaking memory.
-    return -1
+  guard pthread_cond_destroy(barrier.pointee.cond!) == 0 &&
+    pthread_mutex_destroy(barrier.pointee.mutex!) == 0 else {
+    fatalError("_stdlib_thread_barrier_destroy() failed")
   }
 #endif
 
@@ -127,7 +122,7 @@ public func _stdlib_thread_barrier_destroy(
   barrier.pointee.mutex!.deallocate()
 #endif
 
-  return 0
+  return
 }
 
 public func _stdlib_thread_barrier_wait(

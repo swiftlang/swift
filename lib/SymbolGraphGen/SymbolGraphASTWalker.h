@@ -27,7 +27,6 @@ class ValueDecl;
 
 namespace symbolgraphgen {
 
-struct SymbolIdentifier;
 struct SymbolGraph;
 struct SymbolGraphOptions;
 
@@ -49,9 +48,6 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   /// A context for allocations.
   markup::MarkupContext Ctx;
 
-  /// A cache of identifiers for declarations that may be seen more than once.
-  llvm::DenseMap<const Decl *, SymbolIdentifier> SymbolIdentifierCache;
-
   /// A cache of USRs for declarations.
   llvm::DenseMap<const ValueDecl *, StringRef> USRCache;
 
@@ -72,8 +68,8 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   /// Get the USR of a declaration and add it to the local allocator.
   StringRef getUSR(const ValueDecl *VD);
 
-  /// Returns a `SymbolIdentifier` for a given declaration.
-  SymbolIdentifier getSymbolIdentifier(const ValueDecl *VD);
+  /// Returns an array of path components for a declaration.
+  void getPathComponents(const ValueDecl *VD, SmallVectorImpl<SmallString<32>> &Components);
 
   // MARK: - Declaration Fragments
 

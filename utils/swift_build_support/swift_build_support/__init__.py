@@ -14,14 +14,3 @@
 # utils/swift_build_support/ directory as a module.
 #
 # ----------------------------------------------------------------------------
-
-__all__ = [
-    "cmake",
-    "debug",
-    "diagnostics",
-    "host_specific_configuration",
-    "tar",
-    "targets",
-    "toolchain",
-    "xcrun",
-]

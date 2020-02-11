@@ -106,8 +106,8 @@ func testMutating(_ x: Mutating, _ y: inout Mutating) {
   _ = x()
   // expected-error @+1 {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
   _ = x.callAsFunction()
-  _ = y()
-  _ = y.callAsFunction()
+  y()
+  y.callAsFunction()
 }
 
 struct Inout {
@@ -185,8 +185,8 @@ func testIUO(a: SimpleCallable!, b: MultipleArgsCallable!, c: Extended!,
   _ = d()?.callAsFunction()?()
   _ = e()
   _ = e(1, 2, 3)
-  _ = f()
-  _ = g(&inoutInt)
+  f()
+  g(&inoutInt)
   _ = try? h()
   _ = try? h { throw DummyError() }
 }

@@ -41,6 +41,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
@@ -68,6 +69,10 @@ using namespace swift::serialization;
 using namespace llvm::support;
 using swift::version::Version;
 using llvm::BCBlockRAII;
+
+ASTContext &SerializerBase::getASTContext() {
+  return M->getASTContext();
+}
 
 /// Used for static_assert.
 static constexpr bool declIDFitsIn32Bits() {
@@ -585,6 +590,29 @@ serialization::TypeID Serializer::addTypeRef(Type ty) {
   return TypesToSerialize.addRef(ty);
 }
 
+serialization::ClangTypeID Serializer::addClangTypeRef(const clang::Type *ty) {
+  if (!ty) return 0;
+
+  // Try to serialize the non-canonical type, but fall back to the
+  // canonical type if necessary.
+  auto loader = getASTContext().getClangModuleLoader();
+  bool isSerializable;
+  if (loader->isSerializable(ty, false)) {
+    isSerializable = true;
+  } else if (!ty->isCanonicalUnqualified()) {
+    ty = ty->getCanonicalTypeInternal().getTypePtr();
+    isSerializable = loader->isSerializable(ty, false);
+  } else {
+    isSerializable = false;
+  }
+  if (!isSerializable) {
+    PrettyStackTraceClangType trace("staging a serialized reference to", ty);
+    llvm::report_fatal_error("Clang function type is not serializable");
+  }
+
+  return ClangTypesToSerialize.addRef(ty);
+}
+
 IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
   switch (ident.getKind()) {
   case DeclBaseName::Kind::Normal: {
@@ -745,6 +773,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, LOCAL_DECL_CONTEXT_OFFSETS);
   BLOCK_RECORD(index_block, GENERIC_SIGNATURE_OFFSETS);
   BLOCK_RECORD(index_block, SUBSTITUTION_MAP_OFFSETS);
+  BLOCK_RECORD(index_block, CLANG_TYPE_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
   BLOCK_RECORD(index_block, NORMAL_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
@@ -1515,6 +1544,25 @@ getStableCtorInitializerKind(swift::CtorInitializerKind K){
   }
 
   llvm_unreachable("Unhandled CtorInitializerKind in switch.");
+}
+
+static serialization::ClangDeclPathComponentKind
+getStableClangDeclPathComponentKind(
+                   StableSerializationPath::ExternalPath::ComponentKind kind) {
+  switch (kind) {
+#define CASE(ID) \
+  case StableSerializationPath::ExternalPath::ID: \
+    return serialization::ClangDeclPathComponentKind::ID;
+  CASE(Record)
+  CASE(Enum)
+  CASE(Namespace)
+  CASE(Typedef)
+  CASE(TypedefAnonDecl)
+  CASE(ObjCInterface)
+  CASE(ObjCProtocol)
+#undef CASE
+  }
+  llvm_unreachable("bad kind");
 }
 
 void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
@@ -3255,6 +3303,7 @@ public:
                           var->isGetterMutating(),
                           var->isSetterMutating(),
                           var->isLazyStorageProperty(),
+                          var->isTopLevelGlobal(),
                           S.addDeclRef(lazyStorage),
                           accessors.OpaqueReadOwnership,
                           accessors.ReadImpl,
@@ -4031,11 +4080,14 @@ public:
   void visitFunctionType(const FunctionType *fnTy) {
     using namespace decls_block;
 
-    // FIXME: [clang-function-type-serialization] Serialize the clang type here
+    auto resultType = S.addTypeRef(fnTy->getResult());
+    auto clangType = S.addClangTypeRef(fnTy->getClangFunctionType());
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-        S.addTypeRef(fnTy->getResult()),
+        resultType,
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
+        clangType,
         fnTy->isNoEscape(),
         fnTy->throws(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()));
@@ -4107,7 +4159,9 @@ public:
       variableData.push_back(TypeID(conv));
     }
 
-    auto sig = fnTy->getSubstGenericSignature();
+    auto sigID = S.addGenericSignatureRef(fnTy->getSubstGenericSignature());
+    auto substMapID = S.addSubstitutionMapRef(fnTy->getSubstitutions());
+    auto clangTypeID = S.addClangTypeRef(fnTy->getClangFunctionType());
 
     auto stableCoroutineKind =
       getRawStableSILCoroutineKind(fnTy->getCoroutineKind());
@@ -4126,9 +4180,7 @@ public:
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
         fnTy->isGenericSignatureImplied(),
-        S.addGenericSignatureRef(sig),
-        S.addSubstitutionMapRef(fnTy->getSubstitutions()),
-        variableData);
+        sigID, substMapID, clangTypeID, variableData);
 
     if (auto conformance = fnTy->getWitnessMethodConformanceOrInvalid())
       S.writeConformance(conformance, S.DeclTypeAbbrCodes);
@@ -4220,6 +4272,96 @@ void Serializer::writeASTBlockEntity(Type ty) {
   TypeSerializer(*this).visit(ty);
 }
 
+namespace {
+class ClangToSwiftBasicWriter :
+    public swift::DataStreamBasicWriter<ClangToSwiftBasicWriter> {
+
+  Serializer &S;
+  SmallVectorImpl<uint64_t> &Record;
+  using TypeWriter = 
+    clang::serialization::AbstractTypeWriter<ClangToSwiftBasicWriter>;
+  TypeWriter Types;
+
+  ClangModuleLoader *getClangLoader() {
+    return S.getASTContext().getClangModuleLoader();
+  }
+
+public:
+  ClangToSwiftBasicWriter(Serializer &S, SmallVectorImpl<uint64_t> &record)
+    : S(S), Record(record), Types(*this) {}
+
+  void writeUInt64(uint64_t value) {
+    Record.push_back(value);
+  }
+
+  void writeIdentifier(const clang::IdentifierInfo *value) {
+    IdentifierID id = 0;
+    if (value) {
+      id = S.addDeclBaseNameRef(
+               S.getASTContext().getIdentifier(value->getName()));
+    }
+    Record.push_back(id);
+  }
+
+  void writeStmtRef(const clang::Stmt *stmt) {
+    // The deserializer should always read null, and isSerializable
+    // should be checking that we don't see a non-null statement here.
+    if (stmt) {
+      llvm::report_fatal_error("serializing a non-null Clang statement or"
+                               " expression reference");
+    }
+  }
+
+  void writeDeclRef(const clang::Decl *decl) {
+    if (!decl) {
+      Record.push_back(/*no declaration*/ 0);
+      return;
+    }
+
+    auto path = getClangLoader()->findStableSerializationPath(decl);
+    if (!path) {
+      decl->dump(llvm::errs());
+      llvm::report_fatal_error("failed to find a stable Swift serialization"
+                               " path for the above Clang declaration");
+    }
+
+    if (path.isSwiftDecl()) {
+      Record.push_back(/*swift declaration*/ 1);
+      Record.push_back(S.addDeclRef(path.getSwiftDecl()));
+      return;
+    }
+
+    assert(path.isExternalPath());
+    auto &ext = path.getExternalPath();
+    Record.push_back(/*external path*/ 2);
+    Record.push_back(ext.Path.size());
+    for (auto &elt : ext.Path) {
+      auto kind = elt.first;
+      auto stableKind = unsigned(getStableClangDeclPathComponentKind(kind));
+      Record.push_back(stableKind);
+      if (ext.requiresIdentifier(kind))
+        Record.push_back(S.addDeclBaseNameRef(elt.second));
+    }
+  }
+};
+
+}
+
+void Serializer::writeASTBlockEntity(const clang::Type *ty) {
+  using namespace decls_block;
+  PrettyStackTraceClangType traceRAII("serializing clang type", ty);
+  assert(ClangTypesToSerialize.hasRef(ty));
+
+  // Serialize the type as an opaque sequence of data.
+  SmallVector<uint64_t, 16> typeData;
+  ClangToSwiftBasicWriter(*this, typeData).writeTypeRef(ty);
+
+  // Write that in an opaque record.
+  unsigned abbrCode = DeclTypeAbbrCodes[ClangTypeLayout::Code];
+  ClangTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                              typeData);
+}
+
 template <typename SpecificASTBlockRecordKeeper>
 bool Serializer::writeASTBlockEntitiesIfNeeded(
     SpecificASTBlockRecordKeeper &entities) {
@@ -4261,6 +4403,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
+
+  registerDeclTypeAbbr<ClangTypeLayout>();
 
   registerDeclTypeAbbr<TypeAliasLayout>();
   registerDeclTypeAbbr<GenericTypeParamTypeLayout>();
@@ -4346,6 +4490,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
     wroteSomething |= writeASTBlockEntitiesIfNeeded(DeclsToSerialize);
     wroteSomething |= writeASTBlockEntitiesIfNeeded(TypesToSerialize);
+    wroteSomething |= writeASTBlockEntitiesIfNeeded(ClangTypesToSerialize);
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(LocalDeclContextsToSerialize);
     wroteSomething |=
@@ -4803,6 +4948,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     index_block::OffsetsLayout Offsets(Out);
     writeOffsets(Offsets, DeclsToSerialize);
     writeOffsets(Offsets, TypesToSerialize);
+    writeOffsets(Offsets, ClangTypesToSerialize);
     writeOffsets(Offsets, LocalDeclContextsToSerialize);
     writeOffsets(Offsets, GenericSignaturesToSerialize);
     writeOffsets(Offsets, SubstitutionMapsToSerialize);

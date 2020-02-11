@@ -21,7 +21,7 @@
 :: The user will need permission to write files into the Windows SDK and the
 :: VisualC++ folder.
 
-@echo off
+:: @echo off
 
 setlocal enableextensions enabledelayedexpansion
 
@@ -45,9 +45,9 @@ mkdir %full_build_root%
 
 :: Use the shortest path we can for the build directory, to avoid Windows
 :: path problems as much as we can.
-subst S: /d
-subst S: %full_build_root% %exitOnError%
-set build_root=S:
+subst T: /d
+subst T: %full_build_root% %exitOnError%
+set build_root=T:
 set install_directory=%build_root%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr
 
 call :clone_repositories %exitOnError%
@@ -67,7 +67,7 @@ call :build_lldb %exitOnError%
 
 call :build_libdispatch %exitOnError%
 
-path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;C:\Program Files\Git\usr\bin
 call :test_swift %exitOnError%
 call :test_libdispatch %exitOnError%
 
@@ -80,7 +80,10 @@ endlocal
 :: It supposes the %CD% is the source root.
 setlocal enableextensions enabledelayedexpansion
 
-git config --global core.autocrlf false
+git -C "%source_root%\swift" config --local core.autocrlf input
+git -C "%source_root%\swift" config --local core.symlink true
+git -C "%source_root%\swift" checkout-index --force --all
+
 git clone --depth 1 --single-branch https://github.com/apple/swift-cmark cmark %exitOnError%
 git clone --depth 1 --single-branch --branch swift/master https://github.com/apple/llvm-project llvm-project %exitOnError%
 mklink /D "%source_root%\clang" "%source_root%\llvm-project\clang"
@@ -104,7 +107,7 @@ set file_name=icu4c-%icu_version%-Win64-MSVC2017.zip
 curl -L -O "https://github.com/unicode-org/icu/releases/download/release-%icu_version_dashed%/%file_name%" %exitOnError%
 :: unzip warns about the paths in the zip using slashes, which raises the
 :: errorLevel to 1. We cannot use exitOnError, and have to ignore errors.
-unzip -o %file_name% -d "%source_root%\icu-%icu_version%"
+"C:\Program Files\Git\usr\bin\unzip.exe" -o %file_name% -d "%source_root%\icu-%icu_version%"
 exit /b 0
 
 goto :eof
@@ -118,7 +121,7 @@ setlocal enableextensions enabledelayedexpansion
 
 set file_name=sqlite-amalgamation-3270200.zip
 curl -L -O "https://www.sqlite.org/2019/%file_name%" %exitOnError%
-unzip -o %file_name% %exitOnError%
+"C:\Program Files\Git\usr\bin\unzip.exe" -o %file_name% %exitOnError%
 
 goto :eof
 endlocal
@@ -143,10 +146,8 @@ endlocal
 :: Configures, builds, and installs LLVM
 setlocal enableextensions enabledelayedexpansion
 
-mkdir "%build_root%\llvm" %exitOnError%
-pushd "%build_root%\llvm"
-
-cmake "%source_root%\llvm"^
+cmake^
+    -B "%build_root%\llvm"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
@@ -172,9 +173,8 @@ cmake "%source_root%\llvm"^
     -DCLANG_TOOLS="clang;clang-format;clang-headers;clang-tidy"^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
-    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO %exitOnError%
-
-popd
+    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
+    -S "%source_root%\llvm" %exitOnError%
 
 cmake --build "%build_root%\llvm" %exitOnError%
 cmake --build "%build_root%\llvm" --target install %exitOnError%
@@ -187,19 +187,16 @@ endlocal
 :: Configures and builds CMark
 setlocal enableextensions enabledelayedexpansion
 
-mkdir "%build_root%\cmark" %exitOnError%
-pushd "%build_root%\cmark"
-
-cmake "%source_root%\cmark"^
+cmake^
+    -B "%build_root%\cmark"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
-    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO %exitOnError%
-
-popd
+    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
+    -S "%source_root%\cmark" %exitOnError%
 
 cmake --build "%build_root%\cmark" %exitOnError%
 
@@ -211,12 +208,10 @@ endlocal
 :: Configures, builds, and installs Swift and the Swift Standard Library
 setlocal enableextensions enabledelayedexpansion
 
-mkdir "%build_root%\swift" %exitOnError%
-pushd "%build_root%\swift"
-
 :: SWIFT_PARALLEL_LINK_JOBS=8 allows the build machine to use as many CPU as
 :: possible, while not exhausting the RAM.
-cmake "%source_root%\swift"^
+cmake^
+    -B "%build_root%\swift"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
@@ -244,9 +239,8 @@ cmake "%source_root%\swift"^
     -DPYTHON_EXECUTABLE:PATH=%PYTHON_HOME%\python.exe^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
-    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO %exitOnError%
-
-popd
+    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
+    -S "%source_root%\swift" %exitOnError%
 
 cmake --build "%build_root%\swift" %exitOnError%
 cmake --build "%build_root%\swift" --target install %exitOnError%
@@ -269,10 +263,8 @@ endlocal
 :: Configures, builds, and installs LLDB
 setlocal enableextensions enabledelayedexpansion
 
-mkdir "%build_root%\lldb" %exitOnError%
-pushd "%build_root%\lldb"
-
-cmake "%source_root%\lldb"^
+cmake^
+    -B "%build_root%\lldb"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=clang-cl^
@@ -287,9 +279,9 @@ cmake "%source_root%\lldb"^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
-    -DLLDB_INCLUDE_TESTS:BOOL=NO %exitOnError%
-
-popd
+    -DLLDB_DISABLE_PYTHON=YES^
+    -DLLDB_INCLUDE_TESTS:BOOL=NO^
+    -S "%source_root%\lldb" %exitOnError%
 
 cmake --build "%build_root%\lldb" %exitOnError%
 cmake --build "%build_root%\lldb" --target install %exitOnError%
@@ -302,10 +294,8 @@ endlocal
 :: Configures, builds, and installs Dispatch
 setlocal enableextensions enabledelayedexpansion
 
-mkdir "%build_root%\swift-corelibs-libdispatch" %exitOnError%
-pushd "%build_root%\swift-corelibs-libdispatch"
-
-cmake "%source_root%\swift-corelibs-libdispatch"^
+cmake^
+    -B "%build_root%\swift-corelibs-libdispatch"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=clang-cl^
@@ -323,10 +313,8 @@ cmake "%source_root%\swift-corelibs-libdispatch"^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
     -DCMAKE_Swift_COMPILER_TARGET:STRING=x86_64-unknown-windows-msvc^
     -DCMAKE_Swift_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\""^
-    -DCMAKE_Swift_LINK_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\"" %exitOnError%
-
-
-popd
+    -DCMAKE_Swift_LINK_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\""^
+    -S "%source_root%\swift-corelibs-libdispatch" %exitOnError%
 
 cmake --build "%build_root%\swift-corelibs-libdispatch" %exitOnError%
 cmake --build "%build_root%\swift-corelibs-libdispatch" --target install %exitOnError%

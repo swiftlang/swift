@@ -26,6 +26,7 @@ add_swift_host_library(swiftSIL STATIC
   SILDebugScope.cpp
   SILDeclRef.cpp
   SILDefaultWitnessTable.cpp
+  SILDifferentiabilityWitness.cpp
   SILFunction.cpp
   SILFunctionType.cpp
   SILGlobalVariable.cpp

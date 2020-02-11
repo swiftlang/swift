@@ -25,7 +25,7 @@ func fT<T>(_ t: T) { }
 func testPassExistential(_ p: P, op: OP, opp: OP & P, cp: CP, sp: SP, any: Any, ao: AnyObject) {
   fP(p) // expected-error{{value of protocol type 'P' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
   fAO(p) // expected-error{{global function 'fAO' requires that 'P' be a class type}}
-  fAOE(p) // expected-error{{argument type 'P' does not conform to expected type 'AnyObject'}}
+  fAOE(p) // expected-error{{argument type 'P' expected to be an instance of a class or class-constrained type}}
   fT(p)
 
   fOP(op)
