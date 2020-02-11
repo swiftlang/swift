@@ -834,7 +834,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             bool CodeCompletionComments) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
-    OnDiskCache = llvm::make_unique<ide::OnDiskCodeCompletionCache>(
+    OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
         options::CompletionCachePath);
   }
   ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
@@ -1043,8 +1043,8 @@ public:
     }
 
     if (Begin) {
-      if (const char *CStr =
-          llvm::sys::Process::OutputColor(Col, false, false)) {
+      if (const char *CStr = llvm::sys::Process::OutputColor(
+              static_cast<char>(Col), false, false)) {
         OS << CStr;
       }
     } else {
@@ -1596,8 +1596,8 @@ private:
       Col = llvm::raw_ostream::CYAN; break;
     }
 
-    if (const char *CStr =
-        llvm::sys::Process::OutputColor(Col, false, false)) {
+    if (const char *CStr = llvm::sys::Process::OutputColor(
+            static_cast<char>(Col), false, false)) {
       OS << CStr;
     }
     OS << Text;

@@ -98,7 +98,7 @@ func almostSubscriptable(as1 as1: AlmostSubscriptable, a: A) {
   as1.objectForKeyedSubscript(a)
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir13protocolTypes1a1bySo7NSMinceC_So9NSRuncing_ptF"(%TSo7NSMinceC*, %objc_object*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir13protocolTypes1a1bySo7NSMinceC_So9NSRuncing_ptF"(%TSo7NSMinceC* %0, %objc_object* %1) {{.*}} {
 func protocolTypes(a a: NSMince, b: NSRuncing) {
   // - (void)eatWith:(id <NSRuncing>)runcer;
   a.eat(with: b)
@@ -106,7 +106,7 @@ func protocolTypes(a a: NSMince, b: NSRuncing) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OPAQUE:%.*]]*, i8*, i8*)*)([[OPAQUE:%.*]]* {{%.*}}, i8* [[SEL]], i8* {{%.*}})
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir6getset1pySo8FooProto_p_tF"(%objc_object*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir6getset1pySo8FooProto_p_tF"(%objc_object* %0) {{.*}} {
 func getset(p p: FooProto) {
   // CHECK: load i8*, i8** @"\01L_selector(bar)"
   // CHECK: load i8*, i8** @"\01L_selector(setBar:)"
@@ -114,7 +114,7 @@ func getset(p p: FooProto) {
   p.bar = prop
 }
 
-// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir16protocolMetatype1pSo8FooProto_pXpSoAD_p_tF"(%objc_object*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir16protocolMetatype1pSo8FooProto_pXpSoAD_p_tF"(%objc_object* %0) {{.*}} {
 func protocolMetatype(p: FooProto) -> FooProto.Type {
   // CHECK: = call %swift.type* @swift_getObjectType(%objc_object* %0)
   // CHECK-NOT: {{retain|release}}
@@ -131,7 +131,7 @@ class Impl: FooProto, AnotherProto {
   @objc var bar: Int32 = 0
 }
 
-// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir27protocolCompositionMetatype1pSo12AnotherProto_So03FooG0pXpAA4ImplC_tF"(%T7objc_ir4ImplC*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir27protocolCompositionMetatype1pSo12AnotherProto_So03FooG0pXpAA4ImplC_tF"(%T7objc_ir4ImplC* %0) {{.*}} {
 func protocolCompositionMetatype(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: = getelementptr inbounds %T7objc_ir4ImplC, %T7objc_ir4ImplC* %0, i32 0, i32 0, i32 0
   // CHECK-NOT: {{retain|release}}
@@ -144,7 +144,7 @@ func protocolCompositionMetatype(p: Impl) -> (FooProto & AnotherProto).Type {
   return type
 } // CHECK: }
 
-// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir28protocolCompositionMetatype21pSo12AnotherProto_So03FooG0pXpAA4ImplC_tF"(%T7objc_ir4ImplC*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir28protocolCompositionMetatype21pSo12AnotherProto_So03FooG0pXpAA4ImplC_tF"(%T7objc_ir4ImplC* %0) {{.*}} {
 func protocolCompositionMetatype2(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: = getelementptr inbounds %T7objc_ir4ImplC, %T7objc_ir4ImplC* %0, i32 0, i32 0, i32 0
   // CHECK-NOT: {{retain|release}}
@@ -157,7 +157,7 @@ func protocolCompositionMetatype2(p: Impl) -> (FooProto & AnotherProto).Type {
   return type
 } // CHECK: }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir17pointerPropertiesyySo14PointerWrapperCF"(%TSo14PointerWrapperC*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir17pointerPropertiesyySo14PointerWrapperCF"(%TSo14PointerWrapperC* %0) {{.*}} {
 func pointerProperties(_ obj: PointerWrapper) {
   // CHECK: load i8*, i8** @"\01L_selector(setVoidPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIntPtr:)"
@@ -167,7 +167,7 @@ func pointerProperties(_ obj: PointerWrapper) {
   obj.idPtr = nil as AutoreleasingUnsafeMutablePointer?
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir16strangeSelectorsyySo13SwiftNameTestCF"(%TSo13SwiftNameTestC*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir16strangeSelectorsyySo13SwiftNameTestCF"(%TSo13SwiftNameTestC* %0) {{.*}} {
 func strangeSelectors(_ obj: SwiftNameTest) {
   // CHECK: load i8*, i8** @"\01L_selector(:b:)"
   obj.empty(a: 0, b: 0)

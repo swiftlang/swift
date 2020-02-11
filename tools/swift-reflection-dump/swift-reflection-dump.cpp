@@ -565,7 +565,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
     const ObjectFile *O = dyn_cast<ObjectFile>(BinaryFile);
     if (!O) {
       auto Universal = cast<MachOUniversalBinary>(BinaryFile);
-      ObjectOwner = unwrap(Universal->getObjectForArch(Arch));
+      ObjectOwner = unwrap(Universal->getMachOObjectForArch(Arch));
       O = ObjectOwner.get();
     }
 

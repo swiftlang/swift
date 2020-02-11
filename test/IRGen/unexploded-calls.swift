@@ -17,7 +17,7 @@ public func g(_ s : S) {
   return f(s)
 }
 
-// CHECK: define {{.*}}swiftcc void @"$ss1gyySo1SVF"(float, float) {{.*}}{
+// CHECK: define {{.*}}swiftcc void @"$ss1gyySo1SVF"(float %0, float %1) {{.*}}{
 // CHECK: entry:
 // CHECK:   alloca
 // CHECK:   [[ALLOCA:%[-._0-9a-zA-Z]+]] = alloca %TSo1SV, align 4

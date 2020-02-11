@@ -83,7 +83,7 @@ BuiltinUnit::LookupCache &BuiltinUnit::getCache() const {
   // FIXME: This leaks. Sticking this into ASTContext isn't enough because then
   // the DenseMap will leak.
   if (!Cache)
-    const_cast<BuiltinUnit *>(this)->Cache = llvm::make_unique<LookupCache>();
+    const_cast<BuiltinUnit *>(this)->Cache = std::make_unique<LookupCache>();
   return *Cache;
 }
 
@@ -192,7 +192,7 @@ public:
 SourceLookupCache &SourceFile::getCache() const {
   if (!Cache) {
     const_cast<SourceFile *>(this)->Cache =
-        llvm::make_unique<SourceLookupCache>(*this);
+        std::make_unique<SourceLookupCache>(*this);
   }
   return *Cache;
 }
@@ -435,7 +435,7 @@ void ModuleDecl::removeFile(FileUnit &existingFile) {
 SourceLookupCache &ModuleDecl::getSourceLookupCache() const {
   if (!Cache) {
     const_cast<ModuleDecl *>(this)->Cache =
-        llvm::make_unique<SourceLookupCache>(*this);
+        std::make_unique<SourceLookupCache>(*this);
   }
   return *Cache;
 }
