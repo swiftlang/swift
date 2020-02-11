@@ -48,7 +48,7 @@ bb0(%0 : $ObjCClass):
   return %0 : $ObjCClass
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @indirect_partial_apply(i8*, %swift.refcounted*, i64) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @indirect_partial_apply(i8* %0, %swift.refcounted* %1, i64 %2) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[T0:%.*]] = bitcast i8* %0 to void (i64, %swift.refcounted*)*
 // CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata, i32 0, i32 2), i64 40, i64 7)
@@ -63,7 +63,7 @@ bb0(%0 : $ObjCClass):
 // CHECK:   [[RET:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* [[INDIRECT_PARTIAL_APPLY_STUB:@"\$sTA[A-Za-z0-9_]*"]] to i8*), %swift.refcounted* undef }, %swift.refcounted* [[OBJ]], 1
 // CHECK:   ret { i8*, %swift.refcounted* } [[RET]]
 // CHECK: }
-// CHECK: define internal swiftcc void [[INDIRECT_PARTIAL_APPLY_STUB]](%swift.refcounted* swiftself) {{.*}} {
+// CHECK: define internal swiftcc void [[INDIRECT_PARTIAL_APPLY_STUB]](%swift.refcounted* swiftself %0) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* %0 to [[DATA_TYPE]]
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]], [[DATA_TYPE]]* %1, i32 0, i32 1
@@ -83,7 +83,7 @@ entry(%f : $@callee_owned (Builtin.Word) -> (), %x : $Builtin.Word):
   return %p : $@callee_owned () -> ()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @objc_partial_apply(%T18partial_apply_objc9ObjCClassC*) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @objc_partial_apply(%T18partial_apply_objc9ObjCClassC* %0) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata.2, i32 0, i32 2), i64 24, i64 7)
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* [[OBJ]] to [[DATA_TYPE:<{ %swift.refcounted, %T18partial_apply_objc9ObjCClassC\* }>]]*
@@ -92,7 +92,7 @@ entry(%f : $@callee_owned (Builtin.Word) -> (), %x : $Builtin.Word):
 // CHECK:   [[RET:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (i64, %swift.refcounted*)* [[OBJC_PARTIAL_APPLY_STUB:@"\$sTa[A-Za-z0-9_]*"]] to i8*), %swift.refcounted* undef }, %swift.refcounted* [[OBJ]], 1
 // CHECK:   ret { i8*, %swift.refcounted* } [[RET]]
 // CHECK: }
-// CHECK: define internal swiftcc void [[OBJC_PARTIAL_APPLY_STUB]](i64, %swift.refcounted* swiftself) {{.*}} {
+// CHECK: define internal swiftcc void [[OBJC_PARTIAL_APPLY_STUB]](i64 %0, %swift.refcounted* swiftself %1) {{.*}} {
 // CHECK: entry:
 // CHECK-NOT: swift_retain
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* %1 to [[DATA_TYPE]]*
@@ -115,7 +115,7 @@ entry(%c : $ObjCClass):
   return %p : $@callee_owned (Int) -> ()
 }
 
-// CHECK-LABEL: define{{.*}} { i8*, %swift.refcounted* } @objc_partial_apply_indirect_sil_argument(%T18partial_apply_objc9ObjCClassC*) {{.*}}
+// CHECK-LABEL: define{{.*}} { i8*, %swift.refcounted* } @objc_partial_apply_indirect_sil_argument(%T18partial_apply_objc9ObjCClassC* %0) {{.*}}
 // CHECK:  [[CTX:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK:  [[CTX_ADDR:%.*]] = bitcast %swift.refcounted* [[CTX]] to [[CTXTYPE:<{ %swift.refcounted, %T18partial_apply_objc9ObjCClassC\* }>]]*
 // CHECK:  [[SELF_ADDR:%.*]] = getelementptr inbounds [[CTXTYPE]], [[CTXTYPE]]* [[CTX_ADDR]], i32 0, i32 1
@@ -123,7 +123,7 @@ entry(%c : $ObjCClass):
 // CHECK:  [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (double, double, double, double, %swift.refcounted*)* [[OBJC_PARTIAL_APPLY_STUB2:@"\$sTa[A-Za-z0-9_.]*"]] to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CTX]], 1
 // CHECK:  ret { i8*, %swift.refcounted* } [[CLOSURE]]
 // CHECK:}
-// CHECK: define internal swiftcc void [[OBJC_PARTIAL_APPLY_STUB2]](double, double, double, double, %swift.refcounted*
+// CHECK: define internal swiftcc void [[OBJC_PARTIAL_APPLY_STUB2]](double %0, double %1, double %2, double %3, %swift.refcounted*
 // CHECK:  [[TMP:%.*]] = alloca %TSo6NSRectV
 // CHECK:  [[ORIGIN:%.*]] = getelementptr inbounds %TSo6NSRectV, %TSo6NSRectV* [[TMP]]
 // CHECK:  [[ORIGINX:%.*]] = getelementptr inbounds %TSo7NSPointV, %TSo7NSPointV* [[ORIGIN]]
@@ -136,10 +136,10 @@ entry(%c : $ObjCClass):
   return %p : $@callee_owned (NSRect) -> ()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @objc_partial_apply_consumes_self(%T18partial_apply_objc9ObjCClassC*) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @objc_partial_apply_consumes_self(%T18partial_apply_objc9ObjCClassC* %0) {{.*}} {
 // CHECK:         bitcast %swift.refcounted* {{%.*}} to [[DATA_TYPE:<{ %swift.refcounted, %T18partial_apply_objc9ObjCClassC\* }>]]*
 // CHECK:         insertvalue {{.*}} [[OBJC_CONSUMES_SELF_PARTIAL_APPLY_STUB:@"\$sTa[A-Za-z0-9_.]*"]]
-// CHECK: define internal swiftcc %T18partial_apply_objc9ObjCClassC* [[OBJC_CONSUMES_SELF_PARTIAL_APPLY_STUB]](%swift.refcounted* swiftself) {{.*}} {
+// CHECK: define internal swiftcc %T18partial_apply_objc9ObjCClassC* [[OBJC_CONSUMES_SELF_PARTIAL_APPLY_STUB]](%swift.refcounted* swiftself %0) {{.*}} {
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* %0 to [[DATA_TYPE]]*
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]], [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
 // CHECK:   [[SELF:%.*]] = load %T18partial_apply_objc9ObjCClassC*, %T18partial_apply_objc9ObjCClassC** [[X_ADDR]], align 8
@@ -167,9 +167,9 @@ entry(%x : $Int):
   return %v : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @dynamic_lookup_br_partial_apply(%objc_object*) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @dynamic_lookup_br_partial_apply(%objc_object* %0) {{.*}} {
 // CHECK:   phi i8* [ bitcast (void (i64)* @dummy to i8*), {{%.*}} ], [ bitcast (void (i64, %swift.refcounted*)* [[DYNAMIC_LOOKUP_BR_PARTIAL_APPLY_STUB:@"\$sTa[A-Za-z0-9_.]*"]] to i8*), {{%.*}} ]
-// CHECK: define internal swiftcc void [[DYNAMIC_LOOKUP_BR_PARTIAL_APPLY_STUB]](i64, %swift.refcounted* swiftself) {{.*}} {
+// CHECK: define internal swiftcc void [[DYNAMIC_LOOKUP_BR_PARTIAL_APPLY_STUB]](i64 %0, %swift.refcounted* swiftself %1) {{.*}} {
 // CHECK:   load i8*, i8** @"\01L_selector(methodWithX:)", align 8
 
 sil @dynamic_lookup_br_partial_apply : $@convention(thin) (Builtin.AnyObject) -> @callee_owned (Int) -> () {
@@ -200,7 +200,7 @@ entry(%c : $Gizmo):
   return %g : $@callee_owned () -> ()
 }
 
-// CHECK: define internal swiftcc void @"$sTa.17"(i64, i64, i64, %swift.refcounted* swiftself)
+// CHECK: define internal swiftcc void @"$sTa.17"(i64 %0, i64 %1, i64 %2, %swift.refcounted* swiftself %3)
 // CHECK: [[TMPCOERCE:%.*]] = alloca { i64, i64, i64 }
 // CHECK: [[INDIRECTTEMP:%.*]] = alloca %TSo3FobV
 // CHECK: [[ADDR:%.*]] = getelementptr inbounds { i64, i64, i64 }, { i64, i64, i64 }* [[TMPCOERCE]], i32 0, i32 0
@@ -240,7 +240,7 @@ entry(%c : $ObjCClass):
   return %p : $@callee_guaranteed (Int) -> ()
 }
 
-// CHECK-LABEL: define {{.*}}swiftcc void @"$sTa.20"(i64, %swift.refcounted* swiftself)
+// CHECK-LABEL: define {{.*}}swiftcc void @"$sTa.20"(i64 %0, %swift.refcounted* swiftself %1)
 // CHECK: entry:
 // CHECK-NOT: retain
 // CHECK-NOT: release
@@ -263,7 +263,7 @@ entry(%c : $Gizmo):
   return %p : $@callee_guaranteed (Fob) -> ()
 }
 
-// CHECK-LABEL: define {{.*}}swiftcc void @"$sTa.23"(i64, i64, i64, %swift.refcounted* swiftself)
+// CHECK-LABEL: define {{.*}}swiftcc void @"$sTa.23"(i64 %0, i64 %1, i64 %2, %swift.refcounted* swiftself %3)
 // CHECK: entry:
 // CHECK-NOT: retain
 // CHECK-NOT: release

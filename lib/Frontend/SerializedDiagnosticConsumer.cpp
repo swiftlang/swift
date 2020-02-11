@@ -238,7 +238,7 @@ private:
 namespace swift {
 namespace serialized_diagnostics {
   std::unique_ptr<DiagnosticConsumer> createConsumer(StringRef outputPath) {
-    return llvm::make_unique<SerializedDiagnosticConsumer>(outputPath);
+    return std::make_unique<SerializedDiagnosticConsumer>(outputPath);
   }
 } // namespace serialized_diagnostics
 } // namespace swift

@@ -27,7 +27,7 @@ struct ProtAndResilStruct {
   func crash() {
     fooImp.foo(ptr: bar)
   }
-// CHECK-LABEL: define{{.*}} @"$s26struct_with_resilient_type18ProtAndResilStructV3baryyFTc"(%T26struct_with_resilient_type18ProtAndResilStructV* noalias nocapture)
+// CHECK-LABEL: define{{.*}} @"$s26struct_with_resilient_type18ProtAndResilStructV3baryyFTc"(%T26struct_with_resilient_type18ProtAndResilStructV* noalias nocapture %0)
 // CHECK: [[T0:%.*]] = zext i32 %flags to i64
 // CHECK: %flags.alignmentMask = and i64 [[T0]], 255
 // CHECK: [[XOR_ALIGN:%.*]] = xor i64 %flags.alignmentMask, -1

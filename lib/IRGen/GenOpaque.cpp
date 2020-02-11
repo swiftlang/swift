@@ -523,12 +523,12 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 
     // Allocate memory.  This produces an abstract token.
     auto allocFn = llvm::Intrinsic::getDeclaration(
-        &IGM.Module, llvm::Intrinsic::ID::coro_alloca_alloc, { IGM.SizeTy });
+        &IGM.Module, llvm::Intrinsic::coro_alloca_alloc, {IGM.SizeTy});
     auto allocToken = Builder.CreateCall(allocFn, { byteCount, alignment });
 
     // Get the allocation result.
     auto getFn = llvm::Intrinsic::getDeclaration(
-        &IGM.Module, llvm::Intrinsic::ID::coro_alloca_get);
+        &IGM.Module, llvm::Intrinsic::coro_alloca_get);
     auto ptr = Builder.CreateCall(getFn, { allocToken });
 
     return {Address(ptr, align), allocToken};
@@ -542,14 +542,14 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
   bool isInEntryBlock = (Builder.GetInsertBlock() == &*CurFn->begin());
   if (!isInEntryBlock) {
     auto *stackSaveFn = llvm::Intrinsic::getDeclaration(
-        &IGM.Module, llvm::Intrinsic::ID::stacksave);
+        &IGM.Module, llvm::Intrinsic::stacksave);
 
     stackRestorePoint =  Builder.CreateCall(stackSaveFn, {}, "spsave");
   }
 
   // Emit the dynamic alloca.
   auto *alloca = Builder.IRBuilderBase::CreateAlloca(eltTy, arraySize, name);
-  alloca->setAlignment(align.getValue());
+  alloca->setAlignment(llvm::MaybeAlign(align.getValue()));
 
   assert(!isInEntryBlock ||
          getActiveDominancePoint().isUniversal() &&
@@ -569,7 +569,7 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
     auto allocToken = address.getExtraInfo();
     assert(allocToken && "dynamic alloca in coroutine without alloc token?");
     auto freeFn = llvm::Intrinsic::getDeclaration(
-        &IGM.Module, llvm::Intrinsic::ID::coro_alloca_free);
+        &IGM.Module, llvm::Intrinsic::coro_alloca_free);
     Builder.CreateCall(freeFn, allocToken);
     return;
   }
@@ -578,7 +578,7 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
   if (savedSP == nullptr)
     return;
   auto *stackRestoreFn = llvm::Intrinsic::getDeclaration(
-      &IGM.Module, llvm::Intrinsic::ID::stackrestore);
+      &IGM.Module, llvm::Intrinsic::stackrestore);
   Builder.CreateCall(stackRestoreFn, savedSP);
 }
 

@@ -1381,10 +1381,14 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::ExtendArgument:
   case IITDescriptor::TruncArgument:
   case IITDescriptor::HalfVecArgument:
+  case IITDescriptor::ScalableVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
   case IITDescriptor::VecElementArgument:
   case IITDescriptor::VecOfAnyPtrsToElt:
+  case IITDescriptor::VecOfBitcastsToInt:
+  case IITDescriptor::Subdivide2Argument:
+  case IITDescriptor::Subdivide4Argument:
     // These types cannot be expressed in swift yet.
     return Type();
 
