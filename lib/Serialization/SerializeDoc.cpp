@@ -75,7 +75,7 @@ class YamlGroupInputParser {
           GroupNameAndFileName.append(CombinedName);
           GroupNameAndFileName.append(Separator);
           GroupNameAndFileName.append(llvm::sys::path::stem(FileName));
-          Map[FileName] = std::string(GroupNameAndFileName);
+          Map[FileName] = std::string(GroupNameAndFileName.str());
         } else if (Entry.getType() == llvm::yaml::Node::NodeKind::NK_Mapping) {
           if (parseRoot(Map, &Entry, CombinedName))
             return true;

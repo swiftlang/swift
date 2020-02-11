@@ -21,29 +21,27 @@ import re
 import subprocess
 
 
-BENCHMARK_OUTPUT_RE = re.compile(r'\d+,([^,]+)')
+BENCHMARK_OUTPUT_RE = re.compile(r"\d+,([^,]+)")
 
 
 class Result(object):
-
     def __init__(self, name, status, output, xfail_list):
         self.name = name
         self.status = status
         self.output = output
-        self.is_xfailed = any(
-            (re.match(x, self.name) is not None for x in xfail_list))
+        self.is_xfailed = any((re.match(x, self.name) is not None for x in xfail_list))
 
     def is_failure(self):
-        return self.get_result() in ['FAIL', 'XPASS']
+        return self.get_result() in ["FAIL", "XPASS"]
 
     def get_result(self):
         if self.is_xfailed:
             if self.status:
-                return 'XFAIL'
-            return 'XPASS'
+                return "XFAIL"
+            return "XPASS"
         if self.status:
-            return 'FAIL'
-        return 'PASS'
+            return "FAIL"
+        return "PASS"
 
     def get_name(self):
         return self.name
@@ -53,7 +51,7 @@ class Result(object):
         return d
 
     def print_data(self, max_test_len):
-        fmt = '{:<%d}{:}' % (max_test_len + 5)
+        fmt = "{:<%d}{:}" % (max_test_len + 5)
         print(fmt.format(self.get_name(), self.get_result()))
 
 
@@ -65,36 +63,44 @@ def run_with_timeout(func, args):
     # we update to use python >= 3.3, use the timeout API on communicate
     # instead.
     import multiprocessing.dummy
+
     fakeThreadPool = multiprocessing.dummy.Pool(1)
     try:
         result = fakeThreadPool.apply_async(func, args=args)
         return result.get(timeout_seconds)
     except multiprocessing.TimeoutError:
         fakeThreadPool.terminate()
-        raise RuntimeError("Child process aborted due to timeout. "
-                           "Timeout: %s seconds" % timeout_seconds)
+        raise RuntimeError(
+            "Child process aborted due to timeout. "
+            "Timeout: %s seconds" % timeout_seconds
+        )
 
 
 def _unwrap_self(args):
     return type(args[0]).process_input(*args)
 
 
-BenchmarkDriver_OptLevels = ['Onone', 'O', 'Osize']
+BenchmarkDriver_OptLevels = ["Onone", "O", "Osize"]
 
 
 class BenchmarkDriver(object):
-
-    def __init__(self, binary_dir, xfail_list, enable_parallel=False,
-                 opt_levels=BenchmarkDriver_OptLevels):
-        self.targets = [(os.path.join(binary_dir, 'Benchmark_%s' % o), o)
-                        for o in opt_levels]
+    def __init__(
+        self,
+        binary_dir,
+        xfail_list,
+        enable_parallel=False,
+        opt_levels=BenchmarkDriver_OptLevels,
+    ):
+        self.targets = [
+            (os.path.join(binary_dir, "Benchmark_%s" % o), o) for o in opt_levels
+        ]
         self.xfail_list = xfail_list
         self.enable_parallel = enable_parallel
         self.data = None
 
     def print_data_header(self, max_test_len):
-        fmt = '{:<%d}{:}' % (max_test_len + 5)
-        print(fmt.format('Name', 'Result'))
+        fmt = "{:<%d}{:}" % (max_test_len + 5)
+        print(fmt.format("Name", "Result"))
 
     def prepare_input(self, name, opt_level):
         raise RuntimeError("Abstract method")
@@ -115,7 +121,7 @@ class BenchmarkDriver(object):
             names = [n for n in names if regex.match(n)]
 
         def prepare_input_wrapper(name):
-            x = {'opt': opt_level, 'path': binary, 'test_name': name}
+            x = {"opt": opt_level, "path": binary, "test_name": name}
             x.update(self.prepare_input(name))
             return x
 
@@ -129,33 +135,31 @@ class BenchmarkDriver(object):
             results = map(self.process_input, prepared_input)
 
         def reduce_results(acc, r):
-            acc['result'].append(r)
-            acc['has_failure'] = acc['has_failure'] or r.is_failure()
-            acc['max_test_len'] = max(acc['max_test_len'], len(r.get_name()))
-            acc['extra_data'] = r.merge_in_extra_data(acc['extra_data'])
+            acc["result"].append(r)
+            acc["has_failure"] = acc["has_failure"] or r.is_failure()
+            acc["max_test_len"] = max(acc["max_test_len"], len(r.get_name()))
+            acc["extra_data"] = r.merge_in_extra_data(acc["extra_data"])
             return acc
 
-        return functools.reduce(reduce_results, results, {
-            'result': [],
-            'has_failure': False,
-            'max_test_len': 0,
-            'extra_data': {}
-        })
+        return functools.reduce(
+            reduce_results,
+            results,
+            {"result": [], "has_failure": False, "max_test_len": 0, "extra_data": {}},
+        )
 
     def print_data(self, data, max_test_len):
         print("Results:")
         self.print_data_header(max_test_len)
         for d in data:
-            for r in d['result']:
+            for r in d["result"]:
                 r.print_data(max_test_len)
 
     def run(self, test_filter=None):
         self.data = [
             self.run_for_opt_level(binary, opt_level, test_filter)
-            for binary, opt_level in self.targets]
-        max_test_len = functools.reduce(max,
-                                        [d['max_test_len'] for d in self.data])
-        has_failure = functools.reduce(max,
-                                       [d['has_failure'] for d in self.data])
+            for binary, opt_level in self.targets
+        ]
+        max_test_len = functools.reduce(max, [d["max_test_len"] for d in self.data])
+        has_failure = functools.reduce(max, [d["has_failure"] for d in self.data])
         self.print_data(self.data, max_test_len)
         return not has_failure

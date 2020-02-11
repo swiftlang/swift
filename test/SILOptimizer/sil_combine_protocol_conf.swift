@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -O -wmo -emit-sil -Xllvm -sil-disable-pass=DeadFunctionElimination -enforce-exclusivity=unchecked | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -wmo -emit-sil -Xllvm -sil-disable-pass=DeadFunctionElimination | %FileCheck %s
 
 // case 1: class protocol -- should optimize
 internal protocol SomeProtocol : class {
@@ -237,14 +237,24 @@ internal class OtherClass {
 // CHECK-LABEL: sil hidden [noinline] @$s25sil_combine_protocol_conf10OtherClassC12doWorkStructSiyF : $@convention(method) (@guaranteed OtherClass) -> Int {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK: debug_value
+// CHECK: [[STACK1:%.*]] = alloc_stack $PropProtocol
 // CHECK: [[R1:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg1
-// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[R1]] : $*PropProtocol to $*@opened("{{.*}}") PropProtocol
+// CHECK: [[ACC1:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R1]]
+
+// TODO: this copy_addr should be eliminated: rdar://problem/59345115
+// CHECK: copy_addr [[ACC1]] to [initialization] [[STACK1]]
+// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[STACK1]] : $*PropProtocol to $*@opened("{{.*}}") PropProtocol
 // CHECK: [[U1:%.*]] = unchecked_addr_cast [[O1]] : $*@opened("{{.*}}") PropProtocol to $*PropClass 
 // CHECK: [[S1:%.*]] = struct_element_addr [[U1]] : $*PropClass, #PropClass.val
 // CHECK: [[S11:%.*]] = struct_element_addr [[S1]] : $*Int, #Int._value
 // CHECK: load [[S11]] 
+// CHECK: [[STACK2:%.*]] = alloc_stack $GenericPropProtocol
 // CHECK: [[R2:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg2
-// CHECK: [[O2:%.*]] = open_existential_addr immutable_access [[R2]] : $*GenericPropProtocol to $*@opened("{{.*}}") GenericPropProtocol
+// CHECK: [[ACC2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R2]]
+
+// TODO: this copy_addr should be eliminated: rdar://problem/59345115
+// CHECK: copy_addr [[ACC2]] to [initialization] [[STACK2]]
+// CHECK: [[O2:%.*]] = open_existential_addr immutable_access [[STACK2]] : $*GenericPropProtocol to $*@opened("{{.*}}") GenericPropProtocol
 // CHECK: [[W2:%.*]] = witness_method $@opened("{{.*}}") GenericPropProtocol, #GenericPropProtocol.val!getter.1 : <Self where Self : GenericPropProtocol> (Self) -> () -> Int, [[O2]] : $*@opened("{{.*}}") GenericPropProtocol : $@convention(witness_method: GenericPropProtocol) <τ_0_0 where τ_0_0 : GenericPropProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W2]]<@opened("{{.*}}") GenericPropProtocol>([[O2]]) : $@convention(witness_method: GenericPropProtocol) <τ_0_0 where τ_0_0 : GenericPropProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
@@ -253,8 +263,13 @@ internal class OtherClass {
 // CHECK: tuple_extract
 // CHECK: tuple_extract
 // CHECK: cond_fail
+// CHECK: [[STACK4:%.*]] = alloc_stack $NestedPropProtocol
 // CHECK: [[R4:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg3
-// CHECK: [[O4:%.*]] = open_existential_addr immutable_access [[R4]] : $*NestedPropProtocol to $*@opened("{{.*}}") NestedPropProtocol
+// CHECK: [[ACC4:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R4]]
+
+// TODO: this copy_addr should be eliminated: rdar://problem/59345115
+// CHECK: copy_addr [[ACC4]] to [initialization] [[STACK4]]
+// CHECK: [[O4:%.*]] = open_existential_addr immutable_access [[STACK4]] : $*NestedPropProtocol to $*@opened("{{.*}}") NestedPropProtocol
 // CHECK: [[U4:%.*]] = unchecked_addr_cast [[O4]] : $*@opened("{{.*}}") NestedPropProtocol to $*Outer.Inner
 // CHECK: [[S4:%.*]] = struct_element_addr [[U4]] : $*Outer.Inner, #Outer.Inner.val
 // CHECK: [[S41:%.*]] = struct_element_addr [[S4]] : $*Int, #Int._value
@@ -263,8 +278,13 @@ internal class OtherClass {
 // CHECK: tuple_extract
 // CHECK: tuple_extract
 // CHECK: cond_fail
+// CHECK: [[STACK5:%.*]] = alloc_stack $GenericNestedPropProtocol
 // CHECK: [[R5:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg4
-// CHECK: [[O5:%.*]] = open_existential_addr immutable_access [[R5]] : $*GenericNestedPropProtocol to $*@opened("{{.*}}") GenericNestedPropProtocol
+// CHECK: [[ACC5:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R5]]
+
+// TODO: this copy_addr should be eliminated: rdar://problem/59345115
+// CHECK: copy_addr [[ACC5]] to [initialization] [[STACK5]]
+// CHECK: [[O5:%.*]] = open_existential_addr immutable_access [[STACK5]] : $*GenericNestedPropProtocol to $*@opened("{{.*}}") GenericNestedPropProtocol
 // CHECK: [[W5:%.*]] = witness_method $@opened("{{.*}}") GenericNestedPropProtocol, #GenericNestedPropProtocol.val!getter.1 : <Self where Self : GenericNestedPropProtocol> (Self) -> () -> Int, [[O5:%.*]] : $*@opened("{{.*}}") GenericNestedPropProtocol : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int 
 // CHECK: apply [[W5]]<@opened("{{.*}}") GenericNestedPropProtocol>([[O5]]) : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
@@ -331,8 +351,13 @@ internal class OtherKlass {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK: debug_value
 // CHECK: integer_literal
+// CHECK: [[STACK1:%.*]] = alloc_stack $AGenericProtocol
 // CHECK: [[R1:%.*]] = ref_element_addr [[ARG]] : $OtherKlass, #OtherKlass.arg2
-// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[R1]] : $*AGenericProtocol to $*@opened("{{.*}}") AGenericProtocol
+// CHECK: [[ACC1:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R1]]
+
+// TODO: this copy_addr should be eliminated: rdar://problem/59345115
+// CHECK: copy_addr [[ACC1]] to [initialization] [[STACK1]]
+// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[STACK1]] : $*AGenericProtocol to $*@opened("{{.*}}") AGenericProtocol
 // CHECK: [[W1:%.*]] = witness_method $@opened("{{.*}}") AGenericProtocol, #AGenericProtocol.val!getter.1 : <Self where Self : AGenericProtocol> (Self) -> () -> Int, [[O1]] : $*@opened("{{.*}}") AGenericProtocol : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W1]]<@opened("{{.*}}") AGenericProtocol>([[O1]]) : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract

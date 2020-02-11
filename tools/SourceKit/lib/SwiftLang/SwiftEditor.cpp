@@ -108,7 +108,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
                                            Info.FormatArgs);
   }
-  SKInfo.Description = std::string(Text);
+  SKInfo.Description = std::string(Text.str());
 
   Optional<unsigned> BufferIDOpt;
   if (Info.Loc.isValid()) {

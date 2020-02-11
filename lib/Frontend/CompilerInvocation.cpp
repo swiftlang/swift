@@ -56,7 +56,7 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   llvm::sys::path::remove_filename(DiagnosticDocsPath); // Remove /bin
   llvm::sys::path::append(DiagnosticDocsPath, "share", "doc", "swift",
                           "diagnostics");
-  DiagnosticOpts.DiagnosticDocumentationPath = std::string(DiagnosticDocsPath);
+  DiagnosticOpts.DiagnosticDocumentationPath = std::string(DiagnosticDocsPath.str());
 }
 
 /// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
@@ -82,7 +82,7 @@ static void setDefaultPrebuiltCacheIfNecessary(
     platform = getPlatformNameForTriple(triple);
   }
   llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
-  frontendOpts.PrebuiltModuleCachePath = std::string(defaultPrebuiltPath);
+  frontendOpts.PrebuiltModuleCachePath = std::string(defaultPrebuiltPath.str());
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
@@ -95,7 +95,7 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
 
   llvm::sys::path::append(LibPath, LibSubDir);
   SearchPathOpts.RuntimeLibraryPaths.clear();
-  SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(LibPath));
+  SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(LibPath.str()));
   if (Triple.isOSDarwin())
     SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
 
@@ -109,14 +109,14 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
 
   if (!Triple.isOSDarwin())
     llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
-  SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath));
+  SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
 
   if (!SearchPathOpts.SDKPath.empty()) {
     if (tripleIsMacCatalystEnvironment(Triple)) {
       LibPath = SearchPathOpts.SDKPath;
       llvm::sys::path::append(LibPath, "System", "iOSSupport");
       llvm::sys::path::append(LibPath, "usr", "lib", "swift");
-      SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath));
+      SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
     }
 
     LibPath = SearchPathOpts.SDKPath;
@@ -125,7 +125,7 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
       llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
       llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
     }
-    SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath));
+    SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
 }
 
@@ -750,7 +750,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
       return searchPath.str();
     SmallString<64> fullPath{workingDirectory};
     path::append(fullPath, searchPath);
-    return std::string(fullPath);
+    return std::string(fullPath.str());
   };
 
   for (const Arg *A : Args.filtered(OPT_I)) {
@@ -1141,7 +1141,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     // TODO: Should we support -fdebug-compilation-dir?
     llvm::SmallString<256> cwd;
     llvm::sys::fs::current_path(cwd);
-    Opts.DebugCompilationDir = std::string(cwd);
+    Opts.DebugCompilationDir = std::string(cwd.str());
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
@@ -1458,8 +1458,8 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
       llvm::SmallString<128> authoredDataPath(basePath);
       llvm::sys::path::append(authoredDataPath, getScriptFileName("overlay", langVer));
       // Add authored list first to take higher priority.
-      Opts.APIDigesterDataStorePaths.push_back(std::string(authoredDataPath));
-      Opts.APIDigesterDataStorePaths.push_back(std::string(dataPath));
+      Opts.APIDigesterDataStorePaths.push_back(std::string(authoredDataPath.str()));
+      Opts.APIDigesterDataStorePaths.push_back(std::string(dataPath.str()));
     }
   }
 

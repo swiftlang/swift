@@ -158,9 +158,13 @@ func testNSObjectInterpolation(h: Logger, nsArray: NSArray) {
     // CHECK-NEXT: [[BITCASTED_DEST:%.+]] = bitcast i8* [[OFFSET4]] to %TSo7NSArrayC**
     // CHECK-NEXT: [[BITCASTED_SRC:%.+]] = bitcast i8* [[NSARRAY_ARG]] to %TSo7NSArrayC*
     // CHECK-NEXT: store %TSo7NSArrayC*  [[BITCASTED_SRC]], %TSo7NSArrayC** [[BITCASTED_DEST]], align 1
+
+    // TODO: check why the ARC optimizer cannot eliminate this retain/release pair
+    // CHECK-NEXT: [[NSARRAY_ARG2:%.+]] = tail call i8* @llvm.objc.retain(i8* [[NSARRAY_ARG]])
     // CHECK-64-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i64 0, i64 0), i8* {{(nonnull )?}}[[BUFFER]], i32 12)
     // CHECK-32-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i32 0, i32 0), i8* {{(nonnull )?}}[[BUFFER]], i32 8)
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
+    // CHECK-NEXT: tail call void @llvm.objc.release(i8* [[NSARRAY_ARG2]])
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
 
     // CHECK: [[NOT_ENABLED]]:

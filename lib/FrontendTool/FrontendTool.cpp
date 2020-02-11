@@ -1700,7 +1700,7 @@ static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
     SmallString<256> Path = OutDir;
     StringRef Filename = SF->getFilename();
     path::append(Path, path::filename(Filename));
-    return std::string(Path);
+    return std::string(Path.str());
   };
 
   std::unordered_set<std::string> Filenames;

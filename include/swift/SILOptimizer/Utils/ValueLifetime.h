@@ -79,6 +79,9 @@ public:
   /// instructions of the frontier that are not in the critical edges. Note that
   /// the method getCriticalEdges can be used to retrieve the critical edges.
   ///
+  /// An edge is also considered as "critical" if it has a single precedessor
+  /// but the predecessor's terminal instruction is a user of the value.
+  ///
   /// If \p deBlocks is provided, all dead-end blocks are ignored. This
   /// prevents unreachable-blocks to be included in the frontier.
   bool computeFrontier(Frontier &frontier, Mode mode,
@@ -132,6 +135,15 @@ private:
   SILInstruction *findLastUserInBlock(SILBasicBlock *bb);
 };
 
+/// Destroys \p valueOrStackLoc at \p frontier.
+///
+/// If  \p valueOrStackLoc is an alloc_stack, inserts destroy_addr and
+/// dealloc_stack at each instruction of the \p frontier.
+/// Otherwise \p valueOrStackLoc must be a value type and in this case, inserts
+/// destroy_value at each instruction of the \p frontier.
+void endLifetimeAtFrontier(SILValue valueOrStackLoc,
+                           const ValueLifetimeAnalysis::Frontier &frontier,
+                           SILBuilderContext &builderCtxt);
 
 } // end namespace swift
 

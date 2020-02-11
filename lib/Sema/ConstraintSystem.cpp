@@ -2765,6 +2765,9 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     ParameterList,
     /// General ambiguity failure.
     General,
+    /// Argument mismatch ambiguity where each solution has the same
+    /// argument mismatch fixes for the same call.
+    ArgumentMismatch
   };
   auto ambiguityKind = AmbiguityKind::CloseMatch;
 
@@ -2775,16 +2778,52 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       return false;
 
     if (fixes.size() > 1) {
-      ambiguityKind = (ambiguityKind == AmbiguityKind::CloseMatch ||
-                       ambiguityKind == AmbiguityKind::ParameterList) &&
+      // Attempt to disambiguite in cases where the argument matches
+      // involves tuple mismatches. e.g.
+      // func t<T, U>(_: (T, U), _: (U, T)) {}
+      // func useTuples(_ x: Int, y: Float) {
+      //     t((x, y), (x, y))
+      // }
+      // So fixes are ambiguous in all solutions.
+      if ((ambiguityKind == AmbiguityKind::CloseMatch ||
+           ambiguityKind == AmbiguityKind::ArgumentMismatch) &&
           llvm::all_of(fixes, [](const ConstraintFix *fix) -> bool {
-            auto *locator = fix->getLocator();
-            return locator->findLast<LocatorPathElt::ApplyArgument>().hasValue();
-          }) ? AmbiguityKind::ParameterList
-             : AmbiguityKind::General;
+            return fix->getKind() == FixKind::AllowTupleTypeMismatch;
+          })) {
+        ambiguityKind = AmbiguityKind::ArgumentMismatch;
+      } else {
+        ambiguityKind =
+            (ambiguityKind == AmbiguityKind::CloseMatch ||
+             ambiguityKind == AmbiguityKind::ArgumentMismatch ||
+             ambiguityKind == AmbiguityKind::ParameterList) &&
+                    llvm::all_of(
+                        fixes,
+                        [](const ConstraintFix *fix) -> bool {
+                          auto *locator = fix->getLocator();
+                          return locator
+                              ->findLast<LocatorPathElt::ApplyArgument>()
+                              .hasValue();
+                        })
+                ? AmbiguityKind::ParameterList
+                : AmbiguityKind::General;
+      }
     }
 
-    for (const auto *fix: fixes) {
+    if (fixes.size() == 1) {
+      // Attempt to disambiguite in cases where all the solutions
+      // produces the same fixes for different generic arguments e.g.
+      //   func f<T>(_: T, _: T) {}
+      //   f(Int(1), Float(1))
+      //
+      ambiguityKind =
+          ((ambiguityKind == AmbiguityKind::CloseMatch ||
+            ambiguityKind == AmbiguityKind::ArgumentMismatch) &&
+           fixes.front()->getKind() == FixKind::AllowArgumentTypeMismatch)
+              ? AmbiguityKind::ArgumentMismatch
+              : AmbiguityKind::CloseMatch;
+    }
+
+    for (const auto *fix : fixes) {
       auto *locator = fix->getLocator();
       // Assignment failures are all about the source expression,
       // because they treat destination as a contextual type.
@@ -2815,6 +2854,15 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       viableSolutions.push_back(&solution);
     return true;
   });
+
+  if (ambiguityKind == AmbiguityKind::ArgumentMismatch &&
+      viableSolutions.size() == 1) {
+    // Let's apply the solution so the contextual generic types
+    // are available in the system for diagnostics.
+    applySolution(*viableSolutions[0]);
+    solutions.front().Fixes.front()->diagnose(/*asNote*/ false);
+    return true;
+  }
 
   if (!diagnosable || viableSolutions.size() < 2)
     return false;
@@ -2860,6 +2908,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     };
 
     switch (ambiguityKind) {
+    case AmbiguityKind::ArgumentMismatch:
     case AmbiguityKind::CloseMatch:
       // Handled below
       break;
@@ -3994,7 +4043,60 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.dc = dc;
   expression.contextualPurpose = contextualPurpose;
   expression.convertType = convertType;
+  expression.pattern = nullptr;
+  expression.wrappedVar = nullptr;
   expression.isDiscarded = isDiscarded;
+}
+
+void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
+  assert(kind == Kind::expression);
+  assert(expression.contextualPurpose == CTP_Initialization);
+  auto singleVar = expression.pattern->getSingleVar();
+  if (!singleVar)
+    return;
+
+  auto wrapperAttrs = singleVar->getAttachedPropertyWrappers();
+  if (wrapperAttrs.empty())
+    return;
+
+  // If the outermost property wrapper is directly initialized, form the
+  // call.
+  auto &ctx = singleVar->getASTContext();
+  auto outermostWrapperAttr = wrapperAttrs.front();
+  Expr *backingInitializer;
+  if (Expr *initializer = expression.expression) {
+    // Form init(wrappedValue:) call(s).
+    Expr *wrappedInitializer =
+        buildPropertyWrapperInitialValueCall(
+            singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
+    if (!wrappedInitializer)
+      return;
+
+    backingInitializer = wrappedInitializer;
+  } else if (auto outermostArg = outermostWrapperAttr->getArg()) {
+    Type outermostWrapperType =
+        singleVar->getAttachedPropertyWrapperType(0);
+    if (!outermostWrapperType)
+      return;
+
+    auto typeExpr = TypeExpr::createImplicitHack(
+        outermostWrapperAttr->getTypeLoc().getLoc(),
+        outermostWrapperType, ctx);
+    backingInitializer = CallExpr::create(
+        ctx, typeExpr, outermostArg,
+        outermostWrapperAttr->getArgumentLabels(),
+        outermostWrapperAttr->getArgumentLabelLocs(),
+        /*hasTrailingClosure=*/false,
+        /*implicit=*/false);
+  } else {
+    llvm_unreachable("No initializer anywhere?");
+  }
+  wrapperAttrs[0]->setSemanticInit(backingInitializer);
+
+  // Note that we have applied to property wrapper, so we can adjust
+  // the initializer type later.
+  expression.wrappedVar = singleVar;
+  expression.expression = backingInitializer;
 }
 
 SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
@@ -4020,6 +4122,7 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
       initializer, dc, CTP_Initialization, contextualType,
       /*isDiscarded=*/false);
   target.expression.pattern = pattern;
+  target.maybeApplyPropertyWrapper();
   return target;
 }
 

@@ -290,7 +290,7 @@ static inline std::string getInterfaceGenDocumentName() {
   llvm::SmallString<64> path = llvm::StringRef("/<interface-gen>");
   llvm::sys::fs::make_absolute(path);
   llvm::sys::path::native(path);
-  return std::string(path);
+  return std::string(path.str());
 }
 
 static int printAnnotations();
@@ -489,7 +489,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     AbsSourceFile += SourceFile;
     llvm::sys::fs::make_absolute(AbsSourceFile);
     llvm::sys::path::native(AbsSourceFile);
-    SourceFile = std::string(AbsSourceFile);
+    SourceFile = std::string(AbsSourceFile.str());
   }
   std::string SemaName = !Opts.Name.empty() ? Opts.Name : SourceFile;
 
@@ -1479,7 +1479,7 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   std::string Filename = FilenameIn.str();
   llvm::SmallString<256> output;
   if (!llvm::sys::fs::real_path(Filename, output))
-    Filename = std::string(output);
+    Filename = std::string(output.str());
 
   const char *Kind = sourcekitd_uid_get_string_ptr(KindUID);
   const char *USR = sourcekitd_variant_dictionary_get_string(Info, KeyUSR);
@@ -1651,7 +1651,7 @@ static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   std::string Filename = FilenameIn.str();
   llvm::SmallString<256> output;
   if (llvm::sys::fs::real_path(Filename, output))
-    Filename = std::string(output);
+    Filename = std::string(output.str());
 
   sourcekitd_variant_t OffsetObj =
     sourcekitd_variant_dictionary_get_value(Info, KeyOffset);

@@ -971,6 +971,8 @@ void SILClosureSpecializerTransform::run() {
     // specialized all of their uses.
     LLVM_DEBUG(llvm::dbgs() << "Trying to remove dead closures!\n");
     sortUnique(PropagatedClosures);
+    bool needUpdateStackNesting = false;
+
     for (auto *Closure : PropagatedClosures) {
       LLVM_DEBUG(llvm::dbgs() << "    Visiting: " << *Closure);
       if (!tryDeleteDeadClosure(Closure)) {
@@ -981,6 +983,11 @@ void SILClosureSpecializerTransform::run() {
 
       LLVM_DEBUG(llvm::dbgs() << "        Deleted closure!\n");
       ++NumPropagatedClosuresEliminated;
+      needUpdateStackNesting = true;
+    }
+
+    if (needUpdateStackNesting) {
+      StackNesting().correctStackNesting(F);
     }
   }
 

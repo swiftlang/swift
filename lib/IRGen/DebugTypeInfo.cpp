@@ -60,25 +60,20 @@ DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty,
 
 DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
                                               const TypeInfo &Info) {
+
+  auto DeclType = Decl->getInterfaceType();
+  auto RealType = Ty;
+
+  // DynamicSelfType is also sugar as far as debug info is concerned.
+  auto Sugared = DeclType;
+  if (auto DynSelfTy = DeclType->getAs<DynamicSelfType>())
+    Sugared = DynSelfTy->getSelfType();
+
   // Prefer the original, potentially sugared version of the type if
   // the type hasn't been mucked with by an optimization pass.
-  swift::Type DeclType = Decl->getInterfaceType();
-  swift::Type RealType = Ty;
-
-  swift::Type DebugType;
-  if (auto DynSelfTy = DeclType->getAs<DynamicSelfType>()) {
-    // DynamicSelfType is also sugar as far as debug info is concerned.
-    auto DesugaredSelf = DynSelfTy->getSelfType();
-    DebugType = DesugaredSelf->isEqual(RealType) ? DynSelfTy : RealType;
-  } else {
-    // Map the sugared type into the context to resolve bound generics and
-    // generic type aliases.
-    DeclContext *DeclCtx = Decl->getDeclContext();
-    swift::Type Sugared =
-        DeclCtx ? DeclCtx->mapTypeIntoContext(DeclType) : DeclType;
-    DebugType = Sugared->isEqual(RealType) ? Sugared : RealType;
-  }
-  return getFromTypeInfo(DebugType, Info);
+  auto *Type = Sugared->isEqual(RealType) ? DeclType.getPointer()
+                                          : RealType.getPointer();
+  return getFromTypeInfo(Type, Info);
 }
 
 DebugTypeInfo DebugTypeInfo::getMetadata(swift::Type Ty, llvm::Type *StorageTy,

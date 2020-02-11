@@ -774,8 +774,8 @@ struct Score {
 
 /// An AST node that can gain type information while solving.
 using TypedNode =
-    llvm::PointerUnion<const Expr *, const TypeLoc *,
-                       const VarDecl *>;
+    llvm::PointerUnion4<const Expr *, const TypeLoc *,
+                        const VarDecl *, const Pattern *>;
 
 /// Display a score.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
@@ -1161,7 +1161,11 @@ class SolutionApplicationTarget {
 
       /// When initializing a pattern from the expression, this is the
       /// pattern.
-      Pattern *pattern = nullptr;
+      Pattern *pattern;
+
+      /// The variable to which property wrappers have been applied, if
+      /// this is an initialization involving a property wrapper.
+      VarDecl *wrappedVar;
 
       /// Whether the expression result will be discarded at the end.
       bool isDiscarded;
@@ -1172,6 +1176,11 @@ class SolutionApplicationTarget {
       BraceStmt *body;
     } function;
   };
+
+  // If the pattern contains a single variable that has an attached
+  // property wrapper, set up the initializer expression to initialize
+  // the backing storage.
+  void maybeApplyPropertyWrapper();
 
 public:
   SolutionApplicationTarget(Expr *expr, DeclContext *dc,
@@ -1281,6 +1290,14 @@ public:
         isa<OptionalSomePattern>(expression.pattern);
   }
 
+  /// Retrieve the wrapped variable when initializing a pattern with a
+  /// property wrapper.
+  VarDecl *getInitializationWrappedVar() const {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_Initialization);
+    return expression.wrappedVar;
+  }
+
   /// Whether this context infers an opaque return type.
   bool infersOpaqueReturnType() const;
 
@@ -1295,6 +1312,12 @@ public:
   void setExpr(Expr *expr) {
     assert(kind == Kind::expression);
     expression.expression = expr;
+  }
+
+  void setPattern(Pattern *pattern) {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_Initialization);
+    expression.pattern = pattern;
   }
 
   Optional<AnyFunctionRef> getAsFunction() const {
@@ -1464,6 +1487,7 @@ private:
   llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
   llvm::DenseMap<const TypeLoc *, TypeBase *> TypeLocTypes;
   llvm::DenseMap<const VarDecl *, TypeBase *> VarTypes;
+  llvm::DenseMap<const Pattern *, TypeBase *> PatternTypes;
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
       KeyPathComponentTypes;
 
@@ -2218,9 +2242,11 @@ public:
       ExprTypes[expr] = type.getPointer();
     } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
       TypeLocTypes[typeLoc] = type.getPointer();
-    } else {
-      auto var = node.get<const VarDecl *>();
+    } else if (auto var = node.dyn_cast<const VarDecl *>()) {
       VarTypes[var] = type.getPointer();
+    } else {
+      auto pattern = node.get<const Pattern *>();
+      PatternTypes[pattern] = type.getPointer();
     }
 
     // Record the fact that we ascribed a type to this node.
@@ -2241,9 +2267,11 @@ public:
       ExprTypes.erase(expr);
     } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
       TypeLocTypes.erase(typeLoc);
-    } else {
-      auto var = node.get<const VarDecl *>();
+    } else if (auto var = node.dyn_cast<const VarDecl *>()) {
       VarTypes.erase(var);
+    } else {
+      auto pattern = node.get<const Pattern *>();
+      PatternTypes.erase(pattern);
     }
   }
 
@@ -2270,9 +2298,11 @@ public:
       return ExprTypes.find(expr) != ExprTypes.end();
     } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
       return TypeLocTypes.find(typeLoc) != TypeLocTypes.end();
-    } else {
-      auto var = node.get<const VarDecl *>();
+    } else if (auto var = node.dyn_cast<const VarDecl *>()) {
       return VarTypes.find(var) != VarTypes.end();
+    } else {
+      auto pattern = node.get<const Pattern *>();
+      return PatternTypes.find(pattern) != PatternTypes.end();
     }
   }
 
@@ -3230,6 +3260,12 @@ public:
   ArrayRef<T> allocateCopy(SmallVectorImpl<T> &vec) {
     return allocateCopy(vec.begin(), vec.end());
   }
+
+  /// Generate constraints for the given solution target.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool generateConstraints(SolutionApplicationTarget &target,
+                           FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// Generate constraints for the body of the given single-statement closure.
   ///
