@@ -34,13 +34,17 @@ ClassTests.test("TrivialMember") {
     static func controlFlow(_ c1: C, _ c2: C, _ flag: Bool) -> Float {
       var result: Float = 0
       if flag {
-        result = c1.float * c2.float
+        var c3 = C(c1.float * c2.float)
+        result = c3.float
       } else {
         result = c2.float * c1.float
       }
       return result
     }
   }
+  // Test class initializer differentiation.
+  expectEqual(10, pullback(at: 3, in: { C($0) })(.init(float: 10)))
+  // Test class method differentiation.
   expectEqual((.init(float: 3), 10), gradient(at: C(10), 3, in: { c, x in c.method(x) }))
   expectEqual(.init(float: 0), gradient(at: C(10), in: { c in c.testNoDerivative() }))
   expectEqual((.init(float: 20), .init(float: 10)),
@@ -72,6 +76,9 @@ ClassTests.test("NontrivialMember") {
       return result
     }
   }
+  // Test class initializer differentiation.
+  expectEqual(10, pullback(at: 3, in: { C($0) })(.init(float: 10)))
+  // Test class method differentiation.
   expectEqual((.init(float: 3), 10), gradient(at: C(10), 3, in: { c, x in c.method(x) }))
   expectEqual((.init(float: 20), .init(float: 10)),
               gradient(at: C(10), C(20), in: { c1, c2 in C.controlFlow(c1, c2, true) }))
@@ -94,6 +101,9 @@ ClassTests.test("AddressOnlyTangentVector") {
       stored
     }
   }
+  // Test class initializer differentiation.
+  expectEqual(10, pullback(at: 3, in: { C<Float>($0) })(.init(float: 10)))
+  // Test class method differentiation.
   expectEqual((.init(stored: Float(3)), 10),
               gradient(at: C<Float>(3), 3, in: { c, x in c.method(x) }))
 }

@@ -266,10 +266,17 @@ private:
 
   SILBasicBlock::iterator getNextFunctionLocalAllocationInsertionPoint();
 
+  /// Creates and returns a local allocation with the given type.
+  ///
+  /// Local allocations are created uninitialized in the pullback entry and
+  /// deallocated in the pullback exit. All local allocations not in
+  /// `destroyedLocalAllocations` are also destroyed in the pullback exit.
+  AllocStackInst *createFunctionLocalAllocation(SILType type, SILLocation loc);
+
   SILValue &getAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer);
 
-  // Accumulates `rhsBufferAccess` into the adjoint buffer corresponding to
-  // `originalBuffer`.
+  /// Accumulates `rhsBufferAccess` into the adjoint buffer corresponding to
+  /// `originalBuffer`.
   void addToAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
                           SILValue rhsBufferAccess, SILLocation loc);
 
