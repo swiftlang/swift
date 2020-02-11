@@ -2709,9 +2709,11 @@ bb3:
   br bb2(%14 : $Builtin.Int1)
 }
 
-// Make sure we do not crash on this and remove everything.
+// Make sure we do not crash on this and remove everything, except a trivial retain/release pair.
 // CHECK-LABEL: sil @partial_apply_retain_removal : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 // CHECK: bb0
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
 // CHECK-NEXT: return
 sil @partial_apply_retain_removal : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : $Builtin.NativeObject):
