@@ -1133,9 +1133,6 @@ public:
   bool isDynamicallyReplaceableFunctionKey() const {
     return getKind() == Kind::DynamicallyReplaceableFunctionKey;
   }
-  bool isNominalTypeDescriptor() const {
-    return getKind() == Kind::NominalTypeDescriptor;
-  }
 
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(ModuleDecl *module) const;
