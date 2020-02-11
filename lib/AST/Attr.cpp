@@ -1088,7 +1088,7 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_Semantics:
     return "_semantics";
   case DAK_Available:
-    return "availability";
+    return "available";
   case DAK_ObjC:
   case DAK_ObjCRuntimeName:
     return "objc";
