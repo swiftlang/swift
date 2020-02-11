@@ -1679,7 +1679,7 @@ do {
   f(a: log() as ((()) -> Void)?) // expected-error {{cannot convert value of type '((()) -> Void)?' to expected argument type '(() -> Void)?'}}
 
   func logNoOptional<T>() -> (T) -> Void { }
-  f(a: logNoOptional() as ((()) -> Void)) // expected-error {{cannot convert value of type '(()) -> Void' to expected argument type '(() -> Void)?'}}
+  f(a: logNoOptional() as ((()) -> Void)) // expected-error {{cannot convert value of type '(()) -> Void' to expected argument type '() -> Void'}}
 
   func g() {}
   g(()) // expected-error {{argument passed to call that takes no arguments}}

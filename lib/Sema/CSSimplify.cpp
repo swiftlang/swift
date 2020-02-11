@@ -3248,6 +3248,11 @@ bool ConstraintSystem::repairFailures(
         }))
       break;
 
+    if (hasConversionOrRestriction(
+            ConversionRestrictionKind::ValueToOptional) ||
+        hasConversionOrRestriction(ConversionRestrictionKind::PointerToPointer))
+      break;
+
     // If this is something like `[A] argument conv [B]` where `A` and `B`
     // are unrelated types, let's give `matchTypes` a chance to consider
     // element types.
@@ -3257,6 +3262,9 @@ bool ConstraintSystem::repairFailures(
     // If there right-hand side is an existential value, let's allow conformance
     // check to happen before trying to do anything else for arguments.
     if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
+      break;
+
+    if (hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
       break;
 
     // If there implicit 'something-to-pointer' conversions involved,
@@ -8280,16 +8288,27 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   auto fixContextualFailure = [&](Type fromType, Type toType,
                                   ConstraintLocatorBuilder locator) -> bool {
     auto *loc = getConstraintLocator(locator);
+    // Since this is a contextual type mismatch, let's start from higher
+    // impact than regular fix to avoid ambiguities.
+    auto impact = 2;
     if (loc->isForAssignment() || loc->isForCoercion() ||
-        loc->isForContextualType()) {
+        loc->isForContextualType() ||
+        loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
       if (restriction == ConversionRestrictionKind::Superclass) {
         if (auto *fix =
                 CoerceToCheckedCast::attempt(*this, fromType, toType, loc))
-          return !recordFix(fix);
+          return !recordFix(fix, impact);
       }
 
-      auto *fix = ContextualMismatch::create(*this, fromType, toType, loc);
-      return !recordFix(fix);
+      if (restriction == ConversionRestrictionKind::ValueToOptional ||
+          restriction == ConversionRestrictionKind::OptionalToOptional)
+        ++impact;
+
+      auto *fix =
+          loc->isLastElement<LocatorPathElt::ApplyArgToParam>()
+              ? AllowArgumentMismatch::create(*this, fromType, toType, loc)
+              : ContextualMismatch::create(*this, fromType, toType, loc);
+      return !recordFix(fix, impact);
     }
 
     return false;
@@ -8378,14 +8397,18 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     assert(matchKind >= ConstraintKind::Subtype);
     if (auto generic2 = type2->getAs<BoundGenericType>()) {
       if (generic2->getDecl()->isOptionalDecl()) {
-        return matchTypes(type1, generic2->getGenericArgs()[0],
-                          matchKind, subflags,
-                          locator.withPathElement(
-                            ConstraintLocator::OptionalPayload));
+        auto result = matchTypes(
+            type1, generic2->getGenericArgs()[0], matchKind, subflags,
+            locator.withPathElement(ConstraintLocator::OptionalPayload));
+
+        if (!(shouldAttemptFixes() && result.isFailure()))
+          return result;
       }
     }
 
-    return SolutionKind::Error;
+    return shouldAttemptFixes() && fixContextualFailure(type1, type2, locator)
+               ? SolutionKind::Solved
+               : SolutionKind::Error;
   }
 
   // for $< in { <, <c, <oc }:
@@ -8401,16 +8424,21 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (auto generic1 = type1->getAs<BoundGenericType>()) {
       if (auto generic2 = type2->getAs<BoundGenericType>()) {
         if (generic1->getDecl()->isOptionalDecl() &&
-            generic2->getDecl()->isOptionalDecl())
-          return matchTypes(generic1->getGenericArgs()[0],
-                            generic2->getGenericArgs()[0],
-                            matchKind, subflags,
-                            locator.withPathElement(
-                              LocatorPathElt::GenericArgument(0)));
+            generic2->getDecl()->isOptionalDecl()) {
+          auto result = matchTypes(
+              generic1->getGenericArgs()[0], generic2->getGenericArgs()[0],
+              matchKind, subflags,
+              locator.withPathElement(LocatorPathElt::GenericArgument(0)));
+
+          if (!(shouldAttemptFixes() && result.isFailure()))
+            return result;
+        }
       }
     }
 
-    return SolutionKind::Error;
+    return shouldAttemptFixes() && fixContextualFailure(type1, type2, locator)
+               ? SolutionKind::Solved
+               : SolutionKind::Error;
   }
 
   case ConversionRestrictionKind::ClassMetatypeToAnyObject:
