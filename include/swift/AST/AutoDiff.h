@@ -254,10 +254,10 @@ void getSubsetParameterTypes(IndexSubset *indices, AnyFunctionType *type,
 ///
 /// Returns the "constrained" derivative/transpose generic signature given:
 /// - An original SIL function type.
-/// - Differentiability parameter indices.
-/// - A possibly "unconstrained" derivative generic signature.
+/// - Differentiability/linearity parameter indices.
+/// - A possibly "unconstrained" derivative/transpose generic signature.
 GenericSignature getConstrainedDerivativeGenericSignature(
-    SILFunctionType *originalFnTy, IndexSubset *diffParamIndices,
+    SILFunctionType *originalFnTy, IndexSubset *parameterIndices,
     GenericSignature derivativeGenSig, LookupConformanceFn lookupConformance,
     bool isTranspose = false);
 
