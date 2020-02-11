@@ -2153,8 +2153,8 @@ TypeChecker::typeCheckExpression(
     performSyntacticExprDiagnostics(result, dc, isExprStmt);
   }
 
-  target.setExpr(result);
-  return target;
+  resultTarget->setExpr(result);
+  return *resultTarget;
 }
 
 Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
@@ -2422,6 +2422,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   if (resultTarget) {
     initializer = resultTarget->getAsExpr();
+    pattern = resultTarget->getInitializationPattern();
     return false;
   }
 
