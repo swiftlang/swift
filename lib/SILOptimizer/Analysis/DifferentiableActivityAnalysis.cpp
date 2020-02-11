@@ -166,18 +166,20 @@ void DifferentiableActivityInfo::propagateVaried(
         setVariedAndPropagateToUsers(teai, i);
     }
   }
-  // Handle `struct_extract` and `struct_element_addr` instructions.
+  // Handle element projection instructions:
+  //   `struct_extract`, `struct_element_addr`, `ref_element_addr`.
   // - If the field is marked `@noDerivative`, do not set the result as
   //   varied because it does not need a derivative.
   // - Otherwise, propagate variedness from operand to result as usual.
-#define PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(INST)                           \
-  else if (auto *sei = dyn_cast<INST##Inst>(inst)) {                           \
-    if (isVaried(sei->getOperand(), i) &&                                      \
-        !sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())         \
-      setVariedAndPropagateToUsers(sei, i);                                    \
+#define PROPAGATE_VARIED_FOR_ELEMENT_PROJECTION(INST)                          \
+  else if (auto *projInst = dyn_cast<INST##Inst>(inst)) {                      \
+    if (isVaried(projInst->getOperand(), i) &&                                 \
+        !projInst->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())    \
+      setVariedAndPropagateToUsers(projInst, i);                               \
   }
-  PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructExtract)
-  PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructElementAddr)
+  PROPAGATE_VARIED_FOR_ELEMENT_PROJECTION(StructExtract)
+  PROPAGATE_VARIED_FOR_ELEMENT_PROJECTION(StructElementAddr)
+  PROPAGATE_VARIED_FOR_ELEMENT_PROJECTION(RefElementAddr)
 #undef PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION
   // Handle `br`.
   else if (auto *bi = dyn_cast<BranchInst>(inst)) {
@@ -222,13 +224,14 @@ static Optional<AccessorKind> getAccessorKind(SILFunction *fn) {
 void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
     SILValue value, unsigned independentVariableIndex) {
   auto i = independentVariableIndex;
-  // Skip `@noDerivative` struct projections.
+  // Skip `@noDerivative` projections.
 #define SKIP_NODERIVATIVE(INST)                                                \
-  if (auto *sei = dyn_cast<INST##Inst>(value))                                 \
-    if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())          \
+  if (auto *projInst = dyn_cast<INST##Inst>(value))                            \
+    if (projInst->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())     \
       return;
   SKIP_NODERIVATIVE(StructExtract)
   SKIP_NODERIVATIVE(StructElementAddr)
+  SKIP_NODERIVATIVE(RefElementAddr)
 #undef SKIP_NODERIVATIVE
   // Set value as varied and propagate to users.
   setVariedAndPropagateToUsers(value, i);
@@ -274,7 +277,8 @@ void DifferentiableActivityInfo::setUsefulAndPropagateToOperands(
   // Skip already-useful values to prevent infinite recursion.
   if (isUseful(value, dependentVariableIndex))
     return;
-  if (value->getType().isAddress()) {
+  if (value->getType().isAddress() ||
+      value->getType().getClassOrBoundGenericClass()) {
     propagateUsefulThroughAddress(value, dependentVariableIndex);
     return;
   }
@@ -331,15 +335,16 @@ void DifferentiableActivityInfo::propagateUseful(
   PROPAGATE_USEFUL_THROUGH_STORE(CopyAddr)
   PROPAGATE_USEFUL_THROUGH_STORE(UnconditionalCheckedCastAddr)
 #undef PROPAGATE_USEFUL_THROUGH_STORE
-  // Handle struct element extraction, skipping `@noDerivative` fields:
-  //   `struct_extract`, `struct_element_addr`.
-#define PROPAGATE_USEFUL_THROUGH_STRUCT_EXTRACTION(INST)                       \
-  else if (auto *sei = dyn_cast<INST##Inst>(inst)) {                           \
-    if (!sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())         \
-      setUsefulAndPropagateToOperands(sei->getOperand(), i);                   \
+  // Handle element projections, skipping `@noDerivative` fields:
+  //   `struct_extract`, `struct_element_addr`, `ref_element_addr`.
+#define PROPAGATE_USEFUL_THROUGH_ELEMENT_PROJECTION(INST)                      \
+  else if (auto *projInst = dyn_cast<INST##Inst>(inst)) {                      \
+    if (!projInst->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())    \
+      setUsefulAndPropagateToOperands(projInst->getOperand(), i);              \
   }
-  PROPAGATE_USEFUL_THROUGH_STRUCT_EXTRACTION(StructExtract)
-  PROPAGATE_USEFUL_THROUGH_STRUCT_EXTRACTION(StructElementAddr)
+  PROPAGATE_USEFUL_THROUGH_ELEMENT_PROJECTION(StructExtract)
+  PROPAGATE_USEFUL_THROUGH_ELEMENT_PROJECTION(StructElementAddr)
+  PROPAGATE_USEFUL_THROUGH_ELEMENT_PROJECTION(RefElementAddr)
 #undef PROPAGATE_USEFUL_THROUGH_STRUCT_EXTRACTION
   // Handle everything else.
   else {
@@ -350,7 +355,8 @@ void DifferentiableActivityInfo::propagateUseful(
 
 void DifferentiableActivityInfo::propagateUsefulThroughAddress(
     SILValue value, unsigned dependentVariableIndex) {
-  assert(value->getType().isAddress());
+  assert(value->getType().isAddress() ||
+         value->getType().getClassOrBoundGenericClass());
   // Skip already-useful values to prevent infinite recursion.
   if (isUseful(value, dependentVariableIndex))
     return;
@@ -364,13 +370,15 @@ void DifferentiableActivityInfo::propagateUsefulThroughAddress(
     propagateUseful(use->getUser(), dependentVariableIndex);
     for (auto res : use->getUser()->getResults()) {
 #define SKIP_NODERIVATIVE(INST)                                                \
-  if (auto *sei = dyn_cast<INST##Inst>(res))                                   \
-    if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())          \
+  if (auto *projInst = dyn_cast<INST##Inst>(res))                              \
+    if (projInst->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())     \
       continue;
       SKIP_NODERIVATIVE(StructExtract)
       SKIP_NODERIVATIVE(StructElementAddr)
+      SKIP_NODERIVATIVE(RefElementAddr)
 #undef SKIP_NODERIVATIVE
-      if (Projection::isAddressProjection(res) || isa<BeginAccessInst>(res))
+      if (Projection::isAddressProjection(res) || isa<BeginAccessInst>(res) ||
+          isa<BeginBorrowInst>(res))
         propagateUsefulThroughAddress(res, dependentVariableIndex);
     }
   }
