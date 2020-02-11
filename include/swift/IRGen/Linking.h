@@ -1137,9 +1137,9 @@ public:
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(ModuleDecl *module) const;
   
-  /// Return the source file whose codegen should trigger emission of this
-  /// link entity, if one can be identified.
-  const SourceFile *getSourceFileForEmission() const;
+  /// Return the module scope context whose codegen should trigger emission
+  /// of this link entity, if one can be identified.
+  DeclContext *getDeclContextForEmission() const;
   
   /// Get the preferred alignment for the definition of this entity.
   Alignment getAlignment(IRGenModule &IGM) const;

@@ -2947,9 +2947,11 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
   // If the entity will be emitted as part of the current source file
   // (if we know what that is), then we can reference it directly.
   if (CurSourceFile
-      && !isa<ClangModuleUnit>(CurSourceFile)
-      && CurSourceFile == entity.getSourceFileForEmission())
-    return direct();
+      && !isa<ClangModuleUnit>(CurSourceFile)) {
+    if (auto *dc = entity.getDeclContextForEmission())
+      if (CurSourceFile == dc->getParentSourceFile())
+        return direct();
+  }
   
   // TODO: If we know the target entry is going to be linked into the same
   // binary, then we ought to be able to directly relative-reference the

@@ -1071,20 +1071,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   llvm_unreachable("Bad link entity kind");
 }
 
-const SourceFile *LinkEntity::getSourceFileForEmission() const {
-  const SourceFile *sf;
-  
-  // Shared-linkage entities don't get emitted with any particular file.
-  if (hasSharedVisibility(getLinkage(NotForDefinition)))
-    return nullptr;
-  
-  auto getSourceFileForDeclContext =
-  [](const DeclContext *dc) -> const SourceFile * {
-    if (!dc)
-      return nullptr;
-    return dc->getParentSourceFile();
-  };
-  
+DeclContext *LinkEntity::getDeclContextForEmission() const {
   switch (getKind()) {
   case Kind::DispatchThunk:
   case Kind::DispatchThunkInitializer:
@@ -1122,36 +1109,22 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::OpaqueTypeDescriptorAccessorImpl:
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
-    sf = getSourceFileForDeclContext(getDecl()->getDeclContext());
-    if (!sf)
-      return nullptr;
-    break;
+    return getDecl()->getDeclContext();
   
   case Kind::SILFunction:
   case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::DynamicallyReplaceableFunctionKey:
-    sf = getSourceFileForDeclContext(getSILFunction()->getDeclContext());
-    if (!sf)
-      return nullptr;
-    break;
+    return getSILFunction()->getDeclContext();
   
   case Kind::SILGlobalVariable:
-    if (auto decl = getSILGlobalVariable()->getDecl()) {
-      sf = getSourceFileForDeclContext(decl->getDeclContext());
-      if (!sf)
-        return nullptr;
-    } else {
-      return nullptr;
-    }
-    break;
+    if (auto decl = getSILGlobalVariable()->getDecl())
+      return decl->getDeclContext();
+
+    return nullptr;
     
   case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
-    sf = getSourceFileForDeclContext(
-                              getRootProtocolConformance()->getDeclContext());
-    if (!sf)
-      return nullptr;
-    break;
+    return getRootProtocolConformance()->getDeclContext();
 
   case Kind::ProtocolWitnessTablePattern:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
@@ -1159,23 +1132,16 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::ReflectionAssociatedTypeDescriptor:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
   case Kind::ProtocolWitnessTableLazyAccessFunction:
-    sf = getSourceFileForDeclContext(
-      getProtocolConformance()->getRootConformance()->getDeclContext());
-    if (!sf)
-      return nullptr;
-    break;
+    return getRootProtocolConformance()->getDeclContext();
     
   case Kind::TypeMetadata: {
     auto ty = getType();
     // Only fully concrete nominal type metadata gets emitted eagerly.
     auto nom = ty->getAnyNominal();
-    if (!nom || nom->isGenericContext())
-      return nullptr;
+    if (nom)
+      return nom->getDeclContext();
     
-    sf = getSourceFileForDeclContext(nom);
-    if (!sf)
-      return nullptr;
-    break;
+    return nullptr;
   }
 
   // Always shared linkage
@@ -1197,6 +1163,4 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::DifferentiabilityWitness:
     return nullptr;
   }
-  
-  return sf;
 }
