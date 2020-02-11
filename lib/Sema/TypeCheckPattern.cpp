@@ -676,7 +676,8 @@ static Type validateTypedPattern(TypeResolution resolution,
   // variable binding, then we can bind the opaque return type from the
   // property definition.
   auto &Context = resolution.getASTContext();
-  if (auto opaqueRepr = dyn_cast_or_null<OpaqueReturnTypeRepr>(TL.getTypeRepr())) {
+  auto *Repr = TL.getTypeRepr();
+  if (Repr && isa<OpaqueReturnTypeRepr>(Repr)) {
     auto named = dyn_cast<NamedPattern>(
                            TP->getSubPattern()->getSemanticsProvidingPattern());
     if (named) {
@@ -700,7 +701,7 @@ static Type validateTypedPattern(TypeResolution resolution,
     return ErrorType::get(Context);
   }
 
-  assert(!dyn_cast_or_null<SpecifierTypeRepr>(TL.getTypeRepr()));
+  assert(!dyn_cast_or_null<SpecifierTypeRepr>(Repr));
   return TL.getType();
 }
 

@@ -337,7 +337,7 @@ public:
       }
 
       // Don't look up field info for imported Objective-C classes.
-      if (auto *OC = dyn_cast<ObjCClassTypeRef>(T)) {
+      if (isa<ObjCClassTypeRef>(T)) {
         addAnyObject();
         return;
       }

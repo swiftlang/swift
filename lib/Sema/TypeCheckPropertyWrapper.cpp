@@ -461,8 +461,8 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
     }
 
     // Properties with wrappers must not override another property.
-    if (auto classDecl = dyn_cast<ClassDecl>(dc)) {
-      if (auto overrideAttr = var->getAttrs().getAttribute<OverrideAttr>()) {
+    if (isa<ClassDecl>(dc)) {
+      if (var->getAttrs().hasAttribute<OverrideAttr>()) {
         var->diagnose(diag::property_with_wrapper_overrides,
                       var->getFullName())
           .highlight(attr->getRange());

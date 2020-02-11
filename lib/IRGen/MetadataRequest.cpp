@@ -1936,7 +1936,7 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
       : llvm::UndefValue::get(IGM.Int8PtrTy);
 
-    std::array<llvm::Value *, 3> argValues{arg0, arg1, arg2};
+    std::array<llvm::Value *, 3> argValues = {arg0, arg1, arg2};
 
     emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
         IGF, params, nominal, genericArgs,
