@@ -4797,13 +4797,15 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
     // have an explicit return type. The reason we also need to check
     // whether the parameter list has a valid loc is to guard against
     // cases like like 'var foo: () { return 1 }' as here that loc will
-    // be invalid.
+    // be invalid. We also need to check that the name is not empty,
+    // because certain decls will have empty name (like setters).
     if (FD->getBodyResultTypeLoc().getLoc().isInvalid() &&
-        FD->getParameters()->getStartLoc().isValid()) {
+        FD->getParameters()->getStartLoc().isValid() &&
+        !FD->getName().empty()) {
       auto fixItLoc = Lexer::getLocForEndOfToken(
           getASTContext().SourceMgr, FD->getParameters()->getEndLoc());
       emitDiagnostic(anchor->getLoc(), diag::add_return_type_note)
-          .fixItInsert(fixItLoc, " -> <# Return Type #>");
+          .fixItInsert(fixItLoc, " -> <#Return Type#>");
     }
   }
 
