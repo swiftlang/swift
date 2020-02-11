@@ -30,11 +30,6 @@ __all__ = [
     'requires_module',
     'requires_platform',
     'requires_python',
-
-    'BUILD_SCRIPT_IMPL_PATH',
-    'BUILD_SWIFT_PATH',
-    'TESTS_PATH',
-    'UTILS_PATH',
 ]
 
 
@@ -42,12 +37,6 @@ __all__ = [
 # Constants
 
 _PYTHON_VERSION = Version(platform.python_version())
-
-TESTS_PATH = os.path.abspath(os.path.dirname(__file__))
-BUILD_SWIFT_PATH = os.path.abspath(os.path.join(TESTS_PATH, os.pardir))
-UTILS_PATH = os.path.abspath(os.path.join(BUILD_SWIFT_PATH, os.pardir))
-
-BUILD_SCRIPT_IMPL_PATH = os.path.join(UTILS_PATH, 'build-script-impl')
 
 
 # -----------------------------------------------------------------------------

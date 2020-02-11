@@ -28,6 +28,10 @@ from build_swift.build_swift import defaults
 from build_swift.build_swift import driver_arguments
 from build_swift.build_swift import migration
 from build_swift.build_swift import presets
+from build_swift.build_swift.constants import BUILD_SCRIPT_IMPL_PATH
+from build_swift.build_swift.constants import SWIFT_BUILD_ROOT
+from build_swift.build_swift.constants import SWIFT_REPO_NAME
+from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
 import six
 
@@ -35,25 +39,18 @@ from swift_build_support.swift_build_support import products
 from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support import targets
 from swift_build_support.swift_build_support import workspace
-from swift_build_support.swift_build_support.SwiftBuildSupport import (
-    HOME,
-    SWIFT_BUILD_ROOT,
-    SWIFT_REPO_NAME,
-    SWIFT_SOURCE_ROOT,
-)
 from swift_build_support.swift_build_support.cmake import CMake
 from swift_build_support.swift_build_support.host_specific_configuration \
     import HostSpecificConfiguration
-from swift_build_support.swift_build_support.targets import \
-    StdlibDeploymentTarget
+from swift_build_support.swift_build_support.targets import StdlibDeploymentTarget
 from swift_build_support.swift_build_support.toolchain import host_toolchain
 
 
 # -----------------------------------------------------------------------------
 # Constants
 
-BUILD_SCRIPT_IMPL = os.path.join(
-    SWIFT_SOURCE_ROOT, SWIFT_REPO_NAME, "utils", "build-script-impl")
+# TODO: Remove this constant, it's really not helpful.
+HOME = os.environ.get("HOME", "/")
 
 
 # -----------------------------------------------------------------------------
@@ -968,7 +965,7 @@ class BuildScriptInvocation(object):
         # `build-script-impl`.
         if self.args.legacy_impl:
             # Execute the underlying build script implementation.
-            shell.call_without_sleeping([BUILD_SCRIPT_IMPL] + self.impl_args,
+            shell.call_without_sleeping([BUILD_SCRIPT_IMPL_PATH] + self.impl_args,
                                         env=self.impl_env, echo=True)
             return
 
@@ -1090,7 +1087,7 @@ class BuildScriptInvocation(object):
 
     def _execute_action(self, action_name):
         shell.call_without_sleeping(
-            [BUILD_SCRIPT_IMPL] + self.impl_args +
+            [BUILD_SCRIPT_IMPL_PATH] + self.impl_args +
             ["--only-execute", action_name],
             env=self.impl_env, echo=self.args.verbose_build)
 
@@ -1274,7 +1271,7 @@ def main_normal():
         # If we received any impl args, check if `build-script-impl` would
         # accept them or not before any further processing.
         try:
-            migration.check_impl_args(BUILD_SCRIPT_IMPL,
+            migration.check_impl_args(BUILD_SCRIPT_IMPL_PATH,
                                       args.build_script_impl_args)
         except ValueError as e:
             exit_rejecting_arguments(e, parser)

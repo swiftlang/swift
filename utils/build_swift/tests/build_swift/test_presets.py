@@ -12,6 +12,7 @@ from __future__ import unicode_literals
 import os
 import unittest
 
+from build_swift import constants
 from build_swift import presets
 from build_swift.presets import Preset, PresetParser
 
@@ -25,7 +26,7 @@ from .. import utils
 # Constants
 
 PRESET_FILES = [
-    os.path.join(utils.UTILS_PATH, 'build-presets.ini'),
+    os.path.join(constants.UTILS_PATH, 'build-presets.ini'),
 ]
 
 PRESET_DEFAULTS = {

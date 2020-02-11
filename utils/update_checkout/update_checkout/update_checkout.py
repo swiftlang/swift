@@ -20,9 +20,9 @@ import traceback
 from functools import reduce
 from multiprocessing import Lock, Pool, cpu_count, freeze_support
 
+from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
+
 from swift_build_support.swift_build_support import shell
-from swift_build_support.swift_build_support.SwiftBuildSupport import \
-    SWIFT_SOURCE_ROOT
 
 
 SCRIPT_FILE = os.path.abspath(__file__)
