@@ -15,6 +15,7 @@ import sys
 import unittest
 
 from build_swift import argparse
+from build_swift import constants
 from build_swift import driver_arguments
 from build_swift import migration
 from build_swift.presets import PresetParser
@@ -27,7 +28,7 @@ from .. import utils
 
 
 PRESETS_FILES = [
-    os.path.join(utils.UTILS_PATH, 'build-presets.ini'),
+    os.path.join(constants.UTILS_PATH, 'build-presets.ini'),
 ]
 
 
@@ -349,7 +350,7 @@ class TestDriverArgumentParser(unittest.TestCase):
 
         try:
             migration.check_impl_args(
-                utils.BUILD_SCRIPT_IMPL_PATH,
+                constants.BUILD_SCRIPT_IMPL_PATH,
                 namespace.build_script_impl_args)
         except (SystemExit, ValueError) as e:
             raise ParserError('failed to parse impl arguments: {}'.format(
