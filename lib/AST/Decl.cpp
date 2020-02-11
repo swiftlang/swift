@@ -4635,20 +4635,26 @@ ProtocolDecl::getInheritedProtocolsSlow() {
   SmallPtrSet<const ProtocolDecl *, 2> known;
   known.insert(this);
   bool anyObject = false;
-  auto enumerateInherited = [&] (llvm::PointerUnion<TypeDecl *,
-                                 ExtensionDecl *> decl) {
-    for (const auto found :
-             getDirectlyInheritedNominalTypeDecls(decl, anyObject))
-      if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
-        if (known.insert(proto).second)
-          result.push_back(proto);
-  };
-
-  enumerateInherited(this);
-  for (auto ext : getExtensions())
-      enumerateInherited(ext);
+  for (const auto found :
+           getDirectlyInheritedNominalTypeDecls(
+             const_cast<ProtocolDecl *>(this), anyObject)) {
+    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
+      if (known.insert(proto).second)
+        result.push_back(proto);
+    }
+  }
 
   auto &ctx = getASTContext();
+  // Protocol extensions with conformances.
+  for (auto ext : getExtensions())
+    for (const auto found :
+             getDirectlyInheritedNominalTypeDecls(ext, anyObject))
+      if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
+        if (known.insert(proto).second) {
+          result.push_back(proto);
+          ctx.ExtendedConformances[this][proto] = ext;
+        }
+
   InheritedProtocols = ctx.AllocateCopy(result);
   return InheritedProtocols;
 }

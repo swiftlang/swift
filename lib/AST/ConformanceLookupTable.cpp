@@ -1282,10 +1282,19 @@ void ProtocolDecl::inheritedProtocolsChanged() {
   RequirementSignature = nullptr;
 }
 
+bool ProtocolDecl::isExtendedConformance(ProtocolDecl *proto) {
+  if (!Bits.ProtocolDecl.InheritedProtocolsValid)
+    (void)getInheritedProtocolsSlow();
+  auto &extendedProtocols = getASTContext().ExtendedConformances;
+  auto extendedProto = extendedProtocols.find(this);
+  return extendedProto != extendedProtocols.end() &&
+    extendedProto->second.find(proto) != extendedProto->second.end();
+}
+
 void ExtensionDecl::setInherited(MutableArrayRef<TypeLoc> i) {
   Inherited = i;
   if (!Inherited.empty()) {
-    getASTContext().ExtensionsWithConformances.emplace_back(this);
+    getASTContext().addExtensionWithConformances(this);
 
     if (hasBeenBound())
       if (auto *proto = getExtendedProtocolDecl())

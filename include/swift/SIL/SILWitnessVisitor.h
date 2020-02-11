@@ -50,7 +50,15 @@ template <class T> class SILWitnessVisitor : public ASTVisitor<T> {
 
 public:
   void visitProtocolDecl(ProtocolDecl *protocol) {
+    // This chicanery is to move conformances arising from
+    // protocol extensions to the end of the witness table.
+    visitProtocolDecl(protocol, false);
+    visitProtocolDecl(protocol, true);
+  }
+
+  void visitProtocolDecl(ProtocolDecl *protocol, bool includeExtended) {
     // The protocol conformance descriptor gets added first.
+    if (!includeExtended)
     asDerived().addProtocolConformanceDescriptor();
 
     for (const auto &reqt : protocol->getRequirementSignature()) {
@@ -79,12 +87,14 @@ public:
           assert(type->isEqual(protocol->getSelfInterfaceType()));
           assert(parameter->getDepth() == 0 && parameter->getIndex() == 0 &&
                  "non-self type parameter in protocol");
-          asDerived().addOutOfLineBaseProtocol(requirement);
+          if (protocol->isExtendedConformance(requirement) == includeExtended)
+            asDerived().addOutOfLineBaseProtocol(requirement);
           continue;
         }
 
         // Otherwise, add an associated requirement.
         AssociatedConformance assocConf(protocol, type, requirement);
+        if (!includeExtended)
         asDerived().addAssociatedConformance(assocConf);
         continue;
       }
@@ -93,6 +103,7 @@ public:
     }
 
     // Add the associated types.
+    if (!includeExtended)
     for (auto *associatedType : protocol->getAssociatedTypeMembers()) {
       // If this is a new associated type (which does not override an
       // existing associated type), add it.
@@ -100,10 +111,11 @@ public:
         asDerived().addAssociatedType(AssociatedType(associatedType));
     }
 
-    if (asDerived().shouldVisitRequirementSignatureOnly())
-      return;
+//    if (asDerived().shouldVisitRequirementSignatureOnly())
+//      return;
 
     // Visit the witnesses for the direct members of a protocol.
+    if (!includeExtended)
     for (Decl *member : protocol->getMembers()) {
       ASTVisitor<T>::visit(member);
     }

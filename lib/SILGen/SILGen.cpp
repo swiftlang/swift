@@ -1834,13 +1834,9 @@ public:
 
     SGM.getASTContext()
       .forEachExtendedConformance([&](NormalProtocolConformance *normal) {
-      getWitnessTable(normal, /*emitAsPrivate*/true);
+      SGM.getWitnessTable(normal, /*emitAsPrivate*/true);
     });
   }
-
-//===----------------------------------------------------------------------===//
-// SILModule::constructSIL method implementation
-//===----------------------------------------------------------------------===//
 
   SILGenModuleRAII(SILModule &M, ModuleDecl *SM) : SGM{M, SM} {}
 

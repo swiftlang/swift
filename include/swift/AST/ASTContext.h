@@ -308,9 +308,6 @@ public:
       llvm::SmallPtrSet<DerivativeAttr *, 1>>
       DerivativeAttrs;
 
-  /// Track protocol extensions that inherit to determine witness tables to emit.
-  mutable SmallVector<ExtensionDecl *, 2> ExtensionsWithConformances;
-
 private:
   /// The current generation number, which reflects the number of
   /// times that external modules have been loaded.
@@ -334,6 +331,15 @@ private:
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
+
+  /// Track protocol extensions that inherit to determine witness tables to emit.
+  mutable SmallVector<ExtensionDecl *, 2> ExtensionsWithConformances;
+
+  /// Protocol conformances that are a result of a protocol extension
+  mutable llvm::DenseMap<ProtocolDecl *,
+    llvm::DenseMap<ProtocolDecl *, ExtensionDecl *>> ExtendedConformances;
+
+  friend class ProtocolDecl;
 
 public:
   /// Allocate - Allocate memory from the ASTContext bump pointer.
@@ -719,7 +725,16 @@ public:
   /// one.
   void loadExtensions(NominalTypeDecl *nominal, unsigned previousGeneration);
 
-  /// Iterate over conformances arising from protocol extensions
+  /// Keep track of protocol extensions that include a conformance.
+  ///
+  /// \param extWithConformances A (protocol) extension that has conformances
+  void addExtensionWithConformances(ExtensionDecl *extWithConformances) {
+    ExtensionsWithConformances.emplace_back(extWithConformances);
+  }
+
+  /// Iterate over conformances arising from protocol extensions.
+  ///
+  /// \param emitWitness A function to call to emit a witness table.
   void forEachExtendedConformance(
                 std::function<void (NormalProtocolConformance *)> emitWitness);
 

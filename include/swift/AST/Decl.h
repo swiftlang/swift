@@ -4280,6 +4280,9 @@ public:
   /// An extension has inherited a new protocol
   void inheritedProtocolsChanged();
 
+  //// Has a conformance come about from an extension?
+  bool isExtendedConformance(ProtocolDecl *proto);
+
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 

@@ -90,7 +90,8 @@ static void checkInheritanceClause(
 
         auto *attr = ext->getAttrs().getAttribute<AccessControlAttr>();
         if (!attr || attr->getAccess() < AccessLevel::Public)
-          ext->diagnose(diag::protocol_extension_access_with_conformances);
+          ext->diagnose(diag::protocol_extension_access_with_conformances)
+                              .fixItInsert(ext->getStartLoc(), "public ");
 
         // Warning (eventually error?) here is now gated
         if (!ext->getASTContext().LangOpts.EnableConformingExtensions)
