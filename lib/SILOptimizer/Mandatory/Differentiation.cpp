@@ -567,7 +567,8 @@ emitDerivativeFunctionReference(
       auto derivativeConstrainedGenSig =
           autodiff::getConstrainedDerivativeGenericSignature(
               originalFn->getLoweredFunctionType(), desiredParameterIndices,
-              contextualDerivativeGenSig);
+              contextualDerivativeGenSig,
+              LookUpConformanceInModule(context.getModule().getSwiftModule()));
       minimalWitness = SILDifferentiabilityWitness::createDefinition(
           context.getModule(), SILLinkage::Private, originalFn,
           desiredParameterIndices, desiredResultIndices,
