@@ -16,8 +16,14 @@ ClassTests.test("TrivialMember") {
     @noDerivative
     final var noDerivative: Float = 1
 
+    @differentiable
     init(_ float: Float) {
       self.float = float
+    }
+
+    @differentiable
+    convenience init(convenience x: Float) {
+      self.init(x)
     }
 
     @differentiable
@@ -44,6 +50,7 @@ ClassTests.test("TrivialMember") {
   }
   // Test class initializer differentiation.
   expectEqual(10, pullback(at: 3, in: { C($0) })(.init(float: 10)))
+  expectEqual(10, pullback(at: 3, in: { C(convenience: $0) })(.init(float: 10)))
   // Test class method differentiation.
   expectEqual((.init(float: 3), 10), gradient(at: C(10), 3, in: { c, x in c.method(x) }))
   expectEqual(.init(float: 0), gradient(at: C(10), in: { c in c.testNoDerivative() }))
@@ -56,6 +63,7 @@ ClassTests.test("NontrivialMember") {
     @differentiable
     var float: Tracked<Float>
 
+    @differentiable
     init(_ float: Tracked<Float>) {
       self.float = float
     }
@@ -82,6 +90,26 @@ ClassTests.test("NontrivialMember") {
   expectEqual((.init(float: 3), 10), gradient(at: C(10), 3, in: { c, x in c.method(x) }))
   expectEqual((.init(float: 20), .init(float: 10)),
               gradient(at: C(10), C(20), in: { c1, c2 in C.controlFlow(c1, c2, true) }))
+}
+
+ClassTests.test("GenericNontrivialMember") {
+  final class C<T: Differentiable>: Differentiable where T == T.TangentVector {
+    @differentiable
+    var x: Tracked<T>
+
+    @differentiable
+    init(_ x: T) {
+      self.x = Tracked(x)
+    }
+
+    @differentiable
+    convenience init(convenience x: T) {
+      self.init(x)
+    }
+  }
+  // Test class initializer differentiation.
+  expectEqual(10, pullback(at: 3, in: { C<Float>($0) })(.init(x: 10)))
+  expectEqual(10, pullback(at: 3, in: { C<Float>(convenience: $0) })(.init(x: 10)))
 }
 
 // TF-1149: Test class with loadable type but address-only `TangentVector` type.

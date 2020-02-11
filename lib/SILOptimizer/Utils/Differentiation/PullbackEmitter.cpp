@@ -376,7 +376,8 @@ SILValue PullbackEmitter::getAdjointProjection(SILBasicBlock *origBB,
     auto *tanField = cast<VarDecl>(tanFieldLookup.front());
     // Create a local allocation for the element adjoint buffer.
     auto eltTanType = tanField->getValueInterfaceType()->getCanonicalType();
-    auto eltTanSILType = SILType::getPrimitiveAddressType(eltTanType);
+    auto eltTanSILType =
+        remapType(SILType::getPrimitiveAddressType(eltTanType));
     auto *eltAdjBuffer = createFunctionLocalAllocation(eltTanSILType, loc);
     builder.emitScopedBorrowOperation(
         loc, adjClass, [&](SILValue borrowedAdjClass) {
@@ -1090,7 +1091,7 @@ PullbackEmitter::getArrayAdjointElementBuffer(SILValue arrayAdjoint,
   auto arrayTanType = cast<StructType>(arrayAdjoint->getType().getASTType());
   auto arrayType = arrayTanType->getParent()->castTo<BoundGenericStructType>();
   auto eltTanType = arrayType->getGenericArgs().front()->getCanonicalType();
-  auto eltTanSILType = SILType::getPrimitiveAddressType(eltTanType);
+  auto eltTanSILType = remapType(SILType::getPrimitiveAddressType(eltTanType));
   // Get `function_ref` and generic signature of
   // `Array.TangentVector.subscript.getter`.
   auto *arrayTanStructDecl = arrayTanType->getStructOrBoundGenericStruct();
@@ -1602,12 +1603,11 @@ void PullbackEmitter::visitLoadOperation(SingleValueInstruction *inst) {
 void PullbackEmitter::visitStoreOperation(SILBasicBlock *bb, SILLocation loc,
                                           SILValue origSrc, SILValue origDest) {
   auto &adjBuf = getAdjointBuffer(bb, origDest);
-  auto bufType = remapType(adjBuf->getType());
   auto adjVal =
       builder.emitLoadValueOperation(loc, adjBuf, LoadOwnershipQualifier::Take);
   recordTemporary(adjVal);
   addAdjointValue(bb, origSrc, makeConcreteAdjointValue(adjVal), loc);
-  emitZeroIndirect(bufType.getASTType(), adjBuf, loc);
+  emitZeroIndirect(adjBuf->getType().getASTType(), adjBuf, loc);
 }
 
 void PullbackEmitter::visitStoreInst(StoreInst *si) {
