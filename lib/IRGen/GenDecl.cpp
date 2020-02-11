@@ -2861,14 +2861,18 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
 /// relative references to the GOT entry for the variable in the object file.
 ConstantReference
 IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
+  auto canDirectlyReferenceSILFunction = [&](SILFunction *silFn) {
+    return (silFn->isDefinition() &&
+           !isAvailableExternally(silFn->getLinkage()) &&
+           this == IRGen.getGenModule(silFn));
+  };
+
   // Handle SILFunctions specially, because unlike other entities they aren't
   // variables and aren't kept in the GlobalVars table.
   if (entity.isSILFunction()) {
     auto *silFn = entity.getSILFunction();
     auto fn = getAddrOfSILFunction(silFn, NotForDefinition);
-    if (silFn->isDefinition() &&
-        !isAvailableExternally(silFn->getLinkage()) &&
-        this == IRGen.getGenModule(silFn)) {
+    if (canDirectlyReferenceSILFunction(silFn)) {
       return {fn, ConstantReference::Direct};
     }
     
@@ -2888,22 +2892,6 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
   // Ensure the variable is at least forward-declared.
   getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
 
-  // Guess whether a global entry is a definition from this TU. This isn't
-  // bulletproof, but at the point we emit conformance tables, we're far enough
-  // along that we should have emitted any metadata objects we were going to.
-  auto isDefinition = [&](llvm::Constant *global) -> bool {
-    // We only emit aliases for definitions. (An extern alias would be an
-    // extern global.)
-    if (isa<llvm::GlobalAlias>(global))
-      return true;
-    // Global vars are definitions if they have an initializer.
-    if (auto var = dyn_cast<llvm::GlobalVariable>(global))
-      return var->hasInitializer();
-    // Assume anything else isn't a definition.
-    return false;
-  };
-  
-  //
   auto entry = GlobalVars[entity];
   
   /// Returns a direct reference.
@@ -2928,36 +2916,59 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
   if (IRGen.Opts.IntegratedREPL)
     return indirect();
 
-  // Nominal type descriptors are only emitted once and can only be
-  // referenced directly from the same TU.
-  if (entity.isNominalTypeDescriptor()) {
-    auto *dc = entity.getDecl()->getDeclContext();
-    if (isa<ClangModuleUnit>(dc->getModuleScopeContext()) &&
-        this != IRGen.getGenModule(dc))
-      return indirect();
+  // Dynamically replaceable function keys are stored in the GlobalVars
+  // table, but they don't have an associated Decl, so they require
+  // special treatment here.
+  if (entity.isDynamicallyReplaceableFunctionKey()) {
+    auto *silFn = entity.getSILFunction();
+    if (canDirectlyReferenceSILFunction(silFn))
+      return direct();
+
+    return indirect();
   }
 
-  // If the variable has already been defined in this TU,
-  // then it definitely doesn't need a GOT entry, and we can
-  // relative-reference it directly.
-  if (!entity.isAvailableExternally(*this) || isDefinition(entry)) {
-    return direct();
-  }
+  if (auto *entityDC = entity.getDeclContextForEmission()) {
+    auto *entitySF = entityDC->getModuleScopeContext();
+    bool clangImportedEntity = isa<ClangModuleUnit>(entitySF);
 
-  // If the entity will be emitted as part of the current source file
-  // (if we know what that is), then we can reference it directly.
-  if (CurSourceFile
-      && !isa<ClangModuleUnit>(CurSourceFile)) {
-    if (auto *dc = entity.getDeclContextForEmission())
-      if (CurSourceFile == dc->getParentSourceFile())
+    auto &mod = getSILModule();
+
+    if (!mod.isWholeModule()) {
+      // In non-WMO builds, the associated context of the SILModule must
+      // be a source file. Every source file is its own translation unit.
+      auto *modDC = mod.getAssociatedContext();
+      auto *modSF = modDC->getModuleScopeContext();
+      assert(modSF != nullptr);
+
+      // Imported entities are in a different Swift module, but are emitted
+      // on demand and can be referenced directly. Entities in the same
+      // source file can also be referenced directly.
+      if (clangImportedEntity ||
+          modSF == entitySF)
         return direct();
+
+      // Everything else must be referenced indirectly.
+      return indirect();
+    }
+
+    // We're performing a WMO build.
+    //
+    // The associated context of the SILModule is the entire AST ModuleDecl,
+    // but we might be doing a multi-threaded IRGen build, in which case
+    // there is one translation unit per source file.
+
+    // Imported entities are in a different Swift module and are emitted
+    // on demand. In multi-threaded builds, they will be emitted into one
+    // translation unit only.
+    if (clangImportedEntity ||
+        entitySF->getParentModule() == mod.getSwiftModule()) {
+      // If we're doing a single-threaded WMO build, or if the entity is
+      // scheduled to be emitted in the same translation unit, reference
+      // it directly.
+      if (this == IRGen.getGenModule(entitySF))
+        return direct();
+    }
   }
-  
-  // TODO: If we know the target entry is going to be linked into the same
-  // binary, then we ought to be able to directly relative-reference the
-  // symbol. However, some platforms don't have the necessary relocations to
-  // represent a relative reference to an undefined symbol, so conservatively
-  // produce an indirect reference in this case.
 
   // Fall back to an indirect reference if we can't establish that a direct
   // reference is OK.

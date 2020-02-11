@@ -1130,6 +1130,9 @@ public:
   bool isSILFunction() const {
     return getKind() == Kind::SILFunction;
   }
+  bool isDynamicallyReplaceableFunctionKey() const {
+    return getKind() == Kind::DynamicallyReplaceableFunctionKey;
+  }
   bool isNominalTypeDescriptor() const {
     return getKind() == Kind::NominalTypeDescriptor;
   }
