@@ -1123,7 +1123,7 @@ class Super: Differentiable {
   func instanceMethod<T>(_ x: Float, y: T) -> Float { x }
 
   // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-  // expected-error @+1 {{'@differentiable' attribute cannot be declared on class methods returning 'Self'}}
+  // expected-error @+1 {{'@differentiable' attribute cannot be declared on class members returning 'Self'}}
   @differentiable(vjp: vjpDynamicSelfResult)
   func dynamicSelfResult() -> Self { self }
 
