@@ -343,7 +343,7 @@ static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
 /// Removes instructions that create the callee value if they are no
 /// longer necessary after inlining.
 static void cleanupCalleeValue(SILValue calleeValue,
-                               bool &needUpdateStackNesting) {
+                               bool &invalidatedStackNesting) {
   // Handle the case where the callee of the apply is a load instruction. If we
   // fail to optimize, return. Otherwise, see if we can look through other
   // abstractions on our callee.
@@ -383,7 +383,7 @@ static void cleanupCalleeValue(SILValue calleeValue,
       return;
     calleeValue = callee;
   }
-  needUpdateStackNesting = true;
+  invalidatedStackNesting = true;
 
   calleeValue = stripCopiesAndBorrows(calleeValue);
 
@@ -450,7 +450,7 @@ class ClosureCleanup {
 public:
   /// Set to true if some alloc/dealloc_stack instruction are inserted and at
   /// the end of the run stack nesting needs to be corrected.
-  bool needUpdateStackNesting = false;
+  bool invalidatedStackNesting = false;
 
   /// This regular instruction deletion callback checks for any function-type
   /// values that may be unused after deleting the given instruction.
@@ -481,7 +481,7 @@ public:
         continue;
 
       if (auto *SVI = dyn_cast<SingleValueInstruction>(I.getValue()))
-        cleanupCalleeValue(SVI, needUpdateStackNesting);
+        cleanupCalleeValue(SVI, invalidatedStackNesting);
     }
   }
 };
@@ -812,7 +812,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
 
   SmallVector<ParameterConvention, 16> CapturedArgConventions;
   SmallVector<SILValue, 32> FullArgs;
-  bool needUpdateStackNesting = false;
+  bool invalidatedStackNesting = false;
 
   // Visiting blocks in reverse order avoids revisiting instructions after block
   // splitting, which would be quadratic.
@@ -930,7 +930,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
         closureCleanup.recordDeadFunction(I);
       });
 
-      needUpdateStackNesting |= Inliner.needsUpdateStackNesting(InnerAI);
+      invalidatedStackNesting |= Inliner.invalidatesStackNesting(InnerAI);
 
       // Inlining deletes the apply, and can introduce multiple new basic
       // blocks. After this, CalleeValue and other instructions may be invalid.
@@ -944,7 +944,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
       // we may be able to remove dead callee computations (e.g. dead
       // partial_apply closures).
       closureCleanup.cleanupDeadClosures(F);
-      needUpdateStackNesting |= closureCleanup.needUpdateStackNesting;
+      invalidatedStackNesting |= closureCleanup.invalidatedStackNesting;
 
       // Resume inlining within nextBB, which contains only the inlined
       // instructions and possibly instructions in the original call block that
@@ -953,7 +953,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
     }
   }
 
-  if (needUpdateStackNesting) {
+  if (invalidatedStackNesting) {
     StackNesting().correctStackNesting(F);
   }
 

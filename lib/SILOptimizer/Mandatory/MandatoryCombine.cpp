@@ -72,7 +72,7 @@ class MandatoryCombiner final
 
   /// Set to true if some alloc/dealloc_stack instruction are inserted and at
   /// the end of the run stack nesting needs to be corrected.
-  bool needUpdateStackNesting;
+  bool invalidatedStackNesting;
 
   /// The number of times that the worklist has been processed.
   unsigned iteration;
@@ -119,7 +119,7 @@ public:
       ++iteration;
     }
 
-    if (needUpdateStackNesting) {
+    if (invalidatedStackNesting) {
       StackNesting().correctStackNesting(&function);
     }
 
@@ -279,7 +279,7 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
 #endif
   );
   if (tryDeleteDeadClosure(partialApply, instModCallbacks)) {
-    needUpdateStackNesting = true;
+    invalidatedStackNesting = true;
   }
   return nullptr;
 }
