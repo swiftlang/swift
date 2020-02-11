@@ -108,8 +108,7 @@ namespace swift {
   /// \param SF The file within the module being parsed.
   ///
   /// \param BufferID The buffer to parse from.
-  void parseIntoSourceFile(SourceFile &SF, unsigned BufferID,
-                           bool EvaluateConditionals = true);
+  void parseIntoSourceFile(SourceFile &SF, unsigned BufferID);
 
   /// Parse a source file's SIL declarations into a given SIL module.
   void parseSourceFileSIL(SourceFile &SF, SILParserState *sil);

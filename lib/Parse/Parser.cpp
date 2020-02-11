@@ -362,16 +362,14 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
-               std::shared_ptr<SyntaxParseActions> SPActions,
-               bool EvaluateConditionals)
+               std::shared_ptr<SyntaxParseActions> SPActions)
     : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState,
-             std::move(SPActions), EvaluateConditionals) {}
+             std::move(SPActions)) {}
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
                SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
-               std::shared_ptr<SyntaxParseActions> SPActions,
-               bool EvaluateConditionals)
+               std::shared_ptr<SyntaxParseActions> SPActions)
     : Parser(
           std::unique_ptr<Lexer>(new Lexer(
               SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
@@ -386,8 +384,7 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
               SF.shouldBuildSyntaxTree()
                   ? TriviaRetentionMode::WithTrivia
                   : TriviaRetentionMode::WithoutTrivia)),
-          SF, SIL, PersistentState, std::move(SPActions),
-          EvaluateConditionals) {}
+          SF, SIL, PersistentState, std::move(SPActions)) {}
 
 namespace {
 
@@ -507,8 +504,7 @@ public:
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
-               std::shared_ptr<SyntaxParseActions> SPActions,
-               bool EvaluateConditionals)
+               std::shared_ptr<SyntaxParseActions> SPActions)
   : SourceMgr(SF.getASTContext().SourceMgr),
     Diags(SF.getASTContext().Diags),
     SF(SF),
@@ -517,7 +513,6 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     CurDeclContext(&SF),
     Context(SF.getASTContext()),
     CurrentTokenHash(SF.getInterfaceHashPtr()),
-    EvaluateConditionals(EvaluateConditionals),
     TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF, L->getBufferID()) :
                 new ConsumeTokenReceiver()),
@@ -549,6 +544,11 @@ bool Parser::isDelayedParsingEnabled() const {
     return false;
 
   return SF.hasDelayedBodyParsing();
+}
+
+bool Parser::shouldEvaluatePoundIfDecls() const {
+  auto opts = SF.getParsingOptions();
+  return !opts.contains(SourceFile::ParsingFlags::DisablePoundIfEvaluation);
 }
 
 bool Parser::allowTopLevelCode() const {
@@ -1179,7 +1179,8 @@ struct ParserUnit::Implementation {
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx), SFKind,
             BufferID, SourceFile::ImplicitModuleImportKind::None,
             Opts.CollectParsedToken, Opts.BuildSyntaxTree,
-            SourceFile::ParsingFlags::DisableDelayedBodies)) {}
+            SourceFile::ParsingFlags::DisableDelayedBodies |
+                SourceFile::ParsingFlags::DisablePoundIfEvaluation)) {}
 
   ~Implementation() {
     // We need to delete the parser before the context so that it can finalize

@@ -1147,7 +1147,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
         SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
         BufferID, parsingOpts);
 
-    parseIntoSourceFile(*NextInput, BufferID, EvaluateConditionals);
+    parseIntoSourceFile(*NextInput, BufferID);
   }
 
   // Now parse the main file.
@@ -1157,7 +1157,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
     MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
     assert(MainBufferID == MainFile.getBufferID());
 
-    parseIntoSourceFile(MainFile, MainBufferID, EvaluateConditionals);
+    parseIntoSourceFile(MainFile, MainBufferID);
   }
 
   assert(Context->LoadedModules.size() == 1 &&
