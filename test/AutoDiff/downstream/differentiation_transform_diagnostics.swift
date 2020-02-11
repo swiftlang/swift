@@ -247,9 +247,6 @@ class MultipleDiffAttrsClass : Differentiable {
   func f(_ x: Float) -> Float { x }
 }
 func testMultipleDiffAttrsClass<C: MultipleDiffAttrsClass>(_ c: C, _ x: Float) {
-  // TODO(TF-647): Handle differentiation of `upcast` instruction.
-  // expected-error @+2 {{function is not differentiable}}
-  // expected-note @+1 {{expression is not differentiable}}
   _ = gradient(at: c, x) { c, x in c.f(x) }
   _ = gradient(at: x) { x in c.f(x) }
 }

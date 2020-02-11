@@ -1030,8 +1030,7 @@ extension ProtocolRequirementUnsupported {
 class Super : Differentiable {
   var base: Float
 
-  // NOTE(TF-654): Class initializers are not yet supported.
-  // expected-error @+1 {{'@differentiable' attribute does not yet support class initializers}}
+  // expected-error @+1 {{'@differentiable' attribute cannot be declared on 'init' in a non-final class; consider making 'Super' final}}
   @differentiable
   init(base: Float) {
     self.base = base
@@ -1074,9 +1073,13 @@ class Super : Differentiable {
   func instanceMethod<T>(_ x: Float, y: T) -> Float { x }
 
   // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-  // expected-error @+1 {{'@differentiable' attribute cannot be declared on class methods returning 'Self'}}
+  // expected-error @+1 {{'@differentiable' attribute cannot be declared on class members returning 'Self'}}
   @differentiable(vjp: vjpDynamicSelfResult)
   func dynamicSelfResult() -> Self { self }
+
+  // expected-error @+1 {{'@differentiable' attribute cannot be declared on class members returning 'Self'}}
+  @differentiable
+  var testDynamicSelfProperty: Self { self }
 
   // TODO(TF-632): Fix "'TangentVector' is not a member type of 'Self'" diagnostic.
   // The underlying error should appear instead:
@@ -1096,6 +1099,15 @@ class Sub : Super {
   // expected-error @+1 {{'vjp' is not defined in the current type context}}
   @differentiable(wrt: x, vjp: vjp)
   override func testSuperclassDerivatives(_ x: Float) -> Float { x }
+}
+
+final class FinalClass: Differentiable {
+  var base: Float
+
+  @differentiable
+  init(base: Float) {
+    self.base = base
+  }
 }
 
 // Test unsupported accessors: `set`, `_read`, `_modify`.

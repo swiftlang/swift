@@ -2705,17 +2705,15 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
                                             loweredInterfaceType);
 
   // SWIFT_ENABLE_TENSORFLOW
-  // In the case of autodiff derivative functions, the above computations
-  // determine `silFnType` by first computing the derivative function type at
-  // the AST level and then lowering that. Unfortunately, the actual
-  // SILFunctionType for the function is determined by first lowering the
-  // function's AST type, and then computing the derivative function type at the
-  // SIL level. "Lowering" does not commute with "getting the autodiff
-  // associated type", so these two computations produce different results.
-  // Therefore `silFnType` is not the actual type of the function that
-  // `constant` refers to.
+  // For derivative functions, the above computations determine `silFnType`
+  // by first computing the derivative AST function type and then lowering it to
+  // SIL. Unfortunately, the expected derivative SIL function type is determined
+  // by first lowering the original function's AST type, and then computing its
+  // SIL derivative function type. "Lowering" does not commute with "getting the
+  // derivative type", so these two computations produce different results.
+  // Therefore, `silFnType` is not the expected SIL derivative function type.
   //
-  // We hackily fix this problem by redoing the computation in the right order.
+  // We fix this problem by performing the computation in the right order.
   if (auto *autoDiffFuncId = constant.autoDiffDerivativeFunctionIdentifier) {
     auto origFnConstantInfo = getConstantInfo(
         TypeExpansionContext::minimal(), constant.asAutoDiffOriginalFunction());
@@ -2725,6 +2723,7 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
         loweredIndices, /*resultIndex*/ 0, autoDiffFuncId->getKind(),
         *this, LookUpConformanceInModule(&M));
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";
              constant.print(llvm::dbgs());
