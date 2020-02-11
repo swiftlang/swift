@@ -1428,6 +1428,13 @@ WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
       "unexpected version number in '%0' attribute for non-specific platform "
       "'*'", (StringRef))
 
+// _availableRef
+
+ERROR(attr_availableRef_expected_rparen,none,
+      "expected ')' after target name for '_availableRef'", ())
+ERROR(attr_availableRef_expected_target_name,PointsToFirstBadToken,
+      "expected a target name in '_availableRef' attribute", ())
+
 // originallyDefinedIn
 ERROR(originally_defined_in_missing_rparen,none,
       "expected ')' in @_originallyDefinedIn argument list", ())

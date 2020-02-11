@@ -85,7 +85,7 @@ public protocol _ObjectiveCBridgeable {
 
 #if _runtime(_ObjC)
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@_availableRef(_Stdlib_Dev)
 @available(*, deprecated)
 @_cdecl("_SwiftCreateBridgedArray")
 @usableFromInline
@@ -98,7 +98,7 @@ internal func _SwiftCreateBridgedArray(
   return Unmanaged<AnyObject>.passRetained(bridged)
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@_availableRef(_Stdlib_Dev)
 @available(*, deprecated)
 @_cdecl("_SwiftCreateBridgedMutableArray")
 @usableFromInline

@@ -1778,6 +1778,12 @@ namespace decls_block {
     BCBlob      // platform, followed by message
   >;
 
+  using AvailableRefDeclAttrLayout = BCRecordLayout<
+    AvailableRef_DECL_ATTR,
+    BCFixed<1>,     // implicit flag
+    BCBlob          // target name
+  >;
+
   using OriginallyDefinedInDeclAttrLayout = BCRecordLayout<
     OriginallyDefinedIn_DECL_ATTR,
     BCFixed<1>,     // implicit flag

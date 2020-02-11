@@ -2018,6 +2018,36 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
     break;
   }
+  case DAK_AvailableRef: {
+    // @_availableRef(SomeDecl.reference)
+
+    // Parse the leading '('.
+    if (Tok.isNot(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+    SourceLoc LParenLoc = consumeToken(tok::l_paren);
+
+    auto TargetType = parseType();
+    if (TargetType.isNull()) {
+      diagnose(Loc, diag::attr_availableRef_expected_target_name);
+      return false;
+    }
+               
+    // Parse the matching ')'.
+    SourceLoc RParenLoc;
+    if (parseMatchingToken(tok::r_paren, RParenLoc,
+                           diag::attr_availableRef_expected_rparen,
+                           LParenLoc))
+      return false;
+
+    auto Attr = new (Context)
+      AvailableRefAttr(AtLoc, SourceRange(AtLoc, Tok.getLoc()),
+                       TargetType.get());
+    Attributes.add(Attr);
+    break;
+  }
   case DAK_PrivateImport: {
     // Parse the leading '('.
     if (Tok.isNot(tok::l_paren)) {

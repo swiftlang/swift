@@ -12,6 +12,15 @@
 
 import SwiftShims
 
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+internal typealias _Stdlib_5_1 = Void
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+internal typealias _Stdlib_5_2 = Void
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+internal typealias _Stdlib_Dev = Void
+
 /// Returns 1 if the running OS version is greater than or equal to
 /// major.minor.patchVersion and 0 otherwise.
 ///

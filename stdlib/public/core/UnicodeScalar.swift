@@ -435,7 +435,7 @@ extension Unicode.Scalar.UTF16View: RandomAccessCollection {
 }
 
 extension Unicode.Scalar {
-  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+  @_availableRef(_Stdlib_5_1)
   @frozen
   public struct UTF8View {
     @inlinable
@@ -446,12 +446,12 @@ extension Unicode.Scalar {
     internal var value: Unicode.Scalar
   }
 
-  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+  @_availableRef(_Stdlib_5_1)
   @inlinable
   public var utf8: UTF8View { return UTF8View(value: self) }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@_availableRef(_Stdlib_5_1)
 extension Unicode.Scalar.UTF8View: RandomAccessCollection {
   public typealias Indices = Range<Int>
 

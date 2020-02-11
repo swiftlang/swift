@@ -17,6 +17,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
+#include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"
@@ -54,6 +55,69 @@ static bool hasActiveAvailableAttribute(Decl *D,
                                            ASTContext &AC) {
   return getActiveAvailableAttribute(D, AC);
 }
+
+static void resolveAvailableRef(Decl *D, AvailableRefAttr *refAttr) {
+  // auto &AC = D->getASTContext();
+
+  // for (auto attr : D->getAttrs()) {
+  //   auto avAttr = dyn_cast<AvailableAttr>(attr);
+  //   if (!avAttr || avAttr->isImplicit())
+  //     continue;
+  //   AC.Diags.diagnose(avAttr->getLocation(),
+  //                     diag::availableRef_conflicting_available_attribute);
+  //   AC.Diags.diagnose(attr->getLocation(),
+  //                     diag::availableRef_here);
+  //   return;
+  // }
+
+  Type target = refAttr->TargetType.getType();
+  if (!target && refAttr->TargetType.getTypeRepr()) {
+    TypeResolutionOptions options = None;
+    options |= TypeResolutionFlags::AllowUnavailable;
+    options |= TypeResolutionFlags::AllowUnavailableProtocol;
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+
+    auto resolution = TypeResolution::forStructural(D->getDeclContext());
+    target = resolution.resolveType(refAttr->TargetType.getTypeRepr(), options);
+    refAttr->TargetType.setType(target);
+  }
+  if (target->hasError())
+    return;
+
+  TypeDecl *targetDecl;
+  if (auto aliasType = dyn_cast<TypeAliasType>(target.getPointer())) {
+    targetDecl = aliasType->getDecl();
+  } else if (auto nominal = target->getAnyNominal()) {
+    targetDecl = nominal;
+  } else {
+    // FIXME: Diagnose
+    return;
+  }
+
+  llvm::SmallVector<AvailableAttr*, 4> newAttrs;
+  for (auto attr : targetDecl->getAttrs()) {
+    if (auto avAttr = dyn_cast<AvailableRefAttr>(attr)) {
+      // FIXME: Diagnose
+      return;
+    }
+    auto avAttr = dyn_cast<AvailableAttr>(attr);
+    if (!avAttr)
+      continue;
+    auto clone = avAttr->clone(D->getASTContext(),
+                               refAttr->AtLoc,
+                               refAttr->TargetType.getSourceRange(),
+                               /*implicit*/true);
+    newAttrs.push_back(clone);
+  }
+  if (newAttrs.size() == 0) {
+    // FIXME: Diagnose
+    return;
+  }
+  for (auto it = newAttrs.rbegin(); it != newAttrs.rend(); ++it) {
+    D->getAttrs().add(*it);
+  }
+}
+
 
 namespace {
 
@@ -148,6 +212,11 @@ private:
       if (it != StorageContexts.end()) {
         return it->second;
       }
+    }
+
+    // Resolve @_availableRef attribute, if any.
+    if (auto refAttr = D->getAttrs().getAttribute<AvailableRefAttr>()) {
+      resolveAvailableRef(D, refAttr);
     }
     
     if (declarationIntroducesNewContext(D)) {

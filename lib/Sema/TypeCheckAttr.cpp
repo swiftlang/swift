@@ -200,6 +200,7 @@ public:
   void visitOptionalAttr(OptionalAttr *attr);
 
   void visitAvailableAttr(AvailableAttr *attr);
+  void visitAvailableRefAttr(AvailableRefAttr *attr);
 
   void visitCDeclAttr(CDeclAttr *attr);
 
@@ -1404,6 +1405,10 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     diagnose(EnclosingDecl->getLoc(),
              diag::availability_decl_more_than_enclosing_enclosing_here);
   }
+}
+
+void AttributeChecker::visitAvailableRefAttr(AvailableRefAttr *attr) {
+  // All the work is done by TypeRefinementContextBuilder.
 }
 
 void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {

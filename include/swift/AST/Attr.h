@@ -837,6 +837,10 @@ public:
   /// platform).
   AvailableVersionComparison getVersionAvailability(const ASTContext &ctx) const;
 
+  /// Clone this attribute, overriding source location and implicitness.
+  AvailableAttr *clone(ASTContext &context, SourceLoc atLoc, SourceRange range,
+                       bool implicit) const;
+
   /// Create an AvailableAttr that indicates specific availability
   /// for all platforms.
   static AvailableAttr *
@@ -848,6 +852,23 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Available;
+  }
+};
+
+/// Copies availability information from another declaration.
+class AvailableRefAttr : public DeclAttribute {
+public:
+    AvailableRefAttr(SourceLoc AtLoc, SourceRange Range,
+                     TypeLoc TargetType,
+                     bool Implicit = false)
+    : DeclAttribute(DAK_AvailableRef, AtLoc, Range, Implicit),
+      TargetType(TargetType)
+  {}
+
+  TypeLoc TargetType;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_AvailableRef;
   }
 };
 
