@@ -128,6 +128,15 @@ void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID) {
         SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
   }
 
+  // If we've been asked to silence warnings, do so now. This is needed for
+  // secondary files, which can be parsed multiple times.
+  auto &diags = ctx.Diags;
+  auto didSuppressWarnings = diags.getSuppressWarnings();
+  auto shouldSuppress = SF.getParsingOptions().contains(
+      SourceFile::ParsingFlags::SuppressWarnings);
+  diags.setSuppressWarnings(didSuppressWarnings || shouldSuppress);
+  SWIFT_DEFER { diags.setSuppressWarnings(didSuppressWarnings); };
+
   // If this buffer is for code completion, hook up the state needed by its
   // second pass.
   PersistentParserState *state = nullptr;

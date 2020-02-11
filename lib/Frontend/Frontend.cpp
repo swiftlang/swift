@@ -970,16 +970,7 @@ void CompilerInstance::parseLibraryFile(
       SourceFileKind::Library, implicitImports.kind, BufferID);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
-  auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
-
-  auto &Diags = NextInput->getASTContext().Diags;
-  auto DidSuppressWarnings = Diags.getSuppressWarnings();
-  Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
-
   parseIntoSourceFile(*NextInput, BufferID);
-
-  Diags.setSuppressWarnings(DidSuppressWarnings);
-
   performNameBinding(*NextInput);
 }
 
