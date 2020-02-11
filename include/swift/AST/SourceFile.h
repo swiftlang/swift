@@ -90,6 +90,36 @@ public:
     }
   };
 
+  /// Flags that direct how the source file is parsed.
+  enum class ParsingFlags : uint8_t {
+    /// Whether to disable delayed parsing for nominal type, extension, and
+    /// function bodies.
+    ///
+    /// If set, type and function bodies will be parsed eagerly. Otherwise they
+    /// will be lazily parsed when their contents is queried. This lets us avoid
+    /// building AST nodes when they're not needed.
+    ///
+    /// This is set for primary files, since we want to type check all
+    /// declarations and function bodies anyway, so there's no benefit in lazy
+    /// parsing.
+    DisableDelayedBodies = 1 << 0,
+
+    /// Whether to disable evaluating the conditions of #if decls.
+    ///
+    /// If set, #if decls are parsed as-is. Otherwise, the bodies of any active
+    /// clauses are hoisted such that they become sibling nodes with the #if
+    /// decl.
+    ///
+    /// FIXME: When condition evaluation moves to a later phase, remove this
+    /// and adjust the client call 'performParseOnly'.
+    DisablePoundIfEvaluation = 1 << 1,
+
+    /// Whether to suppress warnings when parsing. This is set for secondary
+    /// files, as they get parsed multiple times.
+    SuppressWarnings = 1 << 2
+  };
+  using ParsingOptions = OptionSet<ParsingFlags>;
+
 private:
   std::unique_ptr<SourceLookupCache> Cache;
   SourceLookupCache &getCache() const;
@@ -131,6 +161,9 @@ private:
   /// Does this source file have any implementation-only imports?
   /// If not, we can fast-path module checks.
   bool HasImplementationOnlyImports = false;
+
+  /// The parsing options for the file.
+  ParsingOptions ParsingOpts;
 
   /// The scope map that describes this source file.
   std::unique_ptr<ASTScope> Scope;
@@ -195,6 +228,9 @@ public:
     assert(count <= Decls.size() && "Can only truncate top-level decls!");
     Decls.resize(count);
   }
+
+  /// Retrieve the parsing options for the file.
+  ParsingOptions getParsingOptions() const { return ParsingOpts; }
 
   /// A cache of syntax nodes that can be reused when creating the syntax tree
   /// for this file.
@@ -270,7 +306,7 @@ public:
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
-             bool KeepSyntaxTree = false);
+             bool KeepSyntaxTree = false, ParsingOptions parsingOpts = {});
 
   ~SourceFile();
 
@@ -555,6 +591,11 @@ private:
 
   std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
 };
+
+inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
+                                            SourceFile::ParsingFlags rhs) {
+  return SourceFile::ParsingOptions(lhs) | rhs;
+}
 
 inline SourceFile &
 ModuleDecl::getMainSourceFile(SourceFileKind expectedKind) const {

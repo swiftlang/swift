@@ -1081,17 +1081,27 @@ void CompilerInstance::finishTypeChecking() {
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
     SourceFileKind fileKind, SourceFile::ImplicitModuleImportKind importKind,
-    Optional<unsigned> bufferID) {
+    Optional<unsigned> bufferID, SourceFile::ParsingOptions opts) {
   ModuleDecl *mainModule = getMainModule();
+
+  auto isPrimary = bufferID && isPrimaryInput(*bufferID);
+  if (isPrimary || isWholeModuleCompilation()) {
+    // Disable delayed body parsing for primaries.
+    opts |= SourceFile::ParsingFlags::DisableDelayedBodies;
+  } else {
+    // Suppress parse warnings for non-primaries, as they'll get parsed multiple
+    // times.
+    opts |= SourceFile::ParsingFlags::SuppressWarnings;
+  }
+
   SourceFile *inputFile = new (*Context)
       SourceFile(*mainModule, fileKind, bufferID, importKind,
                  Invocation.getLangOptions().CollectParsedToken,
-                 Invocation.getLangOptions().BuildSyntaxTree);
+                 Invocation.getLangOptions().BuildSyntaxTree, opts);
   MainModule->addFile(*inputFile);
 
-  if (bufferID && isPrimaryInput(*bufferID)) {
+  if (isPrimary)
     recordPrimarySourceFile(inputFile);
-  }
 
   if (bufferID == SourceMgr.getCodeCompletionBufferID()) {
     assert(!CodeCompletionFile && "Multiple code completion files?");
@@ -1113,6 +1123,12 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
          "only supports parsing .swift files");
   (void)Kind;
 
+  SourceFile::ParsingOptions parsingOpts;
+  if (!EvaluateConditionals)
+    parsingOpts |= SourceFile::ParsingFlags::DisablePoundIfEvaluation;
+  if (!CanDelayBodies)
+    parsingOpts |= SourceFile::ParsingFlags::DisableDelayedBodies;
+
   // Make sure the main file is the first file in the module but parse it last,
   // to match the parsing logic used when performing Sema.
   if (MainBufferID != NO_SUCH_BUFFER) {
@@ -1120,7 +1136,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
            Kind == InputFileKind::SwiftModuleInterface);
     createSourceFileForMainModule(Invocation.getSourceFileKind(),
                                   SourceFile::ImplicitModuleImportKind::None,
-                                  MainBufferID);
+                                  MainBufferID, parsingOpts);
   }
 
   auto shouldDelayBodies = [&](unsigned bufferID) -> bool {
@@ -1138,7 +1154,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
 
     SourceFile *NextInput = createSourceFileForMainModule(
         SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
-        BufferID);
+        BufferID, parsingOpts);
 
     parseIntoSourceFile(*NextInput, BufferID, shouldDelayBodies(BufferID),
                         EvaluateConditionals);
