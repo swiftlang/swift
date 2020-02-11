@@ -1029,11 +1029,6 @@ public:
   std::string mangleAsString() const;
   SILLinkage getLinkage(ForDefinition_t isDefinition) const;
 
-  /// Returns true if this function or global variable is potentially defined
-  /// in a different module.
-  ///
-  bool isAvailableExternally(IRGenModule &IGM) const;
-
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
     return reinterpret_cast<ValueDecl*>(Pointer);
