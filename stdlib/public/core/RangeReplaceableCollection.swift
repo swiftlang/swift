@@ -1155,6 +1155,7 @@ extension RangeReplaceableCollection {
   /// - Parameter subranges: The indices of the elements to remove.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
   public mutating func removeSubranges(_ subranges: RangeSet<Index>) {
     guard !subranges.isEmpty else {
       return
@@ -1184,6 +1185,7 @@ extension MutableCollection where Self: RangeReplaceableCollection {
   /// - Parameter subranges: The indices of the elements to remove.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
   public mutating func removeSubranges(_ subranges: RangeSet<Index>) {
     guard let firstRange = subranges.ranges.first else {
       return
@@ -1216,7 +1218,7 @@ extension MutableCollection where Self: RangeReplaceableCollection {
       firstUnprocessed = range.upperBound
     }
     
-    // After dealing with all the ranges in `indices`, move the elements
+    // After dealing with all the ranges in `subranges`, move the elements
     // that are still in the third region down to the first.
     while firstUnprocessed != endIndex {
       swapAt(endOfElementsToKeep, firstUnprocessed)

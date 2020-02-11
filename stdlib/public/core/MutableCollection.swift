@@ -290,6 +290,7 @@ extension MutableCollection {
   /// - Returns: The new bounds of the moved elements.
   ///
   /// - Complexity: O(*n* log *n*) where *n* is the length of the collection.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
   @discardableResult
   public mutating func moveSubranges(
     _ subranges: RangeSet<Index>, to insertionPoint: Index

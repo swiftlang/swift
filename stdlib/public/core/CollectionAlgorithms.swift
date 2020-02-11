@@ -231,6 +231,7 @@ extension Collection {
   ///   returns `true`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
   public func subranges(where predicate: (Element) throws -> Bool) rethrows
     -> RangeSet<Index>
   {
@@ -266,6 +267,7 @@ extension Collection where Element: Equatable {
   ///   `element`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
   public func subranges(of element: Element) -> RangeSet<Index> {
     subranges(where: { $0 == element })
   }

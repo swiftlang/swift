@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A set of ranges of any comparable value.
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 public struct RangeSet<Bound: Comparable> {
   internal var _ranges = _RangeSetStorage<Bound>()
 
@@ -238,12 +239,15 @@ public struct RangeSet<Bound: Comparable> {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension RangeSet: Equatable {}
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension RangeSet: Hashable where Bound: Hashable {}
 
 // MARK: - Range Collection
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension RangeSet {
   public struct Ranges: RandomAccessCollection {
     var _ranges: _RangeSetStorage<Bound>
@@ -264,6 +268,7 @@ extension RangeSet {
 
 // MARK: - Collection APIs
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension RangeSet {
   /// Creates a new range set containing ranges that contain only the
   /// specified indices in the given collection.
@@ -352,6 +357,7 @@ extension RangeSet {
 
 // These methods only depend on the ranges that comprise the range set, so
 // we can provide them even when we can't provide `SetAlgebra` conformance.
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension RangeSet {
   public mutating func formUnion(_ other: __owned RangeSet<Bound>) {
     for range in other._ranges {
@@ -476,6 +482,7 @@ extension RangeSet {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension RangeSet: CustomStringConvertible {
   public var description: String {
     let rangesDescription = _ranges

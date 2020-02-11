@@ -12,6 +12,7 @@
 
 /// A collection wrapper that provides access to the elements of a collection,
 /// indexed by a set of indices.
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 public struct DiscontiguousSlice<Base: Collection> {
   /// The collection that the indexed collection wraps.
   public var base: Base
@@ -20,6 +21,7 @@ public struct DiscontiguousSlice<Base: Collection> {
   public var subranges: RangeSet<Base.Index>
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension DiscontiguousSlice {
   /// A position in an `DiscontiguousSlice`.
   public struct Index: Comparable {
@@ -35,8 +37,10 @@ extension DiscontiguousSlice {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension DiscontiguousSlice.Index: Hashable where Base.Index: Hashable {}
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension DiscontiguousSlice: Collection {
   public typealias SubSequence = Self
   
@@ -77,6 +81,7 @@ extension DiscontiguousSlice: Collection {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension DiscontiguousSlice {
   public var count: Int {
     var c = 0
@@ -95,6 +100,7 @@ extension DiscontiguousSlice {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension DiscontiguousSlice: BidirectionalCollection
   where Base: BidirectionalCollection
 {
@@ -114,6 +120,7 @@ extension DiscontiguousSlice: BidirectionalCollection
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension DiscontiguousSlice: MutableCollection where Base: MutableCollection {
   public subscript(i: Index) -> Base.Element {
     get {
@@ -136,6 +143,7 @@ extension Collection {
   /// - Returns: A collection of the elements at the positions in `subranges`.
   ///
   /// - Complexity: O(1)
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
   public subscript(subranges: RangeSet<Index>) -> DiscontiguousSlice<Self> {
     DiscontiguousSlice(base: self, subranges: subranges)
   }
@@ -152,6 +160,7 @@ extension MutableCollection {
   /// - Complexity: O(1) to access the elements, O(*m*) to mutate the
   ///   elements at the positions in `subranges`, where *m* is the number of
   ///   elements indicated by `subranges`.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
   public subscript(subranges: RangeSet<Index>) -> DiscontiguousSlice<Self> {
     get {
       DiscontiguousSlice(base: self, subranges: subranges)
@@ -185,6 +194,7 @@ extension Collection {
   /// - Returns: A collection of the elements that are not in `subranges`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
   public func removingSubranges(
     _ subranges: RangeSet<Index>
   ) -> DiscontiguousSlice<Self> {
