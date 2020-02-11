@@ -1893,7 +1893,8 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
                 IGM.Int8PtrTy, // arg 1
                 IGM.Int8PtrTy, // arg 2
                 IGM.TypeContextDescriptorPtrTy) // type context descriptor
-        .getCallee());
+        .getCallee()
+        ->stripPointerCasts());
 
     if (thunkFn->empty()) {
       ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
@@ -2374,7 +2375,8 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
       IGM.getModule()
           ->getOrInsertFunction(instantiationFnName, IGF.IGM.TypeMetadataPtrTy,
                                 cache->getType())
-          .getCallee());
+          .getCallee()
+          ->stripPointerCasts());
   if (instantiationFn->empty()) {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
       .to(instantiationFn);

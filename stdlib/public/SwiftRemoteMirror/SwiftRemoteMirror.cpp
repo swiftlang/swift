@@ -19,6 +19,7 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 unsigned long long swift_reflection_classIsSwiftMask = 2;
 }
 
+#include "swift/Demangling/Demangler.h"
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"
@@ -431,6 +432,17 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
     fprintf(stdout, "<null type info>\n");
   } else {
     TI->dump(stdout);
+    Demangle::Demangler Dem;
+    std::string MangledName = mangleNode(TR->getDemangling(Dem));
+    fprintf(stdout, "Mangled name: %s%s\n", MANGLING_PREFIX_STR,
+            MangledName.c_str());
+#ifndef NDEBUG
+    auto *Reconstructed = reinterpret_cast<const TypeRef *>(
+        swift_reflection_typeRefForMangledTypeName(
+            ContextRef, MangledName.c_str(), MangledName.size()));
+    assert(mangleNode(TR->getDemangling(Dem)) == MangledName &&
+           "round-trip diff");
+#endif
   }
 }
 

@@ -35,8 +35,6 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "llvm/Support/Options.h"
 
 using namespace swift;
 

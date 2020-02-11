@@ -37,7 +37,7 @@ std::unique_ptr<DifferentiableActivityCollection>
 DifferentiableActivityAnalysis::newFunctionAnalysis(SILFunction *f) {
   assert(dominanceAnalysis && "Expect a valid dominance anaysis");
   assert(postDominanceAnalysis && "Expect a valid post-dominance anaysis");
-  return llvm::make_unique<DifferentiableActivityCollection>(
+  return std::make_unique<DifferentiableActivityCollection>(
       *f, dominanceAnalysis->get(f), postDominanceAnalysis->get(f));
 }
 

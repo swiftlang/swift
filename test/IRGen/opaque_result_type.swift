@@ -163,7 +163,7 @@ public func useFoo(x: String, y: C) {
 // CHECK-LABEL: define {{.*}} @"$s18opaque_result_type6useFoo1x1yySS_AA1CCtF"
 // CHECK: [[OPAQUE:%.*]] = call {{.*}} @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOMg"
 // CHECK: [[CONFORMANCE:%.*]] = call swiftcc i8** @swift_getOpaqueTypeConformance(i8* {{.*}}, %swift.type_descriptor* [[OPAQUE]], [[WORD:i32|i64]] 1)
-// CHECK: [[TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOyAA1CCQo_MD")
+// CHECK: [[TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}} @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOyAA1CCQo_MD")
 // CHECK: call swiftcc i8** @swift_getAssociatedConformanceWitness(i8** [[CONFORMANCE]], %swift.type* [[TYPE]]
 
 // CHECK-LABEL: define {{.*}} @"$sSS18opaque_result_type1PAA1AAaBP_AA1OPWT"

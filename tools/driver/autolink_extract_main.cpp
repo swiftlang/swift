@@ -113,8 +113,12 @@ extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
                                  CompilerInstance &Instance) {
   // Search for the section we hold autolink entries in
   for (auto &Section : ObjectFile->sections()) {
-    llvm::StringRef SectionName;
-    Section.getName(SectionName);
+    llvm::Expected<llvm::StringRef> SectionNameOrErr = Section.getName();
+    if (!SectionNameOrErr) {
+      llvm::consumeError(SectionNameOrErr.takeError());
+      continue;
+    }
+    llvm::StringRef SectionName = *SectionNameOrErr;
     if (SectionName == ".swift1_autolink_entries") {
       llvm::Expected<llvm::StringRef> SectionData = Section.getContents();
       if (!SectionData) {

@@ -4263,7 +4263,7 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
   llvm::AllocaInst *alloca =
       new llvm::AllocaInst(type, IGM.DataLayout.getAllocaAddrSpace(), name,
                            AllocaIP);
-  alloca->setAlignment(alignment.getValue());
+  alloca->setAlignment(llvm::MaybeAlign(alignment.getValue()));
   return Address(alloca, alignment);
 }
 
@@ -4272,9 +4272,9 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
                                     llvm::Value *ArraySize,
                                     Alignment alignment,
                                     const llvm::Twine &name) {
-  llvm::AllocaInst *alloca =
-      new llvm::AllocaInst(type, IGM.DataLayout.getAllocaAddrSpace(), ArraySize,
-                           alignment.getValue(), name, AllocaIP);
+  llvm::AllocaInst *alloca = new llvm::AllocaInst(
+      type, IGM.DataLayout.getAllocaAddrSpace(), ArraySize,
+      llvm::MaybeAlign(alignment.getValue()), name, AllocaIP);
   return Address(alloca, alignment);
 }
 
@@ -4599,9 +4599,8 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
     llvm::FunctionType::get(resultTy, paramTys, false);
 
   llvm::Constant *fn =
-      cast<llvm::Function>(Module.getOrInsertFunction(fnName, fnTy)
-                               .getCallee()
-                               ->stripPointerCasts());
+      cast<llvm::Constant>(
+          Module.getOrInsertFunction(fnName, fnTy).getCallee());
 
   if (llvm::Function *def = shouldDefineHelper(*this, fn, setIsNoInline)) {
     IRGenFunction IGF(*this, def);

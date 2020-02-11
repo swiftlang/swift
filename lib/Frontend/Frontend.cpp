@@ -843,7 +843,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
     const ImplicitImports &implicitImports, SourceFile::ASTStage_t limitStage) {
   FrontendStatsTracer tracer(Context->Stats, "parse-and-check-types");
 
-  PersistentState = llvm::make_unique<PersistentParserState>();
+  PersistentState = std::make_unique<PersistentParserState>();
 
   bool hadLoadError = parsePartialModulesAndLibraryFiles(implicitImports);
   if (Invocation.isCodeCompletion()) {
@@ -1058,7 +1058,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
                                   MainBufferID);
   }
 
-  PersistentState = llvm::make_unique<PersistentParserState>();
+  PersistentState = std::make_unique<PersistentParserState>();
   PersistentState->PerformConditionEvaluation = EvaluateConditionals;
 
   auto shouldDelayBodies = [&](unsigned bufferID) -> bool {

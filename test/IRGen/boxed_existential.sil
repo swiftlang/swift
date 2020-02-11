@@ -4,7 +4,7 @@ import Swift
 
 sil @error_user : $@convention(thin) (@owned Error) -> ()
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @retain_release_boxed_existential(%swift.error*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @retain_release_boxed_existential(%swift.error* %0)
 sil @retain_release_boxed_existential : $@convention(thin) (@owned Error) -> () {
 entry(%e : $Error):
   // CHECK-objc: @swift_errorRetain
@@ -18,7 +18,7 @@ entry(%e : $Error):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.error* @alloc_boxed_existential(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.Error)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.error* @alloc_boxed_existential(%swift.opaque* noalias nocapture %0, %swift.type* %T, i8** %T.Error)
 sil @alloc_boxed_existential : $@convention(thin) <T: Error> (@in T) -> @owned Error {
 entry(%x : $*T):
   // CHECK: [[BOX_PAIR:%.*]] = call swiftcc { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* %T, i8** %T.Error, %swift.opaque* null, i1 false)
@@ -51,7 +51,7 @@ entry(%x : $SomeError):
   return %b : $Error
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dealloc_boxed_existential(%swift.error*, %swift.type* %T, i8** %T.Error)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dealloc_boxed_existential(%swift.error* %0, %swift.type* %T, i8** %T.Error)
 sil @dealloc_boxed_existential : $@convention(thin) <T: Error> (@owned Error) -> () {
 entry(%b : $Error):
   // CHECK: call void @swift_deallocError(%swift.error* %0, %swift.type* %T)
@@ -72,7 +72,7 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{i[0-9]+}} @project_boxed_existential(%swift.error*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{i[0-9]+}} @project_boxed_existential(%swift.error* %0)
 sil @project_boxed_existential : $@convention(thin) (@owned Error) -> Int {
 entry(%b : $Error):
   // CHECK: call void @swift_getErrorValue(%swift.error* %0, i8** {{%.*}}, [[TRIPLE:{ %swift.opaque\*, %swift.type\*, i8\*\* }]]* [[OUT:%.*]])
