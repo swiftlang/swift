@@ -7538,13 +7538,7 @@ ProtocolConformanceRef Solution::resolveConformance(
 }
 
 Type Solution::getType(const Expr *expr) const {
-  auto result = llvm::find_if(
-      nodeTypes, [&](const std::pair<TypedNode, Type> &node) -> bool {
-        if (auto *e = node.first.dyn_cast<const Expr *>())
-          return expr == e;
-        return false;
-      });
-
+  auto result = nodeTypes.find(expr);
   if (result != nodeTypes.end())
     return result->second;
 

@@ -1484,7 +1484,7 @@ private:
   /// nodes themselves. This allows us to typecheck and
   /// run through various diagnostics passes without actually mutating
   /// the types on the nodes.
-  llvm::DenseMap<TypedNode, Type> NodeTypes;
+  llvm::MapVector<TypedNode, Type> NodeTypes;
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
       KeyPathComponentTypes;
 
