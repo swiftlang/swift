@@ -665,4 +665,7 @@ def emit_ldadd_cfile_path
 def previous_module_installname_map_file
   : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,
     HelpText<"Path to a Json file indicating module name to installname map for @_originallyDefinedIn">;
+
+def enable_type_layouts : Flag<["-"], "enable-type-layout">,
+  HelpText<"Enable type layout based lowering">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

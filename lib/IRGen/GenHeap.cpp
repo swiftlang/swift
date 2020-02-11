@@ -54,6 +54,10 @@ namespace {
                                 FixedTypeInfo> { \
     llvm::PointerIntPair<llvm::Type*, 1, bool> ValueTypeAndIsOptional; \
   public: \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
+                                        SILType T) const override { \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T); \
+    } \
     Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType, \
                                     llvm::Type *type, \
                                     Size size, Alignment alignment, \
@@ -138,6 +142,10 @@ namespace {
                              alignment, IsNotPOD, IsFixedSize), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     enum { IsScalarPOD = false }; \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,                    \
+                                          SILType T) const override {          \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);             \
+    } \
     llvm::Type *getScalarType() const { \
       return ValueTypeAndIsOptional.getPointer(); \
     } \
