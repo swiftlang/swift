@@ -764,19 +764,9 @@ IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
       // descriptor, so we'll just emit an extension context.
       auto clas = dyn_cast<ClassDecl>(nominal);
       if (!clas || clas->isForeign() || hasKnownSwiftMetadata(*this, clas)) {
-        // Some targets don't support relative references to undefined symbols.
-        // If the extension is in a different file from the original type
-        // declaration, it may not get emitted in this TU. Use an indirect
-        // reference to work around the object format limitation.
-        auto shouldBeIndirect =
-            parent->getModuleScopeContext() != ofChild->getModuleScopeContext()
-          ? ConstantReference::Indirect
-          : ConstantReference::Direct;
-        
         IRGen.noteUseOfTypeContextDescriptor(nominal, DontRequireMetadata);
         return getAddrOfLLVMVariableOrGOTEquivalent(
-                                LinkEntity::forNominalTypeDescriptor(nominal),
-                                shouldBeIndirect);
+                                LinkEntity::forNominalTypeDescriptor(nominal));
       }
     }
     return {getAddrOfExtensionContextDescriptor(ext),
@@ -2870,8 +2860,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
 /// global variable. LLVM can replace relative references to this variable with
 /// relative references to the GOT entry for the variable in the object file.
 ConstantReference
-IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
-                              ConstantReference::Directness forceIndirectness) {
+IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
   // Handle SILFunctions specially, because unlike other entities they aren't
   // variables and aren't kept in the GlobalVars table.
   if (entity.isSILFunction()) {
@@ -2933,10 +2922,6 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
       cast<llvm::GlobalValue>(entry), entity);
     return {gotEquivalent, ConstantReference::Indirect};
   };
-  
-  // Return the GOT entry if we were asked to.
-  if (forceIndirectness == ConstantReference::Indirect)
-    return indirect();
   
   // The integrated REPL incrementally adds new definitions, so always use
   // indirect references in this mode.

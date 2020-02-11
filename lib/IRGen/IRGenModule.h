@@ -1483,8 +1483,7 @@ public:
   GenericEnvironment *getGenericEnvironment();
 
   ConstantReference
-  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
-       ConstantReference::Directness forceIndirect = ConstantReference::Direct);
+  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity);
 
   llvm::Constant *
   emitRelativeReference(ConstantReference target,
