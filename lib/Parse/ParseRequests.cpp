@@ -177,8 +177,7 @@ void ParseSourceFileRequest::cacheResult(ArrayRef<Decl *> decls) const {
   assert(!SF->Decls);
   SF->Decls = decls;
 
-  // Note that the source file is fully parsed and verify it.
-  SF->ASTStage = SourceFile::Parsed;
+  // Verify the parsed source file.
   verify(*SF);
 }
 

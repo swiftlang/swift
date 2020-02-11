@@ -306,10 +306,8 @@ public:
   const SourceFileKind Kind;
 
   enum ASTStage_t {
-    /// Parsing is underway.
-    Parsing,
-    /// Parsing has completed.
-    Parsed,
+    /// The source file is not name bound or type checked.
+    Unprocessed,
     /// Name binding has completed.
     NameBound,
     /// Type checking has completed.
@@ -321,7 +319,7 @@ public:
   ///
   /// Only files that have been fully processed (i.e. type-checked) will be
   /// forwarded on to IRGen.
-  ASTStage_t ASTStage = Parsing;
+  ASTStage_t ASTStage = Unprocessed;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,

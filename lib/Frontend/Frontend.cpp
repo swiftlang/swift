@@ -759,11 +759,7 @@ void CompilerInstance::performSema() {
 }
 
 void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
-  // FIXME: A lot of the logic in `performParseOnly` is a stripped-down version
-  // of the logic in `performSemaUpTo`.  We should try to unify them over time.
-  if (LimitStage <= SourceFile::Parsed) {
-    return performParseOnly();
-  }
+  assert(LimitStage > SourceFile::Unprocessed);
 
   FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
 
