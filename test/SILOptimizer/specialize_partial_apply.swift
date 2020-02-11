@@ -174,11 +174,12 @@ func testit3_throwing(_ b: Bool) -> Int {
 	}
 }
 
-// CHECK-LABEL: sil shared [transparent] [thunk] @$s4test16generic_get_funcyxxcx_SbtlF0B0L_yxxlFSi_TG5 : $@convention(thin) (@in_guaranteed Int, Bool, @guaranteed <τ_0_0> { var τ_0_0 } <Int>) -> @out Int {
-// CHECK: bb0(%0 : $*Int, %1 : $*Int, %2 : $Bool, %3 : $<τ_0_0> { var τ_0_0 } <Int>):
-// CHECK: [[LD:%[0-9]+]] = load %1 : $*Int
-// CHECK: [[F:%[0-9]+]] = function_ref @$s4test16generic_get_funcyxxcx_SbtlF0B0L_yxxlFSi_Tg5 : $@convention(thin) (Int, Bool, @guaranteed <τ_0_0> { var τ_0_0 } <Int>) -> Int
-// CHECK: [[RET:%[0-9]+]] = apply [[F]]([[LD]], %2, %3)
+// CHECK-LABEL: sil shared [transparent] [thunk] @$s4test16generic_get_funcyxxcx_SbtlF0B0L_yxxlFSi_TG5 : $@convention(thin) (@in_guaranteed Int, Bool, @in_guaranteed Int) -> @out Int {
+// CHECK: bb0(%0 : $*Int, %1 : $*Int, %2 : $Bool, %3 : $*Int):
+// CHECK: [[LD1:%[0-9]+]] = load %1 : $*Int
+// CHECK: [[LD2:%[0-9]+]] = load %3 : $*Int
+// CHECK: [[F:%[0-9]+]] = function_ref @$s4test16generic_get_funcyxxcx_SbtlF0B0L_yxxlFSi_Tg5 : $@convention(thin) (Int, Bool, Int) -> Int
+// CHECK: [[RET:%[0-9]+]] = apply [[F]]([[LD1]], %2, [[LD2]])
 // CHECK: store [[RET]] to %0 : $*Int
 // CHECK: return %{{[0-9]*}} : $()
 

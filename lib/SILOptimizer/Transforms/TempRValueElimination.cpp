@@ -147,11 +147,23 @@ bool TempRValueOptPass::collectLoads(
     LLVM_DEBUG(llvm::dbgs()
                << "  Temp use may write/destroy its source" << *user);
     return false;
-
   case SILInstructionKind::BeginAccessInst:
     return cast<BeginAccessInst>(user)->getAccessKind() == SILAccessKind::Read;
 
+  case SILInstructionKind::MarkDependenceInst: {
+    auto mdi = cast<MarkDependenceInst>(user);
+    if (mdi->getBase() == address) {
+      return true;
+    }
+    for (auto *mdiUseOper : mdi->getUses()) {
+      if (!collectLoads(mdiUseOper, mdiUseOper->getUser(), mdi, srcObject,
+                        loadInsts))
+        return false;
+    }
+    return true;
+  }
   case SILInstructionKind::ApplyInst:
+  case SILInstructionKind::PartialApplyInst:
   case SILInstructionKind::TryApplyInst: {
     ApplySite apply(user);
 

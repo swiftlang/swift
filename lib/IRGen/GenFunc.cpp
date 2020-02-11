@@ -1524,7 +1524,7 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
     HeapNonFixedOffsets offsets(IGF, layout);
     if (outType->isNoEscape()) {
       stackAddr = IGF.emitDynamicAlloca(
-          IGF.IGM.Int8Ty, layout.emitSize(IGF.IGM), Alignment(16));
+          IGF.IGM.Int8Ty, layout.isFixedLayout() ? layout.emitSize(IGF.IGM) : offsets.getSize() , Alignment(16));
       stackAddr = stackAddr->withAddress(IGF.Builder.CreateBitCast(
           stackAddr->getAddress(), IGF.IGM.OpaquePtrTy));
       data = stackAddr->getAddress().getAddress();
