@@ -242,12 +242,6 @@ extension RangeSet: Equatable {}
 
 extension RangeSet: Hashable where Bound: Hashable {}
 
-extension RangeSet: ExpressibleByArrayLiteral {
-  public init(arrayLiteral elements: Range<Bound>...) {
-    self.init(elements)
-  }
-}
-
 // MARK: - Range Collection
 
 extension RangeSet {

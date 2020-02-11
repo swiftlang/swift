@@ -234,7 +234,7 @@ extension Collection {
   public func subranges(where predicate: (Element) throws -> Bool) rethrows
     -> RangeSet<Index>
   {
-    if isEmpty { return [] }
+    if isEmpty { return RangeSet() }
 
     var result = RangeSet<Index>()
     var i = startIndex
