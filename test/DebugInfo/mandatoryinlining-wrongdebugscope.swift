@@ -3,7 +3,7 @@
 // RUN:   -Xllvm -sil-print-debuginfo -o /dev/null 2>&1 | %FileCheck %s
 
 // CHECK: destroy_value {{.*}} : $@callee_guaranteed () -> (), loc {{.*}}:21:5, scope 9
-// CHECK: destroy_value {{.*}} : $@callee_guaranteed () -> @out (), loc {{.*}}:18:17, scope 9
+// CHECK: destroy_value {{.*}} : $@callee_guaranteed () -> @out (), loc {{.*}}:21:5, scope 9
 // CHECK: destroy_value {{.*}} : $@callee_guaranteed () -> (), loc {{.*}}:21:5, scope 9
 
 func patatino<d, i>(_ function: @escaping (d) -> i, g: d...) -> () -> i {

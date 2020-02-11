@@ -249,14 +249,17 @@ void getSubsetParameterTypes(IndexSubset *indices, AnyFunctionType *type,
 /// "Constrained" derivative generic signatures require all differentiability
 /// parameters to conform to the `Differentiable` protocol.
 ///
-/// Returns the "constrained" derivative generic signature given:
+/// "Constrained" transpose generic signatures additionally require all
+/// linearity parameters to satisfy `Self == Self.TangentVector`.
+///
+/// Returns the "constrained" derivative/transpose generic signature given:
 /// - An original SIL function type.
 /// - Differentiability parameter indices.
 /// - A possibly "unconstrained" derivative generic signature.
-GenericSignature
-getConstrainedDerivativeGenericSignature(SILFunctionType *originalFnTy,
-                                         IndexSubset *diffParamIndices,
-                                         GenericSignature derivativeGenSig);
+GenericSignature getConstrainedDerivativeGenericSignature(
+    SILFunctionType *originalFnTy, IndexSubset *diffParamIndices,
+    GenericSignature derivativeGenSig, LookupConformanceFn lookupConformance,
+    bool isTranspose = false);
 
 } // end namespace autodiff
 
