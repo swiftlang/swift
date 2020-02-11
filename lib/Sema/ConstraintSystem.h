@@ -1314,6 +1314,12 @@ public:
     expression.expression = expr;
   }
 
+  void setPattern(Pattern *pattern) {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_Initialization);
+    expression.pattern = pattern;
+  }
+
   Optional<AnyFunctionRef> getAsFunction() const {
     switch (kind) {
     case Kind::expression:
@@ -1481,6 +1487,7 @@ private:
   llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
   llvm::DenseMap<const TypeLoc *, TypeBase *> TypeLocTypes;
   llvm::DenseMap<const VarDecl *, TypeBase *> VarTypes;
+  llvm::DenseMap<const Pattern *, TypeBase *> PatternTypes;
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
       KeyPathComponentTypes;
 
@@ -2235,9 +2242,11 @@ public:
       ExprTypes[expr] = type.getPointer();
     } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
       TypeLocTypes[typeLoc] = type.getPointer();
-    } else {
-      auto var = node.get<const VarDecl *>();
+    } else if (auto var = node.dyn_cast<const VarDecl *>()) {
       VarTypes[var] = type.getPointer();
+    } else {
+      auto pattern = node.get<const Pattern *>();
+      PatternTypes[pattern] = type.getPointer();
     }
 
     // Record the fact that we ascribed a type to this node.
@@ -2258,9 +2267,11 @@ public:
       ExprTypes.erase(expr);
     } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
       TypeLocTypes.erase(typeLoc);
-    } else {
-      auto var = node.get<const VarDecl *>();
+    } else if (auto var = node.dyn_cast<const VarDecl *>()) {
       VarTypes.erase(var);
+    } else {
+      auto pattern = node.get<const Pattern *>();
+      PatternTypes.erase(pattern);
     }
   }
 
@@ -2287,9 +2298,11 @@ public:
       return ExprTypes.find(expr) != ExprTypes.end();
     } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
       return TypeLocTypes.find(typeLoc) != TypeLocTypes.end();
-    } else {
-      auto var = node.get<const VarDecl *>();
+    } else if (auto var = node.dyn_cast<const VarDecl *>()) {
       return VarTypes.find(var) != VarTypes.end();
+    } else {
+      auto pattern = node.get<const Pattern *>();
+      return PatternTypes.find(pattern) != PatternTypes.end();
     }
   }
 
