@@ -120,7 +120,6 @@ static void deletePersistentParserState(PersistentParserState *state) {
 }
 
 void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
-                                bool DelayBodyParsing,
                                 bool EvaluateConditionals) {
   auto &ctx = SF.getASTContext();
   std::shared_ptr<SyntaxTreeCreator> STreeCreator;
@@ -129,16 +128,6 @@ void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
         SF.getASTContext().SourceMgr, BufferID,
         SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
   }
-
-  // Not supported right now.
-  if (SF.Kind == SourceFileKind::REPL)
-    DelayBodyParsing = false;
-  if (SF.hasInterfaceHash())
-    DelayBodyParsing = false;
-  if (SF.shouldCollectToken())
-    DelayBodyParsing = false;
-  if (SF.shouldBuildSyntaxTree())
-    DelayBodyParsing = false;
 
   // If this buffer is for code completion, hook up the state needed by its
   // second pass.
@@ -150,7 +139,7 @@ void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
 
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "Parsing");
-  Parser P(BufferID, SF, /*SIL*/ nullptr, state, STreeCreator, DelayBodyParsing,
+  Parser P(BufferID, SF, /*SIL*/ nullptr, state, STreeCreator,
            EvaluateConditionals);
   PrettyStackTraceParser StackTrace(P);
 
@@ -172,7 +161,7 @@ void swift::parseSourceFileSIL(SourceFile &SF, SILParserState *sil) {
                              "Parsing SIL");
   Parser parser(*bufferID, SF, sil->Impl.get(),
                 /*persistentParserState*/ nullptr,
-                /*syntaxTreeCreator*/ nullptr, /*delayBodyParsing*/ false);
+                /*syntaxTreeCreator*/ nullptr);
   PrettyStackTraceParser StackTrace(parser);
   parser.parseTopLevelSIL();
 }

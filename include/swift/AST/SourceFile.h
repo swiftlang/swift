@@ -569,6 +569,10 @@ public:
 
   bool isSuitableForASTScopes() const { return canBeParsedInFull(); }
 
+  /// Whether the bodies of types and functions within this file can be lazily
+  /// parsed.
+  bool hasDelayedBodyParsing() const;
+
   syntax::SourceFileSyntax getSyntaxRoot() const;
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;

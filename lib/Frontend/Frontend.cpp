@@ -976,7 +976,7 @@ void CompilerInstance::parseLibraryFile(
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
   Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
-  parseIntoSourceFile(*NextInput, BufferID, /*DelayedBodyParsing=*/!IsPrimary);
+  parseIntoSourceFile(*NextInput, BufferID);
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
 
@@ -1023,8 +1023,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
   Diags.setSuppressWarnings(DidSuppressWarnings || !mainIsPrimary);
 
   // Parse the Swift decls into the source file.
-  parseIntoSourceFile(MainFile, MainBufferID,
-                      /*delayBodyParsing*/ !mainIsPrimary);
+  parseIntoSourceFile(MainFile, MainBufferID);
 
   // For a primary, also perform type checking if needed. Otherwise, just do
   // name binding.
@@ -1139,14 +1138,6 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
                                   MainBufferID, parsingOpts);
   }
 
-  auto shouldDelayBodies = [&](unsigned bufferID) -> bool {
-    if (!CanDelayBodies)
-      return false;
-
-    // Don't delay bodies in whole module mode or for primary files.
-    return !(isWholeModuleCompilation() || isPrimaryInput(bufferID));
-  };
-
   // Parse all the library files.
   for (auto BufferID : InputSourceCodeBufferIDs) {
     if (BufferID == MainBufferID)
@@ -1156,8 +1147,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
         SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
         BufferID, parsingOpts);
 
-    parseIntoSourceFile(*NextInput, BufferID, shouldDelayBodies(BufferID),
-                        EvaluateConditionals);
+    parseIntoSourceFile(*NextInput, BufferID, EvaluateConditionals);
   }
 
   // Now parse the main file.
@@ -1167,8 +1157,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
     MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
     assert(MainBufferID == MainFile.getBufferID());
 
-    parseIntoSourceFile(MainFile, MainBufferID, shouldDelayBodies(MainBufferID),
-                        EvaluateConditionals);
+    parseIntoSourceFile(MainFile, MainBufferID, EvaluateConditionals);
   }
 
   assert(Context->LoadedModules.size() == 1 &&
