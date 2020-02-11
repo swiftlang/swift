@@ -151,9 +151,6 @@ void Parser::performCodeCompletionSecondPassImpl(
   // Set the parser position to the start of the delayed decl or the body.
   restoreParserPosition(getParserPosition(startLoc, prevLoc));
 
-  // Do not delay parsing in the second pass.
-  llvm::SaveAndRestore<bool> DisableDelayedBody(DelayBodyParsing, false);
-
   // Re-enter the lexical scope.
   Scope S(this, info.takeScope());
 
@@ -366,15 +363,15 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions,
-               bool DelayBodyParsing, bool EvaluateConditionals)
+               bool EvaluateConditionals)
     : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState,
-             std::move(SPActions), DelayBodyParsing, EvaluateConditionals) {}
+             std::move(SPActions), EvaluateConditionals) {}
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
                SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions,
-               bool DelayBodyParsing, bool EvaluateConditionals)
+               bool EvaluateConditionals)
     : Parser(
           std::unique_ptr<Lexer>(new Lexer(
               SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
@@ -389,7 +386,7 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
               SF.shouldBuildSyntaxTree()
                   ? TriviaRetentionMode::WithTrivia
                   : TriviaRetentionMode::WithoutTrivia)),
-          SF, SIL, PersistentState, std::move(SPActions), DelayBodyParsing,
+          SF, SIL, PersistentState, std::move(SPActions),
           EvaluateConditionals) {}
 
 namespace {
@@ -511,7 +508,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions,
-               bool DelayBodyParsing, bool EvaluateConditionals)
+               bool EvaluateConditionals)
   : SourceMgr(SF.getASTContext().SourceMgr),
     Diags(SF.getASTContext().Diags),
     SF(SF),
@@ -520,7 +517,6 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     CurDeclContext(&SF),
     Context(SF.getASTContext()),
     CurrentTokenHash(SF.getInterfaceHashPtr()),
-    DelayBodyParsing(DelayBodyParsing),
     EvaluateConditionals(EvaluateConditionals),
     TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF, L->getBufferID()) :
@@ -546,6 +542,14 @@ Parser::~Parser() {
 }
 
 bool Parser::isInSILMode() const { return SF.Kind == SourceFileKind::SIL; }
+
+bool Parser::isDelayedParsingEnabled() const {
+  // Do not delay parsing during code completion's second pass.
+  if (CodeCompletion)
+    return false;
+
+  return SF.hasDelayedBodyParsing();
+}
 
 bool Parser::allowTopLevelCode() const {
   return SF.isScriptMode();
@@ -1201,8 +1205,7 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
 
   Impl.SF->SyntaxParsingCache = SyntaxCache;
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, /*SIL=*/nullptr,
-                                  /*PersistentState=*/nullptr, Impl.SPActions,
-                                  /*DelayBodyParsing=*/false));
+                                  /*PersistentState=*/nullptr, Impl.SPActions));
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
@@ -1219,7 +1222,7 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
                       TriviaRetentionMode::WithoutTrivia,
                       Offset, EndOffset));
   Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF, /*SIL=*/nullptr,
-    /*PersistentState=*/nullptr, Impl.SPActions, /*DelayBodyParsing=*/false));
+                                  /*PersistentState=*/nullptr, Impl.SPActions));
 }
 
 ParserUnit::~ParserUnit() {

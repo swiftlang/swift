@@ -173,9 +173,9 @@ public:
 
   LocalContext *CurLocalContext = nullptr;
 
-  bool isDelayedParsingEnabled() const {
-    return DelayBodyParsing || isCodeCompletionFirstPass();
-  }
+  /// Whether we should delay parsing nominal type, extension, and function
+  /// bodies.
+  bool isDelayedParsingEnabled() const;
 
   void setCodeCompletionCallbacks(CodeCompletionCallbacks *Callbacks) {
     CodeCompletion = Callbacks;
@@ -212,16 +212,6 @@ public:
   /// trailing trivias for \c Tok.
   /// Always empty if !SF.shouldBuildSyntaxTree().
   ParsedTrivia TrailingTrivia;
-
-  /// Whether we should delay parsing nominal type and extension bodies,
-  /// and skip function bodies.
-  ///
-  /// This is false in primary files, since we want to type check all
-  /// declarations and function bodies.
-  ///
-  /// This is true for non-primary files, where declarations only need to be
-  /// lazily parsed and type checked.
-  bool DelayBodyParsing;
 
   /// Whether to evaluate the conditions of #if decls, meaning that the bodies
   /// of any active clauses are hoisted such that they become sibling nodes with
@@ -408,16 +398,16 @@ public:
          SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true, bool EvaluateConditionals = true);
+         bool EvaluateConditionals = true);
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState = nullptr,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true, bool EvaluateConditionals = true);
+         bool EvaluateConditionals = true);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
          SILParserTUStateBase *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true, bool EvaluateConditionals = true);
+         bool EvaluateConditionals = true);
   ~Parser();
 
   /// Returns true if the buffer being parsed is allowed to contain SIL.

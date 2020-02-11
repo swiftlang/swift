@@ -108,11 +108,7 @@ namespace swift {
   /// \param SF The file within the module being parsed.
   ///
   /// \param BufferID The buffer to parse from.
-  ///
-  /// \param DelayBodyParsing Whether parsing of type and function bodies can be
-  /// delayed.
   void parseIntoSourceFile(SourceFile &SF, unsigned BufferID,
-                           bool DelayBodyParsing = true,
                            bool EvaluateConditionals = true);
 
   /// Parse a source file's SIL declarations into a given SIL module.
