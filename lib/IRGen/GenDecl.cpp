@@ -2695,6 +2695,9 @@ llvm::Constant *IRGenModule::getOrCreateGOTEquivalent(llvm::Constant *global,
     return gotEntry;
   }
 
+  if (Context.Stats)
+    Context.Stats->getFrontendCounters().NumGOTEntries++;
+
   // Use the global as the initializer for an anonymous constant. LLVM can treat
   // this as equivalent to the global's GOT entry.
   auto gotEquivalent = createGOTEquivalent(*this, global, entity);
