@@ -448,22 +448,43 @@ func two7(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Flo
 
 // Test class methods.
 
-class Super {
+class Super: Differentiable {
+  var float: Float
+
+  init(_ float: Float) {
+    self.float = float
+  }
+
+  // expected-error @+1 {{cannot register derivative for 'init' in a non-final class; consider making 'Super' final}}
+  @derivative(of: init)
+  static func vjpInit(_ float: Float) -> (value: Super, pullback: (TangentVector) -> Float) {
+    return (Super(float), { v in v.float })
+  }
+
   @differentiable
   func foo(_ x: Float) -> Float {
     return x
   }
 
-  @derivative(of: foo)
+  @derivative(of: foo, wrt: x)
   func vjpFoo(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     return (foo(x), { v in v })
   }
 }
 
-class Sub : Super {
+final class Sub : Super {
+  override init(_ float: Float) {
+    self.float = float
+  }
+
+  @derivative(of: init)
+  static func vjpSubInit(_ float: Float) -> (value: Sub, pullback: (TangentVector) -> Float) {
+    return (Sub(float), { v in v.float })
+  }
+
   // TODO(TF-649): Enable `@derivative` to override original functions from superclass.
   // expected-error @+1 {{'foo' is not defined in the current type context}}
-  @derivative(of: foo)
+  @derivative(of: foo, wrt: x)
   override func vjpFoo(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     return (foo(x), { v in v })
   }

@@ -745,17 +745,10 @@ ForwardModeTests.test("SimpleWrtSelf") {
     // FIXME(TF-648): Dummy to make `Super.AllDifferentiableVariables` be nontrivial.
     var _nontrivial: [Float] = []
 
-    // TODO(TF-654): Remove attribute when differentiation supports class initializers.
-    // @differentiable(vjp: vjpInit)
+    // FIXME(SR-12175): Fix forward-mode differentiation crash.
+    // @differentiable
     required init(base: Float) {
       self.base = base
-    }
-    static func vjpInit(base: Float) -> (Super, (TangentVector) -> Float) {
-      return (Super(base: base), { x in x.base })
-    }
-
-    static func jvpInit(base: Float) -> (Super, (Float) -> TangentVector) {
-      return (Super(base: base), { x in TangentVector(base: x, _nontrivial: []) })
     }
 
     @differentiable(wrt: (self, x), jvp: jvpf, vjp: vjpf)
@@ -794,7 +787,7 @@ ForwardModeTests.test("SimpleWrtSelf") {
     }
   }
 
-  // TODO(TF-654): Uncomment when differentiation supports class initializers.
+  // FIXME(SR-12175): Fix forward-mode differentiation crash.
   // let v = Super.TangentVector(base: 100, _nontrivial: [])
   // expectEqual(100, pullback(at: 1337) { x in Super(base: x) }(v))
   // expectEqual(100, pullback(at: 1337) { x in SubOverride(base: x) }(v))

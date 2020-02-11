@@ -434,6 +434,16 @@ public:
   void visitUnconditionalCheckedCastAddrInst(
       UnconditionalCheckedCastAddrInst *uccai);
 
+  /// Handle `unchecked_ref_cast` instruction.
+  ///   Original: y = unchecked_ref_cast x
+  ///    Adjoint: adj[x] += adj[y] (assuming x' and y' have the same type)
+  void visitUncheckedRefCastInst(UncheckedRefCastInst *urci);
+
+  /// Handle `upcast` instruction.
+  ///   Original: y = upcast x
+  ///    Adjoint: adj[x] += adj[y] (assuming x' and y' have the same type)
+  void visitUpcastInst(UpcastInst *ui);
+
 #define NOT_DIFFERENTIABLE(INST, DIAG) void visit##INST##Inst(INST##Inst *inst);
 #undef NOT_DIFFERENTIABLE
 
