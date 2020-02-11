@@ -970,7 +970,7 @@ void CompilerInstance::parseLibraryFile(
       SourceFileKind::Library, implicitImports.kind, BufferID);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
-  parseIntoSourceFile(*NextInput, BufferID);
+  // Name binding will lazily trigger parsing of the file.
   performNameBinding(*NextInput);
 }
 
@@ -1013,11 +1013,8 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
   Diags.setSuppressWarnings(DidSuppressWarnings || !mainIsPrimary);
 
-  // Parse the Swift decls into the source file.
-  parseIntoSourceFile(MainFile, MainBufferID);
-
-  // For a primary, also perform type checking if needed. Otherwise, just do
-  // name binding.
+  // For a primary, perform type checking if needed. Otherwise, just do name
+  // binding.
   if (mainIsPrimary && LimitStage >= SourceFile::TypeChecked) {
     performTypeChecking(MainFile);
   } else {
@@ -1138,7 +1135,8 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
         SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
         BufferID, parsingOpts);
 
-    parseIntoSourceFile(*NextInput, BufferID);
+    // Force the parsing of the top level decls.
+    (void)NextInput->getTopLevelDecls();
   }
 
   // Now parse the main file.
@@ -1146,9 +1144,9 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
     SourceFile &MainFile =
         MainModule->getMainSourceFile(Invocation.getSourceFileKind());
     MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
-    assert(MainBufferID == MainFile.getBufferID());
 
-    parseIntoSourceFile(MainFile, MainBufferID);
+    // Force the parsing of the top level decls.
+    (void)MainFile.getTopLevelDecls();
   }
 
   assert(Context->LoadedModules.size() == 1 &&

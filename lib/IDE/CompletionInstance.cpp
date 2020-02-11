@@ -199,6 +199,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   DiagnosticEngine tmpDiags(tmpSM);
   std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
+  registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
   registerSILGenRequestFunctions(tmpCtx->evaluator);
@@ -209,7 +210,6 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   tmpSF->enableInterfaceHash();
   // Ensure all non-function-body tokens are hashed into the interface hash
   tmpCtx->LangOpts.EnableTypeFingerprints = false;
-  parseIntoSourceFile(*tmpSF, tmpBufferID);
 
   // Couldn't find any completion token?
   auto *newState = tmpSF->getDelayedParserState();
@@ -324,8 +324,8 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     // Tell the compiler instance we've replaced the code completion file.
     CI.setCodeCompletionFile(newSF);
 
-    // Re-parse the whole file. Still re-use imported modules.
-    parseIntoSourceFile(*newSF, newBufferID);
+    // Re-process the whole file (parsing will be lazily triggered). Still
+    // re-use imported modules.
     performNameBinding(*newSF);
     bindExtensions(*newSF);
 

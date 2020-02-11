@@ -32,6 +32,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -674,7 +675,8 @@ void ModuleDecl::getTopLevelDeclsWhereAttributesMatch(
 }
 
 void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
-  Results.append(Decls.begin(), Decls.end());
+  auto decls = getTopLevelDecls();
+  Results.append(decls.begin(), decls.end());
 }
 
 void ModuleDecl::getPrecedenceGroups(
@@ -1688,7 +1690,7 @@ void SourceFile::print(raw_ostream &OS, const PrintOptions &PO) {
 void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   std::set<DeclKind> MajorDeclKinds = {DeclKind::Class, DeclKind::Enum,
     DeclKind::Extension, DeclKind::Protocol, DeclKind::Struct};
-  for (auto decl : Decls) {
+  for (auto decl : getTopLevelDecls()) {
     if (!decl->shouldPrintInContext(PO))
       continue;
     // For a major decl, we print an empty line before it.
@@ -1971,6 +1973,13 @@ bool SourceFile::hasDelayedBodyParsing() const {
   return true;
 }
 
+ArrayRef<Decl *> SourceFile::getTopLevelDecls() const {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  return evaluateOrDefault(ctx.evaluator, ParseSourceFileRequest{mutableThis},
+                           {});
+}
+
 bool FileUnit::walk(ASTWalker &walker) {
   SmallVector<Decl *, 64> Decls;
   getTopLevelDecls(Decls);
@@ -2004,7 +2013,7 @@ bool FileUnit::walk(ASTWalker &walker) {
 bool SourceFile::walk(ASTWalker &walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
-  for (Decl *D : Decls) {
+  for (Decl *D : getTopLevelDecls()) {
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into decl", D);
 #endif
