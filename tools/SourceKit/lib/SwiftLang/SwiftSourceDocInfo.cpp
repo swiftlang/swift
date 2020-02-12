@@ -915,7 +915,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     auto ClangMod = Importer->getClangOwningModule(ClangNode);
     if (ClangMod)
       ModuleName = ClangMod->getFullModuleName();
-  } else if (VD->getLoc().isInvalid() && VD->getModuleContext() != MainModule) {
+  } else if (VD->getModuleContext() != MainModule) {
     ModuleName = VD->getModuleContext()->getName().str();
   }
   StringRef ModuleInterfaceName;
