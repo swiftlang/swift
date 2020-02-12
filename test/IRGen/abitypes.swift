@@ -47,8 +47,8 @@ class Foo {
   // x86_64-macosx: define hidden double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, %TSo6CGRectV* byval align 8 %2) {{[#0-9]*}} {
   // armv7-ios: define hidden swiftcc double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}F"(float %0, float %1, float %2, float %3, %T8abitypes3FooC* swiftself %4) {{.*}} {
   // armv7-ios: define hidden double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, [4 x i32] %2) {{[#0-9]*}} {
-  // armv7s-ios: define hidden swiftcc double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}F"(float %0, float %1, float %2, float %3, %T8abitypes3FooC* swiftself %3) {{.*}} {
-  // armv7s-ios: define hidden double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, [4 x i32] %3) {{[#0-9]*}} {
+  // armv7s-ios: define hidden swiftcc double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}F"(float %0, float %1, float %2, float %3, %T8abitypes3FooC* swiftself %4) {{.*}} {
+  // armv7s-ios: define hidden double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, [4 x i32] %2) {{[#0-9]*}} {
   // armv7k-watchos: define hidden swiftcc double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}F"(float %0, float %1, float %2, float %3, %T8abitypes3FooC* swiftself %4) {{.*}} {
   // armv7k-watchos: define hidden double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, [4 x float] %2) {{[#0-9]*}} {
   @objc dynamic func getXFromNSRect(_ r: NSRect) -> Double {
@@ -62,7 +62,7 @@ class Foo {
   // armv7s-ios: define hidden swiftcc float @"$s8abitypes3FooC12getXFromRect{{[_0-9a-zA-Z]*}}F"(float %0, float %1, float %2, float %3, %T8abitypes3FooC* swiftself %4) {{.*}} {
   // armv7s-ios: define hidden float @"$s8abitypes3FooC12getXFromRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, [4 x i32] %2) {{[#0-9]*}} {
   // armv7k-watchos: define hidden swiftcc float @"$s8abitypes3FooC12getXFromRect{{[_0-9a-zA-Z]*}}F"(float %0, float %1, float %2, float %3, %T8abitypes3FooC* swiftself %4) {{.*}} {
-  // armv7k-watchos: define hidden float @"$s8abitypes3FooC12getXFromRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, [4 x float] %3) {{[#0-9]*}} {
+  // armv7k-watchos: define hidden float @"$s8abitypes3FooC12getXFromRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, [4 x float] %2) {{[#0-9]*}} {
   @objc dynamic func getXFromRect(_ r: MyRect) -> Float {
     return r.x
   }
@@ -151,7 +151,7 @@ class Foo {
   // armv7-ios: ret float [[RETVAL]]
   //
   // armv7s returns an HA of four floats indirectly
-  // armv7s-ios: define hidden swiftcc float @"$s8abitypes3FooC4barc{{[_0-9a-zA-Z]*}}F"(%TSo13StructReturnsC* %0, %T8abitypes3FooC* swiftself % %1) {{.*}} {
+  // armv7s-ios: define hidden swiftcc float @"$s8abitypes3FooC4barc{{[_0-9a-zA-Z]*}}F"(%TSo13StructReturnsC* %0, %T8abitypes3FooC* swiftself %1) {{.*}} {
   // armv7s-ios: [[RESULT:%.*]] = alloca [[RECTTYPE:%.*MyRect.*]], align 4
   // armv7s-ios: load i8*, i8** @"\01L_selector(newRect)", align 4
   // armv7s-ios: call void bitcast (void ()* @objc_msgSend_stret to void ([[RECTTYPE]]*, [[RECEIVER:.*]]*, i8*)*)([[RECTTYPE]]* noalias nocapture sret %call.aggresult
@@ -514,10 +514,10 @@ class Foo {
   }
 
   // arm64-ios: define hidden swiftcc { i64, i64, i64, i64 } @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}F"(%TSo13StructReturnsC* %0, i64 %1, i64 %2, i64 %3, i64 %4, %T8abitypes3FooC* swiftself %5) {{.*}} {
-  // arm64-ios: define hidden void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(%TSo9BigStructV* noalias nocapture sret, i8*, i8*, [[OPAQUE:.*]]*, %TSo9BigStructV*) {{[#0-9]*}} {
+  // arm64-ios: define hidden void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(%TSo9BigStructV* noalias nocapture sret %0, i8* %1, i8* %2, [[OPAQUE:.*]]* %3, %TSo9BigStructV* %4) {{[#0-9]*}} {
   //
   // arm64-tvos: define hidden swiftcc { i64, i64, i64, i64 } @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}F"(%TSo13StructReturnsC* %0, i64 %1, i64 %2, i64 %3, i64 %4, %T8abitypes3FooC* swiftself %5) {{.*}} {
-  // arm64-tvos: define hidden void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(%TSo9BigStructV* noalias nocapture sret, i8*, i8*, [[OPAQUE:.*]]*, %TSo9BigStructV*) {{[#0-9]*}} {
+  // arm64-tvos: define hidden void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(%TSo9BigStructV* noalias nocapture sret %0, i8* %1, i8* %2, [[OPAQUE:.*]]* %3, %TSo9BigStructV* %4) {{[#0-9]*}} {
   @objc dynamic func callJustReturn(_ r: StructReturns, with v: BigStruct) -> BigStruct {
     return r.justReturn(v)
   }
