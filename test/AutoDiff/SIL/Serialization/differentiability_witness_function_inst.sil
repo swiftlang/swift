@@ -80,33 +80,33 @@ bb0:
 // CHECK:   {{%.*}} = differentiability_witness_function [vjp] [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable, τ_0_0 == τ_0_0.TangentVector> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
 // CHECK: }
 
-// IRGEN: @AD__foo_PSUURS = external global %swift.differentiability_witness, align 8
-// IRGEN: @AD__foo_PSSURS = external global %swift.differentiability_witness, align 8
-// IRGEN: @AD__bar_PSUURSU = external global %swift.differentiability_witness, align 8
-// IRGEN: @AD__bar_PSSURSS = external global %swift.differentiability_witness, align 8
-// IRGEN: @AD__generic_PSURS16_Differentiation14DifferentiableRzl = external global %swift.differentiability_witness, align 8
-// IRGEN: @AD__generic_PSSRSs18AdditiveArithmeticRz16_Differentiation14DifferentiableRzl = external global %swift.differentiability_witness, align 8
-// IRGEN: @AD__generic_PSSRS16_Differentiation14DifferentiableRz13TangentVectorAaBPQzRszl = external global %swift.differentiability_witness, align 8
+// IRGEN: @AD__foo_PSUURS = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT:[0-9]+]]
+// IRGEN: @AD__foo_PSSURS = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @AD__bar_PSUURSU = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @AD__bar_PSSURSS = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @AD__generic_PSURS16_Differentiation14DifferentiableRzl = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @AD__generic_PSSRSs18AdditiveArithmeticRz16_Differentiation14DifferentiableRzl = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @AD__generic_PSSRS16_Differentiation14DifferentiableRz13TangentVectorAaBPQzRszl = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
 
 // IRGEN-LABEL: define {{.*}} @test_derivative_witnesses()
 
-// IRGEN: [[PTR1:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__foo_PSUURS, i32 0, i32 0), align 8
+// IRGEN: [[PTR1:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__foo_PSUURS, i32 0, i32 0), align [[PTR_ALIGNMENT]]
 // IRGEN: [[FNPTR1:%.*]] = bitcast i8* [[PTR1]] to { float, i8*, %swift.refcounted* } (float, float, float)*
 
-// IRGEN: [[PTR2:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__foo_PSSURS, i32 0, i32 1), align 8
+// IRGEN: [[PTR2:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__foo_PSSURS, i32 0, i32 1), align [[PTR_ALIGNMENT]]
 // IRGEN: [[FNPTR2:%.*]] = bitcast i8* [[PTR2]] to { float, i8*, %swift.refcounted* } (float, float, float)*
 
-// IRGEN: [[PTR3:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__bar_PSUURSU, i32 0, i32 0), align 8
+// IRGEN: [[PTR3:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__bar_PSUURSU, i32 0, i32 0), align [[PTR_ALIGNMENT]]
 // IRGEN: [[FNPTR3:%.*]] = bitcast i8* [[PTR3]] to { float, float, i8*, %swift.refcounted* } (float, float, float)*
 
-// IRGEN: [[PTR4:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__bar_PSSURSS, i32 0, i32 1), align 8
+// IRGEN: [[PTR4:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__bar_PSSURSS, i32 0, i32 1), align [[PTR_ALIGNMENT]]
 // IRGEN: [[FNPTR4:%.*]] = bitcast i8* [[PTR4]] to { float, float, i8*, %swift.refcounted* } (float, float, float)*
 
-// IRGEN: [[PTR5:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__generic_PSURS16_Differentiation14DifferentiableRzl, i32 0, i32 0), align 8
+// IRGEN: [[PTR5:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__generic_PSURS16_Differentiation14DifferentiableRzl, i32 0, i32 0), align [[PTR_ALIGNMENT]]
 // IRGEN: [[FNPTR5:%.*]] = bitcast i8* [[PTR5]] to { i8*, %swift.refcounted* } (%swift.opaque*, %swift.opaque*, float, %swift.type*, i8**)*
 
-// IRGEN: [[PTR6:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__generic_PSSRSs18AdditiveArithmeticRz16_Differentiation14DifferentiableRzl, i32 0, i32 1), align 8
+// IRGEN: [[PTR6:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__generic_PSSRSs18AdditiveArithmeticRz16_Differentiation14DifferentiableRzl, i32 0, i32 1), align [[PTR_ALIGNMENT]]
 // IRGEN: [[FNPTR6:%.*]] = bitcast i8* [[PTR6]] to { i8*, %swift.refcounted* } (%swift.opaque*, %swift.opaque*, float, %swift.type*, i8**, i8**)*
 
-// IRGEN: [[PTR7:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__generic_PSSRS16_Differentiation14DifferentiableRz13TangentVectorAaBPQzRszl, i32 0, i32 1), align 8
+// IRGEN: [[PTR7:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__generic_PSSRS16_Differentiation14DifferentiableRz13TangentVectorAaBPQzRszl, i32 0, i32 1), align [[PTR_ALIGNMENT]]
 // IRGEN: [[FNPTR7:%.*]] = bitcast i8* [[PTR7]] to { i8*, %swift.refcounted* } (%swift.opaque*, %swift.opaque*, float, %swift.type*, i8**)*
