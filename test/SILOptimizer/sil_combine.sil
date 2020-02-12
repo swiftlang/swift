@@ -2422,6 +2422,16 @@ bb0(%0 : $Builtin.Int64, %1 : $Builtin.RawPointer, %2 : $Builtin.RawPointer):
   return %13 : $()
 }
 
+// Make sure we do not crash here. This ensures that when checking for
+// tuple_extract, we check if we have an argument or not.
+sil @builtin_array_opt_index_raw_pointer_to_index_addr_no_crash : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.Word {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Builtin.Word
+  %4 = load %3 : $*Builtin.Word
+  return %4 : $Builtin.Word
+}
+
 // CHECK-LABEL: sil @cmp_zext_peephole
 // CHECK: bb0([[Arg1:%.*]] : $Builtin.Word, [[Arg2:%.*]] : $Builtin.Word):
 // CHECK:   [[ZA1:%.*]] = builtin "zextOrBitCast_Word_Int64"([[Arg1]] : $Builtin.Word) : $Builtin.Int64
