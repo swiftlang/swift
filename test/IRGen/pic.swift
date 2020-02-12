@@ -1,6 +1,9 @@
 // <rdar://problem/15358345> Check that we always use PIC relocations on all
 // platforms.
 
+// SR-12194
+// XFAIL: OS=linux-android, CPU=aarch64
+
 // RUN: %target-swift-frontend %s -module-name main -S -o - | %FileCheck -check-prefix=%target-cpu -check-prefix=%target-cpu-%target-sdk-name %s
 
 var global: Int = 0
