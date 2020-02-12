@@ -217,6 +217,7 @@ def validate_arguments(toolchain, args):
 
     targets_needing_toolchain = [
         'build_indexstoredb',
+        'build_playgroundsupport',
         'build_pythonkit',
         'build_sourcekitlsp',
         'build_toolchainbenchmarks',
@@ -545,8 +546,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-libdispatch"]
         if not args.build_libicu:
             impl_args += ["--skip-build-libicu"]
-        if not args.build_playgroundsupport:
-            impl_args += ["--skip-build-playgroundsupport"]
         if args.build_swift_dynamic_stdlib:
             impl_args += ["--build-swift-dynamic-stdlib"]
         if args.build_swift_static_stdlib:
@@ -586,14 +585,15 @@ class BuildScriptInvocation(object):
         if not args.test and not args.long_test and not args.stress_test:
             impl_args += ["--skip-test-swift"]
         if not args.test:
-            impl_args += ["--skip-test-cmark",
-                          "--skip-test-lldb",
-                          "--skip-test-llbuild",
-                          "--skip-test-xctest",
-                          "--skip-test-foundation",
-                          "--skip-test-libdispatch",
-                          "--skip-test-libicu",
-                          "--skip-test-playgroundsupport"]
+            impl_args += [
+                "--skip-test-cmark",
+                "--skip-test-lldb",
+                "--skip-test-llbuild",
+                "--skip-test-xctest",
+                "--skip-test-foundation",
+                "--skip-test-libdispatch",
+                "--skip-test-libicu",
+            ]
         if not args.test_linux:
             impl_args += ["--skip-test-linux"]
         if not args.test_freebsd:
@@ -816,6 +816,8 @@ class BuildScriptInvocation(object):
             product_classes.append(products.SwiftEvolve)
         if self.args.build_indexstoredb:
             product_classes.append(products.IndexStoreDB)
+        if self.args.build_playgroundsupport:
+            product_classes.append(products.PlaygroundSupport)
         if self.args.build_pythonkit:
             product_classes.append(products.PythonKit)
         if self.args.build_sourcekitlsp:
