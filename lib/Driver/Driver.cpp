@@ -2347,7 +2347,7 @@ static StringRef baseNameForImage(const JobAction *JA, const OutputInfo &OI,
   if (JA->size() == 1 && OI.ModuleNameIsFallback && BaseInput != "-")
     return llvm::sys::path::stem(BaseInput);
   
-  if (auto link = dyn_cast<StaticLinkJobAction>(JA)) {
+  if (isa<StaticLinkJobAction>(JA)) {
     Buffer = "lib";
     Buffer.append(BaseName);
     Buffer.append(Triple.isOSWindows() ? ".lib" : ".a");

@@ -6488,7 +6488,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
             return;
           }
         }
-        if (auto F = dyn_cast<FuncDecl>(AFD)) {
+        if (isa<FuncDecl>(AFD)) {
           auto RS = new (Context) ReturnStmt(SourceLoc(), E);
           BS->setFirstElement(RS);
           AFD->setHasSingleExpressionBody();

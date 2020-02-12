@@ -2937,7 +2937,7 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
 
   // If we can lazily resolve the function, do so now.
   if (auto *LazyResolver = attr->Resolver) {
-    auto decl = attr->Resolver->loadDynamicallyReplacedFunctionDecl(
+    auto decl = LazyResolver->loadDynamicallyReplacedFunctionDecl(
         attr, attr->ResolverContextData);
     attr->Resolver = nullptr;
     return decl;

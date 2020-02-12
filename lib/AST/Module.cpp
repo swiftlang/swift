@@ -1218,7 +1218,7 @@ ModuleDecl::ReverseFullNameIterator::operator++() {
   if (!current)
     return *this;
 
-  if (auto *swiftModule = current.dyn_cast<const ModuleDecl *>()) {
+  if (current.is<const ModuleDecl *>()) {
     current = nullptr;
     return *this;
   }

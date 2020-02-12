@@ -725,7 +725,7 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
                             requirement);
   };
 
-  if (auto memberTy = type->getAs<DependentMemberType>())
+  if (type->is<DependentMemberType>())
     return missingRequirementMatch(type);
 
   type = type->mapTypeOutOfContext();

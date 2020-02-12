@@ -712,7 +712,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       // Check for availability of wrappedValue.
       if (accessor->getAccessorKind() == AccessorKind::Get ||
           accessor->getAccessorKind() == AccessorKind::Read) {
-        if (auto *attr = wrappedValue->getAttrs().getUnavailable(ctx)) {
+        if (wrappedValue->getAttrs().getUnavailable(ctx)) {
           diagnoseExplicitUnavailability(
               wrappedValue,
               var->getAttachedPropertyWrappers()[i]->getRangeWithAt(),
@@ -862,7 +862,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
             lookupExpr, lookupExpr->getType()->getRValueType());
       }
     }
-  } else if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+  } else if (isa<SubscriptDecl>(storage)) {
     Expr *indices = buildSubscriptIndexReference(ctx, accessor);
     lookupExpr = SubscriptExpr::create(ctx, selfDRE, indices, memberRef,
                                        /*IsImplicit=*/true, semantics);

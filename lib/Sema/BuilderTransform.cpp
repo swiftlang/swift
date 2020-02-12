@@ -266,7 +266,7 @@ protected:
           continue;
 
         // Skip #warning/#error; we'll handle them when applying the builder.
-        if (auto poundDiag = dyn_cast<PoundDiagnosticDecl>(decl)) {
+        if (isa<PoundDiagnosticDecl>(decl)) {
           continue;
         }
 

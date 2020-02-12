@@ -219,7 +219,7 @@ void State::initializeConsumingUse(BranchPropagatedUser consumingUser,
     llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
                  << "Found over consume?!\n";
     if (auto v = value) {
-      llvm::errs() << "Value: " << *value;
+      llvm::errs() << "Value: " << *v;
     } else {
       llvm::errs() << "Value: N/A\n";
     }

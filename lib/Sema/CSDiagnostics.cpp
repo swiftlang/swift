@@ -730,7 +730,7 @@ bool LabelingFailure::diagnoseAsNote() {
     return false;
 
   SmallVector<Identifier, 4> argLabels;
-  if (auto *paren = dyn_cast<ParenExpr>(argExpr)) {
+  if (isa<ParenExpr>(argExpr)) {
     argLabels.push_back(Identifier());
   } else if (auto *tuple = dyn_cast<TupleExpr>(argExpr)) {
     argLabels.append(tuple->getElementNames().begin(),
@@ -1306,7 +1306,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
               diag::assignment_dynamic_property_has_immutable_base;
       }
     }
-  } else if (auto sub = dyn_cast<SubscriptExpr>(diagExpr)) {
+  } else if (isa<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;
   } else {
     subElementDiagID = diag::assignment_lhs_is_immutable_variable;
@@ -2171,7 +2171,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
       if (auto *TE = dyn_cast<TupleExpr>(parentExpr)) {
         // In case of dictionary e.g. `[42: nil]` we need to figure
         // out whether nil is a "key" or a "value".
-        if (auto *DE = dyn_cast<DictionaryExpr>(enclosingExpr)) {
+        if (isa<DictionaryExpr>(enclosingExpr)) {
           assert(TE->getNumElements() == 2);
           CTP = TE->getElement(0) == anchor ? CTP_DictionaryKey
                                             : CTP_DictionaryValue;
@@ -2187,7 +2187,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
       if (isa<ApplyExpr>(enclosingExpr) || isa<SubscriptExpr>(enclosingExpr) ||
           isa<KeyPathExpr>(enclosingExpr))
         CTP = CTP_CallArgument;
-    } else if (auto *CE = dyn_cast<CoerceExpr>(parentExpr)) {
+    } else if (isa<CoerceExpr>(parentExpr)) {
       // `nil` is passed as a left-hand side of the coercion
       // operator e.g. `nil as Foo`
       CTP = CTP_CoerceOperand;
@@ -3603,10 +3603,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         // Give a customized message if we're accessing a member type
         // of a protocol -- otherwise a diagnostic talking about
         // static members doesn't make a whole lot of sense
-        if (auto TAD = dyn_cast<TypeAliasDecl>(Member)) {
+        if (isa<TypeAliasDecl>(Member)) {
           Diag.emplace(emitDiagnostic(loc, diag::typealias_outside_of_protocol,
                                       Name));
-        } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
+        } else if (isa<AssociatedTypeDecl>(Member)) {
           Diag.emplace(emitDiagnostic(loc, diag::assoc_type_outside_of_protocol,
                                       Name));
         } else if (isa<ConstructorDecl>(Member)) {
