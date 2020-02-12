@@ -205,8 +205,8 @@ void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
                                        unsigned argIndex, Alignment align) {
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::ByVal);
-  b.addAttribute(llvm::Attribute::getWithAlignment(IGM.LLVMContext,
-                                                   align.getValue()));
+  b.addAttribute(llvm::Attribute::getWithAlignment(
+      IGM.LLVMContext, llvm::Align(align.getValue())));
   attrs = attrs.addAttributes(IGM.LLVMContext,
                               argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
@@ -1617,10 +1617,9 @@ llvm::CallSite CallEmission::emitCallSite() {
     auto origCallee = call->getCalledValue();
     llvm::Value *opaqueCallee = origCallee;
     opaqueCallee =
-      IGF.Builder.CreateBitCast(opaqueCallee, IGF.IGM.Int8PtrTy);    
-    opaqueCallee =
-      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_prepare_retcon,
-                                      { opaqueCallee });
+      IGF.Builder.CreateBitCast(opaqueCallee, IGF.IGM.Int8PtrTy);
+    opaqueCallee = IGF.Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::coro_prepare_retcon, {opaqueCallee});
     opaqueCallee =
       IGF.Builder.CreateBitCast(opaqueCallee, origCallee->getType());
     call->setCalledFunction(fn.getFunctionType(), opaqueCallee);
@@ -1743,7 +1742,8 @@ void CallEmission::emitYieldsToExplosion(Explosion &out) {
     auto indirectStructTy = cast<llvm::StructType>(
       indirectPointer->getType()->getPointerElementType());
     auto layout = IGF.IGM.DataLayout.getStructLayout(indirectStructTy);
-    Address indirectBuffer(indirectPointer, Alignment(layout->getAlignment()));
+    Address indirectBuffer(indirectPointer,
+                           Alignment(layout->getAlignment().value()));
 
     for (auto i : indices(indirectStructTy->elements())) {
       // Skip padding.
@@ -2075,10 +2075,11 @@ static void emitCoerceAndExpand(IRGenFunction &IGF, Explosion &in,
 
   // Make the alloca at least as aligned as the coercion struct, just
   // so that the element accesses we make don't end up under-aligned.
-  Alignment coercionTyAlignment = Alignment(coercionTyLayout->getAlignment());
+  Alignment coercionTyAlignment =
+      Alignment(coercionTyLayout->getAlignment().value());
   auto alloca = cast<llvm::AllocaInst>(temporary.getAddress());
   if (alloca->getAlignment() < coercionTyAlignment.getValue()) {
-    alloca->setAlignment(coercionTyAlignment.getValue());
+    alloca->setAlignment(llvm::MaybeAlign(coercionTyAlignment.getValue()));
     temporary = Address(temporary.getAddress(), coercionTyAlignment);
   }
 
@@ -2355,7 +2356,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
         auto ABIAlign = AI.getIndirectAlign();
         if (ABIAlign > addr.getAlignment()) {
           auto *AS = cast<llvm::AllocaInst>(addr.getAddress());
-          AS->setAlignment(ABIAlign.getQuantity());
+          AS->setAlignment(llvm::MaybeAlign(ABIAlign.getQuantity()));
           addr = Address(addr.getAddress(), Alignment(ABIAlign.getQuantity()));
         }
       }
@@ -2584,10 +2585,9 @@ static void emitRetconCoroutineEntry(IRGenFunction &IGF,
 
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
   // This serves as a handle that we can pass around to other intrinsics.
-  auto hdl = IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_begin, {
-    id,
-    llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy)
-  });
+  auto hdl = IGF.Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_begin,
+      {id, llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy)});
 
   // Set the coroutine handle; this also flags that is a coroutine so that
   // e.g. dynamic allocas use the right code generation.
@@ -2598,7 +2598,7 @@ void irgen::emitYieldOnceCoroutineEntry(IRGenFunction &IGF,
                                         CanSILFunctionType fnType,
                                         Explosion &allParamValues) {
   emitRetconCoroutineEntry(IGF, fnType, allParamValues,
-                           llvm::Intrinsic::ID::coro_id_retcon_once,
+                           llvm::Intrinsic::coro_id_retcon_once,
                            getYieldOnceCoroutineBufferSize(IGF.IGM),
                            getYieldOnceCoroutineBufferAlignment(IGF.IGM));
 }
@@ -2607,7 +2607,7 @@ void irgen::emitYieldManyCoroutineEntry(IRGenFunction &IGF,
                                         CanSILFunctionType fnType,
                                         Explosion &allParamValues) {
   emitRetconCoroutineEntry(IGF, fnType, allParamValues,
-                           llvm::Intrinsic::ID::coro_id_retcon,
+                           llvm::Intrinsic::coro_id_retcon,
                            getYieldManyCoroutineBufferSize(IGF.IGM),
                            getYieldManyCoroutineBufferAlignment(IGF.IGM));
 }
@@ -2684,8 +2684,8 @@ llvm::Value *irgen::emitYield(IRGenFunction &IGF,
       resultStructTy->getElementType(resultStructTy->getNumElements() - 1)
                     ->getPointerElementType());
     auto layout = IGF.IGM.DataLayout.getStructLayout(bufferStructTy);
-    indirectBuffer = IGF.createAlloca(bufferStructTy,
-                                      Alignment(layout->getAlignment()));
+    indirectBuffer = IGF.createAlloca(
+        bufferStructTy, Alignment(layout->getAlignment().value()));
     indirectBufferSize = Size(layout->getSizeInBytes());
     IGF.Builder.CreateLifetimeStart(*indirectBuffer, indirectBufferSize);
 
@@ -2709,10 +2709,8 @@ llvm::Value *irgen::emitYield(IRGenFunction &IGF,
   }
 
   // Perform the yield.
-  auto isUnwind =
-    IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_suspend_retcon,
-                                    { IGF.IGM.Int1Ty },
-                                    yieldArgs);
+  auto isUnwind = IGF.Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_suspend_retcon, {IGF.IGM.Int1Ty}, yieldArgs);
 
   // We're done with the indirect buffer.
   if (indirectBuffer) {
@@ -3030,10 +3028,10 @@ void IRGenFunction::emitScalarReturn(llvm::Type *resultType,
 static void adjustAllocaAlignment(const llvm::DataLayout &DL,
                                   Address allocaAddr, llvm::StructType *type) {
   auto layout = DL.getStructLayout(type);
-  Alignment layoutAlignment = Alignment(layout->getAlignment());
+  Alignment layoutAlignment = Alignment(layout->getAlignment().value());
   auto alloca = cast<llvm::AllocaInst>(allocaAddr.getAddress());
   if (alloca->getAlignment() < layoutAlignment.getValue()) {
-    alloca->setAlignment(layoutAlignment.getValue());
+    alloca->setAlignment(llvm::MaybeAlign(layoutAlignment.getValue()));
     allocaAddr = Address(allocaAddr.getAddress(), layoutAlignment);
   }
 }

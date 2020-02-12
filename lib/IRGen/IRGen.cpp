@@ -72,6 +72,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
+#include "llvm/Transforms/Instrumentation/SanitizerCoverage.h"
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/ObjCARC.h"
 
@@ -146,7 +147,7 @@ static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
                                      legacy::PassManagerBase &PM) {
   const PassManagerBuilderWrapper &BuilderWrapper =
       static_cast<const PassManagerBuilderWrapper &>(Builder);
-  PM.add(createSanitizerCoverageModulePass(
+  PM.add(createModuleSanitizerCoverageLegacyPassPass(
       BuilderWrapper.IRGOpts.SanitizeCoverage));
 }
 
@@ -398,8 +399,13 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
 
   // Search for the section which holds the hash.
   for (auto &Section : ObjectFile->sections()) {
-    StringRef SectionName;
-    Section.getName(SectionName);
+    llvm::Expected<StringRef> SectionNameOrErr = Section.getName();
+    if (!SectionNameOrErr) {
+      llvm::consumeError(SectionNameOrErr.takeError());
+      continue;
+    }
+
+    StringRef SectionName = *SectionNameOrErr;
     if (SectionName == HashSectionName) {
       llvm::Expected<llvm::StringRef> SectionData = Section.getContents();
       if (!SectionData) {
@@ -579,10 +585,10 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine *Diags,
     break;
   case IRGenOutputKind::NativeAssembly:
   case IRGenOutputKind::ObjectFile: {
-    llvm::TargetMachine::CodeGenFileType FileType;
+    CodeGenFileType FileType;
     FileType = (Opts.OutputKind == IRGenOutputKind::NativeAssembly
-                  ? llvm::TargetMachine::CGFT_AssemblyFile
-                  : llvm::TargetMachine::CGFT_ObjectFile);
+                  ? CGFT_AssemblyFile
+                  : CGFT_ObjectFile);
 
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         TargetMachine->getTargetIRAnalysis()));

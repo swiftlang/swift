@@ -403,6 +403,8 @@ public:
                    SmallVectorImpl<GenericSignature> &genericSignatures)
                 override;
 
+  StringRef getTargetTriple() const;
+
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST;
   }

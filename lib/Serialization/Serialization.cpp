@@ -2583,7 +2583,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           std::unique_ptr<DeclMembersTable> &memberTable =
             S.DeclMemberNames[VD->getBaseName()].second;
           if (!memberTable) {
-            memberTable = llvm::make_unique<DeclMembersTable>();
+            memberTable = std::make_unique<DeclMembersTable>();
           }
           (*memberTable)[parentID].push_back(memberID);
         }
@@ -2593,7 +2593,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           std::unique_ptr<DeclMembersTable> &memberTable =
             S.DeclMemberNames[A->getMemberName().getBaseName()].second;
           if (!memberTable) {
-            memberTable = llvm::make_unique<DeclMembersTable>();
+            memberTable = std::make_unique<DeclMembersTable>();
           }
           (*memberTable)[parentID].push_back(memberID);
         }
@@ -4832,8 +4832,7 @@ static void collectInterestingNestedDeclarations(
   }
 }
 
-void Serializer::writeAST(ModuleOrSourceFile DC,
-                          bool enableNestedTypeLookupTable) {
+void Serializer::writeAST(ModuleOrSourceFile DC) {
   DeclTable topLevelDecls, operatorDecls, operatorMethodDecls;
   DeclTable precedenceGroupDecls;
   ObjCMethodTable objcMethods;
@@ -4984,8 +4983,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     index_block::ObjCMethodTableLayout ObjCMethodTable(Out);
     writeObjCMethodTable(ObjCMethodTable, objcMethods);
 
-    if (enableNestedTypeLookupTable &&
-        !nestedTypeDecls.empty()) {
+    if (!nestedTypeDecls.empty()) {
       index_block::NestedTypeDeclsLayout NestedTypeDeclsTable(Out);
       writeNestedTypeDeclsTable(NestedTypeDeclsTable, nestedTypeDecls);
     }
@@ -5041,7 +5039,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     S.writeHeader(options);
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
-    S.writeAST(DC, options.EnableNestedTypeLookupTable);
+    S.writeAST(DC);
   }
 
   S.writeToStream(os);
@@ -5070,7 +5068,7 @@ void swift::serializeToBuffers(
     if (hadError)
       return;
     if (moduleBuffer)
-      *moduleBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
+      *moduleBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
                         std::move(buf), options.OutputPath);
   }
 
@@ -5087,7 +5085,7 @@ void swift::serializeToBuffers(
       return false;
     });
     if (moduleDocBuffer)
-      *moduleDocBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
+      *moduleDocBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
                            std::move(buf), options.DocOutputPath);
   }
 
@@ -5104,8 +5102,8 @@ void swift::serializeToBuffers(
       return false;
     });
     if (moduleSourceInfoBuffer)
-      *moduleSourceInfoBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
-        std::move(buf), options.SourceInfoOutputPath);
+      *moduleSourceInfoBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
+          std::move(buf), options.SourceInfoOutputPath);
   }
 }
 

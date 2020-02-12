@@ -16,7 +16,6 @@ using namespace swift;
 
 IndexSubset *
 IndexSubset::getFromString(ASTContext &ctx, StringRef string) {
-  if (string.size() < 0) return nullptr;
   unsigned capacity = string.size();
   llvm::SmallBitVector indices(capacity);
   for (unsigned i : range(capacity)) {

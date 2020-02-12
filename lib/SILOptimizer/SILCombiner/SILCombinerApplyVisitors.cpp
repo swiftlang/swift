@@ -104,10 +104,18 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   if (foldInverseReabstractionThunks(PAI, this))
     return nullptr;
 
-  tryOptimizeApplyOfPartialApply(PAI, Builder, getInstModCallbacks());
+  bool argsAreKeptAlive = tryOptimizeApplyOfPartialApply(
+      PAI, Builder.getBuilderContext(), getInstModCallbacks());
+  if (argsAreKeptAlive)
+    invalidatedStackNesting = true;
 
-  // Try to delete dead closures.
-  tryDeleteDeadClosure(PAI, getInstModCallbacks());
+  // Try to delete the partial_apply.
+  // In case it became dead because of tryOptimizeApplyOfPartialApply, we don't
+  // need to copy all arguments again (to extend their lifetimes), because it
+  // was already done in tryOptimizeApplyOfPartialApply.
+  if (tryDeleteDeadClosure(PAI, getInstModCallbacks(), !argsAreKeptAlive))
+    invalidatedStackNesting = true;
+
   return nullptr;
 }
 

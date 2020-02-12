@@ -351,6 +351,13 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-D_WASI_EMULATED_MMAN")
   endif()
 
+  if("${CFLAGS_SDK}" STREQUAL "LINUX")
+    if(${CFLAGS_ARCH} STREQUAL x86_64)
+      # this is the minimum architecture that supports 16 byte CAS, which is necessary to avoid a dependency to libatomic
+      list(APPEND result "-march=core2")
+    endif()
+  endif()
+
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -470,7 +477,7 @@ function(_add_variant_link_flags)
     RESULT_VAR_NAME result
     MACCATALYST_BUILD_FLAVOR  "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
-    list(APPEND link_libraries "pthread" "atomic" "dl")
+    list(APPEND link_libraries "pthread" "dl")
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
     list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")

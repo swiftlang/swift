@@ -676,7 +676,7 @@ public:
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
     ZeroInitBuilder.CreateMemSet(
         AI, llvm::ConstantInt::get(IGM.Int8Ty, 0),
-        Size, AI->getAlignment());
+        Size, llvm::MaybeAlign(AI->getAlignment()));
   }
 
   /// Account for bugs in LLVM.
@@ -1585,12 +1585,6 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
     return;
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
-  llvm::SaveAndRestore<SourceFile *> SetCurSourceFile(CurSourceFile);
-  if (auto dc = f->getModule().getAssociatedContext()) {
-    if (auto sf = dc->getParentSourceFile()) {
-      CurSourceFile = sf;
-    }
-  }
   IRGenSILFunction(*this, f).emitSILFunction();
 }
 
@@ -2567,10 +2561,9 @@ static void emitCoroutineExit(IRGenSILFunction &IGF) {
   // Emit the block.
   IGF.Builder.emitBlock(coroEndBB);
   auto handle = IGF.getCoroutineHandle();
-  IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_end, {
-    handle,
-    /*is unwind*/ IGF.Builder.getFalse()
-  });
+  IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
+                                  {handle,
+                                   /*is unwind*/ IGF.Builder.getFalse()});
   IGF.Builder.CreateUnreachable();
 }
 

@@ -856,7 +856,7 @@ public:
   llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
 
   /// The node -> type mappings introduced by this solution.
-  llvm::MapVector<TypedNode, Type> addedNodeTypes;
+  llvm::MapVector<TypedNode, Type> nodeTypes;
 
   /// Contextual types introduced by this solution.
   std::vector<std::pair<const Expr *, ContextualTypeInfo>> contextualTypes;
@@ -953,8 +953,8 @@ public:
 
   /// Retrieve the type of the given node, as recorded in this solution.
   Type getType(TypedNode node) const {
-    auto known = addedNodeTypes.find(node);
-    assert(known != addedNodeTypes.end());
+    auto known = nodeTypes.find(node);
+    assert(known != nodeTypes.end());
     return known->second;
   }
 
@@ -1314,6 +1314,12 @@ public:
     expression.expression = expr;
   }
 
+  void setPattern(Pattern *pattern) {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_Initialization);
+    expression.pattern = pattern;
+  }
+
   Optional<AnyFunctionRef> getAsFunction() const {
     switch (kind) {
     case Kind::expression:
@@ -1473,14 +1479,12 @@ private:
   /// from declared parameters/result and body.
   llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
 
-  /// Maps expression types used within all portions of the constraint
-  /// system, instead of directly using the types on the expression
-  /// nodes themselves. This allows us to typecheck an expression and
+  /// Maps node types used within all portions of the constraint
+  /// system, instead of directly using the types on the
+  /// nodes themselves. This allows us to typecheck and
   /// run through various diagnostics passes without actually mutating
-  /// the types on the expression nodes.
-  llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
-  llvm::DenseMap<const TypeLoc *, TypeBase *> TypeLocTypes;
-  llvm::DenseMap<const VarDecl *, TypeBase *> VarTypes;
+  /// the types on the nodes.
+  llvm::MapVector<TypedNode, Type> NodeTypes;
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
       KeyPathComponentTypes;
 
@@ -1548,7 +1552,8 @@ private:
   SmallVector<std::pair<ConstraintLocator *, OpenedArchetypeType *>, 4>
     OpenedExistentialTypes;
 
-  /// The node -> type mappings introduced by generating constraints.
+  /// The nodes for which we have produced types, along with the prior type
+  /// each node had before introducing this type.
   llvm::SmallVector<std::pair<TypedNode, Type>, 8> addedNodeTypes;
 
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
@@ -2231,17 +2236,12 @@ public:
     assert(type && "Expected non-null type");
 
     // Record the type.
-    if (auto expr = node.dyn_cast<const Expr *>()) {
-      ExprTypes[expr] = type.getPointer();
-    } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
-      TypeLocTypes[typeLoc] = type.getPointer();
-    } else {
-      auto var = node.get<const VarDecl *>();
-      VarTypes[var] = type.getPointer();
-    }
+    Type &entry = NodeTypes[node];
+    Type oldType = entry;
+    entry = type;
 
     // Record the fact that we ascribed a type to this node.
-    addedNodeTypes.push_back({node, type});
+    addedNodeTypes.push_back({node, oldType});
   }
 
   /// Set the type in our type map for a given expression. The side
@@ -2252,28 +2252,10 @@ public:
     setType(TypedNode(&L), T);
   }
 
-  /// Erase the type for the given node.
-  void eraseType(TypedNode node) {
-    if (auto expr = node.dyn_cast<const Expr *>()) {
-      ExprTypes.erase(expr);
-    } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
-      TypeLocTypes.erase(typeLoc);
-    } else {
-      auto var = node.get<const VarDecl *>();
-      VarTypes.erase(var);
-    }
-  }
-
   void setType(KeyPathExpr *KP, unsigned I, Type T) {
     assert(KP && "Expected non-null key path parameter!");
     assert(T && "Expected non-null type!");
     KeyPathComponentTypes[std::make_pair(KP, I)] = T.getPointer();
-  }
-
-  /// Check to see if we have a type for an expression.
-  bool hasType(const Expr *E) const {
-    assert(E != nullptr && "Expected non-null expression!");
-    return ExprTypes.find(E) != ExprTypes.end();
   }
 
   bool hasType(const TypeLoc &L) const {
@@ -2283,14 +2265,7 @@ public:
   /// Check to see if we have a type for a node.
   bool hasType(TypedNode node) const {
     assert(!node.isNull() && "Expected non-null node");
-    if (auto expr = node.dyn_cast<const Expr *>()) {
-      return ExprTypes.find(expr) != ExprTypes.end();
-    } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
-      return TypeLocTypes.find(typeLoc) != TypeLocTypes.end();
-    } else {
-      auto var = node.get<const VarDecl *>();
-      return VarTypes.find(var) != VarTypes.end();
-    }
+    return NodeTypes.count(node) > 0;
   }
 
   bool hasType(const KeyPathExpr *KP, unsigned I) const {
@@ -2299,24 +2274,18 @@ public:
               != KeyPathComponentTypes.end();
   }
 
-  /// Get the type for an expression.
-  Type getType(const Expr *E) const {
-    assert(hasType(E) && "Expected type to have been set!");
+  /// Get the type for an node.
+  Type getType(TypedNode node) const {
+    assert(hasType(node) && "Expected type to have been set!");
     // FIXME: lvalue differences
     //    assert((!E->getType() ||
     //            E->getType()->isEqual(ExprTypes.find(E)->second)) &&
     //           "Mismatched types!");
-    return ExprTypes.find(E)->second;
+    return NodeTypes.find(node)->second;
   }
 
   Type getType(const TypeLoc &L) const {
-    assert(hasType(L) && "Expected type to have been set!");
-    return TypeLocTypes.find(&L)->second;
-  }
-
-  Type getType(const VarDecl *VD) const {
-    assert(hasType(VD) && "Expected type to have been set!");
-    return VarTypes.find(VD)->second;
+    return getType(TypedNode(&L));
   }
 
   Type getType(const KeyPathExpr *KP, unsigned I) const {
@@ -2324,10 +2293,10 @@ public:
     return KeyPathComponentTypes.find(std::make_pair(KP, I))->second;
   }
 
-  /// Retrieve the type of the variable, if known.
-  Type getTypeIfAvailable(const VarDecl *VD) const {
-    auto known = VarTypes.find(VD);
-    if (known == VarTypes.end())
+  /// Retrieve the type of the node, if known.
+  Type getTypeIfAvailable(TypedNode node) const {
+    auto known = NodeTypes.find(node);
+    if (known == NodeTypes.end())
       return Type();
 
     return known->second;

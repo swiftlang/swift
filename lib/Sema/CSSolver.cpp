@@ -164,8 +164,8 @@ Solution ConstraintSystem::finalize() {
   solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
                                        DefaultedConstraints.end());
 
-  for (auto &nodeType : addedNodeTypes) {
-    solution.addedNodeTypes.insert(nodeType);
+  for (auto &nodeType : NodeTypes) {
+    solution.nodeTypes.insert(nodeType);
   }
 
   // Remember contextual types.
@@ -231,9 +231,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
                               solution.DefaultedConstraints.end());
 
   // Add the node types back.
-  for (auto &nodeType : solution.addedNodeTypes) {
-    if (!hasType(nodeType.first))
-      setType(nodeType.first, nodeType.second);
+  for (auto &nodeType : solution.nodeTypes) {
+    setType(nodeType.first, nodeType.second);
   }
 
   // Add the contextual types.
@@ -421,6 +420,7 @@ ConstraintSystem::SolverState::~SolverState() {
   #define CS_STATISTIC(Name, Description) JOIN2(Overall,Name) += Name;
   #include "ConstraintSolverStats.def"
 
+#if LLVM_ENABLE_STATS
   // Update the "largest" statistics if this system is larger than the
   // previous one.  
   // FIXME: This is not at all thread-safe.
@@ -432,6 +432,7 @@ ConstraintSystem::SolverState::~SolverState() {
       ++JOIN2(Largest,Name);
     #include "ConstraintSolverStats.def"
   }
+#endif
 }
 
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
@@ -509,8 +510,13 @@ ConstraintSystem::SolverScope::~SolverScope() {
   truncate(cs.DefaultedConstraints, numDefaultedConstraints);
 
   // Remove any node types we registered.
-  for (unsigned i : range(numAddedNodeTypes, cs.addedNodeTypes.size())) {
-    cs.eraseType(cs.addedNodeTypes[i].first);
+  for (unsigned i :
+           reverse(range(numAddedNodeTypes, cs.addedNodeTypes.size()))) {
+    TypedNode node = cs.addedNodeTypes[i].first;
+    if (Type oldType = cs.addedNodeTypes[i].second)
+      cs.NodeTypes[node] = oldType;
+    else
+      cs.NodeTypes.erase(node);
   }
   truncate(cs.addedNodeTypes, numAddedNodeTypes);
 
@@ -1246,17 +1252,10 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
     return SolutionResult::forError();;
 
   // Notify the listener that we've built the constraint system.
-  Expr *expr = target.getAsExpr();
-  if (listener && listener->builtConstraints(*this, expr)) {
-    return SolutionResult::forError();
-  }
-
-  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = getASTContext().TypeCheckerDebug->getStream();
-    log << "---Initial constraints for the given expression---\n";
-    print(log, expr);
-    log << "\n";
-    print(log);
+  if (Expr *expr = target.getAsExpr()) {
+    if (listener && listener->builtConstraints(*this, expr)) {
+      return SolutionResult::forError();
+    }
   }
 
   // Try to solve the constraint system using computed suggestions.
@@ -1265,8 +1264,6 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
 
   if (getExpressionTooComplex(solutions))
     return SolutionResult::forTooComplex();
-
-  target.setExpr(expr);
 
   switch (solutions.size()) {
   case 0:
@@ -1330,7 +1327,7 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
 
   SmallVector<std::unique_ptr<SolverStep>, 16> workList;
   // First step is always wraps whole constraint system.
-  workList.push_back(llvm::make_unique<SplitterStep>(*this, solutions));
+  workList.push_back(std::make_unique<SplitterStep>(*this, solutions));
 
   // Indicate whether previous step in the stack has failed
   // (returned StepResult::Kind = Error), this is useful to

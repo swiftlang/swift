@@ -22,6 +22,7 @@
 #include "MiscDiagnostics.h"
 #include "SolutionResult.h"
 #include "TypeCheckProtocol.h"
+#include "TypeCheckType.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -7227,6 +7228,83 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
   return diagnosedAnyErrors;
 }
 
+/// Apply the given solution to the initialization target.
+///
+/// \returns the resulting initialiation expression.
+static Optional<SolutionApplicationTarget> applySolutionToInitialization(
+    Solution &solution, SolutionApplicationTarget target,
+    Expr *initializer) {
+  auto wrappedVar = target.getInitializationWrappedVar();
+  Type initType;
+  if (wrappedVar) {
+    initType = solution.getType(initializer);
+  } else {
+    initType = solution.getType(target.getInitializationPattern());
+  }
+
+  {
+    // Figure out what type the constraints decided on.
+    auto ty = solution.simplifyType(initType);
+    initType = ty->getRValueType()->reconstituteSugar(/*recursive =*/false);
+  }
+
+  // Convert the initializer to the type of the pattern.
+  auto &cs = solution.getConstraintSystem();
+  auto locator =
+      cs.getConstraintLocator(initializer, LocatorPathElt::ContextualType());
+  initializer = solution.coerceToType(initializer, initType, locator);
+  if (!initializer)
+    return None;
+
+  SolutionApplicationTarget resultTarget = target;
+  resultTarget.setExpr(initializer);
+
+  // Record the property wrapper type and note that the initializer has
+  // been subsumed by the backing property.
+  if (wrappedVar) {
+    ASTContext &ctx = cs.getASTContext();
+    wrappedVar->getParentPatternBinding()->setInitializerSubsumed(0);
+    ctx.setSideCachedPropertyWrapperBackingPropertyType(
+        wrappedVar, initType->mapTypeOutOfContext());
+
+    // Record the semantic initializer on the outermost property wrapper.
+    wrappedVar->getAttachedPropertyWrappers().front()
+        ->setSemanticInit(initializer);
+  }
+
+  // Coerce the pattern to the type of the initializer.
+  TypeResolutionOptions options =
+      isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())
+      ? TypeResolverContext::EditorPlaceholderExpr
+      : TypeResolverContext::InExpression;
+  options |= TypeResolutionFlags::OverrideType;
+
+  // Determine the type of the pattern.
+  Type finalPatternType = initializer->getType();
+  if (wrappedVar) {
+    if (!finalPatternType->hasError() && !finalPatternType->is<TypeVariableType>())
+      finalPatternType = computeWrappedValueType(wrappedVar, finalPatternType);
+  }
+
+  if (finalPatternType->hasDependentMember())
+    return None;
+
+  finalPatternType = finalPatternType->reconstituteSugar(/*recursive =*/false);
+
+  // Apply the solution to the pattern as well.
+  auto contextualPattern =
+      ContextualPattern::forRawPattern(target.getInitializationPattern(),
+                                       target.getDeclContext());
+  if (auto coercedPattern = TypeChecker::coercePatternToType(
+          contextualPattern, finalPatternType, options)) {
+    resultTarget.setPattern(coercedPattern);
+  } else {
+    return None;
+  }
+
+  return resultTarget;
+}
+
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
 Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
@@ -7265,7 +7343,17 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     if (!rewrittenExpr)
       return None;
 
-    result.setExpr(rewrittenExpr);
+    /// Handle application for initializations.
+    if (target.getExprContextualTypePurpose() == CTP_Initialization) {
+      auto initResultTarget = applySolutionToInitialization(
+          solution, target, rewrittenExpr);
+      if (!initResultTarget)
+        return None;
+
+      result = *initResultTarget;
+    } else {
+      result.setExpr(rewrittenExpr);
+    }
   } else {
     auto fn = *target.getAsFunction();
 
@@ -7353,6 +7441,13 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
 
     solution.setExprTypes(resultExpr);
     result.setExpr(resultExpr);
+
+    if (Context.TypeCheckerOpts.DebugConstraintSolver) {
+      auto &log = Context.TypeCheckerDebug->getStream();
+      log << "---Type-checked expression---\n";
+      resultExpr->dump(log);
+      log << "\n";
+    }
   }
 
   rewriter.finalize();
@@ -7450,14 +7545,8 @@ ProtocolConformanceRef Solution::resolveConformance(
 }
 
 Type Solution::getType(const Expr *expr) const {
-  auto result = llvm::find_if(
-      addedNodeTypes, [&](const std::pair<TypedNode, Type> &node) -> bool {
-        if (auto *e = node.first.dyn_cast<const Expr *>())
-          return expr == e;
-        return false;
-      });
-
-  if (result != addedNodeTypes.end())
+  auto result = nodeTypes.find(expr);
+  if (result != nodeTypes.end())
     return result->second;
 
   auto &cs = getConstraintSystem();
@@ -7476,7 +7565,8 @@ void Solution::setExprTypes(Expr *expr) const {
 
 SolutionResult SolutionResult::forSolved(Solution &&solution) {
   SolutionResult result(Kind::Success);
-  result.solutions = new Solution(std::move(solution));
+  void *memory = malloc(sizeof(Solution));
+  result.solutions = new (memory) Solution(std::move(solution));
   result.numSolutions = 1;
   return result;
 }

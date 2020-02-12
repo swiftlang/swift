@@ -504,7 +504,8 @@ static ModuleDecl *createBuiltinModule(ASTContext &ctx) {
 
 inline ASTContext::Implementation &ASTContext::getImpl() const {
   auto pointer = reinterpret_cast<char*>(const_cast<ASTContext*>(this));
-  auto offset = llvm::alignAddr((void*)sizeof(*this), alignof(Implementation));
+  auto offset = llvm::alignAddr((void *)sizeof(*this),
+                                llvm::Align(alignof(Implementation)));
   return *reinterpret_cast<Implementation*>(pointer + offset);
 }
 
@@ -524,7 +525,8 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
   auto size = llvm::alignTo(sizeof(ASTContext) + sizeof(Implementation), align);
   auto mem = AlignedAlloc(size, align);
   auto impl = reinterpret_cast<void*>((char*)mem + sizeof(ASTContext));
-  impl = reinterpret_cast<void*>(llvm::alignAddr(impl,alignof(Implementation)));
+  impl = reinterpret_cast<void *>(
+      llvm::alignAddr(impl, llvm::Align(alignof(Implementation))));
   new (impl) Implementation();
   return new (mem)
       ASTContext(langOpts, typeckOpts, SearchPathOpts, SourceMgr, Diags);
@@ -1547,7 +1549,7 @@ void ASTContext::registerGenericSignatureBuilder(
 
   ++NumRegisteredGenericSignatureBuilders;
   genericSignatureBuilders[canSig] =
-    llvm::make_unique<GenericSignatureBuilder>(std::move(builder));
+    std::make_unique<GenericSignatureBuilder>(std::move(builder));
 }
 
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(

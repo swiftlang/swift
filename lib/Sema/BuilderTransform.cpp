@@ -266,7 +266,7 @@ protected:
           continue;
 
         // Skip #warning/#error; we'll handle them when applying the builder.
-        if (auto poundDiag = dyn_cast<PoundDiagnosticDecl>(decl)) {
+        if (isa<PoundDiagnosticDecl>(decl)) {
           continue;
         }
 
@@ -1100,6 +1100,9 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
 
     // The system was salvaged; continue on as if nothing happened.
   }
+
+  // FIXME: Shouldn't need to do this.
+  cs.applySolution(solutions.front());
 
   // Apply the solution to the function body.
   if (auto result = cs.applySolution(

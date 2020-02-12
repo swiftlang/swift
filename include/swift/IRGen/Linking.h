@@ -1029,11 +1029,6 @@ public:
   std::string mangleAsString() const;
   SILLinkage getLinkage(ForDefinition_t isDefinition) const;
 
-  /// Returns true if this function or global variable is potentially defined
-  /// in a different module.
-  ///
-  bool isAvailableExternally(IRGenModule &IGM) const;
-
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
     return reinterpret_cast<ValueDecl*>(Pointer);
@@ -1130,16 +1125,16 @@ public:
   bool isSILFunction() const {
     return getKind() == Kind::SILFunction;
   }
-  bool isNominalTypeDescriptor() const {
-    return getKind() == Kind::NominalTypeDescriptor;
+  bool isDynamicallyReplaceableFunctionKey() const {
+    return getKind() == Kind::DynamicallyReplaceableFunctionKey;
   }
 
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(ModuleDecl *module) const;
   
-  /// Return the source file whose codegen should trigger emission of this
-  /// link entity, if one can be identified.
-  const SourceFile *getSourceFileForEmission() const;
+  /// Return the module scope context whose codegen should trigger emission
+  /// of this link entity, if one can be identified.
+  DeclContext *getDeclContextForEmission() const;
   
   /// Get the preferred alignment for the definition of this entity.
   Alignment getAlignment(IRGenModule &IGM) const;

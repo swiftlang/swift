@@ -66,7 +66,7 @@ public:
     /// "open", "public", "internal", "fileprivate", or "private".
     AccessControlKeyword,
 
-    /// such as @"availability".
+    /// such as @"available".
     DeclAttrKeyword,
 
     /// such as "unavailable" etc. for @available.

@@ -48,8 +48,10 @@ function(add_swift_unittest test_dirname)
       "${android_system_libs}")
     set_property(TARGET "${test_dirname}" APPEND PROPERTY LINK_LIBRARIES "log")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-    set_property(TARGET "${test_dirname}" APPEND PROPERTY LINK_LIBRARIES
-      "atomic")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+      target_compile_options(${test_dirname} PRIVATE
+        -march=core2)
+    endif()
   endif()
 
   find_program(LDLLD_PATH "ld.lld")

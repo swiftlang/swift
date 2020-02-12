@@ -12,8 +12,8 @@ bb0:
   return %0 : $()
 }
 
-// CHECK-64:  define hidden swiftcc void @test1([[WORD:i64]], [[WORD]])
-// CHECK-32:  define hidden swiftcc void @test1([[WORD:i32]], [[WORD]])
+// CHECK-64:  define hidden swiftcc void @test1([[WORD:i64]] %0, [[WORD]] %1)
+// CHECK-32:  define hidden swiftcc void @test1([[WORD:i32]] %0, [[WORD]] %1)
 sil hidden @test1 : $@convention(thin) (@owned Optional<() -> ()>) -> () {
 bb0(%0 : $Optional<() -> ()>):
   // CHECK: call void @"$sIey_SgWOy"

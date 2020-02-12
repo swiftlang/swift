@@ -3831,15 +3831,83 @@ static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
   return result;
 }
 
+/// Generate constraints to produce the wrapped value type given the property
+/// that has an attached property wrapper.
+///
+/// \param initializerType The type of the adjusted initializer, which
+/// initializes the underlying storage variable.
+/// \param wrappedVar The property that has a property wrapper.
+/// \returns the type of the property.
+static Type generateWrappedPropertyTypeConstraints(
+   ConstraintSystem &cs, Type initializerType,
+   VarDecl *wrappedVar, ConstraintLocator *locator) {
+  Type valueType = LValueType::get(initializerType);
+  auto dc = wrappedVar->getInnermostDeclContext();
+
+  for (unsigned i : indices(wrappedVar->getAttachedPropertyWrappers())) {
+    auto wrapperInfo = wrappedVar->getAttachedPropertyWrapperTypeInfo(i);
+    if (!wrapperInfo)
+      break;
+
+    locator = cs.getConstraintLocator(locator, ConstraintLocator::Member);
+    Type memberType = cs.createTypeVariable(locator, TVO_CanBindToLValue);
+    cs.addValueMemberConstraint(
+        valueType, wrapperInfo.valueVar->createNameRef(),
+        memberType, dc, FunctionRefKind::Unapplied, { }, locator);
+    valueType = memberType;
+  }
+
+  // Set up an equality constraint to drop the lvalue-ness of the value
+  // type we produced.
+  Type propertyType = cs.createTypeVariable(locator, 0);
+  cs.addConstraint(ConstraintKind::Equal, propertyType, valueType, locator);
+  return propertyType;
+}
+
+/// Generate additional constraints for the pattern of an initialization.
+static bool generateInitPatternConstraints(
+    ConstraintSystem &cs, SolutionApplicationTarget target, Expr *initializer) {
+  auto pattern = target.getInitializationPattern();
+  auto locator =
+      cs.getConstraintLocator(initializer, LocatorPathElt::ContextualType());
+  Type patternType = cs.generateConstraints(pattern, locator);
+  if (!patternType)
+    return true;
+
+  // Record the type of this pattern.
+  cs.setType(pattern, patternType);
+
+  if (auto wrappedVar = target.getInitializationWrappedVar()) {
+    // Add an equal constraint between the pattern type and the
+    // property wrapper's "value" type.
+    Type propertyType = generateWrappedPropertyTypeConstraints(
+        cs, cs.getType(target.getAsExpr()), wrappedVar, locator);
+    cs.addConstraint(ConstraintKind::Equal, patternType,
+                     propertyType, locator, /*isFavored*/ true);
+  } else if (!patternType->is<OpaqueTypeArchetypeType>()) {
+    // Add a conversion constraint between the types.
+    cs.addConstraint(ConstraintKind::Conversion, cs.getType(target.getAsExpr()),
+                     patternType, locator, /*isFavored*/true);
+  }
+
+  return false;
+}
+
 bool ConstraintSystem::generateConstraints(
     SolutionApplicationTarget &target,
     FreeTypeVariableBinding allowFreeTypeVariables) {
   if (Expr *expr = target.getAsExpr()) {
-    // Try to shrink the system by reducing disjunction domains. This
-    // goes through every sub-expression and generate its own sub-system, to
-    // try to reduce the domains of those subexpressions.
-    shrink(expr);
-    target.setExpr(expr);
+    // If the target requires an optional of some type, form a new appropriate
+    // type variable and update the target's type with an optional of that
+    // type variable.
+    if (target.isOptionalSomePatternInit()) {
+      assert(!target.getExprContextualType() &&
+             "some pattern cannot have contextual type pre-configured");
+      auto *convertTypeLocator =
+          getConstraintLocator(expr, LocatorPathElt::ContextualType());
+      Type var = createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
+      target.setExprConversionType(TypeChecker::getOptionalType(expr->getLoc(), var));
+    }
 
     // Generate constraints for the main system.
     expr = generateConstraints(expr, target.getDeclContext());
@@ -3871,6 +3939,20 @@ bool ConstraintSystem::generateConstraints(
 
       addContextualConversionConstraint(expr, convertType, ctp,
                                         isOpaqueReturnType);
+    }
+
+    // For an initialization target, generate constraints for the pattern.
+    if (target.getExprContextualTypePurpose() == CTP_Initialization &&
+        generateInitPatternConstraints(*this, target, expr)) {
+      return true;
+    }
+
+    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log << "---Initial constraints for the given expression---\n";
+      print(log, expr);
+      log << "\n";
+      print(log);
     }
 
     return false;
