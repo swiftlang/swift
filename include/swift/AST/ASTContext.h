@@ -138,9 +138,7 @@ enum class AllocationArena {
   /// lifetime of a particular instance of the constraint solver.
   ///
   /// Any type involving a type variable is allocated in this arena.
-  ConstraintSolver,
-
-  Declarations
+  ConstraintSolver
 };
 
 /// Lists the set of "known" Foundation entities that are used in the
@@ -339,7 +337,7 @@ public:
     if (LangOpts.UseMalloc)
       return AlignedAlloc(bytes, alignment);
 
-    if ((arena == AllocationArena::Permanent || arena == AllocationArena::Declarations) && Stats)
+    if (arena == AllocationArena::Permanent && Stats)
       Stats->getFrontendCounters().NumASTBytesAllocated += bytes;
     return getAllocator(arena).Allocate(bytes, alignment);
   }

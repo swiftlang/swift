@@ -17,7 +17,6 @@
 #ifndef SWIFT_DECL_H
 #define SWIFT_DECL_H
 
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/CaptureInfo.h"
@@ -961,7 +960,7 @@ void *allocateMemoryForDecl(AllocatorTy &allocator, size_t baseSize,
   if (includeSpaceForClangNode)
     size += alignof(DeclTy);
 
-  void *mem = allocator.Allocate(size, alignof(DeclTy), AllocationArena::Declarations);
+  void *mem = allocator.Allocate(size, alignof(DeclTy));
   if (includeSpaceForClangNode)
     mem = reinterpret_cast<char *>(mem) + alignof(DeclTy);
   return mem;
