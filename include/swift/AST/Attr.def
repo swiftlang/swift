@@ -519,6 +519,11 @@ SIMPLE_DECL_ATTR(_inheritsConvenienceInitializers,
   APIStableToAdd | ABIStableToAdd | APIBreakingToRemove | ABIBreakingToRemove,
   93)
 
+DECL_ATTR(_typeEraser, TypeEraser,
+  OnProtocol | UserInaccessible | NotSerialized |
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
+  94)
+
 SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
   OnFunc |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
