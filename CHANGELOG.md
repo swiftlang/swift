@@ -26,6 +26,17 @@ CHANGELOG
 Swift Next
 ----------
 
+* [SE-266][]:
+  Enumerations with no associated values, or only `Comparable` associated values, can opt-in to synthesized `Comparable` conformance by declaring conformance to the `Comparable` protocol. The synthesized implementation orders the cases first by case-declaration order, and then by lexicographic order of the associated values (if any).
+  
+  ```swift
+  enum Foo: Comparable {
+    case a(Int), b(Int), c
+  }
+  
+  // .a(0) < .a(1) < .b(0) < .b(1) < .c
+  ```
+
 * [SE-0269][]:
 
   When an escaping closure explicitly captures `self` in its capture list, the
