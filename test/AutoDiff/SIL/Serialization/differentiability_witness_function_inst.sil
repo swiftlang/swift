@@ -13,7 +13,9 @@
 
 // IRGen test.
 
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck --check-prefix=IRGEN %s
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=IRGEN --check-prefix %target-cpu
+// NOTE: `%target-cpu`-specific FileCheck lines exist because lowered function
+// types in LLVM IR differ between architectures.
 
 // REQUIRES: differentiable_programming
 // NOTE(SR-12090): `shell` is required only to run `sed` as a SR-12090 workaround.
@@ -97,10 +99,12 @@ bb0:
 // IRGEN: [[FNPTR2:%.*]] = bitcast i8* [[PTR2]] to { float, i8*, %swift.refcounted* } (float, float, float)*
 
 // IRGEN: [[PTR3:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__bar_PSUURSU, i32 0, i32 0), align [[PTR_ALIGNMENT]]
-// IRGEN: [[FNPTR3:%.*]] = bitcast i8* [[PTR3]] to { float, float, i8*, %swift.refcounted* } (float, float, float)*
+// x86_64: [[FNPTR3:%.*]] = bitcast i8* [[PTR3]] to { float, float, i8*, %swift.refcounted* } (float, float, float)*
+// i386: [[FNPTR3:%.*]] = bitcast i8* [[PTR3]] to void (<{ %TSf, %TSf, %swift.function }>*, float, float, float)*
 
 // IRGEN: [[PTR4:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__bar_PSSURSS, i32 0, i32 1), align [[PTR_ALIGNMENT]]
-// IRGEN: [[FNPTR4:%.*]] = bitcast i8* [[PTR4]] to { float, float, i8*, %swift.refcounted* } (float, float, float)*
+// x86_64: [[FNPTR4:%.*]] = bitcast i8* [[PTR4]] to { float, float, i8*, %swift.refcounted* } (float, float, float)*
+// i386: [[FNPTR4:%.*]] = bitcast i8* [[PTR4]] to void (<{ %TSf, %TSf, %swift.function }>*, float, float, float)*
 
 // IRGEN: [[PTR5:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__generic_PSURS16_Differentiation14DifferentiableRzl, i32 0, i32 0), align [[PTR_ALIGNMENT]]
 // IRGEN: [[FNPTR5:%.*]] = bitcast i8* [[PTR5]] to { i8*, %swift.refcounted* } (%swift.opaque*, %swift.opaque*, float, %swift.type*, i8**)*
