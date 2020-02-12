@@ -327,3 +327,17 @@ func checkImplicitSelfInClosure() {
     }
   }
 }
+
+// rdar://problem/59239224 - crash because some nodes don't have type
+// information during solution application.
+struct X<T> {
+  init(_: T) { }
+}
+
+@TupleBuilder func foo(cond: Bool) -> some Any {
+  if cond {
+    tuplify(cond) { x in
+      X(x)
+    }
+  }
+}
