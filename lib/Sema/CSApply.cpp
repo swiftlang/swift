@@ -7441,6 +7441,13 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
 
     solution.setExprTypes(resultExpr);
     result.setExpr(resultExpr);
+
+    if (Context.TypeCheckerOpts.DebugConstraintSolver) {
+      auto &log = Context.TypeCheckerDebug->getStream();
+      log << "---Type-checked expression---\n";
+      resultExpr->dump(log);
+      log << "\n";
+    }
   }
 
   rewriter.finalize();
@@ -7538,14 +7545,8 @@ ProtocolConformanceRef Solution::resolveConformance(
 }
 
 Type Solution::getType(const Expr *expr) const {
-  auto result = llvm::find_if(
-      addedNodeTypes, [&](const std::pair<TypedNode, Type> &node) -> bool {
-        if (auto *e = node.first.dyn_cast<const Expr *>())
-          return expr == e;
-        return false;
-      });
-
-  if (result != addedNodeTypes.end())
+  auto result = nodeTypes.find(expr);
+  if (result != nodeTypes.end())
     return result->second;
 
   auto &cs = getConstraintSystem();
@@ -7564,7 +7565,8 @@ void Solution::setExprTypes(Expr *expr) const {
 
 SolutionResult SolutionResult::forSolved(Solution &&solution) {
   SolutionResult result(Kind::Success);
-  result.solutions = new Solution(std::move(solution));
+  void *memory = malloc(sizeof(Solution));
+  result.solutions = new (memory) Solution(std::move(solution));
   result.numSolutions = 1;
   return result;
 }

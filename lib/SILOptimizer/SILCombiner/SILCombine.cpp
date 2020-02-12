@@ -230,7 +230,7 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
     Iteration++;
   }
 
-  if (needUpdateStackNesting) {
+  if (invalidatedStackNesting) {
     StackNesting().correctStackNesting(&F);
   }
 

@@ -12,8 +12,9 @@
 
 import os
 
+from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
+
 from . import product
-from .. import multiroot_data_file
 from .. import shell
 
 
@@ -43,7 +44,7 @@ class SwiftSyntax(product.Product):
         build_cmd = [
             script_path,
             '--build-dir', self.build_dir,
-            '--multiroot-data-file', multiroot_data_file.path(),
+            '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
             '--toolchain', self.install_toolchain_path(),
             '--filecheck-exec', os.path.join(llvm_build_dir, 'bin',
                                              'FileCheck'),

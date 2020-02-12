@@ -164,8 +164,8 @@ Solution ConstraintSystem::finalize() {
   solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
                                        DefaultedConstraints.end());
 
-  for (auto &nodeType : addedNodeTypes) {
-    solution.addedNodeTypes.insert(nodeType);
+  for (auto &nodeType : NodeTypes) {
+    solution.nodeTypes.insert(nodeType);
   }
 
   // Remember contextual types.
@@ -231,9 +231,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
                               solution.DefaultedConstraints.end());
 
   // Add the node types back.
-  for (auto &nodeType : solution.addedNodeTypes) {
-    if (!hasType(nodeType.first))
-      setType(nodeType.first, nodeType.second);
+  for (auto &nodeType : solution.nodeTypes) {
+    setType(nodeType.first, nodeType.second);
   }
 
   // Add the contextual types.
@@ -511,8 +510,13 @@ ConstraintSystem::SolverScope::~SolverScope() {
   truncate(cs.DefaultedConstraints, numDefaultedConstraints);
 
   // Remove any node types we registered.
-  for (unsigned i : range(numAddedNodeTypes, cs.addedNodeTypes.size())) {
-    cs.eraseType(cs.addedNodeTypes[i].first);
+  for (unsigned i :
+           reverse(range(numAddedNodeTypes, cs.addedNodeTypes.size()))) {
+    TypedNode node = cs.addedNodeTypes[i].first;
+    if (Type oldType = cs.addedNodeTypes[i].second)
+      cs.NodeTypes[node] = oldType;
+    else
+      cs.NodeTypes.erase(node);
   }
   truncate(cs.addedNodeTypes, numAddedNodeTypes);
 
@@ -1248,17 +1252,10 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
     return SolutionResult::forError();;
 
   // Notify the listener that we've built the constraint system.
-  Expr *expr = target.getAsExpr();
-  if (listener && listener->builtConstraints(*this, expr)) {
-    return SolutionResult::forError();
-  }
-
-  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = getASTContext().TypeCheckerDebug->getStream();
-    log << "---Initial constraints for the given expression---\n";
-    print(log, expr);
-    log << "\n";
-    print(log);
+  if (Expr *expr = target.getAsExpr()) {
+    if (listener && listener->builtConstraints(*this, expr)) {
+      return SolutionResult::forError();
+    }
   }
 
   // Try to solve the constraint system using computed suggestions.
@@ -1267,8 +1264,6 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
 
   if (getExpressionTooComplex(solutions))
     return SolutionResult::forTooComplex();
-
-  target.setExpr(expr);
 
   switch (solutions.size()) {
   case 0:

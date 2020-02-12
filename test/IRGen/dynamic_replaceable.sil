@@ -8,19 +8,19 @@
 // CHECK: @test_replacementTX = global %swift.dyn_repl_link_entry zeroinitializer
 
 // CHECK: @"\01l_unnamed_dynamic_replacements" = private constant { i32, i32, [1 x { i32, i32, i32, i32 }] }
-// CHECK: { i32 0,
-// CHECK:   i32 1,
-// CHECK:  [1 x { i32, i32, i32, i32 }]
-// CHECK:  [{ i32, i32, i32, i32 }
-// CHECK:  %swift.dyn_repl_key* @test_dynamically_replaceableTx
-// CHECK:  @test_replacement
-// CHECK:  %swift.dyn_repl_link_entry* @test_replacementTX
-// CHECK:  i32 0 }] }, section "__TEXT,__const"
+// CHECK-SAME: { i32 0,
+// CHECK-SAME:   i32 1,
+// CHECK-SAME:  [1 x { i32, i32, i32, i32 }]
+// CHECK-SAME:  [{ i32, i32, i32, i32 }
+// CHECK-SAME:  %swift.dyn_repl_key* @test_dynamically_replaceableTx
+// CHECK-SAME:  @test_replacement
+// CHECK-SAME:  %swift.dyn_repl_link_entry* @test_replacementTX
+// CHECK-SAME:  i32 0 }] }, section "__TEXT,__const"
 
 // CHECK: @"\01l_auto_dynamic_replacements" = private constant { i32, i32, [2 x i32] }
-// CHECK: { i32 0, i32 1,
-// CHECK: [2 x i32] [{{.*}}@"\01l_unnamed_dynamic_replacements"{{.*}}, i32 0]
-// CHECK: }, section "__TEXT, __swift5_replace, regular, no_dead_strip"
+// CHECK-SAME: { i32 0, i32 1,
+// CHECK-SAME: [2 x i32] [{{.*}}@"\01l_unnamed_dynamic_replacements"{{.*}}, i32 0]
+// CHECK-SAME: }, section "__TEXT, __swift5_replace, regular, no_dead_strip"
 
 // CHECK-LABEL: define swiftcc void @test_dynamically_replaceable()
 // CHECK-NEXT: entry:

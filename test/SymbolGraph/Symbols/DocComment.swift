@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name DocComment -emit-module-path %t/DocComment.swiftmodule
-// RUN: %target-swift-symbolgraph-extract -module-name DocComment -I %t -pretty-print -o %t/DocComment.symbols.json
+// RUN: %target-swift-symbolgraph-extract -module-name DocComment -I %t -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/DocComment.symbols.json
 
 // CHECK: "text": "Single line."

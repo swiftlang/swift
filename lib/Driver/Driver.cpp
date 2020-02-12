@@ -964,7 +964,7 @@ Driver::buildCompilation(const ToolChain &TC,
 
     const bool OnlyOneDependencyFile =
         ArgList->hasFlag(options::OPT_enable_only_one_dependency_file,
-                         options::OPT_disable_only_one_dependency_file, true);
+                         options::OPT_disable_only_one_dependency_file, false);
 
     // relies on the new dependency graph
     // Get the default from the initializer in LangOptions.
@@ -2348,7 +2348,7 @@ static StringRef baseNameForImage(const JobAction *JA, const OutputInfo &OI,
   if (JA->size() == 1 && OI.ModuleNameIsFallback && BaseInput != "-")
     return llvm::sys::path::stem(BaseInput);
   
-  if (auto link = dyn_cast<StaticLinkJobAction>(JA)) {
+  if (isa<StaticLinkJobAction>(JA)) {
     Buffer = "lib";
     Buffer.append(BaseName);
     Buffer.append(Triple.isOSWindows() ? ".lib" : ".a");

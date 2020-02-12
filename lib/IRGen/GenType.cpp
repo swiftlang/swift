@@ -440,7 +440,7 @@ static void emitSpecializedMemOperation(
   auto &Builder = IGF.Builder;
 
   // Sizes to try. Tested in order.
-  const auto sizes = std::array<Size, 4>{
+  const std::array<Size, 4> sizes = {
     Size(0),
     Size(1),
     Size(2),

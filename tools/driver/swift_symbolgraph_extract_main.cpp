@@ -71,7 +71,7 @@ Xcc("Xcc", llvm::cl::desc("Pass the following command-line flag to Clang"),
          llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
-OutputPath("o", llvm::cl::desc("Symbol Graph JSON Output Path (Required)"), llvm::cl::cat(Category));
+OutputDir("output-dir", llvm::cl::desc("Symbol Graph JSON Output Directory (Required)"), llvm::cl::cat(Category));
 } // end namespace options
 
 static bool argumentsAreValid() {
@@ -86,8 +86,8 @@ static bool argumentsAreValid() {
     Valid = false;
   }
 
-  if (options::OutputPath.empty()) {
-    llvm::errs() << "Required -o argument is missing\n";
+  if (options::OutputDir.empty()) {
+    llvm::errs() << "Required -output-dir argument is missing\n";
     Valid = false;
   }
 
@@ -113,6 +113,12 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
 
   if (!argumentsAreValid()) {
     llvm::cl::PrintHelpMessage();
+    return EXIT_FAILURE;
+  }
+
+  if (!llvm::sys::fs::is_directory(options::OutputDir)) {
+    llvm::errs() << "-output-dir argument '" << options::OutputDir
+      << " does not exist or is not a directory\n";
     return EXIT_FAILURE;
   }
 
@@ -161,7 +167,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   }
 
   symbolgraphgen::SymbolGraphOptions Options {
-    options::OutputPath,
+    options::OutputDir,
     llvm::Triple(options::Target),
     options::PrettyPrint,
     AccessLevel::Public,

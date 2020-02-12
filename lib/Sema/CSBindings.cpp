@@ -904,7 +904,7 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
   }
 
   // If the type is a type variable itself, don't permit the binding.
-  if (auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>())
+  if (type->getRValueType()->is<TypeVariableType>())
     return None;
 
   // Don't bind to a dependent member type, even if it's currently
@@ -1082,8 +1082,8 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
             cs, TypeVar->getImpl().getLocator());
         if (cs.recordFix(fix))
           return true;
-      } else if (auto *OLE = dyn_cast_or_null<ObjectLiteralExpr>(
-                     srcLocator->getAnchor())) {
+      } else if (srcLocator->getAnchor() &&
+                 isa<ObjectLiteralExpr>(srcLocator->getAnchor())) {
         auto *fix = SpecifyObjectLiteralTypeImport::create(
             cs, TypeVar->getImpl().getLocator());
         if (cs.recordFix(fix))

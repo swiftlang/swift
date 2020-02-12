@@ -5115,7 +5115,7 @@ void swift::checkMetadataDependencyCycle(const Metadata *startMetadata,
 /***************************************************************************/
 
 namespace {
-  struct PoolRange {
+  struct alignas(sizeof(uintptr_t) * 2) PoolRange {
     static constexpr uintptr_t PageSize = 16 * 1024;
     static constexpr uintptr_t MaxPoolAllocationSize = PageSize / 2;
 
