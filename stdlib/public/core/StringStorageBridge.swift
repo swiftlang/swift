@@ -15,6 +15,12 @@ import SwiftShims
 #if _runtime(_ObjC)
 
 @_effects(readonly)
+@inline(__always)
+internal func malloc_good_size(_ capacity: Int) -> Int {
+  return _swift_stdlib_malloc_good_size(capacity)
+}
+
+@_effects(readonly)
 private func _isNSString(_ str:AnyObject) -> UInt8 {
   return _swift_stdlib_isNSString(str)
 }

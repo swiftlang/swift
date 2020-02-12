@@ -121,8 +121,13 @@ private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
   let minCap = 1 + Swift.max(desiredCapacity, _SmallString.capacity)
   _internalInvariant(minCap < 0x1_0000_0000_0000, "max 48-bit length")
 
+#if _runtime(_ObjC)
+  let storageHeaderSize = 32
+  let capacity = malloc_good_size(minCap + storageHeaderSize)
+#else
   // Round up to the nearest multiple of 8 that isn't also a multiple of 16.
   let capacity = ((minCap + 7) & -16) + 8
+#endif
   _internalInvariant(
     capacity > desiredCapacity && capacity % 8 == 0 && capacity % 16 != 0)
   return capacity

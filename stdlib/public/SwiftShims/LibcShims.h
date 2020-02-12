@@ -104,6 +104,11 @@ static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
   extern __swift_size_t malloc_size(const void *);
   return malloc_size(ptr);
 }
+
+static inline __swift_size_t _swift_stdlib_malloc_good_size(__swift_size_t size) {
+  extern __swift_size_t malloc_good_size(__swift_size_t);
+  return malloc_good_size(size);
+}
 #elif defined(__linux__) || defined(__CYGWIN__) || defined(__ANDROID__) \
    || defined(__HAIKU__) || defined(__FreeBSD__)
 static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {

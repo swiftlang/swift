@@ -54,7 +54,12 @@ extension _StringGuts {
 
 @inline(__always)
 internal func _growStringCapacity(_ capacity: Int) -> Int {
-  return ((capacity * 3) + 1) / 2
+  switch capacity {
+  case 0 ... 128:
+    return capacity
+  default:
+    return ((capacity * 3) + 1) / 2
+  }
 }
 
 // Range-replaceable operation support
