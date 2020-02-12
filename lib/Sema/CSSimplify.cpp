@@ -6325,8 +6325,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
       // Impact is higher if the the base type is any function type
       // because function types can't have any members other than self
-      if (baseObjTy->getDesugaredType()->is<AnyFunctionType>()) {
-          impact += 1;
+      if (baseObjTy->is<AnyFunctionType>()) {
+          impact += 10;
       }
 
       if (recordFix(fix, impact))
