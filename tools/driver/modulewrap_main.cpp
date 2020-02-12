@@ -160,7 +160,7 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   SmallString<128> RuntimeResourcePath;
   CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
     MainExecutablePath, RuntimeResourcePath);
-  SearchPathOpts.RuntimeResourcePath = std::string(RuntimeResourcePath);
+  SearchPathOpts.RuntimeResourcePath = std::string(RuntimeResourcePath.str());
 
   SourceManager SrcMgr;
   TypeCheckerOptions TypeCheckOpts;

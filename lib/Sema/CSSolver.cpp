@@ -421,6 +421,7 @@ ConstraintSystem::SolverState::~SolverState() {
   #define CS_STATISTIC(Name, Description) JOIN2(Overall,Name) += Name;
   #include "ConstraintSolverStats.def"
 
+#if LLVM_ENABLE_STATS
   // Update the "largest" statistics if this system is larger than the
   // previous one.  
   // FIXME: This is not at all thread-safe.
@@ -432,6 +433,7 @@ ConstraintSystem::SolverState::~SolverState() {
       ++JOIN2(Largest,Name);
     #include "ConstraintSolverStats.def"
   }
+#endif
 }
 
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
@@ -1239,46 +1241,14 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
   assert(!solverState && "cannot be used directly");
 
   // Set up the expression type checker timer.
-  Expr *expr = target.getAsExpr();
-  Timer.emplace(expr, *this);
+  if (Expr *expr = target.getAsExpr())
+    Timer.emplace(expr, *this);
 
-  // Try to shrink the system by reducing disjunction domains. This
-  // goes through every sub-expression and generate its own sub-system, to
-  // try to reduce the domains of those subexpressions.
-  shrink(expr);
-
-  // Generate constraints for the main system.
-  if (auto generatedExpr = generateConstraints(expr, DC))
-    expr = generatedExpr;
-  else {
-    return SolutionResult::forError();
-  }
-
-  // If there is a type that we're expected to convert to, add the conversion
-  // constraint.
-  if (Type convertType = target.getExprConversionType()) {
-    // Determine whether we know more about the contextual type.
-    ContextualTypePurpose ctp = target.getExprContextualTypePurpose();
-    bool isOpaqueReturnType = target.infersOpaqueReturnType();
-
-    // Substitute type variables in for unresolved types.
-    if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
-      bool isForSingleExprFunction = (ctp == CTP_ReturnSingleExpr);
-      auto *convertTypeLocator = getConstraintLocator(
-          expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
-
-      convertType = convertType.transform([&](Type type) -> Type {
-        if (type->is<UnresolvedType>())
-          return createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
-        return type;
-      });
-    }
-
-    addContextualConversionConstraint(expr, convertType, ctp,
-                                      isOpaqueReturnType);
-  }
+  if (generateConstraints(target, allowFreeTypeVariables))
+    return SolutionResult::forError();;
 
   // Notify the listener that we've built the constraint system.
+  Expr *expr = target.getAsExpr();
   if (listener && listener->builtConstraints(*this, expr)) {
     return SolutionResult::forError();
   }

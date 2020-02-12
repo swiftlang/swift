@@ -3072,23 +3072,16 @@ bool ConstraintSystem::repairFailures(
   auto elt = path.back();
   switch (elt.getKind()) {
   case ConstraintLocator::LValueConversion: {
-    auto CTP = getContextualTypePurpose(anchor);
-    // Special case for `CTP_CallArgument` set by CSDiag
-    // while type-checking each argument because we yet
-    // to cover argument-to-parameter conversions in the
-    // new framework.
-    if (CTP != CTP_CallArgument) {
-      // Ignore l-value conversion element since it has already
-      // played its role.
-      path.pop_back();
-      // If this is a contextual mismatch between l-value types e.g.
-      // `@lvalue String vs. @lvalue Int`, let's pretend that it's okay.
-      if (!path.empty() && path.back().is<LocatorPathElt::ContextualType>()) {
-        auto *locator = getConstraintLocator(anchor, path.back());
-        conversionsOrFixes.push_back(
-            IgnoreContextualType::create(*this, lhs, rhs, locator));
-        break;
-      }
+    // Ignore l-value conversion element since it has already
+    // played its role.
+    path.pop_back();
+    // If this is a contextual mismatch between l-value types e.g.
+    // `@lvalue String vs. @lvalue Int`, let's pretend that it's okay.
+    if (!path.empty() && path.back().is<LocatorPathElt::ContextualType>()) {
+      auto *locator = getConstraintLocator(anchor, path.back());
+      conversionsOrFixes.push_back(
+          IgnoreContextualType::create(*this, lhs, rhs, locator));
+      break;
     }
 
     LLVM_FALLTHROUGH;
@@ -3519,13 +3512,6 @@ bool ConstraintSystem::repairFailures(
     // If contextual type is an existential value, it's handled
     // after conversion restriction is attempted.
     if (rhs->isExistentialType())
-      break;
-
-    // TODO(diagnostics): This is a problem related to `inout` mismatch,
-    // in argument position, and we got here from CSDiag. Once
-    // argument-to-pararameter conversion failures are implemented,
-    // this check could be removed.
-    if (lhs->is<InOutType>() || rhs->is<InOutType>())
       break;
 
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,

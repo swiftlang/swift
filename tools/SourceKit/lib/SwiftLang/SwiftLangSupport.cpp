@@ -262,7 +262,7 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
       CCCache(new SwiftCompletionCache) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
-  RuntimeResourcePath = std::string(LibPath);
+  RuntimeResourcePath = std::string(LibPath.str());
 
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
@@ -901,7 +901,7 @@ std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
   llvm::SmallString<256> output;
   if (llvm::sys::fs::real_path(InputPath, output))
     return InputPath;
-  return std::string(output);
+  return std::string(output.str());
 }
 
 void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {

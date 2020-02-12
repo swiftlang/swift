@@ -659,8 +659,10 @@ private:
       }
     }
 
+    StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
     llvm::DIModule *M =
-        DBuilder.createModule(Parent, Name, ConfigMacros, RemappedIncludePath);
+        DBuilder.createModule(Parent, Name, ConfigMacros, RemappedIncludePath,
+                              Sysroot);
     DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
     return M;
   }
@@ -1690,7 +1692,6 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       DBuilder.createFile(DebugPrefixMap.remapPath(SourcePath),
                           DebugPrefixMap.remapPath(Opts.DebugCompilationDir));
 
-  llvm::StringRef SysRoot = IGM.Context.SearchPathOpts.SDKPath;
   TheCU = DBuilder.createCompileUnit(
       Lang, MainFile,
       Producer, Opts.shouldOptimize(), Opts.getDebugFlags(PD),
@@ -1701,7 +1702,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       /* DWOId */ 0, /* SplitDebugInlining */ true,
       /* DebugInfoForProfiling */ false,
       llvm::DICompileUnit::DebugNameTableKind::Default,
-      /* RangesBaseAddress */ false, SysRoot);
+      /* RangesBaseAddress */ false);
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading

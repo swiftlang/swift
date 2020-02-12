@@ -12,9 +12,11 @@
 
 #include "swift/Driver/FineGrainedDependencyDriverGraph.h"
 // Next two includes needed for reporting errors opening dot file for writing.
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Driver/Job.h"
@@ -57,7 +59,14 @@ ModuleDepGraph::simulateLoad(const Job *cmd,
       swiftDeps.str(), includePrivateDeps, hadCompilationError,
       interfaceHash.str(), simpleNames, compoundNames);
 
-  return loadFromSourceFileDepGraph(cmd, sfdg);
+  SourceManager sm;
+  DiagnosticEngine diags(sm);
+  // help for debugging: emit imported file, too
+  if (emitFineGrainedDependencyDotFileAfterEveryImport) {
+    sfdg.emitDotFile(swiftDeps, diags);
+  }
+
+  return loadFromSourceFileDepGraph(cmd, sfdg, diags);
 }
 
 std::string SourceFileDepGraph::noncascading(std::string name) {
@@ -104,7 +113,7 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromPath(const Job *Cmd,
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return None;
-  auto r = loadFromBuffer(Cmd, *buffer.get());
+  auto r = loadFromBuffer(Cmd, *buffer.get(), diags);
   assert(path == getSwiftDeps(Cmd) && "Should be reading the job's swiftdeps");
   assert(!r ||
          !nodeMap[path.str()].empty() && "Must have a node for the whole file");
@@ -117,18 +126,26 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromPath(const Job *Cmd,
 
 /// Returns None for error or a set of changed keys
 ModuleDepGraph::Changes
-ModuleDepGraph::loadFromBuffer(const Job *job, llvm::MemoryBuffer &buffer) {
+ModuleDepGraph::loadFromBuffer(const Job *job, llvm::MemoryBuffer &buffer,
+                               DiagnosticEngine &diags) {
   Optional<SourceFileDepGraph> sourceFileDepGraph =
       SourceFileDepGraph::loadFromBuffer(buffer);
   if (!sourceFileDepGraph)
     return None;
-  return loadFromSourceFileDepGraph(job, sourceFileDepGraph.getValue());
+  return loadFromSourceFileDepGraph(job, sourceFileDepGraph.getValue(), diags);
 }
 
 ModuleDepGraph::Changes ModuleDepGraph::loadFromSourceFileDepGraph(
-    const Job *job, const SourceFileDepGraph &sourceFileDepGraph) {
+    const Job *job, const SourceFileDepGraph &sourceFileDepGraph,
+    DiagnosticEngine &diags) {
   registerJob(job);
-  return integrate(sourceFileDepGraph, getSwiftDeps(job));
+  auto changes = integrate(sourceFileDepGraph, getSwiftDeps(job));
+
+  if (verifyFineGrainedDependencyGraphAfterEveryImport)
+    verify();
+  if (emitFineGrainedDependencyDotFileAfterEveryImport)
+    emitDotFileForJob(diags, job);
+  return changes;
 }
 
 bool ModuleDepGraph::haveAnyNodesBeenTraversedIn(const Job *cmd) const {
@@ -254,7 +271,9 @@ ModuleDepGraph::Changes ModuleDepGraph::integrate(const SourceFileDepGraph &g,
   auto disappearedNodes = nodeMap[swiftDepsOfJob.str()];
   // When done, changeDependencyKeys contains a list of keys that changed
   // as a result of this integration.
-  auto changedNodes = std::unordered_set<ModuleDepGraphNode *>();
+  // Or if the integration failed, None.
+  Optional<std::unordered_set<ModuleDepGraphNode *>> changedNodes =
+      std::unordered_set<ModuleDepGraphNode *>();
 
   g.forEachNode([&](const SourceFileDepGraphNode *integrand) {
     const auto &key = integrand->getKey();
@@ -264,24 +283,30 @@ ModuleDepGraph::Changes ModuleDepGraph::integrate(const SourceFileDepGraph &g,
         preexistingMatch.getValue().first == LocationOfPreexistingNode::here)
       disappearedNodes.erase(key); // Node was and still is. Do not erase it.
 
-    NullablePtr<ModuleDepGraphNode> newNodeOrChangedNode =
+    Optional<NullablePtr<ModuleDepGraphNode>> newNodeOrChangedNode =
         integrateSourceFileDepGraphNode(g, integrand, preexistingMatch,
                                         swiftDepsOfJob);
 
-    if (auto *n = newNodeOrChangedNode.getPtrOrNull())
-      changedNodes.insert(n);
+    if (!newNodeOrChangedNode)
+      changedNodes = None;
+    else if (!changedNodes)
+      ;
+    else if (auto *n = newNodeOrChangedNode.getValue().getPtrOrNull())
+      changedNodes.getValue().insert(n);
   });
+  if (!changedNodes)
+    return None;
 
   for (auto &p : disappearedNodes) {
-    changedNodes.insert(p.second);
+    changedNodes.getValue().insert(p.second);
     eraseNodeFromJob(p.second);
   }
 
   // Make sure the changes can be retraced:
-  for (auto *n : changedNodes)
+  for (auto *n : changedNodes.getValue())
     n->clearHasBeenTraced();
 
-  return changedNodes;
+  return changedNodes.getValue();
 }
 
 ModuleDepGraph::PreexistingNodeIfAny ModuleDepGraph::findPreexistingMatch(
@@ -310,13 +335,20 @@ ModuleDepGraph::PreexistingNodeIfAny ModuleDepGraph::findPreexistingMatch(
   return None;
 }
 
-NullablePtr<ModuleDepGraphNode> ModuleDepGraph::integrateSourceFileDepGraphNode(
+Optional<NullablePtr<ModuleDepGraphNode>>
+ModuleDepGraph::integrateSourceFileDepGraphNode(
     const SourceFileDepGraph &g, const SourceFileDepGraphNode *integrand,
     const PreexistingNodeIfAny preexistingMatch,
     const StringRef swiftDepsOfJob) {
 
+  if (!EnableTypeFingerprints &&
+      integrand->getKey().getKind() != NodeKind::sourceFileProvide &&
+      integrand->getFingerprint())
+    return None;
+
   if (!integrand->getIsProvides())
-    return nullptr; // depends are captured by recordWhatUseDependsUpon below
+    return NullablePtr<ModuleDepGraphNode>(); // depends are captured by
+                                              // recordWhatUseDependsUpon below
 
   auto changedAndIntegrationResultNode =
       integrateSourceFileDeclNode(integrand, swiftDepsOfJob, preexistingMatch);
@@ -549,6 +581,14 @@ void ModuleDepGraph::emitDotFile(llvm::raw_ostream &out) {
 //==============================================================================
 // MARK: ModuleDepGraph debugging
 //==============================================================================
+
+void ModuleDepGraphNode::dump(llvm::raw_ostream &out) const {
+  DepGraphNode::dump(out);
+  if (getIsProvides())
+    out << " swiftDeps: <" << getSwiftDepsOfProvides() << ">\n";
+  else
+    out << " no swiftDeps\n";
+}
 
 void ModuleDepGraphNode::dump() const {
   DepGraphNode::dump();

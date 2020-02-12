@@ -345,7 +345,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
     llvm::SmallString<64> Str;
     Str += "-fmodule-name=";
     Str += ClangInvok->getLangOpts()->CurrentModule;
-    CCArgs.push_back(std::string(Str));
+    CCArgs.push_back(std::string(Str.str()));
   }
 
   if (PPOpts.DetailedRecord) {

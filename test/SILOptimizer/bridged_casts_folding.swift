@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -O -emit-sil -enforce-exclusivity=unchecked %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -O -emit-sil -enforce-exclusivity=unchecked %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -O -emit-sil %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -904,9 +904,14 @@ var anyHashable: AnyHashable = 0
 
 // CHECK-LABEL: $s21bridged_casts_folding29testUncondCastSwiftToSubclassAA08NSObjectI0CyF
 // CHECK: [[GLOBAL:%[0-9]+]] = global_addr @$s21bridged_casts_folding11anyHashables03AnyE0Vv
+// CHECK: [[GLOBAL_COPY:%[0-9]+]] = alloc_stack
+// CHECK: [[GLOBAL_EXCL:%[0-9]+]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]]
+
+// TODO: this copy_addr should be eliminated: rdar://problem/59345115
+// CHECK: copy_addr [[GLOBAL_EXCL]] to [initialization] [[GLOBAL_COPY]]
 // CHECK: [[FUNC:%.*]] = function_ref @$ss11AnyHashableV10FoundationE19_bridgeToObjectiveCSo8NSObjectCyF
-// CHECK-NEXT: apply [[FUNC]]([[GLOBAL]])
-// CHECK-NEXT: unconditional_checked_cast {{%.*}} : $NSObject to NSObjectSubclass
+// CHECK: apply [[FUNC]]([[GLOBAL_COPY]])
+// CHECK: unconditional_checked_cast {{%.*}} : $NSObject to NSObjectSubclass
 // CHECK: } // end sil function '$s21bridged_casts_folding29testUncondCastSwiftToSubclassAA08NSObjectI0CyF'
 @inline(never)
 public func testUncondCastSwiftToSubclass() -> NSObjectSubclass {

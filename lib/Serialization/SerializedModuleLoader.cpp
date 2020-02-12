@@ -433,7 +433,7 @@ std::string SerializedModuleBaseName::getName(file_types::ID fileTy) const {
   result += '.';
   result += file_types::getExtension(fileTy);
 
-  return std::string(result);
+  return std::string(result.str());
 }
 
 bool

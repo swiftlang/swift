@@ -2153,8 +2153,8 @@ TypeChecker::typeCheckExpression(
     performSyntacticExprDiagnostics(result, dc, isExprStmt);
   }
 
-  target.setExpr(result);
-  return target;
+  resultTarget->setExpr(result);
+  return *resultTarget;
 }
 
 Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
@@ -2413,232 +2413,30 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                    DeclContext *DC,
                                    Type patternType) {
-
-  /// Type checking listener for pattern binding initializers.
-  class BindingListener : public ExprTypeCheckListener {
-    ASTContext &context;
-    Pattern *&pattern;
-    Expr *&initializer;
-
-    /// The locator we're using.
-    ConstraintLocator *Locator;
-
-    /// The type of the initializer.
-    Type initType;
-
-    /// The variable to that has property wrappers that have been applied to the initializer expression.
-    VarDecl *wrappedVar = nullptr;
-
-  public:
-    explicit BindingListener(ASTContext &ctx, Pattern *&pattern,
-                             Expr *&initializer)
-        : context(ctx), pattern(pattern), initializer(initializer),
-          Locator(nullptr) {
-      maybeApplyPropertyWrapper();
-    }
-
-    /// Retrieve the type to which the pattern should be coerced.
-    Type getPatternInitType(ConstraintSystem *cs) const {
-      if (!wrappedVar || initType->hasError() ||
-          initType->is<TypeVariableType>())
-        return initType;
-
-      // When we have an active constraint system, form value-member
-      // constraints to dig in to the appropriate resulting property.
-      if (cs) {
-        Type valueType = LValueType::get(initType);
-        auto dc = wrappedVar->getInnermostDeclContext();
-        auto *loc = cs->getConstraintLocator(initializer);
-
-        for (unsigned i : indices(wrappedVar->getAttachedPropertyWrappers())) {
-          auto wrapperInfo = wrappedVar->getAttachedPropertyWrapperTypeInfo(i);
-          if (!wrapperInfo)
-            break;
-
-          loc = cs->getConstraintLocator(loc, ConstraintLocator::Member);
-          Type memberType = cs->createTypeVariable(loc, TVO_CanBindToLValue);
-          cs->addValueMemberConstraint(
-              valueType, wrapperInfo.valueVar->createNameRef(),
-              memberType, dc, FunctionRefKind::Unapplied, { }, loc);
-          valueType = memberType;
-        }
-        
-        // Set up an equality constraint to drop the lvalue-ness of the value
-        // type we produced.
-        Type propertyType = cs->createTypeVariable(loc, 0);
-        cs->addConstraint(ConstraintKind::Equal, propertyType, valueType, loc);
-        return propertyType;
-      }
-
-      // Otherwise, compute the wrapped value type directly.
-      return computeWrappedValueType(wrappedVar, initType);
-    }
-
-    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
-      assert(!expr->isSemanticallyInOutExpr());
-
-      // Save the locator we're using for the expression.
-      Locator = cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
-
-      // Collect constraints from the pattern.
-      Type patternType = cs.generateConstraints(pattern, Locator);
-      if (!patternType)
-        return true;
-
-      if (wrappedVar) {
-        // When we have applied a property wrapper, the initializer type
-        // is the initialization of the property wrapper instance.
-        initType = cs.getType(expr);
-
-        // Add an equal constraint between the pattern type and the
-        // property wrapper's "value" type.
-        cs.addConstraint(ConstraintKind::Equal, patternType,
-                         getPatternInitType(&cs), Locator, /*isFavored*/ true);
-      } else {
-        // The initializer type is the type of the pattern.
-        initType = patternType;
-
-        // Add a conversion constraint between the types.
-        if (!initType->is<OpaqueTypeArchetypeType>()) {
-          cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                           patternType, Locator, /*isFavored*/true);
-        }
-      }
-
-      // The expression has been pre-checked; save it in case we fail later.
-      initializer = expr;
-      return false;
-    }
-
-    Expr *appliedSolution(Solution &solution, Expr *expr) override {
-      {
-        // Figure out what type the constraints decided on.
-        auto ty = solution.simplifyType(initType);
-        initType = ty->getRValueType()->reconstituteSugar(/*recursive =*/false);
-      }
-
-      // Convert the initializer to the type of the pattern.
-      expr = solution.coerceToType(expr, initType, Locator);
-      if (!expr)
-        return nullptr;
-
-      assert(solution.getConstraintSystem().getType(expr)->isEqual(initType));
-
-      // Record the property wrapper type and note that the initializer has
-      // been subsumed by the backing property.
-      if (wrappedVar) {
-        wrappedVar->getParentPatternBinding()->setInitializerSubsumed(0);
-        context.setSideCachedPropertyWrapperBackingPropertyType(
-            wrappedVar, initType->mapTypeOutOfContext());
-
-        // Record the semantic initializer on the outermost property wrapper.
-        wrappedVar->getAttachedPropertyWrappers().front()
-            ->setSemanticInit(expr);
-      }
-
-      initializer = expr;
-      return expr;
-    }
-
-  private:
-    // If the pattern contains a single variable that has an attached
-    // property wrapper, set up the initializer expression to initialize
-    // the backing storage.
-    void maybeApplyPropertyWrapper() {
-      auto singleVar = pattern->getSingleVar();
-      if (!singleVar)
-        return;
-
-      auto wrapperAttrs = singleVar->getAttachedPropertyWrappers();
-      if (wrapperAttrs.empty())
-        return;
-
-      // If the outermost property wrapper is directly initialized, form the
-      // call.
-      auto &ctx = singleVar->getASTContext();
-      auto outermostWrapperAttr = wrapperAttrs.front();
-      if (initializer) {
-        // Form init(wrappedValue:) call(s).
-        Expr *wrappedInitializer =
-            buildPropertyWrapperInitialValueCall(
-                singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
-        if (!wrappedInitializer)
-          return;
-
-        initializer = wrappedInitializer;
-      } else if (auto outermostArg = outermostWrapperAttr->getArg()) {
-        Type outermostWrapperType =
-            singleVar->getAttachedPropertyWrapperType(0);
-        if (!outermostWrapperType)
-          return;
-        
-        auto typeExpr = TypeExpr::createImplicitHack(
-            outermostWrapperAttr->getTypeLoc().getLoc(),
-            outermostWrapperType, ctx);
-        initializer = CallExpr::create(
-            ctx, typeExpr, outermostArg,
-            outermostWrapperAttr->getArgumentLabels(),
-            outermostWrapperAttr->getArgumentLabelLocs(),
-            /*hasTrailingClosure=*/false,
-            /*implicit=*/false);
-      } else {
-        llvm_unreachable("No initializer anywhere?");
-      }
-      wrapperAttrs[0]->setSemanticInit(initializer);
-
-      // Note that we have applied to property wrapper, so we can adjust
-      // the initializer type later.
-      wrappedVar = singleVar;
-    }
-  };
-
-  auto &Context = DC->getASTContext();
-  BindingListener listener(Context, pattern, initializer);
-  if (!initializer)
-    return true;
-
-  // Type-check the initializer.
   auto target = SolutionApplicationTarget::forInitialization(
       initializer, DC, patternType, pattern);
+
+  // Type-check the initializer.
   bool unresolvedTypeExprs = false;
-  auto resultTarget = typeCheckExpression(target, unresolvedTypeExprs,
-                                          None, &listener);
+  auto resultTarget = typeCheckExpression(target, unresolvedTypeExprs);
 
   if (resultTarget) {
     initializer = resultTarget->getAsExpr();
-
-    TypeResolutionOptions options =
-        isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())
-        ? TypeResolverContext::EditorPlaceholderExpr
-        : TypeResolverContext::InExpression;
-    options |= TypeResolutionFlags::OverrideType;
-
-    auto initTy = listener.getPatternInitType(nullptr);
-    if (initTy->hasDependentMember())
-      return true;
-
-    // Apply the solution to the pattern as well.
-    auto contextualPattern =
-        ContextualPattern::forRawPattern(pattern, DC);
-    if (auto coercedPattern = TypeChecker::coercePatternToType(
-            contextualPattern, initTy, options)) {
-      pattern = coercedPattern;
-    } else {
-      return true;
-    }
-  } else {
-    initializer = target.getAsExpr();
+    pattern = resultTarget->getInitializationPattern();
+    return false;
   }
 
-  if (!resultTarget && !initializer->getType())
+  auto &Context = DC->getASTContext();
+  initializer = target.getAsExpr();
+
+  if (!initializer->getType())
     initializer->setType(ErrorType::get(Context));
 
   // If the type of the pattern is inferred, assign error types to the pattern
   // and its variables, to prevent it from being referenced by the constraint
   // system.
-  if (!resultTarget &&
-      (patternType->hasUnresolvedType() ||
-       patternType->hasUnboundGenericType())) {
+  if (patternType->hasUnresolvedType() ||
+      patternType->hasUnboundGenericType()) {
     pattern->setType(ErrorType::get(Context));
     pattern->forEachVariable([&](VarDecl *var) {
       // Don't change the type of a variable that we've been able to
@@ -2651,8 +2449,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       var->setInvalid();
     });
   }
-
-  return !resultTarget;
+  return true;
 }
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,

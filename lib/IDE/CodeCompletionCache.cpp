@@ -437,7 +437,7 @@ static std::string getName(StringRef cacheDirectory,
   llvm::APInt(64, uint64_t(hash)).toStringUnsigned(hashStr, /*Radix*/ 36);
   OSS << "-" << hashStr << ".completions";
 
-  return std::string(name);
+  return std::string(name.str());
 }
 
 Optional<CodeCompletionCache::ValueRefCntPtr>
