@@ -520,7 +520,7 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   // e.g. 'override'.
   if (auto *AD = dyn_cast<AccessorDecl>(this)) {
     // If this is implicit getter, accessor range should not include attributes.
-    if (!AD->getAccessorKeywordLoc().isValid())
+    if (AD->isImplicitGetter())
       return Range;
 
     // Otherwise, include attributes directly attached to the accessor.
@@ -5937,7 +5937,7 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
                  ->hasReferenceSemantics()) {
       // Do not suggest the fix-it in implicit getters
       if (auto AD = dyn_cast<AccessorDecl>(FD)) {
-        if (AD->isGetter() && !AD->getAccessorKeywordLoc().isValid())
+        if (AD->isImplicitGetter())
           return;
       }
 
