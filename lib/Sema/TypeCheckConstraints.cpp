@@ -2079,6 +2079,12 @@ TypeChecker::typeCheckExpression(
       target.getExprContextualTypeLoc(),
       target.getExprContextualTypePurpose());
 
+  // Try to shrink the system by reducing disjunction domains. This
+  // goes through every sub-expression and generate its own sub-system, to
+  // try to reduce the domains of those subexpressions.
+  cs.shrink(expr);
+  target.setExpr(expr);
+
   // If the client can handle unresolved type variables, leave them in the
   // system.
   auto allowFreeTypeVariables = FreeTypeVariableBinding::Disallow;

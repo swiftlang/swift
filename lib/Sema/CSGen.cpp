@@ -3897,12 +3897,6 @@ bool ConstraintSystem::generateConstraints(
     SolutionApplicationTarget &target,
     FreeTypeVariableBinding allowFreeTypeVariables) {
   if (Expr *expr = target.getAsExpr()) {
-    // Try to shrink the system by reducing disjunction domains. This
-    // goes through every sub-expression and generate its own sub-system, to
-    // try to reduce the domains of those subexpressions.
-    shrink(expr);
-    target.setExpr(expr);
-
     // If the target requires an optional of some type, form a new appropriate
     // type variable and update the target's type with an optional of that
     // type variable.
