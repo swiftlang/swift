@@ -1259,7 +1259,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.EnableDynamicReplacementChaining |=
       Args.hasArg(OPT_enable_dynamic_replacement_chaining);
 
-  Opts.UseTypeLayoutValueHandling |= Args.hasArg(OPT_enable_type_layouts);
+  if (auto A = Args.getLastArg(OPT_enable_type_layouts,
+                               OPT_disable_type_layouts)) {
+    Opts.UseTypeLayoutValueHandling
+      = A->getOption().matches(OPT_enable_access_control);
+  }
 
   Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);
 
