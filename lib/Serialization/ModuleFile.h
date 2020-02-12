@@ -847,6 +847,10 @@ public:
     return ModuleInputBuffer->getBufferIdentifier();
   }
 
+  StringRef getTargetTriple() const {
+    return TargetTriple;
+  }
+
   /// AST-verify imported decls.
   ///
   /// Has no effect in NDEBUG builds.
