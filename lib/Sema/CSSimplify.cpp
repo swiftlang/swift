@@ -6322,6 +6322,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // not a match in this case.
       auto impact =
           locator->findLast<LocatorPathElt::UnresolvedMember>() ? 2 : 1;
+
+      // Impact is higher if the the base type is any function type
+      // because function types can't have any members other than self
+      if (baseObjTy->getDesugaredType()->is<AnyFunctionType>()) {
+          impact += 1;
+      }
+
       if (recordFix(fix, impact))
         return SolutionKind::Error;
 
