@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name AccessLevels -emit-module -emit-module-path %t/
-// RUN: %target-swift-symbolgraph-extract -module-name AccessLevels -I %t -pretty-print -o %t/AccessLevels.symbols.json
+// RUN: %target-swift-symbolgraph-extract -module-name AccessLevels -I %t -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/AccessLevels.symbols.json
 
 // CHECK: "accessLevel": "public" 

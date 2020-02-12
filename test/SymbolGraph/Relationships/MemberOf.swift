@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name MemberOf -emit-module -emit-module-path %t/
-// RUN: %target-swift-symbolgraph-extract -module-name MemberOf -I %t -pretty-print -o %t/MemberOf.symbols.json
+// RUN: %target-swift-symbolgraph-extract -module-name MemberOf -I %t -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/MemberOf.symbols.json
 
 public struct S {
