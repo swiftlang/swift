@@ -11,9 +11,9 @@
 // CHECK: @"$s1A3baryQrSiFQOMj" = constant %swift.dyn_repl_key { {{.*}}%swift.dyn_repl_link_entry* @"$s1A3baryQrSiFQOMk"{{.*}}, i32 0 }, section "__TEXT,__const"
 // CHECK: @"$s1A16_replacement_bar1yQrSi_tFQOMk" = global %swift.dyn_repl_link_entry zeroinitializer
 // CHECK: @"\01l_unnamed_dynamic_replacements" =
-// CHECK:   private constant { i32, i32, [4 x { i32, i32, i32, i32 }] }
-// CHECK:   { i32 0, i32 4, [4 x { i32, i32, i32, i32 }] [
-// CHECK:     { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A3baryQrSiFTx"{{.*}}@"$s1A16_replacement_bar1yQrSi_tF"{{.*}}%swift.dyn_repl_link_entry* @"$s1A16_replacement_bar1yQrSi_tFTX"{{.*}}, i32 0 }, { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A9ContainerV4propQrvgTx"{{.*}}@"$s1A9ContainerV7_r_propQrvg"{{.*}}, i32 0 }, { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A3baryQrSiFQOMj"{{.*}},{{.*}}@"$s1A16_replacement_bar1yQrSi_tFQOMg"{{.*}},{{.*}}@"$s1A16_replacement_bar1yQrSi_tFQOMk"{{.*}}, i32 0 }, { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A9ContainerV4propQrvpQOMj"{{.*}},{{.*}}@"$s1A9ContainerV7_r_propQrvpQOMg"{{.*}},{{.*}}@"$s1A9ContainerV7_r_propQrvpQOMk"{{.*}}, i32 0 }] }
+// CHECK-SAME:   private constant { i32, i32, [4 x { i32, i32, i32, i32 }] }
+// CHECK-SAME:   { i32 0, i32 4, [4 x { i32, i32, i32, i32 }] [
+// CHECK-SAME:     { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A3baryQrSiFTx"{{.*}}@"$s1A16_replacement_bar1yQrSi_tF"{{.*}}%swift.dyn_repl_link_entry* @"$s1A16_replacement_bar1yQrSi_tFTX"{{.*}}, i32 0 }, { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A9ContainerV4propQrvgTx"{{.*}}@"$s1A9ContainerV7_r_propQrvg"{{.*}}, i32 0 }, { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A3baryQrSiFQOMj"{{.*}},{{.*}}@"$s1A16_replacement_bar1yQrSi_tFQOMg"{{.*}},{{.*}}@"$s1A16_replacement_bar1yQrSi_tFQOMk"{{.*}}, i32 0 }, { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A9ContainerV4propQrvpQOMj"{{.*}},{{.*}}@"$s1A9ContainerV7_r_propQrvpQOMg"{{.*}},{{.*}}@"$s1A9ContainerV7_r_propQrvpQOMk"{{.*}}, i32 0 }] }
 // CHECK: , section "__TEXT,__const"
 
 public protocol P {

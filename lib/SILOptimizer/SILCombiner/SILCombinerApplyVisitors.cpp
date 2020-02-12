@@ -112,19 +112,17 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   if (foldInverseReabstractionThunks(PAI, this))
     return nullptr;
 
-  SILBuilderContext BuilderCtxt(Builder.getModule(), Builder.getTrackingList());
-  BuilderCtxt.setOpenedArchetypesTracker(Builder.getOpenedArchetypesTracker());
-  bool argsAreKeptAlive =
-      tryOptimizeApplyOfPartialApply(PAI, BuilderCtxt, getInstModCallbacks());
+  bool argsAreKeptAlive = tryOptimizeApplyOfPartialApply(
+      PAI, Builder.getBuilderContext(), getInstModCallbacks());
   if (argsAreKeptAlive)
-    needUpdateStackNesting = true;
+    invalidatedStackNesting = true;
 
   // Try to delete the partial_apply.
   // In case it became dead because of tryOptimizeApplyOfPartialApply, we don't
   // need to copy all arguments again (to extend their lifetimes), because it
   // was already done in tryOptimizeApplyOfPartialApply.
   if (tryDeleteDeadClosure(PAI, getInstModCallbacks(), !argsAreKeptAlive))
-    needUpdateStackNesting = true;
+    invalidatedStackNesting = true;
 
   return nullptr;
 }

@@ -1849,6 +1849,12 @@ namespace decls_block {
     BCArray<IdentifierIDField>
   >;
 
+  using TypeEraserDeclAttrLayout = BCRecordLayout<
+    TypeEraser_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    TypeIDField // type eraser type
+  >;
+
   using CustomDeclAttrLayout = BCRecordLayout<
     Custom_DECL_ATTR,
     BCFixed<1>,  // implicit flag

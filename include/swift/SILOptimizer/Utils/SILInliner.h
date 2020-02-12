@@ -72,7 +72,7 @@ public:
   ///
   /// In this case stack nesting must be corrected after inlining with the
   /// StackNesting utility.
-  static bool needsUpdateStackNesting(FullApplySite apply) {
+  static bool invalidatesStackNesting(FullApplySite apply) {
     // Inlining of coroutines can result in improperly nested stack
     // allocations.
     return isa<BeginApplyInst>(apply);
@@ -111,7 +111,7 @@ public:
   /// function.
   ///
   /// *NOTE*: Inlining can result in improperly nested stack allocations, which
-  /// must be corrected after inlining. See needsUpdateStackNesting().
+  /// must be corrected after inlining. See invalidatesStackNesting().
   ///
   /// Returns an iterator to the first inlined instruction (or the end of the
   /// caller block for empty functions) and the last block in function order
@@ -134,7 +134,7 @@ public:
   /// function.
   ///
   /// *NOTE*: Inlining can result in improperly nested stack allocations, which
-  /// must be corrected after inlining. See needsUpdateStackNesting().
+  /// must be corrected after inlining. See invalidatesStackNesting().
   ///
   /// Returns an iterator to the first inlined instruction (or the end of the
   /// caller block for empty functions) and the last block in function order
