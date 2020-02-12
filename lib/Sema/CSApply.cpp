@@ -7441,6 +7441,13 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
 
     solution.setExprTypes(resultExpr);
     result.setExpr(resultExpr);
+
+    if (Context.TypeCheckerOpts.DebugConstraintSolver) {
+      auto &log = Context.TypeCheckerDebug->getStream();
+      log << "---Type-checked expression---\n";
+      resultExpr->dump(log);
+      log << "\n";
+    }
   }
 
   rewriter.finalize();
