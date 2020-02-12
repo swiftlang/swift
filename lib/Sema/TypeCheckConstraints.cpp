@@ -2085,18 +2085,6 @@ TypeChecker::typeCheckExpression(
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     allowFreeTypeVariables = FreeTypeVariableBinding::UnresolvedType;
 
-  // If the target requires an optional of some type, form a new appropriate
-  // type variable and update the target's type with an optional of that
-  // type variable.
-  if (target.isOptionalSomePatternInit()) {
-    assert(!target.getExprContextualType() &&
-           "some pattern cannot have contextual type pre-configured");
-    auto *convertTypeLocator =
-        cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
-    Type var = cs.createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
-    target.setExprConversionType(getOptionalType(expr->getLoc(), var));
-  }
-
   // Attempt to solve the constraint system.
   auto viable = cs.solve(target, listener, allowFreeTypeVariables);
   if (!viable) {

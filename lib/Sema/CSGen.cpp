@@ -3903,6 +3903,18 @@ bool ConstraintSystem::generateConstraints(
     shrink(expr);
     target.setExpr(expr);
 
+    // If the target requires an optional of some type, form a new appropriate
+    // type variable and update the target's type with an optional of that
+    // type variable.
+    if (target.isOptionalSomePatternInit()) {
+      assert(!target.getExprContextualType() &&
+             "some pattern cannot have contextual type pre-configured");
+      auto *convertTypeLocator =
+          getConstraintLocator(expr, LocatorPathElt::ContextualType());
+      Type var = createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
+      target.setExprConversionType(TypeChecker::getOptionalType(expr->getLoc(), var));
+    }
+
     // Generate constraints for the main system.
     expr = generateConstraints(expr, target.getDeclContext());
     if (!expr)
