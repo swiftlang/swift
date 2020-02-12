@@ -1252,17 +1252,10 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
     return SolutionResult::forError();;
 
   // Notify the listener that we've built the constraint system.
-  Expr *expr = target.getAsExpr();
-  if (listener && listener->builtConstraints(*this, expr)) {
-    return SolutionResult::forError();
-  }
-
-  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = getASTContext().TypeCheckerDebug->getStream();
-    log << "---Initial constraints for the given expression---\n";
-    print(log, expr);
-    log << "\n";
-    print(log);
+  if (Expr *expr = target.getAsExpr()) {
+    if (listener && listener->builtConstraints(*this, expr)) {
+      return SolutionResult::forError();
+    }
   }
 
   // Try to solve the constraint system using computed suggestions.
@@ -1271,8 +1264,6 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
 
   if (getExpressionTooComplex(solutions))
     return SolutionResult::forTooComplex();
-
-  target.setExpr(expr);
 
   switch (solutions.size()) {
   case 0:

@@ -2132,13 +2132,6 @@ TypeChecker::typeCheckExpression(
       return None;
   }
 
-  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Type-checked expression---\n";
-    result->dump(log);
-    log << "\n";
-  }
-
   // Unless the client has disabled them, perform syntactic checks on the
   // expression now.
   if (!cs.shouldSuppressDiagnostics() &&

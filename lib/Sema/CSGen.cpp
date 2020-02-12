@@ -3947,6 +3947,14 @@ bool ConstraintSystem::generateConstraints(
       return true;
     }
 
+    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log << "---Initial constraints for the given expression---\n";
+      print(log, expr);
+      log << "\n";
+      print(log);
+    }
+
     return false;
   }
 
