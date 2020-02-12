@@ -81,6 +81,10 @@ public:
     CodeCompletionBufferID = 0U;
   }
 
+  bool hasCodeCompletionBuffer() const {
+    return CodeCompletionBufferID != 0U;
+  }
+
   unsigned getCodeCompletionBufferID() const {
     return CodeCompletionBufferID;
   }
