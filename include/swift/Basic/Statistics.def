@@ -286,10 +286,10 @@ FRONTEND_STATISTIC(SILModule, NumSILOptWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILOptDefaultWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILOptGlobalVariables)
 
-/// The next 9 statistics count kinds of LLVM entities produced
+/// The next 10 statistics count kinds of LLVM entities produced
 /// during the IRGen phase: globals, functions, aliases, ifuncs,
 /// named metadata, value and comdat symbols, basic blocks,
-/// and instructions.
+/// instructions, and GOT entries.
 FRONTEND_STATISTIC(IRModule, NumIRGlobals)
 FRONTEND_STATISTIC(IRModule, NumIRFunctions)
 FRONTEND_STATISTIC(IRModule, NumIRAliases)
@@ -299,6 +299,7 @@ FRONTEND_STATISTIC(IRModule, NumIRValueSymbols)
 FRONTEND_STATISTIC(IRModule, NumIRComdatSymbols)
 FRONTEND_STATISTIC(IRModule, NumIRBasicBlocks)
 FRONTEND_STATISTIC(IRModule, NumIRInsts)
+FRONTEND_STATISTIC(IRModule, NumGOTEntries)
 
 /// Number of bytes written to the object-file output stream
 /// of the frontend job, which should be the same as the size of
