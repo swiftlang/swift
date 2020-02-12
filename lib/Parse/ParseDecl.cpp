@@ -5457,35 +5457,18 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
       AccessorCtx.reset();
 
       if (Tok.is(tok::code_complete)) {
-        if (CodeCompletion) {
-          CodeCompletionExpr *CCE = nullptr;
-          if (IsFirstAccessor && !parsingLimitedSyntax) {
-            // If CC token is the first token after '{', it might be implicit
-            // getter. Set up dummy accessor as the decl context to populate
-            // 'self' decl.
-
-            // FIXME: if there is already code inside the body, we should fall
-            // through to parseImplicitGetter and handle the completion there so
-            // that we can differentiate a single-expression body from the first
-            // expression in a multi-statement body.
-            auto getter = createAccessorFunc(
-                accessors.LBLoc, /*ValueNamePattern*/ nullptr, GenericParams,
-                Indices, StaticLoc, Flags, AccessorKind::Get,
-                storage, this, /*AccessorKeywordLoc*/ SourceLoc());
-            CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-            getter->setBodyParsed(BraceStmt::create(Context, Tok.getLoc(),
-                                                    ASTNode(CCE), Tok.getLoc(),
-                                                    /*implicit*/ true));
-            accessors.add(getter);
-            CodeCompletion->setParsedDecl(getter);
-          } else {
+        // Handle code completion here only if it's not the first accessor.
+        // If it's the first accessor, it's handled in function body parsing
+        // because it might be an implicit getter.
+        if (!IsFirstAccessor || parsingLimitedSyntax) {
+          if (CodeCompletion) {
             CodeCompletion->setParsedDecl(storage);
+            CodeCompletion->completeAccessorBeginning(nullptr);
           }
-          CodeCompletion->completeAccessorBeginning(CCE);
+          consumeToken(tok::code_complete);
+          accessorHasCodeCompletion = true;
+          break;
         }
-        consumeToken(tok::code_complete);
-        accessorHasCodeCompletion = true;
-        break;
       }
 
       // parsingLimitedSyntax mode cannot have a body.
@@ -6347,6 +6330,23 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
 
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
+  // In implicit getter, if a CC token is the first token after '{', it might
+  // be a start of an accessor block. Perform special completion for that.
+  if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
+    if (peekToken().is(tok::code_complete) && accessor->isImplicitGetter()) {
+      SourceLoc LBraceLoc, RBraceLoc;
+      LBraceLoc = consumeToken(tok::l_brace);
+      auto *CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+      CodeCompletion->setParsedDecl(accessor);
+      CodeCompletion->completeAccessorBeginning(CCE);
+      RBraceLoc = Tok.getLoc();
+      consumeToken(tok::code_complete);
+      return makeParserCodeCompletionResult(
+          BraceStmt::create(Context, LBraceLoc, ASTNode(CCE), RBraceLoc,
+          /*implicit*/ true));
+    }
+  }
 
   return parseBraceItemList(diag::invalid_diagnostic);
 }
