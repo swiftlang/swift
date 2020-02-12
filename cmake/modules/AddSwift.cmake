@@ -279,6 +279,10 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-D_DLL")
     # NOTE: We assume that we are using VS 2015 U2+
     list(APPEND result "-D_ENABLE_ATOMIC_ALIGNMENT_FIX")
+    # NOTE: We use over-aligned values for the RefCount side-table
+    # (see revision d913eefcc93f8c80d6d1a6de4ea898a2838d8b6f)
+    # This is required to build with VS2017 15.8+
+    list(APPEND result "-D_ENABLE_EXTENDED_ALIGNED_STORAGE=1")
 
     # msvcprt's std::function requires RTTI, but we do not want RTTI data.
     # Emulate /GR-.
