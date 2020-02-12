@@ -108,6 +108,7 @@ public:
   IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
+  IGNORED_ATTR(TypeEraser)
   IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(DisfavoredOverload)

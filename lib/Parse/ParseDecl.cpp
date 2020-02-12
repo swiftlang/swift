@@ -2175,6 +2175,37 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
+  case DAK_TypeEraser: {
+    // Parse leading '('
+    if (Tok.isNot(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    SourceLoc LParenLoc = consumeToken(tok::l_paren);
+    ParserResult<TypeRepr> ErasedType;
+    bool invalid = false;
+    {
+      // Parse type-eraser type
+      SyntaxParsingContext ContentContext(SyntaxContext, SyntaxKind::Type);
+      ErasedType = parseType(diag::attr_type_eraser_expected_type_name);
+      invalid = ErasedType.hasCodeCompletion() || ErasedType.isNull();
+    }
+
+    // Parse matching ')'
+    SourceLoc RParenLoc;
+    invalid |= parseMatchingToken(tok::r_paren, RParenLoc,
+                                  diag::attr_type_eraser_expected_rparen,
+                                  LParenLoc);
+    if (invalid)
+      return false;
+
+    Attributes.add(new (Context)
+        TypeEraserAttr(AtLoc, {Loc, RParenLoc}, ErasedType.get()));
+    break;
+  }
+
   case DAK_Specialize: {
     if (Tok.isNot(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,

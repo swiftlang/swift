@@ -1094,6 +1094,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "objc";
   case DAK_DynamicReplacement:
     return "_dynamicReplacement";
+  case DAK_TypeEraser:
+    return "_typeEraser";
   case DAK_PrivateImport:
     return "_private";
   case DAK_RestatedObjCConformance:

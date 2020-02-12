@@ -1488,6 +1488,11 @@ ERROR(attr_dynamic_replacement_expected_for,none,
 ERROR(attr_dynamic_replacement_expected_colon,none,
       "expected ':' after @_dynamicReplacement(for", ())
 
+ERROR(attr_type_eraser_expected_type_name,none,
+      "expected a type name in @_typeEraser()", ())
+ERROR(attr_type_eraser_expected_rparen,none,
+      "expected ')' after type name for @_typeEraser", ())
+
 ERROR(attr_private_import_expected_rparen,none,
       "expected ')' after function name for @_private", ())
 ERROR(attr_private_import_expected_sourcefile, none,
