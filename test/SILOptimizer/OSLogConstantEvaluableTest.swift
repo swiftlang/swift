@@ -28,7 +28,7 @@ func osLogMessageStringLiteralInitTest() -> OSLogMessage {
 // CHECK-NOT: error:
 // CHECK-LABEL: @appendLiteral(String) -> ()
 // CHECK-NOT: error:
-// CHECK-LABEL: @appendInterpolation(_: @autoclosure () -> Int, format: IntFormat, privacy: Privacy) -> ()
+// CHECK-LABEL: @appendInterpolation(_: @autoclosure () -> Int, format: OSLogIntegerFormatting, align: OSLogStringAlignment, privacy: OSLogPrivacy) -> ()
 // CHECK-NOT: error:
 // CHECK-LABEL: @appendLiteral(String) -> ()
 // CHECK-NOT: error:
@@ -41,7 +41,7 @@ func intValueInterpolationTest() -> OSLogMessage {
 
 // CHECK-LABEL: @init(literalCapacity: Int, interpolationCount: Int) -> OSLogInterpolation
 // CHECK-NOT: error:
-// CHECK-LABEL: @appendInterpolation(_: @autoclosure () -> String, privacy: Privacy) -> ()
+// CHECK-LABEL: @appendInterpolation(_: @autoclosure () -> String, privacy: OSLogPrivacy) -> ()
 // CHECK-NOT: error:
 @_semantics("test_driver")
 func stringValueInterpolationTest() -> OSLogMessage {

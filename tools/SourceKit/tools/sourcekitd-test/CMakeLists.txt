@@ -5,7 +5,7 @@ swift_add_public_tablegen_target(sourcekitdTestOptionsTableGen)
 add_sourcekit_executable(sourcekitd-test
   sourcekitd-test.cpp
   TestOptions.cpp
-  LLVM_LINK_COMPONENTS core option coverage lto
+  LLVM_LINK_COMPONENTS option coverage lto
 )
 # SWIFT_ENABLE_TENSORFLOW
 target_compile_definitions(sourcekitd-test PRIVATE

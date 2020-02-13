@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -3837,4 +3838,45 @@ StringRef swift::getAccessorKindString(AccessorKind value) {
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
+}
+
+void StableSerializationPath::dump() const {
+  dump(llvm::errs());
+}
+
+static StringRef getExternalPathComponentKindString(
+                  StableSerializationPath::ExternalPath::ComponentKind kind) {
+  switch (kind) {
+#define CASE(ID, STRING) \
+  case StableSerializationPath::ExternalPath::ID: return STRING;
+  CASE(Record, "record")
+  CASE(Enum, "enum")
+  CASE(Namespace, "namespace")
+  CASE(Typedef, "typedef")
+  CASE(TypedefAnonDecl, "anonymous tag")
+  CASE(ObjCInterface, "@interface")
+  CASE(ObjCProtocol, "@protocol")
+#undef CASE
+  }
+  llvm_unreachable("bad kind");
+}
+
+void StableSerializationPath::dump(llvm::raw_ostream &os) const {
+  if (isSwiftDecl()) {
+    os << "clang decl of:\n";
+    getSwiftDecl()->dump(os, 2);
+  } else {
+    auto &path = getExternalPath();
+    using ExternalPath = StableSerializationPath::ExternalPath;
+    os << "external path: ";
+    size_t index = 0;
+    for (auto &entry : path.Path) {
+      if (index++) os << " -> ";
+      os << getExternalPathComponentKindString(entry.first);
+      if (ExternalPath::requiresIdentifier(entry.first))  {
+        os << "(" << entry.second << ")";
+      }
+    }
+    os << "\n";
+  }
 }

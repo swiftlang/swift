@@ -70,7 +70,7 @@ bb0(%0 : @unowned $X, %1 : @unowned $SwiftGizmo):
   return %7 : $()                                 // id: %8
 }
 
-// CHECK: define internal void @"$s12objc_dealloc10SwiftGizmoCfDTo"([[OPAQUE:%.*]]*, i8*) {{[#0-9]*}} {
+// CHECK: define internal void @"$s12objc_dealloc10SwiftGizmoCfDTo"([[OPAQUE:%.*]]* %0, i8* %1) {{[#0-9]*}} {
 sil [ossa] @$s12objc_dealloc10SwiftGizmoCfDTo : $@convention(objc_method) (SwiftGizmo) -> () {
 bb0(%0 : @unowned $SwiftGizmo):
   // CHECK-NEXT: entry

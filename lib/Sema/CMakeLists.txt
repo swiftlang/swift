@@ -22,6 +22,7 @@ add_swift_host_library(swiftSema STATIC
   DerivedConformanceCodable.cpp
   DerivedConformanceCodingKey.cpp
   DerivedConformanceEquatableHashable.cpp
+  DerivedConformanceComparable.cpp
   DerivedConformanceError.cpp
   # SWIFT_ENABLE_TENSORFLOW
   DerivedConformanceRingMathProtocols.cpp
@@ -82,4 +83,3 @@ target_link_libraries(swiftSema PRIVATE
   swiftAST
   swiftParse
   swiftSerialization)
-

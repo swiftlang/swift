@@ -78,9 +78,7 @@ public:
   bool parseSILGlobal(Parser &P) override;
   bool parseSILWitnessTable(Parser &P) override;
   bool parseSILDefaultWitnessTable(Parser &P) override;
-  // SWIFT_ENABLE_TENSORFLOW
   bool parseSILDifferentiabilityWitness(Parser &P) override;
-  // SWIFT_ENABLE_TENSORFLOW END
   bool parseSILCoverageMap(Parser &P) override;
   bool parseSILProperty(Parser &P) override;
   bool parseSILScope(Parser &P) override;
@@ -107,7 +105,7 @@ SILParserTUState::~SILParserTUState() {
 }
 
 SILParserState::SILParserState(SILModule *M)
-    : Impl(M ? llvm::make_unique<SILParserTUState>(*M) : nullptr) {}
+    : Impl(M ? std::make_unique<SILParserTUState>(*M) : nullptr) {}
 
 SILParserState::~SILParserState() = default;
 
@@ -2043,7 +2041,6 @@ static bool parseAssignOwnershipQualifier(AssignOwnershipQualifier &Result,
   return false;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 // Parse a list of integer indices, prefaced with the given string label.
 // Returns true on error.
 static bool parseIndexList(Parser &P, StringRef label,
@@ -2067,9 +2064,7 @@ static bool parseIndexList(Parser &P, StringRef label,
     return true;
   return false;
 };
-// SWIFT_ENABLE_TENSORFLOW END
 
-// SWIFT_ENABLE_TENSORFLOW
 /// sil-differentiability-witness-config-and-function ::=
 ///   '[' 'parameters' index-subset ']'
 ///   '[' 'results' index-subset ']'
@@ -2108,8 +2103,8 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
     return {};
   // Resolve parsed witness generic signature.
   if (witnessGenSig) {
-    auto origGenSig = originalFunction
-        ->getLoweredFunctionType()->getSubstGenericSignature();
+    auto origGenSig =
+        originalFunction->getLoweredFunctionType()->getSubstGenericSignature();
     // Check whether original function generic signature and parsed witness
     // generic have the same generic parameters.
     auto areGenericParametersConsistent = [&]() {
@@ -2123,7 +2118,7 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
     };
     if (!areGenericParametersConsistent()) {
       P.diagnose(witnessGenSigStartLoc,
-                 diag::sil_inst_autodiff_invalid_witness_generic_signature,
+                 diag::sil_diff_witness_invalid_generic_signature,
                  witnessGenSig->getAsString(), origGenSig->getAsString());
       return {};
     }
@@ -2134,21 +2129,19 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
         witnessGenSig->getRequirements().end());
     witnessGenSig = evaluateOrDefault(
         P.Context.evaluator,
-        AbstractGenericSignatureRequest{
-            origGenSig.getPointer(),
-            /*addedGenericParams=*/{},
-            std::move(witnessRequirements)},
-            nullptr);
+        AbstractGenericSignatureRequest{origGenSig.getPointer(),
+                                        /*addedGenericParams=*/{},
+                                        std::move(witnessRequirements)},
+        nullptr);
   }
   auto origFnType = originalFunction->getLoweredFunctionType();
   auto *parameterIndexSet = IndexSubset::get(
       P.Context, origFnType->getNumParameters(), parameterIndices);
-  auto *resultIndexSet = IndexSubset::get(
-      P.Context, origFnType->getNumResults(), resultIndices);
+  auto *resultIndexSet =
+      IndexSubset::get(P.Context, origFnType->getNumResults(), resultIndices);
   AutoDiffConfig config(parameterIndexSet, resultIndexSet, witnessGenSig);
   return std::make_pair(config, originalFunction);
 }
-// SWIFT_ENABLE_TENSORFLOW_END
 
 bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
   SourceLoc TyLoc;
@@ -6788,8 +6781,8 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
   // We need to turn on InSILBody to parse the function references.
   Lexer::SILBodyRAII tmp(*P.L);
 
-  auto configAndFn = parseSILDifferentiabilityWitnessConfigAndFunction(
-      P, State, silLoc);
+  auto configAndFn =
+      parseSILDifferentiabilityWitnessConfigAndFunction(P, State, silLoc);
   if (!configAndFn) {
     return true;
   }
@@ -6849,7 +6842,6 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
       config.derivativeGenericSignature, jvp, vjp, isSerialized);
   return false;
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 llvm::Optional<llvm::coverage::Counter> SILParser::parseSILCoverageExpr(
     llvm::coverage::CounterExpressionBuilder &Builder) {

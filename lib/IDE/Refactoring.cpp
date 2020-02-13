@@ -1077,7 +1077,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
       InputFile("<extract>", true, InputBuffer.get()));
   Invocation.getFrontendOptions().ModuleName = "extract";
 
-  auto Instance = llvm::make_unique<swift::CompilerInstance>();
+  auto Instance = std::make_unique<swift::CompilerInstance>();
   if (Instance->setup(Invocation))
     llvm_unreachable("Failed setup");
 
@@ -1763,8 +1763,8 @@ findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
   assert(E);
 
   struct StringInterpolationExprFinder: public SourceEntityWalker {
-    std::unique_ptr<llvm::SetVector<Expr*>> Bucket = llvm::
-    make_unique<llvm::SetVector<Expr*>>();
+    std::unique_ptr<llvm::SetVector<Expr *>> Bucket =
+        std::make_unique<llvm::SetVector<Expr *>>();
     ASTContext &Ctx;
 
     bool IsValidInterpolation = true;
@@ -1995,11 +1995,11 @@ findExpandableTernaryExpression(ResolvedRangeInfo Info) {
 
   if (auto D = Info.ContainedNodes[0].dyn_cast<Decl*>())
     if (auto Binding = dyn_cast<PatternBindingDecl>(D))
-      return llvm::make_unique<ExpandableBindingTernaryExprInfo>(Binding);
+      return std::make_unique<ExpandableBindingTernaryExprInfo>(Binding);
 
   if (auto E = Info.ContainedNodes[0].dyn_cast<Expr*>())
     if (auto Assign = dyn_cast<AssignExpr>(E))
-      return llvm::make_unique<ExpandableAssignTernaryExprInfo>(Assign);
+      return std::make_unique<ExpandableAssignTernaryExprInfo>(Assign);
 
   return nullptr;
 }

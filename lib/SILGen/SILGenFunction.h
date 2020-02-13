@@ -1338,6 +1338,11 @@ public:
                                       const TypeLowering &lowering);
   ManagedValue emitManagedBeginBorrow(SILLocation loc, SILValue v);
 
+  ManagedValue
+  emitManagedBorrowedRValueWithCleanup(SILValue borrowedValue,
+                                       const TypeLowering &lowering);
+  ManagedValue emitManagedBorrowedRValueWithCleanup(SILValue borrowedValue);
+
   ManagedValue emitManagedBorrowedRValueWithCleanup(SILValue original,
                                                     SILValue borrowedValue);
   ManagedValue emitManagedBorrowedRValueWithCleanup(

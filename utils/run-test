@@ -129,7 +129,7 @@ def main():
                         help="build test dependencies before running tests "
                              "(default: true)")
     parser.add_argument("--target",
-                        type=argparse.types.ShellSplitType,
+                        type=argparse.types.ShellSplitType(),
                         action=argparse.actions.AppendAction,
                         dest="targets",
                         help="stdlib deployment targets to test. Accept "
@@ -141,7 +141,7 @@ def main():
                         choices=TEST_SUBSETS, default='primary',
                         help="test subset (default: primary)")
     parser.add_argument("--param",
-                        type=argparse.types.ShellSplitType,
+                        type=argparse.types.ShellSplitType(),
                         action=argparse.actions.AppendAction,
                         default=[],
                         help="key=value parameters they are directly passed "

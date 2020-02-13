@@ -1,15 +1,15 @@
 
-// RUN: %swift -module-name generic_metatypes -target x86_64-apple-macosx10.9  -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
-// RUN: %swift -module-name generic_metatypes -target i386-apple-ios7.0        -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
-// RUN: %swift -module-name generic_metatypes -target x86_64-apple-ios7.0      -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64  %s
-// RUN: %swift -module-name generic_metatypes -target x86_64-apple-tvos9.0     -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64  %s
-// RUN: %swift -module-name generic_metatypes -target i386-apple-watchos2.0    -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32  %s
-// RUN: %swift -module-name generic_metatypes -target x86_64-unknown-linux-gnu -disable-objc-interop -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
+// RUN: %swift -disable-generic-metadata-prespecialization -module-name generic_metatypes -target x86_64-apple-macosx10.9  -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
+// RUN: %swift -disable-generic-metadata-prespecialization -module-name generic_metatypes -target i386-apple-ios7.0        -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
+// RUN: %swift -disable-generic-metadata-prespecialization -module-name generic_metatypes -target x86_64-apple-ios7.0      -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64  %s
+// RUN: %swift -disable-generic-metadata-prespecialization -module-name generic_metatypes -target x86_64-apple-tvos9.0     -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64  %s
+// RUN: %swift -disable-generic-metadata-prespecialization -module-name generic_metatypes -target i386-apple-watchos2.0    -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32  %s
+// RUN: %swift -disable-generic-metadata-prespecialization -module-name generic_metatypes -target x86_64-unknown-linux-gnu -disable-objc-interop -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
 
-// RUN: %swift -module-name generic_metatypes -target armv7-apple-ios7.0       -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
-// RUN: %swift -module-name generic_metatypes -target arm64-apple-ios7.0       -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
-// RUN: %swift -module-name generic_metatypes -target arm64-apple-tvos9.0      -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
-// RUN: %swift -module-name generic_metatypes -target armv7k-apple-watchos2.0  -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
+// RUN: %swift -disable-generic-metadata-prespecialization -module-name generic_metatypes -target armv7-apple-ios7.0       -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
+// RUN: %swift -disable-generic-metadata-prespecialization -module-name generic_metatypes -target arm64-apple-ios7.0       -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
+// RUN: %swift -disable-generic-metadata-prespecialization -module-name generic_metatypes -target arm64-apple-tvos9.0      -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
+// RUN: %swift -disable-generic-metadata-prespecialization -module-name generic_metatypes -target armv7k-apple-watchos2.0  -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
 
 // REQUIRES: CODEGENERATOR=X86
 // REQUIRES: CODEGENERATOR=ARM
@@ -23,7 +23,7 @@ public func type<T, Metatype>(of value: T) -> Metatype {
   never()
 }
 
-// CHECK: define hidden swiftcc %swift.type* [[GENERIC_TYPEOF:@"\$s17generic_metatypes0A6TypeofyxmxlF"]](%swift.opaque* noalias nocapture, %swift.type* [[TYPE:%.*]])
+// CHECK: define hidden swiftcc %swift.type* [[GENERIC_TYPEOF:@"\$s17generic_metatypes0A6TypeofyxmxlF"]](%swift.opaque* noalias nocapture %0, %swift.type* [[TYPE:%.*]])
 func genericTypeof<T>(_ x: T) -> T.Type {
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* {{.*}}, %swift.type* [[TYPE]], i1 false)
   // CHECK: ret %swift.type* [[METATYPE]]
@@ -33,7 +33,7 @@ func genericTypeof<T>(_ x: T) -> T.Type {
 struct Foo {}
 class Bar {}
 
-// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s17generic_metatypes27remapToSubstitutedMetatypes{{.*}}"(%T17generic_metatypes3BarC*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s17generic_metatypes27remapToSubstitutedMetatypes{{.*}}"(%T17generic_metatypes3BarC* %0) {{.*}} {
 func remapToSubstitutedMetatypes(_ x: Foo, y: Bar)
   -> (Foo.Type, Bar.Type)
 {
@@ -58,7 +58,7 @@ func genericMetatypes<T, U>(_ t: T.Type, _ u: U.Type) {}
 
 protocol Bas {}
 
-// CHECK: define hidden swiftcc { %swift.type*, i8** } @"$s17generic_metatypes14protocolTypeof{{.*}}"(%T17generic_metatypes3BasP* noalias nocapture dereferenceable({{.*}}))
+// CHECK: define hidden swiftcc { %swift.type*, i8** } @"$s17generic_metatypes14protocolTypeof{{.*}}"(%T17generic_metatypes3BasP* noalias nocapture dereferenceable({{.*}}) %0)
 func protocolTypeof(_ x: Bas) -> Bas.Type {
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %T17generic_metatypes3BasP, %T17generic_metatypes3BasP* [[X:%.*]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
@@ -83,7 +83,7 @@ func metatypeErasure(_ z: Zim.Type) -> Bas.Type {
   return z
 }
 
-// CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @"$s17generic_metatypes15metatypeErasureyAA3Bas_pXpAA4ZangCmF"(%swift.type*) #0
+// CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @"$s17generic_metatypes15metatypeErasureyAA3Bas_pXpAA4ZangCmF"(%swift.type* %0)
 func metatypeErasure(_ z: Zang.Type) -> Bas.Type {
   // CHECK: [[RET:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* %0, 0
   // CHECK: [[RET2:%.*]] = insertvalue { %swift.type*, i8** } [[RET]], i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$s17generic_metatypes4ZangCAA3BasAAWP", i32 0, i32 0), 1
@@ -101,37 +101,37 @@ func genericMetatype<A>(_ x: A.Type) {}
 
 // CHECK-LABEL: define hidden swiftcc void @"$s17generic_metatypes20makeGenericMetatypesyyF"() {{.*}} {
 func makeGenericMetatypes() {
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes6OneArgVyAA3FooVGMD") [[NOUNWIND_READNONE:#[0-9]+]]
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}} @"$s17generic_metatypes6OneArgVyAA3FooVGMD") [[NOUNWIND_READNONE:#[0-9]+]]
   genericMetatype(OneArg<Foo>.self)
 
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes7TwoArgsVyAA3FooVAA3BarCGMD") [[NOUNWIND_READNONE]]
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}} @"$s17generic_metatypes7TwoArgsVyAA3FooVAA3BarCGMD") [[NOUNWIND_READNONE]]
   genericMetatype(TwoArgs<Foo, Bar>.self)
 
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes9ThreeArgsVyAA3FooVAA3BarCAEGMD") [[NOUNWIND_READNONE]]
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}} @"$s17generic_metatypes9ThreeArgsVyAA3FooVAA3BarCAEGMD") [[NOUNWIND_READNONE]]
   genericMetatype(ThreeArgs<Foo, Bar, Foo>.self)
 
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes8FourArgsVyAA3FooVAA3BarCAeGGMD") [[NOUNWIND_READNONE]]
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}} @"$s17generic_metatypes8FourArgsVyAA3FooVAA3BarCAeGGMD") [[NOUNWIND_READNONE]]
   genericMetatype(FourArgs<Foo, Bar, Foo, Bar>.self)
 
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes8FiveArgsVyAA3FooVAA3BarCAegEGMD") [[NOUNWIND_READNONE]]
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}} @"$s17generic_metatypes8FiveArgsVyAA3FooVAA3BarCAegEGMD") [[NOUNWIND_READNONE]]
   genericMetatype(FiveArgs<Foo, Bar, Foo, Bar, Foo>.self)
 }
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s17generic_metatypes6OneArgVMa"
-// CHECK-SAME:    ([[INT]], %swift.type*)
+// CHECK-SAME:    ([[INT]] %0, %swift.type* %1)
 // CHECK:   [[BITCAST_1:%.*]] = bitcast {{.*}} %1
 // CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[BITCAST_1]], i8* undef, i8* undef, %swift.type_descriptor* {{.*}} @"$s17generic_metatypes6OneArgVMn" {{.*}})
 // CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s17generic_metatypes7TwoArgsVMa"
-// CHECK-SAME:    ([[INT]], %swift.type*, %swift.type*)
+// CHECK-SAME:    ([[INT]] %0, %swift.type* %1, %swift.type* %2)
 // CHECK:   [[BITCAST_1:%.*]] = bitcast {{.*}} %1
 // CHECK:   [[BITCAST_2:%.*]] = bitcast {{.*}} %2
 // CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[BITCAST_1]], i8* [[BITCAST_2]], i8* undef, %swift.type_descriptor* {{.*}} @"$s17generic_metatypes7TwoArgsVMn" {{.*}})
 // CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s17generic_metatypes9ThreeArgsVMa"
-// CHECK-SAME:    ({{i[0-9]+}}, %swift.type*, %swift.type*, %swift.type*)
+// CHECK-SAME:    ({{i[0-9]+}} %0, %swift.type* %1, %swift.type* %2, %swift.type* %3)
 // CHECK:   [[BITCAST_1:%.*]] = bitcast {{.*}} %1
 // CHECK:   [[BITCAST_2:%.*]] = bitcast {{.*}} %2
 // CHECK:   [[BITCAST_3:%.*]] = bitcast {{.*}} %3
@@ -139,7 +139,7 @@ func makeGenericMetatypes() {
 // CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s17generic_metatypes8FiveArgsVMa"
-// CHECK-SAME:    ([[INT]], i8**) [[NOUNWIND_OPT:#[0-9]+]]
+// CHECK-SAME:    ([[INT]] %0, i8** %1) [[NOUNWIND_OPT:#[0-9]+]]
 // CHECK-NOT: alloc
 // CHECK:   call swiftcc %swift.metadata_response @swift_getGenericMetadata([[INT]] %0, i8* {{.*}}, %swift.type_descriptor* {{.*}} @"$s17generic_metatypes8FiveArgsVMn" {{.*}})
 // CHECK-NOT: call void @llvm.lifetime.end

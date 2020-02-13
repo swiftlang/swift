@@ -1436,10 +1436,27 @@ function(_add_swift_library_single target name)
     # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
     if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
       if(${SWIFTLIB_SINGLE_SDK} MATCHES "(I|TV|WATCH)OS")
-        target_link_options(${target} PRIVATE
-          "LINKER:-bitcode_bundle"
-          $<$<BOOL:SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS>:"LINKER:-bitcode_hide_symbols">
-          "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
+        # The two branches of this if statement accomplish the same end result
+        # We are simply accounting for the fact that on CMake < 3.16
+        # using a generator expression to
+        # specify a LINKER: argument does not work,
+        # since that seems not to allow the LINKER: prefix to be
+        # evaluated (i.e. it will be added as-is to the linker parameters)
+        if(CMAKE_VERSION VERSION_LESS 3.16)
+          target_link_options(${target} PRIVATE
+            "LINKER:-bitcode_bundle"
+            "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
+
+          if(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
+            target_link_options(${target} PRIVATE
+              "LINKER:-bitcode_hide_symbols")
+          endif()
+        else()
+          target_link_options(${target} PRIVATE
+            "LINKER:-bitcode_bundle"
+            $<$<BOOL:SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS>:"LINKER:-bitcode_hide_symbols">
+            "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
+        endif()
       endif()
     endif()
   endif()
@@ -1574,6 +1591,9 @@ function(add_swift_host_library name)
   if(ASHL_DEPENDS)
     message(SEND_ERROR "library ${name} is using DEPENDS parameter which is deprecated.  Please use add_dependencies instead")
   endif()
+  if(ASHL_FILE_DEPENDS)
+    message(SEND_ERROR "library ${name} is using FILE_DEPENDS parameter which is deprecated.")
+  endif()
   if(ASHL_LINK_LIBRARIES)
     message(SEND_ERROR "library ${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
   endif()
@@ -1593,7 +1613,6 @@ function(add_swift_host_library name)
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     LLVM_LINK_COMPONENTS ${ASHL_LLVM_LINK_COMPONENTS}
-    FILE_DEPENDS ${ASHL_FILE_DEPENDS}
     INSTALL_IN_COMPONENT "dev"
     )
 
@@ -2544,6 +2563,9 @@ function(_add_swift_executable_single name)
   if(SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL)
     message(SEND_ERROR "${name} is using EXCLUDE_FROM_ALL option which is deprecated.")
   endif()
+  if(SWIFTEXE_SINGLE_LINK_LIBRARIES)
+    message(SEND_ERROR "${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
+  endif()
 
   # Check arguments.
   precondition(SWIFTEXE_SINGLE_SDK MESSAGE "Should specify an SDK")
@@ -2589,12 +2611,6 @@ function(_add_swift_executable_single name)
     set(local_rpath "$ORIGIN:$ORIGIN/${swift_relative_library_path}:${SWIFTLIB_DIR}/..:/usr/lib/swift/cygwin")
   endif()
   # END SWIFT_ENABLE_TENSORFLOW
-
-  _list_add_string_suffix(
-      "${SWIFTEXE_SINGLE_LINK_LIBRARIES}"
-      "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
-      SWIFTEXE_SINGLE_LINK_LIBRARIES_TARGETS)
-  set(SWIFTEXE_SINGLE_LINK_LIBRARIES ${SWIFTEXE_SINGLE_LINK_LIBRARIES_TARGETS})
 
   handle_swift_sources(
       dependency_target
@@ -2659,7 +2675,6 @@ function(_add_swift_executable_single name)
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-  target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_LINK_COMPONENTS})
 
   # NOTE(compnerd) use the C linker language to invoke `clang` rather than

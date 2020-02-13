@@ -35,8 +35,6 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "llvm/Support/Options.h"
 
 using namespace swift;
 
@@ -946,9 +944,16 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
                  : diag::objc_name_deinit);
       const_cast<ObjCAttr *>(attr)->clearName();
     } else {
+      auto func = cast<AbstractFunctionDecl>(D);
+
+      // Trigger lazy loading of any imported members with the same selector.
+      // This ensures we correctly diagnose selector conflicts.
+      if (auto *CD = D->getDeclContext()->getSelfClassDecl()) {
+        (void) CD->lookupDirect(*objcName, !func->isStatic());
+      }
+
       // We have a function. Make sure that the number of parameters
       // matches the "number of colons" in the name.
-      auto func = cast<AbstractFunctionDecl>(D);
       auto params = func->getParameters();
       unsigned numParameters = params->size();
       if (auto CD = dyn_cast<ConstructorDecl>(func))

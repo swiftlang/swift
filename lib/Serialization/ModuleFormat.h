@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 534; // add SIL parameter differentiability
+const uint16_t SWIFTMODULE_VERSION_MINOR = 539; // swift master-rebranch
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -70,6 +70,10 @@ using TypeID = DeclID;
 using TypeIDField = DeclIDField;
 
 using TypeIDWithBitField = BCFixed<32>;
+
+// ClangTypeID must be the same as DeclID because it is stored in the same way.
+using ClangTypeID = TypeID;
+using ClangTypeIDField = TypeIDField;
 
 // IdentifierID must be the same as DeclID because it is stored in the same way.
 using IdentifierID = DeclID;
@@ -548,6 +552,18 @@ enum class ImportControl : uint8_t {
 };
 using ImportControlField = BCFixed<2>;
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class ClangDeclPathComponentKind : uint8_t {
+  Record = 0,
+  Enum,
+  Namespace,
+  Typedef,
+  TypedefAnonDecl,
+  ObjCInterface,
+  ObjCProtocol,
+};
+
 // Encodes a VersionTuple:
 //
 //  Major
@@ -851,6 +867,11 @@ namespace decls_block {
 #include "DeclTypeRecordNodes.def"
   };
 
+  using ClangTypeLayout = BCRecordLayout<
+    CLANG_TYPE,
+    BCArray<BCVBR<6>>
+  >;
+
   using BuiltinAliasTypeLayout = BCRecordLayout<
     BUILTIN_ALIAS_TYPE,
     DeclIDField, // typealias decl
@@ -902,6 +923,7 @@ namespace decls_block {
     FUNCTION_TYPE,
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
+    ClangTypeIDField, // type
     BCFixed<1>,  // noescape?
     BCFixed<1>,   // throws?
     DifferentiabilityKindField // differentiability kind
@@ -999,9 +1021,8 @@ namespace decls_block {
     BCFixed<1>,            // generic signature implied
     GenericSignatureIDField, // generic signature
     SubstitutionMapIDField, // substitutions
-    // SWIFT_ENABLE_TENSORFLOW
-    BCArray<TypeIDField>   // parameter types/conventions/differentiability, alternating
-    // SWIFT_ENABLE_TENSORFLOW END
+    ClangTypeIDField,      // clang function type, for foreign conventions
+    BCArray<TypeIDField>   // parameter types/conventions, alternating
                            // followed by result types/conventions, alternating
                            // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
@@ -1191,6 +1212,7 @@ namespace decls_block {
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
     BCFixed<1>,   // is this the backing storage for a lazy property?
+    BCFixed<1>,   // top level global?
     DeclIDField,  // if this is a lazy property, this is the backing storage
     OpaqueReadOwnershipField,   // opaque read ownership
     ReadImplKindField,   // read implementation
@@ -1921,7 +1943,8 @@ namespace index_block {
     ORDERED_TOP_LEVEL_DECLS,
 
     SUBSTITUTION_MAP_OFFSETS,
-    LastRecordKind = SUBSTITUTION_MAP_OFFSETS,
+    CLANG_TYPE_OFFSETS,
+    LastRecordKind = CLANG_TYPE_OFFSETS,
   };
   
   constexpr const unsigned RecordIDFieldWidth = 5;

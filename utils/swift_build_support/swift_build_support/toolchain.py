@@ -18,10 +18,10 @@ from __future__ import absolute_import
 
 import platform
 
+from build_swift.build_swift import cache_utils
 from build_swift.build_swift.shell import which
 from build_swift.build_swift.wrappers import xcrun
 
-from . import cache_util
 from . import shell
 
 
@@ -44,7 +44,7 @@ def _register(name, *tool):
     def _getter(self):
         return self.find_tool(*tool)
     _getter.__name__ = name
-    setattr(Toolchain, name, cache_util.reify(_getter))
+    setattr(Toolchain, name, cache_utils.reify(_getter))
 
 
 if platform.system() == 'Windows':
@@ -164,7 +164,7 @@ class FreeBSD(GenericUnix):
             suffixes = ['38', '37', '36', '35']
         super(FreeBSD, self).__init__(suffixes)
 
-    @cache_util.reify
+    @cache_utils.reify
     def _release_date(self):
         """Return the release date for FreeBSD operating system on this host.
         If the release date cannot be ascertained, return None.

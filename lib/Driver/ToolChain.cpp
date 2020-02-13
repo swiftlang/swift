@@ -145,7 +145,7 @@ std::unique_ptr<Job> ToolChain::constructJob(
   auto responseFileInfo =
       getResponseFileInfo(C, executablePath, invocationInfo, context);
 
-  return llvm::make_unique<Job>(
+  return std::make_unique<Job>(
       JA, std::move(inputs), std::move(output), executablePath,
       std::move(invocationInfo.Arguments),
       std::move(invocationInfo.ExtraEnvironment),
@@ -240,7 +240,7 @@ static std::unique_ptr<CommandOutput>
 makeBatchCommandOutput(ArrayRef<const Job *> jobs, Compilation &C,
                        file_types::ID outputType) {
   auto output =
-      llvm::make_unique<CommandOutput>(outputType, C.getDerivedOutputFileMap());
+      std::make_unique<CommandOutput>(outputType, C.getDerivedOutputFileMap());
   for (auto const *J : jobs) {
     output->addOutputs(J->getOutput());
   }
@@ -333,7 +333,7 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
   auto responseFileInfo =
       getResponseFileInfo(C, executablePath, invocationInfo, context);
 
-  return llvm::make_unique<BatchJob>(
+  return std::make_unique<BatchJob>(
       *batchCJA, inputJobs.takeVector(), std::move(output), executablePath,
       std::move(invocationInfo.Arguments),
       std::move(invocationInfo.ExtraEnvironment),

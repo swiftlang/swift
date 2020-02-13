@@ -31,7 +31,6 @@ from build_swift.build_swift import presets
 
 import six
 
-from swift_build_support.swift_build_support import diagnostics
 from swift_build_support.swift_build_support import products
 from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support import targets
@@ -59,6 +58,25 @@ BUILD_SCRIPT_IMPL = os.path.join(
 
 # -----------------------------------------------------------------------------
 # Helpers
+
+def print_note(message, stream=sys.stdout):
+    """Writes a diagnostic message to the given stream. By default this
+    function outputs to stdout.
+    """
+
+    stream.write('[{}] NOTE: {}\n'.format(sys.argv[0], message))
+    stream.flush()
+
+
+def fatal_error(message, stream=sys.stderr):
+    """Writes a message to the given stream and exits. By default this
+    function outputs to stderr.
+    """
+
+    stream.write('[{}] ERROR: {}\n'.format(sys.argv[0], message))
+    stream.flush()
+    sys.exit(1)
+
 
 def clean_delay():
     """Provide a short delay so accidentally invoked clean builds can be
@@ -156,23 +174,23 @@ def tar(source, destination):
 
 def validate_arguments(toolchain, args):
     if toolchain.cc is None or toolchain.cxx is None:
-        diagnostics.fatal(
+        fatal_error(
             "can't find clang (please install clang-3.5 or a "
             "later version)")
 
     if toolchain.cmake is None:
-        diagnostics.fatal("can't find CMake (please install CMake)")
+        fatal_error("can't find CMake (please install CMake)")
 
     if args.distcc:
         if toolchain.distcc is None:
-            diagnostics.fatal(
+            fatal_error(
                 "can't find distcc (please install distcc)")
         if toolchain.distcc_pump is None:
-            diagnostics.fatal(
+            fatal_error(
                 "can't find distcc-pump (please install distcc-pump)")
 
     if args.host_target is None or args.stdlib_deployment_targets is None:
-        diagnostics.fatal("unknown operating system")
+        fatal_error("unknown operating system")
 
     # SWIFT_ENABLE_TENSORFLOW
     if args.enable_tensorflow:
@@ -188,7 +206,7 @@ def validate_arguments(toolchain, args):
                 '(was \'{}\')'.format(args.symbols_package))
             return 1
         if not args.install_symroot:
-            diagnostics.fatal(
+            fatal_error(
                 "--install-symroot is required when specifying "
                 "--symbols-package.")
 
@@ -200,7 +218,7 @@ def validate_arguments(toolchain, args):
                 args.android_icu_i18n is None or \
                 args.android_icu_i18n_include is None or \
                 args.android_icu_data is None:
-            diagnostics.fatal(
+            fatal_error(
                 "when building for Android, --android-ndk, "
                 "--android-api-level, --android-icu-uc, "
                 "--android-icu-uc-include, --android-icu-i18n, "
@@ -217,7 +235,7 @@ def validate_arguments(toolchain, args):
     has_target_needing_toolchain = \
         bool(sum(getattr(args, x) for x in targets_needing_toolchain))
     if args.legacy_impl and has_target_needing_toolchain:
-        diagnostics.fatal(
+        fatal_error(
             "--legacy-impl is incompatible with building packages needing "
             "a toolchain (%s)" % ", ".join(targets_needing_toolchain))
 
@@ -430,7 +448,7 @@ class BuildScriptInvocation(object):
 
     def build_ninja(self):
         if not os.path.exists(self.workspace.source_dir("ninja")):
-            diagnostics.fatal(
+            fatal_error(
                 "can't find source directory for ninja "
                 "(tried %s)" % (self.workspace.source_dir("ninja")))
 
@@ -513,7 +531,7 @@ class BuildScriptInvocation(object):
             source_dir = self.workspace.source_dir(product_source_name)
 
             if not os.path.exists(source_dir):
-                diagnostics.fatal(
+                fatal_error(
                     "can't find source directory for %s "
                     "(tried %s)" % (product_name, source_dir))
 
@@ -871,7 +889,7 @@ class BuildScriptInvocation(object):
             try:
                 config = HostSpecificConfiguration(host_target, args)
             except argparse.ArgumentError as e:
-                exit_rejecting_arguments(e.message)
+                exit_rejecting_arguments(six.text_type(e))
 
             # Convert into `build-script-impl` style variables.
             options[host_target] = {
@@ -979,7 +997,7 @@ class BuildScriptInvocation(object):
             try:
                 config = HostSpecificConfiguration(host_target.name, self.args)
             except argparse.ArgumentError as e:
-                exit_rejecting_arguments(e.message)
+                exit_rejecting_arguments(six.text_type(e))
             print("Building the standard library for: {}".format(
                 " ".join(config.swift_stdlib_build_targets)))
             if config.swift_test_run_targets and (
@@ -1176,7 +1194,7 @@ def main_preset():
     try:
         preset_parser.read_files(args.preset_file_names)
     except presets.PresetError as e:
-        diagnostics.fatal(e.message)
+        fatal_error(six.text_type(e))
 
     if args.show_presets:
         for name in sorted(preset_parser.preset_names,
@@ -1185,7 +1203,7 @@ def main_preset():
         return 0
 
     if not args.preset:
-        diagnostics.fatal("missing --preset option")
+        fatal_error("missing --preset option")
 
     args.preset_substitutions = {
       'home': os.path.expanduser("~")
@@ -1200,12 +1218,12 @@ def main_preset():
             args.preset,
             vars=args.preset_substitutions)
     except presets.PresetError as e:
-        diagnostics.fatal(e.message)
+        fatal_error(six.text_type(e))
 
     preset_args = migration.migrate_swift_sdks(preset.args)
 
     if args.distcc and (args.cmake_c_launcher or args.cmake_cxx_launcher):
-        diagnostics.fatal(
+        fatal_error(
             '--distcc can not be used with' +
             ' --cmake-c-launcher or --cmake-cxx-launcher')
 
@@ -1238,7 +1256,7 @@ def main_preset():
     if args.reconfigure:
         build_script_args += ["--reconfigure"]
 
-    diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
+    print_note('using preset "{}", which expands to \n\n{}\n'.format(
         args.preset, printable_command))
     shell.call_without_sleeping(build_script_args)
     return 0
@@ -1271,7 +1289,7 @@ def main_normal():
         xcrun_toolchain = os.environ.get('TOOLCHAINS',
                                          defaults.DARWIN_XCRUN_TOOLCHAIN)
 
-        diagnostics.note('Using toolchain {}'.format(xcrun_toolchain))
+        print_note('Using toolchain {}'.format(xcrun_toolchain))
         args.darwin_xcrun_toolchain = xcrun_toolchain
 
     toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain)
@@ -1358,12 +1376,12 @@ def main_normal():
 
 def main():
     if not SWIFT_SOURCE_ROOT:
-        diagnostics.fatal(
+        fatal_error(
             "could not infer source root directory " +
             "(forgot to set $SWIFT_SOURCE_ROOT environment variable?)")
 
     if not os.path.isdir(SWIFT_SOURCE_ROOT):
-        diagnostics.fatal(
+        fatal_error(
             "source root directory \'" + SWIFT_SOURCE_ROOT +
             "\' does not exist " +
             "(forgot to set $SWIFT_SOURCE_ROOT environment variable?)")

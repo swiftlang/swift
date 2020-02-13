@@ -165,8 +165,14 @@ namespace {
 struct EndBorrowCleanup : Cleanup {
   SILValue borrowedValue;
 
-  EndBorrowCleanup(SILValue borrowedValue)
-      : borrowedValue(borrowedValue) {}
+  EndBorrowCleanup(SILValue borrowedValue) : borrowedValue(borrowedValue) {
+    if (auto *arg = dyn_cast<SILPhiArgument>(borrowedValue)) {
+      if (auto *ti = arg->getSingleTerminator()) {
+        assert(!ti->isTransformationTerminator() &&
+               "Transforming terminators do not have end_borrow");
+      }
+    }
+  }
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
@@ -289,6 +295,30 @@ SILGenFunction::emitManagedBorrowedRValueWithCleanup(SILValue original,
          borrowed->getType().getObjectType());
   auto &lowering = getTypeLowering(original->getType());
   return emitManagedBorrowedRValueWithCleanup(original, borrowed, lowering);
+}
+
+ManagedValue
+SILGenFunction::emitManagedBorrowedRValueWithCleanup(SILValue borrowed) {
+  auto &lowering = getTypeLowering(borrowed->getType());
+  return emitManagedBorrowedRValueWithCleanup(borrowed, lowering);
+}
+
+ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
+    SILValue borrowed, const TypeLowering &lowering) {
+  assert(lowering.getLoweredType().getObjectType() ==
+         borrowed->getType().getObjectType());
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(borrowed);
+
+  if (borrowed->getType().isObject() &&
+      borrowed.getOwnershipKind() == ValueOwnershipKind::None)
+    return ManagedValue::forUnmanaged(borrowed);
+
+  if (borrowed->getType().isObject()) {
+    Cleanups.pushCleanup<EndBorrowCleanup>(borrowed);
+  }
+
+  return ManagedValue(borrowed, CleanupHandle::invalid());
 }
 
 ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
@@ -5035,13 +5065,17 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
     return visit(E->getSubExpr(), C);
   };
 
-  // Handle @convention(block). No withoutActuallyEscaping verification yet.
-  if (silFnTy->getExtInfo().getRepresentation() !=
-      SILFunctionTypeRepresentation::Thick) {
+  // Handle @convention(block) an @convention(c). No withoutActuallyEscaping
+  // verification yet.
+  auto closureRepresentation = silFnTy->getExtInfo().getRepresentation();
+  if (closureRepresentation != SILFunctionTypeRepresentation::Thick) {
     auto escapingClosure =
         SGF.B.createConvertFunction(E, functionValue, escapingFnTy,
                                     /*WithoutActuallyEscaping=*/true);
-    return visitSubExpr(escapingClosure, true /*isClosureConsumable*/);
+    bool isBlockConvention =
+        closureRepresentation == SILFunctionTypeRepresentation::Block;
+    return visitSubExpr(escapingClosure,
+                        isBlockConvention /*isClosureConsumable*/);
   }
 
   // Convert it to an escaping function value.
@@ -5376,7 +5410,7 @@ RValue RValueEmitter::visitDifferentiableFunctionExpr(
   auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
   auto *diffFunc = SGF.B.createDifferentiableFunction(
-      E, destTy->getDifferentiationParameterIndices(), origFunc.forward(SGF));
+      E, destTy->getDifferentiabilityParameterIndices(), origFunc.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
 
@@ -5385,7 +5419,7 @@ RValue RValueEmitter::visitLinearFunctionExpr(
   auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
   auto *diffFunc = SGF.B.createLinearFunction(
-      E, destTy->getDifferentiationParameterIndices(), origFunc.forward(SGF));
+      E, destTy->getDifferentiabilityParameterIndices(), origFunc.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -O -emit-sil -enforce-exclusivity=unchecked -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend  -O -emit-sil -primary-file %s | %FileCheck %s
 
 // Check that values of static let and global let variables are propagated into their uses
 // and enable further optimizations like constant propagation, simplifications, etc.
@@ -274,6 +274,7 @@ public func test_static_class_let_int_complex() -> Int {
 // CHECK-LABEL: sil [noinline] @$s25globalopt_let_propagation15test_var_doubleSdyF
 // CHECK: bb0:
 // CHECK-NEXT: global_addr
+// CHECK-NEXT: begin_access [read] [dynamic]
 // CHECK-NEXT: struct_element_addr
 // CHECK-NEXT: load
 @inline(never)
@@ -284,6 +285,7 @@ public func test_var_double() -> Double {
 // CHECK-LABEL: sil [noinline] @$s25globalopt_let_propagation12test_var_intSiyF
 // CHECK: bb0: 
 // CHECK-NEXT: global_addr
+// CHECK-NEXT: begin_access [read] [dynamic]
 // CHECK-NEXT: struct_element_addr
 // CHECK-NEXT: load
 @inline(never)

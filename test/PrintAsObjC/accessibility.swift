@@ -21,6 +21,9 @@
 
 // REQUIRES: objc_interop
 
+// CHECK: #ifndef ACCESSIBILITY_SWIFT_H
+// CHECK-NEXT: #define ACCESSIBILITY_SWIFT_H
+
 // CHECK-LABEL: @interface A_Public{{$}}
 // CHECK-INTERNAL-NEXT: init
 // CHECK-NEXT: @end

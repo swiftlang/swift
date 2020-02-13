@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-module"
 #include "swift/SIL/SILModule.h"
 #include "Linker.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/ASTMangler.h"
@@ -591,9 +592,8 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
 SILDifferentiabilityWitness *
 SILModule::lookUpDifferentiabilityWitness(StringRef name) {
   auto it = DifferentiabilityWitnessMap.find(name);
-  if (it != DifferentiabilityWitnessMap.end()) {
+  if (it != DifferentiabilityWitnessMap.end())
     return it->second;
-  }
   return nullptr;
 }
 
@@ -610,12 +610,11 @@ SILModule::lookUpDifferentiabilityWitnessesForFunction(StringRef name) {
   return DifferentiabilityWitnessesByFunction[name];
 }
 
-bool SILModule::loadDifferentiabilityWitness(SILDifferentiabilityWitness *W) {
-  auto *NewW = getSILLoader()->lookupDifferentiabilityWitness(W->getKey());
-  if (!NewW)
+bool SILModule::loadDifferentiabilityWitness(SILDifferentiabilityWitness *dw) {
+  auto *newDW = getSILLoader()->lookupDifferentiabilityWitness(dw->getKey());
+  if (!newDW)
     return false;
-
-  assert(W == NewW);
+  assert(dw == newDW);
   return true;
 }
 

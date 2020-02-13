@@ -468,17 +468,14 @@ func test_isa_class_1(x: B) {
   case is D1 where runced():
   // CHECK:   function_ref @$s6switch1ayyF
   // CHECK:   destroy_value [[CAST_D1_COPY]]
-  // CHECK:   end_borrow [[CAST_D1]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
   // CHECK: [[NO_CASE1]]:
   // CHECK-NEXT:   destroy_value [[CAST_D1_COPY]]
-  // CHECK-NEXT:   end_borrow [[CAST_D1]]
   // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_D1]]([[CASTFAIL_D1:%.*]] : @guaranteed $B):
-  // CHECK-NEXT:   end_borrow [[CASTFAIL_D1]]
   // CHECK-NEXT:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]:
@@ -492,7 +489,6 @@ func test_isa_class_1(x: B) {
     b()
 
   // CHECK: [[IS_NOT_D2]]([[CASTFAIL_D2:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[CASTFAIL_D2]]
   // CHECK:   checked_cast_br [[X]] : $B to E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   case is E where funged():
   // CHECK: [[IS_E]]([[CAST_E:%.*]] : @guaranteed $E):
@@ -508,11 +504,9 @@ func test_isa_class_1(x: B) {
 
   // CHECK: [[NO_CASE3]]:
   // CHECK-NEXT:   destroy_value [[CAST_E_COPY]]
-  // CHECK-NEXT:   end_borrow
   // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_E]]([[NOTCAST_E:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[NOTCAST_E]]
   // CHECK:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]:
@@ -524,12 +518,10 @@ func test_isa_class_1(x: B) {
   // CHECK:   function_ref @$s6switch1dyyF
   // CHECK-NEXT: apply
   // CHECK:   destroy_value [[CAST_C_COPY]]
-  // CHECK:   end_borrow [[CAST_C]]
   // CHECK:   br [[CONT]]
     d()
 
   // CHECK: [[IS_NOT_C]]([[NOCAST_C:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[NOCAST_C]]
   default:
   // CHECK:    function_ref @$s6switch1eyyF
   // CHECK:    br [[CONT]]
@@ -570,7 +562,6 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   br [[NEXT_CASE:bb5]]
 
   // CHECK: [[IS_NOT_D1]]([[NOCAST_D1:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[NOCAST_D1]]
   // CHECK:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]:
@@ -589,7 +580,6 @@ func test_isa_class_2(x: B) -> AnyObject {
     return y
 
   // CHECK: [[IS_NOT_D2]]([[NOCAST_D2:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[NOCAST_D2]]
   // CHECK:   checked_cast_br [[X]] : $B to E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   case let y as E where funged():
   // CHECK: [[IS_E]]([[CAST_E:%.*]] : @guaranteed $E):
@@ -604,7 +594,6 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_E_COPY_COPY]]
   // CHECK:   end_borrow [[BORROWED_CAST_E_COPY]]
   // CHECK:   destroy_value [[CAST_E_COPY]]
-  // CHECK:   end_borrow [[CAST_E]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
     c()
     return y
@@ -614,7 +603,6 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_E]]([[NOCAST_E:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[NOCAST_E]]
   // CHECK:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]
@@ -633,7 +621,6 @@ func test_isa_class_2(x: B) -> AnyObject {
     return y
 
   // CHECK: [[IS_NOT_C]]([[NOCAST_C:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[NOCAST_C]]
   default:
   // CHECK:   function_ref @$s6switch1eyyF
   // CHECK:   [[X_COPY_2:%.*]] = copy_value [[X]]
@@ -1166,7 +1153,6 @@ func address_only_with_trivial_subtype(_ a: TrivialSingleCaseEnum, _ value: Any)
 // CHECK: switch_enum [[TUP_0_VAL]]
 //
 // CHECK: bb1([[CASE_VAL:%.*]] :
-// CHECK-NEXT:   end_borrow [[CASE_VAL]]
 // CHECK-NEXT:   destroy_addr [[TUP_1]]
 // CHECK-NEXT:   end_borrow [[TUP_0_VAL]]
 // CHECK-NEXT:   destroy_addr [[TUP_0]]

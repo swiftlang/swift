@@ -1921,7 +1921,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
 
       SILValue eltValue;
       if (isPlusZero) {
-        origCMV = {SGF.B.createGuaranteedPhiArgument(eltTy),
+        origCMV = {SGF.B.createGuaranteedTransformingTerminatorArgument(eltTy),
                    CastConsumptionKind::BorrowAlways};
       } else {
         origCMV = {SGF.B.createOwnedPhiArgument(eltTy),
@@ -1971,7 +1971,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
   if (SILBasicBlock *defaultBB = blocks.getDefaultBlock()) {
     SGF.B.setInsertionPoint(defaultBB);
     if (isPlusZero) {
-      SGF.B.createGuaranteedPhiArgument(src.getType());
+      SGF.B.createGuaranteedTransformingTerminatorArgument(src.getType());
     } else {
       SGF.B.createOwnedPhiArgument(src.getType());
     }

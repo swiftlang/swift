@@ -17,6 +17,7 @@
 #include "swift/IDE/CodeCompletion.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/StringMap.h"
 
 namespace SourceKit {
 namespace CodeCompletion {

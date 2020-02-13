@@ -609,7 +609,7 @@ class ShadowingGenericParameter<T> {
   func foo (t : T) {}
 }
 
-_ = ShadowingGenericParameter<String>().foo(t: "hi")
+ShadowingGenericParameter<String>().foo(t: "hi")
 
 // rdar://problem/51266778
 struct PatternBindingWithTwoVars1 { var x = 3, y = x }

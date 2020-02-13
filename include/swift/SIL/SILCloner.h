@@ -1238,9 +1238,8 @@ void SILCloner<ImplClass>::visitEndBorrowInst(EndBorrowInst *Inst) {
     return;
 
   recordClonedInstruction(
-      Inst,
-      getBuilder().createEndBorrow(getOpLocation(Inst->getLoc()),
-                                   getOpValue(Inst->getOperand()), SILValue()));
+      Inst, getBuilder().createEndBorrow(getOpLocation(Inst->getLoc()),
+                                         getOpValue(Inst->getOperand())));
 }
 
 template <typename ImplClass>

@@ -47,32 +47,6 @@ using namespace swift;
 using namespace fine_grained_dependencies;
 
 //==============================================================================
-// MARK: Emitting and reading SourceFileDepGraph
-//==============================================================================
-
-Optional<SourceFileDepGraph> SourceFileDepGraph::loadFromPath(StringRef path) {
-  auto bufferOrError = llvm::MemoryBuffer::getFile(path);
-  if (!bufferOrError)
-    return None;
-  return loadFromBuffer(*bufferOrError.get());
-}
-
-Optional<SourceFileDepGraph>
-SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer) {
-  SourceFileDepGraph fg;
-  llvm::yaml::Input yamlReader(llvm::MemoryBufferRef(buffer), nullptr);
-  yamlReader >> fg;
-  if (yamlReader.error())
-    return None;
-  // return fg; compiles for Mac but not Linux, because it cannot be copied.
-  return Optional<SourceFileDepGraph>(std::move(fg));
-}
-
-//==============================================================================
-// MARK: Start of SourceFileDepGraph building, specific to status quo
-//==============================================================================
-
-//==============================================================================
 // MARK: Helpers for key construction that must be in frontend
 //==============================================================================
 
@@ -501,7 +475,7 @@ class SourceFileDepGraphConstructor {
   /// a flag indicating if the member is private to its enclosing file, and
   /// a flag indicating if the dependency cascades.
   const std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>>
-      memberDepends;
+      dependsWithContexts;
 
   /// The base name of a class member depended-upon for dynamic lookup, and a
   /// cascades flag.
@@ -534,7 +508,8 @@ public:
     bool hadCompilationError,
     const std::string &interfaceHash,
     ArrayRef<std::pair<std::string, bool>> topLevelDepends,
-    ArrayRef<std::pair<std::tuple<std::string, std::string, bool>, bool>> memberDepends,
+    ArrayRef<std::pair<std::tuple<std::string, std::string, bool>, bool>>
+      dependsWithContexts,
     ArrayRef<std::pair<std::string, bool>> dynamicLookupDepends,
     ArrayRef<std::string> externalDependencies,
 
@@ -554,7 +529,7 @@ public:
 
     interfaceHash(interfaceHash),
     topLevelDepends(topLevelDepends),
-    memberDepends(memberDepends),
+    dependsWithContexts(dependsWithContexts),
     dynamicLookupDepends(dynamicLookupDepends),
     externalDependencies(externalDependencies),
 
@@ -569,11 +544,15 @@ public:
     classMembers(classMembers)
     {}
 
-  SourceFileDepGraphConstructor static forSourceFile(SourceFile *SF,
-                                const DependencyTracker &depTracker,
-                                StringRef swiftDeps,
-                                const bool includePrivateDeps,
-                                const bool hadCompilationError) {
+// clang-format off
+static SourceFileDepGraphConstructor
+forSourceFile(
+  SourceFile *SF,
+  const DependencyTracker &depTracker,
+  StringRef swiftDeps,
+  const bool includePrivateDeps,
+  const bool hadCompilationError) {
+// clang-format on
 
   SourceFileDeclFinder declFinder(SF, includePrivateDeps);
     std::vector<std::pair<std::string, bool>> topLevelDepends;
@@ -584,11 +563,11 @@ public:
     for (const auto &p: SF->getReferencedNameTracker()->getDynamicLookupNames())
       dynamicLookupDepends.push_back(std::make_pair(p.getFirst().userFacingName(), p.getSecond()));
 
-    std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>> memberDepends;
+    std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>> dependsWithContexts;
     for (const auto &p: SF->getReferencedNameTracker()->getUsedMembers()) {
       const auto &member = p.getFirst().second;
       StringRef emptyOrUserFacingName = member.empty() ? "" : member.userFacingName();
-      memberDepends.push_back(
+      dependsWithContexts.push_back(
         std::make_pair(
           std::make_tuple(
             mangleTypeAsContext(p.getFirst().first),
@@ -604,7 +583,7 @@ public:
 
       getInterfaceHash(SF),
       topLevelDepends,
-      memberDepends,
+      dependsWithContexts,
       dynamicLookupDepends,
       depTracker.getDependencies(),
 
@@ -782,7 +761,7 @@ void SourceFileDepGraphConstructor::addDependencyArcsToGraph() {
   // TODO: express the multiple provides and depends streams with variadic
   // templates
   addAllDependenciesFrom<NodeKind::topLevel>(topLevelDepends);
-  addAllDependenciesFrom(memberDepends);
+  addAllDependenciesFrom(dependsWithContexts);
   addAllDependenciesFrom<NodeKind::dynamicLookup>(dynamicLookupDepends);
   addAllDependenciesFrom(externalDependencies);
 }
@@ -798,7 +777,7 @@ void SourceFileDepGraphConstructor::recordThatThisWholeFileDependsOn(
 // Entry point from the Frontend to this whole system
 //==============================================================================
 
-bool swift::fine_grained_dependencies::emitReferenceDependencies(
+bool fine_grained_dependencies::emitReferenceDependencies(
     DiagnosticEngine &diags, SourceFile *const SF,
     const DependencyTracker &depTracker, StringRef outputPath,
     const bool alsoEmitDotFile) {
@@ -814,8 +793,9 @@ bool swift::fine_grained_dependencies::emitReferenceDependencies(
   // we force the inclusion of private declarations when fingerprints
   // are enabled.
   const bool includeIntrafileDeps =
-    SF->getASTContext().LangOpts.FineGrainedDependenciesIncludeIntrafileOnes ||
-    SF->getASTContext().LangOpts.EnableTypeFingerprints;
+      SF->getASTContext()
+          .LangOpts.FineGrainedDependenciesIncludeIntrafileOnes ||
+      SF->getASTContext().LangOpts.EnableTypeFingerprints;
   const bool hadCompilationError = SF->getASTContext().hadError();
   auto gc = SourceFileDepGraphConstructor::forSourceFile(
       SF, depTracker, outputPath, includeIntrafileDeps, hadCompilationError);
@@ -832,13 +812,9 @@ bool swift::fine_grained_dependencies::emitReferenceDependencies(
   // If path is stdout, cannot read it back, so check for "-"
   assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
 
-  if (alsoEmitDotFile) {
-    std::string dotFileName = outputPath.str() + ".dot";
-    withOutputFile(diags, dotFileName, [&](llvm::raw_pwrite_stream &out) {
-      DotFileEmitter<SourceFileDepGraph>(out, g, false, false).emit();
-      return false;
-    });
-  }
+  if (alsoEmitDotFile)
+    g.emitDotFile(outputPath, diags);
+
   return hadError;
 }
 
@@ -952,7 +928,10 @@ SourceFileDepGraph SourceFileDepGraph::simulateLoad(
 
   // clang-format off
   SourceFileDepGraphConstructor c(
-    swiftDepsFilename, includePrivateDeps, hadCompilationError, interfaceHash,
+    swiftDepsFilename,
+    includePrivateDeps,
+    hadCompilationError,
+    interfaceHash,
     getSimpleDepends(simpleNamesByRDK[dependsTopLevel]),
     getCompoundDepends(simpleNamesByRDK[dependsNominal],
                        compoundNamesByRDK[dependsMember]),
@@ -961,7 +940,7 @@ SourceFileDepGraph SourceFileDepGraph::simulateLoad(
     {}, // precedence groups
     {}, // memberOperatorDecls
     {}, // operators
-    getMangledHolderProvides(simpleNamesByRDK[providesNominal]), // topNominals
+    {}, // topNominals
     getBaseNameProvides(simpleNamesByRDK[providesTopLevel]), // topValues
     getMangledHolderProvides(simpleNamesByRDK[providesNominal]), // allNominals
     getMangledHolderProvides(simpleNamesByRDK[providesNominal]), // potentialMemberHolders

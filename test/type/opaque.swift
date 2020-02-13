@@ -270,10 +270,10 @@ func associatedTypeIdentity() {
 
   sameType(cr, c.r_out())
   sameType(dr, d.r_out())
-  sameType(cr, dr) // expected-error{{}} expected-note {{}}
+  sameType(cr, dr) // expected-error {{cannot convert value of type '(some opaque.R).S' (associated type of protocol 'R') to expected argument type '(some opaque.R).S' (associated type of protocol 'R')}}
   sameType(gary(candace()).r_out(), gary(candace()).r_out())
   sameType(gary(doug()).r_out(), gary(doug()).r_out())
-  sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error{{}} expected-note {{}}
+  sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error {{cannot convert value of type 'some R' (result of 'candace()') to expected argument type 'some R' (result of 'doug()')}}
 }
 
 func redeclaration() -> some P { return 0 } // expected-note 2{{previously declared}}

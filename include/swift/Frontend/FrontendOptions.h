@@ -177,11 +177,6 @@ public:
   /// entity.
   bool ProfileEntities = false;
 
-  /// If true, serialization encodes an extra lookup table for use in module-
-  /// merging when emitting partial modules (the per-file modules in a non-WMO
-  /// build).
-  bool EnableSerializationNestedTypeLookupTable = true;
-
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
   bool EnableSourceImport = false;

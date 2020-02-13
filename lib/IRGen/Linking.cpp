@@ -414,12 +414,10 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::ReflectionAssociatedTypeDescriptor:
     return mangler.mangleReflectionAssociatedTypeDescriptor(
                                                     getProtocolConformance());
-  // SWIFT_ENABLE_TENSORFLOW
   case Kind::DifferentiabilityWitness:
     return mangler.mangleSILDifferentiabilityWitnessKey(
         {getSILDifferentiabilityWitness()->getOriginalFunction()->getName(),
          getSILDifferentiabilityWitness()->getConfig()});
-    // SWIFT_ENABLE_TENSORFLOW_END
   }
   llvm_unreachable("bad entity kind!");
 }
@@ -665,10 +663,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ExtensionDescriptor:
   case Kind::AnonymousDescriptor:
     return SILLinkage::Shared;
-  // SWIFT_ENABLE_TENSORFLOW
   case Kind::DifferentiabilityWitness:
     return getSILDifferentiabilityWitness()->getLinkage();
-  // SWIFT_ENABLE_TENSORFLOW_END
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -793,6 +789,9 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
                                      ->getDeclContext()
                                      ->getInnermostTypeContext());
   }
+
+  case Kind::DifferentiabilityWitness:
+    return true;
   
   case Kind::ObjCMetadataUpdateFunction:
   case Kind::ObjCResilientClassStub:
@@ -813,10 +812,6 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::DynamicallyReplaceableFunctionImpl:
   case Kind::DynamicallyReplaceableFunctionKeyAST:
     llvm_unreachable("Relative reference to unsupported link entity");
-  // SWIFT_ENABLE_TENSORFLOW
-  case Kind::DifferentiabilityWitness:
-    return true;
-  // SWIFT_ENABLE_TENSORFLOW_END
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -918,10 +913,8 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
       return IGM.ObjCResilientClassStubTy;
     }
     llvm_unreachable("invalid metadata address");
-  // SWIFT_ENABLE_TENSORFLOW
   case Kind::DifferentiabilityWitness:
     return IGM.DifferentiabilityWitnessTy;
-  // SWIFT_ENABLE_TENSORFLOW_END
   default:
     llvm_unreachable("declaration LLVM type not specified");
   }
@@ -969,15 +962,12 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::ObjCResilientClassStub:
+  case Kind::DifferentiabilityWitness:
     return IGM.getPointerAlignment();
   case Kind::TypeMetadataDemanglingCacheVariable:
     return Alignment(8);
   case Kind::SILFunction:
     return Alignment(1);
-  // SWIFT_ENABLE_TENSORFLOW
-  case Kind::DifferentiabilityWitness:
-    return IGM.getPointerAlignment();
-  // SWIFT_ENABLE_TENSORFLOW_END
   default:
     llvm_unreachable("alignment not specified");
   }
@@ -1074,12 +1064,8 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:
   case Kind::CoroutineContinuationPrototype:
-    return false;
-
-  // SWIFT_ENABLE_TENSORFLOW
   case Kind::DifferentiabilityWitness:
     return false;
-  // SWIFT_ENABLE_TENSORFLOW_END
   }
 
   llvm_unreachable("Bad link entity kind");
@@ -1208,12 +1194,8 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ValueWitness:
   case Kind::ValueWitnessTable:
-    return nullptr;
-
-  // SWIFT_ENABLE_TENSORFLOW
   case Kind::DifferentiabilityWitness:
     return nullptr;
-  // SWIFT_ENABLE_TENSORFLOW_END
   }
   
   return sf;

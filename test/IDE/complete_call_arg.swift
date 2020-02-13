@@ -555,9 +555,9 @@ func testTupleShuffle() {
 // SHUFFLE_2-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s2[#String#]; name=s2
 
 // SHUFFLE_3: Begin completions, 3 items
-// SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific:     foo[#SimpleEnum#]; name=foo
-// SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific:     bar[#SimpleEnum#]; name=bar
-// SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific:     baz[#SimpleEnum#]; name=baz
+// SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
+// SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
+// SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
 
 class HasSubscript {
   subscript(idx: Int) -> String {}
