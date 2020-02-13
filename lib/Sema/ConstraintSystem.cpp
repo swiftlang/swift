@@ -2729,6 +2729,154 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
               llvm::join(parameters, ", "));
 }
 
+std::string swift::describeGenericType(ValueDecl *GP, bool includeName) {
+  if (!GP)
+    return "";
+
+  Decl *parent = nullptr;
+  if (auto *AT = dyn_cast<AssociatedTypeDecl>(GP)) {
+    parent = AT->getProtocol();
+  } else {
+    auto *dc = GP->getDeclContext();
+    parent = dc->getInnermostDeclarationDeclContext();
+  }
+
+  if (!parent)
+    return "";
+
+  llvm::SmallString<64> result;
+  llvm::raw_svector_ostream OS(result);
+
+  OS << Decl::getDescriptiveKindName(GP->getDescriptiveKind());
+
+  if (includeName && GP->hasName())
+    OS << " '" << GP->getBaseName() << "'";
+
+  OS << " of ";
+  OS << Decl::getDescriptiveKindName(parent->getDescriptiveKind());
+  if (auto *decl = dyn_cast<ValueDecl>(parent)) {
+    if (decl->hasName())
+      OS << " '" << decl->getFullName() << "'";
+  }
+
+  return OS.str();
+}
+
+/// Special handling of conflicts associated with generic arguments.
+///
+/// func foo<T>(_: T, _: T) {}
+/// func bar(x: Int, y: Float) {
+///   foo(x, y)
+/// }
+///
+/// It's done by first retrieving all generic parameters from each solution,
+/// filtering boundings into distrinct set and diagnosing any differences.
+static bool diagnoseConflictingArguments(ConstraintSystem &cs,
+                                         const SolutionDiff &diff,
+                                         ArrayRef<Solution> solutions) {
+  if (!diff.overloads.empty())
+    return false;
+
+  if (!llvm::all_of(solutions, [](const Solution &solution) -> bool {
+        return llvm::all_of(
+            solution.Fixes, [](const ConstraintFix *fix) -> bool {
+              return fix->getKind() == FixKind::AllowArgumentTypeMismatch ||
+                     fix->getKind() == FixKind::AllowFunctionTypeMismatch ||
+                     fix->getKind() == FixKind::AllowTupleTypeMismatch;
+            });
+      }))
+    return false;
+
+  auto &DE = cs.getASTContext().Diags;
+
+  llvm::SmallDenseMap<TypeVariableType *, SmallVector<Type, 4>> conflicts;
+
+  for (const auto &binding : solutions[0].typeBindings) {
+    auto *typeVar = binding.first;
+
+    if (!typeVar->getImpl().getGenericParameter())
+      continue;
+
+    llvm::SmallSetVector<Type, 4> arguments;
+    arguments.insert(binding.second);
+
+    if (!llvm::all_of(solutions.slice(1), [&](const Solution &solution) {
+          auto binding = solution.typeBindings.find(typeVar);
+          if (binding == solution.typeBindings.end())
+            return false;
+
+          if (auto *opaque =
+                  binding->second->getAs<OpaqueTypeArchetypeType>()) {
+            auto *decl = opaque->getDecl();
+            arguments.remove_if([&](Type argType) -> bool {
+              if (auto *otherOpaque =
+                      argType->getAs<OpaqueTypeArchetypeType>()) {
+                return decl == otherOpaque->getDecl();
+              }
+              return false;
+            });
+          }
+
+          arguments.insert(binding->second);
+          return true;
+        }))
+      continue;
+
+    if (arguments.size() > 1) {
+      conflicts[typeVar].append(arguments.begin(), arguments.end());
+    }
+  }
+
+  auto getGenericTypeDecl = [&](ArchetypeType *archetype) -> ValueDecl * {
+    auto type = archetype->getInterfaceType();
+
+    if (auto *GTPT = type->getAs<GenericTypeParamType>())
+      return GTPT->getDecl();
+
+    if (auto *DMT = type->getAs<DependentMemberType>())
+      return DMT->getAssocType();
+
+    return nullptr;
+  };
+
+  bool diagnosed = false;
+  for (auto &conflict : conflicts) {
+    auto *typeVar = conflict.first;
+    auto *locator = typeVar->getImpl().getLocator();
+    auto conflictingArguments = conflict.second;
+
+    llvm::SmallString<64> arguments;
+    llvm::raw_svector_ostream OS(arguments);
+
+    interleave(
+        conflictingArguments,
+        [&](Type argType) {
+          OS << "'" << argType << "'";
+
+          if (auto *opaque = argType->getAs<OpaqueTypeArchetypeType>()) {
+            auto *decl = opaque->getDecl()->getNamingDecl();
+            OS << " (result type of '" << decl->getBaseName().userFacingName()
+               << "')";
+            return;
+          }
+
+          if (auto archetype = argType->getAs<ArchetypeType>()) {
+            if (auto *GTD = getGenericTypeDecl(archetype))
+              OS << " (" << describeGenericType(GTD) << ")";
+          }
+        },
+        [&OS] { OS << " vs. "; });
+
+    auto *anchor = locator->getAnchor();
+    DE.diagnose(anchor->getLoc(),
+                diag::conflicting_arguments_for_generic_parameter,
+                typeVar->getImpl().getGenericParameter(), OS.str());
+    diagnosed = true;
+  }
+
+  return diagnosed;
+}
+
 bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     SmallVectorImpl<Solution> &solutions) {
   if (solutions.empty())
@@ -2749,6 +2897,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       return false;
   }
 
+  SolutionDiff solutionDiff(solutions);
+
+  if (diagnoseConflictingArguments(*this, solutionDiff, solutions))
+    return true;
+
   // Collect aggregated fixes from all solutions
   llvm::SmallMapVector<std::pair<ConstraintLocator *, FixKind>,
       llvm::SmallVector<ConstraintFix *, 4>, 4> aggregatedFixes;
@@ -2763,7 +2916,6 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
   // If there is an overload difference, let's see if there's a common callee
   // locator for all of the fixes.
-  SolutionDiff solutionDiff(solutions);
   auto ambiguousOverload = llvm::find_if(solutionDiff.overloads,
       [&](const auto &overloadDiff) {
         return llvm::all_of(aggregatedFixes, [&](const auto &aggregatedFix) {

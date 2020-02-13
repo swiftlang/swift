@@ -1106,6 +1106,12 @@ UseValueTypeOfRawRepresentative::attempt(ConstraintSystem &cs, Type argType,
   return nullptr;
 }
 
+unsigned AllowArgumentMismatch::getParamIdx() const {
+  const auto *locator = getLocator();
+  auto elt = locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
+  return elt.getParamIdx();
+}
+
 bool AllowArgumentMismatch::diagnose(bool asNote) const {
   auto &cs = getConstraintSystem();
   ArgumentMismatchFailure failure(cs, getFromType(), getToType(),

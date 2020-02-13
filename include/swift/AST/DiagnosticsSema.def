@@ -385,6 +385,10 @@ ERROR(cannot_convert_argument_value_generic,none,
       "cannot convert value of type %0 (%1) to expected argument type %2 (%3)",
       (Type, StringRef, Type, StringRef))
 
+ERROR(conflicting_arguments_for_generic_parameter,none,
+      "conflicting arguments to generic parameter %0 (%1)",
+      (Type, StringRef))
+
 // @_nonEphemeral conversion diagnostics
 ERROR(cannot_pass_type_to_non_ephemeral,none,
       "cannot pass %0 to parameter; argument %1 must be a pointer that "

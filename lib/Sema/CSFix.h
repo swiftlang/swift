@@ -1499,11 +1499,17 @@ public:
     return "allow argument to parameter type conversion mismatch";
   }
 
+  unsigned getParamIdx() const;
+
   bool diagnose(bool asNote = false) const override;
 
   static AllowArgumentMismatch *create(ConstraintSystem &cs, Type argType,
                                        Type paramType,
                                        ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowArgumentTypeMismatch;
+  }
 };
 
 class ExpandArrayIntoVarargs final : public AllowArgumentMismatch {
