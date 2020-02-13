@@ -26,7 +26,7 @@ CHANGELOG
 Swift Next
 ----------
 
-* [SE-266][]:
+* [SE-0266][]:
   
   Enumerations with no associated values, or only `Comparable` associated values, can opt-in to synthesized `Comparable` conformance by declaring conformance to the `Comparable` protocol. The synthesized implementation orders the cases first by case-declaration order, and then by lexicographic order of the associated values (if any).
   
