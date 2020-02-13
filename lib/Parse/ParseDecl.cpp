@@ -5488,35 +5488,18 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
       AccessorCtx.reset();
 
       if (Tok.is(tok::code_complete)) {
-        if (CodeCompletion) {
-          CodeCompletionExpr *CCE = nullptr;
-          if (IsFirstAccessor && !parsingLimitedSyntax) {
-            // If CC token is the first token after '{', it might be implicit
-            // getter. Set up dummy accessor as the decl context to populate
-            // 'self' decl.
-
-            // FIXME: if there is already code inside the body, we should fall
-            // through to parseImplicitGetter and handle the completion there so
-            // that we can differentiate a single-expression body from the first
-            // expression in a multi-statement body.
-            auto getter = createAccessorFunc(
-                accessors.LBLoc, /*ValueNamePattern*/ nullptr, GenericParams,
-                Indices, StaticLoc, Flags, AccessorKind::Get,
-                storage, this, /*AccessorKeywordLoc*/ SourceLoc());
-            CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-            getter->setBodyParsed(BraceStmt::create(Context, Tok.getLoc(),
-                                                    ASTNode(CCE), Tok.getLoc(),
-                                                    /*implicit*/ true));
-            accessors.add(getter);
-            CodeCompletion->setParsedDecl(getter);
-          } else {
+        // Handle code completion here only if it's not the first accessor.
+        // If it's the first accessor, it's handled in function body parsing
+        // because it might be an implicit getter.
+        if (!IsFirstAccessor || parsingLimitedSyntax) {
+          if (CodeCompletion) {
             CodeCompletion->setParsedDecl(storage);
+            CodeCompletion->completeAccessorBeginning(nullptr);
           }
-          CodeCompletion->completeAccessorBeginning(CCE);
+          consumeToken(tok::code_complete);
+          accessorHasCodeCompletion = true;
+          break;
         }
-        consumeToken(tok::code_complete);
-        accessorHasCodeCompletion = true;
-        break;
       }
 
       // parsingLimitedSyntax mode cannot have a body.
@@ -6359,7 +6342,47 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   return DCC.fixupParserResult(FD);
 }
 
-/// Parse function body into \p AFD.
+/// Parse a function body for \p AFD and returns it without setting the body
+/// to \p AFD .
+ParserResult<BraceStmt>
+Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
+  assert(Tok.is(tok::l_brace));
+
+  // Enter the arguments for the function into a new function-body scope.  We
+  // need this even if there is no function body to detect argument name
+  // duplication.
+  if (auto *P = AFD->getImplicitSelfDecl())
+    addToScope(P);
+  addParametersToScope(AFD->getParameters());
+
+   // Establish the new context.
+  ParseFunctionBody CC(*this, AFD);
+  setLocalDiscriminatorToParamList(AFD->getParameters());
+
+  if (Context.Stats)
+    Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
+  // In implicit getter, if a CC token is the first token after '{', it might
+  // be a start of an accessor block. Perform special completion for that.
+  if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
+    if (peekToken().is(tok::code_complete) && accessor->isImplicitGetter()) {
+      SourceLoc LBraceLoc, RBraceLoc;
+      LBraceLoc = consumeToken(tok::l_brace);
+      auto *CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+      CodeCompletion->setParsedDecl(accessor);
+      CodeCompletion->completeAccessorBeginning(CCE);
+      RBraceLoc = Tok.getLoc();
+      consumeToken(tok::code_complete);
+      return makeParserCodeCompletionResult(
+          BraceStmt::create(Context, LBraceLoc, ASTNode(CCE), RBraceLoc,
+          /*implicit*/ true));
+    }
+  }
+
+  return parseBraceItemList(diag::invalid_diagnostic);
+}
+
+/// Parse function body into \p AFD or skip it for delayed parsing.
 void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (!Tok.is(tok::l_brace)) {
     checkForInputIncomplete();
@@ -6379,21 +6402,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
 
   Scope S(this, ScopeKind::FunctionBody);
 
-  // Enter the arguments for the function into a new function-body scope.  We
-  // need this even if there is no function body to detect argument name
-  // duplication.
-  if (auto *P = AFD->getImplicitSelfDecl())
-    addToScope(P);
-  addParametersToScope(AFD->getParameters());
-
-   // Establish the new context.
-  ParseFunctionBody CC(*this, AFD);
-  setLocalDiscriminatorToParamList(AFD->getParameters());
-
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumFunctionsParsed++;
-
-  ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+  ParserResult<BraceStmt> Body = parseAbstractFunctionBodyImpl(AFD);
   if (!Body.isNull()) {
     BraceStmt * BS = Body.get();
     AFD->setBodyParsed(BS);
@@ -6476,13 +6485,8 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope TopLevelScope(this, ScopeKind::TopLevel);
   Scope S(this, ScopeKind::FunctionBody);
-  if (auto *P = AFD->getImplicitSelfDecl())
-    addToScope(P);
-  addParametersToScope(AFD->getParameters());
-  ParseFunctionBody CC(*this, AFD);
-  setLocalDiscriminatorToParamList(AFD->getParameters());
 
-  return parseBraceItemList(diag::func_decl_without_brace).getPtrOrNull();
+  return parseAbstractFunctionBodyImpl(AFD).getPtrOrNull();
 }
 
 /// Parse a 'enum' declaration, returning true (and doing no token

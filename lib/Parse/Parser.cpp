@@ -197,16 +197,7 @@ void Parser::performCodeCompletionSecondPassImpl(
 
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-
-    if (auto *P = AFD->getImplicitSelfDecl())
-      addToScope(P);
-    addParametersToScope(AFD->getParameters());
-
-    ParseFunctionBody CC(*this, AFD);
-    setLocalDiscriminatorToParamList(AFD->getParameters());
-
-    auto result = parseBraceItemList(diag::func_decl_without_brace);
-    AFD->setBody(result.getPtrOrNull());
+    AFD->setBodyParsed(parseAbstractFunctionBodyImpl(AFD).getPtrOrNull());
     break;
   }
   }
