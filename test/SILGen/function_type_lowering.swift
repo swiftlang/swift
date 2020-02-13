@@ -16,6 +16,9 @@ func c<T, U, V>(_ x: (V) -> T, _: U) {}
 // CHECK-LABEL: sil {{.*}}003Hca{{.*}} : $@convention(thin) <T> (@noescape @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, T>) -> ()
 func ç<T>(_ x: (T) -> T) {}
 
+// CHECK-LABEL: sil {{.*}}returnsThrowing{{.*}} : $@convention(thin) <T, U, V> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2> in (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> (@out τ_0_1, @error Error) for <τ_0_1, τ_0_2> for <T, U, V>) -> ()
+func returnsThrowing<T, U, V>(_ x: (T) -> (U) throws -> V) {}
+
 
 // ...including unconstrained associated types
 
@@ -170,4 +173,11 @@ dynamic func opaqueObject() -> some AnyObject { return C<Int, String>() }
 // CHECK-LABEL: sil {{.*}}1y{{.*}} : $@convention(thin) (@noescape @callee_guaranteed (@in_guaranteed @_opaqueReturnTypeOf("$s4main9opaqueAnyQryF", 0) {{.*}}) -> @owned @_opaqueReturnTypeOf("$s4main12opaqueObjectQryF", 0) {{.*}}) -> ()
 func y(_: (@_opaqueReturnTypeOf("$s4main9opaqueAnyQryF", 0) X) -> (@_opaqueReturnTypeOf("$s4main12opaqueObjectQryF", 0) X)) {}
 
+// Make sure type lowering doesn't choke on override signatures.
+class Foo {
+  func foo() -> Foo { return self }
+}
 
+class Bar<T>: Foo {
+  override func foo() -> Bar<T> { return self }
+}

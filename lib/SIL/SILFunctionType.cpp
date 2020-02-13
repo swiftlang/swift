@@ -859,15 +859,6 @@ public:
     
     auto origContextType = origType.getType();
     
-    if (!origContextType->hasTypeParameter()
-        && !origContextType->hasArchetype()) {
-      // If the abstraction pattern doesn't have substitutable positions, nor
-      // should the concrete type.
-      assert(!substType->hasTypeParameter()
-             && !substType->hasArchetype());
-      return substType;
-    }
-    
     // TODO: If the substituted type is a subclass of the abstraction pattern
     // type, then bail out. This should only come up when lowering override
     // types for vtable entries, where we don't currently use substituted
@@ -899,6 +890,15 @@ public:
           return substType;
         }
       }
+    }
+    
+    if (!origContextType->hasTypeParameter()
+        && !origContextType->hasArchetype()) {
+      // If the abstraction pattern doesn't have substitutable positions, nor
+      // should the concrete type.
+      assert(!substType->hasTypeParameter()
+             && !substType->hasArchetype());
+      return substType;
     }
     
     // Extract structural substitutions.
