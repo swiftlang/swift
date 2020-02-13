@@ -3256,6 +3256,23 @@ public:
   /// if generation succeeded.
   bool generateConstraints(StmtCondition condition, DeclContext *dc);
 
+  /// Provide a type for each variable that occurs within the given pattern,
+  /// by matching the pattern structurally with its already-computed pattern
+  /// type. The variables will either get a concrete type (when present in
+  /// the pattern type) or a fresh type variable bound to that part of the
+  /// pattern via a one-way constraint.
+  void bindVariablesInPattern(Pattern *pattern, Type patternType,
+                              ConstraintLocator *locator);
+
+  /// Provide a type for each variable that occurs within the given pattern,
+  /// by matching the pattern structurally with its already-computed pattern
+  /// type. The variables will either get a concrete type (when present in
+  /// the pattern type) or a fresh type variable bound to that part of the
+  /// pattern via a one-way constraint.
+  void bindVariablesInPattern(Pattern *pattern, ConstraintLocator *locator) {
+    bindVariablesInPattern(pattern, getType(pattern), locator);
+  }
+
   /// Generate constraints for a given set of overload choices.
   ///
   /// \param constraints The container of generated constraint choices.
