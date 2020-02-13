@@ -13,13 +13,15 @@
 import SwiftPrivate
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
 import WinSDK
 #endif
 
+#if !os(WASI)
+// No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
 internal func _signalToString(_ signal: Int) -> String {
   switch CInt(signal) {
   case SIGILL:  return "SIGILL"
@@ -34,6 +36,7 @@ internal func _signalToString(_ signal: Int) -> String {
   default:      return "SIG???? (\(signal))"
   }
 }
+#endif
 
 public enum ProcessTerminationStatus : CustomStringConvertible {
   case exit(Int)
@@ -44,7 +47,12 @@ public enum ProcessTerminationStatus : CustomStringConvertible {
     case .exit(let status):
       return "Exit(\(status))"
     case .signal(let signal):
+#if os(WASI)
+      // No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
+      fatalError("Signals are not supported on WebAssembly/WASI")
+#else
       return "Signal(\(_signalToString(signal)))"
+#endif
     }
   }
 }
@@ -140,6 +148,15 @@ public func waitProcess(_ process: HANDLE) -> ProcessTerminationStatus {
     return .signal(Int(status))
   }
   return .exit(Int(status))
+}
+#elseif os(WASI)
+// WASI doesn't support child processes
+public func spawnChild(_ args: [String])
+  -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
+  fatalError("\(#function) is not supported on WebAssembly/WASI")
+}
+public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
+  fatalError("\(#function) is not supported on WebAssembly/WASI")
 }
 #else
 // posix_spawn is not available on Android.
