@@ -886,7 +886,7 @@ public:
   /// \returns the coerced expression, which will have type \c ToType.
   Expr *coerceToType(Expr *expr, Type toType,
                      ConstraintLocator *locator,
-                     Optional<Pattern*> typeFromPattern = None) const;
+                     Optional<Pattern*> typeFromPattern = None);
 
   /// Compute the set of substitutions for a generic signature opened at the
   /// given locator.
