@@ -7063,14 +7063,14 @@ namespace {
           llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
           auto newBody = applyFunctionBuilderTransform(
               Rewriter.solution, *transform, closure->getBody(), closure,
-              [&](Expr *expr) {
-                Expr *result = expr->walk(*this);
-                if (result)
-                  Rewriter.solution.setExprTypes(result);
-                return result;
-              },
-              [&](Expr *expr, Type toType, ConstraintLocator *locator) {
-                return Rewriter.coerceToType(expr, toType, locator);
+              [&](SolutionApplicationTarget target) {
+                auto resultTarget = rewriteTarget(target);
+                if (resultTarget) {
+                  if (auto expr = resultTarget->getAsExpr())
+                    Rewriter.solution.setExprTypes(expr);
+                }
+
+                return resultTarget;
               });
           closure->setBody(newBody, /*isSingleExpression=*/false);
           closure->setAppliedFunctionBuilder();
@@ -7340,14 +7340,14 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
     auto newBody = applyFunctionBuilderTransform(
         solution, *transform, fn.getBody(), fn.getAsDeclContext(),
-        [&](Expr *expr) {
-          Expr *result = expr->walk(*this);
-          if (result)
-            solution.setExprTypes(result);
-          return result;
-        },
-        [&](Expr *expr, Type toType, ConstraintLocator *locator) {
-          return Rewriter.coerceToType(expr, toType, locator);
+        [&](SolutionApplicationTarget target) {
+          auto resultTarget = rewriteTarget(target);
+          if (resultTarget) {
+            if (auto expr = resultTarget->getAsExpr())
+              Rewriter.solution.setExprTypes(expr);
+          }
+
+          return resultTarget;
         });
 
     if (!newBody)

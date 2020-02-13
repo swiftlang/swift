@@ -5067,10 +5067,8 @@ bool isSIMDOperator(ValueDecl *value);
 /// \param applied The applied builder transform.
 /// \param body The body to transform
 /// \param dc The context in which the transform occurs.
-/// \param rewriteExpr Rewrites expressions that show up in the transform
-/// to their final, type-checked versions.
-/// \param coerceToType Coerce the given expression to the specified type,
-/// which may introduce implicit conversions.
+/// \param rewriteTarget Rewrites a solution application target to its final,
+/// type-checked version.
 ///
 /// \returns the transformed body
 BraceStmt *applyFunctionBuilderTransform(
@@ -5078,9 +5076,10 @@ BraceStmt *applyFunctionBuilderTransform(
     constraints::AppliedBuilderTransform applied,
     BraceStmt *body,
     DeclContext *dc,
-    std::function<Expr *(Expr *)> rewriteExpr,
-    std::function<Expr *(Expr *, Type, constraints::ConstraintLocator *)>
-      coerceToType);
+    std::function<
+        Optional<constraints::SolutionApplicationTarget> (
+          constraints::SolutionApplicationTarget)>
+            rewriteTarget);
 
 } // end namespace swift
 
