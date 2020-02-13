@@ -282,6 +282,9 @@ def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
 
+def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
+  HelpText<"Enable speculative devirtualization pass.">;
+
 def enable_ownership_stripping_after_serialization
   : Flag<["-"], "enable-ownership-stripping-after-serialization">,
   HelpText<"Strip ownership after serialization">;
@@ -333,6 +336,10 @@ def disable_reflection_metadata : Flag<["-"], "disable-reflection-metadata">,
 def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
   HelpText<"Disable emission of names of stored properties and enum cases in"
            "reflection metadata">;
+
+def function_sections: Flag<["-"], "function-sections">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit functions to separate sections.">;
 
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
@@ -661,4 +668,8 @@ def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
 def emit_ldadd_cfile_path
   : Separate<["-"], "emit-ldadd-cfile-path">, MetaVarName<"<path>">,
     HelpText<"Generate .c file defining symbols to add back">;
+
+def previous_module_installname_map_file
+  : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,
+    HelpText<"Path to a Json file indicating module name to installname map for @_originallyDefinedIn">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

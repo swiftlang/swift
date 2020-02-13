@@ -189,8 +189,13 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       if (CodeCompletion)
         CodeCompletion->setLeadingSequenceExprs(SequencedExprs);
     }
-    if (Primary.isNull())
+    if (Primary.isNull()) {
+      if (HasCodeCompletion) {
+        SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
+        break;
+      }
       return Primary;
+    }
 
     SequencedExprs.push_back(Primary.get());
 
@@ -242,16 +247,23 @@ parse_operator:
         HasCodeCompletion = true;
       if (middle.isNull())
         return nullptr;
-      
+
       // Make sure there's a matching ':' after the middle expr.
       if (!Tok.is(tok::colon)) {
+        if (middle.hasCodeCompletion()) {
+          SequencedExprs.push_back(new (Context) IfExpr(questionLoc,
+                                                        middle.get(),
+                                                        PreviousLoc));
+          SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
+          goto done;
+        }
+        
         diagnose(questionLoc, diag::expected_colon_after_if_question);
-
-      Status.setIsParseError();
-      return makeParserResult(Status, new (Context) ErrorExpr(
-          {startLoc, middle.get()->getSourceRange().End}));
+        Status.setIsParseError();
+        return makeParserResult(Status, new (Context) ErrorExpr(
+            {startLoc, middle.get()->getSourceRange().End}));
       }
-      
+
       SourceLoc colonLoc = consumeToken();
       
       auto *unresolvedIf
@@ -1658,12 +1670,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
   case tok::l_square:
     return parseExprCollection();
-
-  case tok::pound_quote:
-    return parseExprQuoteLiteral();
-
-  case tok::pound_unquote:
-    return parseExprUnquote();
 
   case tok::pound_available: {
     // For better error recovery, parse but reject #available in an expr
@@ -3206,105 +3212,6 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
                               trailingClosure, /*implicit=*/false));
 }
 
-/// Parse a quote literal expression.
-///
-/// quote-expr:
-///   '#quote' '(' expr ')'
-///   '#quote' '{' expr '}'
-ParserResult<Expr> Parser::parseExprQuoteLiteral() {
-  SyntaxParsingContext RADEContext(SyntaxContext, SyntaxKind::QuoteLiteralExpr);
-  auto poundQuoteLoc = consumeToken();
-  SourceLoc openLoc;
-  SourceLoc closeLoc;
-
-  auto errorAndSkipToEnd = [&]() -> ParserResult<Expr> {
-    skipUntilDeclStmtRBrace(tok::r_paren);
-    closeLoc = Tok.is(tok::r_paren) ? consumeToken() : PreviousLoc;
-    return makeParserResult<Expr>(
-        new (Context) ErrorExpr(SourceRange(poundQuoteLoc, closeLoc)));
-  };
-
-  ParserResult<Expr> subExprResult;
-  if (Tok.is(tok::l_paren)) {
-    openLoc = consumeToken();
-    subExprResult = parseExpr(diag::expr_quote_expected_expr);
-    if (subExprResult.hasCodeCompletion()) {
-      return makeParserCodeCompletionResult<Expr>();
-    }
-    if (subExprResult.isParseError()) {
-      return errorAndSkipToEnd();
-    }
-    if (parseToken(tok::r_paren, closeLoc, diag::expr_quote_expected_rparen)) {
-      return makeParserResult<Expr>(
-          new (Context) ErrorExpr(SourceRange(poundQuoteLoc, PreviousLoc)));
-    }
-  } else if (Tok.is(tok::l_brace)) {
-    openLoc = Tok.getLoc();
-    subExprResult = parseExprClosure();
-    if (subExprResult.hasCodeCompletion()) {
-      return makeParserCodeCompletionResult<Expr>();
-    }
-    if (subExprResult.isParseError()) {
-      diagnose(openLoc, diag::expr_quote_expected_closure);
-      return errorAndSkipToEnd();
-    }
-  } else {
-    diagnose(Tok, diag::expr_quote_expected_lparen_or_lbrace);
-    return errorAndSkipToEnd();
-  }
-
-  if (Context.LangOpts.EnableExperimentalQuasiquotes) {
-    return makeParserResult<Expr>(
-        QuoteLiteralExpr::create(Context, poundQuoteLoc, subExprResult.get()));
-  } else {
-    diagnose(openLoc, diag::expr_quote_enable_experimental_quasiquotes);
-    return makeParserResult<Expr>(
-        new (Context) ErrorExpr(SourceRange(poundQuoteLoc, PreviousLoc)));
-  }
-}
-
-/// Parse an unquote expression.
-///
-/// unquote-expr:
-///   '#unquote' '(' expr ')'
-ParserResult<Expr> Parser::parseExprUnquote() {
-  SyntaxParsingContext RADEContext(SyntaxContext, SyntaxKind::UnquoteExpr);
-  auto poundUnquoteLoc = consumeToken();
-  SourceLoc openLoc;
-  SourceLoc closeLoc;
-
-  auto errorAndSkipToEnd = [&]() -> ParserResult<Expr> {
-    skipUntilDeclStmtRBrace(tok::r_paren);
-    closeLoc = Tok.is(tok::r_paren) ? consumeToken() : PreviousLoc;
-    return makeParserResult<Expr>(
-        new (Context) ErrorExpr(SourceRange(poundUnquoteLoc, closeLoc)));
-  };
-
-  if (parseToken(tok::l_paren, openLoc, diag::expr_unquote_expected_lparen)) {
-    return errorAndSkipToEnd();
-  }
-  auto subExprResult = parseExpr(diag::expr_unquote_expected_expr);
-  if (subExprResult.hasCodeCompletion()) {
-    return makeParserCodeCompletionResult<Expr>();
-  }
-  if (subExprResult.isParseError()) {
-    return errorAndSkipToEnd();
-  }
-  if (parseToken(tok::r_paren, closeLoc, diag::expr_unquote_expected_rparen)) {
-    return makeParserResult<Expr>(
-        new (Context) ErrorExpr(SourceRange(poundUnquoteLoc, PreviousLoc)));
-  }
-
-  if (Context.LangOpts.EnableExperimentalQuasiquotes) {
-    return makeParserResult<Expr>(
-        UnquoteExpr::create(Context, poundUnquoteLoc, subExprResult.get()));
-  } else {
-    diagnose(openLoc, diag::expr_unquote_enable_experimental_quasiquotes);
-    return makeParserResult<Expr>(
-        new (Context) ErrorExpr(SourceRange(poundUnquoteLoc, PreviousLoc)));
-  }
-}
-
 /// Parse and diagnose unknown pound expression
 ///
 /// If it look like a legacy (Swift 2) object literal expression, suggest fix-it
@@ -3556,7 +3463,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
       // If The next token is at the beginning of a new line and can never start
       // an element, break.
       if (Tok.isAtStartOfLine() && (Tok.isAny(tok::r_brace, tok::pound_endif) ||
-                                    isStartOfDecl() || isStartOfStmt()))
+                                    isStartOfSwiftDecl() || isStartOfStmt()))
         break;
 
       diagnose(Tok, diag::expected_separator, ",")
@@ -3618,6 +3525,11 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
 
   // Parse the ':'.
   if (!consumeIf(tok::colon)) {
+    if (Element.hasCodeCompletion()) {
+      // Return the completion expression itself so we can analyze the type
+      // later.
+      return Element;
+    }
     diagnose(Tok, diag::expected_colon_in_dictionary_literal);
     return ParserStatus(Element) | makeParserError();
   }
@@ -3625,8 +3537,14 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
   // Parse the value.
   auto Value = parseExpr(diag::expected_value_in_dictionary_literal);
 
-  if (Value.isNull())
-    Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+  if (Value.isNull()) {
+    if (!Element.hasCodeCompletion()) {
+      Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+    } else {
+      Value = makeParserResult(Value,
+                               new (Context) CodeCompletionExpr(PreviousLoc));
+    }
+  }
 
   // Make a tuple of Key Value pair.
   return makeParserResult(

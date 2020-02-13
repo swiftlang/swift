@@ -331,6 +331,18 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   llvm_unreachable("bad DescriptiveDeclKind");
 }
 
+Optional<llvm::VersionTuple>
+Decl::getIntroducedOSVersion(PlatformKind Kind) const {
+  for (auto *attr: getAttrs()) {
+    if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
+      if (ava->Platform == Kind && ava->Introduced) {
+        return ava->Introduced;
+      }
+    }
+  }
+  return None;
+}
+
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
                                      StaticSpellingKind SSK) {
   switch (SSK) {
@@ -796,6 +808,10 @@ AvailabilityContext Decl::getAvailabilityForLinkage() const {
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->getAvailabilityForLinkage();
 
+  if (auto *ext = dyn_cast<ExtensionDecl>(this))
+    if (auto *nominal = ext->getExtendedNominal())
+      return nominal->getAvailabilityForLinkage();
+
   auto *dc = getDeclContext();
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
     return ext->getAvailabilityForLinkage();
@@ -816,6 +832,10 @@ bool Decl::isAlwaysWeakImported() const {
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->isAlwaysWeakImported();
+
+  if (auto *ext = dyn_cast<ExtensionDecl>(this))
+    if (auto *nominal = ext->getExtendedNominal())
+      return nominal->isAlwaysWeakImported();
 
   auto *dc = getDeclContext();
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
@@ -1447,8 +1467,30 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
   auto PBE = PatternBindingEntry(Pat, EqualLoc, E, BindingInitContext);
   auto *Result = create(Ctx, StaticLoc, StaticSpelling, VarLoc, PBE, Parent);
 
-  if (BindingInitContext)
+  if (BindingInitContext) {
     cast<PatternBindingInitializer>(BindingInitContext)->setBinding(Result, 0);
+
+    // If the expression contains any closures, then we must change the
+    // closures' parents to `BindingInitContext`, because the closures are now
+    // children of `BindingInitContext`.
+    if (E) {
+      class Walker : public ASTWalker {
+      public:
+        DeclContext *NewParent;
+        explicit Walker(DeclContext *NewParent) : NewParent(NewParent) {}
+        virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+          if (auto *ACE = dyn_cast<AbstractClosureExpr>(E)) {
+            ACE->setParent(NewParent);
+            // Don't set the parents of nested closures.
+            return { false, E };
+          }
+          return { true, E };
+        }
+      };
+      Walker walker(BindingInitContext);
+      E->walk(walker);
+    }
+  }
 
   return Result;
 }
@@ -3604,7 +3646,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   // Get the parent type.
   Type Ty;
   DeclContext *dc = decl->getDeclContext();
-  if (dc->isTypeContext()) {
+  if (!isa<ProtocolDecl>(decl) && dc->isTypeContext()) {
     switch (kind) {
     case DeclTypeKind::DeclaredType: {
       auto *nominal = dc->getSelfNominalTypeDecl();
@@ -4122,6 +4164,19 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   if (member.isSimpleName() && !baseName.isSpecial()) {
     if (baseName.getIdentifier() == getASTContext().Id_CodingKeys) {
       action.emplace(ImplicitMemberAction::ResolveCodingKeys);
+    }
+  } else {
+    auto argumentNames = member.getArgumentNames();
+    if (!member.isCompoundName() || argumentNames.size() == 1) {
+      if (baseName == DeclBaseName::createConstructor() &&
+          (member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
+        action.emplace(ImplicitMemberAction::ResolveDecodable);
+      } else if (!baseName.isSpecial() &&
+                 baseName.getIdentifier() == Context.Id_encode &&
+                 (member.isSimpleName() ||
+                  argumentNames.front() == Context.Id_to)) {
+        action.emplace(ImplicitMemberAction::ResolveEncodable);
+      }
     }
   }
 
@@ -4699,7 +4754,8 @@ ValueDecl *ProtocolDecl::getSingleRequirement(DeclName name) const {
 }
 
 AssociatedTypeDecl *ProtocolDecl::getAssociatedType(Identifier name) const {
-  auto results = const_cast<ProtocolDecl *>(this)->lookupDirect(name);
+  const auto flags = NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  auto results = const_cast<ProtocolDecl *>(this)->lookupDirect(name, flags);
   for (auto candidate : results) {
     if (candidate->getDeclContext() == this &&
         isa<AssociatedTypeDecl>(candidate)) {
@@ -6676,14 +6732,19 @@ ParameterList *swift::getParameterList(ValueDecl *source) {
     return AFD->getParameters();
   } else if (auto *EED = dyn_cast<EnumElementDecl>(source)) {
     return EED->getParameterList();
-  } else {
-    return cast<SubscriptDecl>(source)->getIndices();
+  } else if (auto *SD = dyn_cast<SubscriptDecl>(source)) {
+    return SD->getIndices();
   }
+
+  return nullptr;
 }
 
 const ParamDecl *swift::getParameterAt(const ValueDecl *source,
                                        unsigned index) {
-  return getParameterList(const_cast<ValueDecl *>(source))->get(index);
+  if (auto *params = getParameterList(const_cast<ValueDecl *>(source))) {
+    return params->get(index);
+  }
+  return nullptr;
 }
 
 Type AbstractFunctionDecl::getMethodInterfaceType() const {
@@ -7060,7 +7121,6 @@ StringRef AbstractFunctionDecl::getInlinableBodyText(
   return extractInlinableText(getASTContext().SourceMgr, body, scratch);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 /// A uniqued list of derivative function configurations.
 struct AbstractFunctionDecl::DerivativeFunctionConfigurationList
     : public llvm::SetVector<AutoDiffConfig> {
@@ -7101,7 +7161,6 @@ void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
   prepareDerivativeFunctionConfigurations();
   DerivativeFunctionConfigs->insert(config);
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                SourceLoc StaticLoc,
@@ -7967,6 +8026,15 @@ void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
   } else {
     out << "(unknown decl)";
   }
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           OptionSet<NominalTypeDecl::LookupDirectFlags> opts) {
+  out << "{ ";
+  using LookupFlags = NominalTypeDecl::LookupDirectFlags;
+  if (opts.contains(LookupFlags::IncludeAttrImplements))
+    out << "IncludeAttrImplements";
+  out << " }";
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {

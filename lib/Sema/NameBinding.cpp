@@ -397,7 +397,7 @@ static void insertPrecedenceGroupDecl(NameBinder &binder, SourceFile &SF,
 /// UnresolvedDeclRefExpr nodes for unresolved value names, and we may have
 /// unresolved type names as well. This handles import directives and forward
 /// references.
-void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
+void swift::performNameBinding(SourceFile &SF) {
   FrontendStatsTracer tracer(SF.getASTContext().Stats, "Name binding");
 
   // Make sure we skip adding the standard library imports if the
@@ -417,7 +417,7 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
 
   // Do a prepass over the declarations to find and load the imported modules
   // and map operator decls.
-  for (auto D : SF.getTopLevelDecls().slice(StartElem)) {
+  for (auto D : SF.getTopLevelDecls()) {
     if (auto *ID = dyn_cast<ImportDecl>(D)) {
       Binder.addImport(ImportedModules, ID);
     } else if (auto *OD = dyn_cast<PrefixOperatorDecl>(D)) {

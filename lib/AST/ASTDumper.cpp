@@ -314,19 +314,6 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
 static StringRef
-getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
-  switch (value) {
-    case MagicIdentifierLiteralExpr::File: return "#file";
-    case MagicIdentifierLiteralExpr::FilePath: return "#filePath";
-    case MagicIdentifierLiteralExpr::Function: return "#function";
-    case MagicIdentifierLiteralExpr::Line: return "#line";
-    case MagicIdentifierLiteralExpr::Column: return "#column";
-    case MagicIdentifierLiteralExpr::DSOHandle: return "#dsohandle";
-  }
-
-  llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
-}
-static StringRef
 getObjCSelectorExprKindString(ObjCSelectorExpr::ObjCSelectorKind value) {
   switch (value) {
     case ObjCSelectorExpr::Method: return "method";
@@ -1957,7 +1944,7 @@ public:
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E) {
     printCommon(E, "magic_identifier_literal_expr")
-      << " kind=" << getMagicIdentifierLiteralExprKindString(E->getKind());
+      << " kind=" << MagicIdentifierLiteralExpr::getKindString(E->getKind());
 
     if (E->isString()) {
       OS << " encoding="
@@ -1979,27 +1966,6 @@ public:
     OS << "\n";
     printRec(E->getArg());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
-  void visitQuoteLiteralExpr(QuoteLiteralExpr *E) {
-    printCommon(E, "quote_literal");
-    OS << "\n";
-    printRec(E->getSubExpr());
-    printSemanticExpr(E->getSemanticExpr());
-  }
-
-  void visitUnquoteExpr(UnquoteExpr *E) {
-    printCommon(E, "unquote");
-    OS << "\n";
-    printRec(E->getSubExpr());
-  }
-
-  void visitDeclQuoteExpr(DeclQuoteExpr *E) {
-    printCommon(E, "decl_quote");
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    printDeclRef(ConcreteDeclRef(E->getQuotedDecl()));
-    OS << "\n";
-    printSemanticExpr(E->getSemanticExpr());
   }
 
   void visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
@@ -3826,6 +3792,10 @@ void Type::dump() const {
 }
 
 void Type::dump(raw_ostream &os, unsigned indent) const {
+  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+    return; // not needed for the parser library.
+  #endif
+
   PrintType(os, indent).visit(*this, "");
   os << "\n";
 }

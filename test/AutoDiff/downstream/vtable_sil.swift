@@ -10,14 +10,8 @@ class Super : Differentiable {
   // FIXME(TF-648): Dummy to make `Super.TangentVector` be nontrivial.
   var _nontrivial: [Float] = []
 
-  // TODO(TF-654): Uncomment attribute when differentiation supports class initializers.
-  // TODO(TF-645): Remove `vjpInit` when differentiation supports `ref_element_addr`.
-  // @differentiable(vjp: vjpInit)
   init(base: Float) {
     self.base = base
-  }
-  static func vjpInit(base: Float) -> (Super, (TangentVector) -> Float) {
-    return (Super(base: base), { x in x.base })
   }
 
   @differentiable
@@ -55,15 +49,8 @@ class Super : Differentiable {
 }
 
 class Sub : Super {
-  // TODO(TF-654): Uncomment attribute when differentiation supports class initializers.
-  // TODO(TF-645): Remove `vjpInit2` when differentiation supports `ref_element_addr`.
-  // @differentiable(vjp: vjpInit2)
   override init(base: Float) {
     super.init(base: base)
-    self.base = base
-  }
-  static func vjpInit2(base: Float) -> (Sub, (TangentVector) -> Float) {
-    return (Sub(base: base), { x in x.base })
   }
 
   @differentiable

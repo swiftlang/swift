@@ -21,6 +21,7 @@ from .llbuild import LLBuild
 from .lldb import LLDB
 from .llvm import LLVM
 from .ninja import Ninja
+from .pythonkit import PythonKit
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
 from .swift import Swift
@@ -43,6 +44,7 @@ __all__ = [
     'LLDB',
     'LLVM',
     'Ninja',
+    'PythonKit',
     'Swift',
     'SwiftPM',
     'XCTest',

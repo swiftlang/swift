@@ -839,9 +839,10 @@ namespace {
 //   1b. pat
 // type ~ ((T1, ..., Tn)) (n >= 2)
 //   2. pat ~ (P1, ..., Pm) (m >= 2)
-void implicitlyUntuplePatternIfApplicable(DiagnosticEngine &DE,
+void implicitlyUntuplePatternIfApplicable(ASTContext &Ctx,
                                           Pattern *&enumElementInnerPat,
                                           Type enumPayloadType) {
+  auto &DE = Ctx.Diags;
   if (auto *tupleType = dyn_cast<TupleType>(enumPayloadType.getPointer())) {
     if (tupleType->getNumElements() >= 2
         && enumElementInnerPat->getKind() == PatternKind::Paren) {
@@ -859,9 +860,14 @@ void implicitlyUntuplePatternIfApplicable(DiagnosticEngine &DE,
     }
   } else if (auto *tupleType = enumPayloadType->getAs<TupleType>()) {
     if (tupleType->getNumElements() >= 2
-        && enumElementInnerPat->getKind() == PatternKind::Tuple)
+        && enumElementInnerPat->getKind() == PatternKind::Tuple) {
       DE.diagnose(enumElementInnerPat->getLoc(),
                   diag::matching_many_patterns_with_tupled_assoc_value);
+      enumElementInnerPat =
+        new (Ctx) ParenPattern(enumElementInnerPat->getStartLoc(),
+                               enumElementInnerPat,
+                               enumElementInnerPat->getEndLoc());
+    }
   }
 }
 }
@@ -1334,6 +1340,43 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       if (!elt)
         return nullptr;
 
+      // Emit an ambiguous none diagnostic if:
+      // 1) We have an Optional<T> type.
+      // 2) We're matching a 'none' enum case.
+      // 3) The 'none' enum case exists in T too.
+      if (EEP->getName().isSimpleName("none") &&
+          type->getOptionalObjectType()) {
+        SmallVector<Type, 4> allOptionals;
+        auto baseTyUnwrapped = type->lookThroughAllOptionalTypes(allOptionals);
+        if (lookupEnumMemberElement(dc, baseTyUnwrapped, EEP->getName(),
+                                    EEP->getLoc())) {
+          auto baseTyName = type->getCanonicalType().getString();
+          auto baseTyUnwrappedName = baseTyUnwrapped->getString();
+          diags.diagnoseWithNotes(
+              diags.diagnose(EEP->getLoc(), diag::optional_ambiguous_case_ref,
+                             baseTyName, baseTyUnwrappedName, "none"),
+              [&]() {
+                // Emit a note to swap '.none' with 'nil' to match with
+                // the 'none' case in Optional<T>.
+                diags.diagnose(EEP->getLoc(),
+                              diag::optional_fixit_ambiguous_case_ref_switch)
+                    .fixItReplace(EEP->getSourceRange(), "nil");
+                // Emit a note to swap '.none' with 'none?' to match with the
+                // 'none' case in T. Add as many '?' as needed to look though
+                // all the optionals.
+                std::string fixItString = "none";
+                llvm::for_each(allOptionals,
+                               [&](const Type) { fixItString += "?"; });
+                diags.diagnose(
+                        EEP->getLoc(),
+                        diag::type_fixit_optional_ambiguous_case_ref_switch,
+                        fixItString)
+                    .fixItReplace(EEP->getNameLoc().getSourceRange(),
+                                  fixItString);
+              });
+        }
+      }
+
       enumTy = type;
     } else {
       // Check if the explicitly-written enum type matches the type we're
@@ -1406,7 +1449,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
 
-      ::implicitlyUntuplePatternIfApplicable(Context.Diags, sub, elementType);
+      ::implicitlyUntuplePatternIfApplicable(Context, sub, elementType);
 
       sub = coercePatternToType(
           pattern.forSubPattern(sub, /*retainTopLevel=*/false), elementType,

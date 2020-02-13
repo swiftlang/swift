@@ -435,10 +435,6 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// A cache of tangent spaces per type.
-  llvm::DenseMap<CanType, Optional<TangentSpace>> TangentSpaces;
-
   /// For uniquifying `IndexSubset` allocations.
   llvm::FoldingSet<IndexSubset> IndexSubsets;
 
@@ -3518,14 +3514,14 @@ SILFunctionType::SILFunctionType(
     }
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Make sure that NotDifferentiable parameters only exist on differentiable
+  // Check that `@noDerivative` parameters only exist on `@differentiable`
   // functions.
   if (!ext.isDifferentiable())
     for (auto param : getParameters())
       assert(param.getDifferentiability() ==
                  SILParameterDifferentiability::DifferentiableOrNotApplicable &&
-             "non-differentiable function has NotDifferentiable parameter");
+             "non-`@differentiable` function should not have NotDifferentiable "
+             "parameter");
 #endif
 }
 
@@ -3573,13 +3569,13 @@ CanSILFunctionType SILFunctionType::get(
 
   // All SILFunctionTypes are canonical.
 
-  // Allocate storage for the object.
-  size_t bytes = sizeof(SILFunctionType)
-                 + sizeof(SILParameterInfo) * params.size()
-                 + sizeof(SILYieldInfo) * yields.size()
-                 + sizeof(SILResultInfo) * normalResults.size()
-                 + (errorResult ? sizeof(SILResultInfo) : 0)
-                 + (normalResults.size() > 1 ? sizeof(CanType) * 2 : 0);
+  // See [SILFunctionType-layout]
+  bool hasResultCache = normalResults.size() > 1;
+  size_t bytes =
+    totalSizeToAlloc<SILParameterInfo, SILResultInfo, SILYieldInfo, CanType>(
+      params.size(), normalResults.size() + (errorResult ? 1 : 0),
+      yields.size(), hasResultCache ? 2 : 0);
+
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
@@ -3610,6 +3606,8 @@ CanSILFunctionType SILFunctionType::get(
                                 params, yields, normalResults, errorResult,
                                 substitutions, genericSigIsImplied,
                                 ctx, properties, witnessMethodConformance);
+  assert(fnType->hasResultCache() == hasResultCache);
+
   ctx.getImpl().SILFunctionTypes.InsertNode(fnType, insertPos);
   return CanSILFunctionType(fnType);
 }

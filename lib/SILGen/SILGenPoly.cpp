@@ -3745,8 +3745,9 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto *thunk = fb.getOrCreateFunction(
       loc, name, customDerivativeFn->getLinkage(), thunkFnTy, IsBare,
       IsNotTransparent, customDerivativeFn->isSerialized(),
-      customDerivativeFn->isDynamicallyReplaceable(), customDerivativeFn->getEntryCount(),
-      IsThunk, customDerivativeFn->getClassSubclassScope());
+      customDerivativeFn->isDynamicallyReplaceable(),
+      customDerivativeFn->getEntryCount(), IsThunk,
+      customDerivativeFn->getClassSubclassScope());
   thunk->setInlineStrategy(AlwaysInline);
   if (!thunk->empty())
     return thunk;
@@ -3758,15 +3759,39 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   thunkSGF.collectThunkParams(loc, params, &indirectResults);
 
   auto *fnRef = thunkSGF.B.createFunctionRef(loc, customDerivativeFn);
-  auto fnRefType =
-      fnRef->getType().castTo<SILFunctionType>();
+  auto fnRefType = fnRef->getType().castTo<SILFunctionType>();
 
   // Collect thunk arguments, converting ownership.
   SmallVector<SILValue, 8> arguments;
   for (auto *indRes : indirectResults)
     arguments.push_back(indRes);
-  forwardFunctionArguments(thunkSGF, loc, fnRefType, params,
-                           arguments);
+  forwardFunctionArguments(thunkSGF, loc, fnRefType, params, arguments);
+
+  // Special support for thunking class initializer derivatives.
+  //
+  // User-defined custom derivatives take a metatype as the last parameter:
+  // - `$(Param0, Param1, ..., @thick Class.Type) -> (...)`
+  // But class initializers take an allocated instance as the last parameter:
+  // - `$(Param0, Param1, ..., @owned Class) -> (...)`
+  //
+  // Adjust forwarded arguments:
+  // - Pop the last `@owned Class` argument.
+  // - Create a `@thick Class.Type` value and pass it as the last argument.
+  auto *origAFD =
+      cast<AbstractFunctionDecl>(originalFn->getDeclContext()->getAsDecl());
+  if (isa<ConstructorDecl>(origAFD) &&
+      SILDeclRef(origAFD, SILDeclRef::Kind::Initializer).mangle() ==
+          originalFn->getName()) {
+    auto classArgument = arguments.pop_back_val();
+    auto *classDecl = classArgument->getType().getClassOrBoundGenericClass();
+    assert(classDecl && "Expected last argument to have class type");
+    auto classMetatype = MetatypeType::get(
+        classDecl->getDeclaredInterfaceType(), MetatypeRepresentation::Thick);
+    auto canClassMetatype = classMetatype->getCanonicalType();
+    auto *metatype = thunkSGF.B.createMetatype(
+        loc, SILType::getPrimitiveObjectType(canClassMetatype));
+    arguments.push_back(metatype);
+  }
   // Apply function argument.
   auto apply = thunkSGF.emitApplyWithRethrow(
       loc, fnRef, /*substFnType*/ fnRef->getType(),

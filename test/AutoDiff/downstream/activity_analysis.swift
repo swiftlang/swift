@@ -471,16 +471,16 @@ func testAccessorCoroutines(_ x: HasCoroutineAccessors) -> HasCoroutineAccessors
 // CHECK: [ACTIVE] %0 = argument of bb0 : $HasCoroutineAccessors
 // CHECK: [ACTIVE]   %2 = alloc_stack $HasCoroutineAccessors, var, name "x"
 // CHECK: [ACTIVE]   %4 = begin_access [read] [static] %2 : $*HasCoroutineAccessors
-// CHECK: [VARIED]   %5 = load [trivial] %4 : $*HasCoroutineAccessors
+// CHECK: [ACTIVE]   %5 = load [trivial] %4 : $*HasCoroutineAccessors
 // CHECK: [NONE]   // function_ref HasCoroutineAccessors.computed.read
-// CHECK: [VARIED] (**%7**, %8) = begin_apply %6(%5) : $@yield_once @convention(method) (HasCoroutineAccessors) -> @yields Float
+// CHECK: [ACTIVE] (**%7**, %8) = begin_apply %6(%5) : $@yield_once @convention(method) (HasCoroutineAccessors) -> @yields Float
 // CHECK: [VARIED] (%7, **%8**) = begin_apply %6(%5) : $@yield_once @convention(method) (HasCoroutineAccessors) -> @yields Float
-// CHECK: [VARIED]   %9 = alloc_stack $Float
-// CHECK: [VARIED]   %11 = load [trivial] %9 : $*Float
+// CHECK: [ACTIVE]   %9 = alloc_stack $Float
+// CHECK: [ACTIVE]   %11 = load [trivial] %9 : $*Float
 // CHECK: [ACTIVE]   %14 = begin_access [modify] [static] %2 : $*HasCoroutineAccessors
 // CHECK: [NONE]   // function_ref HasCoroutineAccessors.computed.modify
 // CHECK:   %15 = function_ref @$s17activity_analysis21HasCoroutineAccessorsV8computedSfvM : $@yield_once @convention(method) (@inout HasCoroutineAccessors) -> @yields @inout Float
-// CHECK: [VARIED] (**%16**, %17) = begin_apply %15(%14) : $@yield_once @convention(method) (@inout HasCoroutineAccessors) -> @yields @inout Float
+// CHECK: [ACTIVE] (**%16**, %17) = begin_apply %15(%14) : $@yield_once @convention(method) (@inout HasCoroutineAccessors) -> @yields @inout Float
 // CHECK: [VARIED] (%16, **%17**) = begin_apply %15(%14) : $@yield_once @convention(method) (@inout HasCoroutineAccessors) -> @yields @inout Float
 // CHECK: [ACTIVE]   %22 = begin_access [read] [static] %2 : $*HasCoroutineAccessors
 // CHECK: [ACTIVE]   %23 = load [trivial] %22 : $*HasCoroutineAccessors
@@ -501,7 +501,7 @@ func testBeginApplyActiveInoutArgument(array: [Float], x: Float) -> Float {
 
 // CHECK-LABEL: [AD] Activity info for ${{.*}}testBeginApplyActiveInoutArgument{{.*}} at (source=0 parameters=(0 1))
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Array<Float>
-// CHECK: [VARIED] %1 = argument of bb0 : $Float
+// CHECK: [ACTIVE] %1 = argument of bb0 : $Float
 // CHECK: [ACTIVE]   %4 = alloc_stack $Array<Float>, var, name "array"
 // CHECK: [ACTIVE]   %5 = copy_value %0 : $Array<Float>
 // CHECK: [USEFUL]   %7 = integer_literal $Builtin.IntLiteral, 0
@@ -510,7 +510,7 @@ func testBeginApplyActiveInoutArgument(array: [Float], x: Float) -> Float {
 // CHECK: [USEFUL]   %10 = apply %9(%7, %8) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [ACTIVE]   %11 = begin_access [modify] [static] %4 : $*Array<Float>
 // CHECK: [NONE]   // function_ref Array.subscript.modify
-// CHECK: [VARIED] (**%13**, %14) = begin_apply %12<Float>(%10, %11) : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0
+// CHECK: [ACTIVE] (**%13**, %14) = begin_apply %12<Float>(%10, %11) : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0
 // CHECK: [VARIED] (%13, **%14**) = begin_apply %12<Float>(%10, %11) : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0
 // CHECK: [USEFUL]   %18 = integer_literal $Builtin.IntLiteral, 0
 // CHECK: [USEFUL]   %19 = metatype $@thin Int.Type
@@ -522,3 +522,193 @@ func testBeginApplyActiveInoutArgument(array: [Float], x: Float) -> Float {
 // CHECK: [NONE]   // function_ref Array.subscript.getter
 // CHECK: [NONE]   %26 = apply %25<Float>(%24, %21, %23) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
 // CHECK: [ACTIVE]   %27 = load [trivial] %24 : $*Float
+
+// TF-1115: Test `begin_apply` active `inout` argument with non-active initial result.
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func testBeginApplyActiveButInitiallyNonactiveInoutArgument(x: Float) -> Float {
+  // `var array` is initially non-active.
+  var array: [Float] = [0]
+  // Array subscript assignment below calls `Array.subscript.modify`.
+  // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
+  array[0] = x
+  return array[0]
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testBeginApplyActiveButInitiallyNonactiveInoutArgument{{.*}} at (source=0 parameters=(0))
+// CHECK: [ACTIVE] %0 = argument of bb0 : $Float
+// CHECK: [ACTIVE]   %2 = alloc_stack $Array<Float>, var, name "array"
+// CHECK: [USEFUL]   %3 = integer_literal $Builtin.Word, 1
+// CHECK: [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
+// CHECK: [USEFUL]   %5 = apply %4<Float>(%3) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [USEFUL] (**%6**, %7) = destructure_tuple %5 : $(Array<Float>, Builtin.RawPointer)
+// CHECK: [NONE] (%6, **%7**) = destructure_tuple %5 : $(Array<Float>, Builtin.RawPointer)
+// CHECK: [USEFUL]   %8 = pointer_to_address %7 : $Builtin.RawPointer to [strict] $*Float
+// CHECK: [USEFUL]   %9 = integer_literal $Builtin.IntLiteral, 0
+// CHECK: [USEFUL]   %10 = metatype $@thin Float.Type
+// CHECK: [NONE]   // function_ref Float.init(_builtinIntegerLiteral:)
+// CHECK: [USEFUL]   %12 = apply %11(%9, %10) : $@convention(method) (Builtin.IntLiteral, @thin Float.Type) -> Float
+// CHECK: [USEFUL]   %15 = integer_literal $Builtin.IntLiteral, 0
+// CHECK: [USEFUL]   %16 = metatype $@thin Int.Type
+// CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
+// CHECK: [USEFUL]   %18 = apply %17(%15, %16) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [ACTIVE]   %19 = begin_access [modify] [static] %2 : $*Array<Float>
+// CHECK: [NONE]   // function_ref Array.subscript.modify
+// CHECK: [ACTIVE] (**%21**, %22) = begin_apply %20<Float>(%18, %19) : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0
+// CHECK: [VARIED] (%21, **%22**) = begin_apply %20<Float>(%18, %19) : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0
+// CHECK: [USEFUL]   %26 = integer_literal $Builtin.IntLiteral, 0
+// CHECK: [USEFUL]   %27 = metatype $@thin Int.Type
+// CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
+// CHECK: [USEFUL]   %29 = apply %28(%26, %27) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [ACTIVE]   %30 = begin_access [read] [static] %2 : $*Array<Float>
+// CHECK: [ACTIVE]   %31 = load_borrow %30 : $*Array<Float>
+// CHECK: [ACTIVE]   %32 = alloc_stack $Float
+// CHECK: [NONE]   // function_ref Array.subscript.getter
+// CHECK: [NONE]   %34 = apply %33<Float>(%32, %29, %31) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+// CHECK: [ACTIVE]   %35 = load [trivial] %32 : $*Float
+
+//===----------------------------------------------------------------------===//
+// Class differentiation
+//===----------------------------------------------------------------------===//
+
+class C: Differentiable {
+  @differentiable
+  var float: Float
+
+  init(_ float: Float) {
+    self.float = float
+  }
+
+  @differentiable
+  func method(_ x: Float) -> Float {
+    x * float
+  }
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}1CC6methodyS2fF at (source=0 parameters=(0 1))
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $Float
+// CHECK: [ACTIVE] %1 = argument of bb0 : $C
+// CHECK: [USEFUL]   %4 = metatype $@thin Float.Type
+// CHECK: [VARIED]   %5 = class_method %1 : $C, #C.float!getter.1 : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
+// CHECK: [ACTIVE]   %6 = apply %5(%1) : $@convention(method) (@guaranteed C) -> Float
+// CHECK: [NONE]   // function_ref static Float.* infix(_:_:)
+// CHECK:   %7 = function_ref @$sSf1moiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: [ACTIVE]   %8 = apply %7(%0, %6, %4) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+}
+
+//===----------------------------------------------------------------------===//
+// Enum differentiation
+//===----------------------------------------------------------------------===//
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func testActiveOptional(_ x: Float) -> Float {
+  // expected-note @+1 {{differentiating enum values is not yet supported}}
+  var maybe: Float? = 10
+  maybe = x
+  return maybe!
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveOptional{{.*}} at (source=0 parameters=(0))
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $Float
+// CHECK: [ACTIVE]   %2 = alloc_stack $Optional<Float>, var, name "maybe"
+// CHECK: [USEFUL]   %3 = integer_literal $Builtin.IntLiteral, 10
+// CHECK: [USEFUL]   %4 = metatype $@thin Float.Type
+// CHECK: [NONE]   // function_ref Float.init(_builtinIntegerLiteral:)
+// CHECK: [USEFUL]   %6 = apply %5(%3, %4) : $@convention(method) (Builtin.IntLiteral, @thin Float.Type) -> Float
+// CHECK: [USEFUL]   %7 = enum $Optional<Float>, #Optional.some!enumelt.1, %6 : $Float
+// CHECK: [ACTIVE]   %9 = enum $Optional<Float>, #Optional.some!enumelt.1, %0 : $Float
+// CHECK: [ACTIVE]   %10 = begin_access [modify] [static] %2 : $*Optional<Float>
+// CHECK: [ACTIVE]   %13 = begin_access [read] [static] %2 : $*Optional<Float>
+// CHECK: [ACTIVE]   %14 = load [trivial] %13 : $*Optional<Float>
+// CHECK: bb1:
+// CHECK: [NONE]   // function_ref _diagnoseUnexpectedNilOptional(_filenameStart:_filenameLength:_filenameIsASCII:_line:_isImplicitUnwrap:)
+// CHECK: [NONE]   %24 = apply %23(%17, %18, %19, %20, %22) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Int1) -> ()
+// CHECK: bb2:
+// CHECK: [ACTIVE] %26 = argument of bb2 : $Float
+
+enum DirectEnum: Differentiable & AdditiveArithmetic {
+  case case0
+  case case1(Float)
+  case case2(Float, Float)
+
+  typealias TangentVector = Self
+
+  static var zero: Self { fatalError() }
+  static func +(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+  static func -(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: e)
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{differentiating enum values is not yet supported}}
+func testActiveEnumValue(_ e: DirectEnum, _ x: Float) -> Float {
+  switch e {
+  case .case0: return x
+  case let .case1(y1): return y1
+  case let .case2(y1, y2): return y1 + y2
+  }
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveEnumValue{{.*}} at (source=0 parameters=(0))
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $DirectEnum
+// CHECK: [USEFUL] %1 = argument of bb0 : $Float
+// CHECK: bb1:
+// CHECK: bb2:
+// CHECK: [ACTIVE] %6 = argument of bb2 : $Float
+// CHECK: bb3:
+// CHECK: [ACTIVE] %9 = argument of bb3 : $(Float, Float)
+// CHECK: [ACTIVE] (**%10**, %11) = destructure_tuple %9 : $(Float, Float)
+// CHECK: [ACTIVE] (%10, **%11**) = destructure_tuple %9 : $(Float, Float)
+// CHECK: [USEFUL]   %14 = metatype $@thin Float.Type
+// CHECK: [NONE]   // function_ref static Float.+ infix(_:_:)
+// CHECK:   %15 = function_ref @$sSf1poiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: [ACTIVE]   %16 = apply %15(%10, %11, %14) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: bb4:
+// CHECK: [ACTIVE] %18 = argument of bb4 : $Float
+
+enum IndirectEnum<T: Differentiable>: Differentiable & AdditiveArithmetic {
+  case case1(T)
+  case case2(Float, T)
+
+  typealias TangentVector = Self
+
+  static func ==(_ lhs: Self, _ rhs: Self) -> Bool { fatalError() }
+  static var zero: Self { fatalError() }
+  static func +(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+  static func -(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: e)
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{differentiating enum values is not yet supported}}
+func testActiveEnumAddr<T>(_ e: IndirectEnum<T>) -> T {
+  switch e {
+  case let .case1(y1): return y1
+  case let .case2(_, y2): return y2
+  }
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveEnumAddr{{.*}} at (source=0 parameters=(0))
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $*T
+// CHECK: [ACTIVE] %1 = argument of bb0 : $*IndirectEnum<T>
+// CHECK: [ACTIVE]   %3 = alloc_stack $IndirectEnum<T>
+// CHECK: bb1:
+// CHECK: [ACTIVE]   %6 = unchecked_take_enum_data_addr %3 : $*IndirectEnum<T>, #IndirectEnum.case1!enumelt.1
+// CHECK: [ACTIVE]   %7 = alloc_stack $T, let, name "y1"
+// CHECK: bb2:
+// CHECK: [ACTIVE]   %14 = unchecked_take_enum_data_addr %3 : $*IndirectEnum<T>, #IndirectEnum.case2!enumelt.1
+// CHECK: [ACTIVE]   %15 = tuple_element_addr %14 : $*(Float, T), 0
+// CHECK: [VARIED]   %16 = load [trivial] %15 : $*Float
+// CHECK: [ACTIVE]   %17 = tuple_element_addr %14 : $*(Float, T), 1
+// CHECK: [ACTIVE]   %18 = alloc_stack $T, let, name "y2"
+// CHECK: bb3:
+// CHECK: [NONE]   %25 = tuple ()

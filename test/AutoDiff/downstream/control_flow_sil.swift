@@ -43,7 +43,6 @@ func cond(_ x: Float) -> Float {
 // CHECK-DATA-STRUCTURES:   case bb1(_AD__cond_bb1__PB__src_0_wrt_0)
 // CHECK-DATA-STRUCTURES: }
 
-
 // CHECK-SIL-LABEL: sil hidden [ossa] @AD__cond__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // CHECK-SIL: bb0([[INPUT_ARG:%.*]] : $Float):
 // CHECK-SIL:   [[BB0_PB_STRUCT:%.*]] = struct $_AD__cond_bb0__PB__src_0_wrt_0 ()
@@ -154,43 +153,19 @@ func enum_notactive(_ e: Enum, _ x: Float) -> Float {
   }
 }
 
-// ECK-SIL-LABEL: sil hidden [ossa] @AD__cond__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
-// ECK-SIL: bb0([[INPUT_ARG:%.*]] : $Float):
-// ECK-SIL:   [[BB0_PB_STRUCT:%.*]] = struct $_AD__cond_bb0__PB__src_0_wrt_0 ()
-// ECK-SIL:   cond_br {{%.*}}, bb1, bb2
-
-// ECK-SIL: bb1:
-// ECK-SIL:   [[BB1_PRED:%.*]] = enum $_AD__cond_bb1__Pred__src_0_wrt_0, #_AD__cond_bb1__Pred__src_0_wrt_0.bb0!enumelt.1, [[BB0_PB_STRUCT]]
-// ECK-SIL:   [[BB1_PB_STRUCT:%.*]] = struct $_AD__cond_bb1__PB__src_0_wrt_0
-// ECK-SIL:   [[BB3_PRED_PRED1:%.*]] = enum $_AD__cond_bb3__Pred__src_0_wrt_0, #_AD__cond_bb3__Pred__src_0_wrt_0.bb1!enumelt.1, [[BB1_PB_STRUCT]]
-// ECK-SIL:   br bb3({{.*}} : $Float, [[BB3_PRED_PRED1]] : $_AD__cond_bb3__Pred__src_0_wrt_0)
-
-// ECK-SIL: bb2:
-// ECK-SIL:   [[BB2_PRED:%.*]] = enum $_AD__cond_bb2__Pred__src_0_wrt_0, #_AD__cond_bb2__Pred__src_0_wrt_0.bb0!enumelt.1, [[BB0_PB_STRUCT]]
-// ECK-SIL:   [[BB2_PB_STRUCT:%.*]] = struct $_AD__cond_bb2__PB__src_0_wrt_0
-// ECK-SIL:   [[BB3_PRED_PRED2:%.*]] = enum $_AD__cond_bb3__Pred__src_0_wrt_0, #_AD__cond_bb3__Pred__src_0_wrt_0.bb2!enumelt.1, [[BB2_PB_STRUCT]]
-// ECK-SIL:   br bb3({{.*}} : $Float, [[BB3_PRED_PRED2]] : $_AD__cond_bb3__Pred__src_0_wrt_0)
-
-// ECK-SIL: bb3([[ORIG_RES:%.*]] : $Float, [[BB3_PRED_ARG:%.*]] : @owned $_AD__cond_bb3__Pred__src_0_wrt_0)
-// ECK-SIL:   [[BB3_PB_STRUCT:%.*]] = struct $_AD__cond_bb3__PB__src_0_wrt_0
-// ECK-SIL:   [[PULLBACK_REF:%.*]] = function_ref @AD__cond__pullback_src_0_wrt_0
-// ECK-SIL:   [[PB:%.*]] = partial_apply [callee_guaranteed] [[PULLBACK_REF]]([[BB3_PB_STRUCT]])
-// ECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[PB]] : $@callee_guaranteed (Float) -> Float)
-// ECK-SIL:   return [[VJP_RESULT]]
-
 // CHECK-SIL-LABEL: sil hidden [ossa] @AD__enum_notactive__vjp_src_0_wrt_1 : $@convention(thin) (Enum, Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // CHECK-SIL: bb0([[ENUM_ARG:%.*]] : $Enum, [[X_ARG:%.*]] : $Float):
 // CHECK-SIL:   [[BB0_PB_STRUCT:%.*]] = struct $_AD__enum_notactive_bb0__PB__src_0_wrt_1 ()
 // CHECK-SIL:   switch_enum [[ENUM_ARG]] : $Enum, case #Enum.a!enumelt.1: bb1, case #Enum.b!enumelt.1: bb2
 
 // CHECK-SIL: bb1([[ENUM_A:%.*]] : $Float):
-// CHECK-SIL:   [[BB1_PRED_PRED0:%.*]] = enum $_AD__enum_notactive_bb1__Pred__src_0_wrt_1, #_AD__enum_notactive_bb1__Pred__src_0_wrt_1.bb0!enumelt.1, %4 : $_AD__enum_notactive_bb0__PB__src_0_wrt_1
+// CHECK-SIL:   [[BB1_PRED_PRED0:%.*]] = enum $_AD__enum_notactive_bb1__Pred__src_0_wrt_1, #_AD__enum_notactive_bb1__Pred__src_0_wrt_1.bb0!enumelt.1, [[BB0_PB_STRUCT]] : $_AD__enum_notactive_bb0__PB__src_0_wrt_1
 // CHECK-SIL:   [[BB1_PB_STRUCT:%.*]] = struct $_AD__enum_notactive_bb1__PB__src_0_wrt_1 ({{.*}})
 // CHECK-SIL:   [[BB3_PRED_PRED1:%.*]] = enum $_AD__enum_notactive_bb3__Pred__src_0_wrt_1, #_AD__enum_notactive_bb3__Pred__src_0_wrt_1.bb1!enumelt.1, [[BB1_PB_STRUCT]] : $_AD__enum_notactive_bb1__PB__src_0_wrt_1
 // CHECK-SIL:   br bb3({{.*}} : $Float, [[BB3_PRED_PRED1]] : $_AD__enum_notactive_bb3__Pred__src_0_wrt_1)
 
 // CHECK-SIL: bb2([[ENUM_B:%.*]] : $(Float, Float)):
-// CHECK-SIL:   [[BB2_PRED_PRED0:%.*]] = enum $_AD__enum_notactive_bb2__Pred__src_0_wrt_1, #_AD__enum_notactive_bb2__Pred__src_0_wrt_1.bb0!enumelt.1, %4 : $_AD__enum_notactive_bb0__PB__src_0_wrt_1
+// CHECK-SIL:   [[BB2_PRED_PRED0:%.*]] = enum $_AD__enum_notactive_bb2__Pred__src_0_wrt_1, #_AD__enum_notactive_bb2__Pred__src_0_wrt_1.bb0!enumelt.1, [[BB0_PB_STRUCT]] : $_AD__enum_notactive_bb0__PB__src_0_wrt_1
 // CHECK-SIL:   [[BB2_PB_STRUCT:%.*]] = struct $_AD__enum_notactive_bb2__PB__src_0_wrt_1 ({{.*}})
 // CHECK-SIL:   [[BB3_PRED_PRED2:%.*]] = enum $_AD__enum_notactive_bb3__Pred__src_0_wrt_1, #_AD__enum_notactive_bb3__Pred__src_0_wrt_1.bb2!enumelt.1, [[BB2_PB_STRUCT]] : $_AD__enum_notactive_bb2__PB__src_0_wrt_1
 // CHECK-SIL:   br bb3({{.*}} : $Float, [[BB3_PRED_PRED2]] : $_AD__enum_notactive_bb3__Pred__src_0_wrt_1)
@@ -201,6 +176,55 @@ func enum_notactive(_ e: Enum, _ x: Float) -> Float {
 // CHECK-SIL:   [[PB:%.*]] = partial_apply [callee_guaranteed] [[PULLBACK_REF]]([[BB3_PB_STRUCT]])
 // CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[PB]] : $@callee_guaranteed (Float) -> Float)
 // CHECK-SIL:   return [[VJP_RESULT]]
+// CHECK-SIL: }
+
+// Test `switch_enum_addr`.
+
+// Clone of `enum Optional<Wrapped>`.
+enum AddressOnlyEnum<T> {
+  case some(T)
+  case none
+}
+@differentiable
+@_silgen_name("enum_addr_notactive")
+func enum_addr_notactive<T>(_ e: AddressOnlyEnum<T>, _ x: Float) -> Float {
+  switch e {
+  case .none: break
+  case .some: break
+  }
+  return x
+}
+
+// CHECK-SIL-LABEL: sil hidden [ossa] @AD__enum_addr_notactive__vjp_src_0_wrt_1_l : $@convention(thin) <τ_0_0> (@in_guaranteed AddressOnlyEnum<τ_0_0>, Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK-SIL: bb0([[ENUM_ARG:%.*]] : $*AddressOnlyEnum<τ_0_0>, [[X_ARG:%.*]] : $Float):
+// CHECK-SIL:   [[ENUM_ADDR:%.*]] = alloc_stack $AddressOnlyEnum<τ_0_0>
+// CHECK-SIL:   copy_addr [[ENUM_ARG]] to [initialization] [[ENUM_ADDR]] : $*AddressOnlyEnum<τ_0_0>
+// CHECK-SIL:   [[BB0_PB_STRUCT:%.*]] = struct $_AD__enum_addr_notactive_bb0__PB__src_0_wrt_1<τ_0_0> ()
+// CHECK-SIL:   switch_enum_addr [[ENUM_ADDR]] : $*AddressOnlyEnum<τ_0_0>, case #AddressOnlyEnum.none!enumelt: bb1, case #AddressOnlyEnum.some!enumelt.1: bb2
+
+// CHECK-SIL: bb1:
+// CHECK-SIL:   [[BB1_PRED_PRED0:%.*]] = enum $_AD__enum_addr_notactive_bb1__Pred__src_0_wrt_1<τ_0_0>, #_AD__enum_addr_notactive_bb1__Pred__src_0_wrt_1.bb0!enumelt.1, [[BB0_PB_STRUCT]] : $_AD__enum_addr_notactive_bb0__PB__src_0_wrt_1<τ_0_0>
+// CHECK-SIL:   dealloc_stack [[ENUM_ADDR]] : $*AddressOnlyEnum<τ_0_0>
+// CHECK-SIL:   [[BB1_PB_STRUCT:%.*]] = struct $_AD__enum_addr_notactive_bb1__PB__src_0_wrt_1<τ_0_0> ([[BB1_PRED_PRED0]] : $_AD__enum_addr_notactive_bb1__Pred__src_0_wrt_1<τ_0_0>)
+// CHECK-SIL:   [[BB3_PRED_PRED1:%.*]] = enum $_AD__enum_addr_notactive_bb3__Pred__src_0_wrt_1<τ_0_0>, #_AD__enum_addr_notactive_bb3__Pred__src_0_wrt_1.bb1!enumelt.1, [[BB1_PB_STRUCT]] : $_AD__enum_addr_notactive_bb1__PB__src_0_wrt_1<τ_0_0>
+// CHECK-SIL:   br bb3([[BB3_PRED_PRED1]] : $_AD__enum_addr_notactive_bb3__Pred__src_0_wrt_1<τ_0_0>)
+
+// CHECK-SIL: bb2:
+// CHECK-SIL:   [[BB2_PRED_PRED0:%.*]] = enum $_AD__enum_addr_notactive_bb2__Pred__src_0_wrt_1<τ_0_0>, #_AD__enum_addr_notactive_bb2__Pred__src_0_wrt_1.bb0!enumelt.1, [[BB0_PB_STRUCT]] : $_AD__enum_addr_notactive_bb0__PB__src_0_wrt_1<τ_0_0>
+// CHECK-SIL:   [[ENUM_DATA:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*AddressOnlyEnum<τ_0_0>, #AddressOnlyEnum.some!enumelt.1
+// CHECK-SIL:   destroy_addr [[ENUM_DATA]] : $*τ_0_0
+// CHECK-SIL:   dealloc_stack [[ENUM_ADDR]] : $*AddressOnlyEnum<τ_0_0>
+// CHECK-SIL:   [[BB2_PB_STRUCT:%.*]] = struct $_AD__enum_addr_notactive_bb2__PB__src_0_wrt_1<τ_0_0> ([[BB2_PRED_PRED0]] : $_AD__enum_addr_notactive_bb2__Pred__src_0_wrt_1<τ_0_0>)
+// CHECK-SIL:   [[BB3_PRED_PRED2:%.*]] = enum $_AD__enum_addr_notactive_bb3__Pred__src_0_wrt_1<τ_0_0>, #_AD__enum_addr_notactive_bb3__Pred__src_0_wrt_1.bb2!enumelt.1, [[BB2_PB_STRUCT]] : $_AD__enum_addr_notactive_bb2__PB__src_0_wrt_1<τ_0_0>
+// CHECK-SIL:   br bb3([[BB3_PRED_PRED2]] : $_AD__enum_addr_notactive_bb3__Pred__src_0_wrt_1<τ_0_0>)
+
+// CHECK-SIL: bb3([[BB3_PRED_ARG:%.*]] : $_AD__enum_addr_notactive_bb3__Pred__src_0_wrt_1<τ_0_0>):
+// CHECK-SIL:   [[BB3_PB_STRUCT:%.*]] = struct $_AD__enum_addr_notactive_bb3__PB__src_0_wrt_1<τ_0_0> ([[BB3_PRED_ARG]] : $_AD__enum_addr_notactive_bb3__Pred__src_0_wrt_1<τ_0_0>)
+
+// CHECK-SIL:   [[PB_FNREF:%.*]] = function_ref @AD__enum_addr_notactive__pullback_src_0_wrt_1_l : $@convention(thin) <τ_0_0> (Float, @owned _AD__enum_addr_notactive_bb3__PB__src_0_wrt_1<τ_0_0>) -> Float
+// CHECK-SIL:   [[PB:%.*]] = partial_apply [callee_guaranteed] [[PB_FNREF]]<τ_0_0>([[BB3_PB_STRUCT]]) : $@convention(thin) <τ_0_0> (Float, @owned _AD__enum_addr_notactive_bb3__PB__src_0_wrt_1<τ_0_0>) -> Float
+// CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[X_ARG]] : $Float, [[PB]] : $@callee_guaranteed (Float) -> Float)
+// CHECK-SIL:   return [[VJP_RESULT]] : $(Float, @callee_guaranteed (Float) -> Float)
 // CHECK-SIL: }
 
 // Test control flow + tuple buffer.

@@ -200,55 +200,33 @@ void Parser::parseTopLevel() {
 
   // Parse the body of the file.
   SmallVector<ASTNode, 128> Items;
+  while (!Tok.is(tok::eof)) {
+    // If we run into a SIL decl, skip over until the next Swift decl. We need
+    // to delay parsing these, as SIL parsing currently requires type checking
+    // Swift decls.
+    if (isStartOfSILDecl()) {
+      assert(!isStartOfSwiftDecl() && "Start of both a Swift and SIL decl?");
+      skipSILUntilSwiftDecl();
+      continue;
+    }
 
-  // If we are in SIL mode, and if the first token is the start of a sil
-  // declaration, parse that one SIL function and return to the top level.  This
-  // allows type declarations and other things to be parsed, name bound, and
-  // type checked in batches, similar to immediate mode.  This also enforces
-  // that SIL bodies can only be at the top level.
-  switch (Tok.getKind()) {
-  default:
     parseBraceItems(Items, allowTopLevelCode()
                                ? BraceItemListKind::TopLevelCode
                                : BraceItemListKind::TopLevelLibrary);
-    break;
 
-// For now, create 'UnknownDecl' for all SIL declarations.
-#define CASE_SIL(KW, NAME)                                                     \
-  case tok::kw_##KW: {                                                         \
-    assert(isInSILMode() && "'" #KW "' should only be a keyword in SIL mode"); \
-    SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);   \
-    SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);     \
-    SIL->parse##NAME(*this);                                                   \
-    break;                                                                     \
-  }
-    CASE_SIL(sil, DeclSIL)
-    CASE_SIL(sil_stage, DeclSILStage)
-    CASE_SIL(sil_vtable, SILVTable)
-    CASE_SIL(sil_global, SILGlobal)
-    CASE_SIL(sil_witness_table, SILWitnessTable)
-    CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
-    // SWIFT_ENABLE_TENSORFLOW
-    CASE_SIL(sil_differentiability_witness, SILDifferentiabilityWitness)
-    // SWIFT_ENABLE_TENSORFLOW END
-    CASE_SIL(sil_coverage_map, SILCoverageMap)
-    CASE_SIL(sil_property, SILProperty)
-    CASE_SIL(sil_scope, SILScope)
-#undef CASE_SIL
-  }
-  
-  // In the case of a catastrophic parse error, consume any trailing
-  // #else, #elseif, or #endif and move on to the next statement or declaration
-  // block.
-  if (Tok.is(tok::pound_else) || Tok.is(tok::pound_elseif) ||
-      Tok.is(tok::pound_endif)) {
-    diagnose(Tok.getLoc(),
-             diag::unexpected_conditional_compilation_block_terminator);
-    // Create 'UnknownDecl' for orphan directives.
-    SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
-    SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);
+    // In the case of a catastrophic parse error, consume any trailing
+    // #else, #elseif, or #endif and move on to the next statement or
+    // declaration block.
+    if (Tok.is(tok::pound_else) || Tok.is(tok::pound_elseif) ||
+        Tok.is(tok::pound_endif)) {
+      diagnose(Tok.getLoc(),
+               diag::unexpected_conditional_compilation_block_terminator);
+      // Create 'UnknownDecl' for orphan directives.
+      SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
+      SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);
 
-    consumeToken();
+      consumeToken();
+    }
   }
 
   // Add newly parsed decls to the module.
@@ -263,15 +241,60 @@ void Parser::parseTopLevel() {
   SF.ASTStage = SourceFile::Parsed;
   verify(SF);
 
-  // Next time start relexing from the beginning of the comment so that we can
-  // attach it to the token.
-  State->markParserPosition(getParserPosition(),
-                            InPoundLineEnvironment);
+  // Finalize the token receiver.
+  SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
+  TokReceiver->finalize();
+}
 
-  // If we are done parsing the whole file, finalize the token receiver.
-  if (Tok.is(tok::eof)) {
-    SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
-    TokReceiver->finalize();
+void Parser::parseTopLevelSIL() {
+  assert(SIL && isInSILMode());
+
+  // Prime the lexer.
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeTokenWithoutFeedingReceiver();
+
+  auto skipToNextSILDecl = [&]() {
+    while (!Tok.is(tok::eof) && !isStartOfSILDecl())
+      skipSingle();
+  };
+
+  while (!Tok.is(tok::eof)) {
+    // If we run into a Swift decl, skip over until we find the next SIL decl.
+    if (isStartOfSwiftDecl()) {
+      assert(!isStartOfSILDecl() && "Start of both a Swift and SIL decl?");
+      skipToNextSILDecl();
+      continue;
+    }
+
+    switch (Tok.getKind()) {
+#define CASE_SIL(KW, NAME)                                                     \
+    case tok::kw_##KW: {                                                       \
+      /* If we failed to parse a SIL decl, move onto the next SIL decl to      \
+         better help recovery. */                                              \
+      if (SIL->parse##NAME(*this)) {                                           \
+        Lexer::SILBodyRAII sbr(*L);                                            \
+        skipToNextSILDecl();                                                   \
+      }                                                                        \
+      break;                                                                   \
+    }
+    CASE_SIL(sil, DeclSIL)
+    CASE_SIL(sil_stage, DeclSILStage)
+    CASE_SIL(sil_vtable, SILVTable)
+    CASE_SIL(sil_global, SILGlobal)
+    CASE_SIL(sil_witness_table, SILWitnessTable)
+    CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
+    CASE_SIL(sil_differentiability_witness, SILDifferentiabilityWitness)
+    CASE_SIL(sil_coverage_map, SILCoverageMap)
+    CASE_SIL(sil_property, SILProperty)
+    CASE_SIL(sil_scope, SILScope)
+#undef CASE_SIL
+    default:
+      // If we reached here, we have something malformed that isn't a Swift decl
+      // or a SIL decl. Emit an error and skip ahead to the next SIL decl.
+      diagnose(Tok, diag::expected_sil_keyword);
+      skipToNextSILDecl();
+      break;
+    }
   }
 }
 
@@ -1344,19 +1367,6 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
       original, parameters));
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-ParserResult<QuotedAttr> Parser::parseQuotedAttribute(SourceLoc atLoc,
-                                                      SourceLoc loc) {
-  if (Context.LangOpts.EnableExperimentalQuasiquotes) {
-    return ParserResult<QuotedAttr>(QuotedAttr::create(
-        Context, atLoc, SourceRange(loc, loc), /*Implicit=*/false));
-  } else {
-    diagnose(atLoc, diag::attr_quoted_enable_experimental_quasiquotes);
-    return makeParserError();
-  }
-}
-// SWIFT_ENABLE_TENSORFLOW END
-
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
                                SmallVector<SourceLoc, 4> &NameLocs,
                                bool &IsNullarySelector) {
@@ -1945,43 +1955,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
     break;
   }
-
-  case DAK_ImplicitlySynthesizesNestedRequirement: {
-    if (!consumeIf(tok::l_paren)) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-      return false;
-    }
-
-    if (Tok.isNot(tok::string_literal)) {
-      diagnose(Loc, diag::attr_expected_string_literal, AttrName);
-      return false;
-    }
-
-    auto Value = getStringLiteralIfNotInterpolated(
-        Loc, ("'" + AttrName + "'").str());
-
-    consumeToken(tok::string_literal);
-
-    if (Value.hasValue())
-      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-    else
-      DiscardAttribute = true;
-
-    if (!consumeIf(tok::r_paren)) {
-      diagnose(Loc, diag::attr_expected_rparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-      return false;
-    }
-
-    if (!DiscardAttribute) {
-      Attributes.add(new (Context)
-                     ImplicitlySynthesizesNestedRequirementAttr(Value.getValue(), AtLoc,
-                                                   AttrRange));
-    }
-    break;
-  }
-
   case DAK_Available: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -2390,13 +2363,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     Attributes.add(new (Context) ProjectedValuePropertyAttr(
         name, AtLoc, range, /*implicit*/ false));
-    break;
-  }
-
-  case DAK_Quoted: {
-    auto Attr = parseQuotedAttribute(AtLoc, Loc);
-    if (Attr.isNonNull())
-      Attributes.add(Attr.get());
     break;
   }
   }
@@ -3193,9 +3159,9 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
         // treat 'class' as a modifier; in the case of a following CC
         // token, we cannot be sure there is no intention to override
         // or witness something static.
-        if (isStartOfDecl() || (isa<ClassDecl>(CurDeclContext) &&
-                                (Tok.is(tok::code_complete) ||
-                                 Tok.getRawText().equals("override")))) {
+        if (isStartOfSwiftDecl() || (isa<ClassDecl>(CurDeclContext) &&
+                                     (Tok.is(tok::code_complete) ||
+                                      Tok.getRawText().equals("override")))) {
           /* We're OK */
         } else {
           // This 'class' is a real ClassDecl introducer.
@@ -3442,8 +3408,7 @@ static bool isParenthesizedUnowned(Parser &P) {
           (P.Tok.getText() == "safe" || P.Tok.getText() == "unsafe");
 }
 
-  
-bool Parser::isStartOfDecl() {
+bool Parser::isStartOfSwiftDecl() {
   // If this is obviously not the start of a decl, then we're done.
   if (!isKeywordPossibleDeclStart(Tok)) return false;
 
@@ -3494,7 +3459,36 @@ bool Parser::isStartOfDecl() {
     if (Tok.isAny(tok::r_brace, tok::eof, tok::pound_endif))
       return true;
 
-    return isStartOfDecl();
+    return isStartOfSwiftDecl();
+  }
+
+  // If we have a decl modifying keyword, check if the next token is a valid
+  // decl start. This is necessary to correctly handle Swift keywords that are
+  // shared by SIL, e.g 'private' in 'sil private @foo :'. We need to make sure
+  // this isn't considered a valid Swift decl start.
+  if (Tok.isKeyword()) {
+    auto DAK = DeclAttribute::getAttrKindFromString(Tok.getText());
+    if (DAK != DAK_Count && DeclAttribute::isDeclModifier(DAK)) {
+      BacktrackingScope backtrack(*this);
+      consumeToken();
+
+      // Eat paren after modifier name; e.g. private(set)
+      if (consumeIf(tok::l_paren)) {
+        while (Tok.isNot(tok::r_brace, tok::eof, tok::pound_endif)) {
+          if (consumeIf(tok::r_paren))
+            break;
+
+          // If we found the start of a decl while trying to skip over the
+          // paren, then we have something incomplete like 'private('. Return
+          // true for better recovery.
+          if (isStartOfSwiftDecl())
+            return true;
+
+          skipSingle();
+        }
+      }
+      return isStartOfSwiftDecl();
+    }
   }
 
   // Otherwise, the only hard case left is the identifier case.
@@ -3520,7 +3514,7 @@ bool Parser::isStartOfDecl() {
     consumeToken(tok::l_paren);
     consumeToken(tok::identifier);
     consumeToken(tok::r_paren);
-    return isStartOfDecl();
+    return isStartOfSwiftDecl();
   }
 
   // If the next token is obviously not the start of a decl, bail early.
@@ -3530,7 +3524,31 @@ bool Parser::isStartOfDecl() {
   // Otherwise, do a recursive parse.
   Parser::BacktrackingScope Backtrack(*this);
   consumeToken(tok::identifier);
-  return isStartOfDecl();
+  return isStartOfSwiftDecl();
+}
+
+bool Parser::isStartOfSILDecl() {
+  switch (Tok.getKind()) {
+  case tok::kw_sil:
+  case tok::kw_sil_stage:
+  case tok::kw_sil_property:
+  case tok::kw_sil_vtable:
+  case tok::kw_sil_global:
+  case tok::kw_sil_witness_table:
+  case tok::kw_sil_default_witness_table:
+  case tok::kw_sil_differentiability_witness:
+  case tok::kw_sil_coverage_map:
+  case tok::kw_sil_scope:
+    // SIL decls must start on a new line.
+    return Tok.isAtStartOfLine();
+  case tok::kw_undef:
+  case tok::NUM_TOKENS:
+    return false;
+#define SIL_KEYWORD(Name)
+#define TOKEN(Name) case tok:: Name: return false;
+#include "swift/Syntax/TokenKinds.def"
+  }
+  llvm_unreachable("Unhandled case in switch");
 }
 
 void Parser::consumeDecl(ParserPosition BeginParserPosition,
@@ -3997,46 +4015,6 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
     if (!declWasHandledAlready(D)) {
       Handler(D);
-      // SWIFT_ENABLE_TENSORFLOW
-      if (auto FD = dyn_cast<FuncDecl>(D)) {
-        if (auto attr = D->getAttrs().getAttribute<QuotedAttr>()) {
-          // TODO(TF-718): Properly mangle names for quote decls.
-          auto originalName = FD->getBaseName().userFacingName();
-          SmallString<16> buf;
-          buf.append("_quoted");
-          buf.push_back(clang::toUppercase(originalName[0]));
-          buf.append(originalName.begin() + 1, originalName.end());
-          auto id = Context.getIdentifier(StringRef(buf.data(), buf.size()));
-          SmallVector<Identifier, 4> pieces;
-          auto name = DeclName(Context, id, pieces);
-
-          // TODO(TF-716): Should this perhaps be a let?
-          // TODO(TF-717): Figure out the overriding story for quote decls.
-          auto kind = CurDeclContext->isTypeContext()
-                          ? StaticSpellingKind::KeywordClass
-                          : StaticSpellingKind::None;
-          auto params =
-              ParameterList::create(Context, SourceLoc(), {}, SourceLoc());
-          auto ret = new (Context)
-              SimpleIdentTypeRepr(DeclNameLoc(),
-                                  DeclNameRef(Context.getIdentifier("Tree")));
-          auto quoteDecl = FuncDecl::create(
-              Context, SourceLoc(), kind, SourceLoc(), name, SourceLoc(),
-              /*Throws=*/false, SourceLoc(),
-              /*GenericParams=*/nullptr, params, TypeLoc(ret), CurDeclContext);
-          quoteDecl->setImplicit(true);
-          auto expr = DeclQuoteExpr::create(Context, FD);
-          auto stmt =
-              new (Context) ReturnStmt(SourceLoc(), expr, /*Implicit=*/true);
-          auto body = BraceStmt::create(Context, SourceLoc(), {stmt},
-                                        SourceLoc(), /*Implicit=*/true);
-          quoteDecl->setBody(body);
-
-          attr->setQuoteDecl(quoteDecl);
-          Handler(quoteDecl);
-        }
-      }
-      // SWIFT_ENABLE_TENSORFLOW END
     }
 
     setOriginalDeclarationForDifferentiableAttributes(D->getAttrs(), D);
@@ -4102,7 +4080,8 @@ static ScopeKind getMemberParseScopeKind(IterableDeclContext *idc) {
   }
 }
 
-std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
+std::pair<std::vector<Decl *>, Optional<std::string>>
+Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   Decl *D = const_cast<Decl*>(IDC->getDecl());
   DeclContext *DC = cast<DeclContext>(D);
   SourceRange BodyRange;
@@ -4115,10 +4094,11 @@ std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
 
   if (BodyRange.isInvalid()) {
     assert(D->isImplicit());
-    return { };
+    return {std::vector<Decl *>(), None};
   }
 
-  auto BeginParserPosition = getParserPosition({BodyRange.Start, SourceLoc()});
+  auto BeginParserPosition = getParserPosition(BodyRange.Start,
+                                               /*previousLoc*/ SourceLoc());
   auto EndLexerState = L->getStateForEndOfTokenLoc(BodyRange.End);
 
   // ParserPositionRAII needs a primed parser to restore to.
@@ -4141,7 +4121,7 @@ std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   // If there is no left brace, then return an empty list of declarations;
   // we will have already diagnosed this.
   if (!Tok.is(tok::l_brace))
-    return { };
+    return {std::vector<Decl *>(), None};
 
   // Re-enter the lexical scope. The top-level scope is needed because
   // delayed parsing of members happens with a fresh parser, where there is
@@ -4519,13 +4499,15 @@ bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
     // evaluator.
     bool hadError = false;
     ParseDeclOptions Options = getMemberParseDeclOptions(IDC);
-    auto members = parseDeclList(
-        LBLoc, RBLoc, ErrorDiag, Options, IDC, hadError);
+    auto membersAndHash =
+        parseDeclList(LBLoc, RBLoc, ErrorDiag, Options, IDC, hadError);
     IDC->setMaybeHasOperatorDeclarations();
     IDC->setMaybeHasNestedClassDeclarations();
     Context.evaluator.cacheOutput(
         ParseMembersRequest{IDC},
-        Context.AllocateCopy(llvm::makeArrayRef(members)));
+        FingerprintAndMembers{
+            membersAndHash.second,
+            Context.AllocateCopy(llvm::makeArrayRef(membersAndHash.first))});
 
     if (hadError)
       return true;
@@ -4539,10 +4521,22 @@ bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
 /// \verbatim
 ///    decl* '}'
 /// \endverbatim
-std::vector<Decl *> Parser::parseDeclList(
-    SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
-    ParseDeclOptions Options, IterableDeclContext *IDC,
-    bool &hadError) {
+std::pair<std::vector<Decl *>, Optional<std::string>>
+Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
+                      ParseDeclOptions Options, IterableDeclContext *IDC,
+                      bool &hadError) {
+
+  // Record the curly braces but nothing inside.
+  if (IDC->areDependenciesUsingTokenHashesForTypeBodies()) {
+    recordTokenHash("{");
+    recordTokenHash("}");
+  }
+  llvm::MD5 tokenHashForThisDeclList;
+  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(
+      CurrentTokenHash, IDC->areDependenciesUsingTokenHashesForTypeBodies()
+                            ? &tokenHashForThisDeclList
+                            : CurrentTokenHash);
+
   std::vector<Decl *> decls;
   ParserStatus Status;
   bool PreviousHadSemi = true;
@@ -4571,7 +4565,15 @@ std::vector<Decl *> Parser::parseDeclList(
   // were errors while parsing inner decls, because we recovered.
   if (RBLoc.isInvalid())
     hadError = true;
-  return decls;
+
+  if (!Context.LangOpts.EnableTypeFingerprints)
+    return std::make_pair(decls, None);
+
+  llvm::MD5::MD5Result result;
+  tokenHashForThisDeclList.final(result);
+  llvm::SmallString<32> tokenHashString;
+  llvm::MD5::stringifyResult(result, tokenHashString);
+  return std::make_pair(decls, tokenHashString.str().str());
 }
 
 bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
@@ -5298,6 +5300,41 @@ bool Parser::skipBracedBlock() {
   if (consumeIf(tok::r_brace))
     OpenBraces--;
   return OpenBraces != 0;
+}
+
+void Parser::skipSILUntilSwiftDecl() {
+  // For now, create 'UnknownDecl' for all SIL declarations.
+  SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
+  SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);
+
+  // Tell the lexer we're about to start lexing SIL.
+  Lexer::SILBodyRAII sbr(*L);
+
+  // Enter a top-level scope. This is necessary as parseType may need to setup
+  // child scopes for generic params.
+  Scope topLevel(this, ScopeKind::TopLevel);
+
+  while (!Tok.is(tok::eof) && !isStartOfSwiftDecl()) {
+    // SIL pound dotted paths need to be skipped specially as they can contain
+    // decl keywords like 'subscript'.
+    if (consumeIf(tok::pound)) {
+      do {
+        consumeToken();
+      } while (consumeIf(tok::period));
+      continue;
+    }
+
+    // SIL types need to be skipped specially as they can contain attributes on
+    // tuples which can look like decl attributes.
+    if (consumeIf(tok::sil_dollar)) {
+      if (Tok.isAnyOperator() && Tok.getText().startswith("*")) {
+        consumeStartingCharacterOfCurrentToken();
+      }
+      (void)parseType();
+      continue;
+    }
+    skipSingle();
+  }
 }
 
 /// Returns a descriptive name for the given accessor/addressor kind.
@@ -6388,12 +6425,11 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     return;
   }
 
-  if (IsParsingInterfaceTokens) {
-    // Record the curly braces but nothing inside.
-    SF.recordInterfaceToken("{");
-    SF.recordInterfaceToken("}");
-  }
-  llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
+  // Record the curly braces but nothing inside.
+  recordTokenHash("{");
+  recordTokenHash("}");
+
+  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(CurrentTokenHash, nullptr);
 
   if (isDelayedParsingEnabled()) {
     consumeAbstractFunctionBody(AFD, AFD->getAttrs());
@@ -6476,7 +6512,8 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
          "function body should be delayed");
 
   auto bodyRange = AFD->getBodySourceRange();
-  auto BeginParserPosition = getParserPosition({bodyRange.Start, SourceLoc()});
+  auto BeginParserPosition = getParserPosition(bodyRange.Start,
+                                               /*previousLoc*/ SourceLoc());
   auto EndLexerState = L->getStateForEndOfTokenLoc(AFD->getEndLoc());
 
   // ParserPositionRAII needs a primed parser to restore to.

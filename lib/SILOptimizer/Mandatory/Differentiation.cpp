@@ -84,39 +84,6 @@ template <typename T> static inline void debugDump(T &v) {
                           << v << "\n==== END DEBUG DUMP ====\n");
 }
 
-/// Returns the "constrained" derivative generic signature given:
-/// - An original SIL function type.
-/// - A wrt parameter index subset.
-/// - A possibly uncanonical derivative generic signature (optional).
-/// - Additional derivative requirements (optional).
-/// The constrained derivative generic signature constrains all wrt parameters
-/// to conform to `Differentiable`.
-static GenericSignature
-getConstrainedDerivativeGenericSignature(CanSILFunctionType originalFnTy,
-                                         IndexSubset *paramIndexSet,
-                                         GenericSignature derivativeGenSig) {
-  if (!derivativeGenSig)
-    derivativeGenSig = originalFnTy->getSubstGenericSignature();
-  if (!derivativeGenSig)
-    return nullptr;
-  // Constrain all wrt parameters to `Differentiable`.
-  auto &ctx = derivativeGenSig->getASTContext();
-  auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  SmallVector<Requirement, 4> requirements;
-  for (unsigned paramIdx : paramIndexSet->getIndices()) {
-    auto paramType = originalFnTy->getParameters()[paramIdx].getInterfaceType();
-    Requirement req(RequirementKind::Conformance, paramType,
-                    diffableProto->getDeclaredType());
-    requirements.push_back(req);
-  }
-  return evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequest{derivativeGenSig.getPointer(),
-                                      /*addedGenericParams*/ {},
-                                      std::move(requirements)},
-      nullptr);
-}
-
 namespace {
 
 class DifferentiationTransformer {
@@ -195,9 +162,10 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
   // Diagnose unsupported branching terminators.
   for (auto &bb : *original) {
     auto *term = bb.getTerminator();
-    // Supported terminators are: `br`, `cond_br`, `switch_enum`.
+    // Supported terminators are: `br`, `cond_br`, `switch_enum`,
+    // `switch_enum_addr`.
     if (isa<BranchInst>(term) || isa<CondBranchInst>(term) ||
-        isa<SwitchEnumInst>(term))
+        isa<SwitchEnumInst>(term) || isa<SwitchEnumAddrInst>(term))
       continue;
     // If terminator is an unsupported branching terminator, emit an error.
     if (term->isBranch()) {
@@ -597,9 +565,10 @@ emitDerivativeFunctionReference(
             invoker.getIndirectDifferentiation()
                 .second->getDerivativeGenericSignature();
       auto derivativeConstrainedGenSig =
-          getConstrainedDerivativeGenericSignature(
+          autodiff::getConstrainedDerivativeGenericSignature(
               originalFn->getLoweredFunctionType(), desiredParameterIndices,
-              contextualDerivativeGenSig);
+              contextualDerivativeGenSig,
+              LookUpConformanceInModule(context.getModule().getSwiftModule()));
       minimalWitness = SILDifferentiabilityWitness::createDefinition(
           context.getModule(), SILLinkage::Private, originalFn,
           desiredParameterIndices, desiredResultIndices,

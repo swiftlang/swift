@@ -1299,6 +1299,13 @@ public:
   /// false otherwise.
   bool forEachLookupTable(llvm::function_ref<bool(SwiftLookupTable &table)> fn);
 
+  /// Determine whether the given Clang entry is visible.
+  ///
+  /// FIXME: this is an elaborate hack to badly reflect Clang's
+  /// submodule visibility into Swift.
+  bool isVisibleClangEntry(const clang::NamedDecl *clangDecl);
+  bool isVisibleClangEntry(SwiftLookupTable::SingleEntry entry);
+
   /// Look for namespace-scope values with the given name in the given
   /// Swift lookup table.
   void lookupValue(SwiftLookupTable &table, DeclName name,

@@ -7,7 +7,7 @@ import DifferentiationUnittest
 var ClassMethodTests = TestSuite("ClassMethods")
 
 ClassMethodTests.test("Final") {
-  final class Final : Differentiable {
+  final class Final: Differentiable {
     func method(_ x: Tracked<Float>) -> Tracked<Float> {
       return x * x
     }
@@ -35,14 +35,14 @@ ClassMethodTests.test("Simple") {
     }
   }
 
-  class SubOverride : Super {
+  class SubOverride: Super {
     @differentiable(wrt: x)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
   }
 
-  class SubOverrideCustomDerivatives : Super {
+  class SubOverrideCustomDerivatives: Super {
     @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
@@ -64,19 +64,13 @@ ClassMethodTests.test("Simple") {
 }
 
 ClassMethodTests.test("SimpleWrtSelf") {
-  class Super : Differentiable {
+  class Super: Differentiable {
     var base: Tracked<Float>
     // FIXME(TF-648): Dummy to make `Super.AllDifferentiableVariables` be nontrivial.
     var _nontrivial: [Tracked<Float>] = []
 
-    // TODO(TF-654): Uncomment attribute when differentiation supports class initializers.
-    // TODO(TF-645): Remove `vjpInit` when differentiation supports `ref_element_addr`.
-    // @differentiable(vjp: vjpInit)
-    required init(base: Tracked<Float>) {
+    init(base: Tracked<Float>) {
       self.base = base
-    }
-    static func vjpInit(base: Tracked<Float>) -> (Super, (TangentVector) -> Tracked<Float>) {
-      return (Super(base: base), { x in x.base })
     }
 
     @differentiable(wrt: (self, x), jvp: jvpf, vjp: vjpf)
@@ -98,14 +92,36 @@ ClassMethodTests.test("SimpleWrtSelf") {
     }
   }
 
-  class SubOverride : Super {
+  final class SubOverride: Super {
+    @differentiable
+    override init(base: Tracked<Float>) {
+      super.init(base: base)
+    }
+
+    // Note: `TangentVector` type is unused.
+    // There is no way to customize `SubOverride: Differentiable` conformance.
+    // The conformance is always inherited from `Super`.
+    struct TangentVector: Differentiable & AdditiveArithmetic {
+      var base: Float
+    }
+
     @differentiable(wrt: (self, x))
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
   }
 
-  class SubOverrideCustomDerivatives : Super {
+  final class SubOverrideCustomDerivatives: Super {
+    @differentiable(vjp: vjpInit)
+    override init(base: Tracked<Float>) {
+      super.init(base: base)
+    }
+    static func vjpInit(base: Tracked<Float>) -> (
+      SubOverrideCustomDerivatives, (Super.TangentVector) -> Tracked<Float>
+    ) {
+      return (SubOverrideCustomDerivatives(base: base), { x in x.base * 2 })
+    }
+
     @differentiable(wrt: (self, x))
     @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
@@ -119,13 +135,10 @@ ClassMethodTests.test("SimpleWrtSelf") {
     }
   }
 
-  // TODO(TF-654): Uncomment when differentiation supports class initializers.
-  /*
   let v = Super.TangentVector(base: 100, _nontrivial: [])
   expectEqual(100, pullback(at: 1337) { x in Super(base: x) }(v))
   expectEqual(100, pullback(at: 1337) { x in SubOverride(base: x) }(v))
-  expectEqual(100, pullback(at: 1337) { x in SubOverrideCustomDerivatives(base: x) }(v))
-  */
+  expectEqual(200, pullback(at: 1337) { x in SubOverrideCustomDerivatives(base: x) }(v))
 
   // `valueWithGradient` is not used because nested tuples cannot be compared
   // with `expectEqual`.
@@ -141,7 +154,7 @@ ClassMethodTests.test("SimpleWrtSelf") {
 }
 
 ClassMethodTests.test("Generics") {
-  class Super<T : Differentiable & FloatingPoint> where T == T.TangentVector {
+  class Super<T: Differentiable & FloatingPoint> where T == T.TangentVector {
     @differentiable(wrt: x, jvp: jvpf, vjp: vjpf)
     func f(_ x: Tracked<T>) -> Tracked<T> {
       return Tracked<T>(2) * x
@@ -158,21 +171,21 @@ ClassMethodTests.test("Generics") {
     }
   }
 
-  class SubOverride<T : Differentiable & FloatingPoint> : Super<T> where T == T.TangentVector {
+  class SubOverride<T: Differentiable & FloatingPoint>: Super<T> where T == T.TangentVector {
     @differentiable(wrt: x)
     override func f(_ x: Tracked<T>) -> Tracked<T> {
       return x
     }
   }
 
-  class SubSpecializeOverride : Super<Float> {
+  class SubSpecializeOverride: Super<Float> {
     @differentiable(wrt: x)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
   }
 
-  class SubOverrideCustomDerivatives<T : Differentiable & FloatingPoint> : Super<T>
+  class SubOverrideCustomDerivatives<T: Differentiable & FloatingPoint>: Super<T>
   where T == T.TangentVector {
     @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
     override func f(_ x: Tracked<T>) -> Tracked<T> {
@@ -190,7 +203,7 @@ ClassMethodTests.test("Generics") {
     }
   }
 
-  class SubSpecializeOverrideCustomDerivatives : Super<Float80> {
+  class SubSpecializeOverrideCustomDerivatives: Super<Float80> {
     @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
     override func f(_ x: Tracked<Float80>) -> Tracked<Float80> {
       return 3 * x
@@ -207,7 +220,7 @@ ClassMethodTests.test("Generics") {
     }
   }
 
-  func classValueWithGradient<T : Differentiable & FloatingPoint>(
+  func classValueWithGradient<T: Differentiable & FloatingPoint>(
     _ c: Super<T>
   ) -> (T, T) where T == T.TangentVector {
     let (x,y) =  valueWithGradient(at: Tracked<T>(1), in: {
@@ -222,19 +235,13 @@ ClassMethodTests.test("Generics") {
 }
 
 ClassMethodTests.test("Methods") {
-  class Super : Differentiable {
+  class Super: Differentiable {
     var base: Tracked<Float>
     // Dummy to make `Super.AllDifferentiableVariables` be nontrivial.
     var _nontrivial: [Tracked<Float>] = []
 
-    // TODO(TF-654): Uncomment attribute when differentiation supports class initializers.
-    // TODO(TF-645): Remove `vjpInit` when differentiation supports `ref_element_addr`.
-    // @differentiable(vjp: vjpInit)
     init(base: Tracked<Float>) {
       self.base = base
-    }
-    static func vjpInit(base: Tracked<Float>) -> (Super, (TangentVector) -> Tracked<Float>) {
-      return (Super(base: base), { x in x.base })
     }
 
     @differentiable(vjp: vjpSquared)
@@ -248,7 +255,7 @@ ClassMethodTests.test("Methods") {
     }
   }
 
-  class Sub1 : Super {
+  class Sub1: Super {
     @differentiable(vjp: vjpSquared2)
     override func squared() -> Tracked<Float> { base * base }
     final func vjpSquared2() -> (Tracked<Float>, (Tracked<Float>) -> TangentVector) {
@@ -263,15 +270,8 @@ ClassMethodTests.test("Methods") {
     return valueWithGradient(at: c) { c in c.squared() }
   }
 
-  // TODO(TF-654, TF-645): Uncomment when differentiation supports class initializers or `ref_element_addr`.
-  // expectEqual(4, gradient(at: 2) { x in Super(base: x).squared() })
-
-  // TODO(TF-647): Handle `unchecked_ref_cast` in `Sub1.init` during pullback generation.
-  // FIXME: `Super.init` VJP type mismatch for empty `Super.AllDifferentiableVariables`:
-  // SIL verification failed: VJP type does not match expected VJP type
-  //   $@convention(method) (Tracked<Float>, @thick Super.Type) -> (@owned Super, @owned @callee_guaranteed (@guaranteed Super.AllDifferentiableVariables) -> Tracked<Float>)
-  //   $@convention(method) (Tracked<Float>, @owned Super) -> (@owned Super, @owned @callee_guaranteed (@guaranteed Super.AllDifferentiableVariables) -> Tracked<Float>)
-  // expectEqual(4, gradient(at: 2) { x in Sub1(base: x).squared() })
+  expectEqual(4, gradient(at: 2) { x in Super(base: x).squared() })
+  expectEqual(4, gradient(at: 2) { x in Sub1(base: x).squared() })
 
   expectEqual(Super.TangentVector(base: 4, _nontrivial: []),
               gradient(at: Super(base: 2)) { foo in foo.squared() })
@@ -280,16 +280,11 @@ ClassMethodTests.test("Methods") {
 }
 
 ClassMethodTests.test("Properties") {
-  class Super : Differentiable {
+  class Super: Differentiable {
+    @differentiable
     var base: Tracked<Float>
 
-    // TODO(TF-654): Uncomment attribute when differentiation supports class initializers.
-    // TODO(TF-645): Remove `vjpInit` when differentiation supports `ref_element_addr`.
-    // @differentiable(vjp: vjpInit)
     init(base: Tracked<Float>) { self.base = base }
-    static func vjpInit(base: Tracked<Float>) -> (Super, (TangentVector) -> Tracked<Float>) {
-      return (Super(base: base), { x in x.base })
-    }
 
     @differentiable(vjp: vjpSquared)
     var squared: Tracked<Float> { base * base }
@@ -300,22 +295,16 @@ ClassMethodTests.test("Properties") {
     }
   }
 
-  class Sub1 : Super {
-    // FIXME(TF-625): Crash due to `Super.AllDifferentiableVariables` abstraction pattern mismatch.
-    // SIL verification failed: vtable entry for #<anonymous function>Super.squared!getter.1.jvp.1.S must be ABI-compatible
-    //   ABI incompatible return values
-    //   @convention(method) (@guaranteed Super) -> (Tracked<Float>, @owned @callee_guaranteed (@guaranteed Super.AllDifferentiableVariables) -> Tracked<Float>)
-    //   @convention(method) (@guaranteed Sub1) -> (Tracked<Float>, @owned @callee_guaranteed (Super.AllDifferentiableVariables) -> Tracked<Float>)
-    // @differentiable
-    // override var squared: Tracked<Float> { base * base }
+  class Sub1: Super {
+    @differentiable
+    override var squared: Tracked<Float> { base * base }
   }
 
   func classValueWithGradient(_ c: Super) -> (Tracked<Float>, Super.TangentVector) {
     return valueWithGradient(at: c) { c in c.squared }
   }
 
-  // TODO(TF-654, TF-645): Uncomment when differentiation supports class initializers or `ref_element_addr`.
-  // expectEqual(4, gradient(at: 2) { x in Super(base: x).squared })
+  expectEqual(4, gradient(at: 2) { x in Super(base: x).squared })
   expectEqual(Super.TangentVector(base: 4),
               gradient(at: Super(base: 2)) { foo in foo.squared })
 }

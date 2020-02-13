@@ -235,6 +235,15 @@ enum class FixKind : uint8_t {
   /// Closure return type has to be explicitly specified because it can't be
   /// inferred in current context e.g. because it's a multi-statement closure.
   SpecifyClosureReturnType,
+
+  /// Object literal type coudn't be inferred because the module where
+  /// the default type that implements the associated literal protocol
+  /// is declared was not imported.
+  SpecifyObjectLiteralTypeImport,
+
+  /// Allow any type (and not just class or class-constrained type) to
+  /// be convertible to AnyObject.
+  AllowNonClassTypeToConvertToAnyObject,
 };
 
 class ConstraintFix {
@@ -1631,6 +1640,37 @@ public:
 
   static SpecifyClosureReturnType *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
+};
+
+class SpecifyObjectLiteralTypeImport final : public ConstraintFix {
+  SpecifyObjectLiteralTypeImport(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::SpecifyObjectLiteralTypeImport, locator) {}
+
+public:
+  std::string getName() const {
+    return "import required module to gain access to a default literal type";
+  }
+
+  bool diagnose(bool asNote = false) const;
+
+  static SpecifyObjectLiteralTypeImport *create(ConstraintSystem &cs,
+                                                ConstraintLocator *locator);
+
+};
+
+class AllowNonClassTypeToConvertToAnyObject final : public ContextualMismatch {
+  AllowNonClassTypeToConvertToAnyObject(ConstraintSystem &cs, Type type,
+                                        ConstraintLocator *locator);
+
+public:
+  std::string getName() const {
+    return "allow non-class type to convert to 'AnyObject'";
+  }
+
+  bool diagnose(bool asNote = false) const;
+
+  static AllowNonClassTypeToConvertToAnyObject *
+  create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

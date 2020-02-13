@@ -146,6 +146,9 @@ public:
   /// objects.
   unsigned EmitStackPromotionChecks : 1;
 
+  /// Emit functions to separate sections.
+  unsigned FunctionSections : 1;
+
   /// The maximum number of bytes used on a stack frame for stack promotion
   /// (includes alloc_stack allocations).
   unsigned StackPromotionSizeLimit = 1024;
@@ -253,7 +256,7 @@ public:
         IntegratedREPL(false), DisableLLVMOptzns(false),
         DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
         DisableFPElim(true), Playground(false), EmitStackPromotionChecks(false),
-        PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
+        FunctionSections(false), PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
         HasValueNamesSetting(false), ValueNames(false),
         EnableReflectionMetadata(true), EnableReflectionNames(true),
         EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
@@ -271,7 +274,7 @@ public:
   /// Appends to \p os an arbitrary string representing all options which
   /// influence the llvm compilation but are not reflected in the llvm module
   /// itself.
-  void writeLLVMCodeGenOptionsTo(llvm::raw_ostream &os) {
+  void writeLLVMCodeGenOptionsTo(llvm::raw_ostream &os) const {
     // We put a letter between each value simply to keep them from running into
     // one another. There might be a vague correspondence between meaning and
     // letter, but don't sweat it.
@@ -300,6 +303,16 @@ public:
 
   bool optimizeForSize() const {
     return OptMode == OptimizationMode::ForSize;
+  }
+
+  std::string getDebugFlags(StringRef PrivateDiscriminator) const {
+    std::string Flags = DebugFlags;
+    if (!PrivateDiscriminator.empty()) {
+      if (!Flags.empty())
+        Flags += " ";
+      Flags += ("-private-discriminator " + PrivateDiscriminator).str();
+    }
+    return Flags;
   }
 
   /// Return a hash code of any components from these options that should

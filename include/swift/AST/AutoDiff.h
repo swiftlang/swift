@@ -31,7 +31,7 @@ namespace swift {
 class AnyFunctionType;
 class TupleType;
 struct SILAutoDiffIndices;
-
+class SILFunctionType;
 
 /// A function type differentiability kind.
 enum class DifferentiabilityKind : uint8_t {
@@ -240,6 +240,21 @@ void getSubsetParameterTypes(IndexSubset *indices, AnyFunctionType *type,
                              SmallVectorImpl<Type> &results,
                              bool reverseCurryLevels = false);
 
+/// "Constrained" derivative generic signatures require all differentiability
+/// parameters to conform to the `Differentiable` protocol.
+///
+/// "Constrained" transpose generic signatures additionally require all
+/// linearity parameters to satisfy `Self == Self.TangentVector`.
+///
+/// Returns the "constrained" derivative/transpose generic signature given:
+/// - An original SIL function type.
+/// - Differentiability/linearity parameter indices.
+/// - A possibly "unconstrained" derivative/transpose generic signature.
+GenericSignature getConstrainedDerivativeGenericSignature(
+    SILFunctionType *originalFnTy, IndexSubset *parameterIndices,
+    GenericSignature derivativeGenSig, LookupConformanceFn lookupConformance,
+    bool isTranspose = false);
+
 } // end namespace autodiff
 
 } // end namespace swift
@@ -342,7 +357,6 @@ namespace swift {
 
 class ASTContext;
 class AnyFunctionType;
-class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 enum class SILLinkage : uint8_t;
 
@@ -464,6 +478,15 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
   indices.print(s);
   return s;
 }
+
+struct SILAutoDiffDerivativeFunctionKey {
+  SILFunctionType *originalType;
+  IndexSubset *parameterIndices;
+  IndexSubset *resultIndices;
+  AutoDiffDerivativeFunctionKind kind;
+  CanGenericSignature derivativeFnGenSig;
+  bool isReabstractionThunk;
+};
 
 /// In conjunction with the original function declaration, identifies an
 /// autodiff derivative function.
@@ -599,7 +622,60 @@ template <> struct DenseMapInfo<SILAutoDiffIndices> {
   }
 };
 
-} // end namespace llvm
+using swift::SILAutoDiffDerivativeFunctionKey;
+using swift::SILFunctionType;
+using swift::IndexSubset;
+using swift::AutoDiffDerivativeFunctionKind;
+using swift::GenericSignature;
+using swift::CanGenericSignature;
+
+template <> struct DenseMapInfo<SILAutoDiffDerivativeFunctionKey> {
+
+  static bool isEqual(const SILAutoDiffDerivativeFunctionKey lhs,
+                      const SILAutoDiffDerivativeFunctionKey rhs) {
+    return lhs.originalType == rhs.originalType &&
+        lhs.parameterIndices == rhs.parameterIndices &&
+        lhs.resultIndices == rhs.resultIndices &&
+        lhs.kind.rawValue == rhs.kind.rawValue &&
+        lhs.derivativeFnGenSig == rhs.derivativeFnGenSig &&
+        lhs.isReabstractionThunk == rhs.isReabstractionThunk;
+  }
+
+  static inline SILAutoDiffDerivativeFunctionKey getEmptyKey() {
+    return {
+        DenseMapInfo<SILFunctionType *>::getEmptyKey(),
+        DenseMapInfo<IndexSubset *>::getEmptyKey(),
+        DenseMapInfo<IndexSubset *>::getEmptyKey(),
+        AutoDiffDerivativeFunctionKind::innerty(
+            DenseMapInfo<unsigned>::getEmptyKey()),
+        CanGenericSignature(DenseMapInfo<GenericSignature>::getEmptyKey()),
+        (bool)DenseMapInfo<unsigned>::getEmptyKey()};
+  }
+
+  static inline SILAutoDiffDerivativeFunctionKey getTombstoneKey() {
+    return {
+        DenseMapInfo<SILFunctionType *>::getTombstoneKey(),
+        DenseMapInfo<IndexSubset *>::getTombstoneKey(),
+        DenseMapInfo<IndexSubset *>::getTombstoneKey(),
+        AutoDiffDerivativeFunctionKind::innerty(
+            DenseMapInfo<unsigned>::getTombstoneKey()),
+        CanGenericSignature(DenseMapInfo<GenericSignature>::getTombstoneKey()),
+        (bool)DenseMapInfo<unsigned>::getTombstoneKey()};
+  }
+
+  static unsigned getHashValue(const SILAutoDiffDerivativeFunctionKey &Val) {
+    return hash_combine(
+        DenseMapInfo<SILFunctionType *>::getHashValue(Val.originalType),
+        DenseMapInfo<IndexSubset *>::getHashValue(Val.parameterIndices),
+        DenseMapInfo<IndexSubset *>::getHashValue(Val.resultIndices),
+        DenseMapInfo<unsigned>::getHashValue((unsigned)Val.kind.rawValue),
+        DenseMapInfo<GenericSignature>::getHashValue(Val.derivativeFnGenSig),
+        DenseMapInfo<unsigned>::getHashValue(
+            (unsigned)Val.isReabstractionThunk));
+  }
+};
+
+} // namespace llvm
 // SWIFT_ENABLE_TENSORFLOW END
 
 #endif // SWIFT_AST_AUTODIFF_H

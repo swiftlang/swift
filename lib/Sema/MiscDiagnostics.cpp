@@ -194,28 +194,30 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           callee = dynamicMRE->getMember();
         }
 
-        visitArguments(Call, [&](unsigned argIndex, Expr *arg) {
-          // InOutExprs can be wrapped in some implicit casts.
-          Expr *unwrapped = arg;
-          if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(arg))
-            unwrapped = IIO->getSubExpr();
+        if (callee) {
+          visitArguments(Call, [&](unsigned argIndex, Expr *arg) {
+            checkMagicIdentifierMismatch(callee, uncurryLevel, argIndex, arg);
 
-          if (isa<InOutToPointerExpr>(unwrapped) ||
-              isa<ArrayToPointerExpr>(unwrapped) ||
-              isa<ErasureExpr>(unwrapped)) {
-            auto operand =
-              cast<ImplicitConversionExpr>(unwrapped)->getSubExpr();
-            if (auto *IOE = dyn_cast<InOutExpr>(operand))
-              operand = IOE->getSubExpr();
+            // InOutExprs can be wrapped in some implicit casts.
+            Expr *unwrapped = arg;
+            if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(arg))
+              unwrapped = IIO->getSubExpr();
 
-            // Also do some additional work based on how the function uses
-            // the argument.
-            if (callee) {
+            if (isa<InOutToPointerExpr>(unwrapped) ||
+                isa<ArrayToPointerExpr>(unwrapped) ||
+                isa<ErasureExpr>(unwrapped)) {
+              auto operand =
+                cast<ImplicitConversionExpr>(unwrapped)->getSubExpr();
+              if (auto *IOE = dyn_cast<InOutExpr>(operand))
+                operand = IOE->getSubExpr();
+
+              // Also do some additional work based on how the function uses
+              // the argument.
               checkConvertedPointerArgument(callee, uncurryLevel, argIndex,
                                             unwrapped, operand);
             }
-          }
-        });
+          });
+        }
       }
 
       // If we have an assignment expression, scout ahead for acceptable _'s.
@@ -421,6 +423,91 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // Otherwise, we can't support this.
     }
 
+    void checkMagicIdentifierMismatch(ConcreteDeclRef callee,
+                                      unsigned uncurryLevel,
+                                      unsigned argIndex,
+                                      Expr *arg) {
+      // We only care about args in the arg list.
+      if (uncurryLevel != (callee.getDecl()->hasCurriedSelf() ? 1 : 0))
+        return;
+
+      // Get underlying params for both callee and caller, if declared.
+      auto *calleeParam = getParameterAt(callee.getDecl(), argIndex);
+      auto *callerParam = dyn_cast_or_null<ParamDecl>(
+          arg->getReferencedDecl(/*stopAtParenExpr=*/true).getDecl()
+      );
+
+      // (Otherwise, we don't need to do anything.)
+      if (!calleeParam || !callerParam)
+        return;
+
+      auto calleeDefaultArg = getMagicIdentifierDefaultArgKind(calleeParam);
+      auto callerDefaultArg = getMagicIdentifierDefaultArgKind(callerParam);
+
+      // If one of the parameters doesn't have a default arg, or they both have
+      // the same one, everything's fine.
+      if (!calleeDefaultArg || !callerDefaultArg ||
+          *calleeDefaultArg == *callerDefaultArg)
+        return;
+
+      StringRef calleeDefaultArgString =
+          MagicIdentifierLiteralExpr::getKindString(*calleeDefaultArg);
+      StringRef callerDefaultArgString =
+          MagicIdentifierLiteralExpr::getKindString(*callerDefaultArg);
+
+      // Emit main warning
+      Ctx.Diags.diagnose(arg->getLoc(), diag::default_magic_identifier_mismatch,
+                         callerParam->getName(), callerDefaultArgString,
+                         calleeParam->getName(), calleeDefaultArgString);
+
+      // Add "change caller default arg" fixit
+      SourceLoc callerDefaultArgLoc =
+          callerParam->getStructuralDefaultExpr()->getLoc();
+      Ctx.Diags.diagnose(callerDefaultArgLoc,
+                         diag::change_caller_default_to_match_callee,
+                         callerParam->getName(), calleeDefaultArgString)
+        .fixItReplace(callerDefaultArgLoc, calleeDefaultArgString);
+
+      // Add "silence with parens" fixit
+      Ctx.Diags.diagnose(arg->getLoc(),
+                         diag::silence_default_magic_identifier_mismatch)
+        .fixItInsert(arg->getStartLoc(), "(")
+        .fixItInsertAfter(arg->getEndLoc(), ")");
+
+      // Point to callee parameter
+      Ctx.Diags.diagnose(calleeParam, diag::decl_declared_here,
+                         calleeParam->getFullName());
+    }
+
+    Optional<MagicIdentifierLiteralExpr::Kind>
+    getMagicIdentifierDefaultArgKind(const ParamDecl *param) {
+      switch (param->getDefaultArgumentKind()) {
+      case DefaultArgumentKind::Column:
+        return MagicIdentifierLiteralExpr::Kind::Column;
+      case DefaultArgumentKind::DSOHandle:
+        return MagicIdentifierLiteralExpr::Kind::DSOHandle;
+      case DefaultArgumentKind::File:
+        return MagicIdentifierLiteralExpr::Kind::File;
+      case DefaultArgumentKind::FilePath:
+        return MagicIdentifierLiteralExpr::Kind::FilePath;
+      case DefaultArgumentKind::Function:
+        return MagicIdentifierLiteralExpr::Kind::Function;
+      case DefaultArgumentKind::Line:
+        return MagicIdentifierLiteralExpr::Kind::Line;
+
+      case DefaultArgumentKind::None:
+      case DefaultArgumentKind::Normal:
+      case DefaultArgumentKind::Inherited:
+      case DefaultArgumentKind::NilLiteral:
+      case DefaultArgumentKind::EmptyArray:
+      case DefaultArgumentKind::EmptyDictionary:
+      case DefaultArgumentKind::StoredProperty:
+        return None;
+      }
+
+      llvm_unreachable("Unhandled DefaultArgumentKind in "
+                       "getMagicIdentifierDefaultArgKind");
+    }
 
     void checkUseOfModule(DeclRefExpr *E) {
       // Allow module values as a part of:

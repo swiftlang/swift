@@ -203,6 +203,8 @@ PASS(LICM, "licm",
      "Loop Invariant Code Motion")
 PASS(LateCodeMotion, "late-codemotion",
      "Late Code Motion with Release Hoisting")
+PASS(LateDeadFunctionElimination, "late-deadfuncelim",
+     "Late Dead Function Elimination")
 PASS(LateInliner, "late-inline",
      "Late Function Inlining")
 PASS(LoopCanonicalizer, "loop-canonicalizer",

@@ -79,6 +79,15 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
   for (auto *A : Attrs.getAttributes<DifferentiableAttr>())
     (void)A->getParameterIndices();
 
+  // Propagate `@noDerivative` as `[_semantics "autodiff.nonvarying"]`.
+  //
+  // `@noDerivative` implies non-varying semantics for differentiable activity
+  // analysis. SIL values produced from references to `@noDerivative`
+  // declarations will not be marked as varying; these values do not need a
+  // derivative.
+  if (Attrs.hasAttribute<NoDerivativeAttr>())
+    F->addSemanticsAttr("autodiff.nonvarying");
+
   // Propagate @_dynamicReplacement(for:).
   if (constant.isNull())
     return;

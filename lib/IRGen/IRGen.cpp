@@ -152,7 +152,7 @@ static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
 
 std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
            std::string>
-swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
+swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
   // Things that maybe we should collect from the command line:
   //   - relocation model
   //   - code model
@@ -162,6 +162,7 @@ swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
   // Explicitly request debugger tuning for LLDB which is the default
   // on Darwin platforms but not on others.
   TargetOpts.DebuggerTuning = llvm::DebuggerKind::LLDB;
+  TargetOpts.FunctionSections = Opts.FunctionSections;
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
@@ -178,7 +179,8 @@ void setModuleFlags(IRGenModule &IGM) {
                         IRGenModule::swiftVersion);
 }
 
-void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
+void swift::performLLVMOptimizations(const IRGenOptions &Opts,
+                                     llvm::Module *Module,
                                      llvm::TargetMachine *TargetMachine) {
   // Set up a pipeline.
   PassManagerBuilderWrapper PMBuilder(Opts);
@@ -344,7 +346,7 @@ public:
 
 /// Computes the MD5 hash of the llvm \p Module including the compiler version
 /// and options which influence the compilation.
-static void getHashOfModule(MD5::MD5Result &Result, IRGenOptions &Opts,
+static void getHashOfModule(MD5::MD5Result &Result, const IRGenOptions &Opts,
                             llvm::Module *Module,
                             llvm::TargetMachine *TargetMachine,
                             version::Version const& effectiveLanguageVersion) {
@@ -456,7 +458,7 @@ diagnoseSync(DiagnosticEngine *Diags, llvm::sys::Mutex *DiagMutex,
 
 /// Run the LLVM passes. In multi-threaded compilation this will be done for
 /// multiple LLVM modules in parallel.
-bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
+bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine *Diags,
                         llvm::sys::Mutex *DiagMutex,
                         llvm::GlobalVariable *HashGlobal,
                         llvm::Module *Module,
@@ -465,6 +467,11 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
                         StringRef OutputFilename,
                         UnifiedStatsReporter *Stats) {
 #ifndef NDEBUG
+// FIXME: Some bots are failing. See: rdar://54708850
+//#define DEBUG_VERIFY_GENERATED_CODE
+#endif
+
+#ifdef DEBUG_VERIFY_GENERATED_CODE
   // To check that we only skip generating code when it would have no effect, in
   // assertion builds we still generate the code, but write it into a temporary
   // file that we compare to the original file.
@@ -497,7 +504,7 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
         !Opts.PrintInlineTree &&
         !needsRecompile(OutputFilename, HashData, HashGlobal, DiagMutex)) {
       // The llvm IR did not change. We don't need to re-create the object file.
-#ifdef NDEBUG
+#ifndef DEBUG_VERIFY_GENERATED_CODE
       return false;
 #else
       // ...but we're in an asserts build, so we want to check that assumption.
@@ -601,8 +608,7 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
     if (DiagMutex)
       DiagMutex->unlock();
   }
-#if 0
-#ifndef NDEBUG
+#ifdef DEBUG_VERIFY_GENERATED_CODE
   if (!OriginalOutputFilename.empty()) {
     // We're done changing the file; make sure it's saved before we compare.
     RawOS->close();
@@ -638,13 +644,12 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
     }
   }
 #endif
-#endif
 
   return false;
 }
 
 std::unique_ptr<llvm::TargetMachine>
-swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
+swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
   CodeGenOpt::Level OptLevel = Opts.shouldOptimize()
                                    ? CodeGenOpt::Default // -Os
                                    : CodeGenOpt::None;
@@ -696,7 +701,7 @@ swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
   return std::unique_ptr<llvm::TargetMachine>(TargetMachine);
 }
 
-IRGenerator::IRGenerator(IRGenOptions &options, SILModule &module)
+IRGenerator::IRGenerator(const IRGenOptions &options, SILModule &module)
   : Opts(options), SIL(module), QueueIndex(0) {
 }
 
@@ -807,6 +812,7 @@ static void initLLVMModule(const IRGenModule &IGM, ModuleDecl &M) {
 std::pair<IRGenerator *, IRGenModule *>
 swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
                                 StringRef MainInputFilenameForDebugInfo,
+                                StringRef PrivateDiscriminator,
                                 llvm::LLVMContext &LLVMContext) {
 
   IRGenOptions Opts;
@@ -818,7 +824,8 @@ swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
   // Create the IR emitter.
   IRGenModule *IGM =
       new IRGenModule(*irgen, std::move(targetMachine), nullptr, LLVMContext,
-                      "", OutputFilename, MainInputFilenameForDebugInfo);
+                      "", OutputFilename, MainInputFilenameForDebugInfo,
+                      PrivateDiscriminator);
 
   initLLVMModule(*IGM, *SILMod->getSwiftModule());
 
@@ -854,9 +861,10 @@ static void runIRGenPreparePasses(SILModule &Module,
 /// Generates LLVM IR, runs the LLVM passes and produces the output file.
 /// All this is done in a single thread.
 static std::unique_ptr<llvm::Module>
-performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
+performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
                     std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
                     const PrimarySpecificPaths &PSPs,
+                    StringRef PrivateDiscriminator,
                     llvm::LLVMContext &LLVMContext, SourceFile *SF = nullptr,
                     llvm::GlobalVariable **outModuleHash = nullptr,
                     llvm::StringSet<> *linkerDirectives = nullptr) {
@@ -871,7 +879,8 @@ performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
   // Create the IR emitter.
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, LLVMContext,
                   ModuleName, PSPs.OutputFilename,
-                  PSPs.MainInputFilenameForDebugInfo);
+                  PSPs.MainInputFilenameForDebugInfo,
+                  PrivateDiscriminator);
 
   initLLVMModule(IGM, *SILMod->getSwiftModule());
 
@@ -1068,7 +1077,7 @@ struct LLVMCodeGenThreads {
 /// Generates LLVM IR, runs the LLVM passes and produces the output files.
 /// All this is done in multiple threads.
 static void performParallelIRGeneration(
-    IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
+    const IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
     StringRef ModuleName, int numThreads,
     ArrayRef<std::string> outputFilenames,
     llvm::StringSet<> *linkerDirectives) {
@@ -1118,7 +1127,8 @@ static void performParallelIRGeneration(
     // Create the IR emitter.
     IRGenModule *IGM =
         new IRGenModule(irgen, std::move(targetMachine), nextSF, *Context,
-                        ModuleName, *OutputIter++, nextSF->getFilename());
+                        ModuleName, *OutputIter++, nextSF->getFilename(),
+                        nextSF->getPrivateDiscriminator().str());
     IGMcreated = true;
 
     initLLVMModule(*IGM, *SILMod->getSwiftModule());
@@ -1261,7 +1271,7 @@ static void performParallelIRGeneration(
 }
 
 std::unique_ptr<llvm::Module> swift::performIRGeneration(
-    IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
+    const IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
     StringRef ModuleName, const PrimarySpecificPaths &PSPs,
     llvm::LLVMContext &LLVMContext,
     ArrayRef<std::string> parallelOutputFilenames,
@@ -1278,19 +1288,21 @@ std::unique_ptr<llvm::Module> swift::performIRGeneration(
     return nullptr;
   }
   return ::performIRGeneration(Opts, M, std::move(SILMod), ModuleName, PSPs,
-                               LLVMContext, nullptr, outModuleHash,
-                               LinkerDirectives);
+                               "", LLVMContext, nullptr,
+                               outModuleHash, LinkerDirectives);
 }
 
 std::unique_ptr<llvm::Module> swift::
-performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
+performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
                     std::unique_ptr<SILModule> SILMod,
                     StringRef ModuleName, const PrimarySpecificPaths &PSPs,
+                    StringRef PrivateDiscriminator,
                     llvm::LLVMContext &LLVMContext,
                     llvm::GlobalVariable **outModuleHash,
                     llvm::StringSet<> *LinkerDirectives) {
   return ::performIRGeneration(Opts, SF.getParentModule(), std::move(SILMod),
-                               ModuleName, PSPs, LLVMContext, &SF,
+                               ModuleName, PSPs, PrivateDiscriminator,
+                               LLVMContext, &SF,
                                outModuleHash, LinkerDirectives);
 }
 
@@ -1310,7 +1322,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   if (!targetMachine) return;
 
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, VMContext,
-                  OutputPath, OutputPath, "");
+                  OutputPath, OutputPath, "", "");
   initLLVMModule(IGM, *SILMod.getSwiftModule());
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =
@@ -1345,7 +1357,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
                 OutputPath);
 }
 
-bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
+bool swift::performLLVM(const IRGenOptions &Opts, ASTContext &Ctx,
                         llvm::Module *Module, StringRef OutputFilename,
                         UnifiedStatsReporter *Stats) {
   // Build TargetMachine.

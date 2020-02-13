@@ -13,7 +13,7 @@
 // =============================================================================
 
 
-// RUN: cd %t && %swiftc_driver -enable-batch-mode -j2 -incremental -enable-source-range-dependencies -driver-compare-incremental-schemes-path=./comparo -driver-show-incremental -driver-show-job-lifecycle ./main.swift ./fileA.swift ./fileB.swift -module-name main -output-file-map %t/output.json    >& %t/output2
+// RUN: cd %t && %swiftc_driver -disable-fine-grained-dependencies -enable-batch-mode -j2 -incremental -enable-source-range-dependencies -driver-compare-incremental-schemes-path=./comparo -driver-show-incremental -driver-show-job-lifecycle ./main.swift ./fileA.swift ./fileB.swift -module-name main -output-file-map %t/output.json    >& %t/output2
 
 // RUN: tail -1 %t/comparo | %FileCheck -match-full-lines -check-prefix=CHECK-COMPARO-1 %s
 // CHECK-COMPARO-1: *** Incremental build disabled because different arguments passed to compiler, cannot compare ***
@@ -62,7 +62,7 @@
 // Steady-state: Now, do it again with no changes
 // =============================================================================
 
-// RUN: cd %t && %swiftc_driver -enable-batch-mode -j2 -incremental -enable-source-range-dependencies -driver-compare-incremental-schemes-path=./comparo -driver-show-incremental -driver-show-job-lifecycle ./main.swift ./fileA.swift ./fileB.swift -module-name main -output-file-map %t/output.json  >& %t/output3
+// RUN: cd %t && %swiftc_driver -disable-fine-grained-dependencies -enable-batch-mode -j2 -incremental -enable-source-range-dependencies -driver-compare-incremental-schemes-path=./comparo -driver-show-incremental -driver-show-job-lifecycle ./main.swift ./fileA.swift ./fileB.swift -module-name main -output-file-map %t/output.json  >& %t/output3
 
 // RUN: tail -1 %t/comparo | %FileCheck -match-full-lines -check-prefix=CHECK-COMPARO-2 %s
 // CHECK-COMPARO-2: *** Range benefit: 0 compilations, 0 stages, without ranges: 0, with ranges: 0, used ranges, total: 3 ***
@@ -100,7 +100,7 @@
 // =============================================================================
 
 // RUN: touch %t/*.swift
-// RUN: cd %t && %swiftc_driver -enable-batch-mode -j2 -incremental -enable-source-range-dependencies -driver-compare-incremental-schemes-path=./comparo -driver-show-incremental -driver-show-job-lifecycle ./main.swift ./fileA.swift ./fileB.swift -module-name main -output-file-map %t/output.json  >& %t/output4
+// RUN: cd %t && %swiftc_driver -disable-fine-grained-dependencies -enable-batch-mode -j2 -incremental -enable-source-range-dependencies -driver-compare-incremental-schemes-path=./comparo -driver-show-incremental -driver-show-job-lifecycle ./main.swift ./fileA.swift ./fileB.swift -module-name main -output-file-map %t/output.json  >& %t/output4
 
 
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-COMPARO-3 %s < %t/comparo
@@ -139,7 +139,7 @@
 // =============================================================================
 
 // RUN: cp %t/fileB{1-internal-change,}.swift
-// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output5
+// RUN: cd %t && %swiftc_driver -disable-fine-grained-dependencies -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output5
 
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-INTERNAL-CHANGE  %s < %t/output5
 // CHECK-INTERNAL-CHANGE: Skipping <With ranges> : {compile: main.o <= main.swift}
@@ -150,11 +150,11 @@
 // RUN: %FileCheck -check-prefix=CHECK-NO-FILEA %s < %t/output5
 
 // =============================================================================
-// Make an external change, should  recompile dependents right away with ranges
+// Make an external change, should recompile dependents right away with ranges
 // =============================================================================
 
 // RUN: cp %t/fileB{2-external-change,}.swift
-// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output6
+// RUN: cd %t && %swiftc_driver -disable-fine-grained-dependencies -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output6
 
 
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-EXTERNAL-CHANGE-1  %s < %t/output6

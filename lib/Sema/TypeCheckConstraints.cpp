@@ -83,6 +83,13 @@ TypeVariableType::Implementation::getGenericParameter() const {
   return locator ? locator->getGenericParameter() : nullptr;
 }
 
+bool TypeVariableType::Implementation::isClosureType() const {
+  if (!(locator && locator->getAnchor()))
+    return false;
+
+  return isa<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
+}
+
 bool TypeVariableType::Implementation::isClosureResultType() const {
   if (!(locator && locator->getAnchor()))
     return false;
@@ -2182,9 +2189,6 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
 
-  if (options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType))
-    csOptions |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
-
   if (options.contains(TypeCheckExprFlags::SubExpressionDiagnostics))
     csOptions |= ConstraintSystemFlags::SubExpressionDiagnostics;
 
@@ -2210,7 +2214,14 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
 
   // Tell the constraint system what the contextual type is.  This informs
   // diagnostics and is a hint for various performance optimizations.
-  cs.setContextualType(expr, convertType, convertTypePurpose);
+  // FIXME: Look through LoadExpr. This is an egregious hack due to the
+  // way typeCheckExprIndependently works.
+  Expr *contextualTypeExpr = expr;
+  if (auto loadExpr = dyn_cast_or_null<LoadExpr>(contextualTypeExpr))
+    contextualTypeExpr = loadExpr->getSubExpr();
+  cs.setContextualType(
+      contextualTypeExpr, convertType, convertTypePurpose,
+      options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType));
 
   // If the convertType is *only* provided for that hint, then null it out so
   // that we don't later treat it as an actual conversion constraint.
@@ -2454,7 +2465,7 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
 
   // Construct a constraint system from this expression.
   ConstraintSystem CS(DC, options);
-  expr = CS.generateConstraints(expr);
+  expr = CS.generateConstraints(expr, DC);
   if (!expr)
     return nullptr;
 
@@ -2654,8 +2665,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         initType = patternType;
 
         // Add a conversion constraint between the types.
-        if (!cs.Options.contains(
-                   ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType)) {
+        if (!initType->is<OpaqueTypeArchetypeType>()) {
           cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                            patternType, Locator, /*isFavored*/true);
         }
@@ -2976,12 +2986,6 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
                        SequenceProto->getDeclaredType(), ContextualLocator);
 
-      // Since we are using "contextual type" here, it has to be recorded
-      // in the constraint system for diagnostics to have access to "purpose".
-      cs.setContextualType(
-          expr, TypeLoc::withoutLoc(SequenceProto->getDeclaredType()),
-          CTP_ForEachStmt);
-
       auto elementLocator = cs.getConstraintLocator(
           ContextualLocator, ConstraintLocator::SequenceElementType);
 
@@ -3052,10 +3056,6 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       SequenceType = solution.simplifyType(SequenceType);
       ElementType = solution.simplifyType(ElementType);
       IteratorType = solution.simplifyType(IteratorType);
-
-      // Perform any necessary conversions of the sequence (e.g. [T]! -> [T]).
-      expr = solution.coerceToType(expr, SequenceType, Locator);
-      if (!expr) return nullptr;
 
       cs.cacheExprTypes(expr);
       Stmt->setSequence(expr);
@@ -3147,8 +3147,15 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   Expr *seq = stmt->getSequence();
   assert(seq && "type-checking an uninitialized for-each statement?");
 
+  auto sequenceProto = TypeChecker::getProtocol(
+      dc->getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
+  if (!sequenceProto)
+    return true;
+
   // Type-check the for-each loop sequence and element pattern.
-  auto resultTy = TypeChecker::typeCheckExpression(seq, dc, &listener);
+  auto resultTy = TypeChecker::typeCheckExpression(
+      seq, dc, TypeLoc::withoutLoc(sequenceProto->getDeclaredType()),
+      CTP_ForEachStmt, TypeCheckExprFlags::ConvertTypeIsOnlyAHint, &listener);
   if (!resultTy)
     return true;
   return false;
@@ -3761,9 +3768,9 @@ void ConstraintSystem::print(raw_ostream &out) const {
   
   out << "Score: " << CurrentScore << "\n";
 
-  if (auto ty = contextualType.getType()) {
-    out << "Contextual Type: " << ty.getString(PO);
-    if (TypeRepr *TR = contextualType.getTypeRepr()) {
+  for (const auto &contextualType : contextualTypes) {
+    out << "Contextual Type: " << contextualType.second.getType().getString(PO);
+    if (TypeRepr *TR = contextualType.second.typeLoc.getTypeRepr()) {
       out << " at ";
       TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
     }

@@ -7,7 +7,7 @@ add_swift_host_library(swiftSymbolGraphGen STATIC
   SymbolGraphGen.cpp
   SymbolGraphASTWalker.cpp)
 
-target_link_libraries(swiftSymbolGraphGen
+target_link_libraries(swiftSymbolGraphGen PRIVATE
   swiftAST
   swiftFrontend
   swiftMarkup)

@@ -595,9 +595,10 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
   return true;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
-                                             ValueDecl *baseDecl) {
+/// Returns true if `derivedDecl` has a `@differentiable` attribute that
+/// overrides one from `baseDecl`.
+static bool hasOverridingDifferentiableAttribute(ValueDecl *derivedDecl,
+                                                 ValueDecl *baseDecl) {
   ASTContext &ctx = derivedDecl->getASTContext();
   auto &diags = ctx.Diags;
 
@@ -607,12 +608,13 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
   if (!derivedAFD || !baseAFD)
     return false;
 
-  auto derivedDAs = derivedAFD->getAttrs()
-      .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
+  auto derivedDAs =
+      derivedAFD->getAttrs()
+          .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
   auto baseDAs = baseAFD->getAttrs().getAttributes<DifferentiableAttr>();
 
-  // Make sure all the `@differentiable` attributes in `baseDecl` are
-  // also declared in `derivedDecl`.
+  // Make sure all the `@differentiable` attributes on `baseDecl` are
+  // also declared on `derivedDecl`.
   bool diagnosed = false;
   for (auto *baseDA : baseDAs) {
     auto baseParameters = baseDA->getParameterIndices();
@@ -638,20 +640,26 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
     if (defined)
       continue;
     diagnosed = true;
-    // Omit printing wrt clause if attribute differentiation parameters match
-    // inferred differentiation parameters.
+    // Emit an error and fix-it showing the missing base declaration's
+    // `@differentiable` attribute.
+    // Omit printing `wrt:` clause if attribute's differentiability parameters
+    // match inferred differentiability parameters.
     auto *inferredParameters =
         TypeChecker::inferDifferentiabilityParameters(derivedAFD, nullptr);
-    bool omitWrtClause = !baseParameters ||
+    bool omitWrtClause =
+        !baseParameters ||
         baseParameters->getNumIndices() == inferredParameters->getNumIndices();
     // Get `@differentiable` attribute description.
-    std::string baseDAString;
-    llvm::raw_string_ostream stream(baseDAString);
-    baseDA->print(stream, derivedDecl, omitWrtClause,
+    std::string baseDiffAttrString;
+    llvm::raw_string_ostream os(baseDiffAttrString);
+    baseDA->print(os, derivedDecl, omitWrtClause,
                   /*omitDerivativeFunctions*/ true);
-    diags.diagnose(
-        derivedDecl, diag::overriding_decl_missing_differentiable_attr,
-        StringRef(stream.str()).trim());
+    os.flush();
+    diags
+        .diagnose(derivedDecl,
+                  diag::overriding_decl_missing_differentiable_attr,
+                  baseDiffAttrString)
+        .fixItInsert(derivedDecl->getStartLoc(), baseDiffAttrString + ' ');
     diags.diagnose(baseDecl, diag::overridden_here);
   }
   // If a diagnostic was produced, return false.
@@ -691,7 +699,6 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
 
   return false;
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 /// Returns true if the given declaration is for the `NSObject.hashValue`
 /// property.
@@ -855,11 +862,10 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     if (!areOverrideCompatibleSimple(decl, parentDecl))
       continue;
 
-    // SWIFT_ENABLE_TENSORFLOW
-    // Check whether the `@differentiable` attribute allows overriding.
-    if (overridesDifferentiableAttribute(decl, parentDecl))
+    // Check whether the derived declaration has a `@differentiable` attribute
+    // that overrides one from the parent declaration.
+    if (hasOverridingDifferentiableAttribute(decl, parentDecl))
       continue;
-    // SWIFT_ENABLE_TENSORFLOW END
 
     auto parentMethod = dyn_cast<AbstractFunctionDecl>(parentDecl);
     auto parentStorage = dyn_cast<AbstractStorageDecl>(parentDecl);
@@ -1402,7 +1408,6 @@ namespace  {
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(IBSegueAction)
-    UNINTERESTING_ATTR(ImplicitlySynthesizesNestedRequirement)
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
@@ -1480,8 +1485,6 @@ namespace  {
     UNINTERESTING_ATTR(FunctionBuilder)
     UNINTERESTING_ATTR(ProjectedValueProperty)
     UNINTERESTING_ATTR(OriginallyDefinedIn)
-
-    UNINTERESTING_ATTR(Quoted)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1864,16 +1867,6 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
     diagnoseOverrideForAvailability(override, base);
-  }
-
-  // Overrides of NSObject.hashValue are deprecated; one should override
-  // NSObject.hash instead.
-  // FIXME: Remove this when NSObject.hashValue becomes non-open in
-  // swift-corelibs-foundation.
-  if (isNSObjectHashValue(base) &&
-      base->hasOpenAccess(override->getDeclContext())) {
-    override->diagnose(diag::override_nsobject_hashvalue_warning)
-      .fixItReplace(SourceRange(override->getNameLoc()), "hash");
   }
 
   /// Check attributes associated with the base; some may need to merged with

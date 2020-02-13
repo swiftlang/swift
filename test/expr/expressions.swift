@@ -708,7 +708,7 @@ func test() {
 func unusedExpressionResults() {
   // Unused l-value
   _ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
-
+  // expected-error@-1 {{expression resolves to an unused variable}}
 
   // <rdar://problem/20749592> Conditional Optional binding hides compiler error
   let optionalc:C? = nil
@@ -748,10 +748,8 @@ func invalidDictionaryLiteral() {
 }
 
 
-[4].joined(separator: [1]) // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
-// expected-error@-1 {{cannot convert value of type '[Int]' to expected argument type 'String'}}
-[4].joined(separator: [[[1]]]) // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
-// expected-error@-1 {{cannot convert value of type '[[[Int]]]' to expected argument type 'String'}}
+[4].joined(separator: [1]) // expected-error {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'Sequence'}}
+[4].joined(separator: [[[1]]]) // expected-error {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'Sequence'}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons

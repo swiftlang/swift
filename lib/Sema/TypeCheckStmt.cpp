@@ -144,10 +144,10 @@ namespace {
           }
         }
 
-        // If the closure has a single expression body, we need to walk into it
-        // with a new sequence.  Otherwise, it'll have been separately
-        // type-checked.
-        if (CE->hasSingleExpressionBody())
+        // If the closure has a single expression body or has had a function
+        // builder applied to it, we need to walk into it with a new sequence.
+        // Otherwise, it'll have been separately type-checked.
+        if (CE->hasSingleExpressionBody() || CE->hasAppliedFunctionBuilder())
           CE->getBody()->walk(ContextualizeClosures(CE));
 
         TypeChecker::computeCaptures(CE);
@@ -1390,18 +1390,10 @@ static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
     case ExprKind::StringLiteral: return "string";
     case ExprKind::InterpolatedStringLiteral: return "string";
     case ExprKind::MagicIdentifierLiteral:
-      switch (cast<MagicIdentifierLiteralExpr>(LE)->getKind()) {
-      case MagicIdentifierLiteralExpr::Kind::File: return "#file";
-      case MagicIdentifierLiteralExpr::Kind::FilePath: return "#filePath";
-      case MagicIdentifierLiteralExpr::Kind::Line: return "#line";
-      case MagicIdentifierLiteralExpr::Kind::Column: return "#column";
-      case MagicIdentifierLiteralExpr::Kind::Function: return "#function";
-      case MagicIdentifierLiteralExpr::Kind::DSOHandle: return "#dsohandle";
-      }
+      return MagicIdentifierLiteralExpr::getKindString(
+          cast<MagicIdentifierLiteralExpr>(LE)->getKind());
     case ExprKind::NilLiteral: return "nil";
     case ExprKind::ObjectLiteral: return "object";
-    case ExprKind::QuoteLiteral:
-      return "quote";
 
     // Define an unreachable case for all non-literal expressions.
     // This way, if a new literal is added in the future, the compiler

@@ -1,19 +1,21 @@
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+from __future__ import absolute_import, unicode_literals
+
 import multiprocessing
+
+from build_swift import argparse
+from build_swift import defaults
 
 from swift_build_support.swift_build_support import host
 from swift_build_support.swift_build_support import targets
-
-from .. import argparse
-from .. import defaults
 
 
 __all__ = [
@@ -74,6 +76,7 @@ EXPECTED_DEFAULTS = {
     'build_ninja': False,
     'build_osx': True,
     'build_playgroundsupport': False,
+    'build_pythonkit': False,
     'build_runtime_with_host_compiler': False,
     'build_stdlib_deployment_targets': ['all'],
     'build_subdir': None,
@@ -91,8 +94,8 @@ EXPECTED_DEFAULTS = {
     'build_sourcekitlsp': False,
     'install_swiftpm': False,
     'install_swiftsyntax': False,
-    'skip_install_swiftsyntax_module': False,
     'swiftsyntax_verify_generated_files': False,
+    'install_pythonkit': False,
     'install_sourcekitlsp': False,
     'install_skstresstester': False,
     'install_swiftevolve': False,
@@ -171,6 +174,8 @@ EXPECTED_DEFAULTS = {
     'tsan_libdispatch_test': False,
     'long_test': False,
     'lto_type': None,
+    'maccatalyst': False,
+    'maccatalyst_ios_tests': False,
     'dump_config': False,
     'show_sdks': False,
     'skip_build': False,
@@ -204,6 +209,7 @@ EXPECTED_DEFAULTS = {
     'test_optimized': None,
     'test_osx': False,
     'test_paths': [],
+    'test_pythonkit': False,
     'test_tvos': False,
     'test_tvos_host': False,
     'test_tvos_simulator': False,
@@ -451,7 +457,12 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--llbuild', dest='build_llbuild'),
     SetTrueOption('--lldb', dest='build_lldb'),
     SetTrueOption('--libcxx', dest='build_libcxx'),
+    SetTrueOption('--maccatalyst', dest='maccatalyst'),
+    SetTrueOption('--maccatalyst-ios-tests', dest='maccatalyst_ios_tests'),
     SetTrueOption('--playgroundsupport', dest='build_playgroundsupport'),
+    SetTrueOption('--pythonkit', dest='build_pythonkit'),
+    SetTrueOption('--install-pythonkit', dest='install_pythonkit'),
+    SetTrueOption('--test-pythonkit', dest='test_pythonkit'),
     SetTrueOption('--skip-build'),
     SetTrueOption('--swiftpm', dest='build_swiftpm'),
     SetTrueOption('--swiftsyntax', dest='build_swiftsyntax'),
@@ -495,8 +506,6 @@ EXPECTED_OPTIONS = [
     EnableOption('--indexstore-db', dest='build_indexstoredb'),
     EnableOption('--sourcekit-lsp', dest='build_sourcekitlsp'),
     EnableOption('--install-swiftsyntax', dest='install_swiftsyntax'),
-    EnableOption('--skip-install-swiftsyntax-module',
-                 dest='skip_install_swiftsyntax_module'),
     EnableOption('--swiftsyntax-verify-generated-files',
                  dest='swiftsyntax_verify_generated_files'),
     EnableOption('--install-swiftpm', dest='install_swiftpm'),

@@ -266,10 +266,17 @@ private:
 
   SILBasicBlock::iterator getNextFunctionLocalAllocationInsertionPoint();
 
+  /// Creates and returns a local allocation with the given type.
+  ///
+  /// Local allocations are created uninitialized in the pullback entry and
+  /// deallocated in the pullback exit. All local allocations not in
+  /// `destroyedLocalAllocations` are also destroyed in the pullback exit.
+  AllocStackInst *createFunctionLocalAllocation(SILType type, SILLocation loc);
+
   SILValue &getAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer);
 
-  // Accumulates `rhsBufferAccess` into the adjoint buffer corresponding to
-  // `originalBuffer`.
+  /// Accumulates `rhsBufferAccess` into the adjoint buffer corresponding to
+  /// `originalBuffer`.
   void addToAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
                           SILValue rhsBufferAccess, SILLocation loc);
 
@@ -354,6 +361,13 @@ public:
   ///                     field in tangent space corresponding to #field
   void visitStructExtractInst(StructExtractInst *sei);
 
+  /// Handle `ref_element_addr` instruction.
+  ///   Original: y = ref_element_addr x, <n>
+  ///    Adjoint: adj[x] += struct (0, ..., #field': adj[y], ..., 0)
+  ///                                       ^~~~~~~
+  ///                     field in tangent space corresponding to #field
+  void visitRefElementAddrInst(RefElementAddrInst *reai);
+
   /// Handle `tuple` instruction.
   ///   Original: y = tuple (x0, x1, x2, ...)
   ///    Adjoint: (adj[x0], adj[x1], adj[x2], ...) += destructure_tuple adj[y]
@@ -420,9 +434,17 @@ public:
   void visitUnconditionalCheckedCastAddrInst(
       UnconditionalCheckedCastAddrInst *uccai);
 
-#define NOT_DIFFERENTIABLE(INST, DIAG) void visit##INST##Inst(INST##Inst *inst);
+  /// Handle `unchecked_ref_cast` instruction.
+  ///   Original: y = unchecked_ref_cast x
+  ///    Adjoint: adj[x] += adj[y] (assuming x' and y' have the same type)
+  void visitUncheckedRefCastInst(UncheckedRefCastInst *urci);
 
-  NOT_DIFFERENTIABLE(RefElementAddr, autodiff_class_property_not_supported)
+  /// Handle `upcast` instruction.
+  ///   Original: y = upcast x
+  ///    Adjoint: adj[x] += adj[y] (assuming x' and y' have the same type)
+  void visitUpcastInst(UpcastInst *ui);
+
+#define NOT_DIFFERENTIABLE(INST, DIAG) void visit##INST##Inst(INST##Inst *inst);
 #undef NOT_DIFFERENTIABLE
 
 #define NO_ADJOINT(INST)                                                       \

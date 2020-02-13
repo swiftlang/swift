@@ -1557,6 +1557,7 @@ extension BinaryInteger {
   }
 
   /// A textual representation of this value.
+  @_semantics("binaryInteger.description")
   public var description: String {
     return _description(radix: 10, uppercase: false)
   }

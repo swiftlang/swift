@@ -248,6 +248,9 @@ public:
   llvm::Optional<unsigned> resolveOffsetForEndOfLine(unsigned BufferId,
                                                      unsigned Line) const;
 
+  /// Get the length of the line
+  llvm::Optional<unsigned> getLineLength(unsigned BufferId, unsigned Line) const;
+
   SourceLoc getLocForLineCol(unsigned BufferId, unsigned Line, unsigned Col) const {
     auto Offset = resolveFromLineCol(BufferId, Line, Col);
     return Offset.hasValue() ? getLocForOffset(BufferId, Offset.getValue()) :

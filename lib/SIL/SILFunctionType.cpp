@@ -22,7 +22,6 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
-// SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
@@ -224,46 +223,22 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
                               isGenericSignatureImplied(), getASTContext());
 }
 
-// Returns the canonical generic signature for an autodiff derivative function
-// given an existing derivative function generic signature. All differentiation
-// parameters are constrained to conform to `Differentiable`.
-static CanGenericSignature getAutoDiffDerivativeFunctionGenericSignature(
-    CanGenericSignature derivativeFnGenSig,
-    ArrayRef<SILParameterInfo> originalParameters,
-    IndexSubset *parameterIndices, ModuleDecl *module) {
-  if (!derivativeFnGenSig)
-    return nullptr;
-  auto &ctx = module->getASTContext();
-  GenericSignatureBuilder builder(ctx);
-
-  // Add derivative function generic signature.
-  builder.addGenericSignature(derivativeFnGenSig);
-  // Constrain all wrt parameters to conform to `Differentiable`.
-  auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-  auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  for (unsigned paramIdx : parameterIndices->getIndices()) {
-    auto paramType = originalParameters[paramIdx].getInterfaceType();
-    Requirement req(RequirementKind::Conformance, paramType,
-                    diffableProto->getDeclaredType());
-    builder.addRequirement(req, source, module);
-  }
-  return std::move(builder)
-      .computeGenericSignature(SourceLoc(), /*allowConcreteGenericParams*/ true)
-      ->getCanonicalSignature();
-}
-
 CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     IndexSubset *parameterIndices, unsigned resultIndex,
     AutoDiffDerivativeFunctionKind kind, TypeConverter &TC,
     LookupConformanceFn lookupConformance,
     CanGenericSignature derivativeFnGenSig, bool isReabstractionThunk) {
-  // JVP: (T...) -> ((R...),
-  //                 (T.TangentVector...) -> (R.TangentVector...))
-  // VJP: (T...) -> ((R...),
-  //                 (R.TangentVector...) -> (T.TangentVector...))
-
   auto &ctx = getASTContext();
+  SILAutoDiffDerivativeFunctionKey key{
+    this, parameterIndices,
+    IndexSubset::get(ctx, getNumResults(), {resultIndex}),
+    kind, derivativeFnGenSig, isReabstractionThunk
+  };
+  auto insertion =
+      ctx.SILAutoDiffDerivativeFunctions.try_emplace(key, CanSILFunctionType());
+  auto &cachedResult = insertion.first->getSecond();
+  if (!insertion.second)
+    return cachedResult;
 
   // Helper function testing if we are differentiating wrt this index.
   auto isWrtIndex = [&](unsigned index) -> bool {
@@ -277,11 +252,13 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     if (isWrtIndex(valueAndIndex.index()))
       diffParams.push_back(valueAndIndex.value());
 
-  // Get the canonical derivative function generic signature.
+  // Get the "constrained" derivative function generic signature.
   if (!derivativeFnGenSig)
     derivativeFnGenSig = getSubstGenericSignature();
-  derivativeFnGenSig = getAutoDiffDerivativeFunctionGenericSignature(
-      derivativeFnGenSig, getParameters(), parameterIndices, &TC.M);
+  derivativeFnGenSig =
+      autodiff::getConstrainedDerivativeGenericSignature(
+          this, parameterIndices, derivativeFnGenSig, lookupConformance)
+          .getCanonicalSignature();
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult =
@@ -293,9 +270,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     switch (origResConv) {
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
-      conv = tl.isTrivial()
-          ? ParameterConvention::Direct_Unowned
-          : ParameterConvention::Direct_Guaranteed;
+      if (tl.isAddressOnly()) {
+        conv = ParameterConvention::Indirect_In_Guaranteed;
+      } else {
+        conv = tl.isTrivial() ? ParameterConvention::Direct_Unowned
+                              : ParameterConvention::Direct_Guaranteed;
+      }
       break;
     case ResultConvention::Unowned:
     case ResultConvention::UnownedInnerPointer:
@@ -319,9 +299,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Direct_Unowned:
-      conv = tl.isTrivial()
-          ? ResultConvention::Unowned
-          : ResultConvention::Owned;
+      if (tl.isAddressOnly()) {
+        conv = ResultConvention::Indirect;
+      } else {
+        conv = tl.isTrivial() ? ResultConvention::Unowned
+                              : ResultConvention::Owned;
+      }
       break;
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
@@ -429,35 +412,38 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   auto extInfo = getExtInfo();
   if (getRepresentation() == SILFunctionTypeRepresentation::CFunctionPointer)
     extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
-  return SILFunctionType::get(canGenSig, extInfo, getCoroutineKind(),
-                              getCalleeConvention(), newParameters, getYields(),
-                              newResults, getOptionalErrorResult(),
-                              getSubstitutions(), isGenericSignatureImplied(),
-                              ctx, getWitnessMethodConformanceOrInvalid());
+  cachedResult = SILFunctionType::get(
+      canGenSig, extInfo, getCoroutineKind(), getCalleeConvention(),
+      newParameters, getYields(), newResults, getOptionalErrorResult(),
+      getSubstitutions(), isGenericSignatureImplied(), ctx,
+      getWitnessMethodConformanceOrInvalid());
+  return cachedResult;
 }
 
 CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
     IndexSubset *parameterIndices, Lowering::TypeConverter &TC,
-    LookupConformanceFn lookupConformance, CanGenericSignature genSig) {
-  // Get the canonical transpose function generic signature.
-  if (!genSig)
-    genSig = getSubstGenericSignature();
-  genSig = getAutoDiffDerivativeFunctionGenericSignature(
-      genSig, getParameters(), parameterIndices, &TC.M);
+    LookupConformanceFn lookupConformance,
+    CanGenericSignature transposeFnGenSig) {
+  // Get the "constrained" transpose function generic signature.
+  if (!transposeFnGenSig)
+    transposeFnGenSig = getSubstGenericSignature();
+  transposeFnGenSig = autodiff::getConstrainedDerivativeGenericSignature(
+                          this, parameterIndices, transposeFnGenSig,
+                          lookupConformance, /*isLinear*/ true)
+                          .getCanonicalSignature();
 
   // Given a type, returns its formal SIL parameter info.
   auto getParameterInfoForOriginalResult =
       [&](const SILResultInfo &result) -> SILParameterInfo {
-    AbstractionPattern pattern(genSig, result.getInterfaceType());
+    AbstractionPattern pattern(transposeFnGenSig, result.getInterfaceType());
     auto &tl = TC.getTypeLowering(pattern, result.getInterfaceType(),
                                   TypeExpansionContext::minimal());
     ParameterConvention newConv;
     switch (result.getConvention()) {
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
-      newConv = tl.isTrivial()
-          ? ParameterConvention::Direct_Unowned
-          : ParameterConvention::Direct_Guaranteed;
+      newConv = tl.isTrivial() ? ParameterConvention::Direct_Unowned
+                               : ParameterConvention::Direct_Guaranteed;
       break;
     case ResultConvention::Unowned:
     case ResultConvention::UnownedInnerPointer:
@@ -467,13 +453,14 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
       newConv = ParameterConvention::Indirect_In_Guaranteed;
       break;
     }
-    return {result.getInterfaceType()->getCanonicalType(genSig), newConv};
+    return {result.getInterfaceType()->getCanonicalType(transposeFnGenSig),
+            newConv};
   };
 
   // Given a type, returns its formal SIL result info.
   auto getResultInfoForOriginalParameter =
       [&](const SILParameterInfo &param) -> SILResultInfo {
-    AbstractionPattern pattern(genSig, param.getInterfaceType());
+    AbstractionPattern pattern(transposeFnGenSig, param.getInterfaceType());
     auto &tl = TC.getTypeLowering(pattern, param.getInterfaceType(),
                                   TypeExpansionContext::minimal());
     ResultConvention newConv;
@@ -481,9 +468,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Direct_Unowned:
-      newConv = tl.isTrivial()
-          ? ResultConvention::Unowned
-          : ResultConvention::Owned;
+      newConv =
+          tl.isTrivial() ? ResultConvention::Unowned : ResultConvention::Owned;
       break;
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
@@ -493,7 +479,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
       newConv = ResultConvention::Indirect;
       break;
     }
-    return {param.getInterfaceType()->getCanonicalType(genSig), newConv};
+    return {param.getInterfaceType()->getCanonicalType(transposeFnGenSig),
+            newConv};
   };
 
   SmallVector<SILParameterInfo, 4> newParameters;
@@ -507,10 +494,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
   for (auto &res : getResults())
     newParameters.push_back(getParameterInfoForOriginalResult(res));
   // Transpose function type has a generic signature only if the original
-  // function type does.
+  // function type does, and if `transposeFnGenSig` does not have all concrete
+  // generic parameters.
   CanGenericSignature canGenSig;
-  if (getSubstGenericSignature())
-    canGenSig = genSig;
+  if (getSubstGenericSignature() && transposeFnGenSig &&
+      !transposeFnGenSig->areAllParamsConcrete())
+    canGenSig = transposeFnGenSig;
   return SILFunctionType::get(
       canGenSig, getExtInfo(), getCoroutineKind(), getCalleeConvention(),
       newParameters, getYields(), newResults, getOptionalErrorResult(),
@@ -1102,9 +1091,8 @@ private:
       auto eltPattern = origType.getFunctionParamType(i);
       auto flags = params[i].getParameterFlags();
 
-      visit(flags.getValueOwnership(), /*forSelf=*/false,
-            // SWIFT_ENABLE_TENSORFLOW
-            eltPattern, ty, silRepresentation, flags.isNoDerivative());
+      visit(flags.getValueOwnership(), /*forSelf=*/false, eltPattern, ty,
+            silRepresentation, flags.isNoDerivative());
     }
 
     // Process the self parameter.  Note that we implicitly drop self
@@ -1125,7 +1113,6 @@ private:
 
   void visit(ValueOwnership ownership, bool forSelf,
              AbstractionPattern origType, CanType substType,
-             // SWIFT_ENABLE_TENSORFLOW
              SILFunctionTypeRepresentation rep,
              bool isNonDifferentiable = false) {
     assert(!isa<InOutType>(substType));
@@ -1181,13 +1168,11 @@ private:
       assert(!isIndirectFormalParameter(convention));
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
     SILParameterInfo param(substTL.getLoweredType().getASTType(), convention);
     if (isNonDifferentiable)
       param = param.getWithDifferentiability(
           SILParameterDifferentiability::NotDifferentiable);
     Inputs.push_back(param);
-    // SWIFT_ENABLE_TENSORFLOW END
 
     maybeAddForeignParameters();
   }
@@ -1625,7 +1610,6 @@ static CanSILFunctionType getSILFunctionType(
   auto silExtInfo = SILFunctionType::ExtInfo()
     .withRepresentation(extInfo.getSILRepresentation())
     .withIsPseudogeneric(pseudogeneric)
-    // SWIFT_ENABLE_TENSORFLOW
     .withNoEscape(extInfo.isNoEscape())
     .withDifferentiabilityKind(extInfo.getDifferentiabilityKind());
   
@@ -2725,17 +2709,15 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
                                             loweredInterfaceType);
 
   // SWIFT_ENABLE_TENSORFLOW
-  // In the case of autodiff derivative functions, the above computations
-  // determine `silFnType` by first computing the derivative function type at
-  // the AST level and then lowering that. Unfortunately, the actual
-  // SILFunctionType for the function is determined by first lowering the
-  // function's AST type, and then computing the derivative function type at the
-  // SIL level. "Lowering" does not commute with "getting the autodiff
-  // associated type", so these two computations produce different results.
-  // Therefore `silFnType` is not the actual type of the function that
-  // `constant` refers to.
+  // For derivative functions, the above computations determine `silFnType`
+  // by first computing the derivative AST function type and then lowering it to
+  // SIL. Unfortunately, the expected derivative SIL function type is determined
+  // by first lowering the original function's AST type, and then computing its
+  // SIL derivative function type. "Lowering" does not commute with "getting the
+  // derivative type", so these two computations produce different results.
+  // Therefore, `silFnType` is not the expected SIL derivative function type.
   //
-  // We hackily fix this problem by redoing the computation in the right order.
+  // We fix this problem by performing the computation in the right order.
   if (auto *autoDiffFuncId = constant.autoDiffDerivativeFunctionIdentifier) {
     auto origFnConstantInfo = getConstantInfo(
         TypeExpansionContext::minimal(), constant.asAutoDiffOriginalFunction());
@@ -2745,6 +2727,7 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
         loweredIndices, /*resultIndex*/ 0, autoDiffFuncId->getKind(),
         *this, LookUpConformanceInModule(&M));
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";
              constant.print(llvm::dbgs());
@@ -3113,9 +3096,8 @@ public:
   }
 
   SILParameterInfo substInterface(SILParameterInfo orig) {
-    // SWIFT_ENABLE_TENSORFLOW
-    return SILParameterInfo(visit(orig.getInterfaceType()), orig.getConvention(),
-                            orig.getDifferentiability());
+    return SILParameterInfo(visit(orig.getInterfaceType()),
+                            orig.getConvention(), orig.getDifferentiability());
   }
 
   /// Tuples need to have their component types substituted by these

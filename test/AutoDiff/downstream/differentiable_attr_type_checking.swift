@@ -532,7 +532,7 @@ func emptyWhereClause<T>(x: T) -> T {
   return x
 }
 
-// expected-error @+1 {{trailing 'where' clause in '@differentiable' attribute of non-generic function 'nongenericWhereClause(x:)'}}
+// expected-error @+1 {{where' clause is valid only when original function is generic 'nongenericWhereClause(x:)}}
 @differentiable(where T : Differentiable)
 func nongenericWhereClause(x: Float) -> Float {
   return x
@@ -640,7 +640,7 @@ func invalidAnyObjectRequirement<T : Differentiable>(x: T) -> T {
   return x
 }
 
-// expected-error @+1 {{'@differentiable' attribute does not support layout requirements}}
+// expected-error @+1 {{'@differentiable' attribute does not yet support layout requirements}}
 @differentiable(where Scalar : _Trivial)
 func invalidRequirementLayout<Scalar>(x: Scalar) -> Scalar {
   return x
@@ -846,19 +846,19 @@ struct NonDiffableStruct {
 }
 
 // expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-@differentiable(linear, wrt: x, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
+@differentiable(linear, wrt: x, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' attribute for transpose registration instead}}
 func slope1(_ x: Float) -> Float {
   return 3 * x
 }
 
 // expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-@differentiable(linear, wrt: x, jvp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
+@differentiable(linear, wrt: x, jvp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' attribute for transpose registration instead}}
 func slope2(_ x: Float) -> Float {
   return 3 * x
 }
 
 // expected-warning @+1 2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-@differentiable(linear, jvp: const3, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
+@differentiable(linear, jvp: const3, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' attribute for transpose registration instead}}
 func slope3(_ x: Float) -> Float {
   return 3 * x
 }
@@ -1030,8 +1030,7 @@ extension ProtocolRequirementUnsupported {
 class Super : Differentiable {
   var base: Float
 
-  // NOTE(TF-654): Class initializers are not yet supported.
-  // expected-error @+1 {{'@differentiable' attribute does not yet support class initializers}}
+  // expected-error @+1 {{'@differentiable' attribute cannot be declared on 'init' in a non-final class; consider making 'Super' final}}
   @differentiable
   init(base: Float) {
     self.base = base
@@ -1074,9 +1073,13 @@ class Super : Differentiable {
   func instanceMethod<T>(_ x: Float, y: T) -> Float { x }
 
   // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-  // expected-error @+1 {{'@differentiable' attribute cannot be declared on class methods returning 'Self'}}
+  // expected-error @+1 {{'@differentiable' attribute cannot be declared on class members returning 'Self'}}
   @differentiable(vjp: vjpDynamicSelfResult)
   func dynamicSelfResult() -> Self { self }
+
+  // expected-error @+1 {{'@differentiable' attribute cannot be declared on class members returning 'Self'}}
+  @differentiable
+  var testDynamicSelfProperty: Self { self }
 
   // TODO(TF-632): Fix "'TangentVector' is not a member type of 'Self'" diagnostic.
   // The underlying error should appear instead:
@@ -1096,6 +1099,15 @@ class Sub : Super {
   // expected-error @+1 {{'vjp' is not defined in the current type context}}
   @differentiable(wrt: x, vjp: vjp)
   override func testSuperclassDerivatives(_ x: Float) -> Float { x }
+}
+
+final class FinalClass: Differentiable {
+  var base: Float
+
+  @differentiable
+  init(base: Float) {
+    self.base = base
+  }
 }
 
 // Test unsupported accessors: `set`, `_read`, `_modify`.

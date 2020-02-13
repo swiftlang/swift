@@ -227,11 +227,6 @@ namespace swift {
     /// overloads.
     void suggestPotentialOverloads(SourceLoc loc, bool isResult = false);
 
-    /// Emit a diagnostic and return true if this is an error condition we can
-    /// handle uniformly.  This should be called after filtering the candidate
-    /// list.
-    bool diagnoseSimpleErrors(const Expr *E);
-    
     void dump(llvm::raw_ostream &os) const;
     SWIFT_DEBUG_DUMP;
     

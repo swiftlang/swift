@@ -47,7 +47,6 @@ enum class TypeResolutionStage : uint8_t;
 
 namespace constraints {
   enum class ConstraintKind : char;
-  enum class SolutionKind : char;
   class ConstraintSystem;
   class Solution;
   class SolutionResult;
@@ -154,7 +153,7 @@ enum ContextualTypePurpose {
 
 
 
-/// Flags that can be used to control name lookup.
+/// Flags that can be used to control type checking.
 enum class TypeCheckExprFlags {
   /// Whether we know that the result of the expression is discarded.  This
   /// disables constraints forcing an lvalue result to be loadable.
@@ -719,7 +718,7 @@ public:
 
   static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  static void processREPLTopLevel(SourceFile &SF, unsigned StartElem);
+  static void processREPLTopLevel(SourceFile &SF);
 
   static void typeCheckDecl(Decl *D);
 
@@ -1278,17 +1277,6 @@ public:
   static Type deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
                                 AssociatedTypeDecl *assocType);
 
-  /// Derive an implicit type witness for a given "phantom" nested type
-  /// requirement that is known to the compiler but unstated as a
-  /// formal type requirement.
-  ///
-  /// This exists to support Codable and only Codable. Do not expand its
-  /// usage outside of that domain.
-  static TypeDecl *derivePhantomWitness(DeclContext *DC,
-                                        NominalTypeDecl *nominal,
-                                        ProtocolDecl *proto,
-                                        const StringRef Name);
-
   /// \name Name lookup
   ///
   /// Routines that perform name lookup.
@@ -1503,11 +1491,7 @@ public:
                                         const TypeRefinementContext **MostRefined=nullptr);
 
   /// Walk the AST to build the hierarchy of TypeRefinementContexts
-  ///
-  /// \param StartElem Where to start for incremental building of refinement
-  /// contexts
-  static void buildTypeRefinementContextHierarchy(SourceFile &SF,
-                                                  unsigned StartElem);
+  static void buildTypeRefinementContextHierarchy(SourceFile &SF);
 
   /// Build the hierarchy of TypeRefinementContexts for the entire
   /// source file, if it has not already been built. Returns the root

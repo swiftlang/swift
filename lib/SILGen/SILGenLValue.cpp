@@ -739,16 +739,13 @@ namespace {
         SGF.B.createRefElementAddr(loc, base.getUnmanagedValue(),
                                    Field, SubstFieldType);
 
-      // Avoid emitting non-trivial access markers for non-accesses and
-      // immutable values.
-      auto enforcement = SGF.getDynamicEnforcement(Field);
-      if (enforcement && !IsNonAccessing && !Field->isLet()) {
-        result = enterAccessScope(SGF, loc, result, getTypeData(),
-                                  getAccessKind(), *enforcement);
-      } else {
-        result =
-            enterAccessScope(SGF, loc, result, getTypeData(), getAccessKind(),
-                             SILAccessEnforcement::Unsafe);
+      // Avoid emitting access markers completely for non-accesses or immutable
+      // declarations. Access marker verification is aware of these cases.
+      if (!IsNonAccessing && !Field->isLet()) {
+        if (auto enforcement = SGF.getDynamicEnforcement(Field)) {
+          result = enterAccessScope(SGF, loc, result, getTypeData(),
+                                    getAccessKind(), *enforcement);
+        }
       }
 
       return ManagedValue::forLValue(result);
