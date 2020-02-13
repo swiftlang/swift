@@ -476,3 +476,18 @@ func testIfConditions(cond: Bool, c1: Bool, i1: Int, i2: Int) {
 testIfConditions(cond: true, c1: true, i1: 1, i2: 1)
 // CHECK: testIfConditions
 // CHECK-SAME: hello
+
+// Use a "let" declaration within a function builder.
+tuplify(true) { c in
+  "testLetDeclarations"
+  let (a, b) = (c, c && true)
+  if a == b {
+    "hello"
+    b
+  }
+  a
+}
+// CHECK: testLetDeclarations"
+// CHECK-SAME: hello
+// CHECK-SAME: true
+
