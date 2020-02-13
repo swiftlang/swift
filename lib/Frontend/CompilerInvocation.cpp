@@ -1104,6 +1104,9 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_previous_module_installname_map_file)) {
     Opts.ModuleInstallNameMapPath = A->getValue();
   }
+  for (auto A : Args.getAllArgValues(OPT_embed_tbd_for_module)) {
+    Opts.embedSymbolsFromModules.push_back(StringRef(A).str());
+  }
   return false;
 }
 

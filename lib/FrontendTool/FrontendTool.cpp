@@ -1432,11 +1432,14 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
   }
 
   const bool allSymbols = mode == FrontendOptions::TBDValidationMode::All;
+  // We should ignore embeded symbols from external modules for validation.
+  TBDGenOptions Opts = Invocation.getTBDGenOptions();
+  Opts.embedSymbolsFromModules.clear();
   return MSF.is<SourceFile *>()
              ? validateTBD(MSF.get<SourceFile *>(), IRModule,
-                           Invocation.getTBDGenOptions(), allSymbols)
+                           Opts, allSymbols)
              : validateTBD(MSF.get<ModuleDecl *>(), IRModule,
-                           Invocation.getTBDGenOptions(), allSymbols);
+                           Opts, allSymbols);
 }
 
 static bool generateCode(const CompilerInvocation &Invocation,
