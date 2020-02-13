@@ -115,6 +115,75 @@ private typealias CountAndFlags = _StringObject.CountAndFlags
 // Optional<_StringBreadcrumbs>.
 //
 
+/*
+
+ String's storage class has a header, which includes the isa pointer, reference
+ count, and stored properties (count and capacity). After the header is a tail
+ allocation for the UTF-8 code units, a null terminator, and some spare capacity
+ (if available). After that, it optionally contains another tail allocation for
+ the breadcrumbs pointer.
+
+ If the requested code unit capacity is less than the breadcrumbs stride, no
+ pointer is allocated. This has the effect of either allowing us to save space
+ with a smaller allocation, or claim additional excess capacity, depending on
+ which half of the malloc bucket the requested capacity lies within.
+
+ On 64-bit platforms:
+
+ 0                                                                            32
+ ├─────────────────────────────────────────────────────────────────────────────┤
+ │ Class Header                                                                │
+ ├─────────────┬─────────────────┬────────────────────┬────────────────────────┤
+ │ B0 ..< B8   │ B8 ..< B16      │ B16 ..< B24        │ B24 ..< B32            │
+ ├─────────────┼─────────────────┼────────────────────┼────────────────────────┤
+ │ isa pointer │ reference count │ capacity and flags │ count and flags        │
+ └─────────────┴─────────────────┴────────────────────┴────────────────────────┘
+
+ 1) If breadcrumbs are not present, the tail allocation is the requested
+ capacity plus one (for the null terminator) rounded up to the nearest multiple
+ of 16 (estimated malloc bucket size).
+
+ 32                                                                         32+n
+ ├─────────────────────────────────────────────────────────────────────────────┤
+ │ Tail allocation, no breadcrumbs pointer                                     │
+ ├────────────────────┬─────────┬──────────────────────────────────────────────┤
+ │ B32 ..< B<32+r>    │ B<32+r> │ B<32+r+1> ..< B<32+n>                        │
+ ├────────────────────┼─────────┼──────────────────────────────────────────────┤
+ │ requested capacity │ null    │ spare capacity                               │
+ └────────────────────┴─────────┴──────────────────────────────────────────────┘
+
+  where *r* is the requested capacity, and *n* is (r+16)&~15, or the nearest
+  multiple of 16 greater than (but not equal to) the requested code unit
+  capacity.
+
+ 2) If breadcrumbs are present, the tail allocation is the requested capacity
+ plus one (for the null terminator) plus eight (for the pointer) rounded up to
+ the nearest multiple of 16.
+
+ 32                                                                       32+m+8
+ ├─────────────────────────────────────────────────────────────────────────────┤
+ │ Tail allocations, with breadcrumbs pointer                                  │
+ ├────────────────────┬─────────┬───────────────────────┬──────────────────────┤
+ │ B32 ..< B<32+r>    │ B<32+r> │ B<32+r+1> ..< B<32+m> │ B<32+m> ..< B<32+m+8>│
+ ├────────────────────┼─────────┼───────────────────────┼──────────────────────┤
+ │ requested capacity │ null    │ spare capacity        │ breadcrumbs pointer  │
+ └────────────────────┴─────────┴───────────────────────┴──────────────────────┘
+
+  where *r* is the requested capacity, and *m* is ((r+8)&-16)+8, or the nearest
+  multiple of 8, which is not also a multiple of 16, greater than (but not equal
+  to) the requested code unit capacity.
+
+
+ On 32-bit platforms:
+
+  TODO
+
+
+  TODO: size savings of PR for 64-bit systems, and 32-bit systems.
+
+*/
+
+
 // NOTE: older runtimes called this class _StringStorage. The two
 // must coexist without conflicting ObjC class names, so it was
 // renamed. The old name must not be used in the new runtime.
@@ -193,17 +262,14 @@ private func determineCodeUnitCapacity(
   // FIXME: Adapt to actual 32-bit allocator. For now, let's arrange things so
   // that the instance size will be a multiple of 4.
   let bias = Int(bitPattern: _StringObject.nativeBias)
-  let minimum = bias + desiredCapacity + 1
-  let size = (minimum + 3) & ~3
+  let size = (desiredCapacity + 4) & ~3
   _internalInvariant(size % 4 == 0)
   let capacity = size - bias
   _internalInvariant(capacity > desiredCapacity)
   return capacity
 #else
-  // Bigger than _SmallString, and we need 1 extra for nul-terminator.
-  let minCap = 1 + desiredCapacity// Swift.max(desiredCapacity, _SmallString.capacity)
-  _internalInvariant(minCap < 0x1_0000_0000_0000, "max 48-bit length")
-  _internalInvariant(minCap > 0)
+  _internalInvariant((0..<0x1_0000_0000_0000).contains(desiredCapacity),
+    "max 48-bit length")
 
   // If the resultant code unit capacity is less than the breadcrumbs stride,
   // don't allocate a breadcrumb pointer. We determine this by checking if we
@@ -211,22 +277,26 @@ private func determineCodeUnitCapacity(
   // overestimating the result.
   let (capacity, includeBreadcrumbs): (Int, Bool)
 
-  // Round up to the nearest multiple of 16 (bucket estimate)
-  let crumblessCapacity = (minCap + 15) & -16
+  // Round up to the nearest multiple of 16 (bucket estimate) greater than,
+  // but not equal to (for null terminator) the requested capacity
+  let crumblessCapacity = (desiredCapacity + 16) & ~15
 
   // We over-allocate by 1 for the nul-terminator, which should not participate
   // in the breadcrumb stride
   if crumblessCapacity - 1 < _StringBreadcrumbs.breadcrumbStride {
     (capacity, includeBreadcrumbs) = (crumblessCapacity, false)
   } else {
-    // Round up to the nearest multiple of 8 that isn't also a multiple of 16.
-    capacity = ((minCap + 7) & -16) + 8
+    // Round up to the nearest multiple of 8, which isn't also a multiple of 16,
+    // greater than, but not equal to (for null terminator) the requested
+    // capacity
+    capacity = ((desiredCapacity + 8) & ~15) + 8
     _internalInvariant(
       capacity > desiredCapacity && capacity % 8 == 0 && capacity % 16 != 0)
     includeBreadcrumbs = true
   }
 
-  _internalInvariant(capacity <= minCap + 15, "We exceeded the nearest bucket")
+  _internalInvariant(capacity <= desiredCapacity + 16,
+    "We exceeded the nearest bucket")
   return (capacity, includeBreadcrumbs)
 #endif
 }
