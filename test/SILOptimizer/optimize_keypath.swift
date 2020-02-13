@@ -16,6 +16,8 @@ protocol P {
 struct GenStruct<T : P> : P {
   var st: T
   var computed: Int { get { st.computed } set { st.computed = newValue } }
+
+  var computedGeneric: T { get { st} set { st = newValue} }
   
   init(_ st: T) { self.st = st }
 
@@ -581,6 +583,20 @@ func testGetComplex(_ s: SimpleClass) -> Int {
   return s[keyPath: kp]
 }
 
+// allow exactly one unoptimzedkey path instruction, in this function
+// CHECK-ALL: sil {{.*}}makeKeyPathInGenericContext
+// CHECK-ALL: = keypath
+func makeKeyPathInGenericContext<T: P>(of: T.Type) -> WritableKeyPath<GenStruct<T>, T> {
+  \.computedGeneric
+}
+
+// CHECK-ALL-NOT: = keypath
+
+func testGenericResult(_ s: inout GenStruct<SimpleStruct>) {
+    let kp = makeKeyPathInGenericContext(of: SimpleStruct.self)
+    s[keyPath: kp].i += 1
+}
+
 // CHECK-LABEL: sil {{.*}}testit
 func testit() {
   // CHECK-OUTPUT: GenStructRead: 27
@@ -680,6 +696,11 @@ func testit() {
   
   // CHECK-OUTPUT: testGetComplex: 1
   print("testGetComplex: \(testGetComplex(c4))")
+  
+  // CHECK-OUTPUT: testGenericResult: 2
+  var s5 = GenStruct(SimpleStruct(i: 1))
+  testGenericResult(&s5)
+  print("testGenericResult: \(s5.st.i)")
 }
 
 testit()
