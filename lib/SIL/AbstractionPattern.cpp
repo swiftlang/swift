@@ -914,7 +914,7 @@ const {
 AbstractionPattern AbstractionPattern::getAutoDiffDerivativeFunctionType(
     IndexSubset *indices, unsigned resultIndex,
     AutoDiffDerivativeFunctionKind kind, LookupConformanceFn lookupConformance,
-    GenericSignature whereClauseGenericSignature, bool makeSelfParamFirst) {
+    GenericSignature derivativeGenericSignature, bool makeSelfParamFirst) {
   switch (getKind()) {
   case Kind::Type: {
     auto fnTy = dyn_cast<AnyFunctionType>(getType());
@@ -922,7 +922,7 @@ AbstractionPattern AbstractionPattern::getAutoDiffDerivativeFunctionType(
       return getOpaqueDerivativeFunction();
     auto derivativeFnTy = fnTy->getAutoDiffDerivativeFunctionType(
         indices, resultIndex, kind, lookupConformance,
-        whereClauseGenericSignature, makeSelfParamFirst);
+        derivativeGenericSignature, makeSelfParamFirst);
     assert(derivativeFnTy);
     return AbstractionPattern(getGenericSignature(),
                               derivativeFnTy->getCanonicalType());
