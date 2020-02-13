@@ -569,6 +569,21 @@ struct WrappedIntContainer {
   @WrappedInt var int: Int?
 }
 
+// rdar://problem/59117087 - crash due to incorrectly taking the "self access"
+// path for a static property with a wrapper
+
+struct HasStaticWrapper {
+  @StructWrapper static var staticWrapper: Int = 0
+
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers16HasStaticWrapperV08assignToD4SelfyyFZ : $@convention(method) (@thin HasStaticWrapper.Type) -> () {
+  static func assignToStaticSelf() {
+    // Make sure we call the setter instead of attempting a direct access,
+    // like we would if the property was not static:
+
+    // CHECK: function_ref @$s17property_wrappers16HasStaticWrapperV06staticE0SivsZ : $@convention(method) (Int, @thin HasStaticWrapper.Type) -> ()
+    staticWrapper = 1
+  }
+}
 
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK-NEXT:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter

@@ -1384,7 +1384,9 @@ namespace {
       assert(getAccessorDecl()->isSetter());
       SILDeclRef setter = Accessor;
 
-      if (hasPropertyWrapper() && IsOnSelfParameter &&
+      if (IsOnSelfParameter &&
+          !Storage->isStatic() &&
+          hasPropertyWrapper() &&
           isBackingVarVisible(cast<VarDecl>(Storage),
                               SGF.FunctionDC)) {
         // This is wrapped property. Instead of emitting a setter, emit an
