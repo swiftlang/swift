@@ -39,14 +39,14 @@ struct id {
 // Class and methods are [objc] by inheritance.
 class MyBlammo : Blammo {
   func foo() {}
-// CHECK:  define hidden swiftcc void @"$s4objc8MyBlammoC3fooyyF"([[MYBLAMMO]]* swiftself) {{.*}} {
+// CHECK:  define hidden swiftcc void @"$s4objc8MyBlammoC3fooyyF"([[MYBLAMMO]]* swiftself %0) {{.*}} {
 // CHECK:    ret void
 }
 
 // Class and methods are [objc] by inheritance.
 class Test2 : Gizmo {
   func foo() {}
-// CHECK:  define hidden swiftcc void @"$s4objc5Test2C3fooyyF"([[TEST2]]* swiftself) {{.*}} {
+// CHECK:  define hidden swiftcc void @"$s4objc5Test2C3fooyyF"([[TEST2]]* swiftself %0) {{.*}} {
 // CHECK:    ret void
 
   @objc dynamic func bar() {}
@@ -70,7 +70,7 @@ class Octogenarian : Contrarian {
 @_silgen_name("unknown")
 func unknown(_ x: id) -> id
 
-// CHECK:    define hidden swiftcc %objc_object* @"$s4objc5test0{{[_0-9a-zA-Z]*}}F"(%objc_object*)
+// CHECK:    define hidden swiftcc %objc_object* @"$s4objc5test0{{[_0-9a-zA-Z]*}}F"(%objc_object* %0)
 // CHECK-NOT:  call {{.*}} @swift_unknownObjectRetain
 // CHECK:      call {{.*}} @swift_unknownObjectRetain
 // CHECK-NOT:  call {{.*}} @swift_unknownObjectRelease
@@ -85,7 +85,7 @@ func test0(_ arg: id) -> id {
 }
 
 func test1(_ cell: Blammo) {}
-// CHECK:  define hidden swiftcc void @"$s4objc5test1{{[_0-9a-zA-Z]*}}F"([[BLAMMO]]*) {{.*}} {
+// CHECK:  define hidden swiftcc void @"$s4objc5test1{{[_0-9a-zA-Z]*}}F"([[BLAMMO]]* %0) {{.*}} {
 // CHECK-NEXT:    entry
 // CHECK-NEXT:    alloca
 // CHECK-NEXT:    bitcast

@@ -21,7 +21,7 @@ class TrivialDestructor {
 // Remove a dead array.
 // rdar://20980377 Add dead array elimination to DeadObjectElimination
 // Swift._allocateUninitializedArray <A> (Builtin.Word) -> (Swift.Array<A>, Builtin.RawPointer)
-sil [_semantics "array.uninitialized"] @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+sil [_semantics "array.uninitialized_intrinsic"] @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
 
 sil [_semantics "array.uninitialized"] @adoptStorageSpecialiedForInt : $@convention(method) (@guaranteed _ContiguousArrayStorage<Int>, Builtin.Word, @thin Array<Int>.Type) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
 

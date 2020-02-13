@@ -431,6 +431,7 @@ std::string ASTMangler::mangleAutoDiffLinearMapHelper(
   Storage.clear();
   return result;
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
     SILDifferentiabilityWitnessKey key) {
@@ -452,7 +453,7 @@ std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
   Storage.clear();
   return result;
 }
-// SWIFT_ENABLE_TENSORFLOW END
+
 
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   PrettyStackTraceType prettyStackTrace(Ty->getASTContext(),

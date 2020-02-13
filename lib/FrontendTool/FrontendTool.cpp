@@ -471,7 +471,7 @@ emitLoadedModuleTraceForAllPrimariesIfNeeded(ModuleDecl *mainModule,
 static std::unique_ptr<llvm::raw_fd_ostream>
 getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
   std::error_code errorCode;
-  auto os = llvm::make_unique<llvm::raw_fd_ostream>(
+  auto os = std::make_unique<llvm::raw_fd_ostream>(
               OutputFilename, errorCode, llvm::sys::fs::F_None);
   if (errorCode) {
     Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
@@ -713,7 +713,7 @@ createOptRecordFile(StringRef Filename, DiagnosticEngine &DE) {
     return nullptr;
 
   std::error_code EC;
-  auto File = llvm::make_unique<llvm::raw_fd_ostream>(Filename, EC,
+  auto File = std::make_unique<llvm::raw_fd_ostream>(Filename, EC,
                                                       llvm::sys::fs::F_None);
   if (EC) {
     DE.diagnose(SourceLoc(), diag::cannot_open_file, Filename, EC.message());
@@ -1520,7 +1520,7 @@ static bool performCompileStepsPostSILGen(
       createOptRecordFile(SILOpts.OptRecordFile, Instance.getDiags());
   if (OptRecordFile) {
     auto Output =
-        llvm::make_unique<llvm::yaml::Output>(*OptRecordFile,
+        std::make_unique<llvm::yaml::Output>(*OptRecordFile,
                                               &Instance.getSourceMgr());
     SM->setOptRecordStream(std::move(Output), std::move(OptRecordFile));
   }
@@ -1796,7 +1796,7 @@ computeStatsReporter(const CompilerInvocation &Invocation, CompilerInstance *Ins
           Instance->getASTContext().getClangModuleLoader())) {
     CSM = &clangImporter->getClangASTContext().getSourceManager();
   }
-  return llvm::make_unique<UnifiedStatsReporter>(
+  return std::make_unique<UnifiedStatsReporter>(
       "swift-frontend", FEOpts.ModuleName, InputName, TripleName, OutputType,
       OptType, StatsOutputDir, SM, CSM, Trace,
       ProfileEvents, ProfileEntities);
@@ -1889,9 +1889,41 @@ createJSONFixItDiagnosticConsumerIfNeeded(
     std::string fixItsOutputPath = input.fixItsOutputPath();
     if (fixItsOutputPath.empty())
       return nullptr;
-    return llvm::make_unique<JSONFixitWriter>(
+    return std::make_unique<JSONFixitWriter>(
         fixItsOutputPath, invocation.getDiagnosticOptions());
   });
+}
+
+/// Print information about the target triple in JSON.
+static void printTripleInfo(const llvm::Triple &triple,
+                            llvm::raw_ostream &out) {
+  out << "{\n";
+
+  out << "    \"triple\": \"";
+  out.write_escaped(triple.getTriple());
+  out << "\",\n";
+
+  out << "    \"unversionedTriple\": \"";
+  out.write_escaped(getUnversionedTriple(triple).getTriple());
+  out << "\",\n";
+
+  out << "    \"moduleTriple\": \"";
+  out.write_escaped(getTargetSpecificModuleTriple(triple).getTriple());
+  out << "\",\n";
+
+  if (auto runtimeVersion = getSwiftRuntimeCompatibilityVersionForTarget(
+          triple)) {
+    out << "    \"swiftRuntimeCompatibilityVersion\": \"";
+    out.write_escaped(runtimeVersion->getAsString());
+    out << "\",\n";
+  }
+
+  out << "    \"librariesRequireRPath\": "
+      << (tripleRequiresRPathForSwiftInOS(triple) ? "true" : "false")
+      << "\n";
+
+  out << "  }";
+
 }
 
 /// Print information about the selected target in JSON.
@@ -1899,34 +1931,17 @@ static void printTargetInfo(const CompilerInvocation &invocation,
                             llvm::raw_ostream &out) {
   out << "{\n";
 
-  // Target information.
+  // Target triple and target variant triple.
   auto &langOpts = invocation.getLangOptions();
-  out << "  \"target\": {\n";
+  out << "  \"target\": ";
+  printTripleInfo(langOpts.Target, out);
+  out << ",\n";
 
-  out << "    \"triple\": \"";
-  out.write_escaped(langOpts.Target.getTriple());
-  out << "\",\n";
-
-  out << "    \"unversionedTriple\": \"";
-  out.write_escaped(getUnversionedTriple(langOpts.Target).getTriple());
-  out << "\",\n";
-
-  out << "    \"moduleTriple\": \"";
-  out.write_escaped(getTargetSpecificModuleTriple(langOpts.Target).getTriple());
-  out << "\",\n";
-
-  if (auto runtimeVersion = getSwiftRuntimeCompatibilityVersionForTarget(
-          langOpts.Target)) {
-    out << "    \"swiftRuntimeCompatibilityVersion\": \"";
-    out.write_escaped(runtimeVersion->getAsString());
-    out << "\",\n";
+  if (auto &variant = langOpts.TargetVariant) {
+    out << "  \"targetVariant\": ";
+    printTripleInfo(*variant, out);
+    out << ",\n";
   }
-
-  out << "    \"librariesRequireRPath\": "
-      << (tripleRequiresRPathForSwiftInOS(langOpts.Target) ? "true" : "false")
-      << "\n";
-
-  out << "  },\n";
 
   // Various paths.
   auto &searchOpts = invocation.getSearchPathOptions();
@@ -1967,6 +1982,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                            const char *Argv0, void *MainAddr,
                            FrontendObserver *observer) {
   INITIALIZE_LLVM();
+  llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   PrintingDiagnosticConsumer PDC;
 
@@ -2007,7 +2023,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }, &diagnoseFatalError);
 
   std::unique_ptr<CompilerInstance> Instance =
-    llvm::make_unique<CompilerInstance>();
+    std::make_unique<CompilerInstance>();
   Instance->addDiagnosticConsumer(&PDC);
 
   struct FinishDiagProcessingCheckRAII {
@@ -2055,7 +2071,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // dynamically-sized array of optional PrettyStackTraces, which get
   // initialized by iterating over the buffers we collected above.
   auto configurationFileStackTraces =
-      llvm::make_unique<Optional<PrettyStackTraceFileContents>[]>(
+      std::make_unique<Optional<PrettyStackTraceFileContents>[]>(
         configurationFileBuffers.size());
   for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
            &configurationFileStackTraces[0],

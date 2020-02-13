@@ -199,6 +199,13 @@ ManagedValue SILGenBuilder::createGuaranteedPhiArgument(SILType type) {
   return SGF.emitManagedBorrowedArgumentWithCleanup(arg);
 }
 
+ManagedValue
+SILGenBuilder::createGuaranteedTransformingTerminatorArgument(SILType type) {
+  SILPhiArgument *arg =
+      getInsertionBB()->createPhiArgument(type, ValueOwnershipKind::Guaranteed);
+  return ManagedValue::forUnmanaged(arg);
+}
+
 ManagedValue SILGenBuilder::createAllocRef(
     SILLocation loc, SILType refType, bool objc, bool canAllocOnStack,
     ArrayRef<SILType> inputElementTypes,
@@ -836,4 +843,13 @@ ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,
                                              unsigned index) {
   auto *pbi = createProjectBox(loc, mv.getValue(), index);
   return ManagedValue::forUnmanaged(pbi);
+}
+
+ManagedValue SILGenBuilder::createMarkDependence(SILLocation loc,
+                                                 ManagedValue value,
+                                                 ManagedValue base) {
+  CleanupCloner cloner(*this, value);
+  auto *mdi = createMarkDependence(loc, value.forward(getSILGenFunction()),
+                                   base.forward(getSILGenFunction()));
+  return cloner.clone(mdi);
 }

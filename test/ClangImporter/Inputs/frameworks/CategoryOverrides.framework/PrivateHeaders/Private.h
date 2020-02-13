@@ -18,3 +18,9 @@
 @interface Refinery ()
 @property (nonatomic, readwrite) RefinedSugar sugar;
 @end
+
+@interface MyBaseClass () <NonNullProtocol>
+@end
+
+@interface MyDerivedClass () <ReadwriteProtocol>
+@end

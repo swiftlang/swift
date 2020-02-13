@@ -23,7 +23,7 @@ func bar() {
 // WITH: source.lang.swift.ref.function.free ({{.*}}/Foo.swift:2:13-2:16)
 // WITHOUT: source.lang.swift.ref.function.free ()
 // BOTH: foo()
-// BOTH: s:3Foo3fooyyF
-// BOTH: () -> ()
-// BOTH: $syycD
-// BOTH: Foo
+// BOTH-NEXT: s:3Foo3fooyyF
+// BOTH-NEXT: () -> ()
+// BOTH-NEXT: $syycD
+// BOTH-NEXT: Foo

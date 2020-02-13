@@ -22,8 +22,8 @@ let total = 15.0
 let count = 7
 let median = total / count // expected-error {{binary operator '/' cannot be applied to operands of type 'Double' and 'Int'}} expected-note {{overloads for '/' exist with these partially matching parameter lists:}}
 
-if (1) {} // expected-error{{cannot convert value of type 'Int' to expected condition type 'Bool'}}
-if 1 {} // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+if (1) {} // expected-error{{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+if 1 {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 
 var a: [String] = [1] // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
 var b: Int = [1, 2, 3] // expected-error{{cannot convert value of type '[Int]' to specified type 'Int'}}
@@ -34,7 +34,7 @@ var f2: Float = 3.0
 var dd: Double = f1 - f2 // expected-error{{cannot convert value of type 'Float' to specified type 'Double'}}
 
 func f() -> Bool {
-  return 1 + 1 // expected-error{{cannot convert return expression of type 'Int' to return type 'Bool'}}
+  return 1 + 1 // expected-error{{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 }
 
 // Test that nested diagnostics are properly surfaced.
@@ -56,7 +56,9 @@ class A {
     }
 }
 
-func retV() { return true } // expected-error {{unexpected non-void return value in void function}}
+func retV() { return true } 
+// expected-error@-1 {{unexpected non-void return value in void function}}
+// expected-note@-2 {{did you mean to add a return type?}}
 
 func retAI() -> Int {
     let a = [""]
@@ -65,7 +67,9 @@ func retAI() -> Int {
 }
 
 func bad_return1() {
-  return 42  // expected-error {{unexpected non-void return value in void function}}
+  return 42  
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 func bad_return2() -> (Int, Int) {
@@ -74,7 +78,9 @@ func bad_return2() -> (Int, Int) {
 
 // <rdar://problem/14096697> QoI: Diagnostics for trying to return values from void functions
 func bad_return3(lhs: Int, rhs: Int) {
-  return lhs != 0  // expected-error {{unexpected non-void return value in void function}}
+  return lhs != 0  
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 class MyBadReturnClass {
@@ -82,7 +88,9 @@ class MyBadReturnClass {
 }
 
 func ==(lhs:MyBadReturnClass, rhs:MyBadReturnClass) {
-  return MyBadReturnClass.intProperty == MyBadReturnClass.intProperty  // expected-error{{unexpected non-void return value in void function}}
+  return MyBadReturnClass.intProperty == MyBadReturnClass.intProperty
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 
@@ -156,4 +164,3 @@ func tuple_splat2(_ q : (a : Int, b : Int)) {
 func is_foreign(a: AnyObject) -> Bool {
   return a is CGColor // expected-warning {{'is' test is always true because 'CGColor' is a Core Foundation type}}
 }
-

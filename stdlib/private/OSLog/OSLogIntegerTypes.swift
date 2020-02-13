@@ -26,7 +26,7 @@ extension OSLogInterpolation {
   /// - Parameters:
   ///  - number: the interpolated expression of type Int, which is autoclosured.
   ///  - format: a formatting option available for integer types, defined by the
-  ///    enum `IntFormat`.
+  ///    enum `OSLogIntegerFormatting`.
   ///  - privacy: a privacy qualifier which is either private or public.
   ///    The default is public.
   @_semantics("constant_evaluable")
@@ -34,17 +34,18 @@ extension OSLogInterpolation {
   @_optimize(none)
   public mutating func appendInterpolation(
     _ number: @autoclosure @escaping () -> Int,
-    format: IntFormat = .decimal,
-    privacy: Privacy = .public
+    format: OSLogIntegerFormatting = .decimal,
+    align: OSLogStringAlignment = .none,
+    privacy: OSLogPrivacy = .public
   ) {
-    appendInteger(number, format: format, privacy: privacy)
+    appendInteger(number, format: format, align: align, privacy: privacy)
   }
 
   /// Define interpolation for expressions of type Int32.
   /// - Parameters:
   ///  - number: the interpolated expression of type Int32, which is autoclosured.
   ///  - format: a formatting option available for integer types, defined by the
-  ///    enum `IntFormat`.
+  ///    enum `OSLogIntegerFormatting`.
   ///  - privacy: a privacy qualifier which is either private or public.
   ///    The default is public.
   @_semantics("constant_evaluable")
@@ -52,10 +53,30 @@ extension OSLogInterpolation {
   @_optimize(none)
   public mutating func appendInterpolation(
     _ number: @autoclosure @escaping () -> Int32,
-    format: IntFormat = .decimal,
-    privacy: Privacy = .public
+    format: OSLogIntegerFormatting = .decimal,
+    align: OSLogStringAlignment = .none,
+    privacy: OSLogPrivacy = .public
   ) {
-    appendInteger(number, format: format, privacy: privacy)
+    appendInteger(number, format: format, align: align, privacy: privacy)
+  }
+
+  /// Define interpolation for expressions of type UInt.
+  /// - Parameters:
+  ///  - number: the interpolated expression of type UInt, which is autoclosured.
+  ///  - format: a formatting option available for integer types, defined by the
+  ///    enum `OSLogIntegerFormatting`.
+  ///  - privacy: a privacy qualifier which is either private or public.
+  ///    The default is public.
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
+  public mutating func appendInterpolation(
+    _ number: @autoclosure @escaping () -> UInt,
+    format: OSLogIntegerFormatting = .decimal,
+    align: OSLogStringAlignment = .none,
+    privacy: OSLogPrivacy = .public
+  ) {
+    appendInteger(number, format: format, align: align, privacy: privacy)
   }
 
   /// Given an integer, create and append a format specifier for the integer to the
@@ -66,17 +87,15 @@ extension OSLogInterpolation {
   @_optimize(none)
   internal mutating func appendInteger<T>(
     _ number: @escaping () -> T,
-    format: IntFormat,
-    privacy: Privacy
+    format: OSLogIntegerFormatting,
+    align: OSLogStringAlignment,
+    privacy: OSLogPrivacy
   ) where T: FixedWidthInteger {
     guard argumentCount < maxOSLogArgumentCount else { return }
+    formatString +=
+      format.formatSpecifier(for: T.self, align: align, privacy: privacy)
 
     let isPrivateArgument = isPrivate(privacy)
-    formatString +=
-      getIntegerFormatSpecifier(
-        T.self,
-        format,
-        isPrivateArgument)
     addIntHeaders(isPrivateArgument, sizeForEncoding(T.self))
 
     arguments.append(number)
@@ -103,38 +122,6 @@ extension OSLogInterpolation {
 
     preamble = getUpdatedPreamble(isPrivate: isPrivate, isScalar: true)
   }
-
-  /// Construct an os_log format specifier from the given parameters.
-  /// This function must be constant evaluable and all its arguments
-  /// must be known at compile time.
-  @inlinable
-  @_semantics("constant_evaluable")
-  @_effects(readonly)
-  @_optimize(none)
-  internal func getIntegerFormatSpecifier<T>(
-    _ integerType: T.Type,
-    _ format: IntFormat,
-    _ isPrivate: Bool
-  ) -> String where T : FixedWidthInteger {
-    var formatSpecifier: String = isPrivate ? "%{private}" : "%{public}"
-
-    // Add a length modifier to the specifier.
-    // TODO: more length modifiers will be added.
-    if (integerType.bitWidth == CLongLong.bitWidth) {
-      formatSpecifier += "ll"
-    }
-
-    // TODO: more format specifiers will be added.
-    switch (format) {
-    case .hex:
-      formatSpecifier += "x"
-    case .octal:
-      formatSpecifier += "o"
-    default:
-      formatSpecifier += integerType.isSigned ? "d" : "u"
-    }
-    return formatSpecifier
-  }
 }
 
 extension OSLogArguments {
@@ -154,10 +141,11 @@ extension OSLogArguments {
 }
 
 /// Return the number of bytes needed for serializing an integer argument as
-/// specified by os_log. This function must be constant evaluable.
-@_semantics("constant_evaluable")
-@inlinable
-@_optimize(none)
+/// specified by os_log. This function must be constant evaluable. Note that
+/// it is marked transparent instead of @inline(__always) as it is used in
+/// optimize(none) functions.
+@_transparent
+@usableFromInline
 internal func sizeForEncoding<T>(
   _ type: T.Type
 ) -> Int where T : FixedWidthInteger  {

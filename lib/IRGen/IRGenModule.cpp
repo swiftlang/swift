@@ -529,10 +529,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
 
-  // SWIFT_ENABLE_TENSORFLOW
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
-  // SWIFT_ENABLE_TENSORFLOW_END
 }
 
 IRGenModule::~IRGenModule() {
@@ -1356,7 +1354,8 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
       AvailabilityContext::forDeploymentTarget(context);
   return IRGen.Opts.PrespecializeGenericMetadata && 
     deploymentAvailability.isContainedIn(
-      context.getPrespecializedGenericMetadataAvailability());
+      context.getPrespecializedGenericMetadataAvailability()) &&
+    (Triple.isOSDarwin() || Triple.isTvOS() || Triple.isOSLinux());
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {

@@ -26,8 +26,8 @@ add_swift_host_library(swiftIRGen STATIC
   GenDecl.cpp
   # SWIFT_ENABLE_TENSORFLOW
   GenDiffFunc.cpp
-  GenDiffWitness.cpp
   # SWIFT_ENABLE_TENSORFLOW END
+  GenDiffWitness.cpp
   GenEnum.cpp
   GenExistential.cpp
   GenFunc.cpp

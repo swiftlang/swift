@@ -25,7 +25,7 @@ end:
 
 protocol P {}
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @existential_archetype_metatype_cast(%swift.type*, i8**, %swift.type* %T)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @existential_archetype_metatype_cast(%swift.type* %0, i8** %1, %swift.type* %T)
 // CHECK:         [[T0:%.*]] = call %swift.type* @swift_dynamicCastMetatype(%swift.type* %0, %swift.type* %T)
 // CHECK:         [[T1:%.*]] = icmp ne %swift.type* [[T0]], null
 sil @existential_archetype_metatype_cast : $@convention(thin) <T> (@thick P.Type) -> () {
@@ -44,7 +44,7 @@ end:
 class SomeClass {}
 sil_vtable SomeClass {}
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %objc_object* @metatype_object_conversion(%objc_class*) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %objc_object* @metatype_object_conversion(%objc_class* %0) {{.*}} {
 // CHECK:         %1 = bitcast %objc_class* %0 to %objc_object*
 // CHECK:         ret %objc_object* %1
 // CHECK:       }
@@ -56,7 +56,7 @@ entry(%m : $@objc_metatype SomeClass.Type):
 
 protocol SomeClassProtocol : class {}
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %objc_object* @existential_metatype_object_conversion(%objc_class*, i8**) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %objc_object* @existential_metatype_object_conversion(%objc_class* %0, i8** %1) {{.*}} {
 // CHECK:         [[T0:%.*]] = bitcast %objc_class* %0 to %objc_object*
 // CHECK:         ret %objc_object* [[T0]]
 // CHECK:       }
@@ -69,7 +69,7 @@ entry(%m : $@objc_metatype SomeClassProtocol.Type):
 class OtherClass : SomeClass {}
 sil_vtable OtherClass {}
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @value_metatype_cast(%T14metatype_casts9SomeClassC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @value_metatype_cast(%T14metatype_casts9SomeClassC* %0)
 // CHECK:         [[T0:%.*]] = bitcast %T14metatype_casts9SomeClassC* %0 to %swift.type**
 // CHECK:         [[T1:%.*]] = load %swift.type*, %swift.type** [[T0]]
 // CHECK-DIRECT:  [[T2:%.*]] = icmp eq %swift.type* [[T1]], {{.*}} @"$s14metatype_casts10OtherClassCMf"

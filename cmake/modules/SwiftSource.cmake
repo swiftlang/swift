@@ -364,13 +364,9 @@ function(_compile_swift_files
     if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS OR
        SWIFTFILE_SDK STREQUAL "MACCATALYST")
       set(specific_module_dir "${module_base}.swiftmodule")
-      set(specific_module_project_dir "${specific_module_dir}/Project")
-      set(source_info_file "${specific_module_project_dir}/${SWIFTFILE_ARCHITECTURE}.swiftsourceinfo")
       set(module_base "${module_base}.swiftmodule/${SWIFTFILE_ARCHITECTURE}")
     else()
       set(specific_module_dir)
-      set(specific_module_project_dir)
-      set(source_info_file "${module_base}.swiftsourceinfo")
     endif()
     set(module_file "${module_base}.swiftmodule")
     set(module_doc_file "${module_base}.swiftdoc")
@@ -631,11 +627,10 @@ function(_compile_swift_files
         COMMAND
           "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
           ${specific_module_dir}
-          ${specific_module_project_dir}
         COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
-          "-emit-module-source-info-path" "${source_info_file}"
+          "-avoid-emit-module-source-info"
           ${swift_flags} ${swift_module_flags} "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}

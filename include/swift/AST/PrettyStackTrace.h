@@ -24,6 +24,10 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 
+namespace clang {
+  class Type;
+}
+
 namespace swift {
   class ASTContext;
   class Decl;
@@ -132,6 +136,17 @@ public:
   virtual void print(llvm::raw_ostream &OS) const;
 };
 
+/// PrettyStackTraceClangType - Observe that we are processing a
+/// specific Clang type.
+class PrettyStackTraceClangType : public llvm::PrettyStackTraceEntry {
+  const clang::Type *TheType;
+  const char *Action;
+public:
+  PrettyStackTraceClangType(const char *action, const clang::Type *type)
+    : TheType(type), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
 /// Observe that we are processing a specific type representation.
 class PrettyStackTraceTypeRepr : public llvm::PrettyStackTraceEntry {
   ASTContext &Context;
@@ -187,7 +202,6 @@ public:
   void print(llvm::raw_ostream &OS) const override;
 };
 
-// SWIFT_ENABLE_TENSORFLOW
 /// PrettyStackTraceDifferentiabilityWitness - Observe that we are processing a
 /// specific differentiability witness.
 class PrettyStackTraceDifferentiabilityWitness
@@ -205,7 +219,6 @@ public:
 void printDifferentiabilityWitnessDescription(
     llvm::raw_ostream &out, const SILDifferentiabilityWitnessKey key,
     bool addNewline = true);
-// SWIFT_ENABLE_TENSORFLOW END
 
 } // end namespace swift
 

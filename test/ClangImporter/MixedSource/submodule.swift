@@ -4,6 +4,6 @@
 @_exported import Mixed.Submodule
 
 func test() {
-  _ = topLevel()
-  _ = fromSubmodule()
+  topLevel()
+  fromSubmodule()
 }

@@ -336,14 +336,14 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   CompletionInst = std::make_unique<CompletionInstance>();
 
   // By default, just use the in-memory cache.
-  CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
+  CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();
 
   // Provide a default file system provider.
-  setFileSystemProvider("in-memory-vfs", llvm::make_unique<InMemoryFileSystemProvider>());
+  setFileSystemProvider("in-memory-vfs", std::make_unique<InMemoryFileSystemProvider>());
 
   // SWIFT_ENABLE_TENSORFLOW
   setFileSystemProvider("directly-passed-vfs",
-                        llvm::make_unique<DirectlyPassedFileSystemProvider>());
+                        std::make_unique<DirectlyPassedFileSystemProvider>());
 }
 
 SwiftLangSupport::~SwiftLangSupport() {
@@ -998,7 +998,7 @@ void SwiftLangSupport::codeComplete(
   assert(provider);
   auto options = provider->addFileSystem(FS);
   vfsOptions.options =
-      llvm::make_unique<DirectlyPassedFileSystemProvider::Options>(options);
+      std::make_unique<DirectlyPassedFileSystemProvider::Options>(options);
   codeComplete(InputBuf, Offset, vfsOptions.options.get(), Consumer, Args,
                std::move(vfsOptions));
   provider->removeFileSystem(options);
@@ -1016,7 +1016,7 @@ void SwiftLangSupport::editorOpen(
   assert(provider);
   auto options = provider->addFileSystem(FS);
   vfsOptions.options =
-      llvm::make_unique<DirectlyPassedFileSystemProvider::Options>(options);
+      std::make_unique<DirectlyPassedFileSystemProvider::Options>(options);
   editorOpen(Name, Buf, Consumer, Args, std::move(vfsOptions));
   provider->removeFileSystem(options);
 }

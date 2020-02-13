@@ -342,7 +342,8 @@ static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
 
 /// Removes instructions that create the callee value if they are no
 /// longer necessary after inlining.
-static void cleanupCalleeValue(SILValue calleeValue) {
+static void cleanupCalleeValue(SILValue calleeValue,
+                               bool &needUpdateStackNesting) {
   // Handle the case where the callee of the apply is a load instruction. If we
   // fail to optimize, return. Otherwise, see if we can look through other
   // abstractions on our callee.
@@ -382,6 +383,7 @@ static void cleanupCalleeValue(SILValue calleeValue) {
       return;
     calleeValue = callee;
   }
+  needUpdateStackNesting = true;
 
   calleeValue = stripCopiesAndBorrows(calleeValue);
 
@@ -446,6 +448,10 @@ class ClosureCleanup {
   SmallBlotSetVector<SILInstruction *, 4> deadFunctionVals;
 
 public:
+  /// Set to true if some alloc/dealloc_stack instruction are inserted and at
+  /// the end of the run stack nesting needs to be corrected.
+  bool needUpdateStackNesting = false;
+
   /// This regular instruction deletion callback checks for any function-type
   /// values that may be unused after deleting the given instruction.
   void recordDeadFunction(SILInstruction *deletedInst) {
@@ -475,7 +481,7 @@ public:
         continue;
 
       if (auto *SVI = dyn_cast<SingleValueInstruction>(I.getValue()))
-        cleanupCalleeValue(SVI);
+        cleanupCalleeValue(SVI, needUpdateStackNesting);
     }
   }
 };
@@ -938,6 +944,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
       // we may be able to remove dead callee computations (e.g. dead
       // partial_apply closures).
       closureCleanup.cleanupDeadClosures(F);
+      needUpdateStackNesting |= closureCleanup.needUpdateStackNesting;
 
       // Resume inlining within nextBB, which contains only the inlined
       // instructions and possibly instructions in the original call block that

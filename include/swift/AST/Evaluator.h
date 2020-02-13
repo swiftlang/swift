@@ -345,7 +345,7 @@ private:
     // Check for a cycle.
     if (checkDependency(activeReq)) {
       return llvm::Error(
-        llvm::make_unique<CyclicalRequestError<Request>>(request, *this));
+          std::make_unique<CyclicalRequestError<Request>>(request, *this));
     }
 
     // Make sure we remove this from the set of active requests once we're

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,11 +15,10 @@
 // indices, derivative generic signature) to derivative functions (JVP and VJP).
 //
 // SIL differentiability witnesses are generated from the `@differentiable`
-// and `@derivative` attribute AST declaration attributes.
-// Differentiability witnesses are canonicalized by the differentiation SIL
-// transform, which fills in missing derivative functions. Canonical
-// differentiability witnesses from other modules can be deserialized to look up
-// derivative functions.
+// and `@derivative` AST declaration attributes.
+//
+// Differentiability witnesses are canonicalized by the SIL differentiation
+// transform, which fills in missing derivative functions.
 //
 //===----------------------------------------------------------------------===//
 
@@ -30,8 +29,9 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/SIL/SILAllocated.h"
-#include "llvm/ADT/ilist_node.h"
+#include "swift/SIL/SILLinkage.h"
 #include "llvm/ADT/ilist.h"
+#include "llvm/ADT/ilist_node.h"
 
 namespace swift {
 
@@ -39,8 +39,7 @@ class SILPrintContext;
 
 class SILDifferentiabilityWitness
     : public llvm::ilist_node<SILDifferentiabilityWitness>,
-      public SILAllocated<SILDifferentiabilityWitness>
-{
+      public SILAllocated<SILDifferentiabilityWitness> {
 private:
   /// The module which contains the differentiability witness.
   SILModule &Module;
@@ -48,10 +47,10 @@ private:
   SILLinkage Linkage;
   /// The original function.
   SILFunction *OriginalFunction;
-  /// The autodiff configuration: parameter indices, result indices, derivative
-  /// generic signature (optional). The derivative generic signature may contain
-  /// same-type requirements such that all generic parameters are bound to
-  /// concrete types.
+  /// The derivative configuration: parameter indices, result indices, and
+  /// derivative generic signature (optional). The derivative generic signature
+  /// may contain same-type requirements such that all generic parameters are
+  /// bound to concrete types.
   AutoDiffConfig Config;
   /// The JVP (Jacobian-vector products) derivative function.
   SILFunction *JVP;
@@ -100,12 +99,8 @@ public:
   SILLinkage getLinkage() const { return Linkage; }
   SILFunction *getOriginalFunction() const { return OriginalFunction; }
   const AutoDiffConfig &getConfig() const { return Config; }
-  IndexSubset *getParameterIndices() const {
-    return Config.parameterIndices;
-  }
-  IndexSubset *getResultIndices() const {
-    return Config.resultIndices;
-  }
+  IndexSubset *getParameterIndices() const { return Config.parameterIndices; }
+  IndexSubset *getResultIndices() const { return Config.resultIndices; }
   GenericSignature getDerivativeGenericSignature() const {
     return Config.derivativeGenericSignature;
   }
@@ -113,8 +108,10 @@ public:
   SILFunction *getVJP() const { return VJP; }
   SILFunction *getDerivative(AutoDiffDerivativeFunctionKind kind) const {
     switch (kind) {
-    case AutoDiffDerivativeFunctionKind::JVP: return JVP;
-    case AutoDiffDerivativeFunctionKind::VJP: return VJP;
+    case AutoDiffDerivativeFunctionKind::JVP:
+      return JVP;
+    case AutoDiffDerivativeFunctionKind::VJP:
+      return VJP;
     }
   }
   void setJVP(SILFunction *jvp) { JVP = jvp; }
@@ -122,8 +119,12 @@ public:
   void setDerivative(AutoDiffDerivativeFunctionKind kind,
                      SILFunction *derivative) {
     switch (kind) {
-    case AutoDiffDerivativeFunctionKind::JVP: JVP = derivative; break;
-    case AutoDiffDerivativeFunctionKind::VJP: VJP = derivative; break;
+    case AutoDiffDerivativeFunctionKind::JVP:
+      JVP = derivative;
+      break;
+    case AutoDiffDerivativeFunctionKind::VJP:
+      VJP = derivative;
+      break;
     }
   }
   bool isDeclaration() const { return IsDeclaration; }
@@ -131,10 +132,12 @@ public:
   bool isSerialized() const { return IsSerialized; }
   const DeclAttribute *getAttribute() const { return Attribute; }
 
+  // SWIFT_ENABLE_TENSORFLOW
   /// Returns the `SILAutoDiffIndices` corresponding to this config's indices.
   // TODO(TF-893): This is a temporary shim for incremental removal of
   // `SILAutoDiffIndices`. Eventually remove this.
   SILAutoDiffIndices getSILAutoDiffIndices() const;
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Verify that the differentiability witness is well-formed.
   void verify(const SILModule &module) const;

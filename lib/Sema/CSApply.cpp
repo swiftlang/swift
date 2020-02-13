@@ -22,6 +22,7 @@
 #include "MiscDiagnostics.h"
 #include "SolutionResult.h"
 #include "TypeCheckProtocol.h"
+#include "TypeCheckType.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -845,11 +846,9 @@ namespace {
 
       // If we're referring to a member type, it's just a type
       // reference.
-      if (isa<TypeDecl>(member)) {
+      if (auto *TD = dyn_cast<TypeDecl>(member)) {
         Type refType = simplifyType(openedType);
-        auto ref =
-            TypeExpr::createImplicitHack(memberLoc.getBaseNameLoc(),
-                                         refType, context);
+        auto ref = TypeExpr::createForDecl(memberLoc, TD, cs.DC, /*isImplicit=*/false);
         cs.setType(ref, refType);
         auto *result = new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, ref, refType);
@@ -7352,16 +7351,93 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
   return diagnosedAnyErrors;
 }
 
+/// Apply the given solution to the initialization target.
+///
+/// \returns the resulting initialiation expression.
+static Optional<SolutionApplicationTarget> applySolutionToInitialization(
+    Solution &solution, SolutionApplicationTarget target,
+    Expr *initializer) {
+  auto wrappedVar = target.getInitializationWrappedVar();
+  Type initType;
+  if (wrappedVar) {
+    initType = solution.getType(initializer);
+  } else {
+    initType = solution.getType(target.getInitializationPattern());
+  }
+
+  {
+    // Figure out what type the constraints decided on.
+    auto ty = solution.simplifyType(initType);
+    initType = ty->getRValueType()->reconstituteSugar(/*recursive =*/false);
+  }
+
+  // Convert the initializer to the type of the pattern.
+  auto &cs = solution.getConstraintSystem();
+  auto locator =
+      cs.getConstraintLocator(initializer, LocatorPathElt::ContextualType());
+  initializer = solution.coerceToType(initializer, initType, locator);
+  if (!initializer)
+    return None;
+
+  SolutionApplicationTarget resultTarget = target;
+  resultTarget.setExpr(initializer);
+
+  // Record the property wrapper type and note that the initializer has
+  // been subsumed by the backing property.
+  if (wrappedVar) {
+    ASTContext &ctx = cs.getASTContext();
+    wrappedVar->getParentPatternBinding()->setInitializerSubsumed(0);
+    ctx.setSideCachedPropertyWrapperBackingPropertyType(
+        wrappedVar, initType->mapTypeOutOfContext());
+
+    // Record the semantic initializer on the outermost property wrapper.
+    wrappedVar->getAttachedPropertyWrappers().front()
+        ->setSemanticInit(initializer);
+  }
+
+  // Coerce the pattern to the type of the initializer.
+  TypeResolutionOptions options =
+      isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())
+      ? TypeResolverContext::EditorPlaceholderExpr
+      : TypeResolverContext::InExpression;
+  options |= TypeResolutionFlags::OverrideType;
+
+  // Determine the type of the pattern.
+  Type finalPatternType = initializer->getType();
+  if (wrappedVar) {
+    if (!finalPatternType->hasError() && !finalPatternType->is<TypeVariableType>())
+      finalPatternType = computeWrappedValueType(wrappedVar, finalPatternType);
+  }
+
+  if (finalPatternType->hasDependentMember())
+    return None;
+
+  finalPatternType = finalPatternType->reconstituteSugar(/*recursive =*/false);
+
+  // Apply the solution to the pattern as well.
+  auto contextualPattern =
+      ContextualPattern::forRawPattern(target.getInitializationPattern(),
+                                       target.getDeclContext());
+  if (auto coercedPattern = TypeChecker::coercePatternToType(
+          contextualPattern, finalPatternType, options)) {
+    resultTarget.setPattern(coercedPattern);
+  } else {
+    return None;
+  }
+
+  return resultTarget;
+}
+
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
-llvm::PointerUnion<Expr *, Stmt *> ConstraintSystem::applySolutionImpl(
-    Solution &solution, SolutionApplicationTarget target, Type convertType,
-    bool discardedExpr, bool performingDiagnostics) {
+Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
+    Solution &solution, SolutionApplicationTarget target,
+    bool performingDiagnostics) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
     if (shouldSuppressDiagnostics())
-      return nullptr;
+      return None;
 
     bool diagnosedErrorsViaFixes = applySolutionFixes(solution);
     // If all of the available fixes would result in a warning,
@@ -7371,12 +7447,12 @@ llvm::PointerUnion<Expr *, Stmt *> ConstraintSystem::applySolutionImpl(
         })) {
       // If we already diagnosed any errors via fixes, that's it.
       if (diagnosedErrorsViaFixes)
-        return nullptr;
+        return None;
 
       // If we didn't manage to diagnose anything well, so fall back to
       // diagnosing mining the system to construct a reasonable error message.
       diagnoseFailureFor(target);
-      return nullptr;
+      return None;
     }
   }
 
@@ -7384,9 +7460,23 @@ llvm::PointerUnion<Expr *, Stmt *> ConstraintSystem::applySolutionImpl(
   ExprWalker walker(rewriter);
 
   // Apply the solution to the target.
-  llvm::PointerUnion<Expr *, Stmt *> result;
+  SolutionApplicationTarget result = target;
   if (auto expr = target.getAsExpr()) {
-    result = expr->walk(walker);
+    Expr *rewrittenExpr = expr->walk(walker);
+    if (!rewrittenExpr)
+      return None;
+
+    /// Handle application for initializations.
+    if (target.getExprContextualTypePurpose() == CTP_Initialization) {
+      auto initResultTarget = applySolutionToInitialization(
+          solution, target, rewrittenExpr);
+      if (!initResultTarget)
+        return None;
+
+      result = *initResultTarget;
+    } else {
+      result.setExpr(rewrittenExpr);
+    }
   } else {
     auto fn = *target.getAsFunction();
 
@@ -7407,13 +7497,10 @@ llvm::PointerUnion<Expr *, Stmt *> ConstraintSystem::applySolutionImpl(
         });
 
     if (!newBody)
-      return result;
+      return None;
 
-    result = newBody;
+    result.setFunctionBody(newBody);
   }
-
-  if (result.isNull())
-    return result;
 
   // If we're re-typechecking an expression for diagnostics, don't
   // visit closures that have non-single expression bodies.
@@ -7432,17 +7519,20 @@ llvm::PointerUnion<Expr *, Stmt *> ConstraintSystem::applySolutionImpl(
 
     // If any of them failed to type check, bail.
     if (hadError)
-      return nullptr;
+      return None;
   }
 
-  if (auto resultExpr = result.dyn_cast<Expr *>()) {
+  if (auto resultExpr = result.getAsExpr()) {
     Expr *expr = target.getAsExpr();
     assert(expr && "Can't have expression result without expression target");
+
     // We are supposed to use contextual type only if it is present and
     // this expression doesn't represent the implicit return of the single
     // expression function which got deduced to be `Never`.
+    Type convertType = target.getExprConversionType();
     auto shouldCoerceToContextualType = [&]() {
       return convertType &&
+          !target.isOptionalSomePatternInit() &&
           !(getType(resultExpr)->isUninhabited() &&
             getContextualTypePurpose(target.getAsExpr())
               == CTP_ReturnSingleExpr);
@@ -7451,19 +7541,29 @@ llvm::PointerUnion<Expr *, Stmt *> ConstraintSystem::applySolutionImpl(
     // If we're supposed to convert the expression to some particular type,
     // do so now.
     if (shouldCoerceToContextualType()) {
-      result = rewriter.coerceToType(resultExpr, convertType,
-                                     getConstraintLocator(expr));
-      if (!result)
-        return nullptr;
-    } else if (getType(resultExpr)->hasLValueType() && !discardedExpr) {
+      resultExpr = rewriter.coerceToType(resultExpr,
+                                         simplifyType(convertType),
+                                         getConstraintLocator(expr));
+    } else if (getType(resultExpr)->hasLValueType() &&
+               !target.isDiscardedExpr()) {
       // We referenced an lvalue. Load it.
-      result = rewriter.coerceToType(resultExpr,
-                                     getType(resultExpr)->getRValueType(),
-                                     getConstraintLocator(expr));
+      resultExpr = rewriter.coerceToType(resultExpr,
+                                         getType(resultExpr)->getRValueType(),
+                                         getConstraintLocator(expr));
     }
 
-    if (resultExpr)
-      solution.setExprTypes(resultExpr);
+    if (!resultExpr)
+      return None;
+
+    // For an @autoclosure default parameter type, add the autoclosure
+    // conversion.
+    if (FunctionType *autoclosureParamType =
+            target.getAsAutoclosureParamType()) {
+      resultExpr = buildAutoClosureExpr(resultExpr, autoclosureParamType);
+    }
+
+    solution.setExprTypes(resultExpr);
+    result.setExpr(resultExpr);
   }
 
   rewriter.finalize();
@@ -7632,16 +7732,21 @@ ArrayRef<Solution> SolutionResult::getAmbiguousSolutions() const {
 
 MutableArrayRef<Solution> SolutionResult::takeAmbiguousSolutions() && {
   assert(getKind() == Ambiguous);
+  markAsDiagnosed();
   return MutableArrayRef<Solution>(solutions, numSolutions);
 }
 
-llvm::PointerUnion<Expr *, Stmt *> SolutionApplicationTarget::walk(
-    ASTWalker &walker) {
+SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
   switch (kind) {
-  case Kind::expression:
-    return getAsExpr()->walk(walker);
+  case Kind::expression: {
+    SolutionApplicationTarget result = *this;
+    result.setExpr(getAsExpr()->walk(walker));
+    return result;
+  }
 
   case Kind::function:
-    return getAsFunction()->getBody()->walk(walker);
+    return SolutionApplicationTarget(
+        *getAsFunction(),
+        cast_or_null<BraceStmt>(getFunctionBody()->walk(walker)));
   }
 }

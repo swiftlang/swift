@@ -6045,6 +6045,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       VD->getAttrs() = Attributes;
 
       setLocalDiscriminator(VD);
+      VD->setTopLevelGlobal(topLevelDecl);
 
       // Set original declaration in `@differentiable` attributes.
       setOriginalDeclarationForDifferentiableAttributes(Attributes, VD);

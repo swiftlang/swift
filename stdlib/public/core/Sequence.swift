@@ -710,6 +710,7 @@ extension Sequence {
   ///
   /// - Parameter body: A closure that takes an element of the sequence as a
   ///   parameter.
+  @_semantics("sequence.forEach")
   @inlinable
   public func forEach(
     _ body: (Element) throws -> Void

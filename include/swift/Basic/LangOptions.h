@@ -306,7 +306,7 @@ namespace swift {
     /// the interface hash, hash them into per-iterable-decl-context
     /// fingerprints. Fine-grained dependency types won't dirty every provides
     /// in a file when the user adds a member to, e.g., a struct.
-    bool EnableTypeFingerprints = false;
+    bool EnableTypeFingerprints = true;
 
     /// When using fine-grained dependencies, emit dot files for every swiftdeps
     /// file.

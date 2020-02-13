@@ -173,15 +173,15 @@ public:
   std::string mangleAutoDiffLinearMapHelper(StringRef name,
                                             AutoDiffLinearMapKind kind,
                                             AutoDiffConfig config);
+  // SWIFT_ENABLE_TENSORFLOW END
 
-  /// Mangle a SIL differentiability witness key.
+  /// Mangle a SIL differentiability witness key:
   /// - Mangled original function name.
   /// - Parameter indices.
   /// - Result indices.
   /// - Derivative generic signature (optional).
-  std::string mangleSILDifferentiabilityWitnessKey(
-      SILDifferentiabilityWitnessKey key);
-  // SWIFT_ENABLE_TENSORFLOW END
+  std::string
+  mangleSILDifferentiabilityWitnessKey(SILDifferentiabilityWitnessKey key);
 
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature signature,

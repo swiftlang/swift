@@ -28,6 +28,7 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
+#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -507,6 +508,21 @@ void InstructionDeleter::recursivelyDeleteUsersIfDead(SILInstruction *inst,
   for (SILInstruction *user : users)
     recursivelyDeleteUsersIfDead(user, callback);
   deleteIfDead(inst, callback);
+}
+
+void InstructionDeleter::recursivelyForceDeleteUsersAndFixLifetimes(
+    SILInstruction *inst, CallbackTy callback) {
+  for (SILValue result : inst->getResults()) {
+    while (!result->use_empty()) {
+      SILInstruction *user = result->use_begin()->getUser();
+      recursivelyForceDeleteUsersAndFixLifetimes(user);
+    }
+  }
+  if (isIncidentalUse(inst) || isa<DestroyValueInst>(inst)) {
+    forceDelete(inst);
+    return;
+  }
+  forceDeleteAndFixLifetimes(inst);
 }
 
 void swift::eliminateDeadInstruction(SILInstruction *inst,
@@ -1255,9 +1271,9 @@ SingleValueInstruction *swift::tryToConcatenateStrings(ApplyInst *ai,
 //===----------------------------------------------------------------------===//
 
 /// NOTE: Instructions with transitive ownership kind are assumed to not keep
-/// the underlying closure alive as well. This is meant for instructions only
+/// the underlying value alive as well. This is meant for instructions only
 /// with non-transitive users.
-static bool useDoesNotKeepClosureAlive(const SILInstruction *inst) {
+static bool useDoesNotKeepValueAlive(const SILInstruction *inst) {
   switch (inst->getKind()) {
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::StrongReleaseInst:
@@ -1281,37 +1297,6 @@ static bool useHasTransitiveOwnership(const SILInstruction *inst) {
   // Look through copy_value, begin_borrow. They are inert for our purposes, but
   // we need to look through it.
   return isa<CopyValueInst>(inst) || isa<BeginBorrowInst>(inst);
-}
-
-static SILValue createLifetimeExtendedAllocStack(
-    SILBuilder &builder, SILLocation loc, SILValue arg,
-    ArrayRef<SILBasicBlock *> exitingBlocks, InstModCallbacks callbacks) {
-  AllocStackInst *asi = nullptr;
-  {
-    // Save our insert point and create a new alloc_stack in the initial BB and
-    // dealloc_stack in all exit blocks.
-    auto *oldInsertPt = &*builder.getInsertionPoint();
-    builder.setInsertionPoint(builder.getFunction().begin()->begin());
-    asi = builder.createAllocStack(loc, arg->getType());
-    callbacks.createdNewInst(asi);
-
-    for (auto *BB : exitingBlocks) {
-      builder.setInsertionPoint(BB->getTerminator());
-      callbacks.createdNewInst(builder.createDeallocStack(loc, asi));
-    }
-    builder.setInsertionPoint(oldInsertPt);
-  }
-  assert(asi != nullptr);
-
-  // Then perform a copy_addr [take] [init] right after the partial_apply from
-  // the original address argument to the new alloc_stack that we have
-  // created.
-  callbacks.createdNewInst(
-      builder.createCopyAddr(loc, arg, asi, IsTake, IsInitialization));
-
-  // Return the new alloc_stack inst that has the appropriate live range to
-  // destroy said values.
-  return asi;
 }
 
 static bool shouldDestroyPartialApplyCapturedArg(SILValue arg,
@@ -1392,76 +1377,6 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
   callbacks.createdNewInst(u.get<ReleaseValueInst *>());
 }
 
-/// For each captured argument of pai, decrement the ref count of the captured
-/// argument as appropriate at each of the post dominated release locations
-/// found by tracker.
-static bool releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *pai,
-                                                  ReleaseTracker &tracker,
-                                                  InstModCallbacks callbacks) {
-  SILBuilderWithScope builder(pai);
-  SILLocation loc = pai->getLoc();
-  CanSILFunctionType paiTy =
-      pai->getCallee()->getType().getAs<SILFunctionType>();
-
-  ArrayRef<SILParameterInfo> params = paiTy->getParameters();
-  llvm::SmallVector<SILValue, 8> args;
-  for (SILValue v : pai->getArguments()) {
-    // If any of our arguments contain open existentials, bail. We do not
-    // support this for now so that we can avoid having to re-order stack
-    // locations (a larger change).
-    if (v->getType().hasOpenedExistential())
-      return false;
-    args.emplace_back(v);
-  }
-  unsigned delta = params.size() - args.size();
-  assert(delta <= params.size()
-         && "Error, more args to partial apply than "
-            "params in its interface.");
-  params = params.drop_front(delta);
-
-  llvm::SmallVector<SILBasicBlock *, 2> exitingBlocks;
-  pai->getFunction()->findExitingBlocks(exitingBlocks);
-
-  // Go through our argument list and create new alloc_stacks for each
-  // non-trivial address value. This ensures that the memory location that we
-  // are cleaning up has the same live range as the partial_apply. Otherwise, we
-  // may be inserting destroy_addr of alloc_stack that have already been passed
-  // to a dealloc_stack.
-  for (unsigned i : llvm::reverse(indices(args))) {
-    SILValue arg = args[i];
-    SILParameterInfo paramInfo = params[i];
-
-    // If we are not going to destroy this partial_apply, continue.
-    if (!shouldDestroyPartialApplyCapturedArg(arg, paramInfo,
-                                              builder.getFunction()))
-      continue;
-
-    // If we have an object, we will not have live range issues, just continue.
-    if (arg->getType().isObject())
-      continue;
-
-    // Now that we know that we have a non-argument address, perform a take-init
-    // of arg into a lifetime extended alloc_stack
-    args[i] = createLifetimeExtendedAllocStack(builder, loc, arg, exitingBlocks,
-                                               callbacks);
-  }
-
-  // Emit a destroy for each captured closure argument at each final release
-  // point.
-  for (auto *finalRelease : tracker.getFinalReleases()) {
-    builder.setInsertionPoint(finalRelease);
-    builder.setCurrentDebugScope(finalRelease->getDebugScope());
-    for (unsigned i : indices(args)) {
-      SILValue arg = args[i];
-      SILParameterInfo param = params[i];
-
-      releasePartialApplyCapturedArg(builder, loc, arg, param, callbacks);
-    }
-  }
-
-  return true;
-}
-
 static bool
 deadMarkDependenceUser(SILInstruction *inst,
                        SmallVectorImpl<SILInstruction *> &deleteInsts) {
@@ -1475,9 +1390,96 @@ deadMarkDependenceUser(SILInstruction *inst,
   return true;
 }
 
-/// TODO: Generalize this to general objects.
+void swift::getConsumedPartialApplyArgs(PartialApplyInst *pai,
+                                        SmallVectorImpl<Operand *> &argOperands,
+                                        bool includeTrivialAddrArgs) {
+  ApplySite applySite(pai);
+  SILFunctionConventions calleeConv = applySite.getSubstCalleeConv();
+  unsigned firstCalleeArgIdx = applySite.getCalleeArgIndexOfFirstAppliedArg();
+  auto argList = pai->getArgumentOperands();
+  SILFunction *F = pai->getFunction();
+
+  for (unsigned i : indices(argList)) {
+    auto argConv = calleeConv.getSILArgumentConvention(firstCalleeArgIdx + i);
+    if (argConv.isInoutConvention())
+      continue;
+
+    Operand &argOp = argList[i];
+    SILType ty = argOp.get()->getType();
+    if (!ty.isTrivial(*F) || (includeTrivialAddrArgs && ty.isAddress()))
+      argOperands.push_back(&argOp);
+  }
+}
+
+bool swift::collectDestroys(SingleValueInstruction *inst,
+                            SmallVectorImpl<SILInstruction *> &destroys) {
+  bool isDead = true;
+  for (Operand *use : inst->getUses()) {
+    SILInstruction *user = use->getUser();
+    if (useHasTransitiveOwnership(user)) {
+      if (!collectDestroys(cast<SingleValueInstruction>(user), destroys))
+        isDead = false;
+      destroys.push_back(user);
+    } else if (useDoesNotKeepValueAlive(user)) {
+      destroys.push_back(user);
+    } else {
+      isDead = false;
+    }
+  }
+  return isDead;
+}
+
+/// Move the original arguments of the partial_apply into newly created
+/// temporaries to extend the lifetime of the arguments until the partial_apply
+/// is finally destroyed.
+///
+/// TODO: figure out why this is needed at all. Probably because of some
+///       weirdness of the old retain/release ARC model. Most likely this will
+///       not be needed anymore with OSSA.
+static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
+                                        ArrayRef<SILInstruction *> paiUsers,
+                                        SILBuilderContext &builderCtxt) {
+  SmallVector<Operand *, 8> argsToHandle;
+  getConsumedPartialApplyArgs(pai, argsToHandle,
+                              /*includeTrivialAddrArgs*/ false);
+  if (argsToHandle.empty())
+    return true;
+
+  // Compute the set of endpoints, which will be used to insert destroys of
+  // temporaries. This may fail if the frontier is located on a critical edge
+  // which we may not split.
+  ValueLifetimeAnalysis vla(pai, paiUsers);
+
+  ValueLifetimeAnalysis::Frontier partialApplyFrontier;
+  if (!vla.computeFrontier(partialApplyFrontier,
+                           ValueLifetimeAnalysis::DontModifyCFG)) {
+    return false;
+  }
+
+  for (Operand *argOp : argsToHandle) {
+    SILValue arg = argOp->get();
+    int argIdx = argOp->getOperandNumber() - pai->getArgumentOperandNumber();
+    SILDebugVariable dbgVar(/*Constant*/ true, argIdx);
+
+    SILValue tmp = arg;
+    if (arg->getType().isAddress()) {
+      // Move the value to a stack-allocated temporary.
+      SILBuilderWithScope builder(pai, builderCtxt);
+      tmp = builder.createAllocStack(pai->getLoc(), arg->getType(), dbgVar);
+      builder.createCopyAddr(pai->getLoc(), arg, tmp, IsTake_t::IsTake,
+                             IsInitialization_t::IsInitialization);
+    }
+
+    // Delay the destroy of the value (either as SSA value or in the stack-
+    // allocated temporary) at the end of the partial_apply's lifetime.
+    endLifetimeAtFrontier(tmp, partialApplyFrontier, builderCtxt);
+  }
+  return true;
+}
+
 bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
-                                 InstModCallbacks callbacks) {
+                                 InstModCallbacks callbacks,
+                                 bool needKeepArgsAlive) {
   auto *pa = dyn_cast<PartialApplyInst>(closure);
 
   // We currently only handle locally identified values that do not escape. We
@@ -1506,38 +1508,54 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     return true;
   }
 
-  // We only accept a user if it is an ARC object that can be removed if the
-  // object is dead. This should be expanded in the future. This also ensures
-  // that we are locally identified and non-escaping since we only allow for
-  // specific ARC users.
-  ReleaseTracker tracker(useDoesNotKeepClosureAlive, useHasTransitiveOwnership);
-
-  // Find the ARC users and the final retain, release.
-  if (!getFinalReleasesForValue(SILValue(closure), tracker))
+  // Collect all destroys of the closure (transitively including destorys of
+  // copies) and check if those are the only uses of the closure.
+  SmallVector<SILInstruction *, 16> closureDestroys;
+  if (!collectDestroys(closure, closureDestroys))
     return false;
 
   // If we have a partial_apply, release each captured argument at each one of
   // the final release locations of the partial apply.
   if (auto *pai = dyn_cast<PartialApplyInst>(closure)) {
-    // If we can not decrement the ref counts of the dead partial apply for any
-    // reason, bail.
-    if (!releaseCapturedArgsOfDeadPartialApply(pai, tracker, callbacks))
-      return false;
+    assert(!pa->isOnStack() &&
+           "partial_apply [stack] should have been handled before");
+    SILBuilderContext builderCtxt(pai->getModule());
+    if (needKeepArgsAlive) {
+      if (!keepArgsOfPartialApplyAlive(pai, closureDestroys, builderCtxt))
+        return false;
+    } else {
+      // A preceeding partial_apply -> apply conversion (done in
+      // tryOptimizeApplyOfPartialApply) already ensured that the arguments are
+      // kept alive until the end of the partial_apply's lifetime.
+      SmallVector<Operand *, 8> argsToHandle;
+      getConsumedPartialApplyArgs(pai, argsToHandle,
+                                  /*includeTrivialAddrArgs*/ false);
+
+      // We can just destroy the arguments at the point of the partial_apply
+      // (remember: partial_apply consumes all arguments).
+      for (Operand *argOp : argsToHandle) {
+        SILValue arg = argOp->get();
+        SILBuilderWithScope builder(pai, builderCtxt);
+        if (arg->getType().isObject()) {
+          builder.emitDestroyValueOperation(pai->getLoc(), arg);
+        } else {
+          builder.emitDestroyAddr(pai->getLoc(), arg);
+        }
+      }
+    }
   }
 
-  // Then delete all user instructions in reverse so that leaf uses are deleted
-  // first.
-  for (auto *user : reverse(tracker.getTrackedUsers())) {
-    assert(user->getResults().empty()
-           || useHasTransitiveOwnership(user)
-                  && "We expect only ARC operations without "
-                     "results or a cast from escape to noescape without users");
+  // Delete all copy and destroy instructions in order so that leaf uses are
+  // deleted first.
+  for (SILInstruction *user : closureDestroys) {
+    assert(
+        (useDoesNotKeepValueAlive(user) || useHasTransitiveOwnership(user)) &&
+        "We expect only ARC operations without "
+        "results or a cast from escape to noescape without users");
     callbacks.deleteInst(user);
   }
 
-  // Finally delete the closure.
   callbacks.deleteInst(closure);
-
   return true;
 }
 

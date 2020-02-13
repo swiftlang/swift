@@ -774,7 +774,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       return nullptr;
     }
 
-    if (!Walker.shouldWalkIntoNonSingleExpressionClosure())
+    if (!Walker.shouldWalkIntoNonSingleExpressionClosure(expr))
       return expr;
 
     // Handle other closures.
@@ -1104,7 +1104,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
 
-    if (!Walker.shouldWalkIntoNonSingleExpressionClosure())
+    if (!Walker.shouldWalkIntoTapExpression())
       return E;
 
     if (auto oldBody = E->getBody()) {

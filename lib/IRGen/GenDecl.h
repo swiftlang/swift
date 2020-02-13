@@ -20,6 +20,7 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/SIL/SILLocation.h"
 #include "llvm/IR/CallingConv.h"
+#include "llvm/Support/CommandLine.h"
 #include "DebugTypeInfo.h"
 #include "IRGen.h"
 

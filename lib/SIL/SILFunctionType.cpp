@@ -175,10 +175,9 @@ CanType SILFunctionType::getSelfInstanceType(SILModule &M) const {
   return selfTy;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 IndexSubset *
-SILFunctionType::getDifferentiationParameterIndices() {
-  assert(isDifferentiable());
+SILFunctionType::getDifferentiabilityParameterIndices() {
+  assert(isDifferentiable() && "Must be a differentiable function");
   SmallVector<unsigned, 8> result;
   for (auto valueAndIndex : enumerate(getParameters()))
     if (valueAndIndex.value().getDifferentiability() !=
@@ -187,17 +186,20 @@ SILFunctionType::getDifferentiationParameterIndices() {
   return IndexSubset::get(getASTContext(), getNumParameters(), result);
 }
 
-CanSILFunctionType SILFunctionType::getWithDifferentiability(
-    DifferentiabilityKind kind, IndexSubset *parameterIndices) {
+CanSILFunctionType
+SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
+                                          IndexSubset *parameterIndices) {
+  assert(kind != DifferentiabilityKind::NonDifferentiable &&
+         "Differentiability kind must be normal or linear");
   SmallVector<SILParameterInfo, 8> newParameters;
   for (auto paramAndIndex : enumerate(getParameters())) {
     auto &param = paramAndIndex.value();
     unsigned index = paramAndIndex.index();
     newParameters.push_back(param.getWithDifferentiability(
         index < parameterIndices->getCapacity() &&
-            parameterIndices->contains(index)
-                ? SILParameterDifferentiability::DifferentiableOrNotApplicable
-                : SILParameterDifferentiability::NotDifferentiable));
+                parameterIndices->contains(index)
+            ? SILParameterDifferentiability::DifferentiableOrNotApplicable
+            : SILParameterDifferentiability::NotDifferentiable));
   }
   auto newExtInfo = getExtInfo().withDifferentiabilityKind(kind);
   return get(getSubstGenericSignature(), newExtInfo, getCoroutineKind(),
@@ -1129,10 +1131,8 @@ private:
         for (auto i : indices(substTupleTy.getElementTypes())) {
           auto &elt = substTupleTy->getElement(i);
           auto ownership = elt.getParameterFlags().getValueOwnership();
-          // FIXME(swift3): Once the entire parameter list is no longer a
-          // target for substitution, re-enable this.
-          // assert(ownership == ValueOwnership::Default);
-          // assert(!elt.isVararg());
+          assert(ownership == ValueOwnership::Default);
+          assert(!elt.isVararg());
           visit(ownership, forSelf,
                 origType.getTupleElementType(i),
                 CanType(elt.getRawType()), rep);

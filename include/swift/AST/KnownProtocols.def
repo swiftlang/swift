@@ -69,6 +69,7 @@ PROTOCOL_(ErrorCodeProtocol)
 PROTOCOL(OptionSet)
 PROTOCOL(CaseIterable)
 PROTOCOL(SIMDScalar)
+PROTOCOL(BinaryInteger)
 
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)

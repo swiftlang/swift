@@ -4,6 +4,8 @@ add_swift_target_library(swiftOSLogPrototype
 
   OSLog.swift
   OSLogMessage.swift
+  OSLogIntegerFormatting.swift
+  OSLogStringAlignment.swift
   OSLogIntegerTypes.swift
   OSLogStringTypes.swift
   OSLogNSObjectType.swift

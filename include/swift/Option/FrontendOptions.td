@@ -182,10 +182,6 @@ def autolink_library : Separate<["-"], "autolink-library">,
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
-def disable_serialization_nested_type_lookup_table :
-  Flag<["-"], "disable-serialization-nested-type-lookup-table">,
-  HelpText<"Force module merging to use regular lookups to find nested types">;
-
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
@@ -654,9 +650,9 @@ def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
 def disable_legacy_type_info : Flag<["-"], "disable-legacy-type-info">,
   HelpText<"Completely disable legacy type layout">;
 
-def prespecialize_generic_metadata : Flag<["-"], "prespecialize-generic-metadata">,
-  HelpText<"Statically specialize metadata for generic types at types that "
-           "are known to be used in source.">;
+def disable_generic_metadata_prespecialization : Flag<["-"], "disable-generic-metadata-prespecialization">,
+  HelpText<"Do not statically specialize metadata for generic types at types "
+           "that are known to be used in source.">;
 
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;

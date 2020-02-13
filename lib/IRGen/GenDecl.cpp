@@ -1074,7 +1074,6 @@ void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
     IGM->emitSILProperty(&prop);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   // Emit differentiability witnesses.
   for (auto &dw :
            PrimaryIGM->getSILModule().getDifferentiabilityWitnessList()) {
@@ -1088,7 +1087,6 @@ void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
 
     IGM->emitSILDifferentiabilityWitness(&dw);
   }
-  // SWIFT_ENABLE_TENSORFLOW_END
 
   // Emit code coverage mapping data.
   PrimaryIGM->emitCoverageMapping();
@@ -4265,7 +4263,7 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
   llvm::AllocaInst *alloca =
       new llvm::AllocaInst(type, IGM.DataLayout.getAllocaAddrSpace(), name,
                            AllocaIP);
-  alloca->setAlignment(alignment.getValue());
+  alloca->setAlignment(llvm::MaybeAlign(alignment.getValue()));
   return Address(alloca, alignment);
 }
 
@@ -4274,9 +4272,9 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
                                     llvm::Value *ArraySize,
                                     Alignment alignment,
                                     const llvm::Twine &name) {
-  llvm::AllocaInst *alloca =
-      new llvm::AllocaInst(type, IGM.DataLayout.getAllocaAddrSpace(), ArraySize,
-                           alignment.getValue(), name, AllocaIP);
+  llvm::AllocaInst *alloca = new llvm::AllocaInst(
+      type, IGM.DataLayout.getAllocaAddrSpace(), ArraySize,
+      llvm::MaybeAlign(alignment.getValue()), name, AllocaIP);
   return Address(alloca, alignment);
 }
 
@@ -4508,14 +4506,12 @@ IRGenModule::getAddrOfWitnessTablePattern(const NormalProtocolConformance *conf,
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 /// Look up the address of a differentiability witness.
 llvm::Constant *IRGenModule::getAddrOfDifferentiabilityWitness(
     const SILDifferentiabilityWitness *witness, ConstantInit definition) {
   auto entity = LinkEntity::forDifferentiabilityWitness(witness);
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
-// SWIFT_ENABLE_TENSORFLOW
 
 llvm::Function *
 IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
@@ -4603,9 +4599,8 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
     llvm::FunctionType::get(resultTy, paramTys, false);
 
   llvm::Constant *fn =
-      cast<llvm::Function>(Module.getOrInsertFunction(fnName, fnTy)
-                               .getCallee()
-                               ->stripPointerCasts());
+      cast<llvm::Constant>(
+          Module.getOrInsertFunction(fnName, fnTy).getCallee());
 
   if (llvm::Function *def = shouldDefineHelper(*this, fn, setIsNoInline)) {
     IRGenFunction IGF(*this, def);

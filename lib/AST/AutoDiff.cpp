@@ -12,10 +12,23 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 
 using namespace swift;
+
+void AutoDiffConfig::print(llvm::raw_ostream &s) const {
+  s << "(parameters=";
+  parameterIndices->print(s);
+  s << " results=";
+  resultIndices->print(s);
+  if (derivativeGenericSignature) {
+    s << " where=";
+    derivativeGenericSignature->print(s);
+  }
+  s << ')';
+}
 
 // TODO(TF-874): This helper is inefficient and should be removed. Unwrapping at
 // most once (for curried method types) is sufficient.
@@ -197,18 +210,6 @@ void SILAutoDiffIndices::dump() const {
 SILAutoDiffIndices AutoDiffConfig::getSILAutoDiffIndices() const {
   assert(resultIndices->getNumIndices() == 1);
   return SILAutoDiffIndices(*resultIndices->begin(), parameterIndices);
-}
-
-void AutoDiffConfig::print(llvm::raw_ostream &s) const {
-  s << "(parameters=";
-  parameterIndices->print(s);
-  s << " results=";
-  resultIndices->print(s);
-  if (derivativeGenericSignature) {
-    s << " where=";
-    derivativeGenericSignature->print(s);
-  }
-  s << ')';
 }
 
 void AutoDiffConfig::dump() const {
