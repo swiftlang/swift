@@ -224,9 +224,6 @@ FRONTEND_STATISTIC(Sema, NumAccessorsSynthesized)
 /// Number of synthesized accessor bodies.
 FRONTEND_STATISTIC(Sema, NumAccessorBodiesSynthesized)
 
-/// Number of full function bodies typechecked.
-FRONTEND_STATISTIC(Sema, NumFunctionsTypechecked)
-
 /// Number of generic signature builders constructed. Rough proxy for
 /// amount of work the GSB does analyzing type signatures.
 FRONTEND_STATISTIC(Sema, NumGenericSignatureBuilders)
