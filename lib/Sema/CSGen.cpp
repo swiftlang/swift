@@ -2199,17 +2199,6 @@ namespace {
         return getTypeForPattern(cast<VarPattern>(pattern)->getSubPattern(),
                                  locator);
       case PatternKind::Any: {
-        // If we have a type from an initializer expression, and that
-        // expression does not produce an InOut type, use it.  This
-        // will avoid exponential typecheck behavior in the case of
-        // tuples, nested arrays, and dictionary literals.
-        //
-        // Otherwise, create a new type variable.
-        if (auto boundExpr = locator.trySimplifyToExpr()) {
-          if (!boundExpr->isSemanticallyInOutExpr())
-            return CS.getType(boundExpr)->getRValueType();
-        }
-
         return CS.createTypeVariable(CS.getConstraintLocator(locator),
                                      TVO_CanBindToNoEscape);
       }
@@ -2217,44 +2206,19 @@ namespace {
       case PatternKind::Named: {
         auto var = cast<NamedPattern>(pattern)->getDecl();
 
-        // If we have a type from an initializer expression, and that
-        // expression does not produce an InOut type, use it.  This
-        // will avoid exponential typecheck behavior in the case of
-        // tuples, nested arrays, and dictionary literals.
-        //
-        // FIXME: This should be handled in the solver, not here.
-        //
-        // Otherwise, create a new type variable.
-        auto ty = Type();
-        if (!var->hasNonPatternBindingInit() &&
-            !var->hasAttachedPropertyWrapper()) {
-          if (auto boundExpr = locator.trySimplifyToExpr()) {
-            if (!boundExpr->isSemanticallyInOutExpr())
-              ty = CS.getType(boundExpr)->getRValueType();
-          }
-        }
+        Type varType = CS.createTypeVariable(
+            CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
 
         auto ROK = ReferenceOwnership::Strong;
         if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
           ROK = OA->get();
-
         switch (optionalityOf(ROK)) {
         case ReferenceOwnershipOptionality::Required:
-          if (ty && ty->getOptionalObjectType())
-            return ty; // Already Optional<T>.
-          // Create a fresh type variable to handle overloaded expressions.
-          if (!ty || ty->is<TypeVariableType>())
-            ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                       TVO_CanBindToNoEscape);
-          return TypeChecker::getOptionalType(var->getLoc(), ty);
+          return TypeChecker::getOptionalType(var->getLoc(), varType);
         case ReferenceOwnershipOptionality::Allowed:
         case ReferenceOwnershipOptionality::Disallowed:
-          break;
+          return varType;
         }
-        if (ty)
-          return ty;
-        return CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                     TVO_CanBindToNoEscape);
       }
 
       case PatternKind::Typed: {
