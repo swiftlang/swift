@@ -1247,17 +1247,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     return;
   }
 
-  // Diagnose ".foo" expressions that lack context specifically.
-  if (auto UME =
-        dyn_cast<UnresolvedMemberExpr>(E->getSemanticsProvidingExpr())) {
-    if (!CS.getContextualType(E)) {
-      diagnose(E->getLoc(), diag::unresolved_member_no_inference,UME->getName())
-        .highlight(SourceRange(UME->getDotLoc(),
-                               UME->getNameLoc().getSourceRange().End));
-      return;
-    }
-  }
-
   // Attempt to re-type-check the entire expression, allowing ambiguity, but
   // ignoring a contextual type.
   if (expr == E) {

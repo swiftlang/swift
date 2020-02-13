@@ -5587,40 +5587,6 @@ bool ArgumentMismatchFailure::diagnoseArchetypeMismatch() const {
   if (!(paramDecl && argDecl))
     return false;
 
-  auto describeGenericType = [&](ValueDecl *genericParam,
-                                 bool includeName = false) -> std::string {
-    if (!genericParam)
-      return "";
-
-    Decl *parent = nullptr;
-    if (auto *AT = dyn_cast<AssociatedTypeDecl>(genericParam)) {
-      parent = AT->getProtocol();
-    } else {
-      auto *dc = genericParam->getDeclContext();
-      parent = dc->getInnermostDeclarationDeclContext();
-    }
-
-    if (!parent)
-      return "";
-
-    llvm::SmallString<64> result;
-    llvm::raw_svector_ostream OS(result);
-
-    OS << Decl::getDescriptiveKindName(genericParam->getDescriptiveKind());
-
-    if (includeName && genericParam->hasName())
-      OS << " '" << genericParam->getBaseName() << "'";
-
-    OS << " of ";
-    OS << Decl::getDescriptiveKindName(parent->getDescriptiveKind());
-    if (auto *decl = dyn_cast<ValueDecl>(parent)) {
-      if (decl->hasName())
-        OS << " '" << decl->getFullName() << "'";
-    }
-
-    return OS.str();
-  };
-
   emitDiagnostic(
       getAnchor()->getLoc(), diag::cannot_convert_argument_value_generic, argTy,
       describeGenericType(argDecl), paramTy, describeGenericType(paramDecl));
