@@ -2805,6 +2805,9 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
           if (binding == solution.typeBindings.end())
             return false;
 
+          // Contextual opaque result type is uniquely identified by
+          // declaration it's associated with, so we have to compare
+          // declarations instead of using pointer equality on such types.
           if (auto *opaque =
                   binding->second->getAs<OpaqueTypeArchetypeType>()) {
             auto *decl = opaque->getDecl();
