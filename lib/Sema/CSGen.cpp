@@ -4033,6 +4033,100 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
   return false;
 }
 
+void ConstraintSystem::bindVariablesInPattern(
+    Pattern *pattern, Type patternType, ConstraintLocator *locator) {
+  switch (pattern->getKind()) {
+  case PatternKind::Paren: {
+    // Parentheses don't affect the type, but unwrap a paren type if we have
+    // one.
+    Type subPatternType;
+    if (auto parenType = dyn_cast<ParenType>(patternType.getPointer()))
+      subPatternType = parenType->getUnderlyingType();
+    else
+      subPatternType = patternType;
+    return bindVariablesInPattern(
+        cast<ParenPattern>(pattern)->getSubPattern(),
+        subPatternType, locator);
+  }
+
+  case PatternKind::Var:
+    // Var doesn't affect the type.
+    return bindVariablesInPattern(cast<VarPattern>(pattern)->getSubPattern(),
+                                  patternType, locator);
+
+  case PatternKind::Any:
+    // Nothing to bind.
+    return;
+
+  case PatternKind::Named: {
+    auto var = cast<NamedPattern>(pattern)->getDecl();
+
+    /// Create a fresh type variable to describe the type of the
+    Type varType = createTypeVariable(locator, TVO_CanBindToNoEscape);
+
+    auto ROK = ReferenceOwnership::Strong;
+    if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+      ROK = OA->get();
+    switch (optionalityOf(ROK)) {
+    case ReferenceOwnershipOptionality::Required:
+      // FIXME: Can we assert this rather than just checking it.
+      if (auto optPatternType =
+              dyn_cast<OptionalType>(patternType.getPointer())) {
+        // Add a one-way constraint from the type variable to the wrapped
+        // type of the optional.
+        addConstraint(
+          ConstraintKind::OneWayEqual, varType, optPatternType->getBaseType(),
+                          locator);
+
+        // Make the variable type optional.
+        varType = TypeChecker::getOptionalType(var->getLoc(), varType);
+        break;
+      }
+
+      // Fall through to treat this normally.
+      LLVM_FALLTHROUGH;
+
+    case ReferenceOwnershipOptionality::Allowed:
+    case ReferenceOwnershipOptionality::Disallowed:
+      // Add the one-way constraint from the variable type to the pattern
+      // type.
+      addConstraint(ConstraintKind::OneWayEqual, varType, patternType,
+                    locator);
+      break;
+    }
+
+    // Bind the type of the variable.
+    setType(var, varType);
+    return;
+  }
+
+  case PatternKind::Typed: {
+    // Ignore the type itself; it's part of patternType now.
+    return bindVariablesInPattern(
+        cast<TypedPattern>(pattern)->getSubPattern(),
+        patternType, locator);
+  }
+
+  case PatternKind::Tuple: {
+    auto tuplePat = cast<TuplePattern>(pattern);
+    auto tupleType = patternType->castTo<TupleType>();
+    for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
+      bindVariablesInPattern(tuplePat->getElement(i).getPattern(),
+                             tupleType->getElementType(i), locator);
+    }
+    return;
+  }
+
+  // FIXME: Refutable patterns will generate additional constraints.
+#define PATTERN(Id, Parent)
+#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
+#include "swift/AST/PatternNodes.def"
+    llvm_unreachable("Refutable patterns are not supported here");
+  }
+
+  llvm_unreachable("Unhandled pattern kind");
+}
+
 void ConstraintSystem::optimizeConstraints(Expr *e) {
   if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return;
