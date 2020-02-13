@@ -5066,6 +5066,8 @@ bool exprNeedsParensOutsideFollowingOperator(
 /// Determine whether this is a SIMD operator.
 bool isSIMDOperator(ValueDecl *value);
 
+std::string describeGenericType(ValueDecl *GP, bool includeName = false);
+
 /// Apply the given function builder transform within a specific solution
 /// to produce the rewritten body.
 ///
