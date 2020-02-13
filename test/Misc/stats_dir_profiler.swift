@@ -7,7 +7,7 @@
 // RUN: %FileCheck -check-prefix=ENTITIES -input-file %t/stats-entities/*.dir/Time.User.entities %s
 
 // EVENTS: {{perform-sema;.*;typecheck-decl.* [0-9]+}}
-// ENTITIES: {{perform-sema;.*;typecheck-fn bar\(\);typecheck-stmt.* [0-9]+}}
+// ENTITIES: {{perform-sema;.*;TypeCheckFunctionBodyUntilRequest bar\(\);typecheck-stmt.* [0-9]+}}
 
 public func foo() {
     print("hello")
