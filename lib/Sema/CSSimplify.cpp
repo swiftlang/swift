@@ -2113,11 +2113,25 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
         // witness tables.
         if (!type1->isClassExistentialType() && !type1->mayHaveSuperclass()) {
           if (shouldAttemptFixes()) {
-            auto *fix = AllowNonClassTypeToConvertToAnyObject::create(
-                *this, type1, getConstraintLocator(locator));
+            llvm::SmallVector<LocatorPathElt, 4> path;
+            if (auto *anchor = locator.getLocatorParts(path)) {
 
-            return recordFix(fix) ? getTypeMatchFailure(locator)
-                                  : getTypeMatchSuccess();
+              // Let's drop `optional` or `generic argument` bits from
+              // locator because that helps to diagnose reference equality
+              // operaators ("===" and "!==") since there is always a
+              // `value-to-optional` or `optional-to-optional` conversion
+              // associated with them (expected argument is `AnyObject?`).
+              if (!path.empty() &&
+                  (path.back().is<LocatorPathElt::OptionalPayload>() ||
+                   path.back().is<LocatorPathElt::GenericArgument>()))
+                path.pop_back();
+
+              auto *fix = AllowNonClassTypeToConvertToAnyObject::create(
+                  *this, type1, getConstraintLocator(anchor, path));
+
+              return recordFix(fix) ? getTypeMatchFailure(locator)
+                                    : getTypeMatchSuccess();
+            }
           }
 
           return getTypeMatchFailure(locator);
@@ -3101,15 +3115,6 @@ bool ConstraintSystem::repairFailures(
     if (!isPatternMatching &&
         repairViaBridgingCast(*this, lhs, rhs, conversionsOrFixes, locator))
       break;
-
-    // If this is an argument to `===` or `!==` there are tailored
-    // diagnostics available for it as part of argument-to-parameter
-    // conversion fix, so let's not try any restrictions or other fixes.
-    if (isArgumentOfReferenceEqualityOperator(loc)) {
-      conversionsOrFixes.push_back(
-          AllowArgumentMismatch::create(*this, lhs, rhs, loc));
-      break;
-    }
 
     // Argument is a r-value but parameter expects an l-value e.g.
     //
