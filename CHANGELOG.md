@@ -26,6 +26,18 @@ CHANGELOG
 Swift Next
 ----------
 
+* [SE-0266][]:
+  
+  Enumerations with no associated values, or only `Comparable` associated values, can opt-in to synthesized `Comparable` conformance by declaring conformance to the `Comparable` protocol. The synthesized implementation orders the cases first by case-declaration order, and then by lexicographic order of the associated values (if any).
+  
+  ```swift
+  enum Foo: Comparable {
+    case a(Int), b(Int), c
+  }
+  
+  // .a(0) < .a(1) < .b(0) < .b(1) < .c
+  ```
+
 * [SE-0269][]:
 
   When an escaping closure explicitly captures `self` in its capture list, the
@@ -7901,6 +7913,7 @@ Swift 1.0
 [SE-0252]: <https://github.com/apple/swift-evolution/blob/master/proposals/0252-keypath-dynamic-member-lookup.md>
 [SE-0253]: <https://github.com/apple/swift-evolution/blob/master/proposals/0253-callable.md>
 [SE-0254]: <https://github.com/apple/swift-evolution/blob/master/proposals/0254-static-subscripts.md>
+[SE-0266]: <https://github.com/apple/swift-evolution/blob/master/proposals/0266-synthesized-comparable-for-enumerations.md>
 [SE-0269]: <https://github.com/apple/swift-evolution/blob/master/proposals/0269-implicit-self-explicit-capture.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
