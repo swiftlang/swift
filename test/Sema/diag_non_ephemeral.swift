@@ -489,7 +489,7 @@ func takesPointerOverload(x: Int = 0, @_nonEphemeral _ ptr: UnsafeMutablePointer
 
 func testAmbiguity() {
   var arr = [1, 2, 3]
-  takesPointerOverload(&arr) // expected-error {{no exact matches in call to global function 'takesPointerOverload(x:_:)'}}
+  takesPointerOverload(&arr) // expected-error {{no exact matches in call to global function 'takesPointerOverload'}}
 }
 
 func takesPointerOverload2(@_nonEphemeral _ ptr: UnsafePointer<Int>) {}

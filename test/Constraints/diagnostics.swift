@@ -935,7 +935,7 @@ class CacheValue {
 
 func valueForKey<K>(_ key: K) -> CacheValue? {
   let cache = NSCache<K, CacheValue>()
-  return cache.object(forKey: key)?.value // expected-error {{no exact matches in call to instance method 'value'}}
+  return cache.object(forKey: key)?.value // expected-error {{no exact matches in reference to instance method 'value'}}
 }
 
 // SR-2242: poor diagnostic when argument label is omitted
@@ -1085,7 +1085,7 @@ func SR_6272_c() {
 struct SR_6272_D: ExpressibleByIntegerLiteral {
   typealias IntegerLiteralType = Int
   init(integerLiteral: Int) {}
-  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 } // expected-note 2 {{candidate expects value of type 'Int' for parameter #2}}
+  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 }
 }
 
 func SR_6272_d() {

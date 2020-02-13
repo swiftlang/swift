@@ -47,12 +47,12 @@ takesInt(noParams(1)) // expected-error{{argument passed to call that takes no a
 takesInt(takesAndReturnsInt("")) // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
 
 // Test error recovery for type expressions.
-struct MyArray<Element> {}
+struct MyArray<Element> {} // expected-note {{'Element' declared as parameter to type 'MyArray'}}
 class A {
     var a: MyArray<Int>
     init() {
-        a = MyArray<Int // expected-error{{binary operator '<' cannot be applied to operands of type 'MyArray<_>.Type' and 'Int.Type'}}
-	// expected-note @-1 {{overloads for '<' exist with these partially matching parameter lists:}}
+        a = MyArray<Int // expected-error {{generic parameter 'Element' could not be inferred}}
+        // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
     }
 }
 
