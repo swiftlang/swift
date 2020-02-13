@@ -308,7 +308,8 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
 /// witness.
 /// - If requirement's `@differentiable` attributes are met, or if `result` is
 ///   not viable, returns `result`.
-/// - Otherwise, returns a `DifferentiableConflict` `RequirementMatch`.
+/// - Otherwise, returns a "missing `@differentiable` attribute"
+///   `RequirementMatch`.
 // Note: the `result` argument is only necessary for using
 // `RequirementMatch::WitnessSubstitutions`.
 static RequirementMatch
@@ -386,15 +387,19 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
       bool success = false;
       // If no exact witness derivative configuration was found, check
       // conditions for creating an implicit witness `@differentiable` attribute
-      // with the exaxct derivative configuration:
+      // with the exact derivative configuration:
       // - If the witness has a "superset" derivative configuration.
-      // - If the witness is less than public.
+      // - If the witness is less than public and is declared in the same file
+      //   as the conformance.
       //   - `@differentiable` attributes are really only significant for public
       //     declarations: it improves usability to not require explicit
       //     `@differentiable` attributes for less-visible declarations.
       bool createImplicitWitnessAttribute =
-          supersetConfig || witness->getFormalAccess() < AccessLevel::Public;
-      if (supersetConfig || witness->getFormalAccess() < AccessLevel::Public) {
+          supersetConfig ||
+          (witness->getFormalAccess() < AccessLevel::Public &&
+           dc->getModuleScopeContext() ==
+               witness->getDeclContext()->getModuleScopeContext());
+      if (createImplicitWitnessAttribute) {
         auto derivativeGenSig = witnessAFD->getGenericSignature();
         if (supersetConfig)
           derivativeGenSig = supersetConfig->derivativeGenericSignature;
@@ -428,9 +433,9 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
           return RequirementMatch(
               getStandinForAccessor(vdWitness, AccessorKind::Get),
-              MatchKind::DifferentiableConflict, reqDiffAttr);
+              MatchKind::MissingDifferentiableAttr, reqDiffAttr);
         } else {
-          return RequirementMatch(witness, MatchKind::DifferentiableConflict,
+          return RequirementMatch(witness, MatchKind::MissingDifferentiableAttr,
                                   reqDiffAttr);
         }
       }
@@ -2328,7 +2333,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   case MatchKind::NonObjC:
     diags.diagnose(match.Witness, diag::protocol_witness_not_objc);
     break;
-  case MatchKind::DifferentiableConflict: {
+  case MatchKind::MissingDifferentiableAttr: {
     // Emit a note and fix-it showing the missing requirement `@differentiable`
     // attribute.
     auto *reqAttr = cast<DifferentiableAttr>(match.UnmetAttribute);
