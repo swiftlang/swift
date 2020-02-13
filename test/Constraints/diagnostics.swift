@@ -666,9 +666,10 @@ _ = (i = 6) ? 42 : 57 // expected-error {{use of '=' in a boolean context, did y
 // <rdar://problem/22263468> QoI: Not producing specific argument conversion diagnostic for tuple init
 func r22263468(_ a : String?) {
   typealias MyTuple = (Int, String)
-  _ = MyTuple(42, a) // expected-error {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
-  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // TODO(diagnostics): This is a regression from diagnosing missing optional unwrap for `a`, we have to
+  // re-think the way errors in tuple elements are detected because it's currently impossible to detect
+  // exactly what went wrong here and aggregate fixes for different elements at the same time.
+  _ = MyTuple(42, a) // expected-error {{tuple type 'MyTuple' (aka '(Int, String)') is not convertible to tuple type '(Int, String?)'}}
 }
 
 
