@@ -1749,7 +1749,7 @@ public:
         return CanType();
       if (!didChange && newReturn == substFunc.getResult())
         return subst;
-      return FunctionType::get(newParams, newReturn)
+      return FunctionType::get(newParams, newReturn, func->getExtInfo())
         ->getCanonicalType();
     }
     return CanType();
