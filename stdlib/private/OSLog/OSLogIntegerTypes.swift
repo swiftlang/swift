@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,15 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-// This file defines extensions for interpolating integer expressions into a
+// This file defines extensions for interpolating integer expressions into an
 // OSLogMesage. It defines `appendInterpolation` functions for standard integer
 // types. It also defines extensions for serializing integer types into the
 // argument buffer passed to os_log ABIs.
 //
-// The `appendInterpolation` functions defined in this file accept formatting
-// and privacy options along with the interpolated expression as shown below:
+// The `appendInterpolation` functions defined in this file accept formatting,
+// privacy and alignment options along with the interpolated expression as
+// shown below:
 //
-//         "\(x, format: .hex, privacy: .private\)"
+//  1.  "\(x, format: .hex, privacy: .private, align: .right\)"
+//  2.  "\(x, format: .hex(minDigits: 10), align: .right(columns: 10)\)"
 
 extension OSLogInterpolation {
 
@@ -26,9 +28,11 @@ extension OSLogInterpolation {
   /// - Parameters:
   ///  - number: the interpolated expression of type Int, which is autoclosured.
   ///  - format: a formatting option available for integer types, defined by the
-  ///    enum `OSLogIntegerFormatting`.
+  ///    type`OSLogIntegerFormatting`. The default is .decimal.
+  ///  - align: left or right alignment with the minimum number of columns as
+  ///    defined by the type `OSLogStringAlignment`.
   ///  - privacy: a privacy qualifier which is either private or public.
-  ///    The default is public.
+  ///    It is auto-inferred by default.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
@@ -36,7 +40,7 @@ extension OSLogInterpolation {
     _ number: @autoclosure @escaping () -> Int,
     format: OSLogIntegerFormatting = .decimal,
     align: OSLogStringAlignment = .none,
-    privacy: OSLogPrivacy = .public
+    privacy: OSLogPrivacy = .auto
   ) {
     appendInteger(number, format: format, align: align, privacy: privacy)
   }
@@ -45,9 +49,11 @@ extension OSLogInterpolation {
   /// - Parameters:
   ///  - number: the interpolated expression of type Int32, which is autoclosured.
   ///  - format: a formatting option available for integer types, defined by the
-  ///    enum `OSLogIntegerFormatting`.
+  ///    type `OSLogIntegerFormatting`.
+  ///  - align: left or right alignment with the minimum number of columns as
+  ///    defined by the type `OSLogStringAlignment`.
   ///  - privacy: a privacy qualifier which is either private or public.
-  ///    The default is public.
+  ///    It is auto-inferred by default.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
@@ -55,7 +61,7 @@ extension OSLogInterpolation {
     _ number: @autoclosure @escaping () -> Int32,
     format: OSLogIntegerFormatting = .decimal,
     align: OSLogStringAlignment = .none,
-    privacy: OSLogPrivacy = .public
+    privacy: OSLogPrivacy = .auto
   ) {
     appendInteger(number, format: format, align: align, privacy: privacy)
   }
@@ -64,9 +70,11 @@ extension OSLogInterpolation {
   /// - Parameters:
   ///  - number: the interpolated expression of type UInt, which is autoclosured.
   ///  - format: a formatting option available for integer types, defined by the
-  ///    enum `OSLogIntegerFormatting`.
+  ///    type `OSLogIntegerFormatting`.
+  ///  - align: left or right alignment with the minimum number of columns as
+  ///    defined by the type `OSLogStringAlignment`.
   ///  - privacy: a privacy qualifier which is either private or public.
-  ///    The default is public.
+  ///    It is auto-inferred by default.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
@@ -74,7 +82,7 @@ extension OSLogInterpolation {
     _ number: @autoclosure @escaping () -> UInt,
     format: OSLogIntegerFormatting = .decimal,
     align: OSLogStringAlignment = .none,
-    privacy: OSLogPrivacy = .public
+    privacy: OSLogPrivacy = .auto
   ) {
     appendInteger(number, format: format, align: align, privacy: privacy)
   }
@@ -94,9 +102,7 @@ extension OSLogInterpolation {
     guard argumentCount < maxOSLogArgumentCount else { return }
     formatString +=
       format.formatSpecifier(for: T.self, align: align, privacy: privacy)
-
-    let isPrivateArgument = isPrivate(privacy)
-    addIntHeaders(isPrivateArgument, sizeForEncoding(T.self))
+    addIntHeaders(privacy, sizeForEncoding(T.self))
 
     arguments.append(number)
     argumentCount += 1
@@ -107,9 +113,12 @@ extension OSLogInterpolation {
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
-  internal mutating func addIntHeaders(_ isPrivate: Bool, _ byteCount: Int) {
+  internal mutating func addIntHeaders(
+    _ privacy: OSLogPrivacy,
+    _ byteCount: Int
+  ) {
     // Append argument header.
-    let argumentHeader = getArgumentHeader(isPrivate: isPrivate, type: .scalar)
+    let argumentHeader = getArgumentHeader(privacy: privacy, type: .scalar)
     arguments.append(argumentHeader)
 
     // Append number of bytes needed to serialize the argument.
@@ -120,7 +129,7 @@ extension OSLogInterpolation {
     // two bytes needed for the headers.
     totalBytesForSerializingArguments += byteCount + 2
 
-    preamble = getUpdatedPreamble(isPrivate: isPrivate, isScalar: true)
+    preamble = getUpdatedPreamble(privacy: privacy, isScalar: true)
   }
 }
 

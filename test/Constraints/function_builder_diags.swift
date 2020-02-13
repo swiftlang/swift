@@ -83,7 +83,8 @@ func testDiags() {
   // Declarations
   tuplify(true) { _ in
     17
-    let x = 17 // expected-error{{closure containing a declaration cannot be used with function builder 'TupleBuilder'}}
+    let x = 17
+    let y: Int // expected-error{{closure containing a declaration cannot be used with function builder 'TupleBuilder'}}
     x + 25
   }
 
