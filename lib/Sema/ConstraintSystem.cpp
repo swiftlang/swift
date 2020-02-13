@@ -2771,9 +2771,9 @@ std::string swift::describeGenericType(ValueDecl *GP, bool includeName) {
 ///
 /// It's done by first retrieving all generic parameters from each solution,
 /// filtering boundings into distrinct set and diagnosing any differences.
-static bool diagnoseConflictingArguments(ConstraintSystem &cs,
-                                         const SolutionDiff &diff,
-                                         ArrayRef<Solution> solutions) {
+static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
+                                                const SolutionDiff &diff,
+                                                ArrayRef<Solution> solutions) {
   if (!diff.overloads.empty())
     return false;
 
@@ -2899,7 +2899,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
   SolutionDiff solutionDiff(solutions);
 
-  if (diagnoseConflictingArguments(*this, solutionDiff, solutions))
+  if (diagnoseConflictingGenericArguments(*this, solutionDiff, solutions))
     return true;
 
   // Collect aggregated fixes from all solutions
