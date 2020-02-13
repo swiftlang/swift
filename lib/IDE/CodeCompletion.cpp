@@ -5296,12 +5296,20 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       for (auto T : ContextInfo.getPossibleTypes()) {
         if (auto unwrapped = T->getOptionalObjectType())
           T = unwrapped;
-        if (!T->getAnyNominal() || !T->getAnyNominal()->getKeyPathTypeKind() ||
-            T->hasUnresolvedType() || !T->is<BoundGenericType>())
-          continue;
-        // Use the first KeyPath context type found.
-        baseType = T->castTo<BoundGenericType>()->getGenericArgs()[0];
-        break;
+
+        // If the context type is any of the KeyPath types, use it.
+        if (T->getAnyNominal() && T->getAnyNominal()->getKeyPathTypeKind() &&
+            !T->hasUnresolvedType() && T->is<BoundGenericType>()) {
+          baseType = T->castTo<BoundGenericType>()->getGenericArgs()[0];
+          break;
+        }
+
+        // KeyPath can be used as a function that receives its root type.
+        if (T->is<AnyFunctionType>() &&
+            T->castTo<AnyFunctionType>()->getNumParams() == 1) {
+          baseType = T->castTo<AnyFunctionType>()->getParams()[0].getOldType();
+          break;
+        }
       }
     }
     if (!OnRoot && KPE->getComponents().back().getKind() ==
