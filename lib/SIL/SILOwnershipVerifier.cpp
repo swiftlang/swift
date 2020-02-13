@@ -78,7 +78,7 @@ namespace {
 // refactored into a large state object that is used by functions.
 class SILValueOwnershipChecker {
   /// The result of performing the check.
-  llvm::Optional<bool> result;
+  Optional<bool> result;
 
   /// A cache of dead-end basic blocks that we use to determine if we can
   /// ignore "leaks".
@@ -744,7 +744,7 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
     errorBehavior = ErrorBehaviorKind::PrintMessageAndAssert;
   }
 
-  llvm::SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
+  SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
   if (deadEndBlocks) {
     SILValueOwnershipChecker(*deadEndBlocks, *this, errorBehavior,
                              liveBlocks)
