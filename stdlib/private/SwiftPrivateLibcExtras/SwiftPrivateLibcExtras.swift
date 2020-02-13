@@ -13,14 +13,14 @@
 import SwiftPrivate
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
 #endif
 
 public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CInt {
-#if os(Android) || os(Haiku) || os(Windows)
+#if os(Android) || os(Haiku) || os(Windows) || os(WASI)
   preconditionFailure("mkstemps doesn't work on your platform")
 #else
   var utf8CStr = template.utf8CString
@@ -125,6 +125,8 @@ public func _stdlib_pipe() -> (readEnd: CInt, writeEnd: CInt, error: CInt) {
   let ret = fds.withUnsafeMutableBufferPointer { unsafeFds -> CInt in
 #if os(Windows)
     return _pipe(unsafeFds.baseAddress, 0, 0)
+#elseif os(WASI)
+    preconditionFailure("No pipes available on WebAssembly/WASI")
 #else
     return pipe(unsafeFds.baseAddress)
 #endif
