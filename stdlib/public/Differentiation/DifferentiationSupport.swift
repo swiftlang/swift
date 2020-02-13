@@ -102,7 +102,6 @@ public extension VectorProtocol {
   }
 }
 
-/*
 // Note: These default-implemented operators will slow down type-checking
 // performance and break existing code.
 
@@ -149,7 +148,6 @@ public extension VectorProtocol where VectorSpaceScalar : SignedNumeric {
     .zero - x
   }
 }
-*/
 
 /// A type that is differentiable in the Euclidean space.
 /// The type may represent a vector space, or consist of a vector space and some
