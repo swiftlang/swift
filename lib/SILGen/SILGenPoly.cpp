@@ -358,7 +358,7 @@ ManagedValue Transform::transform(ManagedValue v,
   const TypeLowering &expectedTL = SGF.getTypeLowering(outputOrigType,
                                                        outputSubstType);
   auto loweredResultTy = expectedTL.getLoweredType();
-
+  
   // Nothing to convert
   if (v.getType() == loweredResultTy)
     return v;
@@ -1583,6 +1583,48 @@ namespace {
   };
 } // end anonymous namespace
 
+/// Apply trivial conversions to a value to handle differences between the inner
+/// and outer types of a function conversion thunk.
+static ManagedValue applyTrivialConversions(SILGenFunction &SGF,
+                                            SILLocation loc,
+                                            ManagedValue innerValue,
+                                            SILType outerType) {
+  auto innerASTTy = innerValue.getType().getASTType();
+  auto outerASTTy = outerType.getASTType();
+
+  if (innerASTTy == outerASTTy) {
+    return innerValue;
+  }
+  if (innerASTTy->getClassOrBoundGenericClass()
+      && outerASTTy->getClassOrBoundGenericClass()) {
+    if (outerASTTy->isExactSuperclassOf(innerASTTy)) {
+      return SGF.B.createUpcast(loc, innerValue, outerType);
+    } else if (innerASTTy->isExactSuperclassOf(outerASTTy)) {
+      return SGF.B.createUncheckedRefCast(loc, innerValue, outerType);
+    }
+  } else if (auto innerFnTy = dyn_cast<SILFunctionType>(innerASTTy)) {
+    if (auto outerFnTy = dyn_cast<SILFunctionType>(outerASTTy)) {
+      auto abiDiffA =
+        SGF.SGM.Types.checkFunctionForABIDifferences(SGF.SGM.M,
+                                                     innerFnTy,
+                                                     outerFnTy);
+      auto abiDiffB =
+        SGF.SGM.Types.checkFunctionForABIDifferences(SGF.SGM.M,
+                                                     outerFnTy,
+                                                     innerFnTy);
+      
+      if (abiDiffA == TypeConverter::ABIDifference::CompatibleRepresentation
+        || abiDiffA == TypeConverter::ABIDifference::CompatibleCallingConvention
+        || abiDiffB == TypeConverter::ABIDifference::CompatibleRepresentation
+        || abiDiffB == TypeConverter::ABIDifference::CompatibleCallingConvention) {
+        return SGF.B.createConvertFunction(loc, innerValue, outerType);
+      }
+    }
+  }
+
+  llvm_unreachable("unhandled reabstraction type mismatch");
+}
+
 /// Forward arguments according to a function type's ownership conventions.
 static void forwardFunctionArguments(SILGenFunction &SGF,
                                      SILLocation loc,
@@ -1593,44 +1635,11 @@ static void forwardFunctionArguments(SILGenFunction &SGF,
   for (auto index : indices(managedArgs)) {
     auto arg = managedArgs[index];
     auto argTy = argTypes[index];
-    auto argOrigTy = arg.getType().getASTType();
     auto argSubstTy = argTy.getArgumentType(SGF.SGM.M, fTy);
     
-    // Adjust the class of covariant/contravariant arguments.
-    if (argOrigTy != argSubstTy) {
-      if (argOrigTy->getClassOrBoundGenericClass()
-          && argSubstTy->getClassOrBoundGenericClass()) {
-        if (argSubstTy->isExactSuperclassOf(arg.getType().getASTType())) {
-          arg = SGF.B.createUpcast(loc, arg,
-                                   SILType::getPrimitiveObjectType(argSubstTy));
-        } else if (arg.getType().getASTType()->isExactSuperclassOf(argSubstTy)) {
-          arg = SGF.B.createUncheckedRefCast(loc, arg,
-                                     SILType::getPrimitiveObjectType(argSubstTy));
-        }
-      } else if (auto argOrigFn = dyn_cast<SILFunctionType>(argOrigTy)) {
-        if (auto argSubstFn = dyn_cast<SILFunctionType>(argSubstTy)) {
-          auto abiDiffA =
-            SGF.SGM.Types.checkFunctionForABIDifferences(SGF.SGM.M,
-                                                         argOrigFn,
-                                                         argSubstFn);
-          auto abiDiffB =
-            SGF.SGM.Types.checkFunctionForABIDifferences(SGF.SGM.M,
-                                                         argSubstFn,
-                                                         argOrigFn);
-          
-          if (abiDiffA == TypeConverter::ABIDifference::CompatibleRepresentation
-              || abiDiffA == TypeConverter::ABIDifference::CompatibleCallingConvention
-              || abiDiffB == TypeConverter::ABIDifference::CompatibleRepresentation
-              || abiDiffB == TypeConverter::ABIDifference::CompatibleCallingConvention) {
-            arg = SGF.B.createConvertFunction(loc, arg,
+    arg = applyTrivialConversions(SGF, loc, arg,
                                   SILType::getPrimitiveObjectType(argSubstTy));
-          }
-        }
-      }
-      if (arg.getType().getASTType() != argSubstTy) {
-        llvm_unreachable("unhandled argument type mismatch");
-      }
-    }
+
     if (argTy.isConsumed()) {
       forwardedArgs.push_back(arg.ensurePlusOne(SGF, loc).forward(SGF));
       continue;
@@ -2736,8 +2745,8 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
   // A helper function to add an outer direct result.
   auto addOuterDirectResult = [&](ManagedValue resultValue,
                                   SILResultInfo result) {
-    assert(resultValue.getType() ==
-           SGF.getSILTypeInContext(result, CanSILFunctionType()));
+    resultValue = applyTrivialConversions(SGF, Loc, resultValue,
+                        SGF.getSILTypeInContext(result, CanSILFunctionType()));
     outerDirectResults.push_back(resultValue.forward(SGF));
   };
 
