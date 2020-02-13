@@ -2973,9 +2973,10 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
                                 commonCalleeLocator);
       return true;
     } else {
-      bool isApplication = llvm::find_if(ArgumentInfos, [&](const auto argInfo) {
-        return argInfo.first->getAnchor() == commonAnchor;
-      }) != ArgumentInfos.end();
+      bool isApplication =
+          llvm::any_of(ArgumentInfos, [&](const auto &argInfo) {
+            return argInfo.first->getAnchor() == commonAnchor;
+          });
 
       DE.diagnose(commonAnchor->getLoc(),
                   diag::no_overloads_match_exactly_in_call,
