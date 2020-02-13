@@ -6444,6 +6444,10 @@ public:
     llvm_unreachable("bad accessor kind");
   }
 
+  bool isImplicitGetter() const {
+    return isGetter() && getAccessorKeywordLoc().isInvalid();
+  }
+
   void setIsTransparent(bool transparent) {
     Bits.AccessorDecl.IsTransparent = transparent;
     Bits.AccessorDecl.IsTransparentComputed = 1;
