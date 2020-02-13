@@ -837,21 +837,9 @@ public:
   llvm::DenseMap<std::pair<CanType, CanType>, ConversionRestrictionKind>
     ConstraintRestrictions;
 
-  using ConstraintFixVector = llvm::SmallVector<ConstraintFix *, 4>;
   /// The list of fixes that need to be applied to the initial expression
   /// to make the solution work.
-  ConstraintFixVector Fixes;
-
-  using AggregatedFixesMap = llvm::SmallMapVector<ConstraintLocator *,
-      llvm::SmallMapVector<FixKind, ConstraintFixVector, 4>, 4>;
-
-  AggregatedFixesMap getAggregatedFixes() const {
-    AggregatedFixesMap aggregatedFixes;
-    for (auto *fix: Fixes) {
-      aggregatedFixes[fix->getLocator()][fix->getKind()].push_back(fix);
-    }
-    return aggregatedFixes;
-  }
+  llvm::SmallVector<ConstraintFix *, 4> Fixes;
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
