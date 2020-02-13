@@ -95,6 +95,23 @@ struct S: P {
 }
 ```
 
+4. A non-generic function requirement can be witnessed by a generic one:
+
+```swift
+struct Some {}
+
+protocol P {
+  func foo(arg: Some)
+}
+
+struct S: P {
+  // This is okay, since 'foo' can accept any T, including 'Some'.
+  // If T was constrained in a way that it couldn't accept 'Some',
+  // then this (obviously) won't be a valid witness.
+  func foo<T>(arg: T) {}
+}
+```
+
 However, almost any other kind of mismatch is forbidden. For example:
 
 ```swift
