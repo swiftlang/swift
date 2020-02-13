@@ -18,6 +18,7 @@
 // UNSUPPORTED: CPU=armv7s && OS=ios
 // Executing on the simulator within __abort_with_payload with "No ABI plugin located for triple x86_64h-apple-ios -- shared libraries will not be registered!"
 // UNSUPPORTED: CPU=x86_64 && OS=ios
+// UNSUPPORTED: CPU=x86_64 && OS=tvos
 // UNSUPPORTED: CPU=i386 && OS=watchos
 
 public enum Result<Value> {
