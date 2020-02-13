@@ -24,6 +24,10 @@
 #include "swift/Basic/Malloc.h"
 #include "swift/Basic/type_traits.h"
 
+#ifdef __wasi__
+void wasi_polyfill_call_once(int *flag, void *context, void (*func)(void *));
+#endif
+
 namespace swift {
 
 #ifdef __APPLE__
@@ -38,6 +42,10 @@ namespace swift {
   using OnceToken_t = unsigned long;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
   _swift_once_f(&TOKEN, CONTEXT, FUNC)
+#elif defined(__wasi__)
+  using OnceToken_t = int;
+# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
+  ::wasi_polyfill_call_once(&TOKEN, CONTEXT, FUNC)
 #else
   using OnceToken_t = std::once_flag;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \

@@ -387,6 +387,7 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/pwd.h"
       export *
     }
+% end
     module regex {
       header "${GLIBC_INCLUDE_PATH}/regex.h"
       export *
@@ -511,6 +512,7 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/wait.h"
         export *
       }
+% end
     }
 % end
 % if CMAKE_SDK in ["LINUX", "FREEBSD"]:
@@ -534,6 +536,7 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/utime.h"
       export *
     }
+% end
   }
 % end
 }

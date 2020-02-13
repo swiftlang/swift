@@ -351,6 +351,8 @@ function(_add_variant_c_compile_flags)
       list(APPEND result "SHELL:${CMAKE_INCLUDE_SYSTEM_FLAG_C}${path}")
     endforeach()
     list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
+  elseif("${CFLAGS_SDK}" STREQUAL "WASI")
+    list(APPEND result "-D_WASI_EMULATED_MMAN")
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "LINUX")
@@ -402,6 +404,8 @@ function(_add_variant_swift_compile_flags
     foreach(path IN LISTS ${arch}_swift_include)
       list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
     endforeach()
+  elseif("${sdk}" STREQUAL "WASI")
+    list(APPEND result "-Xcc" "-D_WASI_EMULATED_MMAN")
   endif()
 
   if(NOT BUILD_STANDALONE)
@@ -517,6 +521,8 @@ function(_add_variant_link_flags)
     foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
       list(APPEND library_search_directories ${path})
     endforeach()
+  elseif("${LFLAGS_SDK}" STREQUAL "WASI")
+    list(APPEND result "-Wl,wasi-emulated-mman")
   else()
     # If lto is enabled, we need to add the object path flag so that the LTO code
     # generator leaves the intermediate object file in a place where it will not
@@ -1016,7 +1022,8 @@ function(_add_swift_library_single target name)
               ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
               ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
   if(("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
-      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF") AND
+      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF" OR
+      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "WASM") AND
      SWIFTLIB_SINGLE_TARGET_LIBRARY)
     if("${libkind}" STREQUAL "SHARED" AND NOT SWIFTLIB_SINGLE_NOSWIFTRT)
       # TODO(compnerd) switch to the generator expression when cmake is upgraded
@@ -1324,6 +1331,12 @@ function(_add_swift_library_single target name)
   if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
     if(libkind STREQUAL SHARED)
       list(APPEND c_compile_flags -D_WINDLL)
+    endif()
+  endif()
+  # Double-check that we're not trying to build a dynamic library for WASM.
+  if(SWIFTLIB_SINGLE_SDK MATCHES WASM)
+    if(libkind STREQUAL SHARED)
+      message(FATAL_ERROR "WASM does not support shared libraries.")
     endif()
   endif()
   _add_variant_link_flags(
@@ -1694,6 +1707,9 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_HAIKU
 #   Swift modules this library depends on when built for Haiku.
 #
+# SWIFT_MODULE_DEPENDS_WASI
+#   Swift modules this library depends on when built for WASI.
+#
 # FRAMEWORK_DEPENDS
 #   System frameworks this library depends on.
 #
@@ -1810,6 +1826,7 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS_OSX
         SWIFT_MODULE_DEPENDS_TVOS
         SWIFT_MODULE_DEPENDS_WATCHOS
+	SWIFT_MODULE_DEPENDS_WASI
         SWIFT_MODULE_DEPENDS_WINDOWS
         SWIFT_MODULE_DEPENDS_FROM_SDK
         TARGET_SDKS
@@ -1971,6 +1988,9 @@ function(add_swift_target_library name)
     elseif(${sdk} STREQUAL HAIKU)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_HAIKU})
+    elseif(${sdk} STREQUAL WASI)
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WASI})
     elseif(${sdk} STREQUAL WINDOWS)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WINDOWS})

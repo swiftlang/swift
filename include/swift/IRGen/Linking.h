@@ -1176,6 +1176,11 @@ public:
     // TODO: BFD and gold do not handle COMDATs properly
     if (Triple.isOSBinFormatELF())
       return;
+    // WebAssembly: hack: comdat + custom section = explosion
+    // the comdat code assumes section name would be unique for each comdat
+    // this doesn't happen for metadata.
+    if (Triple.isOSBinFormatWasm())
+      return;
 
     if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
         IRL.Linkage == llvm::GlobalValue::WeakODRLinkage)

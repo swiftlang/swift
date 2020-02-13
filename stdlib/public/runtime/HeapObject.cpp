@@ -152,7 +152,13 @@ swift::swift_initStaticObject(HeapMetadata const *metadata,
   // refcount to 1 while another thread already incremented it - and would
   // decrement it to 0 afterwards.
   InitStaticObjectContext Ctx = { object, metadata };
+#ifdef __wasm__
+  // WebAssembly: hack: swift_once has been modified to take a function pointer without a parameter.
+  // so use the _real version that does have a parameter
+  swift_once_real(token, initStaticObjectWithContext, &Ctx);
+#else
   swift_once(token, initStaticObjectWithContext, &Ctx);
+#endif
 
   return object;
 }
