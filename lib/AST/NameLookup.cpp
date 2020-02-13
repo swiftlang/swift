@@ -1143,34 +1143,27 @@ void ExtensionDecl::addedMember(Decl *member) {
 // MemberLookupTable is constructed (and possibly has entries in it),
 // MemberLookupTable is incrementally reconstituted with new members.
 
-static bool
+static void
 populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
                                           MemberLookupTable &LookupTable,
                                           DeclBaseName name,
                                           IterableDeclContext *IDC) {
   auto ci = ctx.getOrCreateLazyIterableContextData(IDC,
                                                    /*lazyLoader=*/nullptr);
-  if (auto res = ci->loader->loadNamedMembers(IDC, name, ci->memberData)) {
-    if (auto s = ctx.Stats) {
-      ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
-    }
-    for (auto d : *res) {
-      LookupTable.addMember(d);
-    }
-    return false;
-  } else {
-    if (auto s = ctx.Stats) {
-      ++s->getFrontendCounters().NamedLazyMemberLoadFailureCount;
-    }
-    return true;
+  auto res = ci->loader->loadNamedMembers(IDC, name, ci->memberData);
+  if (auto s = ctx.Stats) {
+    ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
+  }
+  for (auto d : res) {
+    LookupTable.addMember(d);
   }
 }
 
 static void
 populateLookupTableEntryFromExtensions(ASTContext &ctx,
                                        MemberLookupTable &table,
-                                       NominalTypeDecl *nominal,
-                                       DeclBaseName name) {
+                                       DeclBaseName name,
+                                       NominalTypeDecl *nominal) {
   assert(!table.isLazilyComplete(name) &&
          "Should not be searching extensions for complete name!");
 
@@ -1185,12 +1178,7 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
            "Extension without deserializable content has lazy members!");
     assert(!e->hasUnparsedMembers());
 
-    // Try lazy loading. If that fails, then we fall back by loading the
-    // entire extension. FIXME: It's rather unfortunate that we fall off the
-    // happy path because the Clang Importer can't handle lazy import-as-member.
-    if (populateLookupTableEntryFromLazyIDCLoader(ctx, table, name, e)) {
-      e->loadAllMembers();
-    }
+    populateLookupTableEntryFromLazyIDCLoader(ctx, table, name, e);
   }
 }
 
@@ -1280,55 +1268,44 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
   decl->prepareLookupTable();
 
-  auto tryCacheLookup =
-      [=](MemberLookupTable &table,
-          DeclName name) -> Optional<TinyPtrVector<ValueDecl *>> {
-    // Look for a declaration with this name.
-    auto known = table.find(name);
-    if (known == table.end()) {
-      return None;
-    }
-
-    // We found something; return it.
-    return maybeFilterOutAttrImplements(known->second, name,
-                                        includeAttrImplements);
-  };
-
-  auto updateLookupTable = [&decl](MemberLookupTable &table,
-                                   bool noExtensions) {
+  auto &Table = *decl->LookupTable;
+  if (!useNamedLazyMemberLoading) {
     // Make sure we have the complete list of members (in this nominal and in
     // all extensions).
     (void)decl->getMembers();
 
-    if (noExtensions)
-      return;
+    if (!disableAdditionalExtensionLoading) {
+      for (auto E : decl->getExtensions())
+        (void)E->getMembers();
 
-    for (auto E : decl->getExtensions())
-      (void)E->getMembers();
-
-    table.updateLookupTable(decl);
-  };
-
-  auto &Table = *decl->LookupTable;
-  if (!useNamedLazyMemberLoading) {
-    updateLookupTable(Table, disableAdditionalExtensionLoading);
+      Table.updateLookupTable(decl);
+    }
   } else if (!Table.isLazilyComplete(name.getBaseName())) {
     // The lookup table believes it doesn't have a complete accounting of this
     // name - either because we're never seen it before, or another extension
     // was registered since the last time we searched. Ask the loaders to give
     // us a hand.
     DeclBaseName baseName(name.getBaseName());
-    if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl)) {
-      updateLookupTable(Table, disableAdditionalExtensionLoading);
-    } else if (!disableAdditionalExtensionLoading) {
-      populateLookupTableEntryFromExtensions(ctx, Table, decl, baseName);
+    populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl);
+
+    if (!disableAdditionalExtensionLoading) {
+      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
     }
+
+    // FIXME: If disableAdditionalExtensionLoading is true, we should
+    // not mark the entry as complete.
     Table.markLazilyComplete(baseName);
   }
 
   // Look for a declaration with this name.
-  return tryCacheLookup(Table, name)
-            .getValueOr(TinyPtrVector<ValueDecl *>());
+  auto known = Table.find(name);
+  if (known == Table.end()) {
+    return TinyPtrVector<ValueDecl *>();
+  }
+
+  // We found something; return it.
+  return maybeFilterOutAttrImplements(known->second, name,
+                                      includeAttrImplements);
 }
 
 void ClassDecl::createObjCMethodLookup() {

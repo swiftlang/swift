@@ -3749,7 +3749,7 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
   }
 }
 
-Optional<TinyPtrVector<ValueDecl *>>
+TinyPtrVector<ValueDecl *>
 ClangImporter::Implementation::loadNamedMembers(
     const IterableDeclContext *IDC, DeclBaseName N, uint64_t contextData) {
 

@@ -2472,7 +2472,7 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
 }
 // SWIFT_ENABLE_TENSORFLOW END
 
-Optional<TinyPtrVector<ValueDecl *>>
+TinyPtrVector<ValueDecl *>
 ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                              uint64_t contextData) {
   PrettyStackTraceDecl trace("loading members for", IDC->getDecl());
@@ -2495,7 +2495,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
         fatalIfUnexpected(DeclMemberTablesCursor.advance());
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       fatal();
-      return None;
+      return results;
     }
     SmallVector<uint64_t, 64> scratch;
     StringRef blobData;
@@ -2520,10 +2520,6 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
         if (!getContext().LangOpts.EnableDeserializationRecovery)
           fatal(mem.takeError());
         consumeError(mem.takeError());
-
-        // Treat this as a cache-miss to the caller and let them attempt
-        // to refill through the normal loadAllMembers() path.
-        return None;
       }
     }
   }
