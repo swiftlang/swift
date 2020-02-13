@@ -76,7 +76,7 @@
 // SWIFT_RUNTIME_EXPORT on the library it's exported from.
 
 /// Attribute used to export symbols from the runtime.
-#if defined(__MACH__)
+#if defined(__MACH__) || defined(__wasi__)
 
 # define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("default")))
 

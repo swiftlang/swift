@@ -285,7 +285,7 @@ internal enum _KnownCocoaString {
   case storage
   case shared
   case cocoa
-#if !(arch(i386) || arch(arm))
+#if !(arch(i386) || arch(arm) || arch(wasm32))
   case tagged
 #endif
 
