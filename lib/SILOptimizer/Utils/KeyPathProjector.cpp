@@ -208,7 +208,9 @@ public:
       // The callback expects a memory address it can read from,
       // so allocate a buffer.
       auto &function = builder.getFunction();
-      SILType type = function.getLoweredType(component.getComponentType());
+      auto substType = component.getComponentType().subst(keyPath->getSubstitutions(),
+                                                           None);
+      SILType type = function.getLoweredType(substType);
       auto addr = builder.createAllocStack(loc, type);
       
       assertHasNoContext();
@@ -283,7 +285,9 @@ public:
           // The callback expects a memory address it can write to,
           // so allocate a writeback buffer.
           auto &function = builder.getFunction();
-          SILType type = function.getLoweredType(component.getComponentType());
+          auto substType = component.getComponentType().subst(keyPath->getSubstitutions(),
+                                                               None);
+          SILType type = function.getLoweredType(substType);
           auto addr = builder.createAllocStack(loc, type);
 
           assertHasNoContext();
@@ -315,10 +319,12 @@ public:
 
 class OptionalWrapProjector : public ComponentProjector {
 public:
-  OptionalWrapProjector(const KeyPathPatternComponent &component,
+  OptionalWrapProjector(KeyPathInst *kpInst,
+                        const KeyPathPatternComponent &component,
                         std::unique_ptr<KeyPathProjector> parent,
                         SILLocation loc, SILBuilder &builder)
-        : ComponentProjector(component, std::move(parent), loc, builder) {}
+        : ComponentProjector(component, std::move(parent), loc, builder),
+          keyPath(kpInst) {}
   
   void project(AccessType accessType,
                std::function<void(SILValue addr)> callback) override {
@@ -328,7 +334,9 @@ public:
     
     parent->project(AccessType::Get, [&](SILValue parentValue) {
       auto &function = builder.getFunction();
-      SILType optType = function.getLoweredType(component.getComponentType());
+      auto substType = component.getComponentType().subst(keyPath->getSubstitutions(),
+                                                           None);
+      SILType optType = function.getLoweredType(substType);
       SILType objType = optType.getOptionalObjectType().getAddressType();
       
       assert(objType && "optional wrap must return an optional");
@@ -352,6 +360,9 @@ public:
       builder.createDeallocStack(loc, optAddr);
     });
   }
+
+private:
+  KeyPathInst *keyPath;
 };
 
 class OptionalForceProjector : public ComponentProjector {
@@ -531,7 +542,8 @@ public:
       // If we're reading an optional chain, create an optional result.
       auto resultCanType = components.back().getComponentType();
       auto &function = builder.getFunction();
-      auto optType = function.getLoweredType(resultCanType);
+      auto substType = resultCanType.subst(keyPath->getSubstitutions(), None);
+      auto optType = function.getLoweredType(substType);
       
       assert(optType.getOptionalObjectType() &&
              "Optional-chained key path should result in an optional");
@@ -608,7 +620,7 @@ private:
         break;
       case KeyPathPatternComponent::Kind::OptionalWrap:
         projector = std::make_unique<OptionalWrapProjector>
-            (comp, std::move(parent), loc, builder);
+            (keyPath, comp, std::move(parent), loc, builder);
         break;
       case KeyPathPatternComponent::Kind::OptionalForce:
         projector = std::make_unique<OptionalForceProjector>
