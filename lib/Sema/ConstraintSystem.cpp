@@ -2770,7 +2770,7 @@ std::string swift::describeGenericType(ValueDecl *GP, bool includeName) {
 /// }
 ///
 /// It's done by first retrieving all generic parameters from each solution,
-/// filtering boundings into distrinct set and diagnosing any differences.
+/// filtering bindings into a distinct set and diagnosing any differences.
 static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
                                                 const SolutionDiff &diff,
                                                 ArrayRef<Solution> solutions) {
