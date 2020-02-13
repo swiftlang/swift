@@ -1385,3 +1385,23 @@ class ClassWithPropContainingSetter {
     set { return 1 } // expected-error {{unexpected non-void return value in void function}}
   }
 }
+
+// https://bugs.swift.org/browse/SR-11964
+struct Rect {
+    let width: Int
+    let height: Int
+}
+
+struct Frame {
+    func rect(width: Int, height: Int) -> Rect {
+        Rect(width: width, height: height)
+    }
+
+    let rect: Rect
+}
+
+func foo(frame: Frame) {
+    frame.rect.width + 10.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+    // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int)}}
+
+}
