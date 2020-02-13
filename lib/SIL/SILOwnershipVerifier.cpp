@@ -123,28 +123,7 @@ public:
   SILValueOwnershipChecker(SILValueOwnershipChecker &) = delete;
   SILValueOwnershipChecker(SILValueOwnershipChecker &&) = delete;
 
-  bool check() {
-    if (result.hasValue())
-      return result.getValue();
-
-    LLVM_DEBUG(llvm::dbgs() << "Verifying ownership of: " << *value);
-    result = checkUses();
-    if (!result.getValue())
-      return false;
-
-    SmallVector<BranchPropagatedUser, 32> allLifetimeEndingUsers;
-    llvm::copy(lifetimeEndingUsers, std::back_inserter(allLifetimeEndingUsers));
-    SmallVector<BranchPropagatedUser, 32> allRegularUsers;
-    llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
-    llvm::copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
-
-    LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-    auto linearLifetimeResult = checker.checkValue(
-        value, allLifetimeEndingUsers, allRegularUsers, errorBehavior);
-    result = !linearLifetimeResult.getFoundError();
-
-    return result.getValue();
-  }
+  bool check();
 
 private:
   bool checkUses();
@@ -181,6 +160,29 @@ private:
 };
 
 } // end anonymous namespace
+
+bool SILValueOwnershipChecker::check() {
+  if (result.hasValue())
+    return result.getValue();
+
+  LLVM_DEBUG(llvm::dbgs() << "Verifying ownership of: " << *value);
+  result = checkUses();
+  if (!result.getValue())
+    return false;
+
+  SmallVector<BranchPropagatedUser, 32> allLifetimeEndingUsers;
+  llvm::copy(lifetimeEndingUsers, std::back_inserter(allLifetimeEndingUsers));
+  SmallVector<BranchPropagatedUser, 32> allRegularUsers;
+  llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
+  llvm::copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
+
+  LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+  auto linearLifetimeResult = checker.checkValue(
+      value, allLifetimeEndingUsers, allRegularUsers, errorBehavior);
+  result = !linearLifetimeResult.getFoundError();
+
+  return result.getValue();
+}
 
 bool SILValueOwnershipChecker::gatherUsers(
     SmallVectorImpl<Operand *> &lifetimeEndingUsers,
