@@ -268,6 +268,9 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
 
+  // Pass on module names whose symbols should be embeded in tbd.
+  inputArgs.AddAllArgs(arguments, options::OPT_embed_tbd_for_module);
+
   if (auto *A = inputArgs.getLastArg(options::OPT_working_directory)) {
     // Add -Xcc -working-directory before any other -Xcc options to ensure it is
     // overridden by an explicit -Xcc -working-directory, although having a

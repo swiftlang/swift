@@ -1122,9 +1122,25 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
     assert(M == singleFile->getParentModule() && "mismatched file and module");
     visitFile(singleFile);
   } else {
-    for (auto *file : M->getFiles()) {
-      visitFile(file);
+    llvm::SmallVector<ModuleDecl*, 4> Modules;
+    Modules.push_back(M);
+    for (auto Name: opts.embedSymbolsFromModules) {
+      if (auto *MD = ctx.getModuleByName(Name)) {
+        // If it is a clang module, the symbols should be collected by TAPI.
+        if (!MD->isNonSwiftModule()) {
+          Modules.push_back(MD);
+          continue;
+        }
+      }
+      // Diagnose module name that cannot be found
+      ctx.Diags.diagnose(SourceLoc(), diag::unknown_swift_module_name, Name);
     }
+    // Collect symbols in each module.
+    llvm::for_each(Modules, [&](ModuleDecl *M) {
+      for (auto *file : M->getFiles()) {
+        visitFile(file);
+      }
+    });
   }
 
   if (os) {

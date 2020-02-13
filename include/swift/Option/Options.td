@@ -344,6 +344,9 @@ def emit_tbd_path : Separate<["-"], "emit-tbd-path">,
 def emit_tbd_path_EQ : Joined<["-"], "emit-tbd-path=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
   Alias<emit_tbd_path>;
+def embed_tbd_for_module : Separate<["-"], "embed-tbd-for-module">,
+  Flags<[FrontendOption]>,
+  HelpText<"Embed symbols from the module in the emitted tbd file">;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
