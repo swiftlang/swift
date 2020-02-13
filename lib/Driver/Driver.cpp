@@ -274,7 +274,7 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   case llvm::Triple::Haiku:
     return std::make_unique<toolchains::GenericUnix>(*this, target);
   case llvm::Triple::WASI:
-    return std::make_unique<toolchains::GenericUnix>(*this, target);
+    return std::make_unique<toolchains::WebAssembly>(*this, target);
   default:
     Diags.diagnose(SourceLoc(), diag::error_unknown_target,
                    ArgList.getLastArg(options::OPT_target)->getValue());

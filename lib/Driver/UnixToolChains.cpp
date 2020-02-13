@@ -346,12 +346,7 @@ toolchains::GenericUnix::constructInvocation(const StaticLinkJobAction &job,
   ArgStringList Arguments;
 
   // Configure the toolchain.
-  const char *AR;
-  if (getTriple().isOSBinFormatWasm()) {
-    AR = "llvm-ar";
-  } else {
-    AR = "ar";
-  }
+  const char *AR = "ar";
   Arguments.push_back("crs");
 
   Arguments.push_back(
