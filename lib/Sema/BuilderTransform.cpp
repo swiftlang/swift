@@ -627,8 +627,9 @@ class BuilderClosureRewriter
   const Solution &solution;
   DeclContext *dc;
   AppliedBuilderTransform builderTransform;
-  std::function<Expr *(Expr *)> rewriteExpr;
-  std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType;
+  std::function<
+      Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
+        rewriteTarget;
 
   /// Retrieve the temporary variable that will be used to capture the
   /// value of the given expression.
@@ -646,6 +647,17 @@ class BuilderClosureRewriter
     // Erase the captured expression, so we're sure we never do this twice.
     builderTransform.capturedExprs.erase(found);
     return recorded;
+  }
+
+  /// Rewrite an expression without any particularly special context.
+  Expr *rewriteExpr(Expr *expr) {
+    auto result = rewriteTarget(
+      SolutionApplicationTarget(expr, dc, CTP_Unused, Type(),
+                                /*isDiscarded=*/false));
+    if (result)
+      return result->getAsExpr();
+
+    return nullptr;
   }
 
 public:
@@ -673,19 +685,21 @@ private:
   ASTNode initializeTarget(FunctionBuilderTarget target) {
     assert(target.captured.second.size() == 1);
     auto capturedExpr = target.captured.second.front();
-    auto finalCapturedExpr = rewriteExpr(capturedExpr);
     SourceLoc implicitLoc = capturedExpr->getEndLoc();
     switch (target.kind) {
     case FunctionBuilderTarget::ReturnValue: {
       // Return the expression.
-      ConstraintSystem &cs = solution.getConstraintSystem();
       Type bodyResultType =
           solution.simplifyType(builderTransform.bodyResultType);
-      finalCapturedExpr = coerceToType(
-          finalCapturedExpr,
-          bodyResultType,
-          cs.getConstraintLocator(capturedExpr));
-      return new (ctx) ReturnStmt(implicitLoc, finalCapturedExpr);
+
+      SolutionApplicationTarget returnTarget(
+          capturedExpr, dc, CTP_ReturnStmt, bodyResultType,
+          /*isDiscarded=*/false);
+      Expr *resultExpr = nullptr;
+      if (auto resultTarget = rewriteTarget(returnTarget))
+        resultExpr = resultTarget->getAsExpr();
+
+      return new (ctx) ReturnStmt(implicitLoc, resultExpr);
     }
 
     case FunctionBuilderTarget::TemporaryVar: {
@@ -696,6 +710,7 @@ private:
       declRef->setType(LValueType::get(temporaryVar->getType()));
 
       // Load the right-hand side if needed.
+      auto finalCapturedExpr = rewriteExpr(capturedExpr);
       if (finalCapturedExpr->getType()->hasLValueType()) {
         finalCapturedExpr =
             TypeChecker::addImplicitLoadExpr(ctx, finalCapturedExpr);
@@ -734,12 +749,12 @@ public:
       const Solution &solution,
       DeclContext *dc,
       const AppliedBuilderTransform &builderTransform,
-      std::function<Expr *(Expr *)> rewriteExpr,
-      std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType
+      std::function<
+          Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
+            rewriteTarget
     ) : ctx(solution.getConstraintSystem().getASTContext()),
         solution(solution), dc(dc), builderTransform(builderTransform),
-        rewriteExpr(rewriteExpr),
-        coerceToType(coerceToType){ }
+        rewriteTarget(rewriteTarget) { }
 
   Stmt *visitBraceStmt(BraceStmt *braceStmt, FunctionBuilderTarget target,
                        Optional<FunctionBuilderTarget> innerTarget = None) {
@@ -954,9 +969,10 @@ BraceStmt *swift::applyFunctionBuilderTransform(
     AppliedBuilderTransform applied,
     BraceStmt *body,
     DeclContext *dc,
-    std::function<Expr *(Expr *)> rewriteExpr,
-    std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType) {
-  BuilderClosureRewriter rewriter(solution, dc, applied, rewriteExpr, coerceToType);
+    std::function<
+        Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
+          rewriteTarget) {
+  BuilderClosureRewriter rewriter(solution, dc, applied, rewriteTarget);
   auto captured = rewriter.takeCapturedStmt(body);
   return cast<BraceStmt>(
     rewriter.visitBraceStmt(
