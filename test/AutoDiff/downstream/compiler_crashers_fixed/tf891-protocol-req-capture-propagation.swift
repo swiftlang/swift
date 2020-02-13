@@ -1,5 +1,9 @@
-// RUN: not --crash %target-swift-frontend -O -emit-ir %s
+// RUN: %target-swift-frontend -O -emit-ir %s
 // REQUIRES: asserts
+
+// TF-891: Generic specialization crash during capture propagation.
+// Related to `@differentiable` function with `partial_apply` operands,
+// to be specialized. Occurs only with `-O`.
 
 public protocol Protocol: Differentiable {
   @differentiable
