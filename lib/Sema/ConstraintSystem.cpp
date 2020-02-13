@@ -2904,14 +2904,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
   // Collect aggregated fixes from all solutions
   llvm::SmallMapVector<std::pair<ConstraintLocator *, FixKind>,
-      llvm::SmallVector<ConstraintFix *, 4>, 4> aggregatedFixes;
-  for (const auto &solution: solutions) {
-    for (auto fixesPerLocator: solution.getAggregatedFixes()) {
-      for (auto kindAndFixes: fixesPerLocator.second) {
-        aggregatedFixes[{fixesPerLocator.first, kindAndFixes.first}]
-            .push_back(kindAndFixes.second.front());
-      }
-    }
+                       llvm::TinyPtrVector<ConstraintFix *>, 4>
+      aggregatedFixes;
+  for (const auto &solution : solutions) {
+    for (auto *fix : solution.Fixes)
+      aggregatedFixes[{fix->getLocator(), fix->getKind()}].push_back(fix);
   }
 
   // If there is an overload difference, let's see if there's a common callee
@@ -2964,20 +2961,17 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     auto &DE = getASTContext().Diags;
     auto name = decl->getFullName();
 
-    if (name.isOperator()) {
-      diagnoseOperatorAmbiguity(*this, name.getBaseIdentifier(), solutions,
-                                commonCalleeLocator);
-      return true;
-    }
-
     // Emit an error message for the ambiguity.
     if (aggregatedFixes.size() == 1 &&
-        aggregatedFixes.front().first.first
-            ->getLastElementAs<LocatorPathElt::ContextualType>()) {
+        aggregatedFixes.front().first.first->isForContextualType()) {
       auto *anchor = aggregatedFixes.front().first.first->getAnchor();
       auto baseName = name.getBaseName();
       DE.diagnose(commonAnchor->getLoc(), diag::no_candidates_match_result_type,
                   baseName.userFacingName(), getContextualType(anchor));
+    } else if (name.isOperator()) {
+      diagnoseOperatorAmbiguity(*this, name.getBaseIdentifier(), solutions,
+                                commonCalleeLocator);
+      return true;
     } else {
       bool isApplication = llvm::find_if(ArgumentInfos, [&](const auto argInfo) {
         return argInfo.first->getAnchor() == commonAnchor;
