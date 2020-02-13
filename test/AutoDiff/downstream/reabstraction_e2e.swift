@@ -144,9 +144,9 @@ ReabstractionE2ETests.test("result concrete => generic => concrete") {
 ReabstractionE2ETests.test("@differentiable function => opaque generic => concrete") {
   func id<T>(_ t: T) -> T { t }
   let inner: @differentiable (Float) -> Float = { 7 * $0 * $0 }
-  let transformed = id(inner)
 
-  // TODO(TF-1122): Actually using `transformed` causes a segfault at runtime.
+  // TODO(TF-1122): Actually using `id` causes a segfault at runtime.
+  // let transformed = id(inner)
   // expectEqual(Float(7 * 3 * 3), transformed(3))
   // expectEqual(Float(7 * 2 * 3), gradient(at: 3, in: id(inner)))
 }
@@ -154,9 +154,9 @@ ReabstractionE2ETests.test("@differentiable function => opaque generic => concre
 ReabstractionE2ETests.test("@differentiable function => opaque Any => concrete") {
   func id(_ any: Any) -> Any { any }
   let inner: @differentiable (Float) -> Float = { 7 * $0 * $0 }
-  let transformed = id(inner)
 
-  // TODO(TF-1122): Actually using `transformed` causes a segfault at runtime.
+  // TODO(TF-1122): Actually using `id` causes a segfault at runtime.
+  // let transformed = id(inner)
   // let casted = transformed as! @differentiable (Float) -> Float
   // expectEqual(Float(7 * 3 * 3), casted(3))
   // expectEqual(Float(7 * 2 * 3), gradient(at: 3, in: casted))
