@@ -645,7 +645,8 @@ class ExprContextAnalyzer {
     }
     case ExprKind::If: {
       auto *IE = cast<IfExpr>(Parent);
-      if (SM.rangeContains(IE->getCondExpr()->getSourceRange(),
+      if (IE->isFolded() &&
+          SM.rangeContains(IE->getCondExpr()->getSourceRange(),
                            ParsedExpr->getSourceRange())) {
         recordPossibleType(Context.getBoolDecl()->getDeclaredInterfaceType());
         break;
