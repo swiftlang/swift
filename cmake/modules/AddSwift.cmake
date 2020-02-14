@@ -689,7 +689,6 @@ endfunction()
 #     [LINK_FLAGS flag1...]
 #     [FILE_DEPENDS target1 ...]
 #     [DONT_EMBED_BITCODE]
-#     [IS_STDLIB]
 #     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
 #
@@ -744,9 +743,6 @@ endfunction()
 # DONT_EMBED_BITCODE
 #   Don't embed LLVM bitcode in this target, even if it is enabled globally.
 #
-# IS_STDLIB
-#   Install library dylib and swift module files to lib/swift.
-#
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
@@ -755,7 +751,6 @@ endfunction()
 function(_add_swift_host_library_single target name)
   set(SWIFTLIB_SINGLE_options
         DONT_EMBED_BITCODE
-        IS_STDLIB
         NOSWIFTRT
         OBJECT_LIBRARY
         SHARED
@@ -904,7 +899,6 @@ function(_add_swift_host_library_single target name)
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
       MODULE_NAME ${module_name}
       COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
-      ${SWIFTLIB_SINGLE_IS_STDLIB_keyword}
       ${embed_bitcode_arg}
       INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
@@ -1059,10 +1053,6 @@ function(_add_swift_host_library_single target name)
   if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
     set(install_name_dir "@rpath")
 
-    if(SWIFTLIB_SINGLE_IS_STDLIB)
-      set(install_name_dir "${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}")
-    endif()
-
     # Always use @rpath for XCTest
     if(module_name STREQUAL "XCTest")
       set(install_name_dir "@rpath")
@@ -1104,65 +1094,20 @@ function(_add_swift_host_library_single target name)
   set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
   set_target_properties("${target}" PROPERTIES FOLDER "Swift libraries")
 
-  # Configure the static library target.
-  # Set compile and link flags for the non-static target.
-  # Do these LAST.
-  set(target_static)
-  if(SWIFTLIB_SINGLE_IS_STDLIB AND SWIFTLIB_SINGLE_STATIC)
-    set(target_static "${target}-static")
-
-    # We have already compiled Swift sources.  Link everything into a static
-    # library.
-    add_library(${target_static} STATIC
-        ${SWIFTLIB_SINGLE_SOURCES}
-        ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
-        ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
-
-    set_output_directory(${target_static}
-        BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
-        LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
-
-    if(SWIFTLIB_INSTALL_WITH_SHARED)
-      set(swift_lib_dir ${SWIFTLIB_DIR})
-    else()
-      set(swift_lib_dir ${SWIFTSTATICLIB_DIR})
-    endif()
-
-    foreach(config ${CMAKE_CONFIGURATION_TYPES})
-      string(TOUPPER ${config} config_upper)
-      escape_path_for_xcode(
-          "${config}" "${swift_lib_dir}" config_lib_dir)
-      set_target_properties(${target_static} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
-        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
-    endforeach()
-
-    set_target_properties(${target_static} PROPERTIES
-      LIBRARY_OUTPUT_DIRECTORY ${swift_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
-      ARCHIVE_OUTPUT_DIRECTORY ${swift_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
-  endif()
-
   set_target_properties(${target}
       PROPERTIES
       # Library name (without the variant information)
       OUTPUT_NAME ${name})
-  if(target_static)
-    set_target_properties(${target_static}
-        PROPERTIES
-        OUTPUT_NAME ${name})
-  endif()
 
   # Don't build standard libraries by default.  We will enable building
   # standard libraries that the user requested; the rest can be built on-demand.
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    foreach(t "${target}" ${target_static})
-      set_target_properties(${t} PROPERTIES EXCLUDE_FROM_ALL TRUE)
-    endforeach()
+    set_target_properties(${target} PROPERTIES EXCLUDE_FROM_ALL TRUE)
   endif()
 
   # Handle linking and dependencies.
   add_dependencies_multiple_targets(
-      TARGETS "${target}" ${target_static}
+      TARGETS "${target}"
       DEPENDS
         ${SWIFTLIB_SINGLE_DEPENDS}
         ${gyb_dependency_targets}
@@ -1188,27 +1133,12 @@ function(_add_swift_host_library_single target name)
     endif()
   endforeach()
 
-  if(target_static)
-    _list_add_string_suffix(
-        "${SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU}"
-        "-static"
-        target_static_depends)
-    # FIXME: should this be target_link_libraries?
-    add_dependencies_multiple_targets(
-        TARGETS "${target_static}"
-        DEPENDS ${target_static_depends})
-  endif()
-
   # Link against system frameworks.
   foreach(FRAMEWORK ${SWIFTLIB_SINGLE_FRAMEWORK_DEPENDS})
-    foreach(t "${target}" ${target_static})
-      target_link_libraries("${t}" PUBLIC "-framework ${FRAMEWORK}")
-    endforeach()
+    target_link_libraries(${target} PUBLIC "-framework ${FRAMEWORK}")
   endforeach()
   foreach(FRAMEWORK ${SWIFTLIB_SINGLE_FRAMEWORK_DEPENDS_WEAK})
-    foreach(t "${target}" ${target_static})
-      target_link_libraries("${t}" PUBLIC "-weak_framework ${FRAMEWORK}")
-    endforeach()
+    target_link_libraries(${target} PUBLIC "-weak_framework ${FRAMEWORK}")
   endforeach()
 
   if(NOT SWIFTLIB_SINGLE_TARGET_LIBRARY)
@@ -1263,14 +1193,6 @@ function(_add_swift_host_library_single target name)
     RESULT_VAR_NAME c_compile_flags
     )
 
-  if(SWIFTLIB_IS_STDLIB)
-    # We don't ever want to link against the ABI-breakage checking symbols
-    # in the standard library, runtime, or overlays because they only rely
-    # on the header parts of LLVM's ADT.
-    list(APPEND c_compile_flags
-      "-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1")
-  endif()
-
   if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
     if(libkind STREQUAL SHARED)
       list(APPEND c_compile_flags -D_WINDLL)
@@ -1295,7 +1217,7 @@ function(_add_swift_host_library_single target name)
 
   # Configure plist creation for OS X.
   set(PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
-  if("${SWIFTLIB_SINGLE_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS AND SWIFTLIB_SINGLE_IS_STDLIB)
+  if("${SWIFTLIB_SINGLE_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS AND FALSE)
     set(PLIST_INFO_NAME ${name})
     set(PLIST_INFO_UTI "com.apple.dt.runtime.${name}")
     set(PLIST_INFO_VERSION "${SWIFT_VERSION}")
@@ -1436,26 +1358,6 @@ function(_add_swift_host_library_single target name)
   else()
     set_property(TARGET "${target}" PROPERTY
       LINKER_LANGUAGE "CXX")
-  endif()
-
-  if(target_static)
-    target_compile_options(${target_static} PRIVATE
-      ${c_compile_flags})
-    # FIXME: The fallback paths here are going to be dynamic libraries.
-
-    if(SWIFTLIB_INSTALL_WITH_SHARED)
-      set(search_base_dir ${SWIFTLIB_DIR})
-    else()
-      set(search_base_dir ${SWIFTSTATICLIB_DIR})
-    endif()
-    set(library_search_directories
-        "${search_base_dir}/${SWIFTLIB_SINGLE_SUBDIR}"
-        "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
-        "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
-    target_link_directories(${target_static} PRIVATE
-      ${library_search_directories})
-    target_link_libraries("${target_static}" PRIVATE
-        ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
 
   # Do not add code here.
