@@ -678,7 +678,6 @@ endfunction()
 #     [STATIC]
 #     [SDK sdk]
 #     [ARCHITECTURE architecture]
-#     [DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
@@ -705,9 +704,6 @@ endfunction()
 #
 # ARCHITECTURE
 #   Architecture to build for.
-#
-# DEPENDS
-#   Targets that this library depends on.
 #
 # FRAMEWORK_DEPENDS
 #   System frameworks this library depends on.
@@ -746,7 +742,6 @@ function(_add_swift_host_library_single target name)
         DARWIN_INSTALL_NAME_DIR
         SDK)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
-        DEPENDS
         FILE_DEPENDS
         FRAMEWORK_DEPENDS
         FRAMEWORK_DEPENDS_WEAK
@@ -853,7 +848,6 @@ function(_add_swift_host_library_single target name)
       SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
       DEPENDS
         ${gyb_dependency_targets}
-        ${SWIFTLIB_SINGLE_DEPENDS}
         ${SWIFTLIB_SINGLE_FILE_DEPENDS}
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
@@ -996,7 +990,6 @@ function(_add_swift_host_library_single target name)
   add_dependencies_multiple_targets(
       TARGETS "${target}"
       DEPENDS
-        ${SWIFTLIB_SINGLE_DEPENDS}
         ${gyb_dependency_targets}
         "${swift_object_dependency_target}"
         "${swift_module_dependency_target}"
