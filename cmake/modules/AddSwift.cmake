@@ -680,7 +680,6 @@ endfunction()
 #     [ARCHITECTURE architecture]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
-#     [LINK_FLAGS flag1...]
 #     [FILE_DEPENDS target1 ...]
 #     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
@@ -709,9 +708,6 @@ endfunction()
 # SWIFT_COMPILE_FLAGS
 #   Extra compile flags (Swift).
 #
-# LINK_FLAGS
-#   Extra linker flags.
-#
 # FILE_DEPENDS
 #   Additional files this library depends on.
 #
@@ -738,7 +734,6 @@ function(_add_swift_host_library_single target name)
         GYB_SOURCES
         INCORPORATE_OBJECT_LIBRARIES
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
-        LINK_FLAGS
         LLVM_LINK_COMPONENTS
         SWIFT_COMPILE_FLAGS)
 
@@ -991,7 +986,7 @@ function(_add_swift_host_library_single target name)
   # Collect compile and link flags for the static and non-static targets.
   # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly.
   set(c_compile_flags ${SWIFTLIB_SINGLE_C_COMPILE_FLAGS})
-  set(link_flags ${SWIFTLIB_SINGLE_LINK_FLAGS})
+  set(link_flags)
 
   set(library_search_subdir "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
   set(library_search_directories
