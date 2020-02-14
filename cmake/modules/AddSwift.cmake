@@ -678,7 +678,6 @@ endfunction()
 #     [STATIC]
 #     [SDK sdk]
 #     [ARCHITECTURE architecture]
-#     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
@@ -703,9 +702,6 @@ endfunction()
 #
 # ARCHITECTURE
 #   Architecture to build for.
-#
-# FRAMEWORK_DEPENDS_WEAK
-#   System frameworks this library depends on that should be weakly-linked.
 #
 # LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
@@ -739,7 +735,6 @@ function(_add_swift_host_library_single target name)
         SDK)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         FILE_DEPENDS
-        FRAMEWORK_DEPENDS_WEAK
         GYB_SOURCES
         INCORPORATE_OBJECT_LIBRARIES
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
@@ -989,11 +984,6 @@ function(_add_swift_host_library_single target name)
         "${swift_object_dependency_target}"
         "${swift_module_dependency_target}"
         ${LLVM_COMMON_DEPENDS})
-
-  # Link against system frameworks.
-  foreach(FRAMEWORK ${SWIFTLIB_SINGLE_FRAMEWORK_DEPENDS_WEAK})
-    target_link_libraries(${target} PUBLIC "-weak_framework ${FRAMEWORK}")
-  endforeach()
 
   # Call llvm_config() only for libraries that are part of the compiler.
   swift_common_llvm_config("${target}" ${SWIFTLIB_SINGLE_LLVM_LINK_COMPONENTS})
