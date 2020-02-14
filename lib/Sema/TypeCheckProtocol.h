@@ -212,11 +212,6 @@ enum class MatchKind : uint8_t {
 
   /// The witness is missing a `@differentiable` attribute from the requirement.
   MissingDifferentiableAttr,
-
-  /// The witness is missing a `@differentiable` attribute from the requirement.
-  /// The witness has less-than-public visibility and is declared in a different
-  /// files than the conformance.
-  MissingDifferentiableAttrNonPublicOtherFile,
 };
 
 /// Describes the kind of optional adjustment performed when
@@ -443,7 +438,6 @@ struct RequirementMatch {
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
     case MatchKind::MissingDifferentiableAttr:
-    case MatchKind::MissingDifferentiableAttrNonPublicOtherFile:
       return false;
     }
 
@@ -474,7 +468,6 @@ struct RequirementMatch {
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
     case MatchKind::MissingDifferentiableAttr:
-    case MatchKind::MissingDifferentiableAttrNonPublicOtherFile:
       return false;
     }
 
@@ -486,13 +479,7 @@ struct RequirementMatch {
 
   /// Determine whether this requirement match has an unmet attribute.
   bool hasUnmetAttribute() {
-    switch (Kind) {
-    case MatchKind::MissingDifferentiableAttr:
-    case MatchKind::MissingDifferentiableAttrNonPublicOtherFile:
-      return true;
-    default:
-      return false;
-    }
+    return Kind == MatchKind::MissingDifferentiableAttr;
   }
 
   swift::Witness getWitness(ASTContext &ctx) const;

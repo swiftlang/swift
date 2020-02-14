@@ -398,21 +398,18 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
           supersetConfig || witness->getFormalAccess() < AccessLevel::Public;
       // If the witness has less-than-public visibility and is declared in a
       // different file than the conformance, produce an error.
-      if (!supersetConfig && witness->getFormalAccess() < AccessLevel::Public) {
-        if (dc->getModuleScopeContext() !=
-            witness->getDeclContext()->getModuleScopeContext()) {
-          // FIXME(TF-1014): `@differentiable` attribute diagnostic does not
-          // appear if associated type inference is involved.
-          if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
-            return RequirementMatch(
-                getStandinForAccessor(vdWitness, AccessorKind::Get),
-                MatchKind::MissingDifferentiableAttrNonPublicOtherFile,
-                reqDiffAttr);
-          } else {
-            return RequirementMatch(
-                witness, MatchKind::MissingDifferentiableAttrNonPublicOtherFile,
-                reqDiffAttr);
-          }
+      if (!supersetConfig && witness->getFormalAccess() < AccessLevel::Public &&
+          dc->getModuleScopeContext() !=
+              witness->getDeclContext()->getModuleScopeContext()) {
+        // FIXME(TF-1014): `@differentiable` attribute diagnostic does not
+        // appear if associated type inference is involved.
+        if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
+          return RequirementMatch(
+              getStandinForAccessor(vdWitness, AccessorKind::Get),
+              MatchKind::MissingDifferentiableAttr, reqDiffAttr);
+        } else {
+          return RequirementMatch(witness, MatchKind::MissingDifferentiableAttr,
+                                  reqDiffAttr);
         }
       }
       if (createImplicitWitnessAttribute) {
@@ -2357,8 +2354,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   case MatchKind::NonObjC:
     diags.diagnose(match.Witness, diag::protocol_witness_not_objc);
     break;
-  case MatchKind::MissingDifferentiableAttr:
-  case MatchKind::MissingDifferentiableAttrNonPublicOtherFile: {
+  case MatchKind::MissingDifferentiableAttr: {
     auto witness = match.Witness;
     // Emit a note and fix-it showing the missing requirement `@differentiable`
     // attribute.
@@ -2377,14 +2373,11 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     llvm::raw_string_ostream os(reqDiffAttrString);
     reqAttr->print(os, req, omitWrtClause, /*omitDerivativeFunctions*/ true);
     os.flush();
-    switch (match.Kind) {
-    case MatchKind::MissingDifferentiableAttr:
-      diags
-          .diagnose(witness, diag::protocol_witness_missing_differentiable_attr,
-                    reqDiffAttrString)
-          .fixItInsert(witness->getStartLoc(), reqDiffAttrString + ' ');
-      break;
-    case MatchKind::MissingDifferentiableAttrNonPublicOtherFile:
+    // If the witness has less-than-public visibility and is declared in a
+    // different file than the conformance, emit a specialized diagnostic.
+    if (witness->getFormalAccess() < AccessLevel::Public &&
+        conformance->getDeclContext()->getModuleScopeContext() !=
+            witness->getDeclContext()->getModuleScopeContext()) {
       diags
           .diagnose(
               witness,
@@ -2395,9 +2388,13 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
               req->getFullName(), conformance->getType(),
               conformance->getProtocol()->getDeclaredInterfaceType())
           .fixItInsert(match.Witness->getStartLoc(), reqDiffAttrString + ' ');
-      break;
-    default:
-      llvm_unreachable("Unexpected requirement match kind");
+    }
+    // Otherwise, emit a general "missing attribute" diagnostic.
+    else {
+      diags
+          .diagnose(witness, diag::protocol_witness_missing_differentiable_attr,
+                    reqDiffAttrString)
+          .fixItInsert(witness->getStartLoc(), reqDiffAttrString + ' ');
     }
     break;
   }
