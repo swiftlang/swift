@@ -2759,7 +2759,7 @@ std::string swift::describeGenericType(ValueDecl *GP, bool includeName) {
       OS << " '" << decl->getFullName() << "'";
   }
 
-  return OS.str();
+  return OS.str().str();
 }
 
 /// Special handling of conflicts associated with generic arguments.

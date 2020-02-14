@@ -2470,7 +2470,7 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
     std::string findDefaultStatements() {
       auto ElseBody = dyn_cast_or_null<BraceStmt>(PreviousIf->getElseStmt());
       if (!ElseBody)
-        return getTokenText(tok::kw_break);
+        return getTokenText(tok::kw_break).str();
       return findBodyWithoutBraces(ElseBody);
     }
 
@@ -2479,7 +2479,7 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
       if (!BS)
         return Lexer::getCharSourceRangeFromSourceRange(SM, body->getSourceRange()).str().str();
       if (BS->getElements().empty())
-        return getTokenText(tok::kw_break);
+        return getTokenText(tok::kw_break).str();
       SourceRange BodyRange = BS->getElements().front().getSourceRange();
       BodyRange.widen(BS->getElements().back().getSourceRange());
       return Lexer::getCharSourceRangeFromSourceRange(SM, BodyRange).str().str();
