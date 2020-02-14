@@ -746,7 +746,6 @@ endfunction()
 #   Sources to add into this library
 function(_add_swift_host_library_single target name)
   set(SWIFTLIB_SINGLE_options
-        OBJECT_LIBRARY
         SHARED
         STATIC)
   set(SWIFTLIB_SINGLE_single_parameter_options
@@ -789,11 +788,8 @@ function(_add_swift_host_library_single target name)
   precondition(SWIFTLIB_SINGLE_ARCHITECTURE MESSAGE "Should specify an architecture")
   precondition(SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
 
-  if(NOT SWIFTLIB_SINGLE_SHARED AND
-     NOT SWIFTLIB_SINGLE_STATIC AND
-     NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY)
-    message(FATAL_ERROR
-        "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
+  if(NOT SWIFTLIB_SINGLE_SHARED AND NOT SWIFTLIB_SINGLE_STATIC)
+    message(FATAL_ERROR "Either SHARED or STATIC must be specified")
   endif()
 
   # Determine the subdirectory where this library will be installed.
@@ -830,17 +826,12 @@ function(_add_swift_host_library_single target name)
 
   if(MODULE)
     set(libkind MODULE)
-  elseif(SWIFTLIB_SINGLE_OBJECT_LIBRARY)
-    set(libkind OBJECT)
   # If both SHARED and STATIC are specified, we add the SHARED library first.
   # The STATIC library is handled further below.
   elseif(SWIFTLIB_SINGLE_SHARED)
     set(libkind SHARED)
   elseif(SWIFTLIB_SINGLE_STATIC)
     set(libkind STATIC)
-  else()
-    message(FATAL_ERROR
-        "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
 
   if(SWIFTLIB_SINGLE_GYB_SOURCES)
@@ -1051,10 +1042,6 @@ function(_add_swift_host_library_single target name)
 
   if("${libkind}" STREQUAL "SHARED")
     target_link_libraries("${target}" PRIVATE ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
-  elseif("${libkind}" STREQUAL "OBJECT")
-    precondition_list_empty(
-        "${SWIFTLIB_SINGLE_LINK_LIBRARIES}"
-        "OBJECT_LIBRARY may not link to anything")
   else()
     target_link_libraries("${target}" INTERFACE ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
   endif()
@@ -1235,14 +1222,8 @@ function(_add_swift_host_library_single target name)
     endforeach()
   endif()
 
-  if("${libkind}" STREQUAL "OBJECT")
-    precondition_list_empty(
-        "${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES}"
-        "OBJECT_LIBRARY may not link to anything")
-  else()
-    target_link_libraries("${target}" PRIVATE
-        ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
-  endif()
+  target_link_libraries("${target}" PRIVATE
+      ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
 
   # NOTE(compnerd) use the C linker language to invoke `clang` rather than
   # `clang++` as we explicitly link against the C++ runtime.  We were previously
