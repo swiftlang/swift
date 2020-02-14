@@ -12,7 +12,7 @@
 struct _RangeSetStorage<T: Comparable> {
   fileprivate enum _Storage {
     case empty
-    case singleRange(high: Int, low: Int32)
+    case singleRange(Range<T>)
     case variadic([Range<T>])
   }
   
@@ -23,22 +23,11 @@ struct _RangeSetStorage<T: Comparable> {
   }
   
   init(_ range: Range<T>) {
-    if let intRange = range as? Range<Int>,
-      let lowerBound = Int32(exactly: intRange.lowerBound)
-    {
-      _storage = .singleRange(high: intRange.upperBound, low: lowerBound)
-    } else {
-      _storage = .variadic([range])
-    }
+    _storage = .singleRange(range)
   }
   
   init(_ ranges: [Range<T>]) {
     _storage = .variadic(ranges)
-  }
-  
-  func unsafeRange(low: Int32, high: Int) -> Range<T> {
-    _precondition(T.self == Int.self)
-    return unsafeBitCast(Int(low)..<high, to: Range<T>.self)
   }
 }
 
@@ -60,13 +49,13 @@ extension _RangeSetStorage: Equatable {
          let (.variadic(ranges), .empty):
       return ranges.isEmpty
       
-    case let (.singleRange(lhsHigh, lhsLow), .singleRange(rhsHigh, rhsLow)):
-      return (lhsLow, lhsHigh) == (rhsLow, rhsHigh)
+    case let (.singleRange(lhs), .singleRange(rhs)):
+      return lhs == rhs
       
-    case let (.singleRange(high, low), .variadic(ranges)),
-         let (.variadic(ranges), .singleRange(high, low)):
+    case let (.singleRange(singleRange), .variadic(ranges)),
+         let (.variadic(ranges), .singleRange(singleRange)):
       return ranges.count == 1 &&
-        (ranges[0] as! Range<Int>) == Int(low)..<high
+        (ranges[0]) == singleRange
       
     case let (.variadic(lhsRanges), .variadic(rhsRanges)):
       return lhsRanges == rhsRanges
@@ -97,9 +86,9 @@ extension _RangeSetStorage: RandomAccessCollection, MutableCollection {
     get {
       switch _storage {
       case .empty: fatalError("Can't access elements of empty storage")
-      case let .singleRange(high, low):
-        _precondition(T.self == Int.self)
-        return unsafeRange(low: low, high: high)
+      case let .singleRange(range):
+        _precondition(i == 0)
+        return range
       case let .variadic(ranges):
         return ranges[i]
       }
@@ -108,13 +97,8 @@ extension _RangeSetStorage: RandomAccessCollection, MutableCollection {
       switch _storage {
       case .empty: fatalError("Can't access elements of empty storage")
       case .singleRange:
-        _precondition(T.self == Int.self)
-        let intRange = newValue as! Range<Int>
-        if let lowerBound = Int32(exactly: intRange.lowerBound) {
-          _storage = .singleRange(high: intRange.upperBound, low: lowerBound)
-        } else {
-          _storage = .variadic([newValue])
-        }
+        _precondition(i == 0)
+        _storage = .singleRange(newValue)
       case .variadic(var ranges):
         // Temporarily set `_storage` to empty so that `ranges`
         // remains uniquely referenced while mutating.
@@ -144,7 +128,7 @@ extension _RangeSetStorage: RangeReplaceableCollection {
         _storage = .variadic(Array(newElements))
       }
       
-    case .singleRange(high: let high, low: let low):
+    case let .singleRange(singleRange):
       switch (subrange.isEmpty, newElements.isEmpty) {
       case (false, true):
         // Replacing the single range with an empty collection.
@@ -165,9 +149,9 @@ extension _RangeSetStorage: RangeReplaceableCollection {
         var ranges: [Range<T>]
         if subrange.lowerBound == 0 {
           ranges = Array(newElements)
-          ranges.append(unsafeRange(low: low, high: high))
+          ranges.append(singleRange)
         } else {
-          ranges = [unsafeRange(low: low, high: high)]
+          ranges = [singleRange]
           ranges.append(contentsOf: newElements)
         }
         _storage = .variadic(ranges)
