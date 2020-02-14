@@ -540,6 +540,9 @@ NOTE(autodiff_cannot_differentiate_through_multiple_results,none,
      "cannot differentiate through multiple results", ())
 NOTE(autodiff_class_member_not_supported,none,
      "differentiating class members is not yet supported", ())
+NOTE(autodiff_implicitly_inherited_differentiable_attr_here,none,
+     "differentiability required by the corresponding protocol requirement "
+     "here", ())
 // TODO(TF-642): Remove when `partial_apply` works with `@differentiable`
 // functions.
 NOTE(autodiff_cannot_param_subset_thunk_partially_applied_orig_fn,none,

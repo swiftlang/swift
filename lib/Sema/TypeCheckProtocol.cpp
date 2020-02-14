@@ -425,6 +425,13 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
             witnessAFD, /*implicit*/ true, witness->getLoc(), witness->getLoc(),
             reqDiffAttr->isLinear(), reqDiffAttr->getParameterIndices(),
             /*jvp*/ None, /*vjp*/ None, derivativeGenSig);
+        // If the implicit attribute is inherited from a protocol requirement's
+        // attribute, store the protocol requirement attribute's location for
+        // use in diagnostics.
+        if (witness->getFormalAccess() < AccessLevel::Public) {
+          newAttr->getImplicitlyInheritedDifferentiableAttrLocation(
+              reqDiffAttr->getLocation());
+        }
         auto insertion = ctx.DifferentiableAttrs.try_emplace(
             {witnessAFD, newAttr->getParameterIndices()}, newAttr);
         // Valid `@differentiable` attributes are uniqued by original function

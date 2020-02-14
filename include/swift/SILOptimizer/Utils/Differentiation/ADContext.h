@@ -311,20 +311,41 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
     return diagnose(loc, diag, std::forward<U>(args)...);
   }
 
-  // For `SILDifferentiabilityWitness`es, try to find an AST function
-  // declaration and `@differentiable` attribute. If they are found, emit an
-  // error on the `@differentiable` attribute; otherwise, emit an error on the
-  // SIL function. Emit a note at the non-differentiable operation.
+  // For differentiability witnesses: try to find a `@differentiable` or
+  // `@derivative` attribute. If an attribute is found, emit an error on it;
+  // otherwise, emit an error on the original function.
   case DifferentiationInvoker::Kind::SILDifferentiabilityWitnessInvoker: {
     auto *witness = invoker.getSILDifferentiabilityWitnessInvoker();
     auto *original = witness->getOriginalFunction();
-    if (auto *diffAttr = witness->getAttribute()) {
-      diagnose(diffAttr->getLocation(),
+    // If the witness has an associated attribute, emit an error at its
+    // location.
+    if (auto *attr = witness->getAttribute()) {
+      diagnose(attr->getLocation(),
                diag::autodiff_function_not_differentiable_error)
-          .highlight(diffAttr->getRangeWithAt());
-      diagnose(original->getLocation().getSourceLoc(),
-               diag::autodiff_when_differentiating_function_definition);
-    } else {
+          .highlight(attr->getRangeWithAt());
+      // Emit informative note.
+      bool emittedNote = false;
+      // If the witness comes from an implicit `@differentiable` attribute
+      // inherited from a protocol requirement's `@differentiable` attribute,
+      // emit a note on the inherited attribute.
+      if (auto *diffAttr = dyn_cast<DifferentiableAttr>(attr)) {
+        auto inheritedAttrLoc =
+            diffAttr->getImplicitlyInheritedDifferentiableAttrLocation();
+        if (inheritedAttrLoc.isValid()) {
+          diagnose(inheritedAttrLoc,
+                   diag::autodiff_implicitly_inherited_differentiable_attr_here)
+              .highlight(inheritedAttrLoc);
+          emittedNote = true;
+        }
+      }
+      // Otherwise, emit a note on the original function.
+      if (!emittedNote) {
+        diagnose(original->getLocation().getSourceLoc(),
+                 diag::autodiff_when_differentiating_function_definition);
+      }
+    }
+    // Otherwise, emit an error on the original function.
+    else {
       diagnose(original->getLocation().getSourceLoc(),
                diag::autodiff_function_not_differentiable_error);
     }
