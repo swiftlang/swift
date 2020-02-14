@@ -715,7 +715,6 @@ function(_add_swift_host_library_single target name)
   set(SWIFTLIB_SINGLE_single_parameter_options
         ARCHITECTURE
         INSTALL_IN_COMPONENT
-        DARWIN_INSTALL_NAME_DIR
         SDK)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         GYB_SOURCES
@@ -882,10 +881,6 @@ function(_add_swift_host_library_single target name)
     # Always use @rpath for XCTest
     if(module_name STREQUAL "XCTest")
       set(install_name_dir "@rpath")
-    endif()
-
-    if(SWIFTLIB_SINGLE_DARWIN_INSTALL_NAME_DIR)
-      set(install_name_dir "${SWIFTLIB_SINGLE_DARWIN_INSTALL_NAME_DIR}")
     endif()
 
     set_target_properties("${target}"
