@@ -88,7 +88,7 @@ bb0:
 // IRGEN: @AD__bar_PSSURSS = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
 // IRGEN: @AD__generic_PSURS{{16_Differentiation|s}}14DifferentiableRzl = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
 // IRGEN: @AD__generic_PSSRSs18AdditiveArithmeticRz{{16_Differentiation|s}}14DifferentiableRzl = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
-// IRGEN: @AD__generic_PSSRSs14DifferentiableRz13TangentVector{{.*}} = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @AD__generic_PSSRS{{16_Differentiation|s}}14DifferentiableRz13TangentVector{{.*}} = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
 
 // IRGEN-LABEL: define {{.*}} @test_derivative_witnesses()
 
