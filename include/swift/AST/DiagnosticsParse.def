@@ -1634,10 +1634,14 @@ ERROR(sil_inst_autodiff_expected_linear_extractee_kind,PointsToFirstBadToken,
       "and '[transpose]'", ())
 ERROR(sil_inst_autodiff_expected_function_type_operand,PointsToFirstBadToken,
       "expected an operand of a function type", ())
+// SWIFT_ENABLE_TENSORFLOW END
 ERROR(sil_inst_autodiff_expected_differentiability_witness_kind,PointsToFirstBadToken,
       "expected a differentiability witness kind, which can be one of '[jvp]', "
       "'[vjp]', or '[transpose]'", ())
-// SWIFT_ENABLE_TENSORFLOW END
+ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
+      "expected witness_generic signature '%0' does not have same generic "
+      "parameters as original function generic signature '%1'",
+      (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics

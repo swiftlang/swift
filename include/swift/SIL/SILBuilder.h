@@ -518,59 +518,6 @@ public:
                                                  beginApply));
   }
 
-  /// SWIFT_ENABLE_TENSORFLOW
-  DifferentiableFunctionInst *createDifferentiableFunction(
-      SILLocation Loc, IndexSubset *ParameterIndices,
-      SILValue OriginalFunction,
-      Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
-    return insert(DifferentiableFunctionInst::create(
-        getModule(), getSILDebugLocation(Loc), ParameterIndices,
-        OriginalFunction, JVPAndVJPFunctions, hasOwnership()));
-  }
-
-  LinearFunctionInst *createLinearFunction(
-      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
-      Optional<SILValue> TransposeFunction = None) {
-    return insert(LinearFunctionInst::create(
-        getModule(), getSILDebugLocation(Loc), ParameterIndices,
-        OriginalFunction, TransposeFunction, hasOwnership()));
-  }
-
-  /// Note: explicit extractee type may be specified only in lowered SIL.
-  DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
-      SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
-      SILValue TheFunction, Optional<SILType> ExtracteeType = None) {
-    return insert(new (getModule()) DifferentiableFunctionExtractInst(
-        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction,
-        ExtracteeType));
-  }
-
-  LinearFunctionExtractInst *createLinearFunctionExtract(
-      SILLocation Loc, LinearDifferentiableFunctionTypeComponent Extractee,
-      SILValue TheFunction) {
-    return insert(new (getModule()) LinearFunctionExtractInst(
-        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
-  }
-
-  DifferentiableFunctionExtractInst *
-  createDifferentiableFunctionExtractOriginal(SILLocation Loc,
-                                              SILValue TheFunction) {
-    return insert(new (getModule()) DifferentiableFunctionExtractInst(
-        getModule(), getSILDebugLocation(Loc),
-        NormalDifferentiableFunctionTypeComponent::Original, TheFunction));
-  }
-
-  /// Note: explicit function type may be specified only in lowered SIL.
-  DifferentiabilityWitnessFunctionInst *createDifferentiabilityWitnessFunction(
-      SILLocation Loc, DifferentiabilityWitnessFunctionKind WitnessKind,
-      SILDifferentiabilityWitness *Witness,
-      Optional<SILType> FunctionType = None) {
-    return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
-        getModule(), getSILDebugLocation(Loc), WitnessKind, Witness,
-        FunctionType));
-  }
-  // SWIFT_ENABLE_TENSORFLOW END
-
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionMap Subs,
                              ArrayRef<SILValue> Args) {
@@ -2209,6 +2156,63 @@ public:
 
   SILValue emitThickToObjCMetatype(SILLocation Loc, SILValue Op, SILType Ty);
   SILValue emitObjCToThickMetatype(SILLocation Loc, SILValue Op, SILType Ty);
+
+  //===--------------------------------------------------------------------===//
+  // Differentiable programming instructions
+  //===--------------------------------------------------------------------===//
+
+  /// Note: explicit function type may be specified only in lowered SIL.
+  DifferentiabilityWitnessFunctionInst *createDifferentiabilityWitnessFunction(
+      SILLocation Loc, DifferentiabilityWitnessFunctionKind WitnessKind,
+      SILDifferentiabilityWitness *Witness,
+      Optional<SILType> FunctionType = None) {
+    return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
+        getModule(), getSILDebugLocation(Loc), WitnessKind, Witness,
+        FunctionType));
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  DifferentiableFunctionInst *createDifferentiableFunction(
+      SILLocation Loc, IndexSubset *ParameterIndices,
+      SILValue OriginalFunction,
+      Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
+    return insert(DifferentiableFunctionInst::create(
+        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        OriginalFunction, JVPAndVJPFunctions, hasOwnership()));
+  }
+
+  LinearFunctionInst *createLinearFunction(
+      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
+      Optional<SILValue> TransposeFunction = None) {
+    return insert(LinearFunctionInst::create(
+        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        OriginalFunction, TransposeFunction, hasOwnership()));
+  }
+
+  /// Note: explicit extractee type may be specified only in lowered SIL.
+  DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
+      SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
+      SILValue TheFunction, Optional<SILType> ExtracteeType = None) {
+    return insert(new (getModule()) DifferentiableFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction,
+        ExtracteeType));
+  }
+
+  LinearFunctionExtractInst *createLinearFunctionExtract(
+      SILLocation Loc, LinearDifferentiableFunctionTypeComponent Extractee,
+      SILValue TheFunction) {
+    return insert(new (getModule()) LinearFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
+  }
+
+  DifferentiableFunctionExtractInst *
+  createDifferentiableFunctionExtractOriginal(SILLocation Loc,
+                                              SILValue TheFunction) {
+    return insert(new (getModule()) DifferentiableFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc),
+        NormalDifferentiableFunctionTypeComponent::Original, TheFunction));
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   //===--------------------------------------------------------------------===//
   // Private Helper Methods

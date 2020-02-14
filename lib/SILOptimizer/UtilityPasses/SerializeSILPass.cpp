@@ -332,8 +332,8 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::DifferentiableFunctionExtractInst:
   case SILInstructionKind::LinearFunctionInst:
   case SILInstructionKind::LinearFunctionExtractInst:
-  case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
   // SWIFT_ENABLE_TENSORFLOW END
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
     // Handle by operand and result check.
     break;
 

@@ -75,6 +75,27 @@ struct AutoDiffDerivativeFunctionKind {
   }
 };
 
+/// The kind of a differentiability witness function.
+struct DifferentiabilityWitnessFunctionKind {
+  enum innerty : uint8_t {
+    // The Jacobian-vector products function.
+    JVP = 0,
+    // The vector-Jacobian products function.
+    VJP = 1,
+    // The transpose function.
+    Transpose = 2
+  } rawValue;
+
+  DifferentiabilityWitnessFunctionKind() = default;
+  DifferentiabilityWitnessFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  explicit DifferentiabilityWitnessFunctionKind(unsigned rawValue)
+      : rawValue(static_cast<innerty>(rawValue)) {}
+  explicit DifferentiabilityWitnessFunctionKind(StringRef name);
+  operator innerty() const { return rawValue; }
+
+  Optional<AutoDiffDerivativeFunctionKind> getAsDerivativeFunctionKind() const;
+};
+
 /// Identifies an autodiff derivative function configuration:
 /// - Parameter indices.
 /// - Result indices.
@@ -365,27 +386,6 @@ class ASTContext;
 class AnyFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 enum class SILLinkage : uint8_t;
-
-/// The kind of a differentiability witness function.
-struct DifferentiabilityWitnessFunctionKind {
-  enum innerty : uint8_t {
-    // The Jacobian-vector products function.
-    JVP = 0,
-    // The vector-Jacobian products function.
-    VJP = 1,
-    // The transpose function.
-    Transpose = 2
-  } rawValue;
-
-  DifferentiabilityWitnessFunctionKind() = default;
-  DifferentiabilityWitnessFunctionKind(innerty rawValue) : rawValue(rawValue) {}
-  explicit DifferentiabilityWitnessFunctionKind(unsigned rawValue)
-      : rawValue(static_cast<innerty>(rawValue)) {}
-  explicit DifferentiabilityWitnessFunctionKind(StringRef name);
-  operator innerty() const { return rawValue; }
-
-  Optional<AutoDiffDerivativeFunctionKind> getAsDerivativeFunctionKind() const;
-};
 
 struct NormalDifferentiableFunctionTypeComponent {
   enum innerty : unsigned {

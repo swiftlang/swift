@@ -17,7 +17,6 @@
 #ifndef SWIFT_SIL_INSTRUCTION_H
 #define SWIFT_SIL_INSTRUCTION_H
 
-// SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
@@ -63,9 +62,7 @@ class SILBasicBlock;
 class SILBuilder;
 class SILDebugLocation;
 class SILDebugScope;
-// SWIFT_ENABLE_TENSORFLOW
 class SILDifferentiabilityWitness;
-// SWIFT_ENABLE_TENSORFLOW_END
 class SILFunction;
 class SILGlobalVariable;
 class SILInstructionResultArray;
@@ -7975,6 +7972,7 @@ class TryApplyInst final
 };
 
 // SWIFT_ENABLE_TENSORFLOW
+
 /// `differentiable_function` - given a function, differentiation indices and
 /// its derivative functions, create an `@differentiable` function that
 /// represents a bundle of these functions and configurations.
@@ -8165,6 +8163,7 @@ public:
   ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
 };
+// SWIFT_ENABLE_TENSORFLOW END
 
 class DifferentiabilityWitnessFunctionInst
     : public InstructionBase<
@@ -8180,8 +8179,7 @@ private:
   bool hasExplicitFunctionType;
 
   static SILType getDifferentiabilityWitnessType(
-      SILModule &module,
-      DifferentiabilityWitnessFunctionKind witnessKind,
+      SILModule &module, DifferentiabilityWitnessFunctionKind witnessKind,
       SILDifferentiabilityWitness *witness);
 
 public:
@@ -8200,7 +8198,6 @@ public:
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
-// SWIFT_ENABLE_TENSORFLOW END
 
 // This is defined out of line to work around the fact that this depends on
 // PartialApplyInst being defined, but PartialApplyInst is a subclass of

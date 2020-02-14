@@ -837,16 +837,6 @@ public:
   void visitPartialApplyInst(PartialApplyInst *i);
   void visitBuiltinInst(BuiltinInst *i);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
-  void visitLinearFunctionInst(LinearFunctionInst *i);
-  void visitDifferentiableFunctionExtractInst(
-      DifferentiableFunctionExtractInst *i);
-  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *i);
-  void visitDifferentiabilityWitnessFunctionInst(
-      DifferentiabilityWitnessFunctionInst *i);
-  // SWIFT_ENABLE_TENSORFLOW END
-
   void visitFunctionRefBaseInst(FunctionRefBaseInst *i);
   void visitFunctionRefInst(FunctionRefInst *i);
   void visitDynamicFunctionRefInst(DynamicFunctionRefInst *i);
@@ -1052,6 +1042,16 @@ public:
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
   
   void visitKeyPathInst(KeyPathInst *I);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
+  void visitLinearFunctionInst(LinearFunctionInst *i);
+  void visitDifferentiableFunctionExtractInst(
+      DifferentiableFunctionExtractInst *i);
+  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *i);
+  // SWIFT_ENABLE_TENSORFLOW END
+  void visitDifferentiabilityWitnessFunctionInst(
+      DifferentiabilityWitnessFunctionInst *i);
 
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
   void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \
@@ -1875,6 +1875,7 @@ visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
   (void)diffFnExp.claimAll();
   setLoweredExplosion(i, e);
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
     DifferentiabilityWitnessFunctionInst *i) {
@@ -1902,7 +1903,6 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
 
   setLoweredFunctionPointer(i, FunctionPointer(diffWitness, signature));
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();

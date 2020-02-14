@@ -783,13 +783,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::DifferentiableFunctionInst:
-  case SILInstructionKind::LinearFunctionInst:
-  case SILInstructionKind::DifferentiableFunctionExtractInst:
-  case SILInstructionKind::LinearFunctionExtractInst:
-  case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
-  // SWIFT_ENABLE_TENSORFLOW END
   case SILInstructionKind::AllocBoxInst:
   case SILInstructionKind::AllocExistentialBoxInst:
   case SILInstructionKind::AllocRefInst:
@@ -882,6 +875,13 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::SelectValueInst:
   case SILInstructionKind::KeyPathInst:
   case SILInstructionKind::GlobalValueInst:
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILInstructionKind::DifferentiableFunctionInst:
+  case SILInstructionKind::LinearFunctionInst:
+  case SILInstructionKind::DifferentiableFunctionExtractInst:
+  case SILInstructionKind::LinearFunctionExtractInst:
+  // SWIFT_ENABLE_TENSORFLOW END
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
 #define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
   case SILInstructionKind::Name##ToRefInst:                                    \
   case SILInstructionKind::RefTo##Name##Inst:                                  \

@@ -1236,103 +1236,6 @@ public:
     *this << Ctx.getID(AI->getOperand());
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
-    *this << "[parameters";
-    for (auto i : dfi->getParameterIndices()->getIndices())
-      *this << ' ' << i;
-    *this << "] ";
-    *this << getIDAndType(dfi->getOriginalFunction());
-    if (dfi->hasDerivativeFunctions()) {
-      *this << " with_derivative ";
-      *this << '{' << getIDAndType(dfi->getJVPFunction()) << ", "
-            << getIDAndType(dfi->getVJPFunction()) << '}';
-    }
-  }
-
-  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
-    *this << "[parameters";
-    for (auto i : lfi->getParameterIndices()->getIndices())
-      *this << ' ' << i;
-    *this << "] ";
-    *this << getIDAndType(lfi->getOriginalFunction());
-    if (lfi->hasTransposeFunction()) {
-      *this << " with_transpose ";
-      *this << getIDAndType(lfi->getTransposeFunction());
-    }
-  }
-
-  void visitDifferentiableFunctionExtractInst(
-      DifferentiableFunctionExtractInst *dfei) {
-    *this << '[';
-    switch (dfei->getExtractee()) {
-    case NormalDifferentiableFunctionTypeComponent::Original:
-      *this << "original";
-      break;
-    case NormalDifferentiableFunctionTypeComponent::JVP:
-      *this << "jvp";
-      break;
-    case NormalDifferentiableFunctionTypeComponent::VJP:
-      *this << "vjp";
-      break;
-    }
-    *this << "] ";
-    *this << getIDAndType(dfei->getFunctionOperand());
-    if (dfei->hasExplicitExtracteeType()) {
-      *this << " as ";
-      *this << dfei->getType();
-    }
-  }
-
-  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
-    *this << '[';
-    switch (lfei->getExtractee()) {
-    case LinearDifferentiableFunctionTypeComponent::Original:
-      *this << "original";
-      break;
-    case LinearDifferentiableFunctionTypeComponent::Transpose:
-      *this << "transpose";
-      break;
-    }
-    *this << "] ";
-    *this << getIDAndType(lfei->getFunctionOperand());
-  }
-
-  void visitDifferentiabilityWitnessFunctionInst(
-      DifferentiabilityWitnessFunctionInst *dwfi) {
-    auto *witness = dwfi->getWitness();
-    *this << '[';
-    switch (dwfi->getWitnessKind()) {
-    case DifferentiabilityWitnessFunctionKind::JVP:
-      *this << "jvp";
-      break;
-    case DifferentiabilityWitnessFunctionKind::VJP:
-      *this << "vjp";
-      break;
-    case DifferentiabilityWitnessFunctionKind::Transpose:
-      *this << "transpose";
-      break;
-    }
-    *this << "] [parameters";
-    for (auto i : witness->getParameterIndices()->getIndices())
-      *this << ' ' << i;
-    *this << "] [results";
-    for (auto i : witness->getResultIndices()->getIndices())
-      *this << ' ' << i;
-    *this << "] ";
-    if (auto witnessGenSig = witness->getDerivativeGenericSignature()) {
-      auto subPrinter = PrintOptions::printSIL();
-      witnessGenSig->print(PrintState.OS, subPrinter);
-      *this << " ";
-    }
-    printSILFunctionNameAndType(PrintState.OS, witness->getOriginalFunction());
-    if (dwfi->getHasExplicitFunctionType()) {
-      *this << " as ";
-      *this << dwfi->getType();
-    }
-  }
-  // SWIFT_ENABLE_TENSORFLOW END
-
   void visitFunctionRefInst(FunctionRefInst *FRI) {
     FRI->getInitiallyReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();
@@ -2370,6 +2273,103 @@ public:
       *this << " : $" << component.getComponentType();
       break;
     }
+    }
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
+    *this << "[parameters";
+    for (auto i : dfi->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+    *this << getIDAndType(dfi->getOriginalFunction());
+    if (dfi->hasDerivativeFunctions()) {
+      *this << " with_derivative ";
+      *this << '{' << getIDAndType(dfi->getJVPFunction()) << ", "
+            << getIDAndType(dfi->getVJPFunction()) << '}';
+    }
+  }
+
+  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
+    *this << "[parameters";
+    for (auto i : lfi->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+    *this << getIDAndType(lfi->getOriginalFunction());
+    if (lfi->hasTransposeFunction()) {
+      *this << " with_transpose ";
+      *this << getIDAndType(lfi->getTransposeFunction());
+    }
+  }
+
+  void visitDifferentiableFunctionExtractInst(
+      DifferentiableFunctionExtractInst *dfei) {
+    *this << '[';
+    switch (dfei->getExtractee()) {
+    case NormalDifferentiableFunctionTypeComponent::Original:
+      *this << "original";
+      break;
+    case NormalDifferentiableFunctionTypeComponent::JVP:
+      *this << "jvp";
+      break;
+    case NormalDifferentiableFunctionTypeComponent::VJP:
+      *this << "vjp";
+      break;
+    }
+    *this << "] ";
+    *this << getIDAndType(dfei->getFunctionOperand());
+    if (dfei->hasExplicitExtracteeType()) {
+      *this << " as ";
+      *this << dfei->getType();
+    }
+  }
+
+  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
+    *this << '[';
+    switch (lfei->getExtractee()) {
+    case LinearDifferentiableFunctionTypeComponent::Original:
+      *this << "original";
+      break;
+    case LinearDifferentiableFunctionTypeComponent::Transpose:
+      *this << "transpose";
+      break;
+    }
+    *this << "] ";
+    *this << getIDAndType(lfei->getFunctionOperand());
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
+
+  void visitDifferentiabilityWitnessFunctionInst(
+      DifferentiabilityWitnessFunctionInst *dwfi) {
+    auto *witness = dwfi->getWitness();
+    *this << '[';
+    switch (dwfi->getWitnessKind()) {
+    case DifferentiabilityWitnessFunctionKind::JVP:
+      *this << "jvp";
+      break;
+    case DifferentiabilityWitnessFunctionKind::VJP:
+      *this << "vjp";
+      break;
+    case DifferentiabilityWitnessFunctionKind::Transpose:
+      *this << "transpose";
+      break;
+    }
+    *this << "] [parameters";
+    for (auto i : witness->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] [results";
+    for (auto i : witness->getResultIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+    if (auto witnessGenSig = witness->getDerivativeGenericSignature()) {
+      auto subPrinter = PrintOptions::printSIL();
+      witnessGenSig->print(PrintState.OS, subPrinter);
+      *this << " ";
+    }
+    printSILFunctionNameAndType(PrintState.OS, witness->getOriginalFunction());
+    if (dwfi->getHasExplicitFunctionType()) {
+      *this << " as ";
+      *this << dwfi->getType();
     }
   }
 };

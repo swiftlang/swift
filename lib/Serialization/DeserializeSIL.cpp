@@ -1558,92 +1558,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                       Args);
     break;
   }
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::DifferentiableFunctionInst: {
-    bool hasDerivativeFunctions = (bool)Attr2;
-    unsigned numOperands = hasDerivativeFunctions ? 3 : 1;
-    auto numParamIndices = ListOfValues.size() - numOperands * 3;
-    assert(ListOfValues.size() == numParamIndices + numOperands * 3);
-    auto rawParamIndices =
-       map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
-                                     [](uint64_t i) { return (unsigned)i; });
-    auto numParams = Attr;
-    auto *paramIndices =
-        IndexSubset::get(MF->getContext(), numParams, rawParamIndices);
-    SmallVector<SILValue, 3> operands;
-    for (auto i = numParamIndices;
-         i < numParamIndices + numOperands * 3; i += 3) {
-      auto astTy = MF->getType(ListOfValues[i]);
-      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1], Fn);
-      operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
-    }
-    Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None;
-    if (hasDerivativeFunctions)
-      derivativeFunctions = std::make_pair(operands[1], operands[2]);
-    ResultVal = Builder.createDifferentiableFunction(
-        Loc, paramIndices, operands[0], derivativeFunctions);
-    break;
-  }
-  case SILInstructionKind::LinearFunctionInst: {
-    bool hasLinearFunction = (bool)Attr2;
-    unsigned numOperands = hasLinearFunction ? 2 : 1;
-    auto numParamIndices = ListOfValues.size() - numOperands * 3;
-    assert(ListOfValues.size() == numParamIndices + numOperands * 3);
-    auto rawParamIndices =
-       map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
-                                     [](uint64_t i) { return (unsigned)i; });
-    auto numParams = Attr;
-    auto *paramIndices =
-        IndexSubset::get(MF->getContext(), numParams, rawParamIndices);
-    SmallVector<SILValue, 3> operands;
-    for (auto i = numParamIndices;
-         i < numParamIndices + numOperands * 3; i += 3) {
-      auto astTy = MF->getType(ListOfValues[i]);
-      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1], Fn);
-      operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
-    }
-    Optional<SILValue> transposeFunction = None;
-    if (hasLinearFunction)
-      transposeFunction = operands[1];
-    ResultVal = Builder.createLinearFunction(
-        Loc, paramIndices, operands[0], transposeFunction);
-    break;
-  }
-  case SILInstructionKind::DifferentiableFunctionExtractInst: {
-    auto astTy = MF->getType(TyID);
-    auto silTy = getSILType(astTy, SILValueCategory::Object, Fn);
-    auto val = getLocalValue(ValID, silTy);
-    NormalDifferentiableFunctionTypeComponent extractee(Attr);
-    Optional<SILType> explicitExtracteeType = None;
-    if (Attr2)
-      explicitExtracteeType = silTy;
-    ResultVal =
-        Builder.createDifferentiableFunctionExtract(Loc, extractee, val,
-                                                    explicitExtracteeType);
-    break;
-  }
-  case SILInstructionKind::LinearFunctionExtractInst: {
-    auto astTy = MF->getType(TyID);
-    auto silTy = getSILType(astTy, SILValueCategory::Object, Fn);
-    auto val = getLocalValue(ValID, silTy);
-    LinearDifferentiableFunctionTypeComponent extractee(Attr);
-    ResultVal = Builder.createLinearFunctionExtract(Loc, extractee, val);
-    break;
-  }
-  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
-    StringRef mangledKey = MF->getIdentifierText(ValID);
-    auto *witness = getSILDifferentiabilityWitnessForReference(mangledKey);
-    assert(witness && "SILDifferentiabilityWitness not found");
-    DifferentiabilityWitnessFunctionKind witnessKind(Attr);
-    Optional<SILType> explicitFnTy = None;
-    auto astTy = MF->getType(TyID);
-    if (TyID)
-      explicitFnTy = getSILType(astTy, SILValueCategory::Object, Fn);
-    ResultVal = Builder.createDifferentiabilityWitnessFunction(
-        Loc, witnessKind, witness, explicitFnTy);
-    break;
-  }
-  // SWIFT_ENABLE_TENSORFLOW END
   case SILInstructionKind::AllocGlobalInst: {
     // Format: Name and type. Use SILOneOperandLayout.
     StringRef Name = MF->getIdentifierText(ValID);
@@ -2682,6 +2596,92 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
     
     ResultVal = Builder.createKeyPath(Loc, pattern, subMap, operands, kpTy);
+    break;
+  }
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILInstructionKind::DifferentiableFunctionInst: {
+    bool hasDerivativeFunctions = (bool)Attr2;
+    unsigned numOperands = hasDerivativeFunctions ? 3 : 1;
+    auto numParamIndices = ListOfValues.size() - numOperands * 3;
+    assert(ListOfValues.size() == numParamIndices + numOperands * 3);
+    auto rawParamIndices =
+       map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
+                                     [](uint64_t i) { return (unsigned)i; });
+    auto numParams = Attr;
+    auto *paramIndices =
+        IndexSubset::get(MF->getContext(), numParams, rawParamIndices);
+    SmallVector<SILValue, 3> operands;
+    for (auto i = numParamIndices;
+         i < numParamIndices + numOperands * 3; i += 3) {
+      auto astTy = MF->getType(ListOfValues[i]);
+      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1], Fn);
+      operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
+    }
+    Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None;
+    if (hasDerivativeFunctions)
+      derivativeFunctions = std::make_pair(operands[1], operands[2]);
+    ResultVal = Builder.createDifferentiableFunction(
+        Loc, paramIndices, operands[0], derivativeFunctions);
+    break;
+  }
+  case SILInstructionKind::LinearFunctionInst: {
+    bool hasLinearFunction = (bool)Attr2;
+    unsigned numOperands = hasLinearFunction ? 2 : 1;
+    auto numParamIndices = ListOfValues.size() - numOperands * 3;
+    assert(ListOfValues.size() == numParamIndices + numOperands * 3);
+    auto rawParamIndices =
+       map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
+                                     [](uint64_t i) { return (unsigned)i; });
+    auto numParams = Attr;
+    auto *paramIndices =
+        IndexSubset::get(MF->getContext(), numParams, rawParamIndices);
+    SmallVector<SILValue, 3> operands;
+    for (auto i = numParamIndices;
+         i < numParamIndices + numOperands * 3; i += 3) {
+      auto astTy = MF->getType(ListOfValues[i]);
+      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1], Fn);
+      operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
+    }
+    Optional<SILValue> transposeFunction = None;
+    if (hasLinearFunction)
+      transposeFunction = operands[1];
+    ResultVal = Builder.createLinearFunction(
+        Loc, paramIndices, operands[0], transposeFunction);
+    break;
+  }
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    auto astTy = MF->getType(TyID);
+    auto silTy = getSILType(astTy, SILValueCategory::Object, Fn);
+    auto val = getLocalValue(ValID, silTy);
+    NormalDifferentiableFunctionTypeComponent extractee(Attr);
+    Optional<SILType> explicitExtracteeType = None;
+    if (Attr2)
+      explicitExtracteeType = silTy;
+    ResultVal =
+        Builder.createDifferentiableFunctionExtract(Loc, extractee, val,
+                                                    explicitExtracteeType);
+    break;
+  }
+  case SILInstructionKind::LinearFunctionExtractInst: {
+    auto astTy = MF->getType(TyID);
+    auto silTy = getSILType(astTy, SILValueCategory::Object, Fn);
+    auto val = getLocalValue(ValID, silTy);
+    LinearDifferentiableFunctionTypeComponent extractee(Attr);
+    ResultVal = Builder.createLinearFunctionExtract(Loc, extractee, val);
+    break;
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+    StringRef mangledKey = MF->getIdentifierText(ValID);
+    auto *witness = getSILDifferentiabilityWitnessForReference(mangledKey);
+    assert(witness && "SILDifferentiabilityWitness not found");
+    DifferentiabilityWitnessFunctionKind witnessKind(Attr);
+    Optional<SILType> explicitFnTy = None;
+    auto astTy = MF->getType(TyID);
+    if (TyID)
+      explicitFnTy = getSILType(astTy, SILValueCategory::Object, Fn);
+    ResultVal = Builder.createDifferentiabilityWitnessFunction(
+        Loc, witnessKind, witness, explicitFnTy);
     break;
   }
   }
