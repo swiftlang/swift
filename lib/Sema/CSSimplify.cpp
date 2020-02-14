@@ -3420,6 +3420,7 @@ bool ConstraintSystem::repairFailures(
       conversionsOrFixes.push_back(
           AddMissingArguments::create(*this, {FunctionType::Param(*arg)},
                                       getConstraintLocator(anchor, path)));
+      break;
     }
 
     if ((lhs->is<InOutType>() && !rhs->is<InOutType>()) ||
@@ -3437,6 +3438,32 @@ bool ConstraintSystem::repairFailures(
             rhs, getConstraintLocator(locator)));
         break;
       }
+    }
+
+    auto *parentLoc = getConstraintLocator(anchor, path);
+    // In cases like this `FunctionArgument` as a last locator element
+    // represents a single parameter of the function type involved in
+    // a conversion to another function type, see `matchFunctionTypes`.
+    if (parentLoc->isForContextualType() ||
+        parentLoc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+      // If there is a fix associated with contextual conversion or
+      // a function type itself, let's ignore argument failure but
+      // increase a score.
+      if (hasFixFor(parentLoc)) {
+        increaseScore(SK_Fix);
+        return true;
+      }
+
+      // Since there is only one parameter let's give it a chance to diagnose
+      // a more specific error in some situations.
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) ||
+          hasConversionOrRestriction(ConversionRestrictionKind::Existential) ||
+          hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
+        break;
+
+      conversionsOrFixes.push_back(AllowFunctionTypeMismatch::create(
+          *this, lhs, rhs, parentLoc, /*index=*/0));
+      break;
     }
 
     break;
@@ -3680,6 +3707,11 @@ bool ConstraintSystem::repairFailures(
     // Let this fail if it's a contextual mismatch with sequence element types,
     // as there's a special fix for that.
     if (tupleLocator->isLastElement<LocatorPathElt::SequenceElementType>())
+      break;
+
+    // Generic argument failures have a more general fix which is attached to a
+    // parent type and aggregates all argument failures into a single fix.
+    if (tupleLocator->isLastElement<LocatorPathElt::GenericArgument>())
       break;
 
     ConstraintFix *fix;
@@ -4081,15 +4113,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Module:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype: {
-      if (shouldAttemptFixes()) {
-        auto last = locator.last();
-        // If this happens as part of the argument-to-parameter
-        // conversion or type requirement, there is a tailored
-        // fix/diagnostic.
-        if (last && (last->is<LocatorPathElt::ApplyArgToParam>() ||
-                     last->is<LocatorPathElt::AnyRequirement>()))
-          break;
-      }
+      // Give `repairFailures` a chance to fix the problem.
+      if (shouldAttemptFixes())
+        break;
+
       // If two module types or archetypes were not already equal, there's
       // nothing more we can do.
       return getTypeMatchFailure(locator);
