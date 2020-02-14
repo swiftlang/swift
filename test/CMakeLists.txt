@@ -235,7 +235,6 @@ _Block_release(void) { }\n")
       BlocksRuntimeStub
       SHARED
       DONT_EMBED_BITCODE
-      NOSWIFTRT
       ARCHITECTURE ${ARCH}
       SDK ${SDK}
       INSTALL_IN_COMPONENT dev

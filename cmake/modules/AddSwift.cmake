@@ -751,7 +751,6 @@ endfunction()
 function(_add_swift_host_library_single target name)
   set(SWIFTLIB_SINGLE_options
         DONT_EMBED_BITCODE
-        NOSWIFTRT
         OBJECT_LIBRARY
         SHARED
         STATIC)
