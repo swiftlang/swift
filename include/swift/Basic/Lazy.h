@@ -28,8 +28,8 @@
 inline void wasi_call_once(int *flag, void *context, void (*func)(void *)) {
   switch (*flag) {
     case 0:
-      func(context);
       *flag = 1;
+      func(context);
       return;
     case 1:
       return;

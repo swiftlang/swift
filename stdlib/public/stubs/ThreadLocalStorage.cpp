@@ -70,21 +70,21 @@ static inline int _stdlib_thread_key_create(__swift_thread_key_t *key,
                           __swift_thread_key_destructor destructor) {
   if (!_stdlib_tls_map)
       _stdlib_tls_map = new _stdlib_tls_map_t();
-  auto &map = reinterpret_cast<_stdlib_tls_map_t &>(_stdlib_tls_map);
-  *key = map.size();
+  auto *map = (_stdlib_tls_map_t *)_stdlib_tls_map;
+  *key = map->size();
   _stdlib_tls_element_t element = { nullptr, destructor };
-  map.insert(std::make_pair(*key, element));
+  map->insert(std::make_pair(*key, element));
   return 0;
 }
 
 static inline void *_stdlib_thread_getspecific(__swift_thread_key_t key) {
-  auto &map = reinterpret_cast<_stdlib_tls_map_t &>(_stdlib_tls_map);
-  return const_cast<void *>(map[key].value);
+  auto *map = (_stdlib_tls_map_t *)_stdlib_tls_map;
+  return const_cast<void *>(map->operator[](key).value);
 }
 
 static inline int _stdlib_thread_setspecific(__swift_thread_key_t key, const void *value) {
-  auto &map = reinterpret_cast<_stdlib_tls_map_t &>(_stdlib_tls_map);
-  map[key].value = value;
+  auto *map = (_stdlib_tls_map_t *)_stdlib_tls_map;
+  map->operator[](key).value = value;
   return 0;
 }
 
