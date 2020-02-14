@@ -5023,6 +5023,47 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                                  blockType, subMap);
       break;
     }
+    case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+      // e.g. differentiability_witness_function
+      //      [jvp] [parameters 0 1] [results 0] <T where T: Differentiable>
+      //      @foo : <T> $(T) -> T
+      DifferentiabilityWitnessFunctionKind witnessKind;
+      StringRef witnessKindNames[3] = {"jvp", "vjp", "transpose"};
+      if (P.parseToken(
+              tok::l_square,
+              diag::
+                  sil_inst_autodiff_expected_differentiability_witness_kind) ||
+          parseSILIdentifierSwitch(
+              witnessKind, witnessKindNames,
+              diag::
+                  sil_inst_autodiff_expected_differentiability_witness_kind) ||
+          P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                       "differentiability witness function kind"))
+        return true;
+      SourceLoc keyStartLoc = P.Tok.getLoc();
+      auto configAndFn =
+          parseSILDifferentiabilityWitnessConfigAndFunction(P, *this, InstLoc);
+      if (!configAndFn)
+        return true;
+      auto config = configAndFn->first;
+      auto originalFn = configAndFn->second;
+      auto *witness = SILMod.lookUpDifferentiabilityWitness(
+          {originalFn->getName(), config});
+      if (!witness) {
+        P.diagnose(keyStartLoc, diag::sil_diff_witness_undefined);
+        return true;
+      }
+      // Parse an optional explicit function type.
+      Optional<SILType> functionType = None;
+      if (P.consumeIf(tok::kw_as)) {
+        functionType = SILType();
+        if (parseSILType(*functionType))
+          return true;
+      }
+      ResultVal = B.createDifferentiabilityWitnessFunction(
+          InstLoc, witnessKind, witness, functionType);
+      break;
+    }
     }
 
     return false;

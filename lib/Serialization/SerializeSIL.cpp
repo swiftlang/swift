@@ -2153,6 +2153,24 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     break;
   }
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+    auto *dwfi = cast<DifferentiabilityWitnessFunctionInst>(&SI);
+    auto *witness = dwfi->getWitness();
+    DifferentiabilityWitnessesToEmit.insert(witness);
+    Mangle::ASTMangler mangler;
+    auto mangledKey =
+        mangler.mangleSILDifferentiabilityWitnessKey(witness->getKey());
+    auto rawWitnessKind = (unsigned)dwfi->getWitnessKind();
+    // We only store the type when the instruction has an explicit type.
+    bool hasExplicitFnTy = dwfi->getHasExplicitFunctionType();
+    SILOneOperandLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneOperandLayout::Code],
+        (unsigned)dwfi->getKind(), rawWitnessKind,
+        hasExplicitFnTy ? S.addTypeRef(dwfi->getType().getASTType()) : TypeID(),
+        hasExplicitFnTy ? (unsigned)dwfi->getType().getCategory() : 0,
+        S.addUniquedStringRef(mangledKey));
+    break;
+  }
   }
   // Non-void values get registered in the value table.
   for (auto result : SI.getResults()) {
