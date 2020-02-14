@@ -2880,6 +2880,58 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
   return diagnosed;
 }
 
+/// Diagnose ambiguity related to overloaded declarations where only
+/// *some* of the overload choices have ephemeral pointer warnings/errors
+/// associated with them. Such situations have be handled specifically
+/// because ephemeral fixes do not affect the score.
+///
+/// If all of the overloads have ephemeral fixes associated with them
+/// it's much easier to diagnose through notes associated with each fix.
+static bool
+diagnoseAmbiguityWithEphemeralPointers(ConstraintSystem &cs,
+                                       ArrayRef<Solution> solutions) {
+  llvm::MapVector<Expr *, ValueDecl *> ambiguities;
+
+  bool allSolutionsHaveFixes = true;
+  for (const auto &solution : solutions) {
+    if (solution.Fixes.empty()) {
+      allSolutionsHaveFixes = false;
+      continue;
+    }
+
+    for (const auto *fix : solution.Fixes) {
+      if (fix->getKind() != FixKind::TreatEphemeralAsNonEphemeral)
+        return false;
+
+      // Ephemeral pointers are only possible in argument positions.
+      if (auto *anchor = simplifyLocatorToAnchor(fix->getLocator())) {
+        anchor = cast<InOutExpr>(anchor)->getSubExpr();
+
+        auto overload = solution.getOverloadChoiceIfAvailable(
+            cs.getConstraintLocator(anchor));
+
+        if (!(overload && overload->choice.isDecl()))
+          return false;
+
+        ambiguities.insert({anchor, overload->choice.getDecl()});
+      }
+    }
+  }
+
+  // If all solutions have fixes for ephemeral pointers, let's
+  // let `diagnoseAmbiguityWithFixes` diagnose the problem.
+  if (allSolutionsHaveFixes)
+    return false;
+
+  auto &DE = cs.getASTContext().Diags;
+  for (const auto &entry : ambiguities) {
+    DE.diagnose(entry.first->getLoc(), diag::ambiguous_decl_ref,
+                DeclNameRef(entry.second->getBaseName()));
+  }
+
+  return true;
+}
+
 bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     SmallVectorImpl<Solution> &solutions) {
   if (solutions.empty())
@@ -2903,6 +2955,9 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   SolutionDiff solutionDiff(solutions);
 
   if (diagnoseConflictingGenericArguments(*this, solutionDiff, solutions))
+    return true;
+
+  if (diagnoseAmbiguityWithEphemeralPointers(*this, solutions))
     return true;
 
   // Collect aggregated fixes from all solutions
