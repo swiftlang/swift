@@ -683,7 +683,6 @@ endfunction()
 #     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
-#     [C_COMPILE_FLAGS flag1...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
 #     [FILE_DEPENDS target1 ...]
@@ -723,9 +722,6 @@ endfunction()
 # LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
-# C_COMPILE_FLAGS
-#   Extra compile flags (C, C++, ObjC).
-#
 # SWIFT_COMPILE_FLAGS
 #   Extra compile flags (Swift).
 #
@@ -754,7 +750,6 @@ function(_add_swift_host_library_single target name)
         DARWIN_INSTALL_NAME_DIR
         SDK)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
-        C_COMPILE_FLAGS
         DEPENDS
         FILE_DEPENDS
         FRAMEWORK_DEPENDS
