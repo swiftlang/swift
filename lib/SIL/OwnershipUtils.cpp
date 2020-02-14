@@ -120,12 +120,12 @@ void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
   case BorrowScopeIntroducingValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
   case BorrowScopeIntroducingValueKind::BeginBorrow:
-    llvm::copy(cast<BeginBorrowInst>(value)->getEndBorrows(),
-               std::back_inserter(scopeEndingInsts));
-    return;
   case BorrowScopeIntroducingValueKind::LoadBorrow:
-    llvm::copy(cast<LoadBorrowInst>(value)->getEndBorrows(),
-               std::back_inserter(scopeEndingInsts));
+    for (auto *use : value->getUses()) {
+      if (use->isConsumingUse()) {
+	scopeEndingInsts.push_back(use->getUser());
+      }
+    }
     return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
@@ -137,16 +137,10 @@ void BorrowScopeIntroducingValue::visitLocalScopeEndingUses(
   switch (kind) {
   case BorrowScopeIntroducingValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
+  case BorrowScopeIntroducingValueKind::LoadBorrow:
   case BorrowScopeIntroducingValueKind::BeginBorrow:
     for (auto *use : value->getUses()) {
-      if (isa<EndBorrowInst>(use->getUser())) {
-        visitor(use);
-      }
-    }
-    return;
-  case BorrowScopeIntroducingValueKind::LoadBorrow:
-    for (auto *use : value->getUses()) {
-      if (isa<EndBorrowInst>(use->getUser())) {
+      if (use->isConsumingUse()) {
         visitor(use);
       }
     }
