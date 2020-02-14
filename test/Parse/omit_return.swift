@@ -474,7 +474,7 @@ func ff_implicitInjectIntoOptionalExpr(_ int: Int) -> Int? {
 }
 
 func ff_implicitTupleShuffle(_ input: (one: Int, two: Int)) -> (two: Int, one: Int) {
-    input
+    input // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
 }
 
 func ff_implicitCollectionUpcast(_ deriveds: [Derived]) -> [Base] {
