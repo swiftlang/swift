@@ -25,26 +25,6 @@ void *_stdlib_createTLS(void);
 
 #if !SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC || (defined(_WIN32) && !defined(__CYGWIN__))
 
-#if defined(__wasi__)
-#define STUB() do { /* fprintf(stderr, "%s is unsupported on WASI environment\n", __func__);*/ abort(); } while(0)
-void wasi_polyfill_call_once(int *flag, void *context, void (*func)(void *))
- {
-    switch (*flag) {
-    case 0:
-      func(context);
-      *flag = 1;
-      return;
-    case 1:
-      return;
-    default:
-      STUB();
-    }
-  }
-int   wasi_polyfill_pthread_key_create(__swift_thread_key_t *key, void (*destructor)(void*)) { STUB(); }
-void *wasi_polyfill_pthread_getspecific(__swift_thread_key_t key) { STUB(); }
-int   wasi_polyfill_pthread_setspecific(__swift_thread_key_t key, const void *value) { STUB(); }
-#endif
-
 static void
 #if defined(_M_IX86)
 __stdcall
@@ -69,6 +49,42 @@ _stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
   *key = FlsAlloc(destroyTLS_CCAdjustmentThunk);
   if (*key == FLS_OUT_OF_INDEXES)
     return GetLastError();
+  return 0;
+}
+
+#endif
+
+#if defined(__wasi__)
+#include <map>
+using __swift_thread_key_destructor = void (*)(void *);
+
+struct _stdlib_tls_element_t {
+  const void *value;
+  __swift_thread_key_destructor destructor;
+};
+
+using _stdlib_tls_map_t = std::map<__swift_thread_key_t, _stdlib_tls_element_t>;
+static void *_stdlib_tls_map;
+
+static inline int _stdlib_thread_key_create(__swift_thread_key_t *key,
+                          __swift_thread_key_destructor destructor) {
+  if (!_stdlib_tls_map)
+      _stdlib_tls_map = new _stdlib_tls_map_t();
+  auto &map = reinterpret_cast<_stdlib_tls_map_t &>(_stdlib_tls_map);
+  *key = map.size();
+  _stdlib_tls_element_t element = { nullptr, destructor };
+  map.insert(std::make_pair(*key, element));
+  return 0;
+}
+
+static inline void *_stdlib_thread_getspecific(__swift_thread_key_t key) {
+  auto &map = reinterpret_cast<_stdlib_tls_map_t &>(_stdlib_tls_map);
+  return const_cast<void *>(map[key].value);
+}
+
+static inline int _stdlib_thread_setspecific(__swift_thread_key_t key, const void *value) {
+  auto &map = reinterpret_cast<_stdlib_tls_map_t &>(_stdlib_tls_map);
+  map[key].value = value;
   return 0;
 }
 
