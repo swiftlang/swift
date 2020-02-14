@@ -2246,13 +2246,22 @@ namespace {
         }
         return TupleType::get(tupleTypeElts, CS.getASTContext());
       }
-      
+
+      case PatternKind::OptionalSome: {
+        // The subpattern must have optional type.
+        Type subPatternType = getTypeForPattern(
+            cast<OptionalSomePattern>(pattern)->getSubPattern(), locator);
+
+        return OptionalType::get(subPatternType);
+      }
+
       // Refutable patterns occur when checking the PatternBindingDecls in an
       // if/let or while/let condition.  They always require an initial value,
       // so they always allow unspecified types.
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
+      case PatternKind::Is:
+      case PatternKind::EnumElement:
+      case PatternKind::Bool:
+      case PatternKind::Expr:
         // TODO: we could try harder here, e.g. for enum elements to provide the
         // enum type.
         return CS.createTypeVariable(CS.getConstraintLocator(locator),

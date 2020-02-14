@@ -23,23 +23,25 @@ if var x = foo() {
 
 use(x) // expected-error{{unresolved identifier 'x'}}
 
-if let x = nonOptionalStruct() { } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
-if let x = nonOptionalEnum() { } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
+if let x = nonOptionalStruct() { _ = x} // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
+if let x = nonOptionalEnum() { _ = x} // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
 
 guard let _ = nonOptionalStruct() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
 guard let _ = nonOptionalEnum() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
 
-if case let x? = nonOptionalStruct() { } // expected-error{{'?' pattern cannot match values of type 'NonOptionalStruct'}}
-if case let x? = nonOptionalEnum() { } // expected-error{{'?' pattern cannot match values of type 'NonOptionalEnum'}}
+if case let x? = nonOptionalStruct() { _ = x } // expected-error{{'?' pattern cannot match values of type 'NonOptionalStruct'}}
+if case let x? = nonOptionalEnum() { _ = x } // expected-error{{'?' pattern cannot match values of type 'NonOptionalEnum'}}
 
 class B {} // expected-note * {{did you mean 'B'?}}
 class D : B {}// expected-note * {{did you mean 'D'?}}
 
 // TODO poor recovery in these cases
 if let {} // expected-error {{expected '{' after 'if' condition}} expected-error {{pattern matching in a condition requires the 'case' keyword}}
-if let x = {} // expected-error{{'{' after 'if'}} expected-error {{variable binding in a condition requires an initializer}} expected-error{{initializer for conditional binding must have Optional type, not '() -> ()'}}
+if let x = { } // expected-error{{'{' after 'if'}} expected-error {{variable binding in a condition requires an initializer}} expected-error{{initializer for conditional binding must have Optional type, not '() -> ()'}}
+// expected-warning@-1{{value 'x' was defined but never used}}
 
 if let x = foo() {
+  _ = x
 } else {
   // TODO: more contextual error? "x is only available on the true branch"?
   use(x) // expected-error{{unresolved identifier 'x'}}
@@ -62,8 +64,8 @@ if var x = opt {} // expected-warning {{value 'x' was defined but never used; co
 
 // <rdar://problem/20800015> Fix error message for invalid if-let
 let someInteger = 1
-if let y = someInteger {}  // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
-if case let y? = someInteger {}  // expected-error {{'?' pattern cannot match values of type 'Int'}}
+if let y = someInteger { _ = y }  // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
+if case let y? = someInteger { _ = y }  // expected-error {{'?' pattern cannot match values of type 'Int'}}
 
 // Test multiple clauses on "if let".
 if let x = opt, let y = opt, x != y,
