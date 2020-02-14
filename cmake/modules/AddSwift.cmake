@@ -786,60 +786,6 @@ function(_add_swift_host_library_single target name)
       ${SWIFTLIB_SINGLE_GYB_SOURCES})
   endif()
 
-  # Remove the "swift" prefix from the name to determine the module name.
-  string(REPLACE swift "" module_name "${name}")
-
-  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
-    swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
-  endif()
-
-  handle_swift_sources(
-      swift_object_dependency_target
-      swift_module_dependency_target
-      swift_sib_dependency_target
-      swift_sibopt_dependency_target
-      swift_sibgen_dependency_target
-      SWIFTLIB_SINGLE_SOURCES
-      SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
-      DEPENDS
-        ${gyb_dependency_targets}
-      SDK ${SWIFTLIB_SINGLE_SDK}
-      ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
-      MODULE_NAME ${module_name}
-      ${embed_bitcode_arg}
-      INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
-  add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
-
-  # If there were any swift sources, then a .swiftmodule may have been created.
-  # If that is the case, then add a target which is an alias of the module files.
-  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
-
-  # For standalone overlay builds to work
-  if(NOT BUILD_STANDALONE)
-    if (EXISTS swift_sib_dependency_target AND NOT "${swift_sib_dependency_target}" STREQUAL "")
-      add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sib ${swift_sib_dependency_target})
-    endif()
-
-    if (EXISTS swift_sibopt_dependency_target AND NOT "${swift_sibopt_dependency_target}" STREQUAL "")
-      add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sibopt ${swift_sibopt_dependency_target})
-    endif()
-
-    if (EXISTS swift_sibgen_dependency_target AND NOT "${swift_sibgen_dependency_target}" STREQUAL "")
-      add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sibgen ${swift_sibgen_dependency_target})
-    endif()
-  endif()
-
-  # Only build the modules for any arch listed in the *_MODULE_ARCHITECTURES.
-  if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_APPLE_PLATFORMS
-      AND SWIFTLIB_SINGLE_ARCHITECTURE IN_LIST SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_MODULE_ARCHITECTURES)
-    # Create dummy target to hook up the module target dependency.
-    add_custom_target("${target}"
-      DEPENDS
-        "${swift_module_dependency_target}")
-
-    return()
-  endif()
-
   add_library("${target}" ${libkind}
               ${SWIFTLIB_SINGLE_SOURCES}
               ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
