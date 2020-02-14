@@ -856,8 +856,6 @@ function(_add_swift_host_library_single target name)
       TARGETS "${target}"
       DEPENDS
         ${gyb_dependency_targets}
-        "${swift_object_dependency_target}"
-        "${swift_module_dependency_target}"
         ${LLVM_COMMON_DEPENDS})
 
   # Call llvm_config() only for libraries that are part of the compiler.
