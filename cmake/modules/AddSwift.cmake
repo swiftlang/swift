@@ -691,7 +691,6 @@ endfunction()
 #     [DONT_EMBED_BITCODE]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
-#     [IS_SDK_OVERLAY]
 #     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
 #
@@ -752,9 +751,6 @@ endfunction()
 # IS_STDLIB_CORE
 #   Compile as the standard library core.
 #
-# IS_SDK_OVERLAY
-#   Treat the library as a part of the Swift SDK overlay.
-#
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
@@ -763,7 +759,6 @@ endfunction()
 function(_add_swift_host_library_single target name)
   set(SWIFTLIB_SINGLE_options
         DONT_EMBED_BITCODE
-        IS_SDK_OVERLAY
         IS_STDLIB
         IS_STDLIB_CORE
         NOSWIFTRT
@@ -920,7 +915,6 @@ function(_add_swift_host_library_single target name)
       COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
       ${SWIFTLIB_SINGLE_IS_STDLIB_keyword}
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
-      ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${embed_bitcode_arg}
       INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
