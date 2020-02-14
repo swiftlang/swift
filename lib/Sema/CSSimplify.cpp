@@ -1329,6 +1329,25 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
   if (!anchor)
     return 1;
 
+  auto isStdlibType = [&](Type type) {
+    if (auto *NTD = type->getAnyNominal()) {
+      auto *DC = NTD->getDeclContext();
+      return DC->isModuleScopeContext() &&
+             DC->getParentModule()->isStdlibModule();
+    }
+    return false;
+  };
+
+  if (requirementType && isStdlibType(cs.simplifyType(requirementType))) {
+    if (auto last = locator.last()) {
+      if (auto requirement = last->getAs<LocatorPathElt::AnyRequirement>()) {
+        auto kind = requirement->getRequirementKind();
+        if (kind == RequirementKind::Conformance)
+          return 3;
+      }
+    }
+  }
+
   // If this requirement is associated with an overload choice let's
   // tie impact to how many times this requirement type is mentioned.
   if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor)) {
