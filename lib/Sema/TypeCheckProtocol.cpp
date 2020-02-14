@@ -395,10 +395,26 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
       //     declarations: it improves usability to not require explicit
       //     `@differentiable` attributes for less-visible declarations.
       bool createImplicitWitnessAttribute =
-          supersetConfig ||
-          (witness->getFormalAccess() < AccessLevel::Public &&
-           dc->getModuleScopeContext() ==
-               witness->getDeclContext()->getModuleScopeContext());
+          supersetConfig || witness->getFormalAccess() < AccessLevel::Public;
+      // If the witness has less-than-public visibility and is declared in a
+      // different file than the conformance, produce an error.
+      if (!supersetConfig && witness->getFormalAccess() < AccessLevel::Public) {
+        if (dc->getModuleScopeContext() !=
+            witness->getDeclContext()->getModuleScopeContext()) {
+          // FIXME(TF-1014): `@differentiable` attribute diagnostic does not
+          // appear if associated type inference is involved.
+          if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
+            return RequirementMatch(
+                getStandinForAccessor(vdWitness, AccessorKind::Get),
+                MatchKind::MissingDifferentiableAttrNonPublicOtherFile,
+                reqDiffAttr);
+          } else {
+            return RequirementMatch(
+                witness, MatchKind::MissingDifferentiableAttrNonPublicOtherFile,
+                reqDiffAttr);
+          }
+        }
+      }
       if (createImplicitWitnessAttribute) {
         auto derivativeGenSig = witnessAFD->getGenericSignature();
         if (supersetConfig)
@@ -2333,14 +2349,16 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   case MatchKind::NonObjC:
     diags.diagnose(match.Witness, diag::protocol_witness_not_objc);
     break;
-  case MatchKind::MissingDifferentiableAttr: {
+  case MatchKind::MissingDifferentiableAttr:
+  case MatchKind::MissingDifferentiableAttrNonPublicOtherFile: {
+    auto witness = match.Witness;
     // Emit a note and fix-it showing the missing requirement `@differentiable`
     // attribute.
     auto *reqAttr = cast<DifferentiableAttr>(match.UnmetAttribute);
     assert(reqAttr);
     // Omit printing `wrt:` clause if attribute's differentiability
     // parameters match inferred differentiability parameters.
-    auto *original = cast<AbstractFunctionDecl>(match.Witness);
+    auto *original = cast<AbstractFunctionDecl>(witness);
     auto *whereClauseGenEnv =
         reqAttr->getDerivativeGenericEnvironment(original);
     auto *inferredParameters = TypeChecker::inferDifferentiabilityParameters(
@@ -2351,11 +2369,28 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     llvm::raw_string_ostream os(reqDiffAttrString);
     reqAttr->print(os, req, omitWrtClause, /*omitDerivativeFunctions*/ true);
     os.flush();
-    diags
-        .diagnose(match.Witness,
-                  diag::protocol_witness_missing_differentiable_attr,
-                  reqDiffAttrString)
-        .fixItInsert(match.Witness->getStartLoc(), reqDiffAttrString + ' ');
+    switch (match.Kind) {
+    case MatchKind::MissingDifferentiableAttr:
+      diags
+          .diagnose(witness, diag::protocol_witness_missing_differentiable_attr,
+                    reqDiffAttrString)
+          .fixItInsert(witness->getStartLoc(), reqDiffAttrString + ' ');
+      break;
+    case MatchKind::MissingDifferentiableAttrNonPublicOtherFile:
+      diags
+          .diagnose(
+              witness,
+              diag::
+                  protocol_witness_missing_differentiable_attr_nonpublic_other_file,
+              reqDiffAttrString, witness->getDescriptiveKind(),
+              witness->getFullName(), req->getDescriptiveKind(),
+              req->getFullName(), conformance->getType(),
+              conformance->getProtocol()->getDeclaredInterfaceType())
+          .fixItInsert(match.Witness->getStartLoc(), reqDiffAttrString + ' ');
+      break;
+    default:
+      llvm_unreachable("Unexpected requirement match kind");
+    }
     break;
   }
   }

@@ -16,8 +16,8 @@
 // - `/usr/bin/ld ...`
 //
 // `%target-build-swift` performs `swiftc main.swift other_file.swift`, so it is expected to fail (hence `not`).
-// `swiftc -frontend -primary-file main.swift other_file.swift` should succeed, so no need for `-verify`.
-// `swiftc -frontend main.swift -primary-file other_file.swift` should fail, so `-verify` is needed.
+// `swiftc -frontend -primary-file main.swift other_file.swift` should fail, so `-verify` is needed.
+// `swiftc -frontend main.swift -primary-file other_file.swift` should succeed, so no need for `-verify`.
 
 // RUN: %target-swift-frontend -c -verify -primary-file %s %S/Inputs/other_file.swift
 // RUN: %target-swift-frontend -c %s -primary-file %S/Inputs/other_file.swift
