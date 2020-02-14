@@ -679,7 +679,6 @@ endfunction()
 #     [SDK sdk]
 #     [ARCHITECTURE architecture]
 #     [DEPENDS dep1 ...]
-#     [LINK_LIBRARIES dep1 ...]
 #     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
@@ -709,9 +708,6 @@ endfunction()
 #
 # DEPENDS
 #   Targets that this library depends on.
-#
-# LINK_LIBRARIES
-#   Libraries this library depends on.
 #
 # FRAMEWORK_DEPENDS
 #   System frameworks this library depends on.
@@ -758,7 +754,6 @@ function(_add_swift_host_library_single target name)
         INCORPORATE_OBJECT_LIBRARIES
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
         LINK_FLAGS
-        LINK_LIBRARIES
         LLVM_LINK_COMPONENTS
         PRIVATE_LINK_LIBRARIES
         SWIFT_COMPILE_FLAGS)
@@ -849,8 +844,6 @@ function(_add_swift_host_library_single target name)
       -libc;${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY})
   endif()
 
-  # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_LINK_LIBRARIES,
-  # just any swiftmodule files that are associated with them.
   handle_swift_sources(
       swift_object_dependency_target
       swift_module_dependency_target
@@ -863,7 +856,6 @@ function(_add_swift_host_library_single target name)
         ${gyb_dependency_targets}
         ${SWIFTLIB_SINGLE_DEPENDS}
         ${SWIFTLIB_SINGLE_FILE_DEPENDS}
-        ${SWIFTLIB_SINGLE_LINK_LIBRARIES}
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
       MODULE_NAME ${module_name}
@@ -1011,20 +1003,6 @@ function(_add_swift_host_library_single target name)
         "${swift_module_dependency_target}"
         ${LLVM_COMMON_DEPENDS})
 
-  if("${libkind}" STREQUAL "SHARED")
-    target_link_libraries("${target}" PRIVATE ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
-  else()
-    target_link_libraries("${target}" INTERFACE ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
-  endif()
-
-  # Don't add the icucore target.
-  set(SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU)
-  foreach(item ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
-    if(NOT "${item}" STREQUAL "icucore")
-      list(APPEND SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU "${item}")
-    endif()
-  endforeach()
-
   # Link against system frameworks.
   foreach(FRAMEWORK ${SWIFTLIB_SINGLE_FRAMEWORK_DEPENDS})
     target_link_libraries(${target} PUBLIC "-framework ${FRAMEWORK}")
@@ -1093,7 +1071,6 @@ function(_add_swift_host_library_single target name)
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
     RESULT_VAR_NAME link_flags
-    LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
       )
 
@@ -1172,7 +1149,7 @@ function(_add_swift_host_library_single target name)
   # import library targets when the library was added.  Use that to adjust the
   # link libraries.
   if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
-    foreach(library_list LINK_LIBRARIES PRIVATE_LINK_LIBRARIES)
+    foreach(library_list PRIVATE_LINK_LIBRARIES)
       set(import_libraries)
       foreach(library ${SWIFTLIB_SINGLE_${library_list}})
         # Ensure that the library is a target.  If an absolute path was given,
