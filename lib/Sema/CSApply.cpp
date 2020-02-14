@@ -4736,6 +4736,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
   SmallVector<Identifier, 4> labels;
   SmallVector<TupleTypeElt, 4> convertedElts;
 
+  bool anythingShuffled = false;
   for (unsigned i = 0, e = sources.size(); i != e; ++i) {
     unsigned source = sources[i];
     auto *fromElt = destructured[source];
@@ -4743,6 +4744,12 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
     // Actually convert the source element.
     auto toEltType = toTuple->getElementType(i);
     auto toLabel = toTuple->getElement(i).getName();
+
+    // If we're shuffling positions and labels, we have to warn about this
+    // conversion.
+    if (i != sources[i] &&
+        fromTuple->getElement(i).getName() != toLabel)
+      anythingShuffled = true;
 
     auto *toElt
       = coerceToType(fromElt, toEltType,
@@ -4754,6 +4761,14 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
     converted.push_back(toElt);
     labels.push_back(toLabel);
     convertedElts.emplace_back(toEltType, toLabel, ParameterTypeFlags());
+  }
+
+  // Shuffling tuple elements is an anti-pattern worthy of a diagnostic.  We
+  // will form the shuffle for now, but a future compiler should decline to
+  // do so and begin the process of removing them altogether.
+  if (anythingShuffled) {
+    cs.getASTContext().Diags.diagnose(
+        expr->getLoc(), diag::warn_reordering_tuple_shuffle_deprecated);
   }
 
   // Create the result tuple, written in terms of the destructured
