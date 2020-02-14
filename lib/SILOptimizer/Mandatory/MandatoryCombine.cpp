@@ -72,7 +72,7 @@ class MandatoryCombiner final
 
   /// Set to true if some alloc/dealloc_stack instruction are inserted and at
   /// the end of the run stack nesting needs to be corrected.
-  bool invalidatedStackNesting;
+  bool invalidatedStackNesting = false;
 
   /// The number of times that the worklist has been processed.
   unsigned iteration;
