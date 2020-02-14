@@ -678,7 +678,6 @@ endfunction()
 #     [STATIC]
 #     [SDK sdk]
 #     [ARCHITECTURE architecture]
-#     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
@@ -704,9 +703,6 @@ endfunction()
 #
 # ARCHITECTURE
 #   Architecture to build for.
-#
-# FRAMEWORK_DEPENDS
-#   System frameworks this library depends on.
 #
 # FRAMEWORK_DEPENDS_WEAK
 #   System frameworks this library depends on that should be weakly-linked.
@@ -743,7 +739,6 @@ function(_add_swift_host_library_single target name)
         SDK)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         FILE_DEPENDS
-        FRAMEWORK_DEPENDS
         FRAMEWORK_DEPENDS_WEAK
         GYB_SOURCES
         INCORPORATE_OBJECT_LIBRARIES
@@ -996,9 +991,6 @@ function(_add_swift_host_library_single target name)
         ${LLVM_COMMON_DEPENDS})
 
   # Link against system frameworks.
-  foreach(FRAMEWORK ${SWIFTLIB_SINGLE_FRAMEWORK_DEPENDS})
-    target_link_libraries(${target} PUBLIC "-framework ${FRAMEWORK}")
-  endforeach()
   foreach(FRAMEWORK ${SWIFTLIB_SINGLE_FRAMEWORK_DEPENDS_WEAK})
     target_link_libraries(${target} PUBLIC "-weak_framework ${FRAMEWORK}")
   endforeach()
