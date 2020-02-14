@@ -1575,15 +1575,10 @@ endfunction()
 #   Sources to add into this library.
 function(add_swift_host_library name)
   set(options
-        FORCE_BUILD_OPTIMIZED
         SHARED
         STATIC)
   set(single_parameter_options)
   set(multiple_parameter_options
-        C_COMPILE_FLAGS
-        DEPENDS
-        FILE_DEPENDS
-        LINK_LIBRARIES
         LLVM_LINK_COMPONENTS)
 
   cmake_parse_arguments(ASHL
@@ -1592,22 +1587,6 @@ function(add_swift_host_library name)
                         "${multiple_parameter_options}"
                         ${ARGN})
   set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
-
-  if(ASHL_FORCE_BUILD_OPTIMIZED)
-    message(SEND_ERROR "library ${name} is using FORCE_BUILD_OPTIMIZED flag which is deprecated.  Please use target_compile_options instead")
-  endif()
-  if(ASHL_C_COMPILE_FLAGS)
-    message(SEND_ERROR "library ${name} is using C_COMPILE_FLAGS parameter which is deprecated.  Please use target_compile_definitions, target_compile_options, or target_include_directories instead")
-  endif()
-  if(ASHL_DEPENDS)
-    message(SEND_ERROR "library ${name} is using DEPENDS parameter which is deprecated.  Please use add_dependencies instead")
-  endif()
-  if(ASHL_FILE_DEPENDS)
-    message(SEND_ERROR "library ${name} is using FILE_DEPENDS parameter which is deprecated.")
-  endif()
-  if(ASHL_LINK_LIBRARIES)
-    message(SEND_ERROR "library ${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
-  endif()
 
   translate_flags(ASHL "${options}")
 
@@ -2562,21 +2541,21 @@ endfunction()
 #   [ARCHITECTURE architecture]
 #     Architecture to build for.
 function(_add_swift_executable_single name)
-  # Parse the arguments we were given.
+  set(options)
+  set(single_parameter_options
+    ARCHITECTURE
+    SDK)
+  set(multiple_parameter_options
+    COMPILE_FLAGS
+    DEPENDS
+    LLVM_LINK_COMPONENTS)
   cmake_parse_arguments(SWIFTEXE_SINGLE
-    "EXCLUDE_FROM_ALL"
-    "SDK;ARCHITECTURE"
-    "DEPENDS;LLVM_LINK_COMPONENTS;LINK_LIBRARIES;COMPILE_FLAGS"
+    "${options}"
+    "${single_parameter_options}"
+    "${multiple_parameter_options}"
     ${ARGN})
 
   set(SWIFTEXE_SINGLE_SOURCES ${SWIFTEXE_SINGLE_UNPARSED_ARGUMENTS})
-
-  if(SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL)
-    message(SEND_ERROR "${name} is using EXCLUDE_FROM_ALL option which is deprecated.")
-  endif()
-  if(SWIFTEXE_SINGLE_LINK_LIBRARIES)
-    message(SEND_ERROR "${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
-  endif()
 
   # Check arguments.
   precondition(SWIFTEXE_SINGLE_SDK MESSAGE "Should specify an SDK")
@@ -2720,17 +2699,13 @@ endmacro()
 function(add_swift_host_tool executable)
   set(options)
   set(single_parameter_options SWIFT_COMPONENT)
-  set(multiple_parameter_options LINK_LIBRARIES)
+  set(multiple_parameter_options)
 
   cmake_parse_arguments(ASHT
     "${options}"
     "${single_parameter_options}"
     "${multiple_parameter_options}"
     ${ARGN})
-
-  if(ASHT_LINK_LIBRARIES)
-    message(SEND_ERROR "${executable} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
-  endif()
 
   precondition(ASHT_SWIFT_COMPONENT
                MESSAGE "Swift Component is required to add a host tool")

@@ -45,6 +45,9 @@
         "pythonkit": {
             "remote": { "id": "pvieito/PythonKit" }
         },
+        "tensorflow-swift-apis": {
+            "remote": { "id": "tensorflow/swift-apis" }
+        },
        "indexstore-db": {
             "remote": { "id": "apple/indexstore-db" } },
         "sourcekit-lsp": {
@@ -78,7 +81,8 @@
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
                 "swift-format": "master",
-                "pythonkit": "master"
+                "pythonkit": "master",
+                "tensorflow-swift-apis": "master"
             }
         },
         "next" : {
