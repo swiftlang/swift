@@ -693,7 +693,6 @@ endfunction()
 #     [IS_STDLIB_CORE]
 #     [IS_SDK_OVERLAY]
 #     INSTALL_IN_COMPONENT comp
-#     MACCATALYST_BUILD_FLAVOR flavor
 #     source1 [source2 source3 ...])
 #
 # target
@@ -759,9 +758,6 @@ endfunction()
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
-# MACCATALYST_BUILD_FLAVOR
-#   Possible values are 'ios-like', 'macos-like', 'zippered', 'unzippered-twin'
-#
 # source1 ...
 #   Sources to add into this library
 function(_add_swift_host_library_single target name)
@@ -785,8 +781,7 @@ function(_add_swift_host_library_single target name)
         INSTALL_IN_COMPONENT
         DARWIN_INSTALL_NAME_DIR
         SDK
-        DEPLOYMENT_VERSION_MACCATALYST
-        MACCATALYST_BUILD_FLAVOR)
+        DEPLOYMENT_VERSION_MACCATALYST)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
@@ -809,10 +804,6 @@ function(_add_swift_host_library_single target name)
                         "${SWIFTLIB_SINGLE_multiple_parameter_options}"
                         ${ARGN})
 
-  # Determine macCatalyst build flavor
-  get_maccatalyst_build_flavor(maccatalyst_build_flavor
-    "${SWIFTLIB_SINGLE_SDK}" "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
-
   set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_UNPARSED_ARGUMENTS})
 
   translate_flags(SWIFTLIB_SINGLE "${SWIFTLIB_SINGLE_options}")
@@ -832,12 +823,6 @@ function(_add_swift_host_library_single target name)
   # Determine the subdirectory where this library will be installed.
   set(SWIFTLIB_SINGLE_SUBDIR
       "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
-
-  # macCatalyst ios-like builds are installed in the maccatalyst/x86_64 directory
-  if(maccatalyst_build_flavor STREQUAL "ios-like")
-    set(SWIFTLIB_SINGLE_SUBDIR
-        "${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
-  endif()
 
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
   set(embed_bitcode_arg)
@@ -938,16 +923,12 @@ function(_add_swift_host_library_single target name)
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${embed_bitcode_arg}
-      INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}"
-      MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
+      INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
 
   # If there were any swift sources, then a .swiftmodule may have been created.
   # If that is the case, then add a target which is an alias of the module files.
   set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
-  if(maccatalyst_build_flavor STREQUAL "ios-like")
-    set(VARIANT_SUFFIX "-${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
-  endif()
 
   if(NOT "${SWIFTLIB_SINGLE_MODULE_TARGETS}" STREQUAL "" AND NOT "${swift_module_dependency_target}" STREQUAL "")
     foreach(module_target ${SWIFTLIB_SINGLE_MODULE_TARGETS})
@@ -1102,13 +1083,6 @@ function(_add_swift_host_library_single target name)
 
     if(SWIFTLIB_SINGLE_IS_STDLIB)
       set(install_name_dir "${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}")
-
-      # iOS-like overlays are installed in a separate directory so that
-      # unzippered twins do not conflict.
-      if(maccatalyst_build_flavor STREQUAL "ios-like"
-          AND DEFINED SWIFT_DARWIN_MACCATALYST_STDLIB_INSTALL_NAME_DIR)
-        set(install_name_dir "${SWIFT_DARWIN_MACCATALYST_STDLIB_INSTALL_NAME_DIR}")
-      endif()
     endif()
 
     # Always use @rpath for XCTest
@@ -1310,7 +1284,6 @@ function(_add_swift_host_library_single target name)
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
     RESULT_VAR_NAME c_compile_flags
-    MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
     )
 
   if(SWIFTLIB_IS_STDLIB)
@@ -1342,7 +1315,6 @@ function(_add_swift_host_library_single target name)
     RESULT_VAR_NAME link_flags
     LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
-    MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
       )
 
   # Configure plist creation for OS X.
