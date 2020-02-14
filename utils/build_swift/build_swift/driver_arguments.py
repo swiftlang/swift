@@ -605,6 +605,12 @@ def create_argument_parser():
     option('--pythonkit', store_true('build_pythonkit'),
            help='build PythonKit')
 
+    option('--tensorflow-swift-apis', store_true('build_tensorflow_swift_apis'),
+           help='build TensorFlow Swift APIs')
+    option('--install-tensorflow-swift-apis',
+           store_true('install_tensorflow_swift_apis'),
+           help='install TensorFlow Swift APIs')
+
     option('--build-ninja', toggle_true,
            help='build the Ninja tool')
 
