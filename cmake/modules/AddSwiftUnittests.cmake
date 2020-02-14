@@ -52,6 +52,9 @@ function(add_swift_unittest test_dirname)
       target_compile_options(${test_dirname} PRIVATE
         -march=core2)
     endif()
+  elseif("${SWIFT_HOST_VARIANT}" STREQUAL "windows")
+    target_compile_definitions("${test_dirname}" PRIVATE
+      _ENABLE_EXTENDED_ALIGNED_STORAGE)
   endif()
 
   find_program(LDLLD_PATH "ld.lld")

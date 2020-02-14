@@ -2255,6 +2255,40 @@ public:
     }
     }
   }
+
+  void visitDifferentiabilityWitnessFunctionInst(
+      DifferentiabilityWitnessFunctionInst *dwfi) {
+    auto *witness = dwfi->getWitness();
+    *this << '[';
+    switch (dwfi->getWitnessKind()) {
+    case DifferentiabilityWitnessFunctionKind::JVP:
+      *this << "jvp";
+      break;
+    case DifferentiabilityWitnessFunctionKind::VJP:
+      *this << "vjp";
+      break;
+    case DifferentiabilityWitnessFunctionKind::Transpose:
+      *this << "transpose";
+      break;
+    }
+    *this << "] [parameters";
+    for (auto i : witness->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] [results";
+    for (auto i : witness->getResultIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+    if (auto witnessGenSig = witness->getDerivativeGenericSignature()) {
+      auto subPrinter = PrintOptions::printSIL();
+      witnessGenSig->print(PrintState.OS, subPrinter);
+      *this << " ";
+    }
+    printSILFunctionNameAndType(PrintState.OS, witness->getOriginalFunction());
+    if (dwfi->getHasExplicitFunctionType()) {
+      *this << " as ";
+      *this << dwfi->getType();
+    }
+  }
 };
 } // end anonymous namespace
 

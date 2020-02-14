@@ -605,6 +605,50 @@ TryApplyInst *TryApplyInst::create(
                                      normalBB, errorBB, specializationInfo);
 }
 
+SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
+    SILModule &module, DifferentiabilityWitnessFunctionKind witnessKind,
+    SILDifferentiabilityWitness *witness) {
+  auto fnTy = witness->getOriginalFunction()->getLoweredFunctionType();
+  CanGenericSignature witnessCanGenSig;
+  if (auto witnessGenSig = witness->getDerivativeGenericSignature())
+    witnessCanGenSig = witnessGenSig->getCanonicalSignature();
+  auto *parameterIndices = witness->getParameterIndices();
+  auto *resultIndices = witness->getResultIndices();
+  if (auto derivativeKind = witnessKind.getAsDerivativeFunctionKind()) {
+    bool isReabstractionThunk =
+        witness->getOriginalFunction()->isThunk() == IsReabstractionThunk;
+    auto diffFnTy = fnTy->getAutoDiffDerivativeFunctionType(
+        parameterIndices, *resultIndices->begin(), *derivativeKind,
+        module.Types, LookUpConformanceInModule(module.getSwiftModule()),
+        witnessCanGenSig, isReabstractionThunk);
+    return SILType::getPrimitiveObjectType(diffFnTy);
+  }
+  assert(witnessKind == DifferentiabilityWitnessFunctionKind::Transpose);
+  auto transposeFnTy = fnTy->getAutoDiffTransposeFunctionType(
+      parameterIndices, module.Types,
+      LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
+  return SILType::getPrimitiveObjectType(transposeFnTy);
+}
+
+DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
+    SILModule &module, SILDebugLocation debugLoc,
+    DifferentiabilityWitnessFunctionKind witnessKind,
+    SILDifferentiabilityWitness *witness, Optional<SILType> functionType)
+    : InstructionBase(debugLoc, functionType
+                                    ? *functionType
+                                    : getDifferentiabilityWitnessType(
+                                          module, witnessKind, witness)),
+      witnessKind(witnessKind), witness(witness),
+      hasExplicitFunctionType(functionType) {
+  assert(witness && "Differentiability witness must not be null");
+#ifndef NDEBUG
+  if (functionType.hasValue()) {
+    assert(module.getStage() == SILStage::Lowered &&
+           "Explicit type is valid only in lowered SIL");
+  }
+#endif
+}
+
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
                                          SILDebugLocation DebugLoc,
                                          SILFunction *F,

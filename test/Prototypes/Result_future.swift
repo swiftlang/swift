@@ -12,7 +12,6 @@
 // RUN: %target-run-stdlib-swift-target-future
 // REQUIRES: executable_test
 
-// REQUIRES: rdar59425215
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
@@ -21,6 +20,7 @@
 // UNSUPPORTED: CPU=x86_64 && OS=ios
 // UNSUPPORTED: CPU=x86_64 && OS=tvos
 // UNSUPPORTED: CPU=i386 && OS=watchos
+// UNSUPPORTED: use_os_stdlib
 
 public enum Result<Value> {
 case Success(Value)
