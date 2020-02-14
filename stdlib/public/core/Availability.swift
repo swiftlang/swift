@@ -18,7 +18,7 @@ import SwiftShims
 /// This is a magic entry point known to the compiler. It is called in
 /// generated code for API availability checking.
 @_semantics("availability.osversion")
-@inlinable
+@_effects(readnone)
 public func _stdlib_isOSVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
@@ -28,9 +28,6 @@ public func _stdlib_isOSVersionAtLeast(
   if Int(major) == 9999 {
     return true._value
   }
-  // The call to _swift_stdlib_operatingSystemVersion is used as an indicator
-  // that this function was called by a compiler optimization pass. If it is
-  // replaced that pass needs to be updated.
   let runningVersion = _swift_stdlib_operatingSystemVersion()
   
   let result =
