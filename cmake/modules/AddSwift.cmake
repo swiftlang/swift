@@ -880,19 +880,13 @@ function(_add_swift_host_library_single target name)
       list(APPEND library_search_directories "$ENV{SDKROOT}/usr/lib/swift")
   endif()
 
-  # Add variant-specific flags.
-  set(build_type "${CMAKE_BUILD_TYPE}")
-  set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
-  set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
-  set(lto_type "${SWIFT_TOOLS_ENABLE_LTO}")
-
   _add_variant_c_compile_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
     ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
-    BUILD_TYPE "${build_type}"
-    ENABLE_ASSERTIONS "${enable_assertions}"
-    ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
-    ENABLE_LTO "${lto_type}"
+    BUILD_TYPE ${CMAKE_BUILD_TYPE}
+    ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS}
+    ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
+    ENABLE_LTO ${SWIFT_TOOLS_ENABLE_LTO}
     RESULT_VAR_NAME c_compile_flags
     )
 
@@ -904,10 +898,10 @@ function(_add_swift_host_library_single target name)
   _add_variant_link_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
     ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
-    BUILD_TYPE "${build_type}"
-    ENABLE_ASSERTIONS "${enable_assertions}"
-    ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
-    ENABLE_LTO "${lto_type}"
+    BUILD_TYPE ${CMAKE_BUILD_TYPE}
+    ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS}
+    ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
+    ENABLE_LTO ${SWIFT_TOOLS_ENABLE_LTO}
     LTO_OBJECT_NAME "${target}-${SWIFTLIB_SINGLE_SDK}-${SWIFTLIB_SINGLE_ARCHITECTURE}"
     RESULT_VAR_NAME link_flags
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
