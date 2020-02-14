@@ -868,6 +868,10 @@ public:
   /// Contextual types introduced by this solution.
   std::vector<std::pair<const Expr *, ContextualTypeInfo>> contextualTypes;
 
+  /// Maps statement condition entries to their solution application targets.
+  llvm::MapVector<const StmtConditionElement *, SolutionApplicationTarget>
+    stmtConditionTargets;
+
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
 
@@ -1487,6 +1491,10 @@ private:
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
       KeyPathComponentTypes;
 
+  /// Maps statement condition entries to their solution application targets.
+  llvm::MapVector<const StmtConditionElement *, SolutionApplicationTarget>
+    stmtConditionTargets;
+
   /// Contextual type information for expressions that are part of this
   /// constraint system.
   llvm::MapVector<const Expr *, ContextualTypeInfo> contextualTypes;
@@ -2068,6 +2076,9 @@ public:
     /// The length of \c contextualTypes.
     unsigned numContextualTypes;
 
+    /// The length of \c stmtConditionTargets.
+    unsigned numStmtConditionTargets;
+
     /// The previous score.
     Score PreviousScore;
 
@@ -2353,6 +2364,22 @@ public:
     if (result)
       return result->purpose;
     return CTP_Unused;
+  }
+
+  void setStmtConditionTarget(
+      const StmtConditionElement *element, SolutionApplicationTarget target) {
+    assert(element != nullptr && "Expected non-null condition element!");
+    assert(stmtConditionTargets.count(element) == 0 &&
+           "Already set this condition target");
+    stmtConditionTargets.insert({element, target});
+  }
+
+  Optional<SolutionApplicationTarget> getStmtConditionTarget(
+      const StmtConditionElement *element) const {
+    auto known = stmtConditionTargets.find(element);
+    if (known == stmtConditionTargets.end())
+      return None;
+    return known->second;
   }
 
   /// Retrieve the constraint locator for the given anchor and
