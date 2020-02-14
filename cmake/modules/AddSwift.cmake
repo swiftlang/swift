@@ -680,7 +680,6 @@ endfunction()
 #     [ARCHITECTURE architecture]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
-#     [FILE_DEPENDS target1 ...]
 #     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
 #
@@ -708,9 +707,6 @@ endfunction()
 # SWIFT_COMPILE_FLAGS
 #   Extra compile flags (Swift).
 #
-# FILE_DEPENDS
-#   Additional files this library depends on.
-#
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
@@ -730,7 +726,6 @@ function(_add_swift_host_library_single target name)
         DARWIN_INSTALL_NAME_DIR
         SDK)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
-        FILE_DEPENDS
         GYB_SOURCES
         LLVM_LINK_COMPONENTS
         SWIFT_COMPILE_FLAGS)
@@ -831,7 +826,6 @@ function(_add_swift_host_library_single target name)
       SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
       DEPENDS
         ${gyb_dependency_targets}
-        ${SWIFTLIB_SINGLE_FILE_DEPENDS}
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
       MODULE_NAME ${module_name}
@@ -1109,7 +1103,6 @@ endfunction()
 #     [SHARED]
 #     [STATIC]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
-#     [FILE_DEPENDS target1 ...]
 #     source1 [source2 source3 ...])
 #
 # name
@@ -1123,9 +1116,6 @@ endfunction()
 #
 # LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
-#
-# FILE_DEPENDS
-#   Additional files this library depends on.
 #
 # source1 ...
 #   Sources to add into this library.
