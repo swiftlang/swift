@@ -674,7 +674,6 @@ endfunction()
 #   _add_swift_host_library_single(
 #     target
 #     name
-#     [MODULE_TARGETS]
 #     [SHARED]
 #     [STATIC]
 #     [SDK sdk]
@@ -696,9 +695,6 @@ endfunction()
 #
 # name
 #   Name of the library (e.g., swiftParse).
-#
-# MODULE_TARGETS
-#   Names of the module target (e.g., swiftParse-swiftmodule-IOS-armv7).
 #
 # SHARED
 #   Build a shared library.
@@ -770,8 +766,7 @@ function(_add_swift_host_library_single target name)
         LINK_LIBRARIES
         LLVM_LINK_COMPONENTS
         PRIVATE_LINK_LIBRARIES
-        SWIFT_COMPILE_FLAGS
-        MODULE_TARGETS)
+        SWIFT_COMPILE_FLAGS)
 
   cmake_parse_arguments(SWIFTLIB_SINGLE
                         "${SWIFTLIB_SINGLE_options}"
@@ -885,15 +880,6 @@ function(_add_swift_host_library_single target name)
   # If there were any swift sources, then a .swiftmodule may have been created.
   # If that is the case, then add a target which is an alias of the module files.
   set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
-
-  if(NOT "${SWIFTLIB_SINGLE_MODULE_TARGETS}" STREQUAL "" AND NOT "${swift_module_dependency_target}" STREQUAL "")
-    foreach(module_target ${SWIFTLIB_SINGLE_MODULE_TARGETS})
-      add_custom_target("${module_target}"
-        DEPENDS ${swift_module_dependency_target})
-      set_target_properties("${module_target}" PROPERTIES
-        FOLDER "Swift libraries/Modules")
-    endforeach()
-  endif()
 
   # For standalone overlay builds to work
   if(NOT BUILD_STANDALONE)
