@@ -322,7 +322,7 @@ bb7:
 // CHECK-LABEL: Function: 'owned_argument_overuse_br1'
 // CHECK-NEXT: Found over consume?!
 // CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: User:   br bb1(%0 : $Builtin.NativeObject)
+// CHECK-NEXT: User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb0
 
 // CHECK-LABEL: Function: 'owned_argument_overuse_br1'
@@ -343,7 +343,7 @@ bb1(%1 : @owned $Builtin.NativeObject):
 // CHECK-LABEL: Function: 'owned_argument_overuse_br2'
 // CHECK-NEXT: Found over consume?!
 // CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: User:   br bb1(%0 : $Builtin.NativeObject)
+// CHECK-NEXT: User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb0
 // CHECK-NOT: Block
 // CHECK-NOT: Function: 'owned_argument_overuse_br2'
