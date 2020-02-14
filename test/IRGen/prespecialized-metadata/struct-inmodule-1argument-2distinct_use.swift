@@ -5,7 +5,7 @@
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-// CHECK: @"$s4main5ValueVySdGMf" = internal constant <{
+// CHECK: @"$s4main5ValueVySdGMf" = linkonce_odr hidden constant <{
 // CHECk-SAME:    i8**,
 // CHECK-SAME:    [[INT]],
 // CHECK-SAME:    %swift.type_descriptor*,
@@ -22,7 +22,7 @@
 // CHECK-SAME:    i64 3
 // CHECK-SAME: }>, align [[ALIGNMENT]]
 
-// CHECK: @"$s4main5ValueVySiGMf" = internal constant <{
+// CHECK: @"$s4main5ValueVySiGMf" = linkonce_odr hidden constant <{
 // CHECK-SAME:    i8**,
 // CHECK-SAME:    [[INT]],
 // CHECK-SAME:    %swift.type_descriptor*,

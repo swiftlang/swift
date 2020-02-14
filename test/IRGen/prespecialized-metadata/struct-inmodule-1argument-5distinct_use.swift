@@ -6,7 +6,7 @@
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
 
-// CHECK: @"$s4main5ValueVys4Int8VGMf" = internal constant <{
+// CHECK: @"$s4main5ValueVys4Int8VGMf" = linkonce_odr hidden constant <{
 // CHECK-SAME:    i8**,
 // CHECK-SAME:    [[INT]],
 // CHECK-SAME:    %swift.type_descriptor*,
@@ -23,7 +23,7 @@
 // CHECK-SAME:    i64 3
 // CHECK-SAME: }>, align [[ALIGNMENT]]
 
-// CHECK: @"$s4main5ValueVys5UInt8VGMf" = internal constant <{
+// CHECK: @"$s4main5ValueVys5UInt8VGMf" = linkonce_odr hidden constant <{
 // CHECK-SAME:    i8**,
 // CHECK-SAME:    [[INT]],
 // CHECK-SAME:    %swift.type_descriptor*,
@@ -57,9 +57,9 @@
 // NOTE: ignore COMDAT on PE/COFF target
 // CHECK-SAME: align [[ALIGNMENT]]
 
-// CHECK: @"$s4main5ValueVySSGMf" = internal constant <{ i8**, [[INT]], %swift.type_descriptor*, %swift.type*, i32{{(, \[4 x i8\])?}}, i64 }> <{ i8** getelementptr inbounds (%swift.vwtable, %swift.vwtable* @"$s4main5ValueVySSGWV", i32 0, i32 0), [[INT]] 512, %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main5ValueVMn" to %swift.type_descriptor*), %swift.type* @"$sSSN", i32 0{{(, \[4 x i8\] zeroinitializer)?}}, i64 3 }>, align [[ALIGNMENT]]
+// CHECK: @"$s4main5ValueVySSGMf" = linkonce_odr hidden constant <{ i8**, [[INT]], %swift.type_descriptor*, %swift.type*, i32{{(, \[4 x i8\])?}}, i64 }> <{ i8** getelementptr inbounds (%swift.vwtable, %swift.vwtable* @"$s4main5ValueVySSGWV", i32 0, i32 0), [[INT]] 512, %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main5ValueVMn" to %swift.type_descriptor*), %swift.type* @"$sSSN", i32 0{{(, \[4 x i8\] zeroinitializer)?}}, i64 3 }>, align [[ALIGNMENT]]
 
-// CHECK: @"$s4main5ValueVySdGMf" = internal constant <{
+// CHECK: @"$s4main5ValueVySdGMf" = linkonce_odr hidden constant <{
 // CHECK-SAME:    i8**,
 // CHECK-SAME:    [[INT]],
 // CHECK-SAME:    %swift.type_descriptor*,
@@ -76,7 +76,7 @@
 // CHECK-SAME:    i64 3
 // CHECK-SAME: }>, align [[ALIGNMENT]]
 
-// CHECK: @"$s4main5ValueVySiGMf" = internal constant <{
+// CHECK: @"$s4main5ValueVySiGMf" = linkonce_odr hidden constant <{
 // CHECK-SAME:    i8**,
 // CHECK-SAME:    [[INT]],
 // CHECK-SAME:    %swift.type_descriptor*,

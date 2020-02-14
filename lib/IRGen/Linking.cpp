@@ -490,6 +490,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
         return SILLinkage::Shared;
 
+      // Prespecialization of the same generic metadata may be requested 
+      // multiple times within the same module, so it needs to be uniqued.
+      if (nominal->isGenericContext())
+        return SILLinkage::Shared;
+
       // The full metadata object is private to the containing module.
       return SILLinkage::Private;
     case TypeMetadataAddress::AddressPoint: {
