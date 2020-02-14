@@ -787,8 +787,7 @@ function(_add_swift_host_library_single target name)
   endif()
 
   add_library("${target}" ${libkind}
-              ${SWIFTLIB_SINGLE_SOURCES}
-              ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
+              ${SWIFTLIB_SINGLE_SOURCES})
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
