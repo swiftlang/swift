@@ -296,6 +296,12 @@ struct S {
   }
 }
 
+class TestAddEquatable {
+    var property = "test"
+    private var prop = "test2"
+    let pr = "test3"
+}
+
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -397,6 +403,8 @@ struct S {
 // RUN: %refactor -source-filename %s -pos=291:3 -end-pos=291:18 | %FileCheck %s -check-prefix=CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY
 // RUN: %refactor -source-filename %s -pos=292:3 -end-pos=296:4 | %FileCheck %s -check-prefix=CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY
 
+// RUN: %refactor -source-filename %s -pos=299:16 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE
+
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
 // CHECK1-NEXT: Action ends
@@ -454,3 +462,4 @@ struct S {
 // CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY-NOT: Convert To Computed Property
 // CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY: Action ends
 
+// CHECK-ADD-EQUATABLE-CONFORMANCE: Add Equatable Conformance
