@@ -1895,6 +1895,28 @@ void FileUnit::getTopLevelDeclsWhereAttributesMatch(
   Results.erase(newEnd, Results.end());
 }
 
+void swift::simple_display(llvm::raw_ostream &out, const FileUnit *file) {
+  if (!file) {
+    out << "(null)";
+    return;
+  }
+
+  switch (file->getKind()) {
+  case FileUnitKind::Source:
+    out << '\"' << cast<SourceFile>(file)->getFilename() << '\"';
+    return;
+  case FileUnitKind::Builtin:
+    out << "(Builtin)";
+    return;
+  case FileUnitKind::DWARFModule:
+  case FileUnitKind::ClangModule:
+  case FileUnitKind::SerializedAST:
+    out << '\"' << cast<LoadedFile>(file)->getFilename() << '\"';
+    return;
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
 StringRef LoadedFile::getFilename() const {
   return "";
 }

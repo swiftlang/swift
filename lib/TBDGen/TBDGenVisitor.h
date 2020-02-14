@@ -113,7 +113,10 @@ public:
     // HACK: 'main' is a special symbol that's always emitted in SILGen if
     //       the file has an entry point. Since it doesn't show up in the
     //       module until SILGen, we need to explicitly add it here.
-    if (file->hasEntryPoint())
+    //
+    // Make sure to only add the main symbol for the module that we're emitting
+    // TBD for, and not for any statically linked libraries.
+    if (file->hasEntryPoint() && file->getParentModule() == SwiftModule)
       addSymbol("main");
   }
 

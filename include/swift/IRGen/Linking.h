@@ -53,12 +53,10 @@ public:
   /// be promoted to public external. Used by the LLDB expression evaluator.
   bool ForcePublicDecls;
 
-  bool IsWholeModule;
-
   explicit UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
-                       bool forcePublicDecls, bool isWholeModule);
+                       bool forcePublicDecls);
 
   /// In case of multiple llvm modules (in multi-threaded compilation) all
   /// private decls must be visible from other files.
