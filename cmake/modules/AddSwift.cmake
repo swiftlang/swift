@@ -688,7 +688,6 @@ endfunction()
 #     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
 #     [FILE_DEPENDS target1 ...]
-#     [DONT_EMBED_BITCODE]
 #     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
 #
@@ -740,9 +739,6 @@ endfunction()
 # FILE_DEPENDS
 #   Additional files this library depends on.
 #
-# DONT_EMBED_BITCODE
-#   Don't embed LLVM bitcode in this target, even if it is enabled globally.
-#
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
@@ -750,7 +746,6 @@ endfunction()
 #   Sources to add into this library
 function(_add_swift_host_library_single target name)
   set(SWIFTLIB_SINGLE_options
-        DONT_EMBED_BITCODE
         OBJECT_LIBRARY
         SHARED
         STATIC)
@@ -807,7 +802,7 @@ function(_add_swift_host_library_single target name)
 
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
   set(embed_bitcode_arg)
-  if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
+  if(SWIFT_EMBED_BITCODE_SECTION)
     if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
       list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
       set(embed_bitcode_arg EMBED_BITCODE)
@@ -1182,7 +1177,7 @@ function(_add_swift_host_library_single target name)
         "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
     endif()
     # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
-    if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
+    if(SWIFT_EMBED_BITCODE_SECTION)
       if(${SWIFTLIB_SINGLE_SDK} MATCHES "(I|TV|WATCH)OS")
         # The two branches of this if statement accomplish the same end result
         # We are simply accounting for the fact that on CMake < 3.16

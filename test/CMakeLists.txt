@@ -234,7 +234,6 @@ _Block_release(void) { }\n")
       BlocksRuntimeStub${VARIANT_SUFFIX}
       BlocksRuntimeStub
       SHARED
-      DONT_EMBED_BITCODE
       ARCHITECTURE ${ARCH}
       SDK ${SDK}
       INSTALL_IN_COMPONENT dev
