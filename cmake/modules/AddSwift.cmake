@@ -821,16 +821,9 @@ function(_add_swift_host_library_single target name)
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
-    set(install_name_dir "@rpath")
-
-    # Always use @rpath for XCTest
-    if(module_name STREQUAL "XCTest")
-      set(install_name_dir "@rpath")
-    endif()
-
     set_target_properties("${target}"
       PROPERTIES
-      INSTALL_NAME_DIR "${install_name_dir}")
+      INSTALL_NAME_DIR "@rpath")
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX")
     set_target_properties("${target}"
       PROPERTIES
