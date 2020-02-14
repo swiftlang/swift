@@ -755,7 +755,6 @@ function(_add_swift_host_library_single target name)
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
         LINK_FLAGS
         LLVM_LINK_COMPONENTS
-        PRIVATE_LINK_LIBRARIES
         SWIFT_COMPILE_FLAGS)
 
   cmake_parse_arguments(SWIFTLIB_SINGLE
@@ -1142,36 +1141,6 @@ function(_add_swift_host_library_single target name)
     ${link_libraries})
   target_link_directories(${target} PRIVATE
     ${library_search_directories})
-
-  # Adjust the linked libraries for windows targets.  On Windows, the link is
-  # performed against the import library, and the runtime uses the dll.  Not
-  # doing so will result in incorrect symbol resolution and linkage.  We created
-  # import library targets when the library was added.  Use that to adjust the
-  # link libraries.
-  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
-    foreach(library_list PRIVATE_LINK_LIBRARIES)
-      set(import_libraries)
-      foreach(library ${SWIFTLIB_SINGLE_${library_list}})
-        # Ensure that the library is a target.  If an absolute path was given,
-        # then we do not have an import library associated with it.  This occurs
-        # primarily with ICU (which will be an import library).  Import
-        # libraries are only associated with shared libraries, so add an
-        # additional check for that as well.
-        set(import_library ${library})
-        if(TARGET ${library})
-          get_target_property(type ${library} TYPE)
-          if(${type} STREQUAL "SHARED_LIBRARY")
-            set(import_library ${library}_IMPLIB)
-          endif()
-        endif()
-        list(APPEND import_libraries ${import_library})
-      endforeach()
-      set(SWIFTLIB_SINGLE_${library_list} ${import_libraries})
-    endforeach()
-  endif()
-
-  target_link_libraries("${target}" PRIVATE
-      ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
 
   # NOTE(compnerd) use the C linker language to invoke `clang` rather than
   # `clang++` as we explicitly link against the C++ runtime.  We were previously
