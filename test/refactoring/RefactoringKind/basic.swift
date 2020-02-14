@@ -276,6 +276,12 @@ func testConvertToIfLetExpr(idxOpt: Int?) {
 }
 
 
+class TestAddEquatable {
+    var property = "test"
+    private var prop = "test2"
+    let pr = "test3"
+}
+
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -373,6 +379,8 @@ func testConvertToIfLetExpr(idxOpt: Int?) {
 
 // RUN: %refactor -source-filename %s -pos=272:3 -end-pos=275:13 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-IFLET-EXPRESSION
 
+// RUN: %refactor -source-filename %s -pos=279:16 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE
+
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
 // CHECK1-NEXT: Action ends
@@ -423,3 +431,5 @@ func testConvertToIfLetExpr(idxOpt: Int?) {
 // CHECK-CONVERT-TO-GUARD-EXPRESSION: Convert To Guard Expression
 
 // CHECK-CONVERT-TO-IFLET-EXPRESSION: Convert To IfLet Expression
+
+// CHECK-ADD-EQUATABLE-CONFORMANCE: Add Equatable Conformance
