@@ -706,11 +706,15 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     CanType elementType;
     ArrayRef<SymbolicValue> arrayElements =
         symVal.getStorageOfArray().getStoredElements(elementType);
+    auto elementSILType = builder.getModule().Types
+      .getLoweredType(AbstractionPattern::getOpaque(), elementType,
+                      TypeExpansionContext(builder.getFunction()));
 
     // Emit code for the symbolic values corresponding to the array elements.
     SmallVector<SILValue, 8> elementSILValues;
     for (SymbolicValue elementSymVal : arrayElements) {
-      SILValue elementSIL = emitCodeForSymbolicValue(elementSymVal, elementType,
+      SILValue elementSIL = emitCodeForSymbolicValue(elementSymVal,
+                                                     elementSILType.getASTType(),
                                                      builder, loc, stringInfo);
       elementSILValues.push_back(elementSIL);
     }
