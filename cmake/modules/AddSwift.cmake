@@ -732,7 +732,6 @@ function(_add_swift_host_library_single target name)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         FILE_DEPENDS
         GYB_SOURCES
-        INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
         LLVM_LINK_COMPONENTS
         SWIFT_COMPILE_FLAGS)
 
@@ -871,22 +870,9 @@ function(_add_swift_host_library_single target name)
     return()
   endif()
 
-  set(SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS_SHARED_ONLY)
-  foreach(object_library ${SWIFTLIB_SINGLE_INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY})
-    list(APPEND SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS_SHARED_ONLY
-        $<TARGET_OBJECTS:${object_library}${VARIANT_SUFFIX}>)
-  endforeach()
-
-  set(INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS)
-  if(${libkind} STREQUAL "SHARED")
-    list(APPEND INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS
-         ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS_SHARED_ONLY})
-  endif()
-
   add_library("${target}" ${libkind}
               ${SWIFTLIB_SINGLE_SOURCES}
-              ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
-              ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS})
+              ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
