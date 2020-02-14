@@ -5,7 +5,7 @@
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-// CHECK: @"$s4main5Value[[UNIQUE_ID_1:[0-9A-Z_]+]]OySiGMf" = internal constant <{
+// CHECK: @"$s4main5Value[[UNIQUE_ID_1:[0-9A-Z_]+]]OySiGMf" = linkonce_odr hidden constant <{
 // CHECK-SAME:    i8**,
 // CHECK-SAME:    [[INT]],
 // CHECK-SAME:    %swift.type_descriptor*,
