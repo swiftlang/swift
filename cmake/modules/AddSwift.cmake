@@ -754,9 +754,7 @@ function(_add_swift_host_library_single target name)
         NOSWIFTRT
         OBJECT_LIBRARY
         SHARED
-        STATIC
-        TARGET_LIBRARY
-        INSTALL_WITH_SHARED)
+        STATIC)
   set(SWIFTLIB_SINGLE_single_parameter_options
         ARCHITECTURE
         DEPLOYMENT_VERSION_IOS
@@ -955,12 +953,6 @@ function(_add_swift_host_library_single target name)
   endforeach()
 
   set(SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES)
-  if(XCODE AND SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    set(SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES
-        # Note: the dummy.cpp source file provides no definitions. However,
-        # it forces Xcode to properly link the static library.
-        ${SWIFT_SOURCE_DIR}/cmake/dummy.cpp)
-  endif()
 
   set(INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS})
   if(${libkind} STREQUAL "SHARED")
@@ -973,28 +965,6 @@ function(_add_swift_host_library_single target name)
               ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
               ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
               ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
-  if(("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
-      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF") AND
-     SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    if("${libkind}" STREQUAL "SHARED" AND NOT SWIFTLIB_SINGLE_NOSWIFTRT)
-      # TODO(compnerd) switch to the generator expression when cmake is upgraded
-      # to a version which supports it.
-      # target_sources(${target}
-      #                PRIVATE
-      #                  $<TARGET_OBJECTS:swiftImageRegistrationObject${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}>)
-      if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
-        set(extension .obj)
-      else()
-        set(extension .o)
-      endif()
-      target_sources(${target}
-                     PRIVATE
-                       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${extension}")
-      set_source_files_properties("${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${extension}"
-                                  PROPERTIES
-                                    GENERATED 1)
-    endif()
-  endif()
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
@@ -1033,23 +1003,6 @@ function(_add_swift_host_library_single target name)
         SUFFIX ${LLVM_PLUGIN_EXT})
   endif()
 
-  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    # Install runtime libraries to lib/swift instead of lib. This works around
-    # the fact that -isysroot prevents linking to libraries in the system
-    # /usr/lib if Swift is installed in /usr.
-    set_target_properties("${target}" PROPERTIES
-      LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
-      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
-
-    foreach(config ${CMAKE_CONFIGURATION_TYPES})
-      string(TOUPPER ${config} config_upper)
-      escape_path_for_xcode("${config}" "${SWIFTLIB_DIR}" config_lib_dir)
-      set_target_properties(${target} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
-        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
-    endforeach()
-  endif()
-
   if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
     set(install_name_dir "@rpath")
 
@@ -1074,13 +1027,6 @@ function(_add_swift_host_library_single target name)
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
-    # CMake generates an incorrect rule `$SONAME_FLAG $INSTALLNAME_DIR$SONAME`
-    # for an Android cross-build from a macOS host. Construct the proper linker
-    # flags manually in add_swift_target_library instead, see there with
-    # variable `swiftlib_link_flags_all`.
-    if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-      set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
-    endif()
     # Only set the install RPATH if cross-compiling the host tools, in which
     # case both the NDK and Sysroot paths must be set.
     if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND
@@ -1098,12 +1044,6 @@ function(_add_swift_host_library_single target name)
       PROPERTIES
       # Library name (without the variant information)
       OUTPUT_NAME ${name})
-
-  # Don't build standard libraries by default.  We will enable building
-  # standard libraries that the user requested; the rest can be built on-demand.
-  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    set_target_properties(${target} PROPERTIES EXCLUDE_FROM_ALL TRUE)
-  endif()
 
   # Handle linking and dependencies.
   add_dependencies_multiple_targets(
@@ -1141,10 +1081,8 @@ function(_add_swift_host_library_single target name)
     target_link_libraries(${target} PUBLIC "-weak_framework ${FRAMEWORK}")
   endforeach()
 
-  if(NOT SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    # Call llvm_config() only for libraries that are part of the compiler.
-    swift_common_llvm_config("${target}" ${SWIFTLIB_SINGLE_LLVM_LINK_COMPONENTS})
-  endif()
+  # Call llvm_config() only for libraries that are part of the compiler.
+  swift_common_llvm_config("${target}" ${SWIFTLIB_SINGLE_LLVM_LINK_COMPONENTS})
 
   # Collect compile and link flags for the static and non-static targets.
   # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly.
@@ -1166,18 +1104,10 @@ function(_add_swift_host_library_single target name)
   endif()
 
   # Add variant-specific flags.
-  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    set(build_type "${SWIFT_STDLIB_BUILD_TYPE}")
-    set(enable_assertions "${SWIFT_STDLIB_ASSERTIONS}")
-  else()
-    set(build_type "${CMAKE_BUILD_TYPE}")
-    set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
-    set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
-  endif()
-
-  if (NOT SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    set(lto_type "${SWIFT_TOOLS_ENABLE_LTO}")
-  endif()
+  set(build_type "${CMAKE_BUILD_TYPE}")
+  set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
+  set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
+  set(lto_type "${SWIFT_TOOLS_ENABLE_LTO}")
 
   _add_variant_c_compile_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
@@ -1217,35 +1147,6 @@ function(_add_swift_host_library_single target name)
 
   # Configure plist creation for OS X.
   set(PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
-  if("${SWIFTLIB_SINGLE_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS AND FALSE)
-    set(PLIST_INFO_NAME ${name})
-    set(PLIST_INFO_UTI "com.apple.dt.runtime.${name}")
-    set(PLIST_INFO_VERSION "${SWIFT_VERSION}")
-    if (SWIFT_COMPILER_VERSION)
-      set(PLIST_INFO_BUILD_VERSION
-        "${SWIFT_COMPILER_VERSION}")
-    endif()
-
-    set(PLIST_INFO_PLIST_OUT "${PLIST_INFO_PLIST}")
-    list(APPEND link_flags
-         "-Wl,-sectcreate,__TEXT,__info_plist,${CMAKE_CURRENT_BINARY_DIR}/${PLIST_INFO_PLIST_OUT}")
-    configure_file(
-        "${SWIFT_SOURCE_DIR}/stdlib/${PLIST_INFO_PLIST}.in"
-        "${PLIST_INFO_PLIST_OUT}"
-        @ONLY
-        NEWLINE_STYLE UNIX)
-
-    # If Application Extensions are enabled, pass the linker flag marking
-    # the dylib as safe.
-    if (CXX_SUPPORTS_FAPPLICATION_EXTENSION AND (NOT DISABLE_APPLICATION_EXTENSION))
-      list(APPEND link_flags "-Wl,-application_extension")
-    endif()
-
-    set(PLIST_INFO_UTI)
-    set(PLIST_INFO_NAME)
-    set(PLIST_INFO_VERSION)
-    set(PLIST_INFO_BUILD_VERSION)
-  endif()
 
   # Set compilation and link flags.
   if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
