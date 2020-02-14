@@ -300,4 +300,8 @@ FRONTEND_STATISTIC(IRModule, NumGOTEntries)
 /// the .o file you find on disk after the frontend exits.
 FRONTEND_STATISTIC(LLVM, NumLLVMBytesOutput)
 
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(TBDGen, NAME)
+#include "swift/AST/TBDGenTypeIDZone.def"
+#undef SWIFT_REQUEST
+
 #endif
