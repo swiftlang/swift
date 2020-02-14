@@ -4901,6 +4901,14 @@ NOTE(function_builder_remove_returns, none,
      "remove 'return' statements to apply the function builder", ())
 
 //------------------------------------------------------------------------------
+// MARK: Tuple Shuffle Diagnostics
+//------------------------------------------------------------------------------
+
+ WARNING(warn_reordering_tuple_shuffle_deprecated,none,
+        "expression shuffles the elements of this tuple; "
+        "this behavior is deprecated", ())
+
+//------------------------------------------------------------------------------
 // MARK: differentiable programming diagnostics
 //------------------------------------------------------------------------------
 ERROR(experimental_differentiable_programming_disabled, none,
