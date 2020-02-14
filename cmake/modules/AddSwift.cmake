@@ -913,9 +913,6 @@ function(_add_swift_host_library_single target name)
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
       )
 
-  # Configure plist creation for OS X.
-  set(PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
-
   # Set compilation and link flags.
   if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE}
