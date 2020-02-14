@@ -933,9 +933,7 @@ function(_add_swift_host_library_single target name)
         "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
     endif()
   endif()
-  target_include_directories(${target} SYSTEM PRIVATE
-    ${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}
-    ${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE})
+
   target_compile_options(${target} PRIVATE
     ${c_compile_flags})
   target_link_options(${target} PRIVATE
