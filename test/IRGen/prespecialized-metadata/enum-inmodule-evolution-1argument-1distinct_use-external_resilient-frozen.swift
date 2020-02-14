@@ -10,7 +10,7 @@
 
 import TestModule
 
-// CHECK: @"$s4main5ValueOy10TestModule7IntegerVGMf" = internal constant <{ 
+// CHECK: @"$s4main5ValueOy10TestModule7IntegerVGMf" = linkonce_odr hidden constant <{ 
 // CHECK-SAME:   i8**, 
 // CHECK-SAME:   [[INT]], 
 // CHECK-SAME:   %swift.type_descriptor*, 
