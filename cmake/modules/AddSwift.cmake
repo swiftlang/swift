@@ -824,11 +824,7 @@ function(_add_swift_host_library_single target name)
     set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES} ${SWIFTLIB_SINGLE_HEADERS} ${SWIFTLIB_SINGLE_TDS})
   endif()
 
-  if(MODULE)
-    set(libkind MODULE)
-  # If both SHARED and STATIC are specified, we add the SHARED library first.
-  # The STATIC library is handled further below.
-  elseif(SWIFTLIB_SINGLE_SHARED)
+  if(SWIFTLIB_SINGLE_SHARED)
     set(libkind SHARED)
   elseif(SWIFTLIB_SINGLE_STATIC)
     set(libkind STATIC)
@@ -981,12 +977,6 @@ function(_add_swift_host_library_single target name)
   set_output_directory(${target}
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
-
-  if(MODULE)
-    set_target_properties("${target}" PROPERTIES
-        PREFIX ""
-        SUFFIX ${LLVM_PLUGIN_EXT})
-  endif()
 
   if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
     set(install_name_dir "@rpath")
