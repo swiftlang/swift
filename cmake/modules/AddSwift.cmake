@@ -679,7 +679,6 @@ endfunction()
 #     [SDK sdk]
 #     [ARCHITECTURE architecture]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
-#     [SWIFT_COMPILE_FLAGS flag1...]
 #     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
 #
@@ -704,9 +703,6 @@ endfunction()
 # LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
-# SWIFT_COMPILE_FLAGS
-#   Extra compile flags (Swift).
-#
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
@@ -727,8 +723,7 @@ function(_add_swift_host_library_single target name)
         SDK)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         GYB_SOURCES
-        LLVM_LINK_COMPONENTS
-        SWIFT_COMPILE_FLAGS)
+        LLVM_LINK_COMPONENTS)
 
   cmake_parse_arguments(SWIFTLIB_SINGLE
                         "${SWIFTLIB_SINGLE_options}"
@@ -800,20 +795,7 @@ function(_add_swift_host_library_single target name)
   string(REPLACE swift "" module_name "${name}")
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
-    if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
-      swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
-        -Xcc;-Xclang;-Xcc;-ivfsoverlay;-Xcc;-Xclang;-Xcc;${SWIFTLIB_SINGLE_VFS_OVERLAY})
-    endif()
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
-    foreach(directory ${SWIFTLIB_INCLUDE})
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-isystem;-Xcc;${directory})
-    endforeach()
-    if("${SWIFTLIB_SINGLE_ARCHITECTURE}" MATCHES arm)
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-D_ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE)
-    endif()
-    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
-      -libc;${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY})
   endif()
 
   handle_swift_sources(
@@ -829,7 +811,6 @@ function(_add_swift_host_library_single target name)
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
       MODULE_NAME ${module_name}
-      COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
       ${embed_bitcode_arg}
       INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
