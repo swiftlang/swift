@@ -10,7 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A set of ranges of any comparable value.
+/// A set of any comparable value, represented by ranges.
+///
+/// You can use a range set to efficiently represent a set `Comparable` values
+/// that spans any number of discontiguous ranges. Range sets are commonly used
+/// to represent multiple subranges of a collection, by storing ranges of a
+/// collection's index type.
+///
+/// In this example, `negativeSubranges` is a range set representing the
+/// locations of all the negative values in `numbers`:
+///
+///     var numbers = [10, 12, -5, 14, -3, -9, 15]
+///     let negativeSubranges = numbers.subranges(where: { $0 < 0 })
+///     // numbers[negativeSubranges].count == 3
+///
+///     numbers.moveSubranges(negativeSubranges, to: 0)
+///     // numbers == [-5, -3, -9, 10, 12, 14, 15]
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 public struct RangeSet<Bound: Comparable> {
   internal var _ranges = _RangeSetStorage<Bound>()
@@ -50,8 +65,8 @@ public struct RangeSet<Bound: Comparable> {
   /// and would instead be represented as `[0..<10]`.
   internal func _checkInvariants() {
     for (a, b) in zip(ranges, ranges.dropFirst()) {
-      precondition(!a.isEmpty && !b.isEmpty, "Empty range in range set")
-      precondition(
+      _debugPrecondition(!a.isEmpty && !b.isEmpty, "Empty range in range set")
+      _debugPrecondition(
         a.upperBound < b.lowerBound,
         "Out of order/overlapping ranges in range set")
     }
@@ -249,6 +264,7 @@ extension RangeSet: Hashable where Bound: Hashable {}
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension RangeSet {
+  /// A collection of the ranges that make up a range set.
   public struct Ranges: RandomAccessCollection {
     var _ranges: _RangeSetStorage<Bound>
     
@@ -261,6 +277,9 @@ extension RangeSet {
   }
   
   /// A collection of the ranges that make up the range set.
+  ///
+  /// The ranges that you access by using `ranges` never overlap, are never
+  /// empty, and are always in increasing order.
   public var ranges: Ranges {
     Ranges(_ranges: _ranges)
   }
@@ -359,28 +378,48 @@ extension RangeSet {
 // we can provide them even when we can't provide `SetAlgebra` conformance.
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension RangeSet {
+  /// Adds the contents of the given range set to this range set.
+  ///
+  /// - Parameter other: A range set to merge with this one.
   public mutating func formUnion(_ other: __owned RangeSet<Bound>) {
     for range in other._ranges {
       insert(contentsOf: range)
     }
   }
   
+  /// Removes the contents of this range set that aren't also in the given
+  /// range set.
+  ///
+  /// - Parameter other: A range set to intersect with.
   public mutating func formIntersection(_ other: RangeSet<Bound>) {
     self = self.intersection(other)
   }
   
+  /// Removes the contents of this range set that are also in the given set
+  /// and adds the contents of the given set that are not already in this
+  /// range set.
+  ///
+  /// - Parameter other: A range set to perform a symmetric difference against.
   public mutating func formSymmetricDifference(
     _ other: __owned RangeSet<Bound>
   ) {
     self = self.symmetricDifference(other)
   }
   
+  /// Removes the contents of the given range set from this range set.
+  ///
+  /// - Parameter other: A range set to subtract from this one.
   public mutating func subtract(_ other: RangeSet<Bound>) {
     for range in other._ranges {
       remove(contentsOf: range)
     }
   }
   
+  /// Returns a new range set containing the contents of both this set and the
+  /// given set.
+  ///
+  /// - Parameter other: The range set to merge with this one.
+  /// - Returns: A new range set.
   public __consuming func union(
     _ other: __owned RangeSet<Bound>
   ) -> RangeSet<Bound> {
@@ -389,6 +428,11 @@ extension RangeSet {
     return result
   }
   
+  /// Returns a new range set containing the contents of both this set and the
+  /// given set.
+  ///
+  /// - Parameter other: The range set to merge with this one.
+  /// - Returns: A new range set.
   public __consuming func intersection(
     _ other: RangeSet<Bound>
   ) -> RangeSet<Bound> {
@@ -453,30 +497,64 @@ extension RangeSet {
     return RangeSet(_orderedRanges: result)
   }
   
+  /// Returns a new range set representing the values in this range set or the
+  /// given range set, but not both.
+  ///
+  /// - Parameter other: The range set to find a symmetric difference with.
+  /// - Returns: A new range set.
   public __consuming func symmetricDifference(
     _ other: __owned RangeSet<Bound>
   ) -> RangeSet<Bound> {
     return union(other).subtracting(intersection(other))
   }
   
+  /// Returns a new set containing the contents of this range set that are not
+  /// also in the given range set.
+  ///
+  /// - Parameter other: The range set to subtract.
+  /// - Returns: A new range set.
   public func subtracting(_ other: RangeSet<Bound>) -> RangeSet<Bound> {
     var result = self
     result.subtract(other)
     return result
   }
   
+  /// Returns a Boolean value that indicates whether this range set is a
+  /// subset of the given set.
+  ///
+  /// - Parameter other: A range set to compare against.
+  /// - Returns: `true` if this range set is a subset of `other`;
+  ///   otherwise, `false`.
   public func isSubset(of other: RangeSet<Bound>) -> Bool {
     self.intersection(other) == self
   }
   
+  /// Returns a Boolean value that indicates whether this range set is a
+  /// superset of the given set.
+  ///
+  /// - Parameter other: A range set to compare against.
+  /// - Returns: `true` if this range set is a superset of `other`;
+  ///   otherwise, `false`.
   public func isSuperset(of other: RangeSet<Bound>) -> Bool {
     other.isSubset(of: self)
   }
   
+  /// Returns a Boolean value that indicates whether this range set is a
+  /// strict subset of the given set.
+  ///
+  /// - Parameter other: A range set to compare against.
+  /// - Returns: `true` if this range set is a strict subset of `other`;
+  ///   otherwise, `false`.
   public func isStrictSubset(of other: RangeSet<Bound>) -> Bool {
     self != other && isSubset(of: other)
   }
   
+  /// Returns a Boolean value that indicates whether this range set is a
+  /// strict superset of the given set.
+  ///
+  /// - Parameter other: A range set to compare against.
+  /// - Returns: `true` if this range set is a strict superset of `other`;
+  ///   otherwise, `false`.
   public func isStrictSuperset(of other: RangeSet<Bound>) -> Bool {
     other.isStrictSubset(of: self)
   }
