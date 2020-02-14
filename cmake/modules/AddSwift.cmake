@@ -690,7 +690,6 @@ endfunction()
 #     [FILE_DEPENDS target1 ...]
 #     [DONT_EMBED_BITCODE]
 #     [IS_STDLIB]
-#     [IS_STDLIB_CORE]
 #     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
 #
@@ -748,9 +747,6 @@ endfunction()
 # IS_STDLIB
 #   Install library dylib and swift module files to lib/swift.
 #
-# IS_STDLIB_CORE
-#   Compile as the standard library core.
-#
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
@@ -760,7 +756,6 @@ function(_add_swift_host_library_single target name)
   set(SWIFTLIB_SINGLE_options
         DONT_EMBED_BITCODE
         IS_STDLIB
-        IS_STDLIB_CORE
         NOSWIFTRT
         OBJECT_LIBRARY
         SHARED
@@ -871,11 +866,7 @@ function(_add_swift_host_library_single target name)
   endif()
 
   # Remove the "swift" prefix from the name to determine the module name.
-  if(SWIFTLIB_IS_STDLIB_CORE)
-    set(module_name "Swift")
-  else()
-    string(REPLACE swift "" module_name "${name}")
-  endif()
+  string(REPLACE swift "" module_name "${name}")
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
     if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
@@ -914,7 +905,6 @@ function(_add_swift_host_library_single target name)
       MODULE_NAME ${module_name}
       COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
       ${SWIFTLIB_SINGLE_IS_STDLIB_keyword}
-      ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
       ${embed_bitcode_arg}
       INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
@@ -1056,11 +1046,6 @@ function(_add_swift_host_library_single target name)
     set_target_properties("${target}" PROPERTIES
       LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
       ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
-    if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND SWIFTLIB_SINGLE_IS_STDLIB_CORE
-        AND libkind STREQUAL SHARED)
-      add_custom_command(TARGET ${target} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${target}> ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
-    endif()
 
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
       string(TOUPPER ${config} config_upper)
