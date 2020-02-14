@@ -85,11 +85,6 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
                              PRIVATE
                                swiftCore_EXPORTS)
 
-  if(SWIFT_HOST_VARIANT STREQUAL "windows")
-    target_compile_definitions(SwiftRuntimeTests PRIVATE
-      _ENABLE_EXTENDED_ALIGNED_STORAGE)
-  endif()
-
   # FIXME: cross-compile for all variants.
   target_link_libraries(SwiftRuntimeTests
     PRIVATE
