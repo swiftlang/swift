@@ -64,7 +64,6 @@ set(SWIFTLIB_ESSENTIAL
   Equatable.swift
   ErrorType.swift
   ExistentialCollection.swift
-  FieldAccessor.swift
   Filter.swift
   FixedArray.swift
   FlatMap.swift
@@ -204,7 +203,6 @@ set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
 set(SWIFTLIB_SOURCES
   ${SWIFTLIB_ESSENTIAL}
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
-  Anchored.swift
   AtomicMemoryOrderings.swift
   Availability.swift
   CollectionDifference.swift
@@ -216,9 +214,9 @@ set(SWIFTLIB_SOURCES
   SliceBuffer.swift
   SIMDVector.swift
   UnfoldSequence.swift
-  UnsafeAtomicInitializableReference.swift
+  UnsafeAtomicLazyReference.swift
   UnsafeAtomicUnmanaged.swift
-  UnsafeAtomicUnsafeMutablePointer.swift
+  UnsafeAtomicMutablePointer.swift
   VarArgs.swift
   Zip.swift
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"

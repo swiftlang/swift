@@ -179,7 +179,6 @@
     "UnsafeRawPointer.swift",
     "UnsafeBufferPointer.swift",
     "UnsafeRawBufferPointer.swift",
-    "FieldAccessor.swift"
   ],
   "Protocols": [
     "CompilerProtocols.swift",
@@ -199,15 +198,14 @@
   "Atomics": [
     "AtomicMemoryOrderings.swift",
     "RawAtomics.swift",
-    "UnsafeAtomicInitializableReference.swift",
+    "UnsafeAtomicLazyReference.swift",
     "UnsafeAtomicInt.swift",
     "UnsafeAtomicUInt.swift",
     "UnsafeAtomicUnmanaged.swift",
-    "UnsafeAtomicUnsafeMutablePointer.swift",
+    "UnsafeAtomicMutablePointer.swift",
     "LegacyAtomicInt.swift"
   ],
   "Misc": [
-    "Anchored.swift",
     "ErrorType.swift",
     "Identifiable.swift",
     "InputStream.swift",

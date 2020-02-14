@@ -36,8 +36,16 @@ public struct UnsafeAtomicUInt {
   internal let _ptr: UnsafeMutableRawPointer
 
   @_transparent // Debug performance
-  public init(_ address: UnsafeMutablePointer<UInt>) {
+  public init(at address: UnsafeMutablePointer<UInt>) {
     self._ptr = UnsafeMutableRawPointer(address)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicUInt {
+  @inlinable
+  public var address: UnsafeMutablePointer<UInt> {
+    _ptr.assumingMemoryBound(to: UInt.self)
   }
 }
 
@@ -130,11 +138,11 @@ extension UnsafeAtomicUInt {
   /// - Returns: The original value before the operation.
   @_transparent @_alwaysEmitIntoClient
   @discardableResult
-  public func fetchThen${name}(
+  public func loadThen${name}(
     ${label} operand: Int,
     ordering: AtomicUpdateOrdering
   ) -> UInt {
-    _ptr._atomicFetchThen${name}Word(${argLabel(label)}operand, ordering: ordering)
+    _ptr._atomicLoadThen${name}Word(${argLabel(label)}operand, ordering: ordering)
   }
 
   /// Perform an atomic ${doc} operation and return the new value, with
@@ -147,11 +155,11 @@ extension UnsafeAtomicUInt {
   % end
   /// - Returns: The new value after the operation.
   @_transparent @_alwaysEmitIntoClient
-  public func ${lowerFirst(name)}ThenFetch(
+  public func ${lowerFirst(name)}ThenLoad(
     ${label} operand: Int,
     ordering: AtomicUpdateOrdering
   ) -> UInt {
-    _ptr._atomicFetchThen${name}Word(
+    _ptr._atomicLoadThen${name}Word(
       ${argLabel(label)}operand,
       ordering: ordering
     ) ${op} operand
@@ -166,7 +174,7 @@ extension UnsafeAtomicUInt {
     by delta: UInt = 1,
     ordering: AtomicUpdateOrdering
   ) {
-    _ptr._atomicFetchThenWrappingIncrementWord(by: delta, ordering: ordering)
+    _ptr._atomicLoadThenWrappingIncrementWord(by: delta, ordering: ordering)
   }
 
   @_transparent @_alwaysEmitIntoClient
@@ -174,6 +182,6 @@ extension UnsafeAtomicUInt {
     by delta: UInt = 1,
     ordering: AtomicUpdateOrdering
   ) {
-    _ptr._atomicFetchThenWrappingDecrementWord(by: delta, ordering: ordering)
+    _ptr._atomicLoadThenWrappingDecrementWord(by: delta, ordering: ordering)
   }
 }

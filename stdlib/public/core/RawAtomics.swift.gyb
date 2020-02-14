@@ -285,7 +285,7 @@ extension UnsafeMutableRawPointer {
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment hook
-  func _atomic${apiOrder}FetchThen${swiftName}Word(
+  func _atomic${apiOrder}LoadThen${swiftName}Word(
     ${label} operand: UInt
   ) -> UInt {
     let value = Builtin.atomicrmw_${builtinName}_${llvmOrder}_Word(
@@ -315,19 +315,19 @@ extension UnsafeMutableRawPointer {
   @_transparent // Debug performance
   @usableFromInline
   internal
-  func _atomicFetchThen${swiftName}Word(
+  func _atomicLoadThen${swiftName}Word(
     ${label} operand: UInt,
     ordering: AtomicUpdateOrdering
   ) -> UInt {
     switch ordering {
     case .relaxed:
-      return _atomicRelaxedFetchThen${swiftName}Word(${argLabel(label)}operand)
+      return _atomicRelaxedLoadThen${swiftName}Word(${argLabel(label)}operand)
     case .acquiring:
-      return _atomicAcquiringFetchThen${swiftName}Word(${argLabel(label)}operand)
+      return _atomicAcquiringLoadThen${swiftName}Word(${argLabel(label)}operand)
     case .releasing:
-      return _atomicReleasingFetchThen${swiftName}Word(${argLabel(label)}operand)
+      return _atomicReleasingLoadThen${swiftName}Word(${argLabel(label)}operand)
     default:
-      return _atomicBarrierFetchThen${swiftName}Word(${argLabel(label)}operand)
+      return _atomicBarrierLoadThen${swiftName}Word(${argLabel(label)}operand)
     }
   }
 % end

@@ -37,8 +37,16 @@ public struct UnsafeAtomicInt {
   internal let _ptr: UnsafeMutableRawPointer
 
   @_transparent // Debug performance
-  public init(_ address: UnsafeMutablePointer<Int>) {
+  public init(at address: UnsafeMutablePointer<Int>) {
     self._ptr = UnsafeMutableRawPointer(address)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicInt {
+  @inlinable
+  public var address: UnsafeMutablePointer<Int> {
+    _ptr.assumingMemoryBound(to: Int.self)
   }
 }
 
@@ -136,12 +144,12 @@ extension UnsafeAtomicInt {
   /// - Returns: The original value before the operation.
   @_transparent @_alwaysEmitIntoClient
   @discardableResult
-  public func fetchThen${name}(
+  public func loadThen${name}(
     ${label} operand: Int,
     ordering: AtomicUpdateOrdering
   ) -> Int {
     Int(bitPattern:
-      _ptr._atomicFetchThen${name}Word(
+      _ptr._atomicLoadThen${name}Word(
         ${argLabel(label)}UInt(bitPattern: operand),
         ordering: ordering))
   }
@@ -156,11 +164,11 @@ extension UnsafeAtomicInt {
   % end
   /// - Returns: The new value after the operation.
   @_transparent @_alwaysEmitIntoClient
-  public func ${lowerFirst(name)}ThenFetch(
+  public func ${lowerFirst(name)}ThenLoad(
     ${label} operand: Int,
     ordering: AtomicUpdateOrdering
   ) -> Int {
-    fetchThen${name}(${argLabel(label)}operand, ordering: ordering) ${op} operand
+    loadThen${name}(${argLabel(label)}operand, ordering: ordering) ${op} operand
   }
 }
 % end
@@ -177,7 +185,7 @@ extension UnsafeAtomicInt {
     by delta: Int = 1,
     ordering: AtomicUpdateOrdering
   ) {
-    fetchThenWrappingIncrement(by: delta, ordering: ordering)
+    loadThenWrappingIncrement(by: delta, ordering: ordering)
   }
 
   /// Atomically decrements the current value by the specified integer, with the
@@ -190,6 +198,6 @@ extension UnsafeAtomicInt {
     by delta: Int = 1,
     ordering: AtomicUpdateOrdering
   ) {
-    fetchThenWrappingDecrement(by: delta, ordering: ordering)
+    loadThenWrappingDecrement(by: delta, ordering: ordering)
   }
 }

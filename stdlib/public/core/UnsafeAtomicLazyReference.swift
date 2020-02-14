@@ -14,7 +14,7 @@
 /// once, but read many times.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct UnsafeAtomicInitializableReference<Instance: AnyObject> {
+public struct UnsafeAtomicLazyReference<Instance: AnyObject> {
   public typealias Value = Instance?
 
   @usableFromInline
@@ -27,7 +27,15 @@ public struct UnsafeAtomicInitializableReference<Instance: AnyObject> {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicInitializableReference {
+extension UnsafeAtomicLazyReference {
+  @inlinable
+  public var address: UnsafeMutablePointer<Value> {
+    _ptr.assumingMemoryBound(to: Value.self)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicLazyReference {
   /// Atomically initializes this reference if its current value is nil, then
   /// returns the initialized value. If this reference is already initialized,
   /// then `initialize(to:)` discards its supplied argument and returns the
@@ -37,7 +45,7 @@ extension UnsafeAtomicInitializableReference {
   /// thread-safe lazily initialized reference:
   ///
   /// ```
-  /// @Anchored var _foo: UnsafeAtomicInitializableReference<Foo>
+  /// @Anchored var _foo: UnsafeAtomicLazyReference<Foo>
   ///
   /// // This is safe to call concurrently from multiple threads.
   /// var atomicLazyFoo: Foo {
@@ -73,7 +81,7 @@ extension UnsafeAtomicInitializableReference {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicInitializableReference {
+extension UnsafeAtomicLazyReference {
   /// Atomically loads and returns the current value of this reference.
   ///
   /// The load operation is performed with the memory ordering

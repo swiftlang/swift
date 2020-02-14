@@ -21,8 +21,16 @@ public struct UnsafeAtomicUnmanaged<Instance: AnyObject> {
   internal let _ptr: UnsafeMutableRawPointer
 
   @_transparent // Debug performance
-  public init(_ address: UnsafeMutablePointer<Value>) {
+  public init(at address: UnsafeMutablePointer<Value>) {
     self._ptr = UnsafeMutableRawPointer(address)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicUnmanaged {
+  @inlinable
+  public var address: UnsafeMutablePointer<Value> {
+    _ptr.assumingMemoryBound(to: Value.self)
   }
 }
 

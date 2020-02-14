@@ -14,20 +14,28 @@
 /// at a stable memory location.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct UnsafeAtomicUnsafeMutablePointer<Pointee> {
+public struct UnsafeAtomicMutablePointer<Pointee> {
   public typealias Value = UnsafeMutablePointer<Pointee>?
 
   @usableFromInline
   internal let _ptr: UnsafeMutableRawPointer
 
   @_transparent // Debug performance
-  public init(_ address: UnsafeMutablePointer<Value>) {
+  public init(at address: UnsafeMutablePointer<Value>) {
     self._ptr = UnsafeMutableRawPointer(address)
   }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicUnsafeMutablePointer {
+extension UnsafeAtomicMutablePointer {
+  @inlinable
+  public var address: UnsafeMutablePointer<Value> {
+    _ptr.assumingMemoryBound(to: Value.self)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicMutablePointer {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
@@ -39,7 +47,7 @@ extension UnsafeAtomicUnsafeMutablePointer {
 
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicUnsafeMutablePointer {
+extension UnsafeAtomicMutablePointer {
   /// Atomically sets the current value to `desired`,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
@@ -53,7 +61,7 @@ extension UnsafeAtomicUnsafeMutablePointer {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicUnsafeMutablePointer {
+extension UnsafeAtomicMutablePointer {
   /// Atomically sets the current value to `desired` and returns the previous
   /// value, with the specified memory ordering.
   ///
@@ -70,7 +78,7 @@ extension UnsafeAtomicUnsafeMutablePointer {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicUnsafeMutablePointer {
+extension UnsafeAtomicMutablePointer {
   /// Perform an atomic compare and exchange operation with
   /// the specified ordering constraints.
   ///
