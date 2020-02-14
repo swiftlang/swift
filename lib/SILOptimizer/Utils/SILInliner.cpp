@@ -875,6 +875,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::SelectValueInst:
   case SILInstructionKind::KeyPathInst:
   case SILInstructionKind::GlobalValueInst:
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
 #define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
   case SILInstructionKind::Name##ToRefInst:                                    \
   case SILInstructionKind::RefTo##Name##Inst:                                  \

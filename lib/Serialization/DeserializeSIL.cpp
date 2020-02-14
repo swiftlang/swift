@@ -2570,6 +2570,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createKeyPath(Loc, pattern, subMap, operands, kpTy);
     break;
   }
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+    StringRef mangledKey = MF->getIdentifierText(ValID);
+    auto *witness = getSILDifferentiabilityWitnessForReference(mangledKey);
+    assert(witness && "SILDifferentiabilityWitness not found");
+    DifferentiabilityWitnessFunctionKind witnessKind(Attr);
+    Optional<SILType> explicitFnTy = None;
+    auto astTy = MF->getType(TyID);
+    if (TyID)
+      explicitFnTy = getSILType(astTy, SILValueCategory::Object, Fn);
+    ResultVal = Builder.createDifferentiabilityWitnessFunction(
+        Loc, witnessKind, witness, explicitFnTy);
+    break;
+  }
   }
 
   for (auto result : ResultVal->getResults()) {

@@ -688,6 +688,11 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(InitBlockStorageHeaderInst, init_block_storage_header,
                     SingleValueInstruction, None, DoesNotRelease)
 
+  // Differentiable programming
+  SINGLE_VALUE_INST(DifferentiabilityWitnessFunctionInst,
+                    differentiability_witness_function,
+                    SingleValueInstruction, None, DoesNotRelease)
+
   // Key paths
   // TODO: The only "side effect" is potentially retaining the returned key path
   // object; is there a more specific effect?
