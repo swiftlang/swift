@@ -419,11 +419,12 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         auto derivativeGenSig = witnessAFD->getGenericSignature();
         if (supersetConfig)
           derivativeGenSig = supersetConfig->derivativeGenericSignature;
+        // Use source location of the witness declaration as the source location
+        // of the implicit `@differentiable` attribute.
         auto *newAttr = DifferentiableAttr::create(
-            witnessAFD, /*implicit*/ true, reqDiffAttr->AtLoc,
-            reqDiffAttr->getRange(), reqDiffAttr->isLinear(),
-            reqDiffAttr->getParameterIndices(), /*jvp*/ None,
-            /*vjp*/ None, derivativeGenSig);
+            witnessAFD, /*implicit*/ true, witness->getLoc(), witness->getLoc(),
+            reqDiffAttr->isLinear(), reqDiffAttr->getParameterIndices(),
+            /*jvp*/ None, /*vjp*/ None, derivativeGenSig);
         auto insertion = ctx.DifferentiableAttrs.try_emplace(
             {witnessAFD, newAttr->getParameterIndices()}, newAttr);
         // Valid `@differentiable` attributes are uniqued by original function
