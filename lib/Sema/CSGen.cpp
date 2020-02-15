@@ -2287,11 +2287,13 @@ namespace {
         return subPatternType;
       }
 
+      case PatternKind::Bool:
+        return CS.getASTContext().getBoolDecl()->getDeclaredType();
+
       // Refutable patterns occur when checking the PatternBindingDecls in an
       // if/let or while/let condition.  They always require an initial value,
       // so they always allow unspecified types.
       case PatternKind::EnumElement:
-      case PatternKind::Bool:
       case PatternKind::Expr:
         // TODO: we could try harder here, e.g. for enum elements to provide the
         // enum type.
