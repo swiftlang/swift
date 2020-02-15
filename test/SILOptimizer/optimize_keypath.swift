@@ -130,7 +130,8 @@ func testGenStructRead<T>(_ s: GenStruct<T>) -> T {
 
 // CHECK-LABEL: sil {{.*}}testGenStructWrite
 // CHECK: [[A:%[0-9]+]] = struct_element_addr %0
-// CHECK: copy_addr %1 to [[A]]
+// CHECK: destroy_addr [[A]]
+// CHECK: copy_addr {{.*}} to [initialization] [[A]]
 // CHECK: return
 @inline(never)
 @_semantics("optimize.sil.specialize.generic.never")
@@ -183,7 +184,8 @@ func testDerivedClass2Read(_ c: DerivedClass2) -> Int {
 // CHECK: [[S:%[0-9]+]] = alloc_stack $T
 // CHECK: [[E:%[0-9]+]] = ref_element_addr %0
 // CHECK: [[A:%[0-9]+]] = begin_access [modify] [dynamic] [[E]]
-// CHECK: copy_addr [take] [[S]] to [[A]]
+// CHECK: destroy_addr [[A]]
+// CHECK: copy_addr [take] [[S]] to [initialization] [[A]]
 // CHECK: end_access [[A]]
 // CHECK: return
 @inline(never)

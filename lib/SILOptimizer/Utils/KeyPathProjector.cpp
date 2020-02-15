@@ -34,6 +34,11 @@ public:
     
     void project(AccessType accessType,
                  std::function<void (SILValue)> callback) override {
+        if (accessType == AccessType::Set) {
+          // We're setting the identity key path (\.self). The callback
+          // expects an uninitialized address, so destroy the old value.
+          builder.emitDestroyAddr(loc, root);
+        }
         callback(root);
     }
     
@@ -105,7 +110,11 @@ public:
         parentAccessType = AccessType::Modify;
       
       parent->project(parentAccessType, [&](SILValue parentValue) {
-        callback(builder.createStructElementAddr(loc, parentValue, storedProperty));
+        auto addr = builder.createStructElementAddr(loc, parentValue, storedProperty);
+        // If we're setting, destroy the old value (the callback expects uninitialized memory)
+        if (accessType == AccessType::Set)
+          builder.createDestroyAddr(loc, addr);
+        callback(addr);
       });
     } else {
       // Accessing a class member -> reading the class
@@ -143,6 +152,9 @@ public:
           addr = beginAccess;
         }
         
+        // If we're setting, destroy the old value (the callback expects uninitialized memory)
+        if (accessType == AccessType::Set)
+          builder.createDestroyAddr(loc, addr);
         callback(addr);
         
         // if a child hasn't started a new access (i.e. beginAccess is unchanged),
@@ -178,8 +190,11 @@ public:
       parentAccessType = AccessType::Modify;
     
     parent->project(parentAccessType, [&](SILValue parentValue) {
-      callback(builder.createTupleElementAddr(loc, parentValue,
-                                              component.getTupleIndex()));
+      auto addr = builder.createTupleElementAddr(loc, parentValue, component.getTupleIndex());
+      // If we're setting, destroy the old value (the callback expects uninitialized memory)
+      if (accessType == AccessType::Set)
+        builder.createDestroyAddr(loc, addr);
+      callback(addr);
     });
   }
 };
