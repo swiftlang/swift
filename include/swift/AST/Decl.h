@@ -665,9 +665,10 @@ private:
     SourceLoc Loc;
     SourceLoc StartLoc;
     SourceLoc EndLoc;
+    SmallVector<CharSourceRange, 4> DocRanges;
   };
-  mutable CachedExternalSourceLocs const *CachedLocs = nullptr;
-  const CachedExternalSourceLocs *calculateSerializedLocs() const;
+  mutable CachedExternalSourceLocs const *CachedSerializedLocs = nullptr;
+  const CachedExternalSourceLocs *getSerializedLocs() const;
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
@@ -828,7 +829,7 @@ public:
   }
 
   /// \returns the unparsed comment attached to this declaration.
-  RawComment getRawComment() const;
+  RawComment getRawComment(bool SerializedOK = false) const;
 
   Optional<StringRef> getGroupName() const;
 

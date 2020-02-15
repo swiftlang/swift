@@ -522,6 +522,7 @@ void serialization::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
 namespace {
 struct DeclLocationsTableData {
   uint32_t SourceFileOffset;
+  uint32_t DocRangesOffset;
   LineColumn Loc;
   LineColumn StartLoc;
   LineColumn EndLoc;
@@ -614,13 +615,72 @@ public:
   }
 };
 
+
+/**
+ Records the locations of `SingleRawComment` pieces for a declaration
+ and emits them into a blob for the DOC_RANGES record.
+
+ See: \c decl_locs_block::DocRangesLayout
+ */
+class DocRangeWriter {
+  llvm::DenseMap<const Decl *, uint32_t> DeclOffsetMap;
+  llvm::SmallString<1024> Buffer;
+public:
+  DocRangeWriter() {
+    /**
+     Offset 0 is reserved to mean "no offset", meaning that a declaration
+     didn't have a doc comment.
+     */
+    Buffer.push_back(0);
+  }
+
+  /**
+   \returns the offset into the doc ranges buffer for a declaration. Calling this
+   twice on the same declaration will not duplicate data but return the
+   original offset.
+   */
+  uint32_t getDocRangesOffset(const Decl *D,
+      ArrayRef<std::pair<LineColumn, uint32_t>> DocRanges) {
+    if (DocRanges.empty()) {
+      return 0;
+    }
+    const auto EntryAndAlreadyFound = DeclOffsetMap.insert({ D, Buffer.size() });
+    const auto StartOffset = EntryAndAlreadyFound.first->getSecond();
+    const auto AlreadyInMap = !EntryAndAlreadyFound.second;
+    if (AlreadyInMap) {
+      return StartOffset;
+    }
+
+    llvm::raw_svector_ostream OS(Buffer);
+
+    endian::write<uint32_t>(OS, DocRanges.size(), little);
+
+    for (const auto &LineColumnAndLength : DocRanges) {
+      endian::write<uint32_t>(OS, LineColumnAndLength.first.Line, little);
+      endian::write<uint32_t>(OS, LineColumnAndLength.first.Column, little);
+      endian::write<uint32_t>(OS, LineColumnAndLength.second, little);
+    }
+
+    return StartOffset;
+  }
+
+  void emitDocRangesRecord(llvm::BitstreamWriter &Out) {
+    decl_locs_block::DocRangesLayout DocRangesBlob(Out);
+    SmallVector<uint64_t, 8> Scratch;
+    DocRangesBlob.emit(Scratch, Buffer);
+  }
+};
+
 struct BasicDeclLocsTableWriter : public ASTWalker {
   llvm::SmallString<1024> Buffer;
   DeclUSRsTableWriter &USRWriter;
   StringWriter &FWriter;
+  DocRangeWriter &DocWriter;
   BasicDeclLocsTableWriter(DeclUSRsTableWriter &USRWriter,
-                           StringWriter &FWriter): USRWriter(USRWriter),
-                           FWriter(FWriter) {}
+                           StringWriter &FWriter,
+                           DocRangeWriter &DocWriter): USRWriter(USRWriter),
+                           FWriter(FWriter),
+                           DocWriter(DocWriter) {}
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override { return { false, S };}
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override { return { false, E };}
@@ -632,6 +692,7 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     llvm::raw_svector_ostream out(Buffer);
     endian::Writer writer(out, little);
     writer.write<uint32_t>(data.SourceFileOffset);
+    writer.write<uint32_t>(data.DocRangesOffset);
 #define WRITE_LINE_COLUMN(X)                                                  \
 writer.write<uint32_t>(data.X.Line);                                          \
 writer.write<uint32_t>(data.X.Column);
@@ -668,6 +729,8 @@ writer.write<uint32_t>(data.X.Column);
     llvm::SmallString<128> AbsolutePath = Locs->SourceFilePath;
     llvm::sys::fs::make_absolute(AbsolutePath);
     Result.SourceFileOffset = FWriter.getTextOffset(AbsolutePath.str());
+    Result.DocRangesOffset = DocWriter.getDocRangesOffset(D,
+      llvm::makeArrayRef(Locs->DocRanges));
 #define COPY_LINE_COLUMN(X)                                                   \
 Result.X.Line = Locs->X.Line;                                                 \
 Result.X.Column = Locs->X.Column;
@@ -713,10 +776,11 @@ Result.X.Column = Locs->X.Column;
 static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
                                 ModuleOrSourceFile MSF,
                                 DeclUSRsTableWriter &USRWriter,
-                                StringWriter &FWriter) {
+                                StringWriter &FWriter,
+                                DocRangeWriter &DocWriter) {
   assert(MSF);
   const decl_locs_block::BasicDeclLocsLayout DeclLocsList(Out);
-  BasicDeclLocsTableWriter Writer(USRWriter, FWriter);
+  BasicDeclLocsTableWriter Writer(USRWriter, FWriter, DocWriter);
   if (auto *SF = MSF.dyn_cast<SourceFile*>()) {
     SF->walk(Writer);
   } else {
@@ -754,6 +818,7 @@ public:
     BLOCK_RECORD(decl_locs_block, BASIC_DECL_LOCS);
     BLOCK_RECORD(decl_locs_block, DECL_USRS);
     BLOCK_RECORD(decl_locs_block, TEXT_DATA);
+    BLOCK_RECORD(decl_locs_block, DOC_RANGES);
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -791,7 +856,8 @@ void serialization::writeSourceInfoToStream(raw_ostream &os,
       BCBlockRAII restoreBlock(S.Out, DECL_LOCS_BLOCK_ID, 4);
       DeclUSRsTableWriter USRWriter;
       StringWriter FPWriter;
-      emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter);
+      DocRangeWriter DocWriter;
+      emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter, DocWriter);
       // Emit USR table mapping from a USR to USR Id.
       // The basic locs record uses USR Id instead of actual USR, so that we
       // don't need to repeat USR texts for newly added records.
@@ -799,6 +865,8 @@ void serialization::writeSourceInfoToStream(raw_ostream &os,
       // A blob of 0 terminated strings referenced by the location records,
       // e.g. file paths.
       FPWriter.emitSourceFilesRecord(S.Out);
+      // A blob of fixed-size location records of `SingleRawComment` pieces.
+      DocWriter.emitDocRangesRecord(S.Out);
     }
   }
 
