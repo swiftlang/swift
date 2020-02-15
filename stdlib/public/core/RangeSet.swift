@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A set of any comparable value, represented by ranges.
+/// A set of value of any comparable type, represented by ranges.
 ///
-/// You can use a range set to efficiently represent a set `Comparable` values
-/// that spans any number of discontiguous ranges. Range sets are commonly used
-/// to represent multiple subranges of a collection, by storing ranges of a
-/// collection's index type.
+/// You can use a range set to efficiently represent a set of `Comparable`
+/// values that spans any number of discontiguous ranges. Range sets are
+/// commonly used to represent multiple subranges of a collection, by storing
+/// ranges of a collection's index type.
 ///
 /// In this example, `negativeSubranges` is a range set representing the
 /// locations of all the negative values in `numbers`:
