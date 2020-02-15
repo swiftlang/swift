@@ -1162,15 +1162,18 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
   assert(ASTStage >= Parsed || Kind == SourceFileKind::SIL);
   assert(filter && "no imports requested?");
   for (auto desc : Imports) {
-    ModuleDecl::ImportFilterKind requiredKind;
+    ModuleDecl::ImportFilter requiredFilter;
     if (desc.importOptions.contains(ImportFlags::Exported))
-      requiredKind = ModuleDecl::ImportFilterKind::Public;
+      requiredFilter |= ModuleDecl::ImportFilterKind::Public;
     else if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
-      requiredKind = ModuleDecl::ImportFilterKind::ImplementationOnly;
+      requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
     else
-      requiredKind = ModuleDecl::ImportFilterKind::Private;
+      requiredFilter |= ModuleDecl::ImportFilterKind::Private;
 
-    if (filter.contains(requiredKind))
+    if (!separatelyImportedOverlays.lookup(desc.module.second).empty())
+      requiredFilter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
+
+    if (filter.contains(requiredFilter))
       modules.push_back(desc.module);
   }
 }

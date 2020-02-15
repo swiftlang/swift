@@ -466,7 +466,11 @@ public:
     /// Include "regular" imports with no special annotation.
     Private = 1 << 1,
     /// Include imports declared with `@_implementationOnly`.
-    ImplementationOnly = 1 << 2
+    ImplementationOnly = 1 << 2,
+    /// Include imports shadowed by a separately-imported overlay (i.e. a
+    /// cross-import overlay). Unshadowed imports are included whether or not
+    /// this flag is specified.
+    ShadowedBySeparateOverlay = 1 << 4
   };
   /// \sa getImportedModules
   using ImportFilter = OptionSet<ImportFilterKind>;

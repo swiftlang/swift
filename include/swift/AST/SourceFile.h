@@ -128,6 +128,17 @@ private:
   /// The list of top-level declarations in the source file.
   std::vector<Decl *> Decls;
 
+  using SeparatelyImportedOverlayMap =
+    llvm::SmallDenseMap<ModuleDecl *, llvm::SmallPtrSet<ModuleDecl *, 1>>;
+
+  /// Keys are modules which are shadowed by one or more separately-imported
+  /// overlays; values are the list of overlays shadowing them.
+  ///
+  /// This is used by cross-import overlays to make their members appear to
+  /// be part of the underlying module. (ClangImporter overlays use a different
+  /// mechanism which is not SourceFile-dependent.)
+  SeparatelyImportedOverlayMap separatelyImportedOverlays;
+
   friend ASTContext;
   friend Impl;
 
@@ -256,6 +267,29 @@ public:
   }
 
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
+
+  /// Register a separately-imported overlay as shadowing the module that
+  /// declares it.
+  ///
+  /// \returns true if the overlay was added; false if it already existed.
+  bool addSeparatelyImportedOverlay(ModuleDecl *overlay,
+                                    ModuleDecl *declaring) {
+    return std::get<1>(separatelyImportedOverlays[declaring].insert(overlay));
+  }
+
+  /// Retrieves a list of separately imported overlays which are shadowing
+  /// \p declaring. If any \p overlays are returned, qualified lookups into
+  /// \p declaring should be performed into \p overlays instead; since they
+  /// are overlays, they will re-export \p declaring, but will also augment it
+  /// with additional symbols.
+  void getSeparatelyImportedOverlays(
+      ModuleDecl *declaring, SmallVectorImpl<ModuleDecl *> &overlays) {
+    auto i = separatelyImportedOverlays.find(declaring);
+    if (i == separatelyImportedOverlays.end()) return;
+
+    auto &value = std::get<1>(*i);
+    overlays.append(value.begin(), value.end());
+  }
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;

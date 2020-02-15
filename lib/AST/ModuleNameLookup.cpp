@@ -127,6 +127,20 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
     const DeclContext *moduleScopeContext) {
   assert(moduleOrFile->isModuleScopeContext());
 
+  // Does the module scope have any separately-imported overlays shadowing
+  // the module we're looking into?
+  SmallVector<ModuleDecl *, 4> overlays;
+  moduleScopeContext->getSeparatelyImportedOverlays(
+      moduleOrFile->getParentModule(), overlays);
+  if (!overlays.empty()) {
+    // If so, look in each of those overlays.
+    for (auto overlay : overlays)
+      lookupInModule(decls, overlay, accessPath, moduleScopeContext);
+    // FIXME: This may not work gracefully if more than one of these lookups
+    // finds something.
+    return;
+  }
+
   const size_t initialCount = decls.size();
   size_t currentCount = decls.size();
 

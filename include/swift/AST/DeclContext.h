@@ -578,6 +578,14 @@ public:
                        SmallVectorImpl<ConformanceDiagnostic> *diagnostics
                          = nullptr) const;
 
+  /// Retrieves a list of separately imported overlays which are shadowing
+  /// \p declaring. If any \p overlays are returned, qualified lookups into
+  /// \p declaring should be performed into \p overlays instead; since they
+  /// are overlays, they will re-export \p declaring, but will also augment it
+  /// with additional symbols.
+  void getSeparatelyImportedOverlays(
+      ModuleDecl *declaring, SmallVectorImpl<ModuleDecl *> &overlays) const;
+
   /// Retrieve the syntactic depth of this declaration context, i.e.,
   /// the number of non-module-scoped contexts.
   ///

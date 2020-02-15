@@ -883,6 +883,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     // Only collect implementation-only dependencies from the main module.
     ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   }
+  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
   TopMod->getImportedModules(Imports, ImportFilter);
 
