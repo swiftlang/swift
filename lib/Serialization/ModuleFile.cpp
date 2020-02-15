@@ -2813,3 +2813,13 @@ ClassDecl *SerializedASTFile::getMainClass() const {
 const version::Version &SerializedASTFile::getLanguageVersionBuiltWith() const {
   return File.CompatibilityVersion;
 }
+
+StringRef SerializedASTFile::getModuleDefiningPath() const {
+  StringRef moduleFilename = getFilename();
+  StringRef parentDir = llvm::sys::path::parent_path(moduleFilename);
+
+  if (llvm::sys::path::extension(parentDir) == ".swiftmodule")
+    return parentDir;
+
+  return moduleFilename;
+}

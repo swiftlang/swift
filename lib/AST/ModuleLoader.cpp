@@ -14,7 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/Basic/FileTypes.h"
+#include "swift/Basic/Platform.h"
 #include "clang/Frontend/Utils.h"
 #include "swift/ClangImporter/ClangImporter.h"
 
@@ -52,6 +57,75 @@ DependencyTracker::getDependencies() const {
 std::shared_ptr<clang::DependencyCollector>
 DependencyTracker::getClangCollector() {
   return clangCollector;
+}
+
+static bool findOverlayFilesInDirectory(SourceLoc diagLoc, StringRef path,
+                                        ModuleDecl *module,
+                                        DependencyTracker * const tracker) {
+  using namespace llvm::sys;
+  using namespace file_types;
+
+  ASTContext &ctx = module->getASTContext();
+  auto fs = ctx.SourceMgr.getFileSystem();
+
+  std::error_code error;
+  for (auto dir = fs->dir_begin(path, error);
+       !error && dir != llvm::vfs::directory_iterator();
+       dir.increment(error)) {
+    StringRef file = dir->path();
+    if (lookupTypeForExtension(path::extension(file)) != TY_SwiftOverlayFile)
+      continue;
+
+    module->addCrossImportOverlayFile(file);
+
+    // FIXME: Better to add it only if we load it.
+    if (tracker)
+      tracker->addDependency(file, module->isSystemModule());
+  }
+
+  if (error && error != std::errc::no_such_file_or_directory) {
+    ctx.Diags.diagnose(diagLoc, diag::cannot_list_swiftcrossimport_dir,
+                       module->getName(), error.message(), path);
+  }
+  return !error;
+}
+
+void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
+                                    FileUnit *file) {
+  using namespace llvm::sys;
+  using namespace file_types;
+
+  auto &langOpts = module->getASTContext().LangOpts;
+
+  SmallString<64> dirPath{file->getModuleDefiningPath()};
+
+  if (dirPath.empty())
+    return;
+  path::remove_filename(dirPath);
+
+  // <parent-dir>/<module-name>.swiftcrossimport
+  path::append(dirPath, file->getExportedModuleName());
+  path::replace_extension(dirPath, getExtension(TY_SwiftCrossImportDir));
+  if (!findOverlayFilesInDirectory(diagLoc, dirPath, module, dependencyTracker))
+    // If we diagnosed an error, or we didn't find the directory at all, don't
+    // bother trying the target-specific directories.
+    return;
+
+  // <parent-dir>/<module-name>.swiftcrossimport/<target-module-triple>
+  auto moduleTriple = getTargetSpecificModuleTriple(langOpts.Target);
+  path::append(dirPath, moduleTriple.str());
+  findOverlayFilesInDirectory(diagLoc, dirPath, module, dependencyTracker);
+
+  if (!langOpts.TargetVariant)
+    return;
+
+  path::remove_filename(dirPath);
+
+  // <parent-dir>/<module-name>.swiftcrossimport/<targetvariant-module-triple>
+  auto moduleVariantTriple =
+      getTargetSpecificModuleTriple(*langOpts.TargetVariant);
+  path::append(dirPath, moduleVariantTriple.str());
+  findOverlayFilesInDirectory(diagLoc, dirPath, module, dependencyTracker);
 }
 
 } // namespace swift

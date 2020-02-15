@@ -1455,6 +1455,189 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
 }
 
 //===----------------------------------------------------------------------===//
+// Cross-Import Overlays
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+/// Represents a file containing information about cross-module overlays.
+class OverlayFile {
+  /// If not empty, contains the name of the cross-import file that must be
+  /// loaded; \c overlayModuleNames is not valid and must be empty.
+  ///
+  /// If empty, \c overlayModuleNames is valid and will contain the list of
+  /// module names unless loading the file failed.
+  StringRef filePath;
+
+  /// The list of module names; empty if loading failed.
+  llvm::TinyPtrVector<Identifier> overlayModuleNames;
+
+  /// Actually loads the overlay module name list. This should mutate
+  /// \c overlayModuleNames, but not \c filePath.
+  void loadOverlayModuleNames(ModuleDecl *M, SourceLoc diagLoc,
+                              Identifier bystandingModule);
+
+public:
+  // Only allocate in ASTContexts.
+  void *operator new(size_t bytes) = delete;
+  void *operator new(size_t bytes, const ASTContext &ctx,
+                     unsigned alignment = alignof(OverlayFile)) {
+    return ctx.Allocate(bytes, alignment);
+  }
+
+  OverlayFile(StringRef filePath)
+    : filePath(filePath), overlayModuleNames() { }
+
+  /// Returns the list of additional modules that should be imported if both
+  /// the primary and secondary modules have been imported. This may load a
+  /// file; if so, it will diagnose any errors itself and arrange for the file
+  /// to not be loaded again.
+  ///
+  /// The result can be empty, either because of an error or because the file
+  /// didn't contain any overlay module names.
+  ArrayRef<Identifier> getOverlayModuleNames(ModuleDecl *M, SourceLoc diagLoc,
+                                             Identifier bystandingModule) {
+    if (!filePath.empty()) {
+      assert(overlayModuleNames.empty()
+             && "cross-import list can't be full before loading");
+      loadOverlayModuleNames(M, diagLoc, bystandingModule);
+      filePath = "";
+    }
+    return overlayModuleNames;
+  }
+};
+}
+
+void ModuleDecl::addCrossImportOverlayFile(StringRef file) {
+  auto &ctx = getASTContext();
+
+  Identifier secondaryModule = ctx.getIdentifier(llvm::sys::path::stem(file));
+  declaredCrossImports[secondaryModule]
+      .push_back(new (ctx) OverlayFile(ctx.AllocateCopy(file)));
+}
+
+void ModuleDecl::
+findDeclaredCrossImportOverlays(Identifier bystanderName,
+                                SmallVectorImpl<Identifier> &overlayNames,
+                                SourceLoc diagLoc) {
+  if (getName() == bystanderName)
+    // We don't currently support self-cross-imports.
+    return;
+
+  for (auto &crossImportFile : declaredCrossImports[bystanderName])
+    llvm::copy(crossImportFile->getOverlayModuleNames(this, diagLoc,
+                                                      bystanderName),
+               std::back_inserter(overlayNames));
+}
+
+void ModuleDecl::getDeclaredCrossImportBystanders(
+    SmallVectorImpl<Identifier> &otherModules) {
+  for (auto &pair : declaredCrossImports)
+    otherModules.push_back(std::get<0>(pair));
+}
+
+namespace {
+struct OverlayFileContents {
+  struct Module {
+    std::string name;
+  };
+
+  unsigned version;
+  std::vector<Module> modules;
+
+  static llvm::ErrorOr<OverlayFileContents>
+  load(std::unique_ptr<llvm::MemoryBuffer> input,
+       SmallVectorImpl<std::string> &errorMessages);
+};
+} // end anonymous namespace
+
+namespace llvm {
+namespace yaml {
+template <>
+struct MappingTraits<OverlayFileContents::Module> {
+  static void mapping(IO &io, OverlayFileContents::Module &module) {
+    io.mapRequired("name", module.name);
+  }
+};
+
+template <>
+struct SequenceElementTraits<OverlayFileContents::Module> {
+  static const bool flow = false;
+};
+
+template <>
+struct MappingTraits<OverlayFileContents> {
+  static void mapping(IO &io, OverlayFileContents &contents) {
+    io.mapRequired("version", contents.version);
+    io.mapRequired("modules", contents.modules);
+  }
+};
+}
+} // end namespace 'llvm'
+
+static void pushYAMLError(const llvm::SMDiagnostic &diag, void *Context) {
+  auto &errorMessages = *static_cast<SmallVectorImpl<std::string> *>(Context);
+  errorMessages.emplace_back(diag.getMessage());
+}
+
+llvm::ErrorOr<OverlayFileContents>
+OverlayFileContents::load(std::unique_ptr<llvm::MemoryBuffer> input,
+                          SmallVectorImpl<std::string> &errorMessages) {
+  llvm::yaml::Input yamlInput(input->getBuffer(), /*Ctxt=*/nullptr,
+                              pushYAMLError, &errorMessages);
+  OverlayFileContents contents;
+  yamlInput >> contents;
+
+  if (auto error = yamlInput.error())
+    return error;
+
+  if (contents.version > 1) {
+    auto message = Twine("key 'version' has invalid value: ") + Twine(contents.version);
+    errorMessages.push_back(message.str());
+    return make_error_code(std::errc::result_out_of_range);
+  }
+
+  return contents;
+}
+
+void OverlayFile::loadOverlayModuleNames(ModuleDecl *M, SourceLoc diagLoc,
+                                         Identifier bystanderName) {
+  assert(!filePath.empty());
+
+  auto &ctx = M->getASTContext();
+  llvm::vfs::FileSystem &fs = *ctx.SourceMgr.getFileSystem();
+
+  auto bufOrError = fs.getBufferForFile(filePath);
+  if (!bufOrError) {
+    M->getASTContext().Diags
+        .diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
+                  M->getName(), bystanderName, bufOrError.getError().message(),
+                  filePath);
+    return;
+  }
+
+  SmallVector<std::string, 4> errorMessages;
+  auto contentsOrErr = OverlayFileContents::load(std::move(bufOrError.get()),
+                                                 errorMessages);
+  if (!contentsOrErr) {
+    if (errorMessages.empty())
+      errorMessages.push_back(contentsOrErr.getError().message());
+
+    for (auto message : errorMessages)
+      M->getASTContext().Diags
+          .diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
+                    M->getName(), bystanderName, message, filePath);
+    return;
+  }
+
+  auto contents = std::move(*contentsOrErr);
+
+  for (const auto &module : contents.modules) {
+    auto moduleIdent = ctx.getIdentifier(module.name);
+    overlayModuleNames.push_back(moduleIdent);
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // SourceFile Implementation
 //===----------------------------------------------------------------------===//
 

@@ -124,6 +124,8 @@ enum class ResilienceStrategy : unsigned {
   Resilient
 };
 
+class OverlayFile;
+
 /// The minimum unit of compilation.
 ///
 /// A module is made up of several file-units, which are all part of the same
@@ -203,6 +205,10 @@ private:
 
   SmallVector<FileUnit *, 2> Files;
 
+  friend OverlayFile;
+  llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
+    declaredCrossImports;
+
   std::unique_ptr<SourceLookupCache> Cache;
   SourceLookupCache &getSourceLookupCache() const;
 
@@ -251,6 +257,22 @@ public:
   bool isClangModule() const;
   void addFile(FileUnit &newFile);
   void removeFile(FileUnit &existingFile);
+
+  /// Add a file declaring a cross-import overlay.
+  void addCrossImportOverlayFile(StringRef file);
+
+  /// Append to \p overlayNames the names of all modules that this module
+  /// declares should be imported when \p bystanderName is imported.
+  ///
+  /// This operation is asymmetric: you will get different results if you
+  /// reverse the positions of the two modules involved in the cross-import.
+  void findDeclaredCrossImportOverlays(
+      Identifier bystanderName, SmallVectorImpl<Identifier> &overlayNames,
+      SourceLoc diagLoc);
+
+  /// Get the list of all modules this module declares a cross-import with.
+  void getDeclaredCrossImportBystanders(
+      SmallVectorImpl<Identifier> &bystanderNames);
 
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
