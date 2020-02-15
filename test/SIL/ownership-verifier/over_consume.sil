@@ -182,7 +182,7 @@ bb0(%0 : @owned $RefWithInt):
 // CHECK-LABEL: Function: 'unchecked_enum_data_propagates_ownership'
 // CHECK: Found over consume?!
 // CHECK: Value: %0 = argument of bb0 : $Optional<Builtin.NativeObject>
-// CHECK: User: destroy_value %0 : $Optional<Builtin.NativeObject>
+// CHECK: User:   %1 = unchecked_enum_data %0 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
 // CHECK: Block: bb0
 sil [ossa] @unchecked_enum_data_propagates_ownership : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $Optional<Builtin.NativeObject>):
