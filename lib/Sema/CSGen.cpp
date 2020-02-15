@@ -2198,6 +2198,13 @@ namespace {
     ///
     /// \param pattern The pattern.
     Type getTypeForPattern(Pattern *pattern, ConstraintLocatorBuilder locator) {
+      // If there's no pattern, then we have an unknown subpattern. Create a
+      // type variable.
+      if (!pattern) {
+        return CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                     TVO_CanBindToNoEscape);
+      }
+
       switch (pattern->getKind()) {
       case PatternKind::Paren:
         // Parentheses don't affect the type.
@@ -2264,10 +2271,25 @@ namespace {
         return OptionalType::get(subPatternType);
       }
 
+      case PatternKind::Is: {
+        auto isPattern = cast<IsPattern>(pattern);
+        Type subPatternType =
+            getTypeForPattern(isPattern->getSubPattern(), locator);
+
+        // Make sure we can cast from the subpattern type to the type we're
+        // checking; if it's impossible, fail.
+        if (Type castType =
+                resolveTypeReferenceInExpression(isPattern->getCastTypeLoc())) {
+          CS.addConstraint(
+              ConstraintKind::CheckedCast, subPatternType, castType, locator);
+        }
+
+        return subPatternType;
+      }
+
       // Refutable patterns occur when checking the PatternBindingDecls in an
       // if/let or while/let condition.  They always require an initial value,
       // so they always allow unspecified types.
-      case PatternKind::Is:
       case PatternKind::EnumElement:
       case PatternKind::Bool:
       case PatternKind::Expr:
