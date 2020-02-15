@@ -2329,6 +2329,15 @@ ConstraintSystem::matchTypesBindTypeVar(
       // instead of re-trying it and failing later.
       if (typeVar->getImpl().canBindToHole() && !type->hasTypeVariable())
         return getTypeMatchSuccess();
+
+      // Just like in cases where both sides are dependent member types
+      // with resolved base that can't be simplified to a concrete type
+      // let's ignore this mismatch and mark affected type variable as a hole
+      // because something else has to be fixed already for this to happen.
+      if (type->is<DependentMemberType>() && !type->hasTypeVariable()) {
+        recordPotentialHole(typeVar);
+        return getTypeMatchSuccess();
+      }
     }
 
     return formUnsolvedResult();
