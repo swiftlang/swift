@@ -54,7 +54,10 @@ public:
     /// elsewhere.
     ///
     /// Mutually exclusive with Exported.
-    ImplementationOnly = 0x8
+    ImplementationOnly = 0x8,
+
+    /// Used for DenseMap.
+    Reserved = 0x80
   };
 
   /// \see ImportFlags
@@ -69,7 +72,8 @@ public:
                        StringRef filename = {})
         : module(module), importOptions(options), filename(filename) {
       assert(!(importOptions.contains(ImportFlags::Exported) &&
-               importOptions.contains(ImportFlags::ImplementationOnly)));
+               importOptions.contains(ImportFlags::ImplementationOnly)) ||
+             importOptions.contains(ImportFlags::Reserved));
     }
   };
 
@@ -541,5 +545,59 @@ inline void simple_display(llvm::raw_ostream &out, const SourceFile *SF) {
   out << "source_file " << '\"' << SF->getFilename() << '\"';
 }
 } // end namespace swift
+
+namespace llvm {
+
+template<>
+struct DenseMapInfo<swift::SourceFile::ImportOptions> {
+  using ImportOptions = swift::SourceFile::ImportOptions;
+
+  using UnsignedDMI = DenseMapInfo<uint8_t>;
+
+  static inline ImportOptions getEmptyKey() {
+    return ImportOptions(UnsignedDMI::getEmptyKey());
+  }
+  static inline ImportOptions getTombstoneKey() {
+    return ImportOptions(UnsignedDMI::getTombstoneKey());
+  }
+  static inline unsigned getHashValue(ImportOptions options) {
+    return UnsignedDMI::getHashValue(options.toRaw());
+  }
+  static bool isEqual(ImportOptions a, ImportOptions b) {
+    return UnsignedDMI::isEqual(a.toRaw(), b.toRaw());
+  }
+};
+
+template<>
+struct DenseMapInfo<swift::SourceFile::ImportedModuleDesc> {
+  using ImportedModuleDesc = swift::SourceFile::ImportedModuleDesc;
+
+  using ImportedModuleDMI = DenseMapInfo<swift::ModuleDecl::ImportedModule>;
+  using ImportOptionsDMI = DenseMapInfo<swift::SourceFile::ImportOptions>;
+  using StringRefDMI = DenseMapInfo<StringRef>;
+
+  static inline ImportedModuleDesc getEmptyKey() {
+    return ImportedModuleDesc(ImportedModuleDMI::getEmptyKey(),
+                              ImportOptionsDMI::getEmptyKey(),
+                              StringRefDMI::getEmptyKey());
+  }
+  static inline ImportedModuleDesc getTombstoneKey() {
+    return ImportedModuleDesc(ImportedModuleDMI::getTombstoneKey(),
+                              ImportOptionsDMI::getTombstoneKey(),
+                              StringRefDMI::getTombstoneKey());
+  }
+  static inline unsigned getHashValue(const ImportedModuleDesc &import) {
+    return combineHashValue(ImportedModuleDMI::getHashValue(import.module),
+           combineHashValue(ImportOptionsDMI::getHashValue(import.importOptions),
+                            StringRefDMI::getHashValue(import.filename)));
+  }
+  static bool isEqual(const ImportedModuleDesc &a,
+                      const ImportedModuleDesc &b) {
+    return ImportedModuleDMI::isEqual(a.module, b.module) &&
+           ImportOptionsDMI::isEqual(a.importOptions, b.importOptions) &&
+           StringRefDMI::isEqual(a.filename, b.filename);
+  }
+};
+}
 
 #endif
