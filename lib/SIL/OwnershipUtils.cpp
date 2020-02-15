@@ -122,6 +122,27 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os;
 }
 
+void BorrowScopeOperand::visitEndScopeInstructions(
+    function_ref<void(Operand *)> func) const {
+  switch (kind) {
+  case BorrowScopeOperandKind::BeginBorrow:
+    for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
+      if (isa<EndBorrowInst>(use->getUser())) {
+        func(use);
+      }
+    }
+    return;
+  case BorrowScopeOperandKind::BeginApply: {
+    auto *user = cast<BeginApplyInst>(op->getUser());
+    for (auto *use : user->getTokenResult()->getUses()) {
+      func(use);
+    }
+    return;
+  }
+  }
+  llvm_unreachable("Covered switch isn't covered");
+}
+
 //===----------------------------------------------------------------------===//
 //                             Borrow Introducers
 //===----------------------------------------------------------------------===//
@@ -139,6 +160,12 @@ void BorrowScopeIntroducingValueKind::print(llvm::raw_ostream &os) const {
     return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
+}
+
+void BorrowScopeIntroducingValue::print(llvm::raw_ostream &os) const {
+  os << "BorrowScopeIntroducingValue:\n"
+    "Kind: " << kind << "\n"
+    "Value: " << value;
 }
 
 void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
