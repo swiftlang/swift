@@ -383,6 +383,7 @@ module SwiftGlibc [system] {
       export *
     }
 % end
+% if CMAKE_SDK != "WASI":
     module pwd {
       header "${GLIBC_INCLUDE_PATH}/pwd.h"
       export *
@@ -514,7 +515,6 @@ module SwiftGlibc [system] {
       }
 % end
     }
-% end
 % if CMAKE_SDK in ["LINUX", "FREEBSD"]:
     module sysexits {
       header "${GLIBC_INCLUDE_PATH}/sysexits.h"
@@ -538,7 +538,6 @@ module SwiftGlibc [system] {
     }
 % end
   }
-% end
 }
 
 % if CMAKE_SDK != "WASI":
