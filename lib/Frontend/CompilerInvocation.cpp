@@ -546,7 +546,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableCrossImportOverlays =
       Args.hasFlag(OPT_enable_cross_import_overlays,
                    OPT_disable_cross_import_overlays,
-                   false);
+                   Opts.EnableCrossImportOverlays);
 
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
