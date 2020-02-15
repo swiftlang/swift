@@ -219,13 +219,13 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
     return false;
 
   SILValue keyPath, rootAddr, valueAddr;
-  bool isModify = false;
+  bool isSet = false;
   if (callee->getName() == "swift_setAtWritableKeyPath" ||
       callee->getName() == "swift_setAtReferenceWritableKeyPath") {
     keyPath = AI->getArgument(1);
     rootAddr = AI->getArgument(0);
     valueAddr = AI->getArgument(2);
-    isModify = true;
+    isSet = true;
   } else if (callee->getName() == "swift_getAtKeyPath") {
     keyPath = AI->getArgument(2);
     rootAddr = AI->getArgument(1);
@@ -240,13 +240,13 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
     return false;
   
   KeyPathProjector::AccessType accessType;
-  if (isModify) accessType = KeyPathProjector::AccessType::Set;
+  if (isSet) accessType = KeyPathProjector::AccessType::Set;
   else accessType = KeyPathProjector::AccessType::Get;
   
   projector->project(accessType, [&](SILValue projectedAddr) {
-    if (isModify) {
+    if (isSet) {
       Builder.createCopyAddr(AI->getLoc(), valueAddr, projectedAddr,
-                             IsTake, IsNotInitialization);
+                             IsTake, IsInitialization);
     } else {
       Builder.createCopyAddr(AI->getLoc(), projectedAddr, valueAddr,
                              IsNotTake, IsInitialization);

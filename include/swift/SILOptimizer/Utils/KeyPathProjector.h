@@ -58,6 +58,9 @@ public:
   /// \param accessType The access type of the projected address.
   /// \param callback A callback to invoke with the projected adddress.
   ///     The projected address is only valid from within \p callback.
+  ///     If accessType is Get or Modify, the projected addres is an
+  ///     initialized address type. If accessType is set, the projected
+  ///     address points to uninitialized memory.
   virtual void project(AccessType accessType,
                std::function<void(SILValue addr)> callback) = 0;
     
