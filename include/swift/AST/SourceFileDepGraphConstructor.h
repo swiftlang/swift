@@ -17,9 +17,10 @@
 
 namespace swift {
 namespace fine_grained_dependencies {
-/// Reads the information provided by the frontend and builds the
-/// SourceFileDepGraph
+/// Abstract class for building a \c SourceFileDepGraph from either a real
+/// \c SourceFile or a unit test
 class SourceFileDepGraphConstructor {
+protected:
   /// To match the existing system, set this to false.
   /// To include even private entities and get intra-file info, set to true.
   const bool includePrivateDeps;
@@ -27,114 +28,142 @@ class SourceFileDepGraphConstructor {
   /// If there was an error, cannot get accurate info.
   const bool hadCompilationError;
 
-public:
-  /// A lambda which invokes its parameter for every unconstrained \c Decl used
-  /// in the source file, passing in the base name, and whether this use
-  /// cascades..
-  using ForEachUnconstrainedDeclUsed =
-      function_ref<void(function_ref<void(StringRef, bool)>)>;
+  /// The name of the swiftDeps file.
+  const std::string swiftDeps;
 
-  /// A lambda which invokes its parameter for every constrained \c Decl used in
-  /// the source file, passing in the manged type name of the holder, the member
-  /// base name, whether the holder is private to its source file, and whether
-  /// the use cascades. If the baseName is empty, this entry will be a \c
-  /// potentialMember dependency.
-  using ForEachConstrainedDeclUsed =
-      function_ref<void(function_ref<void(StringRef, StringRef, bool, bool)>)>;
+  /// The fingerprint of the whole file
+  const std::string fileFingerprint;
 
-  /// Adds nodes to the graph corresponding to a defined \c Decl.
-  /// Parameters are an interface key (implementation node will also be added)
-  /// and the fingerprint if any.
-  using AddDefinedDecl =
-      function_ref<void(const DependencyKey &, Optional<StringRef>)>;
+  /// For debugging
+  const bool emitDotFileAfterConstruction;
 
-  /// A lambda which invokes its parameter for every mock \c Decl "defined" in
-  /// the source file, passing in to its argument the \c NodeKind, \c context,
-  /// and \c name fields of resulting \c DependencyKey pair, and also the
-  /// fingerprint (if present) of the resulting node pair.
-  using ForEachDefinedDecl = function_ref<void(AddDefinedDecl)>;
+  DiagnosticEngine &diags;
 
-  /// A lambda which invokes its parameter for every  use of a \c Decl in the
-  /// source file, passing in to its argument the \c DependencyKey used, and the
-  /// \c DependencyKey doing the using. (A.k.a. a "def" and an a "use".
-  using ForEachUsedDecl = function_ref<void(
-      function_ref<void(const DependencyKey &, const DependencyKey &)>)>;
-
-private:
   /// Graph under construction
   SourceFileDepGraph g;
 
 public:
   /// Expose this layer to enable faking up a constructor for testing.
   /// See the instance variable comments for explanation.
-  // clang-format off
-  SourceFileDepGraphConstructor(
-    bool includePrivateDeps,
-    bool hadCompilationError
-    ) :
-    includePrivateDeps(includePrivateDeps),
-    hadCompilationError(hadCompilationError)
-    {} // clang-format on
+  SourceFileDepGraphConstructor(bool includePrivateDeps,
+                                bool hadCompilationError, StringRef swiftDeps,
+                                StringRef fileFingerprint,
+                                bool emitDotFileAfterConstruction,
+                                DiagnosticEngine &diags);
+
+  virtual ~SourceFileDepGraphConstructor() = default;
 
   /// Create a SourceFileDepGraph.
-  ///
-  /// \param swiftDeps The "output path name" and \c sourceFileProvide node
-  /// names \param interfaceHash The fingerprint for the \c sourceFileProvide
-  /// nodes. \param forEachMockDefinedDecl Iterator for "provides", i.e.
-  /// definitions in this file \param forEachMockUsedDecl Iterator for
-  /// "depends", i.e. used definitions in this file
-  SourceFileDepGraph construct(StringRef swiftDeps, StringRef interfaceHash,
-                               ForEachDefinedDecl forEachDefinedDecl,
-                               ForEachUsedDecl forEachUsedDecl) {
-
-    return addSourceFileNodesAndThen(swiftDeps, interfaceHash, [&] {
-      addAllDefinedDecls(forEachDefinedDecl);
-      addAllUsedDecls(forEachUsedDecl);
-    });
-  }
-
-  /// Centralize the invariant that the fingerprint of the whole file is the
-  /// interface hash
-  static std::string getFingerprint(SourceFile *SF);
-
-  void enumerateDefinedDecls(SourceFile *SF, AddDefinedDecl addDefinedDeclFn);
+  SourceFileDepGraph construct();
 
 private:
-  /// Add the first two nodes in the graph and then, if there is no compilation
-  /// error, do rest of the work to build the graph.
-  SourceFileDepGraph addSourceFileNodesAndThen(StringRef name,
-                                               StringRef fingerprint,
-                                               function_ref<void()> doTheRest);
+  void addSourceFileNodesToGraph();
 
   /// Add the "provides" nodes when mocking up a graph
-  void addAllDefinedDecls(ForEachDefinedDecl forEachDefinedDecl);
+  virtual void addAllDefinedDecls() = 0;
 
   /// Add the "depends" nodes and arcs when mocking a graph
-  void addAllUsedDecls(ForEachUsedDecl forEachUsedDecl);
+  virtual void addAllUsedDecls() = 0;
+
+protected:
+  /// Add an pair of interface, implementation nodes to the graph, which
+  /// represent some \c Decl defined in this source file. \param key the
+  /// interface key of the pair
+  void addADefinedDecl(const DependencyKey &key,
+                       Optional<StringRef> fingerprint);
+
+  void addAUsedDecl(const DependencyKey &def, const DependencyKey &use);
+};
+
+/// Constructs a SourceFileDepGraph from a *real* \c SourceFile
+/// Reads the information provided by the frontend and builds the
+/// SourceFileDepGraph
+
+class RealSourceFileDepGraphConstructor : public SourceFileDepGraphConstructor {
+  SourceFile *const SF;
+  const DependencyTracker &depTracker;
+
+public:
+  RealSourceFileDepGraphConstructor(SourceFile *SF, StringRef outputPath,
+                                    const DependencyTracker &depTracker,
+                                    bool alsoEmitDotFile);
+
+  ~RealSourceFileDepGraphConstructor() override = default;
+
+private:
+  static std::string getFingerprint(SourceFile *SF);
+
+  static bool computeIncludePrivateDeps(SourceFile *SF);
+  static std::string getInterfaceHash(SourceFile *SF);
+
+  void addAllDefinedDecls() override;
+  void addAllUsedDecls() override;
+
+  /// Given an array of Decls or pairs of them in \p declsOrPairs
+  /// create node pairs for context and name
+  template <NodeKind kind, typename ContentsT>
+  void addAllDefinedDeclsOfAGivenType(std::vector<ContentsT> &contentsVec);
 
   /// At present, only nominals, protocols, and extensions have (body)
   /// fingerprints
   static Optional<std::string>
   getFingerprintIfAny(std::pair<const NominalTypeDecl *, const ValueDecl *>);
-
   static Optional<std::string> getFingerprintIfAny(const Decl *d);
+};
 
-  static std::string getInterfaceHash(SourceFile *SF);
+using DependencyDescriptions =
+    std::unordered_multimap<NodeKind, std::vector<std::string>>;
 
-  void addSourceFileNodesToGraph(StringRef swiftDeps, StringRef fingerprint);
+class MockSourceFileDepGraphConstructor : public SourceFileDepGraphConstructor {
+  const DependencyDescriptions dependencyDescriptions;
 
-  /// Given an array of Decls or pairs of them in \p declsOrPairs
-  /// create node pairs for context and name
-  template <NodeKind kind, typename ContentsT>
-  void
-  enumerateAllProviderNodesOfAGivenType(std::vector<ContentsT> &contentsVec,
-                                        AddDefinedDecl addDefinedDeclFn);
+public:
+  MockSourceFileDepGraphConstructor(
+      bool includePrivateDeps, bool hadCompilationError, StringRef swiftDeps,
+      StringRef fileFingerprint, bool emitDotFileAfterConstruction,
+      const DependencyDescriptions &dependencyDescriptions,
+      DiagnosticEngine &diags)
+      : SourceFileDepGraphConstructor(includePrivateDeps, hadCompilationError,
+                                      swiftDeps, fileFingerprint,
+                                      emitDotFileAfterConstruction, diags),
+        dependencyDescriptions(dependencyDescriptions) {}
 
-  /// Add an pair of interface, implementation nodes to the graph, which
-  /// represent some \c Decl defined in this source file. \param key the
-  /// interface key of the pair
-  void addDefinedDecl(const DependencyKey &key,
-                      Optional<StringRef> fingerprint);
+  ~MockSourceFileDepGraphConstructor() override = default;
+
+private:
+  void addAllDefinedDecls() override;
+  void addAllUsedDecls() override;
+
+  /// For brevity, unit tests specify dependencies by NodeKind,
+  /// but for processing, the kind is needed for each entry.
+  void forEachEntry(function_ref<void(NodeKind kind, StringRef entry)> fn);
+
+  static const char *defUseSeparator;
+  static bool isADefinedDecl(StringRef s);
+
+  void addADefinedDecl(StringRef s, NodeKind kind);
+  void addAUsedDecl(StringRef s, NodeKind kind);
+
+  Optional<std::pair<DependencyKey, DependencyKey>> parseAUsedDecl(StringRef s,
+                                                                   NodeKind);
+
+  /// Parse and return an interface \c DependencyKey
+  Optional<DependencyKey> parseADefinedDecl(StringRef s, NodeKind, DeclAspect);
+
+  DependencyKey computeUseKey(StringRef s, bool isCascadingUse);
+
+  /// Return true if when the name appears in a unit test, it represents a
+  /// context, not a baseName. Return false if a single name is a baseName,
+  /// without context Return None if there shoud be two names
+  static Optional<bool> singleNameIsContext(NodeKind kind);
+
+  static constexpr char nameContextSeparator = ',';
+
+  static constexpr char fingerprintSeparator = '@';
+
+  static std::string parseContext(const StringRef s, const NodeKind kind);
+
+  static std::string parseName(const StringRef s, const NodeKind kind);
 };
 
 } // namespace fine_grained_dependencies

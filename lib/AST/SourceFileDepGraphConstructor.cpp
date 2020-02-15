@@ -48,6 +48,68 @@ using namespace swift;
 using namespace fine_grained_dependencies;
 
 //==============================================================================
+// MARK: SourceFileDepGraphConstructor - client interface
+//==============================================================================
+
+SourceFileDepGraphConstructor::SourceFileDepGraphConstructor(
+    bool includePrivateDeps, bool hadCompilationError, StringRef swiftDeps,
+    StringRef fileFingerprint, bool emitDotFileAfterConstruction,
+    DiagnosticEngine &diags)
+    : includePrivateDeps(includePrivateDeps),
+      hadCompilationError(hadCompilationError), swiftDeps(swiftDeps.str()),
+      fileFingerprint(fileFingerprint.str()),
+      emitDotFileAfterConstruction(emitDotFileAfterConstruction), diags(diags) {
+}
+
+SourceFileDepGraph SourceFileDepGraphConstructor::construct() {
+  addSourceFileNodesToGraph();
+  if (!hadCompilationError) {
+    addAllDefinedDecls();
+    addAllUsedDecls();
+  }
+  assert(g.verify());
+  if (emitDotFileAfterConstruction)
+    g.emitDotFile(swiftDeps, diags);
+  return std::move(g);
+}
+
+//==============================================================================
+// MARK: SourceFileDepGraphConstructor - adding a defined or used Decl
+//==============================================================================
+void SourceFileDepGraphConstructor::addSourceFileNodesToGraph() {
+  g.findExistingNodePairOrCreateAndAddIfNew(
+      DependencyKey::createKeyForWholeSourceFile(DeclAspect::interface,
+                                                 swiftDeps),
+      StringRef(fileFingerprint));
+}
+
+void SourceFileDepGraphConstructor::addADefinedDecl(
+    const DependencyKey &interfaceKey, Optional<StringRef> fingerprint) {
+
+  auto nodePair =
+      g.findExistingNodePairOrCreateAndAddIfNew(interfaceKey, fingerprint);
+  // Since the current type fingerprints only include tokens in the body,
+  // when the interface hash changes, it is possible that the type in the
+  // file has changed.
+  g.addArc(g.getSourceFileNodePair().getInterface(), nodePair.getInterface());
+}
+
+void SourceFileDepGraphConstructor::addAUsedDecl(const DependencyKey &defKey,
+                                                 const DependencyKey &useKey) {
+  auto *defNode =
+      g.findExistingNodeOrCreateIfNew(defKey, None, false /* = !isProvides */);
+  auto nullableUse = g.findExistingNode(useKey);
+  assert(nullableUse.isNonNull() && "Use must be an already-added provides");
+  auto *useNode = nullableUse.get();
+  assert(useNode->getIsProvides() && "Use (using node) must be a provides");
+  g.addArc(defNode, useNode);
+}
+
+//==============================================================================
+// MARK: Constructing from a SourceFile
+//==============================================================================
+
+//==============================================================================
 // MARK: Helpers for key construction that must be in frontend
 //==============================================================================
 
@@ -136,6 +198,239 @@ static bool allInheritedProtocolsArePrivate(const ExtensionDecl *ED) {
                      extendedTypeIsPrivate);
 }
 
+//==============================================================================
+// MARK: DependencyKey - creation for Decls
+//==============================================================================
+
+template <NodeKind kindArg, typename Entity>
+DependencyKey DependencyKey::createForProvidedEntityInterface(Entity entity) {
+  return DependencyKey(
+      kindArg, DeclAspect::interface,
+      DependencyKey::computeContextForProvidedEntity<kindArg>(entity),
+      DependencyKey::computeNameForProvidedEntity<kindArg>(entity));
+}
+
+//==============================================================================
+// MARK: computeContextForProvidedEntity
+//==============================================================================
+
+template <NodeKind kind, typename Entity>
+std::string DependencyKey::computeContextForProvidedEntity(Entity) {
+  // Context field is not used for most kinds
+  return "";
+}
+
+// \ref nominal dependencies are created from a Decl and use the context field.
+template <>
+std::string DependencyKey::computeContextForProvidedEntity<
+    NodeKind::nominal, NominalTypeDecl const *>(NominalTypeDecl const *D) {
+  return mangleTypeAsContext(D);
+}
+
+/// \ref potentialMember dependencies are created from a Decl and use the
+/// context field.
+template <>
+std::string
+DependencyKey::computeContextForProvidedEntity<NodeKind::potentialMember,
+                                               NominalTypeDecl const *>(
+    const NominalTypeDecl *D) {
+  return mangleTypeAsContext(D);
+}
+
+template <>
+std::string DependencyKey::computeContextForProvidedEntity<
+    NodeKind::member, const NominalTypeDecl *>(const NominalTypeDecl *holder) {
+  return mangleTypeAsContext(holder);
+}
+
+/// \ref member dependencies are created from a pair and use the context field.
+template <>
+std::string DependencyKey::computeContextForProvidedEntity<
+    NodeKind::member, std::pair<const NominalTypeDecl *, const ValueDecl *>>(
+    std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember) {
+  return computeContextForProvidedEntity<NodeKind::member>(
+      holderAndMember.first);
+}
+
+// Linux compiler requires the following:
+template std::string
+    DependencyKey::computeContextForProvidedEntity<NodeKind::sourceFileProvide,
+                                                   StringRef>(StringRef);
+
+//==============================================================================
+// MARK: computeNameForProvidedEntity
+//==============================================================================
+
+template <>
+std::string
+DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide,
+                                            StringRef>(StringRef swiftDeps) {
+  assert(!swiftDeps.empty());
+  return swiftDeps;
+}
+
+template <>
+std::string
+DependencyKey::computeNameForProvidedEntity<NodeKind::topLevel,
+                                            PrecedenceGroupDecl const *>(
+    const PrecedenceGroupDecl *D) {
+  return ::getName(D);
+}
+template <>
+std::string DependencyKey::computeNameForProvidedEntity<
+    NodeKind::topLevel, FuncDecl const *>(const FuncDecl *D) {
+  return ::getName(D);
+}
+template <>
+std::string DependencyKey::computeNameForProvidedEntity<
+    NodeKind::topLevel, OperatorDecl const *>(const OperatorDecl *D) {
+  return ::getName(D);
+}
+template <>
+std::string DependencyKey::computeNameForProvidedEntity<
+    NodeKind::topLevel, NominalTypeDecl const *>(const NominalTypeDecl *D) {
+  return ::getName(D);
+}
+template <>
+std::string DependencyKey::computeNameForProvidedEntity<
+    NodeKind::topLevel, ValueDecl const *>(const ValueDecl *D) {
+  return getBaseName(D);
+}
+template <>
+std::string DependencyKey::computeNameForProvidedEntity<
+    NodeKind::dynamicLookup, ValueDecl const *>(const ValueDecl *D) {
+  return getBaseName(D);
+}
+template <>
+std::string DependencyKey::computeNameForProvidedEntity<
+    NodeKind::nominal, NominalTypeDecl const *>(const NominalTypeDecl *D) {
+  return "";
+}
+template <>
+std::string
+DependencyKey::computeNameForProvidedEntity<NodeKind::potentialMember,
+                                            NominalTypeDecl const *>(
+    const NominalTypeDecl *D) {
+  return "";
+}
+
+template <>
+std::string DependencyKey::computeNameForProvidedEntity<
+    NodeKind::member, std::pair<const NominalTypeDecl *, const ValueDecl *>>(
+    std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember) {
+  return getBaseName(holderAndMember.second);
+}
+
+//==============================================================================
+// MARK: createDependedUponKey
+//==============================================================================
+
+template <>
+DependencyKey
+DependencyKey::createDependedUponKey<NodeKind::topLevel>(StringRef name) {
+  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "", name);
+}
+
+template <>
+DependencyKey
+DependencyKey::createDependedUponKey<NodeKind::dynamicLookup>(StringRef name) {
+  return DependencyKey(NodeKind::dynamicLookup, DeclAspect::interface, "",
+                       name);
+}
+
+template <>
+DependencyKey
+DependencyKey::createDependedUponKey<NodeKind::externalDepend>(StringRef name) {
+  return DependencyKey(NodeKind::externalDepend, DeclAspect::interface, "",
+                       name);
+}
+
+template <>
+DependencyKey
+DependencyKey::createDependedUponKey<NodeKind::nominal>(StringRef mangledName) {
+  return DependencyKey(NodeKind::nominal, DeclAspect::interface, mangledName,
+                       "");
+}
+
+DependencyKey DependencyKey::createDependedUponKey(StringRef mangledHolderName,
+                                                   StringRef memberBaseName) {
+  const bool isMemberBlank = memberBaseName.empty();
+  const auto kind =
+      isMemberBlank ? NodeKind::potentialMember : NodeKind::member;
+  return DependencyKey(kind, DeclAspect::interface, mangledHolderName,
+                       isMemberBlank ? "" : memberBaseName);
+}
+
+//==============================================================================
+// MARK: Entry point into frontend graph construction
+//==============================================================================
+
+bool fine_grained_dependencies::emitReferenceDependencies(
+    DiagnosticEngine &diags, SourceFile *const SF,
+    const DependencyTracker &depTracker, StringRef outputPath,
+    const bool alsoEmitDotFile) {
+
+  // Before writing to the dependencies file path, preserve any previous file
+  // that may have been there. No error handling -- this is just a nicety, it
+  // doesn't matter if it fails.
+  llvm::sys::fs::rename(outputPath, outputPath + "~");
+
+  SourceFileDepGraph g = RealSourceFileDepGraphConstructor(
+                             SF, outputPath, depTracker, alsoEmitDotFile)
+                             .construct();
+
+  const bool hadError =
+      withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
+        out << g.yamlProlog(SF->getASTContext().hadError());
+        llvm::yaml::Output yamlWriter(out);
+        yamlWriter << g;
+        return false;
+      });
+
+  // If path is stdout, cannot read it back, so check for "-"
+  assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
+
+  if (alsoEmitDotFile)
+    g.emitDotFile(outputPath, diags);
+
+  return hadError;
+}
+
+//==============================================================================
+// MARK: RealSourceFileDepGraphConstructor
+//==============================================================================
+
+RealSourceFileDepGraphConstructor::RealSourceFileDepGraphConstructor(
+    SourceFile *SF, StringRef outputPath, const DependencyTracker &depTracker,
+    const bool alsoEmitDotFile)
+    : SourceFileDepGraphConstructor(computeIncludePrivateDeps(SF),
+                                    SF->getASTContext().hadError(), outputPath,
+                                    getInterfaceHash(SF), alsoEmitDotFile,
+                                    SF->getASTContext().Diags),
+      SF(SF), depTracker(depTracker) {}
+
+bool RealSourceFileDepGraphConstructor::computeIncludePrivateDeps(
+    SourceFile *SF) {
+  // Since, when fingerprints are enabled,
+  // the parser diverts token hashing into per-body fingerprints
+  // before it can know if a difference is in a private type,
+  // in order to be able to test the changed  fingerprints
+  // we force the inclusion of private declarations when fingerprints
+  // are enabled.
+  return SF->getASTContext()
+             .LangOpts.FineGrainedDependenciesIncludeIntrafileOnes ||
+         SF->getASTContext().LangOpts.EnableTypeFingerprints;
+}
+
+/// Centralize the invariant that the fingerprint of the whole file is the
+/// interface hash
+std::string RealSourceFileDepGraphConstructor::getFingerprint(SourceFile *SF) {
+  return getInterfaceHash(SF);
+}
+
+//==============================================================================
+// MARK: RealSourceFileDepGraphConstructor - adding collections of defined Decls
+//==============================================================================
 //==============================================================================
 // MARK: SourceFileDeclFinder
 //==============================================================================
@@ -301,223 +596,7 @@ private:
 };
 } // namespace
 
-template <NodeKind kindArg, typename Entity>
-DependencyKey DependencyKey::createForProvidedEntityInterface(Entity entity) {
-  return DependencyKey(
-      kindArg, DeclAspect::interface,
-      DependencyKey::computeContextForProvidedEntity<kindArg>(entity),
-      DependencyKey::computeNameForProvidedEntity<kindArg>(entity));
-}
-
-//==============================================================================
-// MARK: computeContextForProvidedEntity
-//==============================================================================
-
-template <NodeKind kind, typename Entity>
-std::string DependencyKey::computeContextForProvidedEntity(Entity) {
-  // Context field is not used for most kinds
-  return "";
-}
-
-// \ref nominal dependencies are created from a Decl and use the context field.
-template <>
-std::string DependencyKey::computeContextForProvidedEntity<
-    NodeKind::nominal, NominalTypeDecl const *>(NominalTypeDecl const *D) {
-  return mangleTypeAsContext(D);
-}
-
-/// \ref potentialMember dependencies are created from a Decl and use the
-/// context field.
-template <>
-std::string
-DependencyKey::computeContextForProvidedEntity<NodeKind::potentialMember,
-                                               NominalTypeDecl const *>(
-    const NominalTypeDecl *D) {
-  return mangleTypeAsContext(D);
-}
-
-template <>
-std::string DependencyKey::computeContextForProvidedEntity<
-    NodeKind::member, const NominalTypeDecl *>(const NominalTypeDecl *holder) {
-  return mangleTypeAsContext(holder);
-}
-
-/// \ref member dependencies are created from a pair and use the context field.
-template <>
-std::string DependencyKey::computeContextForProvidedEntity<
-    NodeKind::member, std::pair<const NominalTypeDecl *, const ValueDecl *>>(
-    std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember) {
-  return computeContextForProvidedEntity<NodeKind::member>(
-      holderAndMember.first);
-}
-
-// Linux compiler requires the following:
-template
-std::string
-DependencyKey::computeContextForProvidedEntity<NodeKind::sourceFileProvide,
-                                               StringRef>(StringRef);
-
-//==============================================================================
-// MARK: computeNameForProvidedEntity
-//==============================================================================
-
-template <>
-std::string
-DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide,
-                                            StringRef>(StringRef swiftDeps) {
-  assert(!swiftDeps.empty());
-  return swiftDeps;
-}
-
-template <>
-std::string
-DependencyKey::computeNameForProvidedEntity<NodeKind::topLevel,
-                                            PrecedenceGroupDecl const *>(
-    const PrecedenceGroupDecl *D) {
-  return ::getName(D);
-}
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::topLevel, FuncDecl const *>(const FuncDecl *D) {
-  return ::getName(D);
-}
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::topLevel, OperatorDecl const *>(const OperatorDecl *D) {
-  return ::getName(D);
-}
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::topLevel, NominalTypeDecl const *>(const NominalTypeDecl *D) {
-  return ::getName(D);
-}
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::topLevel, ValueDecl const *>(const ValueDecl *D) {
-  return getBaseName(D);
-}
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::dynamicLookup, ValueDecl const *>(const ValueDecl *D) {
-  return getBaseName(D);
-}
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::nominal, NominalTypeDecl const *>(const NominalTypeDecl *D) {
-  return "";
-}
-template <>
-std::string
-DependencyKey::computeNameForProvidedEntity<NodeKind::potentialMember,
-                                            NominalTypeDecl const *>(
-    const NominalTypeDecl *D) {
-  return "";
-}
-
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::member, std::pair<const NominalTypeDecl *, const ValueDecl *>>(
-    std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember) {
-  return getBaseName(holderAndMember.second);
-}
-
-//==============================================================================
-// MARK: createDependedUponKey
-//==============================================================================
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::topLevel>(StringRef name) {
-  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "", name);
-}
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::dynamicLookup>(StringRef name) {
-  return DependencyKey(NodeKind::dynamicLookup, DeclAspect::interface, "",
-                       name);
-}
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::externalDepend>(StringRef name) {
-  return DependencyKey(NodeKind::externalDepend, DeclAspect::interface, "",
-                       name);
-}
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::nominal>(StringRef mangledName) {
-  return DependencyKey(NodeKind::nominal, DeclAspect::interface, mangledName,
-                       "");
-}
-
-DependencyKey DependencyKey::createDependedUponKey(StringRef mangledHolderName,
-                                                   StringRef memberBaseName) {
-  const bool isMemberBlank = memberBaseName.empty();
-  const auto kind =
-      isMemberBlank ? NodeKind::potentialMember : NodeKind::member;
-  return DependencyKey(kind, DeclAspect::interface, mangledHolderName,
-                       isMemberBlank ? "" : memberBaseName);
-}
-
-//==============================================================================
-// MARK: SourceFileDepGraphConstructor
-//==============================================================================
-
-
-//==============================================================================
-// MARK: SourceFileDepGraphConstructor: Adding nodes to the graph
-//==============================================================================
-
-SourceFileDepGraph SourceFileDepGraphConstructor::addSourceFileNodesAndThen(
-    StringRef name, StringRef fingerprint, function_ref<void()> doTheRest) {
-  // Order matters here, each function adds state used by the next one.
-  addSourceFileNodesToGraph(name, fingerprint);
-  if (!hadCompilationError)
-    doTheRest();
-  assert(g.verify());
-  return std::move(g);
-}
-
-/// Centralize the invariant that the fingerprint of the whole file is the
-/// interface hash
-std::string SourceFileDepGraphConstructor::getFingerprint(SourceFile *SF) {
-  return getInterfaceHash(SF);
-}
-
-/// At present, only nominals, protocols, and extensions have (body)
-/// fingerprints
-Optional<std::string> SourceFileDepGraphConstructor::getFingerprintIfAny(
-    std::pair<const NominalTypeDecl *, const ValueDecl *>) {
-  return None;
-}
-Optional<std::string>
-SourceFileDepGraphConstructor::getFingerprintIfAny(const Decl *d) {
-  if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
-    auto result = idc->getBodyFingerprint();
-    assert((!result || !result->empty()) && "Fingerprint should never be empty");
-    return result;
-  }
-  return None;
-}
-
-std::string SourceFileDepGraphConstructor::getInterfaceHash(SourceFile *SF) {
-  llvm::SmallString<32> interfaceHash;
-  SF->getInterfaceHash(interfaceHash);
-  return interfaceHash.str().str();
-}
-
-void SourceFileDepGraphConstructor::addSourceFileNodesToGraph(
-    StringRef swiftDeps, StringRef fingerprint) {
-  g.findExistingNodePairOrCreateAndAddIfNew(
-      DependencyKey::createKeyForWholeSourceFile(DeclAspect::interface,
-                                                 swiftDeps),
-      fingerprint);
-}
-
-void SourceFileDepGraphConstructor::enumerateDefinedDecls(
-    SourceFile *SF, AddDefinedDecl addDefinedDeclFn) {
+void RealSourceFileDepGraphConstructor::addAllDefinedDecls() {
   // TODO: express the multiple provides and depends streams with variadic
   // templates
 
@@ -525,52 +604,37 @@ void SourceFileDepGraphConstructor::enumerateDefinedDecls(
 
   SourceFileDeclFinder declFinder(SF, includePrivateDeps);
 
-  enumerateAllProviderNodesOfAGivenType<NodeKind::topLevel>(
-      declFinder.precedenceGroups, addDefinedDeclFn);
-  enumerateAllProviderNodesOfAGivenType<NodeKind::topLevel>(
-      declFinder.memberOperatorDecls, addDefinedDeclFn);
-  enumerateAllProviderNodesOfAGivenType<NodeKind::topLevel>(
-      declFinder.operators, addDefinedDeclFn);
-  enumerateAllProviderNodesOfAGivenType<NodeKind::topLevel>(
-      declFinder.topNominals, addDefinedDeclFn);
-  enumerateAllProviderNodesOfAGivenType<NodeKind::topLevel>(
-      declFinder.topValues, addDefinedDeclFn);
-  enumerateAllProviderNodesOfAGivenType<NodeKind::nominal>(
-      declFinder.allNominals, addDefinedDeclFn);
-  enumerateAllProviderNodesOfAGivenType<NodeKind::potentialMember>(
-      declFinder.potentialMemberHolders, addDefinedDeclFn);
-  enumerateAllProviderNodesOfAGivenType<NodeKind::member>(
-      declFinder.valuesInExtensions, addDefinedDeclFn);
-  enumerateAllProviderNodesOfAGivenType<NodeKind::dynamicLookup>(
-      declFinder.classMembers, addDefinedDeclFn);
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(
+      declFinder.precedenceGroups);
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(
+      declFinder.memberOperatorDecls);
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(declFinder.operators);
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(declFinder.topNominals);
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(declFinder.topValues);
+  addAllDefinedDeclsOfAGivenType<NodeKind::nominal>(declFinder.allNominals);
+  addAllDefinedDeclsOfAGivenType<NodeKind::potentialMember>(
+      declFinder.potentialMemberHolders);
+  addAllDefinedDeclsOfAGivenType<NodeKind::member>(
+      declFinder.valuesInExtensions);
+  addAllDefinedDeclsOfAGivenType<NodeKind::dynamicLookup>(
+      declFinder.classMembers);
 }
 
 /// Given an array of Decls or pairs of them in \p declsOrPairs
 /// create node pairs for context and name
 template <NodeKind kind, typename ContentsT>
-void SourceFileDepGraphConstructor::enumerateAllProviderNodesOfAGivenType(
-    std::vector<ContentsT> &contentsVec, AddDefinedDecl addDefinedDeclFn) {
+void RealSourceFileDepGraphConstructor::addAllDefinedDeclsOfAGivenType(
+    std::vector<ContentsT> &contentsVec) {
   for (const auto declOrPair : contentsVec) {
     Optional<std::string> fp = getFingerprintIfAny(declOrPair);
-    addDefinedDeclFn(
+    addADefinedDecl(
         DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
         fp ? StringRef(fp.getValue()) : Optional<StringRef>());
   }
 }
 
-void SourceFileDepGraphConstructor::addDefinedDecl(
-    const DependencyKey &interfaceKey, Optional<StringRef> fingerprint) {
-
-  auto nodePair =
-      g.findExistingNodePairOrCreateAndAddIfNew(interfaceKey, fingerprint);
-  // Since the current type fingerprints only include tokens in the body,
-  // when the interface hash changes, it is possible that the type in the
-  // file has changed.
-  g.addArc(g.getSourceFileNodePair().getInterface(), nodePair.getInterface());
-}
-
 //==============================================================================
-// Entry point from the Frontend to this whole system
+// MARK: RealSourceFileDepGraphConstructor - adding collections of used Decls
 //==============================================================================
 
 namespace {
@@ -584,22 +648,22 @@ class UsedDeclEnumerator {
   const DependencyKey sourceFileInterface;
   const DependencyKey sourceFileImplementation;
 
-  function_ref<void(const DependencyKey &, const DependencyKey &)> createUseDef;
-
   const bool includeIntrafileDeps;
+
+  function_ref<void(const DependencyKey &, const DependencyKey &)> createDefUse;
 
 public:
   UsedDeclEnumerator(
       SourceFile *SF, const DependencyTracker &depTracker, StringRef swiftDeps,
+      bool includeIntrafileDeps,
       function_ref<void(const DependencyKey &, const DependencyKey &)>
-          createUseDef,
-      bool includeIntrafileDeps)
+          createDefUse)
       : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps),
         sourceFileInterface(DependencyKey::createKeyForWholeSourceFile(
             DeclAspect::interface, swiftDeps)),
         sourceFileImplementation(DependencyKey::createKeyForWholeSourceFile(
             DeclAspect::implementation, swiftDeps)),
-        createUseDef(createUseDef), includeIntrafileDeps(includeIntrafileDeps) {
+        includeIntrafileDeps(includeIntrafileDeps), createDefUse(createDefUse) {
   }
 
 public:
@@ -616,7 +680,7 @@ private:
   void enumerateUse(NodeKind kind, StringRef context, StringRef name,
                     bool isCascadingUse) {
     // Assume that what is depended-upon is the interface
-    createUseDef(DependencyKey(kind, DeclAspect::interface, context, name),
+    createDefUse(DependencyKey(kind, DeclAspect::interface, context, name),
                  isCascadingUse ? sourceFileInterface
                                 : sourceFileImplementation);
   }
@@ -695,85 +759,197 @@ private:
 };
 } // end namespace
 
-bool fine_grained_dependencies::emitReferenceDependencies(
-    DiagnosticEngine &diags, SourceFile *const SF,
-    const DependencyTracker &depTracker, StringRef outputPath,
-    const bool alsoEmitDotFile) {
-
-  // Before writing to the dependencies file path, preserve any previous file
-  // that may have been there. No error handling -- this is just a nicety, it
-  // doesn't matter if it fails.
-  llvm::sys::fs::rename(outputPath, outputPath + "~");
-  // Since, when fingerprints are enabled,
-  // the parser diverts token hashing into per-body fingerprints
-  // before it can know if a difference is in a private type,
-  // in order to be able to test the changed  fingerprints
-  // we force the inclusion of private declarations when fingerprints
-  // are enabled.
-  const bool includeIntrafileDeps =
-      SF->getASTContext()
-          .LangOpts.FineGrainedDependenciesIncludeIntrafileOnes ||
-      SF->getASTContext().LangOpts.EnableTypeFingerprints;
-  const bool hadCompilationError = SF->getASTContext().hadError();
-  auto gc =
-      SourceFileDepGraphConstructor(includeIntrafileDeps, hadCompilationError);
-
-  auto forEachDefinedDecl =
-      [&](SourceFileDepGraphConstructor::AddDefinedDecl addDefinedDeclFn) {
-        gc.enumerateDefinedDecls(SF, addDefinedDeclFn);
-      };
-
-  auto forEachUsedDecl =
-      [&](function_ref<void(const DependencyKey &, const DependencyKey &)>
-              createDefUse) {
-        UsedDeclEnumerator(SF, depTracker, outputPath, createDefUse,
-                           includeIntrafileDeps)
-            .enumerateAllUses();
-      };
-
-  SourceFileDepGraph g = gc.construct(outputPath, gc.getFingerprint(SF),
-                                      forEachDefinedDecl, forEachUsedDecl);
-
-  const bool hadError =
-      withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-        out << g.yamlProlog(hadCompilationError);
-        llvm::yaml::Output yamlWriter(out);
-        yamlWriter << g;
-        return false;
-      });
-
-  // If path is stdout, cannot read it back, so check for "-"
-  assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
-
-  if (alsoEmitDotFile)
-    g.emitDotFile(outputPath, diags);
-
-  return hadError;
+void RealSourceFileDepGraphConstructor::addAllUsedDecls() {
+  UsedDeclEnumerator(SF, depTracker, swiftDeps, includePrivateDeps,
+                     [&](const DependencyKey &def, const DependencyKey &use) {
+                       addAUsedDecl(def, use);
+                     })
+      .enumerateAllUses();
 }
 
-  //==============================================================================
-  // For the unit tests
-  //==============================================================================
+//==============================================================================
+// MARK: RealSourceFileDepGraphConstructor - adding individual defined Decls
+//==============================================================================
 
-#warning dmu kmove out of this mark
-void SourceFileDepGraphConstructor::addAllDefinedDecls(
-    ForEachDefinedDecl forEachDefinedDecl) {
-  forEachDefinedDecl(
-      [&](const DependencyKey &interfaceKey, Optional<StringRef> fingerprint) {
-        addDefinedDecl(interfaceKey, fingerprint);
-      });
+std::string
+RealSourceFileDepGraphConstructor::getInterfaceHash(SourceFile *SF) {
+  llvm::SmallString<32> interfaceHash;
+  SF->getInterfaceHash(interfaceHash);
+  return interfaceHash.str().str();
 }
 
-void SourceFileDepGraphConstructor::addAllUsedDecls(
-    ForEachUsedDecl forEachUsedDecl) {
-  forEachUsedDecl([&](const DependencyKey &defKey,
-                      const DependencyKey &useKey) {
-    auto *defNode = g.findExistingNodeOrCreateIfNew(defKey, None,
-                                                    false /* = !isProvides */);
-    auto nullableUse = g.findExistingNode(useKey);
-    assert(nullableUse.isNonNull() && "Use must be an already-added provides");
-    auto *useNode = nullableUse.get();
-    assert(useNode->getIsProvides() && "Use (using node) must be a provides");
-    g.addArc(defNode, useNode);
+/// At present, only nominals, protocols, and extensions have (body)
+/// fingerprints
+Optional<std::string> RealSourceFileDepGraphConstructor::getFingerprintIfAny(
+    std::pair<const NominalTypeDecl *, const ValueDecl *>) {
+  return None;
+}
+Optional<std::string>
+RealSourceFileDepGraphConstructor::getFingerprintIfAny(const Decl *d) {
+  if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
+    auto result = idc->getBodyFingerprint();
+    assert((!result || !result->empty()) &&
+           "Fingerprint should never be empty");
+    return result;
+  }
+  return None;
+}
+
+//==============================================================================
+// MARK: MockSourceFileDepGraphConstructor - adding collections of Decls
+//==============================================================================
+
+void MockSourceFileDepGraphConstructor::forEachEntry(
+    function_ref<void(NodeKind kind, StringRef entry)> fn) {
+  for (const auto &kindAndEntries : dependencyDescriptions) {
+    for (StringRef s : kindAndEntries.second)
+      fn(kindAndEntries.first, s);
+  }
+}
+
+void MockSourceFileDepGraphConstructor::addAllDefinedDecls() {
+  forEachEntry([&](NodeKind kind, StringRef s) {
+    if (isADefinedDecl(s))
+      addADefinedDecl(s, kind);
   });
 }
+
+void MockSourceFileDepGraphConstructor::addAllUsedDecls() {
+  forEachEntry([&](NodeKind kind, StringRef s) {
+    if (!isADefinedDecl(s))
+      addAUsedDecl(s, kind);
+  });
+};
+
+//==============================================================================
+// MARK: MockSourceFileDepGraphConstructor - adding individual Decls
+//==============================================================================
+
+void MockSourceFileDepGraphConstructor::addADefinedDecl(StringRef s,
+                                                        const NodeKind kind) {
+  const Optional<DependencyKey> key =
+      parseADefinedDecl(s, kind, DeclAspect::interface);
+  if (!key)
+    return;
+  StringRef fingerprintString = s.split(fingerprintSeparator).second;
+  const Optional<StringRef> fingerprint = fingerprintString.empty()
+                                              ? Optional<StringRef>()
+                                              : StringRef(fingerprintString);
+
+  SourceFileDepGraphConstructor::addADefinedDecl(key.getValue(), fingerprint);
+  }
+
+  void MockSourceFileDepGraphConstructor::addAUsedDecl(const StringRef s,
+                                                       const NodeKind kind) {
+    const auto defAndUseKeys = parseAUsedDecl(s, kind);
+    if (defAndUseKeys) {
+      SourceFileDepGraphConstructor::addAUsedDecl(defAndUseKeys->first,
+                                                  defAndUseKeys->second);
+    }
+  }
+
+  DependencyKey
+  MockSourceFileDepGraphConstructor::computeUseKey(StringRef s,
+                                                   const bool isCascadingUse) {
+    // For now, in unit tests, mock uses are always nominal
+    static const NodeKind kindOfUse = NodeKind::nominal;
+    const DeclAspect aspectOfUse =
+        isCascadingUse ? DeclAspect::interface : DeclAspect::implementation;
+
+    if (!s.empty())
+      return parseADefinedDecl(s, kindOfUse, aspectOfUse).getValue();
+    StringRef swiftDepsRef(swiftDeps);
+    return DependencyKey(NodeKind::sourceFileProvide, aspectOfUse,
+                         DependencyKey::computeContextForProvidedEntity<
+                             NodeKind::sourceFileProvide>(swiftDepsRef),
+                         DependencyKey::computeNameForProvidedEntity<
+                             NodeKind::sourceFileProvide>(swiftDepsRef));
+  }
+
+  //==============================================================================
+  // MARK: SourceFileDepGraphConstructor - parsing
+  //==============================================================================
+
+  const char *MockSourceFileDepGraphConstructor::defUseSeparator = "->";
+
+  bool MockSourceFileDepGraphConstructor::isADefinedDecl(StringRef s) {
+    return s.find(defUseSeparator) == StringRef::npos;
+  }
+
+  Optional<DependencyKey> MockSourceFileDepGraphConstructor::parseADefinedDecl(
+      StringRef s, const NodeKind kind, const DeclAspect aspect) {
+    static const char *privatePrefix = "#";
+
+    const bool isPrivate = s.consume_front(privatePrefix);
+    if (isPrivate && !includePrivateDeps)
+      return None;
+    const std::string context =
+        parseContext(s.split(fingerprintSeparator).first, kind);
+    std::string name = parseName(s.split(fingerprintSeparator).first, kind);
+
+    return DependencyKey(kind, aspect, context, name);
+  }
+
+  Optional<std::pair<DependencyKey, DependencyKey>>
+  MockSourceFileDepGraphConstructor::parseAUsedDecl(const StringRef argString,
+                                                    const NodeKind kind) {
+    static const char *noncascadingPrefix = "#";
+    static const char *privateHolderPrefix = "~";
+
+    StringRef s = argString;
+    const bool isCascadingUse = !s.consume_front(noncascadingPrefix);
+    // Someday, we might differentiate.
+    const DeclAspect aspectOfDefUsed = DeclAspect::interface;
+
+    const bool isHolderPrivate = s.consume_front(privateHolderPrefix);
+    if (!includePrivateDeps && isHolderPrivate)
+      return None;
+    const auto defUseStrings = s.split(defUseSeparator);
+    const auto context = parseContext(defUseStrings.first, kind);
+    const auto name = parseName(defUseStrings.first, kind);
+
+    const DependencyKey defKey =
+        DependencyKey(kind, aspectOfDefUsed, context, name);
+
+    return std::make_pair(defKey,
+                          computeUseKey(defUseStrings.second, isCascadingUse));
+  }
+
+
+  Optional<bool>
+  MockSourceFileDepGraphConstructor::singleNameIsContext(const NodeKind kind) {
+    switch (kind) {
+    case NodeKind::nominal:
+    case NodeKind::potentialMember:
+      return true;
+    case NodeKind::topLevel:
+    case NodeKind::dynamicLookup:
+    case NodeKind::externalDepend:
+    case NodeKind::sourceFileProvide:
+      return false;
+    case NodeKind::member:
+      return None;
+    case NodeKind::kindCount:
+      llvm_unreachable("impossible case");
+    }
+  }
+
+  std::string
+  MockSourceFileDepGraphConstructor::parseContext(const StringRef s,
+                                                  const NodeKind kind) {
+    return !singleNameIsContext(kind)
+               ? s.split(nameContextSeparator).first.str()
+               : singleNameIsContext(kind).getValue() ? s.str() : "";
+  }
+
+  std::string
+  MockSourceFileDepGraphConstructor::parseName(const StringRef s,
+                                               const NodeKind kind) {
+    const std::string name =
+        !singleNameIsContext(kind)
+            ? s.split(nameContextSeparator).second.str()
+            : singleNameIsContext(kind).getValue() ? "" : s.str();
+    assert(kind != NodeKind::member ||
+           !name.empty() && "Should be a potentialMember");
+    return name;
+  }

@@ -14,6 +14,7 @@
 #define MOCKING_FINE_GRAINED_DEPENDENCY_GRAPHS_H
 
 #include "swift/AST/FineGrainedDependencies.h"
+#include "swift/AST/SourceFileDepGraphConstructor.h"
 #include "swift/Driver/FineGrainedDependencyDriverGraph.h"
 
 namespace swift {
@@ -25,9 +26,6 @@ namespace fine_grained_dependencies {
 /// provides affordances to mock them up in a concise fashion.
 
 namespace mocking_fine_grained_dependency_graphs {
-
-using DependencyDescriptions =
-    std::unordered_multimap<NodeKind, std::vector<std::string>>;
 
 /// Simulate loading for unit testing, as if the driver is reading the swiftdeps
 /// file for the first time.
