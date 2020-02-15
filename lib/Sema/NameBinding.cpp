@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "swift-name-binding"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleLoader.h"
@@ -30,6 +31,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
@@ -69,9 +71,16 @@ namespace {
     ModuleDecl::AccessPathTy declPath;
 
     NullablePtr<DeclAttributes> attrs;
+    NullablePtr<ModuleDecl> underlyingModule;
 
     /// Create an UnboundImport for a user-written import declaration.
     explicit UnboundImport(ImportDecl *ID);
+
+    /// Create an UnboundImport for a cross-import overlay.
+    explicit UnboundImport(ASTContext &ctx,
+                           const UnboundImport &base, Identifier overlayName,
+                           const ImportedModuleDesc &declaringImport,
+                           const ImportedModuleDesc &bystandingImport);
 
     /// Make sure the import is not a self-import.
     bool checkNotTautological(const SourceFile &SF);
@@ -137,6 +146,13 @@ namespace {
     /// Imports which still need their scoped imports validated.
     SmallVector<BoundImport, 16> unvalidatedImports;
 
+    /// All imported modules, including by re-exports.
+    SmallSetVector<ImportedModuleDesc, 16> visibleModules;
+
+    /// The index of the next module in \c visibleModules that should be
+    /// cross-imported.
+    size_t nextModuleToCrossImport = 0;
+
   public:
     NameBinder(SourceFile &SF)
       : SF(SF), ctx(SF.getASTContext())
@@ -170,6 +186,22 @@ namespace {
     void addImport(const UnboundImport &I, ModuleDecl *M,
                    bool needsScopeValidation);
 
+    /// Adds \p desc and everything it re-exports to \c visibleModules using
+    /// the settings from \c desc.
+    void addVisibleModules(ImportedModuleDesc desc);
+
+    /// * If \p I is a cross-import overlay, registers \p M as overlaying
+    ///   \p I.underlyingModule in \c SF.
+    /// * Discovers any cross-imports between \p I and previously bound imports,
+    ///   then adds them to \c unboundImports using source locations from \p I.
+    void crossImport(ModuleDecl *M, UnboundImport &I);
+
+    /// Discovers any cross-imports between \p declaringImport and
+    /// \p bystandingImport and adds them to \c unboundImports, using source
+    /// locations from \p I.
+    void findCrossImports(UnboundImport &I,
+                          const ImportedModuleDesc &declaringImport,
+                          const ImportedModuleDesc &bystandingImport);
 
     /// Load a module referenced by an import statement.
     ///
@@ -310,6 +342,8 @@ void NameBinder::bindImport(UnboundImport &&I) {
     addImport(I, M, true);
   }
 
+  crossImport(M, I);
+
   if (I.ID)
     I.ID.get()->setModule(M);
 }
@@ -318,6 +352,7 @@ void NameBinder::addImport(const UnboundImport &I, ModuleDecl *M,
                            bool needsScopeValidation) {
   auto importDesc = I.makeDesc(M);
 
+  addVisibleModules(importDesc);
   unvalidatedImports.emplace_back(I, importDesc, M, needsScopeValidation);
 }
 
@@ -385,7 +420,7 @@ UnboundImport::UnboundImport(ImportDecl *ID)
   : ID(ID), importLoc(ID->getLoc()), options(), privateImportFileName(),
     importKind(ID->getImportKind(), ID->getKindLoc()),
     modulePath(ID->getModulePath()), declPath(ID->getDeclPath()),
-    attrs(&ID->getAttrs())
+    attrs(&ID->getAttrs()), underlyingModule()
 {
   if (ID->isExported())
     options |= ImportFlags::Exported;
@@ -707,4 +742,166 @@ void BoundImport::validateScope(SourceFile &SF) {
   }
 
   unbound.ID.get()->setDecls(ctx.AllocateCopy(decls));
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Cross-import overlays
+//===----------------------------------------------------------------------===//
+
+static bool canCrossImport(const ImportedModuleDesc &import) {
+  if (import.importOptions.contains(ImportFlags::Testable))
+    return false;
+  if (import.importOptions.contains(ImportFlags::PrivateImport))
+    return false;
+
+  return true;
+}
+
+/// Create an UnboundImport for a cross-import overlay.
+UnboundImport::UnboundImport(ASTContext &ctx,
+                             const UnboundImport &base, Identifier overlayName,
+                             const ImportedModuleDesc &declaringImport,
+                             const ImportedModuleDesc &bystandingImport)
+  : ID(nullptr), importLoc(base.importLoc), options(),
+    privateImportFileName(), importKind({ ImportKind::Module, SourceLoc() }),
+    modulePath(),
+    // If the declaring import was scoped, inherit that scope in the
+    // overlay's import. Note that we do *not* set importKind; this keeps
+    // BoundImport::validateScope() from unnecessarily revalidating the
+    // scope.
+    declPath(declaringImport.module.first),
+    attrs(nullptr), underlyingModule(declaringImport.module.second)
+{
+  modulePath = ctx.AllocateCopy(
+      ModuleDecl::AccessPathTy( { overlayName, base.modulePath[0].Loc }));
+
+  // A cross-import is never private or testable, and never comes from a private
+  // or testable import.
+  assert(canCrossImport(declaringImport));
+  assert(canCrossImport(bystandingImport));
+
+  auto &declaringOptions = declaringImport.importOptions;
+  auto &bystandingOptions = bystandingImport.importOptions;
+
+  // If both are exported, the cross-import is exported.
+  if (declaringOptions.contains(ImportFlags::Exported) &&
+      bystandingOptions.contains(ImportFlags::Exported))
+    options |= ImportFlags::Exported;
+
+  // If either are implementation-only, the cross-import is
+  // implementation-only.
+  if (declaringOptions.contains(ImportFlags::ImplementationOnly) ||
+      bystandingOptions.contains(ImportFlags::ImplementationOnly))
+    options |= ImportFlags::ImplementationOnly;
+}
+
+void NameBinder::crossImport(ModuleDecl *M, UnboundImport &I) {
+  if (!SF.shouldCrossImport())
+    return;
+
+  if (I.underlyingModule)
+    // FIXME: Should we warn if M doesn't reexport underlyingModule?
+    SF.addSeparatelyImportedOverlay(M, I.underlyingModule.get());
+
+  auto newImports = visibleModules.getArrayRef().slice(nextModuleToCrossImport);
+  for (auto &newImport : newImports) {
+    if (!canCrossImport(newImport))
+      continue;
+
+    // Search imports up to, but not including or after, `newImport`.
+    auto oldImports =
+        make_range(visibleModules.getArrayRef().data(), &newImport);
+    for (auto &oldImport : oldImports) {
+      if (!canCrossImport(oldImport))
+        continue;
+
+      findCrossImports(I, newImport, oldImport);
+      findCrossImports(I, oldImport, newImport);
+
+      // If findCrossImports() ever changed the visibleModules list, we'd see
+      // memory smashers here.
+      assert(newImports.data() == &visibleModules[nextModuleToCrossImport] &&
+             "findCrossImports() should never mutate visibleModules");
+    }
+  }
+
+  nextModuleToCrossImport = visibleModules.size();
+}
+
+void NameBinder::findCrossImports(UnboundImport &I,
+                                  const ImportedModuleDesc &declaringImport,
+                                  const ImportedModuleDesc &bystandingImport) {
+  assert(&declaringImport != &bystandingImport);
+
+  LLVM_DEBUG(
+      llvm::dbgs() << "Discovering cross-imports for '"
+                   << declaringImport.module.second->getName() << "' -> '"
+                   << bystandingImport.module.second->getName() << "'\n");
+
+  // Find modules we need to import.
+  SmallVector<Identifier, 2> names;
+  declaringImport.module.second->findDeclaredCrossImportOverlays(
+      bystandingImport.module.second->getName(), names, I.importLoc);
+
+  // Add import statements.
+  for (auto &name : names) {
+    // If we are actually compiling part of this overlay, don't try to load the
+    // overlay.
+    if (name == SF.getParentModule()->getName())
+      continue;
+
+    unboundImports.emplace_back(declaringImport.module.second->getASTContext(),
+                                I, name, declaringImport, bystandingImport);
+
+    LLVM_DEBUG({
+      auto &crossImportOptions = unboundImports.back().options;
+      llvm::dbgs() << "  ";
+      if (crossImportOptions.contains(ImportFlags::Exported))
+        llvm::dbgs() << "@_exported ";
+      if (crossImportOptions.contains(ImportFlags::ImplementationOnly))
+        llvm::dbgs() << "@_implementationOnly ";
+      llvm::dbgs() << "import " << name << "\n";
+    });
+  }
+}
+
+void NameBinder::addVisibleModules(ImportedModuleDesc importDesc) {
+  // FIXME: namelookup::getAllImports() doesn't quite do what we need (mainly
+  // w.r.t. scoped imports), but it seems like we could extend it to do so, and
+  // then eliminate most of this.
+
+  SmallVector<ImportedModule, 16> importsWorklist = { importDesc.module };
+
+  while (!importsWorklist.empty()) {
+    auto nextImport = importsWorklist.pop_back_val();
+
+    // If they are both scoped, and they are *differently* scoped, this import
+    // cannot possibly expose anything new. Skip it.
+    if (!importDesc.module.first.empty() && !nextImport.first.empty() &&
+        importDesc.module.first != nextImport.first)
+      continue;
+
+    // Drop this module into the ImportDesc so we treat it as imported with the
+    // same options and scope as `I`.
+    importDesc.module.second = nextImport.second;
+
+    // If we've already imported it, we've also already imported its
+    // imports.
+    if (!visibleModules.insert(importDesc))
+      continue;
+
+    // Add the module's re-exports to worklist.
+    nextImport.second->getImportedModules(importsWorklist,
+                                          ModuleDecl::ImportFilterKind::Public);
+  }
+}
+
+LLVM_ATTRIBUTE_USED static void dumpCrossImportOverlays(ModuleDecl* M) {
+  llvm::dbgs() << "'" << M->getName() << "' declares cross-imports with bystanders:\n";
+
+  SmallVector<Identifier, 4> secondaries;
+  M->getDeclaredCrossImportBystanders(secondaries);
+
+  for (auto secondary : secondaries)
+    llvm::dbgs() << "  " << secondary << "\n";
 }

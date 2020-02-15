@@ -272,6 +272,8 @@ public:
 
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
+  bool shouldCrossImport() const;
+
   /// Register a separately-imported overlay as shadowing the module that
   /// declares it.
   ///

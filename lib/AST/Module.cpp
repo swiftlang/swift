@@ -1772,6 +1772,11 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   return !imports.isImportedBy(module, getParentModule());
 }
 
+bool SourceFile::shouldCrossImport() const {
+  return Kind != SourceFileKind::SIL && Kind != SourceFileKind::Interface &&
+         getASTContext().LangOpts.EnableCrossImportOverlays;
+}
+
 void ModuleDecl::clearLookupCache() {
   getASTContext().getImportCache().clear();
 
