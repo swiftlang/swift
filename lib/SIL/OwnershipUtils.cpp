@@ -88,6 +88,41 @@ bool swift::isOwnershipForwardingInst(SILInstruction *i) {
 }
 
 //===----------------------------------------------------------------------===//
+//                           Borrow Scope Operand
+//===----------------------------------------------------------------------===//
+
+void BorrowScopeOperandKind::print(llvm::raw_ostream &os) const {
+  switch (value) {
+  case Kind::BeginBorrow:
+    os << "BeginBorrow";
+    return;
+  case Kind::BeginApply:
+    os << "BeginApply";
+    return;
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     BorrowScopeOperandKind kind) {
+  kind.print(os);
+  return os;
+}
+
+void BorrowScopeOperand::print(llvm::raw_ostream &os) const {
+  os << "BorrowScopeOperand:\n"
+        "Kind: " << kind << "\n"
+        "Value: " << op->get()
+     << "User: " << op->getUser();
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     const BorrowScopeOperand &operand) {
+  operand.print(os);
+  return os;
+}
+
+//===----------------------------------------------------------------------===//
 //                             Borrow Introducers
 //===----------------------------------------------------------------------===//
 
@@ -104,12 +139,6 @@ void BorrowScopeIntroducingValueKind::print(llvm::raw_ostream &os) const {
     return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
-}
-
-void BorrowScopeIntroducingValueKind::dump() const {
-#ifndef NDEBUG
-  print(llvm::dbgs());
-#endif
 }
 
 void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
@@ -203,6 +232,12 @@ bool swift::getUnderlyingBorrowIntroducingValues(
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
                                      BorrowScopeIntroducingValueKind kind) {
   kind.print(os);
+  return os;
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     const BorrowScopeIntroducingValue &value) {
+  value.print(os);
   return os;
 }
 
