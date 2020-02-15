@@ -1333,6 +1333,14 @@ SourceLoc DynamicReplacementAttr::getRParenLoc() const {
   return getTrailingLocations()[1];
 }
 
+ConstructorDecl *
+TypeEraserAttr::getTypeEraserInit(ProtocolDecl *protocol) const {
+  return evaluateOrDefault(protocol->getASTContext().evaluator,
+                           TypeEraserInitializerRequest{
+                               const_cast<TypeEraserAttr *>(this), protocol},
+                           nullptr);
+}
+
 AvailableAttr *
 AvailableAttr::createPlatformAgnostic(ASTContext &C,
                                    StringRef Message,

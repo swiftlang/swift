@@ -51,6 +51,7 @@ class Decl;
 class AbstractFunctionDecl;
 class FuncDecl;
 class ClassDecl;
+class ConstructorDecl;
 class GenericFunctionType;
 class LazyConformanceLoader;
 class LazyMemberLoader;
@@ -1117,6 +1118,9 @@ public:
         TypeEraserLoc(typeEraserLoc) {}
 
   const TypeLoc &getTypeEraserLoc() const { return TypeEraserLoc; }
+  TypeLoc &getTypeEraserLoc() { return TypeEraserLoc; }
+
+  ConstructorDecl *getTypeEraserInit(ProtocolDecl *protocol) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_TypeEraser;

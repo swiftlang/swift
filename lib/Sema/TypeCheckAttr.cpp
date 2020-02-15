@@ -108,7 +108,6 @@ public:
   IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
-  IGNORED_ATTR(TypeEraser)
   IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(DisfavoredOverload)
@@ -239,6 +238,7 @@ public:
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
+  void visitTypeEraserAttr(TypeEraserAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
 
   void visitFrozenAttr(FrozenAttr *attr);
@@ -2374,6 +2374,99 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
           attr->getReplacedFunctionName());
     }
   }
+}
+
+llvm::Expected<ConstructorDecl *>
+TypeEraserInitializerRequest::evaluate(Evaluator &evaluator,
+                                       TypeEraserAttr *attr,
+                                       ProtocolDecl *protocol) const {
+  auto &ctx = protocol->getASTContext();
+  auto &diags = ctx.Diags;
+  TypeLoc &typeEraserLoc = attr->getTypeEraserLoc();
+  TypeRepr *typeEraserRepr = typeEraserLoc.getTypeRepr();
+  DeclContext *dc = protocol->getDeclContext();
+  Type protocolType = protocol->getDeclaredType();
+
+  // Get the NominalTypeDecl for the type eraser.
+  Type typeEraser = typeEraserLoc.getType();
+  if (!typeEraser && typeEraserRepr) {
+    auto resolution = TypeResolution::forContextual(dc);
+    typeEraser = resolution.resolveType(typeEraserRepr, /*options=*/None);
+    typeEraserLoc.setType(typeEraser);
+  }
+
+  if (typeEraser->hasError())
+    return nullptr;
+
+  // 1. The type eraser must be a concrete nominal type
+  auto nominalTypeDecl = typeEraser->getAnyNominal();
+  if (!nominalTypeDecl || isa<ProtocolDecl>(nominalTypeDecl)) {
+    diags.diagnose(typeEraserLoc.getLoc(), diag::non_nominal_type_eraser);
+    return nullptr;
+  }
+
+  // 2. The type eraser must conform to the annotated protocol
+  SmallVector<ProtocolConformance *, 2> conformances;
+  if (!nominalTypeDecl->lookupConformance(dc->getParentModule(), protocol,
+                                          conformances)) {
+    diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_does_not_conform,
+                   typeEraser, protocolType);
+    diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
+    return nullptr;
+  }
+
+  // 3. The type eraser must have an init of the form init<T: Protocol>(erasing: T)
+  auto lookupResult = TypeChecker::lookupMember(dc, typeEraser,
+                                                DeclNameRef::createConstructor());
+  auto match = llvm::find_if(lookupResult, [&](const LookupResultEntry &entry) {
+    auto *init = cast<ConstructorDecl>(entry.getValueDecl());
+    if (!init->isGeneric() || init->getGenericParams()->size() != 1)
+      return false;
+
+    GenericTypeParamDecl *genericParam = *init->getGenericParams()->begin();
+    auto genericParamType = genericParam->getDeclaredInterfaceType();
+
+    // Fow now, only allow one parameter.
+    auto params = init->getParameters();
+    if (params->size() != 1)
+      return false;
+
+    // The parameter must be labeled with 'erasing'
+    ParamDecl *param = *init->getParameters()->begin();
+    if (param->getArgumentName() != ctx.Id_erasing ||
+        !param->getInterfaceType()->isEqual(genericParamType))
+      return false;
+
+    // For now, only allow one requirement.
+    auto requirements = init->getGenericRequirements();
+    if (requirements.size() != 1)
+      return false;
+
+    return requirements.front() == Requirement(RequirementKind::Conformance,
+                                               genericParamType, protocolType);
+  });
+
+  if (match == lookupResult.end()) {
+    diags.diagnose(attr->getLocation(), diag::type_eraser_missing_init,
+                   typeEraser, protocolType);
+    diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
+    return nullptr;
+  }
+
+  auto *init = cast<ConstructorDecl>(match->getValueDecl());
+  if (init->isFailable()) {
+    diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_failable_init);
+    diags.diagnose(init->getLoc(), diag::type_eraser_init_declared_here);
+    return nullptr;
+  }
+
+  return init;
+}
+
+void AttributeChecker::visitTypeEraserAttr(TypeEraserAttr *attr) {
+  assert(isa<ProtocolDecl>(D));
+  // Invoke the request.
+  (void)attr->getTypeEraserInit(cast<ProtocolDecl>(D));
 }
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {

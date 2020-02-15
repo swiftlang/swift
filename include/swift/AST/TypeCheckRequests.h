@@ -2054,6 +2054,26 @@ public:
   void cacheResult(IndexSubset *value) const;
 };
 
+/// Retrieves the type eraser initializer for a \c @_typeEraser() attribute.
+class TypeEraserInitializerRequest
+    : public SimpleRequest<TypeEraserInitializerRequest,
+                           ConstructorDecl *(TypeEraserAttr *, ProtocolDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation
+  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
+                                             TypeEraserAttr *attr,
+                                             ProtocolDecl *protocol) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
