@@ -96,6 +96,62 @@ bool swift::isOwnershipForwardingInst(SILInstruction *i) {
 }
 
 //===----------------------------------------------------------------------===//
+//                           Borrow Scope Operand
+//===----------------------------------------------------------------------===//
+
+void BorrowScopeOperandKind::print(llvm::raw_ostream &os) const {
+  switch (value) {
+  case Kind::BeginBorrow:
+    os << "BeginBorrow";
+    return;
+  case Kind::BeginApply:
+    os << "BeginApply";
+    return;
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     BorrowScopeOperandKind kind) {
+  kind.print(os);
+  return os;
+}
+
+void BorrowScopeOperand::print(llvm::raw_ostream &os) const {
+  os << "BorrowScopeOperand:\n"
+        "Kind: " << kind << "\n"
+        "Value: " << op->get()
+     << "User: " << op->getUser();
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     const BorrowScopeOperand &operand) {
+  operand.print(os);
+  return os;
+}
+
+void BorrowScopeOperand::visitEndScopeInstructions(
+    function_ref<void(Operand *)> func) const {
+  switch (kind) {
+  case BorrowScopeOperandKind::BeginBorrow:
+    for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
+      if (isa<EndBorrowInst>(use->getUser())) {
+        func(use);
+      }
+    }
+    return;
+  case BorrowScopeOperandKind::BeginApply: {
+    auto *user = cast<BeginApplyInst>(op->getUser());
+    for (auto *use : user->getTokenResult()->getUses()) {
+      func(use);
+    }
+    return;
+  }
+  }
+  llvm_unreachable("Covered switch isn't covered");
+}
+
+//===----------------------------------------------------------------------===//
 //                             Borrow Introducers
 //===----------------------------------------------------------------------===//
 
@@ -114,10 +170,10 @@ void BorrowScopeIntroducingValueKind::print(llvm::raw_ostream &os) const {
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-void BorrowScopeIntroducingValueKind::dump() const {
-#ifndef NDEBUG
-  print(llvm::dbgs());
-#endif
+void BorrowScopeIntroducingValue::print(llvm::raw_ostream &os) const {
+  os << "BorrowScopeIntroducingValue:\n"
+    "Kind: " << kind << "\n"
+    "Value: " << value;
 }
 
 void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
@@ -128,12 +184,12 @@ void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
   case BorrowScopeIntroducingValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
   case BorrowScopeIntroducingValueKind::BeginBorrow:
-    llvm::copy(cast<BeginBorrowInst>(value)->getEndBorrows(),
-               std::back_inserter(scopeEndingInsts));
-    return;
   case BorrowScopeIntroducingValueKind::LoadBorrow:
-    llvm::copy(cast<LoadBorrowInst>(value)->getEndBorrows(),
-               std::back_inserter(scopeEndingInsts));
+    for (auto *use : value->getUses()) {
+      if (use->isConsumingUse()) {
+	scopeEndingInsts.push_back(use->getUser());
+      }
+    }
     return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
@@ -145,16 +201,10 @@ void BorrowScopeIntroducingValue::visitLocalScopeEndingUses(
   switch (kind) {
   case BorrowScopeIntroducingValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
+  case BorrowScopeIntroducingValueKind::LoadBorrow:
   case BorrowScopeIntroducingValueKind::BeginBorrow:
     for (auto *use : value->getUses()) {
-      if (isa<EndBorrowInst>(use->getUser())) {
-        visitor(use);
-      }
-    }
-    return;
-  case BorrowScopeIntroducingValueKind::LoadBorrow:
-    for (auto *use : value->getUses()) {
-      if (isa<EndBorrowInst>(use->getUser())) {
+      if (use->isConsumingUse()) {
         visitor(use);
       }
     }
@@ -217,6 +267,12 @@ bool swift::getUnderlyingBorrowIntroducingValues(
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
                                      BorrowScopeIntroducingValueKind kind) {
   kind.print(os);
+  return os;
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     const BorrowScopeIntroducingValue &value) {
+  value.print(os);
   return os;
 }
 

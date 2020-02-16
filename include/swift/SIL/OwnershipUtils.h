@@ -236,8 +236,11 @@ struct BorrowScopeOperandKind {
   }
 
   void print(llvm::raw_ostream &os) const;
-  SWIFT_DEBUG_DUMP;
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 };
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              BorrowScopeOperandKind kind);
 
 /// An operand whose user instruction introduces a new borrow scope for the
 /// operand's value. The value of the operand must be considered as implicitly
@@ -258,25 +261,10 @@ struct BorrowScopeOperand {
     return BorrowScopeOperand(*kind, op);
   }
 
-  void visitEndScopeInstructions(function_ref<void(Operand *)> func) const {
-    switch (kind) {
-    case BorrowScopeOperandKind::BeginBorrow:
-      for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
-        if (isa<EndBorrowInst>(use->getUser())) {
-          func(use);
-        }
-      }
-      return;
-    case BorrowScopeOperandKind::BeginApply: {
-      auto *user = cast<BeginApplyInst>(op->getUser());
-      for (auto *use : user->getTokenResult()->getUses()) {
-        func(use);
-      }
-      return;
-    }
-    }
-    llvm_unreachable("Covered switch isn't covered");
-  }
+  void visitEndScopeInstructions(function_ref<void(Operand *)> func) const;
+
+  void print(llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
 private:
   /// Internal constructor for failable static constructor. Please do not expand
@@ -286,7 +274,7 @@ private:
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                              BorrowScopeOperandKind kind);
+                              const BorrowScopeOperand &operand);
 
 struct BorrowScopeIntroducingValueKind {
   using UnderlyingKindTy = std::underlying_type<ValueKind>::type;
@@ -336,7 +324,7 @@ struct BorrowScopeIntroducingValueKind {
   }
 
   void print(llvm::raw_ostream &os) const;
-  SWIFT_DEBUG_DUMP;
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -419,6 +407,9 @@ struct BorrowScopeIntroducingValue {
                              SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
                              DeadEndBlocks &deadEndBlocks) const;
 
+  void print(llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
 private:
   /// Internal constructor for failable static constructor. Please do not expand
   /// its usage since it assumes the code passed in is well formed.
@@ -426,6 +417,9 @@ private:
                               SILValue value)
       : kind(kind), value(value) {}
 };
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const BorrowScopeIntroducingValue &value);
 
 /// Look up through the def-use chain of \p inputValue, recording any "borrow"
 /// introducing values that we find into \p out. If at any point, we find a
