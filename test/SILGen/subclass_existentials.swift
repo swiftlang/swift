@@ -295,9 +295,9 @@ func archetypeUpcasts<T,
                       BaseTAndP : Base<T> & P,
                       BaseIntAndP : Base<Int> & P,
                       DerivedT : Derived>(
-  baseTAndP: BaseTAndP,
-  baseIntAndP : BaseIntAndP,
-  derived : DerivedT) {
+                      baseTAndP: BaseTAndP,
+                      baseIntAndP : BaseIntAndP,
+                      derived : DerivedT) {
   // CHECK: bb0([[ARG0:%.*]] : @guaranteed $BaseTAndP, [[ARG1:%.*]] : @guaranteed $BaseIntAndP, [[ARG2:%.*]] : @guaranteed $DerivedT)
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $BaseTAndP
   // CHECK-NEXT: init_existential_ref [[COPIED]] : $BaseTAndP : $BaseTAndP, $Base<T> & P

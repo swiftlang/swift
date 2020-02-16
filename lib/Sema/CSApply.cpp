@@ -290,7 +290,7 @@ namespace {
   public:
     ConstraintSystem &cs;
     DeclContext *dc;
-    const Solution &solution;
+    Solution &solution;
     bool SuppressDiagnostics;
 
     /// Coerce the given tuple to another tuple type.
@@ -1792,7 +1792,7 @@ namespace {
     }
     
   public:
-    ExprRewriter(ConstraintSystem &cs, const Solution &solution,
+    ExprRewriter(ConstraintSystem &cs, Solution &solution,
                  bool suppressDiagnostics)
         : cs(cs), dc(cs.DC), solution(solution),
           SuppressDiagnostics(suppressDiagnostics) {}
@@ -4736,6 +4736,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
   SmallVector<Identifier, 4> labels;
   SmallVector<TupleTypeElt, 4> convertedElts;
 
+  bool anythingShuffled = false;
   for (unsigned i = 0, e = sources.size(); i != e; ++i) {
     unsigned source = sources[i];
     auto *fromElt = destructured[source];
@@ -4743,6 +4744,12 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
     // Actually convert the source element.
     auto toEltType = toTuple->getElementType(i);
     auto toLabel = toTuple->getElement(i).getName();
+
+    // If we're shuffling positions and labels, we have to warn about this
+    // conversion.
+    if (i != sources[i] &&
+        fromTuple->getElement(i).getName() != toLabel)
+      anythingShuffled = true;
 
     auto *toElt
       = coerceToType(fromElt, toEltType,
@@ -4754,6 +4761,14 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
     converted.push_back(toElt);
     labels.push_back(toLabel);
     convertedElts.emplace_back(toEltType, toLabel, ParameterTypeFlags());
+  }
+
+  // Shuffling tuple elements is an anti-pattern worthy of a diagnostic.  We
+  // will form the shuffle for now, but a future compiler should decline to
+  // do so and begin the process of removing them altogether.
+  if (anythingShuffled) {
+    cs.getASTContext().Diags.diagnose(
+        expr->getLoc(), diag::warn_reordering_tuple_shuffle_deprecated);
   }
 
   // Create the result tuple, written in terms of the destructured
@@ -7063,14 +7078,14 @@ namespace {
           llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
           auto newBody = applyFunctionBuilderTransform(
               Rewriter.solution, *transform, closure->getBody(), closure,
-              [&](Expr *expr) {
-                Expr *result = expr->walk(*this);
-                if (result)
-                  Rewriter.solution.setExprTypes(result);
-                return result;
-              },
-              [&](Expr *expr, Type toType, ConstraintLocator *locator) {
-                return Rewriter.coerceToType(expr, toType, locator);
+              [&](SolutionApplicationTarget target) {
+                auto resultTarget = rewriteTarget(target);
+                if (resultTarget) {
+                  if (auto expr = resultTarget->getAsExpr())
+                    Rewriter.solution.setExprTypes(expr);
+                }
+
+                return resultTarget;
               });
           closure->setBody(newBody, /*isSingleExpression=*/false);
           closure->setAppliedFunctionBuilder();
@@ -7142,6 +7157,10 @@ namespace {
 
     /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
+
+    /// Rewrite the target, producing a new target.
+    Optional<SolutionApplicationTarget>
+    rewriteTarget(SolutionApplicationTarget target);
   };
 } // end anonymous namespace
 
@@ -7305,6 +7324,111 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
   return resultTarget;
 }
 
+Optional<SolutionApplicationTarget>
+ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
+  auto &solution = Rewriter.solution;
+
+  // Apply the solution to the target.
+  SolutionApplicationTarget result = target;
+  if (auto expr = target.getAsExpr()) {
+    Expr *rewrittenExpr = expr->walk(*this);
+    if (!rewrittenExpr)
+      return None;
+
+    /// Handle application for initializations.
+    if (target.getExprContextualTypePurpose() == CTP_Initialization) {
+      auto initResultTarget = applySolutionToInitialization(
+          solution, target, rewrittenExpr);
+      if (!initResultTarget)
+        return None;
+
+      result = *initResultTarget;
+    } else {
+      result.setExpr(rewrittenExpr);
+    }
+  } else {
+    auto fn = *target.getAsFunction();
+
+    // Dig out the function builder transformation we applied.
+    auto transform = Rewriter.getAppliedBuilderTransform(fn);
+    assert(transform);
+
+    auto newBody = applyFunctionBuilderTransform(
+        solution, *transform, fn.getBody(), fn.getAsDeclContext(),
+        [&](SolutionApplicationTarget target) {
+          auto resultTarget = rewriteTarget(target);
+          if (resultTarget) {
+            if (auto expr = resultTarget->getAsExpr())
+              Rewriter.solution.setExprTypes(expr);
+          }
+
+          return resultTarget;
+        });
+
+    if (!newBody)
+      return None;
+
+    result.setFunctionBody(newBody);
+  }
+
+  // Follow-up tasks.
+  auto &cs = solution.getConstraintSystem();
+  if (auto resultExpr = result.getAsExpr()) {
+    Expr *expr = target.getAsExpr();
+    assert(expr && "Can't have expression result without expression target");
+
+    // We are supposed to use contextual type only if it is present and
+    // this expression doesn't represent the implicit return of the single
+    // expression function which got deduced to be `Never`.
+    Type convertType = target.getExprConversionType();
+    auto shouldCoerceToContextualType = [&]() {
+      return convertType &&
+          !target.isOptionalSomePatternInit() &&
+          !(solution.getType(resultExpr)->isUninhabited() &&
+            cs.getContextualTypePurpose(target.getAsExpr())
+              == CTP_ReturnSingleExpr);
+    };
+
+    // If we're supposed to convert the expression to some particular type,
+    // do so now.
+    if (shouldCoerceToContextualType()) {
+      resultExpr = Rewriter.coerceToType(resultExpr,
+                                         solution.simplifyType(convertType),
+                                         cs.getConstraintLocator(expr));
+    } else if (cs.getType(resultExpr)->hasLValueType() &&
+               !target.isDiscardedExpr()) {
+      // We referenced an lvalue. Load it.
+      resultExpr = Rewriter.coerceToType(
+          resultExpr,
+          cs.getType(resultExpr)->getRValueType(),
+          cs.getConstraintLocator(expr));
+    }
+
+    if (!resultExpr)
+      return None;
+
+    // For an @autoclosure default parameter type, add the autoclosure
+    // conversion.
+    if (FunctionType *autoclosureParamType =
+            target.getAsAutoclosureParamType()) {
+      resultExpr = cs.buildAutoClosureExpr(resultExpr, autoclosureParamType);
+    }
+
+    solution.setExprTypes(resultExpr);
+    result.setExpr(resultExpr);
+
+    auto &ctx = cs.getASTContext();
+    if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
+      auto &log = ctx.TypeCheckerDebug->getStream();
+      log << "---Type-checked expression---\n";
+      resultExpr->dump(log);
+      log << "\n";
+    }
+  }
+
+  return result;
+}
+
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
 Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
@@ -7335,49 +7459,9 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
 
   ExprRewriter rewriter(*this, solution, shouldSuppressDiagnostics());
   ExprWalker walker(rewriter);
-
-  // Apply the solution to the target.
-  SolutionApplicationTarget result = target;
-  if (auto expr = target.getAsExpr()) {
-    Expr *rewrittenExpr = expr->walk(walker);
-    if (!rewrittenExpr)
-      return None;
-
-    /// Handle application for initializations.
-    if (target.getExprContextualTypePurpose() == CTP_Initialization) {
-      auto initResultTarget = applySolutionToInitialization(
-          solution, target, rewrittenExpr);
-      if (!initResultTarget)
-        return None;
-
-      result = *initResultTarget;
-    } else {
-      result.setExpr(rewrittenExpr);
-    }
-  } else {
-    auto fn = *target.getAsFunction();
-
-    // Dig out the function builder transformation we applied.
-    auto transform = rewriter.getAppliedBuilderTransform(fn);
-    assert(transform);
-
-    auto newBody = applyFunctionBuilderTransform(
-        solution, *transform, fn.getBody(), fn.getAsDeclContext(),
-        [&](Expr *expr) {
-          Expr *result = expr->walk(walker);
-          if (result)
-            solution.setExprTypes(result);
-          return result;
-        },
-        [&](Expr *expr, Type toType, ConstraintLocator *locator) {
-          return rewriter.coerceToType(expr, toType, locator);
-        });
-
-    if (!newBody)
-      return None;
-
-    result.setFunctionBody(newBody);
-  }
+  auto resultTarget = walker.rewriteTarget(target);
+  if (!resultTarget)
+    return None;
 
   // If we're re-typechecking an expression for diagnostics, don't
   // visit closures that have non-single expression bodies.
@@ -7399,65 +7483,14 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
       return None;
   }
 
-  if (auto resultExpr = result.getAsExpr()) {
-    Expr *expr = target.getAsExpr();
-    assert(expr && "Can't have expression result without expression target");
-
-    // We are supposed to use contextual type only if it is present and
-    // this expression doesn't represent the implicit return of the single
-    // expression function which got deduced to be `Never`.
-    Type convertType = target.getExprConversionType();
-    auto shouldCoerceToContextualType = [&]() {
-      return convertType &&
-          !target.isOptionalSomePatternInit() &&
-          !(getType(resultExpr)->isUninhabited() &&
-            getContextualTypePurpose(target.getAsExpr())
-              == CTP_ReturnSingleExpr);
-    };
-
-    // If we're supposed to convert the expression to some particular type,
-    // do so now.
-    if (shouldCoerceToContextualType()) {
-      resultExpr = rewriter.coerceToType(resultExpr,
-                                         simplifyType(convertType),
-                                         getConstraintLocator(expr));
-    } else if (getType(resultExpr)->hasLValueType() &&
-               !target.isDiscardedExpr()) {
-      // We referenced an lvalue. Load it.
-      resultExpr = rewriter.coerceToType(resultExpr,
-                                         getType(resultExpr)->getRValueType(),
-                                         getConstraintLocator(expr));
-    }
-
-    if (!resultExpr)
-      return None;
-
-    // For an @autoclosure default parameter type, add the autoclosure
-    // conversion.
-    if (FunctionType *autoclosureParamType =
-            target.getAsAutoclosureParamType()) {
-      resultExpr = buildAutoClosureExpr(resultExpr, autoclosureParamType);
-    }
-
-    solution.setExprTypes(resultExpr);
-    result.setExpr(resultExpr);
-
-    if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-      auto &log = Context.TypeCheckerDebug->getStream();
-      log << "---Type-checked expression---\n";
-      resultExpr->dump(log);
-      log << "\n";
-    }
-  }
-
   rewriter.finalize();
 
-  return result;
+  return resultTarget;
 }
 
 Expr *Solution::coerceToType(Expr *expr, Type toType,
                              ConstraintLocator *locator,
-                             Optional<Pattern*> typeFromPattern) const {
+                             Optional<Pattern*> typeFromPattern) {
   auto &cs = getConstraintSystem();
   ExprRewriter rewriter(cs, *this, /*suppressDiagnostics=*/false);
   Expr *result = rewriter.coerceToType(expr, toType, locator, typeFromPattern);

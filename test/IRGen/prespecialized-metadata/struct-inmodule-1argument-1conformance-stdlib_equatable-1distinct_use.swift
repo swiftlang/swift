@@ -6,11 +6,11 @@
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
 // CHECK-NOT: @"$s4main5ValueVyAA7IntegerVGMf"
-struct Value<First : Hashable> {
+struct Value<First : Equatable> {
   let first: First
 }
 
-struct Integer : Hashable {
+struct Integer : Equatable {
   let value: Int
 }
 

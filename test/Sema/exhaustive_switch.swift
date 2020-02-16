@@ -1279,21 +1279,24 @@ enum SR11212Tests {
   func sr11212_content_untupled_pattern_tupled1(u: Untupled) -> (Int, Int) {
     switch u {
     case .upair((let x, let y)): return (x, y)
-    // expected-warning@-1 {{a tuple pattern cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+    // expected-warning@-1 {{enum case 'upair' has 2 associated values}}{{16-17=}}{{31-32=}}
+    // expected-note@-7 {{'upair' declared here}}
     }
   }
 
   func sr11212_content_untupled_pattern_tupled2(u: Untupled) -> (Int, Int) {
     switch u {
     case .upair(let (x, y)): return (x, y)
-    // expected-warning@-1 {{a tuple pattern cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+    // expected-warning@-1 {{enum case 'upair' has 2 associated values}} // No fix-it as that would require us to peek inside the 'let' :-/
+    // expected-note@-15 {{'upair' declared here}}
     }
   }
 
   func sr11212_content_untupled_pattern_tupled3(u: Untupled) -> (Int, Int) {
     switch u {
     case let .upair((x, y)): return (x, y)
-    // expected-warning@-1 {{a tuple pattern cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+    // expected-warning@-1 {{enum case 'upair' has 2 associated values}}{{20-21=}}{{27-28=}}
+    // expected-note@-23 {{'upair' declared here}}
     }
   }
 
@@ -1312,14 +1315,16 @@ enum SR11212Tests {
   func sr11212_content_untupled_pattern_ambiguous1(u: Untupled) -> (Int, Int) {
     switch u {
     case .upair(let u_): return u_
-    // expected-warning@-1 {{cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+    // expected-warning@-1 {{enum case 'upair' has 2 associated values; matching them as a tuple is deprecated}}
+    // expected-note@-43 {{'upair' declared here}}
     }
   }
 
   func sr11212_content_untupled_pattern_ambiguous2(u: Untupled) -> (Int, Int) {
     switch u {
     case let .upair(u_): return u_
-    // expected-warning@-1 {{cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+    // expected-warning@-1 {{enum case 'upair' has 2 associated values; matching them as a tuple is deprecated}}
+    // expected-note@-51 {{'upair' declared here}}
     }
   }
 
@@ -1348,14 +1353,16 @@ enum SR11212Tests {
   func sr11212_content_tupled_pattern_untupled1(t: Tupled) -> (Int, Int) {
     switch t {
     case .tpair(let x, let y): return (x, y)
-    // expected-warning@-1 {{the enum case has a single tuple as an associated value, but there are several patterns here, implicitly tupling the patterns and trying to match that instead}}
+    // expected-warning@-1 {{enum case 'tpair' has one associated value that is a tuple of 2 elements}}{{16-16=(}}{{30-30=)}}
+    // expected-note@-25 {{'tpair' declared here}}
     }
   }
 
   func sr11212_content_tupled_pattern_untupled2(t: Tupled) -> (Int, Int) {
     switch t {
     case let .tpair(x, y): return (x, y)
-    // expected-warning@-1 {{the enum case has a single tuple as an associated value, but there are several patterns here, implicitly tupling the patterns and trying to match that instead}}
+    // expected-warning@-1 {{enum case 'tpair' has one associated value that is a tuple of 2 elements}}{{20-20=(}}{{26-26=)}}
+    // expected-note@-33 {{'tpair' declared here}}
     }
   }
 
@@ -1396,14 +1403,16 @@ enum SR11212Tests {
   func sr11212_content_generic_pattern_untupled1(b: Box<(Int, Int)>) -> (Int, Int) {
     switch b {
     case .box(let x, let y): return (x, y)
-    // expected-warning@-1 {{the enum case has a single tuple as an associated value, but there are several patterns here, implicitly tupling the patterns and trying to match that instead}}
+    // expected-warning@-1 {{enum case 'box' has one associated value that is a tuple of 2 elements}}{{14-14=(}}{{28-28=)}}
+    // expected-note@-25 {{'box' declared here}}
     }
   }
 
   func sr11212_content_generic_pattern_untupled2(b: Box<(Int, Int)>) -> (Int, Int) {
     switch b {
     case let .box(x, y): return (x, y)
-    // expected-warning@-1 {{the enum case has a single tuple as an associated value, but there are several patterns here, implicitly tupling the patterns and trying to match that instead}}
+    // expected-warning@-1 {{enum case 'box' has one associated value that is a tuple of 2 elements}}{{18-18=(}}{{24-24=)}}
+    // expected-note@-33 {{'box' declared here}}
     }
   }
 
@@ -1411,7 +1420,8 @@ enum SR11212Tests {
   func sr11212_content_generic_pattern_untupled3(b: Box<((Int, Int), Int)>) -> (Int, Int, Int) {
     switch b {
     case let .box((x, y), z): return (x, y, z)
-    // expected-warning@-1 {{the enum case has a single tuple as an associated value, but there are several patterns here, implicitly tupling the patterns and trying to match that instead}}
+    // expected-warning@-1 {{enum case 'box' has one associated value that is a tuple of 2 elements}}{{18-18=(}}{{29-29=)}}
+    // expected-note@-42 {{'box' declared here}}
     }
   }
 

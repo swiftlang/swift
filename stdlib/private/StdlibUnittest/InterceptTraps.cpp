@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
+#if !defined(__wasi__)
 #include <stdio.h>
 #include <signal.h>
 #include <string.h>
@@ -25,9 +27,6 @@
 #endif
 
 #include "swift/Runtime/Config.h"
-
-// WebAssembly: no signals on WASI yet
-#ifndef __wasi__
 
 static void CrashCatcher(int Sig) {
   const char *Msg;
@@ -66,17 +65,15 @@ VectoredCrashHandler(PEXCEPTION_POINTERS ExceptionInfo) {
 
   return EXCEPTION_CONTINUE_SEARCH;
 }
-#endif
-
-#endif // __wasi__
+#endif // _WIN32
 
 SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY extern "C"
 void installTrapInterceptor() {
   // Disable buffering on stdout so that everything is printed before crashing.
   setbuf(stdout, 0);
 
-// WebAssembly: no signals on WASI
-#ifndef __wasi__
+// No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
+#if !defined(__wasi__)
 
 #if defined(_WIN32)
   _set_abort_behavior(0, _WRITE_ABORT_MSG);
@@ -94,5 +91,7 @@ void installTrapInterceptor() {
   signal(SIGSYS,  CrashCatcher);
 #endif
 
-#endif // __wasi__
+#endif // !defined(__wasi__)
 }
+
+#endif // !defined(__wasi__)

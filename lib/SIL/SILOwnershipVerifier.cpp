@@ -78,7 +78,7 @@ namespace {
 // refactored into a large state object that is used by functions.
 class SILValueOwnershipChecker {
   /// The result of performing the check.
-  llvm::Optional<bool> result;
+  Optional<bool> result;
 
   /// A cache of dead-end basic blocks that we use to determine if we can
   /// ignore "leaks".
@@ -123,31 +123,13 @@ public:
   SILValueOwnershipChecker(SILValueOwnershipChecker &) = delete;
   SILValueOwnershipChecker(SILValueOwnershipChecker &&) = delete;
 
-  bool check() {
-    if (result.hasValue())
-      return result.getValue();
-
-    LLVM_DEBUG(llvm::dbgs() << "Verifying ownership of: " << *value);
-    result = checkUses();
-    if (!result.getValue())
-      return false;
-
-    SmallVector<BranchPropagatedUser, 32> allLifetimeEndingUsers;
-    llvm::copy(lifetimeEndingUsers, std::back_inserter(allLifetimeEndingUsers));
-    SmallVector<BranchPropagatedUser, 32> allRegularUsers;
-    llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
-    llvm::copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
-
-    LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-    auto linearLifetimeResult = checker.checkValue(
-        value, allLifetimeEndingUsers, allRegularUsers, errorBehavior);
-    result = !linearLifetimeResult.getFoundError();
-
-    return result.getValue();
-  }
+  bool check();
 
 private:
   bool checkUses();
+  bool isCompatibleDefUse(Operand *op, ValueOwnershipKind ownershipKind,
+                          bool isGuaranteed);
+
   bool gatherUsers(SmallVectorImpl<Operand *> &lifetimeEndingUsers,
                    SmallVectorImpl<Operand *> &regularUsers,
                    SmallVectorImpl<Operand *> &implicitRegularUsers);
@@ -182,6 +164,72 @@ private:
 
 } // end anonymous namespace
 
+bool SILValueOwnershipChecker::check() {
+  if (result.hasValue())
+    return result.getValue();
+
+  LLVM_DEBUG(llvm::dbgs() << "Verifying ownership of: " << *value);
+  result = checkUses();
+  if (!result.getValue())
+    return false;
+
+  SmallVector<BranchPropagatedUser, 32> allLifetimeEndingUsers;
+  llvm::copy(lifetimeEndingUsers, std::back_inserter(allLifetimeEndingUsers));
+  SmallVector<BranchPropagatedUser, 32> allRegularUsers;
+  llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
+  llvm::copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
+
+  LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+  auto linearLifetimeResult = checker.checkValue(
+      value, allLifetimeEndingUsers, allRegularUsers, errorBehavior);
+  result = !linearLifetimeResult.getFoundError();
+
+  return result.getValue();
+}
+
+bool SILValueOwnershipChecker::isCompatibleDefUse(
+    Operand *op, ValueOwnershipKind ownershipKind, bool isGuaranteed) {
+  bool isGuaranteedSubValue = false;
+  if (isGuaranteed && isGuaranteedForwardingInst(op->getUser())) {
+    isGuaranteedSubValue = true;
+  }
+  auto *user = op->getUser();
+  auto opOwnershipKindMap = op->getOwnershipKindMap(isGuaranteedSubValue);
+  // If our ownership kind doesn't match, track that we found an error, emit
+  // an error message optionally and then continue.
+  if (opOwnershipKindMap.canAcceptKind(ownershipKind)) {
+    return true;
+  }
+
+  // If we did not support /any/ ownership kind, it means that we found a
+  // conflicting answer so the kind map that was returned is the empty
+  // map. Put out a more specific error here.
+  if (!opOwnershipKindMap.data.any()) {
+    handleError([&]() {
+      llvm::errs() << "Function: '" << user->getFunction()->getName() << "'\n"
+                   << "Ill-formed SIL! Unable to compute ownership kind "
+                      "map for user?!\n"
+                   << "For terminator users, check that successors have "
+                      "compatible ownership kinds.\n"
+                   << "Value: " << op->get() << "User: " << *user
+                   << "Operand Number: " << op->getOperandNumber() << '\n'
+                   << "Conv: " << ownershipKind << "\n\n";
+    });
+    return false;
+  }
+
+  handleError([&]() {
+    llvm::errs() << "Function: '" << user->getFunction()->getName() << "'\n"
+                 << "Have operand with incompatible ownership?!\n"
+                 << "Value: " << op->get() << "User: " << *user
+                 << "Operand Number: " << op->getOperandNumber() << '\n'
+                 << "Conv: " << ownershipKind << '\n'
+                 << "OwnershipMap:\n"
+                 << opOwnershipKindMap << '\n';
+  });
+  return false;
+}
+
 bool SILValueOwnershipChecker::gatherUsers(
     SmallVectorImpl<Operand *> &lifetimeEndingUsers,
     SmallVectorImpl<Operand *> &nonLifetimeEndingUsers,
@@ -212,50 +260,15 @@ bool SILValueOwnershipChecker::gatherUsers(
     if (user->isTypeDependentOperand(*op))
       continue;
 
-    bool isGuaranteedSubValue = false;
-    if (isGuaranteed && isGuaranteedForwardingInst(op->getUser())) {
-      isGuaranteedSubValue = true;
-    }
-
-    auto opOwnershipKindMap = op->getOwnershipKindMap(isGuaranteedSubValue);
-    // If our ownership kind doesn't match, track that we found an error, emit
-    // an error message optionally and then continue.
-    if (!opOwnershipKindMap.canAcceptKind(ownershipKind)) {
+    // First check if this recursive use is compatible with our values ownership
+    // kind. If not, flag the error and continue so that we can report more
+    // errors.
+    if (!isCompatibleDefUse(op, ownershipKind, isGuaranteed)) {
       foundError = true;
-
-      // If we did not support /any/ ownership kind, it means that we found a
-      // conflicting answer so the kind map that was returned is the empty
-      // map. Put out a more specific error here.
-      if (!opOwnershipKindMap.data.any()) {
-        handleError([&]() {
-          llvm::errs() << "Function: '" << user->getFunction()->getName()
-                       << "'\n"
-                       << "Ill-formed SIL! Unable to compute ownership kind "
-                          "map for user?!\n"
-                       << "For terminator users, check that successors have "
-                          "compatible ownership kinds.\n"
-                       << "Value: " << op->get() << "User: " << *user
-                       << "Operand Number: " << op->getOperandNumber() << '\n'
-                       << "Conv: " << ownershipKind << "\n\n";
-        });
-        continue;
-      }
-
-      handleError([&]() {
-        llvm::errs() << "Function: '" << user->getFunction()->getName() << "'\n"
-                     << "Have operand with incompatible ownership?!\n"
-                     << "Value: " << op->get() << "User: " << *user
-                     << "Operand Number: " << op->getOperandNumber() << '\n'
-                     << "Conv: " << ownershipKind << '\n'
-                     << "OwnershipMap:\n"
-                     << opOwnershipKindMap << '\n';
-      });
       continue;
     }
 
-    auto lifetimeConstraint =
-        opOwnershipKindMap.getLifetimeConstraint(ownershipKind);
-    if (lifetimeConstraint == UseLifetimeConstraint::MustBeInvalidated) {
+    if (op->isConsumingUse()) {
       LLVM_DEBUG(llvm::dbgs() << "        Lifetime Ending User: " << *user);
       lifetimeEndingUsers.push_back(op);
     } else {
@@ -742,7 +755,7 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
     errorBehavior = ErrorBehaviorKind::PrintMessageAndAssert;
   }
 
-  llvm::SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
+  SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
   if (deadEndBlocks) {
     SILValueOwnershipChecker(*deadEndBlocks, *this, errorBehavior,
                              liveBlocks)

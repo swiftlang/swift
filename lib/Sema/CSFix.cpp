@@ -479,6 +479,24 @@ bool DefineMemberBasedOnUse::diagnose(bool asNote) const {
   return AlreadyDiagnosed || failure.diagnose(asNote);
 }
 
+bool
+DefineMemberBasedOnUse::diagnoseForAmbiguity(ArrayRef<Solution> solutions) const {
+  Type concreteBaseType;
+  for (const auto &solution: solutions) {
+    auto baseType = solution.simplifyType(BaseType);
+    if (!concreteBaseType)
+      concreteBaseType = baseType;
+
+    if (concreteBaseType->getCanonicalType() != baseType->getCanonicalType()) {
+      getConstraintSystem().getASTContext().Diags.diagnose(getAnchor()->getLoc(),
+          diag::unresolved_member_no_inference, Name);
+      return true;
+    }
+  }
+
+  return diagnose();
+}
+
 DefineMemberBasedOnUse *
 DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
                                DeclNameRef member, bool alreadyDiagnosed,
@@ -1086,6 +1104,12 @@ UseValueTypeOfRawRepresentative::attempt(ConstraintSystem &cs, Type argType,
         cs, rawRepresentableType, valueType, cs.getConstraintLocator(locator));
 
   return nullptr;
+}
+
+unsigned AllowArgumentMismatch::getParamIdx() const {
+  const auto *locator = getLocator();
+  auto elt = locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
+  return elt.getParamIdx();
 }
 
 bool AllowArgumentMismatch::diagnose(bool asNote) const {

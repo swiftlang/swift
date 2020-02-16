@@ -126,7 +126,7 @@ public func _stdlib_pipe() -> (readEnd: CInt, writeEnd: CInt, error: CInt) {
 #if os(Windows)
     return _pipe(unsafeFds.baseAddress, 0, 0)
 #elseif os(WASI)
-    fatalError("no pipes on WebAssembly")
+    preconditionFailure("No pipes available on WebAssembly/WASI")
 #else
     return pipe(unsafeFds.baseAddress)
 #endif

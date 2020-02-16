@@ -277,7 +277,7 @@ public:
     IsSerialized_t serialized = IsNotSerialized;
     auto classIsPublic = theClass->getEffectiveAccess() >= AccessLevel::Public;
     // Only public, fixed-layout classes should have serialized vtables.
-    if (classIsPublic && !theClass->isResilient())
+    if (classIsPublic && !isResilient)
       serialized = IsSerialized;
 
     // Finally, create the vtable.
@@ -285,9 +285,9 @@ public:
   }
 
   void visitAncestor(ClassDecl *ancestor) {
-    auto superTy = ancestor->getSuperclass();
-    if (superTy)
-      visitAncestor(superTy->getClassOrBoundGenericClass());
+    auto *superDecl = ancestor->getSuperclassDecl();
+    if (superDecl)
+      visitAncestor(superDecl);
 
     addVTableEntries(ancestor);
   }

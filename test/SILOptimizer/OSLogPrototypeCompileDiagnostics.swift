@@ -11,6 +11,9 @@ import OSLogPrototype
 
 if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
+  // The following tests check the diagnostics for when the APIs are not invoked
+  // with constants needed for generating a static format string.
+
   func testDynamicLogMessage(h: Logger, message: OSLogMessage) {
     // FIXME: log APIs must always be passed a string interpolation literal.
     // Diagnose this.

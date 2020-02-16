@@ -935,7 +935,7 @@ class CacheValue {
 
 func valueForKey<K>(_ key: K) -> CacheValue? {
   let cache = NSCache<K, CacheValue>()
-  return cache.object(forKey: key)?.value // expected-error {{no exact matches in call to instance method 'value'}}
+  return cache.object(forKey: key)?.value // expected-error {{no exact matches in reference to instance method 'value'}}
 }
 
 // SR-2242: poor diagnostic when argument label is omitted
@@ -1085,7 +1085,7 @@ func SR_6272_c() {
 struct SR_6272_D: ExpressibleByIntegerLiteral {
   typealias IntegerLiteralType = Int
   init(integerLiteral: Int) {}
-  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 } // expected-note 2 {{candidate expects value of type 'Int' for parameter #2}}
+  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 }
 }
 
 func SR_6272_d() {
@@ -1384,4 +1384,24 @@ class ClassWithPropContainingSetter {
     get { return 0 }
     set { return 1 } // expected-error {{unexpected non-void return value in void function}}
   }
+}
+
+// https://bugs.swift.org/browse/SR-11964
+struct Rect {
+    let width: Int
+    let height: Int
+}
+
+struct Frame {
+    func rect(width: Int, height: Int) -> Rect {
+        Rect(width: width, height: height)
+    }
+
+    let rect: Rect
+}
+
+func foo(frame: Frame) {
+    frame.rect.width + 10.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+    // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int)}}
+
 }

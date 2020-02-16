@@ -20,6 +20,8 @@ import MSVCRT
 import WinSDK
 #endif
 
+#if !os(WASI)
+// No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
 internal func _signalToString(_ signal: Int) -> String {
 #if os(WASI)
   return "unsupported"
@@ -38,6 +40,7 @@ internal func _signalToString(_ signal: Int) -> String {
   }
 #endif // os(WASI)
 }
+#endif
 
 public enum ProcessTerminationStatus : CustomStringConvertible {
   case exit(Int)
@@ -48,7 +51,12 @@ public enum ProcessTerminationStatus : CustomStringConvertible {
     case .exit(let status):
       return "Exit(\(status))"
     case .signal(let signal):
+#if os(WASI)
+      // No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
+      fatalError("Signals are not supported on WebAssembly/WASI")
+#else
       return "Signal(\(_signalToString(signal)))"
+#endif
     }
   }
 }
@@ -146,13 +154,13 @@ public func waitProcess(_ process: HANDLE) -> ProcessTerminationStatus {
   return .exit(Int(status))
 }
 #elseif os(WASI)
-// Oops, we can't launch tests in subprocesses yet!
+// WASI doesn't support child processes
 public func spawnChild(_ args: [String])
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
-  fatalError("Not supported on WebAssembly!")
+  fatalError("\(#function) is not supported on WebAssembly/WASI")
 }
 public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
-  fatalError("Not supported on WebAssembly!")
+  fatalError("\(#function) is not supported on WebAssembly/WASI")
 }
 #else
 // posix_spawn is not available on Android.

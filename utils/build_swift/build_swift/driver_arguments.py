@@ -611,8 +611,11 @@ def create_argument_parser():
     option('--libicu', toggle_true('build_libicu'),
            help='build libicu')
 
-    option('--playgroundsupport', store_true('build_playgroundsupport'),
+    option('--playgroundsupport', toggle_true('build_playgroundsupport'),
            help='build PlaygroundSupport')
+    option('--install-playgroundsupport',
+           store_true('install_playgroundsupport'),
+           help='install playground support')
 
     option('--pythonkit', store_true('build_pythonkit'),
            help='build PythonKit')
@@ -1007,6 +1010,9 @@ def create_argument_parser():
            help='skip testing indexstore-db')
     option('--skip-test-sourcekit-lsp', toggle_false('test_sourcekitlsp'),
            help='skip testing sourcekit-lsp')
+    option('--skip-test-playgroundsupport',
+           toggle_false('test_playgroundsupport'),
+           help='skip testing PlaygroundSupport')
     option('--skip-test-skstresstester', toggle_false('test_skstresstester'),
            help='skip testing the SourceKit Stress tester')
     option('--skip-test-swiftevolve', toggle_false('test_swiftevolve'),

@@ -46,7 +46,7 @@ scopedFunction = 42
 // FIXME: Should be an error -- a type name and a function cannot overload.
 var _ : Int = TypeNameWins(42)
 
-TypeNameWins = 42 // expected-error {{no exact matches in assignment to 'TypeNameWins'}}
+TypeNameWins = 42 // expected-error {{no exact matches in reference to global function 'TypeNameWins'}}
 var _ : TypeNameWins // no-warning
 
 // rdar://problem/21739333

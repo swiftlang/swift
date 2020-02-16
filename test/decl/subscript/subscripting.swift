@@ -385,9 +385,9 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   _ = s1.subscript(SuperClass())
   // expected-error@-1 {{no exact matches in call to subscript}}
   _ = s1.subscript("hello")
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  // expected-error@-1 {{no exact matches in call to subscript}}
   _ = s1.subscript("hello"
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  // expected-error@-1 {{no exact matches in call to subscript}}
   // expected-note@-2 {{to match this opening '('}}
 
   let _ = s1["hello"]

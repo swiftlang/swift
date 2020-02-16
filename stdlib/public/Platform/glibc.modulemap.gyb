@@ -382,6 +382,8 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/pthread.h"
       export *
     }
+% end
+% if CMAKE_SDK != "WASI":
     module pwd {
       header "${GLIBC_INCLUDE_PATH}/pwd.h"
       export *

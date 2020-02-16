@@ -79,8 +79,11 @@ public:
 
 LiveRange::LiveRange(SILValue value)
     : destroys(), generalForwardingInsts(), unknownConsumingUsers() {
-  SmallVector<Operand *, 32> worklist(value->getUses());
+  assert(value.getOwnershipKind() == ValueOwnershipKind::Owned);
 
+  // We know that our silvalue produces an @owned value. Look through all of our
+  // uses and classify them as either consuming or not.
+  SmallVector<Operand *, 32> worklist(value->getUses());
   while (!worklist.empty()) {
     auto *op = worklist.pop_back_val();
 
@@ -88,65 +91,59 @@ LiveRange::LiveRange(SILValue value)
     if (op->isTypeDependent())
       continue;
 
+    // Do a quick check that we did not add ValueOwnershipKind that are not
+    // owned to the worklist.
+    assert(op->get().getOwnershipKind() == ValueOwnershipKind::Owned &&
+           "Added non-owned value to worklist?!");
+
     auto *user = op->getUser();
 
-    // We know that a copy_value produces an @owned value. Look through all of
-    // our uses and classify them as either invalidating or not
-    // invalidating. Make sure that all of the invalidating ones are
-    // destroy_value since otherwise the live_range is not complete.
-    auto map = op->getOwnershipKindMap();
-    auto constraint = map.getLifetimeConstraint(ValueOwnershipKind::Owned);
-    switch (constraint) {
-    case UseLifetimeConstraint::MustBeInvalidated: {
-      // See if we have a destroy value. If we don't we have an
-      // unknown consumer. Return false, we need this live range.
-      if (auto *dvi = dyn_cast<DestroyValueInst>(user)) {
-        destroys.push_back(dvi);
-        continue;
-      }
-
-      // Otherwise, see if we have a forwarding value that has a single
-      // non-trivial operand that can accept a guaranteed value. If not, we can
-      // not recursively process it, so be conservative and assume that we /may
-      // consume/ the value, so the live range must not be eliminated.
-      //
-      // DISCUSSION: For now we do not support forwarding instructions with
-      // multiple non-trivial arguments since we would need to optimize all of
-      // the non-trivial arguments at the same time.
-      //
-      // NOTE: Today we do not support TermInsts for simplicity... we /could/
-      // support it though if we need to.
-      if (isa<TermInst>(user) || !isGuaranteedForwardingInst(user) ||
-          1 != count_if(user->getOperandValues(
-                            true /*ignore type dependent operands*/),
-                        [&](SILValue v) {
-                          return v.getOwnershipKind() ==
-                                 ValueOwnershipKind::Owned;
-                        })) {
-        unknownConsumingUsers.push_back(user);
-        continue;
-      }
-
-      // Ok, this is a forwarding instruction whose ownership we can flip from
-      // owned -> guaranteed. Visit its users recursively to see if the the
-      // users force the live range to be alive.
-      generalForwardingInsts.push_back(user);
-      for (SILValue v : user->getResults()) {
-        if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
-          continue;
-        llvm::copy(v->getUses(), std::back_inserter(worklist));
-      }
+    // Ok, this constraint can take something owned as live. Assert that it
+    // can also accept something that is guaranteed. Any non-consuming use of
+    // an owned value should be able to take a guaranteed parameter as well
+    // (modulo bugs). We assert to catch these.
+    if (!op->isConsumingUse()) {
       continue;
     }
-    case UseLifetimeConstraint::MustBeLive:
-      // Ok, this constraint can take something owned as live. Assert that it
-      // can also accept something that is guaranteed. Any non-consuming use of
-      // an owned value should be able to take a guaranteed parameter as well
-      // (modulo bugs). We assert to catch these.
-      assert(map.canAcceptKind(ValueOwnershipKind::Guaranteed) &&
-             "Any non-consuming use of an owned value should be able to take a "
-             "guaranteed value");
+
+    // Ok, we know now that we have a consuming use. See if we have a destroy
+    // value, quickly up front. If we do have one, stash it and continue.
+    if (auto *dvi = dyn_cast<DestroyValueInst>(user)) {
+      destroys.push_back(dvi);
       continue;
+    }
+
+    // Otherwise, we have some form of consuming use that either forwards or
+    // that we do not understand. See if we have a forwarding value that has a
+    // single non-trivial operand that can accept a guaranteed value. If not, we
+    // can not recursively process it, so be conservative and assume that we
+    // /may consume/ the value, so the live range must not be eliminated.
+    //
+    // DISCUSSION: For now we do not support forwarding instructions with
+    // multiple non-trivial arguments since we would need to optimize all of
+    // the non-trivial arguments at the same time.
+    //
+    // NOTE: Today we do not support TermInsts for simplicity... we /could/
+    // support it though if we need to.
+    if (isa<TermInst>(user) || !isGuaranteedForwardingInst(user) ||
+        1 != count_if(user->getOperandValues(
+                          true /*ignore type dependent operands*/),
+                      [&](SILValue v) {
+                        return v.getOwnershipKind() ==
+                               ValueOwnershipKind::Owned;
+                      })) {
+      unknownConsumingUsers.push_back(user);
+      continue;
+    }
+
+    // Ok, this is a forwarding instruction whose ownership we can flip from
+    // owned -> guaranteed. Visit its users recursively to see if the the
+    // users force the live range to be alive.
+    generalForwardingInsts.push_back(user);
+    for (SILValue v : user->getResults()) {
+      if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
+        continue;
+      llvm::copy(v->getUses(), std::back_inserter(worklist));
     }
   }
 }

@@ -2831,14 +2831,10 @@ public:
     if (numBackingProperties > 0) {
       auto backingDecl = MF.getDeclChecked(backingPropertyIDs[0]);
       if (!backingDecl) {
-        if (numBackingProperties > 1 &&
-            backingDecl.errorIsA<XRefNonLoadedModuleError>()) {
-            // A property wrapper defined behind an implementation-only import
-            // is safe to drop when it can't be deserialized.
-            // rdar://problem/56599179
-            consumeError(backingDecl.takeError());
-        } else
-          return backingDecl.takeError();
+        // FIXME: This is actually wrong. We can't just drop stored properties
+        // willy-nilly if the struct is @frozen.
+        consumeError(backingDecl.takeError());
+        return var;
       }
 
       VarDecl *backingVar = cast<VarDecl>(backingDecl.get());

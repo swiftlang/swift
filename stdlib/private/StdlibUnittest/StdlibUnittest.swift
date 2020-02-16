@@ -12,7 +12,9 @@
 
 
 import SwiftPrivate
+#if !os(WASI)
 import SwiftPrivateThreadExtras
+#endif
 import SwiftPrivateLibcExtras
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -749,6 +751,7 @@ extension ProcessTerminationStatus {
 #if os(Windows)
       return CInt(signal) == SIGILL
 #elseif os(WASI)
+      // No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
       return false
 #else
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP

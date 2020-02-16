@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 539; // swift master-rebranch
+const uint16_t SWIFTMODULE_VERSION_MINOR = 540; // differentiability_witness_function instruction
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1844,6 +1844,12 @@ namespace decls_block {
     DeclIDField, // replaced function
     BCVBR<4>,   // # of arguments (+1) or zero if no name
     BCArray<IdentifierIDField>
+  >;
+
+  using TypeEraserDeclAttrLayout = BCRecordLayout<
+    TypeEraser_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    TypeIDField // type eraser type
   >;
 
   using CustomDeclAttrLayout = BCRecordLayout<

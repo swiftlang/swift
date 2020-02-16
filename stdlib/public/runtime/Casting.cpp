@@ -30,7 +30,7 @@
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
-#ifdef __wasi__
+#if defined(__wasi__)
 # define SWIFT_CASTING_SUPPORTS_MUTEX 0
 #else
 # define SWIFT_CASTING_SUPPORTS_MUTEX 1
@@ -1057,6 +1057,10 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
                               const Metadata *targetType) {
   auto origSourceType = sourceType;
 
+  // Identical types always succeed
+  if (sourceType == targetType)
+    return origSourceType;
+
   switch (targetType->getKind()) {
   case MetadataKind::ObjCClassWrapper:
     // Get the actual class object.
@@ -1122,17 +1126,13 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
 
   case MetadataKind::Existential: {
     auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);
-    if (!_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
-      return nullptr;
-    return origSourceType;
+    if (_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
+      return origSourceType;
+    return nullptr;
   }
 
   default:
-    // The cast succeeds only if the metadata pointers are statically
-    // equivalent.
-    if (sourceType != targetType)
-      return nullptr;
-    return origSourceType;
+    return nullptr;
   }
 
   swift_runtime_unreachable("Unhandled MetadataKind in switch.");
@@ -1143,6 +1143,10 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
                                            const Metadata *targetType,
                                            const char *file, unsigned line, unsigned column) {
   auto origSourceType = sourceType;
+
+  // Identical types always succeed
+  if (sourceType == targetType)
+    return origSourceType;
 
   switch (targetType->getKind()) {
   case MetadataKind::ObjCClassWrapper:
@@ -1210,12 +1214,16 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
       swift_dynamicCastFailure(sourceType, targetType);
     }
     break;
+
+  case MetadataKind::Existential: {
+    auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);
+    if (_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
+      return origSourceType;
+    swift_dynamicCastFailure(sourceType, targetType);
+  }
+
   default:
-    // The cast succeeds only if the metadata pointers are statically
-    // equivalent.
-    if (sourceType != targetType)
-      swift_dynamicCastFailure(sourceType, targetType);
-    return origSourceType;
+    swift_dynamicCastFailure(sourceType, targetType);
   }
 }
 

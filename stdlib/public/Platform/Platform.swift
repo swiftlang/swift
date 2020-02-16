@@ -367,7 +367,7 @@ public var SIG_ERR: _crt_signal_t {
   return unsafeBitCast(-1, to: _crt_signal_t.self)
 }
 #elseif os(WASI)
-// WebAssembly/WASI doesn't have signals.
+// No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
 #else
 internal var _ignore = _UnsupportedPlatformError()
 #endif

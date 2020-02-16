@@ -121,6 +121,10 @@ public:
   bool run();
 
 protected:
+  /// Checks if a given global variable is assigned only once.
+  bool isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG,
+                                       SILFunction *globalAddrF);
+
   /// Reset all the maps of global variables.
   void reset();
 
@@ -637,15 +641,26 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
   return GetterF;
 }
 
-/// Checks if a given global variable is assigned only once.
-static bool isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG) {
+bool SILGlobalOpt::isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG,
+                                                   SILFunction *globalAddrF) {
   if (SILG->isLet())
     return true;
-  // TODO: If we can prove that a given global variable
-  // is assigned only once, during initialization, then
-  // we can treat it as if it is a let.
-  // If this global is internal or private, it should be
-  return false;
+
+  // If we should skip this, it is probably because there are multiple stores.
+  // Return false if there are multiple stores or no stores.
+  if (GlobalVarSkipProcessing.count(SILG) || !GlobalVarStore.count(SILG) ||
+      // Check if there is more than one use the global addr function. If there
+      // is only one use, it must be the use that we are trying to optimize, so
+      // that is OK. If there is more than one use, one of the other uses may
+      // have a store attached to it which means there may be more than one
+      // assignment, so return false.
+      (GlobalInitCallMap.count(globalAddrF) &&
+       GlobalInitCallMap[globalAddrF].size() != 1))
+    return false;
+
+  // Otherwise, return true if this can't be used externally (false, otherwise).
+  return !isPossiblyUsedExternally(SILG->getLinkage(),
+                                   SILG->getModule().isWholeModule());
 }
 
 /// Replace load sequence which may contain
@@ -691,7 +706,7 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
   LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: replacing loads with known value for "
                           << SILG->getName() << '\n');
 
-  assert(isAssignedOnlyOnceInInitializer(SILG) &&
+  assert(isAssignedOnlyOnceInInitializer(SILG, AddrF) &&
          "The value of the initializer should be known at compile-time");
   assert(SILG->getDecl() &&
          "Decl corresponding to the global variable should be known");
@@ -804,7 +819,7 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
                           << SILG->getName() << '\n');
 
   // Remove "once" call from the addressor.
-  if (!isAssignedOnlyOnceInInitializer(SILG) || !SILG->getDecl()) {
+  if (!isAssignedOnlyOnceInInitializer(SILG, AddrF) || !SILG->getDecl()) {
     LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: building static initializer for "
                             << SILG->getName() << '\n');
 

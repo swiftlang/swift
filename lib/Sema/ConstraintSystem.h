@@ -697,6 +697,13 @@ struct AppliedBuilderTransform {
 
   /// The return expression, capturing the last value to be emitted.
   Expr *returnExpr = nullptr;
+
+  using PatternEntry = std::pair<const PatternBindingDecl *, unsigned>;
+
+  /// Mapping from specific pattern binding entries to the solution application
+  /// targets capturing their initialization.
+  llvm::DenseMap<PatternEntry, SolutionApplicationTarget>
+      patternBindingEntries;
 };
 
 /// Describes the fixed score of a solution to the constraint system.
@@ -774,8 +781,8 @@ struct Score {
 
 /// An AST node that can gain type information while solving.
 using TypedNode =
-    llvm::PointerUnion4<const Expr *, const TypeLoc *,
-                        const VarDecl *, const Pattern *>;
+    llvm::PointerUnion<const Expr *, const TypeLoc *,
+                       const VarDecl *, const Pattern *>;
 
 /// Display a score.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
@@ -886,7 +893,7 @@ public:
   /// \returns the coerced expression, which will have type \c ToType.
   Expr *coerceToType(Expr *expr, Type toType,
                      ConstraintLocator *locator,
-                     Optional<Pattern*> typeFromPattern = None) const;
+                     Optional<Pattern*> typeFromPattern = None);
 
   /// Compute the set of substitutions for a generic signature opened at the
   /// given locator.
@@ -3249,6 +3256,23 @@ public:
   /// if generation succeeded.
   bool generateConstraints(StmtCondition condition, DeclContext *dc);
 
+  /// Provide a type for each variable that occurs within the given pattern,
+  /// by matching the pattern structurally with its already-computed pattern
+  /// type. The variables will either get a concrete type (when present in
+  /// the pattern type) or a fresh type variable bound to that part of the
+  /// pattern via a one-way constraint.
+  void bindVariablesInPattern(Pattern *pattern, Type patternType,
+                              ConstraintLocator *locator);
+
+  /// Provide a type for each variable that occurs within the given pattern,
+  /// by matching the pattern structurally with its already-computed pattern
+  /// type. The variables will either get a concrete type (when present in
+  /// the pattern type) or a fresh type variable bound to that part of the
+  /// pattern via a one-way constraint.
+  void bindVariablesInPattern(Pattern *pattern, ConstraintLocator *locator) {
+    bindVariablesInPattern(pattern, getType(pattern), locator);
+  }
+
   /// Generate constraints for a given set of overload choices.
   ///
   /// \param constraints The container of generated constraint choices.
@@ -5059,6 +5083,8 @@ bool exprNeedsParensOutsideFollowingOperator(
 /// Determine whether this is a SIMD operator.
 bool isSIMDOperator(ValueDecl *value);
 
+std::string describeGenericType(ValueDecl *GP, bool includeName = false);
+
 /// Apply the given function builder transform within a specific solution
 /// to produce the rewritten body.
 ///
@@ -5067,10 +5093,8 @@ bool isSIMDOperator(ValueDecl *value);
 /// \param applied The applied builder transform.
 /// \param body The body to transform
 /// \param dc The context in which the transform occurs.
-/// \param rewriteExpr Rewrites expressions that show up in the transform
-/// to their final, type-checked versions.
-/// \param coerceToType Coerce the given expression to the specified type,
-/// which may introduce implicit conversions.
+/// \param rewriteTarget Rewrites a solution application target to its final,
+/// type-checked version.
 ///
 /// \returns the transformed body
 BraceStmt *applyFunctionBuilderTransform(
@@ -5078,9 +5102,10 @@ BraceStmt *applyFunctionBuilderTransform(
     constraints::AppliedBuilderTransform applied,
     BraceStmt *body,
     DeclContext *dc,
-    std::function<Expr *(Expr *)> rewriteExpr,
-    std::function<Expr *(Expr *, Type, constraints::ConstraintLocator *)>
-      coerceToType);
+    std::function<
+        Optional<constraints::SolutionApplicationTarget> (
+          constraints::SolutionApplicationTarget)>
+            rewriteTarget);
 
 } // end namespace swift
 

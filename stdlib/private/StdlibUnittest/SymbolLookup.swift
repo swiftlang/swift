@@ -35,6 +35,8 @@
   #endif
 #elseif os(Windows)
   let hStdlibCore: HMODULE = GetModuleHandleA("swiftCore.dll")!
+#elseif os(WASI)
+// WASI doesn't support dynamic linking yet.
 #else
   #error("Unsupported platform")
 #endif
@@ -44,7 +46,7 @@ public func pointerToSwiftCoreSymbol(name: String) -> UnsafeMutableRawPointer? {
   return unsafeBitCast(GetProcAddress(hStdlibCore, name),
                        to: UnsafeMutableRawPointer?.self)
 #elseif os(WASI)
-  fatalError("\(#function) is not supported on WebAssembly")
+  fatalError("\(#function) is not supported on WebAssembly/WASI")
 #else
   return dlsym(RTLD_DEFAULT, name)
 #endif

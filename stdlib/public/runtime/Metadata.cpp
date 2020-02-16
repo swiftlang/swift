@@ -44,10 +44,10 @@
 #else
 #include <sys/mman.h>
 #include <unistd.h>
-// WASI doesn't have dynamic linking yet
-#ifndef __wasi__
+// WASI doesn't support dynamic linking yet.
+#if !defined(__wasi__)
 #include <dlfcn.h>
-#endif //__wasi
+#endif // !defined(__wasi__)
 #endif
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
@@ -5225,6 +5225,8 @@ bool Metadata::satisfiesClassConstraint() const {
 template <>
 bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
   if (auto *metadata = dyn_cast<StructMetadata>(this))
+    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+  if (auto *metadata = dyn_cast<EnumMetadata>(this))
     return metadata->isCanonicalStaticallySpecializedGenericMetadata();
 
   return false;
