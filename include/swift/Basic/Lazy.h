@@ -25,7 +25,20 @@
 #include "swift/Basic/type_traits.h"
 
 #ifdef __wasi__
-void wasi_polyfill_call_once(int *flag, void *context, void (*func)(void *));
+inline void wasi_call_once(int *flag, void *context, void (*func)(void *)) {
+  switch (*flag) {
+    case 0:
+      *flag = 1;
+      func(context);
+      return;
+    case 1:
+      return;
+    default:
+      assert(false && "wasi_call_once got invalid flag");
+      abort();
+    }
+}
+
 #endif
 
 namespace swift {
@@ -45,7 +58,7 @@ namespace swift {
 #elif defined(__wasi__)
   using OnceToken_t = int;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
-  ::wasi_polyfill_call_once(&TOKEN, CONTEXT, FUNC)
+  ::wasi_call_once(&TOKEN, CONTEXT, FUNC)
 #else
   using OnceToken_t = std::once_flag;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \

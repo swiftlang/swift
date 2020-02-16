@@ -82,7 +82,7 @@ typedef unsigned long __swift_thread_key_t;
 # elif defined(__HAIKU__)
 typedef int __swift_thread_key_t;
 # elif defined(__wasi__)
-typedef unsigned int __swift_thread_key_t;
+typedef unsigned long __swift_thread_key_t;
 # else
 typedef unsigned long __swift_thread_key_t;
 # endif
@@ -99,12 +99,9 @@ static_assert(std::is_same<__swift_thread_key_t, DWORD>::value,
 #  define SWIFT_THREAD_GETSPECIFIC FlsGetValue
 #  define SWIFT_THREAD_SETSPECIFIC(key, value) (FlsSetValue(key, value) == FALSE)
 # elif defined(__wasi__)
-int   wasi_polyfill_pthread_key_create(__swift_thread_key_t *key, void (*destructor)(void*));
-void *wasi_polyfill_pthread_getspecific(__swift_thread_key_t key);
-int   wasi_polyfill_pthread_setspecific(__swift_thread_key_t key, const void *value);
-#  define SWIFT_THREAD_KEY_CREATE  wasi_polyfill_pthread_key_create
-#  define SWIFT_THREAD_GETSPECIFIC wasi_polyfill_pthread_getspecific
-#  define SWIFT_THREAD_SETSPECIFIC wasi_polyfill_pthread_setspecific
+#  define SWIFT_THREAD_KEY_CREATE _stdlib_thread_key_create
+#  define SWIFT_THREAD_GETSPECIFIC _stdlib_thread_getspecific
+#  define SWIFT_THREAD_SETSPECIFIC _stdlib_thread_setspecific
 # else
 // Otherwise use the pthread API.
 #  include <pthread.h>
