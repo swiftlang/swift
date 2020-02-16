@@ -378,6 +378,7 @@ const std::string NodeKindNames[]{
     "topLevel",      "nominal",        "potentialMember",  "member",
     "dynamicLookup", "externalDepend", "sourceFileProvide"};
 
+
 /// Instead of the status quo scheme of two kinds of "Depends", cascading and
 /// non-cascading this code represents each entity ("Provides" in the status
 /// quo), by a pair of nodes. One node represents the "implementation." If the
@@ -396,6 +397,7 @@ template <typename FnT> void forEachAspect(FnT fn) {
   for (size_t i = 0; i < size_t(DeclAspect::aspectCount); ++i)
     fn(DeclAspect(i));
 }
+
 
 /// A pair of nodes that represent the two aspects of a given entity.
 /// Templated in order to serve for either SourceFileDepGraphNodes or
@@ -575,6 +577,14 @@ struct std::hash<typename swift::fine_grained_dependencies::DeclAspect> {
     return size_t(aspect);
   }
 };
+template <>
+struct std::hash<typename swift::fine_grained_dependencies::NodeKind> {
+  size_t
+  operator()(const swift::fine_grained_dependencies::NodeKind kind) const {
+    return size_t(kind);
+  }
+};
+
 
 namespace swift {
 namespace fine_grained_dependencies {
