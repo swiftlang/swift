@@ -1721,6 +1721,11 @@ void Remangler::mangleOwningMutableAddressor(Node *node) {
   mangleAbstractStorage(node->getFirstChild(), "aO");
 }
 
+void Remangler::mangleThinToThickForwarder(Node *node) {
+  mangleChildNodesReversed(node);
+  Buffer << "Tu";
+}
+
 void Remangler::manglePartialApplyForwarder(Node *node) {
   mangleChildNodesReversed(node);
   Buffer << "TA";

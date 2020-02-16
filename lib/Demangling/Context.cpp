@@ -88,6 +88,7 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
     MangledName = stripSuffix(MangledName);
     // First do a quick check
     if (MangledName.endswith("TA") ||  // partial application forwarder
+        MangledName.endswith("Tu")||   // thin-to-thick forwarder
         MangledName.endswith("Ta") ||  // ObjC partial application forwarder
         MangledName.endswith("To") ||  // swift-as-ObjC thunk
         MangledName.endswith("TO") ||  // ObjC-as-swift thunk
@@ -107,6 +108,7 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
         case Node::Kind::NonObjCAttribute:
         case Node::Kind::PartialApplyObjCForwarder:
         case Node::Kind::PartialApplyForwarder:
+        case Node::Kind::ThinToThickForwarder:
         case Node::Kind::ReabstractionThunkHelper:
         case Node::Kind::ReabstractionThunk:
         case Node::Kind::ProtocolWitness:

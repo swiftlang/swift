@@ -1,0 +1,33 @@
+// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s
+
+// REQUIRES: CPU=wasm32
+
+// CHECK-LABEL: define swiftcc void @closureToConvert()
+// CHECK: entry:
+// CHECK:   ret void
+// CHECK: }
+sil @closureToConvert : $@convention(thin) () -> () {
+  %99 = tuple ()
+  return %99 : $()
+}
+// CHECK-LABEL: define swiftcc void @testConvertFunc()
+// CHECK: entry:
+// CHECK:   call swiftcc void @"$s{{.*}}Tu"(%swift.refcounted* swiftself bitcast (void ()* @closureToConvert to %swift.refcounted*))
+// CHECK:   ret void
+// CHECK-LABEL: }
+
+sil @testConvertFunc : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @closureToConvert : $@convention(thin) () -> ()
+  %cf = convert_function %f : $@convention(thin) () -> () to $@noescape @convention(thin) () -> ()
+  %thick = thin_to_thick_function %cf : $@noescape @convention(thin) () -> () to $@noescape @callee_owned () -> ()
+  %apply = apply %thick() : $@noescape @callee_owned () -> ()
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: define internal void @"$s{{.*}}Tu"(%swift.refcounted* swiftself %0)
+// CHECK: entry:
+// CHECK:   %1 = bitcast %swift.refcounted* %0 to void ()*
+// CHECK:   call swiftcc void %1()
+// CHECK:   ret void

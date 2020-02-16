@@ -4691,8 +4691,61 @@ void IRGenSILFunction::visit##KIND##Inst(swift::KIND##Inst *i) {  \
 #include "swift/AST/ReferenceStorage.def"
 #undef NOOP_CONVERSION
 
+
+static FunctionPointer
+getLoweredFunctionPointer(IRGenSILFunction &IGF, SILValue v) {
+  LoweredValue &lv = IGF.getLoweredValue(v);
+  auto fnType = v->getType().castTo<SILFunctionType>();
+
+  switch (lv.kind) {
+  case LoweredValue::Kind::ContainedAddress:
+  case LoweredValue::Kind::StackAddress:
+  case LoweredValue::Kind::DynamicallyEnforcedAddress:
+  case LoweredValue::Kind::OwnedAddress:
+  case LoweredValue::Kind::EmptyExplosion:
+  case LoweredValue::Kind::CoroutineState:
+  case LoweredValue::Kind::ObjCMethod:
+    llvm_unreachable("not a valid function");
+
+  case LoweredValue::Kind::FunctionPointer: {
+    return lv.getFunctionPointer();
+  }
+  case LoweredValue::Kind::SingletonExplosion: {
+    llvm::Value *fnPtr = lv.getKnownSingletonExplosion();
+    return FunctionPointer::forExplosionValue(IGF, fnPtr, fnType);
+  }
+  case LoweredValue::Kind::ExplosionVector: {
+    Explosion ex = lv.getExplosion(IGF, v->getType());
+    llvm::Value *fnPtr = ex.claimNext();
+    auto fn = FunctionPointer::forExplosionValue(IGF, fnPtr, fnType);
+    return fn;
+  }
+  }
+  llvm_unreachable("bad kind");
+}
+
 void IRGenSILFunction::visitThinToThickFunctionInst(
                                             swift::ThinToThickFunctionInst *i) {
+
+  if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
+    auto fn = getLoweredFunctionPointer(*this, i->getCallee());
+    auto fnTy = i->getCallee()->getType().castTo<SILFunctionType>();
+    Optional<FunctionPointer> staticFn;
+    if (fn.isConstant()) staticFn = fn;
+    auto thunkFn = getThinToThickForwarder(IGM, staticFn, fnTy);
+    Explosion from = getLoweredExplosion(i->getOperand());
+    Explosion to;
+    auto fnPtr = Builder.CreateBitCast(thunkFn, IGM.Int8PtrTy);
+    to.add(fnPtr);
+    llvm::Value *ctx = from.claimNext();
+    if (fnTy->isNoEscape())
+      ctx = Builder.CreateBitCast(ctx, IGM.OpaquePtrTy);
+    else
+      ctx = Builder.CreateBitCast(ctx, IGM.RefCountedPtrTy);
+    to.add(ctx);
+    setLoweredExplosion(i, to);
+    return;
+  }
   // Take the incoming function pointer and add a null context pointer to it.
   Explosion from = getLoweredExplosion(i->getOperand());
   Explosion to;

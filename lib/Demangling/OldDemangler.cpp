@@ -364,6 +364,15 @@ private:
         DEMANGLE_CHILD_OR_RETURN(forwarder, Global);
       return forwarder;
     }
+    
+    // thin-to-thick thunks.
+    if (Mangled.nextIf("Pu")) {
+      Node::Kind kind = Node::Kind::ThinToThickForwarder;
+      auto forwarder = Factory.createNode(kind);
+      if (Mangled.nextIf("__T"))
+        DEMANGLE_CHILD_OR_RETURN(forwarder, Global);
+      return forwarder;
+    }
 
     // Top-level types, for various consumers.
     if (Mangled.nextIf('t')) {
