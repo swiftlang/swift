@@ -1051,8 +1051,15 @@ struct MemberLookupResult {
   /// If there is a favored candidate in the viable list, this indicates its
   /// index.
   unsigned FavoredChoice = ~0U;
-  
-  
+
+  /// The number of optional unwraps that were applied implicitly in the
+  /// lookup, for contexts where that is permitted.
+  unsigned numImplicitOptionalUnwraps = 0;
+
+  /// The base lookup type used to find the results, which will be non-null
+  /// only when it differs from the provided base type.
+  Type actualBaseType;
+
   /// This enum tracks reasons why a candidate is not viable.
   enum UnviableReason {
     /// This uses a type like Self in its signature that cannot be used on an

@@ -2310,10 +2310,81 @@ namespace {
       case PatternKind::Bool:
         return setType(CS.getASTContext().getBoolDecl()->getDeclaredType());
 
+      case PatternKind::EnumElement: {
+        auto enumPattern = cast<EnumElementPattern>(pattern);
+
+        // Create a type variable to represent the pattern.
+        Type patternType =
+            CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                  TVO_CanBindToNoEscape);
+
+        // Form the member constraint for a reference to a member of this
+        // type.
+        Type baseType;
+        Type memberType = CS.createTypeVariable(
+            CS.getConstraintLocator(locator),
+            TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+        FunctionRefKind functionRefKind = FunctionRefKind::Compound;
+        if (!enumPattern->getParentType().isNull()) {
+          // Resolve the parent type.
+          Type parentType =
+            resolveTypeReferenceInExpression(enumPattern->getParentType());
+          parentType = CS.openUnboundGenericType(parentType, locator);
+
+          // Perform member lookup into the parent's metatype.
+          Type parentMetaType = MetatypeType::get(parentType);
+          CS.addValueMemberConstraint(
+              parentMetaType, enumPattern->getName(), memberType, CurDC,
+              functionRefKind, { },
+              locator.withPathElement(ConstraintLocator::PatternMatch));
+
+          // Parent type needs to be convertible to the pattern type; this
+          // accounts for cases where the pattern type is existential.
+          CS.addConstraint(ConstraintKind::Conversion, parentType, patternType,
+                           locator);
+
+          baseType = parentType;
+        } else {
+          // Use the pattern type for member lookup.
+          CS.addUnresolvedValueMemberConstraint(
+              MetatypeType::get(patternType), enumPattern->getName(),
+              memberType, CurDC, functionRefKind,
+              locator.withPathElement(ConstraintLocator::PatternMatch));
+
+          baseType = patternType;
+        }
+
+        if (auto subPattern = enumPattern->getSubPattern()) {
+          // When there is a subpattern, the member will have function type,
+          // and we're matching the type of that subpattern to the parameter
+          // types.
+          Type subPatternType = getTypeForPattern(subPattern, locator);
+          SmallVector<AnyFunctionType::Param, 8> params;
+          AnyFunctionType::decomposeInput(subPatternType, params);
+
+          // Remove parameter labels; they aren't used when matching cases,
+          // but outright conflicts will be checked during coercion.
+          for (auto &param : params) {
+            param = param.getWithoutLabel();
+          }
+
+          Type outputType = CS.createTypeVariable(
+              CS.getConstraintLocator(locator),
+              TVO_CanBindToNoEscape);
+          Type functionType = FunctionType::get(params, outputType);
+          CS.addConstraint(ConstraintKind::Equal, functionType, memberType,
+                           locator);
+
+          CS.addConstraint(ConstraintKind::Conversion, outputType, baseType,
+                           locator);
+        }
+
+        return setType(patternType);
+      }
+
       // Refutable patterns occur when checking the PatternBindingDecls in an
       // if/let or while/let condition.  They always require an initial value,
       // so they always allow unspecified types.
-      case PatternKind::EnumElement:
       case PatternKind::Expr:
         // TODO: we could try harder here, e.g. for enum elements to provide the
         // enum type.

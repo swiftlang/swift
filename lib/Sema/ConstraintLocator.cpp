@@ -117,6 +117,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::DynamicCallable:
   case ConstraintLocator::ImplicitCallAsFunction:
   case ConstraintLocator::TernaryBranch:
+  case ConstraintLocator::PatternMatch:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -476,10 +477,15 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "implicit reference to callAsFunction";
       break;
 
-    case TernaryBranch:
+    case TernaryBranch: {
       auto branchElt = elt.castTo<LocatorPathElt::TernaryBranch>();
       out << (branchElt.forThen() ? "'then'" : "'else'")
           << " branch of a ternary operator";
+      break;
+    }
+
+    case PatternMatch:
+      out << "pattern match";
       break;
     }
   }

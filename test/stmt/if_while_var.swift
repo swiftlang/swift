@@ -144,3 +144,58 @@ func testWhileScoping(_ a: Int?) {// expected-note {{did you mean 'a'?}}
   useInt(x) // expected-error{{use of unresolved identifier 'x'}}
 }
 
+// Matching a case with a single, labeled associated value.
+public enum SomeParseResult<T> {
+  case error(length: Int)
+  case repeated(value: String, repetitions: Int)
+
+  var _error: Int? {
+    if case .error(let result) = self { return result }
+    return nil
+  }
+
+  var _error2: Int? {
+    if case .error(length: let result) = self { return result }
+    return nil
+  }
+
+  var _error3: Int? {
+    if case .error(wrong: let result) = self { return result } // expected-error{{tuple pattern element label 'wrong' must be 'length'}}
+    return nil
+  }
+
+  var _repeated: (String, Int)? {
+    if case .repeated(let value, let repetitions) = self {
+      return (value, repetitions)
+    }
+    return nil
+  }
+
+  var _repeated2: (String, Int)? {
+    if case .repeated(value: let value, let repetitions) = self {
+      return (value, repetitions)
+    }
+    return nil
+  }
+
+  var _repeated3: (String, Int)? {
+    if case .repeated(let value, repetitions: let repetitions) = self {
+      return (value, repetitions)
+    }
+    return nil
+  }
+
+  var _repeated4: (String, Int)? {
+    if case .repeated(value: let value, repetitions: let repetitions) = self {
+      return (value, repetitions)
+    }
+    return nil
+  }
+
+  var _repeated5: (String, Int)? {
+    if case .repeated(value: let value, wrong: let repetitions) = self { // expected-error{{tuple pattern element label 'wrong' must be 'repetitions'}}
+      return (value, repetitions)
+    }
+    return nil
+  }
+}

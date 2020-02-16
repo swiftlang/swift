@@ -6039,6 +6039,24 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
   }
 
+  // If we have candidates, and we're doing a member lookup for a pattern
+  // match, unwrap optionals and try again to allow implicit creation of
+  // optional "some" patterns (spelled "?").
+  if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
+      memberLocator->getLastElementAs<LocatorPathElt::PatternMatch>() &&
+      instanceTy->getOptionalObjectType() &&
+      baseObjTy->is<AnyMetatypeType>()) {
+    SmallVector<Type, 2> optionals;
+    Type instanceObjectTy = instanceTy->lookThroughAllOptionalTypes(optionals);
+    Type metaObjectType = MetatypeType::get(instanceObjectTy);
+    auto result = performMemberLookup(
+        constraintKind, memberName, metaObjectType,
+        functionRefKind, memberLocator, includeInaccessibleMembers);
+    result.numImplicitOptionalUnwraps = optionals.size();
+    result.actualBaseType = metaObjectType;
+    return result;
+  }
+
   // If we have no viable or unviable candidates, and we're generating,
   // diagnostics, rerun the query with inaccessible members included, so we can
   // include them in the unviable candidates list.
@@ -6369,8 +6387,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   }
 
   SmallVector<Constraint *, 4> candidates;
+
   // If we found viable candidates, then we're done!
   if (!result.ViableCandidates.empty()) {
+    // If we had to look in a different type, use that.
+    if (result.actualBaseType)
+      baseTy = result.actualBaseType;
+
     // If only possible choice to refer to member is via keypath
     // dynamic member dispatch, let's delay solving this constraint
     // until constraint generation phase is complete, because
