@@ -3741,7 +3741,6 @@ ConstraintSystem::getFunctionArgApplyInfo(ConstraintLocator *locator) {
     choice = overload->choice;
     rawFnType = overload->openedType;
   } else {
-    assert(isa<CallExpr>(anchor) && "Should always be a CallExpr");
     // If we didn't resolve an overload for the callee, we should be dealing
     // with a call of an arbitrary function expr.
     auto *call = cast<CallExpr>(anchor);
