@@ -880,7 +880,8 @@ bb2:
 
 bb3:
   %2 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt.1, %0 : $Builtin.NativeObject
-  br bb5(%2 : $ThreeDifferingPayloadEnum)
+  %2a = begin_borrow %2 : $ThreeDifferingPayloadEnum
+  br bb5(%2a : $ThreeDifferingPayloadEnum)
 
 bb4:
   %3 = integer_literal $Builtin.Int32, 0
@@ -907,12 +908,14 @@ bb2:
 
 bb3:
   %3 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt.1, %1 : $Builtin.NativeObject
-  br bb5(%3 : $ThreeDifferingPayloadEnum)
+  %3a = begin_borrow %3 : $ThreeDifferingPayloadEnum
+  br bb5(%3a : $ThreeDifferingPayloadEnum)
 
 bb4:
   %4 = integer_literal $Builtin.Int32, 0
   %5 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt.1, %4 : $Builtin.Int32
-  br bb5(%5 : $ThreeDifferingPayloadEnum)
+  %5a = begin_borrow %5 : $ThreeDifferingPayloadEnum
+  br bb5(%5a : $ThreeDifferingPayloadEnum)
 
 bb5(%6 : @guaranteed $ThreeDifferingPayloadEnum):
   %7 = copy_value %6 : $ThreeDifferingPayloadEnum
@@ -1187,5 +1190,105 @@ bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   %2 = mark_dependence %0 : $Builtin.NativeObject on %1 : $Builtin.NativeObject
   destroy_value %1 : $Builtin.NativeObject
   %9999 = tuple()
+  return %9999 : $()
+}
+
+/////////////////////////////////////////
+// Movable Guaranteed Scope Test Cases //
+/////////////////////////////////////////
+
+sil [ossa] @simple_non_postdominating_diamond : $@convention(thin) (@in_guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = load_borrow %0 : $*Builtin.NativeObject
+  br bb3(%3 : $Builtin.NativeObject)
+
+bb2:
+  %5 = begin_borrow %1 : $Builtin.NativeObject
+  br bb3(%5 : $Builtin.NativeObject)
+
+bb3(%7 : @guaranteed $Builtin.NativeObject):
+  end_borrow %7 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @simple_non_postdominating_diamond_with_forwarding_uses : $@convention(thin) (@in_guaranteed Builtin.NativeObject, @guaranteed NonTrivialStructWithTrivialField) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $NonTrivialStructWithTrivialField):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = load_borrow %0 : $*Builtin.NativeObject
+  br bb3(%3 : $Builtin.NativeObject)
+
+bb2:
+  %5 = struct_extract %1 : $NonTrivialStructWithTrivialField, #NonTrivialStructWithTrivialField.owner
+  %6 = begin_borrow %5 : $Builtin.NativeObject
+  br bb3(%6 : $Builtin.NativeObject)
+
+bb3(%7 : @guaranteed $Builtin.NativeObject):
+  end_borrow %7 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we can express a borrow loop carry.
+sil [ossa] @simple_loop_carry : $@convention(thin) (@in_guaranteed Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  %2 = begin_borrow %1 : $Builtin.NativeObject
+  br bb2(%2 : $Builtin.NativeObject)
+
+bb2(%3 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb3, bb4
+
+bb3:
+  %4 = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %3 : $Builtin.NativeObject
+  br bb2(%4 : $Builtin.NativeObject)
+
+bb4:
+  end_borrow %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  destroy_value %1 : $Builtin.NativeObject
+  return %9999 : $()
+}
+
+// Make sure that we accept a borrow loop carry over a two backedge loop.
+sil [ossa] @simple_loop_carry_two_backedge : $@convention(thin) (@in_guaranteed Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  %2 = begin_borrow %1 : $Builtin.NativeObject
+  br bb2(%2 : $Builtin.NativeObject)
+
+bb2(%3 : @guaranteed $Builtin.NativeObject):
+  br bb2a
+
+bb2a:
+  cond_br undef, bb3, bb4
+
+bb3:
+  cond_br undef, bb3a, bb3b
+
+bb3a:
+  %4 = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %3 : $Builtin.NativeObject
+  br bb2(%4 : $Builtin.NativeObject)
+
+bb3b:
+  %5 = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %3 : $Builtin.NativeObject
+  br bb2(%5 : $Builtin.NativeObject)
+
+bb4:
+  end_borrow %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  destroy_value %1 : $Builtin.NativeObject
   return %9999 : $()
 }
