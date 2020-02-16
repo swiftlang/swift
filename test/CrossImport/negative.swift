@@ -3,7 +3,7 @@
 // normally would do so.
 
 // RUN: %empty-directory(%t)
-// RUN: cp -r %S/Inputs/lib-templates/ %t/
+// RUN: cp -r %S/Inputs/lib-templates/* %t/
 
 //
 // The current module is the defining module, bystanding module, or overlay.

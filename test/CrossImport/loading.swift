@@ -2,7 +2,7 @@
 // kind of module that supports them.
 
 // RUN: %empty-directory(%t)
-// RUN: cp -r %S/Inputs/lib-templates/ %t/
+// RUN: cp -r %S/Inputs/lib-templates/* %t/
 // RUN: %{python} %S/Inputs/rewrite-module-triples.py %t %module-target-triple
 
 //

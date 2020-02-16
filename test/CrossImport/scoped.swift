@@ -2,7 +2,7 @@
 // overlays.
 
 // RUN: %empty-directory(%t)
-// RUN: cp -r %S/Inputs/lib-templates/ %t/
+// RUN: cp -r %S/Inputs/lib-templates/* %t/
 
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DBYSTANDING_SCOPED

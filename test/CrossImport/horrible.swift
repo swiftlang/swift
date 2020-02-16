@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: cp -r %S/Inputs/lib-templates/ %t/
+// RUN: cp -r %S/Inputs/lib-templates/* %t/
 
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/lib/swift
 

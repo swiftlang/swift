@@ -1,7 +1,7 @@
 // This file tests that re-exports can load a cross-import overlay.
 
 // RUN: %empty-directory(%t)
-// RUN: cp -r %S/Inputs/lib-templates/ %t/
+// RUN: cp -r %S/Inputs/lib-templates/* %t/
 
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDIRECT_FIRST
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDIRECT_SECOND

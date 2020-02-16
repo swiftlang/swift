@@ -1,7 +1,7 @@
 // This file tests that we emit cross-imports into module interfaces.
 
 // RUN: %empty-directory(%t)
-// RUN: cp -r %S/Inputs/lib-templates/ %t/
+// RUN: cp -r %S/Inputs/lib-templates/* %t/
 
 //
 // Should pass with -enable-cross-import-overlays
