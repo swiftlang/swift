@@ -6,7 +6,7 @@
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
 // CHECK: @"$s4main5OuterOyAA5InnerVySiGGWV" = linkonce_odr hidden constant %swift.enum_vwtable
-// CHECK: @"$s4main5OuterOyAA5InnerVySiGGMf" = internal constant <{ 
+// CHECK: @"$s4main5OuterOyAA5InnerVySiGGMf" = linkonce_odr hidden constant <{ 
 // CHECK-SAME:   i8**, 
 // CHECK-SAME:   [[INT]], 
 // CHECK-SAME:   %swift.type_descriptor*, 

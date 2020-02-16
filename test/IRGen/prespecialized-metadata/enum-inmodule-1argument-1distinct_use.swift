@@ -21,7 +21,7 @@
 // CHECK-SAME:   i8* bitcast (void (%swift.opaque*, %swift.type*)* @"$s4main5ValueOySiGwup" to i8*), 
 // CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$s4main5ValueOySiGwui" to i8*) 
 // CHECK-SAME: }, align [[ALIGNMENT]]
-// CHECK: @"$s4main5ValueOySiGMf" = internal constant <{ 
+// CHECK: @"$s4main5ValueOySiGMf" = linkonce_odr hidden constant <{ 
 // CHECK-SAME:   i8**, 
 // CHECK-SAME:   [[INT]], 
 // CHECK-SAME:   %swift.type_descriptor*, 
