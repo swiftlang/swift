@@ -62,13 +62,6 @@ if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
         expectFalse(set.contains(i))
       }
     }
-    
-    expectTrue(source.contains(1..<5))
-    expectTrue(source.contains(1..<4))
-    expectTrue(source.contains(2..<5))
-    expectFalse(source.contains(2..<6))
-    expectFalse(source.contains(0..<5))
-    expectFalse(source.contains(2..<9))
   }
 
   RangeSetTests.test("insertions") {

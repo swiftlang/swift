@@ -100,22 +100,6 @@ public struct RangeSet<Bound: Comparable> {
       : _ranges[i].lowerBound <= value
   }
   
-  /// Returns a Boolean value indicating whether all the values in the specified
-  /// range are contained in the range set.
-  ///
-  /// - Parameter range: The range of values to look for in the range set.
-  /// - Returns: `true` if `range` is wholly contained by the range set;
-  ///   otherwise, `false`.
-  ///
-  /// - Complexity: O(log *n*), where *n* is the number of ranges in the
-  ///   range set.
-  public func contains(_ range: Range<Bound>) -> Bool {
-    let i = _ranges._partitioningIndex { $0.upperBound >= range.upperBound }
-    return i == _ranges.endIndex
-      ? false
-      : _ranges[i].lowerBound <= range.lowerBound
-  }
-  
   /// Returns a range indicating the existing ranges that `range` overlaps
   /// with.
   ///
