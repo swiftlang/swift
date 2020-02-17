@@ -117,7 +117,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_4 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_5 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_6 | %FileCheck %s -check-prefix=FOOSTRUCT_NODOT
-
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_7 | %FileCheck %s -check-prefix=FOOSTRUCT_LOCALVAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_8 | %FileCheck %s -check-prefix=FOOSTRUCT_LOCALVAL
 
 struct FooStruct {
   var instanceVar : Int
@@ -605,6 +606,13 @@ func testGuardLetBinding5(x: FooStruct?) {
 func testGuardLetBinding5(x: FooStruct?) {
   guard let y = x, z = y#^GUARD_LET_BIND_6^# else {}
 }
+func testGuardLetBinding7(x: FooStruct?) {
+  guard let boundVal = x, let other = #^GUARD_LET_BIND_7^# else {}
+}
+func testGuardLetBinding8(_ x: FooStruct?) {
+  guard let boundVal = x, let other = testGuardLetBinding8(#^GUARD_LET_BIND_8^#) else {}
+}
+
 
 // FOOSTRUCT_DOT: Begin completions
 // FOOSTRUCT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#];
@@ -623,3 +631,7 @@ func testGuardLetBinding5(x: FooStruct?) {
 // FOOSTRUCT_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .boolGen()[#Bool#];
 // FOOSTRUCT_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .intGen()[#Int#];
 // FOOSTRUCT_NODOT: End completions
+
+// FOOSTRUCT_LOCALVAL: Begin completions
+// FOOSTRUCT_LOCALVAL-DAG: Decl[LocalVar]/Local{{(/TypeRelation\[Convertible\])?}}: boundVal[#FooStruct#];
+// FOOSTRUCT_LOCALVAL: End completions

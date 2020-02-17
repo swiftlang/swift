@@ -247,64 +247,64 @@
 
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_NESTED_TYPES_1 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=VAR_BASE_1_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=VAR_BASE_1_TYPES_INCONTEXT < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_NESTED_TYPES_2 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=VAR_BASE_1_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=VAR_BASE_1_TYPES_INCONTEXT < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_NESTED_TYPES_3 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=VAR_DERIVED_1_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=VAR_DERIVED_1_TYPES_INCONTEXT < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_FUNC_PARAM_NESTED_TYPES_4 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=VAR_DERIVED_1_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=VAR_DERIVED_1_TYPES_INCONTEXT < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_INSTANCE_VAR_1 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=VAR_BASE_1_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=VAR_BASE_1_TYPES_INCONTEXT < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_INSTANCE_VAR_2 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=VAR_BASE_1_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=VAR_BASE_1_TYPES_INCONTEXT < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_INSTANCE_VAR_3 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=VAR_DERIVED_1_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=VAR_DERIVED_1_TYPES_INCONTEXT < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_INSTANCE_VAR_4 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=VAR_DERIVED_1_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=VAR_DERIVED_1_TYPES_INCONTEXT < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_LOCAL_VAR_1 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=VAR_BASE_1_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=VAR_BASE_1_TYPES_INCONTEXT < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_LOCAL_VAR_2 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=VAR_BASE_1_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=VAR_BASE_1_TYPES_INCONTEXT < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_LOCAL_VAR_3 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=VAR_DERIVED_1_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=VAR_DERIVED_1_TYPES_INCONTEXT < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_LOCAL_VAR_4 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=VAR_DERIVED_1_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=VAR_DERIVED_1_TYPES_INCONTEXT < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
@@ -671,9 +671,9 @@ class TestTypeInLocalVarInMemberFunc1 {
   }
 }
 // TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1: Begin completions
-// TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1-DAG: Decl[Struct]/CurrNominal:    NestedStruct[#TestTypeInLocalVarInMemberFunc1.NestedStruct#]{{; name=.+$}}
-// TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1-DAG: Decl[Class]/CurrNominal:     NestedClass[#TestTypeInLocalVarInMemberFunc1.NestedClass#]{{; name=.+$}}
-// TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1-DAG: Decl[Enum]/CurrNominal:      NestedEnum[#TestTypeInLocalVarInMemberFunc1.NestedEnum#]{{; name=.+$}}
+// TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1-DAG: Decl[Struct]/CurrNominal:    NestedStruct[#NestedStruct#]{{; name=.+$}}
+// TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1-DAG: Decl[Class]/CurrNominal:     NestedClass[#NestedClass#]{{; name=.+$}}
+// TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1-DAG: Decl[Enum]/CurrNominal:      NestedEnum[#NestedEnum#]{{; name=.+$}}
 // TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1-DAG: Decl[TypeAlias]/CurrNominal: NestedTypealias[#Int#]{{; name=.+$}}
 // TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1: End completions
 
@@ -911,6 +911,19 @@ extension VarBase1 {
 // VAR_BASE_1_TYPES-DAG: Decl[TypeAlias]/CurrNominal: BaseExtNestedTypealias[#Int#]{{; name=.+$}}
 // VAR_BASE_1_TYPES: End completions
 
+// VAR_BASE_1_TYPES_INCONTEXT: Begin completions
+// From VarBase1
+// VAR_BASE_1_TYPES_INCONTEXT-DAG: Decl[Struct]/CurrNominal:    BaseNestedStruct[#BaseNestedStruct#]{{; name=.+$}}
+// VAR_BASE_1_TYPES_INCONTEXT-DAG: Decl[Class]/CurrNominal:     BaseNestedClass[#BaseNestedClass#]{{; name=.+$}}
+// VAR_BASE_1_TYPES_INCONTEXT-DAG: Decl[Enum]/CurrNominal:      BaseNestedEnum[#BaseNestedEnum#]{{; name=.+$}}
+// VAR_BASE_1_TYPES_INCONTEXT-DAG: Decl[TypeAlias]/CurrNominal: BaseNestedTypealias[#Int#]{{; name=.+$}}
+// From VarBase1 extension
+// VAR_BASE_1_TYPES_INCONTEXT-DAG: Decl[Struct]/CurrNominal:    BaseExtNestedStruct[#BaseExtNestedStruct#]{{; name=.+$}}
+// VAR_BASE_1_TYPES_INCONTEXT-DAG: Decl[Class]/CurrNominal:     BaseExtNestedClass[#BaseExtNestedClass#]{{; name=.+$}}
+// VAR_BASE_1_TYPES_INCONTEXT-DAG: Decl[Enum]/CurrNominal:      BaseExtNestedEnum[#BaseExtNestedEnum#]{{; name=.+$}}
+// VAR_BASE_1_TYPES_INCONTEXT-DAG: Decl[TypeAlias]/CurrNominal: BaseExtNestedTypealias[#Int#]{{; name=.+$}}
+// VAR_BASE_1_TYPES_INCONTEXT: End completions
+
 // VAR_BASE_1_NO_DOT_TYPES: Begin completions
 // From VarBase1
 // VAR_BASE_1_NO_DOT_TYPES-DAG: Decl[Struct]/CurrNominal:    .BaseNestedStruct[#VarBase1.BaseNestedStruct#]{{; name=.+$}}
@@ -986,6 +999,29 @@ extension VarDerived1 {
 // VAR_DERIVED_1_TYPES-DAG: Decl[Enum]/CurrNominal:      DerivedExtNestedEnum[#VarDerived1.DerivedExtNestedEnum#]{{; name=.+$}}
 // VAR_DERIVED_1_TYPES-DAG: Decl[TypeAlias]/CurrNominal: DerivedExtNestedTypealias[#Int#]{{; name=.+$}}
 // VAR_DERIVED_1_TYPES: End completions
+
+// VAR_DERIVED_1_TYPES_INCONTEXT: Begin completions
+// From VarBase1
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Struct]/Super:          BaseNestedStruct[#VarBase1.BaseNestedStruct#]{{; name=.+$}}
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Class]/Super:           BaseNestedClass[#VarBase1.BaseNestedClass#]{{; name=.+$}}
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Enum]/Super:            BaseNestedEnum[#VarBase1.BaseNestedEnum#]{{; name=.+$}}
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[TypeAlias]/Super:       BaseNestedTypealias[#Int#]{{; name=.+$}}
+// From VarBase1 extension
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Struct]/Super:          BaseExtNestedStruct[#VarBase1.BaseExtNestedStruct#]{{; name=.+$}}
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Class]/Super:           BaseExtNestedClass[#VarBase1.BaseExtNestedClass#]{{; name=.+$}}
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Enum]/Super:            BaseExtNestedEnum[#VarBase1.BaseExtNestedEnum#]{{; name=.+$}}
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[TypeAlias]/Super:       BaseExtNestedTypealias[#Int#]{{; name=.+$}}
+// From VarDerived1
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Struct]/CurrNominal:    DerivedNestedStruct[#DerivedNestedStruct#]{{; name=.+$}}
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Class]/CurrNominal:     DerivedNestedClass[#DerivedNestedClass#]{{; name=.+$}}
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Enum]/CurrNominal:      DerivedNestedEnum[#DerivedNestedEnum#]{{; name=.+$}}
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[TypeAlias]/CurrNominal: DerivedNestedTypealias[#Int#]{{; name=.+$}}
+// From VarDerived1 extension
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Struct]/CurrNominal:    DerivedExtNestedStruct[#DerivedExtNestedStruct#]{{; name=.+$}}
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Class]/CurrNominal:     DerivedExtNestedClass[#DerivedExtNestedClass#]{{; name=.+$}}
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Enum]/CurrNominal:      DerivedExtNestedEnum[#DerivedExtNestedEnum#]{{; name=.+$}}
+// VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[TypeAlias]/CurrNominal: DerivedExtNestedTypealias[#Int#]{{; name=.+$}}
+// VAR_DERIVED_1_TYPES_INCONTEXT: End completions
 
 //===---
 //===--- Test that we can complete based on user-provided type-identifier.

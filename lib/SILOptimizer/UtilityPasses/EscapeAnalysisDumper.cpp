@@ -25,6 +25,23 @@ llvm::cl::opt<bool> EnableGraphWriter(
 
 namespace {
 
+static bool gatherValues(EscapeAnalysis *EA, SILFunction &Fn,
+                         std::vector<SILValue> &Values) {
+  for (auto &BB : Fn) {
+    for (auto *Arg : BB.getArguments()) {
+      if (EA->isPointer(Arg))
+        Values.push_back(SILValue(Arg));
+    }
+    for (auto &II : BB) {
+      for (auto result : II.getResults()) {
+        if (EA->isPointer(result))
+          Values.push_back(result);
+      }
+    }
+  }
+  return Values.size() > 1;
+}
+
 /// Dumps the escape information of all functions in the module.
 /// Only dumps if the compiler is built with assertions.
 /// For details see EscapeAnalysis.
@@ -43,6 +60,33 @@ class EscapeAnalysisDumper : public SILModuleTransform {
         ConnectionGraph->print(llvm::outs());
         if (EnableGraphWriter)
           ConnectionGraph->dumpCG();
+
+        // Gather up all Values in Fn.
+        std::vector<SILValue> Values;
+        if (!gatherValues(EA, F, Values))
+          continue;
+
+        // Emit the N^2 escape analysis evaluation of the values.
+        for (auto &bb : F) {
+          for (auto &ii : bb) {
+            if (auto fas = FullApplySite::isa(&ii)) {
+              for (unsigned i = 0, e = Values.size(); i != e; ++i) {
+                SILValue val = Values[i];
+                bool escape = EA->canEscapeTo(val, fas);
+                llvm::outs() << (escape ? "May" : "No") << "Escape: " << val
+                             << " to " << ii;
+              }
+            }
+            if (RefCountingInst *rci = dyn_cast<RefCountingInst>(&ii)) {
+              for (unsigned i = 0, e = Values.size(); i != e; ++i) {
+                SILValue val = Values[i];
+                bool escape = EA->canEscapeTo(val, rci);
+                llvm::outs() << (escape ? "May" : "No") << "Escape: " << val
+                             << " to " << ii;
+              }
+            }
+          }
+        }
       }
     }
 #endif

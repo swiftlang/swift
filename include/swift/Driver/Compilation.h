@@ -19,6 +19,7 @@
 
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Statistic.h"
@@ -257,9 +258,29 @@ private:
   /// limit filelists will be used.
   size_t FilelistThreshold;
 
+  /// Because each frontend job outputs the same info in its .d file, only do it
+  /// on the first job that actually runs. Write out dummies for the rest of the
+  /// jobs. This hack saves a lot of time in the build system when incrementally
+  /// building a project with many files. Record if a scheduled job has already
+  /// added -emit-dependency-path.
+  bool HaveAlreadyAddedDependencyPath = false;
+
+public:
+  /// When set, only the first scheduled frontend job gets the argument needed
+  /// to produce a make-style dependency file. The other jobs create dummy files
+  /// in the driver. This hack speeds up incremental compilation by reducing the
+  /// time for the build system to read each dependency file, which are all
+  /// identical. This optimization can be disabled by passing
+  /// -disable-only-one-dependency-file on the command line.
+  const bool OnlyOneDependencyFile;
+
+private:
   /// Scaffolding to permit experimentation with finer-grained dependencies and
   /// faster rebuilds.
   const bool EnableFineGrainedDependencies;
+
+  /// Is the parser recording token hashes for each type body?
+  const bool EnableTypeFingerprints;
 
   /// Helpful for debugging, but slows down the driver. So, only turn on when
   /// needed.
@@ -268,7 +289,7 @@ private:
   /// needed.
   const bool EmitFineGrainedDependencyDotFileAfterEveryImport;
 
-  /// Experiment with inter-file dependencies
+  /// Experiment with intrafile dependencies
   const bool FineGrainedDependenciesIncludeIntrafileOnes;
 
   /// Experiment with source-range-based dependencies
@@ -309,7 +330,11 @@ public:
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
-              bool EnableFineGrainedDependencies = false,
+              bool OnlyOneDependencyFile = false,
+              bool EnableFineGrainedDependencies
+                = LangOptions().EnableFineGrainedDependencies,
+              bool EnableTypeFingerprints =
+                LangOptions().EnableTypeFingerprints,
               bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
               bool EmitFineGrainedDependencyDotFileAfterEveryImport = false,
               bool FineGrainedDependenciesIncludeIntrafileOnes = false,
@@ -378,6 +403,8 @@ public:
     return EnableFineGrainedDependencies;
   }
 
+  bool getEnableTypeFingerprints() const { return EnableTypeFingerprints; }
+
   bool getVerifyFineGrainedDependencyGraphAfterEveryImport() const {
     return VerifyFineGrainedDependencyGraphAfterEveryImport;
   }
@@ -426,6 +453,16 @@ public:
   size_t getFilelistThreshold() const {
     return FilelistThreshold;
   }
+
+  /// Since every make-style dependency file contains
+  /// the same information, incremental builds are sped up by only emitting one
+  /// of those files. Since the build system expects to see the files existing,
+  /// create dummy files for those jobs that don't emit real dependencies.
+  /// \param path The dependency file path
+  /// \param addDependencyPath A function to add an -emit-dependency-path
+  /// argument
+  void addDependencyPathOrCreateDummy(StringRef path,
+                                      function_ref<void()> addDependencyPath);
 
   UnifiedStatsReporter *getStatsReporter() const {
     return Stats.get();
@@ -492,6 +529,19 @@ public:
 
   /// How many .swift input files?
   unsigned countSwiftInputs() const;
+
+  /// Unfortunately the success or failure of a Swift compilation is currently
+  /// sensitive to the order in which files are processed, at least in terms of
+  /// the order of processing extensions (and likely other ways we haven't
+  /// discovered yet). So long as this is true, we need to make sure any batch
+  /// job we build names its inputs in an order that's a subsequence of the
+  /// sequence of inputs the driver was initially invoked with.
+  ///
+  /// Also use to write out information in a consistent order.
+  template <typename JobCollection>
+  void sortJobsToMatchCompilationInputs(
+      const JobCollection &unsortedJobs,
+      SmallVectorImpl<const Job *> &sortedJobs) const;
 
 private:
   /// Perform all jobs.

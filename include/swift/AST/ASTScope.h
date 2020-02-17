@@ -479,6 +479,10 @@ public:
   /// asked.
   virtual Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const;
 
+  /// Returns the context that should be used when a nested scope (e.g. a
+  /// closure) captures self explicitly.
+  virtual NullablePtr<DeclContext> capturedSelfDC() const;
+
 protected:
   /// Find either locals or members (no scope has both)
   /// \param history The scopes visited since the start of lookup (including
@@ -692,6 +696,15 @@ public:
     /// to compute the selfDC from the history.
     static NullablePtr<DeclContext>
     computeSelfDC(ArrayRef<const ASTScopeImpl *> history);
+    
+    /// If we find a lookup result that requires the dynamic implict self value,
+    /// we need to check the nested scopes to see if any closures explicitly
+    /// captured \c self. In that case, the appropriate selfDC is that of the
+    /// innermost closure which captures a \c self value from one of this type's
+    /// methods.
+    static NullablePtr<DeclContext>
+    checkNestedScopesForSelfCapture(ArrayRef<const ASTScopeImpl *> history,
+                                    size_t start);
 };
 
 /// Behavior specific to representing the trailing where clause of a
@@ -1449,6 +1462,13 @@ public:
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+  
+  /// Since explicit captures of \c self by closures enable the use of implicit
+  /// \c self, we need to make sure that the appropriate \c self is used as the
+  /// base decl for these uses (otherwise, the capture would be marked as
+  /// unused. \c ClosureParametersScope::capturedSelfDC() checks if we have such
+  ///  a capture of self.
+  NullablePtr<DeclContext> capturedSelfDC() const override;
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
@@ -1546,6 +1566,41 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
+};
+
+/// A `@differentiable` attribute scope.
+///
+/// This exists because `@differentiable` attribute may have a `where` clause
+/// referring to generic parameters from some generic context.
+class DifferentiableAttributeScope final : public ASTScopeImpl {
+public:
+  DifferentiableAttr *const differentiableAttr;
+  ValueDecl *const attributedDeclaration;
+
+  DifferentiableAttributeScope(DifferentiableAttr *diffAttr, ValueDecl *decl)
+      : differentiableAttr(diffAttr), attributedDeclaration(decl) {}
+  virtual ~DifferentiableAttributeScope() {}
+
+  std::string getClassName() const override;
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+  NullablePtr<const void> addressForPrinting() const override {
+    return differentiableAttr;
+  }
+
+  NullablePtr<AbstractStorageDecl>
+  getEnclosingAbstractStorageDecl() const override;
+
+  NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
+    return differentiableAttr;
+  }
+  NullablePtr<const void> getReferrent() const override;
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
+  bool doesContextMatchStartingContext(const DeclContext *) const override;
 };
 
 class SubscriptDeclScope final : public ASTScopeImpl {

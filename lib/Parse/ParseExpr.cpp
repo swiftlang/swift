@@ -189,8 +189,13 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       if (CodeCompletion)
         CodeCompletion->setLeadingSequenceExprs(SequencedExprs);
     }
-    if (Primary.isNull())
+    if (Primary.isNull()) {
+      if (HasCodeCompletion) {
+        SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
+        break;
+      }
       return Primary;
+    }
 
     SequencedExprs.push_back(Primary.get());
 
@@ -242,16 +247,23 @@ parse_operator:
         HasCodeCompletion = true;
       if (middle.isNull())
         return nullptr;
-      
+
       // Make sure there's a matching ':' after the middle expr.
       if (!Tok.is(tok::colon)) {
+        if (middle.hasCodeCompletion()) {
+          SequencedExprs.push_back(new (Context) IfExpr(questionLoc,
+                                                        middle.get(),
+                                                        PreviousLoc));
+          SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
+          goto done;
+        }
+        
         diagnose(questionLoc, diag::expected_colon_after_if_question);
-
-      Status.setIsParseError();
-      return makeParserResult(Status, new (Context) ErrorExpr(
-          {startLoc, middle.get()->getSourceRange().End}));
+        Status.setIsParseError();
+        return makeParserResult(Status, new (Context) ErrorExpr(
+            {startLoc, middle.get()->getSourceRange().End}));
       }
-      
+
       SourceLoc colonLoc = consumeToken();
       
       auto *unresolvedIf
@@ -2403,11 +2415,15 @@ static void printTupleNames(const TypeRepr *typeRepr, llvm::raw_ostream &OS) {
 }
 
 bool Parser::
-parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
+parseClosureSignatureIfPresent(SourceRange &bracketRange,
+                               SmallVectorImpl<CaptureListEntry> &captureList,
+                               VarDecl *&capturedSelfDecl,
                                ParameterList *&params, SourceLoc &throwsLoc,
                                SourceLoc &arrowLoc,
                                TypeRepr *&explicitResultType, SourceLoc &inLoc){
   // Clear out result parameters.
+  bracketRange = SourceRange();
+  capturedSelfDecl = nullptr;
   params = nullptr;
   throwsLoc = SourceLoc();
   arrowLoc = SourceLoc();
@@ -2476,14 +2492,16 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
   }
   SyntaxParsingContext ClosureSigCtx(SyntaxContext, SyntaxKind::ClosureSignature);
   if (Tok.is(tok::l_square) && peekToken().is(tok::r_square)) {
+    
     SyntaxParsingContext CaptureCtx(SyntaxContext,
                                     SyntaxKind::ClosureCaptureSignature);
-    consumeToken(tok::l_square);
-    consumeToken(tok::r_square);
+    SourceLoc lBracketLoc = consumeToken(tok::l_square);
+    SourceLoc rBracketLoc = consumeToken(tok::r_square);
+    bracketRange = SourceRange(lBracketLoc, rBracketLoc);
   } else if (Tok.is(tok::l_square) && !peekToken().is(tok::r_square)) {
     SyntaxParsingContext CaptureCtx(SyntaxContext,
                                     SyntaxKind::ClosureCaptureSignature);
-    consumeToken(tok::l_square);
+    SourceLoc lBracketLoc = consumeToken(tok::l_square);
     // At this point, we know we have a closure signature. Parse the capture list
     // and parameters.
     bool HasNext;
@@ -2573,6 +2591,10 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       auto *VD = new (Context) VarDecl(/*isStatic*/false, introducer,
                                        /*isCaptureList*/true,
                                        nameLoc, name, CurDeclContext);
+        
+      // If we captured something under the name "self", remember that.
+      if (name == Context.Id_self)
+        capturedSelfDecl = VD;
 
       // Attributes.
       if (ownershipKind != ReferenceOwnership::Strong)
@@ -2586,17 +2608,22 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
           /*VarLoc*/ nameLoc, pattern, /*EqualLoc*/ equalLoc, initializer,
           CurDeclContext);
 
-      captureList.push_back(CaptureListEntry(VD, PBD));
+        auto CLE = CaptureListEntry(VD, PBD);
+        if (CLE.isSimpleSelfCapture())
+          VD->setIsSelfParamCapture();
+      captureList.push_back(CLE);
     } while (HasNext);
 
     SyntaxContext->collectNodesInPlace(SyntaxKind::ClosureCaptureItemList);
     // The capture list needs to be closed off with a ']'.
+    SourceLoc rBracketLoc = Tok.getLoc();
     if (!consumeIf(tok::r_square)) {
       diagnose(Tok, diag::expected_capture_list_end_rsquare);
       skipUntil(tok::r_square);
       if (Tok.is(tok::r_square))
-        consumeToken(tok::r_square);
+        rBracketLoc = consumeToken(tok::r_square);
     }
+    bracketRange = SourceRange(lBracketLoc, rBracketLoc);
   }
   
   bool invalid = false;
@@ -2754,14 +2781,17 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SourceLoc leftBrace = consumeToken();
 
   // Parse the closure-signature, if present.
+  SourceRange bracketRange;
+  SmallVector<CaptureListEntry, 2> captureList;
+  VarDecl *capturedSelfDecl;
   ParameterList *params = nullptr;
   SourceLoc throwsLoc;
   SourceLoc arrowLoc;
   TypeRepr *explicitResultType;
   SourceLoc inLoc;
-  SmallVector<CaptureListEntry, 2> captureList;
-  parseClosureSignatureIfPresent(captureList, params, throwsLoc, arrowLoc,
-                                 explicitResultType, inLoc);
+  parseClosureSignatureIfPresent(bracketRange, captureList,
+                                 capturedSelfDecl, params, throwsLoc,
+                                 arrowLoc, explicitResultType, inLoc);
 
   // If the closure was created in the context of an array type signature's
   // size expression, there will not be a local context. A parse error will
@@ -2776,9 +2806,10 @@ ParserResult<Expr> Parser::parseExprClosure() {
   unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
 
   // Create the closure expression and enter its context.
-  auto *closure = new (Context) ClosureExpr(params, throwsLoc, arrowLoc, inLoc,
-                                            explicitResultType,
-                                            discriminator, CurDeclContext);
+  auto *closure = new (Context) ClosureExpr(bracketRange, capturedSelfDecl,
+                                            params, throwsLoc, arrowLoc, inLoc,
+                                            explicitResultType, discriminator,
+                                            CurDeclContext);
   // The arguments to the func are defined in their own scope.
   Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);
@@ -2793,7 +2824,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
     // FIXME: We could do this all the time, and then provide Fix-Its
     // to map $i -> the appropriately-named argument. This might help
     // users who are refactoring code by adding names.
-    AnonClosureVars.push_back({ leftBrace, {}});
+    AnonClosureVars.push_back({{}, leftBrace});
   }
   
   // Add capture list variables to scope.
@@ -2817,7 +2848,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // anonymous closure arguments.
   if (!params) {
     // Create a parameter pattern containing the anonymous variables.
-    auto &anonVars = AnonClosureVars.back().second;
+    auto &anonVars = AnonClosureVars.back().Item;
     SmallVector<ParamDecl*, 4> elements;
     for (auto anonVar : anonVars)
       elements.push_back(anonVar);
@@ -2930,8 +2961,8 @@ Expr *Parser::parseExprAnonClosureArg() {
     }
   }
 
-  auto leftBraceLoc = AnonClosureVars.back().first;
-  auto &decls = AnonClosureVars.back().second;
+  auto leftBraceLoc = AnonClosureVars.back().Loc;
+  auto &decls = AnonClosureVars.back().Item;
   while (ArgNo >= decls.size()) {
     unsigned nextIdx = decls.size();
     SmallVector<char, 4> StrBuf;
@@ -3494,6 +3525,11 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
 
   // Parse the ':'.
   if (!consumeIf(tok::colon)) {
+    if (Element.hasCodeCompletion()) {
+      // Return the completion expression itself so we can analyze the type
+      // later.
+      return Element;
+    }
     diagnose(Tok, diag::expected_colon_in_dictionary_literal);
     return ParserStatus(Element) | makeParserError();
   }
@@ -3501,8 +3537,14 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
   // Parse the value.
   auto Value = parseExpr(diag::expected_value_in_dictionary_literal);
 
-  if (Value.isNull())
-    Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+  if (Value.isNull()) {
+    if (!Element.hasCodeCompletion()) {
+      Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+    } else {
+      Value = makeParserResult(Value,
+                               new (Context) CodeCompletionExpr(PreviousLoc));
+    }
+  }
 
   // Make a tuple of Key Value pair.
   return makeParserResult(

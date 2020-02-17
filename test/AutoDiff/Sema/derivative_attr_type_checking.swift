@@ -186,13 +186,19 @@ protocol StaticMethod: Differentiable {
 }
 
 extension StaticMethod {
+  static func foo(_ x: Float) -> Float { x }
+  static func generic<T: Differentiable>(_ x: T) -> T { x }
+}
+
+extension StaticMethod {
   @derivative(of: foo)
   static func jvpFoo(x: Float) -> (value: Float, differential: (Float) -> Float)
   {
     return (x, { $0 })
   }
 
-  @derivative(of: foo)
+  // Test qualified declaration name.
+  @derivative(of: StaticMethod.foo)
   static func vjpFoo(x: Float) -> (value: Float, pullback: (Float) -> Float) {
     return (x, { $0 })
   }
@@ -214,11 +220,16 @@ extension StaticMethod {
 // Test instance methods.
 
 protocol InstanceMethod: Differentiable {
-  // expected-note @+1 {{'foo' defined here}}
   func foo(_ x: Self) -> Self
+  func generic<T: Differentiable>(_ x: T) -> Self
+}
+
+extension InstanceMethod {
+  // expected-note @+1 {{'foo' defined here}}
+  func foo(_ x: Self) -> Self { x }
 
   // expected-note @+1 {{'generic' defined here}}
-  func generic<T: Differentiable>(_ x: T) -> Self
+  func generic<T: Differentiable>(_ x: T) -> Self { self }
 }
 
 extension InstanceMethod {
@@ -227,6 +238,14 @@ extension InstanceMethod {
     value: Self, differential: (TangentVector, TangentVector) -> (TangentVector)
   ) {
     return (x, { $0 + $1 })
+  }
+
+  // Test qualified declaration name.
+  @derivative(of: InstanceMethod.foo, wrt: x)
+  func jvpFooWrtX(x: Self) -> (
+    value: Self, differential: (TangentVector) -> (TangentVector)
+  ) {
+    return (x, { $0 })
   }
 
   @derivative(of: generic)
@@ -276,7 +295,7 @@ func req1<T>(_ x: T) -> T {
   return x
 }
 @derivative(of: req1)
-func vjpReq1<T: Differentiable>(_ x: T) -> (
+func vjpExtraConformanceConstraint<T: Differentiable>(_ x: T) -> (
   value: T, pullback: (T.TangentVector) -> T.TangentVector
 ) {
   return (x, { $0 })
@@ -286,10 +305,40 @@ func req2<T, U>(_ x: T, _ y: U) -> T {
   return x
 }
 @derivative(of: req2)
-func vjpReq2<T: Differentiable, U: Differentiable>(_ x: T, _ y: U)
-  -> (value: T, pullback: (T) -> (T, U))
-where T == T.TangentVector, U == U.TangentVector, T: CustomStringConvertible {
+func vjpExtraConformanceConstraints<T: Differentiable, U: Differentiable>( _ x: T, _ y: U) -> (
+  value: T, pullback: (T) -> (T, U)
+) where T == T.TangentVector, U == U.TangentVector, T: CustomStringConvertible {
   return (x, { ($0, .zero) })
+}
+
+// Test `@derivative` declaration with extra same-type requirements.
+func req3<T>(_ x: T) -> T {
+  return x
+}
+@derivative(of: req3)
+func vjpSameTypeRequirementsGenericParametersAllConcrete<T>(_ x: T) -> (
+  value: T, pullback: (T.TangentVector) -> T.TangentVector
+) where T: Differentiable, T.TangentVector == Float {
+  return (x, { $0 })
+}
+
+struct Wrapper<T: Equatable>: Equatable {
+  var x: T
+  init(_ x: T) { self.x = x }
+}
+extension Wrapper: AdditiveArithmetic where T: AdditiveArithmetic {
+  static var zero: Self { .init(.zero) }
+  static func + (lhs: Self, rhs: Self) -> Self { .init(lhs.x + rhs.x) }
+  static func - (lhs: Self, rhs: Self) -> Self { .init(lhs.x - rhs.x) }
+}
+extension Wrapper: Differentiable where T: Differentiable, T == T.TangentVector {
+  typealias TangentVector = Wrapper<T.TangentVector>
+}
+extension Wrapper where T: Differentiable, T == T.TangentVector {
+  @derivative(of: init(_:))
+  static func vjpInit(_ x: T) -> (value: Self, pullback: (Wrapper<T>.TangentVector) -> (T)) {
+    fatalError()
+  }
 }
 
 // Test class methods.
@@ -497,27 +546,34 @@ extension HasStoredProperty {
   }
 }
 
-// Test cross-file derivative registration. Currently unsupported.
-// TODO(TF-1021): Lift this restriction.
+// Test derivative registration for protocol requirements. Currently unsupported.
+// TODO(TF-982): Lift this restriction and add proper support.
 
-extension AdditiveArithmetic where Self: Differentiable {
-  // expected-error @+1 {{derivative not in the same file as the original function}}
-  @derivative(of: +)
-  static func vjpPlus(x: Self, y: Self) -> (
-    value: Self,
-    pullback: (Self.TangentVector) -> (Self.TangentVector, Self.TangentVector)
-  ) {
-    return (x + y, { v in (v, v) })
+protocol ProtocolRequirementDerivative {
+  func requirement(_ x: Float) -> Float
+}
+extension ProtocolRequirementDerivative {
+  // NOTE: the error is misleading because `findAbstractFunctionDecl` in
+  // TypeCheckAttr.cpp is not setup to show customized error messages for
+  // invalid original function candidates.
+  // expected-error @+1 {{could not find function 'requirement' with expected type '<Self where Self : ProtocolRequirementDerivative> (Self) -> (Float) -> Float'}}
+  @derivative(of: requirement)
+  func vjpRequirement(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    fatalError()
   }
 }
 
-extension FloatingPoint where Self: Differentiable, Self == Self.TangentVector {
+// Test cross-file derivative registration. Currently unsupported.
+// TODO(TF-1021): Lift this restriction.
+
+extension FloatingPoint where Self: Differentiable {
   // expected-error @+1 {{derivative not in the same file as the original function}}
-  @derivative(of: +)
-  static func vjpPlus(x: Self, y: Self) -> (
-    value: Self, pullback: (Self) -> (Self, Self)
+  @derivative(of: rounded)
+  func vjpRounded() -> (
+    value: Self,
+    pullback: (Self.TangentVector) -> (Self.TangentVector)
   ) {
-    return (x + y, { v in (v, v) })
+    fatalError()
   }
 }
 

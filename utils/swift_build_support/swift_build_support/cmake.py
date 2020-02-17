@@ -14,12 +14,15 @@
 #
 # ----------------------------------------------------------------------------
 
-from __future__ import absolute_import
+
+from __future__ import absolute_import, unicode_literals
 
 import os
 import platform
 import re
 from numbers import Number
+
+import six
 
 from . import shell
 
@@ -43,7 +46,7 @@ class CMakeOptions(object):
             value = self.true_false(value)
         if value is None:
             value = ""
-        elif not isinstance(value, (str, Number)):
+        elif not isinstance(value, six.string_types + (Number,)):
             raise ValueError('define: invalid value for key %s: %s (%s)' %
                              (var, value, type(value)))
         self._options.append('-D%s=%s' % (var, value))
@@ -177,7 +180,7 @@ class CMake(object):
 
         elif args.cmake_generator == 'Xcode':
             build_args += ['-parallelizeTargets',
-                           '-jobs', str(jobs)]
+                           '-jobs', six.text_type(jobs)]
 
         return build_args
 

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name devirt_protocol_method_invocations -O -Xllvm -sil-disable-pass=ExistentialSpecializer -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name devirt_protocol_method_invocations -enable-spec-devirt -O -Xllvm -sil-disable-pass=ExistentialSpecializer -emit-sil %s | %FileCheck %s
 
 protocol PPP {
     func f()

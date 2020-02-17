@@ -49,7 +49,9 @@ class Cat : FakeNSObject {
 
   // CHECK: bb1:
     // CHECK-NEXT: [[FIELD_ADDR:%.*]] = ref_element_addr [[ARG2]] : $Cat, #Cat.x
-    // CHECK-NEXT: destroy_addr [[FIELD_ADDR]] : $*LifetimeTracked
+    // CHECK-NEXT: [[FIELD_ADDR_ACCESS:%.*]] = begin_access [deinit] [static] [[FIELD_ADDR]]
+    // CHECK-NEXT: destroy_addr [[FIELD_ADDR_ACCESS]] : $*LifetimeTracked
+    // CHECK-NEXT: end_access [[FIELD_ADDR_ACCESS]]
     // CHECK-NEXT: strong_release [[ARG2]]
     // CHECK-NEXT: [[RELOAD_FROM_BOX:%.*]] = load [[SELF_BOX]]
     // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick Cat.Type

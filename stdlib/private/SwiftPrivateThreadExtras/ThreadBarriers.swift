@@ -69,13 +69,12 @@ public func _stdlib_thread_barrier_init(
   InitializeConditionVariable(barrier.pointee.cond!)
 #else
   barrier.pointee.mutex = UnsafeMutablePointer.allocate(capacity: 1)
-  if pthread_mutex_init(barrier.pointee.mutex!, nil) != 0 {
-    // FIXME: leaking memory.
-    return -1
-  }
   barrier.pointee.cond = UnsafeMutablePointer.allocate(capacity: 1)
-  if pthread_cond_init(barrier.pointee.cond!, nil) != 0 {
-    // FIXME: leaking memory, leaking a mutex.
+  guard _stdlib_thread_barrier_mutex_and_cond_init(barrier) == 0 else {
+    barrier.pointee.mutex!.deinitialize(count: 1)
+    barrier.pointee.mutex!.deallocate()
+    barrier.pointee.cond!.deinitialize(count: 1)
+    barrier.pointee.cond!.deallocate()
     return -1
   }
 #endif
@@ -83,20 +82,29 @@ public func _stdlib_thread_barrier_init(
   return 0
 }
 
+#if !os(Windows)
+private func _stdlib_thread_barrier_mutex_and_cond_init(_ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>) -> CInt {
+  guard pthread_mutex_init(barrier.pointee.mutex!, nil) == 0 else {
+    return -1
+  }
+  guard pthread_cond_init(barrier.pointee.cond!, nil) == 0 else {
+    pthread_mutex_destroy(barrier.pointee.mutex!)
+    return -1
+  }
+  return 0
+}
+#endif
+
 public func _stdlib_thread_barrier_destroy(
   _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>
-) -> CInt {
+) {
 #if os(Windows)
   // Condition Variables do not need to be explicitly destroyed
   // Mutexes do not need to be explicitly destroyed
 #else
-  if pthread_cond_destroy(barrier.pointee.cond!) != 0 {
-    // FIXME: leaking memory, leaking a mutex.
-    return -1
-  }
-  if pthread_mutex_destroy(barrier.pointee.mutex!) != 0 {
-    // FIXME: leaking memory.
-    return -1
+  guard pthread_cond_destroy(barrier.pointee.cond!) == 0 &&
+    pthread_mutex_destroy(barrier.pointee.mutex!) == 0 else {
+    fatalError("_stdlib_thread_barrier_destroy() failed")
   }
 #endif
   barrier.pointee.cond!.deinitialize(count: 1)
@@ -105,7 +113,7 @@ public func _stdlib_thread_barrier_destroy(
   barrier.pointee.mutex!.deinitialize(count: 1)
   barrier.pointee.mutex!.deallocate()
 
-  return 0
+  return
 }
 
 public func _stdlib_thread_barrier_wait(

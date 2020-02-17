@@ -553,9 +553,9 @@ default:
 }
 
 func foo() {
-  _ = MyEnum.One // expected-error {{enum type 'MyEnum' has no case 'One'; did you mean 'one'}}{{14-17=one}}
-  _ = MyEnum.Two // expected-error {{enum type 'MyEnum' has no case 'Two'; did you mean 'two'}}{{14-17=two}}
-  _ = MyEnum.OneTwoThree // expected-error {{enum type 'MyEnum' has no case 'OneTwoThree'; did you mean 'oneTwoThree'}}{{14-25=oneTwoThree}}
+  _ = MyEnum.One // expected-error {{enum type 'MyEnum' has no case 'One'; did you mean 'one'?}}{{14-17=one}}
+  _ = MyEnum.Two // expected-error {{enum type 'MyEnum' has no case 'Two'; did you mean 'two'?}}{{14-17=two}}
+  _ = MyEnum.OneTwoThree // expected-error {{enum type 'MyEnum' has no case 'OneTwoThree'; did you mean 'oneTwoThree'?}}{{14-25=oneTwoThree}}
 }
 
 enum MyGenericEnum<T> {
@@ -564,8 +564,8 @@ enum MyGenericEnum<T> {
 }
 
 func foo1() {
-  _ = MyGenericEnum<Int>.One // expected-error {{enum type 'MyGenericEnum<Int>' has no case 'One'; did you mean 'one'}}{{26-29=one}}
-  _ = MyGenericEnum<Int>.OneTwo // expected-error {{enum type 'MyGenericEnum<Int>' has no case 'OneTwo'; did you mean 'oneTwo'}}{{26-32=oneTwo}}
+  _ = MyGenericEnum<Int>.One // expected-error {{enum type 'MyGenericEnum<Int>' has no case 'One'; did you mean 'one'?}}{{26-29=one}}
+  _ = MyGenericEnum<Int>.OneTwo // expected-error {{enum type 'MyGenericEnum<Int>' has no case 'OneTwo'; did you mean 'oneTwo'?}}{{26-32=oneTwo}}
 }
 
 // SR-4082
@@ -619,20 +619,18 @@ struct PatternBindingWithTwoVars2 { var x = y, y = 3 }
 // expected-error@-1 {{cannot use instance member 'y' within property initializer; property initializers run before 'self' is available}}
 
 struct PatternBindingWithTwoVars3 { var x = y, y = x }
-// expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
-// expected-error@-2 {{cannot use instance member 'y' within property initializer; property initializers run before 'self' is available}}
-// expected-error@-3 {{circular reference}}
+// expected-error@-1 {{circular reference}}
+// expected-note@-2 {{through reference here}}
+// expected-note@-3 {{through reference here}}
 // expected-note@-4 {{through reference here}}
 // expected-note@-5 {{through reference here}}
 // expected-note@-6 {{through reference here}}
-// expected-note@-7 {{through reference here}}
+// expected-error@-7 {{circular reference}}
 // expected-note@-8 {{through reference here}}
-// expected-error@-9 {{circular reference}}
+// expected-note@-9 {{through reference here}}
 // expected-note@-10 {{through reference here}}
 // expected-note@-11 {{through reference here}}
 // expected-note@-12 {{through reference here}}
-// expected-note@-13 {{through reference here}}
-// expected-note@-14 {{through reference here}}
 
 // https://bugs.swift.org/browse/SR-9015
 func sr9015() {

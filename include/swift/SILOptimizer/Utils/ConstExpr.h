@@ -207,6 +207,8 @@ public:
   void dumpState();
 };
 
+bool hasConstantEvaluableAnnotation(SILFunction *fun);
+
 bool isConstantEvaluable(SILFunction *fun);
 
 /// Return true if and only if the given function \p fun is specially modeled

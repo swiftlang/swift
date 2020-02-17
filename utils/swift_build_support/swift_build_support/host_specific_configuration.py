@@ -10,9 +10,8 @@
 #
 # ----------------------------------------------------------------------------
 
+import sys
 from argparse import ArgumentError
-
-import diagnostics
 
 from .targets import StdlibDeploymentTarget
 
@@ -64,8 +63,10 @@ class HostSpecificConfiguration(object):
             deployment_target = StdlibDeploymentTarget.get_target_for_name(
                 deployment_target_name)
             if deployment_target is None:
-                diagnostics.fatal("unknown target: %r" % (
-                    deployment_target_name,))
+                sys.stderr.write('ERROR: unknown target: {}\n'.format(
+                    deployment_target_name))
+                sys.stderr.flush()
+                sys.exit(1)
 
             # Add the SDK to use.
             deployment_platform = deployment_target.platform
@@ -149,8 +150,18 @@ class HostSpecificConfiguration(object):
                     subset_suffix = "-only_stress"
                 else:
                     subset_suffix = ""
-                self.swift_test_run_targets.append("check-swift{}{}-{}".format(
-                    subset_suffix, suffix, name))
+
+                # Support for running the macCatalyst tests with
+                # the iOS-like target triple.
+                if name == "macosx-x86_64" and args.maccatalyst \
+                   and args.maccatalyst_ios_tests:
+                    (self.swift_test_run_targets
+                     .append("check-swift{}{}-{}".format(
+                         subset_suffix, suffix, "macosx-maccatalyst-x86_64")))
+                else:
+                    (self.swift_test_run_targets
+                     .append("check-swift{}{}-{}".format(
+                         subset_suffix, suffix, name)))
                 if args.test_optimized and not test_host_only:
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize-{}".format(

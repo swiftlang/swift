@@ -67,6 +67,8 @@ class ModuleInterfaceBuilder {
       version::Version &Vers, llvm::StringSaver &SubArgSaver,
       SmallVectorImpl<const char *> &SubArgs);
 
+  bool buildSwiftModuleInternal(StringRef OutPath, bool ShouldSerializeDeps,
+                                std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer);
 public:
   ModuleInterfaceBuilder(SourceManager &sourceMgr, DiagnosticEngine &diags,
                             const SearchPathOptions &searchPathOpts,
@@ -102,7 +104,8 @@ public:
   }
 
   bool buildSwiftModule(StringRef OutPath, bool ShouldSerializeDeps,
-                        std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer);
+                        std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                        llvm::function_ref<void()> RemarkRebuild = nullptr);
 };
 
 } // end namespace swift

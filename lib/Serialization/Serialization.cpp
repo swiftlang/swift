@@ -915,7 +915,7 @@ static void flattenImportPath(const ModuleDecl::ImportedModule &import,
   outStream << '\0';
   assert(import.first.size() == 1 && "can only handle top-level decl imports");
   auto accessPathElem = import.first.front();
-  outStream << accessPathElem.first.str();
+  outStream << accessPathElem.Item.str();
 }
 
 uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {
@@ -1585,7 +1585,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     abbrCode = DeclTypeAbbrCodes[XRefExtensionPathPieceLayout::Code];
     CanGenericSignature genericSig(nullptr);
     if (ext->isConstrainedExtension()) {
-      genericSig = ext->getGenericSignature()->getCanonicalSignature();
+      genericSig = ext->getGenericSignature().getCanonicalSignature();
     }
     XRefExtensionPathPieceLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addContainingModuleRef(DC),
@@ -2003,7 +2003,8 @@ static uint8_t getRawStableAutoDiffDerivativeFunctionKind(
     swift::AutoDiffDerivativeFunctionKind kind) {
   switch (kind) {
   case swift::AutoDiffDerivativeFunctionKind::JVP:
-    return uint8_t(serialization::AutoDiffDerivativeFunctionKind::JVP);  case swift::AutoDiffDerivativeFunctionKind::VJP:
+    return uint8_t(serialization::AutoDiffDerivativeFunctionKind::JVP);
+  case swift::AutoDiffDerivativeFunctionKind::VJP:
     return uint8_t(serialization::AutoDiffDerivativeFunctionKind::VJP);
   }
   llvm_unreachable("bad derivative function kind");
@@ -2360,11 +2361,28 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_ImplicitlySynthesizesNestedRequirement: {
-      auto *theAttr = cast<ImplicitlySynthesizesNestedRequirementAttr>(DA);
-      auto abbrCode = S.DeclTypeAbbrCodes[ImplicitlySynthesizesNestedRequirementDeclAttrLayout::Code];
-      ImplicitlySynthesizesNestedRequirementDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                                          theAttr->Value);
+    case DAK_Transpose: {
+      auto abbrCode = S.DeclTypeAbbrCodes[TransposeDeclAttrLayout::Code];
+      auto *attr = cast<TransposeAttr>(DA);
+      // NOTE(TF-838): `@transpose` attribute serialization is blocked by
+      // `@transpose` attribute type-checking (TF-830), which resolves
+      // the original declaration.
+      if (!attr->getOriginalFunction())
+        return;
+      assert(attr->getOriginalFunction() &&
+             "`@transpose` attribute should have original declaration set "
+             "during construction or parsing");
+      auto origName = attr->getOriginalFunctionName().Name.getBaseName();
+      IdentifierID origNameId = S.addDeclBaseNameRef(origName);
+      DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
+      auto *parameterIndices = attr->getParameterIndices();
+      assert(parameterIndices && "Parameter indices must be resolved");
+      SmallVector<bool, 4> indices;
+      for (unsigned i : range(parameterIndices->getCapacity()))
+        indices.push_back(parameterIndices->contains(i));
+      TransposeDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
+          origDeclID, indices);
       return;
     }
     }
@@ -3113,9 +3131,7 @@ public:
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theClass->getFormalAccess());
 
-    bool inheritsSuperclassInitializers =
-        const_cast<ClassDecl *>(theClass)->
-          inheritsSuperclassInitializers();
+    auto mutableClass = const_cast<ClassDecl *>(theClass);
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ClassLayout::Code];
     ClassLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -3123,7 +3139,8 @@ public:
                             contextID.getOpaqueValue(),
                             theClass->isImplicit(),
                             theClass->isObjC(),
-                            inheritsSuperclassInitializers,
+                            mutableClass->inheritsSuperclassInitializers(),
+                            mutableClass->hasMissingDesignatedInitializers(),
                             S.addGenericSignatureRef(
                                              theClass->getGenericSignature()),
                             S.addTypeRef(theClass->getSuperclass()),
@@ -3238,6 +3255,7 @@ public:
                           var->isGetterMutating(),
                           var->isSetterMutating(),
                           var->isLazyStorageProperty(),
+                          var->isTopLevelGlobal(),
                           S.addDeclRef(lazyStorage),
                           accessors.OpaqueReadOwnership,
                           accessors.ReadImpl,
@@ -3749,6 +3767,17 @@ static uint8_t getRawStableParameterConvention(swift::ParameterConvention pc) {
   llvm_unreachable("bad parameter convention kind");
 }
 
+/// Translate from AST SILParameterDifferentiability enum to the Serialization
+/// enum values, which are guaranteed to be stable.
+static uint8_t
+getRawSILParameterDifferentiability(swift::SILParameterDifferentiability pd) {
+  switch (pd) {
+  SIMPLE_CASE(SILParameterDifferentiability, DifferentiableOrNotApplicable)
+  SIMPLE_CASE(SILParameterDifferentiability, NotDifferentiable)
+  }
+  llvm_unreachable("bad parameter differentiability kind");
+}
+
 /// Translate from the AST ResultConvention enum to the
 /// Serialization enum values, which are guaranteed to be stable.
 static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
@@ -3995,8 +4024,8 @@ public:
           S.Out, S.ScratchRecord, abbrCode,
           S.addDeclBaseNameRef(param.getLabel()),
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
-          paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(),
-          rawOwnership);
+          paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
+          paramFlags.isNoDerivative());
     }
   }
 
@@ -4058,6 +4087,9 @@ public:
       variableData.push_back(S.addTypeRef(param.getInterfaceType()));
       unsigned conv = getRawStableParameterConvention(param.getConvention());
       variableData.push_back(TypeID(conv));
+      if (fnTy->isDifferentiable())
+        variableData.push_back(TypeID(
+            getRawSILParameterDifferentiability(param.getDifferentiability())));
     }
     for (auto yield : fnTy->getYields()) {
       variableData.push_back(S.addTypeRef(yield.getInterfaceType()));

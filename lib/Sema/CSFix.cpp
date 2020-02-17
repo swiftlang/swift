@@ -191,7 +191,7 @@ bool MissingConformance::diagnose(bool asNote) const {
   auto *locator = getLocator();
 
   if (IsContextual) {
-    auto context = cs.getContextualTypePurpose();
+    auto context = cs.getContextualTypePurpose(locator->getAnchor());
     MissingContextualConformanceFailure failure(
         cs, context, NonConformingType, ProtocolType, locator);
     return failure.diagnose(asNote);
@@ -262,9 +262,9 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
 /// and the contextual type.
 static Optional<std::tuple<ContextualTypePurpose, Type, Type>>
 getStructuralTypeContext(ConstraintSystem &cs, ConstraintLocator *locator) {
-  if (auto contextualType = cs.getContextualType()) {
+  if (auto contextualType = cs.getContextualType(locator->getAnchor())) {
     if (auto *anchor = simplifyLocatorToAnchor(locator))
-      return std::make_tuple(cs.getContextualTypePurpose(),
+      return std::make_tuple(cs.getContextualTypePurpose(locator->getAnchor()),
                              cs.getType(anchor),
                              contextualType);
   } else if (auto argApplyInfo = cs.getFunctionArgApplyInfo(locator)) {
@@ -304,7 +304,7 @@ bool AllowTupleTypeMismatch::coalesceAndDiagnose(
   Type toType;
 
   if (getFromType()->is<TupleType>() && getToType()->is<TupleType>()) {
-    purpose = cs.getContextualTypePurpose();
+    purpose = cs.getContextualTypePurpose(locator->getAnchor());
     fromType = getFromType();
     toType = getToType();
   } else if (auto contextualTypeInfo = getStructuralTypeContext(cs, locator)) {
@@ -472,14 +472,15 @@ UseSubscriptOperator *UseSubscriptOperator::create(ConstraintSystem &cs,
 bool DefineMemberBasedOnUse::diagnose(bool asNote) const {
   auto failure = MissingMemberFailure(getConstraintSystem(), BaseType,
                                       Name, getLocator());
-  return failure.diagnose(asNote);
+  return AlreadyDiagnosed || failure.diagnose(asNote);
 }
 
 DefineMemberBasedOnUse *
 DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
-                               DeclNameRef member, ConstraintLocator *locator) {
+                               DeclNameRef member, bool alreadyDiagnosed,
+                               ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      DefineMemberBasedOnUse(cs, baseType, member, locator);
+      DefineMemberBasedOnUse(cs, baseType, member, alreadyDiagnosed, locator);
 }
 
 AllowMemberRefOnExistential *
@@ -1154,4 +1155,77 @@ SpecifyBaseTypeForContextualMember *SpecifyBaseTypeForContextualMember::create(
     ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator) {
   return new (cs.getAllocator())
       SpecifyBaseTypeForContextualMember(cs, member, locator);
+}
+
+bool SpecifyClosureReturnType::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+  UnableToInferClosureReturnType failure(cs, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyClosureReturnType *
+SpecifyClosureReturnType::create(ConstraintSystem &cs,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SpecifyClosureReturnType(cs, locator);
+}
+
+bool SpecifyObjectLiteralTypeImport::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+  UnableToInferProtocolLiteralType failure(cs, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyObjectLiteralTypeImport *
+SpecifyObjectLiteralTypeImport::create(ConstraintSystem &cs,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SpecifyObjectLiteralTypeImport(cs, locator);
+}
+
+AllowNonClassTypeToConvertToAnyObject::AllowNonClassTypeToConvertToAnyObject(
+    ConstraintSystem &cs, Type type, ConstraintLocator *locator)
+    : ContextualMismatch(cs, FixKind::AllowNonClassTypeToConvertToAnyObject,
+                         type, cs.getASTContext().getAnyObjectType(), locator) {
+}
+
+bool AllowNonClassTypeToConvertToAnyObject::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+
+  auto *locator = getLocator();
+  if (locator->getPath().empty())
+    return false;
+
+  const auto &last = locator->getPath().back();
+  switch (last.getKind()) {
+  case ConstraintLocator::ContextualType: {
+    ContextualFailure failure(cs, getFromType(), getToType(), locator);
+    return failure.diagnose(asNote);
+  }
+
+  case ConstraintLocator::ApplyArgToParam: {
+    ArgumentMismatchFailure failure(cs, getFromType(), getToType(), locator);
+    return failure.diagnose(asNote);
+  }
+
+  default:
+    return false;
+  }
+}
+
+AllowNonClassTypeToConvertToAnyObject *
+AllowNonClassTypeToConvertToAnyObject::create(ConstraintSystem &cs, Type type,
+                                              ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowNonClassTypeToConvertToAnyObject(cs, type, locator);
+}
+
+bool AddQualifierToAccessTopLevelName::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+  MissingQuialifierInMemberRefFailure failure(cs, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AddQualifierToAccessTopLevelName *
+AddQualifierToAccessTopLevelName::create(ConstraintSystem &cs,
+                                         ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AddQualifierToAccessTopLevelName(cs, locator);
 }
