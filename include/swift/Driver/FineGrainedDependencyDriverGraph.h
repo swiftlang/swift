@@ -57,8 +57,7 @@ class ModuleDepGraphNode : public DepGraphNode {
   bool hasBeenTracedAsADependent = false;
 
 public:
-  ModuleDepGraphNode(const DependencyKey &key,
-                     Optional<std::string> fingerprint,
+  ModuleDepGraphNode(const DependencyKey &key, Optional<StringRef> fingerprint,
                      Optional<std::string> swiftDeps)
       : DepGraphNode(key, fingerprint), swiftDeps(swiftDeps) {}
 
@@ -187,11 +186,13 @@ class ModuleDepGraph {
   /// files for the same name distinct, keep a sequence number for each name.
   std::unordered_map<std::string, unsigned> dotFileSequenceNumber;
 
+public:
   const bool verifyFineGrainedDependencyGraphAfterEveryImport;
   const bool emitFineGrainedDependencyDotFileAfterEveryImport;
 
   const bool EnableTypeFingerprints;
 
+private:
   /// If tracing dependencies, holds a vector used to hold the current path
   /// def - use/def - use/def - ...
   Optional<std::vector<const ModuleDepGraphNode *>> currentPathIfTracing;
@@ -335,15 +336,6 @@ public:
   Changes loadFromSourceFileDepGraph(const driver::Job *cmd,
                                      const SourceFileDepGraph &,
                                      DiagnosticEngine &);
-
-  /// Also for unit tests
-  Changes
-  simulateLoad(const driver::Job *cmd,
-               llvm::StringMap<std::vector<std::string>> simpleNames,
-               llvm::StringMap<std::vector<std::pair<std::string, std::string>>>
-                   compoundNames = {},
-               const bool includePrivateDeps = false,
-               const bool hadCompilationError = false);
 
 
 private:
@@ -514,6 +506,8 @@ private:
 public:
   /// Record a new (to this graph) Job.
   void registerJob(const driver::Job *);
+
+  std::vector<const driver::Job *> getAllJobs() const;
 
   /// Find jobs that were previously not known to need compilation but that
   /// depend on \c externalDependency.
