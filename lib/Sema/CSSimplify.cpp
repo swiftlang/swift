@@ -5336,7 +5336,8 @@ static bool isSelfRecursiveKeyPathDynamicMemberLookup(
     ConstraintSystem &cs, Type keyPathRootTy, ConstraintLocator *locator) {
   // Let's check whether this is a recursive call to keypath
   // dynamic member lookup on the same type.
-  if (!locator->isLastElement<LocatorPathElt::KeyPathDynamicMember>())
+  if (!locator ||
+      !locator->isLastElement<LocatorPathElt::KeyPathDynamicMember>())
     return false;
 
   auto path = locator->getPath();
