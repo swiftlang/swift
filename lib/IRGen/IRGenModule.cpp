@@ -1411,3 +1411,7 @@ TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
   return TypeExpansionContext::maximal(getSwiftModule(),
                                        getSILModule().isWholeModule());
 }
+
+const TypeLayoutEntry &IRGenModule::getTypeLayoutEntry(SILType T) {
+  return Types.getTypeLayoutEntry(T);
+}

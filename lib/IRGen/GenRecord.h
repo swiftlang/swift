@@ -148,6 +148,10 @@ public:
     return new(buffer) Impl(fields, std::forward<As>(args)...);
   }
 
+  bool areFieldsABIAccessible() const {
+    return AreFieldsABIAccessible;
+  }
+
   ArrayRef<FieldImpl> getFields() const {
     return {this->template getTrailingObjects<FieldImpl>(), NumFields};
   }
