@@ -6534,7 +6534,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       SmallVector<Constraint *, 2> optionalities;
       auto nonoptionalResult = Constraint::createFixed(
           *this, ConstraintKind::Bind,
-          UnwrapOptionalBase::create(*this, member, locator), innerTV, memberTy,
+          UnwrapOptionalBase::create(*this, member, locator), memberTy, innerTV,
           locator);
       auto optionalResult = Constraint::createFixed(
           *this, ConstraintKind::Bind,
@@ -8955,6 +8955,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::UnwrapOptionalBaseWithOptionalResult: {
     if (recordFix(fix))
       return SolutionKind::Error;
+
+    type1 = simplifyType(type1);
+    type2 = simplifyType(type2);
+
+    // Explicitly preserve l-valueness of an unwrapped member type.
+    if (!type1->is<LValueType>() && type2->is<LValueType>())
+      type1 = LValueType::get(type1);
 
     // First type already appropriately set.
     return matchTypes(type1, type2, matchKind, subflags, locator);
