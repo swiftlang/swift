@@ -7,7 +7,7 @@
 
 // CHECK: @"$sytN" = external{{( dllimport)?}} global %swift.full_type
 
-// CHECK: @"$s4main5ValueOySiGMf" = internal constant <{
+// CHECK: @"$s4main5ValueOySiGMf" = linkonce_odr hidden constant <{
 // CHECK-SAME:    i8**,
 // CHECK-SAME:    [[INT]],
 // CHECK-SAME:    %swift.type_descriptor*,

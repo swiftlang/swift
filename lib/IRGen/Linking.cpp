@@ -74,16 +74,14 @@ bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
 
 UniversalLinkageInfo::UniversalLinkageInfo(IRGenModule &IGM)
     : UniversalLinkageInfo(IGM.Triple, IGM.IRGen.hasMultipleIGMs(),
-                           IGM.IRGen.Opts.ForcePublicLinkage,
-                           IGM.getSILModule().isWholeModule()) {}
+                           IGM.IRGen.Opts.ForcePublicLinkage) {}
 
 UniversalLinkageInfo::UniversalLinkageInfo(const llvm::Triple &triple,
                                            bool hasMultipleIGMs,
-                                           bool forcePublicDecls,
-                                           bool isWholeModule)
+                                           bool forcePublicDecls)
     : IsELFObject(triple.isOSBinFormatELF()),
       UseDLLStorage(useDllStorage(triple)), HasMultipleIGMs(hasMultipleIGMs),
-      ForcePublicDecls(forcePublicDecls), IsWholeModule(isWholeModule) {}
+      ForcePublicDecls(forcePublicDecls) {}
 
 /// Mangle this entity into the given buffer.
 void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
@@ -490,6 +488,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       // For imported types, the full metadata object is a candidate
       // for uniquing.
       if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
+        return SILLinkage::Shared;
+
+      // Prespecialization of the same generic metadata may be requested 
+      // multiple times within the same module, so it needs to be uniqued.
+      if (nominal->isGenericContext())
         return SILLinkage::Shared;
 
       // The full metadata object is private to the containing module.

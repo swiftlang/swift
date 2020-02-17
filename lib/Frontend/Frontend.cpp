@@ -211,6 +211,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
   registerSILGenRequestFunctions(Context->evaluator);
+  registerTBDGenRequestFunctions(Context->evaluator);
 
   // Migrator, indexing and typo correction need some IDE requests.
   // The integrated REPL needs IDE requests for completion.

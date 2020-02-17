@@ -233,6 +233,7 @@ def validate_arguments(toolchain, args):
         'build_playgroundsupport',
         'build_pythonkit',
         'build_sourcekitlsp',
+        'build_tensorflow_swift_apis',
         'build_toolchainbenchmarks',
         'tsan_libdispatch_test',
     ]
@@ -280,9 +281,13 @@ def default_stdlib_deployment_targets(args):
 def apply_default_arguments(toolchain, args):
     # Infer if ninja is required
     ninja_required = (
-        args.cmake_generator == 'Ninja' or args.build_foundation or
-        args.build_pythonkit or args.build_sourcekitlsp or
-        args.build_indexstoredb)
+        args.build_foundation or
+        args.build_indexstoredb or
+        args.build_pythonkit or
+        args.build_sourcekitlsp or
+        args.build_tensorflow_swift_apis or
+        args.cmake_generator == 'Ninja'
+    )
     if ninja_required and toolchain.ninja is None:
         args.build_ninja = True
 
@@ -850,6 +855,8 @@ class BuildScriptInvocation(object):
             product_classes.append(products.PlaygroundSupport)
         if self.args.build_pythonkit:
             product_classes.append(products.PythonKit)
+        if self.args.build_tensorflow_swift_apis:
+            product_classes.append(products.TensorFlowSwiftAPIs)
         if self.args.build_sourcekitlsp:
             product_classes.append(products.SourceKitLSP)
         if self.args.build_toolchainbenchmarks:

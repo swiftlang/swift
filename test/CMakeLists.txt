@@ -232,7 +232,7 @@ foreach(SDK ${SWIFT_SDKS})
 __declspec(dllexport)
 #endif
 _Block_release(void) { }\n")
-      _add_swift_library_single(
+      _add_swift_host_library_single(
         BlocksRuntimeStub${VARIANT_SUFFIX}
         BlocksRuntimeStub
         SHARED
