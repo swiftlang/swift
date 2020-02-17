@@ -527,8 +527,11 @@ namespace {
         return nullptr;
 
       auto proto = existentialType->getProtocols()[0];
+
+#if SWIFT_OBJC_INTEROP
       if (proto.isObjC())
         return nullptr;
+#endif
 
       return proto.getSwiftProtocol();
     }
