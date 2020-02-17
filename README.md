@@ -356,7 +356,10 @@ expressed today.
 
 ### CMake
 [CMake](https://cmake.org) is the core infrastructure used to configure builds of
-Swift and its companion projects; at least version 3.4.3 is required.
+Swift and its companion projects; at least version 3.4.3 is required to bootstrap
+the build system and build a newer version of CMake for you when using 
+`utils/build-script`. If you don't use the build script CMake version 3.15.1 or later
+is required.
 
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded
