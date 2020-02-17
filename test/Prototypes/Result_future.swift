@@ -9,10 +9,9 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-stdlib-swift-target-future
+// RUN: %target-run-simple-swift(-Xfrontend -prespecialize-generic-metadata -target %module-target-future)
 // REQUIRES: executable_test
 
-// REQUIRES: rdar59425215
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
