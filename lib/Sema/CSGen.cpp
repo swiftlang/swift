@@ -2119,6 +2119,17 @@ namespace {
           auto *paramLoc =
               CS.getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
 
+          // If one of the parameters represents a destructured tuple
+          // e.g. `{ (x: Int, (y: Int, z: Int)) in ... }` let's fail
+          // inference here and not attempt to solve the system because:
+          //
+          // a. Destructuring has already been diagnosed by the parser;
+          // b. Body of the closure would have error expressions for
+          //    each incorrect parameter reference and solver wouldn't
+          //    be able to produce any viable solutions.
+          if (param->isDestructured())
+            return nullptr;
+
           Type externalType;
           if (param->getTypeRepr()) {
             auto declaredTy = param->getType();
