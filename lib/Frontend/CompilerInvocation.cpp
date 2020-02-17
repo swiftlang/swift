@@ -1341,8 +1341,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.DisableLegacyTypeInfo = true;
   }
 
-  if (Args.hasArg(OPT_disable_generic_metadata_prespecialization)) {
-    Opts.PrespecializeGenericMetadata = false;
+  if (Args.hasArg(OPT_prespecialize_generic_metadata) && 
+      !Args.hasArg(OPT_disable_generic_metadata_prespecialization)) {
+    Opts.PrespecializeGenericMetadata = true;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_read_legacy_type_info_path_EQ)) {

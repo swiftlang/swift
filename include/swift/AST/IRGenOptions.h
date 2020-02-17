@@ -262,7 +262,7 @@ public:
         EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
         LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
-        PrespecializeGenericMetadata(true), UseIncrementalLLVMCodeGen(true),
+        PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
         UseSwiftCall(false), GenerateProfile(false),
         EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
