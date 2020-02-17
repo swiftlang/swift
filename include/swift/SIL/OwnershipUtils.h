@@ -251,6 +251,13 @@ struct BorrowScopeOperand {
 
   BorrowScopeOperand(Operand *op)
       : kind(*BorrowScopeOperandKind::get(op->getUser()->getKind())), op(op) {}
+  BorrowScopeOperand(const BorrowScopeOperand &other)
+      : kind(other.kind), op(other.op) {}
+  BorrowScopeOperand &operator=(const BorrowScopeOperand &other) {
+    kind = other.kind;
+    op = other.op;
+    return *this;
+  }
 
   /// If value is a borrow introducer return it after doing some checks.
   static Optional<BorrowScopeOperand> get(Operand *op) {
