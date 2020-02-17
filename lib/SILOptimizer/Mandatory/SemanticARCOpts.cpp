@@ -277,20 +277,12 @@ bool IsAddressWrittenToDefUseAnalysis::isWrittenToHelper(SILValue initialValue) 
 
 namespace {
 
-/// A two stage visitor that optimizes ownership instructions and eliminates any
-/// trivially dead code that results after optimization. The two stages are used
-/// to avoid iterator invalidation. Specifically:
-///
-/// 1. We first process the CFG instruction by instruction, only eliminating
-/// instructions that are guaranteed to be dominated by the visited
-/// instrution. While we do that, we add the operands of any instruction that we
-/// successfully optimize to the worklist. NOTE: We do not process arguments
-/// here to get SSA guarantees around dominance.
-///
-/// 2. Once we have processed the CFG and done some initial optimization, we
-/// enter phase 2 where we process the worklist. Here we are allowed to process
-/// arbitrary values and instructions, removing things that we are erasing from
-/// the worklist before we delete them.
+/// A visitor that optimizes ownership instructions and eliminates any trivially
+/// dead code that results after optimization. It uses an internal worklist that
+/// is initialized on construction with targets to avoid iterator invalidation
+/// issues. Rather than revisit the entire CFG like SILCombine and other
+/// visitors do, we maintain a visitedSinceLastMutation list to ensure that we
+/// revisit all interesting instructions in between mutations.
 struct SemanticARCOptVisitor
     : SILInstructionVisitor<SemanticARCOptVisitor, bool> {
   /// Our main worklist. We use this after an initial run through.
