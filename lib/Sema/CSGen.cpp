@@ -2252,13 +2252,19 @@ namespace {
 
       case PatternKind::Typed: {
         // FIXME: Need a better locator for a pattern as a base.
+        // Compute the type ascribed to the pattern.
         auto contextualPattern =
             ContextualPattern::forRawPattern(pattern, CurDC);
         Type type = TypeChecker::typeCheckPattern(contextualPattern);
         Type openedType = CS.openUnboundGenericType(type, locator);
 
-        // For a typed pattern, simply return the opened type of the pattern.
-        // FIXME: Error recovery if the type is an error type?
+        // Determine the subpattern type. It will be convertible to the
+        // ascribed type.
+        Type subPatternType =
+            getTypeForPattern(
+               cast<TypedPattern>(pattern)->getSubPattern(), locator);
+        CS.addConstraint(
+            ConstraintKind::Conversion, subPatternType, openedType, locator);
         return setType(openedType);
       }
 
