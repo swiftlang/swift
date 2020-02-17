@@ -2762,6 +2762,92 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   return true;
 }
 
+/// Let's check whether this is an out-of-order argument in binary
+/// operator/function with concrete type parameters e.g.
+/// `func ^^(x: Int, y: String)` called as `"" ^^ 42` instead of
+/// `42 ^^ ""` and repair it by using out-of-order fix on the
+/// parent locator.
+static bool repairOutOfOrderArgumentsInBinaryFunction(
+    ConstraintSystem &cs, SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
+    ConstraintLocator *locator) {
+  if (!locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
+    return false;
+
+  auto path = locator->getPath();
+  auto *parentLoc =
+      cs.getConstraintLocator(locator->getAnchor(), path.drop_back());
+
+  if (cs.hasFixFor(parentLoc, FixKind::MoveOutOfOrderArgument))
+    return true;
+
+  auto *calleeLoc = cs.getCalleeLocator(locator);
+  if (!calleeLoc)
+    return false;
+
+  auto overload = cs.findSelectedOverloadFor(calleeLoc);
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  auto *fnType = overload->openedType->getAs<FunctionType>();
+  if (!(fnType && fnType->getNumParams() == 2))
+    return false;
+
+  auto *argExpr = simplifyLocatorToAnchor(locator);
+  // Argument could be synthesized.
+  if (!argExpr)
+    return false;
+
+  auto currArgIdx =
+      locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>().getArgIdx();
+  auto otherArgIdx = currArgIdx == 0 ? 1 : 0;
+
+  auto argType = cs.getType(argExpr);
+  auto paramType = fnType->getParams()[otherArgIdx].getOldType();
+
+  bool isOperatorRef = overload->choice.getDecl()->isOperator();
+
+  auto matchArgToParam = [&](Type argType, Type paramType, Expr *anchor) {
+    auto *loc = cs.getConstraintLocator(anchor);
+    // If argument (and/or parameter) is a generic type let's not even try this
+    // fix because it would be impossible to match given types  without delaying
+    // until more context becomes available.
+    if (argType->hasTypeVariable() || paramType->hasTypeVariable())
+      return cs.getTypeMatchFailure(loc);
+
+    return cs.matchTypes(
+        argType->lookThroughAllOptionalTypes(),
+        paramType->lookThroughAllOptionalTypes(),
+        isOperatorRef ? ConstraintKind::OperatorArgumentConversion
+                      : ConstraintKind::ArgumentConversion,
+        ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix, loc);
+  };
+
+  auto result = matchArgToParam(argType, paramType, argExpr);
+  if (result.isSuccess()) {
+    // Let's check whether other argument matches current parameter type,
+    // if it does - it's definitely out-of-order arguments issue.
+    auto *otherArgLoc = cs.getConstraintLocator(
+        parentLoc, LocatorPathElt::ApplyArgToParam(otherArgIdx, otherArgIdx,
+                                                   ParameterTypeFlags()));
+    auto *otherArgExpr = simplifyLocatorToAnchor(otherArgLoc);
+    // Argument could be synthesized.
+    if (!otherArgExpr)
+      return false;
+
+    argType = cs.getType(otherArgExpr);
+    paramType = fnType->getParams()[currArgIdx].getOldType();
+
+    result = matchArgToParam(argType, paramType, otherArgExpr);
+    if (result.isSuccess()) {
+      conversionsOrFixes.push_back(MoveOutOfOrderArgument::create(
+          cs, otherArgIdx, currArgIdx, {{0}, {1}}, parentLoc));
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /// Attempt to repair typing failures and record fixes if needed.
 /// \return true if at least some of the failures has been repaired
 /// successfully, which allows type matcher to continue.
@@ -3390,6 +3476,10 @@ bool ConstraintSystem::repairFailures(
         }
       }
     }
+
+    if (repairOutOfOrderArgumentsInBinaryFunction(*this, conversionsOrFixes,
+                                                  loc))
+      return true;
 
     conversionsOrFixes.push_back(
         AllowArgumentMismatch::create(*this, lhs, rhs, loc));
@@ -8974,6 +9064,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveReturn:
   case FixKind::RemoveAddressOf:
   case FixKind::AddMissingArguments:
+  case FixKind::MoveOutOfOrderArgument:
   case FixKind::SkipUnhandledConstructInFunctionBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue:
@@ -9072,7 +9163,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidInitRef:
   case FixKind::RemoveExtraneousArguments:
   case FixKind::AllowClosureParameterDestructuring:
-  case FixKind::MoveOutOfOrderArgument:
   case FixKind::AllowInaccessibleMember:
   case FixKind::AllowAnyObjectKeyPathRoot:
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
