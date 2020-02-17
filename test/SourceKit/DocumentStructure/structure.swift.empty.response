@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 2587,
+  key.length: 2630,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -9,7 +9,6 @@
       key.name: "Foo",
       key.offset: 0,
       key.length: 173,
-      key.runtime_name: "_TtC4main3Foo",
       key.nameoffset: 6,
       key.namelength: 3,
       key.bodyoffset: 17,
@@ -121,7 +120,6 @@
       key.name: "Foo2",
       key.offset: 189,
       key.length: 13,
-      key.runtime_name: "_TtC4main4Foo2",
       key.nameoffset: 195,
       key.namelength: 4,
       key.bodyoffset: 201,
@@ -140,7 +138,6 @@
       key.name: "Foo3",
       key.offset: 204,
       key.length: 108,
-      key.runtime_name: "_TtC4main4Foo3",
       key.nameoffset: 210,
       key.namelength: 4,
       key.bodyoffset: 216,
@@ -190,7 +187,6 @@
       key.name: "MyProt",
       key.offset: 314,
       key.length: 18,
-      key.runtime_name: "_TtP4main6MyProt_",
       key.nameoffset: 323,
       key.namelength: 6,
       key.bodyoffset: 331,
@@ -202,7 +198,6 @@
       key.name: "OuterCls",
       key.offset: 334,
       key.length: 41,
-      key.runtime_name: "_TtC4main8OuterCls",
       key.nameoffset: 340,
       key.namelength: 8,
       key.bodyoffset: 350,
@@ -278,7 +273,6 @@
       key.name: "TestParamAndCall",
       key.offset: 449,
       key.length: 212,
-      key.runtime_name: "_TtC4main16TestParamAndCall",
       key.nameoffset: 455,
       key.namelength: 16,
       key.bodyoffset: 473,
@@ -419,7 +413,6 @@
       key.name: "TestMarkers",
       key.offset: 684,
       key.length: 206,
-      key.runtime_name: "_TtC4main11TestMarkers",
       key.nameoffset: 690,
       key.namelength: 11,
       key.bodyoffset: 703,
@@ -918,7 +911,6 @@
       key.name: "ClassObjcAttr",
       key.offset: 1412,
       key.length: 60,
-      key.runtime_name: "_TtC4main13ClassObjcAttr",
       key.nameoffset: 1418,
       key.namelength: 13,
       key.bodyoffset: 1444,
@@ -1020,7 +1012,6 @@
       key.name: "FooProtocol",
       key.offset: 1554,
       key.length: 81,
-      key.runtime_name: "_TtP4main11FooProtocol_",
       key.nameoffset: 1563,
       key.namelength: 11,
       key.bodyoffset: 1576,
@@ -1147,7 +1138,6 @@
       key.name: "C",
       key.offset: 1790,
       key.length: 119,
-      key.runtime_name: "_TtC4main1C",
       key.nameoffset: 1796,
       key.namelength: 1,
       key.bodyoffset: 1799,
@@ -1342,7 +1332,6 @@
       key.name: "OneMore",
       key.offset: 2137,
       key.length: 121,
-      key.runtime_name: "_TtC4main7OneMore",
       key.nameoffset: 2143,
       key.namelength: 7,
       key.bodyoffset: 2152,
@@ -1613,6 +1602,25 @@
               key.bodylength: 0
             }
           ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "BarProtocol",
+      key.offset: 2606,
+      key.length: 23,
+      key.runtime_name: "FPBarProto",
+      key.nameoffset: 2615,
+      key.namelength: 11,
+      key.bodyoffset: 2628,
+      key.bodylength: 0,
+      key.attributes: [
+        {
+          key.offset: 2588,
+          key.length: 17,
+          key.attribute: source.decl.attribute.objc.name
         }
       ]
     }
