@@ -2527,10 +2527,18 @@ namespace {
       struct CollectParameterRefs : public ASTWalker {
         ConstraintSystem &cs;
         llvm::SmallVector<TypeVariableType *, 4> paramRefs;
+        bool hasErrorExprs = false;
 
         CollectParameterRefs(ConstraintSystem &cs) : cs(cs) { }
 
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+          // If there are any error expressions in this closure
+          // it wouldn't be possible to infer its type.
+          if (isa<ErrorExpr>(expr)) {
+            hasErrorExprs = true;
+            return {false, nullptr};
+          }
+
           // Retrieve type variables from references to parameter declarations.
           if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
             if (auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl())) {
@@ -2544,6 +2552,9 @@ namespace {
         }
       } collectParameterRefs(CS);
       closure->walk(collectParameterRefs);
+
+      if (collectParameterRefs.hasErrorExprs)
+        return Type();
 
       auto inferredType = inferClosureType(closure);
       if (!inferredType || inferredType->hasError())
