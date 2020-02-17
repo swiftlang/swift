@@ -18,7 +18,7 @@ extension Single: P1 where A: P2 {
 
 // witness method for Single.normal
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlAaEP6normalyyFTW"(%T42conditional_conformance_basic_conformances6SingleV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlAaEP6normalyyFTW"(%T42conditional_conformance_basic_conformances6SingleV* noalias nocapture swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 -1
 // CHECK-NEXT:    [[A_P2_i8star:%.*]] = load i8*, i8** [[A_P2_PTR]], align 8
@@ -32,7 +32,7 @@ extension Single: P1 where A: P2 {
 
 // witness method for Single.generic
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlAaEP7genericyyqd__AA2P3Rd__lFTW"(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_1_0", i8** %"\CF\84_1_0.P3", %T42conditional_conformance_basic_conformances6SingleV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlAaEP7genericyyqd__AA2P3Rd__lFTW"(%swift.opaque* noalias nocapture %0, %swift.type* %"\CF\84_1_0", i8** %"\CF\84_1_0.P3", %T42conditional_conformance_basic_conformances6SingleV* noalias nocapture swiftself %1, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 -1
 // CHECK-NEXT:    [[A_P2_i8star:%.*]] = load i8*, i8** [[A_P2_PTR]], align 8
@@ -47,7 +47,7 @@ extension Single: P1 where A: P2 {
 public func single_generic<T: P2>(_: T.Type) {
   takes_p1(Single<T>.self)
 }
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s42conditional_conformance_basic_conformances14single_genericyyxmAA2P2RzlF"(%swift.type*, %swift.type* %T, i8** %T.P2)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s42conditional_conformance_basic_conformances14single_genericyyxmAA2P2RzlF"(%swift.type* %0, %swift.type* %T, i8** %T.P2)
 // CHECK-NEXT:  entry:
 // CHECK:         %conditional.requirement.buffer = alloca [1 x i8**], align 8
 // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6SingleVMa"(i64 0, %swift.type* %T)
@@ -71,6 +71,45 @@ public func single_concrete() {
 // CHECK-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances8takes_p1yyxmAA2P1RzlF"(%swift.type* [[Single_TYPE]], %swift.type* [[Single_TYPE]], i8** [[Single_P1]])
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
+
+// CHECK-PRESPECIALIZED: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s42conditional_conformance_basic_conformances15single_concreteyyF"()
+// CHECK-PRESPECIALIZED-NEXT:  entry:
+// CHECK-PRESPECIALIZED-NEXT:    [[Single_P1:%.*]] = call i8** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWl"()
+// CHECK-PRESPECIALIZED-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances8takes_p1yyxmAA2P1RzlF"(
+// CHECK-PRESPECIALIZED-SAME:      %swift.type* getelementptr inbounds (
+// CHECK-PRESPECIALIZED-SAME:        %swift.full_type, 
+// CHECK-PRESPECIALIZED-SAME:        %swift.full_type* bitcast (
+// CHECK-PRESPECIALIZED-SAME:          <{ 
+// CHECK-PRESPECIALIZED-SAME:            i8**, 
+// CHECK-PRESPECIALIZED-SAME:            [[INT]], 
+// CHECK-PRESPECIALIZED-SAME:            %swift.type_descriptor*, 
+// CHECK-PRESPECIALIZED-SAME:            %swift.type*, 
+// CHECK-PRESPECIALIZED-SAME:            i64 
+// CHECK-PRESPECIALIZED-SAME:          }>* @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMf" 
+// CHECK-PRESPECIALIZED-SAME:          to %swift.full_type*
+// CHECK-PRESPECIALIZED-SAME:        ), 
+// CHECK-PRESPECIALIZED-SAME:        i32 0, 
+// CHECK-PRESPECIALIZED-SAME:        i32 1
+// CHECK-PRESPECIALIZED-SAME:      ), 
+// CHECK-PRESPECIALIZED-SAME:      %swift.type* getelementptr inbounds (
+// CHECK-PRESPECIALIZED-SAME:        %swift.full_type, 
+// CHECK-PRESPECIALIZED-SAME:        %swift.full_type* bitcast (
+// CHECK-PRESPECIALIZED-SAME:          <{ 
+// CHECK-PRESPECIALIZED-SAME:            i8**, 
+// CHECK-PRESPECIALIZED-SAME:            [[INT]], 
+// CHECK-PRESPECIALIZED-SAME:            %swift.type_descriptor*, 
+// CHECK-PRESPECIALIZED-SAME:            %swift.type*, 
+// CHECK-PRESPECIALIZED-SAME:            i64 
+// CHECK-PRESPECIALIZED-SAME:          }>* @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMf" 
+// CHECK-PRESPECIALIZED-SAME:          to %swift.full_type*
+// CHECK-PRESPECIALIZED-SAME:        ), 
+// CHECK-PRESPECIALIZED-SAME:        i32 0, 
+// CHECK-PRESPECIALIZED-SAME:        i32 1
+// CHECK-PRESPECIALIZED-SAME:      ), 
+// CHECK-PRESPECIALIZED-SAME:      i8** [[Single_P1]]
+// CHECK-PRESPECIALIZED-SAME:    )
+// CHECK-PRESPECIALIZED-NEXT:    ret void
+// CHECK-PRESPECIALIZED-NEXT:  }
 
 
 // Lazy witness table accessor for the concrete Single<IsP2> : P1.
@@ -134,6 +173,27 @@ public func single_concrete() {
 // TYPEBYNAME-NEXT:    ret i8** [[T0]]
 // TYPEBYNAME-NEXT:  }
 
+// TYPEBYNAME_PRESPECIALIZED-LABEL: define linkonce_odr hidden i8** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWl"()
+// TYPEBYNAME_PRESPECIALIZED-NEXT:  entry:
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    %conditional.requirement.buffer = alloca [1 x i8**], align 8
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[CACHE:%.*]] = load i8**, i8*** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWL", align 8
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[IS_NULL:%.*]] = icmp eq i8** [[CACHE]], null
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
+
+// TYPEBYNAME_PRESPECIALIZED:       cacheIsNull:
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$s42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
+
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[Single_P1:%.*]] = call i8** @swift_getWitnessTable
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    store atomic i8** [[Single_P1]], i8*** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWL" release, align 8
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    br label %cont
+
+// TYPEBYNAME_PRESPECIALIZED:       cont:
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[T0:%.*]] = phi i8** [ [[CACHE]], %entry ], [ [[Single_P1]], %cacheIsNull ]
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    ret i8** [[T0]]
+// TYPEBYNAME_PRESPECIALIZED-NEXT:  }
+
 
 public struct Double<B, C> {}
 extension Double: P1 where B: P2, C: P3 {
@@ -143,7 +203,7 @@ extension Double: P1 where B: P2, C: P3 {
 
 // witness method for Double.normal
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlAaEP6normalyyFTW"(%T42conditional_conformance_basic_conformances6DoubleV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlAaEP6normalyyFTW"(%T42conditional_conformance_basic_conformances6DoubleV* noalias nocapture swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[B_P2_PTR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 -1
 // CHECK-NEXT:    [[B_P2_i8star:%.*]] = load i8*, i8** [[B_P2_PTR]], align 8
@@ -167,7 +227,7 @@ extension Double: P1 where B: P2, C: P3 {
 
 // witness method for Double.generic
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlAaEP7genericyyqd__AaGRd__lFTW"(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_1_0", i8** %"\CF\84_1_0.P3", %T42conditional_conformance_basic_conformances6DoubleV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlAaEP7genericyyqd__AaGRd__lFTW"(%swift.opaque* noalias nocapture %0, %swift.type* %"\CF\84_1_0", i8** %"\CF\84_1_0.P3", %T42conditional_conformance_basic_conformances6DoubleV* noalias nocapture swiftself %1, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 // CHECK-NEXT:    [[B_P2_PTR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 -1
@@ -194,7 +254,7 @@ extension Double: P1 where B: P2, C: P3 {
 public func double_generic_generic<U: P2, V: P3>(_: U.Type, _: V.Type) {
   takes_p1(Double<U, V>.self)
 }
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s42conditional_conformance_basic_conformances015double_generic_F0yyxm_q_mtAA2P2RzAA2P3R_r0_lF"(%swift.type*, %swift.type*, %swift.type* %U, %swift.type* %V, i8** %U.P2, i8** %V.P3)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s42conditional_conformance_basic_conformances015double_generic_F0yyxm_q_mtAA2P2RzAA2P3R_r0_lF"(%swift.type* %0, %swift.type* %1, %swift.type* %U, %swift.type* %V, i8** %U.P2, i8** %V.P3)
 // CHECK-NEXT:  entry:
 // CHECK:          %conditional.requirement.buffer = alloca [2 x i8**], align 8
 // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6DoubleVMa"(i64 0, %swift.type* %U, %swift.type* %V)
@@ -214,7 +274,7 @@ public func double_generic_generic<U: P2, V: P3>(_: U.Type, _: V.Type) {
 public func double_generic_concrete<X: P2>(_: X.Type) {
   takes_p1(Double<X, IsP3>.self)
 }
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s42conditional_conformance_basic_conformances23double_generic_concreteyyxmAA2P2RzlF"(%swift.type*, %swift.type* %X, i8** %X.P2)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s42conditional_conformance_basic_conformances23double_generic_concreteyyxmAA2P2RzlF"(%swift.type* %0, %swift.type* %X, i8** %X.P2)
 // CHECK-NEXT:  entry:
 // CHECK:         %conditional.requirement.buffer = alloca [2 x i8**], align 8
 // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6DoubleVMa"(i64 0, %swift.type* %X, %swift.type* bitcast (i64* getelementptr inbounds (<{ i8**, i64, <{ {{.*}} }>* }>, <{ {{.*}} }>* @"$s42conditional_conformance_basic_conformances4IsP3VMf", i32 0, i32 1) to %swift.type*))

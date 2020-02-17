@@ -406,7 +406,7 @@ static Optional<VFSOptions> getVFSOptions(RequestDict &Req) {
 
   std::unique_ptr<OptionsDictionary> options;
   if (auto dict = Req.getDictionary(KeyVFSOptions)) {
-    options = llvm::make_unique<SKOptionsDictionary>(*dict);
+    options = std::make_unique<SKOptionsDictionary>(*dict);
   }
 
   return VFSOptions{name->str(), std::move(options)};
@@ -1982,6 +1982,7 @@ bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
                      DocBriefOpt,
                      AssocUSRsOpt,
                      R.SemanticContext,
+                     R.TypeRelation,
                      R.NotRecommended,
                      R.NumBytesToErase);
   return true;
@@ -2029,7 +2030,7 @@ static sourcekitd_response_t codeCompleteOpen(StringRef Name,
   std::unique_ptr<SKOptionsDictionary> options;
   std::vector<FilterRule> filterRules;
   if (optionsDict) {
-    options = llvm::make_unique<SKOptionsDictionary>(*optionsDict);
+    options = std::make_unique<SKOptionsDictionary>(*optionsDict);
     bool failed = false;
     optionsDict->dictionaryArrayApply(KeyFilterRules, [&](RequestDict dict) {
       FilterRule rule;
@@ -2124,7 +2125,7 @@ codeCompleteUpdate(StringRef name, int64_t offset,
   SKGroupedCodeCompletionConsumer CCC(RespBuilder);
   std::unique_ptr<SKOptionsDictionary> options;
   if (optionsDict)
-    options = llvm::make_unique<SKOptionsDictionary>(*optionsDict);
+    options = std::make_unique<SKOptionsDictionary>(*optionsDict);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.codeCompleteUpdate(name, offset, options.get(), CCC);
   return CCC.createResponse();
@@ -3106,6 +3107,13 @@ static bool isSemanticEditorDisabled() {
                                            NSEC_PER_SEC * Seconds);
       dispatch_after(When, dispatch_get_main_queue(), ^{
         Toggle = SemaInfoToggle::Enable;
+
+        static UIdent SemaEnabledNotificationUID(
+            "source.notification.sema_enabled");
+        ResponseBuilder RespBuilder;
+        auto Dict = RespBuilder.getDictionary();
+        Dict.set(KeyNotification, SemaEnabledNotificationUID);
+        sourcekitd::postNotification(RespBuilder.createResponse());
       });
     });
   }

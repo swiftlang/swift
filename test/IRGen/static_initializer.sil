@@ -181,7 +181,7 @@ bb0:
   return %1 : $TestArray
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %T18static_initializer16TestArrayStorageC* @phi_nodes(i1, %T18static_initializer16TestArrayStorageC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %T18static_initializer16TestArrayStorageC* @phi_nodes(i1 %0, %T18static_initializer16TestArrayStorageC* %1)
 // CHECK: [[T0:%.*]] = call %swift.refcounted* @swift_initStaticObject
 // CHECK: [[T1:%.*]] = bitcast %swift.refcounted* [[T0]] to %T18static_initializer16TestArrayStorageC*
 // CHECK: br

@@ -61,7 +61,7 @@ class G<T> : A {
 // Ensure that downcasts to generic types instantiate generic metadata instead
 // of trying to reference global metadata. <rdar://problem/14265663>
 
-// CHECK: define hidden swiftcc %T8subclass1GCySiG* @"$s8subclass9a_to_gint1aAA1GCySiGAA1AC_tF"(%T8subclass1AC*) {{.*}} {
+// CHECK: define hidden swiftcc %T8subclass1GCySiG* @"$s8subclass9a_to_gint1aAA1GCySiGAA1AC_tF"(%T8subclass1AC* %0) {{.*}} {
 func a_to_gint(a: A) -> G<Int> {
   // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s8subclass1GCySiGMD")
   // CHECK: call i8* @swift_dynamicCastClassUnconditional

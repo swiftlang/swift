@@ -644,6 +644,14 @@ public:
   OperandOwnershipKindMap
   getOwnershipKindMap(bool isForwardingSubValue = false) const;
 
+  /// Returns true if this operand acts as a use that consumes its associated
+  /// value.
+  bool isConsumingUse() const {
+    auto map = getOwnershipKindMap();
+    auto constraint = map.getLifetimeConstraint(get().getOwnershipKind());
+    return constraint == UseLifetimeConstraint::MustBeInvalidated;
+  }
+
 private:
   void removeFromCurrent() {
     if (!Back) return;

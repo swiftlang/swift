@@ -369,6 +369,7 @@ public:
   }
 };
 
+void simple_display(llvm::raw_ostream &out, const FileUnit *file);
 
 inline FileUnit &ModuleDecl::getMainFile(FileUnitKind expectedKind) const {
   assert(expectedKind != FileUnitKind::Source &&

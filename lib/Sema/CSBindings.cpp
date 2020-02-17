@@ -246,7 +246,14 @@ bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
     // if it's something like a collection (where it has to pick
     // between a conversion and bridging conversion) or concrete
     // type let's prefer the disjunction.
-    return boundType->is<TypeVariableType>();
+    //
+    // We are looking through optionals here because it could be
+    // a situation where disjunction is formed to match optionals
+    // either as deep equality or optional-to-optional conversion.
+    // Such type variables might be connected to closure as well
+    // e.g. when result type is optional, so it makes sense to
+    // open closure before attempting such disjunction.
+    return boundType->lookThroughAllOptionalTypes()->is<TypeVariableType>();
   }
 
   return !InvolvesTypeVariables;
@@ -897,7 +904,7 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
   }
 
   // If the type is a type variable itself, don't permit the binding.
-  if (auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>())
+  if (type->getRValueType()->is<TypeVariableType>())
     return None;
 
   // Don't bind to a dependent member type, even if it's currently
@@ -1075,8 +1082,8 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
             cs, TypeVar->getImpl().getLocator());
         if (cs.recordFix(fix))
           return true;
-      } else if (auto *OLE = dyn_cast_or_null<ObjectLiteralExpr>(
-                     srcLocator->getAnchor())) {
+      } else if (srcLocator->getAnchor() &&
+                 isa<ObjectLiteralExpr>(srcLocator->getAnchor())) {
         auto *fix = SpecifyObjectLiteralTypeImport::create(
             cs, TypeVar->getImpl().getLocator());
         if (cs.recordFix(fix))

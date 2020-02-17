@@ -26,6 +26,18 @@ CHANGELOG
 Swift Next
 ----------
 
+* [SE-0266][]:
+  
+  Enumerations with no associated values, or only `Comparable` associated values, can opt-in to synthesized `Comparable` conformance by declaring conformance to the `Comparable` protocol. The synthesized implementation orders the cases first by case-declaration order, and then by lexicographic order of the associated values (if any).
+  
+  ```swift
+  enum Foo: Comparable {
+    case a(Int), b(Int), c
+  }
+  
+  // .a(0) < .a(1) < .b(0) < .b(1) < .c
+  ```
+
 * [SE-0269][]:
 
   When an escaping closure explicitly captures `self` in its capture list, the
@@ -193,6 +205,23 @@ Swift 5.2
   * `mutating func callAsFunction` is supported.
   * `func callAsFunction` works with `throws` and `rethrows`.
   * `func callAsFunction` works with trailing closures.
+  
+* [SE-0249][]:
+
+  A `\Root.value` key path expression is now allowed wherever a `(Root) -> Value` 
+  function is allowed. Such an expression is implicitly converted to a key path 
+  application of `{ $0[keyPath: \Root.value] }`.
+  
+  For example:
+  
+  ```swift
+  struct User {
+    let email: String
+    let isAdmin: Bool
+  }
+  
+  users.map(\.email) // this is equivalent to: users.map { $0[keyPath: \User.email] }
+  ```
 
 * [SR-4206][]:
 
@@ -7880,9 +7909,11 @@ Swift 1.0
 [SE-0242]: <https://github.com/apple/swift-evolution/blob/master/proposals/0242-default-values-memberwise.md>
 [SE-0244]: <https://github.com/apple/swift-evolution/blob/master/proposals/0244-opaque-result-types.md>
 [SE-0245]: <https://github.com/apple/swift-evolution/blob/master/proposals/0245-array-uninitialized-initializer.md>
+[SE-0249]: <https://github.com/apple/swift-evolution/blob/master/proposals/0249-key-path-literal-function-expressions.md>
 [SE-0252]: <https://github.com/apple/swift-evolution/blob/master/proposals/0252-keypath-dynamic-member-lookup.md>
 [SE-0253]: <https://github.com/apple/swift-evolution/blob/master/proposals/0253-callable.md>
 [SE-0254]: <https://github.com/apple/swift-evolution/blob/master/proposals/0254-static-subscripts.md>
+[SE-0266]: <https://github.com/apple/swift-evolution/blob/master/proposals/0266-synthesized-comparable-for-enumerations.md>
 [SE-0269]: <https://github.com/apple/swift-evolution/blob/master/proposals/0269-implicit-self-explicit-capture.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

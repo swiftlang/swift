@@ -14,10 +14,9 @@ import unittest
 
 from build_swift import argparse
 from build_swift import migration
+from build_swift.constants import BUILD_SCRIPT_IMPL_PATH
 
 import six
-
-from .. import utils
 
 
 # -----------------------------------------------------------------------------
@@ -159,16 +158,16 @@ class TestMigrationCheckImplArgs(unittest.TestCase):
             return
 
         self.assertIsNone(migration.check_impl_args(
-            utils.BUILD_SCRIPT_IMPL_PATH, ['--reconfigure']))
+            BUILD_SCRIPT_IMPL_PATH, ['--reconfigure']))
 
         with self.assertRaises(ValueError) as cm:
             migration.check_impl_args(
-                utils.BUILD_SCRIPT_IMPL_PATH, ['foo'])
+                BUILD_SCRIPT_IMPL_PATH, ['foo'])
 
         self.assertIn('foo', str(cm.exception))
 
         with self.assertRaises(ValueError) as cm:
             migration.check_impl_args(
-                utils.BUILD_SCRIPT_IMPL_PATH, ['--reconfigure', '--foo=true'])
+                BUILD_SCRIPT_IMPL_PATH, ['--reconfigure', '--foo=true'])
 
         self.assertIn('foo', str(cm.exception))

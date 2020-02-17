@@ -1043,8 +1043,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
 
   // Infer @objc for @_dynamicReplacement(for:) when replaced decl is @objc.
   if (isa<AbstractFunctionDecl>(VD) || isa<AbstractStorageDecl>(VD))
-    if (auto *replacementAttr =
-            VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
+    if (VD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
       if (auto *replaced = VD->getDynamicallyReplacedDecl()) {
         if (replaced->isObjC())
           return ObjCReason(ObjCReason::ImplicitlyObjC);

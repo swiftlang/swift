@@ -520,7 +520,7 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   // e.g. 'override'.
   if (auto *AD = dyn_cast<AccessorDecl>(this)) {
     // If this is implicit getter, accessor range should not include attributes.
-    if (!AD->getAccessorKeywordLoc().isValid())
+    if (AD->isImplicitGetter())
       return Range;
 
     // Otherwise, include attributes directly attached to the accessor.
@@ -645,7 +645,7 @@ Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
   if (auto *stmt = body.dyn_cast<Stmt *>()) {
     if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
       return returnStmt->getResult();
-    } else if (auto *failStmt = dyn_cast<FailStmt>(stmt)) {
+    } else if (isa<FailStmt>(stmt)) {
       // We can only get to this point if we're a type-checked ConstructorDecl
       // which was originally spelled init?(...) { nil }.  
       //
@@ -663,7 +663,7 @@ void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
     if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
       returnStmt->setResult(NewBody);
       return;
-    } else if (auto *failStmt = dyn_cast<FailStmt>(stmt)) {
+    } else if (isa<FailStmt>(stmt)) {
       // We can only get to this point if we're a type-checked ConstructorDecl
       // which was originally spelled init?(...) { nil }.  
       //
@@ -780,7 +780,7 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
       FU->getKind() != FileUnitKind::SerializedAST)
     return false;
 
-  if (auto PD = dyn_cast<ProtocolDecl>(D)) {
+  if (isa<ProtocolDecl>(D)) {
     if (treatNonBuiltinProtocolsAsPublic)
       return false;
   }
@@ -2657,7 +2657,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     
     // Functions and subscripts cannot overload differing only in opaque return
     // types. Replace the opaque type with `Any`.
-    if (auto opaque = type->getAs<OpaqueTypeArchetypeType>()) {
+    if (type->is<OpaqueTypeArchetypeType>()) {
       type = ProtocolCompositionType::get(ctx, {}, /*hasAnyObject*/ false);
     }
 
@@ -5937,7 +5937,7 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
                  ->hasReferenceSemantics()) {
       // Do not suggest the fix-it in implicit getters
       if (auto AD = dyn_cast<AccessorDecl>(FD)) {
-        if (AD->isGetter() && !AD->getAccessorKeywordLoc().isValid())
+        if (AD->isImplicitGetter())
           return;
       }
 

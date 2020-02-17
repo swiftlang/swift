@@ -42,7 +42,7 @@
 
 @objc class SomeObject {
   @objc subscript (i : Int) -> SomeObject {
-    // CHECK: define internal [[OPAQUE0:%.*]]* @"$s15objc_subscripts10SomeObjectCyACSicigTo"([[OPAQUE1]]*, i8*, i64) {{[#0-9]*}} {
+    // CHECK: define internal [[OPAQUE0:%.*]]* @"$s15objc_subscripts10SomeObjectCyACSicigTo"([[OPAQUE1]]* %0, i8* %1, i64 %2) {{[#0-9]*}} {
     get {
       // CHECK: call swiftcc %T15objc_subscripts10SomeObjectC* @"$s15objc_subscripts10SomeObjectCyACSicig"
       return self

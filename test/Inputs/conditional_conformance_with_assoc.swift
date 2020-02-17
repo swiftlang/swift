@@ -41,7 +41,7 @@ extension Double: P1 where B.AT2: P2, C: P3, B.AT2.AT2.AT3: P3 {
 
 // witness method for Double.normal
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s34conditional_conformance_with_assoc6DoubleVyxq_GAA2P1A2A2P3R_AA2P23AT2RpzAafH_AhaGP3AT3RPzrlAaEP6normalyyFTW"(%T34conditional_conformance_with_assoc6DoubleV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s34conditional_conformance_with_assoc6DoubleVyxq_GAA2P1A2A2P3R_AA2P23AT2RpzAafH_AhaGP3AT3RPzrlAaEP6normalyyFTW"(%T34conditional_conformance_with_assoc6DoubleV* noalias nocapture swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 -1
 // CHECK-NEXT:    [[C_P3:%.*]] = load i8*, i8** [[C_P3_PTR]], align 8
@@ -73,7 +73,7 @@ extension Double: P1 where B.AT2: P2, C: P3, B.AT2.AT2.AT3: P3 {
 
 // witness method for Double.generic
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s34conditional_conformance_with_assoc6DoubleVyxq_GAA2P1A2A2P3R_AA2P23AT2RpzAafH_AhaGP3AT3RPzrlAaEP7genericyyqd__AaFRd__lFTW"(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_1_0", i8** %"\CF\84_1_0.P3", %T34conditional_conformance_with_assoc6DoubleV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s34conditional_conformance_with_assoc6DoubleVyxq_GAA2P1A2A2P3R_AA2P23AT2RpzAafH_AhaGP3AT3RPzrlAaEP7genericyyqd__AaFRd__lFTW"(%swift.opaque* noalias nocapture %0, %swift.type* %"\CF\84_1_0", i8** %"\CF\84_1_0.P3", %T34conditional_conformance_with_assoc6DoubleV* noalias nocapture swiftself %1, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 -1
 // CHECK-NEXT:    [[C_P3:%.*]] = load i8*, i8** [[C_P3_PTR]], align 8
@@ -109,7 +109,7 @@ public func generic_generic<T: P2, U>(_: T.Type, _: U.Type)
 {
   takes_p1(Double<T, U>.self)
 }
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s34conditional_conformance_with_assoc08generic_E0yyxm_q_mtAA2P2RzAA2P3R_AaC3AT2RpzAadE_AeaCP3AT3RPzr0_lF"(%swift.type*, %swift.type*, %swift.type* %T, %swift.type* %U, i8** %T.P2, i8** %U.P3, i8** %T.AT2.P2, i8** %T.AT2.AT2.AT3.P3)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s34conditional_conformance_with_assoc08generic_E0yyxm_q_mtAA2P2RzAA2P3R_AaC3AT2RpzAadE_AeaCP3AT3RPzr0_lF"(%swift.type* %0, %swift.type* %1, %swift.type* %T, %swift.type* %U, i8** %T.P2, i8** %U.P3, i8** %T.AT2.P2, i8** %T.AT2.AT2.AT3.P3)
 // CHECK-NEXT:  entry:
 // CHECK:         %conditional.requirement.buffer = alloca [3 x i8**], align 8
 // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVMa"(i64 0, %swift.type* %T, %swift.type* %U, i8** %T.P2)
@@ -133,10 +133,27 @@ public func generic_concrete<T: P2>(_: T.Type)
 {
   takes_p1(Double<T, IsP3>.self)
 }
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s34conditional_conformance_with_assoc16generic_concreteyyxmAA2P2RzAaC3AT2RpzAA2P3AD_AdaCP3AT3RPzlF"(%swift.type*, %swift.type* %T, i8** %T.P2, i8** %T.AT2.P2, i8** %T.AT2.AT2.AT3.P3)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s34conditional_conformance_with_assoc16generic_concreteyyxmAA2P2RzAaC3AT2RpzAA2P3AD_AdaCP3AT3RPzlF"(%swift.type* %0, %swift.type* %T, i8** %T.P2, i8** %T.AT2.P2, i8** %T.AT2.AT2.AT3.P3)
 // CHECK-NEXT:  entry:
 // CHECK:         %conditional.requirement.buffer = alloca [3 x i8**], align 8
-// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVMa"(i64 0, %swift.type* %T, %swift.type* bitcast (i64* getelementptr inbounds (<{ i8**, i64, <{ {{.*}} }>* }>, <{ {{.*}} }>* @"$s34conditional_conformance_with_assoc4IsP3VMf", i32 0, i32 1) to %swift.type*), i8** %T.P2)
+// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVMa"(
+// CHECK-SAME:           i64 0, 
+// CHECK-SAME:           %swift.type* 
+// CHECK-SAME:           %T, 
+// CHECK-SAME:           %swift.type* bitcast (
+// CHECK-SAME:             i64* getelementptr inbounds (
+// CHECK-SAME:               <{ 
+// CHECK-SAME:                 i8**, 
+// CHECK-SAME:                 i64, 
+// CHECK-SAME:                 <{ {{[^}]*}} }>* 
+// CHECK-SAME:               }>, 
+// CHECK-SAME:               <{ {{.*}} }>* @"$s34conditional_conformance_with_assoc4IsP3VMf", 
+// CHECK-SAME:               i32 0, 
+// CHECK-SAME:               i32 1
+// CHECK-SAME:             ) to %swift.type*
+// CHECK-SAME:           ), 
+// CHECK-SAME:           i8** %T.P2
+// CHECK-SAME:         )
 // CHECK-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [3 x i8**], [3 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
@@ -159,7 +176,7 @@ public func concrete_generic<U>(_: U.Type)
   takes_p1(Double<IsAlsoP2, U>.self)
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s34conditional_conformance_with_assoc16concrete_genericyyxmAA2P3RzlF"(%swift.type*, %swift.type* %U, i8** %U.P3)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s34conditional_conformance_with_assoc16concrete_genericyyxmAA2P3RzlF"(%swift.type* %0, %swift.type* %U, i8** %U.P3)
 // CHECK-NEXT:  entry:
 // CHECK:       %conditional.requirement.buffer = alloca [3 x i8**], align 8
 // CHECK:       [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVMa"(i64 0, %swift.type* bitcast (i64* getelementptr inbounds (<{ {{.*}} }>, <{ {{.*}} }>* @"$s34conditional_conformance_with_assoc8IsAlsoP2VMf", i32 0, i32 1) to %swift.type*), %swift.type* %U, i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @"$s34conditional_conformance_with_assoc8IsAlsoP2VAA0G0AAWP", i32 0, i32 0))

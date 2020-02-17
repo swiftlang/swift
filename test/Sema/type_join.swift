@@ -98,9 +98,9 @@ func joinFunctions(
   //        Any to be inferred for the generic type. That's pretty
   //        arbitrary.
   _ = commonSupertype(escaping, x)
-  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '() -> ()'}}
+  // expected-error@-1 {{conflicting arguments to generic parameter 'T' ('() -> ()' vs. 'Int')}}
   _ = commonSupertype(x, escaping)
-  // expected-error@-1 {{cannot convert value of type '() -> ()' to expected argument type 'Int'}}
+  // expected-error@-1 {{conflicting arguments to generic parameter 'T' ('Int' vs. '() -> ()')}}
 
   let a: Any = 1
   _ = commonSupertype(nonescaping, a)

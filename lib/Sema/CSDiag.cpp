@@ -182,24 +182,12 @@ public:
     return type;
   }
 
-  /// Diagnose common failures due to applications of an argument list to an
-  /// ApplyExpr or SubscriptExpr.
-  bool diagnoseParameterErrors(CalleeCandidateInfo &CCI,
-                               Expr *fnExpr, Expr *argExpr,
-                               ArrayRef<Identifier> argLabels);
-
   /// Attempt to diagnose a specific failure from the info we've collected from
   /// the failed constraint system.
   bool diagnoseExprFailure();
 
   /// Emit an ambiguity diagnostic about the specified expression.
   void diagnoseAmbiguity(Expr *E);
-
-  /// Attempt to produce a diagnostic for a mismatch between an expression's
-  /// type and its assumed contextual type.
-  bool diagnoseContextualConversionError(Expr *expr, Type contextualType,
-                                         ContextualTypePurpose CTP,
-                                         Type suggestedType = Type());
 
 private:
   /// Validate potential contextual type for type-checking one of the
@@ -498,51 +486,6 @@ DeclContext *FailureDiagnosis::findDeclContext(Expr *subExpr) const {
 
   expr->walk(finder);
   return finder.DC;
-}
-
-bool FailureDiagnosis::diagnoseContextualConversionError(
-    Expr *expr, Type contextualType, ContextualTypePurpose CTP,
-    Type suggestedType) {
-  // If the constraint system has a contextual type, then we can test to see if
-  // this is the problem that prevents us from solving the system.
-  if (!contextualType)
-    return false;
-
-  // Try re-type-checking the expression without the contextual type to see if
-  // it can work without it.  If so, the contextual type is the problem.  We
-  // force a recheck, because "expr" is likely in our table with the extra
-  // contextual constraint that we know we are relaxing.
-  TCCOptions options = TCC_ForceRecheck;
-  if (contextualType->is<InOutType>())
-    options |= TCC_AllowLValue;
-
-  auto *recheckedExpr = typeCheckChildIndependently(expr, options);
-  auto exprType = recheckedExpr ? CS.getType(recheckedExpr) : Type();
-
-  // If there is a suggested type and re-typecheck failed, let's use it.
-  if (!exprType)
-    exprType = suggestedType;
-
-  // If it failed and diagnosed something, then we're done.
-  if (!exprType)
-    return CS.getASTContext().Diags.hadAnyError();
-
-  // If we don't have a type for the expression, then we cannot use it in
-  // conversion constraint diagnostic generation.  If the types match, then it
-  // must not be the contextual type that is the problem.
-  if (isUnresolvedOrTypeVarType(exprType) || exprType->isEqual(contextualType))
-    return false;
-
-  // Don't attempt fixits if we have an unsolved type variable, since
-  // the recovery path's recursion into the type checker via typeCheckCast()
-  // will confuse matters.
-  if (exprType->hasTypeVariable())
-    return false;
-
-  ContextualFailure failure(
-      CS, CTP, exprType, contextualType,
-      CS.getConstraintLocator(expr, LocatorPathElt::ContextualType()));
-  return failure.diagnoseAsError();
 }
 
 //===----------------------------------------------------------------------===//
@@ -969,48 +912,6 @@ static Expr *getFailedArgumentExpr(CalleeCandidateInfo CCI, Expr *argExpr) {
   }
 }
 
-/// If the candidate set has been narrowed down to a specific structural
-/// problem, e.g. that there are too few parameters specified or that argument
-/// labels don't match up, diagnose that error and return true.
-bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
-                                               Expr *fnExpr, Expr *argExpr,
-                                               ArrayRef<Identifier> argLabels) {
-  // If we have a failure where the candidate set differs on exactly one
-  // argument, and where we have a consistent mismatch across the candidate set
-  // (often because there is only one candidate in the set), then diagnose this
-  // as a specific problem of passing something of the wrong type into a
-  // parameter.
-  //
-  // We don't generally want to use this path to diagnose calls to
-  // symmetrically-typed binary operators because it's likely that both
-  // operands contributed to the type.
-  if ((CCI.closeness == CC_OneArgumentMismatch ||
-       CCI.closeness == CC_OneArgumentNearMismatch ||
-       CCI.closeness == CC_OneGenericArgumentMismatch ||
-       CCI.closeness == CC_OneGenericArgumentNearMismatch ||
-       CCI.closeness == CC_GenericNonsubstitutableMismatch) &&
-      CCI.failedArgument.isValid() &&
-      !isSymmetricBinaryOperator(CCI)) {
-    // Map the argument number into an argument expression.
-    TCCOptions options = TCC_ForceRecheck;
-    if (CCI.failedArgument.parameterType->is<InOutType>())
-      options |= TCC_AllowLValue;
-
-    // It could be that the argument doesn't conform to an archetype.
-    Expr *badArgExpr = getFailedArgumentExpr(CCI, argExpr);
-
-    // Re-type-check the argument with the expected type of the candidate set.
-    // This should produce a specific and tailored diagnostic saying that the
-    // type mismatches with expectations.
-    Type paramType = CCI.failedArgument.parameterType;
-    if (!typeCheckChildIndependently(badArgExpr, paramType,
-                                     CTP_CallArgument, options))
-      return true;
-  }
-  
-  return false;
-}
-
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   auto *fnExpr = callExpr->getFn();
   auto fnType = CS.getType(fnExpr)->getRValueType();
@@ -1048,9 +949,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   SmallVector<Identifier, 2> argLabelsScratch;
   ArrayRef<Identifier> argLabels =
     callExpr->getArgumentLabels(argLabelsScratch);
-  if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(),
-                              callExpr->getArg(), argLabels))
-    return true;
 
   Type argType;  // argument list, if known.
   if (auto FTy = fnType->getAs<AnyFunctionType>()) {
@@ -1075,10 +973,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     return true; // already diagnosed.
 
   calleeInfo.filterListArgs(decomposeArgType(CS.getType(argExpr), argLabels));
-
-  if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(), argExpr,
-                              argLabels))
-    return true;
 
   // Force recheck of the arg expression because we allowed unresolved types
   // before, and that turned out not to help, and now we want any diagnoses
@@ -1256,13 +1150,6 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
     if (diagnosis.diagnoseExprFailure())
       return;
 
-    // If this is a contextual conversion problem, dig out some information.
-    if (diagnosis.diagnoseContextualConversionError(
-            expr,
-            getContextualType(expr),
-            getContextualTypePurpose(expr)))
-      return;
-
     // If no one could find a problem with this expression or constraint system,
     // then it must be well-formed... but is ambiguous.  Handle this by diagnostic
     // various cases that come up.
@@ -1355,20 +1242,9 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   // Unresolved/Anonymous ClosureExprs are common enough that we should give
   // them tailored diagnostics.
   if (auto CE = dyn_cast<ClosureExpr>(E->getValueProvidingExpr())) {
-    diagnose(E->getLoc(), diag::cannot_infer_closure_type)
-      .highlight(E->getSourceRange());
+    diagnose(CE->getLoc(), diag::cannot_infer_closure_type)
+      .highlight(CE->getSourceRange());
     return;
-  }
-
-  // Diagnose ".foo" expressions that lack context specifically.
-  if (auto UME =
-        dyn_cast<UnresolvedMemberExpr>(E->getSemanticsProvidingExpr())) {
-    if (!CS.getContextualType(E)) {
-      diagnose(E->getLoc(), diag::unresolved_member_no_inference,UME->getName())
-        .highlight(SourceRange(UME->getDotLoc(),
-                               UME->getNameLoc().getSourceRange().End));
-      return;
-    }
   }
 
   // Attempt to re-type-check the entire expression, allowing ambiguity, but

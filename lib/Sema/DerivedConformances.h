@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -127,6 +127,20 @@ public:
   /// \returns the derived member, which will also be added to the type.
   Type deriveRawRepresentable(AssociatedTypeDecl *assocType);
 
+  /// Determine if a Comparable requirement can be derived for a type.
+  ///
+  /// This is implemented for enums without associated or raw values.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveComparable(DeclContext *DC, EnumDecl *enumeration);
+
+  /// Derive an Equatable requirement for a type.
+  ///
+  /// This is implemented for enums without associated or raw values.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveComparable(ValueDecl *requirement);
+
   /// Determine if an Equatable requirement can be derived for a type.
   ///
   /// This is implemented for enums without associated values or all-Equatable
@@ -218,7 +232,63 @@ public:
   ///
   /// \param synthesizing The decl that is being synthesized.
   bool checkAndDiagnoseDisallowedContext(ValueDecl *synthesizing) const;
+
+  /// Returns a generated guard statement that checks whether the given lhs and
+  /// rhs expressions are equal. If not equal, the else block for the guard
+  /// returns `guardReturnValue`.
+  /// \p C The AST context.
+  /// \p lhsExpr The first expression to compare for equality.
+  /// \p rhsExpr The second expression to compare for equality.
+  /// \p guardReturnValue The expression to return if the two sides are not
+  /// equal
+  static GuardStmt *returnIfNotEqualGuard(ASTContext &C, Expr *lhsExpr,
+                                          Expr *rhsExpr,
+                                          Expr *guardReturnValue);
+  // return false
+  static GuardStmt *returnFalseIfNotEqualGuard(ASTContext &C, Expr *lhsExpr,
+                                               Expr *rhsExpr);
+  // return lhs < rhs
+  static GuardStmt *
+  returnComparisonIfNotEqualGuard(ASTContext &C, Expr *lhsExpr, Expr *rhsExpr);
+
+  /// Returns the ParamDecl for each associated value of the given enum whose
+  /// type does not conform to a protocol \p theEnum The enum whose elements and
+  /// associated values should be checked. \p protocol The protocol being
+  /// requested. \return The ParamDecl of each associated value whose type does
+  /// not conform.
+  static SmallVector<ParamDecl *, 4>
+  associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
+                                          ProtocolDecl *protocol);
+
+  /// Returns true if, for every element of the given enum, it either has no
+  /// associated values or all of them conform to a protocol.
+  /// \p theEnum The enum whose elements and associated values should be
+  /// checked. \p protocol The protocol being requested. \return True if all
+  /// associated values of all elements of the enum conform.
+  static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
+                                                   EnumDecl *theEnum,
+                                                   ProtocolDecl *protocol);
+  /// Create AST statements which convert from an enum to an Int with a switch.
+  /// \p stmts The generated statements are appended to this vector.
+  /// \p parentDC Either an extension or the enum itself.
+  /// \p enumDecl The enum declaration.
+  /// \p enumVarDecl The enum input variable.
+  /// \p funcDecl The parent function.
+  /// \p indexName The name of the output variable.
+  /// \return A DeclRefExpr of the output variable (of type Int).
+  static DeclRefExpr *
+  convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts, DeclContext *parentDC,
+                     EnumDecl *enumDecl, VarDecl *enumVarDecl,
+                     AbstractFunctionDecl *funcDecl, const char *indexName);
+
+  static Pattern *
+  enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl, char varPrefix,
+                               DeclContext *varContext,
+                               SmallVectorImpl<VarDecl *> &boundVars);
+
+  static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
+                                 DeclContext *varContext);
 };
-}
+} // namespace swift
 
 #endif

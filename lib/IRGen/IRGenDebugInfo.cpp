@@ -1608,7 +1608,7 @@ private:
       ClangDecl = ND->getClangDecl();
     }
     if (ClangDecl) {
-      clang::ASTReader &Reader = *CI.getClangInstance().getModuleManager();
+      clang::ASTReader &Reader = *CI.getClangInstance().getASTReader();
       auto Idx = ClangDecl->getOwningModuleID();
       auto SubModuleDesc = Reader.getSourceDescriptor(Idx);
       auto TopLevelModuleDesc = getClangModule(*TypeDecl->getModuleContext());
@@ -2313,7 +2313,8 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   if (!Var)
     Expr = DBuilder.createConstantValueExpression(0);
   auto *GV = DBuilder.createGlobalVariableExpression(
-      MainModule, Name, LinkageName, File, L.Line, DITy, IsLocalToUnit, Expr);
+      MainModule, Name, LinkageName, File, L.Line, DITy, IsLocalToUnit, true,
+      Expr);
   if (Var)
     Var->addDebugInfo(GV);
 }
@@ -2359,7 +2360,7 @@ std::unique_ptr<IRGenDebugInfo> IRGenDebugInfo::createIRGenDebugInfo(
     const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
     llvm::Module &M, StringRef MainOutputFilenameForDebugInfo,
     StringRef PrivateDiscriminator) {
-  return llvm::make_unique<IRGenDebugInfoImpl>(Opts, CI, IGM, M,
+  return std::make_unique<IRGenDebugInfoImpl>(Opts, CI, IGM, M,
                                                MainOutputFilenameForDebugInfo,
                                                PrivateDiscriminator);
 }

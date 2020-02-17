@@ -120,7 +120,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       }
 
       return true;
-    } else if (auto opaque = s.dyn_cast<const OpaqueTypeDecl *>()) {
+    } else if (s.is<const OpaqueTypeDecl *>()) {
       // Always symbolically reference opaque types.
       return true;
     } else {

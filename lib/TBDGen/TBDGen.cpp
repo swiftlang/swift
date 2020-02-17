@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRGenPublic.h"
@@ -945,15 +946,16 @@ static bool hasLinkerDirective(Decl *D) {
   return !getAllMovedPlatformVersions(D).empty();
 }
 
-static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
-                                           StringSet *symbols,
-                                           llvm::raw_ostream *os,
-                                           const TBDGenOptions &opts) {
+llvm::Expected<TBDFileAndSymbols>
+GenerateTBDRequest::evaluate(Evaluator &evaluator,
+                             TBDGenDescriptor desc) const {
+  auto *M = desc.getParentModule();
+  auto &opts = desc.getOptions();
+
   auto &ctx = M->getASTContext();
-  auto isWholeModule = singleFile == nullptr;
   const auto &triple = ctx.LangOpts.Target;
-  UniversalLinkageInfo linkInfo(triple, opts.HasMultipleIGMs, false,
-                                isWholeModule);
+  UniversalLinkageInfo linkInfo(triple, opts.HasMultipleIGMs,
+                                /*forcePublicDecls*/ false);
 
   llvm::MachO::InterfaceFile file;
   file.setFileType(llvm::MachO::FileType::TBD_V3);
@@ -977,8 +979,9 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   llvm::MachO::Target target(triple);
   file.addTarget(target);
 
+  StringSet symbols;
   auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-  TBDGenVisitor visitor(file, {target}, symbols,
+  TBDGenVisitor visitor(file, {target}, &symbols,
                         clang->getTargetInfo().getDataLayout(),
                         linkInfo, M, opts);
 
@@ -1001,31 +1004,53 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
     }
   };
 
-  if (singleFile) {
+  if (auto *singleFile = desc.getSingleFile()) {
     assert(M == singleFile->getParentModule() && "mismatched file and module");
     visitFile(singleFile);
   } else {
-    for (auto *file : M->getFiles()) {
-      visitFile(file);
+    llvm::SmallVector<ModuleDecl*, 4> Modules;
+    Modules.push_back(M);
+    for (auto Name: opts.embedSymbolsFromModules) {
+      if (auto *MD = ctx.getModuleByName(Name)) {
+        // If it is a clang module, the symbols should be collected by TAPI.
+        if (!MD->isNonSwiftModule()) {
+          Modules.push_back(MD);
+          continue;
+        }
+      }
+      // Diagnose module name that cannot be found
+      ctx.Diags.diagnose(SourceLoc(), diag::unknown_swift_module_name, Name);
     }
+    // Collect symbols in each module.
+    llvm::for_each(Modules, [&](ModuleDecl *M) {
+      for (auto *file : M->getFiles()) {
+        visitFile(file);
+      }
+    });
   }
 
-  if (os) {
-    llvm::cantFail(llvm::MachO::TextAPIWriter::writeToStream(*os, file),
-                   "YAML writing should be error-free");
-  }
+  return std::make_pair(std::move(file), std::move(symbols));
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
                                    const TBDGenOptions &opts) {
-  enumeratePublicSymbolsAndWrite(file->getParentModule(), file, &symbols,
-                                 nullptr, opts);
+  assert(symbols.empty() && "Additive symbol enumeration not supported");
+  auto &evaluator = file->getASTContext().evaluator;
+  auto desc = TBDGenDescriptor::forFile(file, opts);
+  symbols = llvm::cantFail(evaluator(GenerateTBDRequest{desc})).second;
 }
 void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
                                    const TBDGenOptions &opts) {
-  enumeratePublicSymbolsAndWrite(M, nullptr, &symbols, nullptr, opts);
+  assert(symbols.empty() && "Additive symbol enumeration not supported");
+  auto &evaluator = M->getASTContext().evaluator;
+  auto desc = TBDGenDescriptor::forModule(M, opts);
+  symbols = llvm::cantFail(evaluator(GenerateTBDRequest{desc})).second;
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
                          const TBDGenOptions &opts) {
-  enumeratePublicSymbolsAndWrite(M, nullptr, nullptr, &os, opts);
+  auto &evaluator = M->getASTContext().evaluator;
+  auto desc = TBDGenDescriptor::forModule(M, opts);
+  auto file = llvm::cantFail(evaluator(GenerateTBDRequest{desc})).first;
+  llvm::cantFail(llvm::MachO::TextAPIWriter::writeToStream(os, file),
+                 "YAML writing should be error-free");
 }

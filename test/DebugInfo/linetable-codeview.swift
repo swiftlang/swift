@@ -32,7 +32,7 @@ func foo() {
 }
 
 // func arithmetic(_ a: Int64, _ b: Int64)
-  // CHECK: define {{.*}} @"$s4main10arithmeticyys5Int64V_ADtF"(i64, i64)
+  // CHECK: define {{.*}} @"$s4main10arithmeticyys5Int64V_ADtF"(i64 %0, i64 %1)
   // CHECK: call { i64, i1 } @llvm.sadd.with.overflow.i64({{.*}}), !dbg ![[ADD:[0-9]+]]
   // NOTE: The division will emit an ``unreachable`` instruction sandwiched
   //       between other instructions for the division. We want to make sure

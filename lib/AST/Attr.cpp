@@ -1088,12 +1088,14 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_Semantics:
     return "_semantics";
   case DAK_Available:
-    return "availability";
+    return "available";
   case DAK_ObjC:
   case DAK_ObjCRuntimeName:
     return "objc";
   case DAK_DynamicReplacement:
     return "_dynamicReplacement";
+  case DAK_TypeEraser:
+    return "_typeEraser";
   case DAK_PrivateImport:
     return "_private";
   case DAK_RestatedObjCConformance:

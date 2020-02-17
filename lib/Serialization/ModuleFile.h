@@ -23,6 +23,7 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Basic/LLVM.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -317,6 +318,9 @@ private:
 
   /// Types referenced by this module.
   MutableArrayRef<Serialized<Type>> Types;
+
+  /// Clang types referenced by this module.
+  MutableArrayRef<Serialized<const clang::Type *>> ClangTypes;
 
   /// Generic signatures referenced by this module.
   MutableArrayRef<Serialized<GenericSignature>> GenericSignatures;
@@ -819,6 +823,10 @@ public:
     return ModuleInputBuffer->getBufferIdentifier();
   }
 
+  StringRef getTargetTriple() const {
+    return TargetTriple;
+  }
+
   /// AST-verify imported decls.
   ///
   /// Has no effect in NDEBUG builds.
@@ -827,8 +835,7 @@ public:
   virtual void loadAllMembers(Decl *D,
                               uint64_t contextData) override;
 
-  virtual
-  Optional<TinyPtrVector<ValueDecl *>>
+  virtual TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;
 
@@ -878,6 +885,10 @@ public:
 
   /// Returns the type with the given ID, deserializing it if needed.
   llvm::Expected<Type> getTypeChecked(serialization::TypeID TID);
+
+  /// Returns the Clang type with the given ID, deserializing it if needed.
+  llvm::Expected<const clang::Type *>
+  getClangType(serialization::ClangTypeID TID);
 
   /// Returns the base name with the given ID, deserializing it if needed.
   DeclBaseName getDeclBaseName(serialization::IdentifierID IID);

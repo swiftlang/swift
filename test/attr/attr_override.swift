@@ -59,8 +59,7 @@ class A {
     }
   }
   
-  // FIXME(SR-10323): The second note is wrong; it should be "potential overridden class subscript 'subscript(_:)' here". This is a preexisting bug.
-  class subscript (i: String) -> String { // expected-note{{overridden declaration is here}} expected-note{{attempt to override subscript here}}
+  class subscript (i: String) -> String { // expected-note{{overridden declaration is here}} expected-note{{potential overridden class subscript 'subscript(_:)' here}}
     get {
       return "hello"
     }
@@ -144,8 +143,7 @@ class B : A {
     }
   }
   
-  // FIXME(SR-10323): This error is wrong; it should be "subscript does not override any subscript from its superclass". This is a preexisting bug.
-  override class subscript (i: Int) -> String { // expected-error{{cannot override mutable subscript of type '(Int) -> String' with covariant type '(String) -> String'}}
+  override class subscript (i: Int) -> String { // expected-error{{subscript does not override any subscript from its superclass}}
     get {
       return "hello"
     }
@@ -647,4 +645,3 @@ public extension SR_11740_Base where F: SR_11740_Q {
 extension SR_11740_Derived where F: SR_11740_P {
     public static func foo(_: A) {}
 }
-

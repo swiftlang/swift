@@ -523,7 +523,7 @@ private:
           // get inactive nodes that nest in active clauses
           for (auto n : clause.Elements) {
             if (auto *const d = n.dyn_cast<Decl *>())
-              if (auto *const icd = dyn_cast<IfConfigDecl>(d))
+              if (isa<IfConfigDecl>(d))
                 expandIfConfigClausesInto(expansion, {d}, true);
           }
         } else if (includeInactiveIfConfigClauses) {
@@ -1776,7 +1776,7 @@ void ScopeCreator::forEachClosureIn(
       return {true, E};
     }
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      if (auto *bs = dyn_cast<BraceStmt>(S)) { // closures hidden in here
+      if (isa<BraceStmt>(S)) { // closures hidden in here
         return {true, S};
       }
       return {false, S};
@@ -2132,7 +2132,7 @@ private:
     auto f = SM.getIdentifierForBuffer(bufID);
     auto lin = SM.getLineNumber(loc);
     if (f.endswith(file) && lin == line)
-      if (auto *v = dyn_cast<PatternBindingDecl>(D))
+      if (isa<PatternBindingDecl>(D))
         llvm::errs() << "*** catchForDebugging: " << lin << " ***\n";
   }
 };

@@ -187,11 +187,7 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
     REPLInputFile.addImports(ImportsWithOptions);
   }
 
-  bool Done;
-  do {
-    parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
-                        &PersistentState);
-  } while (!Done);
+  parseIntoSourceFile(REPLInputFile, BufferID, &PersistentState);
   performTypeChecking(REPLInputFile);
   return REPLModule;
 }
@@ -438,9 +434,8 @@ private:
     PromptString.clear();
 
     if (ShowColors) {
-      const char *colorCode =
-        llvm::sys::Process::OutputColor(llvm::raw_ostream::YELLOW,
-                                        false, false);
+      const char *colorCode = llvm::sys::Process::OutputColor(
+          static_cast<char>(llvm::raw_ostream::YELLOW), false, false);
       if (colorCode)
         appendEscapeSequence(PromptString, colorCode);
     }
@@ -1000,10 +995,6 @@ public:
     IRGenOpts.IntegratedREPL = true;
     IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::None;
     IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::None;
-
-    // The very first module is a dummy.
-    CI.getMainModule()->getMainSourceFile(SourceFileKind::REPL).ASTStage =
-        SourceFile::TypeChecked;
 
     if (!ParseStdlib) {
       // Force standard library to be loaded immediately.  This forces any

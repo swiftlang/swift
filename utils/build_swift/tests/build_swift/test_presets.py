@@ -12,6 +12,7 @@ from __future__ import unicode_literals
 import os
 import unittest
 
+from build_swift import constants
 from build_swift import presets
 from build_swift.presets import Preset, PresetParser
 
@@ -25,7 +26,7 @@ from .. import utils
 # Constants
 
 PRESET_FILES = [
-    os.path.join(utils.UTILS_PATH, 'build-presets.ini'),
+    os.path.join(constants.UTILS_PATH, 'build-presets.ini'),
 ]
 
 PRESET_DEFAULTS = {
@@ -39,6 +40,7 @@ PRESET_DEFAULTS = {
     'install_destdir': '/tmp/install',
     'install_symroot': '/tmp/install/symroot',
     'install_toolchain_dir': '/tmp/install/toolchain',
+    'install_prefix': '/usr',
     'installable_package': '/tmp/install/pkg',
     'swift_install_destdir': '/tmp/install/swift',
     'symbols_package': '/path/to/symbols/package',

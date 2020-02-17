@@ -368,6 +368,10 @@ public:
   using SILBuilder::createProjectBox;
   ManagedValue createProjectBox(SILLocation loc, ManagedValue mv,
                                 unsigned index);
+
+  using SILBuilder::createMarkDependence;
+  ManagedValue createMarkDependence(SILLocation loc, ManagedValue value,
+                                    ManagedValue base);
 };
 
 } // namespace Lowering

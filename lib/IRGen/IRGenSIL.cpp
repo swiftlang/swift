@@ -676,7 +676,7 @@ public:
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
     ZeroInitBuilder.CreateMemSet(
         AI, llvm::ConstantInt::get(IGM.Int8Ty, 0),
-        Size, AI->getAlignment());
+        Size, llvm::MaybeAlign(AI->getAlignment()));
   }
 
   /// Account for bugs in LLVM.
@@ -1041,6 +1041,9 @@ public:
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
   
   void visitKeyPathInst(KeyPathInst *I);
+
+  void visitDifferentiabilityWitnessFunctionInst(
+      DifferentiabilityWitnessFunctionInst *i);
 
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
   void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \
@@ -1585,12 +1588,6 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
     return;
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
-  llvm::SaveAndRestore<SourceFile *> SetCurSourceFile(CurSourceFile);
-  if (auto dc = f->getModule().getAssociatedContext()) {
-    if (auto sf = dc->getParentSourceFile()) {
-      CurSourceFile = sf;
-    }
-  }
   IRGenSILFunction(*this, f).emitSILFunction();
 }
 
@@ -1813,6 +1810,33 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   }
 
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
+}
+
+void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
+    DifferentiabilityWitnessFunctionInst *i) {
+  llvm::Value *diffWitness =
+      IGM.getAddrOfDifferentiabilityWitness(i->getWitness());
+  unsigned offset = 0;
+  switch (i->getWitnessKind()) {
+  case DifferentiabilityWitnessFunctionKind::JVP:
+    offset = 0;
+    break;
+  case DifferentiabilityWitnessFunctionKind::VJP:
+    offset = 1;
+    break;
+  case DifferentiabilityWitnessFunctionKind::Transpose:
+    llvm_unreachable("Not yet implemented");
+  }
+
+  diffWitness = Builder.CreateStructGEP(diffWitness, offset);
+  diffWitness = Builder.CreateLoad(diffWitness, IGM.getPointerAlignment());
+
+  auto fnType = cast<SILFunctionType>(i->getType().getASTType());
+  Signature signature = IGM.getSignature(fnType);
+  diffWitness =
+      Builder.CreateBitCast(diffWitness, signature.getType()->getPointerTo());
+
+  setLoweredFunctionPointer(i, FunctionPointer(diffWitness, signature));
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
@@ -2567,10 +2591,9 @@ static void emitCoroutineExit(IRGenSILFunction &IGF) {
   // Emit the block.
   IGF.Builder.emitBlock(coroEndBB);
   auto handle = IGF.getCoroutineHandle();
-  IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_end, {
-    handle,
-    /*is unwind*/ IGF.Builder.getFalse()
-  });
+  IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
+                                  {handle,
+                                   /*is unwind*/ IGF.Builder.getFalse()});
   IGF.Builder.CreateUnreachable();
 }
 

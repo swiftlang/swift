@@ -44,7 +44,6 @@ add_swift_host_library(swiftAST STATIC
   Evaluator.cpp
   Expr.cpp
   FineGrainedDependencies.cpp
-  FineGrainedDependenciesSourceFileDepGraphConstructor.cpp
   GenericEnvironment.cpp
   GenericSignature.cpp
   GenericSignatureBuilder.cpp
@@ -68,6 +67,7 @@ add_swift_host_library(swiftAST STATIC
   RequirementEnvironment.cpp
   SyntaxASTMap.cpp
   SILLayout.cpp
+  SourceFileDepGraphConstructor.cpp
   Stmt.cpp
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp

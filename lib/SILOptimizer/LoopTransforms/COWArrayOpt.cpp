@@ -163,7 +163,7 @@ class COWArrayOpt {
   // Keep track of cold blocks.
   ColdBlockInfo ColdBlocks;
 
-  // Cache of the analysis whether a loop is safe wrt. make_unique hoisting by
+  // Cache of the analysis whether a loop is safe wrt.std::make_unique hoisting by
   // looking at the operations (no uniquely identified objects).
   std::pair<bool, bool> CachedSafeLoop;
 
@@ -314,6 +314,7 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kWithUnsafeMutableBufferPointer:
   case ArrayCallKind::kArrayInit:
   case ArrayCallKind::kArrayUninitialized:
+  case ArrayCallKind::kArrayUninitializedIntrinsic:
   case ArrayCallKind::kAppendContentsOf:
   case ArrayCallKind::kAppendElement:
     return false;
@@ -626,7 +627,7 @@ bool COWArrayOpt::checkSafeElementValueUses(UserOperList &ElementValueUsers) {
 ///   * all array semantic functions
 ///   * stores to array elements
 ///   * any instruction that does not have side effects.
-///   * any retain must be matched by a release before we hit a make_unique.
+///   * any retain must be matched by a release before we hit astd::make_unique.
 ///
 /// Note, that a release in this modus (we don't have a uniquely identified
 /// object) is not safe because the destructor of what we are releasing might
@@ -662,7 +663,8 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         auto Kind = Sem.getKind();
         // Safe because they create new arrays.
         if (Kind == ArrayCallKind::kArrayInit ||
-            Kind == ArrayCallKind::kArrayUninitialized)
+            Kind == ArrayCallKind::kArrayUninitialized ||
+            Kind == ArrayCallKind::kArrayUninitializedIntrinsic)
           continue;
         // All array types must be the same. This is a stronger guaranteed than
         // we actually need. The requirement is that we can't create another

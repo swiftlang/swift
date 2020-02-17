@@ -267,3 +267,24 @@ var publicX = 10
 public func fold_with_begin_access_public() -> Int {
   return publicX + 10
 }
+
+class Foo {
+  fileprivate static var x: Int = 0
+}
+
+// CHECK-LABEL: sil @$s28globalopt_global_propagation25test_optimize_init_staticSiyF
+// CHECK: bb0:
+// CHECK-NOT: global_addr
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: struct
+// CHECK-NEXT: return
+
+// CHECK-WMO-LABEL: sil @$s28globalopt_global_propagation25test_optimize_init_staticSiyF
+// CHECK-WMO: bb0:
+// CHECK-WMO-NOT: global_addr
+// CHECK-WMO-NEXT: integer_literal
+// CHECK-WMO-NEXT: struct
+// CHECK-WMO-NEXT: return
+public func test_optimize_init_static() -> Int {
+  return Foo.x
+}

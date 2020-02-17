@@ -481,6 +481,9 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
                                      evaluator.getAllocator());
   }
 
+  if (auto *convertEscapeInst = dyn_cast<ConvertEscapeToNoEscapeInst>(value))
+    return getConstantValue(convertEscapeInst->getOperand());
+
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
   // Otherwise, we don't know how to handle this.

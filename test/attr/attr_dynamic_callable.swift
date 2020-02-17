@@ -451,7 +451,7 @@ struct A {
 }
 
 func test9239() {
-  _ = A()() // ok
+  A()() // ok
 }
 
 // SR-10313

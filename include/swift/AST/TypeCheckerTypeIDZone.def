@@ -211,7 +211,7 @@ SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
 SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckSourceFileRequest,
-              bool(SouceFile *, unsigned), SeparatelyCached, NoLocationInfo)
+              bool(SouceFile *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeWitnessRequest,
               TypeWitnessAndDecl(NormalProtocolConformance *,
                                  AssociatedTypeDecl *),

@@ -379,6 +379,27 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   return finalize();
 }
 
+std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
+    SILDifferentiabilityWitnessKey key) {
+  // TODO(TF-20): Make the mangling scheme robust. Support demangling.
+  beginManglingWithoutPrefix();
+
+  auto originalName = key.first;
+  auto *parameterIndices = key.second.parameterIndices;
+  auto *resultIndices = key.second.resultIndices;
+  auto derivativeGenericSignature = key.second.derivativeGenericSignature;
+
+  Buffer << "AD__" << originalName << '_';
+  Buffer << "P" << parameterIndices->getString();
+  Buffer << "R" << resultIndices->getString();
+  if (derivativeGenericSignature)
+    appendGenericSignature(derivativeGenericSignature);
+
+  auto result = Storage.str().str();
+  Storage.clear();
+  return result;
+}
+
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   PrettyStackTraceType prettyStackTrace(Ty->getASTContext(),
                                         "mangling type for debugger", Ty);
