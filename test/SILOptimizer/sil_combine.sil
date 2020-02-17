@@ -2640,6 +2640,107 @@ bb0(%0 : $*B):
   return %4 : $()
 }
 
+// CHECK-LABEL: sil @moved_retain_prevents_alloc_stack_deletion1
+// CHECK: copy_addr
+// CHECK: strong_retain
+// CHECK: destroy_addr
+// CHECK: } // end sil function 'moved_retain_prevents_alloc_stack_deletion1'
+sil @moved_retain_prevents_alloc_stack_deletion1 : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %3 = alloc_stack $B
+  %4 = alloc_stack $B
+  store %0 to %4 : $*B
+  copy_addr [take] %4 to [initialization] %3 : $*B
+  dealloc_stack %4 : $*B
+  strong_retain %0 : $B
+  destroy_addr %3 : $*B
+  dealloc_stack %3 : $*B
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil @moved_retain_prevents_alloc_stack_deletion2
+// CHECK:   copy_addr
+// CHECK: bb1:
+// CHECK:   strong_retain
+// CHECK:   destroy_addr
+// CHECK: bb2:
+// CHECK:   strong_retain
+// CHECK:   destroy_addr
+// CHECK: } // end sil function 'moved_retain_prevents_alloc_stack_deletion2'
+sil @moved_retain_prevents_alloc_stack_deletion2 : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %3 = alloc_stack $B
+  %4 = alloc_stack $B
+  store %0 to %4 : $*B
+  copy_addr [take] %4 to [initialization] %3 : $*B
+  dealloc_stack %4 : $*B
+  cond_br undef, bb1, bb2
+bb1:
+  strong_retain %0 : $B
+  destroy_addr %3 : $*B
+  dealloc_stack %3 : $*B
+  br bb3
+bb2:
+  strong_retain %0 : $B
+  destroy_addr %3 : $*B
+  dealloc_stack %3 : $*B
+  br bb3
+bb3:
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil @retain_is_after_stack_location
+// CHECK-NOT:   copy_addr
+// CHECK: } // end sil function 'retain_is_after_stack_location'
+sil @retain_is_after_stack_location : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %3 = alloc_stack $B
+  %4 = alloc_stack $B
+  store %0 to %4 : $*B
+  copy_addr [take] %4 to [initialization] %3 : $*B
+  dealloc_stack %4 : $*B
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_addr %3 : $*B
+  strong_retain %0 : $B
+  dealloc_stack %3 : $*B
+  br bb3
+bb2:
+  destroy_addr %3 : $*B
+  strong_retain %0 : $B
+  dealloc_stack %3 : $*B
+  br bb3
+bb3:
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil @moved_retain_prevents_alloc_stack_deletion3
+// CHECK:   copy_addr
+// CHECK: bb2:
+// CHECK:   strong_retain
+// CHECK:   destroy_addr
+// CHECK: } // end sil function 'moved_retain_prevents_alloc_stack_deletion3'
+sil @moved_retain_prevents_alloc_stack_deletion3 : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %3 = alloc_stack $B
+  %4 = alloc_stack $B
+  store %0 to %4 : $*B
+  copy_addr [take] %4 to [initialization] %3 : $*B
+  dealloc_stack %4 : $*B
+  br bb1
+bb1:
+  cond_br undef, bb1, bb2
+bb2:
+  strong_retain %0 : $B
+  destroy_addr %3 : $*B
+  dealloc_stack %3 : $*B
+  %14 = tuple ()
+  return %14 : $()
+}
+
 protocol someProtocol {
     var i: Int { get }
 }
