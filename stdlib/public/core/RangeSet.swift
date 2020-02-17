@@ -110,10 +110,10 @@ public struct RangeSet<Bound: Comparable> {
   /// - `_indicesOfRange(17..<19) == 2..<2`
   /// - `_indicesOfRange(12..<22) == 1..<3`
   func _indicesOfRange(_ range: Range<Bound>) -> Range<Int> {
-    precondition(!range.isEmpty)
-    precondition(!_ranges.isEmpty)
-    precondition(range.lowerBound <= _ranges.last!.upperBound)
-    precondition(range.upperBound >= _ranges.first!.lowerBound)
+    _precondition(!range.isEmpty)
+    _precondition(!_ranges.isEmpty)
+    _precondition(range.lowerBound <= _ranges.last!.upperBound)
+    _precondition(range.upperBound >= _ranges.first!.lowerBound)
     
     // The beginning index for the position of `range` is the first range
     // with an upper bound larger than `range`'s lower bound. The range
@@ -140,9 +140,9 @@ public struct RangeSet<Bound: Comparable> {
   ///   `ranges.last!.upperBound <= range.lowerBound`.
   /// - Precondition: `range` must not be empty.
   internal mutating func _append(_ range: Range<Bound>) {
-    precondition(_ranges.isEmpty
+    _precondition(_ranges.isEmpty
       || _ranges.last!.upperBound <= range.lowerBound)
-    precondition(!range.isEmpty)
+    _precondition(!range.isEmpty)
     if _ranges.isEmpty {
       _ranges.append(range)
     } else if _ranges.last!.upperBound == range.lowerBound {

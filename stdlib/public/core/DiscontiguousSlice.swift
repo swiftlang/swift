@@ -105,7 +105,7 @@ extension DiscontiguousSlice: BidirectionalCollection
   where Base: BidirectionalCollection
 {
   public func index(before i: Index) -> Index {
-    precondition(i != startIndex, "Can't move index before startIndex")
+    _precondition(i != startIndex, "Can't move index before startIndex")
     
     if i == endIndex || i.base == subranges._ranges[i._rangeOffset].lowerBound {
       let offset = i._rangeOffset - 1
