@@ -3761,19 +3761,10 @@ ConstraintSystem::getFunctionArgApplyInfo(ConstraintLocator *locator) {
   } else {
     // If we didn't resolve an overload for the callee, we should be dealing
     // with a call of an arbitrary function expr.
-    if (auto *call = dyn_cast<CallExpr>(anchor)) {
-      assert(!shouldHaveDirectCalleeOverload(call) &&
+    auto *call = cast<CallExpr>(anchor);
+    assert(!shouldHaveDirectCalleeOverload(call) &&
              "Should we have resolved a callee for this?");
-      rawFnType = getType(call->getFn());
-    } else if (auto *apply = dyn_cast<ApplyExpr>(anchor)) {
-      // FIXME: ArgumentMismatchFailure is currently used from CSDiag, meaning
-      // we can end up a BinaryExpr here with an unresolved callee. It should be
-      // possible to remove this once we've gotten rid of the old CSDiag logic
-      // and just assert that we have a CallExpr.
-      rawFnType = getType(apply->getFn());
-    } else {
-      return None;
-    }
+    rawFnType = getType(call->getFn());
   }
 
   // Try to resolve the function type by loading lvalues and looking through
