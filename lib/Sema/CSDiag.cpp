@@ -481,60 +481,6 @@ DeclContext *FailureDiagnosis::findDeclContext(Expr *subExpr) const {
   return finder.DC;
 }
 
-static DeclName getBaseName(DeclContext *context) {
-  if (auto generic = context->getSelfNominalTypeDecl()) {
-    return generic->getName();
-  } else if (context->isModuleScopeContext())
-    return context->getParentModule()->getName();
-  else
-    llvm_unreachable("Unsupported base");
-};
-
-static void emitFixItForExplicitlyQualifiedReference(
-    DiagnosticEngine &de, UnresolvedDotExpr *UDE,
-    decltype(diag::fix_unqualified_access_top_level) diag, DeclName baseName,
-    DescriptiveDeclKind kind) {
-  auto name = baseName.getBaseIdentifier();
-  SmallString<32> namePlusDot = name.str();
-  namePlusDot.push_back('.');
-
-  de.diagnose(UDE->getLoc(), diag, namePlusDot, kind, name)
-      .fixItInsert(UDE->getStartLoc(), namePlusDot);
-}
-
-void ConstraintSystem::diagnoseDeprecatedConditionalConformanceOuterAccess(
-    UnresolvedDotExpr *UDE, ValueDecl *choice) {
-  auto result =
-      TypeChecker::lookupUnqualified(DC, UDE->getName(), UDE->getLoc());
-  assert(result && "names can't just disappear");
-  // These should all come from the same place.
-  auto exampleInner = result.front();
-  auto innerChoice = exampleInner.getValueDecl();
-  auto innerDC = exampleInner.getDeclContext()->getInnermostTypeContext();
-  auto innerParentDecl = innerDC->getSelfNominalTypeDecl();
-  auto innerBaseName = getBaseName(innerDC);
-
-  auto choiceKind = choice->getDescriptiveKind();
-  auto choiceDC = choice->getDeclContext();
-  auto choiceBaseName = getBaseName(choiceDC);
-  auto choiceParentDecl = choiceDC->getAsDecl();
-  auto choiceParentKind = choiceParentDecl
-                              ? choiceParentDecl->getDescriptiveKind()
-                              : DescriptiveDeclKind::Module;
-
-  auto &DE = getASTContext().Diags;
-  DE.diagnose(UDE->getLoc(),
-              diag::warn_deprecated_conditional_conformance_outer_access,
-              UDE->getName(), choiceKind, choiceParentKind, choiceBaseName,
-              innerChoice->getDescriptiveKind(),
-              innerParentDecl->getDescriptiveKind(), innerBaseName);
-
-  emitFixItForExplicitlyQualifiedReference(
-      getASTContext().Diags, UDE,
-      diag::fix_deprecated_conditional_conformance_outer_access,
-      choiceBaseName, choiceKind);
-}
-
 bool FailureDiagnosis::
 visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   // Don't walk the children for this node, it leads to multiple diagnostics

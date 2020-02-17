@@ -2546,13 +2546,6 @@ public:
   bool diagnoseAmbiguity(ArrayRef<Solution> solutions);
   bool diagnoseAmbiguityWithFixes(SmallVectorImpl<Solution> &solutions);
 
-  /// Give the deprecation warning for referring to a global function
-  /// when there's a method from a conditional conformance in a smaller/closer
-  /// scope.
-  void
-  diagnoseDeprecatedConditionalConformanceOuterAccess(UnresolvedDotExpr *UDE,
-                                                      ValueDecl *choice);
-
   /// Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
                      ConstraintLocatorBuilder locator,
