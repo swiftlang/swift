@@ -695,15 +695,15 @@ private:
     enumerateMemberUses();
   }
 
-  llvm::StringSet<> computeHoldersOfCascadingMembers() {
-    llvm::StringSet<> holdersOfCascadingMembers;
+  std::unordered_set<std::string> computeHoldersOfCascadingMembers() {
+    std::unordered_set<std::string> holdersOfCascadingMembers;
     for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
       {
         bool isPrivate = declIsPrivate(p.getFirst().first);
         if (isPrivate && !includeIntrafileDeps)
           continue;
       }
-      StringRef context =
+      std::string context =
           DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
               p.getFirst().first);
       bool isCascading = p.getSecond();
@@ -713,8 +713,8 @@ private:
     return holdersOfCascadingMembers;
   }
 
-  void
-  enumerateNominalUses(const llvm::StringSet<> &&holdersOfCascadingMembers) {
+  void enumerateNominalUses(
+      const std::unordered_set<std::string> &&holdersOfCascadingMembers) {
     for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
       {
         bool isPrivate = declIsPrivate(p.getFirst().first);
@@ -723,7 +723,7 @@ private:
       }
       const NominalTypeDecl *nominal = p.getFirst().first;
 
-      StringRef context =
+      std::string context =
           DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
               nominal);
       const bool isCascadingUse = holdersOfCascadingMembers.count(context) != 0;
@@ -738,11 +738,11 @@ private:
       const bool isPotentialMember = rawName.empty();
       const bool isCascadingUse = p.getSecond();
       if (isPotentialMember) {
-        StringRef context = DependencyKey::computeContextForProvidedEntity<
+        std::string context = DependencyKey::computeContextForProvidedEntity<
             NodeKind::potentialMember>(nominal);
         enumerateUse(NodeKind::potentialMember, context, "", isCascadingUse);
       } else {
-        StringRef context =
+        std::string context =
             DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
                 nominal);
         StringRef name = rawName.userFacingName();
