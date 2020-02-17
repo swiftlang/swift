@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 530; // @_implicitly_synthesizes_nested_requirement
+const uint16_t SWIFTMODULE_VERSION_MINOR = 535; // top-level var decls
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -346,6 +346,13 @@ enum class ParameterConvention : uint8_t {
   Indirect_In_Constant,
 };
 using ParameterConventionField = BCFixed<4>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class SILParameterDifferentiability : uint8_t {
+  DifferentiableOrNotApplicable,
+  NotDifferentiable,
+};
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -905,12 +912,13 @@ namespace decls_block {
 
   using FunctionParamLayout = BCRecordLayout<
     FUNCTION_PARAM,
-    IdentifierIDField,  // name
-    TypeIDField,        // type
-    BCFixed<1>,         // vararg?
-    BCFixed<1>,         // autoclosure?
-    BCFixed<1>,         // non-ephemeral?
-    ValueOwnershipField // inout, shared or owned?
+    IdentifierIDField,   // name
+    TypeIDField,         // type
+    BCFixed<1>,          // vararg?
+    BCFixed<1>,          // autoclosure?
+    BCFixed<1>,          // non-ephemeral?
+    ValueOwnershipField, // inout, shared or owned?
+    BCFixed<1>           // noDerivative?
   >;
 
   using MetatypeTypeLayout = BCRecordLayout<
@@ -1113,6 +1121,7 @@ namespace decls_block {
     BCFixed<1>,             // implicit?
     BCFixed<1>,             // explicitly objc?
     BCFixed<1>,             // inherits convenience initializers from its superclass?
+    BCFixed<1>,             // has missing designated initializers?
     GenericSignatureIDField, // generic environment
     TypeIDField,            // superclass
     AccessLevelField,       // access level
@@ -1182,6 +1191,7 @@ namespace decls_block {
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
     BCFixed<1>,   // is this the backing storage for a lazy property?
+    BCFixed<1>,   // top level global?
     DeclIDField,  // if this is a lazy property, this is the backing storage
     OpaqueReadOwnershipField,   // opaque read ownership
     ReadImplKindField,   // read implementation
@@ -1790,6 +1800,14 @@ namespace decls_block {
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
+  using TransposeDeclAttrLayout = BCRecordLayout<
+    Transpose_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
+    IdentifierIDField, // Original name.
+    DeclIDField, // Original function declaration.
+    BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
+  >;
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
   using CLASS##DeclAttrLayout = BCRecordLayout< \
     CLASS##_DECL_ATTR, \
@@ -1811,10 +1829,6 @@ namespace decls_block {
     TypeIDField // type referenced by this custom attribute
   >;
 
-  using ImplicitlySynthesizesNestedRequirementDeclAttrLayout = BCRecordLayout<
-    ImplicitlySynthesizesNestedRequirement_DECL_ATTR,
-    BCBlob      // member name
-  >;
 }
 
 /// Returns the encoding kind for the given decl.

@@ -152,7 +152,7 @@ bool SubstitutionMap::isCanonical() const {
 SubstitutionMap SubstitutionMap::getCanonical() const {
   if (empty()) return *this;
 
-  auto canonicalSig = getGenericSignature()->getCanonicalSignature();
+  auto canonicalSig = getGenericSignature().getCanonicalSignature();
   SmallVector<Type, 4> replacementTypes;
   for (Type replacementType : getReplacementTypesBuffer()) {
     if (replacementType)

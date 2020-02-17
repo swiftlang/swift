@@ -140,6 +140,7 @@ void BasicBlockCloner::sinkAddressProjections() {
   // Because the address projections chains will be disjoint (an instruction
   // in one chain cannot use the result of an instruction in another chain),
   // the order they are sunk does not matter.
+  InstructionDeleter deleter;
   for (auto ii = origBB->begin(), ie = origBB->end(); ii != ie;) {
     bool canSink = sinkProj.analyzeAddressProjections(&*ii);
     (void)canSink;
@@ -150,13 +151,10 @@ void BasicBlockCloner::sinkAddressProjections() {
            && "canCloneInstruction should catch this.");
 
     auto nextII = std::next(ii);
-    recursivelyDeleteTriviallyDeadInstructions(
-        &*ii, false, [&nextII](SILInstruction *deadInst) {
-          if (deadInst->getIterator() == nextII)
-            ++nextII;
-        });
+    deleter.trackIfDead(&*ii);
     ii = nextII;
   }
+  deleter.cleanUpDeadInstructions();
 }
 
 // Populate 'projections' with the chain of address projections leading

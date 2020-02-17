@@ -346,7 +346,7 @@ namespace swift {
     std::vector<Diagnostic> ChildNotes;
     SourceLoc Loc;
     bool IsChildNote = false;
-    const Decl *Decl = nullptr;
+    const swift::Decl *Decl = nullptr;
 
     friend DiagnosticEngine;
 

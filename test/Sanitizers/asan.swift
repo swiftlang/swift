@@ -1,6 +1,6 @@
 // RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=address -o %t_asan-binary
 // RUN: %target-codesign %t_asan-binary
-// RUN: not env %env-ASAN_OPTIONS=abort_on_error=0 %target-run %t_asan-binary 2>&1 | %FileCheck %s
+// RUN: env %env-ASAN_OPTIONS=abort_on_error=0 not %target-run %t_asan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: asan_runtime
 

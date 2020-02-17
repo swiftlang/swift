@@ -389,10 +389,6 @@ public:
   /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
-  /// To avoid inserting elements into ValueDomPoints twice.
-  llvm::SmallDenseSet<llvm::Instruction *, 8> ValueVariables;
-  /// Holds the DominancePoint of values that are storage for a source variable.
-  SmallVector<std::pair<llvm::Instruction *, DominancePoint>, 8> ValueDomPoints;
   unsigned NumAnonVars = 0;
 
   /// Accumulative amount of allocated bytes on the stack. Used to limit the
@@ -661,78 +657,6 @@ public:
     return Name;
   }
 
-  /// Try to emit an inline assembly gadget which extends the lifetime of
-  /// \p Var. Returns whether or not this was successful.
-  bool emitLifetimeExtendingUse(llvm::Value *Var) {
-    llvm::Type *ArgTys;
-    auto *Ty = Var->getType();
-    // Vectors, Pointers and Floats are expected to fit into a register.
-    if (Ty->isPointerTy() || Ty->isFloatingPointTy() || Ty->isVectorTy())
-      ArgTys = {Ty};
-    else {
-      // If this is not a scalar or vector type, we can't handle it.
-      if (isa<llvm::CompositeType>(Ty))
-        return false;
-      // The storage is guaranteed to be no larger than the register width.
-      // Extend the storage so it would fit into a register.
-      llvm::Type *IntTy;
-      switch (IGM.getClangASTContext().getTargetInfo().getRegisterWidth()) {
-      case 64:
-        IntTy = IGM.Int64Ty;
-        break;
-      case 32:
-        IntTy = IGM.Int32Ty;
-        break;
-      default:
-        llvm_unreachable("unsupported register width");
-      }
-      ArgTys = {IntTy};
-      Var = Builder.CreateZExtOrBitCast(Var, IntTy);
-    }
-    // Emit an empty inline assembler expression depending on the register.
-    auto *AsmFnTy = llvm::FunctionType::get(IGM.VoidTy, ArgTys, false);
-    auto *InlineAsm = llvm::InlineAsm::get(AsmFnTy, "", "r", true);
-    Builder.CreateAsmCall(InlineAsm, Var);
-    return true;
-  }
-
-  /// At -Onone, forcibly keep all LLVM values that are tracked by
-  /// debug variables alive by inserting an empty inline assembler
-  /// expression depending on the value in the blocks dominated by the
-  /// value.
-  void emitDebugVariableRangeExtension(const SILBasicBlock *CurBB) {
-    if (IGM.IRGen.Opts.shouldOptimize())
-      return;
-    for (auto &Variable : ValueDomPoints) {
-      llvm::Instruction *Var = Variable.first;
-      DominancePoint VarDominancePoint = Variable.second;
-      if (getActiveDominancePoint() == VarDominancePoint ||
-          isActiveDominancePointDominatedBy(VarDominancePoint)) {
-        bool ExtendedLifetime = emitLifetimeExtendingUse(Var);
-        if (!ExtendedLifetime)
-          continue;
-
-        // Propagate dbg.values for Var into the current basic block. Note
-        // that this shouldn't be necessary. LiveDebugValues should be doing
-        // this but can't in general because it currently only tracks register
-        // locations.
-        llvm::BasicBlock *BB = Var->getParent();
-        llvm::BasicBlock *CurBB = Builder.GetInsertBlock();
-        if (BB == CurBB)
-          // The current basic block must be a successor of the dbg.value().
-          continue;
-
-        llvm::SmallVector<llvm::DbgValueInst *, 4> DbgValues;
-        llvm::findDbgValues(DbgValues, Var);
-        for (auto *DVI : DbgValues)
-          if (DVI->getParent() == BB)
-            IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
-                DVI->getValue(), DVI->getVariable(), DVI->getExpression(),
-                DVI->getDebugLoc(), &*CurBB->getFirstInsertionPt());
-      }
-    }
-  }
-
   /// To make it unambiguous whether a `var` binding has been initialized,
   /// zero-initialize the shadow copy alloca. LLDB uses the first pointer-sized
   /// field to recognize to detect uninitizialized variables. This can be
@@ -757,6 +681,9 @@ public:
 
   /// Account for bugs in LLVM.
   ///
+  /// - When a variable is spilled into a stack slot, LiveDebugValues fails to
+  ///   recognize a restore of that slot for a different variable.
+  ///
   /// - The LLVM type legalizer currently doesn't update debug
   ///   intrinsics when a large value is split up into smaller
   ///   pieces. Note that this heuristic as a bit too conservative
@@ -764,9 +691,7 @@ public:
   ///
   /// - CodeGen Prepare may drop dbg.values pointing to PHI instruction.
   bool needsShadowCopy(llvm::Value *Storage) {
-    return (IGM.DataLayout.getTypeSizeInBits(Storage->getType()) >
-            IGM.getClangASTContext().getTargetInfo().getRegisterWidth()) ||
-           isa<llvm::PHINode>(Storage);
+    return !isa<llvm::Constant>(Storage);
   }
 
   /// Unconditionally emit a stack shadow copy of an \c llvm::Value.
@@ -800,27 +725,10 @@ public:
     if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
         IGM.IRGen.Opts.shouldOptimize() || IsAnonymous ||
         isa<llvm::AllocaInst>(Storage) || isa<llvm::UndefValue>(Storage) ||
-        Storage->getType() == IGM.RefCountedPtrTy)
+        Storage->getType() == IGM.RefCountedPtrTy || !needsShadowCopy(Storage))
       return Storage;
 
-    // Always emit shadow copies for function arguments.
-    if (VarInfo.ArgNo == 0)
-      // Otherwise only if debug value range extension is not feasible.
-      if (!needsShadowCopy(Storage)) {
-        // Mark for debug value range extension unless this is a constant, or
-        // unless it's not possible to emit lifetime-extending uses for this.
-        if (auto *Value = dyn_cast<llvm::Instruction>(Storage)) {
-          // Emit a use at the start of the storage lifetime to force early
-          // materialization. This makes variables available for inspection as
-          // soon as they are defined.
-          bool ExtendedLifetime = emitLifetimeExtendingUse(Value);
-          if (ExtendedLifetime)
-            if (ValueVariables.insert(Value).second)
-              ValueDomPoints.push_back({Value, getActiveDominancePoint()});
-        }
-
-        return Storage;
-      }
+    // Emit a shadow copy.
     return emitShadowCopy(Storage, Scope, VarInfo, Align);
   }
 
@@ -1900,9 +1808,6 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         IGM.DebugInfo->setCurrentLoc(
             Builder, DS, RegularLocation::getAutoGeneratedLocation());
       }
-
-      if (isa<TermInst>(&I))
-        emitDebugVariableRangeExtension(BB);
     }
     visit(&I);
   }

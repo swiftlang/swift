@@ -22,14 +22,14 @@ let _ = arr.map(E.bar) // Ok
 let _ = arr.map(E.two) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping (Int, Int) -> E)'}}
 // expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
 
-let _ = arr.map(E.tuple) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping ((x: Int, y: Int)) -> E)'}}
-// expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
+let _ = arr.map(E.tuple) // expected-error {{cannot convert value of type '((x: Int, y: Int)) -> E' to expected argument type '(String) throws -> T'}}
+// expected-error@-1 {{generic parameter 'T' could not be inferred}}
 
 let _ = arr.map(G_E<String>.foo) // Ok
 let _ = arr.map(G_E<String>.bar) // Ok
 let _ = arr.map(G_E<String>.two) // expected-error {{cannot convert value of type '(String, String) -> G_E<String>' to expected argument type '(String) throws -> G_E<String>'}}
-let _ = arr.map(G_E<Int>.tuple) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping ((x: Int, y: Int)) -> G_E<Int>)'}}
-// expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
+let _ = arr.map(G_E<Int>.tuple) // expected-error {{cannot convert value of type '((x: Int, y: Int)) -> G_E<Int>' to expected argument type '(String) throws -> T'}}
+// expected-error@-1 {{generic parameter 'T' could not be inferred}}
 
 let _ = E.foo("hello") // expected-error {{missing argument label 'bar:' in call}}
 let _ = E.bar("hello") // Ok
@@ -121,7 +121,7 @@ func rdar34583132() {
 
   func bar(_ s: S) {
     guard s.foo(1 + 2) == .timeout else {
-    // expected-error@-1 {{enum type 'E' has no case 'timeout'; did you mean 'timeOut'}}
+    // expected-error@-1 {{enum type 'E' has no case 'timeout'; did you mean 'timeOut'?}}
       fatalError()
     }
   }

@@ -90,7 +90,7 @@ class SILModule::SerializationCallback final
 };
 
 SILModule::SILModule(ModuleDecl *SwiftModule, TypeConverter &TC,
-                     SILOptions &Options, const DeclContext *associatedDC,
+                     const SILOptions &Options, const DeclContext *associatedDC,
                      bool wholeModule)
     : TheSwiftModule(SwiftModule),
       AssociatedDeclContext(associatedDC),
@@ -120,7 +120,7 @@ SILModule::~SILModule() {
 }
 
 std::unique_ptr<SILModule>
-SILModule::createEmptyModule(ModuleDecl *M, TypeConverter &TC, SILOptions &Options,
+SILModule::createEmptyModule(ModuleDecl *M, TypeConverter &TC, const SILOptions &Options,
                              bool WholeModule) {
   return std::unique_ptr<SILModule>(
       new SILModule(M, TC, Options, M, WholeModule));

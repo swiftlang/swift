@@ -12,6 +12,24 @@ func checkMatch<S: Collection, T: Collection>(_ x: S, _ y: T, _ i: S.Index)
   expectEqual(x[i], y[i])
 }
 
+func checkMatchContiguousStorage<S: Collection, T: Collection>(_ x: S, _ y: T)
+  where S.Element == T.Element, S.Element: Equatable
+{
+  let xElement = x.withContiguousStorageIfAvailable { $0.first }
+  let yElement = y.withContiguousStorageIfAvailable { $0.first }
+
+  expectEqual(xElement, yElement)
+}
+
+func checkHasContiguousStorage<S: Collection>(_ x: S) {
+  expectTrue(x.withContiguousStorageIfAvailable { _ in true } ?? false)
+}
+
+func checkHasContiguousStorageSubstring(_ x: Substring.UTF8View) {
+  let hasStorage = x.withContiguousStorageIfAvailable { _ in true } ?? false
+  expectTrue(hasStorage)
+}
+
 SubstringTests.test("Equality") {
   let s = "abcdefg"
   let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
@@ -228,6 +246,22 @@ SubstringTests.test("UTF8View") {
     expectEqual("", String(t.dropLast(100))!)
     expectEqual("", String(u.dropFirst(100))!)
     expectEqual("", String(u.dropLast(100))!)
+
+
+    checkHasContiguousStorage(s.utf8) // Strings always do
+    checkHasContiguousStorageSubstring(t)
+    checkHasContiguousStorageSubstring(u)
+    checkMatchContiguousStorage(Array(s.utf8), s.utf8)
+
+    // The specialization for Substring.withContiguousStorageIfAvailable was
+    // added in https://github.com/apple/swift/pull/29146.
+    guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+      return
+    }
+    checkHasContiguousStorage(t)
+    checkHasContiguousStorage(u)
+    checkMatchContiguousStorage(Array(t), t)
+    checkMatchContiguousStorage(Array(u), u)
   }
 }
 

@@ -563,7 +563,6 @@ protected:
   NodePointer demangleGenericType();
   NodePointer demangleValueWitness();
 
-  NodePointer demangleObjCTypeName();
   NodePointer demangleTypeMangling();
   NodePointer demangleSymbolicReference(unsigned char rawKind,
                                         const void *at);

@@ -447,7 +447,7 @@ void ClosureContextInfo::dump(FILE *file) const {
 
 void TypeRefBuilder::dumpCaptureSection(FILE *file) {
   for (const auto &sections : ReflectionInfos) {
-    for (const auto &descriptor : sections.Capture) {
+    for (const auto descriptor : sections.Capture) {
       auto info = getClosureContextInfo(descriptor);
       info.dump(file);
     }

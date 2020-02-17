@@ -1076,10 +1076,6 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
   // read them later.
   instance.getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
 
-  // Make sure to not trigger extra rebuilds on identical files with mismatching
-  // timestamps.
-  instance.getHeaderSearchOpts().ValidateASTInputFilesContent = true;
-
   if (importerOpts.Mode == ClangImporterOptions::Modes::PrecompiledModule)
     return importer;
 
@@ -1623,19 +1619,19 @@ void ClangImporter::collectVisibleTopLevelModuleNames(
 }
 
 void ClangImporter::collectSubModuleNames(
-    ArrayRef<std::pair<Identifier, SourceLoc>> path,
+    ArrayRef<Located<Identifier>> path,
     std::vector<std::string> &names) const {
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first.
   clang::Module *clangModule = clangHeaderSearch.lookupModule(
-      path.front().first.str(), /*AllowSearch=*/true,
+      path.front().Item.str(), /*AllowSearch=*/true,
       /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule)
     return;
   clang::Module *submodule = clangModule;
   for (auto component : path.slice(1)) {
-    submodule = submodule->findSubmodule(component.first.str());
+    submodule = submodule->findSubmodule(component.Item.str());
     if (!submodule)
       return;
   }
@@ -1647,12 +1643,12 @@ bool ClangImporter::isModuleImported(const clang::Module *M) {
   return M->NameVisibility == clang::Module::NameVisibilityKind::AllVisible;
 }
 
-bool ClangImporter::canImportModule(std::pair<Identifier, SourceLoc> moduleID) {
+bool ClangImporter::canImportModule(Located<Identifier> moduleID) {
   // Look up the top-level module to see if it exists.
   // FIXME: This only works with top-level modules.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
   clang::Module *clangModule =
-      clangHeaderSearch.lookupModule(moduleID.first.str(), /*AllowSearch=*/true,
+      clangHeaderSearch.lookupModule(moduleID.Item.str(), /*AllowSearch=*/true,
                                      /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule) {
     return false;
@@ -1666,13 +1662,13 @@ bool ClangImporter::canImportModule(std::pair<Identifier, SourceLoc> moduleID) {
 }
 
 ModuleDecl *ClangImporter::Implementation::loadModuleClang(
-    SourceLoc importLoc, ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+    SourceLoc importLoc, ArrayRef<Located<Identifier>> path) {
   auto &clangContext = getClangASTContext();
   auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first, to see if it exists at all.
   clang::Module *clangModule = clangHeaderSearch.lookupModule(
-      path.front().first.str(), /*AllowSearch=*/true,
+      path.front().Item.str(), /*AllowSearch=*/true,
       /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule)
     return nullptr;
@@ -1681,8 +1677,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>
       clangPath;
   for (auto component : path) {
-    clangPath.push_back({&clangContext.Idents.get(component.first.str()),
-                         exportSourceLoc(component.second)});
+    clangPath.push_back({&clangContext.Idents.get(component.Item.str()),
+                         exportSourceLoc(component.Loc)});
   }
 
   auto &rawDiagClient = Instance->getDiagnosticClient();
@@ -1732,13 +1728,13 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   // Verify that the submodule exists.
   clang::Module *submodule = clangModule;
   for (auto &component : path.slice(1)) {
-    submodule = submodule->findSubmodule(component.first.str());
+    submodule = submodule->findSubmodule(component.Item.str());
 
     // Special case: a submodule named "Foo.Private" can be moved to a top-level
     // module named "Foo_Private". Clang has special support for this.
     // We're limiting this to just submodules named "Private" because this will
     // put the Clang AST in a fatal error state if it /doesn't/ exist.
-    if (!submodule && component.first.str() == "Private" &&
+    if (!submodule && component.Item.str() == "Private" &&
         (&component) == (&path[1])) {
       submodule = loadModule(llvm::makeArrayRef(clangPath).slice(0, 2), false);
     }
@@ -1757,18 +1753,24 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   return finishLoadingClangModule(clangModule, /*preferOverlay=*/false);
 }
 
-ModuleDecl *ClangImporter::loadModule(
-    SourceLoc importLoc,
-    ArrayRef<std::pair<Identifier, SourceLoc>> path) {
-  ModuleDecl *MD = Impl.loadModuleClang(importLoc, path);
+ModuleDecl *
+ClangImporter::loadModule(SourceLoc importLoc,
+                          ArrayRef<Located<Identifier>> path) {
+  return Impl.loadModule(importLoc, path);
+}
+
+ModuleDecl *ClangImporter::Implementation::loadModule(
+    SourceLoc importLoc, ArrayRef<Located<Identifier>> path) {
+  ModuleDecl *MD = nullptr;
+  if (!DisableSourceImport)
+    MD = loadModuleClang(importLoc, path);
   if (!MD)
-    MD = Impl.loadModuleDWARF(importLoc, path);
+    MD = loadModuleDWARF(importLoc, path);
   return MD;
 }
 
 ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
-    const clang::Module *clangModule,
-    bool findOverlay) {
+    const clang::Module *clangModule, bool findOverlay) {
   assert(clangModule);
 
   // Bump the generation count.
@@ -1857,6 +1859,8 @@ PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
   switch (platformKind) {
   case PlatformKind::iOS:
   case PlatformKind::iOSApplicationExtension:
+  case PlatformKind::macCatalyst:
+  case PlatformKind::macCatalystApplicationExtension:
   case PlatformKind::tvOS:
   case PlatformKind::tvOSApplicationExtension:
     deprecatedAsUnavailableMessage =
@@ -1890,6 +1894,11 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
     return name == "ios";
   case PlatformKind::iOSApplicationExtension:
     return name == "ios" || name == "ios_app_extension";
+
+  case PlatformKind::macCatalyst:
+  case PlatformKind::macCatalystApplicationExtension:
+    // ClangImporter does not yet support macCatalyst.
+    return false;
 
   case PlatformKind::tvOS:
     return name == "tvos";
@@ -1931,6 +1940,11 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
     // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
     return major <= 7;
 
+  case PlatformKind::macCatalyst:
+  case PlatformKind::macCatalystApplicationExtension:
+    // ClangImporter does not yet support macCatalyst.
+    return false;
+
   case PlatformKind::watchOS:
   case PlatformKind::watchOSApplicationExtension:
     // No deprecation filter on watchOS
@@ -1954,6 +1968,7 @@ ClangImporter::Implementation::Implementation(
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
       BuffersForDiagnostics(ctx.SourceMgr),
       platformAvailability(ctx.LangOpts), nameImporter(),
+      DisableSourceImport(opts.DisableSourceImport),
       DWARFImporter(dwarfImporterDelegate) {}
 
 ClangImporter::Implementation::~Implementation() {
@@ -2613,7 +2628,8 @@ void ClangImporter::lookupTypeDecl(
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    lookupKind);
   bool foundViaClang = false;
-  if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
+  if (!Impl.DisableSourceImport &&
+      sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
     for (auto clangDecl : lookupResult) {
       if (!isa<clang::TypeDecl>(clangDecl) &&
           !isa<clang::ObjCContainerDecl>(clangDecl) &&
@@ -2782,7 +2798,7 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
                                     ArrayRef<clang::Module *> Exported) {
   auto *ImportedMod = ClangN.getClangModule();
   assert(ImportedMod);
-  SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 4> AccessPath;
+  SmallVector<Located<Identifier>, 4> AccessPath;
   auto *TmpMod = ImportedMod;
   while (TmpMod) {
     AccessPath.push_back({ Ctx.getIdentifier(TmpMod->Name), SourceLoc() });
@@ -2851,22 +2867,23 @@ void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
   }
 }
 
-/// Determine whether the given Clang entry is visible.
-///
-/// FIXME: this is an elaborate hack to badly reflect Clang's
-/// submodule visibility into Swift.
-static bool isVisibleClangEntry(clang::ASTContext &ctx,
-                                SwiftLookupTable::SingleEntry entry) {
+bool ClangImporter::Implementation::isVisibleClangEntry(
+    const clang::NamedDecl *clangDecl) {
+  // For a declaration, check whether the declaration is hidden.
+  if (!clangDecl->isHidden()) return true;
+
+  // Is any redeclaration visible?
+  for (auto redecl : clangDecl->redecls()) {
+    if (!cast<clang::NamedDecl>(redecl)->isHidden()) return true;
+  }
+
+  return false;
+}
+
+bool ClangImporter::Implementation::isVisibleClangEntry(
+  SwiftLookupTable::SingleEntry entry) {
   if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
-    // For a declaration, check whether the declaration is hidden.
-    if (!clangDecl->isHidden()) return true;
-
-    // Is any redeclaration visible?
-    for (auto redecl : clangDecl->redecls()) {
-      if (!cast<clang::NamedDecl>(redecl)->isHidden()) return true;
-    }
-
-    return false;
+    return isVisibleClangEntry(clangDecl);
   }
 
   // If it's a macro from a module, check whether the module has been imported.
@@ -2901,15 +2918,13 @@ ClangModuleUnit::lookupNestedType(Identifier name,
   if (!baseTypeContext)
     return nullptr;
 
-  auto &clangCtx = owner.getClangASTContext();
-
   // FIXME: This is very similar to what's in Implementation::lookupValue and
   // Implementation::loadAllMembers.
   SmallVector<TypeDecl *, 2> results;
   for (auto entry : lookupTable->lookup(SerializedSwiftName(name.str()),
                                         baseTypeContext)) {
     // If the entry is not visible, skip it.
-    if (!isVisibleClangEntry(clangCtx, entry)) continue;
+    if (!owner.isVisibleClangEntry(entry)) continue;
 
     auto *clangDecl = entry.dyn_cast<clang::NamedDecl *>();
     if (!clangDecl)
@@ -2970,45 +2985,20 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
     SmallVector<clang::NamedDecl *, 4> DelayedCategories;
 
     // Simply importing the categories adds them to the list of extensions.
-    for (auto I = objcClass->visible_categories_begin(),
-           E = objcClass->visible_categories_end();
-         I != E; ++I) {
-      // Delay installing categories that don't have an owning module.
-      if (!I->hasOwningModule()) {
-        DelayedCategories.push_back(*I);
-        continue;
-      }
-
-      Impl.importDeclReal(*I, Impl.CurrentVersion);
-    }
-
-    // Install all the delayed categories.
-    //
-    // The very notion of a delayed category is a result of an emergent behavior
-    // of the visible categories list and the order we import modules. The list
-    // appears in deserialization order rather than some "source order", so it's
-    // possible for, say, a bridging header to import a module that defines an
-    // interface and some categories, but for the categories in the bridging
-    // header to appear *before* the categories in the module - the imported
-    // module will be deserialized on demand. We take it on faith that if there
-    // is no owning module for a given category, that it was created in such a
-    // way, and thus we install it last to try to emulate what we want
-    // "source order" to mean.
-    for (const auto *DelayedCat : DelayedCategories) {
-      Impl.importDeclReal(DelayedCat, Impl.CurrentVersion);
+    for (const auto *Cat : objcClass->visible_categories()) {
+      Impl.importDeclReal(Cat, Impl.CurrentVersion);
     }
   }
 
   // Dig through each of the Swift lookup tables, creating extensions
   // where needed.
-  auto &clangCtx = Impl.getClangASTContext();
   (void)Impl.forEachLookupTable([&](SwiftLookupTable &table) -> bool {
       // FIXME: If we already looked at this for this generation,
       // skip.
 
-      for (auto entry : table.lookupGlobalsAsMembers(effectiveClangContext)) {
+      for (auto entry : table.allGlobalsAsMembersInContext(effectiveClangContext)) {
         // If the entry is not visible, skip it.
-        if (!isVisibleClangEntry(clangCtx, entry)) continue;
+        if (!Impl.isVisibleClangEntry(entry)) continue;
 
         if (auto decl = entry.dyn_cast<clang::NamedDecl *>()) {
           // Import the context of this declaration, which has the
@@ -3269,6 +3259,29 @@ void ClangImporter::verifyAllModules() {
 
   Impl.VerifiedDeclsCounter = verifiedCounter;
 #endif
+}
+
+const clang::Type *
+ClangImporter::parseClangFunctionType(StringRef typeStr,
+                                      SourceLoc loc) const {
+  auto &sema = Impl.getClangSema();
+  StringRef filename = Impl.SwiftContext.SourceMgr.getDisplayNameForLoc(loc);
+  // TODO: Obtain a clang::SourceLocation from the swift::SourceLoc we have
+  auto parsedType = sema.ParseTypeFromStringCallback(typeStr, filename, {});
+  if (!parsedType.isUsable())
+    return nullptr;
+  clang::QualType resultType = clang::Sema::GetTypeFromParser(parsedType.get());
+  auto *typePtr = resultType.getTypePtrOrNull();
+  if (typePtr && (typePtr->isFunctionPointerType()
+                  || typePtr->isBlockPointerType()))
+      return typePtr;
+  return nullptr;
+}
+
+void ClangImporter::printClangType(const clang::Type *type,
+                                   llvm::raw_ostream &os) const {
+  auto policy = clang::PrintingPolicy(getClangASTContext().getLangOpts());
+  clang::QualType(type, 0).print(os, policy);
 }
 
 //===----------------------------------------------------------------------===//
@@ -3566,7 +3579,7 @@ void ClangImporter::Implementation::lookupValue(
 
   for (auto entry : table.lookup(name.getBaseName(), clangTU)) {
     // If the entry is not visible, skip it.
-    if (!isVisibleClangEntry(clangCtx, entry)) continue;
+    if (!isVisibleClangEntry(entry)) continue;
 
     ValueDecl *decl;
     // If it's a Clang declaration, try to import it.
@@ -3670,11 +3683,9 @@ void ClangImporter::Implementation::lookupObjCMembers(
        SwiftLookupTable &table,
        DeclName name,
        VisibleDeclConsumer &consumer) {
-  auto &clangCtx = getClangASTContext();
-
   for (auto clangDecl : table.lookupObjCMembers(name.getBaseName())) {
     // If the entry is not visible, skip it.
-    if (!isVisibleClangEntry(clangCtx, clangDecl)) continue;
+    if (!isVisibleClangEntry(clangDecl)) continue;
 
     forEachDistinctName(clangDecl,
                         [&](ImportedName importedName,
@@ -3723,6 +3734,9 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
 // deserialized before loading the named member of this class. This allows the
 // decl members table to be warmed up and enables the correct identification of
 // overrides.
+//
+// FIXME: Very low hanging fruit: Loading everything is extremely wasteful. We
+// should be able to just load the name lazy member loading is asking for.
 static void ensureSuperclassMembersAreLoaded(const ClassDecl *CD) {
   if (!CD)
     return;
@@ -3732,6 +3746,9 @@ static void ensureSuperclassMembersAreLoaded(const ClassDecl *CD) {
     return;
   
   CD->loadAllMembers();
+
+  for (auto *ED : const_cast<ClassDecl *>(CD)->getExtensions())
+    ED->loadAllMembers();
 }
 
 Optional<TinyPtrVector<ValueDecl *>>
@@ -3759,17 +3776,6 @@ ClangImporter::Implementation::loadNamedMembers(
       return None;
   }
 
-  // Also bail out if there are any global-as-member mappings for this context;
-  // we can support some of them lazily but the full set of idioms seems
-  // prohibitively complex (also they're not stored in by-name lookup, for
-  // reasons unclear).
-  if (isa<ExtensionDecl>(D) && !checkedGlobalsAsMembers.insert(IDC).second) {
-    if (forEachLookupTable([&](SwiftLookupTable &table) -> bool {
-        return (!table.lookupGlobalsAsMembers(effectiveClangContext).empty());
-      }))
-      return None;
-  }
-
   // There are 3 cases:
   //
   //  - The decl is from a bridging header, CMO is Some(nullptr)
@@ -3791,8 +3797,6 @@ ClangImporter::Implementation::loadNamedMembers(
   auto table = findLookupTable(*CMO);
   assert(table && "clang module without lookup table");
 
-  clang::ASTContext &clangCtx = getClangASTContext();
-
   assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD));
 
   ensureSuperclassMembersAreLoaded(dyn_cast<ClassDecl>(D));
@@ -3802,7 +3806,7 @@ ClangImporter::Implementation::loadNamedMembers(
                                   effectiveClangContext)) {
     if (!entry.is<clang::NamedDecl *>()) continue;
     auto member = entry.get<clang::NamedDecl *>();
-    if (!isVisibleClangEntry(clangCtx, member)) continue;
+    if (!isVisibleClangEntry(member)) continue;
 
     // Skip Decls from different clang::DeclContexts
     if (member->getDeclContext() != CDC) continue;
@@ -3816,6 +3820,37 @@ ClangImporter::Implementation::loadNamedMembers(
           Members.push_back(V);
         }
       }
+    }
+  }
+
+  for (auto entry : table->lookupGlobalsAsMembers(SerializedSwiftName(N),
+                                                  effectiveClangContext)) {
+    if (!entry.is<clang::NamedDecl *>()) continue;
+    auto member = entry.get<clang::NamedDecl *>();
+    if (!isVisibleClangEntry(member)) continue;
+
+     // Skip Decls from different clang::DeclContexts
+    if (member->getDeclContext() != CDC) continue;
+
+    SmallVector<Decl*, 4> tmp;
+    insertMembersAndAlternates(member, tmp);
+    for (auto *TD : tmp) {
+      if (auto *V = dyn_cast<ValueDecl>(TD)) {
+        // Skip ValueDecls if they import under different names.
+        if (V->getBaseName() == N) {
+          Members.push_back(V);
+        }
+      }
+    }
+  }
+
+  if (N == DeclBaseName::createConstructor()) {
+    if (auto *classDecl = dyn_cast<ClassDecl>(D)) {
+      SmallVector<Decl *, 4> ctors;
+      importInheritedConstructors(cast<clang::ObjCInterfaceDecl>(CD),
+                                  classDecl, ctors);
+      for (auto ctor : ctors)
+        Members.push_back(cast<ValueDecl>(ctor));
     }
   }
   return Members;

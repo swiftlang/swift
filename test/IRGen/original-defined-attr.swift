@@ -1,14 +1,17 @@
 // RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name CurrentModule -D CURRENT_MODULE | %FileCheck %s --check-prefix=CHECK-COMMON --check-prefix=CHECK-CURRENT --check-prefix=CHECK-CURRENT-%target-ptrsize
 // RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name OriginalModule | %FileCheck %s --check-prefix=CHECK-COMMON --check-prefix=CHECK-ORIGINAL --check-prefix=CHECK-ORIGINAL-%target-ptrsize
+// REQUIRES: OS=macosx
 
 #if CURRENT_MODULE
 
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "OriginalModule", macOS 10.15)
 public struct Entity {
 	public func addEntity(_ e: Entity) {}
 	public func removeEntity(_ e: Entity) {}
 }
 
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "OriginalModule", macOS 10.15)
 public protocol Movable {
 	func MovableFuncFoo()
@@ -16,6 +19,7 @@ public protocol Movable {
 
 public protocol Unmoveable {}
 
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "OriginalModule", macOS 10.15)
 public class MovedClass: Movable, Unmoveable {
 	public func MovableFuncFoo() {}

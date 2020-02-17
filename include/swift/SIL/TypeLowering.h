@@ -946,24 +946,6 @@ public:
   CaptureInfo getLoweredLocalCaptures(SILDeclRef fn);
   bool hasLoweredLocalCaptures(SILDeclRef fn);
 
-#ifndef NDEBUG
-  /// If \c false, \c childDC is in a context it cannot capture variables from,
-  /// so it is expected that Sema may not have computed its \c CaptureInfo.
-  ///
-  /// This call exists for use in assertions; do not use it to skip capture
-  /// processing.
-  static bool canCaptureFromParent(DeclContext *childDC) {
-    // This call was added because Sema leaves the captures of functions that
-    // cannot capture anything uncomputed.
-    // TODO: Make Sema set them to CaptureInfo::empty() instead.
-
-    if (childDC)
-      if (auto decl = childDC->getAsDecl())
-         return decl->getDeclContext()->isLocalContext();
-    return true;
-  }
-#endif
-
   enum class ABIDifference : uint8_t {
     // Types have compatible calling conventions and representations, so can
     // be trivially bitcast.

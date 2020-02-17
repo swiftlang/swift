@@ -87,6 +87,7 @@ Solution::computeSubstitutions(GenericSignature sig,
       return ProtocolConformanceRef(protoType);
     }
 
+    // FIXME: Retrieve the conformance from the solution itself.
     return TypeChecker::conformsToProtocol(replacement, protoType,
                                            getConstraintSystem().DC,
                                            ConformanceCheckFlags::InExpression);
@@ -149,6 +150,18 @@ static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
     return false;
 
   return true;
+}
+
+ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
+                                              bool lookThroughApply) const {
+  auto &cs = getConstraintSystem();
+  return cs.getCalleeLocator(
+      locator, lookThroughApply,
+      [&](const Expr *expr) -> Type { return getType(expr); },
+      [&](Type type) -> Type { return simplifyType(type)->getRValueType(); },
+      [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
+        return getOverloadChoiceIfAvailable(locator);
+      });
 }
 
 /// Return the implicit access kind for a MemberRefExpr with the
@@ -832,11 +845,9 @@ namespace {
 
       // If we're referring to a member type, it's just a type
       // reference.
-      if (isa<TypeDecl>(member)) {
+      if (auto *TD = dyn_cast<TypeDecl>(member)) {
         Type refType = simplifyType(openedType);
-        auto ref =
-            TypeExpr::createImplicitHack(memberLoc.getBaseNameLoc(),
-                                         refType, context);
+        auto ref = TypeExpr::createForDecl(memberLoc, TD, cs.DC, /*isImplicit=*/false);
         cs.setType(ref, refType);
         auto *result = new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, ref, refType);
@@ -1057,7 +1068,7 @@ namespace {
         }
       }
 
-      return finishApply(apply, memberRef, openedType, locator);
+      return finishApply(apply, openedType, locator, memberLocator);
     }
 
     /// Convert the given literal expression via a protocol pair.
@@ -1113,15 +1124,16 @@ namespace {
     /// \param apply The function application to finish type-checking, which
     /// may be a newly-built expression.
     ///
-    /// \param callee The callee for the function being applied.
-    ///
     /// \param openedType The "opened" type this expression had during
     /// type checking, which will be used to specialize the resulting,
     /// type-checked expression appropriately.
     ///
     /// \param locator The locator for the original expression.
-    Expr *finishApply(ApplyExpr *apply, ConcreteDeclRef callee, Type openedType,
-                      ConstraintLocatorBuilder locator);
+    ///
+    /// \param calleeLocator The locator that identifies the apply's callee.
+    Expr *finishApply(ApplyExpr *apply, Type openedType,
+                      ConstraintLocatorBuilder locator,
+                      ConstraintLocatorBuilder calleeLocator);
 
     // Resolve `@dynamicCallable` applications.
     Expr *finishApplyDynamicCallable(ApplyExpr *apply,
@@ -2390,17 +2402,16 @@ namespace {
 
       // If there was an argument, apply it.
       if (auto arg = expr->getArgument()) {
-        // Find the callee. Note this may be different to the member being
-        // referenced for things like callAsFunction.
+        // Get the callee locator. Note this may be different to the locator for
+        // the member being referenced for things like callAsFunction.
         auto *calleeLoc = cs.getCalleeLocator(exprLoc);
-        auto calleeOverload = solution.getOverloadChoice(calleeLoc);
-        auto callee = resolveConcreteDeclRef(calleeOverload.choice.getDecl(),
-                                             calleeLoc);
+
+        // Build and finish the apply.
         ApplyExpr *apply = CallExpr::create(
             ctx, result, arg, expr->getArgumentLabels(),
             expr->getArgumentLabelLocs(), expr->hasTrailingClosure(),
             /*implicit=*/expr->isImplicit(), Type(), getType);
-        result = finishApply(apply, callee, Type(), exprLoc);
+        result = finishApply(apply, Type(), exprLoc, calleeLoc);
 
         // FIXME: Application could fail, because some of the solutions
         // are not expressible in AST (yet?), like certain tuple-to-tuple
@@ -2579,9 +2590,8 @@ namespace {
       auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
                                                               base);
 
-      return finishApply(call, callee, cs.getType(expr),
-                         ConstraintLocatorBuilder(
-                           cs.getConstraintLocator(expr)));
+      return finishApply(call, cs.getType(expr), cs.getConstraintLocator(expr),
+                         ctorLocator);
     }
 
     Expr *applyMemberRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
@@ -3027,17 +3037,8 @@ namespace {
     Expr *visitApplyExpr(ApplyExpr *expr) {
       auto *calleeLoc = CalleeLocators[expr];
       assert(calleeLoc);
-
-      // Resolve the callee for the application if we have one. Note that we're
-      // using `resolveConcreteDeclRef` instead `solution.resolveLocatorToDecl`
-      // here to benefit from ExprRewriter's cache of concrete refs.
-      ConcreteDeclRef callee;
-      if (auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc)) {
-        auto *decl = overload->choice.getDeclOrNull();
-        callee = resolveConcreteDeclRef(decl, calleeLoc);
-      }
-      return finishApply(expr, callee, cs.getType(expr),
-                         cs.getConstraintLocator(expr));
+      return finishApply(expr, cs.getType(expr), cs.getConstraintLocator(expr),
+                         calleeLoc);
     }
 
     Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
@@ -4593,6 +4594,14 @@ namespace {
       return result;
     }
 
+    const AppliedBuilderTransform *getAppliedBuilderTransform(
+       AnyFunctionRef fn) {
+      auto known = solution.functionBuilderTransformed.find(fn);
+      return known != solution.functionBuilderTransformed.end()
+          ? &known->second
+          : nullptr;
+    }
+
     void finalize() {
       assert(ExprStack.empty());
       assert(OpenedExistentials.empty());
@@ -5764,10 +5773,10 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
   return forceBridgeFromObjectiveC(expr, toType);
 }
 
-static Expr *addImplicitLoadExpr(ConstraintSystem &cs, Expr *expr) {
+Expr *ConstraintSystem::addImplicitLoadExpr(Expr *expr) {
   return TypeChecker::addImplicitLoadExpr(
-      cs.getASTContext(), expr, [&cs](Expr *expr) { return cs.getType(expr); },
-      [&cs](Expr *expr, Type type) { cs.setType(expr, type); });
+      getASTContext(), expr, [this](Expr *expr) { return getType(expr); },
+      [this](Expr *expr, Type type) { setType(expr, type); });
 }
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
@@ -6024,7 +6033,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto fromLValue = cast<LValueType>(desugaredFromType);
     auto toIO = toType->getAs<InOutType>();
     if (!toIO)
-      return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
+      return coerceToType(cs.addImplicitLoadExpr(expr), toType, locator);
 
     // In an 'inout' operator like "i += 1", the operand is converted from
     // an implicit lvalue to an inout argument.
@@ -6465,13 +6474,15 @@ static bool isValidDynamicCallableMethod(FuncDecl *method,
 // Build a reference to a `callAsFunction` method.
 static Expr *buildCallAsFunctionMethodRef(
     ExprRewriter &rewriter, ApplyExpr *apply, SelectedOverload selected,
-    ConstraintLocatorBuilder applyFunctionLoc) {
-  auto *fn = apply->getFn();
+    ConstraintLocator *calleeLoc) {
+  assert(calleeLoc->isLastElement<LocatorPathElt::ImplicitCallAsFunction>());
+  assert(cast<FuncDecl>(selected.choice.getDecl())->isCallAsFunctionMethod());
+
   // Create direct reference to `callAsFunction` method.
+  auto *fn = apply->getFn();
   auto *declRef = rewriter.buildMemberRef(
       fn, /*dotLoc*/ SourceLoc(), selected, DeclNameLoc(fn->getEndLoc()),
-      applyFunctionLoc, applyFunctionLoc, /*implicit*/ true,
-      AccessSemantics::Ordinary);
+      calleeLoc, calleeLoc, /*implicit*/ true, AccessSemantics::Ordinary);
   if (!declRef)
     return nullptr;
   declRef->setImplicit(apply->isImplicit());
@@ -6559,9 +6570,9 @@ ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
   return result;
 }
 
-Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
-                                Type openedType,
-                                ConstraintLocatorBuilder locator) {
+Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
+                                ConstraintLocatorBuilder locator,
+                                ConstraintLocatorBuilder calleeLocator) {
   auto &ctx = cs.getASTContext();
   
   auto fn = apply->getFn();
@@ -6705,7 +6716,24 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
       llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");
     };
 
-  // Resolve `callAsFunction` and `@dynamicCallable` applications.
+  // Resolve the callee for the application if we have one.
+  ConcreteDeclRef callee;
+  auto *calleeLoc = cs.getConstraintLocator(calleeLocator);
+  auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc);
+  if (overload) {
+    auto *decl = overload->choice.getDeclOrNull();
+    callee = resolveConcreteDeclRef(decl, calleeLoc);
+  }
+
+  // If this is an implicit call to a `callAsFunction` method, build the
+  // appropriate member reference.
+  if (cs.getType(fn)->getRValueType()->isCallableNominalType(dc)) {
+    fn = buildCallAsFunctionMethodRef(*this, apply, *overload, calleeLoc);
+    if (!fn)
+      return nullptr;
+  }
+
+  // Resolve a `@dynamicCallable` application.
   auto applyFunctionLoc =
       locator.withPathElement(ConstraintLocator::ApplyFunction);
   if (auto selected = solution.getOverloadChoiceIfAvailable(
@@ -6718,15 +6746,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
       if (isValidDynamicCallableMethod(method, methodType))
         return finishApplyDynamicCallable(
             apply, *selected, method, methodType, applyFunctionLoc);
-
-      // If this is an implicit call to a callAsFunction method, build the
-      // appropriate member reference.
-      if (method->isCallAsFunctionMethod()) {
-        fn = buildCallAsFunctionMethodRef(*this, apply, *selected,
-                                          applyFunctionLoc);
-        if (!fn)
-          return nullptr;
-      }
     }
   }
 
@@ -6854,12 +6873,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
   assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
          ty->isExistentialType() || ty->is<ArchetypeType>());
 
-  // We have the constructor.
-  auto choice = selected->choice;
-
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
-  auto ctorRef = resolveConcreteDeclRef(choice.getDecl(), ctorLocator);
   Expr *declRef = buildMemberRef(fn, /*dotLoc=*/SourceLoc(), *selected,
                                  DeclNameLoc(fn->getEndLoc()), locator,
                                  ctorLocator, /*Implicit=*/true,
@@ -6870,7 +6885,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
   apply->setFn(declRef);
 
   // Tail-recur to actually call the constructor.
-  return finishApply(apply, ctorRef, openedType, locator);
+  return finishApply(apply, openedType, locator, ctorLocator);
 }
 
 // Return the precedence-yielding parent of 'expr', along with the index of
@@ -7034,31 +7049,36 @@ namespace {
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         Rewriter.simplifyExprType(expr);
         auto &cs = Rewriter.getConstraintSystem();
-        auto &ctx = cs.getASTContext();
 
         // Coerce the pattern, in case we resolved something.
         auto fnType = cs.getType(closure)->castTo<FunctionType>();
         auto *params = closure->getParameters();
         TypeChecker::coerceParameterListToType(params, closure, fnType);
 
-        // If this closure had a function builder applied, rewrite it to a
-        // closure with a single expression body containing the builder
-        // invocations.
-        auto builder =
-            Rewriter.solution.builderTransformedClosures.find(closure);
-        if (builder != Rewriter.solution.builderTransformedClosures.end()) {
-          auto singleExpr = builder->second.singleExpr;
-          auto returnStmt = new (ctx) ReturnStmt(
-             singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
-          auto braceStmt = BraceStmt::create(
-              ctx, returnStmt->getStartLoc(), ASTNode(returnStmt),
-              returnStmt->getEndLoc(), /*implicit=*/true);
-          closure->setBody(braceStmt, /*isSingleExpression=*/true);
-        }
+        if (auto transform =
+                       Rewriter.getAppliedBuilderTransform(closure)) {
+          // Apply the function builder to the closure. We want to be in the
+          // context of the closure for subsequent transforms.
+          llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
+          auto newBody = applyFunctionBuilderTransform(
+              Rewriter.solution, *transform, closure->getBody(), closure,
+              [&](Expr *expr) {
+                Expr *result = expr->walk(*this);
+                if (result)
+                  Rewriter.solution.setExprTypes(result);
+                return result;
+              },
+              [&](Expr *expr, Type toType, ConstraintLocator *locator) {
+                return Rewriter.coerceToType(expr, toType, locator);
+              });
+          closure->setBody(newBody, /*isSingleExpression=*/false);
+          closure->setAppliedFunctionBuilder();
 
-        // If this is a single-expression closure, convert the expression
-        // in the body to the result type of the closure.
-        if (closure->hasSingleExpressionBody()) {
+          Rewriter.solution.setExprTypes(closure);
+        } else if (closure->hasSingleExpressionBody()) {
+          // If this is a single-expression closure, convert the expression
+          // in the body to the result type of the closure.
+
           // Enter the context of the closure when type-checking the body.
           llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
           Expr *body = closure->getSingleExpressionBody()->walk(*this);
@@ -7209,15 +7229,14 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
-Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
-                                      Type convertType,
-                                      bool discardedExpr,
-                                      bool skipClosures) {
+Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
+    Solution &solution, SolutionApplicationTarget target,
+    bool performingDiagnostics) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
     if (shouldSuppressDiagnostics())
-      return nullptr;
+      return None;
 
     bool diagnosedErrorsViaFixes = applySolutionFixes(solution);
     // If all of the available fixes would result in a warning,
@@ -7227,26 +7246,54 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         })) {
       // If we already diagnosed any errors via fixes, that's it.
       if (diagnosedErrorsViaFixes)
-        return nullptr;
+        return None;
 
       // If we didn't manage to diagnose anything well, so fall back to
       // diagnosing mining the system to construct a reasonable error message.
-      diagnoseFailureForExpr(expr);
-      return nullptr;
+      diagnoseFailureFor(target);
+      return None;
     }
   }
 
   ExprRewriter rewriter(*this, solution, shouldSuppressDiagnostics());
   ExprWalker walker(rewriter);
 
-  // Apply the solution to the expression.
-  auto result = expr->walk(walker);
-  if (!result)
-    return nullptr;
+  // Apply the solution to the target.
+  SolutionApplicationTarget result = target;
+  if (auto expr = target.getAsExpr()) {
+    Expr *rewrittenExpr = expr->walk(walker);
+    if (!rewrittenExpr)
+      return None;
+
+    result.setExpr(rewrittenExpr);
+  } else {
+    auto fn = *target.getAsFunction();
+
+    // Dig out the function builder transformation we applied.
+    auto transform = rewriter.getAppliedBuilderTransform(fn);
+    assert(transform);
+
+    auto newBody = applyFunctionBuilderTransform(
+        solution, *transform, fn.getBody(), fn.getAsDeclContext(),
+        [&](Expr *expr) {
+          Expr *result = expr->walk(walker);
+          if (result)
+            solution.setExprTypes(result);
+          return result;
+        },
+        [&](Expr *expr, Type toType, ConstraintLocator *locator) {
+          return rewriter.coerceToType(expr, toType, locator);
+        });
+
+    if (!newBody)
+      return None;
+
+    result.setFunctionBody(newBody);
+  }
 
   // If we're re-typechecking an expression for diagnostics, don't
   // visit closures that have non-single expression bodies.
-  if (!skipClosures) {
+  if (!performingDiagnostics) {
     bool hadError = false;
     for (auto *closure : walker.getClosuresToTypeCheck())
       hadError |= TypeChecker::typeCheckClosureBody(closure);
@@ -7261,31 +7308,52 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
     // If any of them failed to type check, bail.
     if (hadError)
-      return nullptr;
+      return None;
   }
 
-  // We are supposed to use contextual type only if it is present and
-  // this expression doesn't represent the implicit return of the single
-  // expression function which got deduced to be `Never`.
-  auto shouldCoerceToContextualType = [&]() {
-    return convertType && !(getType(result)->isUninhabited() &&
-                            getContextualTypePurpose() == CTP_ReturnSingleExpr);
-  };
+  if (auto resultExpr = result.getAsExpr()) {
+    Expr *expr = target.getAsExpr();
+    assert(expr && "Can't have expression result without expression target");
 
-  // If we're supposed to convert the expression to some particular type,
-  // do so now.
-  if (shouldCoerceToContextualType()) {
-    result = rewriter.coerceToType(result, convertType,
-                                   getConstraintLocator(expr));
-    if (!result)
-      return nullptr;
-  } else if (getType(result)->hasLValueType() && !discardedExpr) {
-    // We referenced an lvalue. Load it.
-    result = rewriter.coerceToType(result, getType(result)->getRValueType(),
-                                   getConstraintLocator(expr));
+    // We are supposed to use contextual type only if it is present and
+    // this expression doesn't represent the implicit return of the single
+    // expression function which got deduced to be `Never`.
+    Type convertType = target.getExprConversionType();
+    auto shouldCoerceToContextualType = [&]() {
+      return convertType &&
+          !(getType(resultExpr)->isUninhabited() &&
+            getContextualTypePurpose(target.getAsExpr())
+              == CTP_ReturnSingleExpr);
+    };
+
+    // If we're supposed to convert the expression to some particular type,
+    // do so now.
+    if (shouldCoerceToContextualType()) {
+      resultExpr = rewriter.coerceToType(resultExpr,
+                                         simplifyType(convertType),
+                                         getConstraintLocator(expr));
+    } else if (getType(resultExpr)->hasLValueType() &&
+               !target.isDiscardedExpr()) {
+      // We referenced an lvalue. Load it.
+      resultExpr = rewriter.coerceToType(resultExpr,
+                                         getType(resultExpr)->getRValueType(),
+                                         getConstraintLocator(expr));
+    }
+
+    if (!resultExpr)
+      return None;
+
+    // For an @autoclosure default parameter type, add the autoclosure
+    // conversion.
+    if (FunctionType *autoclosureParamType =
+            target.getAsAutoclosureParamType()) {
+      resultExpr = buildAutoClosureExpr(resultExpr, autoclosureParamType);
+    }
+
+    solution.setExprTypes(resultExpr);
+    result.setExpr(resultExpr);
   }
 
-  solution.setExprTypes(result);
   rewriter.finalize();
 
   return result;
@@ -7349,6 +7417,52 @@ public:
 };
 }
 
+ProtocolConformanceRef Solution::resolveConformance(
+    ConstraintLocator *locator, ProtocolDecl *proto) {
+  for (const auto &conformance : Conformances) {
+    if (conformance.first != locator)
+      continue;
+    if (conformance.second.getRequirement() != proto)
+      continue;
+
+    // If the conformance doesn't require substitution, return it immediately.
+    auto conformanceRef = conformance.second;
+    if (conformanceRef.isAbstract())
+      return conformanceRef;
+
+    auto concrete = conformanceRef.getConcrete();
+    auto conformingType = concrete->getType();
+    if (!conformingType->hasTypeVariable())
+      return conformanceRef;
+
+    // Substitute into the conformance type, then look for a conformance
+    // again.
+    // FIXME: Should be able to perform the substitution using the Solution
+    // itself rather than another conforms-to-protocol check.
+    Type substConformingType = simplifyType(conformingType);
+    return TypeChecker::conformsToProtocol(
+        substConformingType, proto, constraintSystem->DC,
+        ConformanceCheckFlags::InExpression);
+  }
+
+  return ProtocolConformanceRef::forInvalid();
+}
+
+Type Solution::getType(const Expr *expr) const {
+  auto result = llvm::find_if(
+      addedNodeTypes, [&](const std::pair<TypedNode, Type> &node) -> bool {
+        if (auto *e = node.first.dyn_cast<const Expr *>())
+          return expr == e;
+        return false;
+      });
+
+  if (result != addedNodeTypes.end())
+    return result->second;
+
+  auto &cs = getConstraintSystem();
+  return cs.getType(expr);
+}
+
 void Solution::setExprTypes(Expr *expr) const {
   if (!expr)
     return;
@@ -7402,4 +7516,25 @@ Solution &&SolutionResult::takeSolution() && {
 ArrayRef<Solution> SolutionResult::getAmbiguousSolutions() const {
   assert(getKind() == Ambiguous);
   return makeArrayRef(solutions, numSolutions);
+}
+
+MutableArrayRef<Solution> SolutionResult::takeAmbiguousSolutions() && {
+  assert(getKind() == Ambiguous);
+  markAsDiagnosed();
+  return MutableArrayRef<Solution>(solutions, numSolutions);
+}
+
+SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
+  switch (kind) {
+  case Kind::expression: {
+    SolutionApplicationTarget result = *this;
+    result.setExpr(getAsExpr()->walk(walker));
+    return result;
+  }
+
+  case Kind::function:
+    return SolutionApplicationTarget(
+        *getAsFunction(),
+        cast_or_null<BraceStmt>(getFunctionBody()->walk(walker)));
+  }
 }

@@ -65,6 +65,7 @@ namespace swift {
   class EnumElementDecl;
   class CallExpr;
   class KeyPathExpr;
+  class CaptureListExpr;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -283,6 +284,12 @@ protected:
     Discriminator : 16
   );
 
+  SWIFT_INLINE_BITFIELD(AutoClosureExpr, AbstractClosureExpr, 1,
+    /// True if this autoclosure was built for a function conversion, and
+    /// not an actual @autoclosure parameter.
+    IsThunk : 1
+  );
+
   SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
@@ -496,7 +503,7 @@ public:
 
   /// Retrieves the declaration that is being referenced by this
   /// expression, if any.
-  ConcreteDeclRef getReferencedDecl() const;
+  ConcreteDeclRef getReferencedDecl(bool stopAtParenExpr = false) const;
 
   /// Determine whether this expression is 'super', possibly converted to
   /// a base class.
@@ -1042,6 +1049,20 @@ public:
   enum Kind : unsigned {
     File, FilePath, Line, Column, Function, DSOHandle
   };
+
+  static StringRef getKindString(MagicIdentifierLiteralExpr::Kind value) {
+    switch (value) {
+      case File: return "#file";
+      case FilePath: return "#filePath";
+      case Function: return "#function";
+      case Line: return "#line";
+      case Column: return "#column";
+      case DSOHandle: return "#dsohandle";
+    }
+
+    llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in getKindString.");
+  }
+
 private:
   SourceLoc Loc;
   ConcreteDeclRef BuiltinInitializer;
@@ -3582,6 +3603,21 @@ public:
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
 
+  /// The range of the brackets of the capture list, if present.
+  SourceRange BracketRange;
+    
+  /// The (possibly null) VarDecl captured by this closure with the literal name
+  /// "self". In order to recover this information at the time of name lookup,
+  /// we must be able to access it from the associated DeclContext.
+  /// Because the DeclContext inside a closure is the closure itself (and not
+  /// the CaptureListExpr which would normally maintain this sort of
+  /// information about captured variables), we need to have some way to access
+  /// this information directly on the ClosureExpr.
+  ///
+  /// The bit indicates whether this closure has had a function builder
+  /// applied to it.
+  llvm::PointerIntPair<VarDecl *, 1, bool> CapturedSelfDeclAndAppliedBuilder;
+  
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
   
@@ -3598,16 +3634,17 @@ class ClosureExpr : public AbstractClosureExpr {
   /// The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
-  
 public:
-  ClosureExpr(ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
+  ClosureExpr(SourceRange bracketRange, VarDecl *capturedSelfDecl,
+              ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
               SourceLoc inLoc, TypeLoc explicitResultType,
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
+      BracketRange(bracketRange),
+      CapturedSelfDeclAndAppliedBuilder(capturedSelfDecl, false),
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
-      ExplicitResultType(explicitResultType),
-      Body(nullptr) {
+      ExplicitResultType(explicitResultType), Body(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
   }
@@ -3639,6 +3676,8 @@ public:
   /// explicitly-specified result type.
   bool hasExplicitResultType() const { return ArrowLoc.isValid(); }
 
+  /// Retrieve the range of the \c '[' and \c ']' that enclose the capture list.
+  SourceRange getBracketRange() const { return BracketRange; }
   
   /// Retrieve the location of the \c '->' for closures with an
   /// explicit result type.
@@ -3704,6 +3743,24 @@ public:
   /// Is this a completely empty closure?
   bool hasEmptyBody() const;
 
+  /// VarDecl captured by this closure under the literal name \c self , if any.
+  VarDecl *getCapturedSelfDecl() const {
+    return CapturedSelfDeclAndAppliedBuilder.getPointer();
+  }
+  
+  /// Whether this closure captures the \c self param in its body in such a
+  /// way that implicit \c self is enabled within its body (i.e. \c self is
+  /// captured non-weakly).
+  bool capturesSelfEnablingImplictSelf() const;
+
+  bool hasAppliedFunctionBuilder() const {
+    return CapturedSelfDeclAndAppliedBuilder.getInt();
+  }
+
+  void setAppliedFunctionBuilder(bool flag = true) {
+    CapturedSelfDeclAndAppliedBuilder.setInt(flag);
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
   }
@@ -3739,6 +3796,16 @@ public:
                             Discriminator, Parent) {
     if (Body != nullptr)
       setBody(Body);
+
+    Bits.AutoClosureExpr.IsThunk = false;
+  }
+
+  bool isThunk() const {
+    return Bits.AutoClosureExpr.IsThunk;
+  }
+
+  void setIsThunk(bool isThunk) {
+    Bits.AutoClosureExpr.IsThunk = isThunk;
   }
 
   SourceRange getSourceRange() const;
@@ -3778,6 +3845,8 @@ struct CaptureListEntry {
   CaptureListEntry(VarDecl *Var, PatternBindingDecl *Init)
   : Var(Var), Init(Init) {
   }
+
+  bool isSimpleSelfCapture() const;
 };
 
 /// CaptureListExpr - This expression represents the capture list on an explicit
@@ -3882,6 +3951,10 @@ public:
   /// is injected before type checking to act as a placeholder for some
   /// value to be specified later.
   bool isPlaceholder() const { return Bits.OpaqueValueExpr.IsPlaceholder; }
+
+  void setIsPlaceholder(bool value) {
+    Bits.OpaqueValueExpr.IsPlaceholder = value;
+  }
 
   SourceRange getSourceRange() const { return Range; }
 

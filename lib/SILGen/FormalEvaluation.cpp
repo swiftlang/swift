@@ -48,8 +48,7 @@ void FormalAccess::verify(SILGenFunction &SGF) const {
 //===----------------------------------------------------------------------===//
 
 void SharedBorrowFormalAccess::finishImpl(SILGenFunction &SGF) {
-  SGF.B.createEndBorrow(CleanupLocation::get(loc), borrowedValue,
-                        originalValue);
+  SGF.B.createEndBorrow(CleanupLocation::get(loc), borrowedValue);
 }
 
 //===----------------------------------------------------------------------===//

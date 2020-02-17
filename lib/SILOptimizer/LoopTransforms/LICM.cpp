@@ -991,7 +991,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
   }
 
   // In case the value is only stored but never loaded in the loop.
-  recursivelyDeleteTriviallyDeadInstructions(initialLoad);
+  eliminateDeadInstruction(initialLoad);
 }
 
 bool LoopTreeOptimization::hoistAllLoadsAndStores(SILLoop *loop) {

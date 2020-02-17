@@ -50,6 +50,7 @@ namespace syntax {
 
 namespace ide {
   class CodeCompletionCache;
+  class CompletionInstance;
   class OnDiskCodeCompletionCache;
   class SourceEditConsumer;
   enum class CodeCompletionDeclKind;
@@ -294,6 +295,7 @@ class SwiftLangSupport : public LangSupport {
   ThreadSafeRefCntPtr<SwiftCustomCompletions> CustomCompletions;
   std::shared_ptr<SwiftStatistics> Stats;
   llvm::StringMap<std::unique_ptr<FileSystemProvider>> FileSystemProviders;
+  std::shared_ptr<swift::ide::CompletionInstance> CompletionInst;
 
 public:
   explicit SwiftLangSupport(SourceKit::Context &SKCtx);
@@ -311,6 +313,10 @@ public:
   SwiftInterfaceGenMap &getIFaceGenContexts() { return IFaceGenContexts; }
   IntrusiveRefCntPtr<SwiftCompletionCache> getCodeCompletionCache() {
     return CCCache;
+  }
+
+  std::shared_ptr<swift::ide::CompletionInstance> getCompletionInstance() {
+    return CompletionInst;
   }
 
   /// Returns the FileSystemProvider registered under Name, or nullptr if not
@@ -341,13 +347,6 @@ public:
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
   getFileSystem(const Optional<VFSOptions> &vfsOptions,
                 Optional<StringRef> primaryFile, std::string &error);
-
-  /// Copy a memory buffer inserting '0' at the position of \c origBuf.
-  // TODO: Share with code completion.
-  static std::unique_ptr<llvm::MemoryBuffer>
-  makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
-                                 unsigned &Offset,
-                                 const std::string bufferIdentifier);
 
   static SourceKit::UIdent getUIDForDecl(const swift::Decl *D,
                                          bool IsRef = false);
@@ -437,6 +436,16 @@ public:
   /// returns the original path;
   static std::string resolvePathSymlinks(StringRef FilePath);
 
+  /// Perform a completion like operation. It initializes a \c CompilerInstance,
+  /// the calls \p Callback with it. \p Callback must perform the second pass
+  /// using that instance.
+  bool performCompletionLikeOperation(
+      llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
+      ArrayRef<const char *> Args,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      bool EnableASTCaching, std::string &Error,
+      llvm::function_ref<void(swift::CompilerInstance &)> Callback);
+
   //==========================================================================//
   // LangSupport Interface
   //==========================================================================//
@@ -446,6 +455,7 @@ public:
 
   void codeComplete(
       llvm::MemoryBuffer *InputBuf, unsigned Offset,
+      OptionsDictionary *options,
       SourceKit::CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
       Optional<VFSOptions> vfsOptions) override;
 
@@ -585,12 +595,14 @@ public:
 
   void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf, unsigned Offset,
                                 ArrayRef<const char *> Args,
-                                TypeContextInfoConsumer &Consumer) override;
+                                TypeContextInfoConsumer &Consumer,
+                                Optional<VFSOptions> vfsOptions) override;
 
   void getConformingMethodList(llvm::MemoryBuffer *inputBuf, unsigned Offset,
                                ArrayRef<const char *> Args,
                                ArrayRef<const char *> ExpectedTypes,
-                               ConformingMethodListConsumer &Consumer) override;
+                               ConformingMethodListConsumer &Consumer,
+                               Optional<VFSOptions> vfsOptions) override;
 
   void getStatistics(StatisticsReceiver) override;
 

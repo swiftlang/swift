@@ -403,6 +403,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (Opts.parseArgs(Args.slice(0, Optargc)))
     return 1;
 
+  if (!Opts.ModuleCachePath.empty())
+    InitOpts.ModuleCachePath = Opts.ModuleCachePath;
+
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
 
@@ -515,6 +518,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
       ByteOffset;
   }
 
+  bool compilerArgsAreClang = false;
+
   sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
                                                                  nullptr, 0);
   ActiveRequest = Opts.Request;
@@ -573,6 +578,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::CodeComplete:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCodeComplete);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    addCodeCompleteOptions(Req, Opts);
     break;
 
   case SourceKitRequest::CodeCompleteOpen:
@@ -881,6 +888,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     } else {
       if (Opts.UsingSwiftArgs)
           sourcekitd_request_dictionary_set_int64(Req, KeyUsingSwiftArgs, true);
+      else
+        compilerArgsAreClang = true;
       sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                             RequestEditorOpenHeaderInterface);
     }
@@ -970,10 +979,28 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   if (Opts.SourceText) {
     sourcekitd_request_dictionary_set_string(Req, KeySourceText,
                                              Opts.SourceText->c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeySourceFile,
+                                             SemaName.c_str());
   }
 
   if (!Opts.CompilerArgs.empty()) {
     sourcekitd_object_t Args = sourcekitd_request_array_create(nullptr, 0);
+    if (!Opts.ModuleCachePath.empty()) {
+      if (compilerArgsAreClang) {
+        // We need -fmodules or else the clang argument parsing does not honour
+        // -fmodules-cache-path. In reality, the swift ClangImporter will always
+        // enable modules when importing, so this should only impact the
+        // clang argument parsing. This is needed even if the header doesn't
+        // use modules, since Swift itself will import its shims module, and
+        // that needs to honour the -module-cache-path option when testing.
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, "-fmodules");
+        std::string opt = "-fmodules-cache-path=" + Opts.ModuleCachePath;
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, opt.c_str());
+      } else {
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, "-module-cache-path");
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Opts.ModuleCachePath.c_str());
+      }
+    }
     for (auto Arg : Opts.CompilerArgs)
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Arg);
     sourcekitd_request_dictionary_set_value(Req, KeyCompilerArgs, Args);

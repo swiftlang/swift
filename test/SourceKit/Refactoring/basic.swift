@@ -152,4 +152,4 @@ func foo7() -> String {
 
 // CHECK-LOCALIZE-STRING: source.refactoring.kind.localize.string
 
-// REQUIRES-ANY: OS=macosx, OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu

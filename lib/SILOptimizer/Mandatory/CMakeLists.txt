@@ -13,7 +13,6 @@ silopt_register_sources(
   DiagnoseUnreachable.cpp
   GuaranteedARCOpts.cpp
   IRGenPrepare.cpp
-  MarkUninitializedFixup.cpp
   MandatoryInlining.cpp
   PredictableMemOpt.cpp
   PMOMemoryUseCollector.cpp

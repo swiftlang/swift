@@ -210,7 +210,9 @@ TEST(ArithmeticEvaluator, Simple) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags);
+  Evaluator evaluator(diags,
+                      /*debugDumpCycles=*/false,
+                      /*buildDependencyGraph=*/true);
   evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);
 
@@ -333,7 +335,9 @@ TEST(ArithmeticEvaluator, Cycle) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags);
+  Evaluator evaluator(diags,
+                      /*debugDumpCycles=*/false,
+                      /*buildDependencyGraph=*/false);
   evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);
 

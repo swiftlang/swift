@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 
 using namespace swift;
@@ -65,4 +67,47 @@ void autodiff::getSubsetParameterTypes(IndexSubset *subset,
       if (subset->contains(parameterIndexOffset + paramIndex))
         results.push_back(curryLevel->getParams()[paramIndex].getOldType());
   }
+}
+
+GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
+    SILFunctionType *originalFnTy, IndexSubset *diffParamIndices,
+    GenericSignature derivativeGenSig) {
+  if (!derivativeGenSig)
+    derivativeGenSig = originalFnTy->getSubstGenericSignature();
+  if (!derivativeGenSig)
+    return nullptr;
+  // Constrain all differentiability parameters to `Differentiable`.
+  auto &ctx = originalFnTy->getASTContext();
+  auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+  SmallVector<Requirement, 4> requirements;
+  for (unsigned paramIdx : diffParamIndices->getIndices()) {
+    auto paramType = originalFnTy->getParameters()[paramIdx].getInterfaceType();
+    Requirement req(RequirementKind::Conformance, paramType,
+                    diffableProto->getDeclaredType());
+    requirements.push_back(req);
+  }
+  return evaluateOrDefault(
+      ctx.evaluator,
+      AbstractGenericSignatureRequest{derivativeGenSig.getPointer(),
+                                      /*addedGenericParams*/ {},
+                                      std::move(requirements)},
+      nullptr);
+}
+
+Type TangentSpace::getType() const {
+  switch (kind) {
+  case Kind::TangentVector:
+    return value.tangentVectorType;
+  case Kind::Tuple:
+    return value.tupleType;
+  }
+}
+
+CanType TangentSpace::getCanonicalType() const {
+  return getType()->getCanonicalType();
+}
+
+NominalTypeDecl *TangentSpace::getNominal() const {
+  assert(isTangentVector());
+  return getTangentVector()->getNominalOrBoundGenericNominal();
 }

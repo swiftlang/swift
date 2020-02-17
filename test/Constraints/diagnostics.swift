@@ -146,7 +146,7 @@ func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 @available(*, unavailable, message: "call the 'map()' method on the sequence")
-public func myMap<C : Collection, T>( // expected-note {{in call to function 'myMap'}}
+public func myMap<C : Collection, T>(
   _ source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")
@@ -159,7 +159,7 @@ public func myMap<T, U>(_ x: T?, _ f: (T) -> U) -> U? {
 
 // <rdar://problem/20142523>
 func rdar20142523() {
-  myMap(0..<10, { x in // expected-error{{generic parameter 'T' could not be inferred}}
+  myMap(0..<10, { x in // expected-error{{unable to infer complex closure return type; add explicit type to disambiguate}} {{21-21=-> <#Result#> }}
     ()
     return x
   })
@@ -288,7 +288,7 @@ func r18800223(_ i : Int) {
 
   
   var buttonTextColor: String?
-  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{unable to infer closure type in the current context}}
+  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '(_) -> _'}}
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
@@ -492,7 +492,9 @@ enum Color {
   static func rainbow() -> Color {}
   
   static func overload(a : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(a:)')}}
+  // expected-note@-1 {{candidate has partially matching parameter list (a: Int)}}
   static func overload(b : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(b:)')}}
+  // expected-note@-1 {{candidate has partially matching parameter list (b: Int)}}
   
   static func frob(_ a : Int, b : inout Int) -> Color {}
   static var svar: Color { return .Red }
@@ -517,8 +519,7 @@ let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of t
 let _ : Color = .rainbow  // expected-error {{member 'rainbow()' is a function; did you mean to call it?}} {{25-25=()}}
 
 let _: Color = .overload(a : 1.0)  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-let _: Color = .overload(1.0)  // expected-error {{ambiguous reference to member 'overload'}}
-// expected-note @-1 {{overloads for 'overload' exist with these partially matching parameter lists: (a: Int), (b: Int)}}
+let _: Color = .overload(1.0)  // expected-error {{no exact matches in call to static method 'overload'}}
 let _: Color = .overload(1)  // expected-error {{no exact matches in call to static method 'overload'}}
 let _: Color = .frob(1.0, &i) // expected-error {{missing argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
@@ -529,8 +530,8 @@ let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' t
 let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
-someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
+var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'?}}
+someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'?}}
 someColor = .svar() // expected-error {{cannot call value of non-function type 'Color'}}
 someColor = .svar(1) // expected-error {{cannot call value of non-function type 'Color'}}
 
@@ -1270,7 +1271,7 @@ func badTypes() {
 // rdar://34357545
 func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
-  // expected-error@-1 {{expression type 'Bool' is ambiguous without more context}}
+  // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
 }
 
 func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}

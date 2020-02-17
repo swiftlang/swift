@@ -94,6 +94,7 @@ struct TestOptions {
   std::string CachePath;
   llvm::SmallVector<std::string, 4> RequestOptions;
   llvm::ArrayRef<const char *> CompilerArgs;
+  std::string ModuleCachePath;
   bool UsingSwiftArgs;
   std::string USR;
   std::string SwiftName;

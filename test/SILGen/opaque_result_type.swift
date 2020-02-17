@@ -149,3 +149,19 @@ struct S2 : X {
     return foo
   }
 }
+
+class Base {}
+class Sub1 : Base {}
+class Sub2 : Base {}
+
+public class D {
+   var cond = true
+   // CHECK-LABEL: sil private [ossa] @$s18opaque_result_type1DC1c33_C2C55A4BAF30C3244D4A165D48A91142LLQrvg
+   // CHECK: bb3([[RET:%[0-9]+]] : @owned $Base):
+   // CHECH:  return [[RET]]
+   // CHECK: } // end sil function '$s18opaque_result_type1DC1c33_C2C55A4BAF30C3244D4A165D48A91142LLQrvg'
+   private lazy var c: some Base = {
+        let d = cond ? Sub1() : Sub2()
+        return d
+    }()
+}

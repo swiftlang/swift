@@ -89,7 +89,7 @@ protected:
 
 public:
   void operator=(const SILArgument &) = delete;
-  void operator delete(void *, size_t) SWIFT_DELETE_OPERATOR_DELETED;
+  void operator delete(void *, size_t) = delete;
 
   ValueOwnershipKind getOwnershipKind() const {
     return static_cast<ValueOwnershipKind>(Bits.SILArgument.VOKind);
@@ -172,6 +172,10 @@ public:
   /// argument value. E.g. the incoming value for a switch_enum payload argument
   /// is the enum itself (the operand of the switch_enum).
   SILValue getSingleTerminatorOperand() const;
+
+  /// If this SILArgument's parent block has a single predecessor whose
+  /// terminator has a single operand, return that terminator.
+  TermInst *getSingleTerminator() const;
 
   /// Return the SILArgumentKind of this argument.
   SILArgumentKind getKind() const {
@@ -263,6 +267,10 @@ public:
   /// argument value. E.g. the incoming value for a switch_enum payload argument
   /// is the enum itself (the operand of the switch_enum).
   SILValue getSingleTerminatorOperand() const;
+
+  /// If this SILArgument's parent block has a single predecessor whose
+  /// terminator has a single operand, return that terminator.
+  TermInst *getSingleTerminator() const;
 
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
@@ -399,6 +407,16 @@ inline bool SILArgument::getSingleTerminatorOperands(
         returnedSingleTermOperands);
   case SILArgumentKind::SILFunctionArgument:
     return false;
+  }
+  llvm_unreachable("Covered switch is not covered?!");
+}
+
+inline TermInst *SILArgument::getSingleTerminator() const {
+  switch (getKind()) {
+  case SILArgumentKind::SILPhiArgument:
+    return cast<SILPhiArgument>(this)->getSingleTerminator();
+  case SILArgumentKind::SILFunctionArgument:
+    return nullptr;
   }
   llvm_unreachable("Covered switch is not covered?!");
 }

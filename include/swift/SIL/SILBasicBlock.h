@@ -54,7 +54,7 @@ private:
   SILBasicBlock() : Parent(nullptr) {}
   void operator=(const SILBasicBlock &) = delete;
 
-  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
+  void operator delete(void *Ptr, size_t) = delete;
 
   SILBasicBlock(SILFunction *F, SILBasicBlock *relativeToBB, bool after);
 
