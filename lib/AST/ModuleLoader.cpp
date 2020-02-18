@@ -97,34 +97,51 @@ void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
 
   auto &langOpts = module->getASTContext().LangOpts;
 
-  SmallString<64> dirPath{file->getModuleDefiningPath()};
+  // This method constructs several paths to directories near the module and
+  // scans them for .swiftoverlay files. These paths can be in various
+  // directories and have a few different filenames at the end, but I'll
+  // illustrate the path transformations by showing examples for a module
+  // defined by a swiftinterface at:
+  //
+  // /usr/lib/swift/FooKit.swiftmodule/x86_64-apple-macos.swiftinterface
 
+  // dirPath = /usr/lib/swift/FooKit.swiftmodule
+  SmallString<64> dirPath{file->getModuleDefiningPath()};
   if (dirPath.empty())
     return;
+
+  // dirPath = /usr/lib/swift/
   path::remove_filename(dirPath);
 
-  // <parent-dir>/<module-name>.swiftcrossimport
+  // dirPath = /usr/lib/swift/FooKit.swiftcrossimport
   path::append(dirPath, file->getExportedModuleName());
   path::replace_extension(dirPath, getExtension(TY_SwiftCrossImportDir));
+
+  // Search for swiftoverlays that apply to all platforms.
   if (!findOverlayFilesInDirectory(diagLoc, dirPath, module, dependencyTracker))
     // If we diagnosed an error, or we didn't find the directory at all, don't
     // bother trying the target-specific directories.
     return;
 
-  // <parent-dir>/<module-name>.swiftcrossimport/<target-module-triple>
+  // dirPath = /usr/lib/swift/FooKit.swiftcrossimport/x86_64-apple-macos
   auto moduleTriple = getTargetSpecificModuleTriple(langOpts.Target);
   path::append(dirPath, moduleTriple.str());
+
+  // Search for swiftoverlays specific to the target triple's platform.
   findOverlayFilesInDirectory(diagLoc, dirPath, module, dependencyTracker);
 
+  // The rest of this handles target variant triples, which are only used for
+  // certain MacCatalyst builds.
   if (!langOpts.TargetVariant)
     return;
 
+  // dirPath = /usr/lib/swift/FooKit.swiftcrossimport/x86_64-apple-ios-macabi
   path::remove_filename(dirPath);
-
-  // <parent-dir>/<module-name>.swiftcrossimport/<targetvariant-module-triple>
   auto moduleVariantTriple =
       getTargetSpecificModuleTriple(*langOpts.TargetVariant);
   path::append(dirPath, moduleVariantTriple.str());
+
+  // Search for swiftoverlays specific to the target variant's platform.
   findOverlayFilesInDirectory(diagLoc, dirPath, module, dependencyTracker);
 }
 

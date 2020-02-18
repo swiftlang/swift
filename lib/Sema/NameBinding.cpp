@@ -594,8 +594,9 @@ void UnboundImport::diagnoseInvalidAttr(DeclAttrKind attrKind,
 BoundImport::BoundImport(UnboundImport unbound, ImportedModuleDesc desc,
                          ModuleDecl *module, bool needsScopeValidation)
   : unbound(unbound), desc(desc), module(module),
-    needsScopeValidation(needsScopeValidation)
-{ }
+    needsScopeValidation(needsScopeValidation) {
+  assert(module && "Can't have an import bound to nothing");
+}
 
 void NameBinder::finishImports(SmallVectorImpl<ImportedModuleDesc> &imports) {
   for (auto &unvalidated : unvalidatedImports) {
@@ -673,11 +674,6 @@ static const char *getImportKindString(ImportKind kind) {
 void BoundImport::validateScope(SourceFile &SF) {
   if (unbound.importKind.Item == ImportKind::Module || !needsScopeValidation)
     return;
-
-  // Per getTopLevelModule(), topLevelModule should only be nullptr if we are
-  // importing a submodule, and we should never do a scoped import of a
-  // submodule.
-//  assert(topLevelModule && "scoped import of a submodule import?");
 
   ASTContext &ctx = SF.getASTContext();
 
@@ -797,6 +793,21 @@ UnboundImport::UnboundImport(ASTContext &ctx,
 }
 
 void NameBinder::crossImport(ModuleDecl *M, UnboundImport &I) {
+  // FIXME: There is a fundamental problem with this find-as-we-go approach:
+  // The '@_exported import'-ed modules in this module's other files should be
+  // taken into account, but they haven't been bound yet, and binding them would
+  // require cross-importing. Chicken, meet egg.
+  //
+  // The way to fix this is probably to restructure name binding so we first
+  // bind all exported imports in all files, then bind all other imports in each
+  // file. This may become simpler if we bind all ImportDecls before we start
+  // computing cross-imports, but I haven't figured that part out yet.
+  //
+  // Fixing this is tracked within Apple by rdar://problem/59527118. I haven't
+  // filed an SR because I plan to address it myself, but if this comment is
+  // still here in April 2020 without an SR number, please file a Swift bug and
+  // harass @brentdax to fill in the details.
+
   if (!SF.shouldCrossImport())
     return;
 

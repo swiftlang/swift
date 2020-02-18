@@ -205,7 +205,6 @@ private:
 
   SmallVector<FileUnit *, 2> Files;
 
-  friend OverlayFile;
   llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
     declaredCrossImports;
 
@@ -268,7 +267,7 @@ public:
   /// reverse the positions of the two modules involved in the cross-import.
   void findDeclaredCrossImportOverlays(
       Identifier bystanderName, SmallVectorImpl<Identifier> &overlayNames,
-      SourceLoc diagLoc);
+      SourceLoc diagLoc) const;
 
   /// Get the list of all modules this module declares a cross-import with.
   void getDeclaredCrossImportBystanders(

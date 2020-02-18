@@ -1464,19 +1464,18 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
 namespace swift {
 /// Represents a file containing information about cross-module overlays.
 class OverlayFile {
-  /// If not empty, contains the name of the cross-import file that must be
-  /// loaded; \c overlayModuleNames is not valid and must be empty.
-  ///
-  /// If empty, \c overlayModuleNames is valid and will contain the list of
-  /// module names unless loading the file failed.
+  /// The file that data should be loaded from.
   StringRef filePath;
 
   /// The list of module names; empty if loading failed.
   llvm::TinyPtrVector<Identifier> overlayModuleNames;
 
+  enum class State { pending, loaded, failed };
+  State state = State::pending;
+
   /// Actually loads the overlay module name list. This should mutate
   /// \c overlayModuleNames, but not \c filePath.
-  void loadOverlayModuleNames(ModuleDecl *M, SourceLoc diagLoc,
+  bool loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
                               Identifier bystandingModule);
 
 public:
@@ -1487,8 +1486,7 @@ public:
     return ctx.Allocate(bytes, alignment);
   }
 
-  OverlayFile(StringRef filePath)
-    : filePath(filePath), overlayModuleNames() { }
+  OverlayFile(StringRef filePath) : filePath(filePath) { }
 
   /// Returns the list of additional modules that should be imported if both
   /// the primary and secondary modules have been imported. This may load a
@@ -1497,13 +1495,12 @@ public:
   ///
   /// The result can be empty, either because of an error or because the file
   /// didn't contain any overlay module names.
-  ArrayRef<Identifier> getOverlayModuleNames(ModuleDecl *M, SourceLoc diagLoc,
+  ArrayRef<Identifier> getOverlayModuleNames(const ModuleDecl *M,
+                                             SourceLoc diagLoc,
                                              Identifier bystandingModule) {
-    if (!filePath.empty()) {
-      assert(overlayModuleNames.empty()
-             && "cross-import list can't be full before loading");
-      loadOverlayModuleNames(M, diagLoc, bystandingModule);
-      filePath = "";
+    if (state == State::pending) {
+      state = loadOverlayModuleNames(M, diagLoc, bystandingModule)
+            ? State::loaded : State::failed;
     }
     return overlayModuleNames;
   }
@@ -1521,12 +1518,12 @@ void ModuleDecl::addCrossImportOverlayFile(StringRef file) {
 void ModuleDecl::
 findDeclaredCrossImportOverlays(Identifier bystanderName,
                                 SmallVectorImpl<Identifier> &overlayNames,
-                                SourceLoc diagLoc) {
+                                SourceLoc diagLoc) const {
   if (getName() == bystanderName)
     // We don't currently support self-cross-imports.
     return;
 
-  for (auto &crossImportFile : declaredCrossImports[bystanderName])
+  for (auto &crossImportFile : declaredCrossImports.lookup(bystanderName))
     llvm::copy(crossImportFile->getOverlayModuleNames(this, diagLoc,
                                                       bystanderName),
                std::back_inserter(overlayNames));
@@ -1602,8 +1599,9 @@ OverlayFileContents::load(std::unique_ptr<llvm::MemoryBuffer> input,
   return contents;
 }
 
-void OverlayFile::loadOverlayModuleNames(ModuleDecl *M, SourceLoc diagLoc,
-                                         Identifier bystanderName) {
+bool
+OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
+                                    Identifier bystanderName) {
   assert(!filePath.empty());
 
   auto &ctx = M->getASTContext();
@@ -1611,11 +1609,10 @@ void OverlayFile::loadOverlayModuleNames(ModuleDecl *M, SourceLoc diagLoc,
 
   auto bufOrError = fs.getBufferForFile(filePath);
   if (!bufOrError) {
-    M->getASTContext().Diags
-        .diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
-                  M->getName(), bystanderName, bufOrError.getError().message(),
-                  filePath);
-    return;
+    ctx.Diags.diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
+                       M->getName(), bystanderName,
+                       bufOrError.getError().message(), filePath);
+    return false;
   }
 
   SmallVector<std::string, 4> errorMessages;
@@ -1626,10 +1623,9 @@ void OverlayFile::loadOverlayModuleNames(ModuleDecl *M, SourceLoc diagLoc,
       errorMessages.push_back(contentsOrErr.getError().message());
 
     for (auto message : errorMessages)
-      M->getASTContext().Diags
-          .diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
-                    M->getName(), bystanderName, message, filePath);
-    return;
+      ctx.Diags.diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
+                         M->getName(), bystanderName, message, filePath);
+    return false;
   }
 
   auto contents = std::move(*contentsOrErr);
@@ -1638,6 +1634,8 @@ void OverlayFile::loadOverlayModuleNames(ModuleDecl *M, SourceLoc diagLoc,
     auto moduleIdent = ctx.getIdentifier(module.name);
     overlayModuleNames.push_back(moduleIdent);
   }
+
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
