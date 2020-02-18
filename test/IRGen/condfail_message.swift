@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -g -Xllvm -enable-trap-debug-info -emit-ir | %FileCheck %s
-// RUN: %target-swift-frontend -primary-file %s -g -Xllvm -enable-trap-debug-info -O -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -g -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -g -O -emit-ir | %FileCheck %s
 // REQUIRES: optimized_stdlib
 
 // CHECK-LABEL: define hidden swiftcc i8 @"$s16condfail_message6testitys4Int8VADF"(i8 %0)
