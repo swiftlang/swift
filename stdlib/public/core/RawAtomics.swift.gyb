@@ -18,20 +18,23 @@
       ('acquiring',              'Acquiring',              'acquiring',               'acquire',   'acquire'),
       ('releasing',              'Releasing',              'releasing',               'release',   'monotonic'),
       ('acquiringAndReleasing',  'AcquiringAndReleasing',  'acquiring-and-releasing', 'acqrel',    'acquire'),
+      ('sequentiallyConsistent', '',                       'sequentially consistent', 'seqcst',    'seqcst'),
     ]
 
   def loadOrderings():
     return [
-      # Swift enum case,         API name,    doc name,     llvm name
-      ('relaxed',                'Relaxed',   'relaxed',    'monotonic'),
-      ('acquiring',              'Acquiring', 'acquiring',  'acquire'),
+      # Swift enum case,         API name,    doc name,                  llvm name
+      ('relaxed',                'Relaxed',   'relaxed',                 'monotonic'),
+      ('acquiring',              'Acquiring', 'acquiring',               'acquire'),
+      ('sequentiallyConsistent', '',          'sequentially consistent', 'seqcst'),
     ]
 
   def storeOrderings():
     return [
-      # Swift enum case,         API name,    doc name,     llvm name
-      ('relaxed',                'Relaxed',   'relaxed',    'monotonic'),
-      ('releasing',              'Releasing', 'releasing',  'release'),
+      # Swift enum case,         API name,    doc name,                  llvm name
+      ('relaxed',                'Relaxed',   'relaxed',                 'monotonic'),
+      ('releasing',              'Releasing', 'releasing',               'release'),
+      ('sequentiallyConsistent', '',          'sequentially consistent', 'seqcst'),
     ]
 
   integerOperations = [
@@ -80,8 +83,10 @@ extension UnsafeMutableRawPointer {
     switch ordering {
     case .relaxed:
       return _atomicRelaxedLoadWord()
-    default:
+    case .acquiring:
       return _atomicAcquiringLoadWord()
+    default:
+      return _atomicLoadWord()
     }
   }
 }
@@ -121,8 +126,10 @@ extension UnsafeMutableRawPointer {
     switch ordering {
     case .relaxed:
       _atomicRelaxedStoreWord(desired)
-    default:
+    case .releasing:
       _atomicReleasingStoreWord(desired)
+    default:
+      _atomicStoreWord(desired)
     }
   }
 }
@@ -171,8 +178,10 @@ extension UnsafeMutableRawPointer {
       return _atomicAcquiringExchangeWord(desired)
     case .releasing:
       return _atomicReleasingExchangeWord(desired)
-    default:
+    case .acquiringAndReleasing:
       return _atomicAcquiringAndReleasingExchangeWord(desired)
+    default:
+      return _atomicExchangeWord(desired)
     }
   }
 }
@@ -259,8 +268,12 @@ extension UnsafeMutableRawPointer {
       return _atomicReleasingCompareExchangeWord(
         expected: &expected,
         desired: desired)
-    default:
+    case .acquiringAndReleasing:
       return _atomicAcquiringAndReleasingCompareExchangeWord(
+        expected: &expected,
+        desired: desired)
+    default:
+      return _atomicCompareExchangeWord(
         expected: &expected,
         desired: desired)
     }
@@ -326,8 +339,10 @@ extension UnsafeMutableRawPointer {
       return _atomicAcquiringLoadThen${swiftName}Word(${argLabel(label)}operand)
     case .releasing:
       return _atomicReleasingLoadThen${swiftName}Word(${argLabel(label)}operand)
-    default:
+    case .acquiringAndReleasing:
       return _atomicAcquiringAndReleasingLoadThen${swiftName}Word(${argLabel(label)}operand)
+    default:
+      return _atomicLoadThen${swiftName}Word(${argLabel(label)}operand)
     }
   }
 % end

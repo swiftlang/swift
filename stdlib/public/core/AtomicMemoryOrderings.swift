@@ -43,6 +43,11 @@ extension AtomicLoadOrdering {
   public static var acquiring: AtomicLoadOrdering {
     AtomicLoadOrdering(_rawValue: 1)
   }
+
+  @_transparent // Debug performance
+  public static var sequentiallyConsistent: AtomicLoadOrdering {
+    AtomicLoadOrdering(_rawValue: 4)
+  }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -70,6 +75,7 @@ extension AtomicLoadOrdering: CustomStringConvertible {
     switch self {
     case .relaxed: return "relaxed"
     case .acquiring: return "acquiring"
+    case .sequentiallyConsistent: return "sequentiallyConsistent"
     default: return "AtomicLoadOrdering(\(_rawValue))"
     }
   }
@@ -110,6 +116,11 @@ extension AtomicStoreOrdering {
   public static var releasing: AtomicStoreOrdering {
     AtomicStoreOrdering(_rawValue: 2)
   }
+
+  @_transparent // Debug performance
+  public static var sequentiallyConsistent: AtomicStoreOrdering {
+    AtomicStoreOrdering(_rawValue: 4)
+  }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -137,6 +148,7 @@ extension AtomicStoreOrdering: CustomStringConvertible {
     switch self {
     case .relaxed: return "relaxed"
     case .releasing: return "releasing"
+    case .sequentiallyConsistent: return "sequentiallyConsistent"
     default: return "AtomicStoreOrdering(\(_rawValue))"
     }
   }
@@ -195,6 +207,11 @@ extension AtomicUpdateOrdering {
   public static var acquiringAndReleasing: AtomicUpdateOrdering {
     AtomicUpdateOrdering(_rawValue: 3)
   }
+
+  @_transparent // Debug performance
+  public static var sequentiallyConsistent: AtomicUpdateOrdering {
+    AtomicUpdateOrdering(_rawValue: 4)
+  }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -224,6 +241,7 @@ extension AtomicUpdateOrdering: CustomStringConvertible {
     case .acquiring: return "acquiring"
     case .releasing: return "releasing"
     case .acquiringAndReleasing: return "acquiringAndReleasing"
+    case .sequentiallyConsistent: return "sequentiallyConsistent"
     default: return "AtomicUpdateOrdering(\(_rawValue))"
     }
   }
