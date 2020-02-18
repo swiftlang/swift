@@ -496,6 +496,4 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF) {
 
     TypeChecker::contextualizeTopLevelCode(TLCD);
   }
-
-  SF.clearLookupCache();
 }
