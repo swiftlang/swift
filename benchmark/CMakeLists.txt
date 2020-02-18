@@ -62,6 +62,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Combos
     single-source/DataBenchmarks
     single-source/DeadArray
+    single-source/DevirtualizeProtocolComposition
     single-source/DictOfArraysToArrayOfDicts
     single-source/DictTest
     single-source/DictTest2
