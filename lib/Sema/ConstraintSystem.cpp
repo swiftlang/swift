@@ -4271,3 +4271,44 @@ bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
     return false;
   }
 }
+
+/// Given a specific expression and the remnants of the failed constraint
+/// system, produce a specific diagnostic.
+///
+/// This is guaranteed to always emit an error message.
+///
+void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
+  setPhase(ConstraintSystemPhase::Diagnostics);
+
+  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
+
+  auto &DE = getASTContext().Diags;
+  if (auto expr = target.getAsExpr()) {
+    if (auto *assignment = dyn_cast<AssignExpr>(expr)) {
+      if (isa<DiscardAssignmentExpr>(assignment->getDest()))
+        expr = assignment->getSrc();
+    }
+
+    // Look through RebindSelfInConstructorExpr to avoid weird Sema issues.
+    if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
+      expr = RB->getSubExpr();
+
+    // Unresolved/Anonymous ClosureExprs are common enough that we should give
+    // them tailored diagnostics.
+    if (auto *closure = dyn_cast<ClosureExpr>(expr->getValueProvidingExpr())) {
+      DE.diagnose(closure->getLoc(), diag::cannot_infer_closure_type)
+        .highlight(closure->getSourceRange());
+      return;
+    }
+
+    // If no one could find a problem with this expression or constraint system,
+    // then it must be well-formed... but is ambiguous.  Handle this by
+    // diagnostic various cases that come up.
+    DE.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous)
+        .highlight(expr->getSourceRange());
+  } else {
+    // Emit a poor fallback message.
+    DE.diagnose(target.getAsFunction()->getLoc(),
+                diag::failed_to_produce_diagnostic);
+  }
+}

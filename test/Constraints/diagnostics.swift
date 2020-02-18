@@ -255,7 +255,8 @@ struct Toe {
   let toenail: Nail // expected-error {{use of undeclared type 'Nail'}}
 
   func clip() {
-    toenail.inspect { x in
+    // TODO(diagnostics): Solver should stop once it has detected that `toenail` doesn't exist and report that.
+    toenail.inspect { x in // expected-error {{type of expression is ambiguous without more context}}
       toenail.inspect { y in }
     }
   }

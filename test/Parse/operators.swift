@@ -91,7 +91,7 @@ postfix func ^ (x: Man) -> () -> God {
 // TODO(diagnostics): This is ambiguous operator use because if solver attempted postfix version of the operator `^`
 // it could have found a solution, with infix one nothing matches - neither argument nor contextual type. It should
 // be possible to find a way to diagnose operator use here instead of type ambiguity...
-var _ : God = Man()^() // expected-error{{expression type 'Man' is ambiguous without more context}}
+var _ : God = Man()^() // expected-error{{type of expression is ambiguous without more context}}
 
 func &(x : Man, y : Man) -> Man { return x } // forgive amp_prefix token
 
