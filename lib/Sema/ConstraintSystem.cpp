@@ -2891,8 +2891,6 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
 static bool
 diagnoseAmbiguityWithEphemeralPointers(ConstraintSystem &cs,
                                        ArrayRef<Solution> solutions) {
-  llvm::MapVector<Expr *, ValueDecl *> ambiguities;
-
   bool allSolutionsHaveFixes = true;
   for (const auto &solution : solutions) {
     if (solution.Fixes.empty()) {
@@ -2900,23 +2898,10 @@ diagnoseAmbiguityWithEphemeralPointers(ConstraintSystem &cs,
       continue;
     }
 
-    for (const auto *fix : solution.Fixes) {
-      if (fix->getKind() != FixKind::TreatEphemeralAsNonEphemeral)
-        return false;
-
-      // Ephemeral pointers are only possible in argument positions.
-      if (auto *anchor = simplifyLocatorToAnchor(fix->getLocator())) {
-        anchor = cast<InOutExpr>(anchor)->getSubExpr();
-
-        auto overload = solution.getOverloadChoiceIfAvailable(
-            cs.getConstraintLocator(anchor));
-
-        if (!(overload && overload->choice.isDecl()))
-          return false;
-
-        ambiguities.insert({anchor, overload->choice.getDecl()});
-      }
-    }
+    if (!llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {
+          return fix->getKind() == FixKind::TreatEphemeralAsNonEphemeral;
+        }))
+      return false;
   }
 
   // If all solutions have fixes for ephemeral pointers, let's
@@ -2924,13 +2909,10 @@ diagnoseAmbiguityWithEphemeralPointers(ConstraintSystem &cs,
   if (allSolutionsHaveFixes)
     return false;
 
-  auto &DE = cs.getASTContext().Diags;
-  for (const auto &entry : ambiguities) {
-    DE.diagnose(entry.first->getLoc(), diag::ambiguous_decl_ref,
-                DeclNameRef(entry.second->getBaseName()));
-  }
-
-  return true;
+  // If only some of the solutions have ephemeral pointer fixes
+  // let's let `diagnoseAmbiguity` diagnose the problem either
+  // with affected argument or related declaration e.g. function ref.
+  return cs.diagnoseAmbiguity(solutions);
 }
 
 bool ConstraintSystem::diagnoseAmbiguityWithFixes(
