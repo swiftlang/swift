@@ -1477,9 +1477,15 @@ namespace {
         ManagedValue setterFn = SGF.emitManagedRValueWithCleanup(setterPAI);
 
         // Create the assign_by_wrapper with the allocator and setter.
+        // FIXME: This should use CallEmission instead of doing everything manually.
         assert(value.isRValue());
         ManagedValue Mval = std::move(value).asKnownRValue(SGF).
                               getAsSingleValue(SGF, loc);
+        if (setterConv.getSILArgumentConvention(0).isIndirectConvention() &&
+            !Mval.getType().isAddress()) {
+          Mval = Mval.materialize(SGF, loc);
+        }
+
         SGF.B.createAssignByWrapper(loc, Mval.forward(SGF), proj.forward(SGF),
                                      initFn.getValue(), setterFn.getValue(),
                                      AssignOwnershipQualifier::Unknown);
