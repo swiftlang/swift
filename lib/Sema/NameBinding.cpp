@@ -407,10 +407,6 @@ void swift::performNameBinding(SourceFile &SF) {
     return;
   }
 
-  // Reset the name lookup cache so we find new decls.
-  // FIXME: This is inefficient.
-  SF.clearLookupCache();
-
   NameBinder Binder(SF);
 
   SmallVector<SourceFile::ImportedModuleDesc, 8> ImportedModules;

@@ -1597,17 +1597,6 @@ void ModuleDecl::clearLookupCache() {
   Cache.reset();
 }
 
-void SourceFile::clearLookupCache() {
-  getParentModule()->clearLookupCache();
-
-  if (!Cache)
-    return;
-
-  // Abandon any current cache. We'll rebuild it on demand.
-  Cache->invalidate();
-  Cache.reset();
-}
-
 void
 SourceFile::cacheVisibleDecls(SmallVectorImpl<ValueDecl*> &&globals) const {
   SmallVectorImpl<ValueDecl*> &cached = getCache().AllVisibleValues;
