@@ -58,3 +58,15 @@ class TensorFlowSwiftAPIs(product.Product):
             '--build', self.build_dir,
             '--target', 'install',
         ])
+
+# SWIFT_ENABLE_TENSORFLOW
+
+class TensorFlow(product.Product):
+    @classmethod
+    def product_source_name(cls):
+        """product_source_name() -> str
+        The name of the source code directory of this product.
+        """
+        return "tensorflow"
+
+# SWIFT_ENABLE_TENSORFLOW END
