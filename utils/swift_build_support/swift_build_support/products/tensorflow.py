@@ -34,10 +34,6 @@ class TensorFlowSwiftAPIs(product.Product):
                                                 self.args.install_prefix)
         swiftc = os.path.join(toolchain_path, 'usr', 'bin', 'swiftc')
 
-        tensorflow_build_dir = os.path.join(self.build_dir, '..',
-                                            'tensorflow-' + host_target)
-        tensorflow_build_dir = os.path.realpath(tensorflow_build_dir)
-
         tensorflow_source_dir = os.path.join(self.source_dir, '..',
                                              'tensorflow')
         tensorflow_source_dir = os.path.realpath(tensorflow_source_dir)
@@ -50,11 +46,10 @@ class TensorFlowSwiftAPIs(product.Product):
                 self.args.install_destdir),
             '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
             '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
-            '-D', 'TensorFlow_INCLUDE_DIR={}'.format(
-                os.path.join(tensorflow_source_dir, 'tensorflow')),
+            '-D', 'TensorFlow_INCLUDE_DIR={}'.format(tensorflow_source_dir),
             '-D', 'TensorFlow_LIBRARY={}'.format(
-                os.path.join(tensorflow_build_dir, 'bazel-bin', 'tensorflow',
-                             'libtensorflow.so')),
+                os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow',
+                             'libtensorflow.2.1.0.dylib')),
             '-B', self.build_dir,
             '-S', self.source_dir,
         ])
