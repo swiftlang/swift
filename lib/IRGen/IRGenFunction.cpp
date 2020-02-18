@@ -33,7 +33,7 @@ using namespace swift;
 using namespace irgen;
 
 static llvm::cl::opt<bool> EnableTrapDebugInfo(
-    "enable-trap-debug-info", llvm::cl::Hidden,
+    "enable-trap-debug-info", llvm::cl::init(true), llvm::cl::Hidden,
     llvm::cl::desc("Generate failure-message functions in the debug info"));
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
