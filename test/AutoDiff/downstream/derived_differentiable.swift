@@ -125,3 +125,19 @@ final class AdditiveArithmeticClass<T : AdditiveArithmetic & Differentiable> : A
 // CHECK-AST:         final internal var x: T, y: T
 // CHECK-AST:         internal struct TangentVector : Differentiable, AdditiveArithmetic
 // CHECK-AST:       }
+
+@frozen
+public struct FrozenStruct: Differentiable {}
+
+// CHECK-AST-LABEL: @frozen public struct FrozenStruct : Differentiable {
+// CHECK-AST:   internal init()
+// CHECK-AST:   @frozen public struct TangentVector : Differentiable, AdditiveArithmetic, PointwiseMultiplicative, ElementaryFunctions {
+
+@usableFromInline
+struct UsableFromInlineStruct: Differentiable {}
+
+// CHECK-AST-LABEL: @usableFromInline
+// CHECK-AST: struct UsableFromInlineStruct : Differentiable {
+// CHECK-AST:   internal init()
+// CHECK-AST:   @usableFromInline
+// CHECK-AST:   struct TangentVector : Differentiable, AdditiveArithmetic, PointwiseMultiplicative, ElementaryFunctions {
