@@ -794,48 +794,6 @@ class BuildScriptInvocation(object):
                         args.build_jobs)
                 ]
 
-        # SWIFT_ENABLE_TENSORFLOW
-        if not args.build_tensorflow:
-            impl_args += ["--skip-build-tensorflow"]
-
-        if args.enable_tensorflow_gpu:
-            impl_args += ["--enable-tensorflow-gpu"]
-
-        if args.enable_tensorflow:
-            impl_args += [
-                "--enable-tensorflow",
-                "--host-bazel", toolchain.bazel,
-            ]
-            print(impl_args)
-            # If args.build-tensorflow, include/lib directories will be
-            # configured automatically by build-script-impl.
-            if not args.build_tensorflow:
-                assert args.tensorflow_host_lib_dir, \
-                    "Missing --tensorflow-host-lib-dir"
-                assert args.tensorflow_host_include_dir, \
-                    "Missing --tensorflow-host-include-dir"
-                impl_args += [
-                    "--tensorflow-host-lib-dir",
-                    args.tensorflow_host_lib_dir,
-                    "--tensorflow-host-include-dir",
-                    args.tensorflow_host_include_dir,
-                ]
-                if args.tensorflow_target_lib_dir:
-                    impl_args += [
-                        "--tensorflow-target-lib-dir",
-                        args.tensorflow_target_lib_dir,
-                    ]
-                if args.tensorflow_target_include_dir:
-                    impl_args += [
-                        "--tensorflow-target-include-dir",
-                        args.tensorflow_target_include_dir,
-                    ]
-        if args.tensorflow_bazel_options:
-            impl_args += [
-                "--tensorflow-bazel-options=%s" % ' '.join(
-                    pipes.quote(opt) for opt in args.tensorflow_bazel_options)
-            ]
-
         impl_args += args.build_script_impl_args
 
         if args.dry_run:
@@ -948,6 +906,7 @@ class BuildScriptInvocation(object):
         if self.args.build_pythonkit:
             product_classes.append(products.PythonKit)
         if self.args.build_tensorflow_swift_apis:
+            product_classes.append(products.TensorFlow)
             product_classes.append(products.TensorFlowSwiftAPIs)
         if self.args.build_sourcekitlsp:
             product_classes.append(products.SourceKitLSP)
