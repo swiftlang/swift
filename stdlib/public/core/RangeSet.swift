@@ -340,6 +340,7 @@ extension RangeSet {
   /// Returns a range set that represents the ranges of values within the
   /// given bounds that aren't represented by this range set.
   internal func _gaps(boundedBy bounds: Range<Bound>) -> RangeSet {
+    guard !_ranges.isEmpty else { return RangeSet(bounds) }
     guard let start = _ranges.firstIndex(where: { $0.lowerBound >= bounds.lowerBound })
       else { return RangeSet() }
     guard let end = _ranges.lastIndex(where: { $0.upperBound <= bounds.upperBound })

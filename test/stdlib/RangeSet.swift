@@ -250,6 +250,16 @@ if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
     numbers.removeSubranges(RangeSet([2..<5, 10..<15, 18..<20]))
     expectEqual(numbers, [1, 2, 6, 7, 8, 9, 10, 16, 17, 18])
     
+    numbers = Array(1...20)
+    numbers.removeSubranges([])
+    expectEqual(numbers, Array(1...20))
+
+    let sameNumbers = numbers.removingSubranges([])
+    expectEqualSequence(numbers, sameNumbers)
+    
+    let noNumbers = numbers.removingSubranges(RangeSet(numbers.indices))
+    expectEqualSequence(EmptyCollection(), noNumbers)
+    
     var str = letterString
     let lowerIndices = str.subranges(where: { $0.isLowercase })
     
