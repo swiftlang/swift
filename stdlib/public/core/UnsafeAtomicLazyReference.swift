@@ -45,18 +45,21 @@ extension UnsafeAtomicLazyReference {
   /// thread-safe lazily initialized reference:
   ///
   /// ```
-  /// @Anchored var _foo: UnsafeAtomicLazyReference<Foo>
+  /// class Image {
+  ///   var _histogram: UnsafeAtomicLazyReference<Histogram> = ...
   ///
-  /// // This is safe to call concurrently from multiple threads.
-  /// var atomicLazyFoo: Foo {
-  ///     if let foo = _foo.load() { return foo }
-  ///     let foo = Foo()
-  ///     return _foo.initialize(to: foo)
+  ///   // This is safe to call concurrently from multiple threads.
+  ///   var atomicLazyHistogram: Histogram {
+  ///     if let histogram = _histogram.load() { return foo }
+  ///     // Note that code here may run concurrently on
+  ///     // multiple threads, but only one of them will get to
+  ///     // succeed setting the reference.
+  ///     let histogram = ...
+  ///     return _histogram.initialize(to: foo)
   /// }
   /// ```
   ///
-  /// The operation establishes a memory barrier, i.e., it uses the ordering
-  /// `AtomicUpdateOrdering.barrier`.
+  /// This operation uses acquiring-and-releasing memory ordering.
   @_transparent
   public func initialize(
     to desired: __owned Instance
@@ -67,7 +70,7 @@ extension UnsafeAtomicLazyReference {
     let success = _ptr._atomicCompareExchangeWord(
       expected: &expectedWord,
       desired: desiredWord,
-      ordering: .barrier)
+      ordering: .acquiringAndReleasing)
     if !success {
       // The reference has already been initialized. Balance the retain that
       // we performed on `desired`.

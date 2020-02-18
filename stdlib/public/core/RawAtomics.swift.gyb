@@ -13,11 +13,11 @@
 %{
   def rmwOrderings():
     return [
-      # Swift enum case,         API name,     documentation name,        llvm name,   failure name
-      ('relaxed',                'Relaxed',    'relaxed',                 'monotonic', 'monotonic'),
-      ('acquiring',              'Acquiring',  'acquiring',               'acquire',   'acquire'),
-      ('releasing',              'Releasing',  'releasing',               'release',   'monotonic'),
-      ('acquiringAndReleasing',  'Barrier',    'acquiring-and-releasing', 'acqrel',    'acquire'),
+      # Swift enum case,         API name,                 documentation name,        llvm name,   failure name
+      ('relaxed',                'Relaxed',                'relaxed',                 'monotonic', 'monotonic'),
+      ('acquiring',              'Acquiring',              'acquiring',               'acquire',   'acquire'),
+      ('releasing',              'Releasing',              'releasing',               'release',   'monotonic'),
+      ('acquiringAndReleasing',  'AcquiringAndReleasing',  'acquiring-and-releasing', 'acqrel',    'acquire'),
     ]
 
   def loadOrderings():
@@ -172,7 +172,7 @@ extension UnsafeMutableRawPointer {
     case .releasing:
       return _atomicReleasingExchangeWord(desired)
     default:
-      return _atomicBarrierExchangeWord(desired)
+      return _atomicAcquiringAndReleasingExchangeWord(desired)
     }
   }
 }
@@ -260,7 +260,7 @@ extension UnsafeMutableRawPointer {
         expected: &expected,
         desired: desired)
     default:
-      return _atomicBarrierCompareExchangeWord(
+      return _atomicAcquiringAndReleasingCompareExchangeWord(
         expected: &expected,
         desired: desired)
     }
@@ -327,7 +327,7 @@ extension UnsafeMutableRawPointer {
     case .releasing:
       return _atomicReleasingLoadThen${swiftName}Word(${argLabel(label)}operand)
     default:
-      return _atomicBarrierLoadThen${swiftName}Word(${argLabel(label)}operand)
+      return _atomicAcquiringAndReleasingLoadThen${swiftName}Word(${argLabel(label)}operand)
     }
   }
 % end
