@@ -1579,6 +1579,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
                                                baseOperand, needsGenericContext,
                                                subs, decl, {},
                                                baseTy->getCanonicalType(),
+                                               M.getSwiftModule(),
                                                /*property descriptor*/ true);
   
   (void)SILProperty::create(M, /*serialized*/ false, decl, component);

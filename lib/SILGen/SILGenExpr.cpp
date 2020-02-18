@@ -3395,6 +3395,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                 AbstractStorageDecl *storage,
                                 ArrayRef<ProtocolConformanceRef> indexHashables,
                                 CanType baseTy,
+                                DeclContext *useDC,
                                 bool forPropertyDescriptor) {
   auto baseDecl = storage;
 
@@ -3464,8 +3465,8 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     // supply the settability if needed. We only reference it here if the
     // setter is public.
     if (shouldUseExternalKeyPathComponent())
-      return storage->isSettable(M.getSwiftModule())
-        && storage->isSetterAccessibleFrom(M.getSwiftModule());
+      return storage->isSettable(useDC)
+        && storage->isSetterAccessibleFrom(useDC);
     return storage->isSettable(storage->getDeclContext());
   };
 
@@ -3619,6 +3620,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                             decl,
                             component.getSubscriptIndexHashableConformances(),
                             baseTy,
+                            SGF.FunctionDC,
                             /*for descriptor*/ false));
       baseTy = loweredComponents.back().getComponentType();
       if (kind == KeyPathExpr::Component::Kind::Property)
