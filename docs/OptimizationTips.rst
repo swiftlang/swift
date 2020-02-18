@@ -544,6 +544,38 @@ protocols as class-only protocols to get better runtime performance.
 
 .. https://developer.apple.com/library/ios/documentation/Swift/Conceptual/Swift_Programming_Language/Protocols.html
 
+The Cost of Let/Var when Captured by Escaping Closures
+======================================================
+
+While one may think that the distinction in between let/var is just
+about language semantics, there are also performance
+considerations. Remember that any time one creates a binding for a
+closure, one is forcing the compiler to emit an escaping closure,
+e.x.:
+
+::
+
+  let f: () -> () = { ... } // Escaping closure
+  // Contrasted with:
+  ({ ... })() // Non Escaping closure
+  x.map { ... } // Non Escaping closure
+
+When a var is captured by an escaping closure, the compiler must
+allocate a heap box to store the var so that both the closure
+creator/closure can read/write to the value. This even includes
+situations where the underlying type of the captured binding is
+trivial! In contrast, when captured a `let` is captured by value. As
+such, the compiler stores a copy of the value directly into the
+closure's storage without needing a box.
+
+Advice: Pass var as an `inout` if closure not actually escaping
+---------------------------------------------------------------
+
+If one is using an escaping closure for expressivity purposes, but is
+actually using a closure locally, pass vars as inout parameters
+instead of by using captures. The inout will ensure that a heap box is
+not allocated for the variables and avoid any retain/release traffic
+from the heap box being passed around.
 
 Unsupported Optimization Attributes
 ===================================
