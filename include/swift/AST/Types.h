@@ -2780,7 +2780,8 @@ public:
                    Identifier l = Identifier(),
                    ParameterTypeFlags f = ParameterTypeFlags())
         : Ty(t), Label(l), Flags(f) {
-      assert(!t || !t->is<InOutType>() && "set flags instead");
+      assert(t && "param type must be non-null");
+      assert(!t->is<InOutType>() && "set flags instead");
     }
 
   private:
