@@ -73,8 +73,6 @@ KNOWN_SETTINGS=(
     workspace                                     "${HOME}/src"     "source directory containing llvm, clang, swift"
 
     ## Build Tools
-    # SWIFT_ENABLE_TENSORFLOW
-    host-bazel                                    ""                "the path to bazel, used to build TensorFlow. **This argument is required for TensorFlow support**"
     host-cc                                       ""                "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
     host-cxx                                      ""                "the path to CXX, the 'clang++' compiler for the host platform. **This argument is required**"
     host-libtool                                  ""                "the path to libtool"
@@ -245,15 +243,6 @@ KNOWN_SETTINGS=(
     skip-merge-lipo-cross-compile-tools           ""                "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     coverage-db                                   ""                "If set, coverage database to use when prioritizing testing"
     skip-local-host-install                       ""                "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
-    # SWIFT_ENABLE_TENSORFLOW
-    enable-tensorflow                             ""                "If true, enable compiling with TensorFlow support"
-    enable-tensorflow-gpu                         ""                "If true, enable compiling with TensorFlow GPU support"
-    tensorflow-bazel-options                      ""                "Bazel options used for all TensorFlow targets"
-    tensorflow-host-lib-dir                       ""                "Path to host TensorFlow libraries"
-    tensorflow-host-include-dir                   ""                "Path to host TensorFlow headers"
-    tensorflow-target-include-dir                 ""                "Path to target Tensorflow headers"
-    tensorflow-target-lib-dir                     ""                "Path to target TensorFlow libraries"
-    tensorflow-swift-apis                         ""                "Path to TensorFlow deep learning library repository"
 )
 
 components=(
@@ -269,8 +258,6 @@ components=(
   static-libdispatch
   swift
   xctest
-  # SWIFT_ENABLE_TENSORFLOW
-  tensorflow
 )
 for component in ${components[@]} ; do
   KNOWN_SETTINGS+=(
@@ -874,13 +861,6 @@ if [ -z "${CMAKE}" ] ; then
     echo "Environment variable CMAKE must be specified."
     exit 1
 fi
-# SWIFT_ENABLE_TENSORFLOW
-if [[ "${ENABLE_TENSORFLOW}" ]]; then
-    if [ -z "${HOST_BAZEL}" ] ; then
-        echo "Can't find bazel, needed for building TensorFlow."
-        exit 1
-    fi
-fi
 
 function xcrun_find_tool() {
   xcrun --sdk macosx --toolchain "${DARWIN_XCRUN_TOOLCHAIN}" --find "$@"
@@ -1107,7 +1087,6 @@ COMMON_C_FLAGS=" -Wno-unknown-warning-option -Werror=unguarded-availability-new"
 eval COMMON_CMAKE_OPTIONS=(${COMMON_CMAKE_OPTIONS})
 eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
 eval BUILD_ARGS=(${BUILD_ARGS})
-eval TENSORFLOW_BAZEL_OPTIONS=(${TENSORFLOW_BAZEL_OPTIONS})
 
 eval CMAKE_BUILD=("${DISTCC_PUMP}" "${CMAKE}" "--build")
 
@@ -1156,9 +1135,6 @@ function build_directory_bin() {
                 echo "${root}/${LIBDISPATCH_BUILD_TYPE}/bin"
                 ;;
             libicu)
-                ;;
-            # SWIFT_ENABLE_TENSORFLOW
-            tensorflow)
                 ;;
             playgroundsupport)
                 echo "${root}/${PLAYGROUNDSUPPORT_BUILD_TYPE}/bin"
@@ -1277,9 +1253,6 @@ function cmake_config_opt() {
                 echo "--config ${LIBDISPATCH_BUILD_TYPE}"
                 ;;
             libicu)
-                ;;
-            # SWIFT_ENABLE_TENSORFLOW
-            tensorflow)
                 ;;
             playgroundsupport)
                 echo "--config ${PLAYGROUNDSUPPORT_BUILD_TYPE}"
@@ -1746,34 +1719,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ "${ENABLE_TENSORFLOW}" ]] ; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
-                        -DTF_LIBRARY:PATH="${TENSORFLOW_TARGET_LIB_DIR}/libtensorflow.so"
-                        -DTF_INCLUDE_DIR:PATH="${TENSORFLOW_TARGET_INCLUDE_DIR}"
-                    )
-
-                    # Propagate TensorFlow GPU support flag to CMake.
-                    if [[ "${ENABLE_TENSORFLOW_GPU}" ]] ; then
-                        cmake_options=(
-                            "${cmake_options[@]}"
-                            -DSWIFT_ENABLE_TENSORFLOW_GPU:BOOL=TRUE
-                        )
-                    fi
-
-                    # Handle TensorFlow high-level APIs repository.
-                    if [[ ! "${TENSORFLOW_SWIFT_APIS}" && -d "${TENSORFLOW_SWIFT_APIS_DIR}" ]] ; then
-                        TENSORFLOW_SWIFT_APIS="${TENSORFLOW_SWIFT_APIS_DIR}"
-                    fi
-                    if [[ "${TENSORFLOW_SWIFT_APIS}" ]] ; then
-                        cmake_options=(
-                            "${cmake_options[@]}"
-                            -DTENSORFLOW_SWIFT_APIS:PATH="${TENSORFLOW_SWIFT_APIS}"
-                        )
-                    fi
-                fi
-
                 if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
                     lldb_build_dir=$(build_directory ${host} lldb)
                     cmake_options=(
@@ -1781,16 +1726,6 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DLLDB_ENABLE:BOOL=TRUE
                         -DLLDB_BUILD_DIR:STRING="${lldb_build_dir}"
                     )
-                    if [[ "${ENABLE_TENSORFLOW}" ]] ; then
-                        lldb_cmake_options=(
-                            "${lldb_cmake_options[@]}"
-                            -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
-                            -DSWIFT_TENSORFLOW_HOST_LIB_DIR:PATH="${TENSORFLOW_HOST_LIB_DIR}"
-                            -DSWIFT_TENSORFLOW_HOST_INCLUDE_DIR:PATH="${TENSORFLOW_HOST_INCLDUE_DIR}"
-                            -DSWIFT_TENSORFLOW_TARGET_LIB_DIR:PATH="${TENSORFLOW_TARGET_LIB_DIR}"
-                            -DSWIFT_TENSORFLOW_TARGET_INCLUDE_DIR:PATH="${TENSORFLOW_TARGET_INCLUDE_DIR}"
-                        )
-                    fi
                 fi
 
                 build_targets=(all "${SWIFT_STDLIB_TARGETS[@]}")
@@ -1816,13 +1751,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 cmark_build_dir=$(build_directory ${host} cmark)
                 lldb_build_dir=$(build_directory ${host} lldb)
                 swift_build_dir=$(build_directory ${host} swift)
-
-                # SWIFT_ENABLE_TENSORFLOW
-                # Add host variant information.
-                cmake_options=(
-                    "${cmake_options[@]}"
-                    -DHOST_VARIANT:STRING="${SWIFT_HOST_VARIANT}"
-                    -DHOST_VARIANT_ARCH:STRING="${SWIFT_HOST_VARIANT_ARCH}")
 
                 # Add any lldb extra cmake arguments here.
 
@@ -2196,16 +2124,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 # libicu builds itself and doesn't use cmake
                 continue
                 ;;
-            # SWIFT_ENABLE_TENSORFLOW
-            tensorflow)
-                # Configure TensorFlow and build using bazel.
-                (cd "${source_dir}"; echo yes "" | ./configure)
-                with_pushd "${source_dir}" \
-                    call ${HOST_BAZEL} build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" --define framework_shared_object=false //tensorflow:libtensorflow.so
-
-                # TensorFlow builds itself and doesn't use CMake.
-                continue
-                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -2405,7 +2323,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --filter=[sS]wift"
                 fi
 
-                # SWIFT_ENABLE_TENSORFLOW: use python3 to launch llvm-lit below.
                 # Record the times test took and report the slowest.
                 LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
 
@@ -2423,6 +2340,7 @@ for host in "${ALL_HOSTS[@]}"; do
                          "${LLDB_TEST_SWIFT_COMPATIBILITY}"
                     DOTEST_ARGS="-G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\""
                     with_pushd ${results_dir} \
+                       # SWIFT_ENABLE_TENSORFLOW: use python3 to launch llvm-lit below.
                        call "/usr/bin/env" "python3" "${llvm_build_dir}/bin/llvm-lit" \
                             "${lldb_build_dir}/test" \
                             ${LLVM_LIT_ARGS} \
