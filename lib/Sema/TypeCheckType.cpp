@@ -1358,7 +1358,7 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   // If we found nothing, complain and give ourselves a chance to recover.
   if (current.isNull()) {
     // Dynamic 'Self' in the result type of a function body.
-    if (id.isSimpleName(ctx.Id_Self)) {
+    if (id == ctx.Id_Self) {
       if (auto *typeDC = DC->getInnermostTypeContext()) {
         // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
         // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
