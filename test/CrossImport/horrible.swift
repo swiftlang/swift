@@ -36,6 +36,9 @@ import ListlessGoose
 import AnonymousGoose
 // expected-error@-1 {{cannot load cross-import overlay for 'HorribleGoose' and 'AnonymousGoose': missing required key 'name'}}
 
+import RedundantGoose
+// expected-warning@-1 {{modules 'RedundantGoose' and 'HorribleGoose' both declare module '_OverlayLibrary' as a cross-import overlay, which may cause paradoxical behavior when looking up names in them; please report this bug to the maintainers of these modules}}
+
 // CircularGoose overlays itself with EndlessGoose, which overlays itself with
 // CircularGoose, which should then break the cycle because we don't load the
 // same overlay on an underlying module twice. If the test hangs, we've broken

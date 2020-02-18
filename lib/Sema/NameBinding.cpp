@@ -201,7 +201,8 @@ namespace {
     /// locations from \p I.
     void findCrossImports(UnboundImport &I,
                           const ImportedModuleDesc &declaringImport,
-                          const ImportedModuleDesc &bystandingImport);
+                          const ImportedModuleDesc &bystandingImport,
+                          SmallVectorImpl<Identifier> &overlayNames);
 
     /// Load a module referenced by an import statement.
     ///
@@ -815,8 +816,21 @@ void NameBinder::crossImport(ModuleDecl *M, UnboundImport &I) {
       if (!canCrossImport(oldImport))
         continue;
 
-      findCrossImports(I, newImport, oldImport);
-      findCrossImports(I, oldImport, newImport);
+      SmallVector<Identifier, 2> newImportOverlays;
+      findCrossImports(I, newImport, oldImport, newImportOverlays);
+
+      SmallVector<Identifier, 2> oldImportOverlays;
+      findCrossImports(I, oldImport, newImport, oldImportOverlays);
+
+      // If both sides of the cross-import declare some of the same overlays,
+      // this will cause some strange name lookup behavior; let's warn about it.
+      for (auto name : newImportOverlays) {
+        if (llvm::is_contained(oldImportOverlays, name)) {
+          ctx.Diags.diagnose(I.importLoc, diag::cross_imported_by_both_modules,
+                             newImport.module.second->getName(),
+                             oldImport.module.second->getName(), name);
+        }
+      }
 
       // If findCrossImports() ever changed the visibleModules list, we'd see
       // memory smashers here.
@@ -830,7 +844,8 @@ void NameBinder::crossImport(ModuleDecl *M, UnboundImport &I) {
 
 void NameBinder::findCrossImports(UnboundImport &I,
                                   const ImportedModuleDesc &declaringImport,
-                                  const ImportedModuleDesc &bystandingImport) {
+                                  const ImportedModuleDesc &bystandingImport,
+                                  SmallVectorImpl<Identifier> &names) {
   assert(&declaringImport != &bystandingImport);
 
   LLVM_DEBUG(
@@ -839,7 +854,6 @@ void NameBinder::findCrossImports(UnboundImport &I,
                    << bystandingImport.module.second->getName() << "'\n");
 
   // Find modules we need to import.
-  SmallVector<Identifier, 2> names;
   declaringImport.module.second->findDeclaredCrossImportOverlays(
       bystandingImport.module.second->getName(), names, I.importLoc);
 
