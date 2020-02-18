@@ -13,7 +13,8 @@ import Builtin
 // CHECK: end_borrow [[PHIBBARG]] : $Builtin.NativeObject
 sil [serialized] [ossa] @borrow_argument_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
-  br bb1(%0 : $Builtin.NativeObject)
+  %0a = begin_borrow %0 : $Builtin.NativeObject
+  br bb1(%0a : $Builtin.NativeObject)
 
 bb1(%1 : @guaranteed $Builtin.NativeObject):
   end_borrow %1 : $Builtin.NativeObject
