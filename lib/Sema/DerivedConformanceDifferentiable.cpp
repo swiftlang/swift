@@ -627,15 +627,20 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     }
   }
 
-  // If nominal type is `@_fixed_layout`, mark `TangentVector` struct as
-  // `@_fixed_layout` as well.
+  // If nominal type is `@_fixed_layout`, also mark `TangentVector` struct as
+  // `@_fixed_layout`.
   if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>())
     structDecl->addFixedLayoutAttr();
 
-  // If nominal type is `@frozen`, mark `TangentVector` struct as `@frozen` as
-  // well.
+  // If nominal type is `@frozen`, also mark `TangentVector` struct as
+  // `@frozen`.
   if (nominal->getAttrs().hasAttribute<FrozenAttr>())
     structDecl->getAttrs().add(new (C) FrozenAttr(/*implicit*/ true));
+
+  // If nominal type is `@usableFromInline`, also mark `TangentVector` struct as
+  // `@usableFromInline`.
+  if (nominal->getAttrs().hasAttribute<UsableFromInlineAttr>())
+    structDecl->getAttrs().add(new (C) UsableFromInlineAttr(/*implicit*/ true));
 
   // The implicit memberwise constructor must be explicitly created so that it
   // can called in `AdditiveArithmetic` and `Differentiable` methods. Normally,
