@@ -287,3 +287,15 @@ class Boxer {
 
   required init() {}
 }
+
+// https://bugs.swift.org/browse/SR-12133 - a type named 'Self' should be found first
+struct OuterType {
+  struct `Self` {
+    let string: String
+  }
+
+  var foo: `Self`? {
+    let optional: String? = "foo"
+    return optional.map { `Self`(string: $0) }
+  }
+}
