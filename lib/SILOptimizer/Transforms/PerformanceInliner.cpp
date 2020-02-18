@@ -893,21 +893,22 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   if (AppliesToInline.empty())
     return false;
 
+  // If our Caller has ownership and any of our callees do not have ownership,
+  // do not inline. We will perform inlining later once our caller has had its
+  // ownership lowered.
+  if (Caller->hasOwnership() && llvm::any_of(AppliesToInline,
+                   [&](FullApplySite AI) {
+                     auto *Callee = AI.getReferencedFunctionOrNull();
+                     return Callee->shouldOptimize() && !Callee->hasOwnership();
+                   }))
+    return false;
+
   // Second step: do the actual inlining.
   for (auto AI : AppliesToInline) {
     SILFunction *Callee = AI.getReferencedFunctionOrNull();
     assert(Callee && "apply_inst does not have a direct callee anymore");
 
     if (!Callee->shouldOptimize()) {
-      continue;
-    }
-
-    // If we have a callee that doesn't have ownership, but the caller does have
-    // ownership... do not inline. The two modes are incompatible. Today this
-    // should only happen with transparent functions.
-    if (!Callee->hasOwnership() && Caller->hasOwnership()) {
-      assert(Caller->isTransparent() &&
-             "Should only happen with transparent functions");
       continue;
     }
 

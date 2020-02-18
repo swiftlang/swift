@@ -395,6 +395,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // we do not spend time optimizing them.
   P.addDeadFunctionElimination();
 
+  P.addEarlyInliner();
   P.addSemanticARCOpts();
 
   // Strip ownership from non-transparent functions.
