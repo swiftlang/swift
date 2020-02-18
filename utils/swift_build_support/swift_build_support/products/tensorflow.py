@@ -10,8 +10,11 @@
 #
 # ----------------------------------------------------------------------------
 
+import os
+
 from . import product
 from .. import shell
+from .. import targets
 
 
 class TensorFlowSwiftAPIs(product.Product):
@@ -27,6 +30,18 @@ class TensorFlowSwiftAPIs(product.Product):
         return self.args.build_tensorflow_swift_apis
 
     def build(self, host_target):
+        toolchain_path = targets.toolchain_path(self.args.install_destdir,
+                                                self.args.install_prefix)
+        swiftc = os.path.join(toolchain_path, 'usr', 'bin', 'swiftc')
+
+        tensorflow_build_dir = os.path.join(self.build_dir, '..',
+                                            'tensorflow-' + host_target)
+        tensorflow_build_dir = os.path.realpath(tensorflow_build_dir)
+
+        tensorflow_source_dir = os.path.join(self.source_dir, '..',
+                                             'tensorflow')
+        tensorflow_source_dir = os.path.realpath(tensorflow_source_dir)
+
         shell.call([
             self.toolchain.cmake,
             '-G', 'Ninja',
@@ -34,7 +49,12 @@ class TensorFlowSwiftAPIs(product.Product):
             '-D', 'CMAKE_INSTALL_PREFIX={}/usr'.format(
                 self.args.install_destdir),
             '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
-            '-D', 'CMAKE_Swift_COMPILER={}'.format(self.toolchain.swiftc),
+            '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
+            '-D', 'TensorFlow_INCLUDE_DIR={}'.format(
+                os.path.join(tensorflow_source_dir, 'tensorflow')),
+            '-D', 'TensorFlow_LIBRARY={}'.format(
+                os.path.join(tensorflow_build_dir, 'bazel-bin', 'tensorflow',
+                             'libtensorflow.so')),
             '-B', self.build_dir,
             '-S', self.source_dir,
         ])
@@ -68,5 +88,37 @@ class TensorFlow(product.Product):
         The name of the source code directory of this product.
         """
         return "tensorflow"
+
+    @classmethod
+    def is_build_script_impl_product(cls):
+        return False
+
+    def should_build(self, host_target):
+        return self.args.build_tensorflow_swift_apis
+
+    def build(self, host_target):
+        with shell.pushd(self.source_dir):
+            shell.call([
+                os.path.join(self.source_dir, "configure"),
+            ])
+            shell.call([
+                self.toolchain.bazel,
+                "build",
+                "-c", "opt",
+                "--define", "framework_shared_object=false",
+                "//tensorflow:tensorflow",
+            ])
+
+    def should_test(self, host_target):
+        return False
+
+    def test(self, host_target):
+        pass
+
+    def should_install(self, host_target):
+        return False
+
+    def install(self, host_target):
+        pass
 
 # SWIFT_ENABLE_TENSORFLOW END
