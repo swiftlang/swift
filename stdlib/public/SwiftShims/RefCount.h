@@ -770,8 +770,15 @@ class RefCounts {
   
   void setPureSwiftDeallocation(bool nonobjc) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
-    //Immortal and no objc complications share a bit, so don't let setting
-    //the complications one clear the immmortal one
+
+    // Having a side table precludes using bits this way, but also precludes
+    // doing the pure Swift deallocation path. So trying to turn this off
+    // on something that has a side table is a noop
+    if (!nonobjc && oldbits.hasSideTable()) {
+      return;
+    }
+    // Immortal and no objc complications share a bit, so don't let setting
+    // the complications one clear the immmortal one
     if (oldbits.isImmortal(true) || oldbits.pureSwiftDeallocation() == nonobjc){
       assert(!oldbits.hasSideTable());
       return;
