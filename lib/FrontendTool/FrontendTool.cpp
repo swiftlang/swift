@@ -2166,7 +2166,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // ensure the input buffer IDs have been added.
   std::unique_ptr<DiagnosticVerifier> verifier;
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
-    verifier = llvm::make_unique<DiagnosticVerifier>(
+    verifier = std::make_unique<DiagnosticVerifier>(
         Instance->getSourceMgr(), Instance->getInputBufferIDs(),
         diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
         diagOpts.VerifyIgnoreUnknown, diagOpts.UseColor);
