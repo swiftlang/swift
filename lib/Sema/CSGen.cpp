@@ -1351,17 +1351,7 @@ namespace {
           knownType = VD->getInterfaceType();
 
         if (knownType) {
-          // If this is a ParamDecl for a closure argument that is a hole,
-          // then this is a situation where CSDiags is trying to perform
-          // error recovery within a ClosureExpr.  Just create a new type
-          // variable for the decl that isn't bound to anything.
-          // This will ensure that it is considered ambiguous.
-          if (knownType && knownType->isHole()) {
-            return CS.createTypeVariable(locator,
-                                         TVO_CanBindToLValue |
-                                         TVO_CanBindToNoEscape);
-          }
-
+          assert(!knownType->isHole());
           // If the known type has an error, bail out.
           if (knownType->hasError()) {
             if (!CS.hasType(E))

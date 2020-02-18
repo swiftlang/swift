@@ -453,6 +453,10 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     }
   }
 
+  if (locator->findLast<LocatorPathElt::DynamicCallable>()) {
+    return getConstraintLocator(anchor, LocatorPathElt::ApplyFunction());
+  }
+
   // If we have a locator that starts with a key path component element, we
   // may have a callee given by a property or subscript component.
   if (auto componentElt =
@@ -491,13 +495,10 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     return getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
 
   auto getSpecialFnCalleeLoc = [&](Type fnTy) -> ConstraintLocator * {
-    // FIXME: We should probably assert that we don't get a type variable
-    // here to make sure we only retrieve callee locators for resolved calls,
-    // ensuring that callee locators don't change after binding a type.
-    // Unfortunately CSDiag currently calls into getCalleeLocator, so all bets
-    // are off. Once we remove that legacy diagnostic logic, we should be able
-    // to assert here.
     fnTy = simplifyType(fnTy);
+    // It's okay for function type to contain type variable(s) e.g.
+    // opened generic function types, but not to be one.
+    assert(!fnTy->is<TypeVariableType>());
 
     // For an apply of a metatype, we have a short-form constructor. Unlike
     // other locators to callees, these are anchored on the apply expression
