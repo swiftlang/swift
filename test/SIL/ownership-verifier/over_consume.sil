@@ -492,7 +492,6 @@ entry(%0 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
-
 // CHECK-LABEL: Function: 'use_after_free_consume_in_same_block'
 // CHECK: Found use after free due to unvisited non lifetime ending uses?!
 // CHECK: Value:   %3 = copy_value %2 : $Builtin.NativeObject
