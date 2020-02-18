@@ -329,6 +329,7 @@
                 "icu": "release-65-1",
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2020-01-31-a",
                 "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-01-31-a",
+                "pythonkit": "master",
                 "swift-format": "master",
                 "tensorflow": "v2.1.0-rc1",
                 "tensorflow-swift-apis": "9a47e3cb71c798938b127729853d5911315a1d6e",

@@ -38,6 +38,13 @@ class TensorFlowSwiftAPIs(product.Product):
                                              'tensorflow')
         tensorflow_source_dir = os.path.realpath(tensorflow_source_dir)
 
+        if 'Darwin' in host_target:
+            lib_name = 'libtensorflow.2.1.0.dylib'
+        elif 'Linux' in host_target:
+            lib_name = 'libtensorflow.so.2.1.0'
+        else:
+            raise RuntimeError("Unknown host target %s" % host_target)
+
         shell.call([
             self.toolchain.cmake,
             '-G', 'Ninja',
@@ -49,7 +56,7 @@ class TensorFlowSwiftAPIs(product.Product):
             '-D', 'TensorFlow_INCLUDE_DIR={}'.format(tensorflow_source_dir),
             '-D', 'TensorFlow_LIBRARY={}'.format(
                 os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow',
-                             'libtensorflow.2.1.0.dylib')),
+                             lib_name)),
             '-B', self.build_dir,
             '-S', self.source_dir,
         ])
