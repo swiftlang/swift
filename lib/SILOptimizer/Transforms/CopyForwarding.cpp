@@ -1659,6 +1659,10 @@ bool TempRValueOptPass::collectLoads(
                             << *user);
     return false;
 
+  case SILInstructionKind::PartialApplyInst: {
+    loadInsts.insert(user);
+    return true;
+  }
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst: {
     ApplySite apply(user);
@@ -1873,7 +1877,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
       continue;
 
     // Destroys and deallocations are allowed to be in a different block.
-    if (isa<DestroyAddrInst>(user) || isa<DeallocStackInst>(user))
+    if (isa<DestroyAddrInst>(user) || isa<DeallocStackInst>(user) || isa<MarkDependenceInst>(user))
       continue;
 
     if (!collectLoads(useOper, user, tempObj, copyInst->getSrc(), loadInsts))
