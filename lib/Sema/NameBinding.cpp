@@ -146,8 +146,16 @@ namespace {
     /// Imports which still need their scoped imports validated.
     SmallVector<BoundImport, 16> unvalidatedImports;
 
-    /// All imported modules, including by re-exports.
-    SmallSetVector<ImportedModuleDesc, 16> visibleModules;
+    // crossImportableModules is usually relatively small (~hundreds max) and
+    // keeping it in order is convenient, so we use a SmallSetVector for it.
+    // visibleModules is much larger and we don't care about its order, so we
+    // use a DenseSet instead.
+
+    /// All imported modules, including by re-exports, and including submodules.
+    llvm::DenseSet<ImportedModuleDesc> visibleModules;
+
+    /// visibleModules but without the submoduless.
+    SmallSetVector<ImportedModuleDesc, 64> crossImportableModules;
 
     /// The index of the next module in \c visibleModules that should be
     /// cross-imported.
@@ -815,14 +823,20 @@ void NameBinder::crossImport(ModuleDecl *M, UnboundImport &I) {
     // FIXME: Should we warn if M doesn't reexport underlyingModule?
     SF.addSeparatelyImportedOverlay(M, I.underlyingModule.get());
 
-  auto newImports = visibleModules.getArrayRef().slice(nextModuleToCrossImport);
+  // FIXME: Most of the comparisons we do here are probably unnecessary. We
+  // only need to findCrossImports() on pairs where at least one of the two
+  // modules declares cross-imports, and most modules don't. This is low-hanging
+  // performance fruit.
+
+  auto newImports = crossImportableModules.getArrayRef()
+                        .slice(nextModuleToCrossImport);
   for (auto &newImport : newImports) {
     if (!canCrossImport(newImport))
       continue;
 
     // Search imports up to, but not including or after, `newImport`.
     auto oldImports =
-        make_range(visibleModules.getArrayRef().data(), &newImport);
+        make_range(crossImportableModules.getArrayRef().data(), &newImport);
     for (auto &oldImport : oldImports) {
       if (!canCrossImport(oldImport))
         continue;
@@ -845,12 +859,13 @@ void NameBinder::crossImport(ModuleDecl *M, UnboundImport &I) {
 
       // If findCrossImports() ever changed the visibleModules list, we'd see
       // memory smashers here.
-      assert(newImports.data() == &visibleModules[nextModuleToCrossImport] &&
+      assert(newImports.data() ==
+                 &crossImportableModules[nextModuleToCrossImport] &&
              "findCrossImports() should never mutate visibleModules");
     }
   }
 
-  nextModuleToCrossImport = visibleModules.size();
+  nextModuleToCrossImport = crossImportableModules.size();
 }
 
 void NameBinder::findCrossImports(UnboundImport &I,
@@ -864,9 +879,15 @@ void NameBinder::findCrossImports(UnboundImport &I,
                    << declaringImport.module.second->getName() << "' -> '"
                    << bystandingImport.module.second->getName() << "'\n");
 
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumCrossImportsChecked++;
+
   // Find modules we need to import.
   declaringImport.module.second->findDeclaredCrossImportOverlays(
       bystandingImport.module.second->getName(), names, I.importLoc);
+
+  if (ctx.Stats && !names.empty())
+    ctx.Stats->getFrontendCounters().NumCrossImportsFound++;
 
   // Add import statements.
   for (auto &name : names) {
@@ -890,6 +911,11 @@ void NameBinder::findCrossImports(UnboundImport &I,
   }
 }
 
+static bool isSubmodule(ModuleDecl* M) {
+  auto clangMod = M->findUnderlyingClangModule();
+  return clangMod && clangMod->Parent;
+}
+
 void NameBinder::addVisibleModules(ImportedModuleDesc importDesc) {
   // FIXME: namelookup::getAllImports() doesn't quite do what we need (mainly
   // w.r.t. scoped imports), but it seems like we could extend it to do so, and
@@ -903,7 +929,8 @@ void NameBinder::addVisibleModules(ImportedModuleDesc importDesc) {
     // If they are both scoped, and they are *differently* scoped, this import
     // cannot possibly expose anything new. Skip it.
     if (!importDesc.module.first.empty() && !nextImport.first.empty() &&
-        importDesc.module.first != nextImport.first)
+        !ModuleDecl::isSameAccessPath(importDesc.module.first,
+                                      nextImport.first))
       continue;
 
     // Drop this module into the ImportDesc so we treat it as imported with the
@@ -912,8 +939,13 @@ void NameBinder::addVisibleModules(ImportedModuleDesc importDesc) {
 
     // If we've already imported it, we've also already imported its
     // imports.
-    if (!visibleModules.insert(importDesc))
+    if (!visibleModules.insert(importDesc).second)
       continue;
+
+    // We don't cross-import submodules, so we shouldn't add them to the
+    // visibility set. (However, we do consider their reexports.)
+    if(!isSubmodule(importDesc.module.second))
+      crossImportableModules.insert(importDesc);
 
     // Add the module's re-exports to worklist.
     nextImport.second->getImportedModules(importsWorklist,
