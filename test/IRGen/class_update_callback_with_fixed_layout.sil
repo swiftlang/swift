@@ -180,7 +180,7 @@ bb0:
 // Accessing a field whose offset depends on resilient types should
 // use the field offset global.
 
-// CHECK-LABEL: define swiftcc {{(dllexport )?}}{{(protected )?}}i64 @accessClassWithResilientField(%T39class_update_callback_with_fixed_layout23ClassWithResilientFieldC*)
+// CHECK-LABEL: define swiftcc {{(dllexport )?}}{{(protected )?}}i64 @accessClassWithResilientField(%T39class_update_callback_with_fixed_layout23ClassWithResilientFieldC* %0)
 sil @accessClassWithResilientField : $@convention(thin) (@guaranteed ClassWithResilientField) -> Int {
 bb0(%0 : $ClassWithResilientField):
 
@@ -202,7 +202,7 @@ bb0(%0 : $ClassWithResilientField):
 
 // Objective-C metadata update callback function for ClassWithResilientField:
 
-// CHECK-LABEL: define internal %objc_class* @"$s39class_update_callback_with_fixed_layout23ClassWithResilientFieldCMU"(%objc_class*, i8*)
+// CHECK-LABEL: define internal %objc_class* @"$s39class_update_callback_with_fixed_layout23ClassWithResilientFieldCMU"(%objc_class* %0, i8* %1)
 // CHECK: entry:
 // CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s39class_update_callback_with_fixed_layout23ClassWithResilientFieldCMa"(i64 0)
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
@@ -212,7 +212,7 @@ bb0(%0 : $ClassWithResilientField):
 
 // Metadata initialization function for ClassWithResilientField calls swift_updateClassMetadata2():
 
-// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s39class_update_callback_with_fixed_layout23ClassWithResilientFieldCMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s39class_update_callback_with_fixed_layout23ClassWithResilientFieldCMr"(%swift.type* %0, i8* %1, i8** %2)
 
 // CHECK: entry:
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [3 x i8**]
@@ -258,7 +258,7 @@ bb0(%0 : $ClassWithResilientField):
 
 // Metadata initialization function for SubclassOfClassWithResilientField:
 
-// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s39class_update_callback_with_fixed_layout33SubclassOfClassWithResilientFieldCMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s39class_update_callback_with_fixed_layout33SubclassOfClassWithResilientFieldCMr"(%swift.type* %0, i8* %1, i8** %2)
 
 // CHECK: entry:
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [0 x i8**]

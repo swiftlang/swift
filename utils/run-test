@@ -17,12 +17,10 @@ import shutil
 import sys
 
 from build_swift.build_swift import argparse
+from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
 from swift_build_support.swift_build_support import shell
-from swift_build_support.swift_build_support.SwiftBuildSupport import \
-    SWIFT_SOURCE_ROOT
-from swift_build_support.swift_build_support.targets import \
-    StdlibDeploymentTarget
+from swift_build_support.swift_build_support.targets import StdlibDeploymentTarget
 
 
 TEST_MODES = [
@@ -129,7 +127,7 @@ def main():
                         help="build test dependencies before running tests "
                              "(default: true)")
     parser.add_argument("--target",
-                        type=argparse.types.ShellSplitType,
+                        type=argparse.types.ShellSplitType(),
                         action=argparse.actions.AppendAction,
                         dest="targets",
                         help="stdlib deployment targets to test. Accept "
@@ -141,7 +139,7 @@ def main():
                         choices=TEST_SUBSETS, default='primary',
                         help="test subset (default: primary)")
     parser.add_argument("--param",
-                        type=argparse.types.ShellSplitType,
+                        type=argparse.types.ShellSplitType(),
                         action=argparse.actions.AppendAction,
                         default=[],
                         help="key=value parameters they are directly passed "

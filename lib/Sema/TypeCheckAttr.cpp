@@ -108,6 +108,7 @@ public:
   IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
+  IGNORED_ATTR(TypeEraser)
   IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(DisfavoredOverload)
@@ -938,9 +939,16 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
                  : diag::objc_name_deinit);
       const_cast<ObjCAttr *>(attr)->clearName();
     } else {
+      auto func = cast<AbstractFunctionDecl>(D);
+
+      // Trigger lazy loading of any imported members with the same selector.
+      // This ensures we correctly diagnose selector conflicts.
+      if (auto *CD = D->getDeclContext()->getSelfClassDecl()) {
+        (void) CD->lookupDirect(*objcName, !func->isStatic());
+      }
+
       // We have a function. Make sure that the number of parameters
       // matches the "number of colons" in the name.
-      auto func = cast<AbstractFunctionDecl>(D);
       auto params = func->getParameters();
       unsigned numParameters = params->size();
       if (auto CD = dyn_cast<ConstructorDecl>(func))
@@ -2924,7 +2932,7 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
 
   // If we can lazily resolve the function, do so now.
   if (auto *LazyResolver = attr->Resolver) {
-    auto decl = attr->Resolver->loadDynamicallyReplacedFunctionDecl(
+    auto decl = LazyResolver->loadDynamicallyReplacedFunctionDecl(
         attr, attr->ResolverContextData);
     attr->Resolver = nullptr;
     return decl;
@@ -3884,7 +3892,7 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
     // TODO(TF-654): Class initializers are not yet supported.
     // Extra JVP/VJP type calculation logic is necessary because classes have
     // both allocators and initializers.
-    if (auto *initDecl = dyn_cast<ConstructorDecl>(original)) {
+    if (isa<ConstructorDecl>(original)) {
       diags.diagnose(attr->getLocation(),
                      diag::differentiable_attr_class_init_not_yet_supported);
       attr->setInvalid();

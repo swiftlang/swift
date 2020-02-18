@@ -1045,6 +1045,111 @@ emitBuiltinGlobalStringTablePointer(SILGenFunction &SGF, SILLocation loc,
   return SGF.emitManagedRValueWithCleanup(resultVal);
 }
 
+/// Emit SIL for the named builtin:
+/// convertStrongToUnownedUnsafe. Unlike the default ownership
+/// convention for named builtins, which is to take (non-trivial)
+/// arguments as Owned, this builtin accepts owned as well as
+/// guaranteed arguments, and hence doesn't require the arguments to
+/// be at +1. Therefore, this builtin is emitted specially.
+///
+/// We assume our convention is (T, @inout @unmanaged T) -> ()
+static ManagedValue emitBuiltinConvertStrongToUnownedUnsafe(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 2);
+  if (!argsOrError)
+    return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+
+  auto args = *argsOrError;
+
+  // First get our object at +0 if we can.
+  auto object = SGF.emitRValue(args[0], SGFContext::AllowGuaranteedPlusZero)
+                    .getAsSingleValue(SGF, args[0]);
+
+  // Borrow it and get the value.
+  SILValue objectSrcValue = object.borrow(SGF, loc).getValue();
+
+  // Then create our inout.
+  auto inout = cast<InOutExpr>(args[1]->getSemanticsProvidingExpr());
+  auto lv =
+      SGF.emitLValue(inout->getSubExpr(), SGFAccessKind::BorrowedAddressRead);
+  lv.unsafelyDropLastComponent(PathComponent::OwnershipKind);
+  if (!lv.isPhysical() || !lv.isLoadingPure()) {
+    llvm::report_fatal_error("Builtin.convertStrongToUnownedUnsafe passed "
+                             "non-physical, non-pure lvalue as 2nd arg");
+  }
+
+  SILValue inoutDest =
+      SGF.emitAddressOfLValue(args[1], std::move(lv)).getLValueAddress();
+  SILType destType = inoutDest->getType().getObjectType();
+
+  // Make sure our types match up as we expect.
+  if (objectSrcValue->getType() !=
+      destType.getReferenceStorageReferentType().getObjectType()) {
+    llvm::errs()
+        << "Invalid usage of Builtin.convertStrongToUnownedUnsafe. lhsType "
+           "must be T and rhsType must be inout unsafe(unowned) T"
+        << "lhsType: " << objectSrcValue->getType() << "\n"
+        << "rhsType: " << inoutDest->getType() << "\n";
+    llvm::report_fatal_error("standard fatal error msg");
+  }
+
+  SILType unmanagedOptType = objectSrcValue->getType().getReferenceStorageType(
+      SGF.getASTContext(), ReferenceOwnership::Unmanaged);
+  SILValue unownedObjectSrcValue = SGF.B.createRefToUnmanaged(
+      loc, objectSrcValue, unmanagedOptType.getObjectType());
+  SGF.B.emitStoreValueOperation(loc, unownedObjectSrcValue, inoutDest,
+                                StoreOwnershipQualifier::Trivial);
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+}
+
+/// Emit SIL for the named builtin: convertUnownedUnsafeToGuaranteed.
+///
+/// We assume our convention is:
+///
+/// <BaseT, T> (BaseT, @inout @unowned(unsafe) T) -> @guaranteed T
+///
+static ManagedValue emitBuiltinConvertUnownedUnsafeToGuaranteed(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 2);
+  if (!argsOrError)
+    return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+
+  auto args = *argsOrError;
+
+  // First grab our base and borrow it.
+  auto baseMV =
+      SGF.emitRValueAsSingleValue(args[0], SGFContext::AllowGuaranteedPlusZero)
+          .borrow(SGF, args[0]);
+
+  // Then grab our LValue operand, drop the last ownership component.
+  auto srcLV = SGF.emitLValue(args[1]->getSemanticsProvidingExpr(),
+                              SGFAccessKind::BorrowedAddressRead);
+  srcLV.unsafelyDropLastComponent(PathComponent::OwnershipKind);
+  if (!srcLV.isPhysical() || !srcLV.isLoadingPure()) {
+    llvm::report_fatal_error("Builtin.convertUnownedUnsafeToGuaranteed passed "
+                             "non-physical, non-pure lvalue as 2nd arg");
+  }
+
+  // Grab our address and load our unmanaged and convert it to a ref.
+  SILValue srcAddr =
+      SGF.emitAddressOfLValue(args[1], std::move(srcLV)).getLValueAddress();
+  SILValue srcValue = SGF.B.emitLoadValueOperation(
+      loc, srcAddr, LoadOwnershipQualifier::Trivial);
+  SILValue unownedNonTrivialRef = SGF.B.createUnmanagedToRef(
+      loc, srcValue, srcValue->getType().getReferenceStorageReferentType());
+
+  // Now convert our unownedNonTrivialRef from unowned ownership to guaranteed
+  // ownership and create a cleanup for it.
+  SILValue guaranteedNonTrivialRef = SGF.B.createUncheckedOwnershipConversion(
+      loc, unownedNonTrivialRef, ValueOwnershipKind::Guaranteed);
+  auto guaranteedNonTrivialRefMV =
+      SGF.emitManagedBorrowedRValueWithCleanup(guaranteedNonTrivialRef);
+  // Now create a mark dependence on our base and return the result.
+  return SGF.B.createMarkDependence(loc, guaranteedNonTrivialRefMV, baseMV);
+}
+
 Optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.

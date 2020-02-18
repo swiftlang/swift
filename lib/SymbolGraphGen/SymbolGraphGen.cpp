@@ -20,6 +20,35 @@
 using namespace swift;
 using namespace symbolgraphgen;
 
+namespace {
+int serializeSymbolGraph(SymbolGraph &SG,
+                             const SymbolGraphOptions &Options) {
+  SmallString<256> FileName(SG.M.getNameStr());
+  if (SG.ExtendedModule.hasValue()) {
+    FileName.push_back('@');
+    FileName.append(SG.ExtendedModule.getValue()->getNameStr());
+  }
+  FileName.append(".symbols.json");
+
+  SmallString<1024> OutputPath(Options.OutputDir);
+  llvm::sys::path::append(OutputPath, FileName);
+
+  std::error_code Error;
+  llvm::raw_fd_ostream OS(OutputPath, Error, llvm::sys::fs::FA_Write);
+  if (Error) {
+    llvm::errs() << "Couldn't open output file '" << OutputPath
+        << " for writing: "
+        << Error.message() << "\n";
+    return EXIT_FAILURE;
+  }
+
+  llvm::json::OStream J(OS, Options.PrettyPrint ? 2 : 0);
+  SG.serialize(J);
+  return EXIT_SUCCESS;
+}
+
+} // end anonymous namespace
+
 // MARK: - Main Entry Point
 
 /// Emit a symbol graph JSON file for a `ModuleDecl`.
@@ -41,16 +70,13 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
     << "Found " << Walker.Graph.Nodes.size() << " symbols and "
     << Walker.Graph.Edges.size() << " relationships.\n";
 
-  std::error_code Error;
-  llvm::raw_fd_ostream OS(Options.OutputPath, Error, llvm::sys::fs::FA_Write);
-  if (Error) {
-    llvm::errs() << "Couldn't open output file for writing: "
-        << Error.message() << "\n";
-    return EXIT_FAILURE;
+  int Success = EXIT_SUCCESS;
+
+  Success |= serializeSymbolGraph(Walker.Graph, Options);
+
+  for (auto Pair : Walker.ExtendedModuleGraphs) {
+    Success |= serializeSymbolGraph(*Pair.getSecond(), Options);
   }
 
-  llvm::json::OStream J(OS, Options.PrettyPrint ? 2 : 0);
-  Walker.Graph.serialize(Walker, J);
-
-  return EXIT_SUCCESS;
+  return Success;
 }

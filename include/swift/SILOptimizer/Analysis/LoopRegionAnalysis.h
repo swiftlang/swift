@@ -1082,7 +1082,7 @@ public:
 
   virtual std::unique_ptr<LoopRegionFunctionInfo>
   newFunctionAnalysis(SILFunction *F) override {
-    return llvm::make_unique<LoopRegionFunctionInfo>(F, POA->get(F),
+    return std::make_unique<LoopRegionFunctionInfo>(F, POA->get(F),
                                                      SLA->get(F));
   }
 

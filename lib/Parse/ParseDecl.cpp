@@ -198,52 +198,33 @@ void Parser::parseTopLevel() {
 
   // Parse the body of the file.
   SmallVector<ASTNode, 128> Items;
+  while (!Tok.is(tok::eof)) {
+    // If we run into a SIL decl, skip over until the next Swift decl. We need
+    // to delay parsing these, as SIL parsing currently requires type checking
+    // Swift decls.
+    if (isStartOfSILDecl()) {
+      assert(!isStartOfSwiftDecl() && "Start of both a Swift and SIL decl?");
+      skipSILUntilSwiftDecl();
+      continue;
+    }
 
-  // If we are in SIL mode, and if the first token is the start of a sil
-  // declaration, parse that one SIL function and return to the top level.  This
-  // allows type declarations and other things to be parsed, name bound, and
-  // type checked in batches, similar to immediate mode.  This also enforces
-  // that SIL bodies can only be at the top level.
-  switch (Tok.getKind()) {
-  default:
     parseBraceItems(Items, allowTopLevelCode()
                                ? BraceItemListKind::TopLevelCode
                                : BraceItemListKind::TopLevelLibrary);
-    break;
 
-// For now, create 'UnknownDecl' for all SIL declarations.
-#define CASE_SIL(KW, NAME)                                                     \
-  case tok::kw_##KW: {                                                         \
-    assert(isInSILMode() && "'" #KW "' should only be a keyword in SIL mode"); \
-    SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);   \
-    SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);     \
-    SIL->parse##NAME(*this);                                                   \
-    break;                                                                     \
-  }
-    CASE_SIL(sil, DeclSIL)
-    CASE_SIL(sil_stage, DeclSILStage)
-    CASE_SIL(sil_vtable, SILVTable)
-    CASE_SIL(sil_global, SILGlobal)
-    CASE_SIL(sil_witness_table, SILWitnessTable)
-    CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
-    CASE_SIL(sil_coverage_map, SILCoverageMap)
-    CASE_SIL(sil_property, SILProperty)
-    CASE_SIL(sil_scope, SILScope)
-#undef CASE_SIL
-  }
-  
-  // In the case of a catastrophic parse error, consume any trailing
-  // #else, #elseif, or #endif and move on to the next statement or declaration
-  // block.
-  if (Tok.is(tok::pound_else) || Tok.is(tok::pound_elseif) ||
-      Tok.is(tok::pound_endif)) {
-    diagnose(Tok.getLoc(),
-             diag::unexpected_conditional_compilation_block_terminator);
-    // Create 'UnknownDecl' for orphan directives.
-    SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
-    SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);
+    // In the case of a catastrophic parse error, consume any trailing
+    // #else, #elseif, or #endif and move on to the next statement or
+    // declaration block.
+    if (Tok.is(tok::pound_else) || Tok.is(tok::pound_elseif) ||
+        Tok.is(tok::pound_endif)) {
+      diagnose(Tok.getLoc(),
+               diag::unexpected_conditional_compilation_block_terminator);
+      // Create 'UnknownDecl' for orphan directives.
+      SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
+      SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);
 
-    consumeToken();
+      consumeToken();
+    }
   }
 
   // Add newly parsed decls to the module.
@@ -258,15 +239,60 @@ void Parser::parseTopLevel() {
   SF.ASTStage = SourceFile::Parsed;
   verify(SF);
 
-  // Next time start relexing from the beginning of the comment so that we can
-  // attach it to the token.
-  State->markParserPosition(getParserPosition(),
-                            InPoundLineEnvironment);
+  // Finalize the token receiver.
+  SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
+  TokReceiver->finalize();
+}
 
-  // If we are done parsing the whole file, finalize the token receiver.
-  if (Tok.is(tok::eof)) {
-    SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
-    TokReceiver->finalize();
+void Parser::parseTopLevelSIL() {
+  assert(SIL && isInSILMode());
+
+  // Prime the lexer.
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeTokenWithoutFeedingReceiver();
+
+  auto skipToNextSILDecl = [&]() {
+    while (!Tok.is(tok::eof) && !isStartOfSILDecl())
+      skipSingle();
+  };
+
+  while (!Tok.is(tok::eof)) {
+    // If we run into a Swift decl, skip over until we find the next SIL decl.
+    if (isStartOfSwiftDecl()) {
+      assert(!isStartOfSILDecl() && "Start of both a Swift and SIL decl?");
+      skipToNextSILDecl();
+      continue;
+    }
+
+    switch (Tok.getKind()) {
+#define CASE_SIL(KW, NAME)                                                     \
+    case tok::kw_##KW: {                                                       \
+      /* If we failed to parse a SIL decl, move onto the next SIL decl to      \
+         better help recovery. */                                              \
+      if (SIL->parse##NAME(*this)) {                                           \
+        Lexer::SILBodyRAII sbr(*L);                                            \
+        skipToNextSILDecl();                                                   \
+      }                                                                        \
+      break;                                                                   \
+    }
+    CASE_SIL(sil, DeclSIL)
+    CASE_SIL(sil_stage, DeclSILStage)
+    CASE_SIL(sil_vtable, SILVTable)
+    CASE_SIL(sil_global, SILGlobal)
+    CASE_SIL(sil_witness_table, SILWitnessTable)
+    CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
+    CASE_SIL(sil_differentiability_witness, SILDifferentiabilityWitness)
+    CASE_SIL(sil_coverage_map, SILCoverageMap)
+    CASE_SIL(sil_property, SILProperty)
+    CASE_SIL(sil_scope, SILScope)
+#undef CASE_SIL
+    default:
+      // If we reached here, we have something malformed that isn't a Swift decl
+      // or a SIL decl. Emit an error and skip ahead to the next SIL decl.
+      diagnose(Tok, diag::expected_sil_keyword);
+      skipToNextSILDecl();
+      break;
+    }
   }
 }
 
@@ -2174,6 +2200,37 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
+  case DAK_TypeEraser: {
+    // Parse leading '('
+    if (Tok.isNot(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    SourceLoc LParenLoc = consumeToken(tok::l_paren);
+    ParserResult<TypeRepr> ErasedType;
+    bool invalid = false;
+    {
+      // Parse type-eraser type
+      SyntaxParsingContext ContentContext(SyntaxContext, SyntaxKind::Type);
+      ErasedType = parseType(diag::attr_type_eraser_expected_type_name);
+      invalid = ErasedType.hasCodeCompletion() || ErasedType.isNull();
+    }
+
+    // Parse matching ')'
+    SourceLoc RParenLoc;
+    invalid |= parseMatchingToken(tok::r_paren, RParenLoc,
+                                  diag::attr_type_eraser_expected_rparen,
+                                  LParenLoc);
+    if (invalid)
+      return false;
+
+    Attributes.add(new (Context)
+        TypeEraserAttr(AtLoc, {Loc, RParenLoc}, ErasedType.get()));
+    break;
+  }
+
   case DAK_Specialize: {
     if (Tok.isNot(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -3046,9 +3103,9 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
         // treat 'class' as a modifier; in the case of a following CC
         // token, we cannot be sure there is no intention to override
         // or witness something static.
-        if (isStartOfDecl() || (isa<ClassDecl>(CurDeclContext) &&
-                                (Tok.is(tok::code_complete) ||
-                                 Tok.getRawText().equals("override")))) {
+        if (isStartOfSwiftDecl() || (isa<ClassDecl>(CurDeclContext) &&
+                                     (Tok.is(tok::code_complete) ||
+                                      Tok.getRawText().equals("override")))) {
           /* We're OK */
         } else {
           // This 'class' is a real ClassDecl introducer.
@@ -3295,8 +3352,7 @@ static bool isParenthesizedUnowned(Parser &P) {
           (P.Tok.getText() == "safe" || P.Tok.getText() == "unsafe");
 }
 
-  
-bool Parser::isStartOfDecl() {
+bool Parser::isStartOfSwiftDecl() {
   // If this is obviously not the start of a decl, then we're done.
   if (!isKeywordPossibleDeclStart(Tok)) return false;
 
@@ -3347,7 +3403,36 @@ bool Parser::isStartOfDecl() {
     if (Tok.isAny(tok::r_brace, tok::eof, tok::pound_endif))
       return true;
 
-    return isStartOfDecl();
+    return isStartOfSwiftDecl();
+  }
+
+  // If we have a decl modifying keyword, check if the next token is a valid
+  // decl start. This is necessary to correctly handle Swift keywords that are
+  // shared by SIL, e.g 'private' in 'sil private @foo :'. We need to make sure
+  // this isn't considered a valid Swift decl start.
+  if (Tok.isKeyword()) {
+    auto DAK = DeclAttribute::getAttrKindFromString(Tok.getText());
+    if (DAK != DAK_Count && DeclAttribute::isDeclModifier(DAK)) {
+      BacktrackingScope backtrack(*this);
+      consumeToken();
+
+      // Eat paren after modifier name; e.g. private(set)
+      if (consumeIf(tok::l_paren)) {
+        while (Tok.isNot(tok::r_brace, tok::eof, tok::pound_endif)) {
+          if (consumeIf(tok::r_paren))
+            break;
+
+          // If we found the start of a decl while trying to skip over the
+          // paren, then we have something incomplete like 'private('. Return
+          // true for better recovery.
+          if (isStartOfSwiftDecl())
+            return true;
+
+          skipSingle();
+        }
+      }
+      return isStartOfSwiftDecl();
+    }
   }
 
   // Otherwise, the only hard case left is the identifier case.
@@ -3373,7 +3458,7 @@ bool Parser::isStartOfDecl() {
     consumeToken(tok::l_paren);
     consumeToken(tok::identifier);
     consumeToken(tok::r_paren);
-    return isStartOfDecl();
+    return isStartOfSwiftDecl();
   }
 
   // If the next token is obviously not the start of a decl, bail early.
@@ -3383,7 +3468,31 @@ bool Parser::isStartOfDecl() {
   // Otherwise, do a recursive parse.
   Parser::BacktrackingScope Backtrack(*this);
   consumeToken(tok::identifier);
-  return isStartOfDecl();
+  return isStartOfSwiftDecl();
+}
+
+bool Parser::isStartOfSILDecl() {
+  switch (Tok.getKind()) {
+  case tok::kw_sil:
+  case tok::kw_sil_stage:
+  case tok::kw_sil_property:
+  case tok::kw_sil_vtable:
+  case tok::kw_sil_global:
+  case tok::kw_sil_witness_table:
+  case tok::kw_sil_default_witness_table:
+  case tok::kw_sil_differentiability_witness:
+  case tok::kw_sil_coverage_map:
+  case tok::kw_sil_scope:
+    // SIL decls must start on a new line.
+    return Tok.isAtStartOfLine();
+  case tok::kw_undef:
+  case tok::NUM_TOKENS:
+    return false;
+#define SIL_KEYWORD(Name)
+#define TOKEN(Name) case tok:: Name: return false;
+#include "swift/Syntax/TokenKinds.def"
+  }
+  llvm_unreachable("Unhandled case in switch");
 }
 
 void Parser::consumeDecl(ParserPosition BeginParserPosition,
@@ -3929,7 +4038,8 @@ Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
     return {std::vector<Decl *>(), None};
   }
 
-  auto BeginParserPosition = getParserPosition({BodyRange.Start, SourceLoc()});
+  auto BeginParserPosition = getParserPosition(BodyRange.Start,
+                                               /*previousLoc*/ SourceLoc());
   auto EndLexerState = L->getStateForEndOfTokenLoc(BodyRange.End);
 
   // ParserPositionRAII needs a primed parser to restore to.
@@ -5133,6 +5243,41 @@ bool Parser::skipBracedBlock() {
   return OpenBraces != 0;
 }
 
+void Parser::skipSILUntilSwiftDecl() {
+  // For now, create 'UnknownDecl' for all SIL declarations.
+  SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
+  SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);
+
+  // Tell the lexer we're about to start lexing SIL.
+  Lexer::SILBodyRAII sbr(*L);
+
+  // Enter a top-level scope. This is necessary as parseType may need to setup
+  // child scopes for generic params.
+  Scope topLevel(this, ScopeKind::TopLevel);
+
+  while (!Tok.is(tok::eof) && !isStartOfSwiftDecl()) {
+    // SIL pound dotted paths need to be skipped specially as they can contain
+    // decl keywords like 'subscript'.
+    if (consumeIf(tok::pound)) {
+      do {
+        consumeToken();
+      } while (consumeIf(tok::period));
+      continue;
+    }
+
+    // SIL types need to be skipped specially as they can contain attributes on
+    // tuples which can look like decl attributes.
+    if (consumeIf(tok::sil_dollar)) {
+      if (Tok.isAnyOperator() && Tok.getText().startswith("*")) {
+        consumeStartingCharacterOfCurrentToken();
+      }
+      (void)parseType();
+      continue;
+    }
+    skipSingle();
+  }
+}
+
 /// Returns a descriptive name for the given accessor/addressor kind.
 static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
                                               bool article) {
@@ -5343,35 +5488,18 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
       AccessorCtx.reset();
 
       if (Tok.is(tok::code_complete)) {
-        if (CodeCompletion) {
-          CodeCompletionExpr *CCE = nullptr;
-          if (IsFirstAccessor && !parsingLimitedSyntax) {
-            // If CC token is the first token after '{', it might be implicit
-            // getter. Set up dummy accessor as the decl context to populate
-            // 'self' decl.
-
-            // FIXME: if there is already code inside the body, we should fall
-            // through to parseImplicitGetter and handle the completion there so
-            // that we can differentiate a single-expression body from the first
-            // expression in a multi-statement body.
-            auto getter = createAccessorFunc(
-                accessors.LBLoc, /*ValueNamePattern*/ nullptr, GenericParams,
-                Indices, StaticLoc, Flags, AccessorKind::Get,
-                storage, this, /*AccessorKeywordLoc*/ SourceLoc());
-            CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-            getter->setBodyParsed(BraceStmt::create(Context, Tok.getLoc(),
-                                                    ASTNode(CCE), Tok.getLoc(),
-                                                    /*implicit*/ true));
-            accessors.add(getter);
-            CodeCompletion->setParsedDecl(getter);
-          } else {
+        // Handle code completion here only if it's not the first accessor.
+        // If it's the first accessor, it's handled in function body parsing
+        // because it might be an implicit getter.
+        if (!IsFirstAccessor || parsingLimitedSyntax) {
+          if (CodeCompletion) {
             CodeCompletion->setParsedDecl(storage);
+            CodeCompletion->completeAccessorBeginning(nullptr);
           }
-          CodeCompletion->completeAccessorBeginning(CCE);
+          consumeToken(tok::code_complete);
+          accessorHasCodeCompletion = true;
+          break;
         }
-        consumeToken(tok::code_complete);
-        accessorHasCodeCompletion = true;
-        break;
       }
 
       // parsingLimitedSyntax mode cannot have a body.
@@ -6214,7 +6342,47 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   return DCC.fixupParserResult(FD);
 }
 
-/// Parse function body into \p AFD.
+/// Parse a function body for \p AFD and returns it without setting the body
+/// to \p AFD .
+ParserResult<BraceStmt>
+Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
+  assert(Tok.is(tok::l_brace));
+
+  // Enter the arguments for the function into a new function-body scope.  We
+  // need this even if there is no function body to detect argument name
+  // duplication.
+  if (auto *P = AFD->getImplicitSelfDecl())
+    addToScope(P);
+  addParametersToScope(AFD->getParameters());
+
+   // Establish the new context.
+  ParseFunctionBody CC(*this, AFD);
+  setLocalDiscriminatorToParamList(AFD->getParameters());
+
+  if (Context.Stats)
+    Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
+  // In implicit getter, if a CC token is the first token after '{', it might
+  // be a start of an accessor block. Perform special completion for that.
+  if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
+    if (peekToken().is(tok::code_complete) && accessor->isImplicitGetter()) {
+      SourceLoc LBraceLoc, RBraceLoc;
+      LBraceLoc = consumeToken(tok::l_brace);
+      auto *CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+      CodeCompletion->setParsedDecl(accessor);
+      CodeCompletion->completeAccessorBeginning(CCE);
+      RBraceLoc = Tok.getLoc();
+      consumeToken(tok::code_complete);
+      return makeParserCodeCompletionResult(
+          BraceStmt::create(Context, LBraceLoc, ASTNode(CCE), RBraceLoc,
+          /*implicit*/ true));
+    }
+  }
+
+  return parseBraceItemList(diag::invalid_diagnostic);
+}
+
+/// Parse function body into \p AFD or skip it for delayed parsing.
 void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (!Tok.is(tok::l_brace)) {
     checkForInputIncomplete();
@@ -6234,21 +6402,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
 
   Scope S(this, ScopeKind::FunctionBody);
 
-  // Enter the arguments for the function into a new function-body scope.  We
-  // need this even if there is no function body to detect argument name
-  // duplication.
-  if (auto *P = AFD->getImplicitSelfDecl())
-    addToScope(P);
-  addParametersToScope(AFD->getParameters());
-
-   // Establish the new context.
-  ParseFunctionBody CC(*this, AFD);
-  setLocalDiscriminatorToParamList(AFD->getParameters());
-
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumFunctionsParsed++;
-
-  ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+  ParserResult<BraceStmt> Body = parseAbstractFunctionBodyImpl(AFD);
   if (!Body.isNull()) {
     BraceStmt * BS = Body.get();
     AFD->setBodyParsed(BS);
@@ -6283,7 +6437,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
             return;
           }
         }
-        if (auto F = dyn_cast<FuncDecl>(AFD)) {
+        if (isa<FuncDecl>(AFD)) {
           auto RS = new (Context) ReturnStmt(SourceLoc(), E);
           BS->setFirstElement(RS);
           AFD->setHasSingleExpressionBody();
@@ -6308,7 +6462,8 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
          "function body should be delayed");
 
   auto bodyRange = AFD->getBodySourceRange();
-  auto BeginParserPosition = getParserPosition({bodyRange.Start, SourceLoc()});
+  auto BeginParserPosition = getParserPosition(bodyRange.Start,
+                                               /*previousLoc*/ SourceLoc());
   auto EndLexerState = L->getStateForEndOfTokenLoc(AFD->getEndLoc());
 
   // ParserPositionRAII needs a primed parser to restore to.
@@ -6330,13 +6485,8 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope TopLevelScope(this, ScopeKind::TopLevel);
   Scope S(this, ScopeKind::FunctionBody);
-  if (auto *P = AFD->getImplicitSelfDecl())
-    addToScope(P);
-  addParametersToScope(AFD->getParameters());
-  ParseFunctionBody CC(*this, AFD);
-  setLocalDiscriminatorToParamList(AFD->getParameters());
 
-  return parseBraceItemList(diag::func_decl_without_brace).getPtrOrNull();
+  return parseAbstractFunctionBodyImpl(AFD).getPtrOrNull();
 }
 
 /// Parse a 'enum' declaration, returning true (and doing no token

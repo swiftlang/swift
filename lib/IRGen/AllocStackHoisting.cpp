@@ -355,8 +355,6 @@ bool indicatesDynamicAvailabilityCheckUse(SILInstruction *I) {
   auto *FunRef = Apply->getReferencedFunctionOrNull();
   if (!FunRef)
     return false;
-  if (FunRef->getName().equals("_swift_stdlib_operatingSystemVersion"))
-    return true;
   return false;
 }
 

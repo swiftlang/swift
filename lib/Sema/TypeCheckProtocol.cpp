@@ -725,7 +725,7 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
                             requirement);
   };
 
-  if (auto memberTy = type->getAs<DependentMemberType>())
+  if (type->is<DependentMemberType>())
     return missingRequirementMatch(type);
 
   type = type->mapTypeOutOfContext();
@@ -5514,6 +5514,9 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
 
   case KnownProtocolKind::CaseIterable:
     return derived.deriveCaseIterable(Requirement);
+
+  case KnownProtocolKind::Comparable:
+    return derived.deriveComparable(Requirement);
 
   case KnownProtocolKind::Equatable:
     return derived.deriveEquatable(Requirement);

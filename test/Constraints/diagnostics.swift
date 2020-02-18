@@ -127,7 +127,9 @@ protocol Shoes {
 
 // Here the opaque value has type (metatype_type (archetype_type ... ))
 func f(_ x: Shoes, asType t: Shoes.Type) {
-  return t.select(x) // expected-error{{unexpected non-void return value in void function}}
+  return t.select(x) 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 precedencegroup Starry {
@@ -184,7 +186,9 @@ func perform<T>() {}  // expected-error {{generic parameter 'T' is not used in f
 
 // <rdar://problem/17080659> Error Message QOI - wrong return type in an overload
 func recArea(_ h: Int, w : Int) {
-  return h * w  // expected-error {{unexpected non-void return value in void function}}
+  return h * w  
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // <rdar://problem/17224804> QoI: Error In Ternary Condition is Wrong
@@ -195,10 +199,10 @@ func r17224804(_ monthNumber : Int) {
 
 // <rdar://problem/17020197> QoI: Operand of postfix '!' should have optional type; type is 'Int?'
 func r17020197(_ x : Int?, y : Int) {
-  if x! {  }  // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if x! {  }  // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 
   // <rdar://problem/12939553> QoI: diagnostic for using an integer in a condition is utterly terrible
-  if y {}    // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if y {}    // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 }
 
 // <rdar://problem/20714480> QoI: Boolean expr not treated as Bool type when function return type is different
@@ -634,11 +638,11 @@ func r18397777(_ d : r21447318?) {
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
   }
   
-  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{8-8= != nil)}}
+  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{8-8= == nil)}}
 
   }
 
-  if !Optional(c) { // expected-error {{optional type 'Optional<r21447318>' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{18-18= != nil)}}
+  if !Optional(c) { // expected-error {{optional type 'Optional<r21447318>' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{18-18= == nil)}}
   }
 }
 
@@ -752,7 +756,9 @@ func segfault23433271(_ a : UnsafeMutableRawPointer) {
 // <rdar://problem/23272739> Poor diagnostic due to contextual constraint
 func r23272739(_ contentType: String) {
   let actualAcceptableContentTypes: Set<String> = []
-  return actualAcceptableContentTypes.contains(contentType)  // expected-error {{unexpected non-void return value in void function}}
+  return actualAcceptableContentTypes.contains(contentType)  
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // <rdar://problem/23641896> QoI: Strings in Swift cannot be indexed directly with integer offsets
@@ -863,8 +869,8 @@ class Foo23752537 {
 extension Foo23752537 {
   func isEquivalent(other: Foo23752537) {
     // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
-    // expected-error @+1 {{unexpected non-void return value in void function}}
-    return (self.title != other.title && self.message != other.message)
+    // expected-error@+1 {{unexpected non-void return value in void function}} 
+    return (self.title != other.title && self.message != other.message) // expected-note {{did you mean to add a return type?}}
   }
 }
 
@@ -890,7 +896,9 @@ func f23213302() {
 
 // <rdar://problem/24202058> QoI: Return of call to overloaded function in void-return context
 func rdar24202058(a : Int) {
-  return a <= 480 // expected-error {{unexpected non-void return value in void function}}
+  return a <= 480 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // SR-1752: Warning about unused result with ternary operator
@@ -927,7 +935,7 @@ class CacheValue {
 
 func valueForKey<K>(_ key: K) -> CacheValue? {
   let cache = NSCache<K, CacheValue>()
-  return cache.object(forKey: key)?.value // expected-error {{no exact matches in call to instance method 'value'}}
+  return cache.object(forKey: key)?.value // expected-error {{no exact matches in reference to instance method 'value'}}
 }
 
 // SR-2242: poor diagnostic when argument label is omitted
@@ -953,7 +961,9 @@ r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unname
 
 // SR-1255
 func foo1255_1() {
-  return true || false // expected-error {{unexpected non-void return value in void function}}
+  return true || false 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 func foo1255_2() -> Int {
   return true || false // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
@@ -1075,7 +1085,7 @@ func SR_6272_c() {
 struct SR_6272_D: ExpressibleByIntegerLiteral {
   typealias IntegerLiteralType = Int
   init(integerLiteral: Int) {}
-  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 } // expected-note 2 {{candidate expects value of type 'Int' for parameter #2}}
+  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 }
 }
 
 func SR_6272_d() {
@@ -1150,6 +1160,7 @@ func sr5045() {
   let doubles: [Double] = [1, 2, 3]
   return doubles.reduce(0, +)
   // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // rdar://problem/32934129 - QoI: misleading diagnostic
@@ -1165,7 +1176,9 @@ class L_32934129<T : Comparable> {
 
   func length() -> Int {
     func inner(_ list: L_32934129<T>?, _ count: Int) {
-    guard let list = list else { return count } // expected-error {{unexpected non-void return value in void function}}
+    guard let list = list else { return count } 
+      // expected-error@-1 {{unexpected non-void return value in void function}}
+      // expected-note@-2 {{did you mean to add a return type?}}
       return inner(list.next, count + 1)
     }
 
@@ -1315,3 +1328,80 @@ takesGenericFunction(true) // expected-error {{cannot convert value of type 'Boo
 func takesTuple<T>(_ x: ([T], [T])) {} // expected-note {{in call to function 'takesTuple'}}
 takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([T], [T])'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+
+// Void function returns non-void result fix-it
+
+func voidFunc() {
+  return 1 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{16-16= -> <#Return Type#>}}
+}
+
+func voidFuncWithArgs(arg1: Int) {
+  return 1 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{33-33= -> <#Return Type#>}}
+}
+
+func voidFuncWithCondFlow() {
+  if Bool.random() {
+    return 1
+    // expected-error@-1 {{unexpected non-void return value in void function}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{28-28= -> <#Return Type#>}}
+  } else {
+    return 2
+    // expected-error@-1 {{unexpected non-void return value in void function}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{28-28= -> <#Return Type#>}}
+  }
+}
+
+func voidFuncWithNestedVoidFunc() {
+  func nestedVoidFunc() {
+    return 1
+    // expected-error@-1 {{unexpected non-void return value in void function}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{24-24= -> <#Return Type#>}}
+  }
+}
+
+// Special cases: These should not offer a note + fix-it
+
+func voidFuncExplicitType() -> Void {
+  return 1 // expected-error {{unexpected non-void return value in void function}}
+}
+
+class ClassWithDeinit {
+  deinit {
+    return 0 // expected-error {{unexpected non-void return value in void function}}
+  }
+}
+
+class ClassWithVoidProp {
+  var propertyWithVoidType: () { return 5 } // expected-error {{unexpected non-void return value in void function}}
+}
+
+class ClassWithPropContainingSetter {
+  var propWithSetter: Int {
+    get { return 0 }
+    set { return 1 } // expected-error {{unexpected non-void return value in void function}}
+  }
+}
+
+// https://bugs.swift.org/browse/SR-11964
+struct Rect {
+    let width: Int
+    let height: Int
+}
+
+struct Frame {
+    func rect(width: Int, height: Int) -> Rect {
+        Rect(width: width, height: height)
+    }
+
+    let rect: Rect
+}
+
+func foo(frame: Frame) {
+    frame.rect.width + 10.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+    // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int)}}
+
+}

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -223,6 +223,9 @@ struct ASTContext::Implementation {
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
+  
+  /// func <Int, Int) -> Bool
+  FuncDecl *LessThanIntDecl = nullptr;
   
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
@@ -501,7 +504,8 @@ static ModuleDecl *createBuiltinModule(ASTContext &ctx) {
 
 inline ASTContext::Implementation &ASTContext::getImpl() const {
   auto pointer = reinterpret_cast<char*>(const_cast<ASTContext*>(this));
-  auto offset = llvm::alignAddr((void*)sizeof(*this), alignof(Implementation));
+  auto offset = llvm::alignAddr((void *)sizeof(*this),
+                                llvm::Align(alignof(Implementation)));
   return *reinterpret_cast<Implementation*>(pointer + offset);
 }
 
@@ -521,7 +525,8 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
   auto size = llvm::alignTo(sizeof(ASTContext) + sizeof(Implementation), align);
   auto mem = AlignedAlloc(size, align);
   auto impl = reinterpret_cast<void*>((char*)mem + sizeof(ASTContext));
-  impl = reinterpret_cast<void*>(llvm::alignAddr(impl,alignof(Implementation)));
+  impl = reinterpret_cast<void *>(
+      llvm::alignAddr(impl, llvm::Align(alignof(Implementation))));
   new (impl) Implementation();
   return new (mem)
       ASTContext(langOpts, typeckOpts, SearchPathOpts, SourceMgr, Diags);
@@ -1083,29 +1088,36 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   return witness;
 }
 
-FuncDecl *ASTContext::getEqualIntDecl() const {
-  if (getImpl().EqualIntDecl)
-    return getImpl().EqualIntDecl;
+static 
+FuncDecl *getBinaryComparisonOperatorIntDecl(const ASTContext &C, StringRef op, FuncDecl *&cached) {
+  if (cached)
+    return cached;
 
-  if (!getIntDecl() || !getBoolDecl())
+  if (!C.getIntDecl() || !C.getBoolDecl())
     return nullptr;
 
-  auto intType = getIntDecl()->getDeclaredType();
+  auto intType = C.getIntDecl()->getDeclaredType();
   auto isIntParam = [&](AnyFunctionType::Param param) {
     return (!param.isVariadic() && !param.isInOut() &&
             param.getPlainType()->isEqual(intType));
   };
-  auto boolType = getBoolDecl()->getDeclaredType();
-  auto decl = lookupOperatorFunc(*this, "==",
-                                 intType, [=](FunctionType *type) {
+  auto boolType = C.getBoolDecl()->getDeclaredType();
+  auto decl = lookupOperatorFunc(C, op, intType, 
+      [=](FunctionType *type) {
     // Check for the signature: (Int, Int) -> Bool
     if (type->getParams().size() != 2) return false;
     if (!isIntParam(type->getParams()[0]) ||
         !isIntParam(type->getParams()[1])) return false;
     return type->getResult()->isEqual(boolType);
   });
-  getImpl().EqualIntDecl = decl;
+  cached = decl;
   return decl;
+}
+FuncDecl *ASTContext::getLessThanIntDecl() const {
+  return getBinaryComparisonOperatorIntDecl(*this, "<", getImpl().LessThanIntDecl);
+}
+FuncDecl *ASTContext::getEqualIntDecl() const {
+  return getBinaryComparisonOperatorIntDecl(*this, "==", getImpl().EqualIntDecl);
 }
 
 FuncDecl *ASTContext::getHashValueForDecl() const {
@@ -1537,7 +1549,7 @@ void ASTContext::registerGenericSignatureBuilder(
 
   ++NumRegisteredGenericSignatureBuilders;
   genericSignatureBuilders[canSig] =
-    llvm::make_unique<GenericSignatureBuilder>(std::move(builder));
+    std::make_unique<GenericSignatureBuilder>(std::move(builder));
 }
 
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
@@ -4390,6 +4402,18 @@ ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
   }
   return impl.Converter.getValue().getFunctionType(params, resultTy, trueRep);
 }
+
+const Decl *
+ASTContext::getSwiftDeclForExportedClangDecl(const clang::Decl *decl) {
+  auto &impl = getImpl();
+
+  // If we haven't exported anything yet, this must not be how we found
+  // this declaration.
+  if (!impl.Converter) return nullptr;
+
+  return impl.Converter->getSwiftDeclForExportedClangDecl(decl);
+}
+
 
 CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   if (auto theSig = getImpl().SingleGenericParameterSignature)

@@ -462,17 +462,17 @@ Identifier REPLChecker::getNextResponseVariableName(DeclContext *DC) {
 /// processREPLTopLevel - This is called after we've parsed and typechecked some
 /// new decls at the top level.  We inject code to print out expressions and
 /// pattern bindings the are evaluated.
-void TypeChecker::processREPLTopLevel(SourceFile &SF, unsigned FirstDecl) {
+void TypeChecker::processREPLTopLevel(SourceFile &SF) {
   // Walk over all decls in the file to find the next available closure
   // discriminator.
   DiscriminatorFinder DF;
   for (Decl *D : SF.getTopLevelDecls())
     D->walk(DF);
 
-  // Move new declarations out.
-  std::vector<Decl *> NewDecls(SF.getTopLevelDecls().begin()+FirstDecl,
+  // Move the new declarations out of the source file.
+  std::vector<Decl *> NewDecls(SF.getTopLevelDecls().begin(),
                                SF.getTopLevelDecls().end());
-  SF.truncateTopLevelDecls(FirstDecl);
+  SF.truncateTopLevelDecls(0);
 
   REPLChecker RC(SF, DF);
 

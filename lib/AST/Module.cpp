@@ -83,7 +83,7 @@ BuiltinUnit::LookupCache &BuiltinUnit::getCache() const {
   // FIXME: This leaks. Sticking this into ASTContext isn't enough because then
   // the DenseMap will leak.
   if (!Cache)
-    const_cast<BuiltinUnit *>(this)->Cache = llvm::make_unique<LookupCache>();
+    const_cast<BuiltinUnit *>(this)->Cache = std::make_unique<LookupCache>();
   return *Cache;
 }
 
@@ -192,7 +192,7 @@ public:
 SourceLookupCache &SourceFile::getCache() const {
   if (!Cache) {
     const_cast<SourceFile *>(this)->Cache =
-        llvm::make_unique<SourceLookupCache>(*this);
+        std::make_unique<SourceLookupCache>(*this);
   }
   return *Cache;
 }
@@ -435,7 +435,7 @@ void ModuleDecl::removeFile(FileUnit &existingFile) {
 SourceLookupCache &ModuleDecl::getSourceLookupCache() const {
   if (!Cache) {
     const_cast<ModuleDecl *>(this)->Cache =
-        llvm::make_unique<SourceLookupCache>(*this);
+        std::make_unique<SourceLookupCache>(*this);
   }
   return *Cache;
 }
@@ -1218,7 +1218,7 @@ ModuleDecl::ReverseFullNameIterator::operator++() {
   if (!current)
     return *this;
 
-  if (auto *swiftModule = current.dyn_cast<const ModuleDecl *>()) {
+  if (current.is<const ModuleDecl *>()) {
     current = nullptr;
     return *this;
   }
@@ -1893,6 +1893,28 @@ void FileUnit::getTopLevelDeclsWhereAttributesMatch(
       return !matchAttributes(D->getAttrs());
     });
   Results.erase(newEnd, Results.end());
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const FileUnit *file) {
+  if (!file) {
+    out << "(null)";
+    return;
+  }
+
+  switch (file->getKind()) {
+  case FileUnitKind::Source:
+    out << '\"' << cast<SourceFile>(file)->getFilename() << '\"';
+    return;
+  case FileUnitKind::Builtin:
+    out << "(Builtin)";
+    return;
+  case FileUnitKind::DWARFModule:
+  case FileUnitKind::ClangModule:
+  case FileUnitKind::SerializedAST:
+    out << '\"' << cast<LoadedFile>(file)->getFilename() << '\"';
+    return;
+  }
+  llvm_unreachable("Unhandled case in switch");
 }
 
 StringRef LoadedFile::getFilename() const {

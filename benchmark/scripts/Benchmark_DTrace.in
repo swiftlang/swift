@@ -19,20 +19,17 @@ import sys
 
 DRIVER_LIBRARY_PATH = "@PATH_TO_DRIVER_LIBRARY@"
 sys.path.append(DRIVER_LIBRARY_PATH)
-DTRACE_PATH = os.path.join(DRIVER_LIBRARY_PATH, 'swift_stats.d')
+DTRACE_PATH = os.path.join(DRIVER_LIBRARY_PATH, "swift_stats.d")
 
 import perf_test_driver  # noqa (E402 module level import not at top of file)
 
 # Regexes for the XFAIL_LIST. Matches against '([Onone|O|Osize],TestName)'
-XFAIL_LIST = [
-]
+XFAIL_LIST = []
 
 
 class DTraceResult(perf_test_driver.Result):
-
     def __init__(self, name, status, output, csv_output):
-        perf_test_driver.Result.__init__(
-            self, name, status, output, XFAIL_LIST)
+        perf_test_driver.Result.__init__(self, name, status, output, XFAIL_LIST)
         self.csv_output = csv_output
 
     def is_failure(self):
@@ -40,40 +37,38 @@ class DTraceResult(perf_test_driver.Result):
 
     @classmethod
     def data_headers(cls):
-        return [
-            'Name', 'Result', 'Total RR Opts', 'Total RR Opts/Iter']
+        return ["Name", "Result", "Total RR Opts", "Total RR Opts/Iter"]
 
     @classmethod
     def data_format(cls, max_test_len):
         non_name_headers = DTraceResult.data_headers()[1:]
-        fmt = ('{:<%d}' % (max_test_len + 5)) + \
-            ''.join(['{:<%d}' % (len(h) + 2) for h in non_name_headers])
+        fmt = ("{:<%d}" % (max_test_len + 5)) + "".join(
+            ["{:<%d}" % (len(h) + 2) for h in non_name_headers]
+        )
         return fmt
 
     @classmethod
     def print_data_header(cls, max_test_len, csv_output):
         headers = cls.data_headers()
         if csv_output:
-            print(','.join(headers))
+            print(",".join(headers))
             return
         print(cls.data_format(max_test_len).format(*headers))
 
     def print_data(self, max_test_len):
         result = [self.get_name(), self.get_result()] + map(str, self.output)
         if self.csv_output:
-            print(','.join(result))
+            print(",".join(result))
             return
 
         print(DTraceResult.data_format(max_test_len).format(*result))
 
 
 class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
-
     def __init__(self, binary, xfail_list, csv_output):
         perf_test_driver.BenchmarkDriver.__init__(
-            self, binary, xfail_list,
-            enable_parallel=True,
-            opt_levels=['O'])
+            self, binary, xfail_list, enable_parallel=True, opt_levels=["O"]
+        )
         self.csv_output = csv_output
 
     def print_data_header(self, max_test_len):
@@ -83,23 +78,37 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
         return {}
 
     def process_input(self, data):
-        test_name = '({}_{})'.format(data['opt'], data['test_name'])
+        test_name = "({}_{})".format(data["opt"], data["test_name"])
         print("Running {}...".format(test_name))
         sys.stdout.flush()
 
         def get_results_with_iters(iters):
             e = os.environ
-            e['SWIFT_DETERMINISTIC_HASHING'] = '1'
-            p = subprocess.Popen([
-                'sudo', 'dtrace', '-s', DTRACE_PATH,
-                '-c', '%s %s %s %s' % (data['path'], data['test_name'],
-                                       '--num-iters=%d' % iters,
-                                       '--num-samples=2')
-            ], stdout=subprocess.PIPE, stderr=open('/dev/null', 'w'), env=e)
+            e["SWIFT_DETERMINISTIC_HASHING"] = "1"
+            p = subprocess.Popen(
+                [
+                    "sudo",
+                    "dtrace",
+                    "-s",
+                    DTRACE_PATH,
+                    "-c",
+                    "%s %s %s %s"
+                    % (
+                        data["path"],
+                        data["test_name"],
+                        "--num-iters=%d" % iters,
+                        "--num-samples=2",
+                    ),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=open("/dev/null", "w"),
+                env=e,
+            )
             results = [x for x in p.communicate()[0].split("\n") if len(x) > 0]
             return [
-                x.split(',')[1] for x in
-                results[results.index('DTRACE RESULTS') + 1:]]
+                x.split(",")[1] for x in results[results.index("DTRACE RESULTS") + 1 :]
+            ]
+
         iter_2_results = get_results_with_iters(2)
         iter_3_results = get_results_with_iters(3)
         iter_5_results = get_results_with_iters(5)
@@ -136,16 +145,18 @@ SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '-filter',
+        "-filter",
         type=str,
         default=None,
-        help='Filter out any test that does not match the given regex')
+        help="Filter out any test that does not match the given regex",
+    )
     parser.add_argument(
-        '--emit-csv',
+        "--emit-csv",
         default=False,
-        action='store_true',
+        action="store_true",
         help="Emit csv output",
-        dest='csv_output')
+        dest="csv_output",
+    )
     return parser.parse_args()
 
 

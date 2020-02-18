@@ -297,6 +297,30 @@ SILGenFunction::emitManagedBorrowedRValueWithCleanup(SILValue original,
   return emitManagedBorrowedRValueWithCleanup(original, borrowed, lowering);
 }
 
+ManagedValue
+SILGenFunction::emitManagedBorrowedRValueWithCleanup(SILValue borrowed) {
+  auto &lowering = getTypeLowering(borrowed->getType());
+  return emitManagedBorrowedRValueWithCleanup(borrowed, lowering);
+}
+
+ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
+    SILValue borrowed, const TypeLowering &lowering) {
+  assert(lowering.getLoweredType().getObjectType() ==
+         borrowed->getType().getObjectType());
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(borrowed);
+
+  if (borrowed->getType().isObject() &&
+      borrowed.getOwnershipKind() == ValueOwnershipKind::None)
+    return ManagedValue::forUnmanaged(borrowed);
+
+  if (borrowed->getType().isObject()) {
+    Cleanups.pushCleanup<EndBorrowCleanup>(borrowed);
+  }
+
+  return ManagedValue(borrowed, CleanupHandle::invalid());
+}
+
 ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
     SILValue original, SILValue borrowed, const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getObjectType() ==

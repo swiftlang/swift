@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_INSTRUCTION_H
 #define SWIFT_SIL_INSTRUCTION_H
 
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
@@ -61,6 +62,7 @@ class SILBasicBlock;
 class SILBuilder;
 class SILDebugLocation;
 class SILDebugScope;
+class SILDifferentiabilityWitness;
 class SILFunction;
 class SILGlobalVariable;
 class SILInstructionResultArray;
@@ -999,7 +1001,7 @@ class MultipleValueInstructionTrailingObjects<Derived, DerivedResult,
                                       MultipleValueInstruction *,
                                       DerivedResult,
                                       FinalOtherTrailingTypes...> {
-  static_assert(LLVM_IS_FINAL(DerivedResult),
+  static_assert(std::is_final<DerivedResult>(),
                 "Expected DerivedResult to be final");
   static_assert(
       std::is_base_of<MultipleValueInstructionResult, DerivedResult>::value,
@@ -7929,6 +7931,40 @@ class TryApplyInst final
          SILBasicBlock *normalBB, SILBasicBlock *errorBB, SILFunction &F,
          SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);
+};
+
+class DifferentiabilityWitnessFunctionInst
+    : public InstructionBase<
+          SILInstructionKind::DifferentiabilityWitnessFunctionInst,
+          SingleValueInstruction> {
+private:
+  friend SILBuilder;
+  /// The differentiability witness function kind.
+  DifferentiabilityWitnessFunctionKind witnessKind;
+  /// The referenced SIL differentiability witness.
+  SILDifferentiabilityWitness *witness;
+  /// Whether the instruction has an explicit function type.
+  bool hasExplicitFunctionType;
+
+  static SILType getDifferentiabilityWitnessType(
+      SILModule &module, DifferentiabilityWitnessFunctionKind witnessKind,
+      SILDifferentiabilityWitness *witness);
+
+public:
+  /// Note: explicit function type may be specified only in lowered SIL.
+  DifferentiabilityWitnessFunctionInst(
+      SILModule &module, SILDebugLocation loc,
+      DifferentiabilityWitnessFunctionKind witnessKind,
+      SILDifferentiabilityWitness *witness, Optional<SILType> FunctionType);
+
+  DifferentiabilityWitnessFunctionKind getWitnessKind() const {
+    return witnessKind;
+  }
+  SILDifferentiabilityWitness *getWitness() const { return witness; }
+  bool getHasExplicitFunctionType() const { return hasExplicitFunctionType; }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
 // This is defined out of line to work around the fact that this depends on

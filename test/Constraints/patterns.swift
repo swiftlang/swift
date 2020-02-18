@@ -301,7 +301,7 @@ switch staticMembers {
   // TODO: repeated error message
   case .optProp: break // expected-error* {{not unwrapped}}
 
-  case .method: break // expected-error{{no exact matches in call to static method 'method'}}
+  case .method: break // expected-error{{no exact matches in reference to static method 'method'}}
   case .method(0): break
   case .method(_): break // expected-error{{'_' can only appear in a pattern}}
   case .method(let x): break // expected-error{{cannot appear in an expression}}

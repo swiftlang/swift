@@ -72,6 +72,8 @@ RANGE_REFACTORING(ConvertGuardExprToIfLetExpr, "Convert To IfLet Expression", co
 
 RANGE_REFACTORING(ConvertToComputedProperty, "Convert To Computed Property", convert.to.computed.property)
 
+RANGE_REFACTORING(ConvertToSwitchStmt, "Convert To Switch Statement", convert.switch.stmt)
+
 // These internal refactorings are designed to be helpful for working on
 // the compiler/standard library, etc., but are likely to be just confusing and
 // noise for general development.

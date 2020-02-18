@@ -20,8 +20,8 @@ class ModuleDecl;
 namespace symbolgraphgen {
 
 struct SymbolGraphOptions {
-  /// The path to output the symbol graph JSON.
-  StringRef OutputPath;
+  /// The directory to output the symbol graph JSON files.
+  StringRef OutputDir;
 
   /// The target of the module.
   llvm::Triple Target;

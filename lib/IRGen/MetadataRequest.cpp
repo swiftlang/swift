@@ -684,11 +684,6 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
     return false;
   }
 
-  if (isa<EnumType>(type) || isa<BoundGenericEnumType>(type)) {
-    // TODO: Support enums.
-    return false;
-  }
-
   if (isa<ClassType>(type) || isa<BoundGenericClassType>(type)) {
     // TODO: Support classes.
     return false;
@@ -701,36 +696,40 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
   auto substitutions =
       type->getContextSubstitutionMap(IGM.getSwiftModule(), &nominal);
 
-  return llvm::all_of(environment->getGenericParams(), [&](auto parameter) {
-    auto conformances =
-        environment->getGenericSignature()->getConformsTo(parameter);
-    auto witnessTablesAreReferenceable =
-        llvm::all_of(conformances, [&](ProtocolDecl *conformance) {
-          return conformance->getModuleContext() == IGM.getSwiftModule() &&
-                 !conformance->isResilient(IGM.getSwiftModule(),
-                                           ResilienceExpansion::Minimal);
-        });
+  auto allWitnessTablesAreReferenceable = llvm::all_of(environment->getGenericParams(), [&](auto parameter) {
+    auto signature = environment->getGenericSignature();
+    auto protocols = signature->getConformsTo(parameter);
     auto argument = ((Type *)parameter)->subst(substitutions);
-    auto genericArgument = argument->getAnyGeneric();
-    // For now, to avoid statically specializing generic protocol witness
-    // tables, don't statically specialize metadata for types any of whose
-    // arguments are generic.
-    //
-    // TODO: This is more pessimistic than necessary.  Specialize even in
-    //       the face of generic arguments so long as those arguments
-    //       aren't required to conform to any protocols.
-    //
+    auto canonicalType = argument->getCanonicalType();
+    auto witnessTablesAreReferenceable = [&]() {
+      return llvm::all_of(protocols, [&](ProtocolDecl *protocol) {
+        auto conformance =
+            signature->lookupConformance(canonicalType, protocol);
+        if (!conformance.isConcrete()) {
+          return false;
+        }
+        auto rootConformance = conformance.getConcrete()->getRootConformance();
+        return !IGM.isDependentConformance(rootConformance) &&
+               !IGM.isResilientConformance(rootConformance);
+      });
+    };
     // TODO: Once witness tables are statically specialized, check whether the
     //       ConformanceInfo returns nullptr from tryGetConstantTable.
-    //       early return.
-    auto isGeneric = genericArgument && genericArgument->isGenericContext();
-    auto isNominal = argument->getNominalOrBoundGenericNominal();
-    auto isExistential = argument->isExistentialType();
-    return isNominal && !isGeneric && !isExistential &&
-           witnessTablesAreReferenceable &&
-           irgen::isTypeMetadataAccessTrivial(IGM,
-                                              argument->getCanonicalType());
-  }) && IGM.getTypeInfoForUnlowered(type).isFixedSize(ResilienceExpansion::Maximal);
+    auto isGenericWithoutPrespecializedConformance = [&]() {
+      auto genericArgument = argument->getAnyGeneric();
+      return genericArgument && genericArgument->isGenericContext() && 
+        (protocols.size() > 0);
+    };
+    auto isExistential = [&]() { return argument->isExistentialType(); };
+    auto metadataAccessIsTrivial = [&]() {
+      return irgen::isTypeMetadataAccessTrivial(IGM,
+                                                argument->getCanonicalType());
+    };
+    return !isGenericWithoutPrespecializedConformance() && !isExistential() && 
+           metadataAccessIsTrivial() && witnessTablesAreReferenceable();
+  });
+  return allWitnessTablesAreReferenceable
+  && IGM.getTypeInfoForUnlowered(type).isFixedSize(ResilienceExpansion::Maximal);
 }
 
 /// Is it basically trivial to access the given metadata?  If so, we don't
@@ -1753,28 +1752,33 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
     SmallVector<std::pair<llvm::BasicBlock *, llvm::Value *>, 4>
         specializationBlocks;
     auto switchDestination = llvm::BasicBlock::Create(IGM.getLLVMContext());
-    unsigned long index = 0;
+    unsigned long blockIndex = 0;
     for (auto specialization : specializations) {
-      auto conditionBlock = conditionBlocks[index];
+      auto conditionBlock = conditionBlocks[blockIndex];
       IGF.Builder.emitBlock(conditionBlock);
-      auto successorBlock = index < conditionBlocks.size() - 1
-                                ? conditionBlocks[index + 1]
+      auto successorBlock = blockIndex < conditionBlocks.size() - 1
+                                ? conditionBlocks[blockIndex + 1]
                                 : switchDestination;
       auto specializationBlock = llvm::BasicBlock::Create(IGM.getLLVMContext());
       auto substitutions = specialization->getContextSubstitutionMap(
           IGM.getSwiftModule(), nominal);
 
       llvm::Value *condition = llvm::ConstantInt::get(IGM.Int1Ty, 1);
-      auto generic = specialization->getAnyGeneric();
-      auto parameters = generic->getGenericEnvironment()->getGenericParams();
-      for (size_t index = 0; index < parameters.size(); ++index) {
-        auto parameter = parameters[index];
-        auto argument = ((Type *)parameter)->subst(substitutions);
+      auto nominal = specialization->getAnyNominal();
+      auto requirements = GenericTypeRequirements(IGF.IGM, nominal);
+      int requirementIndex = 0;
+      for (auto requirement : requirements.getRequirements()) {
+        if (requirement.Protocol) {
+          continue;
+        }
+        auto parameter = requirement.TypeParameter;
+        auto argument = parameter.subst(substitutions);
         llvm::Constant *addr =
             IGM.getAddrOfTypeMetadata(argument->getCanonicalType());
         auto addrInt = IGF.Builder.CreateBitCast(addr, IGM.Int8PtrTy);
         condition = IGF.Builder.CreateAnd(
-            condition, IGF.Builder.CreateICmpEQ(addrInt, valueAtIndex(index)));
+            condition, IGF.Builder.CreateICmpEQ(addrInt, valueAtIndex(requirementIndex)));
+        ++requirementIndex;
       }
       IGF.Builder.CreateCondBr(condition, specializationBlock, successorBlock);
 
@@ -1793,7 +1797,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
       response = IGF.Builder.CreateInsertValue(
           response, state, 1, "insert metadata state into response");
       specializationBlocks.push_back({specializationBlock, response});
-      ++index;
+      ++blockIndex;
     }
 
     for (auto pair : specializationBlocks) {
@@ -1864,7 +1868,8 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
                 IGM.Int8PtrTy, // arg 1
                 IGM.Int8PtrTy, // arg 2
                 IGM.TypeContextDescriptorPtrTy) // type context descriptor
-        .getCallee());
+        .getCallee()
+        ->stripPointerCasts());
 
     if (thunkFn->empty()) {
       ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
@@ -1926,7 +1931,7 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
       : llvm::UndefValue::get(IGM.Int8PtrTy);
 
-    std::array<llvm::Value *, 3> argValues{arg0, arg1, arg2};
+    std::array<llvm::Value *, 3> argValues = {arg0, arg1, arg2};
 
     emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
         IGF, params, nominal, genericArgs,
@@ -2345,7 +2350,8 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
       IGM.getModule()
           ->getOrInsertFunction(instantiationFnName, IGF.IGM.TypeMetadataPtrTy,
                                 cache->getType())
-          .getCallee());
+          .getCallee()
+          ->stripPointerCasts());
   if (instantiationFn->empty()) {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
       .to(instantiationFn);
@@ -2580,144 +2586,116 @@ namespace {
   ///
   /// NOTE: If you modify the special cases in this, you should update
   /// isTypeMetadataForLayoutAccessible in SIL.cpp.
-  class EmitTypeMetadataRefForLayout
-    : public CanTypeVisitor<EmitTypeMetadataRefForLayout, llvm::Value *,
-                            DynamicMetadataRequest> {
-  private:
-    IRGenFunction &IGF;
-  public:
-    EmitTypeMetadataRefForLayout(IRGenFunction &IGF) : IGF(IGF) {}
+class EmitTypeMetadataRefForLayout
+    : public CanTypeVisitor<EmitTypeMetadataRefForLayout, CanType> {
+public:
+  EmitTypeMetadataRefForLayout() {}
 
-    llvm::Value *emitDirectMetadataRef(CanType type,
-                                       DynamicMetadataRequest request) {
-      return IGF.IGM.getAddrOfTypeMetadata(type);
+  /// For most types, we can just emit the usual metadata.
+  CanType visitType(CanType t) { return t; }
+
+  CanType visitBoundGenericEnumType(CanBoundGenericEnumType ty) {
+    // Optionals have a lowered payload type, so we recurse here.
+    if (auto objectTy = ty.getOptionalObjectType()) {
+      auto payloadTy = visit(objectTy);
+      if (payloadTy == objectTy)
+        return ty;
+      auto &C = ty->getASTContext();
+      auto optDecl = C.getOptionalDecl();
+      return CanType(BoundGenericEnumType::get(optDecl, Type(), payloadTy));
     }
 
-    /// For most types, we can just emit the usual metadata.
-    llvm::Value *visitType(CanType t, DynamicMetadataRequest request) {
-      return IGF.emitTypeMetadataRef(t, request).getMetadata();
+    // Otherwise, generic arguments are not lowered.
+    return ty;
+  }
+
+  CanType visitTupleType(CanTupleType ty) {
+    bool changed = false;
+    SmallVector<TupleTypeElt, 4> loweredElts;
+    loweredElts.reserve(ty->getNumElements());
+
+    for (auto i : indices(ty->getElementTypes())) {
+      auto substEltType = ty.getElementType(i);
+      auto &substElt = ty->getElement(i);
+
+      // Make sure we don't have something non-materializable.
+      auto Flags = substElt.getParameterFlags();
+      assert(Flags.getValueOwnership() == ValueOwnership::Default);
+      assert(!Flags.isVariadic());
+
+      CanType loweredSubstEltType = visit(substEltType);
+      changed =
+          (changed || substEltType != loweredSubstEltType || !Flags.isNone());
+
+      // Note: we drop @escaping and @autoclosure which can still appear on
+      // materializable tuple types.
+      //
+      // FIXME: Replace this with an assertion that the original tuple element
+      // did not have any flags.
+      loweredElts.emplace_back(loweredSubstEltType, substElt.getName(),
+                               ParameterTypeFlags());
     }
 
-    llvm::Value *visitBoundGenericEnumType(CanBoundGenericEnumType type,
-                                           DynamicMetadataRequest request) {
-      // Optionals have a lowered payload type, so we recurse here.
-      if (auto objectTy = type.getOptionalObjectType()) {
-        if (auto metadata = tryGetLocal(type, request))
-          return metadata;
+    if (!changed)
+      return ty;
 
-        auto payloadMetadata = visit(objectTy, request);
-        llvm::Value *args[] = { payloadMetadata };
-        llvm::Type *types[] = { IGF.IGM.TypeMetadataPtrTy };
+    // The cast should succeed, because if we end up with a one-element
+    // tuple type here, it must have a label.
+    return cast<TupleType>(
+        CanType(TupleType::get(loweredElts, ty->getASTContext())));
+  }
 
-        // Call the generic metadata accessor function.
-        llvm::Function *accessor =
-            IGF.IGM.getAddrOfGenericTypeMetadataAccessFunction(
-                type->getDecl(), types, NotForDefinition);
+  CanType visitAnyFunctionType(CanAnyFunctionType ty) {
+    llvm_unreachable("not a SIL type");
+  }
 
-        auto response =
-          IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, args,
-                                                        request);
-
-        return setLocal(type, response);
-      }
-
-      // Otherwise, generic arguments are not lowered.
-      return visitType(type, request);
+  CanType visitSILFunctionType(CanSILFunctionType ty) {
+    // All function types have the same layout regardless of arguments or
+    // abstraction level. Use the metadata for () -> () for thick functions,
+    // or AnyObject for block functions.
+    auto &C = ty->getASTContext();
+    switch (ty->getRepresentation()) {
+    case SILFunctionType::Representation::Thin:
+    case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::WitnessMethod:
+    case SILFunctionType::Representation::ObjCMethod:
+    case SILFunctionType::Representation::CFunctionPointer:
+    case SILFunctionType::Representation::Closure:
+      // A thin function looks like a plain pointer.
+      // FIXME: Except for extra inhabitants?
+      return C.TheRawPointerType;
+    case SILFunctionType::Representation::Thick:
+      // All function types look like () -> ().
+      // FIXME: It'd be nice not to have to call through the runtime here.
+      return CanFunctionType::get({}, C.TheEmptyTupleType);
+    case SILFunctionType::Representation::Block:
+      // All block types look like AnyObject.
+      return C.getAnyObjectType();
     }
 
-    llvm::Value *visitTupleType(CanTupleType type,
-                                DynamicMetadataRequest request) {
-      if (auto metadata = tryGetLocal(type, request))
-        return metadata;
+    llvm_unreachable("Not a valid SILFunctionType.");
+  }
 
-      auto response = emitTupleTypeMetadataRef(IGF, type, request,
-                                               /*labels*/ false,
-          [&](CanType eltType, DynamicMetadataRequest eltRequest) {
-        // This use of 'forComplete' is technically questionable, but in
-        // this class we're always producing responses we can ignore, so
-        // it's okay.
-        return MetadataResponse::forComplete(visit(eltType, eltRequest));
-      });
+  CanType visitAnyMetatypeType(CanAnyMetatypeType ty) {
+    assert(ty->hasRepresentation() && "not a lowered metatype");
+    auto &C = ty->getASTContext();
+    switch (ty->getRepresentation()) {
+    case MetatypeRepresentation::Thin:
+      // Thin metatypes are empty, so they look like the empty tuple type.
+      return C.TheEmptyTupleType;
 
-      return setLocal(type, response);
+    case MetatypeRepresentation::Thick:
+    case MetatypeRepresentation::ObjC:
+      // Thick and ObjC metatypes look like pointers with extra inhabitants.
+      // Get the metatype metadata from the runtime.
+      // FIXME: It'd be nice not to need a runtime call here; we should just
+      // have a standard aligned-pointer type metadata.
+      return ty;
     }
 
-    llvm::Value *visitAnyFunctionType(CanAnyFunctionType type,
-                                      DynamicMetadataRequest request) {
-      llvm_unreachable("not a SIL type");
-    }
-      
-    llvm::Value *visitSILFunctionType(CanSILFunctionType type,
-                                      DynamicMetadataRequest request) {
-      // All function types have the same layout regardless of arguments or
-      // abstraction level. Use the metadata for () -> () for thick functions,
-      // or AnyObject for block functions.
-      auto &C = type->getASTContext();
-      switch (type->getRepresentation()) {
-      case SILFunctionType::Representation::Thin:
-      case SILFunctionType::Representation::Method:
-      case SILFunctionType::Representation::WitnessMethod:
-      case SILFunctionType::Representation::ObjCMethod:
-      case SILFunctionType::Representation::CFunctionPointer:
-      case SILFunctionType::Representation::Closure:
-        // A thin function looks like a plain pointer.
-        // FIXME: Except for extra inhabitants?
-        return emitDirectMetadataRef(C.TheRawPointerType, request);
-      case SILFunctionType::Representation::Thick:
-        // All function types look like () -> ().
-        // FIXME: It'd be nice not to have to call through the runtime here.
-        return IGF.emitTypeMetadataRef(
-                 CanFunctionType::get({}, C.TheEmptyTupleType),
-                                       request).getMetadata();
-      case SILFunctionType::Representation::Block:
-        // All block types look like AnyObject.
-        return emitDirectMetadataRef(C.getAnyObjectType(), request);
-      }
-
-      llvm_unreachable("Not a valid SILFunctionType.");
-    }
-
-    llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type,
-                                      DynamicMetadataRequest request) {
-      
-      assert(type->hasRepresentation()
-             && "not a lowered metatype");
-
-      switch (type->getRepresentation()) {
-      case MetatypeRepresentation::Thin:
-        // Thin metatypes are empty, so they look like the empty tuple type.
-        return emitEmptyTupleTypeMetadataRef(IGF.IGM);
-
-      case MetatypeRepresentation::Thick:
-      case MetatypeRepresentation::ObjC:
-        // Thick and ObjC metatypes look like pointers with extra inhabitants.
-        // Get the metatype metadata from the runtime.
-        // FIXME: It'd be nice not to need a runtime call here; we should just
-        // have a standard aligned-pointer type metadata.
-        return IGF.emitTypeMetadataRef(type);
-      }
-
-      llvm_unreachable("Not a valid MetatypeRepresentation.");
-    }
-
-    /// Try to find the metatype in local data.
-    llvm::Value *tryGetLocal(CanType type, DynamicMetadataRequest request) {
-      auto response = IGF.tryGetLocalTypeMetadataForLayout(
-                                          SILType::getPrimitiveObjectType(type),
-                                          request);
-      assert(request.canResponseStatusBeIgnored());
-      return (response ? response.getMetadata() : nullptr);
-    }
-
-    /// Set the metatype in local data.
-    llvm::Value *setLocal(CanType type, MetadataResponse response) {
-      IGF.setScopedLocalTypeMetadataForLayout(
-                                      SILType::getPrimitiveObjectType(type),
-                                      response);
-      return response.getMetadata();
-    }
-
-  };
+    llvm_unreachable("Not a valid MetatypeRepresentation.");
+  }
+};
 } // end anonymous namespace
 
 llvm::Value *IRGenFunction::emitTypeMetadataRefForLayout(SILType type) {
@@ -2725,11 +2703,22 @@ llvm::Value *IRGenFunction::emitTypeMetadataRefForLayout(SILType type) {
 }
 
 llvm::Value *
-IRGenFunction::emitTypeMetadataRefForLayout(SILType type,
+IRGenFunction::emitTypeMetadataRefForLayout(SILType ty,
                                             DynamicMetadataRequest request) {
   assert(request.canResponseStatusBeIgnored());
-  return EmitTypeMetadataRefForLayout(*this).visit(type.getASTType(),
-                                                   request);
+
+  if (auto response =
+          tryGetLocalTypeMetadataForLayout(ty.getObjectType(), request)) {
+    assert(request.canResponseStatusBeIgnored() || !response.isValid());
+    return response.getMetadata();
+  }
+
+  // Map to a layout equivalent AST type.
+  auto layoutEquivalentType =
+      EmitTypeMetadataRefForLayout().visit(ty.getASTType());
+  auto response = emitTypeMetadataRef(layoutEquivalentType, request);
+  setScopedLocalTypeMetadataForLayout(ty.getObjectType(), response);
+  return response.getMetadata();
 }
 
 namespace {

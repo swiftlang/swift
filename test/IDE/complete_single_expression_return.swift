@@ -98,7 +98,7 @@ struct TestSingleExprClosureRetUnresolved {
 
 // TestSingleExprClosureRetUnresolved: Begin completions
 // TestSingleExprClosureRetUnresolved-NOT: notMine
-// TestSingleExprClosureRetUnresolved: Decl[EnumElement]/ExprSpecific: myEnum[#MyEnum#];
+// TestSingleExprClosureRetUnresolved: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myEnum[#MyEnum#];
 // TestSingleExprClosureRetUnresolved-NOT: notMine
 // TestSingleExprClosureRetUnresolved: End completions
 }
@@ -263,7 +263,7 @@ struct TestSingleExprFuncUnresolved {
 
 // TestSingleExprFuncUnresolved: Begin completions
 // TestSingleExprFuncUnresolved-NOT: notMine
-// TestSingleExprFuncUnresolved: Decl[EnumElement]/ExprSpecific: myEnum[#MyEnum#];
+// TestSingleExprFuncUnresolved: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myEnum[#MyEnum#];
 // TestSingleExprFuncUnresolved-NOT: notMine
 // TestSingleExprFuncUnresolved: End completions
 }
@@ -373,7 +373,7 @@ struct TestSingleExprAccessorUnresolved {
 
 // TestSingleExprAccessorUnresolved: Begin completions
 // TestSingleExprAccessorUnresolved-NOT: notMine
-// TestSingleExprAccessorUnresolved: Decl[EnumElement]/ExprSpecific: myEnum[#MyEnum#];
+// TestSingleExprAccessorUnresolved: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myEnum[#MyEnum#];
 // TestSingleExprAccessorUnresolved-NOT: notMine
 // TestSingleExprAccessorUnresolved: End completions
 }
@@ -525,7 +525,7 @@ struct TestSingleExprSubscriptUnresolved {
 
 // TestSingleExprSubscriptUnresolved: Begin completions
 // TestSingleExprSubscriptUnresolved-NOT: notMine
-// TestSingleExprSubscriptUnresolved: Decl[EnumElement]/ExprSpecific: myEnum[#MyEnum#];
+// TestSingleExprSubscriptUnresolved: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myEnum[#MyEnum#];
 // TestSingleExprSubscriptUnresolved-NOT: notMine
 // TestSingleExprSubscriptUnresolved: End completions
 }
@@ -555,8 +555,8 @@ struct TestSingleExprSubscriptGlobal {
   }
 
 // TestSingleExprSubscriptGlobal: Begin completions
-// TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
-// TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal: int()[#Int#];
+// TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
+// TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
 // TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestSingleExprSubscriptGlobal: End completions
 }
@@ -630,7 +630,7 @@ enum TopLevelEnum {
   case foo
 }
 
-// TopLevelEnum: Decl[EnumElement]/ExprSpecific:     foo[#TopLevelEnum#];
+// TopLevelEnum: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: foo[#TopLevelEnum#];
 
 var testAccessorUnresolvedTopLevel: TopLevelEnum {
   .#^testAccessorUnresolvedTopLevel^#

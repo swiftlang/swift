@@ -20,7 +20,7 @@ class G {
   var r = ResilientInt(i:1)
 }
 
-// CHECK-LABEL: define {{.*}}swiftcc %swift.metadata_response @"$s1A12MyControllerCMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL: define {{.*}}swiftcc %swift.metadata_response @"$s1A12MyControllerCMr"(%swift.type* %0, i8* %1, i8** %2)
 // CHECK-NOT: ret
 // CHECK:  call swiftcc %swift.metadata_response @"$s1A17InternalContainerVMa"(
 // CHECK:  ret

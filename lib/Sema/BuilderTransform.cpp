@@ -235,6 +235,44 @@ protected:
     return nullptr;                                        \
   }
 
+  void visitPatternBindingDecl(PatternBindingDecl *patternBinding) {
+    // If any of the entries lacks an initializer, don't handle this node.
+    if (!llvm::all_of(range(patternBinding->getNumPatternEntries()),
+                      [&](unsigned index) {
+            return patternBinding->isExplicitlyInitialized(index);
+        })) {
+      if (!unhandledNode)
+        unhandledNode = patternBinding;
+      return;
+    }
+
+    // If we aren't generating constraints, there's nothing to do.
+    if (!cs)
+      return;
+
+    /// Generate constraints for each pattern binding entry
+    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
+      // Type check the pattern.
+      auto pattern = patternBinding->getPattern(index);
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
+      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+
+      // Generate constraints for the initialization.
+      auto target = SolutionApplicationTarget::forInitialization(
+          patternBinding->getInit(index), dc, patternType, pattern);
+      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
+        continue;
+
+      // Keep track of this binding entry.
+      applied.patternBindingEntries.insert({{patternBinding, index}, target});
+
+      // Bind the variables that occur in the pattern to the corresponding
+      // type entry for the pattern itself.
+      cs->bindVariablesInPattern(
+          pattern, cs->getConstraintLocator(target.getAsExpr()));
+    }
+  }
+
   VarDecl *visitBraceStmt(BraceStmt *braceStmt) {
     SmallVector<Expr *, 4> expressions;
     auto addChild = [&](VarDecl *childVar) {
@@ -244,7 +282,15 @@ protected:
       expressions.push_back(buildVarRef(childVar, childVar->getLoc()));
     };
 
-    for (const auto &node : braceStmt->getElements()) {
+    for (auto node : braceStmt->getElements()) {
+      // Implicit returns in single-expression function bodies are treated
+      // as the expression.
+      if (auto returnStmt =
+              dyn_cast_or_null<ReturnStmt>(node.dyn_cast<Stmt *>())) {
+        assert(returnStmt->isImplicit());
+        node = returnStmt->getResult();
+      }
+
       if (auto stmt = node.dyn_cast<Stmt *>()) {
         addChild(visit(stmt));
         continue;
@@ -258,9 +304,21 @@ protected:
           continue;
 
         // Skip #warning/#error; we'll handle them when applying the builder.
-        if (auto poundDiag = dyn_cast<PoundDiagnosticDecl>(decl)) {
+        if (isa<PoundDiagnosticDecl>(decl)) {
           continue;
         }
+
+        // Pattern bindings are okay so long as all of the entries are
+        // initialized.
+        if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+          visitPatternBindingDecl(patternBinding);
+          continue;
+        }
+
+        // Ignore variable declarations, because they're always handled within
+        // their enclosing pattern bindings.
+        if (isa<VarDecl>(decl))
+          continue;
 
         if (!unhandledNode)
           unhandledNode = decl;
@@ -291,14 +349,9 @@ protected:
   }
 
   VarDecl *visitReturnStmt(ReturnStmt *stmt) {
-    // Allow implicit returns due to 'return' elision.
-    if (!stmt->isImplicit() || !stmt->hasResult()) {
-      if (!unhandledNode)
-        unhandledNode = stmt;
-      return nullptr;
-    }
-
-    return captureExpr(stmt->getResult(), /*oneWay=*/true);
+    if (!unhandledNode)
+      unhandledNode = stmt;
+    return nullptr;
   }
 
   VarDecl *visitDoStmt(DoStmt *doStmt) {
@@ -624,8 +677,9 @@ class BuilderClosureRewriter
   const Solution &solution;
   DeclContext *dc;
   AppliedBuilderTransform builderTransform;
-  std::function<Expr *(Expr *)> rewriteExprFn;
-  std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType;
+  std::function<
+      Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
+        rewriteTarget;
 
   /// Retrieve the temporary variable that will be used to capture the
   /// value of the given expression.
@@ -643,6 +697,17 @@ class BuilderClosureRewriter
     // Erase the captured expression, so we're sure we never do this twice.
     builderTransform.capturedExprs.erase(found);
     return recorded;
+  }
+
+  /// Rewrite an expression without any particularly special context.
+  Expr *rewriteExpr(Expr *expr) {
+    auto result = rewriteTarget(
+      SolutionApplicationTarget(expr, dc, CTP_Unused, Type(),
+                                /*isDiscarded=*/false));
+    if (result)
+      return result->getAsExpr();
+
+    return nullptr;
   }
 
 public:
@@ -670,19 +735,21 @@ private:
   ASTNode initializeTarget(FunctionBuilderTarget target) {
     assert(target.captured.second.size() == 1);
     auto capturedExpr = target.captured.second.front();
-    auto finalCapturedExpr = rewriteExpr(capturedExpr);
     SourceLoc implicitLoc = capturedExpr->getEndLoc();
     switch (target.kind) {
     case FunctionBuilderTarget::ReturnValue: {
       // Return the expression.
-      ConstraintSystem &cs = solution.getConstraintSystem();
       Type bodyResultType =
           solution.simplifyType(builderTransform.bodyResultType);
-      finalCapturedExpr = coerceToType(
-          finalCapturedExpr,
-          bodyResultType,
-          cs.getConstraintLocator(capturedExpr));
-      return new (ctx) ReturnStmt(implicitLoc, finalCapturedExpr);
+
+      SolutionApplicationTarget returnTarget(
+          capturedExpr, dc, CTP_ReturnStmt, bodyResultType,
+          /*isDiscarded=*/false);
+      Expr *resultExpr = nullptr;
+      if (auto resultTarget = rewriteTarget(returnTarget))
+        resultExpr = resultTarget->getAsExpr();
+
+      return new (ctx) ReturnStmt(implicitLoc, resultExpr);
     }
 
     case FunctionBuilderTarget::TemporaryVar: {
@@ -693,6 +760,7 @@ private:
       declRef->setType(LValueType::get(temporaryVar->getType()));
 
       // Load the right-hand side if needed.
+      auto finalCapturedExpr = rewriteExpr(capturedExpr);
       if (finalCapturedExpr->getType()->hasLValueType()) {
         finalCapturedExpr =
             TypeChecker::addImplicitLoadExpr(ctx, finalCapturedExpr);
@@ -726,11 +794,24 @@ private:
     elements.push_back(pbd);
   }
 
-  Expr *rewriteExpr(Expr *expr) {
-    Expr *result = rewriteExprFn(expr);
-    if (result)
-      performSyntacticExprDiagnostics(expr, dc, /*isExprStmt=*/false);
-    return result;
+  /// Produce a final type-checked pattern binding.
+  void finishPatternBindingDecl(PatternBindingDecl *patternBinding) {
+    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
+      // Find the solution application target for this.
+      auto knownTarget =
+          builderTransform.patternBindingEntries.find({patternBinding, index});
+      assert(knownTarget != builderTransform.patternBindingEntries.end());
+
+      // Rewrite the target.
+      auto resultTarget = rewriteTarget(knownTarget->second);
+      if (!resultTarget)
+        continue;
+
+      patternBinding->setPattern(
+          index, resultTarget->getInitializationPattern(),
+          resultTarget->getDeclContext());
+      patternBinding->setInit(index, resultTarget->getAsExpr());
+    }
   }
 
 public:
@@ -738,12 +819,12 @@ public:
       const Solution &solution,
       DeclContext *dc,
       const AppliedBuilderTransform &builderTransform,
-      std::function<Expr *(Expr *)> rewriteExpr,
-      std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType
+      std::function<
+          Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
+            rewriteTarget
     ) : ctx(solution.getConstraintSystem().getASTContext()),
         solution(solution), dc(dc), builderTransform(builderTransform),
-        rewriteExprFn(rewriteExpr),
-        coerceToType(coerceToType){ }
+        rewriteTarget(rewriteTarget) { }
 
   Stmt *visitBraceStmt(BraceStmt *braceStmt, FunctionBuilderTarget target,
                        Optional<FunctionBuilderTarget> innerTarget = None) {
@@ -800,12 +881,29 @@ public:
       auto decl = node.get<Decl *>();
 
       // Skip #if declarations.
-      if (isa<IfConfigDecl>(decl))
+      if (isa<IfConfigDecl>(decl)) {
+        newElements.push_back(decl);
         continue;
+      }
 
       // Diagnose #warning / #error during application.
       if (auto poundDiag = dyn_cast<PoundDiagnosticDecl>(decl)) {
         TypeChecker::typeCheckDecl(poundDiag);
+        newElements.push_back(decl);
+        continue;
+      }
+
+      // Skip variable declarations; they're always part of a pattern
+      // binding.
+      if (isa<VarDecl>(decl)) {
+        newElements.push_back(decl);
+        continue;
+      }
+
+      // Handle pattern bindings.
+      if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+        finishPatternBindingDecl(patternBinding);
+        newElements.push_back(decl);
         continue;
       }
 
@@ -958,9 +1056,10 @@ BraceStmt *swift::applyFunctionBuilderTransform(
     AppliedBuilderTransform applied,
     BraceStmt *body,
     DeclContext *dc,
-    std::function<Expr *(Expr *)> rewriteExpr,
-    std::function<Expr *(Expr *, Type, ConstraintLocator *)> coerceToType) {
-  BuilderClosureRewriter rewriter(solution, dc, applied, rewriteExpr, coerceToType);
+    std::function<
+        Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
+          rewriteTarget) {
+  BuilderClosureRewriter rewriter(solution, dc, applied, rewriteTarget);
   auto captured = rewriter.takeCapturedStmt(body);
   return cast<BraceStmt>(
     rewriter.visitBraceStmt(
@@ -1105,6 +1204,9 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
     // The system was salvaged; continue on as if nothing happened.
   }
 
+  // FIXME: Shouldn't need to do this.
+  cs.applySolution(solutions.front());
+
   // Apply the solution to the function body.
   if (auto result = cs.applySolution(
           solutions.front(),
@@ -1116,7 +1218,8 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   return nullptr;
 }
 
-ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
+Optional<ConstraintSystem::TypeMatchResult>
+ConstraintSystem::matchFunctionBuilder(
     AnyFunctionRef fn, Type builderType, Type bodyResultType,
     ConstraintKind bodyResultConstraintKind,
     ConstraintLocator *calleeLocator, ConstraintLocatorBuilder locator) {
@@ -1140,7 +1243,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
   case FunctionBuilderBodyPreCheck::HasReturnStmt:
     // If the body has a return statement, suppress the transform but
     // continue solving the constraint system.
-    return getTypeMatchSuccess();
+    return None;
   }
 
   // Check the form of this body to see if we can apply the
@@ -1286,12 +1389,6 @@ public:
 llvm::Expected<FunctionBuilderBodyPreCheck>
 PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
                                          AnyFunctionRef fn) const {
-  // Single-expression closures should already have been pre-checked.
-  if (auto closure = fn.getAbstractClosureExpr()) {
-    if (closure->hasSingleExpressionBody())
-      return FunctionBuilderBodyPreCheck::Okay;
-  }
-
   return PreCheckFunctionBuilderApplication(fn, false).run();
 }
 

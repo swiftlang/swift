@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s  -emit-sil -enforce-exclusivity=unchecked -O | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s  -emit-sil -O | %FileCheck %s
 
 // Check that LoadStoreOpts can handle "let" variables properly.
 // Such variables should be loaded only once and their loaded values can be reused.
@@ -311,12 +311,13 @@ public func testLetTuple(s: S3) -> Int32 {
 
 // Check that s.x.0 is reloaded every time.
 // CHECK-LABEL: sil {{.*}}testVarTuple
-// CHECK: tuple_element_addr
-// CHECK: %[[X:[0-9]+]] = struct_element_addr
-// CHECK: load %[[X]]
-// CHECK: load %[[X]]
-// CHECK: load %[[X]]
-// CHECK: load %[[X]]
+// CHECK: [[X0:%[0-9]+]] = load
+// CHECK: [[X1:%[0-9]+]] = load
+// CHECK: builtin "sadd_with_overflow{{.*}}"([[X0]] {{.*}}, [[X1]]
+// CHECK: [[X2:%[0-9]+]] = load
+// CHECK: builtin "sadd_with_overflow{{.*}} [[X2]]
+// CHECK: [[X3:%[0-9]+]] = load
+// CHECK: builtin "sadd_with_overflow{{.*}} [[X3]]
 // CHECK: return
 public func testVarTuple(s: S3) -> Int32 {
   var counter: Int32 = 0

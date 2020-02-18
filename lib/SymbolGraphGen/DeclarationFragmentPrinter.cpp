@@ -128,7 +128,7 @@ void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
     PrintNameContext NameContext) {
   openFragment(FragmentKind::TypeIdentifier);
   printText(Name.str());
-  USR = Walker.getUSR(RefTo);
+  USR = Graph.getUSR(RefTo);
   closeFragment();
 }
 

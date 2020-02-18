@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-// This file defines extensions for interpolating NSObject into a OSLogMesage.
+// This file defines extensions for interpolating NSObject into an OSLogMesage.
 // It defines `appendInterpolation` function for NSObject type. It also defines
 // extensions for generating an os_log format string for NSObjects (using the
 // format specifier %@) and for serializing NSObject into the argument buffer
 // passed to os_log ABIs.
 //
-// The `appendInterpolation` function defined in this file accept formatting
-// and privacy options along with the interpolated expression as shown below:
+// The `appendInterpolation` function defined in this file accept privacy
+// options along with the interpolated expression as shown below:
 //
 //         "\(x, privacy: .public\)"
 import ObjectiveC
@@ -27,20 +27,19 @@ extension OSLogInterpolation {
   /// Define interpolation for expressions of type NSObject.
   /// - Parameters:
   ///  - argumentObject: the interpolated expression of type NSObject, which is autoclosured.
-  ///  - privacy: a privacy qualifier which is either private or public. Default is private.
-  ///  TODO: create a specifier to denote auto-inferred privacy level and make it default.
+  ///  - privacy: a privacy qualifier which is either private or public.
+  ///  It is auto-inferred by default.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
   public mutating func appendInterpolation(
     _ argumentObject: @autoclosure @escaping () -> NSObject,
-    privacy: Privacy = .private
+    privacy: OSLogPrivacy = .auto
   ) {
     guard argumentCount < maxOSLogArgumentCount else { return }
 
-    let isPrivateArgument = isPrivate(privacy)
-    formatString += getNSObjectFormatSpecifier(isPrivateArgument)
-    addNSObjectHeaders(isPrivateArgument)
+    formatString += getNSObjectFormatSpecifier(privacy)
+    addNSObjectHeaders(privacy)
 
     arguments.append(argumentObject)
     argumentCount += 1
@@ -51,9 +50,9 @@ extension OSLogInterpolation {
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
-  internal mutating func addNSObjectHeaders(_ isPrivate: Bool) {
+  internal mutating func addNSObjectHeaders(_ privacy: OSLogPrivacy) {
     // Append argument header.
-    let header = getArgumentHeader(isPrivate: isPrivate, type: .object)
+    let header = getArgumentHeader(privacy: privacy, type: .object)
     arguments.append(header)
 
     // Append number of bytes needed to serialize the argument.
@@ -65,7 +64,7 @@ extension OSLogInterpolation {
     // two bytes needed for the headers.
     totalBytesForSerializingArguments += byteCount + 2
 
-    preamble = getUpdatedPreamble(isPrivate: isPrivate, isScalar: false)
+    preamble = getUpdatedPreamble(privacy: privacy, isScalar: false)
   }
 
   /// Construct an os_log format specifier from the given parameters.
@@ -75,9 +74,15 @@ extension OSLogInterpolation {
   @_semantics("constant_evaluable")
   @_effects(readonly)
   @_optimize(none)
-  internal func getNSObjectFormatSpecifier(_ isPrivate: Bool) -> String {
-    // TODO: create a specifier to denote auto-inferred privacy.
-    return isPrivate ? "%{private}@" : "%{public}@"
+  internal func getNSObjectFormatSpecifier(_ privacy: OSLogPrivacy) -> String {
+    switch privacy {
+    case .private:
+      return "%{private}@"
+    case .public:
+      return "%{public}@"
+    default:
+      return "%@"
+    }
   }
 }
 

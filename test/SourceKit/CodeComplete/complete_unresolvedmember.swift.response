@@ -7,6 +7,7 @@
       key.description: "create()",
       key.typename: "Foo",
       key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.identical,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO6createACyFZ",
       key.modulename: "complete_unresolvedmember"
@@ -18,6 +19,7 @@
       key.description: "east",
       key.typename: "Foo",
       key.context: source.codecompletion.context.exprspecific,
+      key.typerelation: source.codecompletion.typerelation.identical,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO4eastyA2CmF",
       key.modulename: "complete_unresolvedmember"
@@ -29,6 +31,7 @@
       key.description: "init(i: Int)",
       key.typename: "Foo",
       key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.identical,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO1iACSi_tcfc",
       key.modulename: "complete_unresolvedmember"
@@ -40,6 +43,7 @@
       key.description: "init(s: String)",
       key.typename: "Foo",
       key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.identical,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO1sACSS_tcfc",
       key.modulename: "complete_unresolvedmember"
@@ -51,6 +55,7 @@
       key.description: "instance",
       key.typename: "Foo",
       key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.identical,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO8instanceACvpZ",
       key.modulename: "complete_unresolvedmember"
@@ -62,6 +67,7 @@
       key.description: "other(String)",
       key.typename: "Foo",
       key.context: source.codecompletion.context.exprspecific,
+      key.typerelation: source.codecompletion.typerelation.identical,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO5otheryACSScACmF",
       key.modulename: "complete_unresolvedmember"
@@ -73,6 +79,7 @@
       key.description: "west",
       key.typename: "Foo",
       key.context: source.codecompletion.context.exprspecific,
+      key.typerelation: source.codecompletion.typerelation.identical,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO4westyA2CmF",
       key.modulename: "complete_unresolvedmember"

@@ -32,10 +32,10 @@ namespace options {
 static llvm::cl::OptionCategory Category("swift-symbolgraph-extract Options");
 
 static llvm::cl::opt<std::string>
-ModuleName("module-name", llvm::cl::desc("Name of the module to extract"), llvm::cl::cat(Category));
+ModuleName("module-name", llvm::cl::desc("Name of the module to extract (Required)"), llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
-FrameworkSearchPaths("F", llvm::cl::desc("add a directory to the framework search paths"), llvm::cl::ZeroOrMore,
+FrameworkSearchPaths("F", llvm::cl::desc("Add a directory to the framework search paths"), llvm::cl::ZeroOrMore,
                      llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
@@ -54,7 +54,7 @@ SDK("sdk", llvm::cl::desc("Path to the SDK"),
     llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
-Target("target", llvm::cl::desc("Target triple"),
+Target("target", llvm::cl::desc("Target triple (Required)"),
        llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
@@ -66,9 +66,33 @@ PrettyPrint("pretty-print", llvm::cl::desc("Pretty-print the resulting Symbol Gr
 static llvm::cl::opt<std::string>
 MinimumAccessLevel("minimum-access-level", llvm::cl::desc("Include symbols with this access level or more"), llvm::cl::cat(Category));
 
+static llvm::cl::list<std::string>
+Xcc("Xcc", llvm::cl::desc("Pass the following command-line flag to Clang"),
+         llvm::cl::cat(Category));
+
 static llvm::cl::opt<std::string>
-OutputPath("o", llvm::cl::desc("Symbol Graph JSON Output Path"), llvm::cl::cat(Category));
+OutputDir("output-dir", llvm::cl::desc("Symbol Graph JSON Output Directory (Required)"), llvm::cl::cat(Category));
 } // end namespace options
+
+static bool argumentsAreValid() {
+  bool Valid = true;
+  if (options::Target.empty()) {
+    llvm::errs() << "Required -target option is missing\n";
+    Valid = false;
+  }
+
+  if (options::ModuleName.empty()) {
+    llvm::errs() << "Required -module-name argument is missing\n";
+    Valid = false;
+  }
+
+  if (options::OutputDir.empty()) {
+    llvm::errs() << "Required -output-dir argument is missing\n";
+    Valid = false;
+  }
+
+  return Valid;
+}
 
 int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv0, void *MainAddr) {
   INITIALIZE_LLVM();
@@ -79,8 +103,24 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   SmallVector<const char *, 8> ArgsWithArgv0 { Argv0 };
   ArgsWithArgv0.append(Args.begin(), Args.end());
 
+  if (Args.empty()) {
+    ArgsWithArgv0.push_back("-help");
+  }
+
   llvm::cl::ParseCommandLineOptions(ArgsWithArgv0.size(),
-      llvm::makeArrayRef(ArgsWithArgv0).data(), "Swift Symbol Graph Extractor\n");
+      llvm::makeArrayRef(ArgsWithArgv0).data(),
+      "Swift Symbol Graph Extractor\n");
+
+  if (!argumentsAreValid()) {
+    llvm::cl::PrintHelpMessage();
+    return EXIT_FAILURE;
+  }
+
+  if (!llvm::sys::fs::is_directory(options::OutputDir)) {
+    llvm::errs() << "-output-dir argument '" << options::OutputDir
+      << " does not exist or is not a directory\n";
+    return EXIT_FAILURE;
+  }
 
   CompilerInvocation Invocation;
 
@@ -89,6 +129,10 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   Invocation.setModuleName("swift_symbolgraph_extract");
   Invocation.setSDKPath(options::SDK);
   Invocation.setTargetTriple(options::Target);
+
+  for (auto &Arg : options::Xcc) {
+    Invocation.getClangImporterOptions().ExtraArgs.push_back(Arg);
+  }
 
   std::vector<SearchPathOptions::FrameworkSearchPath> FrameworkSearchPaths;
   for (const auto &Path : options::FrameworkSearchPaths) {
@@ -123,7 +167,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   }
 
   symbolgraphgen::SymbolGraphOptions Options {
-    options::OutputPath,
+    options::OutputDir,
     llvm::Triple(options::Target),
     options::PrettyPrint,
     AccessLevel::Public,

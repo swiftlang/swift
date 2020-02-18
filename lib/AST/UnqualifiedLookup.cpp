@@ -58,19 +58,34 @@ namespace {
     // lookup.
     if (loc.isInvalid() || decl->getBraces().isInvalid())
       return true;
-    
+
+    SourceManager &SM = decl->getASTContext().SourceMgr;
+
+    // If a code completion happens inside a function body, some lookups may
+    // happen from the 'loc' that is in a different buffer from the 'decl'.
+    // In such cases, look for members of the 'decl' because we know 'loc' is
+    // inside a function body in the 'decl'.
+    if (SM.hasCodeCompletionBuffer()) {
+      auto completionBufferID = SM.getCodeCompletionBufferID();
+      if (SM.getRangeForBuffer(completionBufferID).contains(loc)) {
+        auto declBufferID =
+            decl->getDeclContext()->getParentSourceFile()->getBufferID();
+        if (completionBufferID != declBufferID)
+          return true;
+      }
+    }
+
     // Within the braces, always look for members.
-    auto &ctx = decl->getASTContext();
     auto braces = decl->getBraces();
     if (braces.Start != braces.End &&
-        ctx.SourceMgr.rangeContainsTokenLoc(braces, loc))
+        SM.rangeContainsTokenLoc(braces, loc))
       return true;
     
     // Within 'where' clause, we can also look for members.
     if (auto *whereClause = decl->getTrailingWhereClause()) {
       SourceRange whereClauseRange = whereClause->getSourceRange();
       if (whereClauseRange.isValid() &&
-          ctx.SourceMgr.rangeContainsTokenLoc(whereClauseRange, loc)) {
+          SM.rangeContainsTokenLoc(whereClauseRange, loc)) {
         return true;
       }
     }

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name Overrides -emit-module -emit-module-path %t/
-// RUN: %target-swift-symbolgraph-extract -module-name Overrides -I %t -pretty-print -o %t/Overrides.symbols.json
+// RUN: %target-swift-symbolgraph-extract -module-name Overrides -I %t -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/Overrides.symbols.json
 
 public class Base {
