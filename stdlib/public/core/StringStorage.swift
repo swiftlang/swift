@@ -186,7 +186,7 @@ extension __StringStorage {
     let count = try initializer(buffer)
 
     let countAndFlags = CountAndFlags(mortalCount: count, isASCII: false)
-    #if arch(i386) || arch(arm)
+    #if arch(i386) || arch(arm) || arch(wasm32)
     storage._count = countAndFlags.count
     storage._flags = countAndFlags.flags
     #else
