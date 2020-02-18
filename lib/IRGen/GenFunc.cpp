@@ -1292,8 +1292,9 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   SmallVector<ParameterConvention, 4> argConventions;
 
   // Reserve space for polymorphic bindings.
-  auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
-                                                            origType, subs);
+  auto bindings =
+      NecessaryBindings::forPartialApplyForwarder(IGF.IGM, origType, subs);
+
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
     auto bindingsSize = bindings.getBufferSize(IGF.IGM);
