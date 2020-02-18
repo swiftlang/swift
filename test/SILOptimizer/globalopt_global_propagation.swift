@@ -229,30 +229,30 @@ public func test_let_tuple_wrapped_ints() -> Int {
 }
 
 // Check that we optimize the global access of x in WMO only
-// CHECK-LABEL: sil [noinline] @$s28globalopt_global_propagation22fold_with_begin_accessSiyF
+// CHECK-LABEL: sil [noinline] @$s28globalopt_global_propagation22fold_with_begin_accesss5Int64VyF
 // CHECK: bb0:
 // CHECK: begin_access
 
-// CHECK-WMO-LABEL: sil [noinline] @$s28globalopt_global_propagation22fold_with_begin_accessSiyF
+// CHECK-WMO-LABEL: sil [noinline] @$s28globalopt_global_propagation22fold_with_begin_accesss5Int64VyF
 // CHECK-WMO: bb0:
 // CHECK-WMO-NEXT: integer_literal $Builtin.Int64, 20
 // CHECK-WMO-NEXT: struct
 // CHECK-WMO-NEXT: return
-var x = 10
+var x : Int64 = 10
 @inline(never)
-public func fold_with_begin_access() -> Int {
+public func fold_with_begin_access() -> Int64 {
   return x + 10
 }
 
 // Check that we always optimize the global access of privateX
-// CHECK-LABEL: sil [noinline] @$s28globalopt_global_propagation30fold_with_begin_access_privateSiyF
+// CHECK-LABEL: sil [noinline] @$s28globalopt_global_propagation30fold_with_begin_access_privates5Int64VyF
 // CHECK: bb0:
 // CHECK-NEXT: integer_literal $Builtin.Int64, 20
 // CHECK-NEXT: struct
 // CHECK-NEXT: return
-private var privateX = 10
+private var privateX : Int64 = 10
 @inline(never)
-public func fold_with_begin_access_private() -> Int {
+public func fold_with_begin_access_private() -> Int64 {
   return privateX + 10
 }
 
