@@ -479,7 +479,7 @@ enum SE0036 {
 
   static func staticReferenceInSwitchInStaticMethod() {
     switch SE0036.A {
-    case A: break
+    case A: break // expected-error {{operator function '~=' requires that 'SE0036' conform to 'Equatable'}}
     case B(_): break
     case C(let x): _ = x; break
     }

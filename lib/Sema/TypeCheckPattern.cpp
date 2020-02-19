@@ -499,24 +499,6 @@ public:
                                             elt->createNameRef(), elt, nullptr);
   }
   Pattern *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *ude) {
-    // FIXME: This shouldn't be needed.  It is only necessary because of the
-    // poor representation of clang enum aliases and should be removed when
-    // rdar://20879992 is addressed.
-    //
-    // Try looking up an enum element in context.
-    if (EnumElementDecl *referencedElement
-        = lookupUnqualifiedEnumMemberElement(DC, ude->getName(),
-                                             ude->getLoc())) {
-      auto *enumDecl = referencedElement->getParentEnum();
-      auto enumTy = enumDecl->getDeclaredTypeInContext();
-      TypeLoc loc = TypeLoc::withoutLoc(enumTy);
-
-      return new (Context) EnumElementPattern(
-          loc, SourceLoc(), ude->getNameLoc(), ude->getName(),
-          referencedElement, nullptr);
-    }
-      
-    
     // Perform unqualified name lookup to find out what the UDRE is.
     return getSubExprPattern(TypeChecker::resolveDeclRefExpr(ude, DC));
   }
