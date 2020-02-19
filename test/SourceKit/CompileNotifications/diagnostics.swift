@@ -87,3 +87,42 @@
 // RUN: %sourcekitd-test -req=track-compiles == -req=syntax-map %s | %FileCheck %s -check-prefix=SYNTACTIC
 // SYNTACTIC: key.syntaxmap:
 // SYNTACTIC_NOT: key.notification: source.notification.compile-did-finish
+
+// RUN: %sourcekitd-test -req=track-compiles == -req=sema %S/Inputs/descriptive-error.swift -- -Xfrontend -enable-descriptive-diagnostics -Xfrontend -diagnostic-documentation-path -Xfrontend %S/Inputs/test-docs %S/Inputs/descriptive-error.swift | %FileCheck %s -check-prefix=DESCRIPTIVE
+// DESCRIPTIVE: key.notification: source.notification.compile-did-finish
+// DESCRIPTIVE-NEXT: key.diagnostics: [
+// DESCRIPTIVE-NEXT:   {
+// DESCRIPTIVE-NEXT:     key.line: 1
+// DESCRIPTIVE-NEXT:     key.column: 1
+// DESCRIPTIVE-NEXT:     key.filepath: "{{.*}}descriptive-error.swift"
+// DESCRIPTIVE-NEXT:     key.severity: source.diagnostic.severity.error
+// DESCRIPTIVE-NEXT:     key.description: "non-nominal type
+// DESCRIPTIVE-NEXT:     key.ranges: [
+// DESCRIPTIVE-NEXT:       {
+// DESCRIPTIVE-NEXT:         key.offset: 10,
+// DESCRIPTIVE-NEXT:         key.length: 10
+// DESCRIPTIVE-NEXT:       }
+// DESCRIPTIVE-NEXT:     ],
+// DESCRIPTIVE-NEXT:     key.educational_notes: [
+// DESCRIPTIVE-NEXT:       "Nominal Types\n-------------\nNominal types documentation content\n"
+// DESCRIPTIVE-NEXT:     ]
+// DESCRIPTIVE-NEXT:   }
+// DESCRIPTIVE-NEXT: ],
+
+// RUN: %sourcekitd-test -req=track-compiles == -req=sema %S/Inputs/descriptive-error.swift -- %S/Inputs/descriptive-error.swift | %FileCheck %s -check-prefix=DESCRIPTIVE-DISABLED
+// DESCRIPTIVE-DISABLED: key.notification: source.notification.compile-did-finish
+// DESCRIPTIVE-DISABLED-NEXT: key.diagnostics: [
+// DESCRIPTIVE-DISABLED-NEXT:   {
+// DESCRIPTIVE-DISABLED-NEXT:     key.line: 1
+// DESCRIPTIVE-DISABLED-NEXT:     key.column: 1
+// DESCRIPTIVE-DISABLED-NEXT:     key.filepath: "{{.*}}descriptive-error.swift"
+// DESCRIPTIVE-DISABLED-NEXT:     key.severity: source.diagnostic.severity.error
+// DESCRIPTIVE-DISABLED-NEXT:     key.description: "non-nominal type
+// DESCRIPTIVE-DISABLED-NEXT:     key.ranges: [
+// DESCRIPTIVE-DISABLED-NEXT:       {
+// DESCRIPTIVE-DISABLED-NEXT:         key.offset: 10,
+// DESCRIPTIVE-DISABLED-NEXT:         key.length: 10
+// DESCRIPTIVE-DISABLED-NEXT:       }
+// DESCRIPTIVE-DISABLED-NEXT:     ]
+// DESCRIPTIVE-DISABLED-NEXT:   }
+// DESCRIPTIVE-DISABLED-NEXT: ],
