@@ -3913,6 +3913,7 @@ bool resolveDifferentiableAttrDerivativeFunctions(
 
 llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
     Evaluator &evaluator, DifferentiableAttr *attr) const {
+#if 0
   // Skip type-checking for implicit `@differentiable` attributes. We currently
   // assume that all implicit `@differentiable` attributes are valid.
   //
@@ -3921,6 +3922,7 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
   // clauses and requirements consistently is a larger problem, to be revisited.
   if (attr->isImplicit())
     return nullptr;
+#endif
 
   auto *D = attr->getOriginalDeclaration();
   auto &ctx = D->getASTContext();
