@@ -1145,6 +1145,28 @@ mirrors.test("Enum/SingletonNonGeneric/DefaultMirror") {
   }
 }
 
+enum ZeroSizedEnumWithDefaultMirror {
+  case π
+}
+
+enum SingletonZeroSizedEnumWithDefaultMirror {
+  case wrap(ZeroSizedEnumWithDefaultMirror)
+}
+
+mirrors.test("Enum/SingletonZeroSizedEnumWithDefaultMirror/DefaultMirror") {
+  do {
+    let value = SingletonZeroSizedEnumWithDefaultMirror.wrap(.π)
+    var output = ""
+    dump(value, to: &output)
+
+    let expected =
+      "▿ Mirror.SingletonZeroSizedEnumWithDefaultMirror.wrap\n" +
+      "  - wrap: Mirror.ZeroSizedEnumWithDefaultMirror.π\n"
+
+    expectEqual(expected, output)
+  }
+}
+
 enum SingletonGenericEnumWithDefaultMirror<T> {
   case OnlyOne(T)
 }
@@ -2222,7 +2244,8 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     testSTSDump(STSContainer.Cases<Int>.a(.init()),
                 STSContainer℠.Cases<Int>.a(.init()),
                 """
-      - Mirror.STSContainer<Mirror.STSOuter>.Cases<Swift.Int>.a\n
+      ▿ Mirror.STSContainer<Mirror.STSOuter>.Cases<Swift.Int>.a
+        - a: Mirror.STSOuter\n
       """)
 
     testSTSDump(STSContainer.Cases<Int>.b(.init()),
