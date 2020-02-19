@@ -1634,7 +1634,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    SmallVector<Identifier, 4> spiNames;
+    SmallVector<Identifier, 4> spiGroups;
 
     if (!Tok.is(tok::identifier) ||
         Tok.isContextualKeyword("set")) {
@@ -1645,7 +1645,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     auto text = Tok.getText();
-    spiNames.push_back(Context.getIdentifier(text));
+    spiGroups.push_back(Context.getIdentifier(text));
     consumeToken();
 
     if (!consumeIf(tok::r_paren)) {
@@ -1656,7 +1656,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     AttrRange = SourceRange(Loc, Tok.getLoc());
     Attributes.add(SPIAccessControlAttr::create(Context, AtLoc, AttrRange,
-                                                spiNames));
+                                                spiGroups));
     break;
   }
 

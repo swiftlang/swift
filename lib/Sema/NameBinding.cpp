@@ -82,7 +82,7 @@ namespace {
     ModuleDecl::AccessPathTy declPath;
 
     // Names of explicitly imported SPI groups via @_spi.
-    ArrayRef<Identifier> spiNames;
+    ArrayRef<Identifier> spiGroups;
 
     /// If this UnboundImport directly represents an ImportDecl, contains the
     /// ImportDecl it represents. This should only be used for diagnostics and
@@ -145,7 +145,7 @@ namespace {
     /// UnboundImport.
     ImportedModuleDesc makeDesc(ModuleDecl *module) const {
       return ImportedModuleDesc({ declPath, module }, options,
-                                privateImportFileName);
+                                privateImportFileName, spiGroups);
     }
 
   private:
@@ -517,13 +517,13 @@ UnboundImport::UnboundImport(ImportDecl *ID)
     privateImportFileName = privateImportAttr->getSourceFile();
   }
 
-  SmallVector<Identifier, 4> spiNames;
+  SmallVector<Identifier, 4> spiGroups;
   for (auto attr : ID->getAttrs().getAttributes<SPIAccessControlAttr>()) {
     options |= SourceFile::ImportFlags::SPIAccessControl;
-    auto attrSPIs = attr->getSPINames();
-    spiNames.append(attrSPIs.begin(), attrSPIs.end());
+    auto attrSPIs = attr->getSPIGroups();
+    spiGroups.append(attrSPIs.begin(), attrSPIs.end());
   }
-  this->spiNames = ID->getASTContext().AllocateCopy(spiNames);
+  this->spiGroups = ID->getASTContext().AllocateCopy(spiGroups);
 }
 
 bool UnboundImport::checkNotTautological(const SourceFile &SF) {

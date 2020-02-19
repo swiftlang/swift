@@ -75,11 +75,13 @@ public:
     StringRef filename;
 
     // Names of explicitly imported SPIs.
-    ArrayRef<Identifier> spis;
+    ArrayRef<Identifier> spiGroups;
 
     ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options,
-                       StringRef filename = {}, ArrayRef<Identifier> spis = {})
-        : module(module), importOptions(options), filename(filename), spis(spis) {
+                       StringRef filename = {},
+                       ArrayRef<Identifier> spiGroups = {})
+        : module(module), importOptions(options), filename(filename),
+          spiGroups(spiGroups) {
       assert(!(importOptions.contains(ImportFlags::Exported) &&
                importOptions.contains(ImportFlags::ImplementationOnly)) ||
              importOptions.contains(ImportFlags::Reserved));
@@ -281,11 +283,11 @@ public:
 
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
-  /// Find all SPI imported from \p importedModule by this module, collecting
-  /// their identifiers in \p spis.
+  /// Find all SPI names imported from \p importedModule by this file,
+  /// collecting the identifiers in \p spiGroups.
   virtual void
-  lookupImportedSPIs(const ModuleDecl *importedModule,
-                     SmallVectorImpl<Identifier> &spis) const override;
+  lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                         SmallVectorImpl<Identifier> &spiGroups) const override;
 
   // Is \p targetDecl accessible as an explictly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;

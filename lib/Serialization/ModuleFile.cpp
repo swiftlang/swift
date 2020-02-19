@@ -2014,7 +2014,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
     while (!spisStr.empty()) {
       StringRef nextComponent;
       std::tie(nextComponent, spisStr) = spisStr.split('\0');
-      dependency.spis.push_back(ctx.getIdentifier(nextComponent));
+      dependency.spiGroups.push_back(ctx.getIdentifier(nextComponent));
     }
 
     if (!module->hasResolvedImports()) {
@@ -2556,13 +2556,13 @@ void ModuleFile::lookupObjCMethods(
   }
 }
 
-void ModuleFile::lookupImportedSPIs(const ModuleDecl *importedModule,
-                                    SmallVectorImpl<Identifier> &spis) const {
+void ModuleFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spiGroups) const {
   for (auto &dep : Dependencies) {
-    auto depSpis = dep.spis;
+    auto depSpis = dep.spiGroups;
     if (dep.Import.second == importedModule &&
         !depSpis.empty()) {
-      spis.append(depSpis.begin(), depSpis.end());
+      spiGroups.append(depSpis.begin(), depSpis.end());
     }
   }
 }

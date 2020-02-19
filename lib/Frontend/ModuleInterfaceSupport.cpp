@@ -119,7 +119,7 @@ static void printImports(raw_ostream &out,
     // SPI attribute on imports
     if (Opts.PrintSPIs) {
       SmallVector<Identifier, 4> spis;
-      M->lookupImportedSPIs(importedModule, spis);
+      M->lookupImportedSPIGroups(importedModule, spis);
       for (auto spiName : spis)
         out << "@_spi(" << spiName << ") ";
     }

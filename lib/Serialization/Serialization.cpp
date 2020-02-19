@@ -1077,7 +1077,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       stableImportControl = ImportControl::ImplementationOnly;
 
     SmallVector<Identifier, 4> spis;
-    M->lookupImportedSPIs(import.second, spis);
+    M->lookupImportedSPIGroups(import.second, spis);
 
     ImportedModule.emit(ScratchRecord,
                         static_cast<uint8_t>(stableImportControl),
@@ -2211,7 +2211,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode = S.DeclTypeAbbrCodes[SPIAccessControlDeclAttrLayout::Code];
 
       SmallVector<IdentifierID, 4> spis;
-      for (auto spi : theAttr->getSPINames()) {
+      for (auto spi : theAttr->getSPIGroups()) {
         assert(!spi.empty() && "Empty SPI name");
         spis.push_back(S.addDeclBaseNameRef(spi));
       }

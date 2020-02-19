@@ -782,7 +782,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (!Options.PrintSPIs) return false;
 
     auto spiAttr = static_cast<const SPIAccessControlAttr*>(this);
-    interleave(spiAttr->getSPINames(),
+    interleave(spiAttr->getSPIGroups(),
                [&](Identifier spiName) {
                  Printer.printAttrName(getAttrName(), true);
                  Printer << "(" << spiName << ")";
@@ -1538,11 +1538,11 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
 }
 
 SPIAccessControlAttr::SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,
-                                           ArrayRef<Identifier> spiNames)
+                                           ArrayRef<Identifier> spiGroups)
       : DeclAttribute(DAK_SPIAccessControl, atLoc, range,
                       /*Implicit=*/false),
-        numSPINames(spiNames.size()) {
-  std::uninitialized_copy(spiNames.begin(), spiNames.end(),
+        numSPIGroups(spiGroups.size()) {
+  std::uninitialized_copy(spiGroups.begin(), spiGroups.end(),
                           getTrailingObjects<Identifier>());
 }
 
@@ -1550,10 +1550,10 @@ SPIAccessControlAttr *
 SPIAccessControlAttr::create(ASTContext &context,
                              SourceLoc atLoc,
                              SourceRange range,
-                             ArrayRef<Identifier> spiNames) {
-  unsigned size = totalSizeToAlloc<Identifier>(spiNames.size());
+                             ArrayRef<Identifier> spiGroups) {
+  unsigned size = totalSizeToAlloc<Identifier>(spiGroups.size());
   void *mem = context.Allocate(size, alignof(SPIAccessControlAttr));
-  return new (mem) SPIAccessControlAttr(atLoc, range, spiNames);
+  return new (mem) SPIAccessControlAttr(atLoc, range, spiGroups);
 }
 
 DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,

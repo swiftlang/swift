@@ -1177,23 +1177,23 @@ class SPIAccessControlAttr final : public DeclAttribute,
   friend TrailingObjects;
 
   SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,
-                       ArrayRef<Identifier> spiNames);
+                       ArrayRef<Identifier> spiGroups);
 
-  // Number of trailing names.
-  size_t numSPINames;
+  // Number of trailing SPI group identifiers.
+  size_t numSPIGroups;
 
 public:
   static SPIAccessControlAttr *create(ASTContext &context, SourceLoc atLoc,
                                       SourceRange range,
-                                      ArrayRef<Identifier> spiNames);
+                                      ArrayRef<Identifier> spiGroups);
 
   /// Name of SPIs declared by the attribute.
   ///
   /// Note: A single SPI name per attribute is currently supported but this
   /// may change with the syntax change.
-  ArrayRef<Identifier> getSPINames() const {
+  ArrayRef<Identifier> getSPIGroups() const {
     return { this->template getTrailingObjects<Identifier>(),
-             numSPINames };
+             numSPIGroups };
   }
 
   static bool classof(const DeclAttribute *DA) {

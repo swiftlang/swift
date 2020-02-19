@@ -549,9 +549,9 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
-void ModuleDecl::lookupImportedSPIs(const ModuleDecl *importedModule,
-                                    SmallVectorImpl<Identifier> &spis) const {
-  FORWARD(lookupImportedSPIs, (importedModule, spis));
+void ModuleDecl::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spiGroups) const {
+  FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
 }
 
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
@@ -1782,13 +1782,13 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   return !imports.isImportedBy(module, getParentModule());
 }
 
-void SourceFile::lookupImportedSPIs(const ModuleDecl *importedModule,
-                                    SmallVectorImpl<Identifier> &spis) const {
+void SourceFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spiGroups) const {
   for (auto &import : Imports) {
     if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
         importedModule == std::get<ModuleDecl*>(import.module)) {
-      auto importedSpis = import.spis;
-      spis.append(importedSpis.begin(), importedSpis.end());
+      auto importedSpis = import.spiGroups;
+      spiGroups.append(importedSpis.begin(), importedSpis.end());
     }
   }
 }
@@ -1799,10 +1799,10 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
 
   auto targetModule = targetDecl->getModuleContext();
   SmallVector<Identifier, 4> importedSpis;
-  lookupImportedSPIs(targetModule, importedSpis);
+  lookupImportedSPIGroups(targetModule, importedSpis);
 
   for (auto attr : targetDecl->getAttrs().getAttributes<SPIAccessControlAttr>())
-    for (auto declSPI : attr->getSPINames())
+    for (auto declSPI : attr->getSPIGroups())
       for (auto importedSPI : importedSpis)
         if (importedSPI == declSPI)
           return true;
