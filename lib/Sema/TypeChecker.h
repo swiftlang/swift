@@ -808,10 +808,6 @@ public:
   /// events in the type checking of this expression, and which can introduce
   /// additional constraints.
   ///
-  /// \param baseCS If this type checking process is the simplification of
-  /// another constraint system, set the original constraint system. \c null
-  /// otherwise
-  ///
   /// \returns The type of the top-level expression, or Type() if an
   ///          error occurred.
   static Type
@@ -819,15 +815,13 @@ public:
                       TypeLoc convertType = TypeLoc(),
                       ContextualTypePurpose convertTypePurpose = CTP_Unused,
                       TypeCheckExprOptions options = TypeCheckExprOptions(),
-                      ExprTypeCheckListener *listener = nullptr,
-                      constraints::ConstraintSystem *baseCS = nullptr);
+                      ExprTypeCheckListener *listener = nullptr);
 
   static Optional<constraints::SolutionApplicationTarget>
   typeCheckExpression(constraints::SolutionApplicationTarget &target,
                       bool &unresolvedTypeExprs,
                       TypeCheckExprOptions options = TypeCheckExprOptions(),
-                      ExprTypeCheckListener *listener = nullptr,
-                      constraints::ConstraintSystem *baseCS = nullptr);
+                      ExprTypeCheckListener *listener = nullptr);
 
   /// Type check the given expression and return its type without
   /// applying the solution.
