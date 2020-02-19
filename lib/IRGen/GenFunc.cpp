@@ -681,6 +681,62 @@ static unsigned findSinglePartiallyAppliedParameterIndexIgnoringEmptyTypes(
   return firstNonEmpty;
 }
 
+
+llvm::Function *irgen::getThinToThickForwarder(IRGenModule &IGM,
+                                               const Optional<FunctionPointer> &staticFnPtr,
+                                               const CanSILFunctionType origType) {
+  auto origSig = IGM.getSignature(origType);
+  llvm::FunctionType *origFnTy = origSig.getType();
+  auto origTy = origSig.getType()->getPointerTo();
+
+  llvm::SmallVector<llvm::Type *, 4> thunkParams;
+
+  for (unsigned i = 0; i < origFnTy->getNumParams(); ++i)
+    thunkParams.push_back(origFnTy->getParamType(i));
+
+  thunkParams.push_back(IGM.RefCountedPtrTy);
+
+  auto thunkType = llvm::FunctionType::get(origFnTy->getReturnType(),
+                                           thunkParams,
+                                           /*vararg*/ false);
+
+  StringRef FnName;
+  if (staticFnPtr)
+    FnName = staticFnPtr->getPointer()->getName();
+
+  IRGenMangler Mangler;
+  std::string thunkName = Mangler.mangleThinToThickForwarder(FnName);
+
+
+  // FIXME: Maybe cache the thunk by function and closure types?.
+  llvm::Function *fwd =
+  llvm::Function::Create(thunkType, llvm::Function::InternalLinkage,
+                         llvm::StringRef(thunkName), &IGM.Module);
+
+  fwd->setAttributes(origSig.getAttributes());
+  fwd->addAttribute(llvm::AttributeList::FirstArgIndex + origFnTy->getNumParams(), llvm::Attribute::SwiftSelf);
+  IRGenFunction IGF(IGM, fwd);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, fwd);
+  auto args = IGF.collectParameters();
+  auto rawFnPtr = args.takeLast();
+
+  // It comes out of the context as an i8*. Cast to the function type.
+  rawFnPtr = IGF.Builder.CreateBitCast(rawFnPtr, origTy);
+
+  auto fnPtr = FunctionPointer(rawFnPtr, origSig);
+
+  auto result = IGF.Builder.CreateCall(fnPtr, args.claimAll());
+
+  // Return the result, if we have one.
+  if (result->getType()->isVoidTy())
+    IGF.Builder.CreateRetVoid();
+  else
+    IGF.Builder.CreateRet(result);
+  return fwd;
+}
+
+
 /// Emit the forwarding stub function for a partial application.
 ///
 /// If 'layout' is null, there is a single captured value of

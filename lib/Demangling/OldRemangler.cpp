@@ -574,6 +574,11 @@ void Remangler::mangleProtocolSelfConformanceDescriptor(Node *node) {
   mangleProtocol(node->begin()[0]);
 }
 
+void Remangler::mangleThinToThickForwarder(Node *node) {
+  Buffer << "Pu__T";
+  mangleSingleChildNode(node); // global
+}
+
 void Remangler::manglePartialApplyForwarder(Node *node) {
   Buffer << "PA__T";
   mangleSingleChildNode(node); // global
