@@ -263,13 +263,32 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       self = _ContiguousArrayBuffer<Element>()
     }
     else {
+      var allocationSize = realMinimumCapacity * MemoryLayout<Element>.stride
+      // Total amount we want to allocate is capacity + header size
+      #if _runtime(_ObjC)
+      let headerSize = 32
+      _debugPrecondition(headerSize == _class_getInstancePositiveExtentSize(
+        _ContiguousArrayStorage<Element>.self
+      ))
+      allocationSize += headerSize
+      // Actual malloc bucket size we will get for that amount
+      allocationSize = _swift_stdlib_malloc_good_size(allocationSize)
+      // Builtin.allocWithTailElems_1 takes the header separately
+      // so subtract it back out
+      allocationSize -= headerSize
+      #endif
+      let capacityToRequest = allocationSize / MemoryLayout<Element>.stride
       _storage = Builtin.allocWithTailElems_1(
          _ContiguousArrayStorage<Element>.self,
-         realMinimumCapacity._builtinWordValue, Element.self)
+         capacityToRequest._builtinWordValue, Element.self)
 
       let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
       let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
       let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
+      #if _runtime(_ObjC)
+      let realSize = _swift_stdlib_malloc_size(storageAddr)
+      _internalInvariant(realSize == allocationSize + headerSize)
+      #endif
 
       _initStorageHeader(
         count: uninitializedCount, capacity: realCapacity)
@@ -612,9 +631,15 @@ internal func += <Element, C: Collection>(
     lhs.count = newCount
   }
   else {
+    let newCapacity = _growArrayCapacity(
+      oldCapacity: lhs.capacity,
+      minimumCapacity: newCount,
+      elementSize: MemoryLayout<Element>.size,
+      growForAppend: true
+    )
     var newLHS = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: newCount,
-      minimumCapacity: _growArrayCapacity(lhs.capacity))
+      minimumCapacity: newCapacity)
 
     newLHS.firstElementAddress.moveInitialize(
       from: lhs.firstElementAddress, count: oldCount)
@@ -773,11 +798,18 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   internal mutating func add(_ element: Element) {
     if remainingCapacity == 0 {
       // Reallocate.
-      let newCapacity = max(_growArrayCapacity(result.capacity), 1)
+      let newCapacity = _growArrayCapacity(
+        oldCapacity: result.capacity,
+        minimumCapacity: result.capacity + 1,
+        elementSize: MemoryLayout<Element>.size,
+        growForAppend: true
+      )
       var newResult = _ContiguousArrayBuffer<Element>(
         _uninitializedCount: newCapacity, minimumCapacity: 0)
       p = newResult.firstElementAddress + result.capacity
       remainingCapacity = newResult.capacity - result.capacity
+      _internalInvariant(remainingCapacity > 0,
+        "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity")
       if !result.isEmpty {
         // This check prevents a data race writing to _swiftEmptyArrayStorage
         // Since count is always 0 there, this code does nothing anyway

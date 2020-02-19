@@ -1054,8 +1054,9 @@ extension Array: RangeReplaceableCollection {
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) {
     let newCapacity = _growArrayCapacity(oldCapacity: _getCapacity(),
-                                         minimumCapacity: minimumCapacity,
-                                         growForAppend: growForAppend)
+      minimumCapacity: minimumCapacity,
+      elementSize: MemoryLayout<Element>.size,
+      growForAppend: growForAppend)
     let count = _getCount()
     _internalInvariant(newCapacity >= count)
     

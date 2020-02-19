@@ -974,10 +974,13 @@ extension ArraySlice: RangeReplaceableCollection {
 
     // Ensure uniqueness, mutability, and sufficient storage.  Note that
     // for consistency, we need unique self even if newElements is empty.
-    self.reserveCapacity(
-      newCount > oldCapacity ?
-      Swift.max(newCount, _growArrayCapacity(oldCapacity))
-      : newCount)
+    let newCapacity = _growArrayCapacity(
+      oldCapacity: oldCapacity,
+      minimumCapacity: newCount,
+      elementSize: MemoryLayout<Element>.size,
+      growForAppend: true
+    )
+    self.reserveCapacity(newCapacity)
   }
 
   @inlinable
