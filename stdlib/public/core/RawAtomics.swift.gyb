@@ -194,13 +194,13 @@ extension UnsafeMutableRawPointer {
   /// This operation is equivalent to the following pseudocode:
   ///
   /// ```
-  /// atomic(self, ordering: .${swiftOrder}) { value in
-  ///   if value == expected {
-  ///      value = desired
-  ///      return true
+  /// atomic(self, ordering: .${swiftOrder}) { currentValue in
+  ///   let original = currentValue
+  ///   if original == expected {
+  ///      currentValue = desired
+  ///      return (true, original)
   ///   } else {
-  ///      expected = value
-  ///      return false
+  ///      return (false, original)
   ///   }
   /// }
   /// ```
@@ -213,14 +213,13 @@ extension UnsafeMutableRawPointer {
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment hook
-  func _atomic${apiOrder}CompareExchangeWord(
-    expected: inout UInt,
+  func _atomic${apiOrder}CompareThenExchangeWord(
+    expected: UInt,
     desired: UInt
-  ) -> Bool {
+  ) -> (exchanged: Bool, original: UInt) {
     let (oldValue, won) = Builtin.cmpxchg_${llvmOrder}_${failureOrder}_Word(
       _rawValue, expected._builtinWordValue, desired._builtinWordValue)
-    expected = UInt(oldValue)
-    return Bool(won)
+    return (Bool(won), UInt(oldValue))
   }
 % end
 }
@@ -232,14 +231,11 @@ extension UnsafeMutableRawPointer {
   /// This operation is equivalent to the following pseudocode:
   ///
   /// ```
-  /// atomic(self, ordering: ordering) { value in
-  ///   if value == expected {
-  ///      value = desired
-  ///      return true
-  ///   } else {
-  ///      expected = value
-  ///      return false
-  ///   }
+  /// atomic(self, ordering: .${swiftOrder}) { currentValue in
+  ///   let original = currentValue
+  ///   guard original == expected else { return (false, original) }
+  ///   currentValue = desired
+  ///   return (true, original)
   /// }
   /// ```
   ///
@@ -250,31 +246,31 @@ extension UnsafeMutableRawPointer {
   @_transparent // Debug performance
   @usableFromInline
   internal
-  func _atomicCompareExchangeWord(
-    expected: inout UInt,
+  func _atomicCompareThenExchangeWord(
+    expected: UInt,
     desired: UInt,
     ordering: AtomicUpdateOrdering
-  ) -> Bool {
+  ) -> (exchanged: Bool, original: UInt) {
     switch ordering {
     case .relaxed:
-      return _atomicRelaxedCompareExchangeWord(
-        expected: &expected,
+      return _atomicRelaxedCompareThenExchangeWord(
+        expected: expected,
         desired: desired)
     case .acquiring:
-      return _atomicAcquiringCompareExchangeWord(
-        expected: &expected,
+      return _atomicAcquiringCompareThenExchangeWord(
+        expected: expected,
         desired: desired)
     case .releasing:
-      return _atomicReleasingCompareExchangeWord(
-        expected: &expected,
+      return _atomicReleasingCompareThenExchangeWord(
+        expected: expected,
         desired: desired)
     case .acquiringAndReleasing:
-      return _atomicAcquiringAndReleasingCompareExchangeWord(
-        expected: &expected,
+      return _atomicAcquiringAndReleasingCompareThenExchangeWord(
+        expected: expected,
         desired: desired)
     default:
-      return _atomicCompareExchangeWord(
-        expected: &expected,
+      return _atomicCompareThenExchangeWord(
+        expected: expected,
         desired: desired)
     }
   }

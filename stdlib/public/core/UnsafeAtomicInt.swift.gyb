@@ -115,17 +115,16 @@ extension UnsafeAtomicInt {
   /// that does not permit spurious failures.
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
-    expected: inout Int,
+    expected: Int,
     desired: Int,
     ordering: AtomicUpdateOrdering
-  ) -> Bool {
-    var expectedWord = UInt(bitPattern: expected)
-    let r = _ptr._atomicCompareExchangeWord(
-      expected: &expectedWord,
+  ) -> (exchanged: Bool, original: Int) {
+    let expectedWord = UInt(bitPattern: expected)
+    let (success, originalWord) = _ptr._atomicCompareThenExchangeWord(
+      expected: expectedWord,
       desired: UInt(bitPattern: desired),
       ordering: ordering)
-    expected = Int(bitPattern: expectedWord)
-    return r
+    return (success, Int(bitPattern: originalWord))
   }
 }
 

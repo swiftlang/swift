@@ -15,9 +15,6 @@ import Swift
 // This type intentionally shadows the stdlib one
 @available(swift, introduced: 5.0)
 public final class _stdlib_AtomicInt {
-// FIXME: This implements acquiring and releasing memory ordering, while
-// the original type was sequentially consistent.
-
   internal var _valueStorage: Int
 
   // FIXME: This should be an UnsafeAtomicInt, but we don't want to constrain
@@ -40,25 +37,25 @@ public final class _stdlib_AtomicInt {
 
   @discardableResult
   public func fetchAndAdd(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicAcquiringAndReleasingLoadThenWrappingIncrementWord(
+    let word = _valuePtr._atomicLoadThenWrappingIncrementWord(
       by: UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndAnd(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicAcquiringAndReleasingLoadThenBitwiseAndWord(
+    let word = _valuePtr._atomicLoadThenBitwiseAndWord(
       UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndOr(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicAcquiringAndReleasingLoadThenBitwiseOrWord(
+    let word = _valuePtr._atomicLoadThenBitwiseOrWord(
       UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndXor(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicAcquiringAndReleasingLoadThenBitwiseXorWord(
+    let word = _valuePtr._atomicLoadThenBitwiseXorWord(
       UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
@@ -77,11 +74,11 @@ public final class _stdlib_AtomicInt {
   }
 
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
-    var expectedWord = UInt(bitPattern: expected)
-    let success = _valuePtr._atomicAcquiringAndReleasingCompareExchangeWord(
-      expected: &expectedWord,
+    let expectedWord = UInt(bitPattern: expected)
+    let (success, originalWord) = _valuePtr._atomicCompareThenExchangeWord(
+      expected: expectedWord,
       desired: UInt(bitPattern: desired))
-    expected = Int(bitPattern: expectedWord)
+    expected = Int(bitPattern: originalWord)
     return success
   }
 }

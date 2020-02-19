@@ -21,8 +21,8 @@ public final class _stdlib_AtomicInt {
 
   // FIXME: This should be an UnsafeAtomicInt, but we don't want to constrain
   // availability, and we need to implement sequential consistent ordering.
-  internal var _valuePtr: Builtin.RawPointer {
-    return _getUnsafePointerToStoredProperties(self)._rawValue
+  internal var _valuePtr: UnsafeMutableRawPointer {
+    return _getUnsafePointerToStoredProperties(self)
   }
 
   public init(_ value: Int = 0) {
@@ -30,28 +30,40 @@ public final class _stdlib_AtomicInt {
   }
 
   public func store(_ desired: Int) {
-    Builtin.atomicstore_seqcst_Word(_valuePtr, desired._builtinWordValue)
+    _valuePtr._atomicStoreWord(UInt(bitPattern: desired))
   }
 
   public func load() -> Int {
-    Int(Builtin.atomicload_seqcst_Word(_valuePtr))
+    Int(bitPattern: _valuePtr._atomicLoadWord())
   }
 
   @discardableResult
   public func fetchAndAdd(_ operand: Int) -> Int {
-    Int(Builtin.atomicrmw_add_seqcst_Word(_valuePtr, operand._builtinWordValue))
+    let operandWord = UInt(bitPattern: operand)
+    let originalWord =
+      _valuePtr._atomicLoadThenWrappingIncrementWord(by: operandWord)
+    return Int(bitPattern: originalWord)
   }
   @discardableResult
   public func fetchAndAnd(_ operand: Int) -> Int {
-    Int(Builtin.atomicrmw_and_seqcst_Word(_valuePtr, operand._builtinWordValue))
+    let operandWord = UInt(bitPattern: operand)
+    let originalWord =
+      _valuePtr._atomicLoadThenBitwiseAndWord(operandWord)
+    return Int(bitPattern: originalWord)
   }
   @discardableResult
   public func fetchAndOr(_ operand: Int) -> Int {
-    Int(Builtin.atomicrmw_or_seqcst_Word(_valuePtr, operand._builtinWordValue))
+    let operandWord = UInt(bitPattern: operand)
+    let originalWord =
+      _valuePtr._atomicLoadThenBitwiseOrWord(operandWord)
+    return Int(bitPattern: originalWord)
   }
   @discardableResult
   public func fetchAndXor(_ operand: Int) -> Int {
-    Int(Builtin.atomicrmw_xor_seqcst_Word(_valuePtr, operand._builtinWordValue))
+    let operandWord = UInt(bitPattern: operand)
+    let originalWord =
+      _valuePtr._atomicLoadThenBitwiseXorWord(operandWord)
+    return Int(bitPattern: originalWord)
   }
 
   public func addAndFetch(_ operand: Int) -> Int {
@@ -68,11 +80,10 @@ public final class _stdlib_AtomicInt {
   }
 
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
-    let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
-      _valuePtr,
-      expected._builtinWordValue,
-      desired._builtinWordValue)
-    expected = Int(oldValue)
+    let (won, oldValue) = _valuePtr._atomicCompareThenExchangeWord(
+      expected: UInt(bitPattern: expected),
+      desired: UInt(bitPattern: desired))
+    expected = Int(bitPattern: oldValue)
     return Bool(won)
   }
 }
@@ -82,7 +93,7 @@ public final class _stdlib_AtomicInt {
 @available(iOS, deprecated: 9999)
 @available(watchOS, deprecated: 9999)
 @available(tvOS, deprecated: 9999)
-@usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
+@usableFromInline // previously used by SwiftPrivate._stdlib_AtomicInt
 internal func _swift_stdlib_atomicCompareExchangeStrongInt(
   object target: UnsafeMutablePointer<Int>,
   expected: UnsafeMutablePointer<Int>,
@@ -116,7 +127,7 @@ func _swift_stdlib_atomicLoadInt(
 @available(iOS, deprecated: 9999)
 @available(watchOS, deprecated: 9999)
 @available(tvOS, deprecated: 9999)
-@usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
+@usableFromInline // previously used by SwiftPrivate._stdlib_AtomicInt
 internal func _swift_stdlib_atomicStoreInt(
   object target: UnsafeMutablePointer<Int>,
   desired: Int
@@ -194,7 +205,7 @@ func _swift_stdlib_atomicFetchXorInt(
 
 // Warning: no overflow checking.
 @available(*, deprecated)
-@usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
+@usableFromInline // previously used by SwiftPrivate._stdlib_AtomicInt
 internal func _swift_stdlib_atomicFetchAddInt32(
   object target: UnsafeMutablePointer<Int32>,
   operand: Int32
@@ -205,7 +216,7 @@ internal func _swift_stdlib_atomicFetchAddInt32(
 
 // Warning: no overflow checking.
 @available(*, deprecated)
-@usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
+@usableFromInline // previously used by SwiftPrivate._stdlib_AtomicInt
 internal func _swift_stdlib_atomicFetchAddInt64(
   object target: UnsafeMutablePointer<Int64>,
   operand: Int64
@@ -216,7 +227,7 @@ internal func _swift_stdlib_atomicFetchAddInt64(
 
 // Warning: no overflow checking.
 @available(*, deprecated)
-@usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
+@usableFromInline // previously used by SwiftPrivate._stdlib_AtomicInt
 internal func _swift_stdlib_atomicFetchAndInt32(
   object target: UnsafeMutablePointer<Int32>,
   operand: Int32
@@ -227,7 +238,7 @@ internal func _swift_stdlib_atomicFetchAndInt32(
 
 // Warning: no overflow checking.
 @available(*, deprecated)
-@usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
+@usableFromInline // previously used by SwiftPrivate._stdlib_AtomicInt
 internal func _swift_stdlib_atomicFetchAndInt64(
   object target: UnsafeMutablePointer<Int64>,
   operand: Int64
@@ -238,7 +249,7 @@ internal func _swift_stdlib_atomicFetchAndInt64(
 
 // Warning: no overflow checking.
 @available(*, deprecated)
-@usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
+@usableFromInline // previously used by SwiftPrivate._stdlib_AtomicInt
 internal func _swift_stdlib_atomicFetchOrInt32(
   object target: UnsafeMutablePointer<Int32>,
   operand: Int32
@@ -249,7 +260,7 @@ internal func _swift_stdlib_atomicFetchOrInt32(
 
 // Warning: no overflow checking.
 @available(*, deprecated)
-@usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
+@usableFromInline // previously used by SwiftPrivate._stdlib_AtomicInt
 internal func _swift_stdlib_atomicFetchOrInt64(
   object target: UnsafeMutablePointer<Int64>,
   operand: Int64
@@ -260,7 +271,7 @@ internal func _swift_stdlib_atomicFetchOrInt64(
 
 // Warning: no overflow checking.
 @available(*, deprecated)
-@usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
+@usableFromInline // previously used by SwiftPrivate._stdlib_AtomicInt
 internal func _swift_stdlib_atomicFetchXorInt32(
   object target: UnsafeMutablePointer<Int32>,
   operand: Int32
@@ -271,7 +282,7 @@ internal func _swift_stdlib_atomicFetchXorInt32(
 
 // Warning: no overflow checking.
 @available(*, deprecated)
-@usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
+@usableFromInline // previously used by SwiftPrivate._stdlib_AtomicInt
 internal func _swift_stdlib_atomicFetchXorInt64(
   object target: UnsafeMutablePointer<Int64>,
   operand: Int64

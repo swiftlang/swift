@@ -66,9 +66,10 @@ extension UnsafeAtomicLazyReference {
   ) -> Instance {
     let desiredUnmanaged = Unmanaged.passRetained(desired)
     let desiredWord = UInt(bitPattern: desiredUnmanaged.toOpaque())
-    var expectedWord: UInt = 0
-    let success = _ptr._atomicCompareExchangeWord(
-      expected: &expectedWord,
+    var currentWord: UInt = 0
+    var success: Bool
+    (success, currentWord) = _ptr._atomicCompareThenExchangeWord(
+      expected: currentWord,
       desired: desiredWord,
       ordering: .acquiringAndReleasing)
     if !success {
@@ -76,9 +77,9 @@ extension UnsafeAtomicLazyReference {
       // we performed on `desired`.
       desiredUnmanaged.release()
     }
-    _precondition(expectedWord != 0)
+    _precondition(currentWord != 0)
     let result = Unmanaged<Instance>.fromOpaque(
-      UnsafeRawPointer(bitPattern: expectedWord)!)
+      UnsafeRawPointer(bitPattern: currentWord)!)
     return result.takeUnretainedValue()
   }
 }

@@ -111,12 +111,12 @@ extension UnsafeAtomicUInt {
   /// that does not permit spurious failures.
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
-    expected: inout UInt,
+    expected: UInt,
     desired: UInt,
     ordering: AtomicUpdateOrdering
-  ) -> Bool {
-    _ptr._atomicCompareExchangeWord(
-      expected: &expected,
+  ) -> (exchanged: Bool, original: UInt) {
+    _ptr._atomicCompareThenExchangeWord(
+      expected: expected,
       desired: desired,
       ordering: ordering)
   }

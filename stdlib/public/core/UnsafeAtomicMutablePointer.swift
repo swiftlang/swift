@@ -100,17 +100,16 @@ extension UnsafeAtomicMutablePointer {
   /// that does not permit spurious failures.
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
-    expected: inout Value,
+    expected: Value,
     desired: Value,
     ordering: AtomicUpdateOrdering
-  ) -> Bool {
-    var expectedWord = UInt(bitPattern: expected)
+  ) -> (exchanged: Bool, original: Value) {
     let desiredWord = UInt(bitPattern: desired)
-    let success = _ptr._atomicCompareExchangeWord(
-      expected: &expectedWord,
+    let expectedWord = UInt(bitPattern: expected)
+    let (success, originalWord) = _ptr._atomicCompareThenExchangeWord(
+      expected: expectedWord,
       desired: desiredWord,
       ordering: ordering)
-    expected = UnsafeMutablePointer(bitPattern: expectedWord)
-    return success
+    return (success, UnsafeMutablePointer(bitPattern: originalWord))
   }
 }

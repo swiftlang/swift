@@ -102,21 +102,22 @@ extension UnsafeAtomicUnmanaged {
   /// that does not permit spurious failures.
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
-    expected: inout Value,
+    expected: Value,
     desired: Value,
     ordering: AtomicUpdateOrdering
-  ) -> Bool {
-    var expectedWord = UInt(bitPattern: expected?.toOpaque())
+  ) -> (exchanged: Bool, original: Value) {
     let desiredWord = UInt(bitPattern: desired?.toOpaque())
-    let success = _ptr._atomicCompareExchangeWord(
-      expected: &expectedWord,
+    let expectedWord = UInt(bitPattern: expected?.toOpaque())
+    let (success, originalWord) = _ptr._atomicCompareThenExchangeWord(
+      expected: expectedWord,
       desired: desiredWord,
       ordering: ordering)
-    if let p = UnsafeRawPointer(bitPattern: expectedWord) {
-      expected = Unmanaged.fromOpaque(p)
+    let original: Value
+    if let p = UnsafeRawPointer(bitPattern: originalWord) {
+      original = Unmanaged.fromOpaque(p)
     } else {
-      expected = nil
+      original = nil
     }
-    return success
+    return (success, original)
   }
 }
