@@ -3808,6 +3808,31 @@ bool resolveDifferentiableAttrDerivativeFunctions(
   return false;
 }
 
+/// Checks whether differentiable programming is enabled for the given
+/// differentiation-related attribute. Returns true on error.
+bool checkIfDifferentiableProgrammingEnabled(
+    ASTContext &ctx, DeclAttribute *attr) {
+  auto &diags = ctx.Diags;
+  // The experimental differentiable programming flag must be enabled.
+  if (!ctx.LangOpts.EnableExperimentalDifferentiableProgramming) {
+    diags
+        .diagnose(attr->getLocation(),
+                  diag::experimental_differentiable_programming_disabled)
+        .highlight(attr->getRangeWithAt());
+    return true;
+  }
+  // The `Differentiable` protocol must be available.
+  // If unavailable, the `_Differentiation` module should be imported.
+  if (!ctx.getProtocol(KnownProtocolKind::Differentiable)) {
+    diags
+        .diagnose(attr->getLocation(), diag::attr_used_without_required_module,
+                  attr, ctx.Id_Differentiation)
+        .highlight(attr->getRangeWithAt());
+    return true;
+  }
+  return false;
+}
+
 llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
     Evaluator &evaluator, DifferentiableAttr *attr) const {
   // Skip type-checking for implicit `@differentiable` attributes. We currently
@@ -3824,21 +3849,8 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
   auto &diags = ctx.Diags;
   // `@differentiable` attribute requires experimental differentiable
   // programming to be enabled.
-  if (!ctx.LangOpts.EnableExperimentalDifferentiableProgramming) {
-    diags
-        .diagnose(attr->getLocation(),
-                  diag::experimental_differentiable_programming_disabled)
-        .highlight(attr->getRangeWithAt());
+  if (checkIfDifferentiableProgrammingEnabled(ctx, attr))
     return nullptr;
-  }
-  // The `Differentiable` protocol must be available.
-  if (!ctx.getProtocol(KnownProtocolKind::Differentiable)) {
-    diags
-        .diagnose(attr->getLocation(), diag::attr_used_without_required_module,
-                  attr, ctx.Id_Differentiation)
-        .highlight(attr->getRangeWithAt());
-    return nullptr;
-  }
 
   // Derivative registration is disabled for `@differentiable(linear)`
   // attributes. Instead, use `@transpose` attribute to register transpose
@@ -3990,7 +4002,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   (void)attr->getParameterIndices();
 }
 
-/// Typechecks the given derivative attribute `attr` on decl `D`.
+/// Type-checks the given `@derivative` attribute `attr` on declaration `D`.
 ///
 /// Effects are:
 /// - Sets the original function and parameter indices on `attr`.
@@ -4000,19 +4012,13 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 /// \returns true on error, false on success.
 static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
                                     DerivativeAttr *attr) {
-  // Note: Implementation must be idempotent because it can get called multiple
+  // Note: Implementation must be idempotent because it may be called multiple
   // times for the same attribute.
-
   auto &diags = Ctx.Diags;
-
   // `@derivative` attribute requires experimental differentiable programming
   // to be enabled.
-  auto &ctx = D->getASTContext();
-  if (!ctx.LangOpts.EnableExperimentalDifferentiableProgramming) {
-    diags.diagnose(attr->getLocation(),
-                   diag::experimental_differentiable_programming_disabled);
+  if (checkIfDifferentiableProgrammingEnabled(Ctx, attr))
     return true;
-  }
   auto *derivative = cast<FuncDecl>(D);
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
