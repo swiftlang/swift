@@ -61,6 +61,22 @@ func vjpSubtractWrt1(x: Float, y: Float) -> (value: Float, pullback: (Float) -> 
   return (x - y, { $0 })
 }
 
+// Test invalid original function.
+
+// expected-error @+1 {{use of unresolved identifier 'nonexistentFunction'}}
+@derivative(of: nonexistentFunction)
+func vjpOriginalFunctionNotFound(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+// Test `@derivative` attribute where `value:` result does not conform to `Differentiable`.
+// Invalid original function should be diagnosed first.
+// expected-error @+1 {{use of unresolved identifier 'nonexistentFunction'}}
+@derivative(of: nonexistentFunction)
+func vjpOriginalFunctionNotFound2(_ x: Float) -> (value: Int, pullback: (Float) -> Float) {
+  fatalError()
+}
+
 // Test incorrect `@derivative` declaration type.
 
 // expected-note @+1 {{'incorrectDerivativeType' defined here}}
@@ -83,7 +99,7 @@ func vjpResultIncorrectFirstLabel(x: Float) -> (Float, (Float) -> Float) {
 func vjpResultIncorrectSecondLabel(x: Float) -> (value: Float, (Float) -> Float) {
   return (x, { $0 })
 }
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple; first element type 'Int' must conform to 'Differentiable'}}
+// expected-error @+1 {{could not find function 'incorrectDerivativeType' with expected type '(Int) -> Int'}}
 @derivative(of: incorrectDerivativeType)
 func vjpResultNotDifferentiable(x: Int) -> (
   value: Int, pullback: (Int) -> Int

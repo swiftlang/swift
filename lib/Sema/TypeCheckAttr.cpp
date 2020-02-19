@@ -4054,19 +4054,6 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     return true;
   }
   attr->setDerivativeKind(kind);
-  // `value: R` result tuple element must conform to `Differentiable`.
-  auto diffableProto = Ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto valueResultType = valueResultElt.getType();
-  if (valueResultType->hasTypeParameter())
-    valueResultType = derivative->mapTypeIntoContext(valueResultType);
-  auto valueResultConf = TypeChecker::conformsToProtocol(
-      valueResultType, diffableProto, derivative->getDeclContext(), None);
-  if (!valueResultConf) {
-    diags.diagnose(attr->getLocation(),
-                   diag::derivative_attr_result_value_not_differentiable,
-                   valueResultElt.getType());
-    return true;
-  }
 
   // Compute expected original function type and look up original function.
   auto *originalFnType =
@@ -4221,6 +4208,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
                                     diffParamTypes);
 
   // Get the differentiability parameters' `TangentVector` associated types.
+  auto *diffableProto = Ctx.getProtocol(KnownProtocolKind::Differentiable);
   auto diffParamTanTypes =
       map<SmallVector<TupleTypeElt, 4>>(diffParamTypes, [&](Type paramType) {
         if (paramType->hasTypeParameter())
@@ -4234,7 +4222,19 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
         return TupleTypeElt(paramAssocType);
       });
 
+  // `value: R` result tuple element must conform to `Differentiable`.
   // Get the `TangentVector` associated type of the `value:` result type.
+  auto valueResultType = valueResultElt.getType();
+  if (valueResultType->hasTypeParameter())
+    valueResultType = derivative->mapTypeIntoContext(valueResultType);
+  auto valueResultConf = TypeChecker::conformsToProtocol(
+      valueResultType, diffableProto, derivative->getDeclContext(), None);
+  if (!valueResultConf) {
+    diags.diagnose(attr->getLocation(),
+                   diag::derivative_attr_result_value_not_differentiable,
+                   valueResultElt.getType());
+    return true;
+  }
   auto resultTanType = valueResultConf.getTypeWitnessByName(
       valueResultType, Ctx.Id_TangentVector);
 
