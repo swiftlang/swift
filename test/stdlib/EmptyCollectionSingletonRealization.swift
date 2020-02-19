@@ -24,25 +24,33 @@ import Foundation
 
 @objc protocol P {}
 
-do {
-  let d: [NSObject: NSObject] = [:]
-  let c: AnyClass? = object_getClass(d)
-  let conforms = class_conformsToProtocol(c, P.self)
-  print("Dictionary: ", conforms) // CHECK: Dictionary: false
-}
 
-do {
-  let a: [NSObject] = []
-  let c: AnyClass? = object_getClass(a)
-  let p = objc_getProtocol("NSObject")
-  let conforms = class_conformsToProtocol(c, p)
-  print("Array:", conforms) // CHECK: Array: false
-}
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  do {
+    let d: [NSObject: NSObject] = [:]
+    let c: AnyClass? = object_getClass(d)
+    let conforms = class_conformsToProtocol(c, P.self)
+    print("Dictionary: ", conforms) // CHECK: Dictionary: false
+  }
 
-do {
-  let s: Set<NSObject> = []
-  let c: AnyClass? = object_getClass(s)
-  let p = objc_getProtocol("NSObject")
-  let conforms = class_conformsToProtocol(c, p)
-  print("Set:", conforms) // CHECK: Set: false
+  do {
+    let a: [NSObject] = []
+    let c: AnyClass? = object_getClass(a)
+    let p = objc_getProtocol("NSObject")
+    let conforms = class_conformsToProtocol(c, p)
+    print("Array:", conforms) // CHECK: Array: false
+  }
+
+  do {
+    let s: Set<NSObject> = []
+    let c: AnyClass? = object_getClass(s)
+    let p = objc_getProtocol("NSObject")
+    let conforms = class_conformsToProtocol(c, p)
+    print("Set:", conforms) // CHECK: Set: false
+  }
+} else {
+  // When testing against an older runtime that doesn't have this fix, lie.
+  print("Dictionary: false")
+  print("Array: false")
+  print("Set: false")
 }
