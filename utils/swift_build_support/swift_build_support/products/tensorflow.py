@@ -101,7 +101,8 @@ class TensorFlow(product.Product):
     def build(self, host_target):
         with shell.pushd(self.source_dir):
             shell.call([
-                os.path.join(self.source_dir, "configure"),
+                os.path.join(self.source_dir, '..', 'swift', 'utils',
+                             'configure-tensorflow-defaults'),
             ])
             shell.call([
                 self.toolchain.bazel,
