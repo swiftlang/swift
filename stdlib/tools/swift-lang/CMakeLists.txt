@@ -18,6 +18,7 @@ add_swift_target_library(swiftSwiftLang SHARED
   GYB_SOURCES
     UIDs.swift.gyb
 
+  DEPENDS sourcekitd
   SWIFT_MODULE_DEPENDS_OSX Darwin Foundation
   PRIVATE_LINK_LIBRARIES sourcekitd
   SWIFT_COMPILE_FLAGS -F${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib
