@@ -18,7 +18,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
-#include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Decl.h"
@@ -29,6 +28,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "DerivedConformances.h"
 
 using namespace swift;
 
