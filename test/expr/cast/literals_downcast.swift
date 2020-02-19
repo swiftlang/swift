@@ -1,7 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
-// REQUIRES: objc_interop
-
-import Foundation
+// RUN: %target-typecheck-verify-swift
 
 let ok = "A" as Character // OK
 let succeed = "A" as? String // expected-warning {{always succeeds}}
@@ -17,10 +14,6 @@ let badInt2 = 1 as? Double // expected-warning {{conditional downcast from liter
 let okUInt = 1 as UInt // OK
 let badUInt = 1 as? UInt // expected-warning {{conditional downcast from literal to 'UInt' always fails; consider using 'as' coercion}} {{none}}
 let badUInt1 = 1.0 as? UInt // expected-warning {{cast from 'Double' to unrelated type 'UInt' always fails}}
-
-// Can downcast by bridging
-let bridge = "A" as? NSString // expected-warning {{always succeeds}}
-let bridge1 = 1 as? NSNumber // expected-warning {{always succeeds}}
 
 // Custom protocol adoption
 struct S: ExpressibleByStringLiteral {
