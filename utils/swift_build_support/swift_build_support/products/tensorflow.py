@@ -39,9 +39,9 @@ class TensorFlowSwiftAPIs(product.Product):
         tensorflow_source_dir = os.path.realpath(tensorflow_source_dir)
 
         if host_target.startswith('macosx'):
-            lib_name = 'libtensorflow.2.1.0.dylib'
+            lib_name = 'libtensorflow.dylib'
         elif host_target.startswith('linux'):
-            lib_name = 'libtensorflow.so.2.1.0'
+            lib_name = 'libtensorflow.so'
         else:
             raise RuntimeError("Unknown host target %s" % host_target)
 
@@ -57,7 +57,7 @@ class TensorFlowSwiftAPIs(product.Product):
             '-D', 'TensorFlow_LIBRARY={}'.format(
                 os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow',
                              lib_name)),
-            '-D', 'CMAKE_SHARED_LIBRARY_LINKER_FLAGS={}'.format('-L{}'.format(
+            '-D', 'CMAKE_Swift_FLAGS={}'.format('-L{}'.format(
                 os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow'))
             ),
             '-B', self.build_dir,
@@ -114,6 +114,26 @@ class TensorFlow(product.Product):
                 "--define", "framework_shared_object=false",
                 "//tensorflow:tensorflow",
             ])
+
+        if host_target.startswith('macosx'):
+            suffixed_lib_name = 'libtensorflow.2.1.0.dylib'
+            unsuffixed_lib_name = 'libtensorflow.dylib'
+        elif host_target.startswith('linux'):
+            suffixed_lib_name = 'libtensorflow.so.2.1.0'
+            unsuffixed_lib_name = 'libtensorflow.so'
+        else:
+            raise RuntimeError('unknown host target {}'.format(host_target))
+
+        # NOTE: ignore the race condition here ....
+        try:
+            os.unlink(os.path.join(self.source_dir, 'bazel-bin', 'tensorflow',
+                                   unsuffixed_lib_name))
+        except OSError:
+            pass
+        os.symlink(os.path.join(self.source_dir, 'bazel-bin', 'tensorflow',
+                                suffixed_lib_name),
+                   os.path.join(self.source_dir, 'bazel-bin', 'tensorflow',
+                                unsuffixed_lib_name))
 
     def should_test(self, host_target):
         return False
