@@ -343,6 +343,7 @@ ImportDepth::ImportDepth(ASTContext &context,
   ModuleDecl::ImportFilter importFilter;
   importFilter |= ModuleDecl::ImportFilterKind::Private;
   importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
   SmallVector<ModuleDecl::ImportedModule, 16> mainImports;
   main->getImportedModules(mainImports, importFilter);
   for (auto &import : mainImports) {

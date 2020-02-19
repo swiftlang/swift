@@ -403,6 +403,7 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
   filter |= ModuleDecl::ImportFilterKind::Private;
   filter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  filter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
   mainModule->getImportedModules(imports, filter);
 

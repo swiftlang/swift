@@ -2758,6 +2758,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       scratch.clear();
       next.second->getImportedModules(scratch,
                                       ModuleDecl::ImportFilterKind::Public);
+      // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
       for (auto &import : scratch) {
         llvm::outs() << "\t" << import.second->getName();
         for (auto accessPathPiece : import.first) {

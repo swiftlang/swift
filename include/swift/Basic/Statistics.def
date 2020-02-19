@@ -187,6 +187,12 @@ FRONTEND_STATISTIC(Parse, NumIterableDeclContextParsed)
 /// Number of conformances that were deserialized by this frontend job.
 FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
 
+/// Number of pairs of modules we've checked for cross-imports.
+FRONTEND_STATISTIC(Sema, NumCrossImportsChecked)
+
+/// Number of pairs of modules we've actually found cross-imports for.
+FRONTEND_STATISTIC(Sema, NumCrossImportsFound)
+
 /// Number of constraint-solving scopes created in the typechecker, while
 /// solving expression type constraints. A rough proxy for "how much work the
 /// expression typechecker did".

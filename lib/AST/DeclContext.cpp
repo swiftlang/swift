@@ -287,6 +287,12 @@ DeclContext *DeclContext::getModuleScopeContext() const {
   }
 }
 
+void DeclContext::getSeparatelyImportedOverlays(
+    ModuleDecl *declaring, SmallVectorImpl<ModuleDecl *> &overlays) const {
+  if (auto SF = getParentSourceFile())
+    SF->getSeparatelyImportedOverlays(declaring, overlays);
+}
+
 /// Determine whether the given context is generic at any level.
 bool DeclContext::isGenericContext() const {
   auto dc = this;

@@ -1,0 +1,1 @@
+framework module ClangFramework { umbrella header "ClangFramework.h" }

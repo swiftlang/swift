@@ -2103,6 +2103,15 @@ public:
     return nullptr;
   }
 
+  /// Retrieve the first attribute with the given kind.
+  DeclAttribute *getAttribute(DeclAttrKind DK,
+                              bool AllowInvalid = false) {
+    for (auto Attr : *this)
+      if (Attr->getKind() == DK && (Attr->isValid() || AllowInvalid))
+        return Attr;
+    return nullptr;
+  }
+
 private:
   /// Predicate used to filter MatchingAttributeRange.
   template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
