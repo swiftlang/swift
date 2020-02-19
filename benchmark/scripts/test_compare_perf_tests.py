@@ -507,6 +507,13 @@ class OldAndNewLog(unittest.TestCase):
                              for line in
                              new_log_content.splitlines()])])
 
+    old_results['D'] = PerformanceTestResult(
+        '184,D,200,648,4,1,5,9,5,3,45,40,3,1,,,,1,1,,4,4,4,268'.split(','),
+        quantiles=True, delta=True)
+    new_results['D'] = PerformanceTestResult(
+        '184,D,200,746,1,3,1,3,2,1,,2,3,1,,1,1,3,1,3,7,9,61,1792'.split(','),
+        quantiles=True, delta=True)
+
     def assert_report_contains(self, texts, report):
         assert not isinstance(texts, str)
         for text in texts:
@@ -761,13 +768,13 @@ class TestTestComparator(OldAndNewLog):
         tc = TestComparator(self.old_results, self.new_results, 0.05)
         self.assertEqual(names(tc.unchanged), ['AngryPhonebook', 'Array2D'])
         self.assertEqual(names(tc.increased), ['ByteSwap', 'ArrayAppend'])
-        self.assertEqual(names(tc.decreased), ['BitCount'])
+        self.assertEqual(names(tc.decreased), ['BitCount', 'D'])
         self.assertEqual(names(tc.added), ['TwoSum'])
         self.assertEqual(names(tc.removed), ['AnyHashableWithAClass'])
         # other way around
         tc = TestComparator(self.new_results, self.old_results, 0.05)
         self.assertEqual(names(tc.unchanged), ['AngryPhonebook', 'Array2D'])
-        self.assertEqual(names(tc.increased), ['BitCount'])
+        self.assertEqual(names(tc.increased), ['BitCount', 'D'])
         self.assertEqual(names(tc.decreased), ['ByteSwap', 'ArrayAppend'])
         self.assertEqual(names(tc.added), ['AnyHashableWithAClass'])
         self.assertEqual(names(tc.removed), ['TwoSum'])
@@ -776,7 +783,7 @@ class TestTestComparator(OldAndNewLog):
         tc = TestComparator(self.old_results, self.new_results, 1)
         self.assertEqual(
             names(tc.unchanged),
-            ['AngryPhonebook', 'Array2D', 'ArrayAppend', 'BitCount']
+            ['AngryPhonebook', 'Array2D', 'ArrayAppend', 'BitCount', 'D']
         )
         self.assertEqual(names(tc.increased), ['ByteSwap'])
         self.assertEqual(tc.decreased, [])
@@ -876,19 +883,19 @@ class TestReportFormatter(OldAndNewLog):
                 <th align='left'>MAX_RSS</th>"""])
 
     def test_emphasize_speedup(self):
-        """Emphasize speedup values for regressions and improvements"""
+        """Emphasize speedup values for regressions and improvements."""
         # tests in No Changes don't have emphasized speedup
         self.assert_markdown_contains([
             'BitCount              | 3      | 9      | +199.9% | **0.33x**',
             'ByteSwap              | 4      | 0      | -100.0% | **4001.00x**',
             'AngryPhonebook        | 10458  | 10458  | +0.0%   | 1.00x',
-            'ArrayAppend           | 23641  | 20000  | -15.4%  | **1.18x (?)**'
+            'ArrayAppend           | 23641  | 20000  | -15.4%  | **1.18x** (?)'
         ])
         self.assert_git_contains([
             'BitCount                3        9        +199.9%   **0.33x**',
             'ByteSwap                4        0        -100.0%   **4001.00x**',
             'AngryPhonebook          10458    10458    +0.0%     1.00x',
-            'ArrayAppend             23641    20000    -15.4%    **1.18x (?)**'
+            'ArrayAppend             23641    20000    -15.4%    **1.18x** (?)'
         ])
         self.assert_html_contains([
             """
@@ -917,11 +924,32 @@ class TestReportFormatter(OldAndNewLog):
         </tr>"""
         ])
 
+    def test_print_quantiles_for_dubious_changes_with_samples(self):
+        self.assert_markdown_contains([
+            'D                     | 648    | 746    | +15.1%  | **0.87x** (?)'
+            '</tr><tr><td colspan=5>'
+            '<code>O: <sub>648 652 653 658 </sub>667<sub> 672 675 720 760 '
+            '</sub>763<sub> 764 764 764 764 </sub>765<sub> 766 766 770 774'
+            '</sub></code><br/>'
+            '<code>N: <sup>746 747 750 751 </sup>754<sup> 756 757 757 759 '
+            '</sup>762<sup> 763 763 764 765 </sup>768<sup> 769 772 779 788'
+            '</sup></code></td></tr>'
+            '\n'
+        ])
+        self.assert_git_contains([
+            'D                       648      746      +15.1%    **0.87x** (?)'
+            '\n  O: 648 652 653 658  667  672 675 720 760 '  # ventiles, old
+            ' 763  764 764 764 764  765  766 766 770 774'
+            '\n  N: 746 747 750 751  754  756 757 757 759 '  # ventiles, new
+            ' 762  763 763 764 765  768  769 772 779 788'
+            '\n'
+        ])
+
     def test_sections(self):
         """Report is divided into sections with summaries."""
         self.assert_markdown_contains([
             """<details open>
-  <summary>Regression (1)</summary>""",
+  <summary>Regression (2)</summary>""",
             """<details >
   <summary>Improvement (2)</summary>""",
             """<details >
@@ -931,13 +959,13 @@ class TestReportFormatter(OldAndNewLog):
             """<details open>
   <summary>Removed (1)</summary>"""])
         self.assert_git_contains([
-            'Regression (1): \n',
+            'Regression (2): \n',
             'Improvement (2): \n',
             'No Changes (2): \n',
             'Added (1): \n',
             'Removed (1): \n'])
         self.assert_html_contains([
-            "<th align='left'>Regression (1)</th>",
+            "<th align='left'>Regression (2)</th>",
             "<th align='left'>Improvement (2)</th>",
             "<th align='left'>No Changes (2)</th>",
             "<th align='left'>Added (1)</th>",

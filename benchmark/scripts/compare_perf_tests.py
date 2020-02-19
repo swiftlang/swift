@@ -568,10 +568,12 @@ class ReportFormatter(object):
                 ReportFormatter.RESULT_COMPARISON_HEADER)
 
     @staticmethod
-    def values(result):
+    def values(result, dubious_formatter=lambda r: ' (?)'):
         """Format values from PerformanceTestResult or ResultComparison.
 
-        Returns tuple of strings to display in the results table.
+        Returns tuple of strings to display in the results table. Uses the
+        supplied `dubious_formatter` to display the empirical sample
+        distribution of the dubious result comparison.
         """
         return (
             (result.name,
@@ -582,14 +584,22 @@ class ReportFormatter(object):
             (result.name,
              str(result.old.min), str(result.new.min),
              '{0:+.1f}%'.format(result.delta),
-             '{0:.2f}x{1}'.format(result.ratio,
-                                  ' (?)' if result.is_dubious else ''))
+             '{0:.2f}x{1}'.format(
+                 result.ratio,
+                 dubious_formatter(result) if result.is_dubious else ''))
         )
 
     def markdown(self):
         """Report results of benchmark comparisons in Markdown format."""
         return self._formatted_text(
             label_formatter=lambda s: ('**' + s + '**'),
+            ventile_formatter=lambda r: ReportFormatter.ventiles(
+                r,
+                START='</tr><tr><td colspan=5><code>O: <sub>',
+                MIDDLE='</sub></code><br/><code>N: <sup>',
+                END='</sup></code></td></tr>',
+                OLD_QUARTILE='</sub>{0}<sub>',
+                NEW_QUARTILE='</sup>{0}<sup>'),
             COLUMN_SEPARATOR=' | ',
             DELIMITER_ROW=([':---'] + ['---:'] * 4),
             SEPARATOR='&nbsp; | | | | \n',
@@ -604,11 +614,38 @@ class ReportFormatter(object):
         """Report results of benchmark comparisons in 'git' format."""
         return self._formatted_text(
             label_formatter=lambda s: s.upper(),
+            ventile_formatter=lambda r: ReportFormatter.ventiles(
+                r,
+                START='\n  O: ',
+                MIDDLE='\n  N: ',
+                END='',
+                OLD_QUARTILE=' {0} ',
+                NEW_QUARTILE=' {0} '),
             COLUMN_SEPARATOR='   ',
             DELIMITER_ROW=None,
             SEPARATOR='\n',
             SECTION="""
 {0} ({1}): \n{2}""")
+
+    @staticmethod
+    def ventiles(result, START, MIDDLE, END, OLD_QUARTILE, NEW_QUARTILE):
+        v = ' (?)'
+        if not (result.old.samples and result.new.samples):
+            return v
+
+        def ventiles(samples, QUARTILE):
+            vs = [str(samples.quantile(ventile)) for ventile in
+                  [v / 100.0 for v in range(5, 100, 5)]]
+            for i in [4, 9, 14]:
+                vs[i] = QUARTILE.format(vs[i])
+            return ' '.join(vs)
+
+        v += START
+        v += ventiles(result.old.samples, OLD_QUARTILE)
+        v += MIDDLE
+        v += ventiles(result.new.samples, NEW_QUARTILE)
+        v += END
+        return v
 
     def _column_widths(self):
         changed = self.comparator.decreased + self.comparator.increased
@@ -628,8 +665,8 @@ class ReportFormatter(object):
 
         return reduce(max_widths, widths, [0] * 4)
 
-    def _formatted_text(self, label_formatter, COLUMN_SEPARATOR,
-                        DELIMITER_ROW, SEPARATOR, SECTION):
+    def _formatted_text(self, label_formatter, ventile_formatter,
+                        COLUMN_SEPARATOR, DELIMITER_ROW, SEPARATOR, SECTION):
         widths = self._column_widths()
         self.header_printed = False
 
@@ -651,15 +688,20 @@ class ReportFormatter(object):
                 self.header_printed = True
             return h
 
+        def bold_first(value):
+            first, sep, rest = value.partition(' ')
+            return '**' + first + '**' + sep + rest
+
         def format_columns(r, is_strong):
             return (r if not is_strong else
-                    r[:-1] + ('**' + r[-1] + '**', ))
+                    r[:-1] + (bold_first(r[-1]), ))
 
         def table(title, results, is_strong=False, is_open=False):
             if not results:
                 return ''
-            rows = [row(format_columns(ReportFormatter.values(r), is_strong))
-                    for r in results]
+            rows = [row(format_columns(
+                ReportFormatter.values(r, ventile_formatter), is_strong))
+                for r in results]
             table = (header(title if self.single_table else '',
                             ReportFormatter.header_for(results[0])) +
                      ''.join(rows))
