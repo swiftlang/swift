@@ -1151,21 +1151,19 @@ namespace {
       // If this is a standalone `nil` literal expression e.g.
       // `_ = nil`, let's diagnose it here because solver can't
       // attempt any types for it.
-      if (!CS.isExprBeingDiagnosed(expr)) {
-        auto *parentExpr = CS.getParentExpr(expr);
+      auto *parentExpr = CS.getParentExpr(expr);
 
-        // `_ = nil`
-        if (auto *assignment = dyn_cast_or_null<AssignExpr>(parentExpr)) {
-          if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
-            DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
-            return Type();
-          }
-        }
-
-        if (!parentExpr && !CS.getContextualType(expr)) {
+      // `_ = nil`
+      if (auto *assignment = dyn_cast_or_null<AssignExpr>(parentExpr)) {
+        if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
           DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
           return Type();
         }
+      }
+
+      if (!parentExpr && !CS.getContextualType(expr)) {
+        DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
+        return Type();
       }
 
       return visitLiteralExpr(expr);
@@ -1343,11 +1341,7 @@ namespace {
       Type knownType;
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
-        if (!knownType &&
-            !(isa<ParamDecl>(VD) &&
-              isa<ClosureExpr>(VD->getDeclContext()) &&
-              CS.Options.contains(
-                ConstraintSystemFlags::SubExpressionDiagnostics)))
+        if (!knownType)
           knownType = VD->getInterfaceType();
 
         if (knownType) {
@@ -3443,12 +3437,10 @@ namespace {
   /// diagnostics and code completion.
   class SanitizeExpr : public ASTWalker {
     ConstraintSystem &CS;
-    const bool eraseOpenExistentialsOnly;
     llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpenExistentials;
 
   public:
-    SanitizeExpr(ConstraintSystem &cs, bool eraseOEsOnly = false)
-        : CS(cs), eraseOpenExistentialsOnly(eraseOEsOnly) { }
+    SanitizeExpr(ConstraintSystem &cs) : CS(cs){ }
 
     ASTContext &getASTContext() const { return CS.getASTContext(); }
 
@@ -3493,15 +3485,10 @@ namespace {
             expr = value->second;
             continue;
           } else {
-            assert((eraseOpenExistentialsOnly || OVE->isPlaceholder()) &&
+            assert(OVE->isPlaceholder() &&
                    "Didn't see this OVE in a containing OpenExistentialExpr?");
-            // NOTE: In 'eraseOpenExistentialsOnly' mode, ASTWalker may walk
-            // into other kind of expressions holding OVE.
           }
         }
-
-        if (eraseOpenExistentialsOnly)
-          return {true, expr};
 
         // Skip any implicit conversions applied to this expression.
         if (auto ICE = dyn_cast<ImplicitConversionExpr>(expr)) {
@@ -3638,9 +3625,6 @@ namespace {
           expr->setType(type);
         }
       }
-
-      if (eraseOpenExistentialsOnly)
-        return expr;
 
       assert(!isa<ImplicitConversionExpr>(expr) &&
              "ImplicitConversionExpr should be eliminated in walkToExprPre");
@@ -4196,10 +4180,6 @@ bool swift::areGenericRequirementsSatisfied(
 
   // Having a solution implies the requirements have been fulfilled.
   return CS.solveSingle().hasValue();
-}
-
-void swift::eraseOpenedExistentials(ConstraintSystem &CS, Expr *&expr) {
-  expr = expr->walk(SanitizeExpr(CS, /*eraseOEsOnly=*/true));
 }
 
 struct ResolvedMemberResult::Implementation {

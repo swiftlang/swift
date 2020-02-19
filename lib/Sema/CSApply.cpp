@@ -7458,8 +7458,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
 Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
-    Solution &solution, SolutionApplicationTarget target,
-    bool performingDiagnostics) {
+    Solution &solution, SolutionApplicationTarget target) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
@@ -7489,25 +7488,22 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
   if (!resultTarget)
     return None;
 
-  // If we're re-typechecking an expression for diagnostics, don't
-  // visit closures that have non-single expression bodies.
-  if (!performingDiagnostics) {
-    bool hadError = false;
-    for (auto *closure : walker.getClosuresToTypeCheck())
-      hadError |= TypeChecker::typeCheckClosureBody(closure);
+  // Visit closures that have non-single expression bodies.
+  bool hadError = false;
+  for (auto *closure : walker.getClosuresToTypeCheck())
+    hadError |= TypeChecker::typeCheckClosureBody(closure);
 
-    // Tap expressions too; they should or should not be
-    // type-checked under the same conditions as closure bodies.
-    for (auto tuple : walker.getTapsToTypeCheck()) {
-      auto tap = std::get<0>(tuple);
-      auto tapDC = std::get<1>(tuple);
-      hadError |= TypeChecker::typeCheckTapBody(tap, tapDC);
-    }
-
-    // If any of them failed to type check, bail.
-    if (hadError)
-      return None;
+  // Tap expressions too; they should or should not be
+  // type-checked under the same conditions as closure bodies.
+  for (auto tuple : walker.getTapsToTypeCheck()) {
+    auto tap = std::get<0>(tuple);
+    auto tapDC = std::get<1>(tuple);
+    hadError |= TypeChecker::typeCheckTapBody(tap, tapDC);
   }
+
+  // If any of them failed to type check, bail.
+  if (hadError)
+    return None;
 
   rewriter.finalize();
 

@@ -864,8 +864,7 @@ namespace {
   class PreCheckExpression : public ASTWalker {
     ASTContext &Ctx;
     DeclContext *DC;
-    ConstraintSystem *BaseCS;
-    
+
     Expr *ParentExpr;
 
     /// A stack of expressions being walked, used to determine where to
@@ -1007,8 +1006,8 @@ namespace {
     }
 
   public:
-    PreCheckExpression(DeclContext *dc, Expr *parent, ConstraintSystem *base)
-        : Ctx(dc->getASTContext()), DC(dc), BaseCS(base), ParentExpr(parent) {}
+    PreCheckExpression(DeclContext *dc, Expr *parent)
+        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent) {}
 
     ASTContext &getASTContext() const { return Ctx; }
 
@@ -1109,10 +1108,6 @@ namespace {
         // If this is an implicit `inout` expression we assume that
         // compiler knowns what it's doing.
         if (expr->isImplicit())
-          return finish(true, expr);
-
-        if (BaseCS && (BaseCS->isExprBeingDiagnosed(ParentExpr) ||
-                       BaseCS->isExprBeingDiagnosed(expr)))
           return finish(true, expr);
 
         auto parents = ParentExpr->getParentMap();
@@ -1953,9 +1948,8 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
-bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
-                                          ConstraintSystem *baseCS) {
-  PreCheckExpression preCheck(dc, expr, baseCS);
+bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc) {
+  PreCheckExpression preCheck(dc, expr);
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
     expr = result;
@@ -2006,14 +2000,13 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,
                                       ContextualTypePurpose convertTypePurpose,
                                       TypeCheckExprOptions options,
-                                      ExprTypeCheckListener *listener,
-                                      ConstraintSystem *baseCS) {
+                                      ExprTypeCheckListener *listener) {
   SolutionApplicationTarget target(
       expr, dc, convertTypePurpose, convertType,
       options.contains(TypeCheckExprFlags::IsDiscarded));
   bool unresolvedTypeExprs = false;
   auto resultTarget = typeCheckExpression(
-      target, unresolvedTypeExprs, options, listener, baseCS);
+      target, unresolvedTypeExprs, options, listener);
   if (!resultTarget) {
     expr = target.getAsExpr();
     return Type();
@@ -2035,8 +2028,7 @@ TypeChecker::typeCheckExpression(
     SolutionApplicationTarget &target,
     bool &unresolvedTypeExprs,
     TypeCheckExprOptions options,
-    ExprTypeCheckListener *listener,
-    ConstraintSystem *baseCS) {
+    ExprTypeCheckListener *listener) {
   unresolvedTypeExprs = false;
   Expr *expr = target.getAsExpr();
   DeclContext *dc = target.getDeclContext();
@@ -2046,7 +2038,7 @@ TypeChecker::typeCheckExpression(
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (ConstraintSystem::preCheckExpression(expr, dc, baseCS)) {
+  if (ConstraintSystem::preCheckExpression(expr, dc)) {
     target.setExpr(expr);
     return None;
   }
@@ -2061,11 +2053,7 @@ TypeChecker::typeCheckExpression(
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
 
-  if (options.contains(TypeCheckExprFlags::SubExpressionDiagnostics))
-    csOptions |= ConstraintSystemFlags::SubExpressionDiagnostics;
-
   ConstraintSystem cs(dc, csOptions);
-  cs.baseCS = baseCS;
 
   // Tell the constraint system what the contextual type is.  This informs
   // diagnostics and is a hint for various performance optimizations.
@@ -2116,9 +2104,7 @@ TypeChecker::typeCheckExpression(
   cs.applySolution(solution);
 
   // Apply the solution to the expression.
-  bool performingDiagnostics =
-      options.contains(TypeCheckExprFlags::SubExpressionDiagnostics);
-  auto resultTarget = cs.applySolution(solution, target, performingDiagnostics);
+  auto resultTarget = cs.applySolution(solution, target);
   if (!resultTarget) {
     // Failure already diagnosed, above, as part of applying the solution.
     return None;
@@ -2134,8 +2120,7 @@ TypeChecker::typeCheckExpression(
 
   // Unless the client has disabled them, perform syntactic checks on the
   // expression now.
-  if (!cs.shouldSuppressDiagnostics() &&
-      !options.contains(TypeCheckExprFlags::SubExpressionDiagnostics)) {
+  if (!cs.shouldSuppressDiagnostics()) {
     bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
     performSyntacticExprDiagnostics(result, dc, isExprStmt);
   }
