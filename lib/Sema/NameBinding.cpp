@@ -81,32 +81,25 @@ namespace {
     /// \c AccessPathTy is the common currency type for this.)
     ModuleDecl::AccessPathTy declPath;
 
-    //
-    // Set only on UnboundImports that represent physical ImportDecls:
-    //
-
-    /// If this UnboundImport directly represents an ImportDecl, the ImportDecl
-    /// it represents.
+    /// If this UnboundImport directly represents an ImportDecl, contains the
+    /// ImportDecl it represents. This should only be used for diagnostics and
+    /// for updating the AST; if you want to read information about the import,
+    /// get it from the other fields in \c UnboundImport rather than from the
+    /// \c ImportDecl.
     ///
-    /// This property should only be used to control where information is added
-    /// to the AST. Don't retrieve information directly from the ImportDecl; use
-    /// the other member variables.
-    NullablePtr<ImportDecl> ID;
+    /// If this UnboundImport represents a cross-import, contains the declaring
+    /// module's \c ModuleDecl.
+    PointerUnion<ImportDecl *, ModuleDecl *> importOrUnderlyingModuleDecl;
 
-    /// If this UnboundImport directly represents an ImportDecl, the attributes
-    /// of that ImportDecl.
-    ///
-    /// This property should only be used to improve diagnostics. Don't pull
-    /// information about the import's attributes from this property; use
-    /// \c options instead.
-    NullablePtr<DeclAttributes> attrs;
+    NullablePtr<ImportDecl> getImportDecl() const {
+      return importOrUnderlyingModuleDecl.is<ImportDecl *>() ?
+             importOrUnderlyingModuleDecl.get<ImportDecl *>() : nullptr;
+    }
 
-    //
-    // Set only on UnboundImports that represent cross-import overlays:
-    //
-
-    /// The module this cross-import overlay is overlaying.
-    NullablePtr<ModuleDecl> underlyingModule;
+    NullablePtr<ModuleDecl> getUnderlyingModule() const {
+      return importOrUnderlyingModuleDecl.is<ModuleDecl *>() ?
+             importOrUnderlyingModuleDecl.get<ModuleDecl *>() : nullptr;
+    }
 
     /// Create an UnboundImport for a user-written import declaration.
     explicit UnboundImport(ImportDecl *ID);
@@ -394,18 +387,20 @@ void NameBinder::visitImportDecl(ImportDecl *ID) {
 }
 
 void NameBinder::bindImport(UnboundImport &&I) {
+  auto ID = I.getImportDecl();
+
   if (!I.checkNotTautological(SF)) {
     // No need to process this import further.
-    if (I.ID)
-      I.ID.get()->setModule(SF.getParentModule());
+    if (ID)
+      ID.get()->setModule(SF.getParentModule());
     return;
   }
 
   ModuleDecl *M = getModule(I.modulePath);
   if (!I.checkModuleLoaded(M, SF)) {
     // Can't process further. checkModuleLoaded() will have diagnosed this.
-    if (I.ID)
-      I.ID.get()->setModule(nullptr);
+    if (ID)
+      ID.get()->setModule(nullptr);
     return;
   }
 
@@ -426,8 +421,8 @@ void NameBinder::bindImport(UnboundImport &&I) {
 
   crossImport(M, I);
 
-  if (I.ID)
-    I.ID.get()->setModule(M);
+  if (ID)
+    ID.get()->setModule(M);
 }
 
 void NameBinder::addImport(const UnboundImport &I, ModuleDecl *M,
@@ -502,7 +497,7 @@ UnboundImport::UnboundImport(ImportDecl *ID)
   : importLoc(ID->getLoc()), options(), privateImportFileName(),
     importKind(ID->getImportKind(), ID->getKindLoc()),
     modulePath(ID->getModulePath()), declPath(ID->getDeclPath()),
-    ID(ID), attrs(&ID->getAttrs()), underlyingModule()
+    importOrUnderlyingModuleDecl(ID)
 {
   if (ID->isExported())
     options |= ImportFlags::Exported;
@@ -660,8 +655,9 @@ void UnboundImport::diagnoseInvalidAttr(DeclAttrKind attrKind,
   auto diag = diags.diagnose(modulePath.front().Loc, diagID,
                              modulePath.front().Item);
 
-  if (!attrs) return;
-  auto *attr = attrs.get()->getAttribute(attrKind);
+  auto *ID = getImportDecl().getPtrOrNull();
+  if (!ID) return;
+  auto *attr = ID->getAttrs().getAttribute(attrKind);
   if (!attr) return;
 
   diag.fixItRemove(attr->getRangeWithAt());
@@ -819,7 +815,7 @@ void BoundImport::validateScope(SourceFile &SF) {
                          decls.front()->getFullName());
   }
 
-  unbound.ID.get()->setDecls(ctx.AllocateCopy(decls));
+  unbound.getImportDecl().get()->setDecls(ctx.AllocateCopy(decls));
 }
 
 //===----------------------------------------------------------------------===//
@@ -847,7 +843,7 @@ UnboundImport::UnboundImport(ASTContext &ctx,
     // BoundImport::validateScope() from unnecessarily revalidating the
     // scope.
     declPath(declaringImport.module.first),
-    ID(nullptr), attrs(nullptr), underlyingModule(declaringImport.module.second)
+    importOrUnderlyingModuleDecl(declaringImport.module.second)
 {
   modulePath = ctx.AllocateCopy(
       ModuleDecl::AccessPathTy( { overlayName, base.modulePath[0].Loc }));
@@ -891,9 +887,9 @@ void NameBinder::crossImport(ModuleDecl *M, UnboundImport &I) {
   if (!SF.shouldCrossImport())
     return;
 
-  if (I.underlyingModule)
+  if (I.getUnderlyingModule())
     // FIXME: Should we warn if M doesn't reexport underlyingModule?
-    SF.addSeparatelyImportedOverlay(M, I.underlyingModule.get());
+    SF.addSeparatelyImportedOverlay(M, I.getUnderlyingModule().get());
 
   // FIXME: Most of the comparisons we do here are probably unnecessary. We
   // only need to findCrossImports() on pairs where at least one of the two
