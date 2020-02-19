@@ -2581,11 +2581,19 @@ static void finishPropertyWrapperImplInfo(VarDecl *var,
     }
   }
 
-  if (wrapperSetterIsUsable)
-    info = StorageImplInfo(ReadImplKind::Get, WriteImplKind::Set,
-                           ReadWriteImplKind::Modify);
-  else
+  bool hasObservers = var->getParsedAccessor(AccessorKind::DidSet) ||
+                      var->getParsedAccessor(AccessorKind::WillSet);
+
+  if (wrapperSetterIsUsable) {
+    if (hasObservers) {
+      info = StorageImplInfo::getMutableComputed();
+    } else {
+      info = StorageImplInfo(ReadImplKind::Get, WriteImplKind::Set,
+                             ReadWriteImplKind::Modify);
+    }
+  } else {
     info = StorageImplInfo::getImmutableComputed();
+  }
 }
 
 static void finishNSManagedImplInfo(VarDecl *var,
