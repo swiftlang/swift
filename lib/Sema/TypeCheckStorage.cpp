@@ -760,6 +760,11 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     auto var = dyn_cast<VarDecl>(decl);
     if (!var)
       return None;
+    bool hasObservers = var->getParsedAccessor(AccessorKind::WillSet) ||
+                        var->getParsedAccessor(AccessorKind::DidSet);
+    if (accessor->isCoroutine() && hasObservers) {
+      return None;
+    }
     auto mut = var->getPropertyWrapperMutability();
     if (!mut)
       return None;
@@ -1584,15 +1589,19 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
                    ? TargetImpl::Ordinary
                    : TargetImpl::Implementation);
 
+  bool hasObservers = storage->getParsedAccessor(AccessorKind::DidSet) ||
+                      storage->getParsedAccessor(AccessorKind::WillSet);
+
   // If this is a variable with an attached property wrapper, then
   // the accessors need to yield the wrappedValue or projectedValue.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->hasAttachedPropertyWrapper()) {
+    if (var->hasAttachedPropertyWrapper() && !hasObservers) {
       target = TargetImpl::Wrapper;
     }
 
     if (var->getOriginalWrappedProperty(
-            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+            PropertyWrapperSynthesizedPropertyKind::StorageWrapper) &&
+        !hasObservers) {
       target = TargetImpl::WrapperStorage;
     }
   }
