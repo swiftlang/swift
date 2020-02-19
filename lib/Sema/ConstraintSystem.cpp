@@ -1831,11 +1831,6 @@ static bool shouldCheckForPartialApplication(ConstraintSystem &cs,
   if (!(anchor && isa<UnresolvedDotExpr>(anchor)))
     return false;
 
-  // FIXME(diagnostics): This check should be removed together with
-  // expression based diagnostics.
-  if (cs.isExprBeingDiagnosed(anchor))
-    return false;
-
   // If this is a reference to instance method marked as 'mutating'
   // it should be checked for invalid partial application.
   if (isMutatingMethod(decl))

@@ -1151,21 +1151,19 @@ namespace {
       // If this is a standalone `nil` literal expression e.g.
       // `_ = nil`, let's diagnose it here because solver can't
       // attempt any types for it.
-      if (!CS.isExprBeingDiagnosed(expr)) {
-        auto *parentExpr = CS.getParentExpr(expr);
+      auto *parentExpr = CS.getParentExpr(expr);
 
-        // `_ = nil`
-        if (auto *assignment = dyn_cast_or_null<AssignExpr>(parentExpr)) {
-          if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
-            DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
-            return Type();
-          }
-        }
-
-        if (!parentExpr && !CS.getContextualType(expr)) {
+      // `_ = nil`
+      if (auto *assignment = dyn_cast_or_null<AssignExpr>(parentExpr)) {
+        if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
           DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
           return Type();
         }
+      }
+
+      if (!parentExpr && !CS.getContextualType(expr)) {
+        DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
+        return Type();
       }
 
       return visitLiteralExpr(expr);

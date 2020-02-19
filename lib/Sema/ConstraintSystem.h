@@ -4442,36 +4442,6 @@ public:
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
 
-private:
-  /// The set of expressions currently being analyzed for failures.
-  llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
-
-public:
-  void addExprForDiagnosis(Expr *E1, Expr *Result) {
-    DiagnosedExprs[E1] = Result;
-  }
-  bool isExprBeingDiagnosed(Expr *E) {
-    if (DiagnosedExprs.count(E)) {
-      return true;
-    }
-    
-    if (baseCS && baseCS != this) {
-      return baseCS->isExprBeingDiagnosed(E);
-    }
-    return false;
-  }
-  Expr *getExprBeingDiagnosed(Expr *E) {
-    if (auto *expr = DiagnosedExprs[E]) {
-      return expr;
-    }
-    
-    if (baseCS && baseCS != this) {
-      return baseCS->getExprBeingDiagnosed(E);
-    }
-    return nullptr;
-  }
-        
-public:
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));
 
