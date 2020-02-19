@@ -364,6 +364,16 @@ static SILValue reapplyFunctionConversion(
     // function.
     return innerNewFunc;
   }
+  // begin_borrow
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(oldConvertedFunc)) {
+    auto innerNewFunc = reapplyFunctionConversion(
+        context, newFunc, oldFunc, bbi->getOperand(), builder, loc,
+        newBuffersToDealloc, parameterIndices, newFuncGenSig);
+    // Note: no `begin_borrow` is needed for the re-converted function because
+    // the caller of `reapplyFunctionConversion` should consume the re-converted
+    // function.
+    return innerNewFunc;
+  }
   // thin_to_thick_function
   if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(
