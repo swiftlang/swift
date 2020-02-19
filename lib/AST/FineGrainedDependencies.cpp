@@ -236,7 +236,7 @@ std::string DependencyKey::humanReadableName() const {
     return demangleTypeAsContext(context) + "." + name;
   case NodeKind::externalDepend:
   case NodeKind::sourceFileProvide:
-    return llvm::sys::path::filename(name);
+    return llvm::sys::path::filename(name).str();
   case NodeKind::potentialMember:
     return demangleTypeAsContext(context) + ".*";
   case NodeKind::nominal:
