@@ -109,6 +109,9 @@ namespace swift {
     /// human-readable string.
     bool EnableConcisePoundFile = false;
 
+    /// Detect and automatically import modules' cross-import overlays.
+    bool EnableCrossImportOverlays = false;
+
     ///
     /// Support for alternate usage modes
     ///

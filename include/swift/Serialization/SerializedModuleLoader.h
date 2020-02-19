@@ -393,6 +393,8 @@ public:
 
   virtual StringRef getFilename() const override;
 
+  virtual StringRef getModuleDefiningPath() const override;
+
   ClassDecl *getMainClass() const override;
 
   bool hasEntryPoint() const override;
