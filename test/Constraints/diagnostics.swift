@@ -255,7 +255,8 @@ struct Toe {
   let toenail: Nail // expected-error {{use of undeclared type 'Nail'}}
 
   func clip() {
-    toenail.inspect { x in
+    // TODO(diagnostics): Solver should stop once it has detected that `toenail` doesn't exist and report that.
+    toenail.inspect { x in // expected-error {{type of expression is ambiguous without more context}}
       toenail.inspect { y in }
     }
   }
@@ -666,9 +667,10 @@ _ = (i = 6) ? 42 : 57 // expected-error {{use of '=' in a boolean context, did y
 // <rdar://problem/22263468> QoI: Not producing specific argument conversion diagnostic for tuple init
 func r22263468(_ a : String?) {
   typealias MyTuple = (Int, String)
-  _ = MyTuple(42, a) // expected-error {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
-  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // TODO(diagnostics): This is a regression from diagnosing missing optional unwrap for `a`, we have to
+  // re-think the way errors in tuple elements are detected because it's currently impossible to detect
+  // exactly what went wrong here and aggregate fixes for different elements at the same time.
+  _ = MyTuple(42, a) // expected-error {{tuple type 'MyTuple' (aka '(Int, String)') is not convertible to tuple type '(Int, String?)'}}
 }
 
 
@@ -726,7 +728,6 @@ func r23560128() {
   var a : (Int,Int)?
   a.0 = 42 // expected-error{{value of optional type '(Int, Int)?' must be unwrapped to refer to member '0' of wrapped base type '(Int, Int)'}}
   // expected-note@-1{{chain the optional }}
-  // expected-note@-2{{force-unwrap using '!'}}
 }
 
 // <rdar://problem/21890157> QoI: wrong error message when accessing properties on optional structs without unwrapping
@@ -736,7 +737,6 @@ struct ExampleStruct21890157 {
 var example21890157: ExampleStruct21890157?
 example21890157.property = "confusing"  // expected-error {{value of optional type 'ExampleStruct21890157?' must be unwrapped to refer to member 'property' of wrapped base type 'ExampleStruct21890157'}}
   // expected-note@-1{{chain the optional }}
-  // expected-note@-2{{force-unwrap using '!'}}
 
 
 struct UnaryOp {}

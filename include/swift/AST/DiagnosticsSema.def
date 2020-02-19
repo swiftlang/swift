@@ -1133,6 +1133,9 @@ ERROR(argument_out_of_order_unnamed_named,none,
 ERROR(argument_out_of_order_unnamed_unnamed,none,
       "unnamed argument #%0 must precede unnamed argument #%1",
       (unsigned, unsigned))
+ERROR(argument_out_of_order_binary_op,none,
+      "operator argument #%0 must precede operator argument #%1",
+      (unsigned, unsigned))
 NOTE(candidate_expected_different_labels,none,
      "incorrect labels for candidate (have: '%0', expected: '%1')",
      (StringRef, StringRef))

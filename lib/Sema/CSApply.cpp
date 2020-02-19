@@ -1929,12 +1929,8 @@ namespace {
 
       // Get the _MaxBuiltinFloatType decl, or look for it if it's not cached.
       auto maxFloatTypeDecl = ctx.get_MaxBuiltinFloatTypeDecl();
-
-      if (!maxFloatTypeDecl ||
-          !maxFloatTypeDecl->getDeclaredInterfaceType()->is<BuiltinFloatType>()) {
-        ctx.Diags.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
-        return nullptr;
-      }
+      // Presence of this declaration has been validated in CSGen.
+      assert(maxFloatTypeDecl);
 
       auto maxType = maxFloatTypeDecl->getUnderlyingType();
 
@@ -2289,16 +2285,8 @@ namespace {
       auto locator = cs.getConstraintLocator(expr);
 
       // Find the overload choice used for this declaration reference.
-      auto selected = solution.getOverloadChoiceIfAvailable(locator);
-      if (!selected.hasValue()) {
-        auto *varDecl = cast<VarDecl>(expr->getDecl());
-        assert(varDecl->getType()->is<UnresolvedType>() &&
-               "should only happen for closure arguments in CSDiags");
-        cs.setType(expr, varDecl->getType());
-        return expr;
-      }
-
-      return buildDeclRef(*selected, expr->getNameLoc(), locator,
+      auto selected = solution.getOverloadChoice(locator);
+      return buildDeclRef(selected, expr->getNameLoc(), locator,
                           expr->isImplicit(), expr->getAccessSemantics());
     }
 
@@ -2595,6 +2583,56 @@ namespace {
                          ctorLocator);
     }
 
+    /// Give the deprecation warning for referring to a global function
+    /// when there's a method from a conditional conformance in a smaller/closer
+    /// scope.
+    void
+    diagnoseDeprecatedConditionalConformanceOuterAccess(UnresolvedDotExpr *UDE,
+                                                        ValueDecl *choice) {
+      auto getBaseName = [](DeclContext *context) -> DeclName {
+        if (auto generic = context->getSelfNominalTypeDecl()) {
+          return generic->getName();
+        } else if (context->isModuleScopeContext())
+          return context->getParentModule()->getName();
+        else
+          llvm_unreachable("Unsupported base");
+      };
+
+      auto result =
+          TypeChecker::lookupUnqualified(cs.DC, UDE->getName(), UDE->getLoc());
+      assert(result && "names can't just disappear");
+      // These should all come from the same place.
+      auto exampleInner = result.front();
+      auto innerChoice = exampleInner.getValueDecl();
+      auto innerDC = exampleInner.getDeclContext()->getInnermostTypeContext();
+      auto innerParentDecl = innerDC->getSelfNominalTypeDecl();
+      auto innerBaseName = getBaseName(innerDC);
+
+      auto choiceKind = choice->getDescriptiveKind();
+      auto choiceDC = choice->getDeclContext();
+      auto choiceBaseName = getBaseName(choiceDC);
+      auto choiceParentDecl = choiceDC->getAsDecl();
+      auto choiceParentKind = choiceParentDecl
+                                  ? choiceParentDecl->getDescriptiveKind()
+                                  : DescriptiveDeclKind::Module;
+
+      auto &DE = cs.getASTContext().Diags;
+      DE.diagnose(UDE->getLoc(),
+                  diag::warn_deprecated_conditional_conformance_outer_access,
+                  UDE->getName(), choiceKind, choiceParentKind, choiceBaseName,
+                  innerChoice->getDescriptiveKind(),
+                  innerParentDecl->getDescriptiveKind(), innerBaseName);
+
+      auto name = choiceBaseName.getBaseIdentifier();
+      SmallString<32> namePlusDot = name.str();
+      namePlusDot.push_back('.');
+
+      DE.diagnose(UDE->getLoc(),
+                  diag::fix_deprecated_conditional_conformance_outer_access,
+                  namePlusDot, choiceKind, name)
+          .fixItInsert(UDE->getStartLoc(), namePlusDot);
+    }
+
     Expr *applyMemberRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
                              DeclNameLoc nameLoc, bool implicit) {
       // If we have a constructor member, handle it as a constructor.
@@ -2628,7 +2666,7 @@ namespace {
         // The only way to get here is via an UnresolvedDotExpr with outer
         // alternatives.
         auto UDE = cast<UnresolvedDotExpr>(expr);
-        cs.diagnoseDeprecatedConditionalConformanceOuterAccess(
+        diagnoseDeprecatedConditionalConformanceOuterAccess(
             UDE, selected.choice.getDecl());
 
         return buildDeclRef(selected, nameLoc, memberLocator, implicit,
@@ -3822,19 +3860,7 @@ namespace {
     Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       simplifyExprType(E);
       auto valueType = cs.getType(E);
-
-      // TODO(diagnostics): Once all of the diagnostics are moved to
-      // new diagnostics framework this check could be eliminated.
-      //
-      // Only way for this to happen is CSDiag try to re-typecheck
-      // sub-expression which contains this placeholder with
-      // `AllowUnresolvedTypeVariables` flag set.
-      //
-      // A better solution could be to replace placeholders with this
-      // implicit call early on and type-check that call together with
-      // the rest of the constraint system.
-      if (valueType->hasUnresolvedType())
-        return nullptr;
+      assert(!valueType->hasUnresolvedType());
 
       auto &ctx = cs.getASTContext();
       // Synthesize a call to _undefined() of appropriate type.
