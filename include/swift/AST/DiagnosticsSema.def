@@ -1133,6 +1133,9 @@ ERROR(argument_out_of_order_unnamed_named,none,
 ERROR(argument_out_of_order_unnamed_unnamed,none,
       "unnamed argument #%0 must precede unnamed argument #%1",
       (unsigned, unsigned))
+ERROR(argument_out_of_order_binary_op,none,
+      "operator argument #%0 must precede operator argument #%1",
+      (unsigned, unsigned))
 NOTE(candidate_expected_different_labels,none,
      "incorrect labels for candidate (have: '%0', expected: '%1')",
      (StringRef, StringRef))
@@ -4843,10 +4846,10 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
       "must be '@usableFromInline' or public",
       (bool, bool))
 WARNING(property_wrapper_wrapperValue,none,
-        "property wrapper's `wrapperValue` property should be renamed to "
+        "property wrapper's 'wrapperValue' property should be renamed to "
         "'projectedValue'; use of 'wrapperValue' is deprecated", ())
 WARNING(property_wrapper_init_initialValue,none,
-        "property wrapper's `init(initialValue:)` should be renamed "
+        "property wrapper's 'init(initialValue:)' should be renamed "
         "to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated",
         ())
 ERROR(property_wrapper_projection_value_missing,none,

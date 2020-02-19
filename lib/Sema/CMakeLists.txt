@@ -3,7 +3,6 @@ add_swift_host_library(swiftSema STATIC
   BuilderTransform.cpp
   CSApply.cpp
   CSBindings.cpp
-  CSDiag.cpp
   CSGen.cpp
   CSRanking.cpp
   CSSimplify.cpp
@@ -11,7 +10,6 @@ add_swift_host_library(swiftSema STATIC
   CSStep.cpp
   CSFix.cpp
   CSDiagnostics.cpp
-  CalleeCandidateInfo.cpp
   CodeSynthesis.cpp
   Constraint.cpp
   ConstraintGraph.cpp

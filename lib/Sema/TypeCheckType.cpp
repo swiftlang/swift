@@ -1303,27 +1303,6 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   auto DC = resolution.getDeclContext();
   auto id = comp->getNameRef();
 
-  // Dynamic 'Self' in the result type of a function body.
-  if (id.isSimpleName(ctx.Id_Self)) {
-    if (auto *typeDC = DC->getInnermostTypeContext()) {
-      // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
-      // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
-      // while the 'Self' type is more than just a reference to a TypeDecl.
-      auto selfType = resolution.mapTypeIntoContext(
-        typeDC->getSelfInterfaceType());
-
-      // Check if we can reference Self here, and if so, what kind of Self it is.
-      switch (getSelfTypeKind(DC, options)) {
-      case SelfTypeKind::StaticSelf:
-        return selfType;
-      case SelfTypeKind::DynamicSelf:
-        return DynamicSelfType::get(selfType, ctx);
-      case SelfTypeKind::InvalidSelf:
-        break;
-      }
-    }
-  }
-
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TypeResolutionFlags::KnownNonCascadingDependency))
     lookupOptions |= NameLookupFlags::KnownPrivate;
@@ -1380,6 +1359,27 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
 
   // If we found nothing, complain and give ourselves a chance to recover.
   if (current.isNull()) {
+    // Dynamic 'Self' in the result type of a function body.
+    if (id.isSimpleName(ctx.Id_Self)) {
+      if (auto *typeDC = DC->getInnermostTypeContext()) {
+        // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
+        // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
+        // while the 'Self' type is more than just a reference to a TypeDecl.
+        auto selfType = resolution.mapTypeIntoContext(
+          typeDC->getSelfInterfaceType());
+
+        // Check if we can reference Self here, and if so, what kind of Self it is.
+        switch (getSelfTypeKind(DC, options)) {
+        case SelfTypeKind::StaticSelf:
+          return selfType;
+        case SelfTypeKind::DynamicSelf:
+          return DynamicSelfType::get(selfType, ctx);
+        case SelfTypeKind::InvalidSelf:
+          break;
+        }
+      }
+    }
+
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
     if (options.contains(TypeResolutionFlags::SilenceErrors))

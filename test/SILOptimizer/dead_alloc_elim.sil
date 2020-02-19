@@ -374,3 +374,23 @@ bb0:
   return %1 : $()
 }
 
+protocol P { }
+struct X : P { }
+
+// CHECK-LABEL: sil @remove_dead_optional_existential
+// CHECK:      bb0(%0 : $X):
+// CHECK-NEXT:   %1 = tuple ()
+// CHECK-NEXT:   return %1
+sil @remove_dead_optional_existential : $@convention(thin) (X) -> () {
+bb0(%0 : $X):
+  %3 = alloc_stack $Optional<P>
+  %4 = init_enum_data_addr %3 : $*Optional<P>, #Optional.some!enumelt.1
+  %5 = init_existential_addr %4 : $*P, $X
+  store %0 to %5 : $*X
+  inject_enum_addr %3 : $*Optional<P>, #Optional.some!enumelt.1
+  destroy_addr %3 : $*Optional<P>
+  dealloc_stack %3 : $*Optional<P>
+  %10 = tuple ()
+  return %10 : $()
+}
+

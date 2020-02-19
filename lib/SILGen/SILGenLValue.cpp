@@ -1398,15 +1398,21 @@ namespace {
         VarDecl *field = cast<VarDecl>(Storage);
         VarDecl *backingVar = field->getPropertyWrapperBackingProperty();
         assert(backingVar);
-        CanType ValType =
-            SGF.F.mapTypeIntoContext(backingVar->getInterfaceType())
-              ->getCanonicalType();
+        auto FieldType = field->getValueInterfaceType();
+        auto ValType = backingVar->getValueInterfaceType();
+        if (!Substitutions.empty()) {
+          FieldType = FieldType.subst(Substitutions);
+          ValType = ValType.subst(Substitutions);
+        }
+
         // TODO: revist minimal
         SILType varStorageType = SGF.SGM.Types.getSubstitutedStorageType(
-            TypeExpansionContext::minimal(), backingVar, ValType);
+            TypeExpansionContext::minimal(), backingVar,
+            ValType->getCanonicalType());
         auto typeData =
             getLogicalStorageTypeData(SGF.getTypeExpansionContext(), SGF.SGM,
-                                      getTypeData().AccessKind, ValType);
+                                      getTypeData().AccessKind,
+                                      ValType->getCanonicalType());
 
         // Get the address of the storage property.
         ManagedValue proj;
@@ -1426,24 +1432,9 @@ namespace {
             field, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
         SILValue initFRef = SGF.emitGlobalFunctionRef(loc, initConstant);
 
-        SubstitutionMap initSubs;
-        if (auto genericSig = field->getInnermostDeclContext()
-                ->getGenericSignatureOfContext()) {
-          initSubs = SubstitutionMap::get(
-              genericSig,
-              [&](SubstitutableType *type) {
-                if (auto gp = type->getAs<GenericTypeParamType>()) {
-                  return SGF.F.mapTypeIntoContext(gp);
-                }
-
-                return Type(type);
-              },
-              LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
-        }
-
         PartialApplyInst *initPAI =
           SGF.B.createPartialApply(loc, initFRef,
-                                   initSubs, ArrayRef<SILValue>(),
+                                   Substitutions, ArrayRef<SILValue>(),
                                    ParameterConvention::Direct_Guaranteed);
         ManagedValue initFn = SGF.emitManagedRValueWithCleanup(initPAI);
 
@@ -1477,9 +1468,34 @@ namespace {
         ManagedValue setterFn = SGF.emitManagedRValueWithCleanup(setterPAI);
 
         // Create the assign_by_wrapper with the allocator and setter.
+        // FIXME: This should use CallEmission instead of doing everything manually.
         assert(value.isRValue());
         ManagedValue Mval = std::move(value).asKnownRValue(SGF).
                               getAsSingleValue(SGF, loc);
+        auto substSetterTy = setterTy->substGenericArgs(SGF.SGM.M, Substitutions,
+                                                        SGF.getTypeExpansionContext());
+        auto param = substSetterTy->getParameters()[0];
+        SILType loweredSubstArgType = Mval.getType();
+        if (param.isIndirectInOut()) {
+          loweredSubstArgType =
+            SILType::getPrimitiveAddressType(loweredSubstArgType.getASTType());
+        }
+        auto loweredSubstParamTy = SILType::getPrimitiveType(
+                    param.getArgumentType(SGF.SGM.M, substSetterTy),
+                    loweredSubstArgType.getCategory());
+        // Handle reabstraction differences.
+        if (Mval.getType() != loweredSubstParamTy) {
+          Mval = SGF.emitSubstToOrigValue(loc, Mval,
+                                          SGF.SGM.Types.getAbstractionPattern(field),
+                                          FieldType->getCanonicalType());
+        }
+
+        // If we need the argument in memory, materialize an address.
+        if (setterConv.getSILArgumentConvention(0).isIndirectConvention() &&
+            !Mval.getType().isAddress()) {
+          Mval = Mval.materialize(SGF, loc);
+        }
+
         SGF.B.createAssignByWrapper(loc, Mval.forward(SGF), proj.forward(SGF),
                                      initFn.getValue(), setterFn.getValue(),
                                      AssignOwnershipQualifier::Unknown);
@@ -2145,7 +2161,7 @@ namespace {
       return SGF.emitSubstToOrigValue(loc, std::move(rv), getOrigFormalType(),
                                       getSubstFormalType(), c);
     }
-    
+
     std::unique_ptr<LogicalPathComponent>
     clone(SILGenFunction &SGF, SILLocation loc) const override {
       LogicalPathComponent *clone

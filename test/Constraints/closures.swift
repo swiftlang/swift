@@ -462,7 +462,7 @@ func fn_r28909024(n: Int) {
   // (since both arguments are literal they are ranked lower than contextual type).
   //
   // Good diagnostic for this is - `unexpected non-void return value in void function`
-  return (0..<10).r28909024 { // expected-error {{expression type 'Range<Int>.Index' (aka 'Int') is ambiguous without more context}}
+  return (0..<10).r28909024 { // expected-error {{type of expression is ambiguous without more context}}
     _ in true
   }
 }

@@ -4358,10 +4358,16 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
                         ->getDependentType(getGenericParams());
 
       Impl->HadAnyError = true;
-      
+
       if (subjectType->is<DependentMemberType>()) {
         subjectType = resolveDependentMemberTypes(*this, subjectType);
-      } else {
+      }
+
+      if (!subjectType->is<DependentMemberType>()) {
+        // If we end up here, it means either the subject type was never a
+        // a dependent member type, or it was initially a dependent member
+        // type, but resolving it lead to some other type. Let's map this
+        // to an error type so we can emit correct diagnostics.
         subjectType = ErrorType::get(subjectType);
       }
 

@@ -827,9 +827,6 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *builder,
   if (srcTy == destTy)
     return value;
 
-  assert(srcTy.isAddress() == destTy.isAddress()
-         && "Addresses aren't compatible with values");
-
   if (srcTy.isAddress() && destTy.isAddress()) {
     // Cast between two addresses and that's it.
     return builder->createUncheckedAddrCast(loc, value, destTy);

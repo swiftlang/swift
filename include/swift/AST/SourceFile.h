@@ -257,12 +257,6 @@ public:
 
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
-  /// This is a hack for 'main' file parsing and the integrated REPL.
-  ///
-  /// FIXME: Refactor main file parsing to not pump the parser incrementally.
-  /// FIXME: Remove the integrated REPL.
-  void clearLookupCache();
-
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
