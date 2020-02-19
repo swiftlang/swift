@@ -42,7 +42,7 @@
             "remote": { "id": "KitWare/CMake" },
             "platforms": [ "Linux" ]
         },
-        "pythonkit": {
+        "PythonKit": {
             "remote": { "id": "pvieito/PythonKit" }
         },
         "tensorflow-swift-apis": {
@@ -81,7 +81,7 @@
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
                 "swift-format": "master",
-                "pythonkit": "master",
+                "PythonKit": "master",
                 "tensorflow-swift-apis": "master"
             }
         },
@@ -329,7 +329,7 @@
                 "icu": "release-65-1",
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2020-01-31-a",
                 "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-01-31-a",
-                "pythonkit": "master",
+                "PythonKit": "master",
                 "swift-format": "master",
                 "tensorflow": "v2.1.0-rc1",
                 "tensorflow-swift-apis": "9a47e3cb71c798938b127729853d5911315a1d6e",
