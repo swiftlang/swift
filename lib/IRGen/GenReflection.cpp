@@ -678,7 +678,7 @@ private:
   const NominalTypeDecl *NTD;
 
   void addFieldDecl(const ValueDecl *value, Type type,
-                    GenericSignature genericSig, bool indirect=false) {
+                    bool indirect=false) {
     reflection::FieldRecordFlags flags;
     flags.setIsIndirectCase(indirect);
     if (auto var = dyn_cast<VarDecl>(value))
@@ -689,6 +689,8 @@ private:
     if (!type) {
       B.addInt32(0);
     } else {
+      auto genericSig = NTD->getGenericSignature();
+
       // The standard library's Mirror demangles metadata from field
       // descriptors, so use MangledTypeRefRole::Metadata to ensure
       // runtime metadata is available.
@@ -722,8 +724,7 @@ private:
     auto properties = NTD->getStoredProperties();
     B.addInt32(properties.size());
     for (auto property : properties)
-      addFieldDecl(property, property->getInterfaceType(),
-                   NTD->getGenericSignature());
+      addFieldDecl(property, property->getInterfaceType());
   }
 
   void layoutEnum() {
@@ -748,12 +749,11 @@ private:
       bool indirect = (enumCase.decl->isIndirect() ||
                        enumDecl->isIndirect());
       addFieldDecl(enumCase.decl, enumCase.decl->getArgumentInterfaceType(),
-                   enumDecl->getGenericSignature(),
                    indirect);
     }
 
     for (auto enumCase : strategy.getElementsWithNoPayload()) {
-      addFieldDecl(enumCase.decl, CanType(), nullptr);
+      addFieldDecl(enumCase.decl, enumCase.decl->getArgumentInterfaceType());
     }
   }
 
