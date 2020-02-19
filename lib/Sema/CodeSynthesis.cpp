@@ -798,23 +798,35 @@ llvm::Expected<bool> AreAllStoredPropertiesDefaultInitableRequest::evaluate(
     // synthesize an initial value (e.g. for an optional) then we suppress
     // generation of the default initializer.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
-      if (pbd->hasStorage() && !pbd->isStatic()) {
-        for (auto idx : range(pbd->getNumPatternEntries())) {
-          if (pbd->isInitialized(idx)) continue;
+      // Static variables are irrelevant.
+      if (pbd->isStatic()) {
+        continue;
+      }
 
+      for (auto idx : range(pbd->getNumPatternEntries())) {
+        bool HasStorage = false;
+        bool CheckDefaultInitializer = true;
+        pbd->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
           // If one of the bound variables is @NSManaged, go ahead no matter
           // what.
-          bool CheckDefaultInitializer = true;
-          pbd->getPattern(idx)->forEachVariable([&](VarDecl *vd) {
-            if (vd->getAttrs().hasAttribute<NSManagedAttr>())
-              CheckDefaultInitializer = false;
-          });
-        
-          // If we cannot default initialize the property, we cannot
-          // synthesize a default initializer for the class.
-          if (CheckDefaultInitializer && !pbd->isDefaultInitializable())
-            return false;
-        }
+          if (VD->getAttrs().hasAttribute<NSManagedAttr>())
+            CheckDefaultInitializer = false;
+
+          if (VD->hasStorage())
+            HasStorage = true;
+          auto *backing = VD->getPropertyWrapperBackingProperty();
+          if (backing && backing->hasStorage())
+            HasStorage = true;
+        });
+
+        if (!HasStorage) continue;
+
+        if (pbd->isInitialized(idx)) continue;
+
+        // If we cannot default initialize the property, we cannot
+        // synthesize a default initializer for the class.
+        if (CheckDefaultInitializer && !pbd->isDefaultInitializable())
+          return false;
       }
     }
   }
