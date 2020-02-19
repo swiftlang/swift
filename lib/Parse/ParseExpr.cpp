@@ -3665,8 +3665,13 @@ Parser::parsePlatformVersionConstraintSpec() {
       platformFromString(PlatformIdentifier.str());
 
   if (!Platform.hasValue() || Platform.getValue() == PlatformKind::none) {
-    diagnose(Tok, diag::avail_query_unrecognized_platform_name,
-             PlatformIdentifier);
+    // Diagnose unrecognized platforms, but suppress if the platform
+    // is macCatalyst.
+    if (!PlatformIdentifier.is("macCatalyst") &&
+        !PlatformIdentifier.is("macCatalystApplicationExtension")) {
+      diagnose(Tok, diag::avail_query_unrecognized_platform_name,
+               PlatformIdentifier);
+    }
     Platform = PlatformKind::none;
   }
 

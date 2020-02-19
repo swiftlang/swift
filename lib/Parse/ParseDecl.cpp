@@ -543,6 +543,11 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   if (AnyArgumentInvalid)
     return nullptr;
   if (!PlatformKind.hasValue()) {
+    if (Platform == "macCatalyst" ||
+        Platform == "macCatalystApplicationExtension") {
+      // Suppress unknown platform diagnostic for macCatalyst.
+      return nullptr;
+    }
     diagnose(AttrLoc, diag::attr_availability_unknown_platform,
            Platform, AttrName);
     return nullptr;
