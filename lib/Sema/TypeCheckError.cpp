@@ -1619,10 +1619,6 @@ void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
 }
 
 void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
-  // In some cases, we won't have validated the signature
-  // by the time we got here.
-  if (!fn->hasInterfaceType()) return;
-
 #ifndef NDEBUG
   PrettyStackTraceDecl debugStack("checking error handling for", fn);
 #endif
