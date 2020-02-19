@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-objc-interop
+// REQUIRES: objc_interop
 
 import Foundation
 
