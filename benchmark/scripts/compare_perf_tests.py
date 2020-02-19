@@ -54,14 +54,17 @@ class PerformanceTestSamples(object):
         """Initialize with benchmark name and optional list of Samples."""
         self.name = name  # Name of the performance test
         self.num_iters = num_iters  # Number of iterations averaged in sample
-        self.samples = []
-        self._all_samples = []
         self.outliers = []
-        self._runtimes = []
         self.mean = 0.0
         self.S_runtime = 0.0  # For computing running variance
-        for sample in samples or []:
-            self.add(sample)
+        if samples:
+            self._all_samples = samples
+            ascending = sorted(samples)
+            self.samples = samples if samples == ascending else ascending
+            self._recompute_stats()
+        else:
+            self.samples = []
+            self._all_samples = []
 
     def __str__(self):
         """Text summary of benchmark statistics."""
@@ -78,8 +81,7 @@ class PerformanceTestSamples(object):
         """Add sample to collection and recompute statistics."""
         assert isinstance(sample, int)
         self._update_stats(sample)
-        i = bisect(self._runtimes, sample)
-        self._runtimes.insert(i, sample)
+        i = bisect(self.samples, sample)
         self.samples.insert(i, sample)
         self._all_samples.append(sample)
 
@@ -87,6 +89,10 @@ class PerformanceTestSamples(object):
         old_stats = (self.count, self.mean, self.S_runtime)
         _, self.mean, self.S_runtime = (
             self.running_mean_variance(old_stats, sample))
+
+    def _recompute_stats(self):
+        _, self.mean, self.S_runtime = reduce(
+            self.running_mean_variance, self.samples, (0, 0.0, 0.0))
 
     def exclude_outliers(self, top_only=False):
         """Exclude outliers by applying Interquartile Range Rule.
@@ -101,14 +107,12 @@ class PerformanceTestSamples(object):
         the environment noise caused by preemtive multitasking.
         """
         lo = (0 if top_only else
-              bisect_left(self._runtimes, int(self.q1 - 1.5 * self.iqr)))
-        hi = bisect_right(self._runtimes, int(self.q3 + 1.5 * self.iqr))
+              bisect_left(self.samples, int(self.q1 - 1.5 * self.iqr)))
+        hi = bisect_right(self.samples, int(self.q3 + 1.5 * self.iqr))
 
         self.outliers = self.samples[:lo] + self.samples[hi:]
         self.samples = self.samples[lo:hi]
-        # re-compute stats
-        _, self.mean, self.S_runtime = reduce(
-            self.running_mean_variance, self.samples, (0, 0.0, 0.0))
+        self._recompute_stats()
 
     @property
     def count(self):
