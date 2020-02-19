@@ -41,7 +41,7 @@ class TensorFlowSwiftAPIs(product.Product):
         if host_target.startswith('macosx'):
             lib_name = 'libtensorflow.2.1.0.dylib'
         elif host_target.startswith('linux'):
-            lib_name = 'libtensorflow.so'
+            lib_name = 'libtensorflow.so.2.1.0'
         else:
             raise RuntimeError("Unknown host target %s" % host_target)
 
@@ -57,8 +57,9 @@ class TensorFlowSwiftAPIs(product.Product):
             '-D', 'TensorFlow_LIBRARY={}'.format(
                 os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow',
                              lib_name)),
-            '-D', 'CMAKE_SHARED_LIBRARY_FLAGS={}'.format(
-                os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow')),
+            '-D', 'CMAKE_SHARED_LIBRARY_LINKER_FLAGS={}'.format('-L{}'.format(
+                os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow'))
+            ),
             '-B', self.build_dir,
             '-S', self.source_dir,
         ])
