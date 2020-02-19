@@ -175,14 +175,6 @@ enum class TypeCheckExprFlags {
   /// statement. This should only be used for syntactic restrictions, and should
   /// not affect type checking itself.
   IsExprStmt = 0x20,
-
-  /// FIXME(diagnostics): Once diagnostics are completely switched to new
-  /// framework, this flag could be removed as obsolete.
-  ///
-  /// If set, this is a sub-expression, and it is being re-typechecked
-  /// as part of the expression diagnostics, which is attempting to narrow
-  /// down failure location.
-  SubExpressionDiagnostics = 0x400,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;

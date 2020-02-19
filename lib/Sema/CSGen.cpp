@@ -1341,11 +1341,7 @@ namespace {
       Type knownType;
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
-        if (!knownType &&
-            !(isa<ParamDecl>(VD) &&
-              isa<ClosureExpr>(VD->getDeclContext()) &&
-              CS.Options.contains(
-                ConstraintSystemFlags::SubExpressionDiagnostics)))
+        if (!knownType)
           knownType = VD->getInterfaceType();
 
         if (knownType) {

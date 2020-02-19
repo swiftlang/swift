@@ -2053,9 +2053,6 @@ TypeChecker::typeCheckExpression(
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
 
-  if (options.contains(TypeCheckExprFlags::SubExpressionDiagnostics))
-    csOptions |= ConstraintSystemFlags::SubExpressionDiagnostics;
-
   ConstraintSystem cs(dc, csOptions);
 
   // Tell the constraint system what the contextual type is.  This informs
@@ -2107,9 +2104,7 @@ TypeChecker::typeCheckExpression(
   cs.applySolution(solution);
 
   // Apply the solution to the expression.
-  bool performingDiagnostics =
-      options.contains(TypeCheckExprFlags::SubExpressionDiagnostics);
-  auto resultTarget = cs.applySolution(solution, target, performingDiagnostics);
+  auto resultTarget = cs.applySolution(solution, target);
   if (!resultTarget) {
     // Failure already diagnosed, above, as part of applying the solution.
     return None;
@@ -2125,8 +2120,7 @@ TypeChecker::typeCheckExpression(
 
   // Unless the client has disabled them, perform syntactic checks on the
   // expression now.
-  if (!cs.shouldSuppressDiagnostics() &&
-      !options.contains(TypeCheckExprFlags::SubExpressionDiagnostics)) {
+  if (!cs.shouldSuppressDiagnostics()) {
     bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
     performSyntacticExprDiagnostics(result, dc, isExprStmt);
   }
