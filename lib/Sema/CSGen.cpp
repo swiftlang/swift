@@ -1171,6 +1171,20 @@ namespace {
       return visitLiteralExpr(expr);
     }
 
+    Type visitFloatLiteralExpr(FloatLiteralExpr *expr) {
+      auto &ctx = CS.getASTContext();
+      // Get the _MaxBuiltinFloatType decl, or look for it if it's not cached.
+      auto maxFloatTypeDecl = ctx.get_MaxBuiltinFloatTypeDecl();
+
+      if (!maxFloatTypeDecl ||
+          !maxFloatTypeDecl->getDeclaredInterfaceType()->is<BuiltinFloatType>()) {
+        ctx.Diags.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
+        return nullptr;
+      }
+
+      return visitLiteralExpr(expr);
+    }
+
     Type visitLiteralExpr(LiteralExpr *expr) {
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType())
@@ -1337,17 +1351,7 @@ namespace {
           knownType = VD->getInterfaceType();
 
         if (knownType) {
-          // If this is a ParamDecl for a closure argument that is a hole,
-          // then this is a situation where CSDiags is trying to perform
-          // error recovery within a ClosureExpr.  Just create a new type
-          // variable for the decl that isn't bound to anything.
-          // This will ensure that it is considered ambiguous.
-          if (knownType && knownType->isHole()) {
-            return CS.createTypeVariable(locator,
-                                         TVO_CanBindToLValue |
-                                         TVO_CanBindToNoEscape);
-          }
-
+          assert(!knownType->isHole());
           // If the known type has an error, bail out.
           if (knownType->hasError()) {
             if (!CS.hasType(E))
@@ -2119,6 +2123,17 @@ namespace {
           auto *paramLoc =
               CS.getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
 
+          // If one of the parameters represents a destructured tuple
+          // e.g. `{ (x: Int, (y: Int, z: Int)) in ... }` let's fail
+          // inference here and not attempt to solve the system because:
+          //
+          // a. Destructuring has already been diagnosed by the parser;
+          // b. Body of the closure would have error expressions for
+          //    each incorrect parameter reference and solver wouldn't
+          //    be able to produce any viable solutions.
+          if (param->isDestructured())
+            return nullptr;
+
           Type externalType;
           if (param->getTypeRepr()) {
             auto declaredTy = param->getType();
@@ -2516,10 +2531,18 @@ namespace {
       struct CollectParameterRefs : public ASTWalker {
         ConstraintSystem &cs;
         llvm::SmallVector<TypeVariableType *, 4> paramRefs;
+        bool hasErrorExprs = false;
 
         CollectParameterRefs(ConstraintSystem &cs) : cs(cs) { }
 
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+          // If there are any error expressions in this closure
+          // it wouldn't be possible to infer its type.
+          if (isa<ErrorExpr>(expr)) {
+            hasErrorExprs = true;
+            return {false, nullptr};
+          }
+
           // Retrieve type variables from references to parameter declarations.
           if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
             if (auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl())) {
@@ -2533,6 +2556,9 @@ namespace {
         }
       } collectParameterRefs(CS);
       closure->walk(collectParameterRefs);
+
+      if (collectParameterRefs.hasErrorExprs)
+        return Type();
 
       auto inferredType = inferClosureType(closure);
       if (!inferredType || inferredType->hasError())

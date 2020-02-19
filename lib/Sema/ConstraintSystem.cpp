@@ -453,6 +453,10 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     }
   }
 
+  if (locator->findLast<LocatorPathElt::DynamicCallable>()) {
+    return getConstraintLocator(anchor, LocatorPathElt::ApplyFunction());
+  }
+
   // If we have a locator that starts with a key path component element, we
   // may have a callee given by a property or subscript component.
   if (auto componentElt =
@@ -491,13 +495,10 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     return getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
 
   auto getSpecialFnCalleeLoc = [&](Type fnTy) -> ConstraintLocator * {
-    // FIXME: We should probably assert that we don't get a type variable
-    // here to make sure we only retrieve callee locators for resolved calls,
-    // ensuring that callee locators don't change after binding a type.
-    // Unfortunately CSDiag currently calls into getCalleeLocator, so all bets
-    // are off. Once we remove that legacy diagnostic logic, we should be able
-    // to assert here.
     fnTy = simplifyType(fnTy);
+    // It's okay for function type to contain type variable(s) e.g.
+    // opened generic function types, but not to be one.
+    assert(!fnTy->is<TypeVariableType>());
 
     // For an apply of a metatype, we have a short-form constructor. Unlike
     // other locators to callees, these are anchored on the apply expression
@@ -2880,6 +2881,40 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
   return diagnosed;
 }
 
+/// Diagnose ambiguity related to overloaded declarations where only
+/// *some* of the overload choices have ephemeral pointer warnings/errors
+/// associated with them. Such situations have be handled specifically
+/// because ephemeral fixes do not affect the score.
+///
+/// If all of the overloads have ephemeral fixes associated with them
+/// it's much easier to diagnose through notes associated with each fix.
+static bool
+diagnoseAmbiguityWithEphemeralPointers(ConstraintSystem &cs,
+                                       ArrayRef<Solution> solutions) {
+  bool allSolutionsHaveFixes = true;
+  for (const auto &solution : solutions) {
+    if (solution.Fixes.empty()) {
+      allSolutionsHaveFixes = false;
+      continue;
+    }
+
+    if (!llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {
+          return fix->getKind() == FixKind::TreatEphemeralAsNonEphemeral;
+        }))
+      return false;
+  }
+
+  // If all solutions have fixes for ephemeral pointers, let's
+  // let `diagnoseAmbiguityWithFixes` diagnose the problem.
+  if (allSolutionsHaveFixes)
+    return false;
+
+  // If only some of the solutions have ephemeral pointer fixes
+  // let's let `diagnoseAmbiguity` diagnose the problem either
+  // with affected argument or related declaration e.g. function ref.
+  return cs.diagnoseAmbiguity(solutions);
+}
+
 bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     SmallVectorImpl<Solution> &solutions) {
   if (solutions.empty())
@@ -2903,6 +2938,9 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   SolutionDiff solutionDiff(solutions);
 
   if (diagnoseConflictingGenericArguments(*this, solutionDiff, solutions))
+    return true;
+
+  if (diagnoseAmbiguityWithEphemeralPointers(*this, solutions))
     return true;
 
   // Collect aggregated fixes from all solutions
@@ -4214,5 +4252,46 @@ bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
   case CTP_Condition:
   case CTP_CannotFail:
     return false;
+  }
+}
+
+/// Given a specific expression and the remnants of the failed constraint
+/// system, produce a specific diagnostic.
+///
+/// This is guaranteed to always emit an error message.
+///
+void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
+  setPhase(ConstraintSystemPhase::Diagnostics);
+
+  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
+
+  auto &DE = getASTContext().Diags;
+  if (auto expr = target.getAsExpr()) {
+    if (auto *assignment = dyn_cast<AssignExpr>(expr)) {
+      if (isa<DiscardAssignmentExpr>(assignment->getDest()))
+        expr = assignment->getSrc();
+    }
+
+    // Look through RebindSelfInConstructorExpr to avoid weird Sema issues.
+    if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
+      expr = RB->getSubExpr();
+
+    // Unresolved/Anonymous ClosureExprs are common enough that we should give
+    // them tailored diagnostics.
+    if (auto *closure = dyn_cast<ClosureExpr>(expr->getValueProvidingExpr())) {
+      DE.diagnose(closure->getLoc(), diag::cannot_infer_closure_type)
+        .highlight(closure->getSourceRange());
+      return;
+    }
+
+    // If no one could find a problem with this expression or constraint system,
+    // then it must be well-formed... but is ambiguous.  Handle this by
+    // diagnostic various cases that come up.
+    DE.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous)
+        .highlight(expr->getSourceRange());
+  } else {
+    // Emit a poor fallback message.
+    DE.diagnose(target.getAsFunction()->getLoc(),
+                diag::failed_to_produce_diagnostic);
   }
 }
