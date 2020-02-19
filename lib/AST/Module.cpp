@@ -1470,11 +1470,14 @@ class OverlayFile {
   /// The list of module names; empty if loading failed.
   llvm::TinyPtrVector<Identifier> overlayModuleNames;
 
-  enum class State { pending, loaded, failed };
-  State state = State::pending;
+  enum class State { Pending, Loaded, Failed };
+  State state = State::Pending;
 
   /// Actually loads the overlay module name list. This should mutate
   /// \c overlayModuleNames, but not \c filePath.
+  ///
+  /// \returns \c true on success, \c false on failure. Diagnoses any failures
+  ///          before returning.
   bool loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
                               Identifier bystandingModule);
 
@@ -1486,7 +1489,10 @@ public:
     return ctx.Allocate(bytes, alignment);
   }
 
-  OverlayFile(StringRef filePath) : filePath(filePath) { }
+  OverlayFile(StringRef filePath)
+      : filePath(filePath) {
+    assert(!filePath.empty());
+  }
 
   /// Returns the list of additional modules that should be imported if both
   /// the primary and secondary modules have been imported. This may load a
@@ -1498,9 +1504,9 @@ public:
   ArrayRef<Identifier> getOverlayModuleNames(const ModuleDecl *M,
                                              SourceLoc diagLoc,
                                              Identifier bystandingModule) {
-    if (state == State::pending) {
+    if (state == State::Pending) {
       state = loadOverlayModuleNames(M, diagLoc, bystandingModule)
-            ? State::loaded : State::failed;
+            ? State::Loaded : State::Failed;
     }
     return overlayModuleNames;
   }
@@ -1602,8 +1608,6 @@ OverlayFileContents::load(std::unique_ptr<llvm::MemoryBuffer> input,
 bool
 OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
                                     Identifier bystanderName) {
-  assert(!filePath.empty());
-
   auto &ctx = M->getASTContext();
   llvm::vfs::FileSystem &fs = *ctx.SourceMgr.getFileSystem();
 

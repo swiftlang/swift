@@ -55,6 +55,36 @@ namespace {
   /// source, or it may represent a cross-import overlay that has been found and
   /// needs to be loaded.
   struct UnboundImport {
+    /// The source location to use when diagnosing errors for this import.
+    SourceLoc importLoc;
+
+    /// The options for this import, such as "exported" or
+    /// "implementation-only". Use this field, not \c attrs, to determine the
+    /// behavior expected for this import.
+    ImportOptions options;
+
+    /// If \c options includes \c PrivateImport, the filename we should import
+    /// private declarations from.
+    StringRef privateImportFileName;
+
+    /// The kind of declaration expected for a scoped import, or \c Module if
+    /// the import is not scoped.
+    Located<ImportKind> importKind;
+
+    /// The module names being imported. There will usually be just one for the
+    /// top-level module, but a submodule import will have more.
+    ModuleDecl::AccessPathTy modulePath;
+
+    /// If this is a scoped import, the names of the declaration being imported;
+    /// otherwise empty. (Currently the compiler doesn't support nested scoped
+    /// imports, so there should always be zero or one elements, but
+    /// \c AccessPathTy is the common currency type for this.)
+    ModuleDecl::AccessPathTy declPath;
+
+    //
+    // Set only on UnboundImports that represent physical ImportDecls:
+    //
+
     /// If this UnboundImport directly represents an ImportDecl, the ImportDecl
     /// it represents.
     ///
@@ -63,14 +93,19 @@ namespace {
     /// the other member variables.
     NullablePtr<ImportDecl> ID;
 
-    SourceLoc importLoc;
-    ImportOptions options;
-    StringRef privateImportFileName;
-    Located<ImportKind> importKind;
-    ModuleDecl::AccessPathTy modulePath;
-    ModuleDecl::AccessPathTy declPath;
-
+    /// If this UnboundImport directly represents an ImportDecl, the attributes
+    /// of that ImportDecl.
+    ///
+    /// This property should only be used to improve diagnostics. Don't pull
+    /// information about the import's attributes from this property; use
+    /// \c options instead.
     NullablePtr<DeclAttributes> attrs;
+
+    //
+    // Set only on UnboundImports that represent cross-import overlays:
+    //
+
+    /// The module this cross-import overlay is overlaying.
     NullablePtr<ModuleDecl> underlyingModule;
 
     /// Create an UnboundImport for a user-written import declaration.
@@ -82,16 +117,27 @@ namespace {
                            const ImportedModuleDesc &declaringImport,
                            const ImportedModuleDesc &bystandingImport);
 
-    /// Make sure the import is not a self-import.
+    /// Diagnoses if the import would simply load the module \p SF already
+    /// belongs to, with no actual effect.
+    ///
+    /// Some apparent self-imports do actually load a different module; this
+    /// method allows them.
     bool checkNotTautological(const SourceFile &SF);
 
     /// Make sure the module actually loaded, and diagnose if it didn't.
     bool checkModuleLoaded(ModuleDecl *M, SourceFile &SF);
 
-    /// Find the top-level module for this module. If \p M is not a submodule,
-    /// returns \p M. If it is a submodule, returns either the parent module of
-    /// \p M or \c nullptr if the current module is the parent (which can happen
-    /// in a mixed-language framework).
+    /// Find the top-level module for this module; that is, if \p M is the
+    /// module \c Foo.Bar.Baz, this finds \c Foo.
+    ///
+    /// Specifically, this method returns:
+    ///
+    /// \li \p M if \p M is a top-level module.
+    /// \li \c nullptr if \p M is a submodule of \c SF's parent module. (This
+    ///     corner case can occur in mixed-source frameworks, where Swift code
+    ///     can import a Clang submodule of itself.)
+    /// \li The top-level parent (i.e. ancestor with no parent) module above
+    ///     \p M otherwise.
     NullablePtr<ModuleDecl> getTopLevelModule(ModuleDecl *M, SourceFile &SF);
 
     /// Diagnose any errors concerning the \c @_exported, \c @_implementationOnly,
@@ -121,21 +167,44 @@ namespace {
   };
 
   /// Represents an import whose options have been checked and module has been
-  /// loaded, but its scope (if any) has not been validated.
+  /// loaded, but its scope (if it's a scoped import) has not been validated
+  /// and it has not been added to \c SF.
   struct BoundImport {
+    /// The \c UnboundImport we bound to produce this import. Used to avoid
+    /// duplicating its fields.
     UnboundImport unbound;
+
+    /// The \c ImportedModuleDesc that should be added to the source file for
+    /// this import.
     ImportedModuleDesc desc;
+
+    /// The module we bound \c unbound to.
     ModuleDecl *module;
-    bool needsScopeValidation = false;
+
+    /// If \c true, another, more specific \c BoundImport will validate the same
+    /// scope as this import, so validating this one is not necessary.
+    bool scopeValidatedElsewhere = true;
 
     BoundImport(UnboundImport unbound, ImportedModuleDesc desc,
-                ModuleDecl *module, bool needsScopeValidation);
+                ModuleDecl *module, bool scopeValidatedElsewhere);
 
     /// Validate the scope of the import, if needed.
+    ///
+    /// A "scoped import" is an import which only covers one particular
+    /// declaration, such as:
+    ///
+    ///     import class Foundation.NSString
+    ///
+    /// We validate the scope by making sure that the named declaration exists
+    /// and is of the kind indicated by the keyword. This can't be done until we
+    /// have bound all cross-import overlays, since a cross-import overlay could
+    /// provide the declaration.
     void validateScope(SourceFile &SF);
   };
 
-  class NameBinder : public DeclVisitor<NameBinder> {
+  class NameBinder final : public DeclVisitor<NameBinder> {
+    friend DeclVisitor<NameBinder>;
+
     SourceFile &SF;
     ASTContext &ctx;
 
@@ -146,15 +215,15 @@ namespace {
     /// Imports which still need their scoped imports validated.
     SmallVector<BoundImport, 16> unvalidatedImports;
 
-    // crossImportableModules is usually relatively small (~hundreds max) and
-    // keeping it in order is convenient, so we use a SmallSetVector for it.
-    // visibleModules is much larger and we don't care about its order, so we
-    // use a DenseSet instead.
-
     /// All imported modules, including by re-exports, and including submodules.
     llvm::DenseSet<ImportedModuleDesc> visibleModules;
 
-    /// visibleModules but without the submoduless.
+    /// \c visibleModules but without the submodules.
+    ///
+    /// We use a \c SmallSetVector here because this doubles as the worklist for
+    /// cross-importing, so we want to keep it in order; this is feasible
+    /// because this set is usually fairly small, while \c visibleModules is
+    /// often enormous.
     SmallSetVector<ImportedModuleDesc, 64> crossImportableModules;
 
     /// The index of the next module in \c visibleModules that should be
@@ -166,6 +235,11 @@ namespace {
       : SF(SF), ctx(SF.getASTContext())
     { }
 
+    /// Postprocess the imports this NameBinder has bound and collect them into
+    /// \p imports.
+    void finishImports(SmallVectorImpl<ImportedModuleDesc> &imports);
+
+  private:
     // Special behavior for these decls:
     void visitImportDecl(ImportDecl *ID);
     void visitPrecedenceGroupDecl(PrecedenceGroupDecl *group);
@@ -176,11 +250,6 @@ namespace {
     // Ignore other decls.
     void visitDecl(Decl *D) {}
 
-    /// Postprocess the imports this NameBinder has bound and collect them into
-    /// a vector.
-    void finishImports(SmallVectorImpl<ImportedModuleDesc> &imports);
-
-  protected:
     template<typename ...ArgTypes>
     InFlightDiagnostic diagnose(ArgTypes &&...Args) {
       return ctx.Diags.diagnose(std::forward<ArgTypes>(Args)...);
@@ -230,10 +299,14 @@ namespace {
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
 ///
-/// At this point parsing has been performed, but we still have
-/// UnresolvedDeclRefExpr nodes for unresolved value names, and we may have
-/// unresolved type names as well. This handles import directives and forward
-/// references.
+/// Most names are actually bound by the type checker, but before we can
+/// type-check a source file, we need to make declarations imported from other
+/// modules available and build tables of the operators and precedecence groups
+/// declared in that file. Name binding processes top-level \c ImportDecl,
+/// \c OperatorDecl, and \c PrecedenceGroupDecl nodes to perform these tasks,
+/// along with related validation.
+///
+/// Name binding operates on a parsed but otherwise unvalidated AST.
 void swift::performNameBinding(SourceFile &SF) {
   FrontendStatsTracer tracer(SF.getASTContext().Stats, "Name binding");
 
@@ -343,12 +416,12 @@ void NameBinder::bindImport(UnboundImport &&I) {
   if (topLevelModule && topLevelModule != M) {
     // If we have distinct submodule and top-level module, add both, disabling
     // the top-level module's scoped import validation.
-    addImport(I, M, false);
-    addImport(I, topLevelModule.get(), true);
+    addImport(I, M, true);
+    addImport(I, topLevelModule.get(), false);
   }
   else {
     // Add only the import itself.
-    addImport(I, M, true);
+    addImport(I, M, false);
   }
 
   crossImport(M, I);
@@ -358,11 +431,11 @@ void NameBinder::bindImport(UnboundImport &&I) {
 }
 
 void NameBinder::addImport(const UnboundImport &I, ModuleDecl *M,
-                           bool needsScopeValidation) {
+                           bool scopeValidatedElsewhere) {
   auto importDesc = I.makeDesc(M);
 
   addVisibleModules(importDesc);
-  unvalidatedImports.emplace_back(I, importDesc, M, needsScopeValidation);
+  unvalidatedImports.emplace_back(I, importDesc, M, scopeValidatedElsewhere);
 }
 
 //===----------------------------------------------------------------------===//
@@ -426,10 +499,10 @@ UnboundImport::getTopLevelModule(ModuleDecl *M, SourceFile &SF) {
 
 /// Create an UnboundImport for a user-written import declaration.
 UnboundImport::UnboundImport(ImportDecl *ID)
-  : ID(ID), importLoc(ID->getLoc()), options(), privateImportFileName(),
+  : importLoc(ID->getLoc()), options(), privateImportFileName(),
     importKind(ID->getImportKind(), ID->getKindLoc()),
     modulePath(ID->getModulePath()), declPath(ID->getDeclPath()),
-    attrs(&ID->getAttrs()), underlyingModule()
+    ID(ID), attrs(&ID->getAttrs()), underlyingModule()
 {
   if (ID->isExported())
     options |= ImportFlags::Exported;
@@ -600,9 +673,9 @@ void UnboundImport::diagnoseInvalidAttr(DeclAttrKind attrKind,
 //===----------------------------------------------------------------------===//
 
 BoundImport::BoundImport(UnboundImport unbound, ImportedModuleDesc desc,
-                         ModuleDecl *module, bool needsScopeValidation)
+                         ModuleDecl *module, bool scopeValidatedElsewhere)
   : unbound(unbound), desc(desc), module(module),
-    needsScopeValidation(needsScopeValidation) {
+    scopeValidatedElsewhere(scopeValidatedElsewhere) {
   assert(module && "Can't have an import bound to nothing");
 }
 
@@ -680,7 +753,7 @@ static const char *getImportKindString(ImportKind kind) {
 }
 
 void BoundImport::validateScope(SourceFile &SF) {
-  if (unbound.importKind.Item == ImportKind::Module || !needsScopeValidation)
+  if (unbound.importKind.Item == ImportKind::Module || scopeValidatedElsewhere)
     return;
 
   ASTContext &ctx = SF.getASTContext();
@@ -767,15 +840,14 @@ UnboundImport::UnboundImport(ASTContext &ctx,
                              const UnboundImport &base, Identifier overlayName,
                              const ImportedModuleDesc &declaringImport,
                              const ImportedModuleDesc &bystandingImport)
-  : ID(nullptr), importLoc(base.importLoc), options(),
-    privateImportFileName(), importKind({ ImportKind::Module, SourceLoc() }),
-    modulePath(),
+  : importLoc(base.importLoc), options(), privateImportFileName(),
+    importKind({ ImportKind::Module, SourceLoc() }), modulePath(),
     // If the declaring import was scoped, inherit that scope in the
     // overlay's import. Note that we do *not* set importKind; this keeps
     // BoundImport::validateScope() from unnecessarily revalidating the
     // scope.
     declPath(declaringImport.module.first),
-    attrs(nullptr), underlyingModule(declaringImport.module.second)
+    ID(nullptr), attrs(nullptr), underlyingModule(declaringImport.module.second)
 {
   modulePath = ctx.AllocateCopy(
       ModuleDecl::AccessPathTy( { overlayName, base.modulePath[0].Loc }));
