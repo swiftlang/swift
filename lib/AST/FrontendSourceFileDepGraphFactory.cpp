@@ -270,7 +270,8 @@ std::string DependencyKey::computeNameForProvidedEntity<
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::topLevel>(StringRef name) {
-  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "", name.str());
+  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "",
+                       name.str());
 }
 
 template <>
@@ -290,8 +291,8 @@ DependencyKey::createDependedUponKey<NodeKind::externalDepend>(StringRef name) {
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::nominal>(StringRef mangledName) {
-  return DependencyKey(NodeKind::nominal, DeclAspect::interface, mangledName.str(),
-                       "");
+  return DependencyKey(NodeKind::nominal, DeclAspect::interface,
+                       mangledName.str(), "");
 }
 
 DependencyKey DependencyKey::createDependedUponKey(StringRef mangledHolderName,
