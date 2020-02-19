@@ -1116,8 +1116,7 @@ static bool debugConstraintSolverForTarget(
 /// diagnostic.
 static void maybeProduceFallbackDiagnostic(
     ConstraintSystem &cs, SolutionApplicationTarget target) {
-  if (cs.Options.contains(ConstraintSystemFlags::SubExpressionDiagnostics) ||
-      cs.Options.contains(ConstraintSystemFlags::SuppressDiagnostics))
+  if (cs.Options.contains(ConstraintSystemFlags::SuppressDiagnostics))
     return;
 
   // Before producing fatal error here, let's check if there are any "error"
@@ -2174,7 +2173,7 @@ void ConstraintSystem::partitionDisjunction(
       if (!funcDecl)
         return false;
 
-      if (!funcDecl->getAttrs().isUnavailable(getASTContext()))
+      if (!isDeclUnavailable(funcDecl, constraint->getLocator()))
         return false;
 
       unavailable.push_back(index);
@@ -2266,6 +2265,9 @@ Constraint *ConstraintSystem::selectDisjunction() {
 }
 
 bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {
+  if (isUnavailable())
+    cs.increaseScore(SK_Unavailable);
+
   cs.simplifyDisjunctionChoice(Choice);
 
   if (ExplicitConversion)
