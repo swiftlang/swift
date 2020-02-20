@@ -4423,6 +4423,11 @@ ERROR(type_eraser_does_not_conform,none,
 ERROR(type_eraser_missing_init,none,
       "type eraser %0 must have an initializer of the form "
       "'init<T: %1>(erasing: T)'", (Type, Type))
+ERROR(type_eraser_not_accessible,none,
+      "%select{private|fileprivate|internal|public|open}0 type eraser %1 "
+      "cannot have more restrictive access than protocol %2 "
+      "(which is %select{private|fileprivate|internal|public|open}3)",
+      (AccessLevel, Identifier, Type, AccessLevel))
 
 NOTE(type_eraser_declared_here,none,
      "type eraser declared here",())
@@ -4430,6 +4435,11 @@ NOTE(type_eraser_failable_init,none,
      "'init(erasing:)' cannot be failable",())
 NOTE(type_eraser_init_unsatisfied_requirements,none,
      "'init(erasing:)' has unsatisfied requirements",())
+NOTE(type_eraser_init_not_accessible,none,
+     "%select{private|fileprivate|internal|public|open}0 'init(erasing:)' "
+     "cannot have more restrictive access than protocol %1 "
+     "(which is %select{private|fileprivate|internal|public|open}2)",
+     (AccessLevel, Type, AccessLevel))
 
 //------------------------------------------------------------------------------
 // MARK: @available

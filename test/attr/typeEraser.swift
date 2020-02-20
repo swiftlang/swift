@@ -100,3 +100,17 @@ class UnsatisfiedReq: D7 {
 }
 @_typeEraser(UnsatisfiedReq) // expected-error {{type eraser 'UnsatisfiedReq' must have an initializer of the form 'init<T: 'D7'>(erasing: T)'}}
 protocol D7 {}
+
+// MARK: - Type eraser and initializer cannot be more restrictive than the annotated protocol
+
+class MoreRestrictive: E1 { // expected-note {{type eraser declared here}}
+  init<T: E1>(erasing t: T) {}
+}
+@_typeEraser(MoreRestrictive) // expected-error {{internal type eraser 'MoreRestrictive' cannot have more restrictive access than protocol 'E1' (which is public)}}
+public protocol E1 {}
+
+public class MoreRestrictiveInit: E2 {
+  init<T: E2>(erasing t: T) {} // expected-note {{internal 'init(erasing:)' cannot have more restrictive access than protocol 'E2' (which is public)}}
+}
+@_typeEraser(MoreRestrictiveInit) // expected-error {{type eraser 'MoreRestrictiveInit' must have an initializer of the form 'init<T: 'E2'>(erasing: T)'}}
+public protocol E2 {}

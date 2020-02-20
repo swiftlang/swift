@@ -2398,14 +2398,23 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
   if (typeEraser->hasError())
     return false;
 
-  // 1. The type eraser must be a concrete nominal type
+  // The type eraser must be a concrete nominal type
   auto nominalTypeDecl = typeEraser->getAnyNominal();
   if (!nominalTypeDecl || isa<ProtocolDecl>(nominalTypeDecl)) {
     diags.diagnose(typeEraserLoc.getLoc(), diag::non_nominal_type_eraser);
     return false;
   }
 
-  // 2. The type eraser must conform to the annotated protocol
+  // The nominal type must be accessible wherever the protocol is accessible
+  if (nominalTypeDecl->getFormalAccess() < protocol->getFormalAccess()) {
+    diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_not_accessible,
+                   nominalTypeDecl->getFormalAccess(), nominalTypeDecl->getName(),
+                   protocolType, protocol->getFormalAccess());
+    diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
+    return false;
+  }
+
+  // The type eraser must conform to the annotated protocol
   SmallVector<ProtocolConformance *, 2> conformances;
   if (!nominalTypeDecl->lookupConformance(dc->getParentModule(), protocol,
                                           conformances)) {
@@ -2415,7 +2424,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
     return false;
   }
 
-  // 3. The type eraser must have an init of the form init<T: Protocol>(erasing: T)
+  // The type eraser must have an init of the form init<T: Protocol>(erasing: T)
   auto lookupResult = TypeChecker::lookupMember(dc, typeEraser,
                                                 DeclNameRef::createConstructor());
 
@@ -2423,6 +2432,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
   enum class UnviableReason {
     Failable,
     UnsatisfiedRequirements,
+    Inaccessible,
   };
   SmallVector<std::pair<ConstructorDecl *, UnviableReason>, 2> unviable;
 
@@ -2481,6 +2491,11 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
       return false;
     }
 
+    if (init->getFormalAccess() < protocol->getFormalAccess()) {
+      unviable.push_back({init, UnviableReason::Inaccessible});
+      return false;
+    }
+
     return true;
   });
 
@@ -2502,6 +2517,11 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
       case UnviableReason::UnsatisfiedRequirements:
         diags.diagnose(init->getLoc(),
                        diag::type_eraser_init_unsatisfied_requirements);
+        break;
+      case UnviableReason::Inaccessible:
+        diags.diagnose(init->getLoc(), diag::type_eraser_init_not_accessible,
+                       init->getFormalAccess(), protocolType,
+                       protocol->getFormalAccess());
         break;
       }
     }
