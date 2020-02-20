@@ -264,7 +264,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCMethodName(StringRef selector) {
                                          init,
                           llvm::Twine("\01L_selector_data(") + selector + ")");
   SetCStringLiteralSection(global, ObjCLabelType::MethodVarName);
-  global->setAlignment(1);
+  global->setAlignment(llvm::MaybeAlign(1));
   addCompilerUsedGlobal(global);
 
   // Drill down to make an i8*.
@@ -295,7 +295,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
                                          init,
                                 llvm::Twine("\01L_selector(") + selector + ")");
   global->setExternallyInitialized(true);
-  global->setAlignment(getPointerAlignment().getValue());
+  global->setAlignment(llvm::MaybeAlign(getPointerAlignment().getValue()));
 
   // This section name is magical for the Darwin static and dynamic linkers.
   global->setSection(GetObjCSectionName("__objc_selrefs",
@@ -359,7 +359,8 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
                                protocolRecord,
                                llvm::Twine("\01l_OBJC_LABEL_PROTOCOL_$_")
                                  + protocolName);
-  protocolLabel->setAlignment(getPointerAlignment().getValue());
+  protocolLabel->setAlignment(
+      llvm::MaybeAlign(getPointerAlignment().getValue()));
   protocolLabel->setVisibility(llvm::GlobalValue::HiddenVisibility);
   protocolLabel->setSection(GetObjCSectionName("__objc_protolist",
                                                "coalesced,no_dead_strip"));
@@ -375,7 +376,7 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
                                llvm::GlobalValue::WeakAnyLinkage,
                                protocolRecord,
                                llvm::Twine("\01l_OBJC_PROTOCOL_REFERENCE_$_") + protocolName);
-  protocolRef->setAlignment(getPointerAlignment().getValue());
+  protocolRef->setAlignment(llvm::MaybeAlign(getPointerAlignment().getValue()));
   protocolRef->setVisibility(llvm::GlobalValue::HiddenVisibility);
   protocolRef->setSection(GetObjCSectionName("__objc_protorefs",
                                              "coalesced,no_dead_strip"));

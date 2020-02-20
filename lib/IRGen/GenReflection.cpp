@@ -469,7 +469,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
                                       nullptr,
                                       symbolName);
   ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
-  var->setAlignment(2);
+  var->setAlignment(llvm::MaybeAlign(2));
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
 

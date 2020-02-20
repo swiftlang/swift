@@ -320,7 +320,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
 #endif
     for (auto I = Module->begin(), E = Module->end(); I != E; ++I) {
       if (!I->isDeclaration()) {
-        I->setAlignment(pageSize);
+        I->setAlignment(llvm::MaybeAlign(pageSize));
         break;
       }
     }
@@ -1362,7 +1362,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
     break;
   }
   ASTSym->setSection(Section);
-  ASTSym->setAlignment(serialization::SWIFTMODULE_ALIGNMENT);
+  ASTSym->setAlignment(llvm::MaybeAlign(serialization::SWIFTMODULE_ALIGNMENT));
   ::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, IGM.getModule(),
                 IGM.TargetMachine.get(),
                 Ctx.LangOpts.EffectiveLanguageVersion,
