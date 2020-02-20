@@ -842,11 +842,6 @@ function(_add_swift_host_library_single target)
   set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
   set_target_properties("${target}" PROPERTIES FOLDER "Swift libraries")
 
-  set_target_properties(${target}
-      PROPERTIES
-      # Library name (without the variant information)
-      OUTPUT_NAME ${target})
-
   # Handle linking and dependencies.
   add_dependencies_multiple_targets(
       TARGETS "${target}"
