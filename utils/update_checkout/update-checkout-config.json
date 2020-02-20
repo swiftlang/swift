@@ -331,7 +331,7 @@
                 "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-02-12-a",
                 "swift-format": "master",
                 "tensorflow": "v2.1.0-rc1",
-                "tensorflow-swift-apis": "9a47e3cb71c798938b127729853d5911315a1d6e",
+                "tensorflow-swift-apis": "6a67b4ef646222af1dc345d631019cc3602eb16b",
                 "tensorflow-swift-quote": "46c3d2996541d0ea902630eda11be5a9ccdeaba3"
             }
         }
