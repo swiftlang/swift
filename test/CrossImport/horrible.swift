@@ -2,6 +2,7 @@
 // RUN: cp -r %S/Inputs/lib-templates/* %t/
 
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/lib/swift
+// UNSUPPORTED: windows
 
 //
 // This module declares some really bad cross-import files.

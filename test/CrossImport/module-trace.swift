@@ -4,6 +4,7 @@
 // RUN: cp -r %S/Inputs/lib-templates/* %t/
 
 // RUN: %target-swift-frontend -enable-cross-import-overlays -I %t/lib/swift -typecheck %s -module-name main -swift-version 5 -emit-loaded-module-trace-path - | %FileCheck %s
+// UNSUPPORTED: windows
 
 import DeclaringLibrary
 import BystandingLibrary
