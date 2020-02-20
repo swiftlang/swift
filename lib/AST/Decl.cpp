@@ -2225,6 +2225,12 @@ AccessorDecl *AbstractStorageDecl::getOpaqueAccessor(AccessorKind kind) const {
   return getSynthesizedAccessor(kind);
 }
 
+ArrayRef<AccessorDecl*> AbstractStorageDecl::getOpaqueAccessors(
+    llvm::SmallVectorImpl<AccessorDecl*> &scratch) const {
+  visitOpaqueAccessors([&](AccessorDecl *D) { scratch.push_back(D); });
+  return scratch;
+}
+
 bool AbstractStorageDecl::hasParsedAccessors() const {
   for (auto *accessor : getAllAccessors())
     if (!accessor->isImplicit())

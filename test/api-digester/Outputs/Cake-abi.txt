@@ -12,7 +12,6 @@ cake: Accessor RemoveSetters.Value.Modify() has been removed
 cake: Accessor RemoveSetters.Value.Set() has been removed
 cake: Accessor RemoveSetters.subscript(_:).Modify() has been removed
 cake: Accessor RemoveSetters.subscript(_:).Set() has been removed
-cake: Accessor fixedLayoutStruct.height.Read() has been removed
 cake: AssociatedType RequiementChanges.removedType has been removed
 cake: Class C3 has been removed
 cake: Constructor Somestruct2.init(_:) has been removed

@@ -1694,7 +1694,8 @@ SwiftDeclCollector::constructVarNode(ValueDecl *VD) {
   Info.IsImplicitlyUnwrappedOptional = VD->isImplicitlyUnwrappedOptional();
   Var->addChild(constructTypeNode(VD->getInterfaceType(), Info));
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
-    for(auto *AC: VAD->getAllAccessors()) {
+    llvm::SmallVector<AccessorDecl*, 4> scratch;
+    for(auto *AC: VAD->getOpaqueAccessors(scratch)) {
       if (!Ctx.shouldIgnore(AC, VAD)) {
         Var->addAccessor(constructFunctionNode(AC, SDKNodeKind::DeclAccessor));
       }
@@ -1728,7 +1729,8 @@ SwiftDeclCollector::constructSubscriptDeclNode(SubscriptDecl *SD) {
   for (auto *Node: createParameterNodes(SD->getIndices())) {
     Subs->addChild(Node);
   }
-  for(auto *AC: SD->getAllAccessors()) {
+  llvm::SmallVector<AccessorDecl*, 4> scratch;
+  for(auto *AC: SD->getOpaqueAccessors(scratch)) {
     if (!Ctx.shouldIgnore(AC, SD)) {
       Subs->addAccessor(constructFunctionNode(AC, SDKNodeKind::DeclAccessor));
     }
