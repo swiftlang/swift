@@ -356,13 +356,21 @@ static SILValue reapplyFunctionConversion(
   // Handle a few instruction cases.
   // copy_value
   if (auto *cvi = dyn_cast<CopyValueInst>(oldConvertedFunc)) {
-    auto innerNewFunc = reapplyFunctionConversion(
-        context, newFunc, oldFunc, cvi->getOperand(), builder, loc,
-        newBuffersToDealloc, parameterIndices, newFuncGenSig);
     // Note: no `copy_value` is needed for the re-converted function because the
     // caller of `reapplyFunctionConversion` should consume the re-converted
     // function.
-    return innerNewFunc;
+    return reapplyFunctionConversion(
+        context, newFunc, oldFunc, cvi->getOperand(), builder, loc,
+        newBuffersToDealloc, parameterIndices, newFuncGenSig);
+  }
+  // begin_borrow
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(oldConvertedFunc)) {
+    // Note: no `begin_borrow` is needed for the re-converted function because
+    // the caller of `reapplyFunctionConversion` should consume the re-converted
+    // function.
+    return reapplyFunctionConversion(
+        context, newFunc, oldFunc, bbi->getOperand(), builder, loc,
+        newBuffersToDealloc, parameterIndices, newFuncGenSig);
   }
   // thin_to_thick_function
   if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(oldConvertedFunc)) {
