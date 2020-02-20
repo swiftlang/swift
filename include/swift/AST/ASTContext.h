@@ -114,6 +114,7 @@ namespace swift {
   class VarDecl;
   class UnifiedStatsReporter;
   class IndexSubset;
+  struct SILAutoDiffDerivativeFunctionKey;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -287,6 +288,10 @@ public:
 
   /// Cached mapping from types to their associated tangent spaces.
   llvm::DenseMap<Type, Optional<TangentSpace>> AutoDiffTangentSpaces;
+
+  /// A cache of derivative function types per configuration.
+  llvm::DenseMap<SILAutoDiffDerivativeFunctionKey, CanSILFunctionType>
+      SILAutoDiffDerivativeFunctions;
 
   /// Cache of `@differentiable` attributes keyed by parameter indices. Used to
   /// diagnose duplicate `@differentiable` attributes for the same key.

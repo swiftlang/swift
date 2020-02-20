@@ -113,6 +113,16 @@ struct AutoDiffConfig {
   SWIFT_DEBUG_DUMP;
 };
 
+/// Key for caching SIL derivative function types.
+struct SILAutoDiffDerivativeFunctionKey {
+  SILFunctionType *originalType;
+  IndexSubset *parameterIndices;
+  IndexSubset *resultIndices;
+  AutoDiffDerivativeFunctionKind kind;
+  CanGenericSignature derivativeFnGenSig;
+  bool isReabstractionThunk;
+};
+
 class ParsedAutoDiffParameter {
 public:
   enum class Kind { Named, Ordered, Self };
@@ -281,8 +291,11 @@ namespace llvm {
 
 using swift::AutoDiffConfig;
 using swift::AutoDiffDerivativeFunctionKind;
+using swift::CanGenericSignature;
 using swift::GenericSignature;
 using swift::IndexSubset;
+using swift::SILAutoDiffDerivativeFunctionKey;
+using swift::SILFunctionType;
 
 template <typename T> struct DenseMapInfo;
 
@@ -351,6 +364,50 @@ template <> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
                       const AutoDiffDerivativeFunctionKind &RHS) {
     return static_cast<AutoDiffDerivativeFunctionKind::innerty>(LHS) ==
         static_cast<AutoDiffDerivativeFunctionKind::innerty>(RHS);
+  }
+};
+
+template <> struct DenseMapInfo<SILAutoDiffDerivativeFunctionKey> {
+  static bool isEqual(const SILAutoDiffDerivativeFunctionKey lhs,
+                      const SILAutoDiffDerivativeFunctionKey rhs) {
+    return lhs.originalType == rhs.originalType &&
+           lhs.parameterIndices == rhs.parameterIndices &&
+           lhs.resultIndices == rhs.resultIndices &&
+           lhs.kind.rawValue == rhs.kind.rawValue &&
+           lhs.derivativeFnGenSig == rhs.derivativeFnGenSig &&
+           lhs.isReabstractionThunk == rhs.isReabstractionThunk;
+  }
+
+  static inline SILAutoDiffDerivativeFunctionKey getEmptyKey() {
+    return {DenseMapInfo<SILFunctionType *>::getEmptyKey(),
+            DenseMapInfo<IndexSubset *>::getEmptyKey(),
+            DenseMapInfo<IndexSubset *>::getEmptyKey(),
+            AutoDiffDerivativeFunctionKind::innerty(
+                DenseMapInfo<unsigned>::getEmptyKey()),
+            CanGenericSignature(DenseMapInfo<GenericSignature>::getEmptyKey()),
+            (bool)DenseMapInfo<unsigned>::getEmptyKey()};
+  }
+
+  static inline SILAutoDiffDerivativeFunctionKey getTombstoneKey() {
+    return {
+        DenseMapInfo<SILFunctionType *>::getTombstoneKey(),
+        DenseMapInfo<IndexSubset *>::getTombstoneKey(),
+        DenseMapInfo<IndexSubset *>::getTombstoneKey(),
+        AutoDiffDerivativeFunctionKind::innerty(
+            DenseMapInfo<unsigned>::getTombstoneKey()),
+        CanGenericSignature(DenseMapInfo<GenericSignature>::getTombstoneKey()),
+        (bool)DenseMapInfo<unsigned>::getTombstoneKey()};
+  }
+
+  static unsigned getHashValue(const SILAutoDiffDerivativeFunctionKey &Val) {
+    return hash_combine(
+        DenseMapInfo<SILFunctionType *>::getHashValue(Val.originalType),
+        DenseMapInfo<IndexSubset *>::getHashValue(Val.parameterIndices),
+        DenseMapInfo<IndexSubset *>::getHashValue(Val.resultIndices),
+        DenseMapInfo<unsigned>::getHashValue((unsigned)Val.kind.rawValue),
+        DenseMapInfo<GenericSignature>::getHashValue(Val.derivativeFnGenSig),
+        DenseMapInfo<unsigned>::getHashValue(
+            (unsigned)Val.isReabstractionThunk));
   }
 };
 
