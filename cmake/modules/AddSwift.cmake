@@ -774,19 +774,7 @@ function(_add_swift_host_library_single target)
                             CXX_STANDARD 14)
   endif()
 
-  if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    if("${libkind}" STREQUAL "SHARED")
-      # Each dll has an associated .lib (import library); since we may be
-      # building on a non-DLL platform (not windows), create an imported target
-      # for the library which created implicitly by the dll.
-      add_custom_command_target(${target}_IMPORT_LIBRARY
-                                OUTPUT "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/${target}.lib"
-                                DEPENDS "${target}")
-      add_library(${target}_IMPLIB SHARED IMPORTED GLOBAL)
-      set_property(TARGET "${target}_IMPLIB" PROPERTY
-          IMPORTED_LOCATION "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/${target}.lib")
-      add_dependencies(${target}_IMPLIB ${${target}_IMPORT_LIBRARY})
-    endif()
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
     set_property(TARGET "${target}" PROPERTY NO_SONAME ON)
   endif()
 
