@@ -483,8 +483,10 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         auto destEnv = IGF.Builder.CreateInBoundsGEP(destArgsBuf, offset);
         
         auto align = IGM.getPointerAlignment().getValue();
-        IGF.Builder.CreateMemCpy(destEnv, align, sourceEnv, align,
-          IGM.getPointerSize().getValue() * requirements.size());
+        IGF.Builder.CreateMemCpy(destEnv, llvm::MaybeAlign(align), sourceEnv,
+                                 llvm::MaybeAlign(align),
+                                 IGM.getPointerSize().getValue() *
+                                     requirements.size());
       }
       
       IGF.Builder.CreateRetVoid();
@@ -640,8 +642,9 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       }
       
       auto align = IGM.getPointerAlignment().getValue();
-      IGF.Builder.CreateMemCpy(destGenericEnv, align, src, align,
-                         IGM.getPointerSize().getValue() * requirements.size());
+      IGF.Builder.CreateMemCpy(
+          destGenericEnv, llvm::MaybeAlign(align), src, llvm::MaybeAlign(align),
+          IGM.getPointerSize().getValue() * requirements.size());
     }
     IGF.Builder.CreateRetVoid();
   }
@@ -1176,7 +1179,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                             llvm::GlobalValue::PrivateLinkage,
                                             llvm::ConstantInt::get(OnceTy, 0),
                                             "keypath_once");
-    onceVar->setAlignment(getPointerAlignment().getValue());
+    onceVar->setAlignment(llvm::MaybeAlign(getPointerAlignment().getValue()));
     fields.addRelativeAddress(onceVar);
   } else {
     fields.addInt32(0);
@@ -1292,7 +1295,7 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
                                     fields.finishAndCreateFuture()));
       var->setConstant(true);
       var->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-      var->setAlignment(4);
+      var->setAlignment(llvm::MaybeAlign(4));
 
       TheTrivialPropertyDescriptor = var;
     } else {
@@ -1353,5 +1356,5 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
                                 fields.finishAndCreateFuture()));
   var->setConstant(true);
   var->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-  var->setAlignment(4);
+  var->setAlignment(llvm::MaybeAlign(4));
 }

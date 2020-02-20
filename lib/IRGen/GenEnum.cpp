@@ -1446,11 +1446,10 @@ namespace {
                            SILType T) const {
       // If the layout is fixed, the size will be a constant.
       // Otherwise, do a memcpy of the dynamic size of the type.
-      IGF.Builder.CreateMemCpy(dest.getAddress(),
-                               dest.getAlignment().getValue(),
-                               src.getAddress(),
-                               src.getAlignment().getValue(),
-                               TI->getSize(IGF, T));
+      IGF.Builder.CreateMemCpy(
+          dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
+          src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
+          TI->getSize(IGF, T));
     }
 
     void emitPrimitiveStorePayloadAndExtraTag(IRGenFunction &IGF, Address dest,
