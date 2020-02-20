@@ -247,6 +247,15 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     LookupConformanceFn lookupConformance,
     CanGenericSignature derivativeFnGenSig, bool isReabstractionThunk) {
   auto &ctx = getASTContext();
+  auto resultIndices = IndexSubset::get(ctx, getNumResults(), {resultIndex});
+  SILAutoDiffDerivativeFunctionKey key{
+      this, parameterIndices,   resultIndices,
+      kind, derivativeFnGenSig, isReabstractionThunk};
+  auto insertion =
+      ctx.SILAutoDiffDerivativeFunctions.try_emplace(key, CanSILFunctionType());
+  auto &cachedResult = insertion.first->getSecond();
+  if (!insertion.second)
+    return cachedResult;
 
   // Returns true if `index` is a differentiability parameter index.
   auto isDiffParamIndex = [&](unsigned index) -> bool {
@@ -396,11 +405,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   auto extInfo = getExtInfo();
   if (getRepresentation() == SILFunctionTypeRepresentation::CFunctionPointer)
     extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
-  return SILFunctionType::get(canGenSig, extInfo, getCoroutineKind(),
-                              getCalleeConvention(), newParameters, getYields(),
-                              newResults, getOptionalErrorResult(),
-                              getSubstitutions(), isGenericSignatureImplied(),
-                              ctx, getWitnessMethodConformanceOrInvalid());
+  cachedResult = SILFunctionType::get(
+      canGenSig, extInfo, getCoroutineKind(), getCalleeConvention(),
+      newParameters, getYields(), newResults, getOptionalErrorResult(),
+      getSubstitutions(), isGenericSignatureImplied(), ctx,
+      getWitnessMethodConformanceOrInvalid());
+  return cachedResult;
 }
 
 CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
