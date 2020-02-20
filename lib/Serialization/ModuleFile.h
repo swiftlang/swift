@@ -106,6 +106,8 @@ public:
   public:
     ModuleDecl::ImportedModule Import = {};
     const StringRef RawPath;
+    const StringRef RawSPIs;
+    SmallVector<Identifier, 4> spiGroups;
 
   private:
     using ImportFilterKind = ModuleDecl::ImportFilterKind;
@@ -120,9 +122,9 @@ public:
       return static_cast<ImportFilterKind>(1 << RawImportControl);
     }
 
-    Dependency(StringRef path, bool isHeader, ImportFilterKind importControl,
+    Dependency(StringRef path, StringRef spiGroups, bool isHeader, ImportFilterKind importControl,
                bool isScoped)
-      : RawPath(path), RawImportControl(rawControlFromKind(importControl)),
+      : RawPath(path), RawSPIs(spiGroups), RawImportControl(rawControlFromKind(importControl)),
         IsHeader(isHeader), IsScoped(isScoped) {
       assert(llvm::countPopulation(static_cast<unsigned>(importControl)) == 1 &&
              "must be a particular filter option, not a bitset");
@@ -130,13 +132,13 @@ public:
     }
 
   public:
-    Dependency(StringRef path, ImportFilterKind importControl, bool isScoped)
-      : Dependency(path, false, importControl, isScoped) {}
+    Dependency(StringRef path, StringRef spiGroups, ImportFilterKind importControl, bool isScoped)
+      : Dependency(path, spiGroups, false, importControl, isScoped) {}
 
     static Dependency forHeader(StringRef headerPath, bool exported) {
       auto importControl = exported ? ImportFilterKind::Public
                                     : ImportFilterKind::Private;
-      return Dependency(headerPath, true, importControl, false);
+      return Dependency(headerPath, StringRef(), true, importControl, false);
     }
 
     bool isLoaded() const {
@@ -785,6 +787,11 @@ public:
   void lookupObjCMethods(
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results);
+
+  /// Find all SPI names imported from \p importedModule by this module,
+  /// collecting the identifiers in \p spiGroups.
+  void lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                              SmallVectorImpl<Identifier> &spiGroups) const;
 
   /// Reports all link-time dependencies.
   void collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const;

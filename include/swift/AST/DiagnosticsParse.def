@@ -1378,6 +1378,8 @@ ERROR(projection_value_property_not_identifier,none,
 // Access control
 ERROR(attr_access_expected_set,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))
+ERROR(attr_access_expected_spi_name,none,
+      "expected an SPI identifier as subject of the '@_spi' attribute", ())
 
 // Attributes
 ERROR(attr_renamed, none,

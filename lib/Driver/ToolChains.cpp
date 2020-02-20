@@ -561,6 +561,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_TBD:
   case file_types::TY_OptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_PrivateSwiftModuleInterfaceFile:
   case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SwiftCrossImportDir:
   case file_types::TY_SwiftOverlayFile:
@@ -678,6 +679,10 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::ID::TY_SwiftModuleInterfaceFile,
                    "-emit-module-interface-path");
+
+  addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
+                   "-emit-private-module-interface-path");
 
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SerializedDiagnostics,
@@ -812,6 +817,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ModuleTrace:
     case file_types::TY_OptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
+    case file_types::TY_PrivateSwiftModuleInterfaceFile:
     case file_types::TY_SwiftSourceInfoFile:
     case file_types::TY_SwiftCrossImportDir:
     case file_types::TY_SwiftOverlayFile:
