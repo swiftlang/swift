@@ -408,8 +408,8 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
 }
 
 extension String {
-  public // SPI(Foundation)
-  init(_cocoaString: AnyObject) {
+  @_spi(Foundation)
+  public init(_cocoaString: AnyObject) {
     self._guts = _bridgeCocoaString(_cocoaString)
   }
 }

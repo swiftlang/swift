@@ -3886,31 +3886,38 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
     return nullptr;
   }
 
+  // Diagnose if original function is an invalid class member.
   bool isOriginalClassMember = original->getDeclContext() &&
                                original->getDeclContext()->getSelfClassDecl();
-
-  // Diagnose if original function is an invalid class member.
   if (isOriginalClassMember) {
-    // Class methods returning dynamic `Self` are not supported.
-    // (For class methods, dynamic `Self` is supported only as the single
-    // result - tuple-returning JVPs/VJPs would not type-check.)
-    if (auto *originalFn = dyn_cast<FuncDecl>(original)) {
-      if (originalFn->hasDynamicSelfResult()) {
-        diags.diagnose(attr->getLocation(),
-                       diag::differentiable_attr_class_member_no_dynamic_self);
+    auto *classDecl = original->getDeclContext()->getSelfClassDecl();
+    assert(classDecl);
+    // Class members returning dynamic `Self` are not supported.
+    // Dynamic `Self` is supported only as a single top-level result for class
+    // members. JVP/VJP functions returning `(Self, ...)` tuples would not
+    // type-check.
+    bool diagnoseDynamicSelfResult = original->hasDynamicSelfResult();
+    if (diagnoseDynamicSelfResult) {
+      // Diagnose class initializers in non-final classes.
+      if (isa<ConstructorDecl>(original)) {
+        if (!classDecl->isFinal()) {
+          diags.diagnose(
+              attr->getLocation(),
+              diag::differentiable_attr_nonfinal_class_init_unsupported,
+              classDecl->getDeclaredInterfaceType());
+          attr->setInvalid();
+          return nullptr;
+        }
+      }
+      // Diagnose all other declarations returning dynamic `Self`.
+      else {
+        diags.diagnose(
+            attr->getLocation(),
+            diag::
+                differentiable_attr_class_member_dynamic_self_result_unsupported);
         attr->setInvalid();
         return nullptr;
       }
-    }
-
-    // TODO(TF-654): Class initializers are not yet supported.
-    // Extra JVP/VJP type calculation logic is necessary because classes have
-    // both allocators and initializers.
-    if (isa<ConstructorDecl>(original)) {
-      diags.diagnose(attr->getLocation(),
-                     diag::differentiable_attr_class_init_not_yet_supported);
-      attr->setInvalid();
-      return nullptr;
     }
   }
 
@@ -4199,6 +4206,38 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
       diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here,
                      asd->getFullName());
       return true;
+    }
+  }
+  // Diagnose if original function is an invalid class member.
+  bool isOriginalClassMember =
+      originalAFD->getDeclContext() &&
+      originalAFD->getDeclContext()->getSelfClassDecl();
+  if (isOriginalClassMember) {
+    auto *classDecl = originalAFD->getDeclContext()->getSelfClassDecl();
+    assert(classDecl);
+    // Class members returning dynamic `Self` are not supported.
+    // Dynamic `Self` is supported only as a single top-level result for class
+    // members. JVP/VJP functions returning `(Self, ...)` tuples would not
+    // type-check.
+    bool diagnoseDynamicSelfResult = originalAFD->hasDynamicSelfResult();
+    if (diagnoseDynamicSelfResult) {
+      // Diagnose class initializers in non-final classes.
+      if (isa<ConstructorDecl>(originalAFD)) {
+        if (!classDecl->isFinal()) {
+          diags.diagnose(attr->getLocation(),
+                         diag::derivative_attr_nonfinal_class_init_unsupported,
+                         classDecl->getDeclaredInterfaceType());
+          return true;
+        }
+      }
+      // Diagnose all other declarations returning dynamic `Self`.
+      else {
+        diags.diagnose(
+            attr->getLocation(),
+            diag::derivative_attr_class_member_dynamic_self_result_unsupported,
+            DeclNameRef(originalAFD->getFullName()));
+        return true;
+      }
     }
   }
   attr->setOriginalFunction(originalAFD);
