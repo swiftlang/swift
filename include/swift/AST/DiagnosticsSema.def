@@ -120,11 +120,6 @@ ERROR(expected_result_in_contextual_member,none,
 ERROR(unexpected_arguments_in_enum_case,none,
       "enum case %0 has no associated values", (DeclName))
 
-ERROR(could_not_use_value_member,none,
-      "member %1 cannot be used on value of type %0", (Type, DeclNameRef))
-ERROR(could_not_use_type_member,none,
-      "member %1 cannot be used on type %0", (Type, DeclNameRef))
-
 ERROR(could_not_use_type_member_on_instance,none,
       "static member %1 cannot be used on instance of type %0",
       (Type, DeclNameRef))
@@ -224,10 +219,6 @@ ERROR(cannot_apply_lvalue_binop_to_subelement,none,
 ERROR(cannot_apply_lvalue_binop_to_rvalue,none,
       "left side of mutating operator has immutable type %0", (Type))
 
-ERROR(cannot_subscript_with_index,none,
-      "cannot subscript a value of type %0 with an argument of type %1",
-      (Type, Type))
-
 ERROR(cannot_subscript_base,none,
       "cannot subscript a value of type %0",
       (Type))
@@ -255,10 +246,6 @@ ERROR(cannot_pass_rvalue_inout,none,
 ERROR(cannot_provide_default_value_inout,none,
       "cannot provide default value to inout parameter %0", (Identifier))
 
-ERROR(cannot_call_with_no_params,none,
-      "cannot invoke %select{|initializer for type }1'%0' with no arguments",
-      (StringRef, bool))
-
 ERROR(cannot_call_with_params, none,
       "cannot invoke %select{|initializer for type }2'%0' with an argument list"
       " of type '%1'", (StringRef, StringRef, bool))
@@ -269,14 +256,6 @@ ERROR(cannot_call_non_function_value,none,
 ERROR(no_candidates_match_result_type,none,
       "no '%0' candidates produce the expected contextual result type %1",
       (StringRef, Type))
-
-
-ERROR(cannot_invoke_closure,none,
-      "cannot invoke closure expression with an argument list of type '%0'",
-      (StringRef))
-ERROR(cannot_invoke_closure_type,none,
-      "cannot invoke closure of type %0 with an argument list of type '%1'",
-      (Type, StringRef))
 
 ERROR(cannot_infer_closure_type,none,
       "unable to infer closure type in the current context", ())
@@ -290,13 +269,6 @@ FIXIT(insert_closure_return_type_placeholder,
 ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
       (Type, Type))
-
-ERROR(cannot_call_function_value,none,
-      "cannot invoke value of function type with argument list '%0'",
-      (StringRef))
-ERROR(cannot_call_value_of_function_type,none,
-      "cannot invoke value of type %0 with argument list '%1'",
-      (Type, StringRef))
 
 NOTE(suggest_expected_match,none,
      "%select{expected an argument list|produces result}0 of type '%1'",
@@ -943,16 +915,6 @@ NOTE(circular_reference_through_precedence_group, none,
 //------------------------------------------------------------------------------
 // MARK: Expression Type Checking Errors
 //------------------------------------------------------------------------------
-ERROR(types_not_convertible,none,
-      "%1 is not %select{convertible to|a subtype of}0 %2",
-      (bool, Type, Type))
-NOTE(in_cast_expr_types,none,
-      "in cast from type %0 to %1",
-      (Type, Type))
-
-ERROR(types_not_convertible_use_bool_value,none,
-      "%0 is not convertible to %1; did you mean %0.boolValue?", (Type, Type))
-
 ERROR(tuple_types_not_convertible_nelts,none,
       "%0 is not convertible to %1, "
       "tuples have a different number of elements", (Type, Type))
@@ -3226,17 +3188,11 @@ ERROR(unresolved_member_no_inference,none,
       (DeclNameRef))
 ERROR(cannot_infer_base_of_unresolved_member,none,
       "cannot infer contextual base in reference to member %0", (DeclNameRef))
-ERROR(unresolved_collection_literal,none,
-      "cannot infer type for empty collection literal without a "
-      "contextual type", ())
 ERROR(unresolved_nil_literal,none,
       "'nil' requires a contextual type", ())
 
 ERROR(type_of_expression_is_ambiguous,none,
       "type of expression is ambiguous without more context", ())
-
-ERROR(specific_type_of_expression_is_ambiguous,none,
-      "expression type %0 is ambiguous without more context", (Type))
 
 ERROR(failed_to_produce_diagnostic,Fatal,
       "failed to produce diagnostic for expression; "
@@ -3515,9 +3471,6 @@ ERROR(general_noescape_to_escaping,none,
 ERROR(converting_noescape_to_type,none,
       "converting non-escaping value to %0 may allow it to escape",
       (Type))
-ERROR(unknown_escaping_use_of_noescape,none,
-      "using non-escaping value in a context where it may escape",
-      ())
 
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
@@ -3746,8 +3699,6 @@ ERROR(single_tuple_parameter_mismatch_special,none,
 ERROR(single_tuple_parameter_mismatch_normal,none,
       "%0 %1 expects a single parameter of type %2%3",
       (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
-ERROR(unknown_single_tuple_parameter_mismatch,none,
-      "single parameter of type %0 is expected in call", (Type))
 ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,
       "%0 %select{%1 |}2expects %3 separate arguments"
       "%select{|; remove extra parentheses to change tuple into separate arguments}4",
