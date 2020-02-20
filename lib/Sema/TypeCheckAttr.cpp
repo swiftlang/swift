@@ -192,6 +192,7 @@ public:
   void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitAccessControlAttr(AccessControlAttr *attr);
   void visitSetterAccessAttr(SetterAccessAttr *attr);
+  void visitSPIAccessControlAttr(SPIAccessControlAttr *attr);
   bool visitAbstractAccessControlAttr(AbstractAccessControlAttr *attr);
 
   void visitObjCAttr(ObjCAttr *attr);
@@ -865,6 +866,19 @@ void AttributeChecker::visitSetterAccessAttr(
              getterAccess)
       .fixItRemove(attr->getRange());
     return;
+  }
+}
+
+void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
+  if (auto VD = dyn_cast<ValueDecl>(D)) {
+    auto declAccess = VD->getFormalAccess();
+    if (declAccess < AccessLevel::Public) {
+      diagnose(attr->getLocation(),
+               diag::spi_attribute_on_non_public,
+               declAccess,
+               D->getDescriptiveKind())
+        .fixItRemove(attr->getRange());
+    }
   }
 }
 

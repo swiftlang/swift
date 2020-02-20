@@ -41,6 +41,7 @@ struct AutoDiffConfig;
 class AbstractFunctionDecl;
 class ClangImporterOptions;
 class ClassDecl;
+class FileUnit;
 class ModuleDecl;
 class NominalTypeDecl;
 class TypeDecl;
@@ -176,6 +177,10 @@ public:
 
   /// Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }
+
+  /// Discover overlays declared alongside this file and add infomation about
+  /// them to it.
+  void findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module, FileUnit *file);
 };
 
 } // namespace swift

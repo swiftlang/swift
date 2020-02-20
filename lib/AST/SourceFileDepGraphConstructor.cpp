@@ -114,11 +114,11 @@ void SourceFileDepGraphConstructor::addAUsedDecl(const DependencyKey &defKey,
 //==============================================================================
 
 template <typename DeclT> static std::string getBaseName(const DeclT *decl) {
-  return decl->getBaseName().userFacingName();
+  return decl->getBaseName().userFacingName().str();
 }
 
 template <typename DeclT> static std::string getName(const DeclT *decl) {
-  return DeclBaseName(decl->getName()).userFacingName();
+  return DeclBaseName(decl->getName()).userFacingName().str();
 }
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *NTD) {
@@ -266,7 +266,7 @@ std::string
 DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide,
                                             StringRef>(StringRef swiftDeps) {
   assert(!swiftDeps.empty());
-  return swiftDeps;
+  return swiftDeps.str();
 }
 
 template <>
@@ -328,27 +328,27 @@ std::string DependencyKey::computeNameForProvidedEntity<
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::topLevel>(StringRef name) {
-  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "", name);
+  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "", name.str());
 }
 
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::dynamicLookup>(StringRef name) {
   return DependencyKey(NodeKind::dynamicLookup, DeclAspect::interface, "",
-                       name);
+                       name.str());
 }
 
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::externalDepend>(StringRef name) {
   return DependencyKey(NodeKind::externalDepend, DeclAspect::interface, "",
-                       name);
+                       name.str());
 }
 
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::nominal>(StringRef mangledName) {
-  return DependencyKey(NodeKind::nominal, DeclAspect::interface, mangledName,
+  return DependencyKey(NodeKind::nominal, DeclAspect::interface, mangledName.str(),
                        "");
 }
 
@@ -357,8 +357,8 @@ DependencyKey DependencyKey::createDependedUponKey(StringRef mangledHolderName,
   const bool isMemberBlank = memberBaseName.empty();
   const auto kind =
       isMemberBlank ? NodeKind::potentialMember : NodeKind::member;
-  return DependencyKey(kind, DeclAspect::interface, mangledHolderName,
-                       isMemberBlank ? "" : memberBaseName);
+  return DependencyKey(kind, DeclAspect::interface, mangledHolderName.str(),
+                       isMemberBlank ? "" : memberBaseName.str());
 }
 
 //==============================================================================
@@ -680,7 +680,7 @@ private:
   void enumerateUse(NodeKind kind, StringRef context, StringRef name,
                     bool isCascadingUse) {
     // Assume that what is depended-upon is the interface
-    createDefUse(DependencyKey(kind, DeclAspect::interface, context, name),
+    createDefUse(DependencyKey(kind, DeclAspect::interface, context.str(), name.str()),
                  isCascadingUse ? sourceFileInterface
                                 : sourceFileImplementation);
   }

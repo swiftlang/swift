@@ -1689,17 +1689,13 @@ public:
 /// func bar(_ v: Int) { foo(v) } // `Int` is not convertible to `String`
 /// ```
 class ArgumentMismatchFailure : public ContextualFailure {
-  // FIXME: Currently ArgumentMismatchFailure can be used from CSDiag, in which
-  // case it's possible we're not able to resolve the arg apply info. Once
-  // the CSDiag logic has been removed, we should be able to store Info
-  // unwrapped.
-  Optional<FunctionArgApplyInfo> Info;
+  FunctionArgApplyInfo Info;
 
 public:
-  ArgumentMismatchFailure(ConstraintSystem &cs, Type argType,
-                          Type paramType, ConstraintLocator *locator)
+  ArgumentMismatchFailure(ConstraintSystem &cs, Type argType, Type paramType,
+                          ConstraintLocator *locator)
       : ContextualFailure(cs, argType, paramType, locator),
-        Info(cs.getFunctionArgApplyInfo(getLocator())) {}
+        Info(*cs.getFunctionArgApplyInfo(getLocator())) {}
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
@@ -1722,10 +1718,10 @@ public:
 
 protected:
   /// \returns The position of the argument being diagnosed, starting at 1.
-  unsigned getArgPosition() const { return Info->getArgPosition(); }
+  unsigned getArgPosition() const { return Info.getArgPosition(); }
 
   /// \returns The position of the parameter being diagnosed, starting at 1.
-  unsigned getParamPosition() const { return Info->getParamPosition(); }
+  unsigned getParamPosition() const { return Info.getParamPosition(); }
 
   /// Returns the argument expression being diagnosed.
   ///
@@ -1735,7 +1731,7 @@ protected:
   /// the conversion from T to U may fail. In this case, \c getArgExpr() will
   /// return the (T, U) expression, whereas \c getAnchor() will return the T
   /// expression.
-  Expr *getArgExpr() const { return Info->getArgExpr(); }
+  Expr *getArgExpr() const { return Info.getArgExpr(); }
 
   /// Returns the argument type for the conversion being diagnosed.
   ///
@@ -1748,27 +1744,25 @@ protected:
   /// In this case, \c getArgType() will return T?, whereas \c getFromType()
   /// will return T.
   Type getArgType(bool withSpecifier = false) const {
-    return Info->getArgType(withSpecifier);
+    return Info.getArgType(withSpecifier);
   }
 
   /// \returns A textual description of the argument suitable for diagnostics.
   /// For an argument with an unambiguous label, this will the label. Otherwise
   /// it will be its position in the argument list.
   StringRef getArgDescription(SmallVectorImpl<char> &scratch) const {
-    return Info->getArgDescription(scratch);
+    return Info.getArgDescription(scratch);
   }
 
   /// \returns The interface type for the function being applied.
-  Type getFnInterfaceType() const { return Info->getFnInterfaceType(); }
+  Type getFnInterfaceType() const { return Info.getFnInterfaceType(); }
 
   /// \returns The function type being applied, including any generic
   /// substitutions.
-  FunctionType *getFnType() const { return Info->getFnType(); }
+  FunctionType *getFnType() const { return Info.getFnType(); }
 
   /// \returns The callee for the argument conversion, if any.
-  const ValueDecl *getCallee() const {
-    return Info ? Info->getCallee() : nullptr;
-  }
+  const ValueDecl *getCallee() const { return Info.getCallee(); }
 
   /// \returns The full name of the callee, or a null decl name if there is no
   /// callee.
@@ -1784,7 +1778,7 @@ protected:
   ///
   /// Note this may differ from \c getToType(), see the note on \c getArgType().
   Type getParamType(bool lookThroughAutoclosure = true) const {
-    return Info->getParamType(lookThroughAutoclosure);
+    return Info.getParamType(lookThroughAutoclosure);
   }
 
   /// Returns the type of the parameter involved in the mismatch.
@@ -1794,17 +1788,17 @@ protected:
   ///
   /// Note this may differ from \c getToType(), see the note on \c getArgType().
   Type getParamInterfaceType(bool lookThroughAutoclosure = true) const {
-    return Info->getParamInterfaceType(lookThroughAutoclosure);
+    return Info.getParamInterfaceType(lookThroughAutoclosure);
   }
 
   /// \returns The flags of the parameter involved in the mismatch.
   ParameterTypeFlags getParameterFlags() const {
-    return Info->getParameterFlags();
+    return Info.getParameterFlags();
   }
 
   /// \returns The flags of a parameter at a given index.
   ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
-    return Info->getParameterFlagsAtIndex(idx);
+    return Info.getParameterFlagsAtIndex(idx);
   }
 
   /// Situations like this:

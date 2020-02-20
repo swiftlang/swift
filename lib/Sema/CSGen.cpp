@@ -616,7 +616,7 @@ namespace {
       if (!overloadType)
         continue;
 
-      if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
+      if (!CS.isDeclUnavailable(decl, constraint->getLocator()) &&
           !decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>() &&
           isFavored(decl, overloadType)) {
         // If we might need to roll back the favored constraints, keep
@@ -1151,21 +1151,33 @@ namespace {
       // If this is a standalone `nil` literal expression e.g.
       // `_ = nil`, let's diagnose it here because solver can't
       // attempt any types for it.
-      if (!CS.isExprBeingDiagnosed(expr)) {
-        auto *parentExpr = CS.getParentExpr(expr);
+      auto *parentExpr = CS.getParentExpr(expr);
 
-        // `_ = nil`
-        if (auto *assignment = dyn_cast_or_null<AssignExpr>(parentExpr)) {
-          if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
-            DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
-            return Type();
-          }
-        }
-
-        if (!parentExpr && !CS.getContextualType(expr)) {
+      // `_ = nil`
+      if (auto *assignment = dyn_cast_or_null<AssignExpr>(parentExpr)) {
+        if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
           DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
           return Type();
         }
+      }
+
+      if (!parentExpr && !CS.getContextualType(expr)) {
+        DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
+        return Type();
+      }
+
+      return visitLiteralExpr(expr);
+    }
+
+    Type visitFloatLiteralExpr(FloatLiteralExpr *expr) {
+      auto &ctx = CS.getASTContext();
+      // Get the _MaxBuiltinFloatType decl, or look for it if it's not cached.
+      auto maxFloatTypeDecl = ctx.get_MaxBuiltinFloatTypeDecl();
+
+      if (!maxFloatTypeDecl ||
+          !maxFloatTypeDecl->getDeclaredInterfaceType()->is<BuiltinFloatType>()) {
+        ctx.Diags.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
+        return nullptr;
       }
 
       return visitLiteralExpr(expr);
@@ -1329,25 +1341,11 @@ namespace {
       Type knownType;
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
-        if (!knownType &&
-            !(isa<ParamDecl>(VD) &&
-              isa<ClosureExpr>(VD->getDeclContext()) &&
-              CS.Options.contains(
-                ConstraintSystemFlags::SubExpressionDiagnostics)))
+        if (!knownType)
           knownType = VD->getInterfaceType();
 
         if (knownType) {
-          // If this is a ParamDecl for a closure argument that is a hole,
-          // then this is a situation where CSDiags is trying to perform
-          // error recovery within a ClosureExpr.  Just create a new type
-          // variable for the decl that isn't bound to anything.
-          // This will ensure that it is considered ambiguous.
-          if (knownType && knownType->isHole()) {
-            return CS.createTypeVariable(locator,
-                                         TVO_CanBindToLValue |
-                                         TVO_CanBindToNoEscape);
-          }
-
+          assert(!knownType->isHole());
           // If the known type has an error, bail out.
           if (knownType->hasError()) {
             if (!CS.hasType(E))
@@ -2119,6 +2117,17 @@ namespace {
           auto *paramLoc =
               CS.getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
 
+          // If one of the parameters represents a destructured tuple
+          // e.g. `{ (x: Int, (y: Int, z: Int)) in ... }` let's fail
+          // inference here and not attempt to solve the system because:
+          //
+          // a. Destructuring has already been diagnosed by the parser;
+          // b. Body of the closure would have error expressions for
+          //    each incorrect parameter reference and solver wouldn't
+          //    be able to produce any viable solutions.
+          if (param->isDestructured())
+            return nullptr;
+
           Type externalType;
           if (param->getTypeRepr()) {
             auto declaredTy = param->getType();
@@ -2516,10 +2525,18 @@ namespace {
       struct CollectParameterRefs : public ASTWalker {
         ConstraintSystem &cs;
         llvm::SmallVector<TypeVariableType *, 4> paramRefs;
+        bool hasErrorExprs = false;
 
         CollectParameterRefs(ConstraintSystem &cs) : cs(cs) { }
 
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+          // If there are any error expressions in this closure
+          // it wouldn't be possible to infer its type.
+          if (isa<ErrorExpr>(expr)) {
+            hasErrorExprs = true;
+            return {false, nullptr};
+          }
+
           // Retrieve type variables from references to parameter declarations.
           if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
             if (auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl())) {
@@ -2533,6 +2550,9 @@ namespace {
         }
       } collectParameterRefs(CS);
       closure->walk(collectParameterRefs);
+
+      if (collectParameterRefs.hasErrorExprs)
+        return Type();
 
       auto inferredType = inferClosureType(closure);
       if (!inferredType || inferredType->hasError())
@@ -3417,12 +3437,10 @@ namespace {
   /// diagnostics and code completion.
   class SanitizeExpr : public ASTWalker {
     ConstraintSystem &CS;
-    const bool eraseOpenExistentialsOnly;
     llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpenExistentials;
 
   public:
-    SanitizeExpr(ConstraintSystem &cs, bool eraseOEsOnly = false)
-        : CS(cs), eraseOpenExistentialsOnly(eraseOEsOnly) { }
+    SanitizeExpr(ConstraintSystem &cs) : CS(cs){ }
 
     ASTContext &getASTContext() const { return CS.getASTContext(); }
 
@@ -3467,15 +3485,10 @@ namespace {
             expr = value->second;
             continue;
           } else {
-            assert((eraseOpenExistentialsOnly || OVE->isPlaceholder()) &&
+            assert(OVE->isPlaceholder() &&
                    "Didn't see this OVE in a containing OpenExistentialExpr?");
-            // NOTE: In 'eraseOpenExistentialsOnly' mode, ASTWalker may walk
-            // into other kind of expressions holding OVE.
           }
         }
-
-        if (eraseOpenExistentialsOnly)
-          return {true, expr};
 
         // Skip any implicit conversions applied to this expression.
         if (auto ICE = dyn_cast<ImplicitConversionExpr>(expr)) {
@@ -3612,9 +3625,6 @@ namespace {
           expr->setType(type);
         }
       }
-
-      if (eraseOpenExistentialsOnly)
-        return expr;
 
       assert(!isa<ImplicitConversionExpr>(expr) &&
              "ImplicitConversionExpr should be eliminated in walkToExprPre");
@@ -4170,10 +4180,6 @@ bool swift::areGenericRequirementsSatisfied(
 
   // Having a solution implies the requirements have been fulfilled.
   return CS.solveSingle().hasValue();
-}
-
-void swift::eraseOpenedExistentials(ConstraintSystem &CS, Expr *&expr) {
-  expr = expr->walk(SanitizeExpr(CS, /*eraseOEsOnly=*/true));
 }
 
 struct ResolvedMemberResult::Implementation {

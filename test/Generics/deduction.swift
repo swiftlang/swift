@@ -247,7 +247,7 @@ protocol Addable { // expected-note {{where 'Self' = 'U'}}
   static func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
-  u + u // expected-error{{protocol 'Addable' requires that 'U' conform to 'Addable'}}
+  u + u // expected-error{{referencing operator function '+' on 'Addable' requires that 'U' conform to 'Addable'}}
   return x+y
 }
 

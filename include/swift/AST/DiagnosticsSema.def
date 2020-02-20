@@ -148,7 +148,7 @@ FIXIT(insert_type_qualification,"%0.",(Type))
 
 ERROR(candidate_inaccessible,none,
       "%0 is inaccessible due to "
-      "'%select{private|fileprivate|internal|%error|%error}1' protection level",
+      "'%select{private|fileprivate|internal|SPI|SPI}1' protection level",
       (DeclBaseName, AccessLevel))
 
 NOTE(note_candidate_inaccessible,none,
@@ -158,7 +158,7 @@ NOTE(note_candidate_inaccessible,none,
 
 ERROR(init_candidate_inaccessible,none,
       "%0 initializer is inaccessible due to "
-      "'%select{private|fileprivate|internal|%error|%error}1' protection level",
+      "'%select{private|fileprivate|internal|SPI|SPI}1' protection level",
       (Type, AccessLevel))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
@@ -1133,6 +1133,9 @@ ERROR(argument_out_of_order_unnamed_named,none,
 ERROR(argument_out_of_order_unnamed_unnamed,none,
       "unnamed argument #%0 must precede unnamed argument #%1",
       (unsigned, unsigned))
+ERROR(argument_out_of_order_binary_op,none,
+      "operator argument #%0 must precede operator argument #%1",
+      (unsigned, unsigned))
 NOTE(candidate_expected_different_labels,none,
      "incorrect labels for candidate (have: '%0', expected: '%1')",
      (StringRef, StringRef))
@@ -1690,6 +1693,13 @@ ERROR(function_type_access,none,
       "because its %select{parameter|result}5 uses "
       "%select{a private|a fileprivate|an internal|%error|%error}3 type",
       (bool, AccessLevel, bool, AccessLevel, unsigned, bool))
+ERROR(function_type_spi,none,
+      "%select{function|method|initializer}0 "
+      "cannot be declared '@_spi' "
+      "because its %select{parameter|result}1 uses "
+      "%select{a private|a fileprivate|an internal|%error|%error}2 type "
+      "without a compatible '@_spi'",
+      (unsigned, bool, AccessLevel))
 WARNING(function_type_access_warn,none,
         "%select{function|method|initializer}4 "
         "%select{should be declared %select{private|fileprivate|internal|%error|%error}1"
@@ -1707,6 +1717,12 @@ WARNING(function_type_usable_from_inline_warn,none,
         "'@usableFromInline' %select{function|method|initializer}0 "
         "should be '@usableFromInline' or public",
         (unsigned, bool))
+
+ERROR(spi_attribute_on_non_public,none,
+      "%select{private|fileprivate|internal|%error|%error}0 %1 "
+      "cannot be declared '@_spi' because only public and open "
+      "declarations can be '@_spi'",
+      (AccessLevel, DescriptiveDeclKind))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -2640,12 +2656,13 @@ NOTE(enum_raw_value_incrementing_from_zero,none,
 NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
-ERROR(decl_from_implementation_only_module,none,
+ERROR(decl_from_hidden_module,none,
       "cannot use %0 %1 %select{here|"
       "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformances}2; %3 has been imported "
-      "as implementation-only",
-      (DescriptiveDeclKind, DeclName, unsigned, Identifier))
+      "in an extension with conditional conformances}2; "
+      "%select{%3 has been imported as implementation-only|"
+      "it is an SPI imported from %3}4",
+      (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|"
       "in an extension with public or '@usableFromInline' members|"
@@ -4709,10 +4726,16 @@ WARNING(resilience_decl_unavailable_warn,
         "should not be referenced from " FRAGILE_FUNC_KIND "3",
         (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
-ERROR(inlinable_decl_ref_implementation_only,
+ERROR(resilience_decl_unavailable_spi,
+      none, DECL_OR_ACCESSOR "4 %1 is imported as SPI; "
+      "it cannot be referenced from " FRAGILE_FUNC_KIND "3",
+      (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
+
+ERROR(inlinable_decl_ref_from_hidden_module,
       none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
-      "because %3 was imported implementation-only",
-      (DescriptiveDeclKind, DeclName, unsigned, Identifier))
+      "because %select{%3 was imported implementation-only|"
+      "it is an SPI imported from %3}4",
+      (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 
 #undef FRAGILE_FUNC_KIND
 

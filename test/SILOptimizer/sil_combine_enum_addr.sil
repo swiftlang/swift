@@ -10,7 +10,7 @@ import Swift
 // CHECK: inject_enum_addr
 // CHECK-NOT: select_enum_addr
 // CHECK-NOT: bb1
-// CHECK: unchecked_take_enum_data_addr
+// CHECK-NOT: unchecked_take_enum_data_addr
 // CHECK: return
 sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> () {
 bb0(%0 : $*Int, %1 : $*_Stdout):
@@ -46,7 +46,7 @@ bb2:
 // CHECK: inject_enum_addr
 // CHECK-NOT: switch_enum_addr
 // CHECK-NOT: bb1
-// CHECK: unchecked_take_enum_data_addr
+// CHECK-NOT: unchecked_take_enum_data_addr
 // CHECK: return
 sil  @convert_inject_enum_addr_switch_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> () {
 bb0(%0 : $*Int, %1 : $*_Stdout):

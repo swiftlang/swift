@@ -10,8 +10,11 @@
 #
 # ----------------------------------------------------------------------------
 
+import os
+
 from . import product
 from .. import shell
+from .. import targets
 
 
 class PythonKit(product.Product):
@@ -27,6 +30,10 @@ class PythonKit(product.Product):
         return True
 
     def build(self, host_target):
+        toolchain_path = targets.toolchain_path(self.args.install_destdir,
+                                                self.args.install_prefix)
+        swiftc = os.path.join(toolchain_path, 'usr', 'bin', 'swiftc')
+
         shell.call([
             self.toolchain.cmake,
             '-G', 'Ninja',
@@ -34,7 +41,7 @@ class PythonKit(product.Product):
             '-D', 'CMAKE_INSTALL_PREFIX={}/usr'.format(
                 self.args.install_destdir),
             '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
-            '-D', 'CMAKE_Swift_COMPILER={}'.format(self.toolchain.swiftc),
+            '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
             '-B', self.build_dir,
             '-S', self.source_dir,
         ])

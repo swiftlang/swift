@@ -1634,6 +1634,19 @@ bb0(%0 : $*AddressOnlyEnum):
   return %2 : $Builtin.Int32
 }
 
+// CHECK-LABEL: sil @dead_unchecked_take_enum_data_addr
+// CHECK:      bb0(%0 : $*AddressOnlyEnum):
+// CHECK-NEXT:   destroy_addr %0
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @dead_unchecked_take_enum_data_addr : $@convention(thin) (@in AddressOnlyEnum) -> () {
+bb0(%0 : $*AddressOnlyEnum):
+  %1 = unchecked_take_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.Loadable!enumelt.1
+  destroy_addr %1 : $*Builtin.Int32
+  %r = tuple ()
+  return %r : $()
+}
+
 sil @partial_apply_arg_fun : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> () {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %2 = tuple()
