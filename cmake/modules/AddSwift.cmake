@@ -693,37 +693,36 @@ endfunction()
 # source1 ...
 #   Sources to add into this library
 function(_add_swift_host_library_single target)
-  set(SWIFTLIB_SINGLE_options
+  set(options
         SHARED
         STATIC)
-  set(SWIFTLIB_SINGLE_single_parameter_options)
-  set(SWIFTLIB_SINGLE_multiple_parameter_options
+  set(single_parameter_options)
+  set(multiple_parameter_options
         GYB_SOURCES
         LLVM_LINK_COMPONENTS)
 
-  cmake_parse_arguments(SWIFTLIB_SINGLE
-                        "${SWIFTLIB_SINGLE_options}"
-                        "${SWIFTLIB_SINGLE_single_parameter_options}"
-                        "${SWIFTLIB_SINGLE_multiple_parameter_options}"
+  cmake_parse_arguments(ASHLS
+                        "${options}"
+                        "${single_parameter_options}"
+                        "${multiple_parameter_options}"
                         ${ARGN})
+  set(ASHLS_SOURCES ${ASHLS_UNPARSED_ARGUMENTS})
 
-  set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_UNPARSED_ARGUMENTS})
+  translate_flags(ASHLS "${options}")
 
-  translate_flags(SWIFTLIB_SINGLE "${SWIFTLIB_SINGLE_options}")
-
-  if(NOT SWIFTLIB_SINGLE_SHARED AND NOT SWIFTLIB_SINGLE_STATIC)
+  if(NOT ASHLS_SHARED AND NOT ASHLS_STATIC)
     message(FATAL_ERROR "Either SHARED or STATIC must be specified")
   endif()
 
   # Determine the subdirectory where this library will be installed.
-  set(SWIFTLIB_SINGLE_SUBDIR
+  set(ASHLS_SUBDIR
     "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
 
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
   set(embed_bitcode_arg)
   if(SWIFT_EMBED_BITCODE_SECTION)
     if(SWIFT_HOST_VARIANT_SDK MATCHES "(I|TV|WATCH)OS")
-      list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
+      list(APPEND ASHLS_C_COMPILE_FLAGS "-fembed-bitcode")
       set(embed_bitcode_arg EMBED_BITCODE)
     endif()
   endif()
@@ -731,39 +730,37 @@ function(_add_swift_host_library_single target)
   if(XCODE)
     string(REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
     list(GET split_path -1 dir)
-    file(GLOB_RECURSE SWIFTLIB_SINGLE_HEADERS
+    file(GLOB_RECURSE ASHLS_HEADERS
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.h
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.def
       ${CMAKE_CURRENT_SOURCE_DIR}/*.def)
 
-    file(GLOB_RECURSE SWIFTLIB_SINGLE_TDS
+    file(GLOB_RECURSE ASHLS_TDS
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.td)
 
-    set_source_files_properties(${SWIFTLIB_SINGLE_HEADERS} ${SWIFTLIB_SINGLE_TDS}
+    set_source_files_properties(${ASHLS_HEADERS} ${ASHLS_TDS}
       PROPERTIES
       HEADER_FILE_ONLY true)
-    source_group("TableGen descriptions" FILES ${SWIFTLIB_SINGLE_TDS})
+    source_group("TableGen descriptions" FILES ${ASHLS_TDS})
 
-    set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES} ${SWIFTLIB_SINGLE_HEADERS} ${SWIFTLIB_SINGLE_TDS})
+    set(ASHLS_SOURCES ${ASHLS_SOURCES} ${ASHLS_HEADERS} ${ASHLS_TDS})
   endif()
 
-  if(SWIFTLIB_SINGLE_SHARED)
+  if(ASHLS_SHARED)
     set(libkind SHARED)
-  elseif(SWIFTLIB_SINGLE_STATIC)
+  elseif(ASHLS_STATIC)
     set(libkind STATIC)
   endif()
 
-  if(SWIFTLIB_SINGLE_GYB_SOURCES)
+  if(ASHLS_GYB_SOURCES)
     handle_gyb_sources(
         gyb_dependency_targets
-        SWIFTLIB_SINGLE_GYB_SOURCES
+        ASHLS_GYB_SOURCES
         "${SWIFT_HOST_VARIANT_ARCH}")
-    set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES}
-      ${SWIFTLIB_SINGLE_GYB_SOURCES})
+      set(ASHLS_SOURCES ${ASHLS_SOURCES} ${ASHLS_GYB_SOURCES})
   endif()
 
-  add_library("${target}" ${libkind}
-              ${SWIFTLIB_SINGLE_SOURCES})
+  add_library("${target}" ${libkind} ${ASHLS_SOURCES})
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFT_HOST_VARIANT_SDK}")
 
   if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
@@ -818,18 +815,18 @@ function(_add_swift_host_library_single target)
         ${LLVM_COMMON_DEPENDS})
 
   # Call llvm_config() only for libraries that are part of the compiler.
-  swift_common_llvm_config("${target}" ${SWIFTLIB_SINGLE_LLVM_LINK_COMPONENTS})
+  swift_common_llvm_config("${target}" ${ASHLS_LLVM_LINK_COMPONENTS})
 
   # Collect compile and link flags for the static and non-static targets.
   # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly.
-  set(c_compile_flags ${SWIFTLIB_SINGLE_C_COMPILE_FLAGS})
+  set(c_compile_flags ${ASHLS_C_COMPILE_FLAGS})
   set(link_flags)
 
   set(library_search_subdir "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
   set(library_search_directories
-      "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
-      "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
-      "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+    "${SWIFTLIB_DIR}/${ASHLS_SUBDIR}"
+    "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${ASHLS_SUBDIR}"
+    "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
 
   # In certain cases when building, the environment variable SDKROOT is set to override
   # where the sdk root is located in the system. If that environment variable has been
@@ -840,7 +837,7 @@ function(_add_swift_host_library_single target)
   endif()
 
   _add_variant_c_compile_flags(
-  SDK "${SWIFT_HOST_VARIANT_SDK}"
+    SDK "${SWIFT_HOST_VARIANT_SDK}"
     ARCH "${SWIFT_HOST_VARIANT_ARCH}"
     BUILD_TYPE ${CMAKE_BUILD_TYPE}
     ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS}
@@ -874,9 +871,9 @@ function(_add_swift_host_library_single target)
       ${${SWIFT_HOST_VARIANT_ARCH}_INCLUDE})
 
     if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
-      swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
+      swift_windows_get_sdk_vfs_overlay(ASHLS_VFS_OVERLAY)
       target_compile_options(${target} PRIVATE
-        "SHELL:-Xclang -ivfsoverlay -Xclang ${SWIFTLIB_SINGLE_VFS_OVERLAY}")
+        "SHELL:-Xclang -ivfsoverlay -Xclang ${ASHLS_VFS_OVERLAY}")
 
       # MSVC doesn't support -Xclang. We don't need to manually specify
       # the dependent libraries as `cl` does so.
