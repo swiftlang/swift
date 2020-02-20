@@ -673,7 +673,6 @@ endfunction()
 # Usage:
 #   _add_swift_host_library_single(
 #     target
-#     name
 #     [SHARED]
 #     [STATIC]
 #     [SDK sdk]
@@ -683,9 +682,6 @@ endfunction()
 #     source1 [source2 source3 ...])
 #
 # target
-#   Name of the target (e.g., swiftParse-IOS-armv7).
-#
-# name
 #   Name of the library (e.g., swiftParse).
 #
 # SHARED
@@ -708,7 +704,7 @@ endfunction()
 #
 # source1 ...
 #   Sources to add into this library
-function(_add_swift_host_library_single target name)
+function(_add_swift_host_library_single target)
   set(SWIFTLIB_SINGLE_options
         SHARED
         STATIC)
@@ -804,11 +800,11 @@ function(_add_swift_host_library_single target name)
       # building on a non-DLL platform (not windows), create an imported target
       # for the library which created implicitly by the dll.
       add_custom_command_target(${target}_IMPORT_LIBRARY
-                                OUTPUT "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/${name}.lib"
+                                OUTPUT "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/${target}.lib"
                                 DEPENDS "${target}")
       add_library(${target}_IMPLIB SHARED IMPORTED GLOBAL)
       set_property(TARGET "${target}_IMPLIB" PROPERTY
-          IMPORTED_LOCATION "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/${name}.lib")
+          IMPORTED_LOCATION "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/${target}.lib")
       add_dependencies(${target}_IMPLIB ${${target}_IMPORT_LIBRARY})
     endif()
     set_property(TARGET "${target}" PROPERTY NO_SONAME ON)
@@ -849,7 +845,7 @@ function(_add_swift_host_library_single target name)
   set_target_properties(${target}
       PROPERTIES
       # Library name (without the variant information)
-      OUTPUT_NAME ${name})
+      OUTPUT_NAME ${target})
 
   # Handle linking and dependencies.
   add_dependencies_multiple_targets(
@@ -1019,7 +1015,6 @@ function(add_swift_host_library name)
   endif()
 
   _add_swift_host_library_single(
-    ${name}
     ${name}
     ${ASHL_SHARED_keyword}
     ${ASHL_STATIC_keyword}
