@@ -2396,20 +2396,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
       auto *attr = cast<DifferentiableAttr>(DA);
 
-      IdentifierID jvpName = 0;
-      DeclID jvpRef = 0;
-      if (auto jvp = attr->getJVP())
-        jvpName = S.addDeclBaseNameRef(jvp->Name.getBaseName());
-      if (auto jvpFunction = attr->getJVPFunction())
-        jvpRef = S.addDeclRef(jvpFunction);
-
-      IdentifierID vjpName = 0;
-      DeclID vjpRef = 0;
-      if (auto vjp = attr->getVJP())
-        vjpName = S.addDeclBaseNameRef(vjp->Name.getBaseName());
-      if (auto vjpFunction = attr->getVJPFunction())
-        vjpRef = S.addDeclRef(vjpFunction);
-
       auto paramIndices = attr->getParameterIndices();
       // NOTE(TF-836): `@differentiable` attribute serialization is blocked by
       // `@differentiable` attribute type-checking (TF-828), which resolves
@@ -2423,7 +2409,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-          attr->isLinear(), jvpName, jvpRef, vjpName, vjpRef,
+          attr->isLinear(),
           S.addGenericSignatureRef(attr->getDerivativeGenericSignature()),
           indices);
       return;
