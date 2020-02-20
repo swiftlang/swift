@@ -56,6 +56,10 @@ public:
     /// Mutually exclusive with Exported.
     ImplementationOnly = 0x8,
 
+    // The module is imported to have access to named SPIs which is an
+    // implementation detail of this file.
+    SPIAccessControl = 0x10,
+
     /// Used for DenseMap.
     Reserved = 0x80
   };
@@ -66,11 +70,18 @@ public:
   struct ImportedModuleDesc {
     ModuleDecl::ImportedModule module;
     ImportOptions importOptions;
+
+    // Filename for a @_private import.
     StringRef filename;
 
+    // Names of explicitly imported SPIs.
+    ArrayRef<Identifier> spiGroups;
+
     ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options,
-                       StringRef filename = {})
-        : module(module), importOptions(options), filename(filename) {
+                       StringRef filename = {},
+                       ArrayRef<Identifier> spiGroups = {})
+        : module(module), importOptions(options), filename(filename),
+          spiGroups(spiGroups) {
       assert(!(importOptions.contains(ImportFlags::Exported) &&
                importOptions.contains(ImportFlags::ImplementationOnly)) ||
              importOptions.contains(ImportFlags::Reserved));
@@ -271,6 +282,15 @@ public:
   }
 
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
+
+  /// Find all SPI names imported from \p importedModule by this file,
+  /// collecting the identifiers in \p spiGroups.
+  virtual void
+  lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                         SmallVectorImpl<Identifier> &spiGroups) const override;
+
+  // Is \p targetDecl accessible as an explictly imported SPI from this file?
+  bool isImportedAsSPI(const ValueDecl *targetDecl) const;
 
   bool shouldCrossImport() const;
 

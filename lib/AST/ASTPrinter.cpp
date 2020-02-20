@@ -100,7 +100,8 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
 }
 
 PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
-                                                   bool printFullConvention) {
+                                                   bool printFullConvention,
+                                                   bool printSPIs) {
   PrintOptions result;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
@@ -120,6 +121,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
+  result.PrintSPIs = printSPIs;
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
@@ -143,7 +145,8 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
       if (D->getAttrs().hasAttribute<ImplementationOnlyAttr>())
         return false;
 
-      // Skip anything that isn't 'public' or '@usableFromInline'.
+      // Skip anything that isn't 'public' or '@usableFromInline',
+      // or SPI if desired.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         if (!isPublicOrUsableFromInline(VD)) {
           // We do want to print private stored properties, without their
@@ -151,6 +154,12 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
           if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD))
             if (contributesToParentTypeStorage(ASD))
               return true;
+
+          // Always print SPI decls if `PrintSPIs`.
+          if (options.PrintSPIs &&
+              VD->getAttrs().hasAttribute<SPIAccessControlAttr>())
+            return true;
+
           return false;
         }
       }

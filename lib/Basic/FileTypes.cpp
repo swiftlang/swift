@@ -80,6 +80,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_ModuleTrace:
   case file_types::TY_OptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_PrivateSwiftModuleInterfaceFile:
   case file_types::TY_SwiftOverlayFile:
     return true;
   case file_types::TY_Image:
@@ -147,6 +148,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_ModuleTrace:
   case file_types::TY_OptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_PrivateSwiftModuleInterfaceFile:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
@@ -179,6 +181,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_SwiftModuleFile:
   case file_types::TY_SwiftModuleDocFile:
   case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_PrivateSwiftModuleInterfaceFile:
   case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SwiftCrossImportDir:
   case file_types::TY_SwiftOverlayFile:
