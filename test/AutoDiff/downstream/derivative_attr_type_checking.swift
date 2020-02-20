@@ -21,17 +21,17 @@ func vjpSinExplicitWrt(x: Float) -> (value: Float, pullback: (Float) -> Float) {
 func vjpDuplicate(x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
 }
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple of type '(value: T..., pullback: (U.TangentVector) -> T.TangentVector...)' or '(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'}}
+// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple; first element must have label 'value:' and second element must have label 'pullback:' or 'differential:'}}
 @derivative(of: sin)
 func jvpSinResultInvalid(x: @noDerivative Float) -> Float {
   return x
 }
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple (second element must have label 'pullback:' or 'differential:')}}
+// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple; second element must have label 'pullback:' or 'differential:'}}
 @derivative(of: sin)
 func vjpSinResultWrongLabel(x: Float) -> (value: Float, (Float) -> Float) {
   return (x, { $0 })
 }
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple (first element type 'Int' must conform to 'Differentiable')}}
+// expected-error @+1 {{could not find function 'sin' with expected type '(Int) -> Int'}}
 @derivative(of: sin)
 func vjpSinResultNotDifferentiable(x: Int) -> (value: Int, pullback: (Int) -> Int) {
   return (x, { $0 })
@@ -50,7 +50,7 @@ func generic<T : Differentiable>(_ x: T, _ y: T) -> T {
 func jvpGeneric<T : Differentiable>(x: T, y: T) -> (value: T, differential: (T.TangentVector, T.TangentVector) -> T.TangentVector) {
   return (x, { $0 + $1 })
 }
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple (second element must have label 'pullback:' or 'differential:')}}
+// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple; second element must have label 'pullback:' or 'differential:'}}
 @derivative(of: generic)
 func vjpGenericWrongLabel<T : Differentiable>(x: T, y: T) -> (value: T, (T) -> (T, T)) {
   return (x, { ($0, $0) })
