@@ -45,28 +45,43 @@ class TensorFlowSwiftAPIs(product.Product):
         else:
             raise RuntimeError("Unknown host target %s" % host_target)
 
-        shell.call([
-            self.toolchain.cmake,
-            '-G', 'Ninja',
-            '-D', 'BUILD_SHARED_LIBS=YES',
-            '-D', 'CMAKE_INSTALL_PREFIX={}/usr'.format(
-                self.args.install_destdir),
-            '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
-            '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
-            '-D', 'TensorFlow_INCLUDE_DIR={}'.format(tensorflow_source_dir),
-            '-D', 'TensorFlow_LIBRARY={}'.format(
-                os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow',
-                             lib_name)),
-            '-D', 'CMAKE_Swift_FLAGS={}'.format('-L{}'.format(
-                os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow'))
-            ),
-            '-B', self.build_dir,
-            '-S', self.source_dir,
-        ])
-        shell.call([
-            self.toolchain.cmake,
-            '--build', self.build_dir,
-        ])
+        # FIXME: this is a workaround for CMake <3.16 which does not correctly
+        # generate the build rules if you are not in the build directory.  As a
+        # result, we need to create the build tree before we can use it and
+        # change into it.
+        #
+        # NOTE: unfortunately, we do not know if the build is using Python
+        # 2.7 or Python 3.2+.  In the latter, the `exist_ok` named parameter
+        # would alleviate some of this issue.
+        try:
+            os.makedirs(self.build_dir)
+        except OSError:
+            pass
+
+        with shell.pushd(self.build_dir):
+
+            shell.call([
+                self.toolchain.cmake,
+                '-G', 'Ninja',
+                '-D', 'BUILD_SHARED_LIBS=YES',
+                '-D', 'CMAKE_INSTALL_PREFIX={}/usr'.format(
+                    self.args.install_destdir),
+                '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
+                '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
+                '-D', 'TensorFlow_INCLUDE_DIR={}'.format(tensorflow_source_dir),
+                '-D', 'TensorFlow_LIBRARY={}'.format(
+                    os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow',
+                                 lib_name)),
+                '-D', 'CMAKE_Swift_FLAGS={}'.format('-L{}'.format(
+                    os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow'))
+                ),
+                '-B', self.build_dir,
+                '-S', self.source_dir,
+            ])
+            shell.call([
+                self.toolchain.cmake,
+                '--build', self.build_dir,
+            ])
 
     def should_test(self, host_target):
         return False
