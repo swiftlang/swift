@@ -13,8 +13,9 @@
 #ifndef MOCKING_FINE_GRAINED_DEPENDENCY_GRAPHS_H
 #define MOCKING_FINE_GRAINED_DEPENDENCY_GRAPHS_H
 
+#include "UnitTestSourceFileDepGraphFactory.h"
+#include "swift/AST/AbstractSourceFileDepGraphFactory.h"
 #include "swift/AST/FineGrainedDependencies.h"
-#include "swift/AST/SourceFileDepGraphConstructor.h"
 #include "swift/Driver/FineGrainedDependencyDriverGraph.h"
 
 namespace swift {
