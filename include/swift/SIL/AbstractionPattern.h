@@ -200,11 +200,11 @@ class AbstractionPattern {
     /// A Swift function whose parameters are opaque and whose result is the
     /// tuple abstraction pattern `(AP::Opaque, AP::OpaqueFunction)`.
     ///
-    /// Purpose. When we reabstract `differentiable_function` using the
-    /// `AP::Opaque` pattern, we use `AP::Opaque` to reabstract the original
-    /// function in the bundle and we use `AP::OpaqueDerivativeFunction` to
+    /// Purpose: when we reabstract `@differentiable` function-typed values
+    /// using the`AP::Opaque` pattern, we use `AP::Opaque` to reabstract the
+    /// original function in the bundle and `AP::OpaqueDerivativeFunction` to
     /// reabstract the derivative functions in the bundle. This preserves the
-    /// `differentiable_function` invariant that the derivative type
+    /// `@differentiable` function invariant that the derivative type
     /// (`SILFunctionType::getAutoDiffDerivativeFunctionType()`) of the original
     /// function is equal to the type of the derivative function. For example:
     ///
@@ -222,7 +222,7 @@ class AbstractionPattern {
     ///       )
     ///     }
     ///
-    /// The invariant-respecting abstraction of this bundle to `AP::Opaque` is:
+    /// The invariant-respecting abstraction of this value to `AP::Opaque` is:
     ///
     ///   differentiable_function
     ///     [parameters 0]
