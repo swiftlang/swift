@@ -722,7 +722,7 @@ function(_add_swift_host_library_single target)
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
   set(embed_bitcode_arg)
   if(SWIFT_EMBED_BITCODE_SECTION)
-    if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "IOS" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "TVOS" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WATCHOS")
+    if(SWIFT_HOST_VARIANT_SDK MATCHES "(I|TV|WATCH)OS")
       list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
       set(embed_bitcode_arg EMBED_BITCODE)
     endif()
