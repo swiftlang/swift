@@ -2376,10 +2376,10 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
   }
 }
 
-llvm::Expected<ConstructorDecl *>
-TypeEraserInitializerRequest::evaluate(Evaluator &evaluator,
-                                       TypeEraserAttr *attr,
-                                       ProtocolDecl *protocol) const {
+llvm::Expected<bool>
+TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
+                                         TypeEraserAttr *attr,
+                                         ProtocolDecl *protocol) const {
   auto &ctx = protocol->getASTContext();
   auto &diags = ctx.Diags;
   TypeLoc &typeEraserLoc = attr->getTypeEraserLoc();
@@ -2390,19 +2390,19 @@ TypeEraserInitializerRequest::evaluate(Evaluator &evaluator,
   // Get the NominalTypeDecl for the type eraser.
   Type typeEraser = typeEraserLoc.getType();
   if (!typeEraser && typeEraserRepr) {
-    auto resolution = TypeResolution::forContextual(dc);
+    auto resolution = TypeResolution::forContextual(protocol);
     typeEraser = resolution.resolveType(typeEraserRepr, /*options=*/None);
     typeEraserLoc.setType(typeEraser);
   }
 
   if (typeEraser->hasError())
-    return nullptr;
+    return false;
 
   // 1. The type eraser must be a concrete nominal type
   auto nominalTypeDecl = typeEraser->getAnyNominal();
   if (!nominalTypeDecl || isa<ProtocolDecl>(nominalTypeDecl)) {
     diags.diagnose(typeEraserLoc.getLoc(), diag::non_nominal_type_eraser);
-    return nullptr;
+    return false;
   }
 
   // 2. The type eraser must conform to the annotated protocol
@@ -2412,61 +2412,84 @@ TypeEraserInitializerRequest::evaluate(Evaluator &evaluator,
     diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_does_not_conform,
                    typeEraser, protocolType);
     diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
-    return nullptr;
+    return false;
   }
 
   // 3. The type eraser must have an init of the form init<T: Protocol>(erasing: T)
   auto lookupResult = TypeChecker::lookupMember(dc, typeEraser,
                                                 DeclNameRef::createConstructor());
-  auto match = llvm::find_if(lookupResult, [&](const LookupResultEntry &entry) {
+  bool foundMatch = llvm::any_of(lookupResult, [&](const LookupResultEntry &entry) {
     auto *init = cast<ConstructorDecl>(entry.getValueDecl());
-    if (!init->isGeneric() || init->getGenericParams()->size() != 1)
+    if (init->isFailable() || !init->isGeneric() ||
+        init->getGenericParams()->size() != 1)
       return false;
 
-    GenericTypeParamDecl *genericParam = *init->getGenericParams()->begin();
-    auto genericParamType = genericParam->getDeclaredInterfaceType();
+    auto genericSignature = init->getGenericSignature();
+    auto genericParamType = genericSignature->getInnermostGenericParams().front();
 
     // Fow now, only allow one parameter.
     auto params = init->getParameters();
     if (params->size() != 1)
       return false;
 
-    // The parameter must be labeled with 'erasing'
+    // The parameter must have the form `erasing: T` where T conforms to the protocol.
     ParamDecl *param = *init->getParameters()->begin();
     if (param->getArgumentName() != ctx.Id_erasing ||
-        !param->getInterfaceType()->isEqual(genericParamType))
+        !param->getInterfaceType()->isEqual(genericParamType) ||
+        !genericSignature->conformsToProtocol(genericParamType, protocol))
       return false;
 
-    // For now, only allow one requirement.
-    auto requirements = init->getGenericRequirements();
-    if (requirements.size() != 1)
-      return false;
+    // Allow other constraints as long as the init can be called with any
+    // type conforming to the annotated protocol. We will check this by
+    // substituting the protocol's Self type for the generic arg and check that
+    // the requirements in the generic signature are satisfied.
+    auto baseMap =
+        typeEraser->getContextSubstitutionMap(nominalTypeDecl->getParentModule(),
+                                              nominalTypeDecl);
+    QuerySubstitutionMap getSubstitution{baseMap};
+    auto subMap = genericSignature->getIdentitySubstitutionMap().subst(
+        [&](SubstitutableType *type) -> Type {
+          if (type->isEqual(genericParamType))
+            return protocol->getSelfTypeInContext();
 
-    return requirements.front() == Requirement(RequirementKind::Conformance,
-                                               genericParamType, protocolType);
+          return getSubstitution(type);
+        }, TypeChecker::LookUpConformance(dc));
+
+    // Listener to suppress diagnostics while checking if the generic
+    // requirements are satisfied.
+    class Listener : public GenericRequirementsCheckListener {
+      bool diagnoseUnsatisfiedRequirement(
+          const Requirement &req, Type first, Type second,
+          ArrayRef<ParentConditionalConformance> parents) override {
+        return true;
+      }
+    } listener;
+
+    auto loc = attr->getLocation();
+    auto result = TypeChecker::checkGenericArguments(
+          protocol, loc, loc, typeEraser,
+          genericSignature->getGenericParams(),
+          genericSignature->getRequirements(),
+          QuerySubstitutionMap{subMap},
+          TypeChecker::LookUpConformance(dc),
+          None, &listener);
+    return result == RequirementCheckResult::Success;
   });
 
-  if (match == lookupResult.end()) {
+  if (!foundMatch) {
     diags.diagnose(attr->getLocation(), diag::type_eraser_missing_init,
                    typeEraser, protocolType);
     diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
-    return nullptr;
+    return false;
   }
 
-  auto *init = cast<ConstructorDecl>(match->getValueDecl());
-  if (init->isFailable()) {
-    diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_failable_init);
-    diags.diagnose(init->getLoc(), diag::type_eraser_init_declared_here);
-    return nullptr;
-  }
-
-  return init;
+  return true;
 }
 
 void AttributeChecker::visitTypeEraserAttr(TypeEraserAttr *attr) {
   assert(isa<ProtocolDecl>(D));
   // Invoke the request.
-  (void)attr->getTypeEraserInit(cast<ProtocolDecl>(D));
+  (void)attr->hasViableTypeEraserInit(cast<ProtocolDecl>(D));
 }
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {

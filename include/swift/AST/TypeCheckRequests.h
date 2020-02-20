@@ -2054,10 +2054,10 @@ public:
   void cacheResult(IndexSubset *value) const;
 };
 
-/// Retrieves the type eraser initializer for a \c @_typeEraser() attribute.
-class TypeEraserInitializerRequest
-    : public SimpleRequest<TypeEraserInitializerRequest,
-                           ConstructorDecl *(TypeEraserAttr *, ProtocolDecl *),
+/// Checks whether a type eraser has a viable initializer.
+class TypeEraserHasViableInitRequest
+    : public SimpleRequest<TypeEraserHasViableInitRequest,
+                           bool(TypeEraserAttr *, ProtocolDecl *),
                            CacheKind::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2066,9 +2066,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation
-  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
-                                             TypeEraserAttr *attr,
-                                             ProtocolDecl *protocol) const;
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, TypeEraserAttr *attr,
+                                ProtocolDecl *protocol) const;
 
 public:
   bool isCached() const { return true; }

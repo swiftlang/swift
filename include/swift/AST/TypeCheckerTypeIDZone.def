@@ -46,8 +46,8 @@ SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
 SWIFT_REQUEST(TypeChecker, DifferentiableAttributeTypeCheckRequest,
               IndexSubset *(DifferentiableAttr *),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, TypeEraserInitializerRequest,
-              ConstructorDecl *(TypeEraserAttr *, ProtocolDecl *),
+SWIFT_REQUEST(TypeChecker, TypeEraserHasViableInitRequest,
+              bool(TypeEraserAttr *, ProtocolDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DynamicallyReplacedDeclRequest,
               ValueDecl *(ValueDecl *),

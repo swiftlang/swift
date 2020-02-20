@@ -9,6 +9,16 @@ class AnyP: P1 {
 @_typeEraser(AnyP) // okay
 protocol P1 {}
 
+class AnyCollection<Element> : Collection {
+  typealias Element = Element
+  init<C: Collection>(erasing c: C) where Element == C.Element {}
+}
+
+@_typeEraser(AnyCollection<Self.Element>)
+protocol Collection {
+  associatedtype Element
+}
+
 // MARK: - Parsing Errors
 
 @_typeEraser // expected-error {{expected '(' in '_typeEraser' attribute}}
@@ -79,8 +89,8 @@ class NoLabel: D5 { // expected-note {{type eraser declared here}}
 @_typeEraser(NoLabel) // expected-error {{type eraser 'NoLabel' must have an initializer of the form 'init<T: 'D5'>(erasing: T)'}}
 protocol D5 {}
 
-class FailableInit: D6 {
-  init?<T: D6>(erasing t: T) {} // expected-note {{type eraser initializer declared here}}
+class FailableInit: D6 { // expected-note {{type eraser declared here}}
+  init?<T: D6>(erasing t: T) {}
 }
-@_typeEraser(FailableInit) // expected-error {{type eraser initializer must not be failable}}
+@_typeEraser(FailableInit) // expected-error {{type eraser 'FailableInit' must have an initializer of the form 'init<T: 'D6'>(erasing: T)'}}
 protocol D6 {}

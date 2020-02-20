@@ -4423,13 +4423,9 @@ ERROR(type_eraser_does_not_conform,none,
 ERROR(type_eraser_missing_init,none,
       "type eraser %0 must have an initializer of the form "
       "'init<T: %1>(erasing: T)'", (Type, Type))
-ERROR(type_eraser_failable_init,none,
-      "type eraser initializer must not be failable",())
 
 NOTE(type_eraser_declared_here,none,
      "type eraser declared here",())
-NOTE(type_eraser_init_declared_here,none,
-     "type eraser initializer declared here",())
 
 //------------------------------------------------------------------------------
 // MARK: @available
