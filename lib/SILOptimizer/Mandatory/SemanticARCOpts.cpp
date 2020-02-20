@@ -113,11 +113,10 @@ LiveRange::LiveRange(SILValue value)
       continue;
     }
 
-    // Otherwise, we have some form of consuming use that either forwards or
-    // that we do not understand. See if we have a forwarding value that has a
-    // single non-trivial operand that can accept a guaranteed value. If not, we
-    // can not recursively process it, so be conservative and assume that we
-    // /may consume/ the value, so the live range must not be eliminated.
+    // Otherwise, see if we have a forwarding value that has a single
+    // non-trivial operand that can accept a guaranteed value. If not, we can
+    // not recursively process it, so be conservative and assume that we /may
+    // consume/ the value, so the live range must not be eliminated.
     //
     // DISCUSSION: For now we do not support forwarding instructions with
     // multiple non-trivial arguments since we would need to optimize all of
@@ -125,7 +124,9 @@ LiveRange::LiveRange(SILValue value)
     //
     // NOTE: Today we do not support TermInsts for simplicity... we /could/
     // support it though if we need to.
-    if (isa<TermInst>(user) || !isGuaranteedForwardingInst(user) ||
+    auto *ti = dyn_cast<TermInst>(user);
+    if ((ti && !ti->isTransformationTerminator()) ||
+        !isGuaranteedForwardingInst(user) ||
         1 != count_if(user->getOperandValues(
                           true /*ignore type dependent operands*/),
                       [&](SILValue v) {
@@ -137,13 +138,39 @@ LiveRange::LiveRange(SILValue value)
     }
 
     // Ok, this is a forwarding instruction whose ownership we can flip from
-    // owned -> guaranteed. Visit its users recursively to see if the the
-    // users force the live range to be alive.
+    // owned -> guaranteed.
     generalForwardingInsts.push_back(user);
-    for (SILValue v : user->getResults()) {
-      if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
+
+    // If we have a non-terminator, just visit its users recursively to see if
+    // the the users force the live range to be alive.
+    if (!ti) {
+      for (SILValue v : user->getResults()) {
+        if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
+          continue;
+        llvm::copy(v->getUses(), std::back_inserter(worklist));
+      }
+      continue;
+    }
+
+    // Otherwise, we know that we have no only a terminator, but a
+    // transformation terminator, so we should add the users of its results to
+    // the worklist.
+    for (auto &succ : ti->getSuccessors()) {
+      auto *succBlock = succ.getBB();
+
+      // If we do not have any arguments, then continue.
+      if (succBlock->args_empty())
         continue;
-      llvm::copy(v->getUses(), std::back_inserter(worklist));
+
+      for (auto *succArg : succBlock->getSILPhiArguments()) {
+        // If we have an any value, just continue.
+        if (succArg->getOwnershipKind() == ValueOwnershipKind::None)
+          continue;
+
+        // Otherwise add all users of this BBArg to the worklist to visit
+        // recursively.
+        llvm::copy(succArg->getUses(), std::back_inserter(worklist));
+      }
     }
   }
 }
@@ -525,8 +552,28 @@ static void convertForwardingInstsFromOwnedToGuaranteed(
   while (!guaranteedForwardingInsts.empty()) {
     auto *i = guaranteedForwardingInsts.back();
     guaranteedForwardingInsts = guaranteedForwardingInsts.drop_back();
-    assert(i->hasResults());
 
+    // If this is a term inst, just convert all of its incoming values that are
+    // owned to be guaranteed.
+    if (auto *ti = dyn_cast<TermInst>(i)) {
+      for (auto &succ : ti->getSuccessors()) {
+        auto *succBlock = succ.getBB();
+
+        // If we do not have any arguments, then continue.
+        if (succBlock->args_empty())
+          continue;
+
+        for (auto *succArg : succBlock->getSILPhiArguments()) {
+          // If we have an any value, just continue.
+          if (succArg->getOwnershipKind() == ValueOwnershipKind::Owned) {
+            succArg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+          }
+        }
+      }
+      continue;
+    }
+
+    assert(i->hasResults());
     for (SILValue result : i->getResults()) {
       if (auto *svi = dyn_cast<OwnershipForwardingSingleValueInst>(result)) {
         if (svi->getOwnershipKind() == ValueOwnershipKind::Owned) {

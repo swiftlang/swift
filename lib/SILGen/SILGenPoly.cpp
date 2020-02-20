@@ -3350,16 +3350,12 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
         return cast<AnyFunctionType>(assocTy->getCanonicalType());
       };
   auto getDerivativeFnPattern =
-      [&](AbstractionPattern pattern, AutoDiffDerivativeFunctionKind kind)
-          -> AbstractionPattern {
-        // If pattern does not store an `AnyFunctionType`, return original
-        // pattern. This logic handles opaque abstraction patterns.
-        auto patternType = pattern.getAs<AnyFunctionType>();
-        if (!patternType)
-          return pattern;
-        return AbstractionPattern(
-            pattern.getGenericSignature(), getDerivativeFnTy(patternType, kind));
-      };
+      [&](AbstractionPattern pattern,
+          AutoDiffDerivativeFunctionKind kind) -> AbstractionPattern {
+    return pattern.getAutoDiffDerivativeFunctionType(
+        parameterIndices, /*resultIndex*/ 0, kind,
+        LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+  };
   auto createDerivativeFnThunk =
       [&](AutoDiffDerivativeFunctionKind kind) -> ManagedValue {
     auto derivativeFnInputOrigType =

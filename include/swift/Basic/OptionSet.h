@@ -88,7 +88,7 @@ public:
   }
 
   /// Check if this option set contains the exact same options as the given set.
-  bool containsOnly(OptionSet set) {
+  bool containsOnly(OptionSet set) const {
     return Storage == set.Storage;
   }
 

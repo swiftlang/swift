@@ -1296,11 +1296,43 @@ visitUnreachableInst(UnreachableInst *UI) {
 /// (load (unchecked_take_enum_data_addr x)) -> (unchecked_enum_data (load x))
 ///
 /// FIXME: Implement this for address projections.
+///
+/// Also remove dead unchecked_take_enum_data_addr:
+///   (destroy_addr (unchecked_take_enum_data_addr x)) -> (destroy_addr x)
 SILInstruction *
 SILCombiner::
 visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
   // If our TEDAI has no users, there is nothing to do.
   if (TEDAI->use_empty())
+    return nullptr;
+
+  bool onlyLoads = true;
+  bool onlyDestroys = true;
+  for (auto U : getNonDebugUses(TEDAI)) {
+    // Check if it is load. If it is not a load, bail...
+    if (!isa<LoadInst>(U->getUser()))
+      onlyLoads = false;
+    if (!isa<DestroyAddrInst>(U->getUser()))
+      onlyDestroys = false;
+  }
+  
+  if (onlyDestroys) {
+    // The unchecked_take_enum_data_addr is dead: remove it and replace all
+    // destroys with a destroy of its operand.
+    while (!TEDAI->use_empty()) {
+      Operand *use = *TEDAI->use_begin();
+      SILInstruction *user = use->getUser();
+      if (auto *dai = dyn_cast<DestroyAddrInst>(user)) {
+        dai->setOperand(TEDAI->getOperand());
+      } else {
+        assert(user->isDebugInstruction());
+        eraseInstFromFunction(*user);
+      }
+    }
+    return eraseInstFromFunction(*TEDAI);
+  }
+
+  if (!onlyLoads)
     return nullptr;
 
   // If our enum type is address only, we cannot do anything here. The key
@@ -1309,12 +1341,6 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
   // TEDAI without the TEDAI being loadable itself.
   if (TEDAI->getOperand()->getType().isAddressOnly(*TEDAI->getFunction()))
     return nullptr;
-
-  // For each user U of the take_enum_data_addr...
-  for (auto U : getNonDebugUses(TEDAI))
-    // Check if it is load. If it is not a load, bail...
-    if (!isa<LoadInst>(U->getUser()))
-      return nullptr;
 
   // Grab the EnumAddr.
   SILLocation Loc = TEDAI->getLoc();

@@ -420,7 +420,7 @@ bool ModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
   case llvm::LockFileManager::LFS_Shared: {
     // Someone else is responsible for building the module. Wait for them to
     // finish.
-    switch (Locked.waitForUnlock()) {
+    switch (Locked.waitForUnlock(256)) {
     case llvm::LockFileManager::Res_Success: {
       // This process may have a different module output path. If the other
       // process doesn't build the interface to this output path, we should try

@@ -50,6 +50,7 @@ TYPE("autolink",            AutolinkFile,              "autolink",        "")
 TYPE("swiftmodule",         SwiftModuleFile,           "swiftmodule",     "")
 TYPE("swiftdoc",            SwiftModuleDocFile,        "swiftdoc",        "")
 TYPE("swiftinterface",      SwiftModuleInterfaceFile,  "swiftinterface",  "")
+TYPE("private-swiftinterface", PrivateSwiftModuleInterfaceFile,  "private.swiftinterface",  "")
 TYPE("swiftsourceinfo",     SwiftSourceInfoFile,       "swiftsourceinfo", "")
 TYPE("assembly",            Assembly,                  "s",               "")
 TYPE("raw-sil",             RawSIL,                    "sil",             "")
@@ -72,6 +73,13 @@ TYPE("module-trace",        ModuleTrace,               "trace.json",      "")
 
 TYPE("index-data",          IndexData,                 "",                "")
 TYPE("opt-record",          OptRecord,                 "opt.yaml",        "")
+
+// Overlay files declare wrapper modules, called "separately-imported overlays",
+// that should be automatically imported when a particular module is imported.
+// Cross-import directories conditionalize overlay files so they only take
+// effect when certain other modules are also loaded.
+TYPE("swiftcrossimport",    SwiftCrossImportDir,       "swiftcrossimport","")
+TYPE("swiftoverlay",        SwiftOverlayFile,          "swiftoverlay",    "")
 
 // Misc types
 TYPE("pcm",                 ClangModuleFile,           "pcm",             "")

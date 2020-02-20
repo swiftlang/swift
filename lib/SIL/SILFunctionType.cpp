@@ -231,27 +231,26 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     LookupConformanceFn lookupConformance,
     CanGenericSignature derivativeFnGenSig, bool isReabstractionThunk) {
   auto &ctx = getASTContext();
+  auto resultIndices = IndexSubset::get(ctx, getNumResults(), {resultIndex});
   SILAutoDiffDerivativeFunctionKey key{
-    this, parameterIndices,
-    IndexSubset::get(ctx, getNumResults(), {resultIndex}),
-    kind, derivativeFnGenSig, isReabstractionThunk
-  };
+      this, parameterIndices,   resultIndices,
+      kind, derivativeFnGenSig, isReabstractionThunk};
   auto insertion =
       ctx.SILAutoDiffDerivativeFunctions.try_emplace(key, CanSILFunctionType());
   auto &cachedResult = insertion.first->getSecond();
   if (!insertion.second)
     return cachedResult;
 
-  // Helper function testing if we are differentiating wrt this index.
-  auto isWrtIndex = [&](unsigned index) -> bool {
+  // Returns true if `index` is a differentiability parameter index.
+  auto isDiffParamIndex = [&](unsigned index) -> bool {
     return index < parameterIndices->getCapacity() &&
         parameterIndices->contains(index);
   };
 
-  // Calculate differentiation parameter infos.
+  // Calculate differentiability parameter infos.
   SmallVector<SILParameterInfo, 4> diffParams;
   for (auto valueAndIndex : enumerate(getParameters()))
-    if (isWrtIndex(valueAndIndex.index()))
+    if (isDiffParamIndex(valueAndIndex.index()))
       diffParams.push_back(valueAndIndex.value());
 
   // Get the "constrained" derivative function generic signature.
@@ -912,6 +911,12 @@ public:
          && !origType.requiresClass())
         || substTL.isAddressOnly()) {
       return true;
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Functions are always returned directly.
+    } else if (origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
+      return false;
+    // SWIFT_ENABLE_TENSORFLOW END
 
     // If the substitution didn't change the type, then a negative
     // response to the above is determinative as well.

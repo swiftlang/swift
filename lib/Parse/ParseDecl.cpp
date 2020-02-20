@@ -1689,6 +1689,39 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
+  case DAK_SPIAccessControl: {
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    SmallVector<Identifier, 4> spiGroups;
+
+    if (!Tok.is(tok::identifier) ||
+        Tok.isContextualKeyword("set")) {
+      diagnose(getEndOfPreviousLoc(), diag::attr_access_expected_spi_name);
+      consumeToken();
+      consumeIf(tok::r_paren);
+      return false;
+    }
+
+    auto text = Tok.getText();
+    spiGroups.push_back(Context.getIdentifier(text));
+    consumeToken();
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    AttrRange = SourceRange(Loc, Tok.getLoc());
+    Attributes.add(SPIAccessControlAttr::create(Context, AtLoc, AttrRange,
+                                                spiGroups));
+    break;
+  }
+
   case DAK_CDecl:
   case DAK_SILGenName: {
     if (!consumeIf(tok::l_paren)) {

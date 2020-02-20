@@ -4,8 +4,11 @@ protocol P {
   associatedtype A
 }
 
-func foo<T: P>(_: () throws -> T) -> T.A? { // expected-note {{where 'T' = 'Never'}}
+func foo<T: P>(_: () throws -> T) -> T.A? {
   fatalError()
 }
 
-let _ = foo() {fatalError()} & nil // expected-error {{global function 'foo' requires that 'Never' conform to 'P'}}
+// TODO(diagnostics): This expression is truly ambiguous because there is no conformance between `Never` and `P`
+// which means no associated type `A` and `nil` can't be an argument to any overload of `&` so we end
+// up generating at least 3 fixes per overload of `&`. But we could at least point to where the problems are.
+let _ = foo() {fatalError()} & nil // expected-error {{type of expression is ambiguous without more context}}

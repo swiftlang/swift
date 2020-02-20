@@ -550,6 +550,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableConcisePoundFile =
       Args.hasArg(OPT_enable_experimental_concise_pound_file);
 
+  Opts.EnableCrossImportOverlays =
+      Args.hasFlag(OPT_enable_cross_import_overlays,
+                   OPT_disable_cross_import_overlays,
+                   Opts.EnableCrossImportOverlays);
+
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   if (const Arg *A = Args.getLastArg(OPT_target)) {

@@ -375,6 +375,7 @@ public:
   /// mode, so return the ModuleInterfaceOutputPath when in that mode and
   /// fail an assert if not in that mode.
   std::string getModuleInterfaceOutputPathForWholeModule() const;
+  std::string getPrivateModuleInterfaceOutputPathForWholeModule() const;
 
   std::string getLdAddCFileOutputPathForWholeModule() const;
 

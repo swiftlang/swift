@@ -1000,7 +1000,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
 
   llvm::SmallString<256>
   ModPath{ BaseName.getName(file_types::TY_SwiftModuleFile) },
-  InPath{  BaseName.getName(file_types::TY_SwiftModuleInterfaceFile) };
+  InPath{  BaseName.getName(file_types::TY_SwiftModuleInterfaceFile) },
+  PrivateInPath{BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile)};
 
   // First check to see if the .swiftinterface exists at all. Bail if not.
   auto &fs = *Ctx.SourceMgr.getFileSystem();
@@ -1012,6 +1013,11 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
       return std::make_error_code(std::errc::not_supported);
     }
     return std::make_error_code(std::errc::no_such_file_or_directory);
+  }
+
+  // If present, use the private interface instead of the public one.
+  if (fs.exists(PrivateInPath)) {
+    InPath = PrivateInPath;
   }
 
   // Create an instance of the Impl to do the heavy lifting.
