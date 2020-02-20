@@ -1019,18 +1019,6 @@ func two9(x: Float, y: Float) -> Float {
   return x + y
 }
 
-// Inout 'wrt:' arguments.
-
-@differentiable(wrt: y) // expected-error {{cannot differentiate void function 'inout1(x:y:)'}}
-func inout1(x: Float, y: inout Float) -> Void {
-  let _ = x + y
-}
-
-@differentiable(wrt: y) // expected-error {{cannot differentiate with respect to 'inout' parameter ('inout Float')}}
-func inout2(x: Float, y: inout Float) -> Float {
-  let _ = x + y
-}
-
 // Test refining protocol requirements with `@differentiable` attribute.
 
 public protocol Distribution {
@@ -1156,6 +1144,42 @@ final class FinalClass: Differentiable {
   init(base: Float) {
     self.base = base
   }
+}
+
+// Test `inout` parameters.
+
+@differentiable(wrt: y)
+func inoutVoid(x: Float, y: inout Float) {}
+
+// expected-error @+1 {{cannot yet differentiate functions with more than one semantic result (formal function result or 'inout' parameter)}}
+@differentiable
+func multipleSemanticResults(_ x: inout Float) -> Float { x }
+
+// expected-error @+1 {{cannot yet differentiate functions with more than one semantic result (formal function result or 'inout' parameter)}}
+@differentiable(wrt: y)
+func swap(x: inout Float, y: inout Float) {}
+
+struct InoutParameters: Differentiable {
+  typealias TangentVector = DummyTangentVector
+  mutating func move(along _: TangentVector) {}
+}
+
+extension InoutParameters {
+  @differentiable
+  static func staticMethod(_ lhs: inout Self, rhs: Self) {}
+
+  // expected-error @+1 {{cannot yet differentiate functions with more than one semantic result (formal function result or 'inout' parameter)}}
+  @differentiable
+  static func multipleSemanticResults(_ lhs: inout Self, rhs: Self) -> Self {}
+}
+
+extension InoutParameters {
+  @differentiable
+  mutating func mutatingMethod(_ other: Self) {}
+
+  // expected-error @+1 {{cannot yet differentiate functions with more than one semantic result (formal function result or 'inout' parameter)}}
+  @differentiable
+  mutating func mutatingMethod(_ other: Self) -> Self {}
 }
 
 // Test unsupported accessors: `set`, `_read`, `_modify`.
