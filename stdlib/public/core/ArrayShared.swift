@@ -140,22 +140,16 @@ internal func _growArrayCapacity(_ capacity: Int) -> Int {
 
 @_alwaysEmitIntoClient
 internal func _growArrayCapacity(
-  oldCapacity: Int, minimumCapacity: Int, elementSize: Int, growForAppend: Bool
+  oldCapacity: Int, minimumCapacity: Int, elementSize: Int
 ) -> Int {
-  if growForAppend {
-    if oldCapacity < minimumCapacity {
-      if minimumCapacity * elementSize <= 128 {
-        return minimumCapacity
-      }
-      // When appending to a large array, grow exponentially.
-      return Swift.max(minimumCapacity, _growArrayCapacity(oldCapacity))
+  if oldCapacity < minimumCapacity {
+    if minimumCapacity * elementSize <= 128 {
+      return minimumCapacity
     }
-    return oldCapacity
+    // When appending to a large array, grow exponentially.
+    return Swift.max(minimumCapacity, _growArrayCapacity(oldCapacity))
   }
-  // If not for append, just use the specified capacity, ignoring oldCapacity.
-  // This means that we "shrink" the buffer in case minimumCapacity is less
-  // than oldCapacity.
-  return minimumCapacity
+  return oldCapacity
 }
 
 //===--- generic helpers --------------------------------------------------===//

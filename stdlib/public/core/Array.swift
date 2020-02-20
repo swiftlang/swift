@@ -1053,10 +1053,16 @@ extension Array: RangeReplaceableCollection {
   internal mutating func _createNewBuffer(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) {
-    let newCapacity = _growArrayCapacity(oldCapacity: _getCapacity(),
-      minimumCapacity: minimumCapacity,
-      elementSize: MemoryLayout<Element>.size,
-      growForAppend: growForAppend)
+    let newCapacity: Int
+    if growForAppend {
+      newCapacity = _growArrayCapacity(
+        oldCapacity: _getCapacity(),
+        minimumCapacity: minimumCapacity,
+        elementSize: MemoryLayout<Element>.size
+      )
+    } else {
+      newCapacity = minimumCapacity
+    }
     let count = _getCount()
     _internalInvariant(newCapacity >= count)
     

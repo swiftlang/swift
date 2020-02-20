@@ -977,8 +977,7 @@ extension ArraySlice: RangeReplaceableCollection {
     let newCapacity = _growArrayCapacity(
       oldCapacity: oldCapacity,
       minimumCapacity: newCount,
-      elementSize: MemoryLayout<Element>.size,
-      growForAppend: true
+      elementSize: MemoryLayout<Element>.size
     )
     self.reserveCapacity(newCapacity)
   }
