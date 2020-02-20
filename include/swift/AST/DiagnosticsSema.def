@@ -3054,6 +3054,22 @@ ERROR(derivative_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
 NOTE(derivative_attr_duplicate_note,none,
      "other attribute declared here", ())
+ERROR(derivative_attr_access_level_lower_than_original,none,
+      "derivative functions for "
+      "%select{private|fileprivate|internal|public or '@usableFromInline'|open}1 "
+      "original function %0 must also be "
+      "%select{private|fileprivate|internal|public or '@usableFromInline'|open}1, "
+      "but %2 is %select{private|fileprivate|internal|public|open}3",
+      (/*original*/ DeclName, /*original*/ AccessLevel,
+       /*derivative*/ DeclName, /*derivative*/ AccessLevel))
+ERROR(derivative_attr_access_level_higher_than_original,none,
+      "the original function of "
+      "%select{a private|a fileprivate|an internal|a public or '@usableFromInline'|an open}3 "
+      "derivative function must also be "
+      "%select{private|fileprivate|internal|public or '@usableFromInline'|open}3, "
+      "but %0 is %select{private|fileprivate|internal|public|open}1",
+      (/*original*/ DeclName, /*original*/ AccessLevel,
+       /*derivative*/ DeclName, /*derivative*/ AccessLevel))
 
 // @transpose
 ERROR(transpose_attr_invalid_linearity_parameter_or_result,none,

@@ -4540,6 +4540,37 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   }
   attr->setOriginalFunction(originalAFD);
 
+  // Returns true if:
+  // - Original function and derivative function has the same access level.
+  // - Original function is public and derivative function is internal
+  //   `@usableFromInline`. This is the only special case.
+  auto compatibleAccessLevels = [&]() {
+    if (originalAFD->getFormalAccess() == derivative->getFormalAccess())
+      return true;
+    return originalAFD->getFormalAccess() == AccessLevel::Public &&
+           derivative->getEffectiveAccess() == AccessLevel::Public;
+  };
+
+  // Check access level compatibility for original and derivative functions.
+  if (!compatibleAccessLevels()) {
+    auto diagID = diag::derivative_attr_access_level_higher_than_original;
+    AccessLevel originalAccess;
+    AccessLevel derivativeAccess;
+    if (originalAFD->getEffectiveAccess() < derivative->getEffectiveAccess()) {
+      originalAccess =
+          originalAFD->getFormalAccessScope().accessLevelForDiagnostics();
+      derivativeAccess = derivative->getEffectiveAccess();
+    } else {
+      diagID = diag::derivative_attr_access_level_lower_than_original;
+      originalAccess = originalAFD->getEffectiveAccess();
+      derivativeAccess =
+          derivative->getFormalAccessScope().accessLevelForDiagnostics();
+    }
+    diags.diagnose(originalName.Loc, diagID, originalAFD->getName(),
+                   originalAccess, derivative->getName(), derivativeAccess);
+    return true;
+  }
+
   // Get the resolved differentiability parameter indices.
   auto *resolvedDiffParamIndices = attr->getParameterIndices();
 
