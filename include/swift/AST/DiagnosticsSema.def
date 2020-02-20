@@ -4426,6 +4426,10 @@ ERROR(type_eraser_missing_init,none,
 
 NOTE(type_eraser_declared_here,none,
      "type eraser declared here",())
+NOTE(type_eraser_failable_init,none,
+     "'init(erasing:)' cannot be failable",())
+NOTE(type_eraser_init_unsatisfied_requirements,none,
+     "'init(erasing:)' has unsatisfied requirements",())
 
 //------------------------------------------------------------------------------
 // MARK: @available

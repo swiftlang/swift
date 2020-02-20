@@ -89,8 +89,14 @@ class NoLabel: D5 { // expected-note {{type eraser declared here}}
 @_typeEraser(NoLabel) // expected-error {{type eraser 'NoLabel' must have an initializer of the form 'init<T: 'D5'>(erasing: T)'}}
 protocol D5 {}
 
-class FailableInit: D6 { // expected-note {{type eraser declared here}}
-  init?<T: D6>(erasing t: T) {}
+class FailableInit: D6 {
+  init?<T: D6>(erasing t: T) {} // expected-note {{'init(erasing:)' cannot be failable}}
 }
 @_typeEraser(FailableInit) // expected-error {{type eraser 'FailableInit' must have an initializer of the form 'init<T: 'D6'>(erasing: T)'}}
 protocol D6 {}
+
+class UnsatisfiedReq: D7 {
+  init<T: D7>(erasing t: T) where T: Hashable {} // expected-note {{'init(erasing:)' has unsatisfied requirements}}
+}
+@_typeEraser(UnsatisfiedReq) // expected-error {{type eraser 'UnsatisfiedReq' must have an initializer of the form 'init<T: 'D7'>(erasing: T)'}}
+protocol D7 {}

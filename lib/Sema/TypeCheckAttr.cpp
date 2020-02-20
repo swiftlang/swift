@@ -2418,10 +2418,17 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
   // 3. The type eraser must have an init of the form init<T: Protocol>(erasing: T)
   auto lookupResult = TypeChecker::lookupMember(dc, typeEraser,
                                                 DeclNameRef::createConstructor());
+
+  // Keep track of unviable init candidates for diagnostics
+  enum class UnviableReason {
+    Failable,
+    UnsatisfiedRequirements,
+  };
+  SmallVector<std::pair<ConstructorDecl *, UnviableReason>, 2> unviable;
+
   bool foundMatch = llvm::any_of(lookupResult, [&](const LookupResultEntry &entry) {
     auto *init = cast<ConstructorDecl>(entry.getValueDecl());
-    if (init->isFailable() || !init->isGeneric() ||
-        init->getGenericParams()->size() != 1)
+    if (!init->isGeneric() || init->getGenericParams()->size() != 1)
       return false;
 
     auto genericSignature = init->getGenericSignature();
@@ -2455,31 +2462,49 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
           return getSubstitution(type);
         }, TypeChecker::LookUpConformance(dc));
 
-    // Listener to suppress diagnostics while checking if the generic
-    // requirements are satisfied.
-    class Listener : public GenericRequirementsCheckListener {
-      bool diagnoseUnsatisfiedRequirement(
-          const Requirement &req, Type first, Type second,
-          ArrayRef<ParentConditionalConformance> parents) override {
-        return true;
-      }
-    } listener;
-
-    auto loc = attr->getLocation();
+    // Use invalid 'SourceLoc's to suppress diagnostics.
     auto result = TypeChecker::checkGenericArguments(
-          protocol, loc, loc, typeEraser,
+          protocol, SourceLoc(), SourceLoc(), typeEraser,
           genericSignature->getGenericParams(),
           genericSignature->getRequirements(),
           QuerySubstitutionMap{subMap},
           TypeChecker::LookUpConformance(dc),
-          None, &listener);
-    return result == RequirementCheckResult::Success;
+          None);
+
+    if (result != RequirementCheckResult::Success) {
+      unviable.push_back({init, UnviableReason::UnsatisfiedRequirements});
+      return false;
+    }
+
+    if (init->isFailable()) {
+      unviable.push_back({init, UnviableReason::Failable});
+      return false;
+    }
+
+    return true;
   });
 
   if (!foundMatch) {
     diags.diagnose(attr->getLocation(), diag::type_eraser_missing_init,
                    typeEraser, protocolType);
-    diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
+    if (unviable.empty())
+      diags.diagnose(nominalTypeDecl->getLoc(),
+                     diag::type_eraser_declared_here);
+
+    for (auto &candidate: unviable) {
+      auto init = candidate.first;
+      auto reason = candidate.second;
+
+      switch (reason) {
+      case UnviableReason::Failable:
+        diags.diagnose(init->getLoc(), diag::type_eraser_failable_init);
+        break;
+      case UnviableReason::UnsatisfiedRequirements:
+        diags.diagnose(init->getLoc(),
+                       diag::type_eraser_init_unsatisfied_requirements);
+        break;
+      }
+    }
     return false;
   }
 
