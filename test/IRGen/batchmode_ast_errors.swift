@@ -9,3 +9,10 @@
 extension SomeClass : SomeProto {
   func conform() {}
 }
+
+func genericParam<T: WithAssoc>(_ t: T) {
+}
+
+func testBuggyGenericParam() {
+   genericParam(BuggyConformer())
+}

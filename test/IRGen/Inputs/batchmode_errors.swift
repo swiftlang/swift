@@ -12,3 +12,11 @@ class SomeClass {
   var x : AnotherClass2? = nil
 }
 
+protocol P {}
+protocol WithAssoc {
+  associatedtype AssocType : P
+}
+
+struct BuggyConformer : WithAssoc {
+  typealias AssocType = Int
+}
