@@ -179,6 +179,7 @@ AbstractionPattern::getOptional(AbstractionPattern object) {
   // SWIFT_ENABLE_TENSORFLOW
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
+  // SWIFT_ENABLE_TENSORFLOW END
     llvm_unreachable("cannot add optionality to non-type abstraction");
   case Kind::Opaque:
     return AbstractionPattern::getOpaque();
@@ -273,6 +274,7 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
   // SWIFT_ENABLE_TENSORFLOW
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
+  // SWIFT_ENABLE_TENSORFLOW END
     return false;
   case Kind::Opaque:
     return true;
@@ -341,6 +343,7 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   // SWIFT_ENABLE_TENSORFLOW
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
+  // SWIFT_ENABLE_TENSORFLOW END
     llvm_unreachable("function types are not tuples");
   case Kind::Opaque:
     return *this;
@@ -476,6 +479,7 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
                                                        getOpaqueFunction()};
     return getTuple(elements);
   }
+  // SWIFT_ENABLE_TENSORFLOW END
   llvm_unreachable("bad kind");
 }
 
@@ -609,6 +613,7 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     return getOpaque();
   case Kind::OpaqueDerivativeFunction:
     return getOpaque();
+  // SWIFT_ENABLE_TENSORFLOW END
   default:
     llvm_unreachable("does not have function parameters");
   }
@@ -641,6 +646,7 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
   // SWIFT_ENABLE_TENSORFLOW
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
+  // SWIFT_ENABLE_TENSORFLOW END
     llvm_unreachable("pattern for function or tuple cannot be for optional");
 
   case Kind::Opaque:
@@ -686,6 +692,7 @@ AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     return *this;
+  // SWIFT_ENABLE_TENSORFLOW END
   case Kind::Type:
     return AbstractionPattern(getGenericSignature(),
                               getType().getReferenceStorageReferent());
@@ -721,6 +728,7 @@ void AbstractionPattern::print(raw_ostream &out) const {
   case Kind::OpaqueDerivativeFunction:
     out << "AP::OpaqueDerivativeFunction";
     return;
+  // SWIFT_ENABLE_TENSORFLOW END
   case Kind::Type:
   case Kind::Discard:
     out << (getKind() == Kind::Type
@@ -891,6 +899,7 @@ const {
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("should not have an opaque derivative function pattern "
                      "matching a struct/enum type");
+  // SWIFT_ENABLE_TENSORFLOW END
   case Kind::PartialCurriedObjCMethodType:
   case Kind::CurriedObjCMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType:

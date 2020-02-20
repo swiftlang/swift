@@ -917,6 +917,7 @@ public:
     // Functions are always returned directly.
     } else if (origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
       return false;
+    // SWIFT_ENABLE_TENSORFLOW END
 
     // If the substitution didn't change the type, then a negative
     // response to the above is determinative as well.

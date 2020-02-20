@@ -248,6 +248,7 @@ class AbstractionPattern {
     /// - The reabstraction %2 => %5 similarly uses pattern
     ///   `AP::OpaqueDerivativeFunction`.
     OpaqueDerivativeFunction,
+    // SWIFT_ENABLE_TENSORFLOW END
   };
 
   class EncodedForeignErrorInfo {
@@ -300,6 +301,7 @@ class AbstractionPattern {
 
   // SWIFT_ENABLE_TENSORFLOW
   unsigned TheKind : 33 - NumOtherDataBits;
+  // SWIFT_ENABLE_TENSORFLOW END
   unsigned OtherData : NumOtherDataBits;
   CanType OrigType;
   union {
@@ -451,6 +453,7 @@ public:
   static AbstractionPattern getOpaqueDerivativeFunction() {
     return AbstractionPattern(Kind::OpaqueDerivativeFunction);
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   bool hasGenericSignature() const {
     switch (getKind()) {
@@ -473,6 +476,7 @@ public:
     // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
+    // SWIFT_ENABLE_TENSORFLOW END
       return false;
     }
     llvm_unreachable("Unhandled AbstractionPatternKind in switch");
@@ -806,6 +810,7 @@ public:
       llvm_unreachable("opaque function pattern has no type");
     case Kind::OpaqueDerivativeFunction:
       llvm_unreachable("opaque derivative function pattern has no type");
+    // SWIFT_ENABLE_TENSORFLOW END
     case Kind::ClangType:
     case Kind::CurriedObjCMethodType:
     case Kind::PartialCurriedObjCMethodType:
@@ -842,6 +847,7 @@ public:
     // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
+    // SWIFT_ENABLE_TENSORFLOW END
       llvm_unreachable("type cannot be replaced on pattern without type");
     case Kind::ClangType:
     case Kind::CurriedObjCMethodType:
@@ -880,6 +886,7 @@ public:
     // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
+    // SWIFT_ENABLE_TENSORFLOW END
       return false;
     case Kind::ClangType:
     case Kind::PartialCurriedObjCMethodType:
@@ -941,6 +948,7 @@ public:
     return (getKind() == Kind::OpaqueFunction ||
             getKind() == Kind::OpaqueDerivativeFunction);
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   EncodedForeignErrorInfo getEncodedForeignErrorInfo() const {
     assert(hasStoredForeignErrorInfo());
@@ -967,6 +975,7 @@ public:
     // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
+    // SWIFT_ENABLE_TENSORFLOW END
       return false;
     case Kind::PartialCurriedObjCMethodType:
     case Kind::CurriedObjCMethodType:
@@ -991,6 +1000,7 @@ public:
     // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
+    // SWIFT_ENABLE_TENSORFLOW END
       return typename CanTypeWrapperTraits<TYPE>::type();
     case Kind::ClangType:
     case Kind::PartialCurriedObjCMethodType:
@@ -1033,6 +1043,7 @@ public:
     // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
+    // SWIFT_ENABLE_TENSORFLOW END
       // We assume that the Clang type might provide additional structure.
       return false;
     case Kind::Type:
@@ -1063,6 +1074,7 @@ public:
     // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
+    // SWIFT_ENABLE_TENSORFLOW END
       return false;
     case Kind::Tuple:
       return true;
@@ -1091,6 +1103,7 @@ public:
     // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
+    // SWIFT_ENABLE_TENSORFLOW END
       llvm_unreachable("pattern is not a tuple");      
     case Kind::Tuple:
       return getNumTupleElements_Stored();
@@ -1136,8 +1149,9 @@ public:
       IndexSubset *indices, unsigned resultIndex,
       AutoDiffDerivativeFunctionKind kind,
       LookupConformanceFn lookupConformance,
-      GenericSignature whereClauseGenericSignature = GenericSignature(),
+      GenericSignature derivativeGenericSignature = GenericSignature(),
       bool makeSelfParamFirst = false);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(raw_ostream &OS) const;
