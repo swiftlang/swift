@@ -1195,7 +1195,7 @@ void IRGenModule::emitAutolinkInfo() {
                                  llvm::GlobalValue::PrivateLinkage,
                                  EntriesConstant, "_swift1_autolink_entries");
     var->setSection(".swift1_autolink_entries");
-    var->setAlignment(getPointerAlignment().getValue());
+    var->setAlignment(llvm::MaybeAlign(getPointerAlignment().getValue()));
 
     disableAddressSanitizer(*this, var);
     addUsedGlobal(var);

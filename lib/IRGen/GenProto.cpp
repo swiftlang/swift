@@ -2157,7 +2157,8 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
                                        initializer)
         : getAddrOfWitnessTable(conf, initializer));
     global->setConstant(isConstantWitnessTable(wt));
-    global->setAlignment(getWitnessTableAlignment().getValue());
+    global->setAlignment(
+        llvm::MaybeAlign(getWitnessTableAlignment().getValue()));
     tableSize = wtableBuilder.getTableSize();
   } else {
     initializer.abandon();

@@ -530,7 +530,7 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
   auto var = new llvm::GlobalVariable(IGM.Module, varTy, isConstant, linkage,
                                       init, name);
   var->setSection(section);
-  var->setAlignment(alignment.getValue());
+  var->setAlignment(llvm::MaybeAlign(alignment.getValue()));
   disableAddressSanitizer(IGM, var);
 
   // Mark the variable as used if doesn't have external linkage.
@@ -1945,7 +1945,7 @@ llvm::GlobalVariable *swift::irgen::createVariable(
                   linkInfo.getVisibility(),
                   linkInfo.getDLLStorage()})
       .to(var);
-  var->setAlignment(alignment.getValue());
+  var->setAlignment(llvm::MaybeAlign(alignment.getValue()));
 
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.
@@ -1998,7 +1998,7 @@ swift::irgen::createLinkerDirectiveVariable(IRGenModule &IGM, StringRef name) {
   ApplyIRLinkage({Linkage,
                   llvm::GlobalValue::VisibilityTypes::DefaultVisibility,
         llvm::GlobalValue::DLLStorageClassTypes::DefaultStorageClass}).to(var);
-  var->setAlignment(Alignment);
+  var->setAlignment(llvm::MaybeAlign(Alignment));
   disableAddressSanitizer(IGM, var);
   IGM.addUsedGlobal(var);
   return var;
@@ -3287,7 +3287,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
 
   var->setInitializer(initializer);
   var->setSection(sectionName);
-  var->setAlignment(4);
+  var->setAlignment(llvm::MaybeAlign(4));
 
   disableAddressSanitizer(*this, var);
   
@@ -3338,8 +3338,8 @@ llvm::Constant *IRGenModule::emitFieldDescriptors() {
 
   var->setInitializer(llvm::ConstantArray::get(arrayTy, elts));
   var->setSection(sectionName);
-  var->setAlignment(4);
-  
+  var->setAlignment(llvm::MaybeAlign(4));
+
   disableAddressSanitizer(*this, var);
   
   addUsedGlobal(var);
