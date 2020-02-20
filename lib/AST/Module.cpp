@@ -1555,6 +1555,10 @@ void ModuleDecl::addCrossImportOverlayFile(StringRef file) {
       .push_back(new (ctx) OverlayFile(ctx.AllocateCopy(file)));
 }
 
+bool ModuleDecl::mightDeclareCrossImportOverlays() const {
+  return !declaredCrossImports.empty();
+}
+
 void ModuleDecl::
 findDeclaredCrossImportOverlays(Identifier bystanderName,
                                 SmallVectorImpl<Identifier> &overlayNames,
