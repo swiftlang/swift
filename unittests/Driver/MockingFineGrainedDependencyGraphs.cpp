@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "MockingFineGrainedDependencyGraphs.h"
+#include "swift/AST/AbstractSourceFileDepGraphFactory.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/SourceFileDepGraphConstructor.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Basic/SourceManager.h"
 
@@ -50,7 +50,7 @@ mocking_fine_grained_dependency_graphs::getChangesForSimulatedLoad(
   DiagnosticEngine diags(sm);
 
   auto sfdg =
-      MockSourceFileDepGraphConstructor(
+      UnitTestSourceFileDepGraphFactory(
           includePrivateDeps, hadCompilationError, swiftDeps, interfaceHash,
           g.emitFineGrainedDependencyDotFileAfterEveryImport,
           dependencyDescriptions, diags)
