@@ -32,7 +32,7 @@ class PythonKit(product.Product):
     def build(self, host_target):
         toolchain_path = targets.toolchain_path(self.args.install_destdir,
                                                 self.args.install_prefix)
-        swiftc = os.path.join(toolchain_path, 'usr', 'bin', 'swift')
+        swiftc = os.path.join(toolchain_path, 'usr', 'bin', 'swiftc')
 
         shell.call([
             self.toolchain.cmake,
