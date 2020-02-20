@@ -29,6 +29,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "DerivedConformances.h"
 
 using namespace swift;
 
