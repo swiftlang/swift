@@ -11,10 +11,8 @@ extension Mut {
 }
 
 @differentiable(wrt: x)
-func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) -> Mut {
-  var result = nonactive
-  result = result.mutatingMethodWrtMultipleResults(x)
-  return result
+func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) {
+  nonactive.mutatingMethodWrtMultipleResults(x)
 }
 
 // [AD] Original bb0: To differentiate or not to differentiate?

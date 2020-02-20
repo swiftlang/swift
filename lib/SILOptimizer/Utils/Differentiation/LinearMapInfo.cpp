@@ -244,8 +244,13 @@ VarDecl *LinearMapInfo::addLinearMapDecl(ApplyInst *ai, SILType linearMapType) {
   // the same parameters and results.
   auto silFnTy = linearMapType.castTo<SILFunctionType>();
   SmallVector<AnyFunctionType::Param, 8> params;
-  for (auto &param : silFnTy->getParameters())
-    params.push_back(AnyFunctionType::Param(param.getInterfaceType()));
+  for (auto &param : silFnTy->getParameters()) {
+    ParameterTypeFlags flags;
+    if (param.isIndirectMutating())
+      flags = flags.withInOut(true);
+    params.push_back(
+        AnyFunctionType::Param(param.getInterfaceType(), Identifier(), flags));
+  }
   AnyFunctionType *astFnTy;
   if (auto genSig = silFnTy->getSubstGenericSignature())
     astFnTy = GenericFunctionType::get(
@@ -283,11 +288,22 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   auto hasActiveResults = llvm::any_of(allResults, [&](SILValue res) {
     return activityInfo.isActive(res, indices);
   });
-  auto hasActiveArguments =
-      llvm::any_of(ai->getArgumentsWithoutIndirectResults(), [&](SILValue arg) {
-        return activityInfo.isActive(arg, indices);
-      });
-  if (!hasActiveResults || !hasActiveArguments)
+  bool hasActiveInoutArgument = false;
+  bool hasActiveArguments = false;
+  auto numIndirectResults = ai->getNumIndirectResults();
+  for (auto argIdx : range(ai->getSubstCalleeConv().getNumParameters())) {
+    auto arg = ai->getArgumentsWithoutIndirectResults()[argIdx];
+    if (activityInfo.isActive(arg, indices)) {
+      hasActiveArguments = true;
+      auto paramInfo = ai->getSubstCalleeConv().getParamInfoForSILArg(
+          numIndirectResults + argIdx);
+      if (paramInfo.isIndirectMutating())
+        hasActiveInoutArgument = true;
+    }
+  }
+  if (!hasActiveArguments)
+    return;
+  if (!hasActiveResults && !hasActiveInoutArgument)
     return;
 
   // Compute differentiation result index.
@@ -323,8 +339,16 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
             return true;
         }
         // Check non-differentiable results.
-        auto remappedResultType = origFnTy->getResults()[applyIndices.source]
-                                      .getSILStorageInterfaceType();
+        SILType remappedResultType;
+        if (applyIndices.source >= origFnTy->getNumResults()) {
+          auto inoutArgIdx = applyIndices.source - origFnTy->getNumResults();
+          auto inoutArg =
+              *std::next(ai->getInoutArguments().begin(), inoutArgIdx);
+          remappedResultType = inoutArg->getType();
+        } else {
+          remappedResultType = origFnTy->getResults()[applyIndices.source]
+                                   .getSILStorageInterfaceType();
+        }
         if (!remappedResultType.isDifferentiable(derivative->getModule()))
           return true;
         return false;
@@ -338,13 +362,14 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
           parameters, source, derivativeFnKind, context.getTypeConverter(),
           LookUpConformanceInModule(derivative->getModule().getSwiftModule()));
 
-  auto derivativeFnResultTypes =
-      derivativeFnType->getAllResultsInterfaceType().castTo<TupleType>();
-  auto linearMapSILType = SILType::getPrimitiveObjectType(
-      derivativeFnResultTypes
-          ->getElement(derivativeFnResultTypes->getElements().size() - 1)
-          .getType()
-          ->getCanonicalType());
+  auto derivativeFnResultTypes = derivativeFnType->getAllResultsInterfaceType();
+  auto linearMapSILType = derivativeFnResultTypes;
+  if (auto tupleType = derivativeFnResultTypes.getAs<TupleType>()) {
+    linearMapSILType = SILType::getPrimitiveObjectType(
+        tupleType->getElement(tupleType->getElements().size() - 1)
+            .getType()
+            ->getCanonicalType());
+  }
   addLinearMapDecl(ai, linearMapSILType);
 }
 
@@ -396,21 +421,11 @@ void LinearMapInfo::generateDifferentiationDataStructures(
   for (auto &origBB : *original) {
     for (auto &inst : origBB) {
       if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
-        // Skip `apply` instructions with active `inout` arguments.
-        // TODO(TF-129): Support `inout` argument differentiation.
-        bool hasActiveInoutArgument =
-            llvm::any_of(ai->getInoutArguments(), [&](SILValue inoutArg) {
-              return activityInfo.isActive(inoutArg, indices);
-            });
-        if (hasActiveInoutArgument)
-          continue;
-
         // Add linear map field to struct for active `apply` instructions.
         // Skip array literal intrinsic applications since array literal
         // initialization is linear and handled separately.
         if (!shouldDifferentiateApplySite(ai) || isArrayLiteralIntrinsic(ai))
           continue;
-
         LLVM_DEBUG(getADDebugStream()
                    << "Adding linear map struct field for " << *ai);
         addLinearMapToStruct(context, ai, indices);

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-forward-mode-differentiation -emit-sil %s | %FileCheck %s
 
 struct Foo {
   var x: Float

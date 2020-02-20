@@ -1,4 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
+// Negative test: verify that forward-mode differentiation crashes.
+// RUN: not --crash %target-swift-frontend -enable-experimental-forward-mode-differentiation -emit-sil -verify %s
 
 // This file tests SIL diagnostics during the differentiation transform.
 
@@ -187,19 +189,21 @@ protocol P {
   func foo(x: Float) -> Float
 }
 
-enum T : P {
+enum T: P {
+  // expected-error @+2 {{function is not differentiable}}
   // expected-note @+2 {{when differentiating this function definition}}
-  // expected-error @+1 {{function is not differentiable}}
-  @differentiable(wrt: x) func foo(x: Float) -> Float {
+  @differentiable(wrt: x)
+  func foo(x: Float) -> Float {
     // expected-note @+1 {{cannot differentiate writes to global variables}}
     a = a + x
     return a
   }
 }
 
+// expected-error @+2 {{function is not differentiable}}
 // expected-note @+2 {{when differentiating this function definition}}
-// expected-error @+1 {{function is not differentiable}}
-@differentiable(wrt: x) func foo(x: Float) -> Float {
+@differentiable(wrt: x)
+func foo(x: Float) -> Float {
   // expected-note @+1 {{cannot differentiate writes to global variables}}
   a = a + x
   return a
@@ -366,51 +370,37 @@ func roundingGivesError(x: Float) -> Float {
 // Inout arguments
 //===----------------------------------------------------------------------===//
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 {{when differentiating this function definition}}
 func activeInoutArg(_ x: Float) -> Float {
   var result = x
-  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
   result += x
   return result
 }
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 {{when differentiating this function definition}}
 func activeInoutArgNonactiveInitialResult(_ x: Float) -> Float {
   var result: Float = 1
-  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
   result += x
   return result
 }
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 {{when differentiating this function definition}}
 func activeInoutArgTuple(_ x: Float) -> Float {
   var tuple = (x, x)
-  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
   tuple.0 *= x
   return x * tuple.0
 }
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 {{when differentiating this function definition}}
 func activeInoutArgControlFlow(_ array: [Float]) -> Float {
   var result: Float = 1
   for i in withoutDerivative(at: array).indices {
-    // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
     result += array[i]
   }
   return result
 }
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 {{when differentiating this function definition}}
 func activeInoutArgControlFlowComplex(_ array: [Float], _ bool: Bool) -> Float {
   var result: Float = 1
   if bool {
@@ -422,7 +412,6 @@ func activeInoutArgControlFlowComplex(_ array: [Float], _ bool: Bool) -> Float {
       default: break
       }
       result = result + 1
-      // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
       result += array[i]
     }
   }
@@ -432,49 +421,33 @@ func activeInoutArgControlFlowComplex(_ array: [Float], _ bool: Bool) -> Float {
 struct Mut: Differentiable {}
 extension Mut {
   @differentiable(wrt: x)
-  mutating func mutatingMethod(_ x: Mut) -> Mut {
-    return x
-  }
+  mutating func mutatingMethod(_ x: Mut) {}
 }
 
-// TODO(TF-985): Find workaround to avoid marking non-wrt `inout` argument as
-// active.
-// expected-error @+1 {{function is not differentiable}}
 @differentiable(wrt: x)
-// expected-note @+1 {{when differentiating this function definition}}
-func nonActiveInoutArg(_ nonactive: inout Mut, _ x: Mut) -> Mut {
-  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
-  return nonactive.mutatingMethod(x)
+func nonActiveInoutArg(_ nonactive: inout Mut, _ x: Mut) {
+  nonactive.mutatingMethod(x)
 }
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable(wrt: x)
-// expected-note @+1 {{when differentiating this function definition}}
 func activeInoutArgMutatingMethod(_ x: Mut) -> Mut {
   var result = x
-  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
-  result = result.mutatingMethod(result)
+  result.mutatingMethod(result)
   return result
 }
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable(wrt: x)
-// expected-note @+1 {{when differentiating this function definition}}
-func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) -> Mut {
+func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) {
   var result = nonactive
-  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
-  result = result.mutatingMethod(x)
-  return result
+  result.mutatingMethod(x)
+  nonactive = result
 }
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable(wrt: x)
-// expected-note @+1 {{when differentiating this function definition}}
-func activeInoutArgMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) -> Mut {
+func activeInoutArgMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) {
   var result = (nonactive, x)
-  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
-  let result2 = result.0.mutatingMethod(result.0)
-  return result2
+  result.0.mutatingMethod(result.0)
+  nonactive = result.0
 }
 
 //===----------------------------------------------------------------------===//

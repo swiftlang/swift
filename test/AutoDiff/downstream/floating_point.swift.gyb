@@ -1,33 +1,38 @@
-// RUN: %target-run-simple-swiftgyb
+// RUN: %target-run-simple-swiftgyb-forward-mode-differentiation
 // REQUIRES: executable_test
 
 import StdlibUnittest
 
-var FloatingPointTests = TestSuite("FloatingPoint")
+var FloatingPointDerivativeTests = TestSuite("FloatingPointDerivatives")
 
 %for Self in ['Float', 'Double', 'Float80']:
-% if Self == 'Float80':
-#if !os(Windows) && (arch(i386) || arch(x86_64))
-% end
 
-FloatingPointTests.test("${Self}.squareRoot") {
+%if Self == 'Float80':
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+%end
+
+FloatingPointDerivativeTests.test("${Self}.+") {
+  expectEqual((${Self}(1), ${Self}(1)), gradient(at: ${Self}(4), ${Self}(5), in: +))
+  expectEqual(${Self}(2), derivative(at: ${Self}(4), ${Self}(5), in: +))
+}
+
+FloatingPointDerivativeTests.test("${Self}.squareRoot") {
   expectEqual(${Self}(0.5), gradient(at: ${Self}(1), in: { $0.squareRoot() }))
   expectEqual(${Self}(0.25), gradient(at: ${Self}(4), in: { $0.squareRoot() }))
+
+  expectEqual(${Self}(0.5), derivative(at: ${Self}(1), in: { $0.squareRoot() }))
+  expectEqual(${Self}(0.25), derivative(at: ${Self}(4), in: { $0.squareRoot() }))
 }
 
-FloatingPointTests.test("${Self}.addingProduct") {
-  expectEqual(
-    (${Self}(1), ${Self}(2), ${Self}(3)),
-    gradient(
-      at: ${Self}(10), ${Self}(3), ${Self}(2),
-      in: { $0.addingProduct($1, $2) }
-    )
-  )
+// Differential operator specific tests.
+
+FloatingPointDerivativeTests.test("${Self}.addingProduct") {
+  expectEqual((1, 2, 3), gradient(at: ${Self}(10), ${Self}(3), ${Self}(2), in: { $0.addingProduct($1, $2) }))
 }
 
-%   if Self == 'Float80':
+%if Self == 'Float80':
 #endif
-%   end
-% end
+%end
+%end # for Self in ['Float', 'Double', 'Float80']:
 
 runAllTests()

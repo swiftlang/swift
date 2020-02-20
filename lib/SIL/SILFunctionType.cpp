@@ -231,11 +231,11 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     LookupConformanceFn lookupConformance,
     CanGenericSignature derivativeFnGenSig, bool isReabstractionThunk) {
   auto &ctx = getASTContext();
+  auto *resultIndices = IndexSubset::get(
+      ctx, getNumResults() + getNumIndirectMutatingParameters(), {resultIndex});
   SILAutoDiffDerivativeFunctionKey key{
-    this, parameterIndices,
-    IndexSubset::get(ctx, getNumResults(), {resultIndex}),
-    kind, derivativeFnGenSig, isReabstractionThunk
-  };
+      this, parameterIndices,   resultIndices,
+      kind, derivativeFnGenSig, isReabstractionThunk};
   auto insertion =
       ctx.SILAutoDiffDerivativeFunctions.try_emplace(key, CanSILFunctionType());
   auto &cachedResult = insertion.first->getSecond();

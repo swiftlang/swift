@@ -1000,10 +1000,12 @@ void JVPEmitter::prepareForDifferentialGeneration() {
   // Initialize tangent mapping for indirect results.
   auto origIndResults = original->getIndirectResults();
   auto diffIndResults = differential.getIndirectResults();
-  assert(origIndResults.size() == diffIndResults.size());
-
+  size_t numInoutArguments = llvm::count_if(
+      original->getLoweredFunctionType()->getParameters(),
+      [](SILParameterInfo paramInfo) { return paramInfo.isIndirectInOut(); });
+  assert(origIndResults.size() + numInoutArguments == diffIndResults.size());
   for (auto &origBB : *original)
-    for (auto i : indices(diffIndResults))
+    for (auto i : indices(origIndResults))
       setTangentBuffer(&origBB, origIndResults[i], diffIndResults[i]);
 }
 
@@ -1036,14 +1038,29 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
   auto indices = witness->getSILAutoDiffIndices();
 
   // Add differential results.
-  auto origResult = origTy->getResults()[indices.source];
-  origResult = origResult.getWithInterfaceType(
-      origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
-  dfResults.push_back(
-      SILResultInfo(origResult.getInterfaceType()
-                        ->getAutoDiffTangentSpace(lookupConformance)
-                        ->getCanonicalType(),
-                    origResult.getConvention()));
+  Optional<SILParameterInfo> inoutDiffParam = None;
+  for (auto origParam : origTy->getParameters()) {
+    if (!origParam.isIndirectInOut())
+      continue;
+    inoutDiffParam = origParam;
+  }
+
+  if (inoutDiffParam) {
+    dfResults.push_back(
+        SILResultInfo(inoutDiffParam->getInterfaceType()
+                          ->getAutoDiffTangentSpace(lookupConformance)
+                          ->getCanonicalType(),
+                      ResultConvention::Indirect));
+  } else {
+    auto origResult = origTy->getResults()[indices.source];
+    origResult = origResult.getWithInterfaceType(
+        origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
+    dfResults.push_back(
+        SILResultInfo(origResult.getInterfaceType()
+                          ->getAutoDiffTangentSpace(lookupConformance)
+                          ->getCanonicalType(),
+                      origResult.getConvention()));
+  }
 
   // Add differential parameters for the requested wrt parameters.
   for (auto i : indices.parameters->getIndices()) {

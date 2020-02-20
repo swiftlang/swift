@@ -2181,10 +2181,11 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     auto originalFnTy =
         makeConstantInterfaceType(c.asAutoDiffOriginalFunction());
     auto *fnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-        autoDiffFuncId->getParameterIndices(), /*resultIndex*/ 0,
-        autoDiffFuncId->getKind(), LookUpConformanceInModule(&M));
+        autoDiffFuncId->getParameterIndices(), autoDiffFuncId->getKind(),
+        LookUpConformanceInModule(&M));
     return cast<AnyFunctionType>(fnTy->getCanonicalType());
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
   switch (c.kind) {

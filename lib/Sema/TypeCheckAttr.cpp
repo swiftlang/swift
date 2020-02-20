@@ -4045,6 +4045,11 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
     return nullptr;
   }
 
+  // Get differentiability parameters.
+  SmallVector<AnyFunctionType::Param, 8> diffParams;
+  originalFnTy->getSubsetParameters(resolvedDiffParamIndices, diffParams,
+                                    /*reverseCurryLevels*/ false);
+
   // Resolve JVP and VJP derivative functions, if specified.
   FuncDecl *jvp = nullptr;
   FuncDecl *vjp = nullptr;
@@ -4164,19 +4169,6 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     return true;
   }
   attr->setDerivativeKind(kind);
-  // `value: R` result tuple element must conform to `Differentiable`.
-  auto diffableProto = Ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto valueResultType = valueResultElt.getType();
-  if (valueResultType->hasTypeParameter())
-    valueResultType = derivative->mapTypeIntoContext(valueResultType);
-  auto valueResultConf = TypeChecker::conformsToProtocol(
-      valueResultType, diffableProto, derivative->getDeclContext(), None);
-  if (!valueResultConf) {
-    diags.diagnose(attr->getLocation(),
-                   diag::derivative_attr_result_value_not_differentiable,
-                   valueResultElt.getType());
-    return true;
-  }
 
   // Compute expected original function type and look up original function.
   auto *originalFnType =
@@ -4598,15 +4590,16 @@ computeLinearityParameters(ArrayRef<ParsedAutoDiffParameter> parsedLinearParams,
 // The parsed differentiability parameters and attribute location are used in
 // diagnostics.
 static bool checkLinearityParameters(
-    AbstractFunctionDecl *originalAFD, SmallVector<Type, 4> linearParamTypes,
+    AbstractFunctionDecl *originalAFD,
+    SmallVector<AnyFunctionType::Param, 4> linearParams,
     GenericEnvironment *derivativeGenEnv, ModuleDecl *module,
     ArrayRef<ParsedAutoDiffParameter> parsedLinearParams, SourceLoc attrLoc) {
   auto &ctx = originalAFD->getASTContext();
   auto &diags = ctx.Diags;
 
   // Check that linearity parameters have allowed types.
-  for (unsigned i : range(linearParamTypes.size())) {
-    auto linearParamType = linearParamTypes[i];
+  for (unsigned i : range(linearParams.size())) {
+    auto linearParamType = linearParams[i].getPlainType();
     if (!linearParamType->hasTypeParameter())
       linearParamType = linearParamType->mapTypeOutOfContext();
     if (derivativeGenEnv)
@@ -4829,13 +4822,12 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   attr->setOriginalFunction(originalAFD);
 
   // Get the linearity parameter types.
-  SmallVector<Type, 4> linearParamTypes;
-  autodiff::getSubsetParameterTypes(linearParamIndices, expectedOriginalFnType,
-                                    linearParamTypes,
-                                    /*reverseCurryLevels*/ true);
+  SmallVector<AnyFunctionType::Param, 4> linearParams;
+  expectedOriginalFnType->getSubsetParameters(linearParamIndices, linearParams,
+                                              /*reverseCurryLevels*/ true);
 
   // Check if linearity parameter indices are valid.
-  if (checkLinearityParameters(originalAFD, linearParamTypes,
+  if (checkLinearityParameters(originalAFD, linearParams,
                                transpose->getGenericEnvironment(),
                                transpose->getModuleContext(),
                                parsedLinearParams, attr->getLocation())) {

@@ -1203,9 +1203,9 @@ extension Array : EuclideanDifferentiable
 
 extension Array where Element : Differentiable {
   @derivative(of: subscript)
-  public func _vjpSubscript(index: Int) ->
-    (value: Element, pullback: (Element.TangentVector) -> TangentVector)
-  {
+  public func _vjpSubscript(index: Int) -> (
+    value: Element, pullback: (Element.TangentVector) -> TangentVector
+  ) {
     func pullback(_ gradientIn: Element.TangentVector) -> TangentVector {
       var gradientOut = Array<Element.TangentVector>(
         repeating: .zero,
@@ -1217,8 +1217,9 @@ extension Array where Element : Differentiable {
   }
 
   @derivative(of: +)
-  public static func _vjpPlus(_ lhs: [Element], _ rhs: [Element]) ->
-    (value: [Element], pullback: (TangentVector) -> (TangentVector, TangentVector)) {
+  public static func _vjpConcatenation(_ lhs: [Element], _ rhs: [Element]) -> (
+    value: [Element], pullback: (TangentVector) -> (TangentVector, TangentVector)
+  ) {
       func pullback(_ gradientIn: TangentVector) ->
         (TangentVector, TangentVector) {
         precondition(
@@ -1233,6 +1234,25 @@ extension Array where Element : Differentiable {
             gradientIn.base[lhs.count...])))
       }
       return (lhs + rhs, pullback)
+  }
+}
+
+extension Array where Element: Differentiable {
+  @derivative(of: append)
+  public mutating func _vjpAppend(_ element: Element) -> (
+    value: Void, pullback: (inout TangentVector) -> Element.TangentVector
+  ) {
+    let appendedElementIndex = count
+    defer { append(element) }
+    return ((), { dself in dself.base[appendedElementIndex] })
+  }
+
+  @derivative(of: append)
+  public mutating func _jvpAppend(_ element: Element) -> (
+    value: Void, differential: (inout TangentVector, Element.TangentVector) -> Void
+  ) {
+    append(element)
+    return ((), { $0.base.append($1) })
   }
 }
 
@@ -1352,11 +1372,31 @@ extension FloatingPoint where Self : Differentiable,
     return (addingProduct(lhs, rhs), { _ in (1, rhs, lhs) })
   }
 
+  /// The Jacobian-vector product function of `addingProduct`. Returns the
+  /// original result and differential of `addingProduct` with respect to `self`,
+  /// `lhs` and `rhs`.
+  @inlinable
+  @derivative(of: addingProduct)
+  func _jvpAddingProduct(
+    _ lhs: Self, _ rhs: Self
+  ) -> (value: Self, differential: (Self, Self, Self) -> Self) {
+    return (addingProduct(lhs, rhs), { dself, dlhs, drhs in dself })
+  }
+
   /// The vector-Jacobian product function of `squareRoot`. Returns the original
   /// result and pullback of `squareRoot` with respect to `self`.
   @inlinable // FIXME(sil-serialize-all)
   @derivative(of: squareRoot)
   func _vjpSquareRoot() -> (value: Self, pullback: (Self) -> Self) {
+    let y = squareRoot()
+    return (y, { v in v / (2 * y) })
+  }
+
+  /// The Jacobian-vector product function of `squareRoot`. Returns the original
+  /// result and differential of `squareRoot` with respect to `self`.
+  @inlinable // FIXME(sil-serialize-all)
+  @derivative(of: squareRoot)
+  func _jvpSquareRoot() -> (value: Self, differential: (Self) -> Self) {
     let y = squareRoot()
     return (y, { v in v / (2 * y) })
   }

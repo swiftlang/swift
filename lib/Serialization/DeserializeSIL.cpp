@@ -3566,10 +3566,13 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
       MF->getContext(), original->getLoweredFunctionType()->getNumParameters(),
       ArrayRef<unsigned>(parameterAndResultIndices)
           .take_front(numParameterIndices));
-  auto *resultIndices = IndexSubset::get(
-      MF->getContext(), original->getLoweredFunctionType()->getNumResults(),
-      ArrayRef<unsigned>(parameterAndResultIndices)
-          .take_back(numResultIndices));
+  auto numResults =
+      original->getLoweredFunctionType()->getNumResults() +
+      original->getLoweredFunctionType()->getNumIndirectMutatingParameters();
+  auto *resultIndices =
+      IndexSubset::get(MF->getContext(), numResults,
+                       ArrayRef<unsigned>(parameterAndResultIndices)
+                           .take_back(numResultIndices));
 
   AutoDiffConfig config(parameterIndices, resultIndices, derivativeGenSig);
   auto *diffWitness =

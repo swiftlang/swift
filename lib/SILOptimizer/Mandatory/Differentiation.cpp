@@ -500,9 +500,10 @@ emitDerivativeFunctionReference(
     auto *originalFn = originalFRI->getReferencedFunctionOrNull();
     assert(originalFn);
     auto originalFnTy = originalFn->getLoweredFunctionType();
-    auto *desiredResultIndices =
-        IndexSubset::get(context.getASTContext(), originalFnTy->getNumResults(),
-                         {desiredIndices.source});
+    auto numResults = originalFnTy->getNumResults() +
+                      originalFnTy->getNumIndirectMutatingParameters();
+    auto *desiredResultIndices = IndexSubset::get(
+        context.getASTContext(), numResults, {desiredIndices.source});
     auto *desiredParameterIndices = desiredIndices.parameters;
     // NOTE(TF-893): Extending capacity is necessary when `originalFnTy` has
     // parameters corresponding to captured variables.
@@ -542,9 +543,19 @@ emitDerivativeFunctionReference(
         }
       }
       // Check and diagnose non-differentiable results.
-      if (!originalFnTy->getResults()[desiredIndices.source]
-               .getSILStorageInterfaceType()
-               .isDifferentiable(context.getModule())) {
+      SILType resultType;
+      if (desiredIndices.source >= originalFnTy->getNumResults()) {
+        auto inoutParamIdx =
+            desiredIndices.source - originalFnTy->getNumResults();
+        auto inoutParam =
+            *std::next(originalFnTy->getIndirectMutatingParameters().begin(),
+                       inoutParamIdx);
+        resultType = inoutParam.getSILStorageInterfaceType();
+      } else {
+        resultType = originalFnTy->getResults()[desiredIndices.source]
+                         .getSILStorageInterfaceType();
+      }
+      if (!resultType.isDifferentiable(context.getModule())) {
         context.emitNondifferentiabilityError(
             original, invoker, diag::autodiff_nondifferentiable_result);
         return None;

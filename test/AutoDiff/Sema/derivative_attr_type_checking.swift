@@ -91,7 +91,7 @@ func vjpResultIncorrectFirstLabel(x: Float) -> (Float, (Float) -> Float) {
 func vjpResultIncorrectSecondLabel(x: Float) -> (value: Float, (Float) -> Float) {
   return (x, { $0 })
 }
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple (first element type 'Int' must conform to 'Differentiable')}}
+// expected-error @+1 {{could not find function 'incorrectDerivativeType' with expected type '(Int) -> Int'}}
 @derivative(of: incorrectDerivativeType)
 func vjpResultNotDifferentiable(x: Int) -> (
   value: Int, pullback: (Int) -> Int

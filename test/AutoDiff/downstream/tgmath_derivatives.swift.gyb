@@ -19,7 +19,7 @@
 
 import StdlibUnittest
 
-let DerivativeTests = TestSuite("TGMath")
+let DerivativeTests = TestSuite("TGMathDerivatives")
 
 func expectEqualWithTolerance<T>(_ expected: TestLiteralType, _ actual: T,
                                  ulps allowed: T = 3,
@@ -40,8 +40,8 @@ func expectEqualWithTolerance<T>(_ expected: TestLiteralType, _ actual: T,
 func checkGradient<T: BinaryFloatingPoint & Differentiable>(
   _ f: @differentiable (T, T) -> T,
   _ x: T,
-  _ y: T)
-where T == T.TangentVector {
+  _ y: T
+) where T == T.TangentVector {
   let eps = T(0.01)
   let grad = gradient(at: x, y, in: f)
   let dfdx = (f(x + eps, y) - f(x, y)) / eps

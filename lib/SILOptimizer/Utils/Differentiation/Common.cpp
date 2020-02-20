@@ -119,6 +119,15 @@ void collectAllFormalResultsInTypeOrder(SILFunction &function,
   for (auto &resInfo : convs.getResults())
     results.push_back(resInfo.isFormalDirect() ? dirResults[dirResIdx++]
                                                : indResults[indResIdx++]);
+  // Treat `inout` arguments as results.
+  // `inout` arguments come after all formal results.
+  for (auto i : range(convs.getNumParameters())) {
+    auto paramInfo = convs.getParameters()[i];
+    if (!paramInfo.isIndirectMutating())
+      continue;
+    auto *argument = function.getArgumentsWithoutIndirectResults()[i];
+    results.push_back(argument);
+  }
 }
 
 /// Given a function, gathers all of its direct results in an order defined by
@@ -194,8 +203,21 @@ void collectMinimalIndicesForFunctionCall(
       ++indResIdx;
     }
   }
+  // Record all `inout` arguments as results.
+  auto inoutArgResultIndex = calleeFnTy->getNumResults();
+  for (auto &paramAndIdx : enumerate(calleeConvs.getParameters())) {
+    auto &param = paramAndIdx.value();
+    if (!param.isIndirectMutating())
+      continue;
+    unsigned idx = paramAndIdx.index();
+    auto inoutArg = ai->getArgument(idx);
+    results.push_back(inoutArg);
+    resultIndices.push_back(inoutArgResultIndex++);
+  }
   // Make sure the function call has active results.
-  assert(results.size() == calleeFnTy->getNumResults());
+  auto numResults = calleeFnTy->getNumResults() +
+                    calleeFnTy->getNumIndirectMutatingParameters();
+  assert(results.size() == numResults);
   assert(llvm::any_of(results, [&](SILValue result) {
     return activityInfo.isActive(result, parentIndices);
   }));

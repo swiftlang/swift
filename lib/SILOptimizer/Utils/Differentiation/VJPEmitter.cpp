@@ -146,14 +146,42 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   auto indices = witness->getSILAutoDiffIndices();
 
   // Add pullback parameter for the seed.
-  auto origResult = origTy->getResults()[indices.source];
-  origResult = origResult.getWithInterfaceType(
-      origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
-  pbParams.push_back(getTangentParameterInfoForOriginalResult(
-      origResult.getInterfaceType()
-          ->getAutoDiffTangentSpace(lookupConformance)
-          ->getCanonicalType(),
-      origResult.getConvention()));
+  // TODO(TF-
+  bool hasInoutParameters = false;
+  SILParameterInfo inoutParam;
+  bool isWrtInoutParam = false;
+  for (auto i : range(origTy->getNumParameters())) {
+    auto origParam = origParams[i];
+    if (!origParam.isIndirectInOut())
+      continue;
+    hasInoutParameters = true;
+    isWrtInoutParam = indices.parameters->contains(i);
+    inoutParam = origParam;
+  }
+
+  // FIXME: Hack.
+  if (hasInoutParameters) {
+    auto origResult = inoutParam.getWithInterfaceType(
+        inoutParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
+    auto inoutParamTanConvention =
+        isWrtInoutParam ? inoutParam.getConvention()
+                        : ParameterConvention::Indirect_In_Guaranteed;
+    SILParameterInfo inoutParamTanParam(
+        origResult.getInterfaceType()
+            ->getAutoDiffTangentSpace(lookupConformance)
+            ->getCanonicalType(),
+        inoutParamTanConvention);
+    pbParams.push_back(inoutParamTanParam);
+  } else {
+    auto origResult = origTy->getResults()[indices.source];
+    origResult = origResult.getWithInterfaceType(
+        origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
+    pbParams.push_back(getTangentParameterInfoForOriginalResult(
+        origResult.getInterfaceType()
+            ->getAutoDiffTangentSpace(lookupConformance)
+            ->getCanonicalType(),
+        origResult.getConvention()));
+  }
 
   // Accept a pullback struct in the pullback parameter list. This is the
   // returned pullback's closure context.
@@ -165,6 +193,8 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   // Add pullback results for the requested wrt parameters.
   for (auto i : indices.parameters->getIndices()) {
     auto origParam = origParams[i];
+    if (origParam.isIndirectMutating())
+      continue;
     origParam = origParam.getWithInterfaceType(
         origParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
     adjResults.push_back(getTangentResultInfoForOriginalParameter(
@@ -456,18 +486,6 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
     return;
   }
 
-  // Diagnose functions with active inout arguments.
-  // TODO(TF-129): Support `inout` argument differentiation.
-  for (auto inoutArg : ai->getInoutArguments()) {
-    if (activityInfo.isActive(inoutArg, getIndices())) {
-      context.emitNondifferentiabilityError(
-          ai, invoker,
-          diag::autodiff_cannot_differentiate_through_inout_arguments);
-      errorOccurred = true;
-      return;
-    }
-  }
-
   LLVM_DEBUG(getADDebugStream() << "VJP-transforming:\n" << *ai << '\n');
 
   // Get the minimal parameter and result indices required for differentiating
@@ -546,6 +564,9 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
           }
         }
         // Check and diagnose non-differentiable results.
+        // TODO: make condition robust for `inout` arguments.
+        if (indices.source >= originalFnTy->getNumResults())
+          return false;
         if (!originalFnTy->getResults()[indices.source]
                  .getSILStorageInterfaceType()
                  .isDifferentiable(getModule())) {
