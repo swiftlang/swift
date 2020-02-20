@@ -2949,13 +2949,12 @@ ERROR(differentiable_attr_protocol_req_assoc_func,none,
 ERROR(differentiable_attr_stored_property_variable_unsupported,none,
       "'@differentiable' attribute on stored property cannot specify "
       "'jvp:' or 'vjp:'", ())
-ERROR(differentiable_attr_class_member_no_dynamic_self,none,
-      "'@differentiable' attribute cannot be declared on class methods "
+ERROR(differentiable_attr_class_member_dynamic_self_result_unsupported,none,
+      "'@differentiable' attribute cannot be declared on class members "
       "returning 'Self'", ())
-// TODO(TF-654): Remove when differentiation supports class initializers.
-ERROR(differentiable_attr_class_init_not_yet_supported,none,
-      "'@differentiable' attribute does not yet support class initializers",
-      ())
+ERROR(differentiable_attr_nonfinal_class_init_unsupported,none,
+      "'@differentiable' attribute cannot be declared on 'init' in a non-final "
+      "class; consider making %0 final", (Type))
 ERROR(differentiable_attr_empty_where_clause,none,
       "empty 'where' clause in '@differentiable' attribute", ())
 ERROR(differentiable_attr_where_clause_for_nongeneric_original,none,
@@ -2994,6 +2993,12 @@ ERROR(derivative_attr_not_in_same_file_as_original,none,
       "derivative not in the same file as the original function", ())
 ERROR(derivative_attr_original_stored_property_unsupported,none,
       "cannot register derivative for stored property %0", (DeclNameRef))
+ERROR(derivative_attr_class_member_dynamic_self_result_unsupported,none,
+      "cannot register derivative for class member %0 returning 'Self'",
+      (DeclNameRef))
+ERROR(derivative_attr_nonfinal_class_init_unsupported,none,
+      "cannot register derivative for 'init' in a non-final class; consider "
+      "making %0 final", (Type))
 ERROR(derivative_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
 NOTE(derivative_attr_duplicate_note,none,
