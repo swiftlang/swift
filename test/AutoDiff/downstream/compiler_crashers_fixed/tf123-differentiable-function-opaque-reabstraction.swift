@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend-emit-silgen %s
+// RUN: %target-swift-frontend-emit-silgen %s
 // REQUIRES: asserts
 
 // TF-123: SILGen crashes when reabstracting `@differentiable` functions to
