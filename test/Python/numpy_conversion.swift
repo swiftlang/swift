@@ -3,7 +3,11 @@
 //
 // `numpy.ndarray` conversion tests.
 
-import Python
+#if canImport(PythonKit)
+  import PythonKit
+#else
+  import Python
+#endif
 import StdlibUnittest
 
 var NumpyConversionTests = TestSuite("NumpyConversion")
