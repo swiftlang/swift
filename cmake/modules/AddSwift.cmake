@@ -1326,11 +1326,6 @@ function(_add_swift_target_library_single target name)
       -libc;${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY})
   endif()
 
-  if(sourcekitd IN_LIST SWIFTLIB_SINGLE_DEPENDS)
-    list(REMOVE_ITEM SWIFTLIB_SINGLE_DEPENDS sourcekitd)
-    set(SWIFTLIB_SINGLE_INJECT_SOURCEKITD_DEPENDENCY TRUE)
-  endif()
-
   # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_LINK_LIBRARIES,
   # just any swiftmodule files that are associated with them.
   handle_swift_sources(
@@ -1356,10 +1351,6 @@ function(_add_swift_target_library_single target name)
       ${embed_bitcode_arg}
       INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}"
       MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
-  if(SWIFTLIB_SINGLE_INJECT_SOURCEKITD_DEPENDENCY)
-    add_dependencies(${swift_object_dependency_target}
-      sourcekitd)
-  endif()
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
 
   # If there were any swift sources, then a .swiftmodule may have been created.
