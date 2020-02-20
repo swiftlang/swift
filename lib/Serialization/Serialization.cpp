@@ -2431,20 +2431,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
              "`@differentiable` attribute should have original declaration set "
              "during construction or parsing");
 
-      IdentifierID jvpName = 0;
-      DeclID jvpRef = 0;
-      if (auto jvp = attr->getJVP())
-        jvpName = S.addDeclBaseNameRef(jvp->Name.getBaseName());
-      if (auto jvpFunction = attr->getJVPFunction())
-        jvpRef = S.addDeclRef(jvpFunction);
-
-      IdentifierID vjpName = 0;
-      DeclID vjpRef = 0;
-      if (auto vjp = attr->getVJP())
-        vjpName = S.addDeclBaseNameRef(vjp->Name.getBaseName());
-      if (auto vjpFunction = attr->getVJPFunction())
-        vjpRef = S.addDeclRef(vjpFunction);
-
       auto paramIndices = attr->getParameterIndices();
       assert(paramIndices && "Checked parameter indices must be resolved");
       SmallVector<bool, 4> indices;
@@ -2453,7 +2439,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-          attr->isLinear(), jvpName, jvpRef, vjpName, vjpRef,
+          attr->isLinear(),
           S.addGenericSignatureRef(attr->getDerivativeGenericSignature()),
           indices);
       return;

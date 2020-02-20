@@ -1010,8 +1010,6 @@ public:
   /// Parse the arguments inside the @differentiable attribute.
   bool parseDifferentiableAttributeArguments(
       bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
-      Optional<DeclNameRefWithLoc> &jvpSpec,
-      Optional<DeclNameRefWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
 
   /// Parse a differentiability parameters clause, i.e. the 'wrt:' clause in

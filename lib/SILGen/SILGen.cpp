@@ -766,12 +766,6 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
     auto *AFD = constant.getAbstractFunctionDecl();
     auto emitWitnesses = [&](DeclAttributes &Attrs) {
       for (auto *diffAttr : Attrs.getAttributes<DifferentiableAttr>()) {
-        SILFunction *jvp = nullptr;
-        SILFunction *vjp = nullptr;
-        if (auto *jvpDecl = diffAttr->getJVPFunction())
-          jvp = getFunction(SILDeclRef(jvpDecl), ForDefinition);
-        if (auto *vjpDecl = diffAttr->getVJPFunction())
-          vjp = getFunction(SILDeclRef(vjpDecl), ForDefinition);
         auto origFnType = F->getLoweredFunctionType();
         auto numResults = origFnType->getNumResults() +
                           origFnType->getNumIndirectMutatingParameters();
@@ -783,7 +777,8 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
                "all original SIL functions with generic signatures");
         AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
                               diffAttr->getDerivativeGenericSignature());
-        emitDifferentiabilityWitness(AFD, F, config, jvp, vjp, diffAttr);
+        emitDifferentiabilityWitness(AFD, F, config, /*jvp*/ nullptr,
+                                     /*vjp*/ nullptr, diffAttr);
       }
       for (auto *derivAttr : Attrs.getAttributes<DerivativeAttr>()) {
         SILFunction *jvp = nullptr;
