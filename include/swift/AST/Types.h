@@ -3327,7 +3327,7 @@ public:
   /// first. `makeSelfParamFirst` should be true when working with user-facing
   /// derivative function types, e.g. when type-checking `@differentiable` and
   /// `@derivative` attributes.
-  AnyFunctionType *getAutoDiffDerivativeFunctionLinearMapResultType(
+  AnyFunctionType *getAutoDiffDerivativeFunctionLinearMapType(
       IndexSubset *parameterIndices, AutoDiffLinearMapKind kind,
       LookupConformanceFn lookupConformance, bool makeSelfParamFirst = false);
 

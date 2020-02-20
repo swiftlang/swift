@@ -115,7 +115,7 @@ struct AutoDiffConfig {
 
 /// A semantic function result type: either a formal function result type or
 /// an `inout` parameter. Used in derivative function type calculation.
-struct SemanticFunctionResultType {
+struct AutoDiffSemanticFunctionResultType {
   Type type;
   bool isInout;
 };
@@ -279,7 +279,7 @@ namespace autodiff {
 /// semantic results.
 ///
 /// Remap the original semantic result using `derivativeGenEnv`, if specified.
-SemanticFunctionResultType getOriginalFunctionSemanticResultType(
+AutoDiffSemanticFunctionResultType getOriginalFunctionSemanticResultType(
     AnyFunctionType *functionType, Type originalFormalResultType,
     bool &hasMultipleOriginalSemanticResults,
     GenericEnvironment *derivativeGenEnv = nullptr);

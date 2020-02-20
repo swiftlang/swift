@@ -4940,7 +4940,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
 
   auto originalResult = curryLevels.back()->getResult();
 
-  Type linearMapType = getAutoDiffDerivativeFunctionLinearMapResultType(
+  Type linearMapType = getAutoDiffDerivativeFunctionLinearMapType(
       parameterIndices, kind.getLinearMapKind(), lookupConformance,
       makeSelfParamFirst);
 
@@ -4969,8 +4969,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
   return derivativeFunctionType;
 }
 
-AnyFunctionType *
-AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapResultType(
+AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     IndexSubset *parameterIndices, AutoDiffLinearMapKind kind,
     LookupConformanceFn lookupConformance, bool makeSelfParamFirst) {
   assert(!parameterIndices->isEmpty() &&

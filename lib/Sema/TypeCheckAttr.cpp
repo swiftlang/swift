@@ -4314,7 +4314,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   // Compute expected differential/pullback type.
   Type expectedFuncEltType =
-      originalFnType->getAutoDiffDerivativeFunctionLinearMapResultType(
+      originalFnType->getAutoDiffDerivativeFunctionLinearMapType(
           resolvedDiffParamIndices, kind.getLinearMapKind(), lookupConformance,
           /*makeSelfParamFirst*/ true);
   if (expectedFuncEltType->hasTypeParameter())

@@ -103,7 +103,8 @@ void AnyFunctionType::getSubsetParameters(
   }
 }
 
-SemanticFunctionResultType autodiff::getOriginalFunctionSemanticResultType(
+AutoDiffSemanticFunctionResultType
+autodiff::getOriginalFunctionSemanticResultType(
     AnyFunctionType *functionType, Type originalFormalResultType,
     bool &hasMultipleOriginalSemanticResults,
     GenericEnvironment *derivativeGenEnv) {
