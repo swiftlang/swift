@@ -675,10 +675,7 @@ endfunction()
 #     target
 #     [SHARED]
 #     [STATIC]
-#     [SDK sdk]
-#     [ARCHITECTURE architecture]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
-#     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
 #
 # target
@@ -690,17 +687,8 @@ endfunction()
 # STATIC
 #   Build a static library.
 #
-# SDK sdk
-#   SDK to build for.
-#
-# ARCHITECTURE
-#   Architecture to build for.
-#
 # LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
-#
-# INSTALL_IN_COMPONENT comp
-#   The Swift installation component that this library belongs to.
 #
 # source1 ...
 #   Sources to add into this library
@@ -708,10 +696,7 @@ function(_add_swift_host_library_single target)
   set(SWIFTLIB_SINGLE_options
         SHARED
         STATIC)
-  set(SWIFTLIB_SINGLE_single_parameter_options
-        ARCHITECTURE
-        INSTALL_IN_COMPONENT
-        SDK)
+  set(SWIFTLIB_SINGLE_single_parameter_options)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         GYB_SOURCES
         LLVM_LINK_COMPONENTS)
@@ -726,23 +711,18 @@ function(_add_swift_host_library_single target)
 
   translate_flags(SWIFTLIB_SINGLE "${SWIFTLIB_SINGLE_options}")
 
-  # Check arguments.
-  precondition(SWIFTLIB_SINGLE_SDK MESSAGE "Should specify an SDK")
-  precondition(SWIFTLIB_SINGLE_ARCHITECTURE MESSAGE "Should specify an architecture")
-  precondition(SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
-
   if(NOT SWIFTLIB_SINGLE_SHARED AND NOT SWIFTLIB_SINGLE_STATIC)
     message(FATAL_ERROR "Either SHARED or STATIC must be specified")
   endif()
 
   # Determine the subdirectory where this library will be installed.
   set(SWIFTLIB_SINGLE_SUBDIR
-      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
+    "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
 
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
   set(embed_bitcode_arg)
   if(SWIFT_EMBED_BITCODE_SECTION)
-    if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
+    if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "IOS" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "TVOS" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WATCHOS")
       list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
       set(embed_bitcode_arg EMBED_BITCODE)
     endif()
@@ -777,24 +757,24 @@ function(_add_swift_host_library_single target)
     handle_gyb_sources(
         gyb_dependency_targets
         SWIFTLIB_SINGLE_GYB_SOURCES
-        "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+        "${SWIFT_HOST_VARIANT_ARCH}")
     set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES}
       ${SWIFTLIB_SINGLE_GYB_SOURCES})
   endif()
 
   add_library("${target}" ${libkind}
               ${SWIFTLIB_SINGLE_SOURCES})
-  _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
+  _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFT_HOST_VARIANT_SDK}")
 
-  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
-    swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
+  if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+    swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH} SWIFTLIB_INCLUDE)
     target_include_directories("${target}" SYSTEM PRIVATE ${SWIFTLIB_INCLUDE})
     set_target_properties(${target}
                           PROPERTIES
                             CXX_STANDARD 14)
   endif()
 
-  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+  if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
     if("${libkind}" STREQUAL "SHARED")
       # Each dll has an associated .lib (import library); since we may be
       # building on a non-DLL platform (not windows), create an imported target
@@ -816,19 +796,19 @@ function(_add_swift_host_library_single target)
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-  if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_NAME_DIR "@rpath")
-  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX")
+  elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
-  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "CYGWIN")
+  elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
-  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
+  elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
     # Only set the install RPATH if cross-compiling the host tools, in which
     # case both the NDK and Sysroot paths must be set.
     if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND
@@ -857,11 +837,11 @@ function(_add_swift_host_library_single target)
   set(c_compile_flags ${SWIFTLIB_SINGLE_C_COMPILE_FLAGS})
   set(link_flags)
 
-  set(library_search_subdir "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
+  set(library_search_subdir "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
   set(library_search_directories
       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
-      "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
+      "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
 
   # In certain cases when building, the environment variable SDKROOT is set to override
   # where the sdk root is located in the system. If that environment variable has been
@@ -872,8 +852,8 @@ function(_add_swift_host_library_single target)
   endif()
 
   _add_variant_c_compile_flags(
-    SDK "${SWIFTLIB_SINGLE_SDK}"
-    ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
+  SDK "${SWIFT_HOST_VARIANT_SDK}"
+    ARCH "${SWIFT_HOST_VARIANT_ARCH}"
     BUILD_TYPE ${CMAKE_BUILD_TYPE}
     ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS}
     ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
@@ -881,29 +861,29 @@ function(_add_swift_host_library_single target)
     RESULT_VAR_NAME c_compile_flags
     )
 
-  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
     if(libkind STREQUAL SHARED)
       list(APPEND c_compile_flags -D_WINDLL)
     endif()
   endif()
   _add_variant_link_flags(
-    SDK "${SWIFTLIB_SINGLE_SDK}"
-    ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
+    SDK "${SWIFT_HOST_VARIANT_SDK}"
+    ARCH "${SWIFT_HOST_VARIANT_ARCH}"
     BUILD_TYPE ${CMAKE_BUILD_TYPE}
     ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS}
     ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
     ENABLE_LTO ${SWIFT_TOOLS_ENABLE_LTO}
-    LTO_OBJECT_NAME "${target}-${SWIFTLIB_SINGLE_SDK}-${SWIFTLIB_SINGLE_ARCHITECTURE}"
+    LTO_OBJECT_NAME "${target}-${SWIFT_HOST_VARIANT_SDK}-${SWIFT_HOST_VARIANT_ARCH}"
     RESULT_VAR_NAME link_flags
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
       )
 
   # Set compilation and link flags.
-  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
-    swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE}
-      ${SWIFTLIB_SINGLE_ARCHITECTURE}_INCLUDE)
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH}
+      ${SWIFT_HOST_VARIANT_ARCH}_INCLUDE)
     target_include_directories(${target} SYSTEM PRIVATE
-      ${${SWIFTLIB_SINGLE_ARCHITECTURE}_INCLUDE})
+      ${${SWIFT_HOST_VARIANT_ARCH}_INCLUDE})
 
     if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
       swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
@@ -923,7 +903,7 @@ function(_add_swift_host_library_single target)
     ${c_compile_flags})
   target_link_options(${target} PRIVATE
     ${link_flags})
-  if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+  if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
     target_link_options(${target} PRIVATE
       "LINKER:-compatibility_version,1")
     if(SWIFT_COMPILER_VERSION)
@@ -932,7 +912,7 @@ function(_add_swift_host_library_single target)
     endif()
     # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
     if(SWIFT_EMBED_BITCODE_SECTION)
-      if(${SWIFTLIB_SINGLE_SDK} MATCHES "(I|TV|WATCH)OS")
+      if(${SWIFT_HOST_VARIANT_SDK} MATCHES "(I|TV|WATCH)OS")
         # The two branches of this if statement accomplish the same end result
         # We are simply accounting for the fact that on CMake < 3.16
         # using a generator expression to
@@ -1014,10 +994,7 @@ function(add_swift_host_library name)
     ${ASHL_SHARED_keyword}
     ${ASHL_STATIC_keyword}
     ${ASHL_SOURCES}
-    SDK ${SWIFT_HOST_VARIANT_SDK}
-    ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     LLVM_LINK_COMPONENTS ${ASHL_LLVM_LINK_COMPONENTS}
-    INSTALL_IN_COMPONENT "dev"
     )
 
   add_dependencies(dev ${name})
