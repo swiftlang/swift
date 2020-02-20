@@ -491,7 +491,7 @@ def enable_experimental_differentiable_programming : Flag<["-"], "enable-experim
 def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable experimental concise '#file' identifier and '#filePath' alternative">;
+  HelpText<"Enable experimental concise '#file' identifier">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
