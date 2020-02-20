@@ -598,3 +598,29 @@ where Self: Differentiable, Self == Self.TangentVector {
     return (x + y, { v in (v, v) })
   }
 }
+
+// Test derivatives of default implementations.
+protocol HasADefaultImplementation {
+  func req(_ x: Float) -> Float
+}
+extension HasADefaultImplementation {
+  func req(_ x: Float) -> Float { x }
+  // ok
+  @derivative(of: req)
+  func req(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    (x, { 10 * $0 })
+  }
+}
+
+// Test default derivatives of requirements.
+protocol HasADefaultDerivative {
+  func req(_ x: Float) -> Float
+}
+extension HasADefaultDerivative {
+  // TODO(TF-982): Make this ok.
+  // expected-error @+1 {{could not find function 'req'}}
+  @derivative(of: req)
+  func req(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    (x, { 10 * $0 })
+  }
+}
