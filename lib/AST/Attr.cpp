@@ -992,12 +992,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DAK_Custom: {
-    Printer.printAttrName("@");
+    Printer.callPrintNamePre(PrintNameContext::Attribute);
+    Printer << "@";
     const TypeLoc &typeLoc = cast<CustomAttr>(this)->getTypeLoc();
     if (auto type = typeLoc.getType())
       type->print(Printer, Options);
     else
       typeLoc.getTypeRepr()->print(Printer, Options);
+    Printer.printNamePost(PrintNameContext::Attribute);
     break;
   }
 

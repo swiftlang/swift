@@ -2701,33 +2701,35 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   }
 
   // Build the signature of the thunk as expected by the keypath runtime.
-  CanType loweredBaseTy, loweredPropTy;
-  AbstractionPattern opaque = AbstractionPattern::getOpaque();
+  auto signature = [&]() {
+    CanType loweredBaseTy, loweredPropTy;
+    AbstractionPattern opaque = AbstractionPattern::getOpaque();
 
-  loweredBaseTy = SGM.Types.getLoweredRValueType(
-      TypeExpansionContext::minimal(), opaque, baseType);
-  loweredPropTy = SGM.Types.getLoweredRValueType(
-      TypeExpansionContext::minimal(), opaque, propertyType);
-  
-  auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
+    loweredBaseTy = SGM.Types.getLoweredRValueType(
+        TypeExpansionContext::minimal(), opaque, baseType);
+    loweredPropTy = SGM.Types.getLoweredRValueType(
+        TypeExpansionContext::minimal(), opaque, propertyType);
+    
+    auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
 
-  SmallVector<SILParameterInfo, 2> params;
-  params.push_back({loweredBaseTy, paramConvention});
-  auto &C = SGM.getASTContext();
-  if (!indexes.empty())
-    params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
-                                                 ->getCanonicalType(),
-                      ParameterConvention::Direct_Unowned});
-  
-  SILResultInfo result(loweredPropTy, ResultConvention::Indirect);
-  
-  auto signature = SILFunctionType::get(genericSig,
-    SILFunctionType::ExtInfo::getThin(),
-    SILCoroutineKind::None,
-    ParameterConvention::Direct_Unowned,
-    params, {}, result, None,
-    SubstitutionMap(), false,
-    SGM.getASTContext());
+    SmallVector<SILParameterInfo, 2> params;
+    params.push_back({loweredBaseTy, paramConvention});
+    auto &C = SGM.getASTContext();
+    if (!indexes.empty())
+      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
+                                                   ->getCanonicalType(),
+                        ParameterConvention::Direct_Unowned});
+    
+    SILResultInfo result(loweredPropTy, ResultConvention::Indirect);
+    
+    return SILFunctionType::get(genericSig,
+      SILFunctionType::ExtInfo::getThin(),
+      SILCoroutineKind::None,
+      ParameterConvention::Direct_Unowned,
+      params, {}, result, None,
+      SubstitutionMap(), false,
+      SGM.getASTContext());
+  }();
   
   // Find the function and see if we already created it.
   auto name = Mangle::ASTMangler()
@@ -2753,9 +2755,15 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   }
   
   SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
+
+  signature = subSGF.F.getLoweredFunctionTypeInContext(
+    subSGF.F.getTypeExpansionContext());
+
   auto entry = thunk->begin();
-  auto resultArgTy = result.getSILStorageType(SGM.M, signature);
-  auto baseArgTy = params[0].getSILStorageType(SGM.M, signature);
+  auto resultArgTy = signature->getSingleResult().getSILStorageType(
+      SGM.M, signature);
+  auto baseArgTy = signature->getParameters()[0].getSILStorageType(
+      SGM.M, signature);
   if (genericEnv) {
     resultArgTy = genericEnv->mapTypeIntoContext(SGM.M, resultArgTy);
     baseArgTy = genericEnv->mapTypeIntoContext(SGM.M, baseArgTy);
@@ -2764,7 +2772,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto baseArg = entry->createFunctionArgument(baseArgTy);
   SILValue indexPtrArg;
   if (!indexes.empty()) {
-    auto indexArgTy = params[1].getSILStorageType(SGM.M, signature);
+    auto indexArgTy = signature->getParameters()[1].getSILStorageType(
+        SGM.M, signature);
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
   
@@ -2833,41 +2842,43 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   }
 
   // Build the signature of the thunk as expected by the keypath runtime.
-  CanType loweredBaseTy, loweredPropTy;
-  {
-    AbstractionPattern opaque = AbstractionPattern::getOpaque();
+  auto signature = [&]() {
+    CanType loweredBaseTy, loweredPropTy;
+    {
+      AbstractionPattern opaque = AbstractionPattern::getOpaque();
 
-    loweredBaseTy = SGM.Types.getLoweredRValueType(
-        TypeExpansionContext::minimal(), opaque, baseType);
-    loweredPropTy = SGM.Types.getLoweredRValueType(
-        TypeExpansionContext::minimal(), opaque, propertyType);
-  }
-  
-  auto &C = SGM.getASTContext();
-  
-  auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
+      loweredBaseTy = SGM.Types.getLoweredRValueType(
+          TypeExpansionContext::minimal(), opaque, baseType);
+      loweredPropTy = SGM.Types.getLoweredRValueType(
+          TypeExpansionContext::minimal(), opaque, propertyType);
+    }
+    
+    auto &C = SGM.getASTContext();
+    
+    auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
 
-  SmallVector<SILParameterInfo, 3> params;
-  // property value
-  params.push_back({loweredPropTy, paramConvention});
-  // base
-  params.push_back({loweredBaseTy,
-                    property->isSetterMutating()
-                      ? ParameterConvention::Indirect_Inout
-                      : paramConvention});
-  // indexes
-  if (!indexes.empty())
-    params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
-                                                 ->getCanonicalType(),
-                      ParameterConvention::Direct_Unowned});
-  
-  auto signature = SILFunctionType::get(genericSig,
-    SILFunctionType::ExtInfo::getThin(),
-    SILCoroutineKind::None,
-    ParameterConvention::Direct_Unowned,
-    params, {}, {}, None,
-    SubstitutionMap(), false,
-    SGM.getASTContext());
+    SmallVector<SILParameterInfo, 3> params;
+    // property value
+    params.push_back({loweredPropTy, paramConvention});
+    // base
+    params.push_back({loweredBaseTy,
+                      property->isSetterMutating()
+                        ? ParameterConvention::Indirect_Inout
+                        : paramConvention});
+    // indexes
+    if (!indexes.empty())
+      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
+                                                   ->getCanonicalType(),
+                        ParameterConvention::Direct_Unowned});
+    
+    return SILFunctionType::get(genericSig,
+      SILFunctionType::ExtInfo::getThin(),
+      SILCoroutineKind::None,
+      ParameterConvention::Direct_Unowned,
+      params, {}, {}, None,
+      SubstitutionMap(), false,
+      SGM.getASTContext());
+  }();
   
   // Mangle the name of the thunk to see if we already created it.
   auto name = Mangle::ASTMangler()
@@ -2894,9 +2905,15 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   }
   
   SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
+
+  signature = subSGF.F.getLoweredFunctionTypeInContext(
+    subSGF.F.getTypeExpansionContext());
+
   auto entry = thunk->begin();
-  auto valueArgTy = params[0].getSILStorageType(SGM.M, signature);
-  auto baseArgTy = params[1].getSILStorageType(SGM.M, signature);
+  auto valueArgTy = signature->getParameters()[0].getSILStorageType(
+      SGM.M, signature);
+  auto baseArgTy = signature->getParameters()[1].getSILStorageType(
+      SGM.M, signature);
   if (genericEnv) {
     valueArgTy = genericEnv->mapTypeIntoContext(SGM.M, valueArgTy);
     baseArgTy = genericEnv->mapTypeIntoContext(SGM.M, baseArgTy);
@@ -2906,7 +2923,8 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   SILValue indexPtrArg;
   
   if (!indexes.empty()) {
-    auto indexArgTy = params[2].getSILStorageType(SGM.M, signature);
+    auto indexArgTy = signature->getParameters()[2].getSILStorageType(
+        SGM.M, signature);
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
 
