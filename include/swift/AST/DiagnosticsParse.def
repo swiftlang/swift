@@ -428,8 +428,14 @@ ERROR(operator_decl_inner_scope,none,
       "'operator' may only be declared at file scope", ())
 ERROR(expected_operator_name_after_operator,PointsToFirstBadToken,
       "expected operator name in operator declaration", ())
-ERROR(identifier_when_expecting_operator,PointsToFirstBadToken,
-      "%0 is considered to be an identifier, not an operator", (Identifier))
+ERROR(identifier_within_operator_name,PointsToFirstBadToken,
+      "'%0' is considered an identifier and must not "
+      "appear within an operator name", (StringRef))
+ERROR(operator_name_invalid_char,PointsToFirstBadToken,
+      "'%0' is not allowed in operator names", (StringRef))
+ERROR(postfix_operator_name_cannot_start_with_unwrap,PointsToFirstBadToken,
+      "postfix operator names starting with '?' or '!' are disallowed "
+      "to avoid collisions with built-in unwrapping operators", ())
 
 ERROR(deprecated_operator_body,PointsToFirstBadToken,
       "operator should no longer be declared with body", ())

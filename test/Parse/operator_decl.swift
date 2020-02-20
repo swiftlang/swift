@@ -40,9 +40,16 @@ prefix operator // expected-error {{expected operator name in operator declarati
 prefix operator %%+
 
 prefix operator ??
-postfix operator ?? // expected-error {{expected operator name in operator declaration}}
+postfix operator ?? // expected-error {{postfix operator names starting with '?' or '!' are disallowed}}
 prefix operator !!
-postfix operator !! // expected-error {{expected operator name in operator declaration}}
+postfix operator !! // expected-error {{postfix operator names starting with '?' or '!' are disallowed}}
+
+infix operator --aa // expected-error {{'aa' is considered an identifier and must not appear within an operator name}}
+infix operator aa--: A // expected-error {{'aa' is considered an identifier and must not appear within an operator name}}
+infix operator <<$$@< // expected-error {{'$$' is considered an identifier and must not appear within an operator name}}
+infix operator !!@aa // expected-error {{'@' is not allowed in operator names}}
+infix operator #++= // expected-error {{'#' is not allowed in operator names}}
+infix operator ++=# // expected-error {{'#' is not allowed in operator names}}
 
 infix operator +++=
 infix operator *** : A

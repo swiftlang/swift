@@ -1503,6 +1503,9 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 static bool isBuiltinOperator(StringRef name, DeclAttribute *attr) {
   return ((isa<PrefixAttr>(attr)  && name == "&") ||   // lvalue to inout
           (isa<PostfixAttr>(attr) && name == "!") ||   // optional unwrapping
+          // FIXME: Not actually a builtin operator, but should probably
+          // be allowed and accounted for in Sema?
+          (isa<PrefixAttr>(attr) && name == "?") ||
           (isa<PostfixAttr>(attr) && name == "?") ||   // optional chaining
           (isa<InfixAttr>(attr) && name == "?") ||     // ternary operator
           (isa<PostfixAttr>(attr) && name == ">") ||   // generic argument list

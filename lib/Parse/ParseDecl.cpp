@@ -7401,24 +7401,50 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc OperatorLoc = consumeToken(tok::kw_operator);
   bool AllowTopLevel = Flags.contains(PD_AllowTopLevel);
 
-  if (!Tok.isAnyOperator() && !Tok.is(tok::exclaim_postfix)) {
-    // A common error is to try to define an operator with something in the
-    // unicode plane considered to be an operator, or to try to define an
-    // operator like "not".  Diagnose this specifically.
-    if (Tok.is(tok::identifier))
-      diagnose(Tok, diag::identifier_when_expecting_operator,
-               Context.getIdentifier(Tok.getText()));
-    else
-      diagnose(Tok, diag::expected_operator_name_after_operator);
+  const auto maybeDiagnoseInvalidCharInOperatorName = [this](const Token &Tk) {
+    if (Tk.is(tok::identifier) &&
+        DeclAttribute::getAttrKindFromString(Tk.getText()) ==
+          DeclAttrKind::DAK_Count) {
+      diagnose(Tk, diag::identifier_within_operator_name, Tk.getText());
+      return true;
+    } else if (Tk.isNot(tok::colon, tok::l_brace, tok::semi) &&
+               Tk.isPunctuation()) {
+      diagnose(Tk, diag::operator_name_invalid_char,
+               Tk.getText().take_front());
+      return true;
+    }
+    return false;
+  };
 
-    // To improve recovery, check to see if we have a { right after this token.
-    // If so, swallow until the end } to avoid tripping over the body of the
-    // malformed operator decl.
+  // A common error is to try to define an operator with something in the
+  // unicode plane considered to be an operator, or to try to define an
+  // operator like "not".  Analyze and diagnose this specifically.
+  if (Tok.isAnyOperator()) {
+    if (peekToken().getLoc() == Tok.getRange().getEnd() &&
+      maybeDiagnoseInvalidCharInOperatorName(peekToken())) {
+      consumeToken();
+
+      // If there's a deprecated body, skip it to improve recovery.
+      if (peekToken().is(tok::l_brace)) {
+        consumeToken();
+        skipSingle();
+      }
+      return nullptr;
+    }
+  // We will handle these either below or in Sema.
+  } else if (Tok.isNot(tok::exclaim_postfix, tok::question_infix,
+                       tok::question_postfix)) {
+    if (maybeDiagnoseInvalidCharInOperatorName(Tok)) {
+      // We're done diagnosing.
+    } else {
+      diagnose(Tok, diag::expected_operator_name_after_operator);
+    }
+
+    // If there's a deprecated body, skip it to improve recovery.
     if (peekToken().is(tok::l_brace)) {
       consumeToken();
       skipSingle();
     }
-
     return nullptr;
   }
 
@@ -7427,9 +7453,11 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   Identifier Name = Context.getIdentifier(Tok.getText());
   SourceLoc NameLoc = consumeToken();
 
+  // Postfix operators starting with ? or ! conflict with builtin
+  // unwrapping operators.
   if (Attributes.hasAttribute<PostfixAttr>()) {
     if (!Name.empty() && (Name.get()[0] == '?' || Name.get()[0] == '!'))
-      diagnose(NameLoc, diag::expected_operator_name_after_operator);      
+      diagnose(NameLoc, diag::postfix_operator_name_cannot_start_with_unwrap);
   }
 
   auto Result = parseDeclOperatorImpl(OperatorLoc, Name, NameLoc, Attributes);
