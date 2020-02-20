@@ -280,7 +280,12 @@ static void computeSwiftModuleTraceInfo(
     path::replace_extension(modPath, swiftInterfaceExt);
   };
 
-  for (auto &depPath : depTracker.getDependencies()) {
+  SmallString<256> normalizedDepPathScratch;
+
+  for (auto &nonNormalizedDepPath : depTracker.getDependencies()) {
+    normalizedDepPathScratch.clear();
+    llvm::sys::path::native(nonNormalizedDepPath, normalizedDepPathScratch);
+    StringRef depPath = normalizedDepPathScratch.str();
 
     // Decide if this is a swiftmodule based on the extension of the raw
     // dependency path, as the true file may have a different one.
@@ -412,6 +417,9 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   for (std::pair<ModuleDecl::AccessPathTy, ModuleDecl *> &import : imports)
     importedModules.insert(import.second);
 
+  SmallString<256> scratch;
+  std::vector<SmallString<256>> normalizedPathStorage;
+
   llvm::DenseMap<StringRef, ModuleDecl *> pathToModuleDecl;
   for (auto &module : ctxt.LoadedModules) {
     ModuleDecl *loadedDecl = module.second;
@@ -424,8 +432,12 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
         "Don't know how to handle modules with empty names."
         " One potential reason for getting an empty module name might"
         " be that the module could not be deserialized correctly.");
-    pathToModuleDecl.insert(
-      std::make_pair(loadedDecl->getModuleFilename(), loadedDecl));
+    // Normalize paths, otherwise we keep running into problems with being
+    // unable to write cross-platform tests that work on both Posix and Windows.
+    llvm::sys::path::native(loadedDecl->getModuleFilename(), scratch);
+    normalizedPathStorage.push_back(scratch);
+    StringRef path = normalizedPathStorage.back().str();
+    pathToModuleDecl.insert(std::make_pair(path, loadedDecl));
   }
 
   std::vector<SwiftModuleTraceInfo> swiftModules;
