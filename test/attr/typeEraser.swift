@@ -53,6 +53,12 @@ protocol B4 {}
 @_typeEraser(Generic<Int>) // bound generic is okay
 protocol B5 {}
 
+class MoreRestrictive: B6 { // expected-note {{type eraser declared here}}
+  init<T: B6>(erasing t: T) {}
+}
+@_typeEraser(MoreRestrictive) // expected-error {{internal type eraser 'MoreRestrictive' cannot have more restrictive access than protocol 'B6' (which is public)}}
+public protocol B6 {}
+
 // MARK: - Type eraser must conform to the annotated protocol
 
 class DoesNotConform {} // expected-note {{type eraser declared here}}
@@ -62,55 +68,44 @@ protocol C1 {}
 // MARK: - Type eraser must have an initializer in the form init<T>(erasing: T) with T constrained to annotated protocol
 
 class NoArgInit: D1 {} // expected-note {{type eraser declared here}}
-@_typeEraser(NoArgInit) // expected-error {{type eraser 'NoArgInit' must have an initializer of the form 'init<T: 'D1'>(erasing: T)'}}
+@_typeEraser(NoArgInit) // expected-error {{type eraser 'NoArgInit' must have an initializer of the form 'init<T: D1>(erasing: T)'}}
 protocol D1 {}
 
 class InvalidArgInit: D2 { // expected-note {{type eraser declared here}}
   init<T>(erasing t: T) {}
 }
-@_typeEraser(InvalidArgInit) // expected-error {{type eraser 'InvalidArgInit' must have an initializer of the form 'init<T: 'D2'>(erasing: T)'}}
+@_typeEraser(InvalidArgInit) // expected-error {{type eraser 'InvalidArgInit' must have an initializer of the form 'init<T: D2>(erasing: T)'}}
 protocol D2 {}
 
 class ExtraArgInit: D3 { // expected-note {{type eraser declared here}}
   init<T: D3>(erasing t: T, extraArg: Int) {}
 }
-@_typeEraser(ExtraArgInit) // expected-error {{type eraser 'ExtraArgInit' must have an initializer of the form 'init<T: 'D3'>(erasing: T)'}}
+@_typeEraser(ExtraArgInit) // expected-error {{type eraser 'ExtraArgInit' must have an initializer of the form 'init<T: D3>(erasing: T)'}}
 protocol D3 {}
 
 class WrongLabelInit: D4 { // expected-note {{type eraser declared here}}
   init<T: D4>(wrongLabel: T) {}
 }
-@_typeEraser(WrongLabelInit) // expected-error {{type eraser 'WrongLabelInit' must have an initializer of the form 'init<T: 'D4'>(erasing: T)'}}
+@_typeEraser(WrongLabelInit) // expected-error {{type eraser 'WrongLabelInit' must have an initializer of the form 'init<T: D4>(erasing: T)'}}
 protocol D4 {}
 
 class NoLabel: D5 { // expected-note {{type eraser declared here}}
   init<T: D5>(_ t: T) {}
 }
-@_typeEraser(NoLabel) // expected-error {{type eraser 'NoLabel' must have an initializer of the form 'init<T: 'D5'>(erasing: T)'}}
+@_typeEraser(NoLabel) // expected-error {{type eraser 'NoLabel' must have an initializer of the form 'init<T: D5>(erasing: T)'}}
 protocol D5 {}
 
-class FailableInit: D6 {
-  init?<T: D6>(erasing t: T) {} // expected-note {{'init(erasing:)' cannot be failable}}
-}
-@_typeEraser(FailableInit) // expected-error {{type eraser 'FailableInit' must have an initializer of the form 'init<T: 'D6'>(erasing: T)'}}
-protocol D6 {}
+// MARK: - Unviable initializers
 
-class UnsatisfiedReq: D7 {
-  init<T: D7>(erasing t: T) where T: Hashable {} // expected-note {{'init(erasing:)' has unsatisfied requirements}}
+public class UnviableInits: E1 {
+  public init<T: E1>(erasing t: T) where T: Hashable {} // expected-note {{'init(erasing:)' cannot have unsatisfied requirements when 'T' = 'some E1'}}
+  init<T: E1>(erasing t: T) {} // expected-note {{internal 'init(erasing:)' cannot have more restrictive access than protocol 'E1' (which is public)}}
 }
-@_typeEraser(UnsatisfiedReq) // expected-error {{type eraser 'UnsatisfiedReq' must have an initializer of the form 'init<T: 'D7'>(erasing: T)'}}
-protocol D7 {}
-
-// MARK: - Type eraser and initializer cannot be more restrictive than the annotated protocol
-
-class MoreRestrictive: E1 { // expected-note {{type eraser declared here}}
-  init<T: E1>(erasing t: T) {}
-}
-@_typeEraser(MoreRestrictive) // expected-error {{internal type eraser 'MoreRestrictive' cannot have more restrictive access than protocol 'E1' (which is public)}}
+@_typeEraser(UnviableInits) // expected-error {{type eraser 'UnviableInits' has no viable initializer of the form 'init<T: E1>(erasing: T)'}}
 public protocol E1 {}
 
-public class MoreRestrictiveInit: E2 {
-  init<T: E2>(erasing t: T) {} // expected-note {{internal 'init(erasing:)' cannot have more restrictive access than protocol 'E2' (which is public)}}
+class FailableInit: E2 {
+  init?<T: E2>(erasing t: T) {} // expected-note {{'init(erasing:)' cannot be failable}}
 }
-@_typeEraser(MoreRestrictiveInit) // expected-error {{type eraser 'MoreRestrictiveInit' must have an initializer of the form 'init<T: 'E2'>(erasing: T)'}}
-public protocol E2 {}
+@_typeEraser(FailableInit) // expected-error {{type eraser 'FailableInit' has no viable initializer of the form 'init<T: E2>(erasing: T)'}}
+protocol E2 {}

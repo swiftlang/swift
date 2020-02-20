@@ -2434,7 +2434,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
     UnsatisfiedRequirements,
     Inaccessible,
   };
-  SmallVector<std::pair<ConstructorDecl *, UnviableReason>, 2> unviable;
+  SmallVector<std::tuple<ConstructorDecl *, UnviableReason, Type>, 2> unviable;
 
   bool foundMatch = llvm::any_of(lookupResult, [&](const LookupResultEntry &entry) {
     auto *init = cast<ConstructorDecl>(entry.getValueDecl());
@@ -2482,17 +2482,21 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
           None);
 
     if (result != RequirementCheckResult::Success) {
-      unviable.push_back({init, UnviableReason::UnsatisfiedRequirements});
+      unviable.push_back(
+          std::make_tuple(init, UnviableReason::UnsatisfiedRequirements,
+                          genericParamType));
       return false;
     }
 
     if (init->isFailable()) {
-      unviable.push_back({init, UnviableReason::Failable});
+      unviable.push_back(
+          std::make_tuple(init, UnviableReason::Failable, genericParamType));
       return false;
     }
 
     if (init->getFormalAccess() < protocol->getFormalAccess()) {
-      unviable.push_back({init, UnviableReason::Inaccessible});
+      unviable.push_back(
+          std::make_tuple(init, UnviableReason::Inaccessible, genericParamType));
       return false;
     }
 
@@ -2500,15 +2504,19 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
   });
 
   if (!foundMatch) {
-    diags.diagnose(attr->getLocation(), diag::type_eraser_missing_init,
-                   typeEraser, protocolType);
-    if (unviable.empty())
-      diags.diagnose(nominalTypeDecl->getLoc(),
-                     diag::type_eraser_declared_here);
+    if (unviable.empty()) {
+      diags.diagnose(attr->getLocation(), diag::type_eraser_missing_init,
+                     typeEraser, protocol->getName().str());
+      diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
+      return false;
+    }
 
+    diags.diagnose(attr->getLocation(), diag::type_eraser_unviable_init,
+                   typeEraser, protocol->getName().str());
     for (auto &candidate: unviable) {
-      auto init = candidate.first;
-      auto reason = candidate.second;
+      auto init = std::get<0>(candidate);
+      auto reason = std::get<1>(candidate);
+      auto genericParamType = std::get<2>(candidate);
 
       switch (reason) {
       case UnviableReason::Failable:
@@ -2516,7 +2524,8 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
         break;
       case UnviableReason::UnsatisfiedRequirements:
         diags.diagnose(init->getLoc(),
-                       diag::type_eraser_init_unsatisfied_requirements);
+                       diag::type_eraser_init_unsatisfied_requirements,
+                       genericParamType, protocol->getName().str());
         break;
       case UnviableReason::Inaccessible:
         diags.diagnose(init->getLoc(), diag::type_eraser_init_not_accessible,
