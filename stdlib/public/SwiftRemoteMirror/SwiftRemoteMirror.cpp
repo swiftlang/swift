@@ -573,7 +573,7 @@ size_t swift_reflection_demangle(const char *MangledName, size_t Length,
   return Demangled.size();
 }
 
-void swift_reflection_dumpConformances(SwiftReflectionContextRef ContextRef) {
+void swift_reflection_dumpConformanceCache(SwiftReflectionContextRef ContextRef) {
   auto Context = ContextRef->nativeContext;
   Context->dumpConformances();
 }

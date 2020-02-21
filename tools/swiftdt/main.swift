@@ -15,35 +15,106 @@ func machErrStr(_ kr: kern_return_t) -> String {
 
 
 var argv = ArraySlice(CommandLine.arguments)
-guard let commandName = argv.popFirst() else {
+guard let executableName = argv.popFirst() else {
   argFail("Command line arguments are completely empty!")
 }
 
-guard let pidStr = argv.popFirst() else {
-  argFail("Specify a pid")
+struct Command {
+  var name: String
+  var help: String
+  var call: (inout ArraySlice<String>) -> Void
+  
+  init(name: String, help: String,
+       call: @escaping (inout ArraySlice<String>) -> Void) {
+    self.name = name
+    self.help = help
+    self.call = call
+  }
+  
+  init(name: String, help: String,
+       call: @escaping (SwiftReflectionContextRef) -> Void) {
+    self.name = name
+    self.help = help
+    self.call = { withReflectionContext(args: &$0, call: call) }
+  }
 }
 
-guard let pid = pidFromHint(pidStr) else {
-  argFail("Cannot find pid/process \(pidStr)")
+let commands = [
+  Command(
+    name: "dump-conformance-cache",
+    help: "Print the contents of the target's protocol conformance cache.",
+    call: swift_reflection_dumpConformanceCache),
+  Command(
+    name: "dump-metadata-allocations",
+    help: "Print the target's metadata allocations.",
+    call: swift_reflection_dumpMetadataAllocations),
+  Command(
+    name: "help",
+    help: "Print this help.",
+    call: printUsage),
+]
+
+func printUsage(args: inout ArraySlice<String>) -> Void {
+  print("Usage: \(executableName) <command>", to: &Std.err)
+  print("", to: &Std.err)
+  print("Available commands:", to: &Std.err)
+  
+  let maxWidth = commands.map({ $0.name.count }).max() ?? 0
+  for command in commands {
+    let paddedName = command.name.padding(toLength: maxWidth,
+                                          withPad: " ", startingAt: 0)
+    print("  \(paddedName) - \(command.help)", to: &Std.err)
+  }
 }
 
-guard let inspector = Inspector(pid: pid) else {
-  argFail("Failed to inspect pid \(pid)")
+func makeReflectionContext(args: inout ArraySlice<String>)
+  -> (Inspector, SwiftReflectionContextRef) {
+  guard let pidStr = args.popFirst() else {
+    argFail("Must specify a pid or process name")
+  }
+
+  guard let pid = pidFromHint(pidStr) else {
+    argFail("Cannot find pid/process \(pidStr)")
+  }
+
+  guard let inspector = Inspector(pid: pid) else {
+    argFail("Failed to inspect pid \(pid)")
+  }
+
+  guard let reflectionContext
+    = swift_reflection_createReflectionContextWithDataLayout(
+    inspector.passContext(),
+    Inspector.Callbacks.QueryDataLayout,
+    Inspector.Callbacks.Free,
+    Inspector.Callbacks.ReadBytes,
+    Inspector.Callbacks.GetStringLength,
+    Inspector.Callbacks.GetSymbolAddress) else {
+    argFail("Failed to create reflection context")
+  }
+  return (inspector, reflectionContext)
 }
 
-let addr = inspector.getAddr(symbolName: "__ZL12Conformances")
-print(addr)
+func withReflectionContext(args: inout ArraySlice<String>,
+                           call: (SwiftReflectionContextRef) -> Void) {
+  let (inspector, context) = makeReflectionContext(args: &args)
+  call(context)
+  swift_reflection_destroyReflectionContext(context)
+  inspector.destroyContext()
+}
 
-let reflectionContext = swift_reflection_createReflectionContextWithDataLayout(
-  inspector.passContext(),
-  Inspector.Callbacks.QueryDataLayout,
-  Inspector.Callbacks.Free,
-  Inspector.Callbacks.ReadBytes,
-  Inspector.Callbacks.GetStringLength,
-  Inspector.Callbacks.GetSymbolAddress)
+let commandName = argv.popFirst()
+for command in commands {
+  if command.name == commandName {
+    command.call(&argv)
+    exit(0)
+  }
+}
 
-swift_reflection_dumpConformances(reflectionContext)
-swift_reflection_dumpMetadataAllocations(reflectionContext)
-
-swift_reflection_destroyReflectionContext(reflectionContext)
-inspector.destroyContext()
+if let commandName = commandName {
+  print("error: \(executableName): unknown command \(commandName)", to: &Std.err)
+} else {
+  print("error: \(executableName): missing command", to: &Std.err)
+}
+print("", to: &Std.err)
+printUsage(args: &argv)
+exit(EX_USAGE)
