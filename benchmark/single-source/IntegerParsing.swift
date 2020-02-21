@@ -221,9 +221,9 @@ func generateValues<Integer : FixedWidthInteger>(
     }
 }
 private let intSmallValues: [Int]
-  = generateValues(in: -1000 ... 1000, count: 20_000)
+  = generateValues(in: -9999 ... 9999, count: 20_000)
 private let uintSmallValues: [UInt]
-  = generateValues(in: 0 ... 1000, count: 20_000)
+  = generateValues(in: 0 ... 9999, count: 20_000)
 private let int32Values: [Int32]
   = generateValues(in: .min ... .max, count: 8000)
 private let int64Values: [Int64]

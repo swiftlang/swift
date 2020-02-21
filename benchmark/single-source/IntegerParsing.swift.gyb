@@ -23,7 +23,7 @@ import TestsUtils
 % SizeNamesLower\
 %  = [ "intSmall", "uintSmall", "int32", "int64", "uint32", "uint64" ]
 % SizeTypes = [ "Int", "UInt", "Int32", "Int64", "UInt32", "UInt64" ]
-% SizeRanges = [ "-1000 ... 1000", "0 ... 1000" ] + ([ ".min ... .max" ] * 4)
+% SizeRanges = [ "-9999 ... 9999", "0 ... 9999" ] + ([ ".min ... .max" ] * 4)
 % SizeValueCounts = [ "20_000", "20_000", "8000", "4000", "8000", "4000" ]
 % RadixNames = [ "Decimal", "Binary", "Hex", "UncommonRadix" ]
 % Radices = [ 10, 2, 16, 7 ]
