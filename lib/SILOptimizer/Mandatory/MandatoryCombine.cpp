@@ -125,8 +125,6 @@ public:
     return changed;
   }
 
-  bool tryRemoveUnused(SILValue v);
-
   /// Base visitor that does not do anything.
   SILInstruction *visitSILInstruction(SILInstruction *) { return nullptr; }
   SILInstruction *visitApplyInst(ApplyInst *instruction);
@@ -292,31 +290,6 @@ template <class InstT> static FunctionRefInst *getRemovableRef(InstT *i) {
     return funcRef;
   }
   return nullptr;
-}
-
-bool MandatoryCombiner::tryRemoveUnused(SILValue v) {
-  if (!v->use_empty()) {
-    SmallVector<SILInstruction *, 2> toRemove;
-    // Get all the uses and add strong_retain, strong_release, and dealloc_stack
-    // to the "toRemove" vector. If we come accross something that isn't one of
-    // those instructions, exit early.
-    for (auto *use : v->getUses()) {
-      if (isa<StrongRetainInst>(use->getUser()) ||
-          isa<StrongReleaseInst>(use->getUser()) ||
-          isa<DeallocStackInst>(use->getUser()) ||
-          isa<DebugValueInst>(use->getUser()))
-        toRemove.push_back(use->getUser());
-      else
-        return false;
-    }
-
-    for (auto *inst : toRemove) {
-      instModCallbacks.deleteInst(inst);
-    }
-  }
-
-  instModCallbacks.deleteInst(v->getDefiningInstruction());
-  return true;
 }
 
 SILInstruction *MandatoryCombiner::visitLoadInst(LoadInst *i) {
