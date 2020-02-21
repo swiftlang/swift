@@ -381,3 +381,66 @@ bb0(%0 : $S, %1 : $*P):
   return %15 : $()
 }
 
+//===----------------------------------------------------------------------===//
+// Test an existential with a generic constraint
+// rdar://56923071; [SR-11714]: Compiler crash when generic class is passed as
+// a parameter to a function accepting a generic class
+//
+// Allowing this results in the error:
+// SIL verification failed: Operand is of an ArchetypeType that does not exist
+// in the Caller's generic param list.: isArchetypeValidInFunction(A, F)
+//
+// This could be fixed by preserving the original function's
+// archetypes when rewriting the generic signature. However, the
+// ExistentialSpecializer should not specialize generic functions in
+// the first place because, without partial specialization, there's no
+// guarantee that the new generic form will be able to be
+// specialized. Preferably, all other generic parameters will be
+// specialized first before attempting to specialize the existential.
+//===----------------------------------------------------------------------===//
+
+public class ClassA<T> { }
+
+public protocol ProtocolA {
+  func foo() -> Int
+}
+
+public class ClassB<T> : ClassA<T> {
+  public func foo() -> Int
+  override init()
+}
+
+extension ClassB : ProtocolA {}
+
+// Pass an existential argument that happens to also have a generic constraint.
+//
+// CHECK-LABEL: sil @testExistentialGenericConstraint : $@convention(thin) <T> (@guaranteed ClassB<T>) -> Int {
+// CHECK:   [[E:%.*]] = init_existential_ref %0 : $ClassB<T> : $ClassB<T>, $ClassA<T> & ProtocolA
+// CHECK:   [[F:%.*]] = function_ref @testExistentialGenericConstraintHelper : $@convention(thin) <τ_0_0> (@guaranteed ClassA<τ_0_0> & ProtocolA) -> Int
+// CHECK:   apply [[F]]<T>([[E]]) : $@convention(thin) <τ_0_0> (@guaranteed ClassA<τ_0_0> & ProtocolA) -> Int
+// CHECK-LABEL: } // end sil function 'testExistentialGenericConstraint'
+sil @testExistentialGenericConstraint : $@convention(thin) <T> (@guaranteed ClassB<T>) -> Int {
+bb0(%0 : $ClassB<T>):
+  strong_retain %0 : $ClassB<T>
+  %3 = init_existential_ref %0 : $ClassB<T> : $ClassB<T>, $ClassA<T> & ProtocolA
+  %4 = function_ref @testExistentialGenericConstraintHelper : $@convention(thin) <τ_0_0> (@guaranteed ClassA<τ_0_0> & ProtocolA) -> Int
+  %5 = apply %4<T>(%3) : $@convention(thin) <τ_0_0> (@guaranteed ClassA<τ_0_0> & ProtocolA) -> Int
+  strong_release %3 : $ClassA<T> & ProtocolA
+  return %5 : $Int
+}
+
+// This generic function should not be "specialized" by ExistentialSpecializer, which would add more generic parameters.
+//
+// CHECK-LABEL: sil hidden @testExistentialGenericConstraintHelper : $@convention(thin) <T> (@guaranteed ClassA<T> & ProtocolA) -> Int {
+// CHECK: bb0(%0 : $ClassA<T> & ProtocolA):
+// CHECK-LABEL: } // end sil function 'testExistentialGenericConstraintHelper'
+sil hidden @testExistentialGenericConstraintHelper : $@convention(thin) <T> (@guaranteed ClassA<T> & ProtocolA) -> Int {
+bb0(%0 : $ClassA<T> & ProtocolA):
+  %2 = open_existential_ref %0 : $ClassA<T> & ProtocolA to $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA
+  %3 = alloc_stack $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA
+  store %2 to %3 : $*@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA
+  %5 = witness_method $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA, #ProtocolA.foo!1 : <Self where Self : ProtocolA> (Self) -> () -> Int, %2 : $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA : $@convention(witness_method: ProtocolA) <τ_0_0 where τ_0_0 : ProtocolA> (@in_guaranteed τ_0_0) -> Int
+  %6 = apply %5<@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA>(%3) : $@convention(witness_method: ProtocolA) <τ_0_0 where τ_0_0 : ProtocolA> (@in_guaranteed τ_0_0) -> Int
+  dealloc_stack %3 : $*@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA
+  return %6 : $Int
+}
