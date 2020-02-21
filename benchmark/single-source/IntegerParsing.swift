@@ -10,12 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-////////////////////////////////////////////////////////////////////////////////
-// WARNING: This file is manually generated from .gyb template and should not
-// be directly modified. Instead, make changes to StringWalk.swift.gyb and run
-// scripts/generate_harness/generate_harness.py to regenerate this file.
-////////////////////////////////////////////////////////////////////////////////
-
 import TestsUtils
 
 
