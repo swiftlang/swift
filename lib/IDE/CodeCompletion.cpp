@@ -1375,7 +1375,7 @@ public:
                               Optional<StmtKind> ParentKind) override;
   void completeAfterPoundDirective() override;
   void completePlatformCondition() override;
-  void completeGenericRequirement(TypeLoc TL) override;
+  void completeGenericRequirement() override;
   void completeAfterIfStmt(bool hasElse) override;
 
   void doneParsing() override;
@@ -3958,17 +3958,18 @@ public:
     }
   }
 
-  void getGenericRequirementCompletions(Type BaseType) {
-    auto GTD = BaseType->getAnyGeneric();
-    if (!GTD)
+  void getGenericRequirementCompletions(DeclContext *DC) {
+
+    auto genericSig = DC->getGenericSignatureOfContext();
+    if (!genericSig)
       return;
 
-    if (auto Params = GTD->getGenericParams())
-      for (auto GP : Params->getParams())
-        addGenericTypeParamRef(GP, DeclVisibilityKind::GenericParameter, {});
-
-    auto selfTy = GTD->getSelfTypeInContext();
-
+    for (auto GPT : genericSig->getGenericParams()) {
+      addGenericTypeParamRef(GPT->getDecl(),
+                             DeclVisibilityKind::GenericParameter, {});
+    }
+    
+    auto selfTy = DC->getSelfTypeInContext();
     Kind = LookupKind::GenericRequirement;
     this->BaseType = selfTy;
     NeedLeadingDot = false;
@@ -4885,10 +4886,9 @@ void CodeCompletionCallbacksImpl::completeAfterIfStmt(bool hasElse) {
   }
 }
 
-void CodeCompletionCallbacksImpl::completeGenericRequirement(TypeLoc TL) {
+void CodeCompletionCallbacksImpl::completeGenericRequirement() {
   CurDeclContext = P.CurDeclContext;
   Kind = CompletionKind::GenericRequirement;
-  ParsedTypeLoc = TL;
 }
 
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
@@ -5614,7 +5614,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::GenericRequirement:
-    Lookup.getGenericRequirementCompletions(ParsedTypeLoc.getType());
+    Lookup.getGenericRequirementCompletions(CurDeclContext);
     break;
   case CompletionKind::PrecedenceGroup:
     Lookup.getPrecedenceGroupCompletions(SyntxKind);
