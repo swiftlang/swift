@@ -437,14 +437,13 @@ void SILType::dump() const {
 }
 
 /// Prints the name and type of the given SIL function with the given
-/// `PrintOptions`. Mutates `printOptions`, setting `GenericEnv` and
-/// `AlternativeTypeNames`.
-static void printSILFunctionNameAndType(llvm::raw_ostream &OS,
-                                        const SILFunction *function,
-                                        PrintOptions &printOptions) {
+/// `PrintOptions`. Computes mapping for sugared type names and stores the
+/// result in `sugaredTypeNames`.
+static void printSILFunctionNameAndType(
+    llvm::raw_ostream &OS, const SILFunction *function,
+    llvm::DenseMap<CanType, Identifier> &sugaredTypeNames) {
   function->printName(OS);
   OS << " : $";
-  llvm::DenseMap<CanType, Identifier> aliases;
   auto genSig = function->getLoweredFunctionType()->getSubstGenericSignature();
   auto *genEnv = function->getGenericEnvironment();
   // If `genSig` and `genEnv` are both defined, get sugared names of generic
@@ -470,22 +469,24 @@ static void printSILFunctionNameAndType(llvm::raw_ostream &OS,
         continue;
       // Otherwise, add sugared name mapping for the type (and its archetype, if
       // defined).
-      aliases[paramTy->getCanonicalType()] = name;
+      sugaredTypeNames[paramTy->getCanonicalType()] = name;
       if (auto *archetypeTy =
               genEnv->mapTypeIntoContext(paramTy)->getAs<ArchetypeType>())
-        aliases[archetypeTy->getCanonicalType()] = name;
+        sugaredTypeNames[archetypeTy->getCanonicalType()] = name;
     }
   }
+  auto printOptions = PrintOptions::printSIL();
   printOptions.GenericEnv = genEnv;
-  printOptions.AlternativeTypeNames = aliases.empty() ? nullptr : &aliases;
+  printOptions.AlternativeTypeNames =
+      sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames;
   function->getLoweredFunctionType()->print(OS, printOptions);
 }
 
 /// Prints the name and type of the given SIL function.
 static void printSILFunctionNameAndType(llvm::raw_ostream &OS,
                                         const SILFunction *function) {
-  auto printOptions = PrintOptions::printSIL();
-  printSILFunctionNameAndType(OS, function, printOptions);
+  llvm::DenseMap<CanType, Identifier> sugaredTypeNames;
+  printSILFunctionNameAndType(OS, function, sugaredTypeNames);
 }
 
 namespace {
@@ -2513,8 +2514,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (!isExternalDeclaration() && hasOwnership())
     OS << "[ossa] ";
 
-  auto printOptions = PrintOptions::printSIL();
-  printSILFunctionNameAndType(OS, this, printOptions);
+  llvm::DenseMap<CanType, Identifier> sugaredTypeNames;
+  printSILFunctionNameAndType(OS, this, sugaredTypeNames);
 
   if (!isExternalDeclaration()) {
     if (auto eCount = getEntryCount()) {
@@ -2522,7 +2523,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     }
     OS << " {\n";
 
-    SILPrinter(PrintCtx, printOptions.AlternativeTypeNames).print(this);
+    SILPrinter(PrintCtx, sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames)
+        .print(this);
     OS << "} // end sil function '" << getName() << '\'';
   }
 
