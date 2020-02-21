@@ -2415,9 +2415,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
   }
 
   // The type eraser must conform to the annotated protocol
-  SmallVector<ProtocolConformance *, 2> conformances;
-  if (!nominalTypeDecl->lookupConformance(dc->getParentModule(), protocol,
-                                          conformances)) {
+  if (!TypeChecker::conformsToProtocol(typeEraser, protocol, dc, None)) {
     diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_does_not_conform,
                    typeEraser, protocolType);
     diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
@@ -2464,13 +2462,15 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
         typeEraser->getContextSubstitutionMap(nominalTypeDecl->getParentModule(),
                                               nominalTypeDecl);
     QuerySubstitutionMap getSubstitution{baseMap};
-    auto subMap = genericSignature->getIdentitySubstitutionMap().subst(
+    auto subMap = SubstitutionMap::get(
+        genericSignature,
         [&](SubstitutableType *type) -> Type {
           if (type->isEqual(genericParamType))
             return protocol->getSelfTypeInContext();
 
           return getSubstitution(type);
-        }, TypeChecker::LookUpConformance(dc));
+        },
+        TypeChecker::LookUpConformance(dc));
 
     // Use invalid 'SourceLoc's to suppress diagnostics.
     auto result = TypeChecker::checkGenericArguments(
