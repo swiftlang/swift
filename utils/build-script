@@ -195,7 +195,7 @@ def validate_arguments(toolchain, args):
     # SWIFT_ENABLE_TENSORFLOW
     if args.enable_tensorflow:
         if toolchain.bazel is None:
-            diagnostics.fatal(
+            fatal_error(
                 "can't find bazel, needed to build TensorFlow (please "
                 "install bazel)")
 
@@ -249,25 +249,25 @@ def validate_arguments(toolchain, args):
             ("tensorflow_target_include_dir", False),
         ]
         tensorflow_dirs = [d for d in tensorflow_dirs
-                            if getattr(args, d[0]) is not None]
+                           if getattr(args, d[0]) is not None]
         for dirname, is_lib_dir in tensorflow_dirs:
             tensorflow_dir = getattr(args, dirname)
             if not os.path.isdir(tensorflow_dir):
-                diagnostics.fatal(
+                fatal_error(
                     "--{} does not exist (was '{}')"
                     .format(dirname, tensorflow_dir))
             if is_lib_dir:
                 for lib in tensorflow_libs:
                     if not os.path.exists(
                             os.path.join(tensorflow_dir, lib)):
-                        diagnostics.fatal(
+                        fatal_error(
                             "--{} does not contain '{}' (was '{}')"
                             .format(dirname, lib, tensorflow_dir))
 
         if args.build_tensorflow and \
             args.tensorflow_host_lib_dir is not None and \
                 args.tensorflow_host_include_dir is not None:
-            diagnostics.fatal(
+            fatal_error(
                 "when building with TensorFlow support, cannot specify "
                 " --build-tensorflow (to build TensorFlow from source) at "
                 "the same time as --tensorflow-host-lib-dir and "
@@ -276,7 +276,7 @@ def validate_arguments(toolchain, args):
 
         if args.tensorflow_swift_apis is not None:
             if not os.path.isdir(args.tensorflow_swift_apis):
-                diagnostics.fatal(
+                fatal_error(
                     "invalid repository specified for "
                     "--tensorflow-swift-apis (was '{}')"
                     .format(args.tensorflow_swift_apis))
@@ -290,7 +290,7 @@ def validate_arguments(toolchain, args):
         # specified.
         def warn_unspecified_tensorflow_env_var(name):
             if name not in os.environ:
-                diagnostics.note(
+                print_note(
                     "'{}' environment variable was not specified; "
                     "TensorFlow configure script default will be used"
                     .format(name))
@@ -409,7 +409,7 @@ def apply_default_arguments(toolchain, args):
             if (target.platform.is_darwin and
                 target.arch in supported_archs)
         ]
-    
+
     # Include the Darwin module-only architectures in the CMake options.
     if args.swift_darwin_module_archs:
         args.extra_cmake_options.append(
@@ -422,7 +422,7 @@ def apply_default_arguments(toolchain, args):
 
     if args.enable_tensorflow:
         if args.tensorflow_host_lib_dir is None and \
-            args.tensorflow_host_include_dir is None:
+           args.tensorflow_host_include_dir is None:
             args.build_tensorflow = True
         elif args.tensorflow_host_lib_dir is not None and \
                 args.tensorflow_host_include_dir is not None:
@@ -1205,10 +1205,7 @@ def main_preset():
     if not args.preset:
         fatal_error("missing --preset option")
 
-    args.preset_substitutions = {
-      'home': os.path.expanduser("~")
-    }
-
+    args.preset_substitutions = {}
     for arg in args.preset_substitutions_raw:
         name, value = arg.split("=", 1)
         args.preset_substitutions[name] = value
