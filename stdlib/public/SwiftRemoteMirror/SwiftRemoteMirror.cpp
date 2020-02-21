@@ -437,9 +437,6 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
     fprintf(stdout, "Mangled name: %s%s\n", MANGLING_PREFIX_STR,
             MangledName.c_str());
 #ifndef NDEBUG
-    auto *Reconstructed = reinterpret_cast<const TypeRef *>(
-        swift_reflection_typeRefForMangledTypeName(
-            ContextRef, MangledName.c_str(), MangledName.size()));
     assert(mangleNode(TR->getDemangling(Dem)) == MangledName &&
            "round-trip diff");
 #endif
