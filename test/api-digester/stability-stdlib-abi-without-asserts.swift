@@ -1,5 +1,3 @@
-// SWIFT_ENABLE_TENSORFLOW
-// UNSUPPORTED: tensorflow
 // REQUIRES: OS=macosx
 // REQUIRES: swift_stdlib_no_asserts
 // RUN: %empty-directory(%t.tmp)
