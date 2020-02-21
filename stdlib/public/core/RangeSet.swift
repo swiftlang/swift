@@ -109,7 +109,7 @@ public struct RangeSet<Bound: Comparable> {
   /// - `_indicesOfRange(12..<19) == 1..<2`
   /// - `_indicesOfRange(17..<19) == 2..<2`
   /// - `_indicesOfRange(12..<22) == 1..<3`
-  func _indicesOfRange(_ range: Range<Bound>) -> Range<Int> {
+  internal func _indicesOfRange(_ range: Range<Bound>) -> Range<Int> {
     _precondition(!range.isEmpty)
     _precondition(!_ranges.isEmpty)
     _precondition(range.lowerBound <= _ranges.last!.upperBound)
@@ -250,7 +250,7 @@ extension RangeSet: Hashable where Bound: Hashable {}
 extension RangeSet {
   /// A collection of the ranges that make up a range set.
   public struct Ranges: RandomAccessCollection {
-    var _ranges: _RangeSetStorage<Bound>
+    internal var _ranges: _RangeSetStorage<Bound>
     
     public var startIndex: Int { _ranges.startIndex }
     public var endIndex: Int { _ranges.endIndex }
@@ -280,9 +280,11 @@ extension RangeSet {
   ///   - index: The index to include in the range set. `index` must be a
   ///     valid index of `collection` that isn't the collection's `endIndex`.
   ///   - collection: The collection that contains `index`.
+  @inlinable
   public init<S, C>(_ indices: S, within collection: C)
     where S: Sequence, C: Collection, S.Element == C.Index, C.Index == Bound
   {
+    self.init()
     for i in indices {
       self.insert(i, within: collection)
     }
@@ -298,6 +300,7 @@ extension RangeSet {
   ///
   /// - Complexity: O(*n*), where *n* is the number of ranges in the range
   ///   set.
+  @inlinable
   public mutating func insert<C>(_ index: Bound, within collection: C)
     where C: Collection, C.Index == Bound
   {
@@ -314,6 +317,7 @@ extension RangeSet {
   ///
   /// - Complexity: O(*n*), where *n* is the number of ranges in the range
   ///   set.
+  @inlinable
   public mutating func remove<C>(_ index: Bound, within collection: C)
     where C: Collection, C.Index == Bound
   {
@@ -330,7 +334,6 @@ extension RangeSet {
   ///
   /// - Complexity: O(*n*), where *n* is the number of ranges in the range
   ///   set.
-  @usableFromInline
   internal func _inverted<C>(within collection: C) -> RangeSet
     where C: Collection, C.Index == Bound
   {
@@ -340,7 +343,6 @@ extension RangeSet {
   
   /// Returns a range set that represents the ranges of values within the
   /// given bounds that aren't represented by this range set.
-  @usableFromInline
   internal func _gaps(boundedBy bounds: Range<Bound>) -> RangeSet {
     guard !_ranges.isEmpty else { return RangeSet(bounds) }
     guard let start = _ranges.firstIndex(where: { $0.lowerBound >= bounds.lowerBound })
@@ -560,21 +562,21 @@ extension RangeSet: CustomStringConvertible {
 /// A collection of two elements, to avoid heap allocation when calling
 /// `replaceSubrange` with just two elements.
 internal struct _Pair<Element>: RandomAccessCollection {
-  var pair: (first: Element, second: Element)
+  internal var pair: (first: Element, second: Element)
   
-  init(_ first: Element, _ second: Element) {
+  internal init(_ first: Element, _ second: Element) {
     self.pair = (first, second)
   }
   
-  var startIndex: Int { 0 }
-  var endIndex: Int { 2 }
+  internal var startIndex: Int { 0 }
+  internal var endIndex: Int { 2 }
   
-  subscript(position: Int) -> Element {
+  internal subscript(position: Int) -> Element {
     get {
       switch position {
       case 0: return pair.first
       case 1: return pair.second
-      default: fatalError("Index '\(position)' is out of range")
+      default: _preconditionFailure("Index is out of range")
       }
     }
   }

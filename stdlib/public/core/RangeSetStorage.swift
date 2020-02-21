@@ -9,24 +9,29 @@
 //
 //===----------------------------------------------------------------------===//
 
-struct _RangeSetStorage<T: Comparable> {
-  fileprivate enum _Storage {
+/// Storage for a `RangeSet<T>`.
+///
+/// This is optimized to avoid allocating array storage for the common case of a
+/// single range. The single range case is only attainable at initialization;
+/// once added
+internal struct _RangeSetStorage<T: Comparable> {
+  private enum _Storage {
     case empty
     case singleRange(Range<T>)
     case variadic([Range<T>])
   }
   
-  fileprivate var _storage: _Storage
+  private var _storage: _Storage
   
-  init() {
+  internal init() {
     _storage = .empty
   }
   
-  init(_ range: Range<T>) {
+  internal init(_ range: Range<T>) {
     _storage = .singleRange(range)
   }
   
-  init(_ ranges: [Range<T>]) {
+  internal init(_ ranges: [Range<T>]) {
     _storage = .variadic(ranges)
   }
 }
@@ -39,7 +44,7 @@ struct _RangeSetStorage<T: Comparable> {
 // with a single-element array.
 
 extension _RangeSetStorage: Equatable {
-  static func == (lhs: _RangeSetStorage, rhs: _RangeSetStorage) -> Bool {
+  internal static func == (lhs: _RangeSetStorage, rhs: _RangeSetStorage) -> Bool {
     switch (lhs._storage, rhs._storage) {
     case (.empty, .empty):
       return true
@@ -64,7 +69,7 @@ extension _RangeSetStorage: Equatable {
 }
 
 extension _RangeSetStorage: Hashable where T: Hashable {
-  func hash(into hasher: inout Hasher) {
+  internal func hash(into hasher: inout Hasher) {
     for range in self {
       hasher.combine(range)
     }
@@ -72,9 +77,9 @@ extension _RangeSetStorage: Hashable where T: Hashable {
 }
 
 extension _RangeSetStorage: RandomAccessCollection, MutableCollection {
-  var startIndex: Int { 0 }
+  internal var startIndex: Int { 0 }
   
-  var endIndex: Int {
+  internal var endIndex: Int {
     switch _storage {
     case .empty: return 0
     case .singleRange: return 1
@@ -82,10 +87,11 @@ extension _RangeSetStorage: RandomAccessCollection, MutableCollection {
     }
   }
   
-  subscript(i: Int) -> Range<T> {
+  internal subscript(i: Int) -> Range<T> {
     get {
       switch _storage {
-      case .empty: fatalError("Can't access elements of empty storage")
+      case .empty:
+        _preconditionFailure("Can't access elements of empty storage")
       case let .singleRange(range):
         _precondition(i == 0)
         return range
@@ -95,7 +101,8 @@ extension _RangeSetStorage: RandomAccessCollection, MutableCollection {
     }
     set {
       switch _storage {
-      case .empty: fatalError("Can't access elements of empty storage")
+      case .empty:
+        _preconditionFailure("Can't access elements of empty storage")
       case .singleRange:
         _precondition(i == 0)
         _storage = .singleRange(newValue)
@@ -109,7 +116,7 @@ extension _RangeSetStorage: RandomAccessCollection, MutableCollection {
     }
   }
   
-  var count: Int {
+  internal var count: Int {
     switch _storage {
     case .empty: return 0
     case .singleRange: return 1
@@ -119,7 +126,7 @@ extension _RangeSetStorage: RandomAccessCollection, MutableCollection {
 }
 
 extension _RangeSetStorage: RangeReplaceableCollection {
-  mutating func replaceSubrange<C>(
+  internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>, with newElements: C
   ) where C : Collection, C.Element == Element {
     switch _storage {

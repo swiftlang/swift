@@ -445,7 +445,6 @@ extension MutableCollection {
   /// - Complexity: O(*n* log *n*) where *n* is the number of elements.
   /// - Precondition:
   ///   `n == distance(from: range.lowerBound, to: range.upperBound)`
-  @usableFromInline
   internal mutating func _indexedStablePartition(
     count n: Int,
     range: Range<Index>,
@@ -489,7 +488,6 @@ extension Collection {
   ///
   /// - Complexity: O(log *n*), where *n* is the length of this collection if
   ///   the collection conforms to `RandomAccessCollection`, otherwise O(*n*).
-  @usableFromInline
   internal func _partitioningIndex(
     where predicate: (Element) throws -> Bool
   ) rethrows -> Index {
