@@ -600,9 +600,10 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     pathResult = parseExprPostfixSuffix(inner, /*isExprBasic=*/true,
                                         /*periodHasKeyPathBehavior=*/false,
                                         unusedHasBindOptional);
-    if (pathResult.isParseError())
-      return pathResult;
   }
+
+  if (!rootResult.getPtrOrNull() && !pathResult.getPtrOrNull())
+    return pathResult;
 
   auto keypath = new (Context) KeyPathExpr(
       backslashLoc, rootResult.getPtrOrNull(), pathResult.getPtrOrNull());
@@ -618,7 +619,8 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     return makeParserCodeCompletionResult(keypath);
   }
 
-  return makeParserResult(keypath);
+  ParserStatus parseStatus = ParserStatus(rootResult) | ParserStatus(pathResult);
+  return makeParserResult(parseStatus, keypath);
 }
 
 ///   expr-keypath-objc:
