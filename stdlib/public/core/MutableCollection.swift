@@ -292,6 +292,7 @@ extension MutableCollection {
   /// - Complexity: O(*n* log *n*) where *n* is the length of the collection.
   @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
   @discardableResult
+  @inlinable
   public mutating func moveSubranges(
     _ subranges: RangeSet<Index>, to insertionPoint: Index
   ) -> Range<Index> {
@@ -320,6 +321,7 @@ extension MutableCollection {
   /// - Returns: The new index of the element that was first pre-rotation.
   ///
   /// - Complexity: O(*n*)
+  @usableFromInline
   @discardableResult
   internal mutating func _rotate(
     in subrange: Range<Index>,
@@ -401,6 +403,7 @@ extension MutableCollection {
   ///   - distance(from: lhs.lowerBound, to: p) == distance(from:
   ///     rhs.lowerBound, to: q)
   ///   - p == lhs.upperBound || q == rhs.upperBound
+  @usableFromInline
   mutating func _swapNonemptySubrangePrefixes(
     _ lhs: Range<Index>, _ rhs: Range<Index>
   ) -> (Index, Index) {

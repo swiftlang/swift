@@ -330,6 +330,7 @@ extension RangeSet {
   ///
   /// - Complexity: O(*n*), where *n* is the number of ranges in the range
   ///   set.
+  @usableFromInline
   internal func _inverted<C>(within collection: C) -> RangeSet
     where C: Collection, C.Index == Bound
   {
@@ -339,6 +340,7 @@ extension RangeSet {
   
   /// Returns a range set that represents the ranges of values within the
   /// given bounds that aren't represented by this range set.
+  @usableFromInline
   internal func _gaps(boundedBy bounds: Range<Bound>) -> RangeSet {
     guard !_ranges.isEmpty else { return RangeSet(bounds) }
     guard let start = _ranges.firstIndex(where: { $0.lowerBound >= bounds.lowerBound })

@@ -434,69 +434,40 @@ extension MutableCollection where Self: BidirectionalCollection {
 }
 
 //===----------------------------------------------------------------------===//
-// _stablePartition / _indexedStablePartition / _partitioningIndex
+// _indexedStablePartition / _partitioningIndex
 //===----------------------------------------------------------------------===//
 
 extension MutableCollection {
-    /// Moves all elements satisfying `belongsInSecondPartition` into a suffix
-    /// of the collection, preserving their relative order, and returns the
-    /// start of the resulting suffix.
-    ///
-    /// - Complexity: O(*n* log *n*) where *n* is the number of elements.
-    /// - Precondition:
-    ///   `n == distance(from: range.lowerBound, to: range.upperBound)`
-    internal mutating func _stablePartition(
-        count n: Int,
-        range: Range<Index>,
-        by belongsInSecondPartition: (Element) throws-> Bool
-    ) rethrows -> Index {
-        if n == 0 { return range.lowerBound }
-        if n == 1 {
-            return try belongsInSecondPartition(self[range.lowerBound])
-                ? range.lowerBound
-                : range.upperBound
-        }
-        let h = n / 2, i = index(range.lowerBound, offsetBy: h)
-        let j = try _stablePartition(
-            count: h,
-            range: range.lowerBound..<i,
-            by: belongsInSecondPartition)
-        let k = try _stablePartition(
-            count: n - h,
-            range: i..<range.upperBound,
-            by: belongsInSecondPartition)
-        return _rotate(in: j..<k, shiftingToStart: i)
+  /// Moves all elements at the indices satisfying `belongsInSecondPartition`
+  /// into a suffix of the collection, preserving their relative order, and
+  /// returns the start of the resulting suffix.
+  ///
+  /// - Complexity: O(*n* log *n*) where *n* is the number of elements.
+  /// - Precondition:
+  ///   `n == distance(from: range.lowerBound, to: range.upperBound)`
+  @usableFromInline
+  internal mutating func _indexedStablePartition(
+    count n: Int,
+    range: Range<Index>,
+    by belongsInSecondPartition: (Index) throws-> Bool
+  ) rethrows -> Index {
+    if n == 0 { return range.lowerBound }
+    if n == 1 {
+      return try belongsInSecondPartition(range.lowerBound)
+        ? range.lowerBound
+        : range.upperBound
     }
-
-    /// Moves all elements at the indices satisfying `belongsInSecondPartition`
-    /// into a suffix of the collection, preserving their relative order, and
-    /// returns the start of the resulting suffix.
-    ///
-    /// - Complexity: O(*n* log *n*) where *n* is the number of elements.
-    /// - Precondition:
-    ///   `n == distance(from: range.lowerBound, to: range.upperBound)`
-    internal mutating func _indexedStablePartition(
-        count n: Int,
-        range: Range<Index>,
-        by belongsInSecondPartition: (Index) throws-> Bool
-    ) rethrows -> Index {
-        if n == 0 { return range.lowerBound }
-        if n == 1 {
-            return try belongsInSecondPartition(range.lowerBound)
-                ? range.lowerBound
-                : range.upperBound
-        }
-        let h = n / 2, i = index(range.lowerBound, offsetBy: h)
-        let j = try _indexedStablePartition(
-            count: h,
-            range: range.lowerBound..<i,
-            by: belongsInSecondPartition)
-        let k = try _indexedStablePartition(
-            count: n - h,
-            range: i..<range.upperBound,
-            by: belongsInSecondPartition)
-        return _rotate(in: j..<k, shiftingToStart: i)
-    }
+    let h = n / 2, i = index(range.lowerBound, offsetBy: h)
+    let j = try _indexedStablePartition(
+      count: h,
+      range: range.lowerBound..<i,
+      by: belongsInSecondPartition)
+    let k = try _indexedStablePartition(
+      count: n - h,
+      range: i..<range.upperBound,
+      by: belongsInSecondPartition)
+    return _rotate(in: j..<k, shiftingToStart: i)
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -504,38 +475,39 @@ extension MutableCollection {
 //===----------------------------------------------------------------------===//
 
 extension Collection {
-    /// Returns the index of the first element in the collection that matches
-    /// the predicate.
-    ///
-    /// The collection must already be partitioned according to the predicate.
-    /// That is, there should be an index `i` where for every element in
-    /// `collection[..<i]` the predicate is `false`, and for every element
-    /// in `collection[i...]` the predicate is `true`.
-    ///
-    /// - Parameter predicate: A predicate that partitions the collection.
-    /// - Returns: The index of the first element in the collection for which
-    ///   `predicate` returns `true`.
-    ///
-    /// - Complexity: O(log *n*), where *n* is the length of this collection if
-    ///   the collection conforms to `RandomAccessCollection`, otherwise O(*n*).
-    internal func _partitioningIndex(
-        where predicate: (Element) throws -> Bool
-    ) rethrows -> Index {
-        var n = count
-        var l = startIndex
-        
-        while n > 0 {
-            let half = n / 2
-            let mid = index(l, offsetBy: half)
-            if try predicate(self[mid]) {
-                n = half
-            } else {
-                l = index(after: mid)
-                n -= half + 1
-            }
-        }
-        return l
+  /// Returns the index of the first element in the collection that matches
+  /// the predicate.
+  ///
+  /// The collection must already be partitioned according to the predicate.
+  /// That is, there should be an index `i` where for every element in
+  /// `collection[..<i]` the predicate is `false`, and for every element
+  /// in `collection[i...]` the predicate is `true`.
+  ///
+  /// - Parameter predicate: A predicate that partitions the collection.
+  /// - Returns: The index of the first element in the collection for which
+  ///   `predicate` returns `true`.
+  ///
+  /// - Complexity: O(log *n*), where *n* is the length of this collection if
+  ///   the collection conforms to `RandomAccessCollection`, otherwise O(*n*).
+  @usableFromInline
+  internal func _partitioningIndex(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Index {
+    var n = count
+    var l = startIndex
+    
+    while n > 0 {
+      let half = n / 2
+      let mid = index(l, offsetBy: half)
+      if try predicate(self[mid]) {
+        n = half
+      } else {
+        l = index(after: mid)
+        n -= half + 1
+      }
     }
+    return l
+  }
 }
 
 //===----------------------------------------------------------------------===//

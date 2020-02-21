@@ -13,6 +13,7 @@
 /// A collection wrapper that provides access to the elements of a collection,
 /// indexed by a set of indices.
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@frozen
 public struct DiscontiguousSlice<Base: Collection> {
   /// The collection that the indexed collection wraps.
   public var base: Base
@@ -24,6 +25,7 @@ public struct DiscontiguousSlice<Base: Collection> {
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension DiscontiguousSlice {
   /// A position in an `DiscontiguousSlice`.
+  @frozen
   public struct Index: Comparable {
     /// The index of the range that contains `base`.
     internal var _rangeOffset: Int
