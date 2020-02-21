@@ -3959,7 +3959,6 @@ public:
   }
 
   void getGenericRequirementCompletions(DeclContext *DC) {
-
     auto genericSig = DC->getGenericSignatureOfContext();
     if (!genericSig)
       return;
@@ -3968,8 +3967,12 @@ public:
       addGenericTypeParamRef(GPT->getDecl(),
                              DeclVisibilityKind::GenericParameter, {});
     }
-    
-    auto selfTy = DC->getSelfTypeInContext();
+
+    auto typeContext = DC->getInnermostTypeContext();
+    if (!typeContext)
+      return;
+
+    auto selfTy = typeContext->getSelfTypeInContext();
     Kind = LookupKind::GenericRequirement;
     this->BaseType = selfTy;
     NeedLeadingDot = false;

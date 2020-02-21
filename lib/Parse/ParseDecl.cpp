@@ -4638,9 +4638,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                                firstTypeInComplete);
     if (whereStatus.hasCodeCompletion()) {
       if (isCodeCompletionFirstPass())
-        return makeParserCodeCompletionStatus();
-      if (firstTypeInComplete && CodeCompletion)
-        CodeCompletion->completeGenericRequirement();
+        return whereStatus;
       trailingWhereHadCodeCompletion = true;
     }
 
@@ -7086,12 +7084,16 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   TrailingWhereClause *TrailingWhere = nullptr;
+  bool whereClauseHadCodeCompletion = false;
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseProtocolOrAssociatedTypeWhereClause(
         TrailingWhere, /*isProtocol=*/true);
-    if (whereStatus.shouldStopParsing())
-      return whereStatus;
+    if (whereStatus.hasCodeCompletion()) {
+      if (isCodeCompletionFirstPass())
+        return whereStatus;
+      whereClauseHadCodeCompletion = true;
+    }
   }
 
   ProtocolDecl *Proto = new (Context)
@@ -7100,6 +7102,8 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // No need to setLocalDiscriminator: protocols can't appear in local contexts.
 
   Proto->getAttrs() = Attributes;
+  if (whereClauseHadCodeCompletion && CodeCompletion)
+    CodeCompletion->setParsedDecl(Proto);
 
   ContextChange CC(*this, Proto);
   Scope ProtocolBodyScope(this, ScopeKind::ProtocolBody);
