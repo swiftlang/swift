@@ -861,6 +861,16 @@ using TargetRelativeMethodDescriptorPointer =
 using RelativeMethodDescriptorPointer =
   TargetRelativeMethodDescriptorPointer<InProcess>;
 
+template<typename Runtime> struct TargetProtocolRequirement;
+
+template<typename Runtime>
+using TargetRelativeProtocolRequirementPointer =
+  RelativeIndirectablePointer<const TargetProtocolRequirement<Runtime>,
+                              /*nullable*/ true>;
+
+using RelativeProtocolRequirementPointer =
+  TargetRelativeProtocolRequirementPointer<InProcess>;
+
 /// An entry in the method override table, referencing a method from one of our
 /// ancestor classes, together with an implementation.
 template <typename Runtime>
@@ -2078,7 +2088,7 @@ using GenericBoxHeapMetadata = TargetGenericBoxHeapMetadata<InProcess>;
 /// pointer to the protocol requirement descriptor.
 template <typename Runtime>
 struct TargetResilientWitness {
-  RelativeIndirectablePointer<TargetProtocolRequirement<Runtime>> Requirement;
+  TargetRelativeProtocolRequirementPointer<Runtime> Requirement;
   RelativeDirectPointer<void> Witness;
 };
 using ResilientWitness = TargetResilientWitness<InProcess>;
