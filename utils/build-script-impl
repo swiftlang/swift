@@ -1719,6 +1719,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                if [[ "${ENABLE_TENSORFLOW}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
+                    )
+                fi
+
                 if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
                     lldb_build_dir=$(build_directory ${host} lldb)
                     cmake_options=(
