@@ -965,6 +965,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                    file_types::ID::TY_SwiftModuleInterfaceFile,
                    "-emit-module-interface-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
+                   "-emit-private-module-interface-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
