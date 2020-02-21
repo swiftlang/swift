@@ -57,10 +57,28 @@ function(get_test_dependencies SDK result_var_name)
   endif()
 
   if(NOT SWIFT_BUILT_STANDALONE)
-    list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
-         clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-dis
-         llvm-bcanalyzer llvm-nm llvm-readobj llvm-profdata count not
-         llvm-strings llvm-readelf dsymutil)
+    list(APPEND deps_binaries
+      arcmt-test
+      c-arcmt-test
+      c-index-test
+      clang
+      count
+      dsymutil
+      FileCheck
+      llc
+      llvm-as
+      llvm-bcanalyzer
+      llvm-cov
+      llvm-dis
+      llvm-dwarfdump
+      llvm-link
+      llvm-nm
+      llvm-objdump
+      llvm-profdata
+      llvm-readelf
+      llvm-readobj
+      llvm-strings
+      not)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR

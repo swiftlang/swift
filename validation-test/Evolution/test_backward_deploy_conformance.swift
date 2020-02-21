@@ -1,6 +1,8 @@
 // RUN: %target-resilience-test --backward-deployment
 // REQUIRES: executable_test
 
+// XFAIL: use_os_stdlib
+
 import StdlibUnittest
 import backward_deploy_conformance
 

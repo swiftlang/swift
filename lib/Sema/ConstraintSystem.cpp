@@ -273,9 +273,7 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name) {
 
     // If the entry we recorded was unavailable but this new entry is not,
     // replace the recorded entry with this one.
-    auto &ctx = getASTContext();
-    if (uniqueEntry->getAttrs().isUnavailable(ctx) &&
-        !decl->getAttrs().isUnavailable(ctx)) {
+    if (isDeclUnavailable(uniqueEntry) && !isDeclUnavailable(decl)) {
       uniqueEntry = decl;
     }
   }
@@ -1831,11 +1829,6 @@ static bool shouldCheckForPartialApplication(ConstraintSystem &cs,
   if (!(anchor && isa<UnresolvedDotExpr>(anchor)))
     return false;
 
-  // FIXME(diagnostics): This check should be removed together with
-  // expression based diagnostics.
-  if (cs.isExprBeingDiagnosed(anchor))
-    return false;
-
   // If this is a reference to instance method marked as 'mutating'
   // it should be checked for invalid partial application.
   if (isMutatingMethod(decl))
@@ -1894,11 +1887,6 @@ isInvalidPartialApplication(ConstraintSystem &cs, const ValueDecl *member,
 std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
     const OverloadChoice &choice, ConstraintLocator *locator,
     Type boundType, Type refType) {
-  // If the declaration is unavailable, note that in the score.
-  if (choice.getDecl()->getAttrs().isUnavailable(getASTContext())) {
-    increaseScore(SK_Unavailable);
-  }
-
   bool bindConstraintCreated = false;
   const auto kind = choice.getKind();
   if (kind != OverloadChoiceKind::DeclViaDynamic &&
@@ -3623,9 +3611,9 @@ void ConstraintSystem::generateConstraints(
 
   if (favoredIndex) {
     const auto &choice = choices[*favoredIndex];
-    assert((!choice.isDecl() ||
-            !choice.getDecl()->getAttrs().isUnavailable(getASTContext())) &&
-           "Cannot make unavailable decl favored!");
+    assert(
+        (!choice.isDecl() || !isDeclUnavailable(choice.getDecl(), locator)) &&
+        "Cannot make unavailable decl favored!");
     recordChoice(constraints, *favoredIndex, choice, /*isFavored=*/true);
   }
 
@@ -4294,4 +4282,27 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
     DE.diagnose(target.getAsFunction()->getLoc(),
                 diag::failed_to_produce_diagnostic);
   }
+}
+
+bool ConstraintSystem::isDeclUnavailable(const Decl *D,
+                                         ConstraintLocator *locator) const {
+  auto &ctx = getASTContext();
+
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return false;
+
+  // First check whether this declaration is universally unavailable.
+  if (D->getAttrs().isUnavailable(ctx))
+    return true;
+
+  SourceLoc loc;
+
+  if (locator) {
+    if (auto *anchor = locator->getAnchor())
+      loc = anchor->getLoc();
+  }
+
+  // If not, let's check contextual unavailability.
+  AvailabilityContext result = AvailabilityContext::alwaysAvailable();
+  return !TypeChecker::isDeclAvailable(D, loc, DC, result);
 }

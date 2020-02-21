@@ -1210,8 +1210,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // Apply the solution to the function body.
   if (auto result = cs.applySolution(
           solutions.front(),
-          SolutionApplicationTarget(func),
-          /*performingDiagnostics=*/false)) {
+          SolutionApplicationTarget(func))) {
     return result->getFunctionBody();
   }
 

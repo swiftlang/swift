@@ -364,6 +364,7 @@ private:
   void chooseModuleInterfacePath(Compilation &C, const JobAction *JA,
                                  StringRef workingDirectory,
                                  llvm::SmallString<128> &buffer,
+                                 file_types::ID fileType,
                                  CommandOutput *output) const;
 
   void chooseRemappingOutputPath(Compilation &C, const TypeToPathMap *OutputMap,

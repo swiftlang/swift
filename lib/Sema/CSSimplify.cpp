@@ -5765,7 +5765,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         auto argType = AnyFunctionType::composeInput(getASTContext(), args,
                                                      /*canonicalVarargs=*/false);
         if (argType->isEqual(favoredType))
-          if (!decl->getAttrs().isUnavailable(getASTContext()))
+          if (!isDeclUnavailable(decl, memberLocator))
             result.FavoredChoice = result.ViableCandidates.size();
       }
     }

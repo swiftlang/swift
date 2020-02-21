@@ -913,6 +913,11 @@ static bool isDependentConformance(
 
     auto assocConformance =
       conformance->getAssociatedConformance(req.getFirstType(), assocProtocol);
+
+    // We migh be presented with a broken AST.
+    if (assocConformance.isInvalid())
+      return false;
+
     if (assocConformance.isAbstract() ||
         isDependentConformance(IGM,
                                assocConformance.getConcrete()
@@ -2157,7 +2162,8 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
                                        initializer)
         : getAddrOfWitnessTable(conf, initializer));
     global->setConstant(isConstantWitnessTable(wt));
-    global->setAlignment(getWitnessTableAlignment().getValue());
+    global->setAlignment(
+        llvm::MaybeAlign(getWitnessTableAlignment().getValue()));
     tableSize = wtableBuilder.getTableSize();
   } else {
     initializer.abandon();

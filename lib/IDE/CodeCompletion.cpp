@@ -1720,6 +1720,7 @@ public:
     ImportFilter |= ModuleDecl::ImportFilterKind::Public;
     ImportFilter |= ModuleDecl::ImportFilterKind::Private;
     ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
 
     SmallVector<ModuleDecl::ImportedModule, 16> Imported;
     SmallVector<ModuleDecl::ImportedModule, 16> FurtherImported;
@@ -5648,6 +5649,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       ImportFilter |= ModuleDecl::ImportFilterKind::Public;
       ImportFilter |= ModuleDecl::ImportFilterKind::Private;
       ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+      // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
       SmallVector<ModuleDecl::ImportedModule, 4> Imports;
       auto *SF = CurDeclContext->getParentSourceFile();
       SF->getImportedModules(Imports, ImportFilter);

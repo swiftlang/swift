@@ -274,11 +274,16 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
     return getNumTupleElements_Stored() == substType->getNumElements();
   case Kind::ClangType:
   case Kind::Type:
-  case Kind::Discard:
+  case Kind::Discard: {
     if (isTypeParameter())
       return true;
-    auto tuple = dyn_cast<TupleType>(getType());
-    return (tuple && tuple->getNumElements() == substType->getNumElements());
+    auto type = getType();
+    if (auto tuple = dyn_cast<TupleType>(type))
+      return (tuple->getNumElements() == substType->getNumElements());
+    if (isa<OpaqueTypeArchetypeType>(type))
+      return true;
+    return false;
+  }
   }
   llvm_unreachable("bad kind");
 }

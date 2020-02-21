@@ -61,6 +61,22 @@ func vjpSubtractWrt1(x: Float, y: Float) -> (value: Float, pullback: (Float) -> 
   return (x - y, { $0 })
 }
 
+// Test invalid original function.
+
+// expected-error @+1 {{use of unresolved identifier 'nonexistentFunction'}}
+@derivative(of: nonexistentFunction)
+func vjpOriginalFunctionNotFound(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+// Test `@derivative` attribute where `value:` result does not conform to `Differentiable`.
+// Invalid original function should be diagnosed first.
+// expected-error @+1 {{use of unresolved identifier 'nonexistentFunction'}}
+@derivative(of: nonexistentFunction)
+func vjpOriginalFunctionNotFound2(_ x: Float) -> (value: Int, pullback: (Float) -> Float) {
+  fatalError()
+}
+
 // Test incorrect `@derivative` declaration type.
 
 // expected-note @+1 {{'incorrectDerivativeType' defined here}}
@@ -68,22 +84,22 @@ func incorrectDerivativeType(_ x: Float) -> Float {
   return x
 }
 
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple of type '(value: T..., pullback: (U.TangentVector) -> T.TangentVector...)' or '(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'}}
+// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple; first element must have label 'value:' and second element must have label 'pullback:' or 'differential:'}}
 @derivative(of: incorrectDerivativeType)
 func jvpResultIncorrect(x: Float) -> Float {
   return x
 }
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple (first element must have label 'value:'}}
+// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple; first element must have label 'value:'}}
 @derivative(of: incorrectDerivativeType)
 func vjpResultIncorrectFirstLabel(x: Float) -> (Float, (Float) -> Float) {
   return (x, { $0 })
 }
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple (second element must have label 'pullback:' or 'differential:')}}
+// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple; second element must have label 'pullback:' or 'differential:'}}
 @derivative(of: incorrectDerivativeType)
 func vjpResultIncorrectSecondLabel(x: Float) -> (value: Float, (Float) -> Float) {
   return (x, { $0 })
 }
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple (first element type 'Int' must conform to 'Differentiable')}}
+// expected-error @+1 {{could not find function 'incorrectDerivativeType' with expected type '(Int) -> Int'}}
 @derivative(of: incorrectDerivativeType)
 func vjpResultNotDifferentiable(x: Int) -> (
   value: Int, pullback: (Int) -> Int
@@ -596,5 +612,31 @@ where Self: Differentiable, Self == Self.TangentVector {
     value: Self, pullback: (Self) -> (Self, Self)
   ) {
     return (x + y, { v in (v, v) })
+  }
+}
+
+// Test derivatives of default implementations.
+protocol HasADefaultImplementation {
+  func req(_ x: Float) -> Float
+}
+extension HasADefaultImplementation {
+  func req(_ x: Float) -> Float { x }
+  // ok
+  @derivative(of: req)
+  func req(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    (x, { 10 * $0 })
+  }
+}
+
+// Test default derivatives of requirements.
+protocol HasADefaultDerivative {
+  func req(_ x: Float) -> Float
+}
+extension HasADefaultDerivative {
+  // TODO(TF-982): Make this ok.
+  // expected-error @+1 {{could not find function 'req'}}
+  @derivative(of: req)
+  func req(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    (x, { 10 * $0 })
   }
 }
