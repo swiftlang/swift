@@ -714,15 +714,6 @@ function(_add_swift_host_library_single target)
     message(FATAL_ERROR "Either SHARED or STATIC must be specified")
   endif()
 
-  # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
-  set(embed_bitcode_arg)
-  if(SWIFT_EMBED_BITCODE_SECTION)
-    if(SWIFT_HOST_VARIANT_SDK MATCHES "(I|TV|WATCH)OS")
-      list(APPEND ASHLS_C_COMPILE_FLAGS "-fembed-bitcode")
-      set(embed_bitcode_arg EMBED_BITCODE)
-    endif()
-  endif()
-
   if(XCODE)
     string(REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
     list(GET split_path -1 dir)
@@ -849,32 +840,6 @@ function(_add_swift_host_library_single target)
     if(SWIFT_COMPILER_VERSION)
       target_link_options(${target} PRIVATE
         "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
-    endif()
-    # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
-    if(SWIFT_EMBED_BITCODE_SECTION)
-      if(${SWIFT_HOST_VARIANT_SDK} MATCHES "(I|TV|WATCH)OS")
-        # The two branches of this if statement accomplish the same end result
-        # We are simply accounting for the fact that on CMake < 3.16
-        # using a generator expression to
-        # specify a LINKER: argument does not work,
-        # since that seems not to allow the LINKER: prefix to be
-        # evaluated (i.e. it will be added as-is to the linker parameters)
-        if(CMAKE_VERSION VERSION_LESS 3.16)
-          target_link_options(${target} PRIVATE
-            "LINKER:-bitcode_bundle"
-            "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
-
-          if(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
-            target_link_options(${target} PRIVATE
-              "LINKER:-bitcode_hide_symbols")
-          endif()
-        else()
-          target_link_options(${target} PRIVATE
-            "LINKER:-bitcode_bundle"
-            $<$<BOOL:SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS>:"LINKER:-bitcode_hide_symbols">
-            "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
-        endif()
-      endif()
     endif()
   endif()
   target_link_libraries(${target} PRIVATE
