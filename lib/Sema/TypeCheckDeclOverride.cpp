@@ -689,9 +689,6 @@ static bool hasOverridingDifferentiableAttribute(ValueDecl *derivedDecl,
         overrides = false;
         break;
       }
-      if (!derivedParameters && !baseParameters) {
-        assert(false);
-      }
     }
     if (overrides)
       return true;
