@@ -329,6 +329,10 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
 
 void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
                                    Address addr, SILType T) const {
+  // Short-cut destruction of trivial values.
+  if (IGF.IGM.getTypeLowering(T).isTrivial())
+    return;
+
   if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
     OutliningMetadataCollector collector(IGF);
     if (T.hasArchetype()) {
