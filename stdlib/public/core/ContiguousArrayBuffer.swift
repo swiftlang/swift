@@ -249,67 +249,6 @@ internal final class _ContiguousArrayStorage<
 @frozen
 internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
 
-  #if _runtime(_ObjC)
-  @_alwaysEmitIntoClient
-  internal static func _allocateStorage(
-    _uninitializedCount uninitializedCount: Int,
-    realMinimumCapacity: Int
-  ) -> (
-    storage: __ContiguousArrayStorageBase,
-    realCapacity: Int
-  ) {
-      let stride = MemoryLayout<Element>.stride
-      let headerSize = 32
-      _debugPrecondition(32 == _class_getInstancePositiveExtentSize(
-        _ContiguousArrayStorage<Element>.self
-      ))
-      // Actual malloc bucket size we will get for capacity + header size
-      let totalAllocationSize = _swift_stdlib_malloc_good_size(
-        (realMinimumCapacity * stride) + headerSize
-      )
-      let capacityToRequest = (totalAllocationSize - headerSize) / stride
-      let storage = Builtin.allocWithTailElems_1(
-         _ContiguousArrayStorage<Element>.self,
-         capacityToRequest._builtinWordValue, Element.self)
-  
-      if _slowPath(_isDebugAssertConfiguration()) {
-        let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(storage))
-        let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
-        let firstElementPtr = UnsafeMutablePointer<Element>(
-          Builtin.projectTailElems(storage, Element.self)
-        )
-        let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementPtr
-        _debugPrecondition(realCapacity == capacityToRequest)
-      }
-      
-      return (storage: storage, realCapacity: capacityToRequest)
-  }
-  
-  #else
-  
-  @_alwaysEmitIntoClient
-  internal static func _allocateStorage(
-    _uninitializedCount uninitializedCount: Int,
-    realMinimumCapacity: Int
-  ) -> (
-    storage: __ContiguousArrayStorageBase,
-    realCapacity: Int
-  ) {
-      let storage = Builtin.allocWithTailElems_1(
-        _ContiguousArrayStorage<Element>.self,
-        realMinimumCapacity._builtinWordValue, Element.self)
-      
-      let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(storage))
-      let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
-      let firstElementPtr = UnsafeMutablePointer<Element>(
-        Builtin.projectTailElems(storage, Element.self)
-      )
-      let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementPtr
-      
-      return (storage: storage, realCapacity: realCapacity)
-  }
-  
-  #endif
   
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the `count` elements at the
@@ -325,11 +264,13 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       self = _ContiguousArrayBuffer<Element>()
     }
     else {
-      let (storage, realCapacity) = _ContiguousArrayBuffer._allocateStorage(
-        _uninitializedCount: uninitializedCount,
-        realMinimumCapacity: realMinimumCapacity
-      )
-      _storage = storage
+      _storage = Builtin.allocWithTailElems_1(
+        _ContiguousArrayStorage<Element>.self,
+        realMinimumCapacity._builtinWordValue, Element.self)
+      
+      let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
+      let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
+      let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
       _initStorageHeader(
         count: uninitializedCount, capacity: realCapacity)
     }
