@@ -284,7 +284,7 @@ size_t swift_reflection_demangle(const char *MangledName, size_t Length,
                                  char *OutDemangledName, size_t MaxLength);
 
 SWIFT_REMOTE_MIRROR_LINKAGE
-void swift_reflection_dumpConformances(SwiftReflectionContextRef ContextRef);
+void swift_reflection_dumpConformanceCache(SwiftReflectionContextRef ContextRef);
 
 SWIFT_REMOTE_MIRROR_LINKAGE
 void swift_reflection_dumpMetadataAllocations(SwiftReflectionContextRef ContextRef);
