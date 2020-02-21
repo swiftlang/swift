@@ -36,7 +36,7 @@ ln -s ../include wasi-sdk/share/wasi-sysroot/usr/include
 # with os and environment name `getMultiarchTriple`.
 ln -s wasm32-wasi wasi-sdk/share/wasi-sysroot/lib/wasm32-wasi-unknown
 
-wget -O icu.tar.xz "https://github.com/swiftwasm/icu4c-wasi/releases/download/20190421.3/icu4c-wasi.tar.xz"
+wget -O icu.tar.xz "https://github.com/swiftwasm/icu4c-wasi/releases/download/0.3.0/icu4c-wasi.tar.xz"
 tar xf icu.tar.xz
 
 $BUILD_SCRIPT --release --debug-swift-stdlib --verbose
