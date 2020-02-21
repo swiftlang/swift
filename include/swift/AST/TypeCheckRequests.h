@@ -2054,6 +2054,25 @@ public:
   void cacheResult(IndexSubset *value) const;
 };
 
+/// Checks whether a type eraser has a viable initializer.
+class TypeEraserHasViableInitRequest
+    : public SimpleRequest<TypeEraserHasViableInitRequest,
+                           bool(TypeEraserAttr *, ProtocolDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, TypeEraserAttr *attr,
+                                ProtocolDecl *protocol) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
