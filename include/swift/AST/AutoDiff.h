@@ -23,6 +23,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
 
