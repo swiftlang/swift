@@ -11,6 +11,7 @@
 # ----------------------------------------------------------------------------
 
 import os
+import shutil
 
 from . import product
 from .. import shell
@@ -68,6 +69,9 @@ class TensorFlowSwiftAPIs(product.Product):
                     self.args.install_destdir),
                 '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
                 '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
+                # SWIFT_ENABLE_TENSORFLOW
+                '-D', 'USE_BUNDLED_CTENSORFLOW=YES',
+                # SWIFT_ENABLE_TENSORFLOW END
                 '-D', 'TensorFlow_INCLUDE_DIR={}'.format(tensorflow_source_dir),
                 '-D', 'TensorFlow_LIBRARY={}'.format(
                     os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow',
@@ -90,7 +94,7 @@ class TensorFlowSwiftAPIs(product.Product):
         pass
 
     def should_install(self, host_target):
-        return self.args.install_tensorflow_swift_apis
+        return self.args.build_tensorflow_swift_apis
 
     def install(self, host_target):
         shell.call([
@@ -116,6 +120,15 @@ class TensorFlow(product.Product):
     def should_build(self, host_target):
         return self.args.build_tensorflow_swift_apis
 
+    def _get_tensorflow_library(self, host):
+        if host.startswith('macosx'):
+            return ('libtensorflow.2.1.0.dylib', 'libtensorflow.dylib')
+
+        if host.startswith('linux'):
+            return ('libtensorflow.so.2.1.0', 'libtensorflow.so')
+
+        raise RuntimeError('unknown host target {}'.format(host))
+
     def build(self, host_target):
         with shell.pushd(self.source_dir):
             shell.call([
@@ -130,14 +143,8 @@ class TensorFlow(product.Product):
                 "//tensorflow:tensorflow",
             ])
 
-        if host_target.startswith('macosx'):
-            suffixed_lib_name = 'libtensorflow.2.1.0.dylib'
-            unsuffixed_lib_name = 'libtensorflow.dylib'
-        elif host_target.startswith('linux'):
-            suffixed_lib_name = 'libtensorflow.so.2.1.0'
-            unsuffixed_lib_name = 'libtensorflow.so'
-        else:
-            raise RuntimeError('unknown host target {}'.format(host_target))
+        (suffixed_lib_name, unsuffixed_lib_name) = \
+            self._get_tensorflow_library(host_target)
 
         # NOTE: ignore the race condition here ....
         try:
@@ -157,8 +164,76 @@ class TensorFlow(product.Product):
         pass
 
     def should_install(self, host_target):
-        return False
+        return self.args.build_tensorflow_swift_apis
 
     def install(self, host_target):
-        pass
+        (suffixed_lib_name, unsuffixed_lib_name) = \
+            self._get_tensorflow_library(host_target)
+
+        subdir = None
+        if host_target.startswith('macsox'):
+            subdir = 'macosx'
+        if host_target.startswith('linux'):
+            subdir = 'linux'
+
+        if not subdir:
+            raise RuntimeError('unknown host target {}'.format(host_target))
+
+        try:
+            os.unlink(os.path.join(self.install_toolchain_path(),
+                                   'usr', 'lib', 'swift',
+                                   subdir, suffixed_lib_name))
+            os.makedirs(os.path.join(self.install_toolchain_path(),
+                                     'usr', 'lib', 'swift', subdir))
+        except OSError:
+            pass
+        shutil.copy(os.path.join(self.source_dir, 'bazel-bin', 'tensorflow',
+                                 suffixed_lib_name),
+                    os.path.join(self.install_toolchain_path(),
+                                 'usr', 'lib', 'swift',
+                                 subdir, suffixed_lib_name))
+
+        try:
+            os.unlink(os.path.join(self.install_toolchain_path(),
+                                   'usr', 'lib', 'swift',
+                                   subdir, unsuffixed_lib_name))
+        except OSError:
+            pass
+        os.symlink(suffixed_lib_name,
+                   os.path.join(self.install_toolchain_path(),
+                                'usr', 'lib', 'swift',
+                                subdir, unsuffixed_lib_name))
+
+        try:
+            shutil.rmtree(os.path.join(self.install_toolchain_path(),
+                                       'usr', 'lib', 'swift', 'tensorflow'))
+            os.makedirs(os.path.join(self.install_toolchain_path(),
+                                     'usr', 'lib', 'swift', 'tensorflow', 'c',
+                                     'eager'))
+        except OSError:
+            pass
+        for header in (
+                'c_api.h',
+                'c_api_experimental.h',
+                'tf_attrtype.h',
+                'tf_datatype.h',
+                'tf_status.h',
+                'tf_tensor.h',
+                'eager/c_api.h',
+        ):
+            shutil.copy(os.path.join(self.source_dir, 'tensorflow', 'c', header),
+                        os.path.join(self.install_toolchain_path(),
+                                     'usr', 'lib', 'swift', 'tensorflow', 'c',
+                                     header))
+
+        for name in (
+                'CTensorFlow.h',
+                'module.modulemap',
+        ):
+            shutil.copy(os.path.join(self.source_dir, '..',
+                                     'tensorflow-swift-apis', 'Sources',
+                                     'CTensorFlow', name),
+                        os.path.join(self.install_toolchain_path(),
+                                     'usr', 'lib', 'swift', 'tensorflow', name))
+
 # SWIFT_ENABLE_TENSORFLOW END
