@@ -5,15 +5,20 @@
 class AnyP: P1 {
   init<T: P1>(erasing t: T) {}
 }
-
 @_typeEraser(AnyP) // okay
 protocol P1 {}
+
+class AnyP2: P2 {
+  init<T: P2>(erasing t: T) {}
+}
+typealias AnyP2Alias = AnyP2
+@_typeEraser(AnyP2Alias)
+protocol P2 {}
 
 class AnyCollection<Element> : Collection {
   typealias Element = Element
   init<C: Collection>(erasing c: C) where Element == C.Element {}
 }
-
 @_typeEraser(AnyCollection<Self.Element>)
 protocol Collection {
   associatedtype Element
@@ -59,6 +64,10 @@ class MoreRestrictive: B6 { // expected-note {{type eraser declared here}}
 @_typeEraser(MoreRestrictive) // expected-error {{internal type eraser 'MoreRestrictive' cannot have more restrictive access than protocol 'B6' (which is public)}}
 public protocol B6 {}
 
+typealias FnAlias = () -> Void
+@_typeEraser(FnAlias) // expected-error {{type eraser must be a class, struct, or enum}}
+protocol B7 {}
+
 // MARK: - Type eraser must conform to the annotated protocol
 
 class DoesNotConform {} // expected-note {{type eraser declared here}}
@@ -94,6 +103,12 @@ class NoLabel: D5 { // expected-note {{type eraser declared here}}
 }
 @_typeEraser(NoLabel) // expected-error {{type eraser 'NoLabel' must have an initializer of the form 'init<T: D5>(erasing: T)'}}
 protocol D5 {}
+
+class NonGenericInit<T: D6>: D6 { // expected-note {{type eraser declared here}}
+  init(_ t: T) {}
+}
+@_typeEraser(NonGenericInit<Self>) // expected-error {{type eraser 'NonGenericInit<Self>' must have an initializer of the form 'init<T: D6>(erasing: T)'}}
+protocol D6 {}
 
 // MARK: - Unviable initializers
 
