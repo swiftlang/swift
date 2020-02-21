@@ -332,7 +332,7 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertIn('check-swift-macosx-x86_64',
                       before.swift_test_run_targets)
 
-        args.only_executable_test = True
+        args.only_non_executable_test = True
         after = HostSpecificConfiguration('macosx-x86_64', args)
         self.assertIn('check-swift-only_non_executable-macosx-x86_64',
                       after.swift_test_run_targets)
@@ -637,6 +637,7 @@ class ToolchainTestCase(unittest.TestCase):
             maccatalyst_ios_tests=False,
             long_test=False,
             only_executable_test=False,
+            only_non_executable_test=False,
             stress_test=False,
             test_android=False,
             test_android_host=False,
