@@ -24,18 +24,20 @@ import TestsUtils
 %  = [ "intSmall", "uintSmall", "int32", "int64", "uint32", "uint64" ]
 % SizeTypes = [ "Int", "UInt", "Int32", "Int64", "UInt32", "UInt64" ]
 % SizeRanges = [ "-9999 ... 9999", "0 ... 9999" ] + ([ ".min ... .max" ] * 4)
+% SizeSkippeds = [ False, True, True, False, True, True ]
 % SizeIterationMultipliers = [ 20, 20, 8, 4, 8, 4 ]
 % RadixNames = [ "Decimal", "Binary", "Hex", "UncommonRadix" ]
 % Radices = [ 10, 2, 16, 7 ]
 
 // - Definitions
 public let IntegerParsing = [
-% for (SizeName, SizeNameLower) in zip(SizeNames, SizeNamesLower):
+% for (SizeName, SizeNameLower, SizeSkipped)\
+%   in zip(SizeNames, SizeNamesLower, SizeSkippeds):
   // ${SizeName}
 %   for RadixName in RadixNames:
   BenchmarkInfo(name: "ParseInt.${SizeName}.${RadixName}",
     runFunction: run_ParseIntFrom${SizeName}${RadixName},
-    tags: [.validation, .api],
+    tags: [.validation, .api${", .skip" if SizeSkipped else ""}],
     setUpFunction: {
       blackHole(${SizeNameLower}ValuesSum)
       blackHole(${SizeNameLower}${RadixName}Strings)

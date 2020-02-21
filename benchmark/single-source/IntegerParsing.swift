@@ -53,28 +53,28 @@ public let IntegerParsing = [
   // UIntSmall
   BenchmarkInfo(name: "ParseInt.UIntSmall.Decimal",
     runFunction: run_ParseIntFromUIntSmallDecimal,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(uintSmallValuesSum)
       blackHole(uintSmallDecimalStrings)
   }),
   BenchmarkInfo(name: "ParseInt.UIntSmall.Binary",
     runFunction: run_ParseIntFromUIntSmallBinary,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(uintSmallValuesSum)
       blackHole(uintSmallBinaryStrings)
   }),
   BenchmarkInfo(name: "ParseInt.UIntSmall.Hex",
     runFunction: run_ParseIntFromUIntSmallHex,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(uintSmallValuesSum)
       blackHole(uintSmallHexStrings)
   }),
   BenchmarkInfo(name: "ParseInt.UIntSmall.UncommonRadix",
     runFunction: run_ParseIntFromUIntSmallUncommonRadix,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(uintSmallValuesSum)
       blackHole(uintSmallUncommonRadixStrings)
@@ -82,28 +82,28 @@ public let IntegerParsing = [
   // Int32
   BenchmarkInfo(name: "ParseInt.Int32.Decimal",
     runFunction: run_ParseIntFromInt32Decimal,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(int32ValuesSum)
       blackHole(int32DecimalStrings)
   }),
   BenchmarkInfo(name: "ParseInt.Int32.Binary",
     runFunction: run_ParseIntFromInt32Binary,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(int32ValuesSum)
       blackHole(int32BinaryStrings)
   }),
   BenchmarkInfo(name: "ParseInt.Int32.Hex",
     runFunction: run_ParseIntFromInt32Hex,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(int32ValuesSum)
       blackHole(int32HexStrings)
   }),
   BenchmarkInfo(name: "ParseInt.Int32.UncommonRadix",
     runFunction: run_ParseIntFromInt32UncommonRadix,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(int32ValuesSum)
       blackHole(int32UncommonRadixStrings)
@@ -140,28 +140,28 @@ public let IntegerParsing = [
   // UInt32
   BenchmarkInfo(name: "ParseInt.UInt32.Decimal",
     runFunction: run_ParseIntFromUInt32Decimal,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(uint32ValuesSum)
       blackHole(uint32DecimalStrings)
   }),
   BenchmarkInfo(name: "ParseInt.UInt32.Binary",
     runFunction: run_ParseIntFromUInt32Binary,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(uint32ValuesSum)
       blackHole(uint32BinaryStrings)
   }),
   BenchmarkInfo(name: "ParseInt.UInt32.Hex",
     runFunction: run_ParseIntFromUInt32Hex,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(uint32ValuesSum)
       blackHole(uint32HexStrings)
   }),
   BenchmarkInfo(name: "ParseInt.UInt32.UncommonRadix",
     runFunction: run_ParseIntFromUInt32UncommonRadix,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(uint32ValuesSum)
       blackHole(uint32UncommonRadixStrings)
@@ -169,28 +169,28 @@ public let IntegerParsing = [
   // UInt64
   BenchmarkInfo(name: "ParseInt.UInt64.Decimal",
     runFunction: run_ParseIntFromUInt64Decimal,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(uint64ValuesSum)
       blackHole(uint64DecimalStrings)
   }),
   BenchmarkInfo(name: "ParseInt.UInt64.Binary",
     runFunction: run_ParseIntFromUInt64Binary,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(uint64ValuesSum)
       blackHole(uint64BinaryStrings)
   }),
   BenchmarkInfo(name: "ParseInt.UInt64.Hex",
     runFunction: run_ParseIntFromUInt64Hex,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(uint64ValuesSum)
       blackHole(uint64HexStrings)
   }),
   BenchmarkInfo(name: "ParseInt.UInt64.UncommonRadix",
     runFunction: run_ParseIntFromUInt64UncommonRadix,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(uint64ValuesSum)
       blackHole(uint64UncommonRadixStrings)
