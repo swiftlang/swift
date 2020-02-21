@@ -4,6 +4,27 @@ include(SwiftXcodeSupport)
 include(SwiftWindowsSupport)
 include(SwiftAndroidSupport)
 
+function(_swift_gyb_target_sources target scope)
+  foreach(source ${ARGN})
+    get_filename_component(generated ${source} NAME_WLE)
+    get_filename_component(absolute ${source} REALPATH)
+
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${generated}
+      COMMAND
+        $<TARGET_FILE:Python2::Interpreter> ${SWIFT_SOURCE_DIR}/utils/gyb -D CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P} ${SWIFT_GYB_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${absolute}
+      COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${CMAKE_CURRENT_BINARY_DIR}/${generated}
+      COMMAND
+        ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp
+      DEPENDS
+        ${absolute})
+    set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/${generated} PROPERTIES
+      GENERATED TRUE)
+    target_sources(${target} ${scope}
+      ${CMAKE_CURRENT_BINARY_DIR}/${generated})
+  endforeach()
+endfunction()
+
 # SWIFTLIB_DIR is the directory in the build tree where Swift resource files
 # should be placed.  Note that $CMAKE_CFG_INTDIR expands to "." for
 # single-configuration builds.
@@ -446,7 +467,6 @@ function(_add_swift_host_library_single target)
         STATIC)
   set(single_parameter_options)
   set(multiple_parameter_options
-        GYB_SOURCES
         LLVM_LINK_COMPONENTS)
 
   cmake_parse_arguments(ASHLS
@@ -494,14 +514,6 @@ function(_add_swift_host_library_single target)
     set(libkind SHARED)
   elseif(ASHLS_STATIC)
     set(libkind STATIC)
-  endif()
-
-  if(ASHLS_GYB_SOURCES)
-    handle_gyb_sources(
-        gyb_dependency_targets
-        ASHLS_GYB_SOURCES
-        "${SWIFT_HOST_VARIANT_ARCH}")
-      set(ASHLS_SOURCES ${ASHLS_SOURCES} ${ASHLS_GYB_SOURCES})
   endif()
 
   add_library("${target}" ${libkind} ${ASHLS_SOURCES})
