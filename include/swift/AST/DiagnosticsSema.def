@@ -2978,8 +2978,6 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
       (DeclName, DeclName))
 
 // @differentiable
-ERROR(differentiable_attr_void_result,none,
-      "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' "
       "attribute for transpose registration instead", ())
@@ -3097,6 +3095,11 @@ ERROR(autodiff_attr_original_decl_none_valid_found,none,
       "could not find function %0 with expected type %1", (DeclNameRef, Type))
 ERROR(autodiff_attr_original_decl_not_same_type_context,none,
       "%0 is not defined in the current type context", (DeclNameRef))
+ERROR(autodiff_attr_original_void_result,none,
+      "cannot differentiate void function %0", (DeclName))
+ERROR(autodiff_attr_original_multiple_semantic_results,none,
+      "cannot differentiate functions with both an 'inout' parameter and a "
+      "result", ())
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
