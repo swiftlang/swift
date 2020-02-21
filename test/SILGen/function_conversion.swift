@@ -676,3 +676,14 @@ func dontCrash() {
   let userInfo = ["hello": "world"]
   let d = [AnyHashable: Any](uniqueKeysWithValues: userInfo.map { ($0.key, $0.value) })
 }
+
+struct Butt<T> {
+  var foo: () throws -> T
+}
+
+@_silgen_name("butt")
+func butt() -> Butt<Any>
+
+func foo() throws -> Any {
+  return try butt().foo()
+}

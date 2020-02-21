@@ -3485,7 +3485,7 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   // escaping->noescape conversion.
   if (fnType != newFnType) {
     SILType resTy = SILType::getPrimitiveObjectType(newFnType);
-    fn = SGF.B.createConvertFunction(Loc, fn, resTy);
+    fn = SGF.B.createConvertFunction(Loc, fn.ensurePlusOne(SGF, Loc), resTy);
   }
 
   // Now do thin-to-thick if necessary.
