@@ -1690,6 +1690,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       DBuilder.createFile(DebugPrefixMap.remapPath(SourcePath),
                           DebugPrefixMap.remapPath(Opts.DebugCompilationDir));
 
+  StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
   TheCU = DBuilder.createCompileUnit(
       Lang, MainFile,
       Producer, Opts.shouldOptimize(), Opts.getDebugFlags(PD),
@@ -1700,7 +1701,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       /* DWOId */ 0, /* SplitDebugInlining */ true,
       /* DebugInfoForProfiling */ false,
       llvm::DICompileUnit::DebugNameTableKind::Default,
-      /* RangesBaseAddress */ false);
+      /* RangesBaseAddress */ false, Sysroot);
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading
