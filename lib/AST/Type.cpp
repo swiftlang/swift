@@ -4982,9 +4982,11 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
                       /*reverseCurryLevels*/ !makeSelfParamFirst);
 
   // Get the original semantic result type.
-  bool hasMultipleSemanticResults = false;
-  auto originalResult =
-      autodiff::getFunctionSemanticResultType(this, hasMultipleSemanticResults);
+  SmallVector<AutoDiffSemanticFunctionResultType, 1> originalResults;
+  autodiff::getFunctionSemanticResultTypes(this, originalResults);
+  assert(originalResults.size() == 1 &&
+         "Only functions with one semantic result are currently supported");
+  auto originalResult = originalResults.front();
   auto originalResultType = originalResult.type;
 
   // Get the original semantic result type's `TangentVector` associated type.
@@ -5008,7 +5010,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     // - Differential: `(T0.Tan, ...) -> T1.Tan`
     //
     // Case 3: original function has a wrt `inout` parameter.
-    // - Original:     `(T0, inout T1, ...) -> R`
+    // - Original:     `(T0, inout T1, ...) -> Void`
     // - Differential: `(T0.Tan, inout T1.Tan, ...) -> Void`
     SmallVector<AnyFunctionType::Param, 4> differentialParams;
     bool hasInoutDiffParameter = false;
@@ -5038,7 +5040,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     // - Pullback: `(T1.Tan) -> (T0.Tan, ...)`
     //
     // Case 3: original function has a wrt `inout` parameter.
-    // - Original: `(T0, inout T1, ...) -> R`
+    // - Original: `(T0, inout T1, ...) -> Void`
     // - Pullback: `(inout T1.Tan) -> (T0.Tan, ...)`
     SmallVector<TupleTypeElt, 4> pullbackResults;
     bool hasInoutDiffParameter = false;

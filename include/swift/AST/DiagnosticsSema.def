@@ -3035,8 +3035,8 @@ ERROR(autodiff_attr_original_decl_not_same_type_context,none,
 ERROR(autodiff_attr_original_void_result,none,
       "cannot differentiate void function %0", (DeclName))
 ERROR(autodiff_attr_original_multiple_semantic_results,none,
-      "cannot yet differentiate functions with more than one semantic result "
-      "(formal function result or 'inout' parameter)", ())
+      "cannot differentiate functions with both an 'inout' parameter and a "
+      "result", ())
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,

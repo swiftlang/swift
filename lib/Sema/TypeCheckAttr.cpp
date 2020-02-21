@@ -3872,7 +3872,6 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
     return nullptr;
 
   auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
-  bool isMethod = original->hasImplicitSelfDecl();
 
   // Diagnose if original function is an invalid class member.
   bool isOriginalClassMember = original->getDeclContext() &&
@@ -3932,22 +3931,12 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
     return nullptr;
 
   // Get the original semantic result type.
-  bool hasMultipleOriginalSemanticResults = false;
-  auto originalResult = autodiff::getFunctionSemanticResultType(
-      originalFnTy, hasMultipleOriginalSemanticResults, derivativeGenEnv);
-  auto originalResultTy = originalResult.type;
-  // Check that original function does not have multiple semantic results.
-  if (hasMultipleOriginalSemanticResults) {
-    diags
-        .diagnose(attr->getLocation(),
-                  diag::autodiff_attr_original_multiple_semantic_results)
-        .highlight(original->getSourceRange());
-    attr->setInvalid();
-    return nullptr;
-  }
+  llvm::SmallVector<AutoDiffSemanticFunctionResultType, 1> originalResults;
+  autodiff::getFunctionSemanticResultTypes(originalFnTy, originalResults,
+                                           derivativeGenEnv);
   // Check that original function has at least one semantic result, i.e.
   // that the original semantic result type is not `Void`.
-  if (!originalResultTy) {
+  if (originalResults.empty()) {
     diags
         .diagnose(attr->getLocation(), diag::autodiff_attr_original_void_result,
                   original->getFullName())
@@ -3955,6 +3944,17 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
     attr->setInvalid();
     return nullptr;
   }
+  // Check that original function does not have multiple semantic results.
+  if (originalResults.size() > 1) {
+    diags
+        .diagnose(attr->getLocation(),
+                  diag::autodiff_attr_original_multiple_semantic_results)
+        .highlight(original->getSourceRange());
+    attr->setInvalid();
+    return nullptr;
+  }
+  auto originalResult = originalResults.front();
+  auto originalResultTy = originalResult.type;
   // Check that the original semantic result conforms to `Differentiable`.
   if (!conformsToDifferentiable(originalResultTy, original)) {
     diags.diagnose(attr->getLocation(),
@@ -4258,23 +4258,13 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   attr->setParameterIndices(resolvedDiffParamIndices);
 
   // Get the original semantic result.
-  bool hasMultipleOriginalSemanticResults = false;
-  auto originalResult = autodiff::getFunctionSemanticResultType(
-      originalFnType, hasMultipleOriginalSemanticResults,
+  llvm::SmallVector<AutoDiffSemanticFunctionResultType, 1> originalResults;
+  autodiff::getFunctionSemanticResultTypes(
+      originalFnType, originalResults,
       derivative->getGenericEnvironmentOfContext());
-  auto originalResultType = originalResult.type;
-  // Check that original function does not have multiple semantic results.
-  if (hasMultipleOriginalSemanticResults) {
-    diags
-        .diagnose(attr->getLocation(),
-                  diag::autodiff_attr_original_multiple_semantic_results)
-        .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
-    attr->setInvalid();
-    return true;
-  }
   // Check that original function has at least one semantic result, i.e.
   // that the original semantic result type is not `Void`.
-  if (!originalResultType) {
+  if (originalResults.empty()) {
     diags
         .diagnose(attr->getLocation(), diag::autodiff_attr_original_void_result,
                   derivative->getFullName())
@@ -4282,6 +4272,17 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     attr->setInvalid();
     return true;
   }
+  // Check that original function does not have multiple semantic results.
+  if (originalResults.size() > 1) {
+    diags
+        .diagnose(attr->getLocation(),
+                  diag::autodiff_attr_original_multiple_semantic_results)
+        .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
+    attr->setInvalid();
+    return true;
+  }
+  auto originalResult = originalResults.front();
+  auto originalResultType = originalResult.type;
   // Check that the original semantic result conforms to `Differentiable`.
   auto *diffableProto = Ctx.getProtocol(KnownProtocolKind::Differentiable);
   auto valueResultConf = TypeChecker::conformsToProtocol(

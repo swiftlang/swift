@@ -103,54 +103,39 @@ void AnyFunctionType::getSubsetParameters(
   }
 }
 
-AutoDiffSemanticFunctionResultType
-autodiff::getFunctionSemanticResultType(AnyFunctionType *functionType,
-                                        bool &hasMultipleSemanticResults,
-                                        GenericEnvironment *genericEnv) {
+void autodiff::getFunctionSemanticResultTypes(
+    AnyFunctionType *functionType,
+    SmallVectorImpl<AutoDiffSemanticFunctionResultType> &result,
+    GenericEnvironment *genericEnv) {
   auto &ctx = functionType->getASTContext();
-  hasMultipleSemanticResults = false;
 
-  // Get the formal result type.
+  // Remap type in `genericEnv`, if specified.
+  auto remap = [&](Type type) {
+    if (!genericEnv)
+      return type;
+    return genericEnv->mapTypeIntoContext(type);
+  };
+
+  // Collect formal result type as a semantic result, unless it is
+  // `Void`.
   auto formalResultType = functionType->getResult();
   if (auto *resultFunctionType =
           functionType->getResult()->getAs<AnyFunctionType>()) {
     formalResultType = resultFunctionType->getResult();
   }
-
-  // Initialize semantic result type with the formal result type, unless it is
-  // `Void`.
-  Type resultType;
   if (!formalResultType->isEqual(ctx.TheEmptyTupleType))
-    resultType = formalResultType;
+    result.push_back({remap(formalResultType), /*isInout*/ false});
 
-  bool isSemanticResultInout = false;
-  auto setSemanticResultType = [&](Type type) {
-    // If semantic result type has already been set, unset it and set
-    // `hasMultipleSemanticResults` to true.
-    if (resultType) {
-      hasMultipleSemanticResults = true;
-      resultType = Type();
-      return;
-    }
-    resultType = type;
-    isSemanticResultInout = true;
-  };
-
-  // Check for `inout` parameters.
+  // Collect `inout` parameters as semantic results.
   for (auto param : functionType->getParams())
     if (param.isInOut())
-      setSemanticResultType(param.getPlainType());
+      result.push_back({remap(param.getPlainType()), /*isInout*/ true});
   if (auto *resultFunctionType =
           functionType->getResult()->getAs<AnyFunctionType>()) {
     for (auto param : resultFunctionType->getParams())
       if (param.isInOut())
-        setSemanticResultType(param.getPlainType());
+        result.push_back({remap(param.getPlainType()), /*isInout*/ true});
   }
-
-  // Map semantic result type into generic environment, if specified.
-  if (resultType && genericEnv)
-    resultType = genericEnv->mapTypeIntoContext(resultType);
-  return {resultType, isSemanticResultInout};
 }
 
 GenericSignature autodiff::getConstrainedDerivativeGenericSignature(

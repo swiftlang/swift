@@ -114,7 +114,7 @@ struct AutoDiffConfig {
 };
 
 /// A semantic function result type: either a formal function result type or
-/// an `inout` parameter. Used in derivative function type calculation.
+/// an `inout` parameter type. Used in derivative function type calculation.
 struct AutoDiffSemanticFunctionResultType {
   Type type;
   bool isInout;
@@ -269,19 +269,17 @@ using SILDifferentiabilityWitnessKey = std::pair<StringRef, AutoDiffConfig>;
 /// Automatic differentiation utility namespace.
 namespace autodiff {
 
-/// Given a function type, returns its semantic result type: either the formal
-/// result type or an `inout` parameter.
+/// Given a function type, collects its semantic result types in type order
+/// into `result`: first, the formal result type (if non-`Void`), followed by
+/// `inout` parameter types.
 ///
 /// The function type may have at most two parameter lists.
 ///
-/// Sets `hasMultipleOriginalSemanticResults` to true iff there are multiple
-/// semantic results.
-///
 /// Remaps the original semantic result using `genericEnv`, if specified.
-AutoDiffSemanticFunctionResultType
-getFunctionSemanticResultType(AnyFunctionType *functionType,
-                              bool &hasMultipleSemanticResults,
-                              GenericEnvironment *genericEnv = nullptr);
+void getFunctionSemanticResultTypes(
+    AnyFunctionType *functionType,
+    SmallVectorImpl<AutoDiffSemanticFunctionResultType> &result,
+    GenericEnvironment *genericEnv = nullptr);
 
 /// "Constrained" derivative generic signatures require all differentiability
 /// parameters to conform to the `Differentiable` protocol.

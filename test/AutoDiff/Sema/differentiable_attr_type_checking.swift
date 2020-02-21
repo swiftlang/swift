@@ -1151,11 +1151,11 @@ final class FinalClass: Differentiable {
 @differentiable(wrt: y)
 func inoutVoid(x: Float, y: inout Float) {}
 
-// expected-error @+1 {{cannot yet differentiate functions with more than one semantic result (formal function result or 'inout' parameter)}}
+// expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
 @differentiable
 func multipleSemanticResults(_ x: inout Float) -> Float { x }
 
-// expected-error @+1 {{cannot yet differentiate functions with more than one semantic result (formal function result or 'inout' parameter)}}
+// expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
 @differentiable(wrt: y)
 func swap(x: inout Float, y: inout Float) {}
 
@@ -1168,7 +1168,7 @@ extension InoutParameters {
   @differentiable
   static func staticMethod(_ lhs: inout Self, rhs: Self) {}
 
-  // expected-error @+1 {{cannot yet differentiate functions with more than one semantic result (formal function result or 'inout' parameter)}}
+  // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
   @differentiable
   static func multipleSemanticResults(_ lhs: inout Self, rhs: Self) -> Self {}
 }
@@ -1177,7 +1177,7 @@ extension InoutParameters {
   @differentiable
   mutating func mutatingMethod(_ other: Self) {}
 
-  // expected-error @+1 {{cannot yet differentiate functions with more than one semantic result (formal function result or 'inout' parameter)}}
+  // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
   @differentiable
   mutating func mutatingMethod(_ other: Self) -> Self {}
 }

@@ -3269,7 +3269,7 @@ public:
   ///
   /// The original type may have `inout` parameters. If so, the
   /// differential/pullback typing rules are more nuanced: see documentation for
-  /// `getAutoDiffReturnedLinearMapFunctionType` for details. Semantically,
+  /// `getAutoDiffDerivativeFunctionLinearMapType` for details. Semantically,
   /// `inout` parameters behave as both parameters and results.
   ///
   /// By default, if the original type has a `self` parameter list and parameter
@@ -3287,9 +3287,8 @@ public:
       GenericSignature derivativeGenericSignature = GenericSignature(),
       bool makeSelfParamFirst = false);
 
-  /// Returns the linear map function type returned by the derivative function
-  /// type for the given parameter indices, linear map function kind, and other
-  /// auxiliary parameters.
+  /// Returns the corresponding linear map function type for the given parameter
+  /// indices, linear map function kind, and other auxiliary parameters.
   ///
   /// Preconditions:
   /// - Parameters corresponding to parameter indices must conform to
@@ -3307,7 +3306,7 @@ public:
   ///   - Original:     `(T0, inout T1, ...) -> Void`
   ///   - Differential: `(T0.Tan, ...) -> T1.Tan`
   /// - Case 3: original function has a wrt `inout` parameter.
-  ///   - Original:     `(T0, inout T1, ...) -> R`
+  ///   - Original:     `(T0, inout T1, ...) -> Void`
   ///   - Differential: `(T0.Tan, inout T1.Tan, ...) -> Void`
   ///
   /// Pullback typing rules: takes a "wrt" result derivative and returns "wrt"
@@ -3320,7 +3319,7 @@ public:
   ///   - Original: `(T0, inout T1, ...) -> Void`
   ///   - Pullback: `(T1.Tan) -> (T0.Tan, ...)`
   /// - Case 3: original function has a wrt `inout` parameter.
-  ///   - Original: `(T0, inout T1, ...) -> R`
+  ///   - Original: `(T0, inout T1, ...) -> Void`
   ///   - Pullback: `(inout T1.Tan) -> (T0.Tan, ...)`
   ///
   /// If `makeSelfParamFirst` is true, `self`'s tangent is reordered to appear
@@ -4585,7 +4584,7 @@ public:
   ///
   /// The original type may have `inout` parameters. If so, the
   /// differential/pullback typing rules are more nuanced: see documentation for
-  /// `getAutoDiffReturnedLinearMapFunctionType` for details. Semantically,
+  /// `getAutoDiffDerivativeFunctionLinearMapType` for details. Semantically,
   /// `inout` parameters behave as both parameters and results.
   ///
   /// A "constrained derivative generic signature" is computed from
