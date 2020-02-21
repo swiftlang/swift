@@ -339,7 +339,6 @@ public:
                               AbstractStorageDecl *storage,
                               ArrayRef<ProtocolConformanceRef> indexHashables,
                               CanType baseTy,
-                              DeclContext *useDC,
                               bool forPropertyDescriptor);
 
   /// Known functions for bridging.
