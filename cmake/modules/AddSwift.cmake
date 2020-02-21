@@ -759,49 +759,22 @@ function(_add_swift_host_library_single target)
   add_library("${target}" ${libkind} ${ASHLS_SOURCES})
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFT_HOST_VARIANT_SDK}")
 
-  if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
-    swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH} SWIFTLIB_INCLUDE)
-    target_include_directories("${target}" SYSTEM PRIVATE ${SWIFTLIB_INCLUDE})
-    set_target_properties(${target}
-                          PROPERTIES
-                            CXX_STANDARD 14)
-  endif()
+  set_target_properties(${target} PROPERTIES
+    BUILD_WITH_INSTALL_RPATH YES
+    FOLDER "Swift libraries"
+    $<$<STREQUAL:${SWIFT_HOST_VARIANT_SDK},WINDOWS>:NO_SONAME YES>
+    # Darwin specific property
+    INSTALL_NAME_DIR "@rpath"
+    $<$<STREQUAL:${SWIFT_HOST_VARIANT_SDK},LINUX>:INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux">
+    $<$<STREQUAL:${SWIFT_HOST_VARIANT_SDK},CYGWIN>:INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin">
+    $<$<STREQUAL:${SWIFT_HOST_VARIANT_SDK},ANDROID>:INSTALL_RPATH "$ORIGIN">)
 
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
-    set_property(TARGET "${target}" PROPERTY NO_SONAME ON)
-  endif()
 
   llvm_update_compile_flags(${target})
 
   set_output_directory(${target}
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
-
-  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
-    set_target_properties("${target}"
-      PROPERTIES
-      INSTALL_NAME_DIR "@rpath")
-  elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-    set_target_properties("${target}"
-      PROPERTIES
-      INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
-  elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
-    set_target_properties("${target}"
-      PROPERTIES
-      INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
-  elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
-    # Only set the install RPATH if cross-compiling the host tools, in which
-    # case both the NDK and Sysroot paths must be set.
-    if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND
-       NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
-      set_target_properties("${target}"
-        PROPERTIES
-        INSTALL_RPATH "$ORIGIN")
-    endif()
-  endif()
-
-  set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
-  set_target_properties("${target}" PROPERTIES FOLDER "Swift libraries")
 
   # Handle linking and dependencies.
   add_dependencies_multiple_targets(
@@ -829,12 +802,6 @@ function(_add_swift_host_library_single target)
     ENABLE_LTO ${SWIFT_TOOLS_ENABLE_LTO}
     RESULT_VAR_NAME c_compile_flags
     )
-
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
-    if(libkind STREQUAL SHARED)
-      list(APPEND c_compile_flags -D_WINDLL)
-    endif()
-  endif()
   _add_variant_link_flags(
     SDK "${SWIFT_HOST_VARIANT_SDK}"
     ARCH "${SWIFT_HOST_VARIANT_ARCH}"
@@ -849,6 +816,10 @@ function(_add_swift_host_library_single target)
 
   # Set compilation and link flags.
   if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    if(libkind STREQUAL SHARED)
+      list(APPEND c_compile_flags -D_WINDLL)
+    endif()
+
     swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH}
       ${SWIFT_HOST_VARIANT_ARCH}_INCLUDE)
     target_include_directories(${target} SYSTEM PRIVATE
