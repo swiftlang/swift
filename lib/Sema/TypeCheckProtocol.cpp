@@ -419,10 +419,9 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         // Use source location of the witness declaration as the source location
         // of the implicit `@differentiable` attribute.
         auto *newAttr = DifferentiableAttr::create(
-            witnessAFD, /*implicit*/ true, reqDiffAttr->AtLoc,
-            reqDiffAttr->getRange(), reqDiffAttr->isLinear(),
-            reqDiffAttr->getParameterIndices(),
-            supersetConfig->derivativeGenericSignature);
+            witnessAFD, /*implicit*/ true, witness->getLoc(), witness->getLoc(),
+            reqDiffAttr->isLinear(), reqDiffAttr->getParameterIndices(),
+            derivativeGenSig);
         // If the implicit attribute is inherited from a protocol requirement's
         // attribute, store the protocol requirement attribute's location for
         // use in diagnostics.

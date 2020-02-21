@@ -18,18 +18,20 @@ public struct Vector : AdditiveArithmetic, Differentiable, Equatable {
   public init(_ scalar: Float) { self.x = scalar; self.y = scalar }
 
   @_silgen_name("Vector_plus")
-  @differentiable(vjp: fakeVJP)
+  @differentiable
   public static func + (lhs: Vector, rhs: Vector) -> Vector { abort() }
 
   @_silgen_name("Vector_subtract")
-  @differentiable(vjp: fakeVJP)
+  @differentiable
   public static func - (lhs: Vector, rhs: Vector) -> Vector { abort() }
 
   public func adding(_ scalar: Float) -> Vector { abort() }
   public func subtracting(_ scalar: Float) -> Vector { abort() }
   public func scaled(by scalar: Float) -> Vector { abort() }
 
-  public static func fakeVJP(lhs: Vector, rhs: Vector) -> (Vector, (Vector) -> (Vector, Vector)) { abort() }
+  @derivative(of: +)
+  @derivative(of: -)
+  public static func fakeVJP(lhs: Vector, rhs: Vector) -> (value: Vector, pullback: (Vector) -> (Vector, Vector)) { abort() }
 }
 
 // This exists to minimize generated SIL.

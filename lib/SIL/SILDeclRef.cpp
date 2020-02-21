@@ -844,10 +844,7 @@ static bool autoDiffDerivativeFunctionRequiresNewVTableEntry(SILDeclRef ref) {
         return derivedAttr->getParameterIndices() ==
                ref.autoDiffDerivativeFunctionIdentifier->getParameterIndices();
       });
-  assert(derivedDiffAttr && "Expected `@differentiable` attribute");
-  // Otherwise, if the base `@differentiable` attribute specifies a derivative
-  // function, then the derivative is inherited and no new vtable entry is
-  // needed. Return false.
+  assert(derivedDA && "Expected `@differentiable` attribute");
   auto baseDAs =
       overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *baseDA : baseDAs) {

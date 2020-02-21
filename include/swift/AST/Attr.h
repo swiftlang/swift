@@ -1779,6 +1779,14 @@ public:
     DerivativeGenericSignature = derivativeGenSig;
   }
 
+  SourceLoc getImplicitlyInheritedDifferentiableAttrLocation() const {
+    return ImplicitlyInheritedDifferentiableAttrLocation;
+  }
+  void getImplicitlyInheritedDifferentiableAttrLocation(SourceLoc loc) {
+    assert(isImplicit());
+    ImplicitlyInheritedDifferentiableAttrLocation = loc;
+  }
+
   /// Get the derivative generic environment for the given `@differentiable`
   /// attribute and original function.
   GenericEnvironment *

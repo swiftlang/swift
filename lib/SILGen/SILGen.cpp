@@ -755,8 +755,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
              F->print(llvm::dbgs()));
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Visit `@differentiable` amd `@derivative` attributes and generate SIL
-  // differentiability witnesses.
+  // Visit `@derivative` attributes and generate SIL differentiability witnesses.
   // Skip if the SILDeclRef is a:
   // - Default argument generator function.
   // - Thunk.
