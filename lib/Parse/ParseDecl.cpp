@@ -4640,7 +4640,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                                         requirements);
     } else if (whereStatus.hasCodeCompletion()) {
       if (CodeCompletion && firstTypeInComplete) {
-        CodeCompletion->completeGenericParams(extendedType.getPtrOrNull());
+        CodeCompletion->completeGenericRequirement(extendedType.getPtrOrNull());
       } else
         return makeParserCodeCompletionResult<ExtensionDecl>();
     }

@@ -1375,7 +1375,7 @@ public:
                               Optional<StmtKind> ParentKind) override;
   void completeAfterPoundDirective() override;
   void completePlatformCondition() override;
-  void completeGenericParams(TypeLoc TL) override;
+  void completeGenericRequirement(TypeLoc TL) override;
   void completeAfterIfStmt(bool hasElse) override;
 
   void doneParsing() override;
@@ -3959,7 +3959,6 @@ public:
   }
 
   void getGenericRequirementCompletions(Type BaseType) {
-    llvm::errs() << "getGenericParamCompletions\n";
     auto GTD = BaseType->getAnyGeneric();
     if (!GTD)
       return;
@@ -4886,9 +4885,9 @@ void CodeCompletionCallbacksImpl::completeAfterIfStmt(bool hasElse) {
   }
 }
 
-void CodeCompletionCallbacksImpl::completeGenericParams(TypeLoc TL) {
+void CodeCompletionCallbacksImpl::completeGenericRequirement(TypeLoc TL) {
   CurDeclContext = P.CurDeclContext;
-  Kind = CompletionKind::GenericParams;
+  Kind = CompletionKind::GenericRequirement;
   ParsedTypeLoc = TL;
 }
 
@@ -5024,7 +5023,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AfterPoundDirective:
   case CompletionKind::PlatformConditon:
-  case CompletionKind::GenericParams:
+  case CompletionKind::GenericRequirement:
   case CompletionKind::KeyPathExprObjC:
   case CompletionKind::KeyPathExprSwift:
   case CompletionKind::PrecedenceGroup:
@@ -5614,7 +5613,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::GenericParams:
+  case CompletionKind::GenericRequirement:
     Lookup.getGenericRequirementCompletions(ParsedTypeLoc.getType());
     break;
   case CompletionKind::PrecedenceGroup:
