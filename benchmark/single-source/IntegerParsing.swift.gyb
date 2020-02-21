@@ -1,0 +1,98 @@
+//===--- IntegerParsing.swift -------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+% # Ignore the following warning. This _is_ the correct file to edit.
+////////////////////////////////////////////////////////////////////////////////
+// WARNING: This file is manually generated from .gyb template and should not
+// be directly modified. Instead, make changes to StringWalk.swift.gyb and run
+// scripts/generate_harness/generate_harness.py to regenerate this file.
+////////////////////////////////////////////////////////////////////////////////
+
+import TestsUtils
+
+% SizeNames = [ "IntSmall", "UIntSmall", "Int32", "Int64", "UInt32", "UInt64" ]
+% SizeNamesLower\
+%  = [ "intSmall", "uintSmall", "int32", "int64", "uint32", "uint64" ]
+% SizeTypes = [ "Int", "UInt", "Int32", "Int64", "UInt32", "UInt64" ]
+% SizeRanges = [ "-1000 ... 1000", "0 ... 1000" ] + ([ ".min ... .max" ] * 4)
+% SizeValueCounts = [ "20_000", "20_000", "8000", "4000", "8000", "4000" ]
+% RadixNames = [ "Decimal", "Binary", "Hex", "UncommonRadix" ]
+% Radices = [ 10, 2, 16, 7 ]
+
+// - Definitions
+public let IntegerParsing = [
+% for (SizeName, SizeNameLower) in zip(SizeNames, SizeNamesLower):
+  // ${SizeName}
+%   for RadixName in RadixNames:
+  BenchmarkInfo(name: "ParseInt.${SizeName}.${RadixName}",
+    runFunction: run_ParseIntFrom${SizeName}${RadixName},
+    tags: [.validation, .api],
+    setUpFunction: {
+      blackHole(${SizeNameLower}ValuesSum)
+      blackHole(${SizeNameLower}DecimalStrings)
+  }),
+%   end
+% end
+]
+
+// - Verification Sums
+% for (SizeNameLower, SizeType) in\
+%   zip(SizeNamesLower, SizeTypes):
+private let ${SizeNameLower}ValuesSum: ${SizeType}
+  = ${SizeNameLower}Values.reduce(0, &+)
+% end
+
+// - Values
+func generateValues<Integer : FixedWidthInteger>(
+  in range: ClosedRange<Integer>, count: Int
+) -> [Integer] {
+    var rng = SplitMix64(seed: 42)
+    return (0..<count).map { _ in
+      Integer.random(in: range, using: &rng)
+    }
+}
+% for (SizeNameLower, SizeType, SizeRange, SizeValueCount) in\
+%   zip(SizeNamesLower, SizeTypes, SizeRanges, SizeValueCounts):
+private let ${SizeNameLower}Values: [${SizeType}]
+  = generateValues(in: ${SizeRange}, count: ${SizeValueCount})
+% end
+
+// - Strings
+% for (SizeName, SizeNameLower) in zip(SizeNames, SizeNamesLower):
+// ${SizeName}
+%   for (RadixName, Radix) in zip(RadixNames, Radices):
+private let ${SizeNameLower}${RadixName}Strings: [String]
+  = ${SizeNameLower}Values.map { String($0, radix: ${Radix}) }
+%   end
+% end
+
+// - Implementations
+
+% for (SizeName, SizeNameLower, SizeType)\
+%   in zip(SizeNames, SizeNamesLower, SizeTypes):
+// ${SizeName}
+%   for (RadixName, Radix) in zip(RadixNames, Radices):
+@inline(never)
+public func run_ParseIntFrom${SizeName}${RadixName}(N: Int) {
+  var result: ${SizeType} = 0
+  for _ in 0..<N {
+    for string in ${SizeNameLower}${RadixName}Strings {
+      result &+= ${SizeType}(string, radix: ${Radix})!
+    }
+  }
+  CheckResults(result == ${SizeNameLower}ValuesSum &* ${SizeType}(N))
+}
+
+%   end
+% end
+
+
