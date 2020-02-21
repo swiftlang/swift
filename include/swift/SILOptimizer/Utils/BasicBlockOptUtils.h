@@ -289,9 +289,17 @@ class StaticInitCloner : public SILCloner<StaticInitCloner> {
   /// don't have any operands).
   llvm::SmallVector<SILInstruction *, 8> readyToClone;
 
+  SILInstruction *insertionPoint = nullptr;
+
 public:
   StaticInitCloner(SILGlobalVariable *gVar)
       : SILCloner<StaticInitCloner>(gVar) {}
+
+  StaticInitCloner(SILInstruction *insertionPoint)
+      : SILCloner<StaticInitCloner>(*insertionPoint->getFunction()),
+        insertionPoint(insertionPoint) {
+    Builder.setInsertionPoint(insertionPoint);
+  }
 
   /// Add \p InitVal and all its operands (transitively) for cloning.
   ///
@@ -314,7 +322,15 @@ public:
 
 protected:
   SILLocation remapLocation(SILLocation loc) {
+    if (insertionPoint)
+      return insertionPoint->getLoc();
     return ArtificialUnreachableLocation();
+  }
+
+  const SILDebugScope *remapScope(const SILDebugScope *DS) {
+    if (insertionPoint)
+      return insertionPoint->getDebugScope();
+    return nullptr;
   }
 };
 
