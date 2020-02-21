@@ -99,8 +99,8 @@ class TensorFlowSwiftAPIs(product.Product):
             '--target', 'install',
         ])
 
-# SWIFT_ENABLE_TENSORFLOW
 
+# SWIFT_ENABLE_TENSORFLOW
 class TensorFlow(product.Product):
     @classmethod
     def product_source_name(cls):
@@ -161,5 +161,4 @@ class TensorFlow(product.Product):
 
     def install(self, host_target):
         pass
-
 # SWIFT_ENABLE_TENSORFLOW END
