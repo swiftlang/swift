@@ -1160,6 +1160,7 @@ def main_preset():
     if not args.preset:
         fatal_error("missing --preset option")
 
+    args.preset_substitutions = {}
     for arg in args.preset_substitutions_raw:
         name, value = arg.split("=", 1)
         args.preset_substitutions[name] = value
