@@ -688,7 +688,7 @@ private:
         std::string context =
             DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
                 nominal);
-        std::string name = rawName.userFacingName();
+        std::string name = rawName.userFacingName().str();
         enumerateUse(NodeKind::member, context, name, isCascadingUse);
       }
     }
