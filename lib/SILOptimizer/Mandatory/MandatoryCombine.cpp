@@ -79,7 +79,6 @@ class MandatoryCombiner final
 
   InstModCallbacks instModCallbacks;
   SmallVectorImpl<SILInstruction *> &createdInstructions;
-  SmallVector<SILInstruction *, 16> instructionsPendingDeletion;
 
 public:
   MandatoryCombiner(SmallVectorImpl<SILInstruction *> &createdInstructions)
@@ -87,7 +86,7 @@ public:
         instModCallbacks(
             [&](SILInstruction *instruction) {
               worklist.erase(instruction);
-              instructionsPendingDeletion.push_back(instruction);
+              worklist.eraseInstFromFunction(*instruction);
             },
             [&](SILInstruction *instruction) { worklist.add(instruction); },
             [this](SILValue oldValue, SILValue newValue) {
@@ -133,6 +132,7 @@ public:
   SILInstruction *visitApplyInst(ApplyInst *instruction);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *i);
   SILInstruction *visitLoadInst(LoadInst *i);
+  SILInstruction *visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
 };
 
 } // end anonymous namespace
@@ -204,11 +204,6 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
 #endif
       );
     }
-
-    for (SILInstruction *instruction : instructionsPendingDeletion) {
-      worklist.eraseInstFromFunction(*instruction);
-    }
-    instructionsPendingDeletion.clear();
 
     // Our tracking list has been accumulating instructions created by the
     // SILBuilder during this iteration. Go through the tracking list and add
@@ -291,8 +286,9 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
 template <class InstT> static FunctionRefInst *getRemovableRef(InstT *i) {
   // If the only use of the function_ref is us, then remove it.
   auto funcRef = dyn_cast<FunctionRefInst>(i->getCallee());
-  if (funcRef && funcRef->getSingleUse() &&
-      funcRef->getSingleUse()->getUser() == i) {
+  if (funcRef && (funcRef->use_empty() ||
+                  (funcRef->getSingleUse() &&
+                   funcRef->getSingleUse()->getUser() == i))) {
     return funcRef;
   }
   return nullptr;
@@ -329,19 +325,30 @@ SILInstruction *MandatoryCombiner::visitLoadInst(LoadInst *i) {
     return nullptr;
 
   val = stripCopiesAndBorrows(val);
+  auto src = val;
+  
+  // Try to get from a convert_function/convert_escape_to_noescape to a
+  // partial_apply/thin_to_thick to a convert_function.
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(val))
+   src = stripCopiesAndBorrows(cfi->getOperand());
 
-  if (auto *pa = dyn_cast<PartialApplyInst>(val)) {
-    if (tryRemoveUnused(pa)) {
+  if (auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(val))
+   src = stripCopiesAndBorrows(cvt->getOperand());
+
+  if (auto *pa = dyn_cast<PartialApplyInst>(src)) {
+    if (tryDeleteDeadClosure(pa, instModCallbacks)) {
+      val = pa->getCallee();
       if (auto *ref = getRemovableRef(pa)) {
         instModCallbacks.deleteInst(ref);
+        return nullptr;
       }
     }
-  }
-
-  if (auto *tttf = dyn_cast<ThinToThickFunctionInst>(val)) {
-    if (tryRemoveUnused(tttf)) {
+  } else if (auto *tttf = dyn_cast<ThinToThickFunctionInst>(src)) {
+    if (tryDeleteDeadClosure(tttf, instModCallbacks)) {
+      val = tttf->getCallee();
       if (auto *ref = getRemovableRef(tttf)) {
         instModCallbacks.deleteInst(ref);
+        return nullptr;
       }
     }
   }
@@ -358,7 +365,18 @@ SILInstruction *MandatoryCombiner::visitLoadInst(LoadInst *i) {
 
 /// Try to remove partial applies that are no longer used
 SILInstruction *MandatoryCombiner::visitPartialApplyInst(PartialApplyInst *i) {
-  if (tryRemoveUnused(i)) {
+  if (tryDeleteDeadClosure(i, instModCallbacks)) {
+    if (auto *ref = getRemovableRef(i)) {
+      instModCallbacks.deleteInst(ref);
+    }
+  }
+
+  return nullptr;
+}
+
+/// Try to remove thing to thick instructions that are no longer used
+SILInstruction *MandatoryCombiner::visitThinToThickFunctionInst(ThinToThickFunctionInst *i) {
+  if (tryDeleteDeadClosure(i, instModCallbacks)) {
     if (auto *ref = getRemovableRef(i)) {
       instModCallbacks.deleteInst(ref);
     }
