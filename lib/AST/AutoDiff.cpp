@@ -104,48 +104,53 @@ void AnyFunctionType::getSubsetParameters(
 }
 
 AutoDiffSemanticFunctionResultType
-autodiff::getOriginalFunctionSemanticResultType(
-    AnyFunctionType *functionType, Type originalFormalResultType,
-    bool &hasMultipleOriginalSemanticResults,
-    GenericEnvironment *derivativeGenEnv) {
+autodiff::getFunctionSemanticResultType(AnyFunctionType *functionType,
+                                        bool &hasMultipleSemanticResults,
+                                        GenericEnvironment *genericEnv) {
   auto &ctx = functionType->getASTContext();
-  hasMultipleOriginalSemanticResults = false;
+  hasMultipleSemanticResults = false;
 
-  // Initialize original semantic result type as the original formal result
-  // type, unless it is `Void`.
-  Type originalResultType;
-  bool isOriginalResultInout = false;
-  if (!originalFormalResultType->isEqual(ctx.TheEmptyTupleType))
-    originalResultType = originalFormalResultType;
+  // Get the formal result type.
+  auto formalResultType = functionType->getResult();
+  if (auto *resultFunctionType =
+          functionType->getResult()->getAs<AnyFunctionType>()) {
+    formalResultType = resultFunctionType->getResult();
+  }
 
-  auto setOriginalSemanticResultType = [&](Type type) {
-    // If original semantic result type has already been set, unset it and set
-    // `hasMultipleOriginalSemanticResults` to true.
-    if (originalResultType) {
-      hasMultipleOriginalSemanticResults = true;
-      originalResultType = Type();
+  // Initialize semantic result type with the formal result type, unless it is
+  // `Void`.
+  Type resultType;
+  if (!formalResultType->isEqual(ctx.TheEmptyTupleType))
+    resultType = formalResultType;
+
+  bool isSemanticResultInout = false;
+  auto setSemanticResultType = [&](Type type) {
+    // If semantic result type has already been set, unset it and set
+    // `hasMultipleSemanticResults` to true.
+    if (resultType) {
+      hasMultipleSemanticResults = true;
+      resultType = Type();
       return;
     }
-    originalResultType = type;
-    isOriginalResultInout = true;
+    resultType = type;
+    isSemanticResultInout = true;
   };
 
   // Check for `inout` parameters.
   for (auto param : functionType->getParams())
     if (param.isInOut())
-      setOriginalSemanticResultType(param.getPlainType());
+      setSemanticResultType(param.getPlainType());
   if (auto *resultFunctionType =
           functionType->getResult()->getAs<AnyFunctionType>()) {
     for (auto param : resultFunctionType->getParams())
       if (param.isInOut())
-        setOriginalSemanticResultType(param.getPlainType());
+        setSemanticResultType(param.getPlainType());
   }
 
-  // Map original semantic result type into derivative generic environment.
-  if (originalResultType && derivativeGenEnv)
-    originalResultType =
-        derivativeGenEnv->mapTypeIntoContext(originalResultType);
-  return {originalResultType, isOriginalResultInout};
+  // Map semantic result type into generic environment, if specified.
+  if (resultType && genericEnv)
+    resultType = genericEnv->mapTypeIntoContext(resultType);
+  return {resultType, isSemanticResultInout};
 }
 
 GenericSignature autodiff::getConstrainedDerivativeGenericSignature(

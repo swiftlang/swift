@@ -3932,14 +3932,9 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
     return nullptr;
 
   // Get the original semantic result type.
-  auto originalFormalResultTy = originalFnTy->getResult();
-  if (isMethod)
-    originalFormalResultTy =
-        originalFormalResultTy->castTo<AnyFunctionType>()->getResult();
   bool hasMultipleOriginalSemanticResults = false;
-  auto originalResult = autodiff::getOriginalFunctionSemanticResultType(
-      originalFnTy, originalFormalResultTy, hasMultipleOriginalSemanticResults,
-      derivativeGenEnv);
+  auto originalResult = autodiff::getFunctionSemanticResultType(
+      originalFnTy, hasMultipleOriginalSemanticResults, derivativeGenEnv);
   auto originalResultTy = originalResult.type;
   // Check that original function does not have multiple semantic results.
   if (hasMultipleOriginalSemanticResults) {
@@ -4264,9 +4259,8 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   // Get the original semantic result.
   bool hasMultipleOriginalSemanticResults = false;
-  auto originalResult = autodiff::getOriginalFunctionSemanticResultType(
-      originalFnType, valueResultElt.getType(),
-      hasMultipleOriginalSemanticResults,
+  auto originalResult = autodiff::getFunctionSemanticResultType(
+      originalFnType, hasMultipleOriginalSemanticResults,
       derivative->getGenericEnvironmentOfContext());
   auto originalResultType = originalResult.type;
   // Check that original function does not have multiple semantic results.

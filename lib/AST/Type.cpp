@@ -4982,12 +4982,9 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
                       /*reverseCurryLevels*/ !makeSelfParamFirst);
 
   // Get the original semantic result type.
-  auto originalFormalResult = getResult();
-  if (auto *resultFunctionType = originalFormalResult->getAs<AnyFunctionType>())
-    originalFormalResult = resultFunctionType->getResult();
-  bool hasMultipleOriginalSemanticResults = false;
-  auto originalResult = autodiff::getOriginalFunctionSemanticResultType(
-      this, originalFormalResult, hasMultipleOriginalSemanticResults);
+  bool hasMultipleSemanticResults = false;
+  auto originalResult =
+      autodiff::getFunctionSemanticResultType(this, hasMultipleSemanticResults);
   auto originalResultType = originalResult.type;
 
   // Get the original semantic result type's `TangentVector` associated type.

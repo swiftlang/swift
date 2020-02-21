@@ -269,20 +269,19 @@ using SILDifferentiabilityWitnessKey = std::pair<StringRef, AutoDiffConfig>;
 /// Automatic differentiation utility namespace.
 namespace autodiff {
 
-/// Given an original/derivative function type and the original formal result
-/// type, return the original semantic result type: either the original formal
+/// Given a function type, returns its semantic result type: either the formal
 /// result type or an `inout` parameter.
 ///
-/// The original/derivative function type may have at most two parameter lists.
+/// The function type may have at most two parameter lists.
 ///
 /// Sets `hasMultipleOriginalSemanticResults` to true iff there are multiple
 /// semantic results.
 ///
-/// Remap the original semantic result using `derivativeGenEnv`, if specified.
-AutoDiffSemanticFunctionResultType getOriginalFunctionSemanticResultType(
-    AnyFunctionType *functionType, Type originalFormalResultType,
-    bool &hasMultipleOriginalSemanticResults,
-    GenericEnvironment *derivativeGenEnv = nullptr);
+/// Remaps the original semantic result using `genericEnv`, if specified.
+AutoDiffSemanticFunctionResultType
+getFunctionSemanticResultType(AnyFunctionType *functionType,
+                              bool &hasMultipleSemanticResults,
+                              GenericEnvironment *genericEnv = nullptr);
 
 /// "Constrained" derivative generic signatures require all differentiability
 /// parameters to conform to the `Differentiable` protocol.
