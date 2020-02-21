@@ -24,7 +24,7 @@ import TestsUtils
 %  = [ "intSmall", "uintSmall", "int32", "int64", "uint32", "uint64" ]
 % SizeTypes = [ "Int", "UInt", "Int32", "Int64", "UInt32", "UInt64" ]
 % SizeRanges = [ "-9999 ... 9999", "0 ... 9999" ] + ([ ".min ... .max" ] * 4)
-% SizeValueCounts = [ "20_000", "20_000", "8000", "4000", "8000", "4000" ]
+% SizeIterationMultipliers = [ 20, 20, 8, 4, 8, 4 ]
 % RadixNames = [ "Decimal", "Binary", "Hex", "UncommonRadix" ]
 % Radices = [ 10, 2, 16, 7 ]
 
@@ -38,7 +38,7 @@ public let IntegerParsing = [
     tags: [.validation, .api],
     setUpFunction: {
       blackHole(${SizeNameLower}ValuesSum)
-      blackHole(${SizeNameLower}DecimalStrings)
+      blackHole(${SizeNameLower}${RadixName}Strings)
   }),
 %   end
 % end
@@ -60,10 +60,10 @@ func generateValues<Integer : FixedWidthInteger>(
       Integer.random(in: range, using: &rng)
     }
 }
-% for (SizeNameLower, SizeType, SizeRange, SizeValueCount) in\
-%   zip(SizeNamesLower, SizeTypes, SizeRanges, SizeValueCounts):
+% for (SizeNameLower, SizeType, SizeRange) in\
+%   zip(SizeNamesLower, SizeTypes, SizeRanges):
 private let ${SizeNameLower}Values: [${SizeType}]
-  = generateValues(in: ${SizeRange}, count: ${SizeValueCount})
+  = generateValues(in: ${SizeRange}, count: 1000)
 % end
 
 // - Strings
@@ -77,19 +77,20 @@ private let ${SizeNameLower}${RadixName}Strings: [String]
 
 // - Implementations
 
-% for (SizeName, SizeNameLower, SizeType)\
-%   in zip(SizeNames, SizeNamesLower, SizeTypes):
+% for (SizeName, SizeNameLower, SizeType, SizeIterationMultiplier)\
+%   in zip(SizeNames, SizeNamesLower, SizeTypes, SizeIterationMultipliers):
 // ${SizeName}
 %   for (RadixName, Radix) in zip(RadixNames, Radices):
 @inline(never)
 public func run_ParseIntFrom${SizeName}${RadixName}(N: Int) {
   var result: ${SizeType} = 0
-  for _ in 0..<N {
+  let count = N * ${SizeIterationMultiplier}
+  for _ in 0..<count {
     for string in ${SizeNameLower}${RadixName}Strings {
       result &+= ${SizeType}(string, radix: ${Radix})!
     }
   }
-  CheckResults(result == ${SizeNameLower}ValuesSum &* ${SizeType}(N))
+  CheckResults(result == ${SizeNameLower}ValuesSum &* ${SizeType}(count))
 }
 
 %   end
