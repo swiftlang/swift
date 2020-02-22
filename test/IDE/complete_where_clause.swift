@@ -32,6 +32,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL | %FileCheck %s -check-prefix=PROTOCOL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT | %FileCheck %s -check-prefix=PROTOCOL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_SELF | %FileCheck %s -check-prefix=PROTOCOL_SELF
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_EXT | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_EXT
 
 class A1<T1, T2, T3> {}
 
@@ -177,3 +179,15 @@ protocol P4 where Self.#^PROTOCOL_SELF^# {
 // PROTOCOL_SELF-DAG: Decl[TypeAlias]/CurrNominal:        IntAlias[#Int#];
 // PROTOCOL_SELF-DAG: Keyword/None:                       Type[#Self.Type#];
 // PROTOCOL_SELF: End completions
+
+struct TA1<T: Assoc> where #^NOMINAL_TYPEALIAS^# {
+  typealias U = T.Q
+}
+// NOMINAL_TYPEALIAS: Begin completions, 1 items
+// NOMINAL_TYPEALIAS-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
+// NOMINAL_TYPEALIAS: End completions
+extension TA1 where #^NOMINAL_TYPEALIAS_EXT^# { }
+// NOMINAL_TYPEALIAS_EXT: Begin completions, 2 items
+// NOMINAL_TYPEALIAS_EXT-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
+// NOMINAL_TYPEALIAS_EXT-DAG: Decl[TypeAlias]/CurrNominal:        U[#T.Q#];
+// NOMINAL_TYPEALIAS_EXT: End completions

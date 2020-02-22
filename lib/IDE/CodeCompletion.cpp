@@ -3968,6 +3968,11 @@ public:
                              DeclVisibilityKind::GenericParameter, {});
     }
 
+    // For non-protocol nominal type decls, only suggest generic parameters.
+    if (auto D = DC->getAsDecl())
+      if (isa<NominalTypeDecl>(D) && !isa<ProtocolDecl>(D))
+        return;
+
     auto typeContext = DC->getInnermostTypeContext();
     if (!typeContext)
       return;
