@@ -16,5 +16,10 @@ extension MyClass {
   subscript(i: Int) -> Int { return 0 }
 }
 
+/// Don't print `mutating` twice.
+struct MyStruct {
+  mutating func foo() {}
+}
+
 // RUN: %target-swift-ide-test -print-swift-file-interface -source-filename %s > %t.out
 // RUN: diff -u %s.result %t.out
