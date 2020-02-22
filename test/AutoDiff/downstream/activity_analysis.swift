@@ -286,9 +286,7 @@ func testArrayUninitializedIntrinsicApplyIndirectResult<T>(_ x: T, _ y: T) -> [W
 struct Mut: Differentiable {}
 extension Mut {
   @differentiable(wrt: x)
-  mutating func mutatingMethod(_ x: Mut) -> Mut {
-    return x
-  }
+  mutating func mutatingMethod(_ x: Mut) {}
 }
 
 // CHECK-LABEL: [AD] Activity info for $s17activity_analysis3MutV14mutatingMethodyA2CF at (source=0 parameters=(0))

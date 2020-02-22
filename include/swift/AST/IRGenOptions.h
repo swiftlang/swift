@@ -210,6 +210,10 @@ public:
   /// Enable use of the swiftcall calling convention.
   unsigned UseSwiftCall : 1;
 
+  /// Enable the use of type layouts for value witness functions and use
+  /// vw functions instead of outlined copy/destroy functions.
+  unsigned UseTypeLayoutValueHandling : 1;
+
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
 
@@ -263,7 +267,7 @@ public:
         LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
-        UseSwiftCall(false), GenerateProfile(false),
+        UseSwiftCall(false), UseTypeLayoutValueHandling(false), GenerateProfile(false),
         EnableDynamicReplacementChaining(false),
         // SWIFT_ENABLE_TENSORFLOW
         // TODO(TF-486): Reenable round type debug types.

@@ -7644,6 +7644,38 @@ Type ConstraintSystem::simplifyAppliedOverloads(
       getUnboundBindOverloadDisjunction(fnTypeVar, &numOptionalUnwraps);
   if (!disjunction) return fnType;
 
+  if (shouldAttemptFixes()) {
+    auto arguments = argFnType->getParams();
+    bool allHoles =
+        arguments.size() > 0 &&
+        llvm::all_of(arguments, [&](const AnyFunctionType::Param &arg) -> bool {
+          auto argType = arg.getPlainType();
+          if (argType->isHole())
+            return true;
+
+          if (auto *typeVar = argType->getAs<TypeVariableType>())
+            return hasFixFor(typeVar->getImpl().getLocator());
+
+          return false;
+        });
+
+    // If all of the arguments are holes, let's disable all but one
+    // overload to make sure holes don't cause performance problems
+    // because hole could be bound to any type.
+    if (allHoles) {
+      auto choices = disjunction->getNestedConstraints();
+      for (auto *choice : choices.slice(1))
+        choice->setDisabled();
+    }
+
+    // Don't attempt further optimization in "diagnostic mode" because
+    // in such mode we'd like to attempt all of the available overloads
+    // regardless of problems related to missing or extraneous labels
+    // and/or arguments.
+    if (solverState)
+      return fnTypeVar;
+  }
+
   /// The common result type amongst all function overloads.
   Type commonResultType;
   auto updateCommonResultType = [&](Type choiceType) {
@@ -7842,20 +7874,14 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
   };
 
-  // Don't attempt this optimization in "diagnostic mode" because
-  // in such mode we'd like to attempt all of the available
-  // overloads regardless of problems related to missing or
-  // extraneous labels and/or arguments.
-  if (!(solverState && shouldAttemptFixes())) {
-    // If the right-hand side is a type variable,
-    // try to simplify the overload set.
-    if (auto typeVar = desugar2->getAs<TypeVariableType>()) {
-      Type newType2 = simplifyAppliedOverloads(typeVar, func1, locator);
-      if (!newType2)
-        return SolutionKind::Error;
+  // If the right-hand side is a type variable,
+  // try to simplify the overload set.
+  if (auto typeVar = desugar2->getAs<TypeVariableType>()) {
+    Type newType2 = simplifyAppliedOverloads(typeVar, func1, locator);
+    if (!newType2)
+      return SolutionKind::Error;
 
-      desugar2 = newType2->getDesugaredType();
-    }
+    desugar2 = newType2->getDesugaredType();
   }
 
   // If right-hand side is a type variable, the constraint is unsolved.

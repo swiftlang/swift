@@ -227,6 +227,16 @@ bool ExistentialSpecializer::canSpecializeCalleeFunction(FullApplySite &Apply) {
   if (Callee->hasOwnership())
     return false;
 
+  // Ignore generic functions. Generic functions should be fully specialized
+  // before attempting to introduce new generic parameters for existential
+  // arguments. Otherwise, there's no guarantee that the generic specializer
+  // will be able to specialize the new generic parameter created by this pass.
+  //
+  // Enabling this would require additional implementation work to correctly
+  // substitute the original archetypes into the new generic signature.
+  if (Callee->getLoweredFunctionType()->getSubstGenericSignature())
+    return false;
+
   /// Ignore functions with indirect results.
   if (Callee->getConventions().hasIndirectSILResults())
     return false;

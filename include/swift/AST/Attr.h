@@ -1118,6 +1118,9 @@ public:
         TypeEraserLoc(typeEraserLoc) {}
 
   const TypeLoc &getTypeEraserLoc() const { return TypeEraserLoc; }
+  TypeLoc &getTypeEraserLoc() { return TypeEraserLoc; }
+
+  bool hasViableTypeEraserInit(ProtocolDecl *protocol) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_TypeEraser;

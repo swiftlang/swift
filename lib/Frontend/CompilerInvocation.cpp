@@ -1274,6 +1274,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.EnableDynamicReplacementChaining |=
       Args.hasArg(OPT_enable_dynamic_replacement_chaining);
 
+  Opts.UseTypeLayoutValueHandling |= Args.hasArg(OPT_enable_type_layouts);
+
   Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);
 
   // This is set to true by default.

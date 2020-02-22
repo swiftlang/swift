@@ -273,33 +273,35 @@ TEST(IndexSubset, GetSubsetParameterTypes) {
   auto &C = testCtx.Ctx;
   // (T, T) -> ()
   {
-    SmallVector<Type, 8> subset;
-    autodiff::getSubsetParameterTypes(
-        IndexSubset::get(C, 1, {0}),
-        FunctionType::get(
-            {FunctionType::Param(C.TheAnyType),
-             FunctionType::Param(C.TheAnyType)},
-            C.TheEmptyTupleType),
-        subset);
-    Type expected[] = {C.TheAnyType};
-    EXPECT_TRUE(std::equal(subset.begin(), subset.end(), expected,
-                    [](Type ty1, Type ty2) { return ty1->isEqual(ty2); }));
+    SmallVector<AnyFunctionType::Param, 8> params;
+    auto *functionType = FunctionType::get({FunctionType::Param(C.TheAnyType),
+                                            FunctionType::Param(C.TheAnyType)},
+                                           C.TheEmptyTupleType);
+    functionType->getSubsetParameters(IndexSubset::get(C, 1, {0}), params);
+    AnyFunctionType::Param expected[] = {AnyFunctionType::Param(C.TheAnyType)};
+    EXPECT_TRUE(std::equal(params.begin(), params.end(), expected,
+                           [](auto param1, auto param2) {
+                             return param1.getPlainType()->isEqual(param2.getPlainType());
+                           }));
   }
   // (T) -> (T, T) -> ()
   {
-    SmallVector<Type, 8> subset;
-    autodiff::getSubsetParameterTypes(
-        IndexSubset::get(C, 3, {0, 1, 2}),
-        FunctionType::get(
-            {FunctionType::Param(C.TheIEEE16Type)},
-            FunctionType::get(
-                {FunctionType::Param(C.TheAnyType),
-                 FunctionType::Param(C.TheAnyType)},
-                C.TheEmptyTupleType)),
-        subset);
-    Type expected[] = {C.TheIEEE16Type, C.TheAnyType, C.TheAnyType};
-    EXPECT_TRUE(std::equal(subset.begin(), subset.end(), expected,
-                    [](Type ty1, Type ty2) { return ty1->isEqual(ty2); }));
+    SmallVector<AnyFunctionType::Param, 8> params;
+    auto *functionType =
+        FunctionType::get({FunctionType::Param(C.TheIEEE16Type)},
+                          FunctionType::get({FunctionType::Param(C.TheAnyType),
+                                             FunctionType::Param(C.TheAnyType)},
+                                            C.TheEmptyTupleType));
+    functionType->getSubsetParameters(IndexSubset::get(C, 3, {0, 1, 2}),
+                                      params);
+    AnyFunctionType::Param expected[] = {
+        AnyFunctionType::Param(C.TheIEEE16Type),
+        AnyFunctionType::Param(C.TheAnyType),
+        AnyFunctionType::Param(C.TheAnyType)};
+    EXPECT_TRUE(std::equal(
+        params.begin(), params.end(), expected, [](auto param1, auto param2) {
+          return param1.getPlainType()->isEqual(param2.getPlainType());
+        }));
   }
 }
 // SWIFT_ENABLE_TENSORFLOW END

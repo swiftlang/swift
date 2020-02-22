@@ -3345,15 +3345,15 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
       [&](CanAnyFunctionType fnTy, AutoDiffDerivativeFunctionKind kind)
           -> CanAnyFunctionType {
         auto assocTy = fnTy->getAutoDiffDerivativeFunctionType(
-            parameterIndices, /*resultIndex*/ 0,
-            kind, LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+            parameterIndices, kind,
+	    LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
         return cast<AnyFunctionType>(assocTy->getCanonicalType());
       };
   auto getDerivativeFnPattern =
       [&](AbstractionPattern pattern,
           AutoDiffDerivativeFunctionKind kind) -> AbstractionPattern {
     return pattern.getAutoDiffDerivativeFunctionType(
-        parameterIndices, /*resultIndex*/ 0, kind,
+        parameterIndices, kind,
         LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
   };
   auto createDerivativeFnThunk =

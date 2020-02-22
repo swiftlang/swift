@@ -2940,8 +2940,6 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
       (DeclName, DeclName))
 
 // @differentiable
-ERROR(differentiable_attr_void_result,none,
-      "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' "
       "attribute for transpose registration instead", ())
@@ -3059,6 +3057,11 @@ ERROR(autodiff_attr_original_decl_none_valid_found,none,
       "could not find function %0 with expected type %1", (DeclNameRef, Type))
 ERROR(autodiff_attr_original_decl_not_same_type_context,none,
       "%0 is not defined in the current type context", (DeclNameRef))
+ERROR(autodiff_attr_original_void_result,none,
+      "cannot differentiate void function %0", (DeclName))
+ERROR(autodiff_attr_original_multiple_semantic_results,none,
+      "cannot differentiate functions with both an 'inout' parameter and a "
+      "result", ())
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
@@ -4505,6 +4508,39 @@ ERROR(dynamic_replacement_replaced_constructor_is_convenience, none,
       "replaced constructor %0 is marked as convenience", (DeclNameRef))
 ERROR(dynamic_replacement_replaced_constructor_is_not_convenience, none,
       "replaced constructor %0 is not marked as convenience", (DeclNameRef))
+
+//------------------------------------------------------------------------------
+// MARK: @_typeEraser()
+//------------------------------------------------------------------------------
+
+ERROR(non_nominal_type_eraser,none,
+      "type eraser must be a class, struct, or enum", ())
+ERROR(type_eraser_does_not_conform,none,
+      "type eraser %0 must conform to protocol %1", (Type, Type))
+ERROR(type_eraser_not_accessible,none,
+      "%select{private|fileprivate|internal|public|open}0 type eraser %1 "
+      "cannot have more restrictive access than protocol %2 "
+      "(which is %select{private|fileprivate|internal|public|open}3)",
+      (AccessLevel, Identifier, Type, AccessLevel))
+ERROR(type_eraser_missing_init,none,
+      "type eraser %0 must have an initializer of the form "
+      "'init<T: %1>(erasing: T)'", (Type, StringRef))
+ERROR(type_eraser_unviable_init,none,
+      "type eraser %0 has no viable initializer of the form "
+      "'init<T: %1>(erasing: T)'", (Type, StringRef))
+
+NOTE(type_eraser_declared_here,none,
+     "type eraser declared here",())
+NOTE(type_eraser_failable_init,none,
+     "'init(erasing:)' cannot be failable",())
+NOTE(type_eraser_init_unsatisfied_requirements,none,
+     "'init(erasing:)' cannot have unsatisfied requirements "
+     "when %0 = 'some %1'", (Type, StringRef))
+NOTE(type_eraser_init_not_accessible,none,
+     "%select{private|fileprivate|internal|public|open}0 'init(erasing:)' "
+     "cannot have more restrictive access than protocol %1 "
+     "(which is %select{private|fileprivate|internal|public|open}2)",
+     (AccessLevel, Type, AccessLevel))
 
 //------------------------------------------------------------------------------
 // MARK: @available

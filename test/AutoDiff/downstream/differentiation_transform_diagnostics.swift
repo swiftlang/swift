@@ -432,9 +432,7 @@ func activeInoutArgControlFlowComplex(_ array: [Float], _ bool: Bool) -> Float {
 struct Mut: Differentiable {}
 extension Mut {
   @differentiable(wrt: x)
-  mutating func mutatingMethod(_ x: Mut) -> Mut {
-    return x
-  }
+  mutating func mutatingMethod(_ x: Mut) {}
 }
 
 // TODO(TF-985): Find workaround to avoid marking non-wrt `inout` argument as

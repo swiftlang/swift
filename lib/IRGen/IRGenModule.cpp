@@ -983,7 +983,7 @@ llvm::AttributeList IRGenModule::constructInitialAttributes() {
                                   llvm::AttributeList::FunctionIndex, b);
 }
 
-llvm::Constant *IRGenModule::getInt32(uint32_t value) {
+llvm::ConstantInt *IRGenModule::getInt32(uint32_t value) {
   return llvm::ConstantInt::get(Int32Ty, value);
 }
 
@@ -1421,4 +1421,8 @@ const llvm::DataLayout &IRGenerator::getClangDataLayout() {
 TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
   return TypeExpansionContext::maximal(getSwiftModule(),
                                        getSILModule().isWholeModule());
+}
+
+const TypeLayoutEntry &IRGenModule::getTypeLayoutEntry(SILType T) {
+  return Types.getTypeLayoutEntry(T);
 }
