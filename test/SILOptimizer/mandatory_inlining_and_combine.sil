@@ -99,7 +99,6 @@ bb0(%0 : $C):
 // CHECK-LABEL: sil @test_apply_pai_in_loop : $@convention(thin) (@guaranteed C) ->  () {
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK-NEXT:   strong_retain [[ARG]]
-// CHECK-NEXT:   strong_retain [[ARG]]
 // CHECK-NEXT:   br bb1
 //
 // CHECK: bb1:
@@ -161,7 +160,6 @@ bb0(%0: $C):
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK-NEXT:   strong_retain [[ARG]]
 // CHECK-NEXT:   strong_retain [[ARG]]
-// CHECK-NEXT:   strong_retain [[ARG]]
 // CHECK-NEXT:   cond_br undef, bb1, bb4
 //
 // CHECK: bb1:
@@ -215,7 +213,6 @@ bb5:
 // CHECK-LABEL: sil @test_apply_pai_in_diamond : $@convention(thin) (@guaranteed C) ->  () {
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK-NEXT:   strong_retain [[ARG]]
-// CHECK-NEXT:   strong_retain [[ARG]]
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 //
 // CHECK: bb1:
@@ -264,7 +261,6 @@ bb3:
 //
 // CHECK: [[BB_DIAMOND_BEGIN]]:
 // CHECK-NEXT:   strong_retain [[ARG]]
-// CHECK-NEXT:   strong_retain [[ARG]]
 // CHECK-NEXT:   cond_br undef, [[NO_CALL_BB:bb[0-9]+]], [[CALL_BB:bb[0-9]+]]
 //
 // CHECK: [[NO_CALL_BB]]:
@@ -280,7 +276,6 @@ bb3:
 // CHECK-NEXT:  br [[MERGE_BB]]
 //
 // CHECK: [[MERGE_BB]]:
-// CHECK-NEXT: strong_release [[ARG]]
 // CHECK-NEXT: br [[BB_END]]
 //
 // CHECK: [[BB_END]]:
@@ -319,10 +314,8 @@ bb6:
 // CHECK-LABEL: sil @test_guaranteed_closure_capture
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK:   strong_retain [[ARG]] : $C
-// CHECK:   strong_retain [[ARG]]
 // CHECK:   [[F:%.*]] = function_ref @use_c
 // CHECK:   apply [[F]]([[ARG]])
-// CHECK:   strong_release [[ARG]]
 // CHECK:   strong_release [[ARG]]
 // CHECK:   return
 sil @test_guaranteed_closure_capture : $@convention(thin) (@guaranteed C) -> () {
@@ -339,10 +332,8 @@ bb0(%0: $C):
 // CHECK-LABEL: sil @test_guaranteed_closure_capture2
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK:   strong_retain [[ARG]] : $C
-// CHECK:   strong_retain [[ARG]]
 // CHECK:   [[F:%.*]] = function_ref @use_c
 // CHECK:   apply [[F]]([[ARG]])
-// CHECK:   strong_release [[ARG]] : $C
 // CHECK:   strong_release [[ARG]] : $C
 // CHECK:   return
 sil @test_guaranteed_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
@@ -392,10 +383,8 @@ bb0(%0 : $C):
 // CHECK-LABEL: sil @test_unowned_closure_capture2
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK:   strong_retain [[ARG]]
-// CHECK:   strong_retain [[ARG]]
 // CHECK:   [[F:%.*]] = function_ref @use_c_unowned
 // CHECK:   apply [[F]]([[ARG]]) : $@convention(thin) (C) -> ()
-// CHECK:   strong_release [[ARG]]
 // CHECK:   strong_release [[ARG]]
 // CHECK:   return
 sil @test_unowned_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {

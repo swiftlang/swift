@@ -414,6 +414,7 @@ sil public_external @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { v
 sil @empty_box : $@convention(thin) () -> () {
 entry:
   // CHECK: [[BOX:%.*]] = call {{.*}}swift_allocEmptyBox
+  // CHECK-NEXT: call void @swift_release(%swift.refcounted* [[BOX]])
   // CHECK-NEXT: ret
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <()>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <()>, 0
