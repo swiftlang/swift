@@ -192,7 +192,7 @@ def validate_arguments(toolchain, args):
     # SWIFT_ENABLE_TENSORFLOW
     if args.enable_tensorflow:
         if toolchain.bazel is None:
-            diagnostics.fatal(
+            fatal_error(
                 "can't find bazel, needed to build TensorFlow (please "
                 "install bazel)")
 
@@ -248,37 +248,30 @@ def validate_arguments(toolchain, args):
             ("tensorflow_target_include_dir", False),
         ]
         tensorflow_dirs = [d for d in tensorflow_dirs
-                            if getattr(args, d[0]) is not None]
+                           if getattr(args, d[0]) is not None]
         for dirname, is_lib_dir in tensorflow_dirs:
             tensorflow_dir = getattr(args, dirname)
             if not os.path.isdir(tensorflow_dir):
-                diagnostics.fatal(
+                fatal_error(
                     "--{} does not exist (was '{}')"
                     .format(dirname, tensorflow_dir))
             if is_lib_dir:
                 for lib in tensorflow_libs:
                     if not os.path.exists(
                             os.path.join(tensorflow_dir, lib)):
-                        diagnostics.fatal(
+                        fatal_error(
                             "--{} does not contain '{}' (was '{}')"
                             .format(dirname, lib, tensorflow_dir))
 
         if args.build_tensorflow and \
             args.tensorflow_host_lib_dir is not None and \
                 args.tensorflow_host_include_dir is not None:
-            diagnostics.fatal(
+            fatal_error(
                 "when building with TensorFlow support, cannot specify "
                 " --build-tensorflow (to build TensorFlow from source) at "
                 "the same time as --tensorflow-host-lib-dir and "
                 "--tensorflow-host-include-dir (to use custom TensorFlow "
                 "headers/libraries); please pick one")
-
-        if args.tensorflow_swift_apis is not None:
-            if not os.path.isdir(args.tensorflow_swift_apis):
-                diagnostics.fatal(
-                    "invalid repository specified for "
-                    "--tensorflow-swift-apis (was '{}')"
-                    .format(args.tensorflow_swift_apis))
 
     if args.enable_tensorflow_gpu:
         os.environ['TF_NEED_CUDA'] = '1'
@@ -289,7 +282,7 @@ def validate_arguments(toolchain, args):
         # specified.
         def warn_unspecified_tensorflow_env_var(name):
             if name not in os.environ:
-                diagnostics.note(
+                print_note(
                     "'{}' environment variable was not specified; "
                     "TensorFlow configure script default will be used"
                     .format(name))
@@ -412,7 +405,7 @@ def apply_default_arguments(toolchain, args):
             if (target.platform.is_darwin and
                 target.arch in supported_archs)
         ]
-    
+
     # Include the Darwin module-only architectures in the CMake options.
     if args.swift_darwin_module_archs:
         args.extra_cmake_options.append(
@@ -425,7 +418,7 @@ def apply_default_arguments(toolchain, args):
 
     if args.enable_tensorflow:
         if args.tensorflow_host_lib_dir is None and \
-            args.tensorflow_host_include_dir is None:
+           args.tensorflow_host_include_dir is None:
             args.build_tensorflow = True
         elif args.tensorflow_host_lib_dir is not None and \
                 args.tensorflow_host_include_dir is not None:
@@ -801,48 +794,6 @@ class BuildScriptInvocation(object):
                         args.build_jobs)
                 ]
 
-        # SWIFT_ENABLE_TENSORFLOW
-        if not args.build_tensorflow:
-            impl_args += ["--skip-build-tensorflow"]
-
-        if args.enable_tensorflow_gpu:
-            impl_args += ["--enable-tensorflow-gpu"]
-
-        if args.enable_tensorflow:
-            impl_args += [
-                "--enable-tensorflow",
-                "--host-bazel", toolchain.bazel,
-            ]
-            print(impl_args)
-            # If args.build-tensorflow, include/lib directories will be
-            # configured automatically by build-script-impl.
-            if not args.build_tensorflow:
-                assert args.tensorflow_host_lib_dir, \
-                    "Missing --tensorflow-host-lib-dir"
-                assert args.tensorflow_host_include_dir, \
-                    "Missing --tensorflow-host-include-dir"
-                impl_args += [
-                    "--tensorflow-host-lib-dir",
-                    args.tensorflow_host_lib_dir,
-                    "--tensorflow-host-include-dir",
-                    args.tensorflow_host_include_dir,
-                ]
-                if args.tensorflow_target_lib_dir:
-                    impl_args += [
-                        "--tensorflow-target-lib-dir",
-                        args.tensorflow_target_lib_dir,
-                    ]
-                if args.tensorflow_target_include_dir:
-                    impl_args += [
-                        "--tensorflow-target-include-dir",
-                        args.tensorflow_target_include_dir,
-                    ]
-        if args.tensorflow_bazel_options:
-            impl_args += [
-                "--tensorflow-bazel-options=%s" % ' '.join(
-                    pipes.quote(opt) for opt in args.tensorflow_bazel_options)
-            ]
-
         impl_args += args.build_script_impl_args
 
         if args.dry_run:
@@ -926,9 +877,6 @@ class BuildScriptInvocation(object):
             product_classes.append(products.LibCXX)
         if self.args.build_libicu:
             product_classes.append(products.LibICU)
-        # SWIFT_ENABLE_TENSORFLOW
-        if self.args.build_tensorflow:
-            product_classes.append(products.TensorFlow)
         product_classes.append(products.Swift)
         if self.args.build_lldb:
             product_classes.append(products.LLDB)
@@ -955,6 +903,7 @@ class BuildScriptInvocation(object):
         if self.args.build_pythonkit:
             product_classes.append(products.PythonKit)
         if self.args.build_tensorflow_swift_apis:
+            product_classes.append(products.TensorFlow)
             product_classes.append(products.TensorFlowSwiftAPIs)
         if self.args.build_sourcekitlsp:
             product_classes.append(products.SourceKitLSP)
@@ -1211,10 +1160,7 @@ def main_preset():
     if not args.preset:
         fatal_error("missing --preset option")
 
-    args.preset_substitutions = {
-      'home': os.path.expanduser("~")
-    }
-
+    args.preset_substitutions = {}
     for arg in args.preset_substitutions_raw:
         name, value = arg.split("=", 1)
         args.preset_substitutions[name] = value

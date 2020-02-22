@@ -241,7 +241,6 @@ EXPECTED_DEFAULTS = {
     'tensorflow_host_include_dir': None,
     'tensorflow_target_lib_dir': None,
     'tensorflow_target_include_dir': None,
-    'tensorflow_swift_apis': None,
     'host_bazel': None,
     'tensorflow_bazel_options': [],
 }
@@ -684,7 +683,6 @@ EXPECTED_OPTIONS = [
     PathOption('--tensorflow-host-include-dir'),
     PathOption('--tensorflow-target-lib-dir'),
     PathOption('--tensorflow-target-include-dir'),
-    PathOption('--tensorflow-swift-apis'),
     PathOption('--host-bazel'),
     AppendOption('--tensorflow-bazel-options'),
 ]

@@ -29,11 +29,12 @@ from .swift import Swift
 from .swiftevolve import SwiftEvolve
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
+# SWIFT_ENABLE_TENSORFLOW
+from .tensorflow import TensorFlow
+# SWIFT_ENABLE_TENSORFLOW END
 from .tensorflow import TensorFlowSwiftAPIs
 from .tsan_libdispatch import TSanLibDispatch
 from .xctest import XCTest
-# SWIFT_ENABLE_TENSORFLOW
-from .tensorflow import TensorFlow
 
 __all__ = [
     'CMark',
