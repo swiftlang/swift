@@ -67,6 +67,12 @@ class SILPerformanceInliner {
   llvm::DenseMap<SILFunction *, ShortestPathAnalysis *> SPAs;
   llvm::SpecificBumpPtrAllocator<ShortestPathAnalysis> SPAAllocator;
 
+  // Mark semantic functions that have nested semantic calls. This is
+  // effectively an immutable cache since we do not inline semantic calls into
+  // other semantic calls. This is computed bottom up--when checking a call
+  // site, we assume that a callee has already been evaluated.
+  llvm::SmallPtrSet<SILFunction *, 8> nestedSemanticFunctions;
+
   ColdBlockInfo CBI;
 
   OptRemark::Emitter &ORE;
@@ -778,7 +784,8 @@ void SILPerformanceInliner::collectAppliesToInline(
     // At this occasion we record additional weight increases.
     addWeightCorrection(FAS, WeightCorrections);
 
-    if (SILFunction *Callee = getEligibleFunction(FAS, WhatToInline)) {
+    if (SILFunction *Callee =
+            getEligibleFunction(FAS, WhatToInline, nestedSemanticFunctions)) {
       // Compute the shortest-path analysis for the callee.
       SILLoopInfo *CalleeLI = LA->get(Callee);
       ShortestPathAnalysis *CalleeSPA = getSPA(Callee, CalleeLI);
@@ -805,6 +812,8 @@ void SILPerformanceInliner::collectAppliesToInline(
   }
 #endif
 
+  bool semanticFunction = isOptimizableSemanticFunction(Caller);
+
   ConstantTracker constTracker(Caller);
   DominanceOrder domOrder(&Caller->front(), DT, Caller->size());
   int NumCallerBlocks = (int)Caller->size();
@@ -827,8 +836,13 @@ void SILPerformanceInliner::collectAppliesToInline(
 
       FullApplySite AI = FullApplySite(&*I);
 
-      auto *Callee = getEligibleFunction(AI, WhatToInline);
+      auto *Callee =
+          getEligibleFunction(AI, WhatToInline, nestedSemanticFunctions);
       if (Callee) {
+        // Mark nested semantic functions to guide inlining of callers.
+        if (semanticFunction && isOptimizableSemanticFunction(Callee))
+          nestedSemanticFunctions.insert(Caller);
+
         // Check if we have an always_inline or transparent function. If we do,
         // just add it to our final Applies list and continue.
         if (isInlineAlwaysCallSite(Callee)) {
@@ -906,6 +920,27 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   if (AppliesToInline.empty())
     return false;
 
+  //!!!
+  bool trace = false;
+  if (Caller->hasName("$s22array_semantics_nested16testInlineAppend5countSaySiGSi_tF")) {
+    //!!!llvm::dbgs() << "inlining into testInlineAppend\n";
+    //!!!trace = true;
+  }
+
+  llvm::SmallPtrSet<FullApplySite, 4> nestedSemanticCalls;
+  for (auto fullApply : AppliesToInline) {
+    //!!!
+    if (false
+        && nestedSemanticFunctions.count(
+            fullApply.getReferencedFunctionOrNull())) {
+      //!!!
+      if (trace)
+        llvm::dbgs() << "Nested: "
+                     << fullApply.getReferencedFunctionOrNull()->getName() << "\n";
+      nestedSemanticCalls.insert(fullApply);
+    }
+  }
+
   // Second step: do the actual inlining.
   for (auto AI : AppliesToInline) {
     SILFunction *Callee = AI.getReferencedFunctionOrNull();
@@ -913,6 +948,16 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
 
     if (!Callee->shouldOptimize()) {
       continue;
+    }
+
+    // If this function calls any nested semantics, only inline the nested
+    // semantic calls.
+    if (!nestedSemanticCalls.empty() && !nestedSemanticCalls.count(AI)) {
+      //!!!
+      if (trace)
+        llvm::dbgs() << "Non Nested: " << Callee->getName() << "\n";
+      if (ArraySemanticsCall(AI.getInstruction()))
+        continue;
     }
 
     // If we have a callee that doesn't have ownership, but the caller does have
@@ -965,7 +1010,8 @@ void SILPerformanceInliner::visitColdBlocks(
       if (!AI)
         continue;
 
-      auto *Callee = getEligibleFunction(AI, WhatToInline);
+      auto *Callee =
+          getEligibleFunction(AI, WhatToInline, nestedSemanticFunctions);
       if (Callee && decideInColdBlock(AI, Callee)) {
         AppliesToInline.push_back(AI);
       }
@@ -1025,16 +1071,17 @@ public:
 } // end anonymous namespace
 
 /// Create an inliner pass that does not inline functions that are marked with
-/// the @_semantics, @_effects or global_init attributes.
+/// the @_semantics, @_effects, availability, or global_init attributes.
 SILTransform *swift::createEarlyInliner() {
-  return new SILPerformanceInlinerPass(
-    InlineSelection::NoSemanticsAndGlobalInit, "Early");
+  return new SILPerformanceInlinerPass(InlineSelection::PreModuleSerialization,
+                                       "Early");
 }
 
-/// Create an inliner pass that does not inline functions that are marked with
-/// the global_init attribute or have an "availability" semantics attribute.
+// The mid-level inliner preserves the lowest level of semantic calls to avoid
+// pessimizing anlayses like EscapeAnlysis and SideEffectAnalysis.
 SILTransform *swift::createPerfInliner() {
-  return new SILPerformanceInlinerPass(InlineSelection::NoGlobalInit, "Middle");
+  return new SILPerformanceInlinerPass(InlineSelection::RetainSemantics,
+                                       "Middle");
 }
 
 /// Create an inliner pass that inlines all functions that are marked with

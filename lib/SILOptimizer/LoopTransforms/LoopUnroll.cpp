@@ -192,7 +192,10 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
         ++Cost;
       if (auto AI = FullApplySite::isa(&Inst)) {
         auto Callee = AI.getCalleeFunction();
-        if (Callee && getEligibleFunction(AI, InlineSelection::Everything)) {
+        SmallPtrSet<SILFunction *, 1> nestedSemanticFunctions;
+        if (Callee
+            && getEligibleFunction(AI, InlineSelection::Everything,
+                                   nestedSemanticFunctions)) {
           // If callee is rather big and potentialy inlinable, it may be better
           // not to unroll, so that the body of the calle can be inlined later.
           Cost += Callee->size() * InsnsPerBB;
