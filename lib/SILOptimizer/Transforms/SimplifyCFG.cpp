@@ -3065,6 +3065,10 @@ bool SimplifyCFG::run() {
 
   LLVM_DEBUG(llvm::dbgs() << "### Run SimplifyCFG on " << Fn.getName() << '\n');
 
+  //!!!
+  if (Fn.hasName("$s32sil_combine_concrete_existential29testWitnessReturnOptionalSelfAA2PP_pSgyF")) {
+    llvm::dbgs() << "TEST WITNESS SIMPLIFYCFG\n";
+  }
   // Disable some expensive optimizations if the function is huge.
   isVeryLargeFunction = (Fn.size() > 10000);
 
