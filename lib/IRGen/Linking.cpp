@@ -988,8 +988,8 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::ReflectionAssociatedTypeDescriptor:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
   case Kind::ProtocolWitnessTableLazyAccessFunction:
-    return getRootProtocolConformance()->getDeclContext();
-    
+    return getProtocolConformance()->getDeclContext();
+
   case Kind::TypeMetadata: {
     auto ty = getType();
     // Only fully concrete nominal type metadata gets emitted eagerly.
