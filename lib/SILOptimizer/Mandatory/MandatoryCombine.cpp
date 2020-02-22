@@ -284,9 +284,9 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
 template <class InstT> static FunctionRefInst *getRemovableRef(InstT *i) {
   // If the only use of the function_ref is us, then remove it.
   auto funcRef = dyn_cast<FunctionRefInst>(i->getCallee());
-  if (funcRef && (funcRef->use_empty() ||
-                  (funcRef->getSingleUse() &&
-                   funcRef->getSingleUse()->getUser() == i))) {
+  if (funcRef &&
+      (funcRef->use_empty() ||
+       (funcRef->getSingleUse() && funcRef->getSingleUse()->getUser() == i))) {
     return funcRef;
   }
   return nullptr;
@@ -299,14 +299,14 @@ SILInstruction *MandatoryCombiner::visitLoadInst(LoadInst *i) {
 
   val = stripCopiesAndBorrows(val);
   auto src = val;
-  
+
   // Try to get from a convert_function/convert_escape_to_noescape to a
   // partial_apply/thin_to_thick to a convert_function.
   if (auto *cfi = dyn_cast<ConvertFunctionInst>(val))
-   src = stripCopiesAndBorrows(cfi->getOperand());
+    src = stripCopiesAndBorrows(cfi->getOperand());
 
   if (auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(val))
-   src = stripCopiesAndBorrows(cvt->getOperand());
+    src = stripCopiesAndBorrows(cvt->getOperand());
 
   if (auto *pa = dyn_cast<PartialApplyInst>(src)) {
     if (tryDeleteDeadClosure(pa, instModCallbacks)) {
@@ -349,7 +349,8 @@ SILInstruction *MandatoryCombiner::visitPartialApplyInst(PartialApplyInst *i) {
 }
 
 /// Try to remove thing to thick instructions that are no longer used
-SILInstruction *MandatoryCombiner::visitThinToThickFunctionInst(ThinToThickFunctionInst *i) {
+SILInstruction *
+MandatoryCombiner::visitThinToThickFunctionInst(ThinToThickFunctionInst *i) {
   auto *ref = getRemovableRef(i);
   if (tryDeleteDeadClosure(i, instModCallbacks, /*needKeepArgsAlive=*/false)) {
     if (ref) {
