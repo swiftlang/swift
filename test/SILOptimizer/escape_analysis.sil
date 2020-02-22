@@ -1019,9 +1019,8 @@ bb0(%0 : $Builtin.Int64, %1 : $X, %2 : $X, %3 : $X):
 
 // CHECK-LABEL: CG of test_existential_addr
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: 
-// CHECK-NEXT:    Val %1 Esc: , Succ: (%2)
-// CHECK-NEXT:    Con %2 Esc: , Succ: (%2.1)
-// CHECK-NEXT:    Con [ref] %2.1 Esc: , Succ: %0
+// CHECK-NEXT:    Val %1 Esc: , Succ: (%1.1)
+// CHECK-NEXT:    Con [ref] %1.1 Esc: , Succ: %0
 // CHECK-NEXT:  End
 sil @test_existential_addr : $@convention(thin) (@owned Pointer) -> () {
 bb0(%0 : $Pointer):
