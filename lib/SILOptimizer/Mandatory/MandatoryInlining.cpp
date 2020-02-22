@@ -755,7 +755,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
 
 static SILInstruction *tryDevirtualizeApplyHelper(FullApplySite InnerAI,
                                                   ClassHierarchyAnalysis *CHA) {
-  auto NewInst = tryDevirtualizeApply(InnerAI, CHA);
+  auto NewInst = tryDevirtualizeApply(InnerAI, CHA).first;
   if (!NewInst)
     return InnerAI.getInstruction();
 
