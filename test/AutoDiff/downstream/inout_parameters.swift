@@ -51,6 +51,7 @@ InoutParametersTests.test("Float./=") {
   expectEqual((10, 10), pullback(at: 4, 5, in: mutatingDivideWrapper)(10))
 }
 
+// Simplest possible `inout` parameter differentiation.
 InoutParametersTests.test("InoutIdentity") {
   // Semantically, an empty function with an `inout` parameter is an identity
   // function.
@@ -61,8 +62,8 @@ InoutParametersTests.test("InoutIdentity") {
     inoutIdentity(&result)
     return result
   }
-  expectEqual(1, gradient(at: 1, in: identity))
-  expectEqual(10, pullback(at: 1, in: identity)(10))
+  expectEqual(1, gradient(at: 10, in: identity))
+  expectEqual(10, pullback(at: 10, in: identity)(10))
 }
 
 extension Float {
@@ -123,6 +124,30 @@ InoutParametersTests.test("SetAccessor") {
   }
   expectEqual(6, gradient(at: 3, in: squared))
   expectEqual(8, gradient(at: 4, in: squared))
+}
+
+// Test differentiation wrt `inout` parameters that have a class type.
+InoutParametersTests.test("InoutClassParameter") {
+  class Class: Differentiable {
+    @differentiable
+    var x: Float
+
+    init(_ x: Float) {
+      self.x = x
+    }
+  }
+
+  // Semantically, an empty function with an `inout` parameter is an identity
+  // function.
+  func inoutIdentity(_ c: inout Class) {}
+
+  func identity(_ x: Float) -> Float {
+    var c = Class(x)
+    inoutIdentity(&c)
+    return c.x
+  }
+  expectEqual(1, gradient(at: 10, in: identity))
+  expectEqual(10, pullback(at: 10, in: identity)(10))
 }
 
 runAllTests()
