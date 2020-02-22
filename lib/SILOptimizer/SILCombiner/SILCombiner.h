@@ -67,7 +67,7 @@ class SILCombiner :
 
   /// Set to true if some alloc/dealloc_stack instruction are inserted and at
   /// the end of the run stack nesting needs to be corrected.
-  bool needUpdateStackNesting = false;
+  bool invalidatedStackNesting = false;
 
   /// The current iteration of the SILCombine.
   unsigned Iteration;

@@ -362,13 +362,10 @@ static void destroyConsumedOperandOfDeadInst(Operand &operand) {
   assert(!isEndOfScopeMarker(deadInst) && !isa<DestroyValueInst>(deadInst) &&
          !isa<DestroyAddrInst>(deadInst) &&
          "lifetime ending instruction is deleted without its operand");
-  ValueOwnershipKind operandOwnershipKind = operandValue.getOwnershipKind();
-  UseLifetimeConstraint lifetimeConstraint =
-      operand.getOwnershipKindMap().getLifetimeConstraint(operandOwnershipKind);
-  if (lifetimeConstraint == UseLifetimeConstraint::MustBeInvalidated) {
+  if (operand.isConsumingUse()) {
     // Since deadInst cannot be an end-of-scope instruction (asserted above),
     // this must be a consuming use of an owned value.
-    assert(operandOwnershipKind == ValueOwnershipKind::Owned);
+    assert(operandValue.getOwnershipKind() == ValueOwnershipKind::Owned);
     SILBuilderWithScope builder(deadInst);
     builder.emitDestroyValueOperation(deadInst->getLoc(), operandValue);
   }
@@ -829,9 +826,6 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *builder,
   // No cast is required if types are the same.
   if (srcTy == destTy)
     return value;
-
-  assert(srcTy.isAddress() == destTy.isAddress()
-         && "Addresses aren't compatible with values");
 
   if (srcTy.isAddress() && destTy.isAddress()) {
     // Cast between two addresses and that's it.

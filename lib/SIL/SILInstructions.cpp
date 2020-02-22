@@ -753,6 +753,7 @@ LinearFunctionExtractInst::LinearFunctionExtractInst(
     : InstructionBase(debugLoc,
                       getExtracteeType(theFunction, extractee, module)),
       extractee(extractee), operands(this, theFunction) {}
+// SWIFT_ENABLE_TENSORFLOW END
 
 SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
     SILModule &module, DifferentiabilityWitnessFunctionKind witnessKind,
@@ -772,8 +773,7 @@ SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
         witnessCanGenSig, isReabstractionThunk);
     return SILType::getPrimitiveObjectType(diffFnTy);
   }
-  assert(witnessKind ==
-             DifferentiabilityWitnessFunctionKind::Transpose);
+  assert(witnessKind == DifferentiabilityWitnessFunctionKind::Transpose);
   auto transposeFnTy = fnTy->getAutoDiffTransposeFunctionType(
       parameterIndices, module.Types,
       LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
@@ -798,7 +798,6 @@ DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
   }
 #endif
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
                                          SILDebugLocation DebugLoc,

@@ -356,6 +356,10 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
+  virtual void
+  lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                         SmallVectorImpl<Identifier> &spiGroups) const override;
+
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const override;
 
   Optional<StringRef> getGroupNameForDecl(const Decl *D) const override;
@@ -399,6 +403,8 @@ public:
 
   virtual StringRef getFilename() const override;
 
+  virtual StringRef getModuleDefiningPath() const override;
+
   ClassDecl *getMainClass() const override;
 
   bool hasEntryPoint() const override;
@@ -408,6 +414,8 @@ public:
   virtual bool getAllGenericSignatures(
                    SmallVectorImpl<GenericSignature> &genericSignatures)
                 override;
+
+  StringRef getTargetTriple() const;
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST;

@@ -658,6 +658,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
       Ctx.bumpGeneration();
       LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
                                      Ctx.getCurrentGeneration());
+      findOverlayFiles(diagLoc.getValueOr(SourceLoc()), &M, fileUnit);
       return fileUnit;
     }
 
@@ -1122,6 +1123,11 @@ void SerializedASTFile::lookupObjCMethods(
   File.lookupObjCMethods(selector, results);
 }
 
+void SerializedASTFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                           SmallVectorImpl<Identifier> &spiGroups) const {
+  File.lookupImportedSPIGroups(importedModule, spiGroups);
+}
+
 Optional<CommentInfo>
 SerializedASTFile::getCommentForDecl(const Decl *D) const {
   return File.getCommentForDecl(D);
@@ -1192,6 +1198,10 @@ SerializedASTFile::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
 
 StringRef SerializedASTFile::getFilename() const {
   return File.getModuleFilename();
+}
+
+StringRef SerializedASTFile::getTargetTriple() const {
+  return File.getTargetTriple();
 }
 
 const clang::Module *SerializedASTFile::getUnderlyingClangModule() const {

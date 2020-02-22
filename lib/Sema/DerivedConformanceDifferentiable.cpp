@@ -19,6 +19,7 @@
 
 #include "CodeSynthesis.h"
 #include "TypeChecker.h"
+#include "DerivedConformances.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"

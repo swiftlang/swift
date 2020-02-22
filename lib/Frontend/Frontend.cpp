@@ -141,6 +141,15 @@ CompilerInvocation::getModuleInterfaceOutputPathForWholeModule() const {
       .SupplementaryOutputs.ModuleInterfaceOutputPath;
 }
 
+std::string
+CompilerInvocation::getPrivateModuleInterfaceOutputPathForWholeModule() const {
+  assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
+         "PrivateModuleInterfaceOutputPath only makes sense when the whole "
+         "module can be seen");
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.PrivateModuleInterfaceOutputPath;
+}
+
 SerializationOptions CompilerInvocation::computeSerializationOptions(
     const SupplementaryOutputPaths &outs, bool moduleIsPublic) const {
   const FrontendOptions &opts = getFrontendOptions();
@@ -211,6 +220,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
   registerSILGenRequestFunctions(Context->evaluator);
+  registerTBDGenRequestFunctions(Context->evaluator);
 
   // Migrator, indexing and typo correction need some IDE requests.
   // The integrated REPL needs IDE requests for completion.

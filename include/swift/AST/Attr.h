@@ -1109,6 +1109,21 @@ public:
   }
 };
 
+/// The \c @_typeEraser(TypeEraserType) attribute.
+class TypeEraserAttr final : public DeclAttribute {
+  TypeLoc TypeEraserLoc;
+public:
+  TypeEraserAttr(SourceLoc atLoc, SourceRange range, TypeLoc typeEraserLoc)
+      : DeclAttribute(DAK_TypeEraser, atLoc, range, /*Implicit=*/false),
+        TypeEraserLoc(typeEraserLoc) {}
+
+  const TypeLoc &getTypeEraserLoc() const { return TypeEraserLoc; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_TypeEraser;
+  }
+};
+
 /// Represents any sort of access control modifier.
 class AbstractAccessControlAttr : public DeclAttribute {
 protected:
@@ -1154,6 +1169,36 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SetterAccess;
+  }
+};
+
+/// SPI attribute applied to both decls and imports.
+class SPIAccessControlAttr final : public DeclAttribute,
+                                   private llvm::TrailingObjects<SPIAccessControlAttr, Identifier> {
+  friend TrailingObjects;
+
+  SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,
+                       ArrayRef<Identifier> spiGroups);
+
+  // Number of trailing SPI group identifiers.
+  size_t numSPIGroups;
+
+public:
+  static SPIAccessControlAttr *create(ASTContext &context, SourceLoc atLoc,
+                                      SourceRange range,
+                                      ArrayRef<Identifier> spiGroups);
+
+  /// Name of SPIs declared by the attribute.
+  ///
+  /// Note: A single SPI name per attribute is currently supported but this
+  /// may change with the syntax change.
+  ArrayRef<Identifier> getSPIGroups() const {
+    return { this->template getTrailingObjects<Identifier>(),
+             numSPIGroups };
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_SPIAccessControl;
   }
 };
 
@@ -2087,6 +2132,15 @@ public:
   /// Retrieve the first attribute with the given kind.
   const DeclAttribute *getAttribute(DeclAttrKind DK,
                                     bool AllowInvalid = false) const {
+    for (auto Attr : *this)
+      if (Attr->getKind() == DK && (Attr->isValid() || AllowInvalid))
+        return Attr;
+    return nullptr;
+  }
+
+  /// Retrieve the first attribute with the given kind.
+  DeclAttribute *getAttribute(DeclAttrKind DK,
+                              bool AllowInvalid = false) {
     for (auto Attr : *this)
       if (Attr->getKind() == DK && (Attr->isValid() || AllowInvalid))
         return Attr;

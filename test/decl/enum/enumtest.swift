@@ -277,7 +277,8 @@ func testDirection() {
     i = x
     break
 
-  case .NorthEast(let x): // expected-warning {{cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+  case .NorthEast(let x): // expected-warning {{enum case 'NorthEast' has 2 associated values; matching them as a tuple is deprecated}}
+                          // expected-note@-14 {{'NorthEast(distanceNorth:distanceEast:)' declared here}}
     i = x.distanceEast
     break
   }

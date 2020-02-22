@@ -165,6 +165,21 @@ WARNING(warn_property_wrapper_module_scope,none,
         "wrapper %0; please qualify the reference with %1",
         (DeclNameRef, Identifier))
 
+//------------------------------------------------------------------------------
+// MARK: Cross-import overlay loading diagnostics
+//------------------------------------------------------------------------------
+ERROR(cannot_load_swiftoverlay_file, none,
+      "cannot load cross-import overlay for %0 and %1: %2 (declared by '%3')",
+      (Identifier, Identifier, StringRef, StringRef))
+ERROR(cannot_list_swiftcrossimport_dir, none,
+      "cannot list cross-import overlays for %0: %1 (declared in '%2')",
+      (Identifier, StringRef, StringRef))
+WARNING(cross_imported_by_both_modules, none,
+        "modules %0 and %1 both declare module %2 as a cross-import overlay, "
+        "which may cause paradoxical behavior when looking up names in them; "
+        "please report this bug to the maintainers of these modules",
+        (Identifier, Identifier, Identifier))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

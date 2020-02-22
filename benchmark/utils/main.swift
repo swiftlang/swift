@@ -50,6 +50,7 @@ import Codable
 import Combos
 import DataBenchmarks
 import DeadArray
+import DevirtualizeProtocolComposition
 import DictOfArraysToArrayOfDicts
 import DictTest
 import DictTest2
@@ -231,6 +232,7 @@ registerBenchmark(Combos)
 registerBenchmark(ClassArrayGetter)
 registerBenchmark(DataBenchmarks)
 registerBenchmark(DeadArray)
+registerBenchmark(DevirtualizeProtocolComposition)
 registerBenchmark(DictOfArraysToArrayOfDicts)
 registerBenchmark(Dictionary)
 registerBenchmark(Dictionary2)

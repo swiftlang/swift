@@ -616,7 +616,7 @@ namespace {
       if (!overloadType)
         continue;
 
-      if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
+      if (!CS.isDeclUnavailable(decl, constraint->getLocator()) &&
           !decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>() &&
           isFavored(decl, overloadType)) {
         // If we might need to roll back the favored constraints, keep
@@ -1151,21 +1151,33 @@ namespace {
       // If this is a standalone `nil` literal expression e.g.
       // `_ = nil`, let's diagnose it here because solver can't
       // attempt any types for it.
-      if (!CS.isExprBeingDiagnosed(expr)) {
-        auto *parentExpr = CS.getParentExpr(expr);
+      auto *parentExpr = CS.getParentExpr(expr);
 
-        // `_ = nil`
-        if (auto *assignment = dyn_cast_or_null<AssignExpr>(parentExpr)) {
-          if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
-            DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
-            return Type();
-          }
-        }
-
-        if (!parentExpr && !CS.getContextualType(expr)) {
+      // `_ = nil`
+      if (auto *assignment = dyn_cast_or_null<AssignExpr>(parentExpr)) {
+        if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
           DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
           return Type();
         }
+      }
+
+      if (!parentExpr && !CS.getContextualType(expr)) {
+        DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
+        return Type();
+      }
+
+      return visitLiteralExpr(expr);
+    }
+
+    Type visitFloatLiteralExpr(FloatLiteralExpr *expr) {
+      auto &ctx = CS.getASTContext();
+      // Get the _MaxBuiltinFloatType decl, or look for it if it's not cached.
+      auto maxFloatTypeDecl = ctx.get_MaxBuiltinFloatTypeDecl();
+
+      if (!maxFloatTypeDecl ||
+          !maxFloatTypeDecl->getDeclaredInterfaceType()->is<BuiltinFloatType>()) {
+        ctx.Diags.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
+        return nullptr;
       }
 
       return visitLiteralExpr(expr);
@@ -1329,25 +1341,11 @@ namespace {
       Type knownType;
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
-        if (!knownType &&
-            !(isa<ParamDecl>(VD) &&
-              isa<ClosureExpr>(VD->getDeclContext()) &&
-              CS.Options.contains(
-                ConstraintSystemFlags::SubExpressionDiagnostics)))
+        if (!knownType)
           knownType = VD->getInterfaceType();
 
         if (knownType) {
-          // If this is a ParamDecl for a closure argument that is a hole,
-          // then this is a situation where CSDiags is trying to perform
-          // error recovery within a ClosureExpr.  Just create a new type
-          // variable for the decl that isn't bound to anything.
-          // This will ensure that it is considered ambiguous.
-          if (knownType && knownType->isHole()) {
-            return CS.createTypeVariable(locator,
-                                         TVO_CanBindToLValue |
-                                         TVO_CanBindToNoEscape);
-          }
-
+          assert(!knownType->isHole());
           // If the known type has an error, bail out.
           if (knownType->hasError()) {
             if (!CS.hasType(E))
@@ -2119,6 +2117,17 @@ namespace {
           auto *paramLoc =
               CS.getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
 
+          // If one of the parameters represents a destructured tuple
+          // e.g. `{ (x: Int, (y: Int, z: Int)) in ... }` let's fail
+          // inference here and not attempt to solve the system because:
+          //
+          // a. Destructuring has already been diagnosed by the parser;
+          // b. Body of the closure would have error expressions for
+          //    each incorrect parameter reference and solver wouldn't
+          //    be able to produce any viable solutions.
+          if (param->isDestructured())
+            return nullptr;
+
           Type externalType;
           if (param->getTypeRepr()) {
             auto declaredTy = param->getType();
@@ -2516,10 +2525,18 @@ namespace {
       struct CollectParameterRefs : public ASTWalker {
         ConstraintSystem &cs;
         llvm::SmallVector<TypeVariableType *, 4> paramRefs;
+        bool hasErrorExprs = false;
 
         CollectParameterRefs(ConstraintSystem &cs) : cs(cs) { }
 
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+          // If there are any error expressions in this closure
+          // it wouldn't be possible to infer its type.
+          if (isa<ErrorExpr>(expr)) {
+            hasErrorExprs = true;
+            return {false, nullptr};
+          }
+
           // Retrieve type variables from references to parameter declarations.
           if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
             if (auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl())) {
@@ -2533,6 +2550,9 @@ namespace {
         }
       } collectParameterRefs(CS);
       closure->walk(collectParameterRefs);
+
+      if (collectParameterRefs.hasErrorExprs)
+        return Type();
 
       auto inferredType = inferClosureType(closure);
       if (!inferredType || inferredType->hasError())
@@ -3417,12 +3437,10 @@ namespace {
   /// diagnostics and code completion.
   class SanitizeExpr : public ASTWalker {
     ConstraintSystem &CS;
-    const bool eraseOpenExistentialsOnly;
     llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpenExistentials;
 
   public:
-    SanitizeExpr(ConstraintSystem &cs, bool eraseOEsOnly = false)
-        : CS(cs), eraseOpenExistentialsOnly(eraseOEsOnly) { }
+    SanitizeExpr(ConstraintSystem &cs) : CS(cs){ }
 
     ASTContext &getASTContext() const { return CS.getASTContext(); }
 
@@ -3467,15 +3485,10 @@ namespace {
             expr = value->second;
             continue;
           } else {
-            assert((eraseOpenExistentialsOnly || OVE->isPlaceholder()) &&
+            assert(OVE->isPlaceholder() &&
                    "Didn't see this OVE in a containing OpenExistentialExpr?");
-            // NOTE: In 'eraseOpenExistentialsOnly' mode, ASTWalker may walk
-            // into other kind of expressions holding OVE.
           }
         }
-
-        if (eraseOpenExistentialsOnly)
-          return {true, expr};
 
         // Skip any implicit conversions applied to this expression.
         if (auto ICE = dyn_cast<ImplicitConversionExpr>(expr)) {
@@ -3612,9 +3625,6 @@ namespace {
           expr->setType(type);
         }
       }
-
-      if (eraseOpenExistentialsOnly)
-        return expr;
 
       assert(!isa<ImplicitConversionExpr>(expr) &&
              "ImplicitConversionExpr should be eliminated in walkToExprPre");
@@ -3897,11 +3907,17 @@ bool ConstraintSystem::generateConstraints(
     SolutionApplicationTarget &target,
     FreeTypeVariableBinding allowFreeTypeVariables) {
   if (Expr *expr = target.getAsExpr()) {
-    // Try to shrink the system by reducing disjunction domains. This
-    // goes through every sub-expression and generate its own sub-system, to
-    // try to reduce the domains of those subexpressions.
-    shrink(expr);
-    target.setExpr(expr);
+    // If the target requires an optional of some type, form a new appropriate
+    // type variable and update the target's type with an optional of that
+    // type variable.
+    if (target.isOptionalSomePatternInit()) {
+      assert(!target.getExprContextualType() &&
+             "some pattern cannot have contextual type pre-configured");
+      auto *convertTypeLocator =
+          getConstraintLocator(expr, LocatorPathElt::ContextualType());
+      Type var = createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
+      target.setExprConversionType(TypeChecker::getOptionalType(expr->getLoc(), var));
+    }
 
     // Generate constraints for the main system.
     expr = generateConstraints(expr, target.getDeclContext());
@@ -3939,6 +3955,14 @@ bool ConstraintSystem::generateConstraints(
     if (target.getExprContextualTypePurpose() == CTP_Initialization &&
         generateInitPatternConstraints(*this, target, expr)) {
       return true;
+    }
+
+    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log << "---Initial constraints for the given expression---\n";
+      print(log, expr);
+      log << "\n";
+      print(log);
     }
 
     return false;
@@ -4019,6 +4043,100 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
   return false;
 }
 
+void ConstraintSystem::bindVariablesInPattern(
+    Pattern *pattern, Type patternType, ConstraintLocator *locator) {
+  switch (pattern->getKind()) {
+  case PatternKind::Paren: {
+    // Parentheses don't affect the type, but unwrap a paren type if we have
+    // one.
+    Type subPatternType;
+    if (auto parenType = dyn_cast<ParenType>(patternType.getPointer()))
+      subPatternType = parenType->getUnderlyingType();
+    else
+      subPatternType = patternType;
+    return bindVariablesInPattern(
+        cast<ParenPattern>(pattern)->getSubPattern(),
+        subPatternType, locator);
+  }
+
+  case PatternKind::Var:
+    // Var doesn't affect the type.
+    return bindVariablesInPattern(cast<VarPattern>(pattern)->getSubPattern(),
+                                  patternType, locator);
+
+  case PatternKind::Any:
+    // Nothing to bind.
+    return;
+
+  case PatternKind::Named: {
+    auto var = cast<NamedPattern>(pattern)->getDecl();
+
+    /// Create a fresh type variable to describe the type of the
+    Type varType = createTypeVariable(locator, TVO_CanBindToNoEscape);
+
+    auto ROK = ReferenceOwnership::Strong;
+    if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+      ROK = OA->get();
+    switch (optionalityOf(ROK)) {
+    case ReferenceOwnershipOptionality::Required:
+      // FIXME: Can we assert this rather than just checking it.
+      if (auto optPatternType =
+              dyn_cast<OptionalType>(patternType.getPointer())) {
+        // Add a one-way constraint from the type variable to the wrapped
+        // type of the optional.
+        addConstraint(
+          ConstraintKind::OneWayEqual, varType, optPatternType->getBaseType(),
+                          locator);
+
+        // Make the variable type optional.
+        varType = TypeChecker::getOptionalType(var->getLoc(), varType);
+        break;
+      }
+
+      // Fall through to treat this normally.
+      LLVM_FALLTHROUGH;
+
+    case ReferenceOwnershipOptionality::Allowed:
+    case ReferenceOwnershipOptionality::Disallowed:
+      // Add the one-way constraint from the variable type to the pattern
+      // type.
+      addConstraint(ConstraintKind::OneWayEqual, varType, patternType,
+                    locator);
+      break;
+    }
+
+    // Bind the type of the variable.
+    setType(var, varType);
+    return;
+  }
+
+  case PatternKind::Typed: {
+    // Ignore the type itself; it's part of patternType now.
+    return bindVariablesInPattern(
+        cast<TypedPattern>(pattern)->getSubPattern(),
+        patternType, locator);
+  }
+
+  case PatternKind::Tuple: {
+    auto tuplePat = cast<TuplePattern>(pattern);
+    auto tupleType = patternType->castTo<TupleType>();
+    for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
+      bindVariablesInPattern(tuplePat->getElement(i).getPattern(),
+                             tupleType->getElementType(i), locator);
+    }
+    return;
+  }
+
+  // FIXME: Refutable patterns will generate additional constraints.
+#define PATTERN(Id, Parent)
+#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
+#include "swift/AST/PatternNodes.def"
+    llvm_unreachable("Refutable patterns are not supported here");
+  }
+
+  llvm_unreachable("Unhandled pattern kind");
+}
+
 void ConstraintSystem::optimizeConstraints(Expr *e) {
   if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return;
@@ -4062,10 +4180,6 @@ bool swift::areGenericRequirementsSatisfied(
 
   // Having a solution implies the requirements have been fulfilled.
   return CS.solveSingle().hasValue();
-}
-
-void swift::eraseOpenedExistentials(ConstraintSystem &CS, Expr *&expr) {
-  expr = expr->walk(SanitizeExpr(CS, /*eraseOEsOnly=*/true));
 }
 
 struct ResolvedMemberResult::Implementation {

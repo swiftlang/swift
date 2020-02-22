@@ -2023,7 +2023,7 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   // DynamicSelfType is always representable in Objective-C, even if
   // the class is not @objc, allowing Self-returning methods to witness
   // @objc protocol requirements.
-  if (auto dynSelf = type->getAs<DynamicSelfType>())
+  if (type->is<DynamicSelfType>())
     return ForeignRepresentableKind::Object;
 
   // @objc classes.
@@ -3411,7 +3411,8 @@ operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
   assert((conformingReplacementType->is<ErrorType>()
           || conformingReplacementType->is<SubstitutableType>()
-          || conformingReplacementType->is<DependentMemberType>())
+          || conformingReplacementType->is<DependentMemberType>()
+          || conformingReplacementType->is<TypeVariableType>())
          && "replacement requires looking up a concrete conformance");
   return ProtocolConformanceRef(conformedProtocol);
 }
@@ -3442,7 +3443,7 @@ Type DependentMemberType::substBaseType(Type substBase,
 Type DependentMemberType::substRootParam(Type newRoot,
                                          LookupConformanceFn lookupConformance){
   auto base = getBase();
-  if (auto param = base->getAs<GenericTypeParamType>()) {
+  if (base->is<GenericTypeParamType>()) {
     return substBaseType(newRoot, lookupConformance);
   }
   if (auto depMem = base->getAs<DependentMemberType>()) {
@@ -3633,7 +3634,7 @@ static Type substType(Type derivedType,
     if (isa<GenericTypeParamType>(substOrig))
       return ErrorType::get(type);
 
-    if (auto primaryArchetype = dyn_cast<PrimaryArchetypeType>(substOrig))
+    if (isa<PrimaryArchetypeType>(substOrig))
       return ErrorType::get(type);
 
     // Opened existentials cannot be substituted in this manner,
@@ -4098,7 +4099,7 @@ case TypeKind::Id:
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
     
-    if (auto subs = fnTy->getSubstitutions()) {
+    if (fnTy->getSubstitutions()) {
 #ifndef NDEBUG
       // This interface isn't suitable for updating the substitution map in a
       // substituted SILFunctionType.

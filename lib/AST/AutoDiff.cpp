@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,10 +13,33 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 
 using namespace swift;
+
+DifferentiabilityWitnessFunctionKind::DifferentiabilityWitnessFunctionKind(
+    StringRef string) {
+  Optional<innerty> result = llvm::StringSwitch<Optional<innerty>>(string)
+                                 .Case("jvp", JVP)
+                                 .Case("vjp", VJP)
+                                 .Case("transpose", Transpose);
+  assert(result && "Invalid string");
+  rawValue = *result;
+}
+
+Optional<AutoDiffDerivativeFunctionKind>
+DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
+  switch (rawValue) {
+  case JVP:
+    return {AutoDiffDerivativeFunctionKind::JVP};
+  case VJP:
+    return {AutoDiffDerivativeFunctionKind::VJP};
+  case Transpose:
+    return None;
+  }
+}
 
 void AutoDiffConfig::print(llvm::raw_ostream &s) const {
   s << "(parameters=";
@@ -137,25 +160,6 @@ AutoDiffDerivativeFunctionKind(StringRef string) {
           .Case("jvp", JVP).Case("vjp", VJP);
   assert(result && "Invalid string");
   rawValue = *result;
-}
-
-DifferentiabilityWitnessFunctionKind::
-DifferentiabilityWitnessFunctionKind(StringRef string) {
-  Optional<innerty> result = llvm::StringSwitch<Optional<innerty>>(string)
-      .Case("jvp", JVP)
-      .Case("vjp", VJP)
-      .Case("transpose", Transpose);
-  assert(result && "Invalid string");
-  rawValue = *result;
-}
-
-Optional<AutoDiffDerivativeFunctionKind>
-DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
-  switch (rawValue) {
-  case JVP: return {AutoDiffDerivativeFunctionKind::JVP};
-  case VJP: return {AutoDiffDerivativeFunctionKind::VJP};
-  case Transpose: return None;
-  }
 }
 
 NormalDifferentiableFunctionTypeComponent::

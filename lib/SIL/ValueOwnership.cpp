@@ -147,10 +147,8 @@ CONSTANT_OWNERSHIP_INST(None, ValueMetatype)
 CONSTANT_OWNERSHIP_INST(None, WitnessMethod)
 CONSTANT_OWNERSHIP_INST(None, StoreBorrow)
 CONSTANT_OWNERSHIP_INST(None, ConvertEscapeToNoEscape)
-// SWIFT_ENABLE_TENSORFLOW
-CONSTANT_OWNERSHIP_INST(None, DifferentiabilityWitnessFunction)
-// SWIFT_ENABLE_TENSORFLOW END
 CONSTANT_OWNERSHIP_INST(Unowned, InitBlockStorageHeader)
+CONSTANT_OWNERSHIP_INST(None, DifferentiabilityWitnessFunction)
 // TODO: It would be great to get rid of these.
 CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)

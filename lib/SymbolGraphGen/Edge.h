@@ -18,10 +18,11 @@
 #include "swift/Basic/LLVM.h"
 
 #include "JSON.h"
-#include "Symbol.h"
 
 namespace swift {
 namespace symbolgraphgen {
+
+struct SymbolGraph;
   
 /// The kind of relationship, tagging an edge in the graph.
 struct RelationshipKind {
@@ -113,7 +114,7 @@ struct RelationshipKind {
 
 /// A relationship between two symbols: an edge in a directed graph.
 struct Edge {
-  SymbolGraphASTWalker *Walker;
+  SymbolGraph *Graph;
 
   /// The kind of relationship this edge represents.
   RelationshipKind Kind;

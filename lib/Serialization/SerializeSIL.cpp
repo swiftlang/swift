@@ -970,86 +970,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                              Args);
     break;
   }
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::DifferentiableFunctionInst: {
-    auto *dfi = cast<DifferentiableFunctionInst>(&SI);
-    SmallVector<ValueID, 4> trailingInfo;
-    auto *paramIndices = dfi->getParameterIndices();
-    for (unsigned idx : paramIndices->getIndices())
-      trailingInfo.push_back(idx);
-    for (auto &op : dfi->getAllOperands()) {
-      auto val = op.get();
-      trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
-      trailingInfo.push_back((unsigned)val->getType().getCategory());
-      trailingInfo.push_back(addValueRef(val));
-    }
-    SILInstDifferentiableFunctionLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstDifferentiableFunctionLayout::Code],
-        paramIndices->getCapacity(), dfi->hasDerivativeFunctions(),
-        trailingInfo);
-    break;
-  }
-  case SILInstructionKind::LinearFunctionInst: {
-    auto *lfi = cast<LinearFunctionInst>(&SI);
-    SmallVector<ValueID, 4> trailingInfo;
-    auto *paramIndices = lfi->getParameterIndices();
-    for (unsigned idx : paramIndices->getIndices())
-      trailingInfo.push_back(idx);
-    for (auto &op : lfi->getAllOperands()) {
-      auto val = op.get();
-      trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
-      trailingInfo.push_back((unsigned)val->getType().getCategory());
-      trailingInfo.push_back(addValueRef(val));
-    }
-    SILInstLinearFunctionLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstLinearFunctionLayout::Code],
-        paramIndices->getCapacity(), lfi->hasTransposeFunction(),
-        trailingInfo);
-    break;
-  }
-  case SILInstructionKind::DifferentiableFunctionExtractInst: {
-    auto *dfei = cast<DifferentiableFunctionExtractInst>(&SI);
-    auto operandRef = addValueRef(dfei->getFunctionOperand());
-    auto operandType = dfei->getFunctionOperand()->getType();
-    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
-    auto rawExtractee = (unsigned)dfei->getExtractee();
-    SILInstDifferentiableFunctionExtractLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstDifferentiableFunctionExtractLayout::Code],
-        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
-        rawExtractee, (unsigned)dfei->hasExplicitExtracteeType());
-    break;
-  }
-  case SILInstructionKind::LinearFunctionExtractInst: {
-    auto *lfei = cast<LinearFunctionExtractInst>(&SI);
-    auto operandRef = addValueRef(lfei->getFunctionOperand());
-    auto operandType = lfei->getFunctionOperand()->getType();
-    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
-    auto rawExtractee = (unsigned)lfei->getExtractee();
-    SILInstLinearFunctionExtractLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstLinearFunctionExtractLayout::Code],
-        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
-        rawExtractee);
-    break;
-  }
-  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
-    auto *dwfi = cast<DifferentiabilityWitnessFunctionInst>(&SI);
-    auto *witness = dwfi->getWitness();
-    DifferentiabilityWitnessesToEmit.insert(witness);
-    Mangle::ASTMangler mangler;
-    auto mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(
-        witness->getKey());
-    auto rawWitnessKind = (unsigned)dwfi->getWitnessKind();
-    // We only store the type when the instruction has an explicit type.
-    bool hasExplicitFnTy = dwfi->getHasExplicitFunctionType();
-    SILOneOperandLayout::emitRecord(
-        Out, ScratchRecord, SILAbbrCodes[SILOneOperandLayout::Code],
-        (unsigned)dwfi->getKind(), rawWitnessKind,
-        hasExplicitFnTy ? S.addTypeRef(dwfi->getType().getASTType()) : TypeID(),
-        hasExplicitFnTy ? (unsigned)dwfi->getType().getCategory() : 0,
-        S.addUniquedStringRef(mangledKey));
-    break;
-  }
-  // SWIFT_ENABLE_TENSORFLOW END
   case SILInstructionKind::ApplyInst: {
     // Format: attributes such as transparent and number of substitutions,
     // the callee's substituted and unsubstituted types, a value for
@@ -2232,6 +2152,86 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     S.writeGenericRequirements(reqts, SILAbbrCodes);
 
+    break;
+  }
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILInstructionKind::DifferentiableFunctionInst: {
+    auto *dfi = cast<DifferentiableFunctionInst>(&SI);
+    SmallVector<ValueID, 4> trailingInfo;
+    auto *paramIndices = dfi->getParameterIndices();
+    for (unsigned idx : paramIndices->getIndices())
+      trailingInfo.push_back(idx);
+    for (auto &op : dfi->getAllOperands()) {
+      auto val = op.get();
+      trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
+      trailingInfo.push_back((unsigned)val->getType().getCategory());
+      trailingInfo.push_back(addValueRef(val));
+    }
+    SILInstDifferentiableFunctionLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstDifferentiableFunctionLayout::Code],
+        paramIndices->getCapacity(), dfi->hasDerivativeFunctions(),
+        trailingInfo);
+    break;
+  }
+  case SILInstructionKind::LinearFunctionInst: {
+    auto *lfi = cast<LinearFunctionInst>(&SI);
+    SmallVector<ValueID, 4> trailingInfo;
+    auto *paramIndices = lfi->getParameterIndices();
+    for (unsigned idx : paramIndices->getIndices())
+      trailingInfo.push_back(idx);
+    for (auto &op : lfi->getAllOperands()) {
+      auto val = op.get();
+      trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
+      trailingInfo.push_back((unsigned)val->getType().getCategory());
+      trailingInfo.push_back(addValueRef(val));
+    }
+    SILInstLinearFunctionLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstLinearFunctionLayout::Code],
+        paramIndices->getCapacity(), lfi->hasTransposeFunction(),
+        trailingInfo);
+    break;
+  }
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    auto *dfei = cast<DifferentiableFunctionExtractInst>(&SI);
+    auto operandRef = addValueRef(dfei->getFunctionOperand());
+    auto operandType = dfei->getFunctionOperand()->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+    auto rawExtractee = (unsigned)dfei->getExtractee();
+    SILInstDifferentiableFunctionExtractLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstDifferentiableFunctionExtractLayout::Code],
+        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
+        rawExtractee, (unsigned)dfei->hasExplicitExtracteeType());
+    break;
+  }
+  case SILInstructionKind::LinearFunctionExtractInst: {
+    auto *lfei = cast<LinearFunctionExtractInst>(&SI);
+    auto operandRef = addValueRef(lfei->getFunctionOperand());
+    auto operandType = lfei->getFunctionOperand()->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+    auto rawExtractee = (unsigned)lfei->getExtractee();
+    SILInstLinearFunctionExtractLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstLinearFunctionExtractLayout::Code],
+        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
+        rawExtractee);
+    break;
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+    auto *dwfi = cast<DifferentiabilityWitnessFunctionInst>(&SI);
+    auto *witness = dwfi->getWitness();
+    DifferentiabilityWitnessesToEmit.insert(witness);
+    Mangle::ASTMangler mangler;
+    auto mangledKey =
+        mangler.mangleSILDifferentiabilityWitnessKey(witness->getKey());
+    auto rawWitnessKind = (unsigned)dwfi->getWitnessKind();
+    // We only store the type when the instruction has an explicit type.
+    bool hasExplicitFnTy = dwfi->getHasExplicitFunctionType();
+    SILOneOperandLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneOperandLayout::Code],
+        (unsigned)dwfi->getKind(), rawWitnessKind,
+        hasExplicitFnTy ? S.addTypeRef(dwfi->getType().getASTType()) : TypeID(),
+        hasExplicitFnTy ? (unsigned)dwfi->getType().getCategory() : 0,
+        S.addUniquedStringRef(mangledKey));
     break;
   }
   }

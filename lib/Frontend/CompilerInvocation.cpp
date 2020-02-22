@@ -550,6 +550,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableConcisePoundFile =
       Args.hasArg(OPT_enable_experimental_concise_pound_file);
 
+  Opts.EnableCrossImportOverlays =
+      Args.hasFlag(OPT_enable_cross_import_overlays,
+                   OPT_disable_cross_import_overlays,
+                   Opts.EnableCrossImportOverlays);
+
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   if (const Arg *A = Args.getLastArg(OPT_target)) {
@@ -1115,6 +1120,9 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_previous_module_installname_map_file)) {
     Opts.ModuleInstallNameMapPath = A->getValue();
   }
+  for (auto A : Args.getAllArgValues(OPT_embed_tbd_for_module)) {
+    Opts.embedSymbolsFromModules.push_back(StringRef(A).str());
+  }
   return false;
 }
 
@@ -1348,8 +1356,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.DisableLegacyTypeInfo = true;
   }
 
-  if (Args.hasArg(OPT_disable_generic_metadata_prespecialization)) {
-    Opts.PrespecializeGenericMetadata = false;
+  if (Args.hasArg(OPT_prespecialize_generic_metadata) && 
+      !Args.hasArg(OPT_disable_generic_metadata_prespecialization)) {
+    Opts.PrespecializeGenericMetadata = true;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_read_legacy_type_info_path_EQ)) {

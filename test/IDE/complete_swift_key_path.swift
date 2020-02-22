@@ -25,6 +25,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_GENERIC_RESULT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_GENERIC_RESULT_OPTIONAL | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_GENERICRESULT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_ROOT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_NONROOT | %FileCheck %s -check-prefix=OBJ-DOT
+
 class Person {
     var name: String
     var friends: [Person] = []
@@ -148,4 +153,20 @@ func recvExplicitKPWithGenericResult<Result>(_ kp: KeyPath<Person, Result>) {
 func recvExplicitKPWithGenericResultOpt<Result>(_ kp: KeyPath<Person, Result>?) {
   recvExplicitKPWithGenericResult(\.#^CONTEXT_GENERIC_RESULT_OPTIONAL^#
   // Same as TYPE_DOT.
+}
+func recvFunc(_ fn: (Person) -> String) {
+  recvFunc(\.#^CONTEXT_FUNC^#)
+}
+func recvFuncGeneric<T>(_ fn: (Person) -> T) {
+  recvFunc(\.#^CONTEXT_FUNC_GENERICRESULT^#)
+}
+
+struct Wrap<T> {
+  func map<U>(_ fn: (T) -> U) -> U { fatalError() }
+}
+func testKeyPathAsFunctions(wrapped: Wrap<Person>) {
+  let _ = wrapped.map(\.#^CONTEXT_FUNC_ROOT^#)
+  // Same as TYPE_DOT.
+  let _ = wrapped.map(\.friends[0].#^CONTEXT_FUNC_NONROOT^#)
+  // Same as OBJ_DOT.
 }

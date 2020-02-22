@@ -320,3 +320,13 @@ bb0(%0 : $ClassWithResilientField):
 // CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
 // CHECK-NEXT: ret %swift.metadata_response [[T1]]
 
+// Make sure we cache the construction of fully bound optional types.
+
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s42class_update_callback_without_fixed_layout21ClassWithResilientRefCMr"
+// CHECK: call swiftcc %swift.metadata_response @"$s16resilient_struct12ResilientRefVSgMa"
+// CHECK: ret
+
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s16resilient_struct12ResilientRefVSgMa"
+// CHECK:  call swiftcc %swift.metadata_response @"$s16resilient_struct12ResilientRefVMa"
+// CHECK:  call swiftcc %swift.metadata_response @"$sSqMa"
+// CHECK:  ret

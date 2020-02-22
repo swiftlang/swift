@@ -85,7 +85,11 @@ namespace irgen {
   /// Emit the metadata associated with the given enum declaration.
   void emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum);
 
-  void emitSpecializedGenericStructMetadata(IRGenModule &IGM, CanType type);
+  void emitSpecializedGenericStructMetadata(IRGenModule &IGM, CanType type,
+                                            StructDecl &decl);
+
+  void emitSpecializedGenericEnumMetadata(IRGenModule &IGM, CanType type,
+                                          EnumDecl &decl);
 
   /// Get what will be the index into the generic type argument array at the end
   /// of a nominal type's metadata.

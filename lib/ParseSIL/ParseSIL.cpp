@@ -2838,184 +2838,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::DifferentiableFunctionInst: {
-    // e.g. differentiable_function [parameters 0 1 2] %0 : $T
-    //
-    // e.g. differentiable_function [parameters 0 1 2] %0 : $T with_derivative
-    //      {%1 : $T, %2 : $T}
-    //       ^~ jvp   ^~ vjp
-    // Parse `[parameters <integer_literal>...]`.
-    SmallVector<unsigned, 8> parameterIndices;
-    if (parseIndexList(P, "parameters", parameterIndices,
-                       diag::sil_autodiff_expected_parameter_index))
-      return true;
-    // Parse the original function value.
-    SILValue original;
-    SourceLoc originalOperandLoc;
-    if (parseTypedValueRef(original, originalOperandLoc, B))
-      return true;
-    auto fnType = original->getType().getAs<SILFunctionType>();
-    if (!fnType) {
-      P.diagnose(originalOperandLoc,
-                 diag::sil_inst_autodiff_expected_function_type_operand);
-      return true;
-    }
-    Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None;
-    // Parse an optional operand list
-    //   `with_derivative { <operand> , <operand> }`.
-    if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with_derivative") {
-      P.consumeToken(tok::identifier);
-      // Parse derivative function values as an operand list.
-      // FIXME(rxwei): Change this to *not* require a type signature once
-      // we can infer derivative function types.
-      derivativeFunctions = std::make_pair(SILValue(), SILValue());
-      if (P.parseToken(tok::l_brace,
-              diag::sil_inst_autodiff_operand_list_expected_lbrace) ||
-          parseTypedValueRef(derivativeFunctions->first, B) ||
-          P.parseToken(tok::comma,
-              diag::sil_inst_autodiff_operand_list_expected_comma) ||
-          parseTypedValueRef(derivativeFunctions->second, B) ||
-          P.parseToken(tok::r_brace,
-                       diag::sil_inst_autodiff_operand_list_expected_rbrace))
-        return true;
-    }
-    if (parseSILDebugLocation(InstLoc, B))
-      return true;
-    auto *parameterIndicesSubset = IndexSubset::get(
-        P.Context, fnType->getNumParameters(), parameterIndices);
-    ResultVal = B.createDifferentiableFunction(
-        InstLoc, parameterIndicesSubset, original, derivativeFunctions);
-    break;
-  }
-
-  case SILInstructionKind::LinearFunctionInst: {
-    // e.g. linear_function [parameters 0 1 2] %0 : $T
-    // e.g. linear_function [parameters 0 1 2] %0 : $T with_transpose %1 : $T
-    // Parse `[parameters <integer_literal>...]`.
-    SmallVector<unsigned, 8> parameterIndices;
-    if (parseIndexList(P, "parameters", parameterIndices,
-                       diag::sil_autodiff_expected_parameter_index))
-      return true;
-    // Parse the original function value.
-    SILValue original;
-    SourceLoc originalOperandLoc;
-    if (parseTypedValueRef(original, originalOperandLoc, B))
-      return true;
-    auto fnType = original->getType().getAs<SILFunctionType>();
-    if (!fnType) {
-      P.diagnose(originalOperandLoc,
-                 diag::sil_inst_autodiff_expected_function_type_operand);
-      return true;
-    }
-    // Parse an optional transpose function.
-    Optional<SILValue> transpose = None;
-    if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with_transpose") {
-      P.consumeToken(tok::identifier);
-      transpose = SILValue();
-      if (parseTypedValueRef(*transpose, B))
-        return true;
-    }
-    if (parseSILDebugLocation(InstLoc, B))
-      return true;
-    auto *parameterIndicesSubset = IndexSubset::get(
-        P.Context, fnType->getNumParameters(), parameterIndices);
-    ResultVal = B.createLinearFunction(
-        InstLoc, parameterIndicesSubset, original, transpose);
-    break;
-  }
-  
-  case SILInstructionKind::DifferentiableFunctionExtractInst: {
-    // Parse the rest of the instruction: an extractee, a differentiable
-    // function operand, an optional explicit extractee type, and a debug
-    // location.
-    NormalDifferentiableFunctionTypeComponent extractee;
-    StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
-    SILValue functionOperand;
-    SourceLoc lastLoc;
-    if (P.parseToken(tok::l_square,
-            diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
-        parseSILIdentifierSwitch(extractee, extracteeNames,
-            diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
-        P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
-                     "extractee kind"))
-      return true;
-    if (parseTypedValueRef(functionOperand, B))
-      return true;
-    // Parse an optional explicit extractee type.
-    Optional<SILType> extracteeType = None;
-    if (P.consumeIf(tok::kw_as)) {
-      extracteeType = SILType();
-      if (parseSILType(*extracteeType))
-        return true;
-    }
-    if (parseSILDebugLocation(InstLoc, B))
-      return true;
-    ResultVal = B.createDifferentiableFunctionExtract(
-        InstLoc, extractee, functionOperand, extracteeType);
-    break;
-  }
-
-  case SILInstructionKind::LinearFunctionExtractInst: {
-    // Parse the rest of the instruction: an extractee, a linear function
-    // operand, and a debug location.
-    LinearDifferentiableFunctionTypeComponent extractee;
-    StringRef extracteeNames[2] = {"original", "transpose"};
-    SILValue functionOperand;
-    SourceLoc lastLoc;
-    if (P.parseToken(tok::l_square,
-            diag::sil_inst_autodiff_expected_linear_extractee_kind) ||
-        parseSILIdentifierSwitch(extractee, extracteeNames,
-            diag::sil_inst_autodiff_expected_linear_extractee_kind) ||
-        P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
-                     "extractee kind"))
-      return true;
-    if (parseTypedValueRef(functionOperand, B) ||
-        parseSILDebugLocation(InstLoc, B))
-      return true;
-    ResultVal = B.createLinearFunctionExtract(
-        InstLoc, extractee, functionOperand);
-    break;
-  }
-  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
-    // e.g. differentiability_witness_function
-    //      [jvp] [parameters 0 1] [results 0] <T where T: Differentiable>
-    //      @foo : <T> $(T) -> T
-    DifferentiabilityWitnessFunctionKind witnessKind;
-    StringRef witnessKindNames[3] = {"jvp", "vjp", "transpose"};
-    if (P.parseToken(tok::l_square,
-            diag::sil_inst_autodiff_expected_differentiability_witness_kind) ||
-        parseSILIdentifierSwitch(witnessKind, witnessKindNames,
-            diag::sil_inst_autodiff_expected_differentiability_witness_kind) ||
-        P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
-                     "differentiability witness function kind"))
-      return true;
-    SourceLoc keyStartLoc = P.Tok.getLoc();
-    auto configAndFn = parseSILDifferentiabilityWitnessConfigAndFunction(
-        P, *this, InstLoc);
-    if (!configAndFn)
-      return true;
-    auto config = configAndFn->first;
-    auto originalFn = configAndFn->second;
-    auto *witness = SILMod.lookUpDifferentiabilityWitness(
-        {originalFn->getName(), config});
-    if (!witness) {
-      P.diagnose(keyStartLoc, diag::sil_diff_witness_undefined);
-      return true;
-    }
-    // Parse an optional explicit function type.
-    Optional<SILType> functionType = None;
-    if (P.consumeIf(tok::kw_as)) {
-      functionType = SILType();
-      if (parseSILType(*functionType))
-        return true;
-    }
-    ResultVal = B.createDifferentiabilityWitnessFunction(InstLoc, witnessKind,
-                                                         witness, functionType);
-    break;
-  }
-  // SWIFT_ENABLE_TENSORFLOW END
-
   case SILInstructionKind::DynamicFunctionRefInst: {
     SILFunction *Fn;
     if (parseSILFunctionRef(InstLoc, Fn) || parseSILDebugLocation(InstLoc, B))
@@ -5267,6 +5089,188 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
       ResultVal = B.createInitBlockStorageHeader(InstLoc, Val, invokeVal,
                                                  blockType, subMap);
+      break;
+    }
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILInstructionKind::DifferentiableFunctionInst: {
+      // e.g. differentiable_function [parameters 0 1 2] %0 : $T
+      //
+      // e.g. differentiable_function [parameters 0 1 2] %0 : $T with_derivative
+      //      {%1 : $T, %2 : $T}
+      //       ^~ jvp   ^~ vjp
+      // Parse `[parameters <integer_literal>...]`.
+      SmallVector<unsigned, 8> parameterIndices;
+      if (parseIndexList(P, "parameters", parameterIndices,
+                         diag::sil_autodiff_expected_parameter_index))
+        return true;
+      // Parse the original function value.
+      SILValue original;
+      SourceLoc originalOperandLoc;
+      if (parseTypedValueRef(original, originalOperandLoc, B))
+        return true;
+      auto fnType = original->getType().getAs<SILFunctionType>();
+      if (!fnType) {
+        P.diagnose(originalOperandLoc,
+                   diag::sil_inst_autodiff_expected_function_type_operand);
+        return true;
+      }
+      Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None;
+      // Parse an optional operand list
+      //   `with_derivative { <operand> , <operand> }`.
+      if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with_derivative") {
+        P.consumeToken(tok::identifier);
+        // Parse derivative function values as an operand list.
+        // FIXME(rxwei): Change this to *not* require a type signature once
+        // we can infer derivative function types.
+        derivativeFunctions = std::make_pair(SILValue(), SILValue());
+        if (P.parseToken(tok::l_brace,
+                diag::sil_inst_autodiff_operand_list_expected_lbrace) ||
+            parseTypedValueRef(derivativeFunctions->first, B) ||
+            P.parseToken(tok::comma,
+                diag::sil_inst_autodiff_operand_list_expected_comma) ||
+            parseTypedValueRef(derivativeFunctions->second, B) ||
+            P.parseToken(tok::r_brace,
+                         diag::sil_inst_autodiff_operand_list_expected_rbrace))
+          return true;
+      }
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      auto *parameterIndicesSubset = IndexSubset::get(
+          P.Context, fnType->getNumParameters(), parameterIndices);
+      ResultVal = B.createDifferentiableFunction(
+          InstLoc, parameterIndicesSubset, original, derivativeFunctions);
+      break;
+    }
+
+    case SILInstructionKind::LinearFunctionInst: {
+      // e.g. linear_function [parameters 0 1 2] %0 : $T
+      // e.g. linear_function [parameters 0 1 2] %0 : $T with_transpose %1 : $T
+      // Parse `[parameters <integer_literal>...]`.
+      SmallVector<unsigned, 8> parameterIndices;
+      if (parseIndexList(P, "parameters", parameterIndices,
+                         diag::sil_autodiff_expected_parameter_index))
+        return true;
+      // Parse the original function value.
+      SILValue original;
+      SourceLoc originalOperandLoc;
+      if (parseTypedValueRef(original, originalOperandLoc, B))
+        return true;
+      auto fnType = original->getType().getAs<SILFunctionType>();
+      if (!fnType) {
+        P.diagnose(originalOperandLoc,
+                   diag::sil_inst_autodiff_expected_function_type_operand);
+        return true;
+      }
+      // Parse an optional transpose function.
+      Optional<SILValue> transpose = None;
+      if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with_transpose") {
+        P.consumeToken(tok::identifier);
+        transpose = SILValue();
+        if (parseTypedValueRef(*transpose, B))
+          return true;
+      }
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      auto *parameterIndicesSubset = IndexSubset::get(
+          P.Context, fnType->getNumParameters(), parameterIndices);
+      ResultVal = B.createLinearFunction(
+          InstLoc, parameterIndicesSubset, original, transpose);
+      break;
+    }
+
+    case SILInstructionKind::DifferentiableFunctionExtractInst: {
+      // Parse the rest of the instruction: an extractee, a differentiable
+      // function operand, an optional explicit extractee type, and a debug
+      // location.
+      NormalDifferentiableFunctionTypeComponent extractee;
+      StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
+      SILValue functionOperand;
+      SourceLoc lastLoc;
+      if (P.parseToken(tok::l_square,
+              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
+          parseSILIdentifierSwitch(extractee, extracteeNames,
+              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
+          P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                       "extractee kind"))
+        return true;
+      if (parseTypedValueRef(functionOperand, B))
+        return true;
+      // Parse an optional explicit extractee type.
+      Optional<SILType> extracteeType = None;
+      if (P.consumeIf(tok::kw_as)) {
+        extracteeType = SILType();
+        if (parseSILType(*extracteeType))
+          return true;
+      }
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createDifferentiableFunctionExtract(
+          InstLoc, extractee, functionOperand, extracteeType);
+      break;
+    }
+
+    case SILInstructionKind::LinearFunctionExtractInst: {
+      // Parse the rest of the instruction: an extractee, a linear function
+      // operand, and a debug location.
+      LinearDifferentiableFunctionTypeComponent extractee;
+      StringRef extracteeNames[2] = {"original", "transpose"};
+      SILValue functionOperand;
+      SourceLoc lastLoc;
+      if (P.parseToken(tok::l_square,
+              diag::sil_inst_autodiff_expected_linear_extractee_kind) ||
+          parseSILIdentifierSwitch(extractee, extracteeNames,
+              diag::sil_inst_autodiff_expected_linear_extractee_kind) ||
+          P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                       "extractee kind"))
+        return true;
+      if (parseTypedValueRef(functionOperand, B) ||
+          parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createLinearFunctionExtract(
+          InstLoc, extractee, functionOperand);
+      break;
+    }
+    // SWIFT_ENABLE_TENSORFLOW END
+
+    case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+      // e.g. differentiability_witness_function
+      //      [jvp] [parameters 0 1] [results 0] <T where T: Differentiable>
+      //      @foo : <T> $(T) -> T
+      DifferentiabilityWitnessFunctionKind witnessKind;
+      StringRef witnessKindNames[3] = {"jvp", "vjp", "transpose"};
+      if (P.parseToken(
+              tok::l_square,
+              diag::
+                  sil_inst_autodiff_expected_differentiability_witness_kind) ||
+          parseSILIdentifierSwitch(
+              witnessKind, witnessKindNames,
+              diag::
+                  sil_inst_autodiff_expected_differentiability_witness_kind) ||
+          P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                       "differentiability witness function kind"))
+        return true;
+      SourceLoc keyStartLoc = P.Tok.getLoc();
+      auto configAndFn =
+          parseSILDifferentiabilityWitnessConfigAndFunction(P, *this, InstLoc);
+      if (!configAndFn)
+        return true;
+      auto config = configAndFn->first;
+      auto originalFn = configAndFn->second;
+      auto *witness = SILMod.lookUpDifferentiabilityWitness(
+          {originalFn->getName(), config});
+      if (!witness) {
+        P.diagnose(keyStartLoc, diag::sil_diff_witness_undefined);
+        return true;
+      }
+      // Parse an optional explicit function type.
+      Optional<SILType> functionType = None;
+      if (P.consumeIf(tok::kw_as)) {
+        functionType = SILType();
+        if (parseSILType(*functionType))
+          return true;
+      }
+      ResultVal = B.createDifferentiabilityWitnessFunction(
+          InstLoc, witnessKind, witness, functionType);
       break;
     }
     }

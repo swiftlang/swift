@@ -1710,16 +1710,33 @@ ModuleFile::ModuleFile(
         case input_block::IMPORTED_MODULE: {
           unsigned rawImportControl;
           bool scoped;
+          bool hasSPI;
           input_block::ImportedModuleLayout::readRecord(scratch,
                                                         rawImportControl,
-                                                        scoped);
+                                                        scoped, hasSPI);
           auto importKind = getActualImportControl(rawImportControl);
           if (!importKind) {
             // We don't know how to import this dependency.
             info.status = error(Status::Malformed);
             return;
           }
-          Dependencies.push_back({blobData, importKind.getValue(), scoped});
+
+          StringRef spiBlob;
+          if (hasSPI) {
+            scratch.clear();
+
+            llvm::BitstreamEntry entry =
+                fatalIfUnexpected(cursor.advance(AF_DontPopBlockAtEnd));
+            unsigned recordID =
+                fatalIfUnexpected(cursor.readRecord(entry.ID, scratch, &spiBlob));
+            assert(recordID == input_block::IMPORTED_MODULE_SPIS);
+            input_block::ImportedModuleLayoutSPI::readRecord(scratch);
+            (void) recordID;
+          } else {
+            spiBlob = StringRef();
+          }
+
+          Dependencies.push_back({blobData, spiBlob, importKind.getValue(), scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {
@@ -2056,6 +2073,14 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       Located<Identifier> accessPathElem = { scopeID, SourceLoc() };
       dependency.Import = {ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)),
                            module};
+    }
+
+    // SPI
+    StringRef spisStr = dependency.RawSPIs;
+    while (!spisStr.empty()) {
+      StringRef nextComponent;
+      std::tie(nextComponent, spisStr) = spisStr.split('\0');
+      dependency.spiGroups.push_back(ctx.getIdentifier(nextComponent));
     }
 
     if (!module->hasResolvedImports()) {
@@ -2472,7 +2497,7 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
 }
 // SWIFT_ENABLE_TENSORFLOW END
 
-Optional<TinyPtrVector<ValueDecl *>>
+TinyPtrVector<ValueDecl *>
 ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                              uint64_t contextData) {
   PrettyStackTraceDecl trace("loading members for", IDC->getDecl());
@@ -2495,7 +2520,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
         fatalIfUnexpected(DeclMemberTablesCursor.advance());
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       fatal();
-      return None;
+      return results;
     }
     SmallVector<uint64_t, 64> scratch;
     StringRef blobData;
@@ -2520,10 +2545,6 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
         if (!getContext().LangOpts.EnableDeserializationRecovery)
           fatal(mem.takeError());
         consumeError(mem.takeError());
-
-        // Treat this as a cache-miss to the caller and let them attempt
-        // to refill through the normal loadAllMembers() path.
-        return None;
       }
     }
   }
@@ -2628,6 +2649,17 @@ void ModuleFile::lookupObjCMethods(
     if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(
                       getDecl(std::get<2>(result))))
       results.push_back(func);
+  }
+}
+
+void ModuleFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spiGroups) const {
+  for (auto &dep : Dependencies) {
+    auto depSpis = dep.spiGroups;
+    if (dep.Import.second == importedModule &&
+        !depSpis.empty()) {
+      spiGroups.append(depSpis.begin(), depSpis.end());
+    }
   }
 }
 
@@ -2912,4 +2944,14 @@ ClassDecl *SerializedASTFile::getMainClass() const {
 
 const version::Version &SerializedASTFile::getLanguageVersionBuiltWith() const {
   return File.CompatibilityVersion;
+}
+
+StringRef SerializedASTFile::getModuleDefiningPath() const {
+  StringRef moduleFilename = getFilename();
+  StringRef parentDir = llvm::sys::path::parent_path(moduleFilename);
+
+  if (llvm::sys::path::extension(parentDir) == ".swiftmodule")
+    return parentDir;
+
+  return moduleFilename;
 }

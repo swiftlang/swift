@@ -5666,10 +5666,10 @@ destination (if it returns with ``throw``).
 
 The rules on generic substitutions are identical to those of ``apply``.
 
-.. SWIFT_ENABLE_TENSORFLOW
+Differentiable Programming
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Automatic Differentiation
-~~~~~~~~~~~~~~~~~~~~~~~~~
+.. SWIFT_ENABLE_TENSORFLOW
 
 differentiable_function
 ```````````````````````
@@ -5778,6 +5778,7 @@ Extracts the original function or a transpose function from the given
 ``@differentiable(linear)`` function. It must be provided with an extractee:
 ``[original]`` or ``[transpose]``.
 
+.. SWIFT_ENABLE_TENSORFLOW END
 
 differentiability_witness_function
 ``````````````````````````````````
@@ -5797,8 +5798,8 @@ differentiability_witness_function
   differentiability_witness_function [jvp] [parameters 0] [results 0] \
     <T where T: Differentiable> @foo : $(T) -> T
 
-Looks up the differentiability witness function for the referenced function
-using SIL differentiability witnesses.
+Looks up a differentiability witness function (JVP, VJP, or transpose) for
+a referenced function via SIL differentiability witnesses.
 
 The differentiability witness function kind identifies the witness function to
 look up: ``[jvp]``, ``[vjp]``, or ``[transpose]``.
@@ -5811,7 +5812,6 @@ The remaining components identify the SIL differentiability witness:
 - Witness generic parameter clause (optional). When parsing SIL, the parsed
   witness generic parameter clause is combined with the original function's
   generic signature to form the full witness generic signature.
-
 
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~

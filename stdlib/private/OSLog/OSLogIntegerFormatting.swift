@@ -1,3 +1,18 @@
+//===----------------- OSLogIntegerFormatting.swift -----------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// This file defines types and functions for specifying formatting of
+// integer-valued interpolations passed to the os log APIs.
+
 @frozen
 public struct OSLogIntegerFormatting: Equatable {
   /// The base to use for the string representation. `radix` must be at least 2
@@ -261,11 +276,8 @@ extension OSLogIntegerFormatting {
     // IEEE: `-` The result of the conversion shall be left-justified within
     // the field. The conversion is right-justified if this flag is not
     // specified.
-    switch align.anchor {
-    case OSLogCollectionBound.start:
-        specification += "-"
-    default:
-        break
+    if case .start = align.anchor {
+      specification += "-"
     }
 
     // 2. Minimumn field width

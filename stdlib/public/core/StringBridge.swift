@@ -285,7 +285,7 @@ internal enum _KnownCocoaString {
   case storage
   case shared
   case cocoa
-#if !(arch(i386) || arch(arm))
+#if !(arch(i386) || arch(arm) || arch(wasm32))
   case tagged
 #endif
 
@@ -408,8 +408,8 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
 }
 
 extension String {
-  public // SPI(Foundation)
-  init(_cocoaString: AnyObject) {
+  @_spi(Foundation)
+  public init(_cocoaString: AnyObject) {
     self._guts = _bridgeCocoaString(_cocoaString)
   }
 }

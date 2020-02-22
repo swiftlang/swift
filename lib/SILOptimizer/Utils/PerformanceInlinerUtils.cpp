@@ -556,49 +556,6 @@ static bool calleeIsSelfRecursive(SILFunction *Callee) {
   return false;
 }
 
-// Returns true if the callee contains a partial apply instruction,
-// whose substitutions list would contain opened existentials after
-// inlining.
-static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
-  if (!AI.hasSubstitutions())
-    return false;
-
-  SILFunction *Callee = AI.getReferencedFunctionOrNull();
-  assert(Callee && "Trying to optimize a dynamic function?!");
-
-  auto SubsMap = AI.getSubstitutionMap();
-
-  // Bail if there are no open existentials in the list of substitutions.
-  bool HasNoOpenedExistentials = true;
-  for (auto Replacement : SubsMap.getReplacementTypes()) {
-    if (Replacement->hasOpenedExistential()) {
-      HasNoOpenedExistentials = false;
-      break;
-    }
-  }
-
-  if (HasNoOpenedExistentials)
-    return false;
-
-  for (auto &BB : *Callee) {
-    for (auto &I : BB) {
-      if (auto PAI = dyn_cast<PartialApplyInst>(&I)) {
-        if (!PAI->hasSubstitutions())
-          continue;
-
-        // Check if any of substitutions would contain open existentials
-        // after inlining.
-        auto PAISubMap = PAI->getSubstitutionMap();
-        PAISubMap = PAISubMap.subst(SubsMap);
-        if (PAISubMap.hasOpenedExistential())
-          return true;
-      }
-    }
-  }
-
-  return false;
-}
-
 // Returns true if a given apply site should be skipped during the
 // early inlining pass.
 //
@@ -779,12 +736,6 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
         // functions. Some tests depend on it.
         Callee->getInlineStrategy() != AlwaysInline && !Callee->isTransparent())
       return nullptr;
-  }
-
-  // IRGen cannot handle partial_applies containing opened_existentials
-  // in its substitutions list.
-  if (calleeHasPartialApplyWithOpenedExistentials(AI)) {
-    return nullptr;
   }
 
   return Callee;

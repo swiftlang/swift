@@ -1206,7 +1206,7 @@ void IRGenModule::emitAutolinkInfo() {
                                  llvm::GlobalValue::PrivateLinkage,
                                  EntriesConstant, "_swift1_autolink_entries");
     var->setSection(".swift1_autolink_entries");
-    var->setAlignment(getPointerAlignment().getValue());
+    var->setAlignment(llvm::MaybeAlign(getPointerAlignment().getValue()));
 
     disableAddressSanitizer(*this, var);
     addUsedGlobal(var);
@@ -1349,6 +1349,11 @@ void IRGenModule::error(SourceLoc loc, const Twine &message) {
 bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
+  // Prespecialize generic metadata in the standard library always, disregarding
+  // flags.
+  if (isStandardLibrary()) {
+    return true;
+  }
   auto &context = getSwiftModule()->getASTContext();
   auto deploymentAvailability =
       AvailabilityContext::forDeploymentTarget(context);

@@ -1381,6 +1381,8 @@ ERROR(projection_value_property_not_identifier,none,
 // Access control
 ERROR(attr_access_expected_set,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))
+ERROR(attr_access_expected_spi_name,none,
+      "expected an SPI identifier as subject of the '@_spi' attribute", ())
 
 // Attributes
 ERROR(attr_renamed, none,
@@ -1492,6 +1494,11 @@ ERROR(attr_dynamic_replacement_expected_for,none,
       "expected 'for' in '_dynamicReplacement' attribute", ())
 ERROR(attr_dynamic_replacement_expected_colon,none,
       "expected ':' after @_dynamicReplacement(for", ())
+
+ERROR(attr_type_eraser_expected_type_name,none,
+      "expected a type name in @_typeEraser()", ())
+ERROR(attr_type_eraser_expected_rparen,none,
+      "expected ')' after type name for @_typeEraser", ())
 
 ERROR(attr_private_import_expected_rparen,none,
       "expected ')' after function name for @_private", ())
@@ -1629,10 +1636,14 @@ ERROR(sil_inst_autodiff_expected_linear_extractee_kind,PointsToFirstBadToken,
       "and '[transpose]'", ())
 ERROR(sil_inst_autodiff_expected_function_type_operand,PointsToFirstBadToken,
       "expected an operand of a function type", ())
+// SWIFT_ENABLE_TENSORFLOW END
 ERROR(sil_inst_autodiff_expected_differentiability_witness_kind,PointsToFirstBadToken,
       "expected a differentiability witness kind, which can be one of '[jvp]', "
       "'[vjp]', or '[transpose]'", ())
-// SWIFT_ENABLE_TENSORFLOW END
+ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
+      "expected witness_generic signature '%0' does not have same generic "
+      "parameters as original function generic signature '%1'",
+      (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics

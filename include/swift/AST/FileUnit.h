@@ -101,6 +101,12 @@ public:
                  ObjCSelector selector,
                  SmallVectorImpl<AbstractFunctionDecl *> &results) const = 0;
 
+  /// Find all SPI names imported from \p importedModule by this module,
+  /// collecting the identifiers in \p spiGroups.
+  virtual void lookupImportedSPIGroups(
+                               const ModuleDecl *importedModule,
+                               SmallVectorImpl<Identifier> &spiGroups) const {};
+
   /// Returns the comment attached to the given declaration.
   ///
   /// This function is an implementation detail for comment serialization.
@@ -213,6 +219,13 @@ public:
   /// imports.
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {}
+
+  /// Returns the path of the file or directory that defines the module
+  /// represented by this \c FileUnit, or empty string if there is none.
+  /// Cross-import overlay specifiers are found relative to this path.
+  virtual StringRef getModuleDefiningPath() const {
+    return "";
+  }
 
   /// True if this file contains the main class for the module.
   bool hasMainClass() const {
@@ -369,6 +382,7 @@ public:
   }
 };
 
+void simple_display(llvm::raw_ostream &out, const FileUnit *file);
 
 inline FileUnit &ModuleDecl::getMainFile(FileUnitKind expectedKind) const {
   assert(expectedKind != FileUnitKind::Source &&

@@ -61,25 +61,13 @@ ERROR(ambiguous_member_overload_set,none,
 ERROR(ambiguous_reference_to_decl,none,
       "ambiguous reference to %0 %1", (DescriptiveDeclKind, DeclName))
 ERROR(no_overloads_match_exactly_in_call,none,
-      "no exact matches in call to %0 %1",
-      (DescriptiveDeclKind, DeclName))
-ERROR(no_overloads_match_exactly_in_call_no_labels,none,
-      "no exact matches in call to %0 %1",
-      (DescriptiveDeclKind, DeclBaseName))
-ERROR(no_overloads_match_exactly_in_call_special,none,
-      "no exact matches in call to %0",
-      (DescriptiveDeclKind))
-ERROR(no_overloads_match_exactly_in_assignment,none,
-      "no exact matches in assignment to %0",
-      (DeclBaseName))
+      "no exact matches in %select{reference|call}0 to %1 %select{%3|}2",
+      (bool, DescriptiveDeclKind, bool, DeclBaseName))
 
 NOTE(candidate_partial_match,none,
      "candidate has partially matching parameter list %0",
      (StringRef))
 
-ERROR(ambiguous_subscript,none,
-      "ambiguous subscript with base type %0 and index type %1",
-      (Type, Type))
 ERROR(could_not_find_value_subscript,none,
       "value of type %0 has no subscripts",
       (Type))
@@ -160,7 +148,7 @@ FIXIT(insert_type_qualification,"%0.",(Type))
 
 ERROR(candidate_inaccessible,none,
       "%0 is inaccessible due to "
-      "'%select{private|fileprivate|internal|%error|%error}1' protection level",
+      "'%select{private|fileprivate|internal|SPI|SPI}1' protection level",
       (DeclBaseName, AccessLevel))
 
 NOTE(note_candidate_inaccessible,none,
@@ -170,7 +158,7 @@ NOTE(note_candidate_inaccessible,none,
 
 ERROR(init_candidate_inaccessible,none,
       "%0 initializer is inaccessible due to "
-      "'%select{private|fileprivate|internal|%error|%error}1' protection level",
+      "'%select{private|fileprivate|internal|SPI|SPI}1' protection level",
       (Type, AccessLevel))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
@@ -281,16 +269,6 @@ ERROR(cannot_call_non_function_value,none,
 ERROR(no_candidates_match_result_type,none,
       "no '%0' candidates produce the expected contextual result type %1",
       (StringRef, Type))
-
-ERROR(candidates_no_match_result_type,none,
-      "'%0' produces %1, not the expected contextual result type %2",
-      (StringRef, Type, Type))
-
-
-
-ERROR(invalid_callee_result_type,none,
-      "cannot convert call result type %0 to expected type %1",
-      (Type, Type))
 
 
 ERROR(cannot_invoke_closure,none,
@@ -406,6 +384,10 @@ NOTE(suggest_pass_elements_directly,none,
 ERROR(cannot_convert_argument_value_generic,none,
       "cannot convert value of type %0 (%1) to expected argument type %2 (%3)",
       (Type, StringRef, Type, StringRef))
+
+ERROR(conflicting_arguments_for_generic_parameter,none,
+      "conflicting arguments to generic parameter %0 (%1)",
+      (Type, StringRef))
 
 // @_nonEphemeral conversion diagnostics
 ERROR(cannot_pass_type_to_non_ephemeral,none,
@@ -1015,6 +997,11 @@ WARNING(conditional_downcast_coercion,none,
       "conditional cast from %0 to %1 always succeeds",
       (Type, Type))
 
+WARNING(literal_conditional_downcast_to_coercion,none,
+        "conditional downcast from literal to %0 always fails; "
+        "consider using 'as' coercion",
+        (Type))
+
 WARNING(forced_downcast_noop,none,
         "forced cast of %0 to same type has no effect", (Type))
 
@@ -1150,6 +1137,9 @@ ERROR(argument_out_of_order_unnamed_named,none,
       "unnamed argument #%0 must precede argument %1", (unsigned, Identifier))
 ERROR(argument_out_of_order_unnamed_unnamed,none,
       "unnamed argument #%0 must precede unnamed argument #%1",
+      (unsigned, unsigned))
+ERROR(argument_out_of_order_binary_op,none,
+      "operator argument #%0 must precede operator argument #%1",
       (unsigned, unsigned))
 NOTE(candidate_expected_different_labels,none,
      "incorrect labels for candidate (have: '%0', expected: '%1')",
@@ -1708,6 +1698,13 @@ ERROR(function_type_access,none,
       "because its %select{parameter|result}5 uses "
       "%select{a private|a fileprivate|an internal|%error|%error}3 type",
       (bool, AccessLevel, bool, AccessLevel, unsigned, bool))
+ERROR(function_type_spi,none,
+      "%select{function|method|initializer}0 "
+      "cannot be declared '@_spi' "
+      "because its %select{parameter|result}1 uses "
+      "%select{a private|a fileprivate|an internal|%error|%error}2 type "
+      "without a compatible '@_spi'",
+      (unsigned, bool, AccessLevel))
 WARNING(function_type_access_warn,none,
         "%select{function|method|initializer}4 "
         "%select{should be declared %select{private|fileprivate|internal|%error|%error}1"
@@ -1725,6 +1722,12 @@ WARNING(function_type_usable_from_inline_warn,none,
         "'@usableFromInline' %select{function|method|initializer}0 "
         "should be '@usableFromInline' or public",
         (unsigned, bool))
+
+ERROR(spi_attribute_on_non_public,none,
+      "%select{private|fileprivate|internal|%error|%error}0 %1 "
+      "cannot be declared '@_spi' because only public and open "
+      "declarations can be '@_spi'",
+      (AccessLevel, DescriptiveDeclKind))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -2658,12 +2661,13 @@ NOTE(enum_raw_value_incrementing_from_zero,none,
 NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
-ERROR(decl_from_implementation_only_module,none,
+ERROR(decl_from_hidden_module,none,
       "cannot use %0 %1 %select{here|"
       "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformances}2; %3 has been imported "
-      "as implementation-only",
-      (DescriptiveDeclKind, DeclName, unsigned, Identifier))
+      "in an extension with conditional conformances}2; "
+      "%select{%3 has been imported as implementation-only|"
+      "it is an SPI imported from %3}4",
+      (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|"
       "in an extension with public or '@usableFromInline' members|"
@@ -3035,18 +3039,18 @@ NOTE(protocol_witness_missing_differentiable_attr,none,
 // @derivative
 ERROR(derivative_attr_expected_result_tuple,none,
       "'@derivative(of:)' attribute requires function to return a two-element "
-      "tuple of type '(value: T..., pullback: (U.TangentVector) -> T.TangentVector...)' "
-      "or '(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'", ())
+      "tuple; first element must have label 'value:' and second element must "
+      "have label 'pullback:' or 'differential:'", ())
 ERROR(derivative_attr_invalid_result_tuple_value_label,none,
       "'@derivative(of:)' attribute requires function to return a two-element "
-      "tuple (first element must have label 'value:')", ())
+      "tuple; first element must have label 'value:'", ())
 ERROR(derivative_attr_invalid_result_tuple_func_label,none,
       "'@derivative(of:)' attribute requires function to return a two-element "
-      "tuple (second element must have label 'pullback:' or 'differential:')",
+      "tuple; second element must have label 'pullback:' or 'differential:'",
       ())
 ERROR(derivative_attr_result_value_not_differentiable,none,
       "'@derivative(of:)' attribute requires function to return a two-element "
-      "tuple (first element type %0 must conform to 'Differentiable')", (Type))
+      "tuple; first element type %0 must conform to 'Differentiable'", (Type))
 ERROR(derivative_attr_result_func_type_mismatch,none,
       "function result's %0 type does not match %1", (Identifier, DeclName))
 NOTE(derivative_attr_result_func_type_mismatch_note,none,
@@ -3820,18 +3824,14 @@ ERROR(pattern_type_mismatch_context,none,
 
 ERROR(tuple_pattern_in_non_tuple_context,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
-WARNING(matching_pattern_with_many_assoc_values, none,
-        "cannot match several associated values at once, "
-        "implicitly tupling the associated values and trying to match that "
-        "instead", ())
-WARNING(matching_tuple_pattern_with_many_assoc_values,none,
-        "a tuple pattern cannot match several associated values at once, "
-        "implicitly tupling the associated values and trying to match "
-        "that instead", ())
-WARNING(matching_many_patterns_with_tupled_assoc_value,none,
-        "the enum case has a single tuple as an associated value, but "
-        "there are several patterns here, implicitly tupling the patterns "
-        "and trying to match that instead", ())
+WARNING(found_one_pattern_for_several_associated_values,none,
+        "enum case '%0' has %1 associated values; matching them as a tuple "
+        "is deprecated", (StringRef, unsigned))
+WARNING(converting_tuple_into_several_associated_values,none,
+        "enum case '%0' has %1 associated values", (StringRef, unsigned))
+WARNING(converting_several_associated_values_into_tuple,none,
+        "enum case '%0' has one associated value that is a tuple of %1 "
+        "elements",(StringRef, unsigned))
 ERROR(closure_argument_list_tuple,none,
       "contextual closure type %0 expects %1 argument%s1, "
       "but %2 %select{were|was}3 used in closure body", (Type, unsigned, unsigned, bool))
@@ -4731,10 +4731,16 @@ WARNING(resilience_decl_unavailable_warn,
         "should not be referenced from " FRAGILE_FUNC_KIND "3",
         (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
-ERROR(inlinable_decl_ref_implementation_only,
+ERROR(resilience_decl_unavailable_spi,
+      none, DECL_OR_ACCESSOR "4 %1 is imported as SPI; "
+      "it cannot be referenced from " FRAGILE_FUNC_KIND "3",
+      (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
+
+ERROR(inlinable_decl_ref_from_hidden_module,
       none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
-      "because %3 was imported implementation-only",
-      (DescriptiveDeclKind, DeclName, unsigned, Identifier))
+      "because %select{%3 was imported implementation-only|"
+      "it is an SPI imported from %3}4",
+      (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 
 #undef FRAGILE_FUNC_KIND
 
@@ -4990,10 +4996,10 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
       "must be '@usableFromInline' or public",
       (bool, bool))
 WARNING(property_wrapper_wrapperValue,none,
-        "property wrapper's `wrapperValue` property should be renamed to "
+        "property wrapper's 'wrapperValue' property should be renamed to "
         "'projectedValue'; use of 'wrapperValue' is deprecated", ())
 WARNING(property_wrapper_init_initialValue,none,
-        "property wrapper's `init(initialValue:)` should be renamed "
+        "property wrapper's 'init(initialValue:)' should be renamed "
         "to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated",
         ())
 ERROR(property_wrapper_projection_value_missing,none,
@@ -5046,6 +5052,14 @@ NOTE(function_builder_remove_attr, none,
      "remove the attribute to explicitly disable the function builder", ())
 NOTE(function_builder_remove_returns, none,
      "remove 'return' statements to apply the function builder", ())
+
+//------------------------------------------------------------------------------
+// MARK: Tuple Shuffle Diagnostics
+//------------------------------------------------------------------------------
+
+ WARNING(warn_reordering_tuple_shuffle_deprecated,none,
+        "expression shuffles the elements of this tuple; "
+        "this behavior is deprecated", ())
 
 //------------------------------------------------------------------------------
 // MARK: differentiable programming diagnostics

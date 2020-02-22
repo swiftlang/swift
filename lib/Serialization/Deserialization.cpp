@@ -2857,14 +2857,10 @@ public:
     if (numBackingProperties > 0) {
       auto backingDecl = MF.getDeclChecked(backingPropertyIDs[0]);
       if (!backingDecl) {
-        if (numBackingProperties > 1 &&
-            backingDecl.errorIsA<XRefNonLoadedModuleError>()) {
-            // A property wrapper defined behind an implementation-only import
-            // is safe to drop when it can't be deserialized.
-            // rdar://problem/56599179
-            consumeError(backingDecl.takeError());
-        } else
-          return backingDecl.takeError();
+        // FIXME: This is actually wrong. We can't just drop stored properties
+        // willy-nilly if the struct is @frozen.
+        consumeError(backingDecl.takeError());
+        return var;
       }
 
       VarDecl *backingVar = cast<VarDecl>(backingDecl.get());
@@ -4377,6 +4373,20 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
       // SWIFT_ENABLE_TENSORFLOW END
+
+      case decls_block::SPIAccessControl_DECL_ATTR: {
+        ArrayRef<uint64_t> spiIds;
+        serialization::decls_block::SPIAccessControlDeclAttrLayout::readRecord(
+                                                               scratch, spiIds);
+
+        SmallVector<Identifier, 4> spis;
+        for (auto id : spiIds)
+          spis.push_back(MF.getIdentifier(id));
+
+        Attr = SPIAccessControlAttr::create(ctx, SourceLoc(),
+                                            SourceRange(), spis);
+        break;
+      }
 
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \

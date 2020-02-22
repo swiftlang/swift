@@ -114,10 +114,10 @@ namespace swift {
   class VarDecl;
   class UnifiedStatsReporter;
   class IndexSubset;
+  struct SILAutoDiffDerivativeFunctionKey;
   // SWIFT_ENABLE_TENSORFLOW
   struct AutoDiffConfig;
   struct AutoDiffDerivativeFunctionKind;
-  struct SILAutoDiffDerivativeFunctionKey;
   class DerivativeAttr;
   class DifferentiableAttr;
   // SWIFT_ENABLE_TENSORFLOW END

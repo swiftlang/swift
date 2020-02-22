@@ -1412,7 +1412,7 @@ func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
   }
 
   f2.forEach { (block: ((Bool, Bool)) -> ()) in
-  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> ()' to expected argument type '(@escaping (Bool, Bool) -> ()) throws -> Void'}}
+  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> Void' to expected argument type '(@escaping (Bool, Bool) -> ()) throws -> Void'}}
     block(p)
     block((c, c))
     block(c, c)
@@ -1679,7 +1679,7 @@ do {
   f(a: log() as ((()) -> Void)?) // expected-error {{cannot convert value of type '((()) -> Void)?' to expected argument type '(() -> Void)?'}}
 
   func logNoOptional<T>() -> (T) -> Void { }
-  f(a: logNoOptional() as ((()) -> Void)) // expected-error {{cannot convert value of type '(()) -> Void' to expected argument type '(() -> Void)?'}}
+  f(a: logNoOptional() as ((()) -> Void)) // expected-error {{cannot convert value of type '(()) -> Void' to expected argument type '() -> Void'}}
 
   func g() {}
   g(()) // expected-error {{argument passed to call that takes no arguments}}

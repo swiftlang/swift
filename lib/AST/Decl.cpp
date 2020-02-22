@@ -520,7 +520,7 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   // e.g. 'override'.
   if (auto *AD = dyn_cast<AccessorDecl>(this)) {
     // If this is implicit getter, accessor range should not include attributes.
-    if (!AD->getAccessorKeywordLoc().isValid())
+    if (AD->isImplicitGetter())
       return Range;
 
     // Otherwise, include attributes directly attached to the accessor.
@@ -656,7 +656,7 @@ Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
   if (auto *stmt = body.dyn_cast<Stmt *>()) {
     if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
       return returnStmt->getResult();
-    } else if (auto *failStmt = dyn_cast<FailStmt>(stmt)) {
+    } else if (isa<FailStmt>(stmt)) {
       // We can only get to this point if we're a type-checked ConstructorDecl
       // which was originally spelled init?(...) { nil }.  
       //
@@ -674,7 +674,7 @@ void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
     if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
       returnStmt->setResult(NewBody);
       return;
-    } else if (auto *failStmt = dyn_cast<FailStmt>(stmt)) {
+    } else if (isa<FailStmt>(stmt)) {
       // We can only get to this point if we're a type-checked ConstructorDecl
       // which was originally spelled init?(...) { nil }.  
       //
@@ -791,7 +791,7 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
       FU->getKind() != FileUnitKind::SerializedAST)
     return false;
 
-  if (auto PD = dyn_cast<ProtocolDecl>(D)) {
+  if (isa<ProtocolDecl>(D)) {
     if (treatNonBuiltinProtocolsAsPublic)
       return false;
   }
@@ -2690,7 +2690,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     
     // Functions and subscripts cannot overload differing only in opaque return
     // types. Replace the opaque type with `Any`.
-    if (auto opaque = type->getAs<OpaqueTypeArchetypeType>()) {
+    if (type->is<OpaqueTypeArchetypeType>()) {
       type = ProtocolCompositionType::get(ctx, {}, /*hasAnyObject*/ false);
     }
 
@@ -3183,15 +3183,16 @@ static AccessLevel getMaximallyOpenAccessFor(const ValueDecl *decl) {
   return AccessLevel::Public;
 }
 
-/// Adjust \p access based on whether \p VD is \@usableFromInline or has been
-/// testably imported from \p useDC.
+/// Adjust \p access based on whether \p VD is \@usableFromInline, has been
+/// testably imported from \p useDC or \p VD is an imported SPI.
 ///
 /// \p access isn't always just `VD->getFormalAccess()` because this adjustment
 /// may be for a write, in which case the setter's access might be used instead.
 static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
                                            AccessLevel access,
                                            const DeclContext *useDC,
-                                           bool treatUsableFromInlineAsPublic) {
+                                           bool treatUsableFromInlineAsPublic,
+                                           bool treatSPIAsPublic) {
   // If access control is disabled in the current context, adjust
   // access level of the current declaration to be as open as possible.
   if (useDC && VD->getASTContext().isAccessControlDisabled())
@@ -3210,6 +3211,10 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     if (!useSF) return access;
     if (useSF->hasTestableOrPrivateImport(access, VD))
       return getMaximallyOpenAccessFor(VD);
+  } else if (!treatSPIAsPublic &&
+             VD->getAttrs().hasAttribute<SPIAccessControlAttr>()) {
+    // Restrict access to SPI decls.
+    return AccessLevel::Internal;
   }
 
   return access;
@@ -3219,15 +3224,18 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
 /// adjust.
 static AccessLevel
 getAdjustedFormalAccess(const ValueDecl *VD, const DeclContext *useDC,
-                        bool treatUsableFromInlineAsPublic) {
+                        bool treatUsableFromInlineAsPublic,
+                        bool treatSPIAsPublic) {
   return getAdjustedFormalAccess(VD, VD->getFormalAccess(), useDC,
-                                 treatUsableFromInlineAsPublic);
+                                 treatUsableFromInlineAsPublic,
+                                 treatSPIAsPublic);
 }
 
 AccessLevel ValueDecl::getEffectiveAccess() const {
   auto effectiveAccess =
     getAdjustedFormalAccess(this, /*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true);
+                            /*treatUsableFromInlineAsPublic=*/true,
+                            /*treatSPIAsPublic=*/true);
 
   // Handle @testable/@_private(sourceFile:)
   switch (effectiveAccess) {
@@ -3294,13 +3302,14 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
 
   AccessLevel access =
       getAdjustedFormalAccess(this, useDC,
-                              /*treatUsableFromInlineAsPublic*/false);
+                              /*treatUsableFromInlineAsPublic*/false,
+                              /*treatSPIAsPublic=*/false);
   return access == AccessLevel::Open;
 }
 
 /// Given the formal access level for using \p VD, compute the scope where
 /// \p VD may be accessed, taking \@usableFromInline, \@testable imports,
-/// and enclosing access levels into account.
+/// \@_spi imports, and enclosing access levels into account.
 ///
 /// \p access isn't always just `VD->getFormalAccess()` because this adjustment
 /// may be for a write, in which case the setter's access might be used instead.
@@ -3310,7 +3319,8 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
                               const DeclContext *useDC,
                               bool treatUsableFromInlineAsPublic) {
   AccessLevel access = getAdjustedFormalAccess(VD, formalAccess, useDC,
-                                               treatUsableFromInlineAsPublic);
+                                               treatUsableFromInlineAsPublic,
+                                               /*treatSPIAsPublic=*/false);
   const DeclContext *resultDC = VD->getDeclContext();
 
   while (!resultDC->isModuleScopeContext()) {
@@ -3325,7 +3335,8 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     if (auto enclosingNominal = dyn_cast<GenericTypeDecl>(resultDC)) {
       auto enclosingAccess =
           getAdjustedFormalAccess(enclosingNominal, useDC,
-                                  treatUsableFromInlineAsPublic);
+                                  treatUsableFromInlineAsPublic,
+                                  /*treatSPIAsPublic=*/false);
       access = std::min(access, enclosingAccess);
 
     } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(resultDC)) {
@@ -3335,7 +3346,8 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
         if (nominal->getParentModule() == enclosingExt->getParentModule()) {
           auto nominalAccess =
               getAdjustedFormalAccess(nominal, useDC,
-                                      treatUsableFromInlineAsPublic);
+                                      treatUsableFromInlineAsPublic,
+                                      /*treatSPIAsPublic=*/false);
           access = std::min(access, nominalAccess);
         }
       }
@@ -3355,8 +3367,16 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Internal:
     return AccessScope(resultDC->getParentModule());
   case AccessLevel::Public:
-  case AccessLevel::Open:
+  case AccessLevel::Open: {
+    if (useDC) {
+      auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+      if (useSF &&
+          VD->getAttrs().hasAttribute<SPIAccessControlAttr>() &&
+          !useSF->isImportedAsSPI(VD))
+        return AccessScope(VD->getModuleContext(), /*private*/false);
+    }
     return AccessScope::getPublic();
+  }
   }
 
   llvm_unreachable("unknown access level");
@@ -3389,8 +3409,8 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
          AccessScope(useDC).isChildOf(accessScope);
 }
 
-/// Checks if \p VD may be used from \p useDC, taking \@testable imports into
-/// account.
+/// Checks if \p VD may be used from \p useDC, taking \@testable and \@_spi
+/// imports into account.
 ///
 /// When \p access is the same as `VD->getFormalAccess()` and the enclosing
 /// context of \p VD is usable from \p useDC, this ought to be the same as
@@ -3461,8 +3481,16 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Public:
-  case AccessLevel::Open:
+  case AccessLevel::Open: {
+    if (useDC) {
+      auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+      if (useSF &&
+          VD->getAttrs().hasAttribute<SPIAccessControlAttr>() &&
+          !useSF->isImportedAsSPI(VD))
+        return false;
+    }
     return true;
+  }
   }
   llvm_unreachable("bad access level");
 }
@@ -6045,7 +6073,7 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
                  ->hasReferenceSemantics()) {
       // Do not suggest the fix-it in implicit getters
       if (auto AD = dyn_cast<AccessorDecl>(FD)) {
-        if (AD->isGetter() && !AD->getAccessorKeywordLoc().isValid())
+        if (AD->isImplicitGetter())
           return;
       }
 

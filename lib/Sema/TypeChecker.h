@@ -175,14 +175,6 @@ enum class TypeCheckExprFlags {
   /// statement. This should only be used for syntactic restrictions, and should
   /// not affect type checking itself.
   IsExprStmt = 0x20,
-
-  /// FIXME(diagnostics): Once diagnostics are completely switched to new
-  /// framework, this flag could be removed as obsolete.
-  ///
-  /// If set, this is a sub-expression, and it is being re-typechecked
-  /// as part of the expression diagnostics, which is attempting to narrow
-  /// down failure location.
-  SubExpressionDiagnostics = 0x400,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -808,10 +800,6 @@ public:
   /// events in the type checking of this expression, and which can introduce
   /// additional constraints.
   ///
-  /// \param baseCS If this type checking process is the simplification of
-  /// another constraint system, set the original constraint system. \c null
-  /// otherwise
-  ///
   /// \returns The type of the top-level expression, or Type() if an
   ///          error occurred.
   static Type
@@ -819,15 +807,13 @@ public:
                       TypeLoc convertType = TypeLoc(),
                       ContextualTypePurpose convertTypePurpose = CTP_Unused,
                       TypeCheckExprOptions options = TypeCheckExprOptions(),
-                      ExprTypeCheckListener *listener = nullptr,
-                      constraints::ConstraintSystem *baseCS = nullptr);
+                      ExprTypeCheckListener *listener = nullptr);
 
   static Optional<constraints::SolutionApplicationTarget>
   typeCheckExpression(constraints::SolutionApplicationTarget &target,
                       bool &unresolvedTypeExprs,
                       TypeCheckExprOptions options = TypeCheckExprOptions(),
-                      ExprTypeCheckListener *listener = nullptr,
-                      constraints::ConstraintSystem *baseCS = nullptr);
+                      ExprTypeCheckListener *listener = nullptr);
 
   /// Type check the given expression and return its type without
   /// applying the solution.

@@ -44,7 +44,10 @@
 #else
 #include <sys/mman.h>
 #include <unistd.h>
+// WASI doesn't support dynamic linking yet.
+#if !defined(__wasi__)
 #include <dlfcn.h>
+#endif // !defined(__wasi__)
 #endif
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
@@ -5115,7 +5118,7 @@ void swift::checkMetadataDependencyCycle(const Metadata *startMetadata,
 /***************************************************************************/
 
 namespace {
-  struct PoolRange {
+  struct alignas(sizeof(uintptr_t) * 2) PoolRange {
     static constexpr uintptr_t PageSize = 16 * 1024;
     static constexpr uintptr_t MaxPoolAllocationSize = PageSize / 2;
 
@@ -5222,6 +5225,8 @@ bool Metadata::satisfiesClassConstraint() const {
 template <>
 bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
   if (auto *metadata = dyn_cast<StructMetadata>(this))
+    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+  if (auto *metadata = dyn_cast<EnumMetadata>(this))
     return metadata->isCanonicalStaticallySpecializedGenericMetadata();
 
   return false;

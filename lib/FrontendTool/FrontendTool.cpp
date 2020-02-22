@@ -404,6 +404,7 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
   filter |= ModuleDecl::ImportFilterKind::Private;
   filter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  filter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
   mainModule->getImportedModules(imports, filter);
 
@@ -1196,6 +1197,18 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
         Instance.getMainModule());
   }
 
+  if (opts.InputsAndOutputs.hasPrivateModuleInterfaceOutputPath()) {
+    // Copy the settings from the module interface
+    ModuleInterfaceOptions privOpts = Invocation.getModuleInterfaceOptions();
+    privOpts.PrintSPIs = true;
+
+    hadAnyError |= printModuleInterfaceIfNeeded(
+        Invocation.getPrivateModuleInterfaceOutputPathForWholeModule(),
+        privOpts,
+        Invocation.getLangOptions(),
+        Instance.getMainModule());
+  }
+
   {
     hadAnyError |= writeTBDIfNeeded(Invocation, Instance);
   }
@@ -1435,11 +1448,14 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
   }
 
   const bool allSymbols = mode == FrontendOptions::TBDValidationMode::All;
+  // We should ignore embeded symbols from external modules for validation.
+  TBDGenOptions Opts = Invocation.getTBDGenOptions();
+  Opts.embedSymbolsFromModules.clear();
   return MSF.is<SourceFile *>()
              ? validateTBD(MSF.get<SourceFile *>(), IRModule,
-                           Invocation.getTBDGenOptions(), allSymbols)
+                           Opts, allSymbols)
              : validateTBD(MSF.get<ModuleDecl *>(), IRModule,
-                           Invocation.getTBDGenOptions(), allSymbols);
+                           Opts, allSymbols);
 }
 
 static bool generateCode(const CompilerInvocation &Invocation,
