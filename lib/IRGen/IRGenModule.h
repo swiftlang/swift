@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -370,10 +370,6 @@ public:
   /// Emit reflection metadata records for builtin and imported types referenced
   /// from this module.
   void emitBuiltinReflectionMetadata();
-
-  /// Emit the builtin protocol conformances that the standard library has for
-  /// non-nominal types.
-  void emitBuiltinProtocolConformances();
 
   /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
@@ -1184,10 +1180,6 @@ public:
   /// from this module.
   void emitBuiltinReflectionMetadata();
 
-  /// Emit the builtin protocol conformances that the standard library has for
-  /// non-nominal types.
-  void emitBuiltinProtocolConformances();
-
   /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
 
@@ -1349,7 +1341,6 @@ public:
                                         ConstantInitFuture init,
                                         llvm::StringRef section = {});
 
-  TypeEntityReference getTypeEntityReference(CanType type);
   TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
 
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType);

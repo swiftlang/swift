@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1797,15 +1797,8 @@ namespace {
       // Add a relative reference to the type, with the type reference
       // kind stored in the flags.
       auto ref = IGM.getTypeEntityReference(
-                   Conformance->getType()->getCanonicalType());
-
-      // Builtin conformance type references are just MetadataKind, which
-      // require no relative reference.
-      if (isa<BuiltinProtocolConformance>(Conformance)) {
-        B.add(ref.getValue());
-      } else {
-        B.addRelativeAddress(ref.getValue());
-      }
+                   Conformance->getType()->getAnyNominal());
+      B.addRelativeAddress(ref.getValue());
       Flags = Flags.withTypeReferenceKind(ref.getKind());
     }
 
@@ -1923,10 +1916,11 @@ namespace {
         return;
 
       // WitnessTableSizeInWords
-      B.addInt16(Description.witnessTableSize);
+      B.addInt(IGM.Int16Ty, Description.witnessTableSize);
       // WitnessTablePrivateSizeInWordsAndRequiresInstantiation
-      B.addInt16((Description.witnessTablePrivateSize << 1) |
-                  Description.requiresSpecialization);
+      B.addInt(IGM.Int16Ty,
+               (Description.witnessTablePrivateSize << 1) |
+                Description.requiresSpecialization);
       // Instantiation function
       B.addRelativeAddressOrNull(Description.instantiationFn);
       // Private data
@@ -3469,55 +3463,4 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
                                       signature->getRequirements());
         return fields.finishAndCreateFuture();
       });
-}
-
-//===----------------------------------------------------------------------===//
-// Builtin Protocol Conformances
-//==-----------------------------------------------------------------------===//
-
-static void addTupleEquatableConformance(IRGenModule &IGM,
-                        SmallVectorImpl<ConformanceDescription> &descriptions) {
-  // For now, the only builtin conformance is Equatable for tuples.
-  // (Just grab Void's conformance, we emit a single conformance descriptor for
-  //  all tuples.)
-  auto tuple = IGM.Context.TheEmptyTupleType;
-  auto equatable = IGM.Context.getProtocol(KnownProtocolKind::Equatable);
-  auto conformance = IGM.Context.getBuiltinConformance(tuple, equatable);
-
-  auto description = ConformanceDescription(conformance,
-                                            /* witness table */ nullptr,
-                                            /* pattern */ nullptr,
-                                            /* table size */ 0,
-                                            /* private size */ 0,
-                                            /* requires specialization */ false);
-
-  descriptions.push_back(description);
-}
-
-void IRGenModule::emitBuiltinProtocolConformances() {
-  // We only emit these for the stdlib.
-  if (!getSwiftModule()->isStdlibModule())
-    return;
-
-  // Collect all builtin conformances.
-  SmallVector<ConformanceDescription, 4> descriptions;
-
-  addTupleEquatableConformance(*this, descriptions);
-
-  for (auto description : descriptions) {
-    // Slight edge case: If this conformance doesn't have a valid protocol decl,
-    // we're compiling some module that has asked be to compiled as the stdlib
-    // and said module hasn't declared this protocol. Don't emit descritors for
-    // this case.
-    if (!description.conformance->getProtocol())
-      return;
-
-    addProtocolConformance(std::move(description));
-  }
-}
-
-void IRGenerator::emitBuiltinProtocolConformances() {
-  for (auto &m : *this) {
-    m.second->emitBuiltinProtocolConformances();
-  }
 }

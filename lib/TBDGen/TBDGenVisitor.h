@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -122,29 +122,6 @@ public:
 
   /// Adds the global symbols associated with the first file.
   void addFirstFileSymbols();
-
-  void addBuiltinProtocolConformances() {
-    // Hack: We emit builtin conformance descriptors in IRGen for the stdlib
-    // module. Add them here too.
-
-    // As of right now, the only known conformance is equatable for tuples.
-    // (Just grab Void's conformance, we emit a single descriptor for all tuples
-    //  so mangling is the same.)
-    auto tuple = SwiftModule->getASTContext().TheEmptyTupleType;
-    auto equatable = SwiftModule->getASTContext()
-                                .getProtocol(KnownProtocolKind::Equatable);
-
-    // If this conformance is coming from a minimal stdlib with no equatable
-    // protocol, don't add it.
-    if (!equatable)
-      return;
-
-    auto conformance = SwiftModule->getASTContext()
-                                   .getBuiltinConformance(tuple, equatable);
-
-    auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
-    addSymbol(entity);
-  }
 
   void visitDefaultArguments(ValueDecl *VD, ParameterList *PL);
 

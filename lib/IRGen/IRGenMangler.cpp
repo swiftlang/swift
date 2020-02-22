@@ -145,32 +145,31 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
 
 std::string IRGenMangler::mangleProtocolConformanceDescriptor(
                                  const RootProtocolConformance *conformance) {
+  // Builtin conformances are different because they don't use a mangled name
+  // for their conformance descriptors.
+  if (isa<BuiltinProtocolConformance>(conformance)) {
+    if (conformance->getType()->is<TupleType>()) {
+      auto &ctx = conformance->getType()->getASTContext();
+      auto equatable = ctx.getProtocol(KnownProtocolKind::Equatable);
+
+      if (conformance->getProtocol() == equatable) {
+        return "_swift_tupleEquatable_conf";
+      } else {
+        llvm_unreachable("mangling unknown tuple witness table protocol");
+      }
+    } else {
+      llvm_unreachable("mangling unknown builtin witness table type");
+    }
+  }
+
   beginMangling();
   if (isa<NormalProtocolConformance>(conformance)) {
     appendProtocolConformance(conformance);
     appendOperator("Mc");
-  } else if (auto self = dyn_cast<SelfProtocolConformance>(conformance)) {
-    auto protocol = self->getProtocol();
+  } else {
+    auto protocol = cast<SelfProtocolConformance>(conformance)->getProtocol();
     appendProtocolName(protocol);
     appendOperator("MS");
-  } else {
-    auto builtin = cast<BuiltinProtocolConformance>(conformance);
-
-    // Builtin conformances are a little different. Currently we only have
-    // conformances for tuples, but we emit a single descriptor for them so
-    // mangle something like a variadic tuple.
-    if (auto tuple = builtin->getType()->getAs<TupleType>()) {
-      // This is equivalent to (A...). We don't currently have variadic generic
-      // mangling.
-      appendOperator("xd_t");
-    } else {
-      llvm_unreachable("mangling unknown builtin type");
-    }
-
-    appendProtocolName(builtin->getProtocol());
-    // Builtin conformances always come from the stdlib module.
-    appendOperator("s");
-    appendOperator("Mb");
   }
   return finalize();
 }

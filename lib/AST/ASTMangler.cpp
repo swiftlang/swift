@@ -194,6 +194,23 @@ std::string ASTMangler::mangleConstructorVTableThunk(
 }
 
 std::string ASTMangler::mangleWitnessTable(const RootProtocolConformance *C) {
+  // Builtin conformances are different because they don't use a mangled name
+  // for the witness table.
+  if (isa<BuiltinProtocolConformance>(C)) {
+    if (C->getType()->is<TupleType>()) {
+      auto &ctx = C->getType()->getASTContext();
+      auto equatable = ctx.getProtocol(KnownProtocolKind::Equatable);
+
+      if (C->getProtocol() == equatable) {
+        return "_swift_tupleEquatable_wt";
+      } else {
+        llvm_unreachable("mangling unknown tuple witness table protocol");
+      }
+    } else {
+      llvm_unreachable("mangling unknown builtin witness table type");
+    }
+  }
+
   beginMangling();
   if (isa<NormalProtocolConformance>(C)) {
     appendProtocolConformance(C);
@@ -201,22 +218,6 @@ std::string ASTMangler::mangleWitnessTable(const RootProtocolConformance *C) {
   } else if (isa<SelfProtocolConformance>(C)) {
     appendProtocolName(cast<SelfProtocolConformance>(C)->getProtocol());
     appendOperator("WS");
-  } else if (isa<BuiltinProtocolConformance>(C)) {
-
-    // Builtin conformances are a little different. Currently we only have
-    // conformances for tuples, but we emit a single witness table for them so
-    // mangle something like a variadic tuple.
-    if (C->getType()->is<TupleType>()) {
-      // This is equivalent to (A...). We don't currently have variadic generic
-      // mangling.
-      appendOperator("xd_t");
-    } else {
-      llvm_unreachable("unknown builtin type");
-    }
-
-    appendProtocolName(C->getProtocol());
-    appendOperator("s");
-    appendOperator("WB");
   } else {
     llvm_unreachable("mangling unknown conformance kind");
   }
@@ -244,8 +245,6 @@ std::string ASTMangler::mangleWitnessThunk(
   if (Conformance) {
     if (isa<SelfProtocolConformance>(Conformance)) {
       appendOperator("TS");
-    } else if (isa<BuiltinProtocolConformance>(Conformance)) {
-      appendOperator("TB");
     } else {
       appendOperator("TW");
     }

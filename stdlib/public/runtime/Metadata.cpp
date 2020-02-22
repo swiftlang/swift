@@ -4273,36 +4273,6 @@ static void initializeResilientWitnessTable(
   }
 }
 
-extern const ProtocolDescriptor
-PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
-
-/// If this conformance is builtin, find the builtin witness table in the
-/// runtime and return that.
-static const WitnessTable *getBuiltinWitnessTable(
-                             const ProtocolConformanceDescriptor *conformance) {
-  auto protocol = conformance->getProtocol();
-  auto metadataKind = conformance->getMetadataKind();
-
-  switch (metadataKind) {
-    case MetadataKind::Tuple: {
-      if (protocol == &PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING)) {
-        auto table = &BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(
-                                                      VARIADIC_TUPLE_MANGLING,
-                                                      SWIFT_EQUATABLE_MANGLING);
-        return reinterpret_cast<const WitnessTable *>(table);
-      } else {
-        swift_runtime_unreachable(
-          "finding witness table for unknown protocol for tuple conformance");
-      }
-
-      break;
-    }
-    default:
-      swift_runtime_unreachable(
-        "finding witness table for unknown builtin type");
-  }
-}
-
 /// Instantiate a brand new witness table for a resilient or generic
 /// protocol conformance.
 WitnessTable *
@@ -4344,7 +4314,6 @@ WitnessTableCacheEntry::allocate(
     // Put the conformance descriptor in place. Instantiation will fill in the
     // rest.
     assert(numPatternWitnesses == 0);
-
     table[0] = (void *)conformance;
   }
 
@@ -4403,9 +4372,6 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
   // accessor directly.
   auto genericTable = conformance->getGenericWitnessTable();
   if (!genericTable || doesNotRequireInstantiation(conformance, genericTable)) {
-    if (conformance->isBuiltin())
-      return getBuiltinWitnessTable(conformance);
-
     return uniqueForeignWitnessTableRef(conformance->getWitnessTablePattern());
   }
 

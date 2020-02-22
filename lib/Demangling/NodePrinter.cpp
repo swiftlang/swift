@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -532,9 +532,6 @@ private:
     case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
     case Node::Kind::OpaqueReturnType:
     case Node::Kind::OpaqueReturnTypeOf:
-    case Node::Kind::BuiltinConformanceWitnessTable:
-    case Node::Kind::BuiltinProtocolWitness:
-    case Node::Kind::BuiltinConformanceDescriptor:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1437,10 +1434,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << " and conformance ";
     print(Node->getChild(1));
     return nullptr;
-  case Node::Kind::BuiltinConformanceWitnessTable:
-    Printer << "builtin protocol conformance witness table for ";
-    print(Node->getFirstChild());
-    return nullptr;
   case Node::Kind::ProtocolSelfConformanceWitnessTable:
     Printer << "protocol self-conformance witness table for ";
     print(Node->getFirstChild());
@@ -1483,13 +1476,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   }
   case Node::Kind::ProtocolWitness: {
     Printer << "protocol witness for ";
-    print(Node->getChild(1));
-    Printer << " in conformance ";
-    print(Node->getChild(0));
-    return nullptr;
-  }
-  case Node::Kind::BuiltinProtocolWitness: {
-    Printer << "builtin protocol witness for ";
     print(Node->getChild(1));
     Printer << " in conformance ";
     print(Node->getChild(0));
@@ -1655,10 +1641,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::Metaclass:
     Printer << "metaclass for ";
     print(Node->getFirstChild());
-    return nullptr;
-  case Node::Kind::BuiltinConformanceDescriptor:
-    Printer << "builtin protocol conformance descriptor for ";
-    print(Node->getChild(0));
     return nullptr;
   case Node::Kind::ProtocolSelfConformanceDescriptor:
     Printer << "protocol self-conformance descriptor for ";

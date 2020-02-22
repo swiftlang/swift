@@ -1,7 +1,6 @@
 set(library_name "swiftCompatibility50")
 
 add_swift_target_library("${library_name}" STATIC
-  BuiltinProtocolConformances.cpp
   ProtocolConformance.cpp
   Overrides.cpp
 

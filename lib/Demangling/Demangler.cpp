@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1823,9 +1823,6 @@ NodePointer Demangler::demangleMetatype() {
     case 'A':
       return createWithChild(Node::Kind::ReflectionMetadataAssocTypeDescriptor,
                              popProtocolConformance());
-    case 'b':
-      return createWithChild(Node::Kind::BuiltinConformanceDescriptor,
-                             popProtocolConformance());
     case 'B':
       return createWithChild(Node::Kind::ReflectionMetadataBuiltinDescriptor,
                                popNode(Node::Kind::Type));
@@ -2166,12 +2163,6 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       NodePointer Entity = popNode(isEntity);
       NodePointer Conf = popProtocolConformance();
       return createWithChildren(Node::Kind::ProtocolWitness, Conf, Entity);
-    }
-    case 'B': {
-      NodePointer Entity = popNode(isEntity);
-      NodePointer Conf = popProtocolConformance();
-      return createWithChildren(Node::Kind::BuiltinProtocolWitness, Conf,
-                                Entity);
     }
     case 'S':
       return createWithChild(Node::Kind::ProtocolSelfConformanceWitness,
@@ -2621,9 +2612,6 @@ NodePointer Demangler::demangleWitness() {
                         createNode(Node::Kind::Directness, Directness),
                         popNode(isEntity));
     }
-    case 'B':
-      return createWithChild(Node::Kind::BuiltinConformanceWitnessTable,
-                             popProtocolConformance());
     case 'S':
       return createWithChild(Node::Kind::ProtocolSelfConformanceWitnessTable,
                              popProtocol());

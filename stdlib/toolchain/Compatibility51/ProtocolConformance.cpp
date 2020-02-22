@@ -54,9 +54,7 @@ static bool tupleConformsToProtocol(const Metadata *type,
 static const WitnessTable *getTupleConformanceWitnessTable(
                                            const ProtocolDescriptor *protocol) {
   if (protocol == &PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING)) {
-    return reinterpret_cast<const WitnessTable *>(
-      &BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(VARIADIC_TUPLE_MANGLING,
-                                          SWIFT_EQUATABLE_MANGLING));
+    return reinterpret_cast<const WitnessTable *>(&_swift_tupleEquatable_wt);
   }
 
   return nullptr;

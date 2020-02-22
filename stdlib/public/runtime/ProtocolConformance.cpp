@@ -94,7 +94,7 @@ template<> void ProtocolConformanceDescriptor::dump() const {
   
   printf(" => ");
   
-  printf("witness table %pattern s\n", symbolName(getWitnessTablePattern()));
+  printf("witness table pattern %p\n", symbolName(getWitnessTablePattern()));
 }
 #endif
 
@@ -509,6 +509,18 @@ static bool tupleConformsToProtocol(const Metadata *type,
   return true;
 }
 
+extern const ProtocolConformanceDescriptor _swift_tupleEquatable_conf;
+
+static const ProtocolConformanceDescriptor *getTupleConformanceDescriptor(
+                                           const ProtocolDescriptor *protocol) {
+  if (protocol == &PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING)) {
+    return reinterpret_cast<const ProtocolConformanceDescriptor *>(
+              &_swift_tupleEquatable_conf);
+  }
+
+  return nullptr;
+}
+
 namespace {
   /// Describes a protocol conformance "candidate" that can be checked
   /// against a type metadata.
@@ -533,6 +545,7 @@ namespace {
       if (auto metadata = conformance.getCanonicalTypeMetadata()) {
         candidate = metadata;
         candidateIsMetadata = true;
+        candidateKind = None;
         return;
       }
 
@@ -665,28 +678,20 @@ swift_conformsToSwiftProtocolImpl(const Metadata * const type,
         if (!matchingType)
           matchingType = type;
 
-        // If the matching type is a structural type, ensure that it actually
-        // conforms to said protocol.
-        if (descriptor.isBuiltin()) {
-          switch (matchingType->getKind()) {
-            case MetadataKind::Tuple: {
-              auto conforms = tupleConformsToProtocol(matchingType, protocol);
-              if (!conforms)
-                continue;
-              break;
-            }
-            default:
-              swift_runtime_unreachable(
-                "matching unknown builtin conforming type");
-          }
-        }
-
         C.cacheSuccess(matchingType, protocol, &descriptor);
       }
     }
   }
   
   // Conformance scan is complete.
+
+  // If we're asking if a tuple conforms to a protocol, handle that here.
+  if (auto tuple = dyn_cast<TupleTypeMetadata>(type)) {
+    if (tupleConformsToProtocol(tuple, protocol)) {
+      auto descriptor = getTupleConformanceDescriptor(protocol);
+      C.cacheSuccess(type, protocol, descriptor);
+    }
+  }
 
   // Search the cache once more, and this time update the cache if necessary.
   FoundConformance = searchInConformanceCache(type, protocol);

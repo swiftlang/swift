@@ -166,7 +166,7 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
 
   auto rootC = C->getRootConformance();
 
-  // For the time being, reject all builtin conformances.
+  // Builtin conformances don't have witness tables in SIL.
   if (isa<BuiltinProtocolConformance>(rootC))
     return nullptr;
 

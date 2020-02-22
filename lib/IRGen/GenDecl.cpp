@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -3013,18 +3013,6 @@ getObjCClassByNameReference(IRGenModule &IGM, ClassDecl *cls) {
                                  /*willBeRelativelyAddressed=*/true);
 
   return TypeEntityReference(kind, ref);
-}
-
-TypeEntityReference IRGenModule::getTypeEntityReference(CanType type) {
-  if (auto nominal = type->getAnyNominal())
-    return getTypeEntityReference(nominal);
-
-  if (auto tuple = type->getAs<TupleType>()) {
-    auto kind = llvm::ConstantInt::get(Int32Ty, unsigned(MetadataKind::Tuple));
-    return {TypeReferenceKind::MetadataKind, kind};
-  }
-
-  llvm_unreachable("bad type entity reference type");
 }
 
 TypeEntityReference

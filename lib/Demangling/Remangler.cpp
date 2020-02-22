@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1890,11 +1890,6 @@ void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
   Buffer << "Mc";
 }
 
-void Remangler::mangleBuiltinConformanceDescriptor(Node *node) {
-  mangleProtocolConformance(node->getChild(0));
-  Buffer << "Mb";
-}
-
 void Remangler::mangleProtocolList(Node *node, Node *superclass,
                                    bool hasExplicitAnyObject) {
   auto *protocols = getSingleChild(node, Node::Kind::TypeList);
@@ -1937,16 +1932,6 @@ void Remangler::mangleProtocolSelfConformanceWitness(Node *node) {
 void Remangler::mangleProtocolWitness(Node *node) {
   mangleChildNodes(node);
   Buffer << "TW";
-}
-
-void Remangler::mangleBuiltinProtocolWitness(Node *node) {
-  mangleChildNodes(node);
-  Buffer << "TB";
-}
-
-void Remangler::mangleBuiltinConformanceWitnessTable(Node *node) {
-  mangleSingleChildNode(node);
-  Buffer << "WB";
 }
 
 void Remangler::mangleProtocolSelfConformanceWitnessTable(Node *node) {

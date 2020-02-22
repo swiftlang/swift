@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -925,14 +925,12 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
 
     // Register our info with the runtime if needed.
     if (Opts.UseJIT) {
-      IGM.emitBuiltinProtocolConformances();
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitRuntimeRegistration();
     } else {
       // Emit protocol conformances into a section we can recognize at runtime.
       // In JIT mode these are manually registered above.
       IGM.emitSwiftProtocols();
-      IGM.emitBuiltinProtocolConformances();
       IGM.emitProtocolConformances();
       IGM.emitTypeMetadataRecords();
       IGM.emitBuiltinReflectionMetadata();
@@ -1180,8 +1178,6 @@ static void performParallelIRGeneration(
   irgen.emitSwiftProtocols();
 
   irgen.emitDynamicReplacements();
-
-  irgen.emitBuiltinProtocolConformances();
 
   irgen.emitProtocolConformances();
 

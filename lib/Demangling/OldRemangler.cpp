@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -574,11 +574,6 @@ void Remangler::mangleProtocolSelfConformanceDescriptor(Node *node) {
   mangleProtocol(node->begin()[0]);
 }
 
-void Remangler::mangleBuiltinConformanceDescriptor(Node *node) {
-  Buffer << "Mb";
-  mangleProtocolConformance(node->begin()[0]);
-}
-
 void Remangler::manglePartialApplyForwarder(Node *node) {
   Buffer << "PA__T";
   mangleSingleChildNode(node); // global
@@ -644,11 +639,6 @@ void Remangler::mangleFieldOffset(Node *node) {
 void Remangler::mangleEnumCase(Node *node) {
   Buffer << "WC";
   mangleSingleChildNode(node); // enum case
-}
-
-void Remangler::mangleBuiltinConformanceWitnessTable(Node *node) {
-  Buffer << "WB";
-  mangleSingleChildNode(node); // protocol-conformance
 }
 
 void Remangler::mangleProtocolSelfConformanceWitnessTable(Node *node) {
@@ -738,11 +728,6 @@ void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
 
 void Remangler::mangleReabstractionThunk(Node *node) {
   Buffer << "<reabstraction-thunk>";
-}
-
-void Remangler::mangleBuiltinProtocolWitness(Node *node) {
-  Buffer << "TB";
-  mangleChildNodes(node); // protocol conformance, entity
 }
 
 void Remangler::mangleProtocolSelfConformanceWitness(Node *node) {
