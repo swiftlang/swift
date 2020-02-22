@@ -1,7 +1,10 @@
 // RUN: %target-resilience-test --backward-deployment
 // REQUIRES: executable_test
 
-// XFAIL: use_os_stdlib
+// This is testing a bug fix in the runtime so we don't want to run it on the
+// backward deployment bots.
+
+// UNSUPPORTED: use_os_stdlib
 
 import StdlibUnittest
 import backward_deploy_conformance
