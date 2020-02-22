@@ -122,6 +122,8 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) {
   case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst:
   case ValueKind::TupleElementAddrInst:
+  case ValueKind::InitExistentialAddrInst:
+  case ValueKind::OpenExistentialAddrInst:
   case ValueKind::BeginAccessInst:
   case ValueKind::UncheckedTakeEnumDataAddrInst:
   case ValueKind::UncheckedEnumDataInst:
@@ -2165,9 +2167,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     }
     case SILInstructionKind::RefElementAddrInst:
     case SILInstructionKind::RefTailAddrInst:
-    case SILInstructionKind::ProjectBoxInst:
-    case SILInstructionKind::InitExistentialAddrInst:
-    case SILInstructionKind::OpenExistentialAddrInst: {
+    case SILInstructionKind::ProjectBoxInst: {
       // For projections into objects, get the non-address reference operand and
       // return an interior content node that the reference points to.
       auto SVI = cast<SingleValueInstruction>(I);
