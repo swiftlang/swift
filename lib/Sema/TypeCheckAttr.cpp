@@ -256,8 +256,6 @@ public:
   void visitDerivativeAttr(DerivativeAttr *attr);
   // SWIFT_ENABLE_TENSORFLOW
   void visitTransposeAttr(TransposeAttr *attr);
-  // TODO(TF-999): Remove deprecated `@differentiating` attribute.
-  void visitDifferentiatingAttr(DerivativeAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   // SWIFT_ENABLE_TENSORFLOW END
 };
@@ -4857,10 +4855,6 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
 
   // Set the resolved linearity parameter indices in the attribute.
   attr->setParameterIndices(linearParamIndices);
-}
-
-void AttributeChecker::visitDifferentiatingAttr(DerivativeAttr *attr) {
-  visitDerivativeAttr(attr);
 }
 
 static bool

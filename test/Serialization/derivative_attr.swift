@@ -63,21 +63,3 @@ extension InstanceMethod {
     return (self, { v in (v, .zero) })
   }
 }
-
-// Test deprecated `@differentiating` attribute.
-// For simplicity, `@differentiating` is serialized/deserialized as
-// `@derivative` attribute.
-
-func subtract(x: Float, y: Float) -> Float {
-  return x - y
-}
-// CHECK: @derivative(of: subtract, wrt: x)
-@differentiating(subtract, wrt: x)
-func jvpSubtractWrtX(x: Float, y: Float) -> (value: Float, differential: (Float) -> (Float)) {
-  return (x - y, { $0 })
-}
-// CHECK: @derivative(of: subtract, wrt: (x, y))
-@differentiating(subtract)
-func vjpSubtract(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
-  return (x - y, { ($0, -$0) })
-}
