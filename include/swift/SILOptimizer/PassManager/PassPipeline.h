@@ -87,7 +87,7 @@ public:
 
   void print(llvm::raw_ostream &os);
 
-  void startPipeline(StringRef Name = "");
+  void startPipeline(StringRef Name = "", bool isFunctionPassPipeline = false);
   using PipelineKindIterator = decltype(Kinds)::const_iterator;
   using PipelineKindRange = iterator_range<PipelineKindIterator>;
   iterator_range<PipelineKindIterator>
@@ -104,11 +104,14 @@ struct SILPassPipeline final {
   unsigned ID;
   StringRef Name;
   unsigned KindOffset;
+  bool isFunctionPassPipeline;
 };
 
-inline void SILPassPipelinePlan::startPipeline(StringRef Name) {
+inline void SILPassPipelinePlan::
+startPipeline(StringRef Name, bool isFunctionPassPipeline) {
   PipelineStages.push_back(SILPassPipeline{
-      unsigned(PipelineStages.size()), Name, unsigned(Kinds.size())});
+      unsigned(PipelineStages.size()), Name, unsigned(Kinds.size()),
+      isFunctionPassPipeline});
 }
 
 inline SILPassPipelinePlan::PipelineKindRange

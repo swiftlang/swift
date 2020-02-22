@@ -261,9 +261,11 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
 
 // Perform classic SSA optimizations.
 //
+// No Module Passes Allowed!
+//
 // Do not add any module passes to this pipeline. It will break the pipeline
 // restart functionality.
-void addSSAFunctionPasses(SILPassPipelinePlan &P,
+void addFunctionPasses(SILPassPipelinePlan &P,
                           OptimizationLevelKind OpLevel) {
   // Promote box allocations to stack allocations.
   P.addAllocBoxToStack();
@@ -419,26 +421,43 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.addCMOSerializeSILPass();
 }
 
-static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("HighLevel+EarlyLoopOpt");
-  // FIXME: update this to be a function pass.
+// The "high-level" pipeline serves two purposes:
+//
+// 1. Optimize the standard library Swift module prior to serialization. This
+// reduces the amount of work during compilation of all non-stdlib clients.
+//
+// 2. Optimizer caller functions before inlining semantic calls inside
+// callees. This provides more precise escape analysis and side effect analysis
+// of callee arguments.
+static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
+  P.startPipeline("HighLevel,Function+EarlyLoopOpt");
+  // FIXME: update EagerSpecializer to be a function pass!
   P.addEagerSpecializer();
-  addSSAFunctionPasses(P, OptimizationLevelKind::HighLevel);
+  addFunctionPasses(P, OptimizationLevelKind::HighLevel);
+
   addHighLevelLoopOptPasses(P);
 }
 
-static void addMidLevelModulePipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("MidModulePasses+StackPromote");
+// After "high-level" function passes have processed the entire call tree, run
+// one round of module passes.
+//
+// It is not clear why stack promotion
+static void addHighLevelModulePipeline(SILPassPipelinePlan &P) {
+  P.startPipeline("HighLevel,Module+StackPromote");
   P.addDeadFunctionElimination();
   P.addPerformanceSILLinker();
   P.addDeadObjectElimination();
   P.addGlobalPropertyOpt();
 
-  // Do the first stack promotion on high-level SIL.
+  // Do the first stack promotion on high-level SIL before serialization.
   P.addStackPromotion();
 
   P.addGlobalOpt();
   P.addLetPropertiesOpt();
+}
+
+static void addSerializePipeline(SILPassPipelinePlan &P) {
+  P.startPipeline("Serialize");
   // It is important to serialize before any of the @_semantics
   // functions are inlined, because otherwise the information about
   // uses of such functions inside the module is lost,
@@ -452,8 +471,8 @@ static void addMidLevelModulePipeline(SILPassPipelinePlan &P) {
 }
 
 static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("MidLevel");
-  addSSAFunctionPasses(P, OptimizationLevelKind::MidLevel);
+  P.startPipeline("MidLevel,Function", true /*isFunctionPassPipeline*/);
+  addFunctionPasses(P, OptimizationLevelKind::MidLevel);
 
   // Specialize partially applied functions with dead arguments as a preparation
   // for CapturePropagation.
@@ -512,12 +531,12 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
 }
 
 static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("LowLevel");
+  P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
 
   // Should be after FunctionSignatureOpts and before the last inliner.
   P.addReleaseDevirtualizer();
 
-  addSSAFunctionPasses(P, OptimizationLevelKind::LowLevel);
+  addFunctionPasses(P, OptimizationLevelKind::LowLevel);
 
   P.addDeadObjectElimination();
   P.addObjectOutliner();
@@ -645,13 +664,19 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   addPerfEarlyModulePassPipeline(P);
 
   // Then run an iteration of the high-level SSA passes.
-  addHighLevelEarlyLoopOptPipeline(P);
+  //
+  // FIXME: When *not* emitting a .swiftmodule, skip the high-level function
+  // pipeline to save compile time.
+  addHighLevelFunctionPipeline(P);
 
-  addMidLevelModulePipeline(P);
+  addHighLevelModulePipeline(P);
+
+  addSerializePipeline(P);
   if (Options.StopOptimizationAfterSerialization)
     return P;
 
-  // Run an iteration of the mid-level SSA function passes.
+  // After serialization run the function pass pipeline to iteratively lower
+  // high-level constructs like @_semantics calls.
   addMidLevelFunctionPipeline(P);
 
   // Perform optimizations that specialize.

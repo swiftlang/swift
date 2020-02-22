@@ -258,16 +258,7 @@ public:
     }
   }
 
-  void executePassPipelinePlan(const SILPassPipelinePlan &Plan) {
-    for (const SILPassPipeline &Pipeline : Plan.getPipelines()) {
-      setStageName(Pipeline.Name);
-      resetAndRemoveTransformations();
-      for (PassKind Kind : Plan.getPipelinePasses(Pipeline)) {
-        addPass(Kind);
-      }
-      execute();
-    }
-  }
+  void executePassPipelinePlan(const SILPassPipelinePlan &Plan);
 
   void registerIRGenPass(PassKind Kind, SILTransform *Transform) {
     assert(IRGenPasses.find(unsigned(Kind)) == IRGenPasses.end() &&
