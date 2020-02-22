@@ -148,6 +148,10 @@ public:
     return new(buffer) Impl(fields, std::forward<As>(args)...);
   }
 
+  bool areFieldsABIAccessible() const {
+    return AreFieldsABIAccessible;
+  }
+
   ArrayRef<FieldImpl> getFields() const {
     return {this->template getTrailingObjects<FieldImpl>(), NumFields};
   }
@@ -239,11 +243,10 @@ public:
                           SILType T, bool isOutlined) const override {
     // If we're bitwise-takable, use memcpy.
     if (this->isBitwiseTakable(ResilienceExpansion::Maximal)) {
-      IGF.Builder.CreateMemCpy(dest.getAddress(),
-                               dest.getAlignment().getValue(),
-                               src.getAddress(),
-                               src.getAlignment().getValue(),
-                 asImpl().Impl::getSize(IGF, T));
+      IGF.Builder.CreateMemCpy(
+          dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
+          src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
+          asImpl().Impl::getSize(IGF, T));
       return;
     }
 

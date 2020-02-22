@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name DeclarationFragments -emit-module -emit-module-path %t/
-// RUN: %target-swift-symbolgraph-extract -module-name DeclarationFragments -I %t -pretty-print -o %t/DeclarationFragments.symbols.json
+// RUN: %target-swift-symbolgraph-extract -module-name DeclarationFragments -I %t -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/DeclarationFragments.symbols.json
 
 public func foo<S>(f: @escaping () -> (), x: Int = 2, s: S) {}

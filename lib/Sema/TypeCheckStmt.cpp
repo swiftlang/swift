@@ -1932,15 +1932,6 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
                                             SourceLoc endTypeCheckLoc) const {
   ASTContext &ctx = AFD->getASTContext();
 
-  // Accounting for type checking of function bodies.
-  // FIXME: We could probably take this away, given that the request-evaluator
-  // does much of it for us.
-  FrontendStatsTracer StatsTracer(ctx.Stats, "typecheck-fn", AFD);
-  PrettyStackTraceDecl StackEntry("type-checking", AFD);
-
-  if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumFunctionsTypechecked++;
-
   Optional<FunctionBodyTimer> timer;
   const auto &tyOpts = ctx.TypeCheckerOpts;
   if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)

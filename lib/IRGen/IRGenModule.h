@@ -20,6 +20,7 @@
 
 #include "IRGen.h"
 #include "SwiftTargetInfo.h"
+#include "TypeLayout.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -48,6 +49,7 @@
 
 namespace llvm {
   class Constant;
+  class ConstantInt;
   class DataLayout;
   class Function;
   class FunctionType;
@@ -542,7 +544,6 @@ public:
   SILModuleConventions silConv;
   ModuleDecl *ObjCModule = nullptr;
   ModuleDecl *ClangImporterModule = nullptr;
-  SourceFile *CurSourceFile = nullptr;
 
   llvm::StringMap<ModuleDecl*> OriginalModules;
   llvm::SmallString<128> OutputFilename;
@@ -556,6 +557,8 @@ public:
   /// A global variable which stores the hash of the module. Used for
   /// incremental compilation.
   llvm::GlobalVariable *ModuleHash;
+
+  TypeLayoutCache typeLayoutCache;
 
   /// Does the current target require Objective-C interoperation?
   bool ObjCInterop = true;
@@ -854,6 +857,8 @@ public:
   clang::CanQual<clang::Type> getClangType(SILType type);
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param,
                                            CanSILFunctionType funcTy);
+
+  const TypeLayoutEntry &getTypeLayoutEntry(SILType T);
 
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
@@ -1290,7 +1295,7 @@ public:
                                       ForeignFunctionInfo *foreignInfo=nullptr);
   ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type);
 
-  llvm::Constant *getInt32(uint32_t value);
+  llvm::ConstantInt *getInt32(uint32_t value);
   llvm::Constant *getSize(Size size);
   llvm::Constant *getAlignment(Alignment align);
   llvm::Constant *getBool(bool condition);
@@ -1483,8 +1488,7 @@ public:
   GenericEnvironment *getGenericEnvironment();
 
   ConstantReference
-  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
-       ConstantReference::Directness forceIndirect = ConstantReference::Direct);
+  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity);
 
   llvm::Constant *
   emitRelativeReference(ConstantReference target,

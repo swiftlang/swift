@@ -63,6 +63,12 @@ struct State {
   /// put in missing destroys.
   SmallVectorImpl<SILBasicBlock *> *leakingBlocks;
 
+  /// The list of passed in consuming uses.
+  ArrayRef<BranchPropagatedUser> consumingUses;
+
+  /// The list of passed in non consuming uses.
+  ArrayRef<BranchPropagatedUser> nonConsumingUses;
+
   /// The set of blocks with consuming uses.
   SmallPtrSet<SILBasicBlock *, 8> blocksWithConsumingUses;
 
@@ -80,16 +86,22 @@ struct State {
 
   State(SILValue value, SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
         ErrorBehaviorKind errorBehavior,
-        SmallVectorImpl<SILBasicBlock *> *leakingBlocks)
+        SmallVectorImpl<SILBasicBlock *> *leakingBlocks,
+        ArrayRef<BranchPropagatedUser> consumingUses,
+        ArrayRef<BranchPropagatedUser> nonConsumingUses)
       : value(value), beginBlock(value->getParentBlock()), error(errorBehavior),
-        visitedBlocks(visitedBlocks), leakingBlocks(leakingBlocks) {}
+        visitedBlocks(visitedBlocks), leakingBlocks(leakingBlocks),
+        consumingUses(consumingUses), nonConsumingUses(nonConsumingUses) {}
 
   State(SILBasicBlock *beginBlock,
         SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
         ErrorBehaviorKind errorBehavior,
-        SmallVectorImpl<SILBasicBlock *> *leakingBlocks)
+        SmallVectorImpl<SILBasicBlock *> *leakingBlocks,
+        ArrayRef<BranchPropagatedUser> consumingUses,
+        ArrayRef<BranchPropagatedUser> nonConsumingUses)
       : value(), beginBlock(beginBlock), error(errorBehavior),
-        visitedBlocks(visitedBlocks), leakingBlocks(leakingBlocks) {}
+        visitedBlocks(visitedBlocks), leakingBlocks(leakingBlocks),
+        consumingUses(consumingUses), nonConsumingUses(nonConsumingUses) {}
 
   void initializeAllNonConsumingUses(
       ArrayRef<BranchPropagatedUser> nonConsumingUsers);
@@ -124,6 +136,22 @@ struct State {
   /// for validity. If this is a linear typed value, return true. Return false
   /// otherwise.
   void checkDataflowEndState(DeadEndBlocks &deBlocks);
+
+  void dumpConsumingUsers() const {
+    llvm::errs() << "Consuming Users:\n";
+    for (auto user : consumingUses) {
+      llvm::errs() << *user.getInst();
+    }
+    llvm::errs() << "\n";
+  }
+
+  void dumpNonConsumingUsers() const {
+    llvm::errs() << "Non Consuming Users:\n";
+    for (auto user : nonConsumingUses) {
+      llvm::errs() << *user.getInst();
+    }
+    llvm::errs() << "\n";
+  }
 };
 
 } // end anonymous namespace
@@ -219,12 +247,13 @@ void State::initializeConsumingUse(BranchPropagatedUser consumingUser,
     llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
                  << "Found over consume?!\n";
     if (auto v = value) {
-      llvm::errs() << "Value: " << *value;
+      llvm::errs() << "Value: " << *v;
     } else {
       llvm::errs() << "Value: N/A\n";
     }
     llvm::errs() << "User: " << *consumingUser << "Block: bb"
-                 << userBlock->getDebugID() << "\n\n";
+                 << userBlock->getDebugID() << "\n";
+    dumpConsumingUsers();
   });
 }
 
@@ -327,7 +356,8 @@ void State::checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
     }
 
     llvm::errs() << "User: " << *consumingUser << "Block: bb"
-                 << userBlock->getDebugID() << "\n\n";
+                 << userBlock->getDebugID() << "\n";
+    dumpConsumingUsers();
   });
 }
 
@@ -356,7 +386,8 @@ void State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
       llvm::errs() << "N/A. \n";
     }
 
-    llvm::errs() << "Block: bb" << userBlock->getDebugID() << "\n\n";
+    llvm::errs() << "Block: bb" << userBlock->getDebugID() << "\n";
+    dumpConsumingUsers();
   });
 }
 
@@ -514,7 +545,8 @@ LinearLifetimeError LinearLifetimeChecker::checkValue(
     SmallVectorImpl<SILBasicBlock *> *leakingBlocks) {
   assert(!consumingUses.empty() && "Must have at least one consuming user?!");
 
-  State state(value, visitedBlocks, errorBehavior, leakingBlocks);
+  State state(value, visitedBlocks, errorBehavior, leakingBlocks, consumingUses,
+              nonConsumingUses);
 
   // First add our non-consuming uses and their blocks to the
   // blocksWithNonConsumingUses map. While we do this, if we have multiple uses

@@ -134,9 +134,18 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &frontier, Mode mode,
         frontier.push_back(&*std::next(lastUser->getIterator()));
         continue;
       }
-      // In case the last user is a TermInst we add all successor blocks to the
-      // frontier (see below).
-      assert(deadInSucc && "The final using TermInst must have successors");
+      // In case the last user is a TermInst there is no further instruction in
+      // the block which can be the frontier. Instead we add all successor
+      // blocks to the frontier (see below).
+      // If the TermInst exits the function (e.g. 'return' or 'throw'), there
+      // are no successors and we have to bail.
+      if (!deadInSucc) {
+        assert(cast<TermInst>(lastUser)->isFunctionExiting() &&
+               "The final using TermInst must have successors");
+        assert(mode != AllowToModifyCFG &&
+               "Cannot bail if the mode is AllowToModifyCFG");
+        return false;
+      }
     }
     if (deadInSucc) {
       if (mode == UsersMustPostDomDef)
@@ -190,7 +199,8 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &frontier, Mode mode,
 
     for (unsigned i = 0, e = succBlocks.size(); i != e; ++i) {
       if (unhandledFrontierBlocks.count(succBlocks[i])) {
-        assert(isCriticalEdge(term, i) && "actually not a critical edge?");
+        assert((isCriticalEdge(term, i) || userSet.count(term)) &&
+               "actually not a critical edge?");
         noCriticalEdges = false;
         if (mode != AllowToModifyCFG) {
           // If the CFG need not be modified, just record the critical edge and
@@ -280,4 +290,20 @@ void ValueLifetimeAnalysis::dump() const {
     llvm::errs() << ' ' << bb->getDebugID();
   }
   llvm::errs() << '\n';
+}
+
+void swift::endLifetimeAtFrontier(
+    SILValue valueOrStackLoc, const ValueLifetimeAnalysis::Frontier &frontier,
+    SILBuilderContext &builderCtxt) {
+  for (SILInstruction *endPoint : frontier) {
+    SILBuilderWithScope builder(endPoint, builderCtxt);
+    SILLocation loc = RegularLocation(endPoint->getLoc().getSourceLoc());
+    if (valueOrStackLoc->getType().isObject()) {
+      builder.emitDestroyValueOperation(loc, valueOrStackLoc);
+    } else {
+      assert(isa<AllocStackInst>(valueOrStackLoc));
+      builder.createDestroyAddr(loc, valueOrStackLoc);
+      builder.createDeallocStack(loc, valueOrStackLoc);
+    }
+  }
 }

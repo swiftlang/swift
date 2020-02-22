@@ -210,6 +210,10 @@ public:
   /// Enable use of the swiftcall calling convention.
   unsigned UseSwiftCall : 1;
 
+  /// Enable the use of type layouts for value witness functions and use
+  /// vw functions instead of outlined copy/destroy functions.
+  unsigned UseTypeLayoutValueHandling : 1;
+
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
 
@@ -262,8 +266,8 @@ public:
         EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
         LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
-        PrespecializeGenericMetadata(true), UseIncrementalLLVMCodeGen(true),
-        UseSwiftCall(false), GenerateProfile(false),
+        PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
+        UseSwiftCall(false), UseTypeLayoutValueHandling(false), GenerateProfile(false),
         EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),

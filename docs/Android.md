@@ -1,11 +1,11 @@
 # Getting Started with Swift on Android
 
-The Swift stdlib can be compiled for Android armv7 targets, which makes it
-possible to execute Swift code on a mobile device running Android. This guide
-explains:
+The Swift stdlib can be compiled for Android armv7 and aarch64 targets, which
+makes it possible to execute Swift code on a mobile device running Android.
+This guide explains:
 
 1. How to run a simple "Hello, world" program on your Android device.
-2. How to run the Swift test suite, targeting Android, and on an Android device.
+2. How to run the Swift test suite on an Android device.
 
 If you encounter any problems following the instructions below, please file a
 bug using https://bugs.swift.org/.
@@ -30,13 +30,12 @@ Swift-to-Java bridging.
 To follow along with this guide, you'll need:
 
 1. A Linux environment capable of building Swift from source, specifically
-   Ubuntu 16.04 or Ubuntu 15.10 (Ubuntu 14.04 has not been tested recently).
-   The stdlib is currently only buildable for Android from a Linux environment.
-   Before attempting to build for Android, please make sure you are able to build
-   for Linux by following the instructions in the Swift project README.
-2. The latest version of the Android NDK (r16 at the time of this writing),
+   Ubuntu 18.04 or Ubuntu 16.04. Before attempting to build for Android,
+   please make sure you are able to build for Linux by following the
+   instructions in the Swift project README.
+2. The latest version of the Android NDK (r21 at the time of this writing),
    available to download here:
-   http://developer.android.com/ndk/downloads/index.html.
+   https://developer.android.com/ndk/downloads/index.html.
 3. An Android device with remote debugging enabled. We require remote
    debugging in order to deploy built stdlib products to the device. You may
    turn on remote debugging by following the official instructions:
@@ -74,16 +73,18 @@ Android NDK, as well as the directories that contain the `libicuucswift.so` and
 
 ```
 $ ARM_DIR=path/to/libicu-libiconv-android
-$ NDK_PATH=path/to/android-ndk16
+$ NDK_PATH=path/to/android-ndk21
 $ utils/build-script \
     -R \                                       # Build in ReleaseAssert mode.
     --android \                                # Build for Android.
-    --android-ndk $NDK_PATH \   # Path to an Android NDK.
+    --android-ndk $NDK_PATH \                  # Path to an Android NDK.
+    --android-arch armv7 \                     # Optionally specify Android architecture, alternately aarch64
     --android-api-level 21 \                   # The Android API level to target. Swift only supports 21 or greater.
     --android-icu-uc ${ARM_DIR}/libicuucswift.so \
     --android-icu-uc-include ${ARM_DIR}/icu/source/common \
     --android-icu-i18n ${ARM_DIR}/libicui18nswift.so \
-    --android-icu-i18n-include ${ARM_DIR}/icu/source/i18n
+    --android-icu-i18n-include ${ARM_DIR}/icu/source/i18n \
+    --android-icu-data ${ARM_DIR}/libicudataswift.so
 ```
 
 ### 3. Compiling `hello.swift` to run on an Android device
@@ -94,27 +95,18 @@ Create a simple Swift file named `hello.swift`:
 print("Hello, Android")
 ```
 
-To compile it, we need to make sure the correct linker is used. Symlink the
-gold linker in the Android NDK into your `PATH`:
-
-```
-$ sudo ln -s \
-    /path/to/android-ndk-r16/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/arm-linux-androideabi/bin/ld.gold \
-    /usr/bin/armv7-none-linux-androideabi-ld.gold
-```
-
 Then use the built Swift compiler from the previous step to compile a Swift
 source file, targeting Android:
 
 ```
-$ NDK_PATH="path/to/android-ndk16"
-$ build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swiftc \                      # The Swift compiler built in the previous step.
-                                                                                 # The location of the tools used to build Android binaries
-    -tools-directory ${NDK_PATH}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/arm-linux-androideabi/bin
-    -target armv7-none-linux-androideabi \                                       # Targeting android-armv7.
-    -sdk ${NDK_PATH}/platforms/android-21/arch-arm \                               # Use the same NDK path and API version as you used to build the stdlib in the previous step.
-    -L ${NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a \                  # Link the Android NDK's libc++ and libgcc.
-    -L ${NDK_PATH}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/4.9.x \
+$ NDK_PATH="path/to/android-ndk21"
+$ build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swiftc \     # The Swift compiler built in the previous step.
+                                                                # The location of the tools used to build Android binaries
+    -tools-directory ${NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/bin/ \
+    -target armv7a-none-linux-androideabi \                     # Targeting android-armv7.
+    -sdk ${NDK_PATH}/platforms/android-21/arch-arm \            # Use the same architecture and API version as you used to build the stdlib in the previous step.
+    -Xclang-linker -nostdlib++ \                                # Don't link libc++, and supply the path to libgcc.
+    -L ${NDK_PATH}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/4.9.x/armv7-a \
     hello.swift
 ```
 
@@ -149,7 +141,6 @@ $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswi
 $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftGlibc.so /data/local/tmp
 $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftSwiftOnoneSupport.so /data/local/tmp
 $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftRemoteMirror.so /data/local/tmp
-$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftSwiftExperimental.so /data/local/tmp
 ```
 
 You will also need to push the icu libraries:
@@ -163,7 +154,7 @@ adb push /path/to/libicu-android/armeabi-v7a/libicuucswift.so /data/local/tmp
 In addition, you'll also need to copy the Android NDK's libc++:
 
 ```
-$ adb push /path/to/android-ndk-r14/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so /data/local/tmp
+$ adb push /path/to/android-ndk-r21/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so /data/local/tmp
 ```
 
 Finally, you'll need to copy the `hello` executable you built in the
@@ -192,7 +183,7 @@ Congratulations! You've just run your first Swift program on Android.
 ## Running the Swift test suite hosted on an Android device
 
 When running the test suite, build products are automatically pushed to your
-device. As in part one, you'll need to connect your Android device via USB:
+device. As in part four, you'll need to connect your Android device via USB:
 
 1. Connect your Android device to your computer via USB. Ensure that remote
    debugging is enabled for that device by following the official instructions:
@@ -204,28 +195,14 @@ device. As in part one, you'll need to connect your Android device via USB:
 ```
 $ utils/build-script \
   -R \                                           # Build in ReleaseAssert mode.
-  -T \                                           # Run all tests.
+  -T --host-test \                               # Run all tests, including on the Android host.
   --android \                                    # Build for Android.
-  --android-ndk ~/android-ndk-r13 \              # Path to an Android NDK.
+  --android-ndk ~/android-ndk-r21 \              # Path to an Android NDK.
+  --android-arch armv7 \                         # Optionally specify Android architecture, alternately aarch64
   --android-ndk-version 21 \
   --android-icu-uc ~/libicu-android/armeabi-v7a/libicuuc.so \
   --android-icu-uc-include ~/libicu-android/armeabi-v7a/icu/source/common \
   --android-icu-i18n ~/libicu-android/armeabi-v7a/libicui18n.so \
-  --android-icu-i18n-include ~/libicu-android/armeabi-v7a/icu/source/i18n/
-```
-
-## Build Android Toolchain
-
-This toolchain will generate the .so and .swiftmodule files of the Swift standard library and Foundation framework for the Android environment, armv7 architecture. Those files are needed when building any Swift library to be included in an application for Android.
-
-To build the toolchain run:
-
-```
-$ utils/android/build-toolchain
-```
-
-It will be built on:
-
-```
-path/to/swift-source/swift-android-toolchain
+  --android-icu-i18n-include ~/libicu-android/armeabi-v7a/icu/source/i18n/ \
+  --android-icu-data ~/libicu-android/armeabi-v7a/libicudata.so
 ```

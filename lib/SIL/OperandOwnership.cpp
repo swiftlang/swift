@@ -116,6 +116,7 @@ SHOULD_NEVER_VISIT_INST(AllocBox)
 SHOULD_NEVER_VISIT_INST(AllocExistentialBox)
 SHOULD_NEVER_VISIT_INST(AllocGlobal)
 SHOULD_NEVER_VISIT_INST(AllocStack)
+SHOULD_NEVER_VISIT_INST(DifferentiabilityWitnessFunction)
 SHOULD_NEVER_VISIT_INST(FloatLiteral)
 SHOULD_NEVER_VISIT_INST(FunctionRef)
 SHOULD_NEVER_VISIT_INST(DynamicFunctionRef)
@@ -414,8 +415,19 @@ OperandOwnershipKindClassifier::checkTerminatorArgumentMatchesDestBB(
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitBranchInst(BranchInst *bi) {
-  return checkTerminatorArgumentMatchesDestBB(bi->getDestBB(),
-                                              getOperandIndex());
+  ValueOwnershipKind destBlockArgOwnershipKind =
+      bi->getDestBB()->getArgument(getOperandIndex())->getOwnershipKind();
+
+  // If we have a guaranteed parameter, treat this as consuming.
+  if (destBlockArgOwnershipKind == ValueOwnershipKind::Guaranteed) {
+    return Map::compatibilityMap(destBlockArgOwnershipKind,
+                                 UseLifetimeConstraint::MustBeInvalidated);
+  }
+
+  // Otherwise, defer to defaults.
+  auto lifetimeConstraint =
+      destBlockArgOwnershipKind.getForwardingLifetimeConstraint();
+  return Map::compatibilityMap(destBlockArgOwnershipKind, lifetimeConstraint);
 }
 
 OperandOwnershipKindMap

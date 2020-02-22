@@ -83,7 +83,8 @@ func testDiags() {
   // Declarations
   tuplify(true) { _ in
     17
-    let x = 17 // expected-error{{closure containing a declaration cannot be used with function builder 'TupleBuilder'}}
+    let x = 17
+    let y: Int // expected-error{{closure containing a declaration cannot be used with function builder 'TupleBuilder'}}
     x + 25
   }
 
@@ -324,6 +325,20 @@ func checkImplicitSelfInClosure() {
         identifier // expected-error {{reference to property 'identifier' in closure requires explicit use of 'self' to make capture semantics explicit}}
         // expected-note@-1 {{reference 'self.' explicitly}}
       }
+    }
+  }
+}
+
+// rdar://problem/59239224 - crash because some nodes don't have type
+// information during solution application.
+struct X<T> {
+  init(_: T) { }
+}
+
+@TupleBuilder func foo(cond: Bool) -> some Any {
+  if cond {
+    tuplify(cond) { x in
+      X(x)
     }
   }
 }

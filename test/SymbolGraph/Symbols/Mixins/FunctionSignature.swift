@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name FunctionSignature -emit-module -emit-module-path %t/
-// RUN: %target-swift-symbolgraph-extract -module-name FunctionSignature -I %t -pretty-print -o %t/FunctionSignature.symbols.json
+// RUN: %target-swift-symbolgraph-extract -module-name FunctionSignature -I %t -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/FunctionSignature.symbols.json
 
 public func foo(_ noext: Int, ext int: Int) -> String {

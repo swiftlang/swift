@@ -1,4 +1,4 @@
-// RUN: %swiftc_driver %s -g -debug-info-format=codeview -Xllvm -enable-trap-debug-info -emit-ir -o - | %FileCheck %s
+// RUN: %swiftc_driver %s -g -debug-info-format=codeview -emit-ir -o - | %FileCheck %s
 // REQUIRES: optimized_stdlib
 
 func markUsed<T>(_ t: T) {}

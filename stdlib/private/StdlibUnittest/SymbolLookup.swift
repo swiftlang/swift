@@ -12,7 +12,7 @@
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
@@ -35,6 +35,8 @@
   #endif
 #elseif os(Windows)
   let hStdlibCore: HMODULE = GetModuleHandleA("swiftCore.dll")!
+#elseif os(WASI)
+// WASI doesn't support dynamic linking yet.
 #else
   #error("Unsupported platform")
 #endif
@@ -43,6 +45,8 @@ public func pointerToSwiftCoreSymbol(name: String) -> UnsafeMutableRawPointer? {
 #if os(Windows)
   return unsafeBitCast(GetProcAddress(hStdlibCore, name),
                        to: UnsafeMutableRawPointer?.self)
+#elseif os(WASI)
+  fatalError("\(#function) is not supported on WebAssembly/WASI")
 #else
   return dlsym(RTLD_DEFAULT, name)
 #endif

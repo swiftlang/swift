@@ -53,6 +53,12 @@ public:
   static bool isFirstElementTrivial() {
     return true;
   }
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+  }
+
   void emitRetainFirstElement(IRGenFunction &IGF, llvm::Value *fn,
                               Optional<Atomicity> atomicity = None) const {}
   void emitReleaseFirstElement(IRGenFunction &IGF, llvm::Value *fn,

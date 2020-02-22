@@ -8,6 +8,19 @@ sil_stage canonical
 
 import Builtin
 
+//////////////////
+// Declarations //
+//////////////////
+
+struct NativeObjectPair {
+  var obj1 : Builtin.NativeObject
+  var obj2 : Builtin.NativeObject
+}
+
+///////////
+// Tests //
+///////////
+
 // CHECK-LABEL: Function: 'no_end_borrow_error'
 // CHECK: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
 // CHECK: Value: %2 = argument of bb1 : $Builtin.NativeObject
@@ -22,6 +35,11 @@ bb1(%1 : @guaranteed $Builtin.NativeObject):
   return %9999 : $()
 }
 
+// CHECK-LABEL: Function: 'leak_along_path'
+// CHECK-NEXT: Guaranteed function parameter with life ending uses!
+// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT: Lifetime Ending User:   br bb1(%0 : $Builtin.NativeObject)
+//
 // CHECK-LABEL: Function: 'leak_along_path'
 // CHECK-NEXT: Error! Found a leak due to a consuming post-dominance failure!
 // CHECK-NEXT:     Value: %2 = argument of bb1 : $Builtin.NativeObject
@@ -43,14 +61,47 @@ bb3:
   return %9999 : $()
 }
 
-// Make sure that we only flag the subargument leak and not the parent argument.
+// CHECK-NOT: Guaranteed function parameter with life ending uses!
+// CHECK-LABEL: Function: 'leak_along_path_2'
+// CHECK-NEXT: Error! Found a leak due to a consuming post-dominance failure!
+// CHECK-NEXT:     Value: %3 = argument of bb1 : $Builtin.NativeObject
+// CHECK-NEXT:     Post Dominating Failure Blocks:
+// CHECK-NEXT:         bb3
+sil [ossa] @leak_along_path_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  br bb1(%1 : $Builtin.NativeObject)
+
+bb1(%2 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb2, bb3
+
+bb2:
+  end_borrow %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we only flag the subargument leak and not the parent
+// argument. Also check for over consuming due to phi nodes.
+//
+// CHECK-LABEL: Function: 'leak_along_subarg_path'
+// CHECK-NEXT: Guaranteed function parameter with life ending uses!
+// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT: Lifetime Ending User:   br bb1(%0 : $Builtin.NativeObject)
+//
+// CHECK-LABEL: Function: 'leak_along_subarg_path'
+// CHECK-NEXT: Found over consume?!
+// CHECK-NEXT: Value: %2 = argument of bb1 : $Builtin.NativeObject
+// CHECK-NEXT: Block: bb2
 //
 // CHECK-LABEL: Function: 'leak_along_subarg_path'
 // CHECK-NEXT: Error! Found a leak due to a consuming post-dominance failure!
 // CHECK-NEXT:     Value: %5 = argument of bb3 : $Builtin.NativeObject
 // CHECK-NEXT:     Post Dominating Failure Blocks:
 // CHECK-NEXT:         bb5
-
 sil [ossa] @leak_along_subarg_path : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%0 : $Builtin.NativeObject)
@@ -74,14 +125,72 @@ bb5:
   return %9999 : $()
 }
 
-// CHECK-NOT: Function: 'good_order'
-sil [ossa] @good_order : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: Function: 'leak_along_subarg_path_2'
+// CHECK-NEXT: Error! Found a leak due to a consuming post-dominance failure!
+// CHECK-NEXT: Value: %7 = argument of bb3 : $Builtin.NativeObject      // user: %9
+// CHECK-NEXT:     Post Dominating Failure Blocks:
+// CHECK-NEXT:         bb5
+// CHECK-NOT: Function: 'leak_along_subarg_path_2'
+sil [ossa] @leak_along_subarg_path_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  br bb1(%1 : $Builtin.NativeObject)
+
+bb1(%2 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb2, bb5
+
+bb2:
+  %2a = begin_borrow %2 : $Builtin.NativeObject
+  br bb3(%2a : $Builtin.NativeObject)
+
+bb3(%3 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb4, bb5
+
+bb4:
+  end_borrow %3 : $Builtin.NativeObject
+  br bb5
+
+bb5:
+  end_borrow %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-NOT: Function: 'good_order_1'
+sil [ossa] @good_order_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   cond_br undef, bb1, bb5
 
 bb1:
   br bb2(%1 : $Builtin.NativeObject)
+
+bb2(%2 : @guaranteed $Builtin.NativeObject):
+  end_borrow %2 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb4
+
+bb4:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+
+bb5:
+  end_borrow %1 : $Builtin.NativeObject
+  br bb4
+}
+
+// CHECK-NOT: Function: 'good_order_2'
+sil [ossa] @good_order_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb5
+
+bb1:
+  %1a = begin_borrow %1 : $Builtin.NativeObject
+  br bb2(%1a : $Builtin.NativeObject)
 
 bb2(%2 : @guaranteed $Builtin.NativeObject):
   end_borrow %2 : $Builtin.NativeObject
@@ -101,19 +210,21 @@ bb5:
   br bb4
 }
 
+
 // Make sure that we only flag the end_borrow "use after free" in bb2.
 //
 // CHECK-LABEL: Function: 'bad_order'
 // CHECK-NEXT: Found use after free?!
 // CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject
-// CHECK-NEXT: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject           // id: %6
+// CHECK-NEXT: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
+//
 // CHECK-LABEL: Function: 'bad_order'
 // CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
 // CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK-NEXT:     Remaining Users:
-// CHECK-NEXT: User:  end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: User:  end_borrow %5 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
 // CHECK-NOT: Block: bb1
 sil [ossa] @bad_order : $@convention(thin) (@owned Builtin.NativeObject) -> () {
@@ -122,7 +233,8 @@ bb0(%0 : @owned $Builtin.NativeObject):
   cond_br undef, bb1, bb5
 
 bb1:
-  br bb2(%1 : $Builtin.NativeObject)
+  %1a = begin_borrow %1 : $Builtin.NativeObject
+  br bb2(%1a : $Builtin.NativeObject)
 
 bb2(%2 : @guaranteed $Builtin.NativeObject):
   end_borrow %1 : $Builtin.NativeObject
@@ -146,7 +258,7 @@ bb5:
 // CHECK-NEXT: Found use after free?!
 // CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject
-// CHECK-NEXT: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
 //
 // CHECK-LABEL: Function: 'bad_order_add_a_level'
@@ -168,13 +280,13 @@ bb5:
 // CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
 // CHECK-NEXT: Value: %1 = begin_borrow
 // CHECK-NEXT: Remaining Users:
-// CHECK-NEXT: User: end_borrow %4
+// CHECK-NEXT: User: end_borrow %5
 // CHECK-NEXT: Block: bb2
 //
 // CHECK-LABEL: Function: 'bad_order_add_a_level'
 // CHECK-NEXT: Found over consume?!
-// CHECK-NEXT: Value: %4 = argument of bb2 : $Builtin.NativeObject
-// CHECK-NEXT: User:   end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Value: %5 = argument of bb2 : $Builtin.NativeObject
+// CHECK-NEXT: User:   end_borrow %5 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
 //
 // CHECK-LABEL: Function: 'bad_order_add_a_level'
@@ -185,7 +297,7 @@ bb5:
 //
 // CHECK-LABEL: Function: 'bad_order_add_a_level'
 // CHECK-NEXT: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
-// CHECK-NEXT: Value: %9 = argument of bb4 : $Builtin.NativeObject
+// CHECK-NEXT: Value: %11 = argument of bb4 : $Builtin.NativeObject
 
 // NOTE: We use the expected numbered value in the output to make it easier to
 // match the filecheck patterns with the input.
@@ -195,7 +307,8 @@ bb0(%0 : @owned $Builtin.NativeObject):
   cond_br undef, bb1, bb7
 
 bb1:
-  br bb2(%1 : $Builtin.NativeObject)
+  %2 = begin_borrow %1 : $Builtin.NativeObject
+  br bb2(%2 : $Builtin.NativeObject)
 
 bb2(%4 : @guaranteed $Builtin.NativeObject):
   end_borrow %1 : $Builtin.NativeObject
@@ -203,7 +316,8 @@ bb2(%4 : @guaranteed $Builtin.NativeObject):
   cond_br undef, bb3, bb5
 
 bb3:
-  br bb4(%4 : $Builtin.NativeObject)
+  %4a = begin_borrow %4 : $Builtin.NativeObject
+  br bb4(%4a : $Builtin.NativeObject)
 
 bb4(%9 : @guaranteed $Builtin.NativeObject):
   br bb6
@@ -234,21 +348,21 @@ bb7:
 // CHECK-NEXT: Found use after free?!
 // CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject
-// CHECK-NEXT: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
 //
 // CHECK-LABEL: Function: 'bad_order_add_a_level_2'
 // CHECK-NEXT: Found use after free?!
 // CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject
-// CHECK-NEXT: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb4
 //
 // CHECK-LABEL: Function: 'bad_order_add_a_level_2'
 // CHECK-NEXT: Found use after free?!
 // CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject
-// CHECK-NEXT: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb5
 //
 // CHECK-LABEL: Function: 'bad_order_add_a_level_2'
@@ -272,15 +386,15 @@ bb7:
 //
 // CHECK-LABEL: Function: 'bad_order_add_a_level_2'
 // CHECK-NEXT: Found use after free?!
-// CHECK-NEXT: Value: %4 = argument of bb2 : $Builtin.NativeObject
-// CHECK-NEXT: Consuming User:   end_borrow %4 : $Builtin.NativeObject
-// CHECK-NEXT: Non Consuming User:   end_borrow %9 : $Builtin.NativeObject
+// CHECK-NEXT: Value: %5 = argument of bb2 : $Builtin.NativeObject
+// CHECK-NEXT: Consuming User:   end_borrow %5 : $Builtin.NativeObject
+// CHECK-NEXT: Non Consuming User:   end_borrow %11 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb4
 
 // CHECK-LABEL: Function: 'bad_order_add_a_level_2'
 // CHECK-NEXT: Found over consume?!
-// CHECK-NEXT: Value: %4 = argument of bb2 : $Builtin.NativeObject
-// CHECK-NEXT: User:   end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Value: %5 = argument of bb2 : $Builtin.NativeObject
+// CHECK-NEXT: User:   end_borrow %5 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
 sil [ossa] @bad_order_add_a_level_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
@@ -288,7 +402,8 @@ bb0(%0 : @owned $Builtin.NativeObject):
   cond_br undef, bb1, bb7
 
 bb1:
-  br bb2(%1 : $Builtin.NativeObject)
+  %1a = begin_borrow %1 : $Builtin.NativeObject
+  br bb2(%1a : $Builtin.NativeObject)
 
 bb2(%4 : @guaranteed $Builtin.NativeObject):
   end_borrow %1 : $Builtin.NativeObject
@@ -296,7 +411,8 @@ bb2(%4 : @guaranteed $Builtin.NativeObject):
   cond_br undef, bb3, bb5
 
 bb3:
-  br bb4(%4 : $Builtin.NativeObject)
+  %4a = begin_borrow %4 : $Builtin.NativeObject
+  br bb4(%4a : $Builtin.NativeObject)
 
 bb4(%9 : @guaranteed $Builtin.NativeObject):
   end_borrow %1 : $Builtin.NativeObject
@@ -322,7 +438,7 @@ bb7:
 // CHECK-LABEL: Function: 'owned_argument_overuse_br1'
 // CHECK-NEXT: Found over consume?!
 // CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: User:   br bb1(%0 : $Builtin.NativeObject)
+// CHECK-NEXT: User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb0
 
 // CHECK-LABEL: Function: 'owned_argument_overuse_br1'
@@ -343,7 +459,7 @@ bb1(%1 : @owned $Builtin.NativeObject):
 // CHECK-LABEL: Function: 'owned_argument_overuse_br2'
 // CHECK-NEXT: Found over consume?!
 // CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: User:   br bb1(%0 : $Builtin.NativeObject)
+// CHECK-NEXT: User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb0
 // CHECK-NOT: Block
 // CHECK-NOT: Function: 'owned_argument_overuse_br2'
@@ -402,6 +518,336 @@ bb1(%1 : @owned $Builtin.NativeObject):
   br bb2
 
 bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+/////////////////////////////////////////
+// Movable Guaranteed Scope Test Cases //
+/////////////////////////////////////////
+
+// Make sure that we error due to the struct_extract. We require end_borrows to
+// be on the original borrowed value.
+//
+// CHECK-LABEL: Function: simple_non_postdominating_diamond_with_forwarding_uses
+// CHECK-NEXT: Invalid End Borrow!
+// CHECK-NEXT: Original Value:   %5 = begin_borrow %1 : $NativeObjectPair        // user: %6
+// CHECK-NEXT: End Borrow:   br bb3(%6 : $Builtin.NativeObject)              // id: %7
+sil [ossa] @simple_non_postdominating_diamond_with_forwarding_uses : $@convention(thin) (@in_guaranteed Builtin.NativeObject, @guaranteed NativeObjectPair) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $NativeObjectPair):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = load_borrow %0 : $*Builtin.NativeObject
+  br bb3(%3 : $Builtin.NativeObject)
+
+bb2:
+  // Should error b/c %5 isn't balanced directly.
+  %5 = begin_borrow %1 : $NativeObjectPair
+  %6 = struct_extract %5 : $NativeObjectPair, #NativeObjectPair.obj1
+  br bb3(%6 : $Builtin.NativeObject)
+
+bb3(%7 : @guaranteed $Builtin.NativeObject):
+  end_borrow %7 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We error due to the cycle in the def-use graph that describes %1's borrow
+// scope.
+//
+// TODO: If we ever add simple support for this, we should make sure that we
+// error on %0.
+//
+// CHECK-LABEL: Function: simple_loop_carry_borrow_owned_arg
+// CHECK-NEXT: Implicit Regular User Guaranteed Phi Cycle!
+// CHECK-NEXT: User:   br bb1(%3 : $Builtin.NativeObject)              // id: %6
+// CHECK-NEXT: Initial: BorrowScopeOperand:
+// CHECK-NEXT: Kind: BeginBorrow
+// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject      // users: %7, %1
+// CHECK-NEXT: User:   %1 = begin_borrow %0 : $Builtin.NativeObject    // user: %2
+sil [ossa] @simple_loop_carry_borrow_owned_arg : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  br bb1(%1 : $Builtin.NativeObject)
+
+bb1(%2 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb2a
+
+bb2a:
+  br bb1(%2 : $Builtin.NativeObject)
+
+bb3:
+  // Should error b/c destroy_value before end_borrow.
+  destroy_value %0 : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This test makes sure that due to the lifetime of %3 ending in bb2a, we get an
+// error since %3a is live over the loop-carry.
+//
+// TODO: Could we ever figure out a way to support this? Maybe via a special
+// terminator? This works for load_borrow, but not for copy_value +
+// begin_borrow.
+//
+// CHECK-LABEL: Function: 'simple_loop_carry_implicitregularusers_do_not_loop_carry'
+// CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
+// CHECK-NEXT: Value:   %8 = copy_value %4 : $Builtin.NativeObject      // users: %12, %9
+// CHECK-NEXT:     Remaining Users:
+// CHECK-NEXT: User:   %9 = begin_borrow %8 : $Builtin.NativeObject    // user: %12
+// CHECK-NEXT: User:   end_borrow %4 : $Builtin.NativeObject           // id: %13
+// CHECK-NEXT: User:   end_borrow %4 : $Builtin.NativeObject           // id: %10
+sil [ossa] @simple_loop_carry_implicitregularusers_do_not_loop_carry : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1a = begin_borrow %0 : $Builtin.NativeObject
+  %1b = copy_value %0 : $Builtin.NativeObject
+  br bb1(%1a : $Builtin.NativeObject, %1b : $Builtin.NativeObject)
+
+bb1(%2a : @guaranteed $Builtin.NativeObject, %2b : @owned $Builtin.NativeObject):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb2a
+
+bb2a:
+  %3 = copy_value %2a : $Builtin.NativeObject
+  %3a = begin_borrow %3 : $Builtin.NativeObject
+  end_borrow %2a : $Builtin.NativeObject
+  destroy_value %2b : $Builtin.NativeObject
+  br bb1(%3a : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
+
+bb3:
+  end_borrow %2a : $Builtin.NativeObject
+  destroy_value %2b : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We should identify bb0a as consuming the value twice.
+//
+// CHECK-LABEL: Function: 'simple_loop_carry_over_consume'
+// CHECK-NEXT: Found over consume?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %3, %3
+// CHECK-NEXT: User:   br bb2(%1 : $Builtin.NativeObject, %1 : $Builtin.NativeObject) // id: %3
+// CHECK-NEXT: Block: bb1
+// CHECK-NEXT: Consuming Users:
+// CHECK-NEXT:   br bb2(%1 : $Builtin.NativeObject, %1 : $Builtin.NativeObject) // id: %3
+// CHECK-NEXT:   br bb2(%1 : $Builtin.NativeObject, %1 : $Builtin.NativeObject) // id: %3
+sil [ossa] @simple_loop_carry_over_consume : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  br bb0a
+
+bb0a:
+  br bb1(%1 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
+
+bb1(%2 : @guaranteed $Builtin.NativeObject, %2a : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb2a
+
+bb2a:
+  %3 = begin_borrow %2a : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  br bb1(%2a : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
+
+bb3:
+  end_borrow %2a : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Function: simple_loop_carry_cycle
+// CHECK-NEXT: Implicit Regular User Guaranteed Phi Cycle!
+// CHECK-NEXT: User:   br bb1(%3 : $Builtin.NativeObject)              // id: %6
+// CHECK-NEXT: Initial: BorrowScopeOperand:
+// CHECK-NEXT: Kind: BeginBorrow
+// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject      // user: %1
+// CHECK-NEXT: User:   %1 = begin_borrow %0 : $Builtin.NativeObject    // user: %2
+sil [ossa] @simple_loop_carry_cycle : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  br bb1(%1 : $Builtin.NativeObject)
+
+bb1(%2 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb2a
+
+bb2a:
+  br bb1(%2 : $Builtin.NativeObject)
+
+bb3:
+  end_borrow %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This first test fails since the %2a is considered dead at bb2a's
+// terminator. So the end_borrow of %2a in bb3 is considered a liveness use of
+// %2 due to it consuming %3 via the loop carry.
+//
+// CHECK-LABEL: Function: 'simple_loop_carry_borrows_do_not_loop_carry'
+// CHECK-NEXT: Found use after free?!
+// CHECK-NEXT: Value: %5 = argument of bb1 : $Builtin.NativeObject      // users: %11, %10, %8
+// CHECK-NEXT: Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %11
+// CHECK-NEXT: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject           // id: %12
+// CHECK-NEXT: Block: bb4
+//
+// CHECK-LABEL: Function: 'simple_loop_carry_borrows_do_not_loop_carry'
+// CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
+// CHECK-NEXT: Value: %5 = argument of bb1 : $Builtin.NativeObject      // users: %11, %10, %8
+// CHECK-NEXT:     Remaining Users:
+// CHECK-NEXT: User:  end_borrow %4 : $Builtin.NativeObject           // id: %12
+// CHECK-NEXT: Block: bb4
+sil [ossa] @simple_loop_carry_borrows_do_not_loop_carry : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %1a = begin_borrow %0 : $Builtin.NativeObject
+  br bb1(%1 : $Builtin.NativeObject, %1a : $Builtin.NativeObject)
+
+bb1(%2 : @guaranteed $Builtin.NativeObject, %2a : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb2a
+
+bb2a:
+  %3 = begin_borrow %2a : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  br bb1(%2a : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
+
+bb3:
+  end_borrow %2a : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We could potentially support this in the future if we wanted to have some
+// sort of support for phi node loops.
+//
+// CHECK-LABEL: Function: simple_validate_enclosing_borrow_around_loop
+// CHECK-NEXT: Implicit Regular User Guaranteed Phi Cycle!
+// CHECK-NEXT: User:   br bb1(%6 : $Builtin.NativeObject, %5 : $Builtin.NativeObject) // id: %9
+// CHECK-NEXT: Initial: BorrowScopeOperand:
+// CHECK-NEXT: Kind: BeginBorrow
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %12, %3, %2
+// CHECK-NEXT: User:   %2 = begin_borrow %1 : $Builtin.NativeObject    // user: %4
+//
+// CHECK-LABEL: Function: simple_validate_enclosing_borrow_around_loop
+// CHECK-NEXT: Implicit Regular User Guaranteed Phi Cycle!
+// CHECK-NEXT: User:   br bb1(%6 : $Builtin.NativeObject, %5 : $Builtin.NativeObject) // id: %9
+// CHECK-NEXT: Initial: BorrowScopeOperand:
+// CHECK-NEXT: Kind: BeginBorrow
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %12, %3, %2
+// CHECK-NEXT: User:   %3 = begin_borrow %1 : $Builtin.NativeObject    // user: %4
+sil [ossa] @simple_validate_enclosing_borrow_around_loop : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %2 = begin_borrow %1 : $Builtin.NativeObject
+  %3 = begin_borrow %1 : $Builtin.NativeObject
+  br bb1(%2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
+
+bb1(%4 : @guaranteed $Builtin.NativeObject, %5 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb2a
+
+bb2a:
+  br bb1(%5 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
+
+bb3:
+  end_borrow %4 : $Builtin.NativeObject
+  end_borrow %5 : $Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure we detect this phi cycle.
+// CHECK-LABEL: Function: simple_validate_enclosing_borrow_around_loop_2
+// CHECK-NEXT: Implicit Regular User Guaranteed Phi Cycle!
+// CHECK-NEXT: User:   br bb1(%5 : $Builtin.NativeObject, %4 : $Builtin.NativeObject) // id: %8
+// CHECK-NEXT: Initial: BorrowScopeOperand:
+// CHECK-NEXT: Kind: BeginBorrow
+// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject      // users: %2, %1
+// CHECK-NEXT: User:   %1 = begin_borrow %0 : $Builtin.NativeObject    // user: %3
+//
+// CHECK-LABEL: Function: simple_validate_enclosing_borrow_around_loop_2
+// CHECK-NEXT: Implicit Regular User Guaranteed Phi Cycle!
+// CHECK-NEXT: User:   br bb1(%5 : $Builtin.NativeObject, %4 : $Builtin.NativeObject) // id: %8
+// CHECK-NEXT: Initial: BorrowScopeOperand:
+// CHECK-NEXT: Kind: BeginBorrow
+// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject      // users: %2, %1
+// CHECK-NEXT: User:   %2 = begin_borrow %0 : $Builtin.NativeObject    // user: %3
+sil [ossa] @simple_validate_enclosing_borrow_around_loop_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %2 = begin_borrow %0 : $Builtin.NativeObject
+  %3 = begin_borrow %0 : $Builtin.NativeObject
+  br bb1(%2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
+
+bb1(%4 : @guaranteed $Builtin.NativeObject, %5 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb2a
+
+bb2a:
+  br bb1(%5 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
+
+bb3:
+  end_borrow %4 : $Builtin.NativeObject
+  end_borrow %5 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Same as before, but this time with an owned value as a base.
+//
+// CHECK-LABEL: Function: simple_validate_enclosing_borrow_around_loop_3
+// CHECK-NEXT: Implicit Regular User Guaranteed Phi Cycle!
+// CHECK-NEXT: User:   br bb1(%5 : $Builtin.NativeObject, %4 : $Builtin.NativeObject) // id: %8
+// CHECK-NEXT: Initial: BorrowScopeOperand:
+// CHECK-NEXT: Kind: BeginBorrow
+// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject      // users: %11, %2, %1
+// CHECK-NEXT: User:   %2 = begin_borrow %0 : $Builtin.NativeObject    // user: %3
+//
+// CHECK-LABEL: Function: simple_validate_enclosing_borrow_around_loop_3
+// CHECK-NEXT: Implicit Regular User Guaranteed Phi Cycle!
+// CHECK-NEXT: User:   br bb1(%5 : $Builtin.NativeObject, %4 : $Builtin.NativeObject) // id: %8
+// CHECK-NEXT: Initial: BorrowScopeOperand:
+// CHECK-NEXT: Kind: BeginBorrow
+// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject      // users: %11, %2, %1
+// CHECK-NEXT: User:   %1 = begin_borrow %0 : $Builtin.NativeObject    // user: %3
+sil [ossa] @simple_validate_enclosing_borrow_around_loop_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %2 = begin_borrow %0 : $Builtin.NativeObject
+  %3 = begin_borrow %0 : $Builtin.NativeObject
+  br bb1(%2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
+
+bb1(%4 : @guaranteed $Builtin.NativeObject, %5 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb2a
+
+bb2a:
+  br bb1(%5 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
+
+bb3:
+  end_borrow %4 : $Builtin.NativeObject
+  end_borrow %5 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }

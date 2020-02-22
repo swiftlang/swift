@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,10 +12,34 @@
 
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 
 using namespace swift;
+
+DifferentiabilityWitnessFunctionKind::DifferentiabilityWitnessFunctionKind(
+    StringRef string) {
+  Optional<innerty> result = llvm::StringSwitch<Optional<innerty>>(string)
+                                 .Case("jvp", JVP)
+                                 .Case("vjp", VJP)
+                                 .Case("transpose", Transpose);
+  assert(result && "Invalid string");
+  rawValue = *result;
+}
+
+Optional<AutoDiffDerivativeFunctionKind>
+DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
+  switch (rawValue) {
+  case JVP:
+    return {AutoDiffDerivativeFunctionKind::JVP};
+  case VJP:
+    return {AutoDiffDerivativeFunctionKind::VJP};
+  case Transpose:
+    return None;
+  }
+}
 
 void AutoDiffConfig::print(llvm::raw_ostream &s) const {
   s << "(parameters=";
@@ -49,13 +73,11 @@ static unsigned countNumFlattenedElementTypes(Type type) {
 }
 
 // TODO(TF-874): Simplify this helper and remove the `reverseCurryLevels` flag.
-// See TF-874 for WIP.
-void autodiff::getSubsetParameterTypes(IndexSubset *subset,
-                                       AnyFunctionType *type,
-                                       SmallVectorImpl<Type> &results,
-                                       bool reverseCurryLevels) {
+void AnyFunctionType::getSubsetParameters(
+    IndexSubset *parameterIndices,
+    SmallVectorImpl<AnyFunctionType::Param> &results, bool reverseCurryLevels) {
   SmallVector<AnyFunctionType *, 2> curryLevels;
-  unwrapCurryLevels(type, curryLevels);
+  unwrapCurryLevels(this, curryLevels);
 
   SmallVector<unsigned, 2> curryLevelParameterIndexOffsets(curryLevels.size());
   unsigned currentOffset = 0;
@@ -76,27 +98,71 @@ void autodiff::getSubsetParameterTypes(IndexSubset *subset,
     unsigned parameterIndexOffset =
         curryLevelParameterIndexOffsets[curryLevelIndex];
     for (unsigned paramIndex : range(curryLevel->getNumParams()))
-      if (subset->contains(parameterIndexOffset + paramIndex))
-        results.push_back(curryLevel->getParams()[paramIndex].getOldType());
+      if (parameterIndices->contains(parameterIndexOffset + paramIndex))
+        results.push_back(curryLevel->getParams()[paramIndex]);
+  }
+}
+
+void autodiff::getFunctionSemanticResultTypes(
+    AnyFunctionType *functionType,
+    SmallVectorImpl<AutoDiffSemanticFunctionResultType> &result,
+    GenericEnvironment *genericEnv) {
+  auto &ctx = functionType->getASTContext();
+
+  // Remap type in `genericEnv`, if specified.
+  auto remap = [&](Type type) {
+    if (!genericEnv)
+      return type;
+    return genericEnv->mapTypeIntoContext(type);
+  };
+
+  // Collect formal result type as a semantic result, unless it is
+  // `Void`.
+  auto formalResultType = functionType->getResult();
+  if (auto *resultFunctionType =
+          functionType->getResult()->getAs<AnyFunctionType>()) {
+    formalResultType = resultFunctionType->getResult();
+  }
+  if (!formalResultType->isEqual(ctx.TheEmptyTupleType))
+    result.push_back({remap(formalResultType), /*isInout*/ false});
+
+  // Collect `inout` parameters as semantic results.
+  for (auto param : functionType->getParams())
+    if (param.isInOut())
+      result.push_back({remap(param.getPlainType()), /*isInout*/ true});
+  if (auto *resultFunctionType =
+          functionType->getResult()->getAs<AnyFunctionType>()) {
+    for (auto param : resultFunctionType->getParams())
+      if (param.isInOut())
+        result.push_back({remap(param.getPlainType()), /*isInout*/ true});
   }
 }
 
 GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
     SILFunctionType *originalFnTy, IndexSubset *diffParamIndices,
-    GenericSignature derivativeGenSig) {
+    GenericSignature derivativeGenSig, LookupConformanceFn lookupConformance,
+    bool isTranspose) {
   if (!derivativeGenSig)
     derivativeGenSig = originalFnTy->getSubstGenericSignature();
   if (!derivativeGenSig)
     return nullptr;
-  // Constrain all differentiability parameters to `Differentiable`.
   auto &ctx = originalFnTy->getASTContext();
   auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
   SmallVector<Requirement, 4> requirements;
   for (unsigned paramIdx : diffParamIndices->getIndices()) {
+    // Require differentiability parameters to conform to `Differentiable`.
     auto paramType = originalFnTy->getParameters()[paramIdx].getInterfaceType();
     Requirement req(RequirementKind::Conformance, paramType,
                     diffableProto->getDeclaredType());
     requirements.push_back(req);
+    if (isTranspose) {
+      // Require linearity parameters to additionally satisfy
+      // `Self == Self.TangentVector`.
+      auto tanSpace = paramType->getAutoDiffTangentSpace(lookupConformance);
+      auto paramTanType = tanSpace->getCanonicalType();
+      Requirement req(RequirementKind::SameType, paramType, paramTanType);
+      requirements.push_back(req);
+    }
   }
   return evaluateOrDefault(
       ctx.evaluator,

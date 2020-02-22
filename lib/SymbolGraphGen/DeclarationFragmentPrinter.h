@@ -25,7 +25,7 @@ class TypeDecl;
 
 namespace symbolgraphgen {
 
-struct SymbolGraphASTWalker;
+struct SymbolGraph;
 
 /// Prints AST nodes as a stream of tagged fragments for syntax highlighting.
 ///
@@ -55,7 +55,7 @@ class DeclarationFragmentPrinter : public ASTPrinter {
     Text,
   };
 
-  SymbolGraphASTWalker &Walker;
+  SymbolGraph &Graph;
 
   /// The output stream to print fragment objects to.
   llvm::json::OStream &OS;
@@ -77,10 +77,10 @@ class DeclarationFragmentPrinter : public ASTPrinter {
   void closeFragment();
 
 public:
-  DeclarationFragmentPrinter(SymbolGraphASTWalker &Walker,
+  DeclarationFragmentPrinter(SymbolGraph &Graph,
                              llvm::json::OStream &OS,
                              Optional<StringRef> Key = None)
-    : Walker(Walker),
+    : Graph(Graph),
       OS(OS),
       Kind(FragmentKind::None) {
     if (Key) {

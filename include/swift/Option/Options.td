@@ -344,6 +344,9 @@ def emit_tbd_path : Separate<["-"], "emit-tbd-path">,
 def emit_tbd_path_EQ : Joined<["-"], "emit-tbd-path=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
   Alias<emit_tbd_path>;
+def embed_tbd_for_module : Separate<["-"], "embed-tbd-for-module">,
+  Flags<[FrontendOption]>,
+  HelpText<"Embed symbols from the module in the emitted tbd file">;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -418,6 +421,12 @@ def emit_module_interface_path :
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
+
+def emit_private_module_interface_path :
+  Separate<["-"], "emit-private-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
+         DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
 
 def avoid_emit_module_source_info :
   Flag<["-"], "avoid-emit-module-source-info">,

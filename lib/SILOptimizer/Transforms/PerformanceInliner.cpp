@@ -888,7 +888,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // remains valid.
   SmallVector<FullApplySite, 8> AppliesToInline;
   collectAppliesToInline(Caller, AppliesToInline);
-  bool needUpdateStackNesting = false;
+  bool invalidatedStackNesting = false;
 
   if (AppliesToInline.empty())
     return false;
@@ -918,7 +918,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
 
     // Note that this must happen before inlining as the apply instruction
     // will be deleted after inlining.
-    needUpdateStackNesting |= SILInliner::needsUpdateStackNesting(AI);
+    invalidatedStackNesting |= SILInliner::invalidatesStackNesting(AI);
 
     // We've already determined we should be able to inline this, so
     // unconditionally inline the function.
@@ -933,7 +933,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // reestablish a canonical CFG.
   mergeBasicBlocks(Caller);
 
-  if (needUpdateStackNesting) {
+  if (invalidatedStackNesting) {
     StackNesting().correctStackNesting(Caller);
   }
 

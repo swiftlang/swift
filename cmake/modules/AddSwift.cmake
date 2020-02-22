@@ -279,6 +279,10 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-D_DLL")
     # NOTE: We assume that we are using VS 2015 U2+
     list(APPEND result "-D_ENABLE_ATOMIC_ALIGNMENT_FIX")
+    # NOTE: We use over-aligned values for the RefCount side-table
+    # (see revision d913eefcc93f8c80d6d1a6de4ea898a2838d8b6f)
+    # This is required to build with VS2017 15.8+
+    list(APPEND result "-D_ENABLE_EXTENDED_ALIGNED_STORAGE=1")
 
     # msvcprt's std::function requires RTTI, but we do not want RTTI data.
     # Emulate /GR-.
@@ -347,6 +351,13 @@ function(_add_variant_c_compile_flags)
       list(APPEND result "SHELL:${CMAKE_INCLUDE_SYSTEM_FLAG_C}${path}")
     endforeach()
     list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
+  endif()
+
+  if("${CFLAGS_SDK}" STREQUAL "LINUX")
+    if(${CFLAGS_ARCH} STREQUAL x86_64)
+      # this is the minimum architecture that supports 16 byte CAS, which is necessary to avoid a dependency to libatomic
+      list(APPEND result "-march=core2")
+    endif()
   endif()
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
@@ -466,7 +477,7 @@ function(_add_variant_link_flags)
     RESULT_VAR_NAME result
     MACCATALYST_BUILD_FLAVOR  "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
-    list(APPEND link_libraries "pthread" "atomic" "dl")
+    list(APPEND link_libraries "pthread" "dl")
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
     list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
@@ -660,7 +671,337 @@ endfunction()
 # Add a single variant of a new Swift library.
 #
 # Usage:
-#   _add_swift_library_single(
+#   _add_swift_host_library_single(
+#     target
+#     [SHARED]
+#     [STATIC]
+#     [LLVM_LINK_COMPONENTS comp1 ...]
+#     source1 [source2 source3 ...])
+#
+# target
+#   Name of the library (e.g., swiftParse).
+#
+# SHARED
+#   Build a shared library.
+#
+# STATIC
+#   Build a static library.
+#
+# LLVM_LINK_COMPONENTS
+#   LLVM components this library depends on.
+#
+# source1 ...
+#   Sources to add into this library
+function(_add_swift_host_library_single target)
+  set(options
+        SHARED
+        STATIC)
+  set(single_parameter_options)
+  set(multiple_parameter_options
+        GYB_SOURCES
+        LLVM_LINK_COMPONENTS)
+
+  cmake_parse_arguments(ASHLS
+                        "${options}"
+                        "${single_parameter_options}"
+                        "${multiple_parameter_options}"
+                        ${ARGN})
+  set(ASHLS_SOURCES ${ASHLS_UNPARSED_ARGUMENTS})
+
+  translate_flags(ASHLS "${options}")
+
+  if(NOT ASHLS_SHARED AND NOT ASHLS_STATIC)
+    message(FATAL_ERROR "Either SHARED or STATIC must be specified")
+  endif()
+
+  # Determine the subdirectory where this library will be installed.
+  set(ASHLS_SUBDIR
+    "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
+
+  # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
+  set(embed_bitcode_arg)
+  if(SWIFT_EMBED_BITCODE_SECTION)
+    if(SWIFT_HOST_VARIANT_SDK MATCHES "(I|TV|WATCH)OS")
+      list(APPEND ASHLS_C_COMPILE_FLAGS "-fembed-bitcode")
+      set(embed_bitcode_arg EMBED_BITCODE)
+    endif()
+  endif()
+
+  if(XCODE)
+    string(REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
+    list(GET split_path -1 dir)
+    file(GLOB_RECURSE ASHLS_HEADERS
+      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.h
+      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.def
+      ${CMAKE_CURRENT_SOURCE_DIR}/*.def)
+
+    file(GLOB_RECURSE ASHLS_TDS
+      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.td)
+
+    set_source_files_properties(${ASHLS_HEADERS} ${ASHLS_TDS}
+      PROPERTIES
+      HEADER_FILE_ONLY true)
+    source_group("TableGen descriptions" FILES ${ASHLS_TDS})
+
+    set(ASHLS_SOURCES ${ASHLS_SOURCES} ${ASHLS_HEADERS} ${ASHLS_TDS})
+  endif()
+
+  if(ASHLS_SHARED)
+    set(libkind SHARED)
+  elseif(ASHLS_STATIC)
+    set(libkind STATIC)
+  endif()
+
+  if(ASHLS_GYB_SOURCES)
+    handle_gyb_sources(
+        gyb_dependency_targets
+        ASHLS_GYB_SOURCES
+        "${SWIFT_HOST_VARIANT_ARCH}")
+      set(ASHLS_SOURCES ${ASHLS_SOURCES} ${ASHLS_GYB_SOURCES})
+  endif()
+
+  add_library("${target}" ${libkind} ${ASHLS_SOURCES})
+  _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFT_HOST_VARIANT_SDK}")
+
+  if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+    swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH} SWIFTLIB_INCLUDE)
+    target_include_directories("${target}" SYSTEM PRIVATE ${SWIFTLIB_INCLUDE})
+    set_target_properties(${target}
+                          PROPERTIES
+                            CXX_STANDARD 14)
+  endif()
+
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    set_property(TARGET "${target}" PROPERTY NO_SONAME ON)
+  endif()
+
+  llvm_update_compile_flags(${target})
+
+  set_output_directory(${target}
+      BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
+      LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
+    set_target_properties("${target}"
+      PROPERTIES
+      INSTALL_NAME_DIR "@rpath")
+  elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+    set_target_properties("${target}"
+      PROPERTIES
+      INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
+  elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
+    set_target_properties("${target}"
+      PROPERTIES
+      INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
+  elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
+    # Only set the install RPATH if cross-compiling the host tools, in which
+    # case both the NDK and Sysroot paths must be set.
+    if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND
+       NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+      set_target_properties("${target}"
+        PROPERTIES
+        INSTALL_RPATH "$ORIGIN")
+    endif()
+  endif()
+
+  set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
+  set_target_properties("${target}" PROPERTIES FOLDER "Swift libraries")
+
+  # Handle linking and dependencies.
+  add_dependencies_multiple_targets(
+      TARGETS "${target}"
+      DEPENDS
+        ${gyb_dependency_targets}
+        ${LLVM_COMMON_DEPENDS})
+
+  # Call llvm_config() only for libraries that are part of the compiler.
+  swift_common_llvm_config("${target}" ${ASHLS_LLVM_LINK_COMPONENTS})
+
+  # Collect compile and link flags for the static and non-static targets.
+  # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly.
+  set(c_compile_flags ${ASHLS_C_COMPILE_FLAGS})
+  set(link_flags)
+
+  set(library_search_subdir "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+  set(library_search_directories
+    "${SWIFTLIB_DIR}/${ASHLS_SUBDIR}"
+    "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${ASHLS_SUBDIR}"
+    "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+
+  # In certain cases when building, the environment variable SDKROOT is set to override
+  # where the sdk root is located in the system. If that environment variable has been
+  # set by the user, respect it and add the specified SDKROOT directory to the
+  # library_search_directories so we are able to link against those libraries
+  if(DEFINED ENV{SDKROOT} AND EXISTS "$ENV{SDKROOT}/usr/lib/swift")
+      list(APPEND library_search_directories "$ENV{SDKROOT}/usr/lib/swift")
+  endif()
+
+  _add_variant_c_compile_flags(
+    SDK "${SWIFT_HOST_VARIANT_SDK}"
+    ARCH "${SWIFT_HOST_VARIANT_ARCH}"
+    BUILD_TYPE ${CMAKE_BUILD_TYPE}
+    ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS}
+    ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
+    ENABLE_LTO ${SWIFT_TOOLS_ENABLE_LTO}
+    RESULT_VAR_NAME c_compile_flags
+    )
+
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    if(libkind STREQUAL SHARED)
+      list(APPEND c_compile_flags -D_WINDLL)
+    endif()
+  endif()
+  _add_variant_link_flags(
+    SDK "${SWIFT_HOST_VARIANT_SDK}"
+    ARCH "${SWIFT_HOST_VARIANT_ARCH}"
+    BUILD_TYPE ${CMAKE_BUILD_TYPE}
+    ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS}
+    ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
+    ENABLE_LTO ${SWIFT_TOOLS_ENABLE_LTO}
+    LTO_OBJECT_NAME "${target}-${SWIFT_HOST_VARIANT_SDK}-${SWIFT_HOST_VARIANT_ARCH}"
+    RESULT_VAR_NAME link_flags
+    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
+      )
+
+  # Set compilation and link flags.
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH}
+      ${SWIFT_HOST_VARIANT_ARCH}_INCLUDE)
+    target_include_directories(${target} SYSTEM PRIVATE
+      ${${SWIFT_HOST_VARIANT_ARCH}_INCLUDE})
+
+    if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
+      swift_windows_get_sdk_vfs_overlay(ASHLS_VFS_OVERLAY)
+      target_compile_options(${target} PRIVATE
+        "SHELL:-Xclang -ivfsoverlay -Xclang ${ASHLS_VFS_OVERLAY}")
+
+      # MSVC doesn't support -Xclang. We don't need to manually specify
+      # the dependent libraries as `cl` does so.
+      target_compile_options(${target} PRIVATE
+        "SHELL:-Xclang --dependent-lib=oldnames"
+        # TODO(compnerd) handle /MT, /MTd
+        "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
+    endif()
+  endif()
+
+  target_compile_options(${target} PRIVATE
+    ${c_compile_flags})
+  target_link_options(${target} PRIVATE
+    ${link_flags})
+  if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+    target_link_options(${target} PRIVATE
+      "LINKER:-compatibility_version,1")
+    if(SWIFT_COMPILER_VERSION)
+      target_link_options(${target} PRIVATE
+        "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
+    endif()
+    # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
+    if(SWIFT_EMBED_BITCODE_SECTION)
+      if(${SWIFT_HOST_VARIANT_SDK} MATCHES "(I|TV|WATCH)OS")
+        # The two branches of this if statement accomplish the same end result
+        # We are simply accounting for the fact that on CMake < 3.16
+        # using a generator expression to
+        # specify a LINKER: argument does not work,
+        # since that seems not to allow the LINKER: prefix to be
+        # evaluated (i.e. it will be added as-is to the linker parameters)
+        if(CMAKE_VERSION VERSION_LESS 3.16)
+          target_link_options(${target} PRIVATE
+            "LINKER:-bitcode_bundle"
+            "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
+
+          if(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
+            target_link_options(${target} PRIVATE
+              "LINKER:-bitcode_hide_symbols")
+          endif()
+        else()
+          target_link_options(${target} PRIVATE
+            "LINKER:-bitcode_bundle"
+            $<$<BOOL:SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS>:"LINKER:-bitcode_hide_symbols">
+            "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
+        endif()
+      endif()
+    endif()
+  endif()
+  target_link_libraries(${target} PRIVATE
+    ${link_libraries})
+  target_link_directories(${target} PRIVATE
+    ${library_search_directories})
+
+  # Do not add code here.
+endfunction()
+
+# Add a new Swift host library.
+#
+# Usage:
+#   add_swift_host_library(name
+#     [SHARED]
+#     [STATIC]
+#     [LLVM_LINK_COMPONENTS comp1 ...]
+#     source1 [source2 source3 ...])
+#
+# name
+#   Name of the library (e.g., swiftParse).
+#
+# SHARED
+#   Build a shared library.
+#
+# STATIC
+#   Build a static library.
+#
+# LLVM_LINK_COMPONENTS
+#   LLVM components this library depends on.
+#
+# source1 ...
+#   Sources to add into this library.
+function(add_swift_host_library name)
+  set(options
+        SHARED
+        STATIC)
+  set(single_parameter_options)
+  set(multiple_parameter_options
+        LLVM_LINK_COMPONENTS)
+
+  cmake_parse_arguments(ASHL
+                        "${options}"
+                        "${single_parameter_options}"
+                        "${multiple_parameter_options}"
+                        ${ARGN})
+  set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
+
+  translate_flags(ASHL "${options}")
+
+  if(NOT ASHL_SHARED AND NOT ASHL_STATIC)
+    message(FATAL_ERROR "Either SHARED or STATIC must be specified")
+  endif()
+
+  _add_swift_host_library_single(
+    ${name}
+    ${ASHL_SHARED_keyword}
+    ${ASHL_STATIC_keyword}
+    ${ASHL_SOURCES}
+    LLVM_LINK_COMPONENTS ${ASHL_LLVM_LINK_COMPONENTS}
+    )
+
+  add_dependencies(dev ${name})
+  if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
+    swift_install_in_component(TARGETS ${name}
+      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
+      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
+      RUNTIME DESTINATION bin COMPONENT dev)
+  endif()
+
+  swift_is_installing_component(dev is_installing)
+  if(NOT is_installing)
+    set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
+  else()
+    set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
+  endif()
+endfunction()
+
+# Add a single variant of a new Swift library.
+#
+# Usage:
+#   _add_swift_target_library_single(
 #     target
 #     name
 #     [MODULE_TARGETS]
@@ -753,7 +1094,7 @@ endfunction()
 #
 # source1 ...
 #   Sources to add into this library
-function(_add_swift_library_single target name)
+function(_add_swift_target_library_single target name)
   set(SWIFTLIB_SINGLE_options
         DONT_EMBED_BITCODE
         IS_SDK_OVERLAY
@@ -1502,103 +1843,6 @@ function(_add_swift_library_single target name)
   # Do not add code here.
 endfunction()
 
-# Add a new Swift host library.
-#
-# Usage:
-#   add_swift_host_library(name
-#     [SHARED]
-#     [STATIC]
-#     [LLVM_LINK_COMPONENTS comp1 ...]
-#     [FILE_DEPENDS target1 ...]
-#     source1 [source2 source3 ...])
-#
-# name
-#   Name of the library (e.g., swiftParse).
-#
-# SHARED
-#   Build a shared library.
-#
-# STATIC
-#   Build a static library.
-#
-# LLVM_LINK_COMPONENTS
-#   LLVM components this library depends on.
-#
-# FILE_DEPENDS
-#   Additional files this library depends on.
-#
-# source1 ...
-#   Sources to add into this library.
-function(add_swift_host_library name)
-  set(options
-        FORCE_BUILD_OPTIMIZED
-        SHARED
-        STATIC)
-  set(single_parameter_options)
-  set(multiple_parameter_options
-        C_COMPILE_FLAGS
-        DEPENDS
-        FILE_DEPENDS
-        LINK_LIBRARIES
-        LLVM_LINK_COMPONENTS)
-
-  cmake_parse_arguments(ASHL
-                        "${options}"
-                        "${single_parameter_options}"
-                        "${multiple_parameter_options}"
-                        ${ARGN})
-  set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
-
-  if(ASHL_FORCE_BUILD_OPTIMIZED)
-    message(SEND_ERROR "library ${name} is using FORCE_BUILD_OPTIMIZED flag which is deprecated.  Please use target_compile_options instead")
-  endif()
-  if(ASHL_C_COMPILE_FLAGS)
-    message(SEND_ERROR "library ${name} is using C_COMPILE_FLAGS parameter which is deprecated.  Please use target_compile_definitions, target_compile_options, or target_include_directories instead")
-  endif()
-  if(ASHL_DEPENDS)
-    message(SEND_ERROR "library ${name} is using DEPENDS parameter which is deprecated.  Please use add_dependencies instead")
-  endif()
-  if(ASHL_FILE_DEPENDS)
-    message(SEND_ERROR "library ${name} is using FILE_DEPENDS parameter which is deprecated.")
-  endif()
-  if(ASHL_LINK_LIBRARIES)
-    message(SEND_ERROR "library ${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
-  endif()
-
-  translate_flags(ASHL "${options}")
-
-  if(NOT ASHL_SHARED AND NOT ASHL_STATIC)
-    message(FATAL_ERROR "Either SHARED or STATIC must be specified")
-  endif()
-
-  _add_swift_library_single(
-    ${name}
-    ${name}
-    ${ASHL_SHARED_keyword}
-    ${ASHL_STATIC_keyword}
-    ${ASHL_SOURCES}
-    SDK ${SWIFT_HOST_VARIANT_SDK}
-    ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-    LLVM_LINK_COMPONENTS ${ASHL_LLVM_LINK_COMPONENTS}
-    INSTALL_IN_COMPONENT "dev"
-    )
-
-  add_dependencies(dev ${name})
-  if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
-    swift_install_in_component(TARGETS ${name}
-      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
-      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
-      RUNTIME DESTINATION bin COMPONENT dev)
-  endif()
-
-  swift_is_installing_component(dev is_installing)
-  if(NOT is_installing)
-    set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
-  else()
-    set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
-  endif()
-endfunction()
-
 # Add a new Swift target library.
 #
 # NOTE: This has not had the swift host code debrided from it yet. That will be
@@ -2179,7 +2423,7 @@ function(add_swift_target_library name)
      list(APPEND swiftlib_c_compile_flags_all "-DSWIFT_TARGET_LIBRARY_NAME=${name}")
 
       # Add this library variant.
-      _add_swift_library_single(
+      _add_swift_target_library_single(
         ${variant_name}
         ${name}
         ${SWIFTLIB_SHARED_keyword}
@@ -2513,21 +2757,21 @@ endfunction()
 #   [ARCHITECTURE architecture]
 #     Architecture to build for.
 function(_add_swift_executable_single name)
-  # Parse the arguments we were given.
+  set(options)
+  set(single_parameter_options
+    ARCHITECTURE
+    SDK)
+  set(multiple_parameter_options
+    COMPILE_FLAGS
+    DEPENDS
+    LLVM_LINK_COMPONENTS)
   cmake_parse_arguments(SWIFTEXE_SINGLE
-    "EXCLUDE_FROM_ALL"
-    "SDK;ARCHITECTURE"
-    "DEPENDS;LLVM_LINK_COMPONENTS;LINK_LIBRARIES;COMPILE_FLAGS"
+    "${options}"
+    "${single_parameter_options}"
+    "${multiple_parameter_options}"
     ${ARGN})
 
   set(SWIFTEXE_SINGLE_SOURCES ${SWIFTEXE_SINGLE_UNPARSED_ARGUMENTS})
-
-  if(SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL)
-    message(SEND_ERROR "${name} is using EXCLUDE_FROM_ALL option which is deprecated.")
-  endif()
-  if(SWIFTEXE_SINGLE_LINK_LIBRARIES)
-    message(SEND_ERROR "${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
-  endif()
 
   # Check arguments.
   precondition(SWIFTEXE_SINGLE_SDK MESSAGE "Should specify an SDK")
@@ -2652,17 +2896,13 @@ endmacro()
 function(add_swift_host_tool executable)
   set(options)
   set(single_parameter_options SWIFT_COMPONENT)
-  set(multiple_parameter_options LINK_LIBRARIES)
+  set(multiple_parameter_options)
 
   cmake_parse_arguments(ASHT
     "${options}"
     "${single_parameter_options}"
     "${multiple_parameter_options}"
     ${ARGN})
-
-  if(ASHT_LINK_LIBRARIES)
-    message(SEND_ERROR "${executable} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
-  endif()
 
   precondition(ASHT_SWIFT_COMPONENT
                MESSAGE "Swift Component is required to add a host tool")

@@ -277,7 +277,7 @@ public:
     IsSerialized_t serialized = IsNotSerialized;
     auto classIsPublic = theClass->getEffectiveAccess() >= AccessLevel::Public;
     // Only public, fixed-layout classes should have serialized vtables.
-    if (classIsPublic && !theClass->isResilient())
+    if (classIsPublic && !isResilient)
       serialized = IsSerialized;
 
     // Finally, create the vtable.
@@ -285,9 +285,9 @@ public:
   }
 
   void visitAncestor(ClassDecl *ancestor) {
-    auto superTy = ancestor->getSuperclass();
-    if (superTy)
-      visitAncestor(superTy->getClassOrBoundGenericClass());
+    auto *superDecl = ancestor->getSuperclassDecl();
+    if (superDecl)
+      visitAncestor(superDecl);
 
     addVTableEntries(ancestor);
   }
@@ -311,8 +311,14 @@ public:
   }
 
   void addPlaceholder(MissingMemberDecl *m) {
-    assert(m->getNumberOfVTableEntries() == 0
-           && "Should not be emitting class with missing members");
+#ifndef NDEBUG
+    auto *classDecl = cast<ClassDecl>(m->getDeclContext());
+    bool isResilient =
+        classDecl->isResilient(SGM.M.getSwiftModule(),
+                               ResilienceExpansion::Maximal);
+    assert(isResilient || m->getNumberOfVTableEntries() == 0 &&
+           "Should not be emitting fragile class with missing members");
+#endif
   }
 };
 
