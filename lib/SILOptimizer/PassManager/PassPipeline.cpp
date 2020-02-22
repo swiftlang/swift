@@ -290,14 +290,17 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Cleanup, which is important if the inliner has restarted the pass pipeline.
   P.addPerformanceConstantPropagation();
-  P.addSimplifyCFG();
   P.addSILCombine();
+  addSimplifyCFGSILCombinePasses(P);
 
-  // Perform a round of array optimization in the mid-level pipeline after
-  // potentially inlining calls to Array append. In that situation, the
-  // high-level pipeline does ArrayElementPropagation and the mid-level pipeline
-  // handles uniqueness hoisting. Do this as late as possible before inlining
-  // because it must run between runs of the inliner when the pipeline restarts.
+  // Perform a round of loop/array optimization in the mid-level pipeline after
+  // potentially inlining semantic calls, e.g. Array append. The high level
+  // pipeline only optimizes semantic calls *after* inlining (see
+  // addHighLevelLoopOptPasses). For example, the high-level pipeline may
+  // performs ArrayElementPropagation and after inlining a level of semantic
+  // calls, the mid-level pipeline may handle uniqueness hoisting. Do this as
+  // late as possible before inlining because it must run between runs of the
+  // inliner when the pipeline restarts.
   if (OpLevel == OptimizationLevelKind::MidLevel) {
     P.addHighLevelLICM();
     P.addArrayCountPropagation();
