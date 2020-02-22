@@ -231,7 +231,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     LookupConformanceFn lookupConformance,
     CanGenericSignature derivativeFnGenSig, bool isReabstractionThunk) {
   auto &ctx = getASTContext();
-  auto resultIndices = IndexSubset::get(ctx, getNumResults(), {resultIndex});
+  auto *resultIndices = IndexSubset::get(
+      ctx, getNumResults() + getNumIndirectMutatingParameters(), {resultIndex});
   SILAutoDiffDerivativeFunctionKey key{
       this, parameterIndices,   resultIndices,
       kind, derivativeFnGenSig, isReabstractionThunk};

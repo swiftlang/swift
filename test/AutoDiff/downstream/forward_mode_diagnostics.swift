@@ -104,9 +104,7 @@ func activeInoutArgControlFlow(_ array: [Float]) -> Float {
 struct Mut: Differentiable {}
 extension Mut {
   @differentiable(wrt: x)
-  mutating func mutatingMethod(_ x: Mut) -> Mut {
-    return x
-  }
+  mutating func mutatingMethod(_ x: Mut) {}
 }
 
 // FIXME(TF-984): Forward-mode crash due to unset tangent buffer.

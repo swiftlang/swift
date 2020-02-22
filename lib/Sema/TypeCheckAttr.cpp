@@ -4601,15 +4601,16 @@ computeLinearityParameters(ArrayRef<ParsedAutoDiffParameter> parsedLinearParams,
 // The parsed differentiability parameters and attribute location are used in
 // diagnostics.
 static bool checkLinearityParameters(
-    AbstractFunctionDecl *originalAFD, SmallVector<Type, 4> linearParamTypes,
+    AbstractFunctionDecl *originalAFD,
+    SmallVector<AnyFunctionType::Param, 4> linearParams,
     GenericEnvironment *derivativeGenEnv, ModuleDecl *module,
     ArrayRef<ParsedAutoDiffParameter> parsedLinearParams, SourceLoc attrLoc) {
   auto &ctx = originalAFD->getASTContext();
   auto &diags = ctx.Diags;
 
   // Check that linearity parameters have allowed types.
-  for (unsigned i : range(linearParamTypes.size())) {
-    auto linearParamType = linearParamTypes[i];
+  for (unsigned i : range(linearParams.size())) {
+    auto linearParamType = linearParams[i].getPlainType();
     if (!linearParamType->hasTypeParameter())
       linearParamType = linearParamType->mapTypeOutOfContext();
     if (derivativeGenEnv)
@@ -4832,13 +4833,12 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   attr->setOriginalFunction(originalAFD);
 
   // Get the linearity parameter types.
-  SmallVector<Type, 4> linearParamTypes;
-  autodiff::getSubsetParameterTypes(linearParamIndices, expectedOriginalFnType,
-                                    linearParamTypes,
-                                    /*reverseCurryLevels*/ true);
+  SmallVector<AnyFunctionType::Param, 4> linearParams;
+  expectedOriginalFnType->getSubsetParameters(linearParamIndices, linearParams,
+                                              /*reverseCurryLevels*/ true);
 
   // Check if linearity parameter indices are valid.
-  if (checkLinearityParameters(originalAFD, linearParamTypes,
+  if (checkLinearityParameters(originalAFD, linearParams,
                                transpose->getGenericEnvironment(),
                                transpose->getModuleContext(),
                                parsedLinearParams, attr->getLocation())) {

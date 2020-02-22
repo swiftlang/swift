@@ -1237,6 +1237,25 @@ extension Array where Element : Differentiable {
 }
 
 extension Array where Element: Differentiable {
+  @derivative(of: append)
+  public mutating func _vjpAppend(_ element: Element) -> (
+    value: Void, pullback: (inout TangentVector) -> Element.TangentVector
+  ) {
+    let appendedElementIndex = count
+    defer { append(element) }
+    return ((), { dself in dself.base[appendedElementIndex] })
+  }
+
+  @derivative(of: append)
+  public mutating func _jvpAppend(_ element: Element) -> (
+    value: Void, differential: (inout TangentVector, Element.TangentVector) -> Void
+  ) {
+    append(element)
+    return ((), { $0.base.append($1) })
+  }
+}
+
+extension Array where Element: Differentiable {
   @usableFromInline
   @derivative(of: init(repeating:count:))
   static func _vjpInit(repeating repeatedValue: Element, count: Int) -> (
