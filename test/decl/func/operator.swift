@@ -179,6 +179,9 @@ prefix operator &  // expected-error {{cannot declare a custom prefix '&' operat
 postfix operator >  // expected-error {{cannot declare a custom postfix '>' operator}}
 prefix operator <  // expected-error {{cannot declare a custom prefix '<' operator}}
 
+infix operator =  // expected-error {{cannot declare a custom infix '=' operator}}
+infix operator ->  // expected-error {{cannot declare a custom infix '->' operator}}
+
 postfix func !(x: Int) { } // expected-error{{cannot declare a custom postfix '!' operator}}
 postfix func!(x: Int8) { } // expected-error{{cannot declare a custom postfix '!' operator}}
 prefix func & (x: Int) {} // expected-error {{cannot declare a custom prefix '&' operator}}
@@ -189,7 +192,6 @@ func operator_in_func_bad () {
 }
 
 infix operator ?  // expected-error {{cannot declare a custom infix '?' operator}}
-
 prefix operator ?  // expected-error {{cannot declare a custom prefix '?' operator}}
 
 infix operator ??=

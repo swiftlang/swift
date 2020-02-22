@@ -1505,11 +1505,14 @@ static bool isBuiltinOperator(StringRef name, DeclAttribute *attr) {
           (isa<PostfixAttr>(attr) && name == "!") ||   // optional unwrapping
           // FIXME: Not actually a builtin operator, but should probably
           // be allowed and accounted for in Sema?
-          (isa<PrefixAttr>(attr) && name == "?") ||
+          (isa<PrefixAttr>(attr)  && name == "?") ||
           (isa<PostfixAttr>(attr) && name == "?") ||   // optional chaining
-          (isa<InfixAttr>(attr) && name == "?") ||     // ternary operator
+          (isa<InfixAttr>(attr)   && name == "?") ||   // ternary operator
           (isa<PostfixAttr>(attr) && name == ">") ||   // generic argument list
-          (isa<PrefixAttr>(attr)  && name == "<"));    // generic argument list
+          (isa<PrefixAttr>(attr)  && name == "<") ||   // generic argument list
+                                     name == "="  ||   // Assignment
+          // FIXME: Should probably be allowed in expression position?
+                                     name == "->");
 }
 
 void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
