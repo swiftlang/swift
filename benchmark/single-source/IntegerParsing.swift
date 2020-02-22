@@ -25,14 +25,14 @@ public let IntegerParsing = [
   }),
   BenchmarkInfo(name: "ParseInt.IntSmall.Binary",
     runFunction: run_ParseIntFromIntSmallBinary,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(intSmallValuesSum)
       blackHole(intSmallBinaryStrings)
   }),
   BenchmarkInfo(name: "ParseInt.IntSmall.Hex",
     runFunction: run_ParseIntFromIntSmallHex,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(intSmallValuesSum)
       blackHole(intSmallHexStrings)
@@ -54,7 +54,7 @@ public let IntegerParsing = [
   }),
   BenchmarkInfo(name: "ParseInt.UIntSmall.Binary",
     runFunction: run_ParseIntFromUIntSmallBinary,
-    tags: [.validation, .api, .skip],
+    tags: [.validation, .api],
     setUpFunction: {
       blackHole(uintSmallValuesSum)
       blackHole(uintSmallBinaryStrings)
@@ -105,14 +105,14 @@ public let IntegerParsing = [
   // Int64
   BenchmarkInfo(name: "ParseInt.Int64.Decimal",
     runFunction: run_ParseIntFromInt64Decimal,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(int64ValuesSum)
       blackHole(int64DecimalStrings)
   }),
   BenchmarkInfo(name: "ParseInt.Int64.Binary",
     runFunction: run_ParseIntFromInt64Binary,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(int64ValuesSum)
       blackHole(int64BinaryStrings)
@@ -126,7 +126,7 @@ public let IntegerParsing = [
   }),
   BenchmarkInfo(name: "ParseInt.Int64.UncommonRadix",
     runFunction: run_ParseIntFromInt64UncommonRadix,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(int64ValuesSum)
       blackHole(int64UncommonRadixStrings)
@@ -148,7 +148,7 @@ public let IntegerParsing = [
   }),
   BenchmarkInfo(name: "ParseInt.UInt32.Hex",
     runFunction: run_ParseIntFromUInt32Hex,
-    tags: [.validation, .api, .skip],
+    tags: [.validation, .api],
     setUpFunction: {
       blackHole(uint32ValuesSum)
       blackHole(uint32HexStrings)
