@@ -33,6 +33,10 @@ typedef enum {
 @property (nonatomic, readonly) RefinedSugar sugar /*NS_REFINED_FOR_SWIFT*/ __attribute__((swift_private));
 @end
 
+@interface ExtraRefinery : Base
+@property (nonatomic, readonly) RefinedSugar sugar /*NS_REFINED_FOR_SWIFT*/ __attribute__((swift_private));
+@end
+
 @protocol NullableProtocol
 @property (nonatomic, readonly, nullable) Base *requirement;
 @end

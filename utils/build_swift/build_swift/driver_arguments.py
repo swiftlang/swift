@@ -840,6 +840,8 @@ def create_argument_parser():
     option('--only-executable-test', toggle_true,
            help='Only run executable tests. Does nothing if host-test is not '
                 'allowed')
+    option('--only-non-executable-test', toggle_true,
+           help='Only run non-executable tests.')
 
     option('--test-paths', append,
            type=argparse.ShellSplitType(),
