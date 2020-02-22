@@ -19,6 +19,10 @@
 @property (nonatomic, readwrite) RefinedSugar sugar;
 @end
 
+@interface ExtraRefinery ()
+- (void)setSugar:(RefinedSugar)sugar;
+@end
+
 @interface MyBaseClass () <NonNullProtocol>
 @end
 
