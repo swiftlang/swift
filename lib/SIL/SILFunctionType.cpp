@@ -326,6 +326,22 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     return {tanType, conv};
   };
 
+  // Compute the original semantic results: original formal results, followed by
+  // `inout` parameters in type order.
+  SmallVector<SILResultInfo, 2> originalResults;
+  originalResults.append(getResults().begin(), getResults().end());
+  Optional<SILParameterInfo> inoutParam = None;
+  bool isWrtInoutParameter = false;
+  for (auto i : range(getNumParameters())) {
+    auto param = getParameters()[i];
+    if (!param.isIndirectInOut())
+      continue;
+    inoutParam = param;
+    isWrtInoutParameter = parameterIndices->contains(i);
+    originalResults.push_back(
+        SILResultInfo(param.getInterfaceType(), ResultConvention::Indirect));
+  }
+
   CanSILFunctionType closureType;
   switch (kind) {
   case AutoDiffDerivativeFunctionKind::JVP: {
@@ -337,13 +353,15 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
       differentialParams.push_back(
           {paramTan->getCanonicalType(), param.getConvention()});
     }
-    SmallVector<SILResultInfo, 8> differentialResults;
-    auto &result = getResults()[resultIndex];
-    auto resultTan =
-        result.getInterfaceType()->getAutoDiffTangentSpace(lookupConformance);
-    assert(resultTan && "Result type does not have a tangent space?");
-    differentialResults.push_back(
-        {resultTan->getCanonicalType(), result.getConvention()});
+    SmallVector<SILResultInfo, 1> differentialResults;
+    if (!inoutParam || !isWrtInoutParameter) {
+      auto &result = originalResults[resultIndex];
+      auto resultTan =
+          result.getInterfaceType()->getAutoDiffTangentSpace(lookupConformance);
+      assert(resultTan && "Result type does not have a tangent space?");
+      differentialResults.push_back(
+          {resultTan->getCanonicalType(), result.getConvention()});
+    }
     closureType = SILFunctionType::get(
         /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,
         ParameterConvention::Direct_Guaranteed, differentialParams, {},
@@ -352,15 +370,28 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     break;
   }
   case AutoDiffDerivativeFunctionKind::VJP: {
-    SmallVector<SILParameterInfo, 8> pullbackParams;
-    auto &origRes = getResults()[resultIndex];
-    auto resultTan =
-        origRes.getInterfaceType()->getAutoDiffTangentSpace(lookupConformance);
-    assert(resultTan && "Result type does not have a tangent space?");
-    pullbackParams.push_back(getTangentParameterInfoForOriginalResult(
-        resultTan->getCanonicalType(), origRes.getConvention()));
+    SmallVector<SILParameterInfo, 1> pullbackParams;
+    if (inoutParam) {
+      auto paramTan = inoutParam->getInterfaceType()->getAutoDiffTangentSpace(
+          lookupConformance);
+      assert(paramTan && "Parameter type does not have a tangent space?");
+      auto paramTanConvention =
+          isWrtInoutParameter ? inoutParam->getConvention()
+                              : ParameterConvention::Indirect_In_Guaranteed;
+      pullbackParams.push_back(
+          SILParameterInfo(paramTan->getCanonicalType(), paramTanConvention));
+    } else {
+      auto &origRes = originalResults[resultIndex];
+      auto resultTan = origRes.getInterfaceType()->getAutoDiffTangentSpace(
+          lookupConformance);
+      assert(resultTan && "Result type does not have a tangent space?");
+      pullbackParams.push_back(getTangentParameterInfoForOriginalResult(
+          resultTan->getCanonicalType(), origRes.getConvention()));
+    }
     SmallVector<SILResultInfo, 8> pullbackResults;
     for (auto &param : diffParams) {
+      if (param.isIndirectInOut())
+        continue;
       auto paramTan =
           param.getInterfaceType()->getAutoDiffTangentSpace(lookupConformance);
       assert(paramTan && "Parameter type does not have a tangent space?");

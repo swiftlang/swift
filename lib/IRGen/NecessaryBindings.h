@@ -42,6 +42,13 @@ namespace irgen {
 class NecessaryBindings {
   llvm::SetVector<GenericRequirement> Requirements;
 
+
+  /// Are the bindings to be computed for a partial apply forwarder.
+  /// In the case this is true we need to store/restore the conformance of a
+  /// specialized type with conditional conformance because the conditional
+  /// requirements are not available in the partial apply forwarder.
+  bool forPartialApply = false;
+
 public:
   NecessaryBindings() = default;
   
@@ -50,7 +57,10 @@ public:
   static NecessaryBindings forFunctionInvocations(IRGenModule &IGM,
                                                   CanSILFunctionType origType,
                                                   SubstitutionMap subs);
-  
+  static NecessaryBindings forPartialApplyForwarder(IRGenModule &IGM,
+                                                    CanSILFunctionType origType,
+                                                    SubstitutionMap subs);
+
   /// Add whatever information is necessary to reconstruct type metadata
   /// for the given type.
   void addTypeMetadata(CanType type);
@@ -84,6 +94,11 @@ public:
   const llvm::SetVector<GenericRequirement> &getRequirements() const {
     return Requirements;
   }
+private:
+  static NecessaryBindings computeBindings(IRGenModule &IGM,
+                                           CanSILFunctionType origType,
+                                           SubstitutionMap subs,
+                                           bool forPartialApplyForwarder);
 };
 
 } // end namespace irgen
