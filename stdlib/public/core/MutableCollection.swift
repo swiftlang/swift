@@ -401,7 +401,7 @@ extension MutableCollection {
   ///   - distance(from: lhs.lowerBound, to: p) == distance(from:
   ///     rhs.lowerBound, to: q)
   ///   - p == lhs.upperBound || q == rhs.upperBound
-  mutating func _swapNonemptySubrangePrefixes(
+  internal mutating func _swapNonemptySubrangePrefixes(
     _ lhs: Range<Index>, _ rhs: Range<Index>
   ) -> (Index, Index) {
     assert(!lhs.isEmpty)
