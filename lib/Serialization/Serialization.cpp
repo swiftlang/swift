@@ -2450,9 +2450,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Derivative:
-    // SWIFT_ENABLE_TENSORFLOW
-    case DAK_Differentiating: {
+    case DAK_Derivative: {
       auto abbrCode = S.DeclTypeAbbrCodes[DerivativeDeclAttrLayout::Code];
       auto *attr = cast<DerivativeAttr>(DA);
       assert(attr->getOriginalFunction() &&

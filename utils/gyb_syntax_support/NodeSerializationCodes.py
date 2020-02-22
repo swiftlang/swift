@@ -247,7 +247,6 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     # SWIFT_ENABLE_TENSORFLOW
     'QuoteLiteralExpr': 243,
     'UnquoteExpr': 244,
-    'DeprecatedDerivativeRegistrationAttributeArguments': 245,
     # SWIFT_ENABLE_TENSORFLOW END
 }
 

@@ -1587,11 +1587,6 @@ WARNING(attr_differentiable_jvp_vjp_deprecated_warning,none,
         "deprecated; use '@derivative' attribute for derivative registration "
         "instead", ())
 
-// derivative
-WARNING(attr_differentiating_deprecated,PointsToFirstBadToken,
-        "'@differentiating' attribute is deprecated; use '@derivative(of:)' "
-        "instead", ())
-
 // differentiation `wrt` parameters clause
 ERROR(expected_colon_after_label,PointsToFirstBadToken,
       "expected a colon ':' after '%0'", (StringRef))

@@ -618,12 +618,6 @@ func addTranspose(_ v: Float) -> (Float, Float) {
   return (v, v)
 }
 
-@differentiating(baz(label:_:), wrt: (x))
-func bazDerivative(_ x: Float, y: Float)
-    -> (value: Float, pullback: (Float) -> Float) {
-  return (x, { v in v })
-}
-
 @transpose(of: -, wrt: (0, 1))
 func subtractTranspose(_ v: Float) -> (Float, Float) {
   return (v, -v)
