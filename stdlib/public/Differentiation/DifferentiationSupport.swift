@@ -1202,8 +1202,9 @@ extension Array : EuclideanDifferentiable
 }
 
 extension Array where Element : Differentiable {
+  @usableFromInline
   @derivative(of: subscript)
-  public func _vjpSubscript(index: Int) ->
+  func _vjpSubscript(index: Int) ->
     (value: Element, pullback: (Element.TangentVector) -> TangentVector)
   {
     func pullback(_ gradientIn: Element.TangentVector) -> TangentVector {
@@ -1216,8 +1217,9 @@ extension Array where Element : Differentiable {
     return (self[index], pullback)
   }
 
+  @usableFromInline
   @derivative(of: +)
-  public static func _vjpPlus(_ lhs: [Element], _ rhs: [Element]) ->
+  static func _vjpConcatenate(_ lhs: [Element], _ rhs: [Element]) ->
     (value: [Element], pullback: (TangentVector) -> (TangentVector, TangentVector)) {
       func pullback(_ gradientIn: TangentVector) ->
         (TangentVector, TangentVector) {
@@ -1237,8 +1239,9 @@ extension Array where Element : Differentiable {
 }
 
 extension Array where Element: Differentiable {
+  @usableFromInline
   @derivative(of: append)
-  public mutating func _vjpAppend(_ element: Element) -> (
+  mutating func _vjpAppend(_ element: Element) -> (
     value: Void, pullback: (inout TangentVector) -> Element.TangentVector
   ) {
     let appendedElementIndex = count
@@ -1246,8 +1249,9 @@ extension Array where Element: Differentiable {
     return ((), { dself in dself.base[appendedElementIndex] })
   }
 
+  @usableFromInline
   @derivative(of: append)
-  public mutating func _jvpAppend(_ element: Element) -> (
+  mutating func _jvpAppend(_ element: Element) -> (
     value: Void, differential: (inout TangentVector, Element.TangentVector) -> Void
   ) {
     append(element)
