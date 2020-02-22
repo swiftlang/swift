@@ -664,6 +664,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   /// If a new buffer needs to be allocated and `growForAppend` is true,
   /// the new capacity is calculated using `_growArrayCapacity`.
   @_alwaysEmitIntoClient
+  @_semantics("array.mutate_unknown")
   internal mutating func _reserveCapacityImpl(
     minimumCapacity: Int, growForAppend: Bool
   ) {

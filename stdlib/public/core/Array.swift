@@ -1027,6 +1027,7 @@ extension Array: RangeReplaceableCollection {
   /// the new capacity is calculated using `_growArrayCapacity`, but at least
   /// kept at `minimumCapacity`.
   @_alwaysEmitIntoClient
+  @_semantics("array.mutate_unknown")
   internal mutating func _reserveCapacityImpl(
     minimumCapacity: Int, growForAppend: Bool
   ) {
