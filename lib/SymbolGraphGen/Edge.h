@@ -15,9 +15,11 @@
 
 #include "llvm/Support/JSON.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 
 #include "JSON.h"
+#include "Symbol.h"
 
 namespace swift {
 namespace symbolgraphgen {
@@ -120,10 +122,10 @@ struct Edge {
   RelationshipKind Kind;
 
   /// The precise identifier of the source symbol node.
-  const ValueDecl *Source;
+  Symbol Source;
   
   /// The precise identifier of the target symbol node.
-  const ValueDecl *Target;
+  Symbol Target;
   
   void serialize(llvm::json::OStream &OS) const;
 };
@@ -132,35 +134,37 @@ struct Edge {
 } // end namespace swift
 
 namespace llvm {
+using SymbolGraph = swift::symbolgraphgen::SymbolGraph;
+using Symbol = swift::symbolgraphgen::Symbol;
 using Edge = swift::symbolgraphgen::Edge;
 template <> struct DenseMapInfo<Edge> {
   static inline Edge getEmptyKey() {
     return {
-      nullptr,
+      DenseMapInfo<SymbolGraph *>::getEmptyKey(),
       { "Empty" },
-      nullptr,
-      nullptr,
+      DenseMapInfo<Symbol>::getEmptyKey(),
+      DenseMapInfo<Symbol>::getEmptyKey()
     };
   }
   static inline Edge getTombstoneKey() {
     return {
       nullptr,
       { "Tombstone" },
-      nullptr,
-      nullptr,
+      DenseMapInfo<Symbol>::getTombstoneKey(),
+      DenseMapInfo<Symbol>::getTombstoneKey(),
     };
   }
   static unsigned getHashValue(const Edge E) {
     unsigned H = 0;
     H ^= DenseMapInfo<StringRef>::getHashValue(E.Kind.Name);
-    H ^= DenseMapInfo<uintptr_t>::getHashValue(reinterpret_cast<uintptr_t>(E.Source));
-    H ^= DenseMapInfo<uintptr_t>::getHashValue(reinterpret_cast<uintptr_t>(E.Target));
+    H ^= DenseMapInfo<Symbol>::getHashValue(E.Source);
+    H ^= DenseMapInfo<Symbol>::getHashValue(E.Target);
     return H;
   }
   static bool isEqual(const Edge LHS, const Edge RHS) {
     return LHS.Kind == RHS.Kind &&
-      LHS.Source == RHS.Source &&
-      LHS.Target == RHS.Target;
+      DenseMapInfo<Symbol>::isEqual(LHS.Source, RHS.Source) &&
+      DenseMapInfo<Symbol>::isEqual(LHS.Target, RHS.Target);
   }
 };
 } // end namespace llvm

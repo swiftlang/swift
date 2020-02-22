@@ -11,8 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Comment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
 #include "JSON.h"
 #include "Symbol.h"
@@ -21,6 +23,12 @@
 
 using namespace swift;
 using namespace symbolgraphgen;
+
+Symbol::Symbol(SymbolGraph *Graph, const ValueDecl *VD,
+               const NominalTypeDecl *SynthesizedBaseTypeDecl)
+: Graph(Graph),
+  VD(VD),
+  SynthesizedBaseTypeDecl(SynthesizedBaseTypeDecl) {}
 
 void Symbol::serializeKind(StringRef Identifier, StringRef DisplayName,
                            llvm::json::OStream &OS) const {
@@ -50,6 +58,9 @@ void Symbol::serializeKind(llvm::json::OStream &OS) const {
     break;
   case swift::DeclKind::Constructor:
     serializeKind("swift.init", "Initializer", OS);
+    break;
+  case swift::DeclKind::Destructor:
+    serializeKind("swift.deinit", "Deinitializer", OS);
     break;
   case swift::DeclKind::Func:
     if (VD->isOperator()) {
@@ -85,13 +96,16 @@ void Symbol::serializeKind(llvm::json::OStream &OS) const {
     serializeKind("swift.associatedtype", "Associated Type", OS);
     break;
   default:
+    llvm::errs() << "Unsupported kind: " << VD->getKindName(VD->getKind());
     llvm_unreachable("Unsupported declaration kind for symbol graph");
   }
 }
 
 void Symbol::serializeIdentifier(llvm::json::OStream &OS) const {
   OS.attributeObject("identifier", [&](){
-    OS.attribute("precise", Graph.getUSR(VD));
+    SmallString<256> USR;
+    getUSR(USR);
+    OS.attribute("precise", USR.str());
     OS.attribute("interfaceLanguage", "swift");
   });
 }
@@ -99,7 +113,7 @@ void Symbol::serializeIdentifier(llvm::json::OStream &OS) const {
 void Symbol::serializePathComponents(llvm::json::OStream &OS) const {
   OS.attributeArray("pathComponents", [&](){
     SmallVector<SmallString<32>, 8> PathComponents;
-    Graph.getPathComponents(VD, PathComponents);
+    getPathComponents(PathComponents);
     for (auto Component : PathComponents) {
       OS.value(Component);
     }
@@ -109,11 +123,11 @@ void Symbol::serializePathComponents(llvm::json::OStream &OS) const {
 void Symbol::serializeNames(llvm::json::OStream &OS) const {
   OS.attributeObject("names", [&](){
     SmallVector<SmallString<32>, 8> PathComponents;
-    Graph.getPathComponents(VD, PathComponents);
+    getPathComponents(PathComponents);
     
     OS.attribute("title", PathComponents.back());
     // "navigator": null
-    Graph.serializeSubheadingDeclarationFragments("subheading", VD, OS);
+    Graph->serializeSubheadingDeclarationFragments("subHeading", *this, OS);
     // "prose": null
   });
 }
@@ -149,7 +163,14 @@ void Symbol::serializeRange(size_t InitialIndentation,
 
 void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
   OS.attributeObject("docComment", [&](){
-    auto LL = Graph.Ctx.getLineList(VD->getRawComment(/*SerializedOK=*/true));
+    const auto *DocCommentProvidingDecl =
+        dyn_cast_or_null<ValueDecl>(
+            getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true));
+    if (!DocCommentProvidingDecl) {
+      DocCommentProvidingDecl = VD;
+    }
+    auto RC = DocCommentProvidingDecl->getRawComment(/*SerializedOK=*/true);
+    auto LL = Graph->Ctx.getLineList(RC);
     size_t InitialIndentation = LL.getLines().empty()
       ? 0
       : markup::measureIndentation(LL.getLines().front().Text);
@@ -161,7 +182,7 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
           // text and start of its source range, if it has one.
           if (Line.Range.isValid()) {
             serializeRange(InitialIndentation,
-                           Line.Range, Graph.M.getASTContext().SourceMgr, OS);
+                           Line.Range, Graph->M.getASTContext().SourceMgr, OS);
           }
           auto TrimmedLine = Line.Text.drop_front(std::min(InitialIndentation,
                                                   Line.FirstNonspaceOffset));
@@ -194,8 +215,9 @@ void Symbol::serializeFunctionSignature(llvm::json::OStream &OS) const {
                     OS.attribute("internalName", InternalName);
                   }
                 }
-                Graph.serializeDeclarationFragments("declarationFragments",
-                                                     Param, OS);
+                Graph->serializeDeclarationFragments("declarationFragments",
+                                                     Symbol(Graph, Param,
+                                                            nullptr), OS);
               }); // end parameter object
             }
           }); // end parameters:
@@ -204,7 +226,7 @@ void Symbol::serializeFunctionSignature(llvm::json::OStream &OS) const {
 
       // Returns
       if (const auto ReturnType = FD->getResultInterfaceType()) {
-        Graph.serializeDeclarationFragments("returns", ReturnType, OS);
+        Graph->serializeDeclarationFragments("returns", ReturnType, OS);
       }
     });
   }
@@ -221,20 +243,23 @@ void Symbol::serializeGenericParam(const swift::GenericTypeParamType &Param,
 
 void Symbol::serializeGenericRequirement(const swift::Requirement &Req,
                                          llvm::json::OStream &OS) const {
+  StringRef Kind;
+  switch (Req.getKind()) {
+    case swift::RequirementKind::Conformance:
+      Kind = "conformance";
+      break;
+    case swift::RequirementKind::Superclass:
+      Kind = "superclass";
+      break;
+    case swift::RequirementKind::SameType:
+      Kind = "sameType";
+      break;
+    case swift::RequirementKind::Layout:
+      return;
+  }
+
   OS.object([&](){
-    switch (Req.getKind()) {
-      case swift::RequirementKind::Conformance:
-        OS.attribute("kind", "conformance");
-        break;
-      case swift::RequirementKind::Superclass:
-        OS.attribute("kind", "superclass");
-        break;
-      case swift::RequirementKind::SameType:
-        OS.attribute("kind", "sameType");
-        break;
-      case swift::RequirementKind::Layout:
-        return;
-    }
+    OS.attribute("kind", Kind);
     OS.attribute("lhs", Req.getFirstType()->getString());
     OS.attribute("rhs", Req.getSecondType()->getString());
   });
@@ -293,7 +318,7 @@ void Symbol::serializeSwiftExtensionMixin(llvm::json::OStream &OS) const {
 }
 
 void Symbol::serializeDeclarationFragmentMixin(llvm::json::OStream &OS) const {
-  Graph.serializeDeclarationFragments("declarationFragments", VD, OS);
+  Graph->serializeDeclarationFragments("declarationFragments", *this, OS);
 }
 
 void Symbol::serializeAccessLevelMixin(llvm::json::OStream &OS) const {
@@ -312,7 +337,7 @@ void Symbol::serializeLocationMixin(llvm::json::OStream &OS) const {
       FileURI.append(FileName);
       OS.attribute("uri", FileURI.str());
     }
-    serializePosition("position", Loc, Graph.M.getASTContext().SourceMgr, OS);
+    serializePosition("position", Loc, Graph->M.getASTContext().SourceMgr, OS);
   });
 }
 
@@ -429,4 +454,64 @@ void Symbol::serialize(llvm::json::OStream &OS) const {
     serializeAvailabilityMixin(OS);
     serializeLocationMixin(OS);
   });
+}
+
+void
+Symbol::getPathComponents(SmallVectorImpl<SmallString<32>> &Components) const {
+
+  auto collectPathComponents = [&](const ValueDecl *Decl,
+                                   SmallVectorImpl<SmallString<32>> &DeclComponents) {
+    // Collect the spellings of the fully qualified identifier components.
+    while (Decl && !isa<ModuleDecl>(Decl)) {
+      SmallString<32> Scratch;
+      Decl->getFullName().getString(Scratch);
+      DeclComponents.push_back(Scratch);
+      if (const auto *DC = Decl->getDeclContext()) {
+        if (const auto *Nominal = DC->getSelfNominalTypeDecl()) {
+          Decl = Nominal;
+        } else {
+          Decl = dyn_cast_or_null<ValueDecl>(DC->getAsDecl());
+        }
+      } else {
+        Decl = nullptr;
+      }
+    }
+  };
+
+  if (const auto BaseTypeDecl = getSynthesizedBaseTypeDecl()) {
+    // This is a synthesized member of some base type declaration, actually
+    // existing on another type, such as a default implementation of
+    // a protocol. Build a path as if it were defined in the base type.
+    SmallString<32> LastPathComponent;
+    VD->getFullName().getString(LastPathComponent);
+    Components.push_back(LastPathComponent);
+    collectPathComponents(BaseTypeDecl, Components);
+  } else {
+    // Otherwise, this is just a normal declaration, so we can build
+    // its path normally.
+    collectPathComponents(VD, Components);
+  }
+
+  // The list is leaf-to-root, but we want root-to-leaf, so reverse it.
+  std::reverse(Components.begin(), Components.end());
+}
+
+void Symbol::printPath(llvm::raw_ostream &OS) const {
+  SmallVector<SmallString<32>, 8> Components;
+  getPathComponents(Components);
+  for (auto it = Components.begin(); it != Components.end(); ++it) {
+    if (it != Components.begin()) {
+      OS << '.';
+    }
+    OS << it->str();
+  }
+}
+
+void Symbol::getUSR(SmallVectorImpl<char> &USR) const {
+  llvm::raw_svector_ostream OS(USR);
+  ide::printDeclUSR(VD, OS);
+  if (SynthesizedBaseTypeDecl) {
+    OS << "::SYNTHESIZED::";
+    ide::printDeclUSR(SynthesizedBaseTypeDecl, OS);
+  }
 }
