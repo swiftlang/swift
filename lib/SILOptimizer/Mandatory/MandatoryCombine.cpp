@@ -338,8 +338,9 @@ SILInstruction *MandatoryCombiner::visitLoadInst(LoadInst *i) {
 
 /// Try to remove partial applies that are no longer used
 SILInstruction *MandatoryCombiner::visitPartialApplyInst(PartialApplyInst *i) {
-  if (tryDeleteDeadClosure(i, instModCallbacks)) {
-    if (auto *ref = getRemovableRef(i)) {
+  auto *ref = getRemovableRef(i);
+  if (tryDeleteDeadClosure(i, instModCallbacks, /*needKeepArgsAlive=*/false)) {
+    if (ref) {
       instModCallbacks.deleteInst(ref);
     }
   }
@@ -349,8 +350,9 @@ SILInstruction *MandatoryCombiner::visitPartialApplyInst(PartialApplyInst *i) {
 
 /// Try to remove thing to thick instructions that are no longer used
 SILInstruction *MandatoryCombiner::visitThinToThickFunctionInst(ThinToThickFunctionInst *i) {
-  if (tryDeleteDeadClosure(i, instModCallbacks)) {
-    if (auto *ref = getRemovableRef(i)) {
+  auto *ref = getRemovableRef(i);
+  if (tryDeleteDeadClosure(i, instModCallbacks, /*needKeepArgsAlive=*/false)) {
+    if (ref) {
       instModCallbacks.deleteInst(ref);
     }
   }

@@ -1251,3 +1251,40 @@ bb5:
   %tuple = tuple()
   return %tuple : $()
 }
+
+sil [ossa] [transparent] @test_partial_nativeobject_bar_guaranteed : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @guaranteed $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %7 = apply %0(%1) : $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %7 : $Builtin.NativeObject
+}
+
+// Make sure we do the inlining and delete the closure.
+// CHECK-BOTH-LABEL: sil [transparent] [ossa] @test_partial_nativeobject_foo_guaranteed_explicit_borrow_dead_pa : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK-BOTH-NOT: partial_apply
+// CHECK-BOTH: [[NATIVEOBJECT_PLUS_FUNC:%.*]] = function_ref @nativeobject_plus : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+// CHECK-BOTH-NEXT: apply [[NATIVEOBJECT_PLUS_FUNC]](
+// CHECK-BOTH-NOT: partial_apply
+// CHECK-BOTH: } // end sil function 'test_partial_nativeobject_foo_guaranteed_explicit_borrow_dead_pa'
+sil [transparent] [ossa] @test_partial_nativeobject_foo_guaranteed_explicit_borrow_dead_pa : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %2 = function_ref @test_partial_nativeobject_bar_guaranteed : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %3 = function_ref @test_partial_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb1
+
+bb1:
+  %0copy1 = copy_value %0 : $Builtin.NativeObject
+  %5 = partial_apply [callee_guaranteed] %3(%0copy1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %6 = begin_borrow %5 : $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb2
+
+bb2:
+  %0copy2 = copy_value %0 : $Builtin.NativeObject
+  %13 = apply %2(%6, %0copy2) : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  end_borrow %6 : $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb3
+
+bb3:
+  destroy_value %5 : $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  return %13 : $Builtin.NativeObject
+}

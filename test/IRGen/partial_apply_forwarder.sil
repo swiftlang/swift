@@ -40,14 +40,17 @@ bb0(%0 : $E):
 sil hidden_external @unspecialized_uncurried : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed E) -> @owned D<τ_0_0>
 
 
-// CHECK-LABEL: define internal swiftcc void @"$s7takingPTA"(%swift.refcounted*
-// CHECK: [[CONTEXT:%.*]] = alloca %swift.refcounted*
-// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s23partial_apply_forwarder1CCMa"([[INT]] 0)
-// CHECK: [[TYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK: store %swift.refcounted* %0, %swift.refcounted** [[CONTEXT]]
-// CHECK: [[CAST:%.*]] = bitcast %swift.refcounted** [[CONTEXT]] to %swift.opaque*
-// CHECK:  call swiftcc void @takingP(%swift.type* [[TYPE]], i8**{{.*}}$s23partial_apply_forwarder1CCAA1PAAWP{{.*}}, %swift.opaque* {{.*}} swiftself [[CAST]]
-// CHECK:  ret
+// CHECK-LABEL: define hidden swiftcc void @reabstract_context(%T23partial_apply_forwarder1CC* %0)
+// CHECK-NEXT: entry
+// CHECK-NEXT: alloca
+// CHECK-NEXT: bitcast
+// CHECK-NEXT: call void @llvm.lifetime.start.p0i8
+// CHECK-NEXT: store
+// CHECK-NEXT: load
+// CHECK-NEXT: call void bitcast
+// CHECK-NEXT: bitcast %T23partial_apply_forwarder1CC** %1 to i8*
+// CHECK-NEXT: call void @llvm.lifetime.end.p0i8
+// CHECK-NEXT:  ret
 sil hidden_external @takingP : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
 
 sil hidden @reabstract_context : $@convention(thin) (@owned C) -> () {
@@ -147,18 +150,6 @@ bb0(%0 : $*τ_0_1, %2: $EmptyType):
 // CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s23partial_apply_forwarder7WeakBoxCMa"([[INT]] 0, %swift.type* [[BPTY]]
 // CHECK:   [[WBTY:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:   call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[WBTY]]
-// CHECK:   ret void
-
-// CHECK-LABEL: define internal swiftcc void @"$s7takingQTA.1"(%T23partial_apply_forwarder7WeakBoxC* %0, %swift.refcounted* swiftself %1)
-// CHECK: entry:
-// CHECK:   [[TYADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder7WeakBoxC, %T23partial_apply_forwarder7WeakBoxC* %0
-// CHECK:   [[TY:%.*]] = load %swift.type*, %swift.type** [[TYADDR]]
-// CHECK:   [[CAST:%.*]] = bitcast %T23partial_apply_forwarder7WeakBoxC* %0 to %T23partial_apply_forwarder7WeakBoxC.1*
-// CHECK:   [[TYPARAMSADDR:%.*]] = bitcast %swift.type* [[TY]] to %swift.type**
-// CHECK:   [[TYPARAM:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[TYPARAMSADDR]], {{(i64 10|i32 13)}}
-// CHECK:   %"BaseProducer<\CF\84_0_1>" = load %swift.type*, %swift.type** [[TYPARAM]]
-// CHECK:   [[WITNESS:%.*]] = call i8** @swift_getWitnessTable
-// CHECK:   tail call swiftcc void @takingQ(%T23partial_apply_forwarder7WeakBoxC.1* [[CAST]], i8** [[WITNESS]])
 // CHECK:   ret void
 
 sil public @bind_polymorphic_param_from_forwarder_parameter : $@convention(thin) <τ_0_1>(@in τ_0_1) -> () {

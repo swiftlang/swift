@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %s -Onone -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 
@@ -387,15 +387,9 @@ sil public_external @receive_closure : $@convention(thin) <C where C : Base> (@o
 // CHECK:  [[CTX:%.*]] = bitcast %T13partial_apply4BaseC* %0 to %swift.refcounted*
 // CHECK:  [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s13partial_apply3SubCMa"(i64 0)
 // CHECK:  [[TYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK:  call swiftcc void @receive_closure(i8* bitcast (%T13partial_apply3SubC* (%swift.refcounted*)* @"$s26parametric_casting_closureTA.{{[0-9]+}}" to i8*), %swift.refcounted* [[CTX]], %swift.type* [[TYPE]])
+// CHECK:  call swiftcc void @receive_closure(i8* bitcast (%T13partial_apply3SubC* (%swift.refcounted*)* @"$s26parametric_casting_closureTA" to i8*), %swift.refcounted* [[CTX]], %swift.type* [[TYPE]])
 
-// CHECK-LABEL: define internal swiftcc %T13partial_apply3SubC* @"$s26parametric_casting_closureTA"(%T13partial_apply4BaseC* %0, %swift.refcounted* swiftself %1)
-// CHECK: [[RES:%.*]] = tail call swiftcc %T13partial_apply4BaseC* @parametric_casting_closure
-// CHECK: [[CASTED:%.*]] = bitcast %T13partial_apply4BaseC* [[RES]] to %T13partial_apply3SubC*
-// CHECK: ret %T13partial_apply3SubC* [[CASTED]]
-
-
-// CHECK-LABEL: define internal swiftcc %T13partial_apply3SubC* @"$s26parametric_casting_closureTA.{{[0-9]+}}"(%swift.refcounted* swiftself %0)
+// CHECK-LABEL: define internal swiftcc %T13partial_apply3SubC* @"$s26parametric_casting_closureTA"(%swift.refcounted* swiftself %0)
 // CHECK:  [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s13partial_apply3SubCMa"(i64 0)
 // CHECK:  [[TYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:  [[CTX:%.*]] = bitcast %swift.refcounted* %0 to %T13partial_apply4BaseC*
@@ -420,8 +414,7 @@ sil public_external @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { v
 sil @empty_box : $@convention(thin) () -> () {
 entry:
   // CHECK: [[BOX:%.*]] = call {{.*}}swift_allocEmptyBox
-  // CHECK: store %swift.refcounted* [[BOX]]
-  // CHECK: store %swift.opaque* undef
+  // CHECK-NEXT: ret
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <()>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <()>, 0
   %f = function_ref @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout_aliasable ()) -> ()
@@ -443,30 +436,10 @@ bb0(%0 : $Int):
   return %result : $()
 }
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @partial_apply_complex_generic_function(i64 %0, %swift.type* %T, i8** %T.P2, i8** %T.Y.P2)
-// CHECK:      [[T0:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}}, i64 48, i64 7)
-// CHECK-NEXT: [[T1:%.*]] = bitcast %swift.refcounted* [[T0]] to <{ %swift.refcounted, [24 x i8], %TSi }>*
-// CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %TSi }>, <{ %swift.refcounted, [24 x i8], %TSi }>* [[T1]], i32 0, i32 1
-// CHECK-NEXT: [[BUFFER:%.*]] = bitcast [24 x i8]* [[T2]] to %swift.type**
-// CHECK-NEXT: store %swift.type* %T, %swift.type** [[BUFFER]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 1
-// CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
-// CHECK-NEXT: store i8** %T.P2, i8*** [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 2
-// CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
-// CHECK-NEXT: store i8** %T.Y.P2, i8*** [[T1]], align 8
-
-// CHECK-LABEL: define internal swiftcc void @"$s24complex_generic_functionTA"(%swift.refcounted* swiftself %0)
-// CHECK:      [[T0:%.*]] = bitcast %swift.refcounted* %0 to <{ %swift.refcounted, [24 x i8], %TSi }>*
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %TSi }>, <{ %swift.refcounted, [24 x i8], %TSi }>* [[T0]], i32 0, i32 1
-// CHECK-NEXT: [[BUFFER:%.*]] = bitcast [24 x i8]* [[T1]] to %swift.type**
-// CHECK-NEXT: %T = load %swift.type*, %swift.type** [[BUFFER]], align 8
-// CHECK-NEXT: store %swift.type* %T, %swift.type**
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 1
-// CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
-// CHECK-NEXT: %T.P2 = load i8**, i8*** [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 2
-// CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
-// CHECK-NEXT: %T.Y.P2 = load i8**, i8*** [[T1]], align 8
+// CHECK-NEXT: entry
+// CHECK-NEXT: alloca
+// CHECK-NEXT: store
+// CHECK-NEXT: ret
 
 struct ComplexBoundedType<T: P2> {}
 

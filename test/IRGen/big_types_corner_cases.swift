@@ -140,19 +140,15 @@ public func enumCallee(_ x: LargeEnum) {
     case .Empty2: break
   }
 }
-// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases10enumCalleeyAA9LargeEnumOF"(%T22big_types_corner_cases9LargeEnumO* noalias nocapture dereferenceable({{.*}}) %0) #0 {
-// CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO05InnerF0O
-// CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO
-// CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
-// CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
-// CHECK-64: $ss5print_9separator10terminatoryypd_S2StF
+// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases10enumCalleeyyAA9LargeEnumOF"(%T22big_types_corner_cases9LargeEnumO* noalias nocapture dereferenceable(33) %0) #0 {
+// CHECK-64: call %T22big_types_corner_cases9LargeEnumO
+// CHECK-64: call %T22big_types_corner_cases9LargeEnumO05InnerF0O*
+// CHECK-64: call swiftcc void @"$ss5print_9separator10terminatoryypd_S2StF"
 // CHECK-64: ret void
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc void @"$s22big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret %0, %T22big_types_corner_cases8SuperSubC* %1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases9SuperBaseC4boomAA9BigStructVyF"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret %0, %T22big_types_corner_cases9SuperBaseC* swiftself %1)
 // CHECK-64: [[ALLOC1:%.*]] = alloca %T22big_types_corner_cases9BigStructV
-// CHECK-64: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
-// CHECK-64: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
-// CHECK-64: call swiftcc void @"$s22big_types_corner_cases9SuperBaseC4boomAA9BigStructVyF"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %T22big_types_corner_cases9SuperBaseC* swiftself {{.*}})
+// CHECK-64: call swiftcc void @"$s22big_types_corner_cases9BigStructVACycfC"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]])
 // CHECK: ret void
 class SuperBase {
   func boom() -> BigStruct {

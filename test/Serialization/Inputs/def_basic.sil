@@ -1147,11 +1147,12 @@ entry(%f : $@convention(thin) (Int) -> @out Int, %x : $Int):
 sil [transparent] [serialized] @partial_apply_with_closure : $@convention(thin) (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> () {
 bb0(%0 : $@callee_owned () -> Bool, %1 : $String, %2 : $UnsafePointer<Int8>, %3 : $Int64):
   %17 = function_ref @closure_body : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
-// CHECK: function_ref @closure_body
+// CHECK-NOT: function_ref @closure_body
   %18 = partial_apply %17(%2, %3) : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
-// CHECK: partial_apply
+// CHECK-NOT: partial_apply
   %30 = tuple ()
   return %30 : $()
+// CHECK-LABEL: // end sil function 'partial_apply_with_closure'
 }
 
 // rdar: 15893086
@@ -1378,9 +1379,6 @@ bb0(%0 : $UnsafePointer<Int8>, %1 : $UnsafePointer<Int8>, %2 : $Int64):
   %5 = tuple ()
   return %5 : $()
 }
-
-// CHECK-LABEL: @closure_body : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> () {
-// CHECK: function_ref @assert_fail
 
 sil_vtable [serialized] Foo {
   #Foo.subscript!getter.1: @$s3tmp3FooC9subscriptSiSi1x_Si1ytcfg

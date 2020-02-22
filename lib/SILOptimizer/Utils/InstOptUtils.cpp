@@ -1449,7 +1449,8 @@ static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
 
   ValueLifetimeAnalysis::Frontier partialApplyFrontier;
   if (!vla.computeFrontier(partialApplyFrontier,
-                           ValueLifetimeAnalysis::DontModifyCFG)) {
+                           ValueLifetimeAnalysis::DontModifyCFG) ||
+      partialApplyFrontier.empty()) {
     return false;
   }
 
