@@ -9,7 +9,7 @@ if [[ "$(uname)" == "Linux" ]]; then
   BUILD_SCRIPT=$UTILS_PATH/build-linux.sh
   DEPENDENCIES_SCRIPT=$UTILS_PATH/linux/install-dependencies.sh
 else
-  BUILD_SCRIPT=$UTILS_PATH/build-macos.sh
+  BUILD_SCRIPT=$UTILS_PATH/build-mac.sh
   DEPENDENCIES_SCRIPT=$UTILS_PATH/macos/install-dependencies.sh
 fi
 
