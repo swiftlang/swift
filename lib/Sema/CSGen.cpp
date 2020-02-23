@@ -2205,21 +2205,31 @@ namespace {
                                      TVO_CanBindToNoEscape);
       }
 
+      // Local function that must be called for each "return" throughout this
+      // function, to set the type of the pattern.
+      auto setType = [&](Type type) {
+        CS.setType(pattern, type);
+        return type;
+      };
+
       switch (pattern->getKind()) {
       case PatternKind::Paren:
         // Parentheses don't affect the canonical type, but record them as
         // type sugar.
-        return ParenType::get(
-            CS.getASTContext(),
-            getTypeForPattern(
-              cast<ParenPattern>(pattern)->getSubPattern(), locator));
+        return setType(
+            ParenType::get(
+              CS.getASTContext(),
+              getTypeForPattern(
+                cast<ParenPattern>(pattern)->getSubPattern(), locator)));
       case PatternKind::Var:
         // Var doesn't affect the type.
-        return getTypeForPattern(cast<VarPattern>(pattern)->getSubPattern(),
-                                 locator);
+        return setType(
+            getTypeForPattern(
+              cast<VarPattern>(pattern)->getSubPattern(), locator));
       case PatternKind::Any: {
-        return CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                     TVO_CanBindToNoEscape);
+        return setType(
+            CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                  TVO_CanBindToNoEscape));
       }
 
       case PatternKind::Named: {
@@ -2233,10 +2243,10 @@ namespace {
           ROK = OA->get();
         switch (optionalityOf(ROK)) {
         case ReferenceOwnershipOptionality::Required:
-          return TypeChecker::getOptionalType(var->getLoc(), varType);
+          return setType(TypeChecker::getOptionalType(var->getLoc(), varType));
         case ReferenceOwnershipOptionality::Allowed:
         case ReferenceOwnershipOptionality::Disallowed:
-          return varType;
+          return setType(varType);
         }
       }
 
@@ -2249,7 +2259,7 @@ namespace {
 
         // For a typed pattern, simply return the opened type of the pattern.
         // FIXME: Error recovery if the type is an error type?
-        return openedType;
+        return setType(openedType);
       }
 
       case PatternKind::Tuple: {
@@ -2263,7 +2273,7 @@ namespace {
                                            LocatorPathElt::TupleElement(i)));
           tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
         }
-        return TupleType::get(tupleTypeElts, CS.getASTContext());
+        return setType(TupleType::get(tupleTypeElts, CS.getASTContext()));
       }
 
       case PatternKind::OptionalSome: {
@@ -2271,7 +2281,7 @@ namespace {
         Type subPatternType = getTypeForPattern(
             cast<OptionalSomePattern>(pattern)->getSubPattern(), locator);
 
-        return OptionalType::get(subPatternType);
+        return setType(OptionalType::get(subPatternType));
       }
 
       case PatternKind::Is: {
@@ -2288,11 +2298,11 @@ namespace {
               ConstraintKind::CheckedCast, subPatternType, castType, locator);
         }
 
-        return subPatternType;
+        return setType(subPatternType);
       }
 
       case PatternKind::Bool:
-        return CS.getASTContext().getBoolDecl()->getDeclaredType();
+        return setType(CS.getASTContext().getBoolDecl()->getDeclaredType());
 
       // Refutable patterns occur when checking the PatternBindingDecls in an
       // if/let or while/let condition.  They always require an initial value,
@@ -2301,8 +2311,9 @@ namespace {
       case PatternKind::Expr:
         // TODO: we could try harder here, e.g. for enum elements to provide the
         // enum type.
-        return CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                     TVO_CanBindToNoEscape);
+        return setType(
+            CS.createTypeVariable(
+              CS.getConstraintLocator(locator), TVO_CanBindToNoEscape));
       }
 
       llvm_unreachable("Unhandled pattern kind");
@@ -3882,11 +3893,7 @@ static bool generateInitPatternConstraints(
   auto locator =
       cs.getConstraintLocator(initializer, LocatorPathElt::ContextualType());
   Type patternType = cs.generateConstraints(pattern, locator);
-  if (!patternType)
-    return true;
-
-  // Record the type of this pattern.
-  cs.setType(pattern, patternType);
+  assert(patternType && "All patterns have a type");
 
   if (auto wrappedVar = target.getInitializationWrappedVar()) {
     // Add an equal constraint between the pattern type and the
