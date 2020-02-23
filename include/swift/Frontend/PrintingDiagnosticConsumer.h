@@ -60,7 +60,6 @@ public:
 
 private:
   void printDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
-  void prettyPrintDiagnostic(SourceManager &SM, DiagnosticInfo Info);
 };
   
 }
