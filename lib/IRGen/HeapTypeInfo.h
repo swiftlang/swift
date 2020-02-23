@@ -52,8 +52,9 @@ enum class IsaEncoding : uint8_t {
 /// of this type:
 ///   ReferenceCounting getReferenceCounting() const;
 template <class Impl>
-class HeapTypeInfo : public SingleScalarTypeInfo<Impl, ReferenceTypeInfo> {
-  using super = SingleScalarTypeInfo<Impl, ReferenceTypeInfo>;
+class HeapTypeInfo
+    : public SingleScalarTypeInfoWithTypeLayout<Impl, ReferenceTypeInfo> {
+  using super = SingleScalarTypeInfoWithTypeLayout<Impl, ReferenceTypeInfo>;
 
   llvm::Type *getOptionalIntType() const {
     return llvm::IntegerType::get(this->getStorageType()->getContext(),

@@ -2780,7 +2780,8 @@ public:
                    Identifier l = Identifier(),
                    ParameterTypeFlags f = ParameterTypeFlags())
         : Ty(t), Label(l), Flags(f) {
-      assert(!t || !t->is<InOutType>() && "set flags instead");
+      assert(t && "param type must be non-null");
+      assert(!t->is<InOutType>() && "set flags instead");
     }
 
   private:
@@ -3202,6 +3203,16 @@ public:
     return getExtInfo().getRepresentation();
   }
 
+  /// Appends the parameters indicated by `parameterIndices` to `results`.
+  ///
+  /// For curried function types: if `reverseCurryLevels` is true, append
+  /// the `self` parameter last instead of first.
+  ///
+  /// TODO(TF-874): Simplify logic and remove the `reverseCurryLevels` flag.
+  void getSubsetParameters(IndexSubset *parameterIndices,
+                           SmallVectorImpl<AnyFunctionType::Param> &results,
+                           bool reverseCurryLevels = false);
+
   /// Returns the derivative function type for the given parameter indices,
   /// result index, derivative function kind, derivative function generic
   /// signature (optional), and other auxiliary parameters.
@@ -3209,8 +3220,8 @@ public:
   /// Preconditions:
   /// - Parameters corresponding to parameter indices must conform to
   ///   `Differentiable`.
-  /// - The result corresponding to the result index must conform to
-  ///   `Differentiable`.
+  /// - There is one semantic function result type: either the formal original
+  ///   result or an `inout` parameter. It must conform to `Differentiable`.
   ///
   /// Typing rules, given:
   /// - Original function type. Three cases:
@@ -3256,6 +3267,11 @@ public:
   ///              original result | deriv. wrt result | deriv. wrt params
   /// \endverbatim
   ///
+  /// The original type may have `inout` parameters. If so, the
+  /// differential/pullback typing rules are more nuanced: see documentation for
+  /// `getAutoDiffDerivativeFunctionLinearMapType` for details. Semantically,
+  /// `inout` parameters behave as both parameters and results.
+  ///
   /// By default, if the original type has a `self` parameter list and parameter
   /// indices include `self`, the computed derivative function type will return
   /// a linear map taking/returning self's tangent *last* instead of first, for
@@ -3266,11 +3282,53 @@ public:
   /// derivative function types, e.g. when type-checking `@differentiable` and
   /// `@derivative` attributes.
   AnyFunctionType *getAutoDiffDerivativeFunctionType(
-      IndexSubset *parameterIndices, unsigned resultIndex,
-      AutoDiffDerivativeFunctionKind kind,
+      IndexSubset *parameterIndices, AutoDiffDerivativeFunctionKind kind,
       LookupConformanceFn lookupConformance,
       GenericSignature derivativeGenericSignature = GenericSignature(),
       bool makeSelfParamFirst = false);
+
+  /// Returns the corresponding linear map function type for the given parameter
+  /// indices, linear map function kind, and other auxiliary parameters.
+  ///
+  /// Preconditions:
+  /// - Parameters corresponding to parameter indices must conform to
+  ///   `Differentiable`.
+  /// - There is one semantic function result type: either the formal original
+  ///   result or an `inout` parameter. It must conform to `Differentiable`.
+  ///
+  /// Differential typing rules: takes "wrt" parameter derivatives and returns a
+  /// "wrt" result derivative.
+  ///
+  /// - Case 1: original function has no `inout` parameters.
+  ///   - Original:     `(T0, T1, ...) -> R`
+  ///   - Differential: `(T0.Tan, T1.Tan, ...) -> R.Tan`
+  /// - Case 2: original function has a non-wrt `inout` parameter.
+  ///   - Original:     `(T0, inout T1, ...) -> Void`
+  ///   - Differential: `(T0.Tan, ...) -> T1.Tan`
+  /// - Case 3: original function has a wrt `inout` parameter.
+  ///   - Original:     `(T0, inout T1, ...) -> Void`
+  ///   - Differential: `(T0.Tan, inout T1.Tan, ...) -> Void`
+  ///
+  /// Pullback typing rules: takes a "wrt" result derivative and returns "wrt"
+  /// parameter derivatives.
+  ///
+  /// - Case 1: original function has no `inout` parameters.
+  ///   - Original: `(T0, T1, ...) -> R`
+  ///   - Pullback: `R.Tan -> (T0.Tan, T1.Tan, ...)`
+  /// - Case 2: original function has a non-wrt `inout` parameter.
+  ///   - Original: `(T0, inout T1, ...) -> Void`
+  ///   - Pullback: `(T1.Tan) -> (T0.Tan, ...)`
+  /// - Case 3: original function has a wrt `inout` parameter.
+  ///   - Original: `(T0, inout T1, ...) -> Void`
+  ///   - Pullback: `(inout T1.Tan) -> (T0.Tan, ...)`
+  ///
+  /// If `makeSelfParamFirst` is true, `self`'s tangent is reordered to appear
+  /// first. `makeSelfParamFirst` should be true when working with user-facing
+  /// derivative function types, e.g. when type-checking `@differentiable` and
+  /// `@derivative` attributes.
+  AnyFunctionType *getAutoDiffDerivativeFunctionLinearMapType(
+      IndexSubset *parameterIndices, AutoDiffLinearMapKind kind,
+      LookupConformanceFn lookupConformance, bool makeSelfParamFirst = false);
 
   /// True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
@@ -4403,6 +4461,28 @@ public:
     return getParameters().back();
   }
 
+  struct IndirectMutatingParameterFilter {
+    bool operator()(SILParameterInfo param) const {
+      return param.isIndirectMutating();
+    }
+  };
+  using IndirectMutatingParameterIter =
+      llvm::filter_iterator<const SILParameterInfo *,
+                            IndirectMutatingParameterFilter>;
+  using IndirectMutatingParameterRange =
+      iterator_range<IndirectMutatingParameterIter>;
+
+  /// A range of SILParameterInfo for all indirect mutating parameters.
+  IndirectMutatingParameterRange getIndirectMutatingParameters() const {
+    return llvm::make_filter_range(getParameters(),
+                                   IndirectMutatingParameterFilter());
+  }
+
+  /// Returns the number of indirect mutating parameters.
+  unsigned getNumIndirectMutatingParameters() const {
+    return llvm::count_if(getParameters(), IndirectMutatingParameterFilter());
+  }
+
   /// Get the generic signature used to apply the substitutions of a substituted function type
   CanGenericSignature getSubstGenericSignature() const {
     return GenericSigAndIsImplied.getPointer();
@@ -4485,18 +4565,27 @@ public:
   /// - Returns original results, followed by a differential function, which
   ///   takes "wrt" parameter derivatives and returns a "wrt" result derivative.
   ///
+  /// \verbatim
   ///     $(T0, ...) -> (R0, ...,  (T0.Tan, T1.Tan, ...) -> R0.Tan)
   ///                    ^~~~~~~    ^~~~~~~~~~~~~~~~~~~     ^~~~~~
   ///          original results | derivatives wrt params | derivative wrt result
+  /// \endverbatim
   ///
   /// VJP derivative type:
   /// - Takes original parameters.
   /// - Returns original results, followed by a pullback function, which
   ///   takes a "wrt" result derivative and returns "wrt" parameter derivatives.
   ///
+  /// \verbatim
   ///     $(T0, ...) -> (R0, ...,       (R0.Tan)  ->     (T0.Tan, T1.Tan, ...))
   ///                    ^~~~~~~         ^~~~~~            ^~~~~~~~~~~~~~~~~~~
   ///          original results | derivative wrt result | derivatives wrt params
+  /// \endverbatim
+  ///
+  /// The original type may have `inout` parameters. If so, the
+  /// differential/pullback typing rules are more nuanced: see documentation for
+  /// `getAutoDiffDerivativeFunctionLinearMapType` for details. Semantically,
+  /// `inout` parameters behave as both parameters and results.
   ///
   /// A "constrained derivative generic signature" is computed from
   /// `derivativeFunctionGenericSignature`, if specified. Otherwise, it is

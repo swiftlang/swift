@@ -342,6 +342,20 @@ namespace {
                                      EnumDecl *theEnum,
                                      llvm::StructType *enumTy) override;
 
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+       if (ElementsWithPayload.empty())
+         return IGM.typeLayoutCache.getEmptyEntry();
+       if (!ElementsAreABIAccessible)
+         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+       if (TIK >= Loadable) {
+         return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T);
+       }
+
+       return getSingleton()->buildTypeLayoutEntry(IGM,
+                                                   getSingletonType(IGM, T));
+    }
+
     llvm::Value *
     emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr)
     const override {
@@ -1018,6 +1032,12 @@ namespace {
                                      EnumDecl *theEnum,
                                      llvm::StructType *enumTy) override;
 
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T);
+    }
+
+
     // TODO: Support this function also for other enum implementation strategies.
     int64_t getDiscriminatorIndex(EnumElementDecl *elt) const override {
       // The elements are assigned discriminators in declaration order.
@@ -1163,6 +1183,11 @@ namespace {
                                      SILType Type,
                                      EnumDecl *theEnum,
                                      llvm::StructType *enumTy) override;
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T);
+    }
 
     /// \group Extra inhabitants for C-compatible enums.
 
@@ -1446,11 +1471,10 @@ namespace {
                            SILType T) const {
       // If the layout is fixed, the size will be a constant.
       // Otherwise, do a memcpy of the dynamic size of the type.
-      IGF.Builder.CreateMemCpy(dest.getAddress(),
-                               dest.getAlignment().getValue(),
-                               src.getAddress(),
-                               src.getAlignment().getValue(),
-                               TI->getSize(IGF, T));
+      IGF.Builder.CreateMemCpy(
+          dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
+          src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
+          TI->getSize(IGF, T));
     }
 
     void emitPrimitiveStorePayloadAndExtraTag(IRGenFunction &IGF, Address dest,
@@ -1562,7 +1586,20 @@ namespace {
     bool needsPayloadSizeInMetadata() const override {
       return false;
     }
-    
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+     if (!ElementsAreABIAccessible)
+       return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+
+      unsigned emptyCases = ElementsWithNoPayload.size();
+      std::vector<TypeLayoutEntry *> nonEmptyCases;
+      nonEmptyCases.push_back(getPayloadTypeInfo().buildTypeLayoutEntry(
+          IGM, getPayloadType(IGM, T)));
+      return IGM.typeLayoutCache.getOrCreateEnumEntry(emptyCases,
+                                                      nonEmptyCases);
+    }
+
     EnumElementDecl *getPayloadElement() const {
       return ElementsWithPayload[0].decl;
     }
@@ -3290,6 +3327,29 @@ namespace {
     mutable llvm::Function *copyEnumFunction = nullptr;
     mutable llvm::Function *consumeEnumFunction = nullptr;
     SmallVector<llvm::Type *, 2> PayloadTypesAndTagType;
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      if (!ElementsAreABIAccessible)
+        return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+
+      if (AllowFixedLayoutOptimizations && TIK >= Loadable) {
+        // The type layout entry code does not handle spare bits atm.
+        return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T);
+      }
+
+      unsigned emptyCases = ElementsWithNoPayload.size();
+      std::vector<TypeLayoutEntry*> nonEmptyCases;
+      for (auto &elt : ElementsWithPayload) {
+        auto eltPayloadType = T.getEnumElementType(
+            elt.decl, IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
+
+        nonEmptyCases.push_back(
+            elt.ti->buildTypeLayoutEntry(IGM, eltPayloadType));
+      }
+      return IGM.typeLayoutCache.getOrCreateEnumEntry(emptyCases,
+                                                      nonEmptyCases);
+    }
 
     llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, SILType type) const {
       IRGenMangler Mangler;
@@ -5388,6 +5448,10 @@ namespace {
       emitDestructiveProjectEnumDataCall(IGF, T, enumAddr);
     }
 
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+    }
+
     void storeTag(IRGenFunction &IGF,
                   SILType T,
                   Address enumAddr,
@@ -5974,6 +6038,10 @@ namespace {
     bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                    ReferenceCounting *rc) const override {
       return Strategy.isSingleRetainablePointer(expansion, rc);
+    }
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType ty) const override {
+      return Strategy.buildTypeLayoutEntry(IGM, ty);
     }
   };
 

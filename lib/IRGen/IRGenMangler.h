@@ -492,6 +492,7 @@ public:
   }
 
   std::string manglePartialApplyForwarder(StringRef FuncName);
+  std::string mangleThinToThickForwarder(StringRef FuncName);
   
   std::string mangleTypeForForeignMetadataUniquing(Type type) {
     return mangleTypeWithoutPrefix(type);

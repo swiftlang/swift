@@ -689,9 +689,6 @@ static bool hasOverridingDifferentiableAttribute(ValueDecl *derivedDecl,
         overrides = false;
         break;
       }
-      if (!derivedParameters && !baseParameters) {
-        assert(false);
-      }
     }
     if (overrides)
       return true;
@@ -1436,6 +1433,7 @@ namespace  {
     UNINTERESTING_ATTR(Semantics)
     UNINTERESTING_ATTR(SetterAccess)
     UNINTERESTING_ATTR(TypeEraser)
+    UNINTERESTING_ATTR(SPIAccessControl)
     UNINTERESTING_ATTR(HasStorage)
     UNINTERESTING_ATTR(UIApplicationMain)
     UNINTERESTING_ATTR(UsableFromInline)

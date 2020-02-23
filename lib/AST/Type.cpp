@@ -3411,7 +3411,8 @@ operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
   assert((conformingReplacementType->is<ErrorType>()
           || conformingReplacementType->is<SubstitutableType>()
-          || conformingReplacementType->is<DependentMemberType>())
+          || conformingReplacementType->is<DependentMemberType>()
+          || conformingReplacementType->is<TypeVariableType>())
          && "replacement requires looking up a concrete conformance");
   return ProtocolConformanceRef(conformedProtocol);
 }
@@ -4912,9 +4913,9 @@ makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
 }
 
 AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
-    IndexSubset *parameterIndices, unsigned resultIndex,
-    AutoDiffDerivativeFunctionKind kind, LookupConformanceFn lookupConformance,
-    GenericSignature derivativeGenSig, bool makeSelfParamFirst) {
+    IndexSubset *parameterIndices, AutoDiffDerivativeFunctionKind kind,
+    LookupConformanceFn lookupConformance, GenericSignature derivativeGenSig,
+    bool makeSelfParamFirst) {
   assert(!parameterIndices->isEmpty() &&
          "Expected at least one differentiability parameter");
   auto &ctx = getASTContext();
@@ -4923,11 +4924,6 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
   // generic signature.
   if (!derivativeGenSig)
     derivativeGenSig = getOptGenericSignature();
-
-  // Get differentiability parameter types.
-  SmallVector<Type, 8> diffParamTypes;
-  autodiff::getSubsetParameterTypes(parameterIndices, this, diffParamTypes,
-                                    /*reverseCurryLevels*/ !makeSelfParamFirst);
 
   // Unwrap curry levels. At most, two parameter lists are necessary, for
   // curried method types with a `(Self)` parameter list.
@@ -4942,65 +4938,11 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
     currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
   }
 
-  Type originalResult = curryLevels.back()->getResult();
+  auto originalResult = curryLevels.back()->getResult();
 
-  // Build the result linear map function type.
-  Type linearMapType;
-  switch (kind) {
-  case AutoDiffDerivativeFunctionKind::JVP: {
-    // Differential function type, a result of the JVP:
-    //   `LinearMapType = (T.TangentVector, ...) -> (R.TangentVector)`
-    SmallVector<AnyFunctionType::Param, 8> differentialParams;
-    for (auto diffParamType : diffParamTypes)
-      differentialParams.push_back(AnyFunctionType::Param(
-          diffParamType->getAutoDiffTangentSpace(lookupConformance)
-              ->getType()));
-    SmallVector<TupleTypeElt, 8> differentialResults;
-    if (auto *resultTuple = originalResult->getAs<TupleType>()) {
-      auto resultTupleEltType = resultTuple->getElementType(resultIndex);
-      differentialResults.push_back(
-          resultTupleEltType->getAutoDiffTangentSpace(lookupConformance)
-              ->getType());
-    } else {
-      assert(resultIndex == 0 && "resultIndex out of bounds");
-      differentialResults.push_back(
-          originalResult->getAutoDiffTangentSpace(lookupConformance)
-              ->getType());
-    }
-    Type differentialResult = differentialResults.size() > 1
-                                  ? TupleType::get(differentialResults, ctx)
-                                  : differentialResults[0].getType();
-    linearMapType = FunctionType::get(differentialParams, differentialResult);
-    break;
-  }
-  case AutoDiffDerivativeFunctionKind::VJP: {
-    // Pullback function type, a result of the VJP:
-    //   `LinearMapType = (R.TangentVector) -> (T.TangentVector, ...)`
-    SmallVector<AnyFunctionType::Param, 8> pullbackParams;
-    if (auto *resultTuple = originalResult->getAs<TupleType>()) {
-      auto resultTupleEltType = resultTuple->getElementType(resultIndex);
-      pullbackParams.push_back(AnyFunctionType::Param(
-          resultTupleEltType->getAutoDiffTangentSpace(lookupConformance)
-              ->getType()));
-    } else {
-      assert(resultIndex == 0 &&
-             "Expected result index 0 for non-tuple result");
-      pullbackParams.push_back(AnyFunctionType::Param(
-          originalResult->getAutoDiffTangentSpace(lookupConformance)
-              ->getType()));
-    }
-    SmallVector<TupleTypeElt, 8> pullbackResults;
-    for (auto diffParamType : diffParamTypes)
-      pullbackResults.push_back(
-          diffParamType->getAutoDiffTangentSpace(lookupConformance)->getType());
-    Type pullbackResult = pullbackResults.size() > 1
-                              ? TupleType::get(pullbackResults, ctx)
-                              : pullbackResults[0].getType();
-    linearMapType = FunctionType::get(pullbackParams, pullbackResult);
-    break;
-  }
-  }
-  assert(linearMapType && "Expected linear map type");
+  Type linearMapType = getAutoDiffDerivativeFunctionLinearMapType(
+      parameterIndices, kind.getLinearMapKind(), lookupConformance,
+      makeSelfParamFirst);
 
   // Build the full derivative function type: `(T...) -> (R, LinearMapType)`.
   SmallVector<TupleTypeElt, 2> retElts;
@@ -5025,6 +4967,111 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
   }
 
   return derivativeFunctionType;
+}
+
+AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
+    IndexSubset *parameterIndices, AutoDiffLinearMapKind kind,
+    LookupConformanceFn lookupConformance, bool makeSelfParamFirst) {
+  assert(!parameterIndices->isEmpty() &&
+         "Expected at least one differentiability parameter");
+  auto &ctx = getASTContext();
+
+  // Get differentiability parameters.
+  SmallVector<AnyFunctionType::Param, 8> diffParams;
+  getSubsetParameters(parameterIndices, diffParams,
+                      /*reverseCurryLevels*/ !makeSelfParamFirst);
+
+  // Get the original semantic result type.
+  SmallVector<AutoDiffSemanticFunctionResultType, 1> originalResults;
+  autodiff::getFunctionSemanticResultTypes(this, originalResults);
+  assert(originalResults.size() == 1 &&
+         "Only functions with one semantic result are currently supported");
+  auto originalResult = originalResults.front();
+  auto originalResultType = originalResult.type;
+
+  // Get the original semantic result type's `TangentVector` associated type.
+  auto resultTan =
+      originalResultType->getAutoDiffTangentSpace(lookupConformance);
+  assert(resultTan && "Original result has no tangent space?");
+  auto resultTanType = resultTan->getType();
+
+  // Compute the result linear map function type.
+  FunctionType *linearMapType;
+  switch (kind) {
+  case AutoDiffLinearMapKind::Differential: {
+    // Compute the differential type, returned by JVP functions.
+    //
+    // Case 1: original function has no `inout` parameters.
+    // - Original:     `(T0, T1, ...) -> R`
+    // - Differential: `(T0.Tan, T1.Tan, ...) -> R.Tan`
+    //
+    // Case 2: original function has a non-wrt `inout` parameter.
+    // - Original:      `(T0, inout T1, ...) -> Void`
+    // - Differential: `(T0.Tan, ...) -> T1.Tan`
+    //
+    // Case 3: original function has a wrt `inout` parameter.
+    // - Original:     `(T0, inout T1, ...) -> Void`
+    // - Differential: `(T0.Tan, inout T1.Tan, ...) -> Void`
+    SmallVector<AnyFunctionType::Param, 4> differentialParams;
+    bool hasInoutDiffParameter = false;
+    for (auto diffParam : diffParams) {
+      auto paramType = diffParam.getPlainType();
+      auto paramTan = paramType->getAutoDiffTangentSpace(lookupConformance);
+      assert(paramTan && "Parameter has no tangent space?");
+      differentialParams.push_back(AnyFunctionType::Param(
+          paramTan->getType(), Identifier(), diffParam.getParameterFlags()));
+      if (diffParam.isInOut())
+        hasInoutDiffParameter = true;
+    }
+    auto differentialResult =
+        hasInoutDiffParameter ? Type(ctx.TheEmptyTupleType) : resultTanType;
+    linearMapType = FunctionType::get(differentialParams, differentialResult);
+    break;
+  }
+  case AutoDiffLinearMapKind::Pullback: {
+    // Compute the pullback type, returned by VJP functions.
+    //
+    // Case 1: original function has no `inout` parameters.
+    // - Original: `(T0, T1, ...) -> R`
+    // - Pullback: `R.Tan -> (T0.Tan, T1.Tan, ...)`
+    //
+    // Case 2: original function has a non-wrt `inout` parameter.
+    // - Original: `(T0, inout T1, ...) -> Void`
+    // - Pullback: `(T1.Tan) -> (T0.Tan, ...)`
+    //
+    // Case 3: original function has a wrt `inout` parameter.
+    // - Original: `(T0, inout T1, ...) -> Void`
+    // - Pullback: `(inout T1.Tan) -> (T0.Tan, ...)`
+    SmallVector<TupleTypeElt, 4> pullbackResults;
+    bool hasInoutDiffParameter = false;
+    for (auto diffParam : diffParams) {
+      auto paramType = diffParam.getPlainType();
+      auto paramTan = paramType->getAutoDiffTangentSpace(lookupConformance);
+      assert(paramTan && "Parameter has no tangent space?");
+      if (diffParam.isInOut()) {
+        hasInoutDiffParameter = true;
+        continue;
+      }
+      pullbackResults.push_back(TupleTypeElt(paramTan->getType(), Identifier(),
+                                             diffParam.getParameterFlags()));
+    }
+    Type pullbackResult;
+    if (pullbackResults.empty()) {
+      pullbackResult = ctx.TheEmptyTupleType;
+    } else if (pullbackResults.size() == 1) {
+      pullbackResult = pullbackResults.front().getType();
+    } else {
+      pullbackResult = TupleType::get(pullbackResults, ctx);
+    }
+    auto flags = ParameterTypeFlags().withInOut(hasInoutDiffParameter);
+    auto pullbackParam =
+        AnyFunctionType::Param(resultTanType, Identifier(), flags);
+    linearMapType = FunctionType::get({pullbackParam}, pullbackResult);
+    break;
+  }
+  }
+  assert(linearMapType && "Expected linear map type");
+  return linearMapType;
 }
 
 CanSILFunctionType

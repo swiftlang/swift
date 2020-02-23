@@ -783,10 +783,10 @@ bool SILCombiner::canReplaceArg(FullApplySite Apply,
 /// (@in or @owned convention).
 struct ConcreteArgumentCopy {
   SILValue origArg;
-  CopyAddrInst *tempArgCopy;
+  AllocStackInst *tempArg;
 
-  ConcreteArgumentCopy(SILValue origArg, CopyAddrInst *tempArgCopy)
-      : origArg(origArg), tempArgCopy(tempArgCopy) {
+  ConcreteArgumentCopy(SILValue origArg, AllocStackInst *tempArg)
+      : origArg(origArg), tempArg(tempArg) {
     assert(origArg->getType().isAddress());
   }
 
@@ -825,9 +825,18 @@ struct ConcreteArgumentCopy {
     SILBuilderWithScope B(apply.getInstruction(), BuilderCtx);
     auto loc = apply.getLoc();
     auto *ASI = B.createAllocStack(loc, CEI.ConcreteValue->getType());
-    auto *CAI = B.createCopyAddr(loc, CEI.ConcreteValue, ASI, IsNotTake,
-                                 IsInitialization_t::IsInitialization);
-    return ConcreteArgumentCopy(origArg, CAI);
+    // If the type is an address, simple copy it.
+    if (CEI.ConcreteValue->getType().isAddress()) {
+      B.createCopyAddr(loc, CEI.ConcreteValue, ASI, IsNotTake,
+                       IsInitialization_t::IsInitialization);
+    } else {
+      // Otherwise, we probably got the value from the source of a store
+      // instruction so, create a store into the temporary argument.
+      B.createStrongRetain(loc, CEI.ConcreteValue, B.getDefaultAtomicity());
+      B.createStore(loc, CEI.ConcreteValue, ASI,
+                    StoreOwnershipQualifier::Unqualified);
+    }
+    return ConcreteArgumentCopy(origArg, ASI);
   }
 };
 
@@ -858,20 +867,19 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     FullApplySite Apply,
     const llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COAIs,
     SILBuilderContext &BuilderCtx) {
-
   // Ensure that the callee is polymorphic.
   assert(Apply.getOrigCalleeType()->isPolymorphic());
 
   // Create the new set of arguments to apply including their substitutions.
   SubstitutionMap NewCallSubs = Apply.getSubstitutionMap();
   SmallVector<SILValue, 8> NewArgs;
-  bool UpdatedArgs = false;
   unsigned ArgIdx = 0;
   // Push the indirect result arguments.
   for (unsigned EndIdx = Apply.getSubstCalleeConv().getSILArgIndexOfFirstParam();
        ArgIdx < EndIdx; ++ArgIdx) {
       NewArgs.push_back(Apply.getArgument(ArgIdx));
   }
+
   // Transform the parameter arguments.
   SmallVector<ConcreteArgumentCopy, 4> concreteArgCopies;
   for (unsigned EndIdx = Apply.getNumArguments(); ArgIdx < EndIdx; ++ArgIdx) {
@@ -890,16 +898,18 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
       NewArgs.push_back(Apply.getArgument(ArgIdx));
       continue;
     }
-    UpdatedArgs = true;
+
     // Ensure that we have a concrete value to propagate.
     assert(CEI.ConcreteValue);
+
     auto argSub =
         ConcreteArgumentCopy::generate(CEI, Apply, ArgIdx, BuilderCtx);
     if (argSub) {
       concreteArgCopies.push_back(*argSub);
-      NewArgs.push_back(argSub->tempArgCopy->getDest());
-    } else
+      NewArgs.push_back(argSub->tempArg);
+    } else {
       NewArgs.push_back(CEI.ConcreteValue);
+    }
 
     // Form a new set of substitutions where the argument is
     // replaced with a concrete type.
@@ -922,7 +932,33 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
         });
   }
 
-  if (!UpdatedArgs) {
+  // We need to make sure that we can a) update Apply to use the new args and b)
+  // at least one argument has changed. If no arguments have changed, we need
+  // to return nullptr. Otherwise, we will have an infinite loop.
+  auto substTy =
+      Apply.getCallee()
+          ->getType()
+          .substGenericArgs(Apply.getModule(), NewCallSubs,
+                            Apply.getFunction()->getTypeExpansionContext())
+          .getAs<SILFunctionType>();
+  SILFunctionConventions conv(substTy,
+                              SILModuleConventions(Apply.getModule()));
+  bool canUpdateArgs = true;
+  bool madeUpdate = false;
+  for (unsigned index = 0; index < conv.getNumSILArguments(); ++index) {
+    // Make sure that *all* the arguments in both the new substitution function
+    // and our vector of new arguments have the same type.
+    canUpdateArgs &=
+        conv.getSILArgumentType(index) == NewArgs[index]->getType();
+    // Make sure that we have changed at least one argument.
+    madeUpdate |=
+        NewArgs[index]->getType() != Apply.getArgument(index)->getType();
+  }
+
+  // If we can't update the args (because of a type mismatch) or the args don't
+  // change, bail out by removing the instructions we've added and returning
+  // nullptr.
+  if (!canUpdateArgs || !madeUpdate) {
     // Remove any new instructions created while attempting to optimize this
     // apply. Since the apply was never rewritten, if they aren't removed here,
     // they will be removed later as dead when visited by SILCombine, causing
@@ -969,8 +1005,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     auto cleanupLoc = RegularLocation::getAutoGeneratedLocation();
     for (ConcreteArgumentCopy &argCopy : llvm::reverse(concreteArgCopies)) {
       cleanupBuilder.createDestroyAddr(cleanupLoc, argCopy.origArg);
-      cleanupBuilder.createDeallocStack(cleanupLoc,
-                                        argCopy.tempArgCopy->getDest());
+      cleanupBuilder.createDeallocStack(cleanupLoc, argCopy.tempArg);
     }
   }
   return NewApply.getInstruction();

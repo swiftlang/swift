@@ -549,6 +549,11 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
+void ModuleDecl::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spiGroups) const {
+  FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
+}
+
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
                               SmallVectorImpl<ValueDecl*> &result) const {
   getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
@@ -1162,15 +1167,20 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
   assert(ASTStage >= Parsed || Kind == SourceFileKind::SIL);
   assert(filter && "no imports requested?");
   for (auto desc : Imports) {
-    ModuleDecl::ImportFilterKind requiredKind;
+    ModuleDecl::ImportFilter requiredFilter;
     if (desc.importOptions.contains(ImportFlags::Exported))
-      requiredKind = ModuleDecl::ImportFilterKind::Public;
+      requiredFilter |= ModuleDecl::ImportFilterKind::Public;
     else if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
-      requiredKind = ModuleDecl::ImportFilterKind::ImplementationOnly;
+      requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    else if (desc.importOptions.contains(ImportFlags::SPIAccessControl))
+      requiredFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
     else
-      requiredKind = ModuleDecl::ImportFilterKind::Private;
+      requiredFilter |= ModuleDecl::ImportFilterKind::Private;
 
-    if (filter.contains(requiredKind))
+    if (!separatelyImportedOverlays.lookup(desc.module.second).empty())
+      requiredFilter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
+
+    if (filter.contains(requiredFilter))
       modules.push_back(desc.module);
   }
 }
@@ -1407,6 +1417,7 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
   ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
   filter |= ModuleDecl::ImportFilterKind::Private;
+  filter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
 
   auto *topLevel = getParentModule();
 
@@ -1452,6 +1463,191 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
       return Mod;
   }
   return nullptr;
+}
+
+//===----------------------------------------------------------------------===//
+// Cross-Import Overlays
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+/// Represents a file containing information about cross-module overlays.
+class OverlayFile {
+  /// The file that data should be loaded from.
+  StringRef filePath;
+
+  /// The list of module names; empty if loading failed.
+  llvm::TinyPtrVector<Identifier> overlayModuleNames;
+
+  enum class State { Pending, Loaded, Failed };
+  State state = State::Pending;
+
+  /// Actually loads the overlay module name list. This should mutate
+  /// \c overlayModuleNames, but not \c filePath.
+  ///
+  /// \returns \c true on success, \c false on failure. Diagnoses any failures
+  ///          before returning.
+  bool loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
+                              Identifier bystandingModule);
+
+public:
+  // Only allocate in ASTContexts.
+  void *operator new(size_t bytes) = delete;
+  void *operator new(size_t bytes, const ASTContext &ctx,
+                     unsigned alignment = alignof(OverlayFile)) {
+    return ctx.Allocate(bytes, alignment);
+  }
+
+  OverlayFile(StringRef filePath)
+      : filePath(filePath) {
+    assert(!filePath.empty());
+  }
+
+  /// Returns the list of additional modules that should be imported if both
+  /// the primary and secondary modules have been imported. This may load a
+  /// file; if so, it will diagnose any errors itself and arrange for the file
+  /// to not be loaded again.
+  ///
+  /// The result can be empty, either because of an error or because the file
+  /// didn't contain any overlay module names.
+  ArrayRef<Identifier> getOverlayModuleNames(const ModuleDecl *M,
+                                             SourceLoc diagLoc,
+                                             Identifier bystandingModule) {
+    if (state == State::Pending) {
+      state = loadOverlayModuleNames(M, diagLoc, bystandingModule)
+            ? State::Loaded : State::Failed;
+    }
+    return overlayModuleNames;
+  }
+};
+}
+
+void ModuleDecl::addCrossImportOverlayFile(StringRef file) {
+  auto &ctx = getASTContext();
+
+  Identifier secondaryModule = ctx.getIdentifier(llvm::sys::path::stem(file));
+  declaredCrossImports[secondaryModule]
+      .push_back(new (ctx) OverlayFile(ctx.AllocateCopy(file)));
+}
+
+void ModuleDecl::
+findDeclaredCrossImportOverlays(Identifier bystanderName,
+                                SmallVectorImpl<Identifier> &overlayNames,
+                                SourceLoc diagLoc) const {
+  if (getName() == bystanderName)
+    // We don't currently support self-cross-imports.
+    return;
+
+  for (auto &crossImportFile : declaredCrossImports.lookup(bystanderName))
+    llvm::copy(crossImportFile->getOverlayModuleNames(this, diagLoc,
+                                                      bystanderName),
+               std::back_inserter(overlayNames));
+}
+
+void ModuleDecl::getDeclaredCrossImportBystanders(
+    SmallVectorImpl<Identifier> &otherModules) {
+  for (auto &pair : declaredCrossImports)
+    otherModules.push_back(std::get<0>(pair));
+}
+
+namespace {
+struct OverlayFileContents {
+  struct Module {
+    std::string name;
+  };
+
+  unsigned version;
+  std::vector<Module> modules;
+
+  static llvm::ErrorOr<OverlayFileContents>
+  load(std::unique_ptr<llvm::MemoryBuffer> input,
+       SmallVectorImpl<std::string> &errorMessages);
+};
+} // end anonymous namespace
+
+namespace llvm {
+namespace yaml {
+template <>
+struct MappingTraits<OverlayFileContents::Module> {
+  static void mapping(IO &io, OverlayFileContents::Module &module) {
+    io.mapRequired("name", module.name);
+  }
+};
+
+template <>
+struct SequenceElementTraits<OverlayFileContents::Module> {
+  static const bool flow = false;
+};
+
+template <>
+struct MappingTraits<OverlayFileContents> {
+  static void mapping(IO &io, OverlayFileContents &contents) {
+    io.mapRequired("version", contents.version);
+    io.mapRequired("modules", contents.modules);
+  }
+};
+}
+} // end namespace 'llvm'
+
+static void pushYAMLError(const llvm::SMDiagnostic &diag, void *Context) {
+  auto &errorMessages = *static_cast<SmallVectorImpl<std::string> *>(Context);
+  errorMessages.emplace_back(diag.getMessage());
+}
+
+llvm::ErrorOr<OverlayFileContents>
+OverlayFileContents::load(std::unique_ptr<llvm::MemoryBuffer> input,
+                          SmallVectorImpl<std::string> &errorMessages) {
+  llvm::yaml::Input yamlInput(input->getBuffer(), /*Ctxt=*/nullptr,
+                              pushYAMLError, &errorMessages);
+  OverlayFileContents contents;
+  yamlInput >> contents;
+
+  if (auto error = yamlInput.error())
+    return error;
+
+  if (contents.version > 1) {
+    auto message = Twine("key 'version' has invalid value: ") + Twine(contents.version);
+    errorMessages.push_back(message.str());
+    return make_error_code(std::errc::result_out_of_range);
+  }
+
+  return contents;
+}
+
+bool
+OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
+                                    Identifier bystanderName) {
+  auto &ctx = M->getASTContext();
+  llvm::vfs::FileSystem &fs = *ctx.SourceMgr.getFileSystem();
+
+  auto bufOrError = fs.getBufferForFile(filePath);
+  if (!bufOrError) {
+    ctx.Diags.diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
+                       M->getName(), bystanderName,
+                       bufOrError.getError().message(), filePath);
+    return false;
+  }
+
+  SmallVector<std::string, 4> errorMessages;
+  auto contentsOrErr = OverlayFileContents::load(std::move(bufOrError.get()),
+                                                 errorMessages);
+  if (!contentsOrErr) {
+    if (errorMessages.empty())
+      errorMessages.push_back(contentsOrErr.getError().message());
+
+    for (auto message : errorMessages)
+      ctx.Diags.diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
+                         M->getName(), bystanderName, message, filePath);
+    return false;
+  }
+
+  auto contents = std::move(*contentsOrErr);
+
+  for (const auto &module : contents.modules) {
+    auto moduleIdent = ctx.getIdentifier(module.name);
+    overlayModuleNames.push_back(moduleIdent);
+  }
+
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1586,19 +1782,41 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   return !imports.isImportedBy(module, getParentModule());
 }
 
-void ModuleDecl::clearLookupCache() {
-  getASTContext().getImportCache().clear();
-
-  if (!Cache)
-    return;
-
-  // Abandon any current cache. We'll rebuild it on demand.
-  Cache->invalidate();
-  Cache.reset();
+void SourceFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spiGroups) const {
+  for (auto &import : Imports) {
+    if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
+        importedModule == std::get<ModuleDecl*>(import.module)) {
+      auto importedSpis = import.spiGroups;
+      spiGroups.append(importedSpis.begin(), importedSpis.end());
+    }
+  }
 }
 
-void SourceFile::clearLookupCache() {
-  getParentModule()->clearLookupCache();
+bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
+  if (!targetDecl->getAttrs().hasAttribute<SPIAccessControlAttr>())
+    return false;
+
+  auto targetModule = targetDecl->getModuleContext();
+  SmallVector<Identifier, 4> importedSpis;
+  lookupImportedSPIGroups(targetModule, importedSpis);
+
+  for (auto attr : targetDecl->getAttrs().getAttributes<SPIAccessControlAttr>())
+    for (auto declSPI : attr->getSPIGroups())
+      for (auto importedSPI : importedSpis)
+        if (importedSPI == declSPI)
+          return true;
+
+  return false;
+}
+
+bool SourceFile::shouldCrossImport() const {
+  return Kind != SourceFileKind::SIL && Kind != SourceFileKind::Interface &&
+         getASTContext().LangOpts.EnableCrossImportOverlays;
+}
+
+void ModuleDecl::clearLookupCache() {
+  getASTContext().getImportCache().clear();
 
   if (!Cache)
     return;

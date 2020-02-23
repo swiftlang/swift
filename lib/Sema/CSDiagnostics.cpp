@@ -242,6 +242,11 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     // associated with it directly or rather with
     // one of its parents.
     if (auto *decl = overload->choice.getDeclOrNull()) {
+      // If declaration is an operator let's always use
+      // it to produce `in reference to` diagnostics.
+      if (decl->isOperator())
+        return decl;
+
       auto *DC = decl->getDeclContext();
 
       do {
@@ -570,8 +575,6 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_closure_result;
   case CTP_ArrayElement:
     return diag::cannot_convert_array_element;
-  // TODO(diagnostics): Make dictionary related diagnostics take prescedence
-  // over CSDiag. Currently these won't ever be produced.
   case CTP_DictionaryKey:
     return diag::cannot_convert_dict_key;
   case CTP_DictionaryValue:
@@ -4480,14 +4483,17 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
                         SM, tuple->getElement(ArgIdx - 1)->getEndLoc()),
                     firstRange.End);
     diag.fixItRemove(removalRange);
-    diag.fixItInsert(secondRange.Start, text.str() + ", ");
+    diag.fixItInsert(secondRange.Start,
+                     text.str() + (isa<BinaryExpr>(anchor) ? "" : ", "));
   };
 
   // There are 4 diagnostic messages variations depending on
   // labeled/unlabeled arguments.
   if (first.empty() && second.empty()) {
     addFixIts(emitDiagnostic(diagLoc,
-                             diag::argument_out_of_order_unnamed_unnamed,
+                             isa<BinaryExpr>(anchor)
+                                 ? diag::argument_out_of_order_binary_op
+                                 : diag::argument_out_of_order_unnamed_unnamed,
                              ArgIdx + 1, PrevArgIdx + 1));
   } else if (first.empty() && !second.empty()) {
     addFixIts(emitDiagnostic(diagLoc, diag::argument_out_of_order_unnamed_named,
@@ -5043,9 +5049,7 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
       continue;
 
     auto type = resolveType(typeVar);
-    // This could happen if the diagnostic is used by CSDiag.
-    if (type->is<TypeVariableType>())
-      continue;
+    assert(!type->is<TypeVariableType>());
 
     // If this is one of the defaulted parameter types, attempt
     // to emit placeholder for it instead of `Any`.

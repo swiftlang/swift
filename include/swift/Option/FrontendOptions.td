@@ -126,6 +126,11 @@ def verify_syntax_tree : Flag<["-"], "verify-syntax-tree">,
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
   
+def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
+  HelpText<"Automatically import declared cross-import overlays.">;
+def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
+  HelpText<"Do not automatically import declared cross-import overlays.">;
+
 def enable_descriptive_diagnostics : Flag<["-"], "enable-descriptive-diagnostics">,
   HelpText<"Show descriptive diagnostic information, if available.">;
   
@@ -651,6 +656,10 @@ def disable_generic_metadata_prespecialization : Flag<["-"], "disable-generic-me
   HelpText<"Do not statically specialize metadata for generic types at types "
            "that are known to be used in source.">;
 
+def prespecialize_generic_metadata : Flag<["-"], "prespecialize-generic-metadata">,
+   HelpText<"Statically specialize metadata for generic types at types that "
+            "are known to be used in source.">;
+
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;
 
@@ -665,4 +674,7 @@ def emit_ldadd_cfile_path
 def previous_module_installname_map_file
   : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,
     HelpText<"Path to a Json file indicating module name to installname map for @_originallyDefinedIn">;
+
+def enable_type_layouts : Flag<["-"], "enable-type-layout">,
+  HelpText<"Enable type layout based lowering">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

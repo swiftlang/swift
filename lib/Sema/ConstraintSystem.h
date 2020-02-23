@@ -1018,14 +1018,6 @@ enum class ConstraintSystemFlags {
   /// If set, constraint system always reuses type of pre-typechecked
   /// expression, and doesn't dig into its subexpressions.
   ReusePrecheckedType = 0x20,
-  
-  /// FIXME(diagnostics): Once diagnostics are completely switched to new
-  /// framework, this flag could be removed as obsolete.
-  ///
-  /// If set, this identifies constraint system as being used to re-typecheck
-  /// one of the sub-expressions as part of the expression diagnostics, which
-  /// is attempting to narrow down failure location.
-  SubExpressionDiagnostics = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2484,6 +2476,10 @@ public:
         });
   }
 
+  /// Determine whether given declaration is unavailable in the current context.
+  bool isDeclUnavailable(const Decl *D,
+                         ConstraintLocator *locator = nullptr) const;
+
 public:
 
   /// Whether we should attempt to fix problems.
@@ -2545,13 +2541,6 @@ public:
 
   bool diagnoseAmbiguity(ArrayRef<Solution> solutions);
   bool diagnoseAmbiguityWithFixes(SmallVectorImpl<Solution> &solutions);
-
-  /// Give the deprecation warning for referring to a global function
-  /// when there's a method from a conditional conformance in a smaller/closer
-  /// scope.
-  void
-  diagnoseDeprecatedConditionalConformanceOuterAccess(UnresolvedDotExpr *UDE,
-                                                      ValueDecl *choice);
 
   /// Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
@@ -4225,8 +4214,7 @@ private:
 public:
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
-  static bool preCheckExpression(Expr *&expr, DeclContext *dc,
-                                 ConstraintSystem *baseCS = nullptr);
+  static bool preCheckExpression(Expr *&expr, DeclContext *dc);
         
   /// Solve the system of constraints generated from provided target.
   ///
@@ -4321,11 +4309,8 @@ public:
   /// type-checked target or \c None if an error occurred.
   ///
   /// \param target the target to which the solution will be applied.
-  /// \param performingDiagnostics if true, don't descend into bodies of
-  /// non-single expression closures, or build curry thunks.
   Optional<SolutionApplicationTarget> applySolution(
-      Solution &solution, SolutionApplicationTarget target,
-      bool performingDiagnostics);
+      Solution &solution, SolutionApplicationTarget target);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
@@ -4450,36 +4435,6 @@ public:
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
 
-private:
-  /// The set of expressions currently being analyzed for failures.
-  llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
-
-public:
-  void addExprForDiagnosis(Expr *E1, Expr *Result) {
-    DiagnosedExprs[E1] = Result;
-  }
-  bool isExprBeingDiagnosed(Expr *E) {
-    if (DiagnosedExprs.count(E)) {
-      return true;
-    }
-    
-    if (baseCS && baseCS != this) {
-      return baseCS->isExprBeingDiagnosed(E);
-    }
-    return false;
-  }
-  Expr *getExprBeingDiagnosed(Expr *E) {
-    if (auto *expr = DiagnosedExprs[E]) {
-      return expr;
-    }
-    
-    if (baseCS && baseCS != this) {
-      return baseCS->getExprBeingDiagnosed(E);
-    }
-    return nullptr;
-  }
-        
-public:
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));
 
@@ -4718,15 +4673,17 @@ Type isRawRepresentable(ConstraintSystem &cs, Type type,
                         KnownProtocolKind rawRepresentableProtocol);
 
 class DisjunctionChoice {
+  ConstraintSystem &CS;
   unsigned Index;
   Constraint *Choice;
   bool ExplicitConversion;
   bool IsBeginningOfPartition;
 
 public:
-  DisjunctionChoice(unsigned index, Constraint *choice, bool explicitConversion,
-                    bool isBeginningOfPartition)
-      : Index(index), Choice(choice), ExplicitConversion(explicitConversion),
+  DisjunctionChoice(ConstraintSystem &cs, unsigned index, Constraint *choice,
+                    bool explicitConversion, bool isBeginningOfPartition)
+      : CS(cs), Index(index), Choice(choice),
+        ExplicitConversion(explicitConversion),
         IsBeginningOfPartition(isBeginningOfPartition) {}
 
   unsigned getIndex() const { return Index; }
@@ -4741,7 +4698,7 @@ public:
 
   bool isUnavailable() const {
     if (auto *decl = getDecl(Choice))
-      return decl->getAttrs().isUnavailable(decl->getASTContext());
+      return CS.isDeclUnavailable(decl, Choice->getLocator());
     return false;
   }
 
@@ -4948,7 +4905,7 @@ public:
 
     ++Index;
 
-    return DisjunctionChoice(currIndex, Choices[Ordering[currIndex]],
+    return DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
                              IsExplicitConversion, isBeginningOfPartition);
   }
 };
@@ -4982,11 +4939,6 @@ TypeVariableType *TypeVariableType::getNew(const ASTContext &C, unsigned ID,
 /// If the expression has the effect of a forced downcast, find the
 /// underlying forced downcast expression.
 ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
-
-
-// Erases any opened existentials from the given expression.
-// Note: this may update the provided expr pointer.
-void eraseOpenedExistentials(constraints::ConstraintSystem &CS, Expr *&expr);
 
 // Count the number of overload sets present
 // in the expression and all of the children.

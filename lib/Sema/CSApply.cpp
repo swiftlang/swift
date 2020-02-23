@@ -1929,12 +1929,8 @@ namespace {
 
       // Get the _MaxBuiltinFloatType decl, or look for it if it's not cached.
       auto maxFloatTypeDecl = ctx.get_MaxBuiltinFloatTypeDecl();
-
-      if (!maxFloatTypeDecl ||
-          !maxFloatTypeDecl->getDeclaredInterfaceType()->is<BuiltinFloatType>()) {
-        ctx.Diags.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
-        return nullptr;
-      }
+      // Presence of this declaration has been validated in CSGen.
+      assert(maxFloatTypeDecl);
 
       auto maxType = maxFloatTypeDecl->getUnderlyingType();
 
@@ -2289,16 +2285,8 @@ namespace {
       auto locator = cs.getConstraintLocator(expr);
 
       // Find the overload choice used for this declaration reference.
-      auto selected = solution.getOverloadChoiceIfAvailable(locator);
-      if (!selected.hasValue()) {
-        auto *varDecl = cast<VarDecl>(expr->getDecl());
-        assert(varDecl->getType()->is<UnresolvedType>() &&
-               "should only happen for closure arguments in CSDiags");
-        cs.setType(expr, varDecl->getType());
-        return expr;
-      }
-
-      return buildDeclRef(*selected, expr->getNameLoc(), locator,
+      auto selected = solution.getOverloadChoice(locator);
+      return buildDeclRef(selected, expr->getNameLoc(), locator,
                           expr->isImplicit(), expr->getAccessSemantics());
     }
 
@@ -2595,6 +2583,56 @@ namespace {
                          ctorLocator);
     }
 
+    /// Give the deprecation warning for referring to a global function
+    /// when there's a method from a conditional conformance in a smaller/closer
+    /// scope.
+    void
+    diagnoseDeprecatedConditionalConformanceOuterAccess(UnresolvedDotExpr *UDE,
+                                                        ValueDecl *choice) {
+      auto getBaseName = [](DeclContext *context) -> DeclName {
+        if (auto generic = context->getSelfNominalTypeDecl()) {
+          return generic->getName();
+        } else if (context->isModuleScopeContext())
+          return context->getParentModule()->getName();
+        else
+          llvm_unreachable("Unsupported base");
+      };
+
+      auto result =
+          TypeChecker::lookupUnqualified(cs.DC, UDE->getName(), UDE->getLoc());
+      assert(result && "names can't just disappear");
+      // These should all come from the same place.
+      auto exampleInner = result.front();
+      auto innerChoice = exampleInner.getValueDecl();
+      auto innerDC = exampleInner.getDeclContext()->getInnermostTypeContext();
+      auto innerParentDecl = innerDC->getSelfNominalTypeDecl();
+      auto innerBaseName = getBaseName(innerDC);
+
+      auto choiceKind = choice->getDescriptiveKind();
+      auto choiceDC = choice->getDeclContext();
+      auto choiceBaseName = getBaseName(choiceDC);
+      auto choiceParentDecl = choiceDC->getAsDecl();
+      auto choiceParentKind = choiceParentDecl
+                                  ? choiceParentDecl->getDescriptiveKind()
+                                  : DescriptiveDeclKind::Module;
+
+      auto &DE = cs.getASTContext().Diags;
+      DE.diagnose(UDE->getLoc(),
+                  diag::warn_deprecated_conditional_conformance_outer_access,
+                  UDE->getName(), choiceKind, choiceParentKind, choiceBaseName,
+                  innerChoice->getDescriptiveKind(),
+                  innerParentDecl->getDescriptiveKind(), innerBaseName);
+
+      auto name = choiceBaseName.getBaseIdentifier();
+      SmallString<32> namePlusDot = name.str();
+      namePlusDot.push_back('.');
+
+      DE.diagnose(UDE->getLoc(),
+                  diag::fix_deprecated_conditional_conformance_outer_access,
+                  namePlusDot, choiceKind, name)
+          .fixItInsert(UDE->getStartLoc(), namePlusDot);
+    }
+
     Expr *applyMemberRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
                              DeclNameLoc nameLoc, bool implicit) {
       // If we have a constructor member, handle it as a constructor.
@@ -2628,7 +2666,7 @@ namespace {
         // The only way to get here is via an UnresolvedDotExpr with outer
         // alternatives.
         auto UDE = cast<UnresolvedDotExpr>(expr);
-        cs.diagnoseDeprecatedConditionalConformanceOuterAccess(
+        diagnoseDeprecatedConditionalConformanceOuterAccess(
             UDE, selected.choice.getDecl());
 
         return buildDeclRef(selected, nameLoc, memberLocator, implicit,
@@ -3648,9 +3686,9 @@ namespace {
       auto sub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
 
-
+      bool isSubExprLiteral = isa<LiteralExpr>(sub);
       auto castContextKind =
-          (SuppressDiagnostics || isInsideIsExpr)
+          (SuppressDiagnostics || isInsideIsExpr || isSubExprLiteral)
             ? CheckedCastContextKind::None
             : CheckedCastContextKind::ConditionalCast;
 
@@ -3661,13 +3699,35 @@ namespace {
       switch (castKind) {
       // Invalid cast.
       case CheckedCastKind::Unresolved:
+        // FIXME: This literal diagnostics needs to be revisited by a proposal
+        // to unify casting semantics for literals.
+        // https://bugs.swift.org/browse/SR-12093
+        if (isSubExprLiteral) {
+          auto protocol = TypeChecker::getLiteralProtocol(ctx, sub);
+          // Special handle for literals conditional checked cast when they can
+          // be statically coerced to the cast type.
+          if (protocol && TypeChecker::conformsToProtocol(
+                              toType, protocol, cs.DC,
+                              ConformanceCheckFlags::InExpression)) {
+            ctx.Diags
+                .diagnose(expr->getLoc(),
+                          diag::literal_conditional_downcast_to_coercion,
+                          toType);
+          } else {
+            ctx.Diags
+                .diagnose(expr->getLoc(), diag::downcast_to_unrelated, fromType,
+                          toType)
+                .highlight(sub->getSourceRange())
+                .highlight(expr->getCastTypeLoc().getSourceRange());
+          }
+        }
         expr->setCastKind(CheckedCastKind::ValueCast);
         break;
 
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion: {
         ctx.Diags.diagnose(expr->getLoc(), diag::conditional_downcast_coercion,
-                           cs.getType(sub), toType);
+                           fromType, toType);
         expr->setCastKind(castKind);
         cs.setType(expr, OptionalType::get(toType));
         return expr;
@@ -3681,7 +3741,7 @@ namespace {
         expr->setCastKind(castKind);
         break;
       }
-      
+
       return handleOptionalBindingsForCast(expr, simplifyType(cs.getType(expr)),
                                          OptionalBindingsCastKind::Conditional);
     }
@@ -3822,19 +3882,7 @@ namespace {
     Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       simplifyExprType(E);
       auto valueType = cs.getType(E);
-
-      // TODO(diagnostics): Once all of the diagnostics are moved to
-      // new diagnostics framework this check could be eliminated.
-      //
-      // Only way for this to happen is CSDiag try to re-typecheck
-      // sub-expression which contains this placeholder with
-      // `AllowUnresolvedTypeVariables` flag set.
-      //
-      // A better solution could be to replace placeholders with this
-      // implicit call early on and type-check that call together with
-      // the rest of the constraint system.
-      if (valueType->hasUnresolvedType())
-        return nullptr;
+      assert(!valueType->hasUnresolvedType());
 
       auto &ctx = cs.getASTContext();
       // Synthesize a call to _undefined() of appropriate type.
@@ -4312,7 +4360,7 @@ namespace {
                                  StringRef(stringCopy, compatStringBuf.size()),
                                  SourceRange(),
                                  /*implicit*/ true);
-          cs.setType(stringExpr, cs.getType(E));
+          cs.setType(stringExpr, TypeChecker::getStringType(cs.getASTContext()));
           E->setObjCStringLiteralExpr(stringExpr);
         }
       }
@@ -7432,8 +7480,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
 Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
-    Solution &solution, SolutionApplicationTarget target,
-    bool performingDiagnostics) {
+    Solution &solution, SolutionApplicationTarget target) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
@@ -7463,25 +7510,22 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
   if (!resultTarget)
     return None;
 
-  // If we're re-typechecking an expression for diagnostics, don't
-  // visit closures that have non-single expression bodies.
-  if (!performingDiagnostics) {
-    bool hadError = false;
-    for (auto *closure : walker.getClosuresToTypeCheck())
-      hadError |= TypeChecker::typeCheckClosureBody(closure);
+  // Visit closures that have non-single expression bodies.
+  bool hadError = false;
+  for (auto *closure : walker.getClosuresToTypeCheck())
+    hadError |= TypeChecker::typeCheckClosureBody(closure);
 
-    // Tap expressions too; they should or should not be
-    // type-checked under the same conditions as closure bodies.
-    for (auto tuple : walker.getTapsToTypeCheck()) {
-      auto tap = std::get<0>(tuple);
-      auto tapDC = std::get<1>(tuple);
-      hadError |= TypeChecker::typeCheckTapBody(tap, tapDC);
-    }
-
-    // If any of them failed to type check, bail.
-    if (hadError)
-      return None;
+  // Tap expressions too; they should or should not be
+  // type-checked under the same conditions as closure bodies.
+  for (auto tuple : walker.getTapsToTypeCheck()) {
+    auto tap = std::get<0>(tuple);
+    auto tapDC = std::get<1>(tuple);
+    hadError |= TypeChecker::typeCheckTapBody(tap, tapDC);
   }
+
+  // If any of them failed to type check, bail.
+  if (hadError)
+    return None;
 
   rewriter.finalize();
 

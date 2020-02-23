@@ -1334,30 +1334,14 @@ public:
   }
 
   StringRef getObjCRuntimeName(const Decl *D, SmallString<64> &Buf) {
-    if (!D)
-      return StringRef();
-    if (!isa<ClassDecl>(D) && !isa<ProtocolDecl>(D))
-      return StringRef();
-    auto *VD = cast<ValueDecl>(D);
-    if (!VD->hasName() || (VD->hasInterfaceType() && VD->isInvalid()))
-      return StringRef();
-    auto ident = VD->getBaseName().getIdentifier().str();
-    if (ident.empty() || Mangle::isDigit(ident.front()))
-      return StringRef();
-
-    // We don't support getting the runtime name for nested classes.
-    // This would require typechecking or at least name lookup, if the nested
-    // class is in an extension.
-    if (!D->getDeclContext()->isModuleScopeContext())
-      return StringRef();
-
-    if (auto ClassD = dyn_cast<ClassDecl>(D)) {
-      // We don't vend the runtime name for generic classes for now.
-      if (ClassD->getGenericParams())
-        return StringRef();
-      return ClassD->getObjCRuntimeName(Buf);
+    // We only report runtime name for classes and protocols with an explicitly
+    // defined ObjC name, i.e. those that have @objc("SomeName")
+    if (D && (isa<ClassDecl>(D) || isa<ProtocolDecl>(D))) {
+      auto *ObjCNameAttr = D->getAttrs().getAttribute<ObjCAttr>();
+      if (ObjCNameAttr && ObjCNameAttr->hasName())
+        return ObjCNameAttr->getName()->getString(Buf);
     }
-    return cast<ProtocolDecl>(D)->getObjCRuntimeName(Buf);
+    return StringRef();
   }
 
   StringRef getObjCSelectorName(const Decl *D, SmallString<64> &Buf) {

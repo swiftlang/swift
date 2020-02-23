@@ -264,7 +264,7 @@ extension _SmallString {
 
     self.init(leading: leading, trailing: trailing, count: count)
   }
-  
+
   @inline(__always)
   internal init(
     initializingUTF8With initializer: (

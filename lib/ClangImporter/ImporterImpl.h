@@ -923,12 +923,13 @@ public:
   ClangModuleUnit *getWrapperForModule(const clang::Module *underlying);
 
   /// Constructs a Swift module for the given Clang module.
-  ModuleDecl *finishLoadingClangModule(const clang::Module *clangModule,
+  ModuleDecl *finishLoadingClangModule(SourceLoc importLoc,
+                                       const clang::Module *clangModule,
                                        bool preferOverlay);
 
   /// Call finishLoadingClangModule on each deferred import collected
   /// while scanning a bridging header or PCH.
-  void handleDeferredImports();
+  void handleDeferredImports(SourceLoc diagLoc);
 
   /// Retrieve the named Swift type, e.g., Int32.
   ///

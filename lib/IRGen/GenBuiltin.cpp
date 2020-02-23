@@ -1012,7 +1012,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
                                /*constant*/ false,
                                llvm::GlobalValue::PrivateLinkage,
                                llvm::ConstantAggregateZero::get(flagStorageTy));
-    flag->setAlignment(IGF.IGM.getAtomicBoolAlignment().getValue());
+    flag->setAlignment(
+        llvm::MaybeAlign(IGF.IGM.getAtomicBoolAlignment().getValue()));
     entrypointArgs[6] = llvm::ConstantExpr::getBitCast(flag, IGF.IGM.Int8PtrTy);
 
     IGF.Builder.CreateCall(IGF.IGM.getSwift3ImplicitObjCEntrypointFn(),

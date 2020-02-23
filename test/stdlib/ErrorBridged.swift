@@ -854,4 +854,35 @@ ErrorBridgingTests.test("Swift Error bridged to NSError description") {
   }
 }
 
+struct SwiftError2: Error, CustomStringConvertible {
+  var description: String
+}
+
+ErrorBridgingTests.test("Swift Error description memory management") {
+  func checkDescription() {
+    // Generate a non-small, non-constant NSString bridged to String.
+    let str = (["""
+      There once was a gigantic genie
+      Who turned out to be a real meanie
+      I wished for flight
+      And with all his might
+      He gave me a propellor beanie
+    """] as NSArray).description
+    let error = SwiftError2(description: str)
+    let bridgedError = error as NSError
+
+    // Ensure that the bridged NSError description method doesn't overrelease
+    // the error value.
+    for _ in 0 ..< 10 {
+      autoreleasepool {
+        expectEqual(str, bridgedError.description)
+      }
+    }
+  }
+
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    checkDescription()
+  }
+}
+
 runAllTests()

@@ -205,7 +205,7 @@ sil hidden_external @takingQAndS : $@convention(thin) <τ_0_0 where  τ_0_0 : Q>
 // CHECK:   [[WBREF:%.*]] = bitcast %T23partial_apply_forwarder7WeakBoxC* [[WB]] to %swift.refcounted*
 // CHECK:   call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[WBREF]])
 // CHECK:   [[TYADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder7WeakBoxC, %T23partial_apply_forwarder7WeakBoxC* [[WB]], i32 0, i32 0, i32 0
-// CHECK:   [[TY:%.*]] = load %swift.type*, %swift.type** [[TYADDR]] 
+// CHECK:   [[TY:%.*]] = load %swift.type*, %swift.type** [[TYADDR]]
 // CHECK:   %.asUnsubstituted = bitcast %T23partial_apply_forwarder7WeakBoxC* [[WB]] to %T23partial_apply_forwarder7WeakBoxC.1*
 // CHECK:   call void @swift_release(%swift.refcounted* %0)
 // CHECK:   [[GENPARAMSADDR:%.*]] = bitcast %swift.type* [[TY]] to %swift.type**
@@ -247,6 +247,42 @@ bb0:
 // CHECK-LABEL: define hidden swiftcc { i8*, %swift.refcounted* } @specializes_closure_returning_closure() #0 {
 // CHECK: entry:
 // CHECK: ret { i8*, %swift.refcounted* } { i8* bitcast ({ %{{.*}}Empty{{.*}}*, i8*, %swift.refcounted* } (%{{.*}}Empty{{.*}}*, %swift.refcounted*)* @"{{.*}}returns_closure{{.*}}" to i8*), %swift.refcounted* null }
+
+protocol MyEquatable {
+  static func isEqual (lhs: Self, rhs: Self) -> Builtin.Int1
+}
+
+public struct Inner<Element> {
+  public init()
+  public init(_ e: Element)
+}
+
+extension Inner : MyEquatable where Element : MyEquatable {
+  public static func isEqual (lhs: Inner<Element>, rhs: Inner<Element>) -> Builtin.Int1
+}
+
+public struct Outer<Value> {
+  init()
+}
+
+extension Outer : MyEquatable where Value : MyEquatable {
+  public static func isEqual (lhs: Outer<Value>, rhs: Outer<Value>) -> Builtin.Int1
+}
+
+sil @$closure : $@convention(method) <Value where Value : MyEquatable> (Outer<Value>, Outer<Value>, @thin Outer<Value>.Type) -> Builtin.Int1
+
+sil @$dont_crash_test_caputre_specialized_conditional_conformance : $@convention(thin) <Element where Element : MyEquatable> (Outer<Inner<Element>>) -> () {
+bb0(%0 : $Outer<Inner<Element>>):
+  %2 = alloc_stack $Outer<Inner<Element>>
+  store %0 to %2 : $*Outer<Inner<Element>>
+  %4 = metatype $@thin Outer<Inner<Element>>.Type
+  %5 = function_ref @$closure : $@convention(method) <τ_0_0 where τ_0_0 : MyEquatable> (Outer<τ_0_0>, Outer<τ_0_0>, @thin Outer<τ_0_0>.Type) -> Builtin.Int1
+  %6 = partial_apply [callee_guaranteed] %5<Inner<Element>>(%4) : $@convention(method) <τ_0_0 where τ_0_0 : MyEquatable> (Outer<τ_0_0>, Outer<τ_0_0>, @thin Outer<τ_0_0>.Type) -> Builtin.Int1
+  strong_release %6 : $@callee_guaranteed (Outer<Inner<Element>>, Outer<Inner<Element>>) -> Builtin.Int1
+  dealloc_stack %2 : $*Outer<Inner<Element>>
+  %15 = tuple ()
+  return %15 : $()
+}
 
 sil_vtable WeakBox {}
 sil_vtable C {}

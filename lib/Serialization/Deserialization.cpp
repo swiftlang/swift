@@ -581,7 +581,11 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
     ProtocolConformanceXrefLayout::readRecord(scratch, protoID, nominalID,
                                               moduleID);
 
-    auto nominal = cast<NominalTypeDecl>(getDecl(nominalID));
+    auto maybeNominal = getDeclChecked(nominalID);
+    if (!maybeNominal)
+      return maybeNominal.takeError();
+
+    auto nominal = cast<NominalTypeDecl>(maybeNominal.get());
     PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
     auto proto = cast<ProtocolDecl>(getDecl(protoID));
     PrettyStackTraceDecl traceTo("... to", proto);
@@ -4269,6 +4273,20 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         derivativeAttr->setOriginalFunction(origDecl);
         derivativeAttr->setDerivativeKind(*derivativeKind);
         Attr = derivativeAttr;
+        break;
+      }
+
+      case decls_block::SPIAccessControl_DECL_ATTR: {
+        ArrayRef<uint64_t> spiIds;
+        serialization::decls_block::SPIAccessControlDeclAttrLayout::readRecord(
+                                                               scratch, spiIds);
+
+        SmallVector<Identifier, 4> spis;
+        for (auto id : spiIds)
+          spis.push_back(MF.getIdentifier(id));
+
+        Attr = SPIAccessControlAttr::create(ctx, SourceLoc(),
+                                            SourceRange(), spis);
         break;
       }
 

@@ -152,6 +152,11 @@ namespace {
                                   spareBits);
     }
 
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
+
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
     }
@@ -209,6 +214,11 @@ namespace {
       llvm_unreachable("[" #name "] function type"); \
     }
 #include "swift/AST/ReferenceStorage.def"
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
 
     static Size getFirstElementSize(IRGenModule &IGM) {
       return IGM.getPointerSize();
@@ -378,6 +388,10 @@ namespace {
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Block;
     }
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
   };
   
   /// The type info class for the on-stack representation of an ObjC block.
@@ -396,6 +410,10 @@ namespace {
         CaptureOffset(captureOffset)
     {}
     
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
     // The lowered type should be an LLVM struct comprising the block header
     // (IGM.ObjCBlockStructTy) as its first element and the capture as its
     // second.
@@ -680,6 +698,62 @@ static unsigned findSinglePartiallyAppliedParameterIndexIgnoringEmptyTypes(
   assert(firstNonEmpty != -1U);
   return firstNonEmpty;
 }
+
+
+llvm::Function *irgen::getThinToThickForwarder(IRGenModule &IGM,
+                                               const Optional<FunctionPointer> &staticFnPtr,
+                                               const CanSILFunctionType origType) {
+  auto origSig = IGM.getSignature(origType);
+  llvm::FunctionType *origFnTy = origSig.getType();
+  auto origTy = origSig.getType()->getPointerTo();
+
+  llvm::SmallVector<llvm::Type *, 4> thunkParams;
+
+  for (unsigned i = 0; i < origFnTy->getNumParams(); ++i)
+    thunkParams.push_back(origFnTy->getParamType(i));
+
+  thunkParams.push_back(IGM.RefCountedPtrTy);
+
+  auto thunkType = llvm::FunctionType::get(origFnTy->getReturnType(),
+                                           thunkParams,
+                                           /*vararg*/ false);
+
+  StringRef FnName;
+  if (staticFnPtr)
+    FnName = staticFnPtr->getPointer()->getName();
+
+  IRGenMangler Mangler;
+  std::string thunkName = Mangler.mangleThinToThickForwarder(FnName);
+
+
+  // FIXME: Maybe cache the thunk by function and closure types?.
+  llvm::Function *fwd =
+  llvm::Function::Create(thunkType, llvm::Function::InternalLinkage,
+                         llvm::StringRef(thunkName), &IGM.Module);
+
+  fwd->setAttributes(origSig.getAttributes());
+  fwd->addAttribute(llvm::AttributeList::FirstArgIndex + origFnTy->getNumParams(), llvm::Attribute::SwiftSelf);
+  IRGenFunction IGF(IGM, fwd);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, fwd);
+  auto args = IGF.collectParameters();
+  auto rawFnPtr = args.takeLast();
+
+  // It comes out of the context as an i8*. Cast to the function type.
+  rawFnPtr = IGF.Builder.CreateBitCast(rawFnPtr, origTy);
+
+  auto fnPtr = FunctionPointer(rawFnPtr, origSig);
+
+  auto result = IGF.Builder.CreateCall(fnPtr, args.claimAll());
+
+  // Return the result, if we have one.
+  if (result->getType()->isVoidTy())
+    IGF.Builder.CreateRetVoid();
+  else
+    IGF.Builder.CreateRet(result);
+  return fwd;
+}
+
 
 /// Emit the forwarding stub function for a partial application.
 ///
@@ -1292,8 +1366,9 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   SmallVector<ParameterConvention, 4> argConventions;
 
   // Reserve space for polymorphic bindings.
-  auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
-                                                            origType, subs);
+  auto bindings =
+      NecessaryBindings::forPartialApplyForwarder(IGF.IGM, origType, subs);
+
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
     auto bindingsSize = bindings.getBufferSize(IGF.IGM);

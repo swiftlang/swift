@@ -2372,7 +2372,7 @@ static void initClassVTable(ClassMetadata *self) {
       auto &descriptor = overrideDescriptors[i];
 
       // Get the base class and method.
-      auto *baseClass = descriptor.Class.get();
+      auto *baseClass = cast_or_null<ClassDescriptor>(descriptor.Class.get());
       auto *baseMethod = descriptor.Method.get();
 
       // If the base method is null, it's an unavailable weak-linked
@@ -2383,11 +2383,20 @@ static void initClassVTable(ClassMetadata *self) {
       // Calculate the base method's vtable offset from the
       // base method descriptor. The offset will be relative
       // to the base class's vtable start offset.
-      auto baseClassMethods = baseClass->getMethodDescriptors().data();
-      auto offset = baseMethod - baseClassMethods;
+      auto baseClassMethods = baseClass->getMethodDescriptors();
+
+      // If the method descriptor doesn't land within the bounds of the
+      // method table, abort.
+      if (baseMethod < baseClassMethods.begin() ||
+          baseMethod >= baseClassMethods.end()) {
+        fatalError(0, "resilient vtable at %p contains out-of-bounds "
+                   "method descriptor %p\n",
+                   overrideTable, baseMethod);
+      }
 
       // Install the method override in our vtable.
       auto baseVTable = baseClass->getVTableDescriptor();
+      auto offset = baseMethod - baseClassMethods.data();
       classWords[baseVTable->getVTableOffset(baseClass) + offset]
         = descriptor.Impl.get();
     }

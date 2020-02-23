@@ -273,9 +273,7 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name) {
 
     // If the entry we recorded was unavailable but this new entry is not,
     // replace the recorded entry with this one.
-    auto &ctx = getASTContext();
-    if (uniqueEntry->getAttrs().isUnavailable(ctx) &&
-        !decl->getAttrs().isUnavailable(ctx)) {
+    if (isDeclUnavailable(uniqueEntry) && !isDeclUnavailable(decl)) {
       uniqueEntry = decl;
     }
   }
@@ -453,6 +451,10 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     }
   }
 
+  if (locator->findLast<LocatorPathElt::DynamicCallable>()) {
+    return getConstraintLocator(anchor, LocatorPathElt::ApplyFunction());
+  }
+
   // If we have a locator that starts with a key path component element, we
   // may have a callee given by a property or subscript component.
   if (auto componentElt =
@@ -491,13 +493,10 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     return getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
 
   auto getSpecialFnCalleeLoc = [&](Type fnTy) -> ConstraintLocator * {
-    // FIXME: We should probably assert that we don't get a type variable
-    // here to make sure we only retrieve callee locators for resolved calls,
-    // ensuring that callee locators don't change after binding a type.
-    // Unfortunately CSDiag currently calls into getCalleeLocator, so all bets
-    // are off. Once we remove that legacy diagnostic logic, we should be able
-    // to assert here.
     fnTy = simplifyType(fnTy);
+    // It's okay for function type to contain type variable(s) e.g.
+    // opened generic function types, but not to be one.
+    assert(!fnTy->is<TypeVariableType>());
 
     // For an apply of a metatype, we have a short-form constructor. Unlike
     // other locators to callees, these are anchored on the apply expression
@@ -1830,11 +1829,6 @@ static bool shouldCheckForPartialApplication(ConstraintSystem &cs,
   if (!(anchor && isa<UnresolvedDotExpr>(anchor)))
     return false;
 
-  // FIXME(diagnostics): This check should be removed together with
-  // expression based diagnostics.
-  if (cs.isExprBeingDiagnosed(anchor))
-    return false;
-
   // If this is a reference to instance method marked as 'mutating'
   // it should be checked for invalid partial application.
   if (isMutatingMethod(decl))
@@ -1893,11 +1887,6 @@ isInvalidPartialApplication(ConstraintSystem &cs, const ValueDecl *member,
 std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
     const OverloadChoice &choice, ConstraintLocator *locator,
     Type boundType, Type refType) {
-  // If the declaration is unavailable, note that in the score.
-  if (choice.getDecl()->getAttrs().isUnavailable(getASTContext())) {
-    increaseScore(SK_Unavailable);
-  }
-
   bool bindConstraintCreated = false;
   const auto kind = choice.getKind();
   if (kind != OverloadChoiceKind::DeclViaDynamic &&
@@ -2880,6 +2869,40 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
   return diagnosed;
 }
 
+/// Diagnose ambiguity related to overloaded declarations where only
+/// *some* of the overload choices have ephemeral pointer warnings/errors
+/// associated with them. Such situations have be handled specifically
+/// because ephemeral fixes do not affect the score.
+///
+/// If all of the overloads have ephemeral fixes associated with them
+/// it's much easier to diagnose through notes associated with each fix.
+static bool
+diagnoseAmbiguityWithEphemeralPointers(ConstraintSystem &cs,
+                                       ArrayRef<Solution> solutions) {
+  bool allSolutionsHaveFixes = true;
+  for (const auto &solution : solutions) {
+    if (solution.Fixes.empty()) {
+      allSolutionsHaveFixes = false;
+      continue;
+    }
+
+    if (!llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {
+          return fix->getKind() == FixKind::TreatEphemeralAsNonEphemeral;
+        }))
+      return false;
+  }
+
+  // If all solutions have fixes for ephemeral pointers, let's
+  // let `diagnoseAmbiguityWithFixes` diagnose the problem.
+  if (allSolutionsHaveFixes)
+    return false;
+
+  // If only some of the solutions have ephemeral pointer fixes
+  // let's let `diagnoseAmbiguity` diagnose the problem either
+  // with affected argument or related declaration e.g. function ref.
+  return cs.diagnoseAmbiguity(solutions);
+}
+
 bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     SmallVectorImpl<Solution> &solutions) {
   if (solutions.empty())
@@ -2903,6 +2926,9 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   SolutionDiff solutionDiff(solutions);
 
   if (diagnoseConflictingGenericArguments(*this, solutionDiff, solutions))
+    return true;
+
+  if (diagnoseAmbiguityWithEphemeralPointers(*this, solutions))
     return true;
 
   // Collect aggregated fixes from all solutions
@@ -3585,9 +3611,9 @@ void ConstraintSystem::generateConstraints(
 
   if (favoredIndex) {
     const auto &choice = choices[*favoredIndex];
-    assert((!choice.isDecl() ||
-            !choice.getDecl()->getAttrs().isUnavailable(getASTContext())) &&
-           "Cannot make unavailable decl favored!");
+    assert(
+        (!choice.isDecl() || !isDeclUnavailable(choice.getDecl(), locator)) &&
+        "Cannot make unavailable decl favored!");
     recordChoice(constraints, *favoredIndex, choice, /*isFavored=*/true);
   }
 
@@ -3743,19 +3769,10 @@ ConstraintSystem::getFunctionArgApplyInfo(ConstraintLocator *locator) {
   } else {
     // If we didn't resolve an overload for the callee, we should be dealing
     // with a call of an arbitrary function expr.
-    if (auto *call = dyn_cast<CallExpr>(anchor)) {
-      assert(!shouldHaveDirectCalleeOverload(call) &&
+    auto *call = cast<CallExpr>(anchor);
+    assert(!shouldHaveDirectCalleeOverload(call) &&
              "Should we have resolved a callee for this?");
-      rawFnType = getType(call->getFn());
-    } else if (auto *apply = dyn_cast<ApplyExpr>(anchor)) {
-      // FIXME: ArgumentMismatchFailure is currently used from CSDiag, meaning
-      // we can end up a BinaryExpr here with an unresolved callee. It should be
-      // possible to remove this once we've gotten rid of the old CSDiag logic
-      // and just assert that we have a CallExpr.
-      rawFnType = getType(apply->getFn());
-    } else {
-      return None;
-    }
+    rawFnType = getType(call->getFn());
   }
 
   // Try to resolve the function type by loading lvalues and looking through
@@ -4224,4 +4241,68 @@ bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
   case CTP_CannotFail:
     return false;
   }
+}
+
+/// Given a specific expression and the remnants of the failed constraint
+/// system, produce a specific diagnostic.
+///
+/// This is guaranteed to always emit an error message.
+///
+void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
+  setPhase(ConstraintSystemPhase::Diagnostics);
+
+  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
+
+  auto &DE = getASTContext().Diags;
+  if (auto expr = target.getAsExpr()) {
+    if (auto *assignment = dyn_cast<AssignExpr>(expr)) {
+      if (isa<DiscardAssignmentExpr>(assignment->getDest()))
+        expr = assignment->getSrc();
+    }
+
+    // Look through RebindSelfInConstructorExpr to avoid weird Sema issues.
+    if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
+      expr = RB->getSubExpr();
+
+    // Unresolved/Anonymous ClosureExprs are common enough that we should give
+    // them tailored diagnostics.
+    if (auto *closure = dyn_cast<ClosureExpr>(expr->getValueProvidingExpr())) {
+      DE.diagnose(closure->getLoc(), diag::cannot_infer_closure_type)
+        .highlight(closure->getSourceRange());
+      return;
+    }
+
+    // If no one could find a problem with this expression or constraint system,
+    // then it must be well-formed... but is ambiguous.  Handle this by
+    // diagnostic various cases that come up.
+    DE.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous)
+        .highlight(expr->getSourceRange());
+  } else {
+    // Emit a poor fallback message.
+    DE.diagnose(target.getAsFunction()->getLoc(),
+                diag::failed_to_produce_diagnostic);
+  }
+}
+
+bool ConstraintSystem::isDeclUnavailable(const Decl *D,
+                                         ConstraintLocator *locator) const {
+  auto &ctx = getASTContext();
+
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return false;
+
+  // First check whether this declaration is universally unavailable.
+  if (D->getAttrs().isUnavailable(ctx))
+    return true;
+
+  SourceLoc loc;
+
+  if (locator) {
+    if (auto *anchor = locator->getAnchor())
+      loc = anchor->getLoc();
+  }
+
+  // If not, let's check contextual unavailability.
+  AvailabilityContext result = AvailabilityContext::alwaysAvailable();
+  return !TypeChecker::isDeclAvailable(D, loc, DC, result);
 }

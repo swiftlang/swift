@@ -778,6 +778,19 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printKeyword(getAttrName(), Options, "(set)");
     return true;
 
+  case DAK_SPIAccessControl: {
+    if (!Options.PrintSPIs) return false;
+
+    auto spiAttr = static_cast<const SPIAccessControlAttr*>(this);
+    interleave(spiAttr->getSPIGroups(),
+               [&](Identifier spiName) {
+                 Printer.printAttrName(getAttrName(), true);
+                 Printer << "(" << spiName << ")";
+               },
+               [&] { Printer << " "; });
+    return true;
+  }
+
   default:
     break;
   }
@@ -973,12 +986,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DAK_Custom: {
-    Printer.printAttrName("@");
+    Printer.callPrintNamePre(PrintNameContext::Attribute);
+    Printer << "@";
     const TypeLoc &typeLoc = cast<CustomAttr>(this)->getTypeLoc();
     if (auto type = typeLoc.getType())
       type->print(Printer, Options);
     else
       typeLoc.getTypeRepr()->print(Printer, Options);
+    Printer.printNamePost(PrintNameContext::Attribute);
     break;
   }
 
@@ -1140,6 +1155,8 @@ StringRef DeclAttribute::getAttrName() const {
     return getAccessLevelSpelling(access);
   }
 
+  case DAK_SPIAccessControl:
+    return "_spi";
   case DAK_ReferenceOwnership:
     return keywordOf(cast<ReferenceOwnershipAttr>(this)->get());
   case DAK_RawDocComment:
@@ -1333,6 +1350,14 @@ SourceLoc DynamicReplacementAttr::getRParenLoc() const {
   return getTrailingLocations()[1];
 }
 
+bool
+TypeEraserAttr::hasViableTypeEraserInit(ProtocolDecl *protocol) const {
+  return evaluateOrDefault(protocol->getASTContext().evaluator,
+                           TypeEraserHasViableInitRequest{
+                               const_cast<TypeEraserAttr *>(this), protocol},
+                           false);
+}
+
 AvailableAttr *
 AvailableAttr::createPlatformAgnostic(ASTContext &C,
                                    StringRef Message,
@@ -1520,6 +1545,25 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        GenericSignature specializedSignature) {
   return new (Ctx) SpecializeAttr(atLoc, range, clause, exported, kind,
                                   specializedSignature);
+}
+
+SPIAccessControlAttr::SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,
+                                           ArrayRef<Identifier> spiGroups)
+      : DeclAttribute(DAK_SPIAccessControl, atLoc, range,
+                      /*Implicit=*/false),
+        numSPIGroups(spiGroups.size()) {
+  std::uninitialized_copy(spiGroups.begin(), spiGroups.end(),
+                          getTrailingObjects<Identifier>());
+}
+
+SPIAccessControlAttr *
+SPIAccessControlAttr::create(ASTContext &context,
+                             SourceLoc atLoc,
+                             SourceRange range,
+                             ArrayRef<Identifier> spiGroups) {
+  unsigned size = totalSizeToAlloc<Identifier>(spiGroups.size());
+  void *mem = context.Allocate(size, alignof(SPIAccessControlAttr));
+  return new (mem) SPIAccessControlAttr(atLoc, range, spiGroups);
 }
 
 DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,
