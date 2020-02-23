@@ -5591,6 +5591,17 @@ SWIFT_RUNTIME_STDLIB_SPI
 const HeapObject *swift_getKeyPathImpl(const void *pattern,
                                        const void *arguments);
 
+// Shims to call a metadata accessor in Swift.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse _swift_metadataAccessorCall(void *accessor,
+                                             MetadataRequest request,
+                                             const void * const *args,
+                                             size_t count) {
+  using Fn = MetadataResponse (...);
+  auto func = reinterpret_cast<Fn *>(accessor);
+  return MetadataAccessFunction(func)(request, llvm::makeArrayRef(args, count));
+}
+
 #define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
 #define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"

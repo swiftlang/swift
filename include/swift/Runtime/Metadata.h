@@ -843,6 +843,13 @@ void swift_enableDynamicReplacementScope(const DynamicReplacementScope *scope);
 SWIFT_RUNTIME_EXPORT
 void swift_disableDynamicReplacementScope(const DynamicReplacementScope *scope);
 
+// Shim to allow Swift to call metadata accessors.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse _swift_metadataAccessorCall(void *accessor,
+                                             MetadataRequest request,
+                                             const void * const *args,
+                                             size_t count);
+
 #pragma clang diagnostic pop
 
 } // end namespace swift
