@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -enable-descriptive-diagnostics -typecheck %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -enable-experimental-diagnostic-formatting -typecheck %s 2>&1 | %FileCheck %s
 
 1 + 2
 
