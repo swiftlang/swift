@@ -138,4 +138,32 @@ ClassTests.test("AddressOnlyTangentVector") {
 }
 */
 
+// TF-1175: Test whether class-typed arguments are not marked active.
+ClassTests.test("ClassArgumentActivity") {
+  class C: Differentiable {
+    @differentiable
+    var x: Float
+
+    init(_ x: Float) {
+      self.x = x
+    }
+
+    // Note: this method mutates `self`. However, since `C` is a class, the
+    // method type does not involve `inout` arguments: `(C) -> () -> ()`.
+    func square() {
+      x *= x
+    }
+  }
+
+  // Returns `x * x`.
+  func squared(_ x: Float) -> Float {
+    var c = C(x)
+    c.square() // FIXME(TF-1175): doesn't get differentiated!
+    return c.x
+  }
+  // FIXME(TF-1175): Find a robust solution so that derivatives are correct.
+  // expectEqual((100, 20), valueWithGradient(at: 10, in: squared))
+  expectEqual((100, 1), valueWithGradient(at: 10, in: squared))
+}
+
 runAllTests()
