@@ -1148,8 +1148,11 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
                      : diag::expected_member_name;
       auto Name = parseDeclNameRef(NameLoc, D,
           DeclNameFlag::AllowKeywords | DeclNameFlag::AllowCompoundNames);
-      if (!Name)
-        return nullptr;
+      if (!Name) {
+        SourceRange ErrorRange = Result.get()->getSourceRange();
+        ErrorRange.widen(TokLoc);
+        return makeParserErrorResult(new (Context) ErrorExpr(ErrorRange, Type(), Result.get()));
+      }
       SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
       Result = makeParserResult(Result, new (Context) UnresolvedDotExpr(
                                             Result.get(), TokLoc, Name, NameLoc,
@@ -1296,9 +1299,13 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 
     // If we end up with an unknown token on this line, return an ErrorExpr
     // covering the range of the token.
-    if (!Tok.isAtStartOfLine() && consumeIf(tok::unknown)) {
-      Result = makeParserResult(
-          Result, new (Context) ErrorExpr(Result.get()->getSourceRange()));
+    if (!Tok.isAtStartOfLine() && Tok.is(tok::unknown)) {
+      SourceLoc UnknownLoc = consumeToken();
+      SourceRange ErrorRange = Result.get()->getSourceRange();
+      ErrorRange.widen(UnknownLoc);
+      Result = makeParserResult(Result, new (Context) ErrorExpr(ErrorRange,
+                                                                Type(),
+                                                                Result.get()));
       continue;
     }
 
@@ -1592,7 +1599,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
     Name = parseDeclNameRef(NameLoc, diag::expected_identifier_after_dot_expr,
         DeclNameFlag::AllowKeywords | DeclNameFlag::AllowCompoundNames);
-    if (!Name) return nullptr;
+    if (!Name)
+      return makeParserErrorResult(new (Context) ErrorExpr(DotLoc));
     SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
     // Check for a () suffix, which indicates a call when constructing

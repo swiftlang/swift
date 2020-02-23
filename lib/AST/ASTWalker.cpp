@@ -327,6 +327,31 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitParamDecl(ParamDecl *P) {
+    // Don't walk into the type if the decl is implicit, or if the type is
+    // implicit.
+    if (!P->isImplicit()) {
+      if (auto *repr = P->getTypeRepr()) {
+        if (doIt(repr)) {
+          return true;
+        }
+      }
+    }
+    if (auto *E = P->getStructuralDefaultExpr()) {
+      auto res = doIt(E);
+      if (!res) return true;
+      P->setDefaultExpr(res, /*isTypeChecked*/ (bool)res->getType());
+    }
+
+    if (!Walker.shouldWalkAccessorsTheOldWay()) {
+      for (auto *AD : P->getAllAccessors())
+        if (doIt(AD))
+          return true;
+    }
+
+    return false;
+  }
+
   bool visitSubscriptDecl(SubscriptDecl *SD) {
     bool WalkGenerics = visitGenericParamListIfNeeded(SD);
 
@@ -1142,22 +1167,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       // Walk each parameter's decl and typeloc and default value.
       if (doIt(P))
         return true;
-
-      // Don't walk into the type if the decl is implicit, or if the type is
-      // implicit.
-      if (!P->isImplicit()) {
-        if (auto *repr = P->getTypeRepr()) {
-          if (doIt(repr)) {
-            return true;
-          }
-        }
-      }
-
-      if (auto *E = P->getStructuralDefaultExpr()) {
-        auto res = doIt(E);
-        if (!res) return true;
-        P->setDefaultExpr(res, /*isTypeChecked*/ (bool)res->getType());
-      }
     }
 
     return Walker.walkToParameterListPost(PL);
