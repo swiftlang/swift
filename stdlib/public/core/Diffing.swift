@@ -179,11 +179,14 @@ extension BidirectionalCollection where Element: Equatable {
 
 // MARK: Internal implementation
 
-// _V is a rudimentary type made to represent the rows of the triangular matrix type used by the Myer's algorithm
+// _V is a rudimentary type made to represent the rows of the triangular matrix
+// type used by the Myer's algorithm.
 //
-// This type is basically an array that only supports indexes in the set `stride(from: -d, through: d, by: 2)` where `d` is the depth of this row in the matrix
-// `d` is always known at allocation-time, and is used to preallocate the structure.
-fileprivate struct _V {
+// This type is basically an array that only supports indexes in the set
+// `stride(from: -d, through: d, by: 2)` where `d` is the depth of this row in
+// the matrix `d` is always known at allocation-time, and is used to preallocate
+// the structure.
+private struct _V {
 
   private var a: [Int]
 #if INTERNAL_CHECKS_ENABLED
@@ -222,7 +225,7 @@ fileprivate struct _V {
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
-fileprivate func _myers<C,D>(
+private func _myers<C,D>(
   from old: C, to new: D,
   using cmp: (C.Element, D.Element) -> Bool
 ) -> CollectionDifference<C.Element>
