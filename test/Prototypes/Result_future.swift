@@ -19,6 +19,7 @@
 // Executing on the simulator within __abort_with_payload with "No ABI plugin located for triple x86_64h-apple-ios -- shared libraries will not be registered!"
 // UNSUPPORTED: CPU=x86_64 && OS=ios
 // UNSUPPORTED: CPU=x86_64 && OS=tvos
+// UNSUPPORTED: CPU=x86_64 && OS=watchos
 // UNSUPPORTED: CPU=i386 && OS=watchos
 // UNSUPPORTED: use_os_stdlib
 
