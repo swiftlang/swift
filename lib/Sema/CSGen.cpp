@@ -2207,9 +2207,12 @@ namespace {
 
       switch (pattern->getKind()) {
       case PatternKind::Paren:
-        // Parentheses don't affect the type.
-        return getTypeForPattern(cast<ParenPattern>(pattern)->getSubPattern(),
-                                 locator);
+        // Parentheses don't affect the canonical type, but record them as
+        // type sugar.
+        return ParenType::get(
+            CS.getASTContext(),
+            getTypeForPattern(
+              cast<ParenPattern>(pattern)->getSubPattern(), locator));
       case PatternKind::Var:
         // Var doesn't affect the type.
         return getTypeForPattern(cast<VarPattern>(pattern)->getSubPattern(),
