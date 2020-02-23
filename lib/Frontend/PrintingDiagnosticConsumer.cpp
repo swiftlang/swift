@@ -212,17 +212,32 @@ namespace {
       return mappedByte;
     }
 
+    unsigned lineByteOffsetForLoc(SourceManager &SM, SourceLoc Loc) {
+      SourceLoc lineStart = SM.getLocForLineCol(SM.findBufferContainingLoc(Loc),
+                                                getLineNumber(), 1);
+      return SM.getByteDistance(lineStart, Loc);
+    }
+
   public:
     AnnotatedLine(unsigned LineNumber, StringRef LineText)
         : LineNumber(LineNumber), LineText(LineText) {}
 
     unsigned getLineNumber() { return LineNumber; }
 
-    void addMessage(Message Message) { Messages.push_back(Message); }
+    void addMessage(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                    StringRef Message) {
+      Messages.push_back({lineByteOffsetForLoc(SM, Loc), Kind, Message});
+    }
 
-    void addHighlight(Highlight Highlight) { Highlights.push_back(Highlight); }
+    void addHighlight(SourceManager &SM, CharSourceRange Range) {
+      Highlights.push_back({lineByteOffsetForLoc(SM, Range.getStart()),
+                            lineByteOffsetForLoc(SM, Range.getEnd())});
+    }
 
-    void addFixIt(FixIt FixIt) { FixIts.push_back(FixIt); }
+    void addFixIt(SourceManager &SM, CharSourceRange Range, StringRef Text) {
+      FixIts.push_back({lineByteOffsetForLoc(SM, Range.getStart()),
+                        lineByteOffsetForLoc(SM, Range.getEnd()), Text});
+    }
 
     void render(unsigned LineNumberIndent, raw_ostream &Out) {
       printNumberedGutter(LineNumber, LineNumberIndent, Out);
@@ -359,30 +374,20 @@ namespace {
       LineRanges.push_back(CharSourceRange(SM, lastLineStart, Range.getEnd()));
     }
 
-    // FIXME: sink into AnnotatedLine
-    unsigned lineByteOffsetForLoc(SourceLoc Loc) {
-      auto line = lineForLoc(Loc);
-      SourceLoc lineStart =
-          SM.getLocForLineCol(BufferID, line.getLineNumber(), 1);
-      return SM.getByteDistance(lineStart, Loc);
-    }
-
   public:
     AnnotatedFileExcerpt(SourceManager &SM, unsigned BufferID,
                          SourceLoc PrimaryLoc)
         : SM(SM), BufferID(BufferID), PrimaryLoc(PrimaryLoc) {}
 
     void addMessage(SourceLoc Loc, DiagnosticKind Kind, StringRef Message) {
-      lineForLoc(Loc).addMessage({lineByteOffsetForLoc(Loc), Kind, Message});
+      lineForLoc(Loc).addMessage(SM, Loc, Kind, Message);
     }
 
     void addHighlight(CharSourceRange Range) {
       SmallVector<CharSourceRange, 1> ranges;
       lineRangesForRange(Range, ranges);
       for (auto lineRange : ranges)
-        lineForLoc(lineRange.getStart())
-            .addHighlight({lineByteOffsetForLoc(lineRange.getStart()),
-                           lineByteOffsetForLoc(lineRange.getEnd())});
+        lineForLoc(lineRange.getStart()).addHighlight(SM, lineRange);
     }
 
     void addFixIt(CharSourceRange Range, StringRef Text) {
@@ -391,13 +396,9 @@ namespace {
       // The removals are broken down line-by-line, so only add any insertions
       // to the last replacement.
       auto last = ranges.pop_back_val();
-      lineForLoc(last.getStart())
-          .addFixIt({lineByteOffsetForLoc(last.getStart()),
-                     lineByteOffsetForLoc(last.getEnd()), Text});
+      lineForLoc(last.getStart()).addFixIt(SM, last, Text);
       for (auto lineRange : ranges)
-        lineForLoc(lineRange.getStart())
-            .addFixIt({lineByteOffsetForLoc(lineRange.getStart()),
-                       lineByteOffsetForLoc(lineRange.getEnd()), ""});
+        lineForLoc(lineRange.getStart()).addFixIt(SM, lineRange, "");
     }
 
     void render(raw_ostream &Out) {
