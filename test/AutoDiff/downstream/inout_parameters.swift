@@ -137,17 +137,35 @@ InoutParametersTests.test("InoutClassParameter") {
     }
   }
 
-  // Semantically, an empty function with an `inout` parameter is an identity
-  // function.
-  func inoutIdentity(_ c: inout Class) {}
-
-  func identity(_ x: Float) -> Float {
-    var c = Class(x)
-    inoutIdentity(&c)
-    return c.x
+  do {
+    func squaredViaMutation(_ c: inout Class) {
+      c = Class(c.x * c.x)
+    }
+    func squared(_ x: Float) -> Float {
+      var c = Class(x)
+      squaredViaMutation(&c)
+      return c.x
+    }
+    expectEqual((100, 20), valueWithGradient(at: 10, in: squared))
+    expectEqual(200, pullback(at: 10, in: squared)(10))
   }
-  expectEqual(1, gradient(at: 10, in: identity))
-  expectEqual(10, pullback(at: 10, in: identity)(10))
+
+  do {
+    func squaredViaModifyAccessor(_ c: inout Class) {
+      // The line below calls `Class.x.modify`.
+      c.x *= c.x
+    }
+    func squared(_ x: Float) -> Float {
+      var c = Class(x)
+      squaredViaModifyAccessor(&c)
+      return c.x
+    }
+    // FIXME(TF-1080): Fix incorrect class property `modify` accessor derivative values.
+    // expectEqual((100, 20), valueWithGradient(at: 10, in: squared))
+    // expectEqual(200, pullback(at: 10, in: squared)(10))
+    expectEqual((100, 1), valueWithGradient(at: 10, in: squared))
+    expectEqual(10, pullback(at: 10, in: squared)(10))
+  }
 }
 
 runAllTests()

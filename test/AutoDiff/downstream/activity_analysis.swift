@@ -210,7 +210,6 @@ func testArrayUninitializedIntrinsicFunctionResult(_ x: Float, _ y: Float) -> [F
 // CHECK: [ACTIVE]   %18 = apply %17(%0, %1, %16) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 
 // TF-975: Test nested array literals.
-// FIXME(TF-975): Some values are incorrectly not marked as active: `%0`, `%1`, etc.
 @differentiable
 func testArrayUninitializedIntrinsicNested(_ x: Float, _ y: Float) -> [Float] {
   let array = [x, y]
@@ -251,7 +250,6 @@ func testArrayUninitializedIntrinsicNested(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [NONE]   %36 = apply %35<Float>(%29, %34, %30) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
 
 // TF-978: Test array literal initialized with `apply` indirect results.
-// FIXME(TF-978): Some values are incorrectly not marked as active: `%0`, `%1`, etc.
 struct Wrapper<T: Differentiable>: Differentiable {
   var value: T
 }
@@ -584,6 +582,31 @@ class C: Differentiable {
 // CHECK:   %7 = function_ref @$sSf1moiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // CHECK: [ACTIVE]   %8 = apply %7(%0, %6, %4) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 }
+
+// TF-1176: Test class property `modify` accessor.
+@differentiable
+func testClassModifyAccessor(_ c: inout C) {
+  c.float *= c.float
+}
+
+// FIXME(TF-1176): Some values are incorrectly not marked as active: `%16`, etc.
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testClassModifyAccessor{{.*}} at (source=0 parameters=(0))
+// CHECK: [ACTIVE] %0 = argument of bb0 : $*C
+// CHECK: [NONE]   %2 = metatype $@thin Float.Type
+// CHECK: [ACTIVE]   %3 = begin_access [read] [static] %0 : $*C
+// CHECK: [VARIED]   %4 = load [copy] %3 : $*C
+// CHECK: [ACTIVE]   %6 = begin_access [read] [static] %0 : $*C
+// CHECK: [VARIED]   %7 = load [copy] %6 : $*C
+// CHECK: [VARIED]   %9 = begin_borrow %7 : $C
+// CHECK: [VARIED]   %10 = class_method %9 : $C, #C.float!getter.1 : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
+// CHECK: [VARIED]   %11 = apply %10(%9) : $@convention(method) (@guaranteed C) -> Float
+// CHECK: [VARIED]   %14 = begin_borrow %4 : $C
+// CHECK: [VARIED]   %15 = class_method %14 : $C, #C.float!modify.1 : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED] (**%16**, %17) = begin_apply %15(%14) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED] (%16, **%17**) = begin_apply %15(%14) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [NONE]   // function_ref static Float.*= infix(_:_:)
+// CHECK: [NONE]   %19 = apply %18(%16, %11, %2) : $@convention(method) (@inout Float, Float, @thin Float.Type) -> ()
+// CHECK: [NONE]   %23 = tuple ()
 
 //===----------------------------------------------------------------------===//
 // Enum differentiation
