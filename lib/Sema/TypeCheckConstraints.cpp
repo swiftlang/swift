@@ -2226,39 +2226,6 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   return exprType;
 }
 
-void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
-    Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
-    FreeTypeVariableBinding allowFreeTypeVariables,
-    ExprTypeCheckListener *listener) {
-  auto &Context = dc->getASTContext();
-  FrontendStatsTracer StatsTracer(Context.Stats,
-                                  "get-possible-types-no-apply", expr);
-  PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
-
-  // Construct a constraint system from this expression.
-  ConstraintSystemOptions options;
-  options |= ConstraintSystemFlags::ReturnAllDiscoveredSolutions;
-  options |= ConstraintSystemFlags::SuppressDiagnostics;
-
-  ConstraintSystem cs(dc, options);
-
-  // Attempt to solve the constraint system.
-  const Type originalType = expr->getType();
-  if (originalType && originalType->hasError())
-    expr->setType(Type());
-
-  SolutionApplicationTarget target(
-      expr, dc, CTP_Unused, Type(), /*isDiscarded=*/false);
-  if (auto viable = cs.solve(target, listener, allowFreeTypeVariables)) {
-    expr = target.getAsExpr();
-    for (auto &solution : *viable) {
-      auto exprType = solution.simplifyType(cs.getType(expr));
-      assert(exprType && !exprType->hasTypeVariable());
-      types.insert(exprType.getPointer());
-    }
-  }
-}
-
 static FunctionType *
 getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
                                 ConcreteDeclRef &referencedDecl) {

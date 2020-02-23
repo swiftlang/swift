@@ -839,12 +839,6 @@ public:
                               FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
 
-  static void getPossibleTypesOfExpressionWithoutApplying(
-      Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
-      FreeTypeVariableBinding allowFreeTypeVariables =
-          FreeTypeVariableBinding::Disallow,
-      ExprTypeCheckListener *listener = nullptr);
-
   /// Return the type of operator function for specified LHS, or a null
   /// \c Type on error.
   static FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
