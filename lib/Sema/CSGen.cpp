@@ -4044,7 +4044,7 @@ void ConstraintSystem::bindVariablesInPattern(
   case PatternKind::Named: {
     auto var = cast<NamedPattern>(pattern)->getDecl();
 
-    /// Create a fresh type variable to describe the type of the
+    /// Create a fresh type variable to describe the type of the bound variable.
     Type varType = createTypeVariable(locator, TVO_CanBindToNoEscape);
 
     auto ROK = ReferenceOwnership::Strong;
