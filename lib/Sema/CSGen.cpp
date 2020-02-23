@@ -2280,6 +2280,7 @@ namespace {
         // checking; if it's impossible, fail.
         if (Type castType =
                 resolveTypeReferenceInExpression(isPattern->getCastTypeLoc())) {
+          castType = CS.openUnboundGenericType(castType, locator);
           CS.addConstraint(
               ConstraintKind::CheckedCast, subPatternType, castType, locator);
         }
