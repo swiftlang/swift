@@ -1000,7 +1000,7 @@ void JVPEmitter::prepareForDifferentialGeneration() {
   // Initialize tangent mapping for indirect results.
   auto origIndResults = original->getIndirectResults();
   auto diffIndResults = differential.getIndirectResults();
-  size_t numInoutParameters = llvm::count_if(
+  unsigned numInoutParameters = llvm::count_if(
       original->getLoweredFunctionType()->getParameters(),
       [](SILParameterInfo paramInfo) { return paramInfo.isIndirectInOut(); });
   assert(origIndResults.size() + numInoutParameters == diffIndResults.size());

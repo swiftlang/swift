@@ -2544,7 +2544,7 @@ void SILSerializer::writeSILDifferentiabilityWitness(
              dw.getParameterIndices()->getCapacity() &&
          "Original function parameter count should match differentiability "
          "witness parameter indices capacity");
-  size_t numInoutParameters = llvm::count_if(
+  unsigned numInoutParameters = llvm::count_if(
       originalFnType->getParameters(), [](SILParameterInfo paramInfo) {
         return paramInfo.isIndirectMutating();
       });
