@@ -37,7 +37,7 @@ func vjpSinResultNotDifferentiable(x: Int) -> (value: Int, pullback: (Int) -> In
   return (x, { $0 })
 }
 // expected-error @+2 {{function result's 'pullback' type does not match 'sin'}}
-// expected-note @+2 {{'pullback' does not have expected type '(Float.TangentVector) -> (Float.TangentVector)' (aka '(Float) -> Float')}}
+// expected-note @+2 {{'pullback' does not have expected type '(Float.TangentVector) -> Float.TangentVector' (aka '(Float) -> Float')}}
 @derivative(of: sin)
 func vjpSinResultInvalidSeedType(x: Float) -> (value: Float, pullback: (Double) -> Double) {
   return (x, { $0 })

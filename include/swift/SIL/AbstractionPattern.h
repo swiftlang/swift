@@ -1146,8 +1146,7 @@ public:
   /// The arguments are the same as the arguments to
   /// `AnyFunctionType::getAutoDiffDerivativeFunctionType()`.
   AbstractionPattern getAutoDiffDerivativeFunctionType(
-      IndexSubset *indices, unsigned resultIndex,
-      AutoDiffDerivativeFunctionKind kind,
+      IndexSubset *indices, AutoDiffDerivativeFunctionKind kind,
       LookupConformanceFn lookupConformance,
       GenericSignature derivativeGenericSignature = GenericSignature(),
       bool makeSelfParamFirst = false);
