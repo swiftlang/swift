@@ -17,8 +17,12 @@ jobs:
       - uses: actions/checkout@v1
         with:
           path: swift
+      - uses: actions/cache@v1
+        with:
+          path: ../build-cache
+          key: ${{ runner.os }}-sccache-v1 }}
       - name: Build Linux installable archive
-        run: ./utils/webassembly/ci-linux.sh
+        run: ./utils/webassembly/ci.sh
       - name: Upload Linux installable archive
         uses: actions/upload-artifact@v1
         with:
@@ -40,8 +44,12 @@ jobs:
       - uses: actions/checkout@v1
         with:
           path: swift
+      - uses: actions/cache@v1
+        with:
+          path: ../build-cache
+          key: ${{ runner.os }}-sccache-v1 }}
       - name: Build macOS installable archive
-        run: ./utils/webassembly/ci-mac.sh
+        run: ./utils/webassembly/ci.sh
       - name: Upload macOS installable archive
         uses: actions/upload-artifact@v1
         with:

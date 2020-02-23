@@ -37,3 +37,10 @@ ln -s wasm32-wasi wasi-sdk/share/wasi-sysroot/lib/wasm32-wasi-unknown
 
 wget -O icu.tar.xz "https://github.com/swiftwasm/icu4c-wasi/releases/download/20190421.3/icu4c-wasi.tar.xz"
 tar xf icu.tar.xz
+
+# Install sccache
+
+sudo mkdir /opt/sccache && cd /opt/sccache
+wget -O - "https://github.com/mozilla/sccache/releases/download/0.2.12/sccache-0.2.12-x86_64-apple-darwin.tar.gz" | \
+  sudo tar xz --strip-components 1
+sudo ln -sf /opt/sccache/sccache /usr/local/bin
