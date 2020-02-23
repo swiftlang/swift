@@ -12,6 +12,7 @@
 
 import os
 import shutil
+import subprocess
 
 from . import product
 from .. import shell
@@ -131,10 +132,14 @@ class TensorFlow(product.Product):
 
     def build(self, host_target):
         with shell.pushd(self.source_dir):
-            shell.call([
-                os.path.join(self.source_dir, '..', 'swift', 'utils',
-                             'configure-tensorflow-defaults'),
-            ])
+            # Run the TensorFlow configure script: `yes "" | ./configure`.
+            # NOTE: consider rewriting `subprocess` API usages using `shell`
+            # APIs.
+            yes_process = subprocess.Popen(['yes', ''], stdout=subprocess.PIPE)
+            subprocess.check_call(['./configure'], stdin=yes_process.stdout)
+            yes_process.terminate()
+
+            # Build TensorFlow via bazel.
             shell.call([
                 self.toolchain.bazel,
                 "build",
@@ -143,6 +148,10 @@ class TensorFlow(product.Product):
                 "//tensorflow:tensorflow",
             ])
 
+        # bazel builds libraries with version suffixes, e.g.
+        # "libtensorflow.{dylib,so}.x.y.z".
+        # Create a symlink to the standard unsuffixed library name:
+        # "libtensorflow.{dylib,so}".
         (suffixed_lib_name, unsuffixed_lib_name) = \
             self._get_tensorflow_library(host_target)
 
