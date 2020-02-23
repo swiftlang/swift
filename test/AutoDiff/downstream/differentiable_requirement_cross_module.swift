@@ -11,10 +11,22 @@ extension Empty : Differentiable {
   public typealias AllDifferentiableVariables = Empty
 }
 
-// expected-error @+1 {{type 'Conforming' does not conform to protocol 'DifferentiableRequirement'}}
-struct Conforming : DifferentiableRequirement {
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: float)'}}
+private struct PrivateConforming : DifferentiableRequirement {
+  fileprivate func foo(float: Float, empty: Empty) -> Float {
+    return float
+  }
+}
+
+struct InternalConforming : DifferentiableRequirement {
   func foo(float: Float, empty: Empty) -> Float {
+    return float
+  }
+}
+
+// expected-error @+1 {{type 'PublicConforming' does not conform to protocol 'DifferentiableRequirement'}}
+public struct PublicConforming : DifferentiableRequirement {
+  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: float)'}}
+  public func foo(float: Float, empty: Empty) -> Float {
     return float
   }
 }
