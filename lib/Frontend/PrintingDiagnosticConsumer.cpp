@@ -85,6 +85,8 @@ namespace {
     size_t preferred_buffer_size() const override { return 0; }
   };
 
+  // MARK: Experimental diagnostic printing.
+
   static void printDiagnosticKind(DiagnosticKind kind, raw_ostream &out) {
     switch (kind) {
     case DiagnosticKind::Error:
@@ -189,9 +191,9 @@ namespace {
     }
 
     // Insert fix-it replacement text at the appropriate point in the line.
-    bool maybePrintInsertionAfter(unsigned Byte, raw_ostream &Out) {
+    bool maybePrintInsertionAfter(int Byte, raw_ostream &Out) {
       for (auto fixIt : FixIts) {
-        if (fixIt.EndByte - 1 == Byte) {
+        if ((int)fixIt.EndByte - 1 == Byte) {
           Out.changeColor(ColoredStream::Colors::GREEN, true);
           Out << fixIt.Text;
           Out.resetColor();
@@ -554,6 +556,7 @@ static void annotateSnippetWithInfo(SourceManager &SM,
   }
 }
 
+// MARK: Main DiagnosticConsumer entrypoint.
 void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
                                                   const DiagnosticInfo &Info) {
   if (Info.Kind == DiagnosticKind::Error) {
