@@ -1149,12 +1149,7 @@ bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
   auto &ctx = cs.getASTContext();
   if (ctx.LangOpts.DisableRedundantCoercionWarning)
     return false;
-  
-  // Don't diagnose if this is coming from a CSDiag typecheck subExpr diagnostics.
-  // We can remove this once CSDiag is gone.
-  if (cs.Options.contains(ConstraintSystemFlags::SubExpressionDiagnostics))
-    return false;
-  
+
   auto last = locator.last();
   bool isExplicitCoercion =
       last && last->is<LocatorPathElt::ExplicitTypeCoercion>();
