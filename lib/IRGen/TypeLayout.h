@@ -432,8 +432,8 @@ class TypeLayoutCache {
   llvm::FoldingSet<ResilientTypeLayoutEntry> resilientEntries;
 
   TypeLayoutEntry emptyEntry;
-
 public:
+  ~TypeLayoutCache();
   ScalarTypeLayoutEntry *getOrCreateScalarEntry(const TypeInfo &ti,
                                                 SILType representative);
 
