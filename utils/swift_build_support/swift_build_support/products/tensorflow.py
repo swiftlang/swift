@@ -216,6 +216,9 @@ class TensorFlow(product.Product):
         try:
             shutil.rmtree(os.path.join(self.install_toolchain_path(),
                                        'usr', 'lib', 'swift', 'tensorflow'))
+        except OSError:
+            pass
+        try:
             os.makedirs(os.path.join(self.install_toolchain_path(),
                                      'usr', 'lib', 'swift', 'tensorflow', 'c',
                                      'eager'))
