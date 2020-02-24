@@ -2794,7 +2794,7 @@ endfunction()
 #
 #   [ARCHITECTURE architecture]
 #     Architecture to build for.
-function(_add_swift_executable_single name)
+function(_add_swift_host_executable_single name)
   set(options)
   set(single_parameter_options
     ARCHITECTURE
@@ -2965,7 +2965,7 @@ function(add_swift_host_tool executable)
                MESSAGE "Swift Component is required to add a host tool")
 
   # Create the executable rule.
-  _add_swift_executable_single(${executable}
+  _add_swift_host_executable_single(${executable}
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     ${ASHT_UNPARSED_ARGUMENTS})
