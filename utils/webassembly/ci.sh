@@ -16,7 +16,7 @@ fi
 $DEPENDENCIES_SCRIPT
 
 export SCCACHE_CACHE_SIZE="50G"
-export SCCACHE_DIR="$SOURCE_PATH/cache"
+export SCCACHE_DIR="$SOURCE_PATH/build-cache"
 
 CACHE_FLAGS="--cmake-c-launcher $(which sccache) --cmake-cxx-launcher $(which sccache)"
 FLAGS="--release --debug-swift-stdlib $CACHE_FLAGS --verbose"
