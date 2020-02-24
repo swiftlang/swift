@@ -1036,13 +1036,6 @@ public:
   ParserResult<TransposeAttr> parseTransposeAttribute(SourceLoc AtLoc,
                                                       SourceLoc Loc);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Parse the deprecated @differentiating attribute.
-  // TODO(TF-999): Remove the deprecated `@differentiating` attribute.
-  ParserResult<DerivativeAttr> parseDifferentiatingAttribute(SourceLoc AtLoc,
-                                                             SourceLoc Loc);
-  // SWIFT_ENABLE_TENSORFLOW END
-
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
 

@@ -61,6 +61,26 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @derivative(of: +=)
+  static func _vjpAddAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
+    value: Void, pullback: (inout ${Self}) -> ${Self}
+  ) {
+    lhs += rhs
+    return ((), { v in v })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: +=)
+  static func _jvpAddAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
+    value: Void, differential: (inout ${Self}, ${Self}) -> Void
+  ) {
+    lhs += rhs
+    return ((), { $0 += $1 })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   @derivative(of: -)
   static func _vjpSubtract(
     lhs: ${Self}, rhs: ${Self}
@@ -75,6 +95,26 @@ extension ${Self} {
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
     return (lhs - rhs, { (dlhs, drhs) in dlhs - drhs })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: -=)
+  static func _vjpSubtractAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
+    value: Void, pullback: (inout ${Self}) -> ${Self}
+  ) {
+    lhs -= rhs
+    return ((), { v in -v })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: -=)
+  static func _jvpSubtractAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
+    value: Void, differential: (inout ${Self}, ${Self}) -> Void
+  ) {
+    lhs -= rhs
+    return ((), { $0 -= $1 })
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -97,6 +137,30 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @derivative(of: *=)
+  static func _vjpMultiplyAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
+    value: Void, pullback: (inout ${Self}) -> ${Self}
+  ) {
+    defer { lhs *= rhs }
+    return ((), { [lhs = lhs] v in
+      let drhs = lhs * v
+      v *= rhs
+      return drhs
+    })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: *=)
+  static func _jvpMultiplyAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
+    value: Void, differential: (inout ${Self}, ${Self}) -> Void
+  ) {
+    lhs *= rhs
+    return ((), { $0 *= $1 })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   @derivative(of: /)
   static func _vjpDivide(
     lhs: ${Self}, rhs: ${Self}
@@ -111,6 +175,30 @@ extension ${Self} {
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
     return (lhs / rhs, { (dlhs, drhs) in dlhs / rhs - lhs / (rhs * rhs) * drhs })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: /=)
+  static func _vjpDivideAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
+    value: Void, pullback: (inout ${Self}) -> ${Self}
+  ) {
+    defer { lhs /= rhs }
+    return ((), { [lhs = lhs] v in
+      let drhs = -lhs / (rhs * rhs) * v
+      v /= rhs
+      return drhs
+    })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: /=)
+  static func _jvpDivideAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
+    value: Void, differential: (inout ${Self}, ${Self}) -> Void
+  ) {
+    lhs /= rhs
+    return ((), { $0 /= $1 })
   }
 }
 

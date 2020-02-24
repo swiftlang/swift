@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"

@@ -307,13 +307,13 @@ ArrayAutoDiffTests.test("ExpressibleByArrayLiteralIndirect") {
   expectEqual(0, gradY)
 }
 
-ArrayAutoDiffTests.test("ArrayConcat") {
+ArrayAutoDiffTests.test("Array.+") {
   struct TwoArrays : Differentiable {
     var a: [Float]
     var b: [Float]
   }
 
-  func sumFirstThreeConcatted(_ arrs: TwoArrays) -> Float {
+  func sumFirstThreeConcatenated(_ arrs: TwoArrays) -> Float {
     let c = arrs.a + arrs.b
     return c[0] + c[1] + c[2]
   }
@@ -324,21 +324,43 @@ ArrayAutoDiffTests.test("ArrayConcat") {
       b: FloatArrayTan([1, 0])),
     gradient(
       at: TwoArrays(a: [0, 0], b: [0, 0]),
-      in: sumFirstThreeConcatted))
+      in: sumFirstThreeConcatenated))
   expectEqual(
     TwoArrays.TangentVector(
       a: FloatArrayTan([1, 1, 1, 0]),
       b: FloatArrayTan([0, 0])),
     gradient(
       at: TwoArrays(a: [0, 0, 0, 0], b: [0, 0]),
-      in: sumFirstThreeConcatted))
+      in: sumFirstThreeConcatenated))
   expectEqual(
     TwoArrays.TangentVector(
       a: FloatArrayTan([]),
       b: FloatArrayTan([1, 1, 1, 0])),
     gradient(
       at: TwoArrays(a: [], b: [0, 0, 0, 0]),
-      in: sumFirstThreeConcatted))
+      in: sumFirstThreeConcatenated))
+
+  func identity(_ array: [Tracked<Float>]) -> [Tracked<Float>] {
+    var results: [Tracked<Float>] = []
+    for i in withoutDerivative(at: array.indices) {
+      results = results + [array[i]]
+    }
+    return results
+  }
+  let v = TrackedFloatArrayTan([4, -5, 6])
+  expectEqual(v, pullback(at: [1, 2, 3], in: identity)(v))
+}
+
+ArrayAutoDiffTests.test("Array.append") {
+  func identity(_ array: [Tracked<Float>]) -> [Tracked<Float>] {
+    var results: [Tracked<Float>] = []
+    for i in withoutDerivative(at: array.indices) {
+      results.append(array[i])
+    }
+    return results
+  }
+  let v = TrackedFloatArrayTan([4, -5, 6])
+  expectEqual(v, pullback(at: [1, 2, 3], in: identity)(v))
 }
 
 ArrayAutoDiffTests.testWithLeakChecking("Array.init(repeating:count:)") {

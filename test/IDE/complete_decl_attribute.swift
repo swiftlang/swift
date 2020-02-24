@@ -69,7 +69,6 @@ struct MyStruct {}
 // KEYWORD2-NEXT:             Keyword/None:                       derivative[#Func Attribute#]; name=derivative
 // KEYWORD2-NEXT:             Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // SWIFT_ENABLE_TENSORFLOW
-// KEYWORD2-NEXT:             Keyword/None:                       differentiating[#Func Attribute#]; name=differentiating
 // KEYWORD2-NEXT:             Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
 // KEYWORD2-NEXT:             Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // SWIFT_ENABLE_TENSORFLOW END
@@ -192,7 +191,6 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // ON_METHOD-DAG: Keyword/None:                       IBSegueAction[#Func Attribute#]; name=IBSegueAction
 // SWIFT_ENABLE_TENSORFLOW
-// ON_METHOD-DAG: Keyword/None:                       differentiating[#Func Attribute#]; name=differentiating
 // ON_METHOD-DAG: Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
 // ON_METHOD-DAG: Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // SWIFT_ENABLE_TENSORFLOW END
@@ -254,7 +252,6 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
 // ON_MEMBER_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // SWIFT_ENABLE_TENSORFLOW
-// ON_MEMBER_LAST-DAG: Keyword/None:                       differentiating[#Declaration Attribute#]; name=differentiating
 // ON_MEMBER_LAST-DAG: Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
 // SWIFT_ENABLE_TENSORFLOW END
@@ -305,7 +302,6 @@ func dummy2() {}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
 // KEYWORD_LAST-NEXT:             Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // SWIFT_ENABLE_TENSORFLOW
-// KEYWORD_LAST-NEXT:             Keyword/None:                       differentiating[#Declaration Attribute#]; name=differentiating
 // KEYWORD_LAST-NEXT:             Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
 // SWIFT_ENABLE_TENSORFLOW END

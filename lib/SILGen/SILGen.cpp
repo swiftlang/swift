@@ -774,7 +774,11 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
           jvp = getFunction(SILDeclRef(jvpDecl), ForDefinition);
         if (auto *vjpDecl = diffAttr->getVJPFunction())
           vjp = getFunction(SILDeclRef(vjpDecl), ForDefinition);
-        auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
+        auto origFnType = F->getLoweredFunctionType();
+        auto numResults = origFnType->getNumResults() +
+                          origFnType->getNumIndirectMutatingParameters();
+        auto *resultIndices =
+            IndexSubset::get(getASTContext(), numResults, {0});
         assert((!F->getLoweredFunctionType()->getSubstGenericSignature() ||
                 diffAttr->getDerivativeGenericSignature()) &&
                "Type-checking should resolve derivative generic signatures for "
@@ -798,8 +802,12 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
         auto origDeclRef =
             SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
         auto *origFn = getFunction(origDeclRef, NotForDefinition);
+        auto origFnType = origFn->getLoweredFunctionType();
+        auto numResults = origFnType->getNumResults() +
+                          origFnType->getNumIndirectMutatingParameters();
+        auto *resultIndices =
+            IndexSubset::get(getASTContext(), numResults, {0});
         auto derivativeGenSig = AFD->getGenericSignature();
-        auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
         AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
                               derivativeGenSig);
         emitDifferentiabilityWitness(origAFD, origFn, config, jvp, vjp,

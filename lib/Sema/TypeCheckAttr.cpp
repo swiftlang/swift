@@ -256,8 +256,6 @@ public:
   void visitDerivativeAttr(DerivativeAttr *attr);
   // SWIFT_ENABLE_TENSORFLOW
   void visitTransposeAttr(TransposeAttr *attr);
-  // TODO(TF-999): Remove deprecated `@differentiating` attribute.
-  void visitDifferentiatingAttr(DerivativeAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   // SWIFT_ENABLE_TENSORFLOW END
 };
@@ -5007,8 +5005,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
 
   // Get the linearity parameter types.
   SmallVector<AnyFunctionType::Param, 4> linearParams;
-  expectedOriginalFnType->getSubsetParameters(
-      linearParamIndices, linearParams, /*reverseCurryLevels*/ true);
+  expectedOriginalFnType->getSubsetParameters(linearParamIndices, linearParams,
+                                              /*reverseCurryLevels*/ true);
 
   // Check if linearity parameter indices are valid.
   if (checkLinearityParameters(originalAFD, linearParams,
@@ -5022,10 +5020,6 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
 
   // Set the resolved linearity parameter indices in the attribute.
   attr->setParameterIndices(linearParamIndices);
-}
-
-void AttributeChecker::visitDifferentiatingAttr(DerivativeAttr *attr) {
-  visitDerivativeAttr(attr);
 }
 
 static bool

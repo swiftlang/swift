@@ -794,6 +794,11 @@ class BuildScriptInvocation(object):
                         args.build_jobs)
                 ]
 
+        # SWIFT_ENABLE_TENSORFLOW
+        if args.enable_tensorflow:
+            impl_args += ["--enable-tensorflow"]
+        # SWIFT_ENABLE_TENSORFLOW END
+
         impl_args += args.build_script_impl_args
 
         if args.dry_run:

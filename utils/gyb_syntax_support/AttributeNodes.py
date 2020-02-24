@@ -66,10 +66,6 @@ ATTRIBUTE_NODES = [
                              kind='DifferentiableAttributeArguments'),
                        Child('DerivativeRegistrationArguments',
                              kind='DerivativeRegistrationAttributeArguments'),
-                       # SWIFT_ENABLE_TENSORFLOW
-                       Child('DeprecatedDerivativeRegistrationArguments',
-                             kind='DeprecatedDerivativeRegistrationAttributeArguments'),
-                       # SWIFT_ENABLE_TENSORFLOW END
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
                    ], description='''
@@ -387,24 +383,4 @@ ATTRIBUTE_NODES = [
                    specified.
                    '''),
          ]),
-
-    # SWIFT_ENABLE_TENSORFLOW
-    # The argument of the deprecated derivative registration attribute
-    # '@differentiating'.
-    # deprecated-derivative-registration-attr-arguments ->
-    #     func-decl-name ','? differentiation-params-clause?
-    # TODO(TF-999): Remove deprecated `@differentiating` attribute.
-    Node('DeprecatedDerivativeRegistrationAttributeArguments', kind='Syntax',
-         description='''
-         The arguments for the '@differentiating' attribute: the original
-         declaration name and an optional differentiation parameter list.
-         ''',
-         children=[
-             Child('OriginalDeclName', kind='QualifiedDeclName',
-                   description='The referenced original declaration name.'),
-             Child('Comma', kind='CommaToken', is_optional=True),
-             Child('DiffParams', kind='DifferentiationParamsClause',
-                   is_optional=True),
-         ]),
-    # SWIFT_ENABLE_TENSORFLOW END
 ]

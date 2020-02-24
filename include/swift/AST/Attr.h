@@ -1923,11 +1923,6 @@ public:
   }
 };
 
-// SWIFT_ENABLE_TENSORFLOW
-// TODO(TF-999): Remove deprecated `@differentiating` attribute.
-using DifferentiatingAttr = DerivativeAttr;
-// SWIFT_ENABLE_TENSORFLOW END
-
 /// The `@transpose(of:)` attribute registers a function as a transpose of
 /// another function-like declaration: a 'func', 'init', 'subscript', or 'var'
 /// computed property declaration.

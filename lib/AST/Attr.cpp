@@ -1189,10 +1189,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "derivative";
   case DAK_Transpose:
     return "transpose";
-  // SWIFT_ENABLE_TENSORFLOW
-  case DAK_Differentiating:
-    return "differentiating";
-  // SWIFT_ENABLE_TENSORFLOW END
   }
   llvm_unreachable("bad DeclAttrKind");
 }

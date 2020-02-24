@@ -556,11 +556,6 @@ DECL_ATTR(transpose, Transpose,
   99)
 
 // SWIFT_ENABLE_TENSORFLOW
-// TODO(TF-999): Remove deprecated `@differentiating` attribute.
-DECL_ATTR(differentiating, Differentiating,
-  OnFunc | LongAttribute | AllowMultipleAttributes |
-  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
-  101)
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
   OnAccessor | OnFunc | OnConstructor | OnSubscript |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove |

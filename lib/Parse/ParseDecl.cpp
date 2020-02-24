@@ -1232,65 +1232,6 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
       original, parameters));
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-ParserResult<DerivativeAttr>
-Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
-  StringRef AttrName = "differentiating";
-  SourceLoc lParenLoc = loc, rParenLoc = loc;
-  TypeRepr *baseType = nullptr;
-  DeclNameRefWithLoc original;
-  SmallVector<ParsedAutoDiffParameter, 8> parameters;
-
-  // Parse trailing comma, if it exists, and check for errors.
-  auto consumeIfTrailingComma = [&]() -> bool {
-    if (!consumeIf(tok::comma))
-      return false;
-    // Diagnose trailing comma before ')'.
-    if (Tok.is(tok::r_paren)) {
-      diagnose(Tok, diag::unexpected_separator, ",");
-      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
-    }
-    // Check that token after comma is 'wrt:'.
-    if (isIdentifier(Tok, "wrt"))
-      return false;
-    diagnose(Tok, diag::attr_expected_label, "wrt", AttrName);
-    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
-  };
-  // Parse '('.
-  if (!consumeIf(tok::l_paren, lParenLoc)) {
-    diagnose(getEndOfPreviousLoc(), diag::attr_expected_lparen, AttrName,
-             /*DeclModifier*/ false);
-    return makeParserError();
-  }
-  {
-    SyntaxParsingContext ContentContext(
-        SyntaxContext,
-        SyntaxKind::DeprecatedDerivativeRegistrationAttributeArguments);
-    {
-      // Parse the optionally qualified function name.
-      if (parseQualifiedDeclName(
-              *this, diag::autodiff_attr_expected_original_decl_name,
-              baseType, original))
-        return makeParserError();
-    }
-    if (consumeIfTrailingComma())
-      return makeParserError();
-    // Parse the optional 'wrt' differentiability parameters clause.
-    if (isIdentifier(Tok, "wrt") &&
-        parseDifferentiabilityParametersClause(parameters, AttrName))
-      return makeParserError();
-  }
-  // Parse ')'.
-  if (!consumeIf(tok::r_paren, rParenLoc)) {
-    diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
-             /*DeclModifier*/ false);
-    return makeParserError();
-  }
-  return ParserResult<DerivativeAttr>(DerivativeAttr::create(
-      Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), baseType,
-      original, parameters));
-}
-
 /// Parse a `@transpose(of:)` attribute, returning true on error.
 ///
 /// \verbatim
@@ -2385,22 +2326,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       Attributes.add(Attr.get());
     break;
   }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  case DAK_Differentiating: {
-    // Diagnose deprecated `@differentiating` attribute.
-    diagnose(Loc, diag::attr_differentiating_deprecated);
-
-    // `@differentiating` in a local scope is not allowed.
-    if (CurDeclContext->isLocalContext())
-      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
-
-    auto Attr = parseDifferentiatingAttribute(AtLoc, Loc);
-    if (Attr.isNonNull())
-      Attributes.add(Attr.get());
-    break;
-  }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   case DAK_ProjectedValueProperty: {
     if (!consumeIf(tok::l_paren)) {

@@ -936,7 +936,7 @@ AbstractionPattern AbstractionPattern::getAutoDiffDerivativeFunctionType(
       return getOpaqueDerivativeFunction();
     auto derivativeFnTy = fnTy->getAutoDiffDerivativeFunctionType(
         indices, kind, lookupConformance, derivativeGenericSignature,
-	makeSelfParamFirst);
+        makeSelfParamFirst);
     assert(derivativeFnTy);
     return AbstractionPattern(getGenericSignature(),
                               derivativeFnTy->getCanonicalType());

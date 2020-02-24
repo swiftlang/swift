@@ -723,14 +723,27 @@ bool PullbackEmitter::run() {
   builder.setInsertionPoint(pullbackEntry,
                             getNextFunctionLocalAllocationInsertionPoint());
   if (seed->getType().isAddress()) {
-    auto *seedBufCopy = builder.createAllocStack(pbLoc, seed->getType());
-    builder.createCopyAddr(pbLoc, seed, seedBufCopy, IsNotTake,
-                           IsInitialization);
-    setAdjointBuffer(origExit, origResult, seedBufCopy);
-    functionLocalAllocations.push_back(seedBufCopy);
-    LLVM_DEBUG(getADDebugStream()
-               << "Assigned seed buffer " << seedBufCopy
-               << " as the adjoint of original indirect result " << origResult);
+    // If the pullback `seed` is an `inout` parameter, assign it directly as the
+    // adjoint buffer of the original result.
+    if (pullback.getLoweredFunctionType()
+            ->getParameters()
+            .front()
+            .isIndirectInOut()) {
+      setAdjointBuffer(origExit, origResult, seed);
+    }
+    // Otherwise, assign a copy of `seed` as the adjoint buffer of the original
+    // result.
+    else {
+      auto *seedBufCopy = builder.createAllocStack(pbLoc, seed->getType());
+      builder.createCopyAddr(pbLoc, seed, seedBufCopy, IsNotTake,
+                             IsInitialization);
+      functionLocalAllocations.push_back(seedBufCopy);
+      setAdjointBuffer(origExit, origResult, seedBufCopy);
+      LLVM_DEBUG(getADDebugStream()
+                 << "Assigned seed buffer " << seedBufCopy
+                 << " as the adjoint of original indirect result "
+                 << origResult);
+    }
   } else {
     setAdjointValue(origExit, origResult, makeConcreteAdjointValue(seed));
     LLVM_DEBUG(getADDebugStream()
@@ -756,6 +769,7 @@ bool PullbackEmitter::run() {
   // This vector will contain all indirect parameter adjoint buffers.
   SmallVector<SILValue, 4> indParamAdjoints;
 
+  auto conv = getOriginal().getConventions();
   auto origParams = getOriginal().getArgumentsWithoutIndirectResults();
 
   // Materializes the return element corresponding to the parameter
@@ -773,8 +787,12 @@ bool PullbackEmitter::run() {
     }
   };
   // Collect differentiation parameter adjoints.
-  for (auto i : getIndices().parameters->getIndices())
+  // Skip `inout` parameters.
+  for (auto i : getIndices().parameters->getIndices()) {
+    if (conv.getParameters()[i].isIndirectMutating())
+      continue;
     addRetElt(i);
+  }
 
   // Copy them to adjoint indirect results.
   assert(indParamAdjoints.size() == getPullback().getIndirectResults().size() &&
@@ -1176,18 +1194,29 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   auto pullback = getPullbackStructElement(ai->getParent(), field);
 
   // Get the original result of the `apply` instruction.
-  SmallVector<SILValue, 8> args;
   SmallVector<SILValue, 8> origDirectResults;
   forEachApplyDirectResult(ai, [&](SILValue directResult) {
     origDirectResults.push_back(directResult);
   });
   SmallVector<SILValue, 8> origAllResults;
   collectAllActualResultsInTypeOrder(ai, origDirectResults, origAllResults);
+  // Append `inout` arguments after original results.
+  for (auto paramIdx : applyInfo.indices.parameters->getIndices()) {
+    auto paramInfo = ai->getSubstCalleeConv().getParamInfoForSILArg(
+        ai->getNumIndirectResults() + paramIdx);
+    if (!paramInfo.isIndirectMutating())
+      continue;
+    origAllResults.push_back(
+        ai->getArgumentsWithoutIndirectResults()[paramIdx]);
+  }
+
   assert(applyInfo.indices.source < origAllResults.size());
   auto origResult = origAllResults[applyInfo.indices.source];
   assert(origResult);
   auto origNumIndRes = ai->getNumIndirectResults();
 
+  // Get pullback arguments.
+  SmallVector<SILValue, 8> args;
   auto pullbackType = remapType(pullback->getType()).castTo<SILFunctionType>();
 
   // Get the seed (i.e. adjoint value of the original result).
@@ -1237,6 +1266,7 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   // Get all results in type-defined order.
   SmallVector<SILValue, 8> allResults;
   collectAllActualResultsInTypeOrder(pullbackCall, dirResults, allResults);
+
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "All results of the nested pullback call:\n";
@@ -1247,6 +1277,11 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   auto allResultsIt = allResults.begin();
   for (unsigned i : applyInfo.indices.parameters->getIndices()) {
     auto origArg = ai->getArgument(origNumIndRes + i);
+    // Skip adjoint accumulation for `inout` arguments.
+    auto paramInfo = ai->getSubstCalleeConv().getParamInfoForSILArg(
+        ai->getNumIndirectResults() + i);
+    if (paramInfo.isIndirectMutating())
+      continue;
     auto tan = *allResultsIt++;
     if (tan->getType().isAddress()) {
       addToAdjointBuffer(bb, origArg, tan, loc);
