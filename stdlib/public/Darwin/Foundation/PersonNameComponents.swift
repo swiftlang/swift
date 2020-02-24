@@ -21,7 +21,7 @@ public struct PersonNameComponents : ReferenceConvertible, Hashable, Equatable, 
         _handle = _MutableHandle(adoptingReference: NSPersonNameComponents())
     }
     
-    fileprivate init(reference: __shared NSPersonNameComponents) {
+    private init(reference: __shared NSPersonNameComponents) {
         _handle = _MutableHandle(reference: reference)
     }
 
