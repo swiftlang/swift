@@ -456,13 +456,7 @@ extension Collection {
   }
 }
 func fn_r28909024(n: Int) {
-  // FIXME(diagnostics): Unfortunately there is no easy way to fix this diagnostic issue at the moment
-  // because the problem is related to ordering of the bindings - we'd attempt to bind result of the expression
-  // to contextual type of `Void` which prevents solver from discovering correct types for range - 0..<10
-  // (since both arguments are literal they are ranked lower than contextual type).
-  //
-  // Good diagnostic for this is - `unexpected non-void return value in void function`
-  return (0..<10).r28909024 { // expected-error {{type of expression is ambiguous without more context}}
+  return (0..<10).r28909024 { // expected-error {{unexpected non-void return value in void function}} expected-note {{did you mean to add a return type?}}
     _ in true
   }
 }

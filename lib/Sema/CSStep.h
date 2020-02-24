@@ -620,6 +620,15 @@ protected:
   /// Check whether attempting type variable binding choices should
   /// be stopped, because optimal solution has already been found.
   bool shouldStopAt(const TypeVariableBinding &choice) const override {
+    if (CS.shouldAttemptFixes()) {
+      // Let's always attempt default types inferred from literals
+      // in diagnostic mode because that could lead to better
+      // diagnostics if the problem is contextual like argument/parameter
+      // conversion or collection element mismatch.
+      if (choice.hasDefaultedProtocol())
+        return false;
+    }
+
     // If we were able to solve this without considering
     // default literals, don't bother looking at default literals.
     return AnySolved && choice.hasDefaultedProtocol() &&
