@@ -159,25 +159,6 @@ namespace {
                              Diag<Identifier> diagID);
   };
 
-  /// Represents an import whose options have been checked and module has been
-  /// loaded, but its scope (if it's a scoped import) has not been validated
-  /// and it has not been added to \c SF.
-  struct BoundImport {
-    /// The \c UnboundImport we bound to produce this import. Used to avoid
-    /// duplicating its fields.
-    UnboundImport unbound;
-
-    /// The \c ImportedModuleDesc that should be added to the source file for
-    /// this import.
-    ImportedModuleDesc desc;
-
-    /// The module we bound \c unbound to.
-    ModuleDecl *module;
-
-    BoundImport(UnboundImport unbound, ImportedModuleDesc desc,
-                ModuleDecl *module);
-  };
-
   class NameBinder final : public DeclVisitor<NameBinder> {
     friend DeclVisitor<NameBinder>;
 
@@ -188,8 +169,8 @@ namespace {
     /// cross-imports found.
     SmallVector<UnboundImport, 4> unboundImports;
 
-    /// Imports which still need their scoped imports validated.
-    SmallVector<BoundImport, 16> unvalidatedImports;
+    /// The list of fully bound imports.
+    SmallVector<ImportedModuleDesc, 16> boundImports;
 
     /// All imported modules, including by re-exports, and including submodules.
     llvm::DenseSet<ImportedModuleDesc> visibleModules;
@@ -211,9 +192,10 @@ namespace {
       : SF(SF), ctx(SF.getASTContext())
     { }
 
-    /// Postprocess the imports this NameBinder has bound and collect them into
-    /// \p imports.
-    void finishImports(SmallVectorImpl<ImportedModuleDesc> &imports);
+    /// Retrieve the finalized imports.
+    ArrayRef<ImportedModuleDesc> getFinishedImports() const {
+      return boundImports;
+    }
 
   private:
     // Special behavior for these decls:
@@ -231,11 +213,11 @@ namespace {
       return ctx.Diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
 
-    /// Check a single unbound import, bind it, add it to \c unvalidatedImports,
+    /// Check a single unbound import, bind it, add it to \c boundImports,
     /// and add its cross-import overlays to \c unboundImports.
     void bindImport(UnboundImport &&I);
 
-    /// Adds \p I and \p M to \c unvalidatedImports and \c visibleModules.
+    /// Adds \p I and \p M to \c boundImports and \c visibleModules.
     void addImport(const UnboundImport &I, ModuleDecl *M);
 
     /// Adds \p desc and everything it re-exports to \c visibleModules using
@@ -298,13 +280,7 @@ void swift::performNameBinding(SourceFile &SF) {
   for (auto D : SF.getTopLevelDecls())
     Binder.visit(D);
 
-  // Validate all scoped imports. We defer this until now because a scoped
-  // import of a cross-import overlay's declaring module can select declarations
-  // in the overlay, and we don't know all of the overlays we're loading until
-  // we've bound all imports in the file.
-  SmallVector<ImportedModuleDesc, 8> ImportedModules;
-  Binder.finishImports(ImportedModules);
-  SF.addImports(ImportedModules);
+  SF.addImports(Binder.getFinishedImports());
 
   SF.ASTStage = SourceFile::NameBound;
   verify(SF);
@@ -408,9 +384,8 @@ void NameBinder::bindImport(UnboundImport &&I) {
 
 void NameBinder::addImport(const UnboundImport &I, ModuleDecl *M) {
   auto importDesc = I.makeDesc(M);
-
   addVisibleModules(importDesc);
-  unvalidatedImports.emplace_back(I, importDesc, M);
+  boundImports.push_back(importDesc);
 }
 
 //===----------------------------------------------------------------------===//
@@ -654,18 +629,6 @@ void UnboundImport::diagnoseInvalidAttr(DeclAttrKind attrKind,
 //===----------------------------------------------------------------------===//
 // MARK: Scoped imports
 //===----------------------------------------------------------------------===//
-
-BoundImport::BoundImport(UnboundImport unbound, ImportedModuleDesc desc,
-                         ModuleDecl *module)
-  : unbound(unbound), desc(desc), module(module) {
-  assert(module && "Can't have an import bound to nothing");
-}
-
-void NameBinder::finishImports(SmallVectorImpl<ImportedModuleDesc> &imports) {
-  for (auto &unvalidated : unvalidatedImports) {
-    imports.push_back(unvalidated.desc);
-  }
-}
 
 /// Returns true if a decl with the given \p actual kind can legally be
 /// imported via the given \p expected kind.
