@@ -148,6 +148,7 @@ func testWhileScoping(_ a: Int?) {// expected-note {{did you mean 'a'?}}
 public enum SomeParseResult<T> {
   case error(length: Int)
   case repeated(value: String, repetitions: Int)
+  // expected-note@-1{{'repeated(value:repetitions:)' declared here}}
 
   var _error: Int? {
     if case .error(let result) = self { return result }
@@ -197,5 +198,11 @@ public enum SomeParseResult<T> {
       return (value, repetitions)
     }
     return nil
+  }
+}
+
+func matchImplicitTupling(pr: SomeParseResult<Int>) {
+  if case .repeated(let x) = pr { // expected-warning{{enum case 'repeated' has 2 associated values; matching them as a tuple is deprecated}}
+    let y: Int = x // expected-error{{cannot convert value of type '(value: String, repetitions: Int)' to specified type 'Int'}}
   }
 }

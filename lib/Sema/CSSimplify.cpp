@@ -1658,6 +1658,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
             implodeParams(func2Params);
           }
         }
+      } else if (last->getKind() == ConstraintLocator::PatternMatch &&
+          isa<EnumElementPattern>(
+            last->castTo<LocatorPathElt::PatternMatch>().getPattern()) &&
+          isSingleTupleParam(ctx, func1Params) &&
+          canImplodeParams(func2Params)) {
+        implodeParams(func2Params);
       }
     }
 
