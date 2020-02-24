@@ -5,7 +5,7 @@
 
 // RUN: not %target-typecheck-verify-swift -I %S/Inputs/broken-c-module 2>&1 | %FileCheck %s
 
-// CHECK: [[@LINE+3]]:8: error: unexpected error produced: could not build C module 
+// CHECK: [[@LINE+3]]:8: error: unexpected error produced: could not build
 // CHECK: note: in file included from <module-includes>
 // CHECK: broken_c.h:2:11: error: expected function body after function declarator
 import BrokenCModule
