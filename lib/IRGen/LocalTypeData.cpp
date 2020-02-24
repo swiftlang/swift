@@ -560,7 +560,7 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
       // the type metadata for Int by chasing through N layers of metadata
       // just because that path happens to be in the cache.
       if (!type->hasArchetype() &&
-          isTypeMetadataAccessTrivial(IGF.IGM, type)) {
+          !shouldCacheTypeMetadataAccess(IGF.IGM, type)) {
         continue;
       }
 
