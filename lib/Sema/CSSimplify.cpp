@@ -6068,6 +6068,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // match, unwrap optionals and try again to allow implicit creation of
   // optional "some" patterns (spelled "?").
   if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
+      memberLocator &&
       memberLocator->isLastElement<LocatorPathElt::PatternMatch>() &&
       instanceTy->getOptionalObjectType() &&
       baseObjTy->is<AnyMetatypeType>()) {
