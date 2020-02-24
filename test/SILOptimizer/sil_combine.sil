@@ -3449,6 +3449,19 @@ bb0(%0 : $*Builtin.Int64, %1 : $B):
   return %4 : $Builtin.Int64
 }
 
+// CHECK-LABEL: sil @mark_dependence_trivial_object_base :
+// CHECK: bb0(
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'mark_dependence_trivial_object_base'
+sil @mark_dependence_trivial_object_base : $@convention(thin) (@guaranteed B) -> @owned B {
+bb0(%0 : $B):
+  strong_retain %0 : $B
+  %1 = enum $Optional<Int>, #Optional.none!enumelt
+  %2 = mark_dependence %0 : $B on %1 : $Optional<Int>
+  return %2 : $B
+}
+
 protocol _NSArrayCore {}
 
 // CHECK-LABEL: sil @mark_dependence_base2
