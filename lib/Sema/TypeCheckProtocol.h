@@ -210,9 +210,8 @@ enum class MatchKind : uint8_t {
   /// The witness is explicitly @nonobjc but the requirement is @objc.
   NonObjC,
 
-  /// The witness does not have a `@differentiable` attribute satisfying one
-  /// from the requirement.
-  DifferentiableConflict,
+  /// The witness is missing a `@differentiable` attribute from the requirement.
+  MissingDifferentiableAttr,
 };
 
 /// Describes the kind of optional adjustment performed when
@@ -363,7 +362,7 @@ struct RequirementMatch {
       : Witness(witness), Kind(kind), WitnessType(), UnmetAttribute(attr),
         ReqEnv(None) {
     assert(!hasWitnessType() && "Should have witness type");
-    assert(UnmetAttribute);
+    assert(hasUnmetAttribute() && "Should have unmet attribute");
   }
 
   RequirementMatch(ValueDecl *witness, MatchKind kind,
@@ -438,7 +437,7 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
-    case MatchKind::DifferentiableConflict:
+    case MatchKind::MissingDifferentiableAttr:
       return false;
     }
 
@@ -468,7 +467,7 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
-    case MatchKind::DifferentiableConflict:
+    case MatchKind::MissingDifferentiableAttr:
       return false;
     }
 
@@ -479,7 +478,9 @@ struct RequirementMatch {
   bool hasRequirement() { return Kind == MatchKind::MissingRequirement; }
 
   /// Determine whether this requirement match has an unmet attribute.
-  bool hasUnmetAttribute() { return Kind == MatchKind::DifferentiableConflict; }
+  bool hasUnmetAttribute() {
+    return Kind == MatchKind::MissingDifferentiableAttr;
+  }
 
   swift::Witness getWitness(ASTContext &ctx) const;
 };
