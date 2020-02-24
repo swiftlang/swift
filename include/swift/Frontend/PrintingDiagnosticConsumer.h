@@ -47,6 +47,8 @@ public:
 
   virtual bool finishProcessing() override;
 
+  void flush(bool includeTrailingBreak = false);
+
   void forceColors() {
     ForceColors = true;
     llvm::sys::Process::UseANSIEscapeCodes(true);

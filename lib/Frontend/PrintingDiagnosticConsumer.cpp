@@ -574,17 +574,7 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
     } else {
       // If we encounter a new error/warning/remark, flush any in-flight
       // snippets.
-      if (currentSnippet) {
-        if (ForceColors) {
-          ColoredStream colorStream{Stream};
-          currentSnippet->render(colorStream);
-          colorStream << "\n\n";
-        } else {
-          NoColorStream noColorStream{Stream};
-          currentSnippet->render(noColorStream);
-          noColorStream << "\n\n";
-        }
-      }
+      flush(/*includeTrailingBreak*/ true);
       currentSnippet = std::make_unique<AnnotatedSourceSnippet>(SM);
       annotateSnippetWithInfo(SM, Info, *currentSnippet);
     }
@@ -602,17 +592,26 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
   }
 }
 
-bool PrintingDiagnosticConsumer::finishProcessing() {
-  // If there's an in-flight snippet, flush it.
+void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
   if (currentSnippet) {
     if (ForceColors) {
       ColoredStream colorStream{Stream};
       currentSnippet->render(colorStream);
+      if (includeTrailingBreak)
+        colorStream << "\n\n";
     } else {
       NoColorStream noColorStream{Stream};
       currentSnippet->render(noColorStream);
+      if (includeTrailingBreak)
+        noColorStream << "\n\n";
     }
+    currentSnippet.reset();
   }
+}
+
+bool PrintingDiagnosticConsumer::finishProcessing() {
+  // If there's an in-flight snippet, flush it.
+  flush();
   return false;
 }
 
