@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift(-Xfrontend -prespecialize-generic-metadata -target %module-target-future)
+// RUN: %target-run-simple-swift(-Xfrontend  -target %module-target-future)
 // REQUIRES: executable_test
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu

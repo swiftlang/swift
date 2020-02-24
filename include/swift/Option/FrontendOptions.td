@@ -671,10 +671,6 @@ def disable_generic_metadata_prespecialization : Flag<["-"], "disable-generic-me
   HelpText<"Do not statically specialize metadata for generic types at types "
            "that are known to be used in source.">;
 
-def prespecialize_generic_metadata : Flag<["-"], "prespecialize-generic-metadata">,
-   HelpText<"Statically specialize metadata for generic types at types that "
-            "are known to be used in source.">;
-
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;
 
