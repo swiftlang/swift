@@ -4686,6 +4686,10 @@ public:
   /// To ensure an accessor is always returned, use getSynthesizedAccessor().
   AccessorDecl *getOpaqueAccessor(AccessorKind kind) const;
 
+  /// Collect all opaque accessors.
+  ArrayRef<AccessorDecl*>
+    getOpaqueAccessors(llvm::SmallVectorImpl<AccessorDecl*> &scratch) const;
+
   /// Return an accessor that was written in source. Returns null if the
   /// accessor was not explicitly defined by the user.
   AccessorDecl *getParsedAccessor(AccessorKind kind) const;
