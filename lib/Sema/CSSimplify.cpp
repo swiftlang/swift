@@ -9103,7 +9103,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     // subscript, which requires changes to declaration to become mutable.
     if (auto last = locator.last()) {
       impact += (last->is<LocatorPathElt::FunctionResult>() ||
-                 last->is<LocatorPathElt::SubscriptMember>())
+                 last->is<LocatorPathElt::SubscriptMember>() ||
+                 last->is<LocatorPathElt::KeyPathDynamicMember>())
                     ? 1
                     : 0;
     }
