@@ -130,6 +130,13 @@ class TensorFlow(product.Product):
 
         raise RuntimeError('unknown host target {}'.format(host))
 
+    def _symlink(self, dest, src):
+        try:
+            os.unlink(src)
+        except OSError:
+            pass
+        os.symlink(dest, src)
+
     def build(self, host_target):
         with shell.pushd(self.source_dir):
             # Run the TensorFlow configure script: `yes "" | ./configure`.
@@ -202,16 +209,24 @@ class TensorFlow(product.Product):
                                  'usr', 'lib', 'swift',
                                  subdir, suffixed_lib_name))
 
-        try:
-            os.unlink(os.path.join(self.install_toolchain_path(),
-                                   'usr', 'lib', 'swift',
-                                   subdir, unsuffixed_lib_name))
-        except OSError:
-            pass
-        os.symlink(suffixed_lib_name,
-                   os.path.join(self.install_toolchain_path(),
-                                'usr', 'lib', 'swift',
-                                subdir, unsuffixed_lib_name))
+        if host_target.startswith('linux'):
+            versions = (
+                    'libtensorflow.so.2.1.0',
+                    'libtensorflow.so.2.1',
+                    'libtensorflow.so.2',
+                    'libtensorflow.so',
+            )
+
+            for (index, value) in enumerate(versions[:-1]):
+                self._symlink(value,
+                              os.path.join(self.install_toolchain_path(),
+                                           'usr', 'lib', 'swift', subdir,
+                                           versions[index + 1]))
+        else:
+            self._symlink(suffixed_lib_name,
+                          os.path.join(self.install_toolchain_path(),
+                                       'usr', 'lib', 'swift', subdir,
+                                       unsuffixed_lib_name))
 
         try:
             shutil.rmtree(os.path.join(self.install_toolchain_path(),
