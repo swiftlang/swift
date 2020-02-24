@@ -2144,3 +2144,21 @@ TypeLayoutCache::getOrCreateResilientEntry(SILType ty) {
   resilientEntries.InsertNode(newEntry, insertPos);
   return newEntry;
 }
+
+TypeLayoutCache::~TypeLayoutCache() {
+  for (auto &entry : scalarEntries) {
+    entry.~ScalarTypeLayoutEntry();
+  }
+  for (auto &entry : archetypeEntries) {
+    entry.~ArchetypeLayoutEntry();
+  }
+  for (auto &entry : alignedGroupEntries) {
+    entry.~AlignedGroupEntry();
+  }
+  for (auto &entry : enumEntries) {
+    entry.~EnumTypeLayoutEntry();
+  }
+  for (auto &entry : resilientEntries) {
+    entry.~ResilientTypeLayoutEntry();
+  }
+}
