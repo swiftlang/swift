@@ -1,3 +1,2 @@
-// This C code intentionally doesn't compile (note missing parenthesis).
-void foo(int bar {
-}
+// This C code intentionally doesn't compile (note missing semicolon).
+void foo()
