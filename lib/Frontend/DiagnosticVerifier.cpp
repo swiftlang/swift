@@ -86,6 +86,12 @@ namespace {
     SourceManager &SM;
     std::vector<llvm::SMDiagnostic> CapturedDiagnostics;
   public:
+    explicit DiagnosticVerifier(SourceManager &SM) : SM(SM) {}
+
+    void addDiagnostic(const llvm::SMDiagnostic &Diag) {
+      CapturedDiagnostics.push_back(Diag);
+    }
+
     /// Result of verifying a file.
     struct Result {
       /// Were there any errors? All of the following are considered errors:
@@ -95,12 +101,6 @@ namespace {
       bool HadError;
       bool HadUnexpectedDiag;
     };
-
-    explicit DiagnosticVerifier(SourceManager &SM) : SM(SM) {}
-
-    void addDiagnostic(const llvm::SMDiagnostic &Diag) {
-      CapturedDiagnostics.push_back(Diag);
-    }
 
     /// verifyFile - After the file has been processed, check to see if we
     /// got all of the expected diagnostics and check to see if there were any
