@@ -22,5 +22,10 @@ CACHE_FLAGS="--cmake-c-launcher $(which sccache) --cmake-cxx-launcher $(which sc
 FLAGS="--release --debug-swift-stdlib $CACHE_FLAGS --verbose"
 
 $BUILD_SCRIPT $FLAGS
-# Run test but ignore failure temporarily
-$BUILD_SCRIPT $FLAGS -t || true
+
+if [[ "$(uname)" == "Linux" ]]; then
+  echo "Skip running test suites for Linux"
+else
+  # Run test but ignore failure temporarily
+  $BUILD_SCRIPT $FLAGS -t || true
+fi
