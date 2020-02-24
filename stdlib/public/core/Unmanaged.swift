@@ -206,10 +206,10 @@ public struct Unmanaged<Instance: AnyObject> {
   public func _withUnsafeGuaranteedRef<Result>(
     _ body: (Instance) throws -> Result
   ) rethrows -> Result {
-    let (guaranteedInstance, token) = Builtin.unsafeGuaranteed(_value)
-    let result = try body(guaranteedInstance)
-    Builtin.unsafeGuaranteedEnd(token)
-    return result
+    var tmp = self
+    let fakeBase: Int? = nil
+    return try body(Builtin.convertUnownedUnsafeToGuaranteed(fakeBase,
+                                                             &tmp._value))
   }
 
   /// Performs an unbalanced retain of the object.
