@@ -206,3 +206,16 @@ func matchImplicitTupling(pr: SomeParseResult<Int>) {
     let y: Int = x // expected-error{{cannot convert value of type '(value: String, repetitions: Int)' to specified type 'Int'}}
   }
 }
+
+// Cope with an ambiguity between a case name and a static member. Prefer the
+// case.
+enum CaseStaticAmbiguity {
+  case C(Bool)
+
+  var isC: Bool {
+    if case .C = self { return true }
+    return false
+  }
+
+  static func C(_: Int) -> CaseStaticAmbiguity { return .C(true) }
+}

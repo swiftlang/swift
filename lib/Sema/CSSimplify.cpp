@@ -5693,6 +5693,22 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
   }
 
+  // If we are pattern-matching an enum element and we found any enum elements,
+  // ignore anything that isn't an enum element.
+  bool onlyAcceptEnumElements = false;
+  if (memberLocator &&
+      memberLocator->isLastElement<LocatorPathElt::PatternMatch>() &&
+      isa<EnumElementPattern>(
+          memberLocator->getLastElementAs<LocatorPathElt::PatternMatch>()
+            ->getPattern())) {
+    for (const auto &result: lookup) {
+      if (isa<EnumElementDecl>(result.getValueDecl())) {
+        onlyAcceptEnumElements = true;
+        break;
+      }
+    }
+  }
+
   // If the instance type is String bridged to NSString, compute
   // the type we'll look in for bridging.
   Type bridgedType;
@@ -5716,6 +5732,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       result.markErrorAlreadyDiagnosed();
       return;
     }
+
+    // If we only accept enum elements but this isn't one, ignore it.
+    if (onlyAcceptEnumElements && !isa<EnumElementDecl>(decl))
+      return;
 
     // Dig out the instance type and figure out what members of the instance type
     // we are going to see.
