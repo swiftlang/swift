@@ -2336,7 +2336,7 @@ namespace {
           CS.addValueMemberConstraint(
               parentMetaType, enumPattern->getName(), memberType, CurDC,
               functionRefKind, { },
-              locator.withPathElement(ConstraintLocator::PatternMatch));
+              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
           // Parent type needs to be convertible to the pattern type; this
           // accounts for cases where the pattern type is existential.
@@ -2349,7 +2349,7 @@ namespace {
           CS.addUnresolvedValueMemberConstraint(
               MetatypeType::get(patternType), enumPattern->getName(),
               memberType, CurDC, functionRefKind,
-              locator.withPathElement(ConstraintLocator::PatternMatch));
+              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
           baseType = patternType;
         }
@@ -2372,8 +2372,9 @@ namespace {
               CS.getConstraintLocator(locator),
               TVO_CanBindToNoEscape);
           Type functionType = FunctionType::get(params, outputType);
-          CS.addConstraint(ConstraintKind::Equal, functionType, memberType,
-                           locator);
+          CS.addConstraint(
+              ConstraintKind::Equal, functionType, memberType,
+              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
           CS.addConstraint(ConstraintKind::Conversion, outputType, baseType,
                            locator);

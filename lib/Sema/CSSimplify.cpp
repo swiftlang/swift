@@ -3920,6 +3920,25 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::PatternMatch: {
+    // If either type is a hole, consider this fixed.
+    if (lhs->isHole() || rhs->isHole())
+      return true;
+
+    // If the left-hand side is a function type and the pattern is an enum
+    // element pattern, call it a contextual mismatch.
+    auto pattern = elt.castTo<LocatorPathElt::PatternMatch>().getPattern();
+    if (lhs->is<FunctionType>() && isa<EnumElementPattern>(pattern)) {
+      markAnyTypeVarsAsPotentialHoles(lhs);
+      markAnyTypeVarsAsPotentialHoles(rhs);
+
+      conversionsOrFixes.push_back(ContextualMismatch::create(
+          *this, lhs, rhs, getConstraintLocator(locator)));
+    }
+
+    break;
+  }
+
   default:
     break;
   }
@@ -6043,7 +6062,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // match, unwrap optionals and try again to allow implicit creation of
   // optional "some" patterns (spelled "?").
   if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
-      memberLocator->getLastElementAs<LocatorPathElt::PatternMatch>() &&
+      memberLocator->isLastElement<LocatorPathElt::PatternMatch>() &&
       instanceTy->getOptionalObjectType() &&
       baseObjTy->is<AnyMetatypeType>()) {
     SmallVector<Type, 2> optionals;

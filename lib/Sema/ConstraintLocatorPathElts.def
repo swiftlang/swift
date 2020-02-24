@@ -176,7 +176,7 @@ SIMPLE_LOCATOR_PATH_ELT(DynamicCallable)
 CUSTOM_LOCATOR_PATH_ELT(TernaryBranch)
 
 /// Performing a pattern patch.
-SIMPLE_LOCATOR_PATH_ELT(PatternMatch)
+CUSTOM_LOCATOR_PATH_ELT(PatternMatch)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

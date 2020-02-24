@@ -2264,13 +2264,31 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
     return false;
 
   auto *srcFT = getFromType()->getAs<FunctionType>();
-  if (!srcFT || !srcFT->getParams().empty())
+  if (!srcFT ||
+      !(srcFT->getParams().empty() ||
+        getLocator()->isLastElement<LocatorPathElt::PatternMatch>()))
     return false;
 
   auto toType = getToType();
   if (toType->is<AnyFunctionType>() ||
       !TypeChecker::isConvertibleTo(srcFT->getResult(), toType, getDC()))
     return false;
+
+  // Diagnose cases where the pattern tried to match associated values but
+  // the case we found had none.
+  if (auto match =
+          getLocator()->getLastElementAs<LocatorPathElt::PatternMatch>()) {
+    if (auto enumElementPattern =
+            dyn_cast<EnumElementPattern>(match->getPattern())) {
+      emitDiagnostic(enumElementPattern->getNameLoc(),
+                     diag::enum_element_pattern_assoc_values_mismatch,
+                     enumElementPattern->getName());
+      emitDiagnostic(enumElementPattern->getNameLoc(),
+                     diag::enum_element_pattern_assoc_values_remove)
+        .fixItRemove(enumElementPattern->getSubPattern()->getSourceRange());
+      return true;
+    }
+  }
 
   auto *anchor = getAnchor();
   emitDiagnostic(anchor->getLoc(), diag::missing_nullary_call,

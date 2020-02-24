@@ -52,6 +52,11 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       id.AddPointer(kpElt.getKeyPathDecl());
       break;
     }
+
+    case PatternMatch:
+      id.AddPointer(elt.castTo<LocatorPathElt::PatternMatch>().getPattern());
+      break;
+
     case GenericArgument:
     case NamedTupleElement:
     case TupleElement:
