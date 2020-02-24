@@ -3449,15 +3449,6 @@ void ClangModuleUnit::getImportedModules(
 void ClangModuleUnit::getImportedModulesForLookup(
     SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
 
-  // Reuse our cached list of imports if we have one.
-  if (importedModulesForLookup.hasValue()) {
-    imports.append(importedModulesForLookup->begin(),
-                   importedModulesForLookup->end());
-    return;
-  }
-
-  size_t firstImport = imports.size();
-
   SmallVector<clang::Module *, 8> imported;
   const clang::Module *topLevel;
   ModuleDecl *topLevelOverlay = getOverlayModule();
@@ -3471,10 +3462,8 @@ void ClangModuleUnit::getImportedModulesForLookup(
     topLevel = clangModule->getTopLevelModule();
   }
 
-  if (imported.empty()) {
-    importedModulesForLookup = ArrayRef<ModuleDecl::ImportedModule>();
+  if (imported.empty())
     return;
-  }
 
   SmallPtrSet<clang::Module *, 32> seen{imported.begin(), imported.end()};
   SmallVector<clang::Module *, 8> tmpBuf;
@@ -3520,10 +3509,6 @@ void ClangModuleUnit::getImportedModulesForLookup(
     assert(actualMod && "Missing imported overlay");
     imports.push_back({ModuleDecl::AccessPathTy(), actualMod});
   }
-
-  // Cache our results for use next time.
-  auto importsToCache = llvm::makeArrayRef(imports).slice(firstImport);
-  importedModulesForLookup = getASTContext().AllocateCopy(importsToCache);
 }
 
 void ClangImporter::getMangledName(raw_ostream &os,
