@@ -27,113 +27,115 @@
 using namespace swift;
 using namespace OptRemark;
 
-Argument::Argument(StringRef Key, int N) : Key(Key), Val(llvm::itostr(N)) {}
+Argument::Argument(StringRef key, int n) : key(key), val(llvm::itostr(n)) {}
 
-Argument::Argument(StringRef Key, long N) : Key(Key), Val(llvm::itostr(N)) {}
+Argument::Argument(StringRef key, long n) : key(key), val(llvm::itostr(n)) {}
 
-Argument::Argument(StringRef Key, long long N)
-    : Key(Key), Val(llvm::itostr(N)) {}
+Argument::Argument(StringRef key, long long n)
+    : key(key), val(llvm::itostr(n)) {}
 
-Argument::Argument(StringRef Key, unsigned N)
-    : Key(Key), Val(llvm::utostr(N)) {}
+Argument::Argument(StringRef key, unsigned n)
+    : key(key), val(llvm::utostr(n)) {}
 
-Argument::Argument(StringRef Key, unsigned long N)
-    : Key(Key), Val(llvm::utostr(N)) {}
+Argument::Argument(StringRef key, unsigned long n)
+    : key(key), val(llvm::utostr(n)) {}
 
-Argument::Argument(StringRef Key, unsigned long long N)
-    : Key(Key), Val(llvm::utostr(N)) {}
+Argument::Argument(StringRef key, unsigned long long n)
+    : key(key), val(llvm::utostr(n)) {}
 
-Argument::Argument(StringRef Key, SILFunction *F)
-    : Key(Key) {
-      auto DO = Demangle::DemangleOptions::SimplifiedUIDemangleOptions();
-      // Enable module names so that we have a way of filtering out
-      // stdlib-related remarks.
-      DO.DisplayModuleNames = true;
+Argument::Argument(StringRef key, SILFunction *f) : key(key) {
+  auto options = Demangle::DemangleOptions::SimplifiedUIDemangleOptions();
+  // Enable module names so that we have a way of filtering out
+  // stdlib-related remarks.
+  options.DisplayModuleNames = true;
 
-      Val = (Twine("\"") + Demangle::demangleSymbolAsString(F->getName(), DO) +
-             "\"")
-                .str();
+  val = (Twine("\"") + Demangle::demangleSymbolAsString(f->getName(), options) +
+         "\"")
+            .str();
 
-      if (F->hasLocation())
-        Loc = F->getLocation().getSourceLoc();
+  if (f->hasLocation())
+    loc = f->getLocation().getSourceLoc();
 }
 
-Argument::Argument(StringRef Key, SILType Ty) : Key(Key) {
-  llvm::raw_string_ostream OS(Val);
-  Ty.print(OS);
+Argument::Argument(StringRef key, SILType ty) : key(key) {
+  llvm::raw_string_ostream stream(val);
+  ty.print(stream);
 }
 
-Argument::Argument(StringRef Key, CanType Ty) : Key(Key) {
-  llvm::raw_string_ostream OS(Val);
-  Ty.print(OS);
+Argument::Argument(StringRef key, CanType ty) : key(key) {
+  llvm::raw_string_ostream stream(val);
+  ty.print(stream);
 }
 
 template <typename DerivedT> std::string Remark<DerivedT>::getMsg() const {
-  std::string Str;
-  llvm::raw_string_ostream OS(Str);
-  for (const Argument &Arg : Args)
-    OS << Arg.Val;
-  return OS.str();
+  std::string str;
+  llvm::raw_string_ostream stream(str);
+  for (const Argument &arg : args)
+    stream << arg.val;
+  return stream.str();
 }
 
 template <typename DerivedT> std::string Remark<DerivedT>::getDebugMsg() const {
-  std::string Str;
-  llvm::raw_string_ostream OS(Str);
+  std::string str;
+  llvm::raw_string_ostream stream(str);
 
-  if (IndentDebugWidth)
-    OS << std::string(" ", IndentDebugWidth);
+  if (indentDebugWidth)
+    stream << std::string(" ", indentDebugWidth);
 
-  for (const Argument &Arg : Args)
-    OS << Arg.Val;
+  for (const Argument &arg : args)
+    stream << arg.val;
 
-  OS << "\n";
-  return OS.str();
+  stream << "\n";
+  return stream.str();
 }
 
-Emitter::Emitter(StringRef PassName, SILModule &M)
-    : Module(M), PassName(PassName),
-      PassedEnabled(
-          M.getASTContext().LangOpts.OptimizationRemarkPassedPattern &&
-          M.getASTContext().LangOpts.OptimizationRemarkPassedPattern->match(
-              PassName)),
-      MissedEnabled(
-          M.getASTContext().LangOpts.OptimizationRemarkMissedPattern &&
-          M.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
-              PassName)) {}
+Emitter::Emitter(StringRef passName, SILModule &m)
+    : module(m), passName(passName),
+      passedEnabled(
+          m.getASTContext().LangOpts.OptimizationRemarkPassedPattern &&
+          m.getASTContext().LangOpts.OptimizationRemarkPassedPattern->match(
+              passName)),
+      missedEnabled(
+          m.getASTContext().LangOpts.OptimizationRemarkMissedPattern &&
+          m.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
+              passName)) {}
 
 template <typename RemarkT, typename... ArgTypes>
-static void emitRemark(SILModule &Module, const Remark<RemarkT> &R,
-                       Diag<ArgTypes...> ID, bool DiagEnabled) {
-  if (R.getLocation().isInvalid())
+static void emitRemark(SILModule &module, const Remark<RemarkT> &remark,
+                       Diag<ArgTypes...> id, bool diagEnabled) {
+  if (remark.getLocation().isInvalid())
     return;
-  if (auto *Out = Module.getOptRecordStream())
+  if (auto *out = module.getOptRecordStream())
     // YAMLTraits takes a non-const reference even when outputting.
-    *Out << const_cast<Remark<RemarkT> &>(R);
-  if (DiagEnabled)
-    Module.getASTContext().Diags.diagnose(R.getLocation(), ID, R.getMsg());
+    *out << const_cast<Remark<RemarkT> &>(remark);
+  if (diagEnabled)
+    module.getASTContext().Diags.diagnose(remark.getLocation(), id,
+                                          remark.getMsg());
 }
 
-void Emitter::emit(const RemarkPassed &R) {
-  emitRemark(Module, R, diag::opt_remark_passed, isEnabled<RemarkPassed>());
+void Emitter::emit(const RemarkPassed &remark) {
+  emitRemark(module, remark, diag::opt_remark_passed,
+             isEnabled<RemarkPassed>());
 }
 
-void Emitter::emit(const RemarkMissed &R) {
-  emitRemark(Module, R, diag::opt_remark_missed, isEnabled<RemarkMissed>());
+void Emitter::emit(const RemarkMissed &remark) {
+  emitRemark(module, remark, diag::opt_remark_missed,
+             isEnabled<RemarkMissed>());
 }
 
-void Emitter::emitDebug(const RemarkPassed &R) {
-  llvm::dbgs() << R.getDebugMsg();
+void Emitter::emitDebug(const RemarkPassed &remark) {
+  llvm::dbgs() << remark.getDebugMsg();
 }
 
-void Emitter::emitDebug(const RemarkMissed &R) {
-  llvm::dbgs() << R.getDebugMsg();
+void Emitter::emitDebug(const RemarkMissed &remark) {
+  llvm::dbgs() << remark.getDebugMsg();
 }
 
 namespace llvm {
 namespace yaml {
 
 template <typename KindT> struct MappingTraits<Remark<KindT>> {
-  static void mapping(llvm::yaml::IO &io, Remark<KindT> &R) {
+  static void mapping(llvm::yaml::IO &io, Remark<KindT> &remark) {
     assert(io.outputting() && "input not implemented");
 
     if (io.mapTag("!Passed", std::is_same<KindT, RemarkPassed>::value))
@@ -145,45 +147,45 @@ template <typename KindT> struct MappingTraits<Remark<KindT>> {
 
     // The attributes are read-only for now since we're only support outputting
     // them.
-    StringRef PassName = R.getPassName();
-    io.mapRequired("Pass", PassName);
-    std::string Id = (Twine("sil.") + R.getIdentifier()).str();
-    io.mapRequired("Name", Id);
+    StringRef passName = remark.getPassName();
+    io.mapRequired("Pass", passName);
+    std::string id = (Twine("sil.") + remark.getIdentifier()).str();
+    io.mapRequired("Name", id);
 
-    SourceLoc Loc = R.getLocation();
-    if (!io.outputting() || Loc.isValid())
-      io.mapOptional("DebugLoc", Loc);
+    SourceLoc loc = remark.getLocation();
+    if (!io.outputting() || loc.isValid())
+      io.mapOptional("DebugLoc", loc);
 
-    std::string FN = Demangle::demangleSymbolAsString(
-        R.getFunction()->getName(),
+    std::string fn = Demangle::demangleSymbolAsString(
+        remark.getFunction()->getName(),
         Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
-    io.mapRequired("Function", FN);
-    io.mapOptional("Args", R.getArgs());
+    io.mapRequired("Function", fn);
+    io.mapOptional("Args", remark.getArgs());
   }
 };
 
 template <> struct MappingTraits<SourceLoc> {
-  static void mapping(IO &io, SourceLoc &Loc) {
+  static void mapping(IO &io, SourceLoc &loc) {
     assert(io.outputting() && "input not yet implemented");
 
-    SourceManager *SM = static_cast<SourceManager *>(io.getContext());
-    StringRef File = SM->getDisplayNameForLoc(Loc);
-    unsigned Line, Col;
-    std::tie(Line, Col) = SM->getLineAndColumn(Loc);
+    SourceManager *srcMgr = static_cast<SourceManager *>(io.getContext());
+    StringRef file = srcMgr->getDisplayNameForLoc(loc);
+    unsigned line, col;
+    std::tie(line, col) = srcMgr->getLineAndColumn(loc);
 
-    io.mapRequired("File", File);
-    io.mapRequired("Line", Line);
-    io.mapRequired("Column", Col);
+    io.mapRequired("File", file);
+    io.mapRequired("Line", line);
+    io.mapRequired("Column", col);
   }
 };
 
 // Implement this as a mapping for now to get proper quotation for the value.
 template <> struct MappingTraits<OptRemark::Argument> {
-  static void mapping(IO &io, OptRemark::Argument &A) {
+  static void mapping(IO &io, OptRemark::Argument &a) {
     assert(io.outputting() && "input not yet implemented");
-    io.mapRequired(A.Key.data(), A.Val);
-    if (A.Loc.isValid())
-      io.mapOptional("DebugLoc", A.Loc);
+    io.mapRequired(a.key.data(), a.val);
+    if (a.loc.isValid())
+      io.mapOptional("DebugLoc", a.loc);
   }
 };
 
