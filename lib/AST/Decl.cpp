@@ -1174,6 +1174,17 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   return FirstKind;
 }
 
+ArrayRef<ValueDecl *> ImportDecl::getDecls() const {
+  // If this isn't a scoped import, there's nothing to do.
+  if (getImportKind() == ImportKind::Module)
+    return {};
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<ImportDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ScopedImportLookupRequest{mutableThis}, {});
+}
+
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
                                            uint64_t contextData) {
   assert(!Bits.NominalTypeDecl.HasLazyConformances &&

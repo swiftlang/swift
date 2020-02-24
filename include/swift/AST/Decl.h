@@ -1527,8 +1527,6 @@ private:
 
   /// The resolved module.
   ModuleDecl *Mod = nullptr;
-  /// The resolved decls if this is a decl import.
-  ArrayRef<ValueDecl *> Decls;
 
   ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
              SourceLoc KindLoc, ArrayRef<AccessPathElement> Path);
@@ -1581,8 +1579,9 @@ public:
   ModuleDecl *getModule() const { return Mod; }
   void setModule(ModuleDecl *M) { Mod = M; }
 
-  ArrayRef<ValueDecl *> getDecls() const { return Decls; }
-  void setDecls(ArrayRef<ValueDecl *> Ds) { Decls = Ds; }
+  /// For a scoped import such as 'import class Foundation.NSString', retrieve
+  /// the decls it references. Otherwise, returns an empty array.
+  ArrayRef<ValueDecl *> getDecls() const;
 
   const clang::Module *getClangModule() const {
     return getClangNode().getClangModule();
