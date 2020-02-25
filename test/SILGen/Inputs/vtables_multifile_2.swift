@@ -94,7 +94,7 @@ open class OtherDerived : Derived {
 // CHECK-NEXT:  return [[RESULT]] : $()
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil private [thunk] [ossa] @$s17vtables_multifile7DerivedC14privateMethod4yySiFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyxFTV : $@convention(method) (@in_guaranteed Int, @guaranteed Derived) -> () {
+// CHECK-LABEL: sil private [thunk] [ossa] @$s17vtables_multifile7DerivedC14privateMethod4yySiFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyxFTV :
 // CHECK: bb0(%0 : $*Int, %1 : @guaranteed $Derived):
 // CHECK-NEXT:  [[ARG:%.*]] = load [trivial] %0 : $*Int
 // CHECK-NEXT:  [[METHOD:%.*]] = class_method %1 : $Derived, #Derived.privateMethod4!1 : (Derived) -> (Int) -> (), $@convention(method) (Int, @guaranteed Derived) -> ()

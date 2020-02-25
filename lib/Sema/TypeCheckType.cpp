@@ -2904,6 +2904,10 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       return ErrorType::get(Context);
 
     Type selfType = params.back().getInterfaceType();
+    if (subs) {
+      selfType = selfType.subst(subs);
+    }
+    
     // The Self type can be nested in a few layers of metatypes (etc.).
     while (auto metatypeType = selfType->getAs<MetatypeType>()) {
       auto next = metatypeType->getInstanceType();

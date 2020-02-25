@@ -706,11 +706,15 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     CanType elementType;
     ArrayRef<SymbolicValue> arrayElements =
         symVal.getStorageOfArray().getStoredElements(elementType);
+    auto elementSILType = builder.getModule().Types
+      .getLoweredType(AbstractionPattern::getOpaque(), elementType,
+                      TypeExpansionContext(builder.getFunction()));
 
     // Emit code for the symbolic values corresponding to the array elements.
     SmallVector<SILValue, 8> elementSILValues;
     for (SymbolicValue elementSymVal : arrayElements) {
-      SILValue elementSIL = emitCodeForSymbolicValue(elementSymVal, elementType,
+      SILValue elementSIL = emitCodeForSymbolicValue(elementSymVal,
+                                                     elementSILType.getASTType(),
                                                      builder, loc, stringInfo);
       elementSILValues.push_back(elementSIL);
     }
@@ -766,11 +770,19 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     PartialApplyInst *papply = builder.createPartialApply(
         loc, functionRef, callSubstMap, capturedSILVals, convention);
     // The type of the created closure must be a lowering of the expected type.
-    SILType resultType = papply->getType();
+    auto resultType = papply->getType().castTo<SILFunctionType>();
     CanType expectedCanType = expectedType->getCanonicalType();
-    assert(expectedType->is<SILFunctionType>()
-               ? resultType.getASTType() == expectedCanType
-               : resultType.is<SILFunctionType>());
+    if (auto expectedFnType = dyn_cast<SILFunctionType>(expectedCanType)) {
+      assert(expectedFnType->getUnsubstitutedType(module)
+               == resultType->getUnsubstitutedType(module));
+      // Convert to the expected type if necessary.
+      if (expectedFnType != resultType) {
+        auto convert = builder.createConvertFunction(loc, papply,
+                               SILType::getPrimitiveObjectType(expectedFnType),
+                               false);
+        return convert;
+      }
+    }
     return papply;
   }
   default: {

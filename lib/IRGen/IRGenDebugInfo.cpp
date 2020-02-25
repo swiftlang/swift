@@ -788,6 +788,11 @@ private:
 
       break;
     }
+    
+    // TODO: Eliminate substitutions in SILFunctionTypes for now.
+    // On platforms where the substitutions affect representation, we will need
+    // to preserve this info and teach type reconstruction about it.
+    Ty = Ty->replaceSubstitutedSILFunctionTypesWithUnsubstituted(IGM.getSILModule());
 
     Mangle::ASTMangler Mangler;
     std::string Result = Mangler.mangleTypeForDebugger(

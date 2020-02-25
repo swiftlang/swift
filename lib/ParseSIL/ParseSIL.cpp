@@ -1279,8 +1279,9 @@ bool SILParser::parseSILType(SILType &Result,
 
   // Save the top-level function generic environment if there was one.
   if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get()))
-    if (auto env = fnType->getGenericEnvironment())
-      ParsedGenericEnv = env;
+    if (!fnType->areGenericParamsImplied())
+      if (auto env = fnType->getGenericEnvironment())
+        ParsedGenericEnv = env;
   
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs, specifier, specifierLoc);
@@ -1690,10 +1691,10 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
                                    GenericEnvironment *GenericEnv,
                                    ProtocolDecl *defaultForProto) {
   // Check for an opening '<' bracket.
-  if (!P.Tok.isContextualPunctuator("<"))
+  if (!P.startsWithLess(P.Tok))
     return false;
   
-  P.consumeToken();
+  P.consumeStartingLess();
   
   // Parse a list of Substitutions.
   do {
@@ -1713,11 +1714,11 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
   } while (P.consumeIf(tok::comma));
   
   // Consume the closing '>'.
-  if (!P.Tok.isContextualPunctuator(">")) {
+  if (!P.startsWithGreater(P.Tok)) {
     P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ">");
     return true;
   }
-  P.consumeToken();
+  P.consumeStartingGreater();
   
   return false;
 }
@@ -2089,7 +2090,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
 
   if (FnTypeRequired &&
       !P.peekToken().is(tok::l_paren) &&
-      !P.peekToken().isContextualPunctuator("<"))
+      !P.startsWithLess(P.peekToken()))
     return false;
 
   // Type of the SILDeclRef is optional to be compatible with the old format.
