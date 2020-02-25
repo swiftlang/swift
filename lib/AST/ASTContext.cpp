@@ -4471,28 +4471,25 @@ CanGenericSignature ASTContext::getOpenedArchetypeSignature(CanType existential,
 GenericSignature 
 ASTContext::getOverrideGenericSignature(const ValueDecl *base,
                                         const ValueDecl *derived) {
-  auto baseGenericCtx = base->getAsGenericContext();
-  auto derivedGenericCtx = derived->getAsGenericContext();
-
-  if (!baseGenericCtx || !derivedGenericCtx)
-    return nullptr;
-
-  if (base == derived)
-    return derivedGenericCtx->getGenericSignature();
+  assert(isa<AbstractFunctionDecl>(base) || isa<SubscriptDecl>(base));
+  assert(isa<AbstractFunctionDecl>(derived) || isa<SubscriptDecl>(derived));
 
   auto baseClass = base->getDeclContext()->getSelfClassDecl();
-  if (!baseClass)
-    return nullptr;
-
   auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
-  if (!derivedClass)
-    return nullptr;
+
+  assert(baseClass != nullptr);
+  assert(derivedClass != nullptr);
+
+  auto baseGenericSig = base->getAsGenericContext()->getGenericSignature();
+  auto derivedGenericSig = derived->getAsGenericContext()->getGenericSignature();
+
+  if (base == derived)
+    return derivedGenericSig;
 
   if (derivedClass->getSuperclass().isNull())
     return nullptr;
 
-  if (baseGenericCtx->getGenericSignature().isNull() ||
-      derivedGenericCtx->getGenericSignature().isNull())
+  if (baseGenericSig.isNull() || derivedGenericSig.isNull())
     return nullptr;
 
   auto baseClassSig = baseClass->getGenericSignature();
@@ -4501,8 +4498,8 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
 
   unsigned derivedDepth = 0;
 
-  auto key = OverrideSignatureKey(baseGenericCtx->getGenericSignature(),
-                                  derivedGenericCtx->getGenericSignature(),
+  auto key = OverrideSignatureKey(baseGenericSig,
+                                  derivedGenericSig,
                                   derivedClass->getSuperclass(),
                                   derivedClass->getDeclaredInterfaceType());
 
@@ -4515,7 +4512,7 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     derivedDepth = derivedSig->getGenericParams().back()->getDepth() + 1;
 
   SmallVector<GenericTypeParamType *, 2> addedGenericParams;
-  if (auto *gpList = derivedGenericCtx->getGenericParams()) {
+  if (auto *gpList = derived->getAsGenericContext()->getGenericParams()) {
     for (auto gp : *gpList) {
       addedGenericParams.push_back(
           gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
@@ -4549,7 +4546,7 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   };
 
   SmallVector<Requirement, 2> addedRequirements;
-  for (auto reqt : baseGenericCtx->getGenericSignature()->getRequirements()) {
+  for (auto reqt : baseGenericSig->getRequirements()) {
     if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
       addedRequirements.push_back(*substReqt);
     }
