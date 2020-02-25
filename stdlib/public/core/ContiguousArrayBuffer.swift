@@ -602,13 +602,15 @@ internal func += <Element, C: Collection>(
   lhs: inout _ContiguousArrayBuffer<Element>, rhs: __owned C
 ) where C.Element == Element {
 
+  var elementsToAppend = rhs //so we can _isUnique() it
+  
   let oldCount = lhs.count
-  let newCount = oldCount + numericCast(rhs.count)
+  let newCount = oldCount + numericCast(elementsToAppend.count)
 
   let buf: UnsafeMutableBufferPointer<Element>
   
   if _fastPath(newCount <= lhs.capacity) {
-    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
+    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(elementsToAppend.count))
     lhs.count = newCount
   }
   else {
@@ -620,22 +622,21 @@ internal func += <Element, C: Collection>(
       from: lhs.firstElementAddress, count: oldCount)
     lhs.count = 0
     (lhs, newLHS) = (newLHS, lhs)
-    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
+    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(elementsToAppend.count))
   }
 
-  if _isUnique(&rhs) {
-    var (remainders,writtenUpTo) = buf.moveInitialize(from: rhs)
+  var (remainders,writtenUpTo) :
+    (C.Iterator, UnsafeMutableBufferPointer<Element>.Index)
 
-    // ensure that exactly rhs.count elements were written
-    _precondition(remainders.next() == nil, "rhs underreported its count")
-    _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
+  if _isUnique(&elementsToAppend) {
+    (remainders,writtenUpTo) = buf.moveInitialize(from: elementsToAppend)
   } else {
-    var (remainders,writtenUpTo) = buf.initialize(from: rhs)
-
-    // ensure that exactly rhs.count elements were written
-    _precondition(remainders.next() == nil, "rhs underreported its count")
-    _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
+    (remainders,writtenUpTo) = buf.initialize(from: elementsToAppend)
   }
+  
+  // ensure that exactly rhs.count elements were written
+  _precondition(remainders.next() == nil, "rhs underreported its count")
+  _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
 }
 
 extension _ContiguousArrayBuffer: RandomAccessCollection {

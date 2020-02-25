@@ -1198,7 +1198,9 @@ extension Array: RangeReplaceableCollection {
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
-    let newElementsCount = newElements.underestimatedCount
+    var elementsToAppend = newElements //so we can _isUnique() it
+      
+    let newElementsCount = elementsToAppend.underestimatedCount
     reserveCapacityForAppend(newElementsCount: newElementsCount)
 
     let oldCount = self.count
@@ -1207,7 +1209,14 @@ extension Array: RangeReplaceableCollection {
                 start: startNewElements, 
                 count: self.capacity - oldCount)
 
-    var (remainder,writtenUpTo) = buf.initialize(from: newElements)
+    var (remainder,writtenUpTo) :
+      (S.Iterator, UnsafeMutableBufferPointer<Element>.Index)
+        
+    if _isUnique(&elementsToAppend) {
+      (remainder, writtenUpTo) = buf.moveInitialize(from: elementsToAppend)
+    } else {
+      (remainder, writtenUpTo) = buf.initialize(from: elementsToAppend)
+    }
     
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
@@ -1643,7 +1652,13 @@ extension Array {
       "Insufficient space allocated to copy array contents")
 
     if let s = _baseAddressIfContiguous {
-      p.initialize(from: s, count: self.count)
+      let isUnique = _buffer.isUniquelyReferenced()
+      if isUnique {
+        p.moveInitialize(from: s, count: self.count)
+      } else {
+        p.initialize(from: s, count: self.count)
+      }
+
       // Need a _fixLifetime bracketing the _baseAddressIfContiguous getter
       // and all uses of the pointer it returns:
       _fixLifetime(self._owner)

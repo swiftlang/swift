@@ -935,8 +935,10 @@ extension ArraySlice: RangeReplaceableCollection {
   @_semantics("array.append_contentsOf")
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
+      
+    var elementsToAppend = newElements //so we can _isUnique() it
 
-    let newElementsCount = newElements.underestimatedCount
+    let newElementsCount = elementsToAppend.underestimatedCount
     reserveCapacityForAppend(newElementsCount: newElementsCount)
 
     let oldCount = self.count
@@ -945,8 +947,15 @@ extension ArraySlice: RangeReplaceableCollection {
                 start: startNewElements, 
                 count: self.capacity - oldCount)
 
-    let (remainder,writtenUpTo) = buf.initialize(from: newElements)
-    
+    var (remainder,writtenUpTo) :
+      (S.Iterator, UnsafeMutableBufferPointer<Element>.Index)
+        
+    if _isUnique(&elementsToAppend) {
+      (remainder, writtenUpTo) = buf.moveInitialize(from: elementsToAppend)
+    } else {
+      (remainder, writtenUpTo) = buf.initialize(from: elementsToAppend)
+    }
+      
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
     _precondition(newElementsCount <= writtenCount, 
@@ -1271,8 +1280,12 @@ extension ArraySlice {
       "Insufficient space allocated to copy array contents")
 
     if let s = _baseAddressIfContiguous {
-      p.initialize(from: s, count: self.count)
-      // Need a _fixLifetime bracketing the _baseAddressIfContiguous getter
+      let isUnique = _buffer.isUniquelyReferenced()
+      if isUnique {
+        p.moveInitialize(from: s, count: self.count)
+      } else {
+        p.initialize(from: s, count: self.count)
+      }      // Need a _fixLifetime bracketing the _baseAddressIfContiguous getter
       // and all uses of the pointer it returns:
       _fixLifetime(self._owner)
     } else {
