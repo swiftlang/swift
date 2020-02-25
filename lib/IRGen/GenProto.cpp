@@ -2743,8 +2743,7 @@ void NecessaryBindings::addTypeMetadata(CanType type) {
 static void addAbstractConditionalRequirements(
     SpecializedProtocolConformance *specializedConformance,
     llvm::SetVector<GenericRequirement> &requirements) {
-  auto module = specializedConformance->getDeclContext()->getParentModule();
-  auto subMap = specializedConformance->getSubstitutions(module);
+  auto subMap = specializedConformance->getSubstitutionMap();
   auto condRequirements =
       specializedConformance->getConditionalRequirementsIfAvailable();
   if (!condRequirements)
@@ -2756,10 +2755,22 @@ static void addAbstractConditionalRequirements(
     auto *proto =
         req.getSecondType()->castTo<ProtocolType>()->getDecl();
     auto ty = req.getFirstType()->getCanonicalType();
+    if (!isa<ArchetypeType>(ty))
+      continue;
     auto conformance = subMap.lookupConformance(ty, proto);
     if (!conformance.isAbstract())
       continue;
     requirements.insert({ty, conformance.getAbstract()});
+  }
+  // Recursively add conditional requirements.
+  for (auto &conf : subMap.getConformances()) {
+    if (conf.isAbstract())
+      continue;
+    auto specializedConf =
+        dyn_cast<SpecializedProtocolConformance>(conf.getConcrete());
+    if (!specializedConf)
+      continue;
+    addAbstractConditionalRequirements(specializedConf, requirements);
   }
 }
 
