@@ -26,8 +26,13 @@ public let RandomTree = [
     tags: [.validation, .algorithm, .refcount],
     setUpFunction: { blackHole(input) }),
   BenchmarkInfo(
-    name: "RandomTree.insert.Unmanaged",
-    runFunction: run_Unmanaged_insert,
+    name: "RandomTree.insert.Unmanaged.slow",
+    runFunction: run_SlowUnmanaged_insert,
+    tags: [.validation, .algorithm, .refcount],
+    setUpFunction: { blackHole(input) }),
+  BenchmarkInfo(
+    name: "RandomTree.insert.Unmanaged.fast",
+    runFunction: run_FastUnmanaged_insert,
     tags: [.validation, .algorithm, .refcount],
     setUpFunction: { blackHole(input) }),
   BenchmarkInfo(
@@ -80,16 +85,16 @@ extension EnumSearchTree {
   }
 }
 
-struct UnmanagedSearchTree<Element: Comparable> {
+struct SlowUnmanagedSearchTree<Element: Comparable> {
   class Node {
     var value: Element
-    var left: UnmanagedSearchTree
-    var right: UnmanagedSearchTree
+    var left: SlowUnmanagedSearchTree
+    var right: SlowUnmanagedSearchTree
 
     init(
       value: Element,
-      left: UnmanagedSearchTree = .empty,
-      right: UnmanagedSearchTree = .empty
+      left: SlowUnmanagedSearchTree = .empty,
+      right: SlowUnmanagedSearchTree = .empty
     ) {
       self.left = left
       self.right = right
@@ -97,7 +102,7 @@ struct UnmanagedSearchTree<Element: Comparable> {
     }
   }
 
-  static var empty: UnmanagedSearchTree<Element> { UnmanagedSearchTree() }
+  static var empty: SlowUnmanagedSearchTree<Element> { SlowUnmanagedSearchTree() }
 
   var root: Unmanaged<Node>?
 
@@ -110,7 +115,76 @@ struct UnmanagedSearchTree<Element: Comparable> {
   }
 }
 
-extension UnmanagedSearchTree {
+extension SlowUnmanagedSearchTree {
+  mutating func deallocate() {
+    guard let root = root?.takeRetainedValue() else { return }
+    root.left.deallocate()
+    root.right.deallocate()
+  }
+}
+
+extension SlowUnmanagedSearchTree {
+  func forEach(_ body: (Element) -> Void) {
+    guard let root = root?.takeUnretainedValue() else { return }
+    root.left.forEach(body)
+    body(root.value)
+    root.right.forEach(body)
+  }
+
+  func contains(_ value: Element) -> Bool {
+    guard let root = root?.takeUnretainedValue() else { return false }
+    if value == root.value { return true }
+    return value < root.value
+      ? root.left.contains(value)
+      : root.right.contains(value)
+  }
+
+  mutating func insert(_ value: __owned Element) {
+    guard let root = root?.takeUnretainedValue() else {
+      self.root = Unmanaged.passRetained(Node(value: value))
+      return
+    }
+    if value == root.value {
+      return
+    } else if value < root.value {
+      root.left.insert(value)
+    } else {
+      root.right.insert(value)
+    }
+  }
+}
+
+struct FastUnmanagedSearchTree<Element: Comparable> {
+  class Node {
+    var value: Element
+    var left: FastUnmanagedSearchTree
+    var right: FastUnmanagedSearchTree
+
+    init(
+      value: Element,
+      left: FastUnmanagedSearchTree = .empty,
+      right: FastUnmanagedSearchTree = .empty
+    ) {
+      self.left = left
+      self.right = right
+      self.value = value
+    }
+  }
+
+  static var empty: FastUnmanagedSearchTree<Element> { FastUnmanagedSearchTree() }
+
+  var root: Unmanaged<Node>?
+
+  init() {
+    self.root = nil
+  }
+
+  init(_root: Unmanaged<Node>?) {
+    self.root = _root
+  }
+}
+
+extension FastUnmanagedSearchTree {
   mutating func deallocate() {
     guard let root = root else { return }
     root._withUnsafeGuaranteedRef { root in
@@ -121,7 +195,7 @@ extension UnmanagedSearchTree {
   }
 }
 
-extension UnmanagedSearchTree {
+extension FastUnmanagedSearchTree {
   func forEach(_ body: (Element) -> Void) {
     guard let root = root else { return }
     root._withUnsafeGuaranteedRef { root in
@@ -231,9 +305,20 @@ func run_ADT_insert(_ iterations: Int) {
   }
 }
 
-func run_Unmanaged_insert(_ iterations: Int) {
+func run_SlowUnmanaged_insert(_ iterations: Int) {
   for _ in 0 ..< iterations {
-    var tree = identity(UnmanagedSearchTree<Int>.empty)
+    var tree = identity(SlowUnmanagedSearchTree<Int>.empty)
+    for value in input {
+      tree.insert(value)
+    }
+    blackHole(tree)
+    tree.deallocate()
+  }
+}
+
+func run_FastUnmanaged_insert(_ iterations: Int) {
+  for _ in 0 ..< iterations {
+    var tree = identity(FastUnmanagedSearchTree<Int>.empty)
     for value in input {
       tree.insert(value)
     }
