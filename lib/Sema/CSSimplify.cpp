@@ -5546,7 +5546,15 @@ static bool isSelfRecursiveKeyPathDynamicMemberLookup(
       return baseDecl == keyPathRootDecl;
     }
 
-    if (baseTy->isEqual(keyPathRootTy))
+    // Previous base type could be r-value because that could be
+    // a base type of subscript "as written" for which we attempt
+    // a dynamic member lookup.
+    auto baseTy1 = baseTy->getRValueType();
+    // Root type of key path is always wrapped in an l-value
+    // before lookup is performed, so we need to unwrap that.
+    auto baseTy2 = keyPathRootTy->getRValueType();
+
+    if (baseTy1->isEqual(baseTy2))
       return true;
   }
 
@@ -5848,6 +5856,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       using KPDynamicMemberElt = LocatorPathElt::KeyPathDynamicMember;
       if (auto kpElt = memberLocator->getLastElementAs<KPDynamicMemberElt>()) {
         auto *keyPath = kpElt->getKeyPathDecl();
+        if (isSelfRecursiveKeyPathDynamicMemberLookup(*this, baseTy,
+                                                      memberLocator))
+          return;
+
         if (auto *storage = dyn_cast<AbstractStorageDecl>(decl)) {
           // If this is an attempt to access read-only member via
           // writable key path, let's fail this choice early.
