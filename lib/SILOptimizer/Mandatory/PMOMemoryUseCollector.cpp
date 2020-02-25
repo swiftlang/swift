@@ -70,8 +70,7 @@ static SILValue scalarizeLoad(LoadInst *LI,
 
   for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
     auto *SubLI = B.createTrivialLoadOr(LI->getLoc(), ElementAddrs[i],
-                                        LI->getOwnershipQualifier(),
-                                        true /*supports unqualified*/);
+                                        LI->getOwnershipQualifier());
     ElementTmps.push_back(SubLI);
   }
 
@@ -135,7 +134,7 @@ class ElementUseCollector {
   SILModule &Module;
   const PMOMemoryObjectInfo &TheMemory;
   SmallVectorImpl<PMOMemoryUse> &Uses;
-  SmallVectorImpl<SILInstruction *> &Releases;
+  SmallVectorImpl<SILInstruction *> &Destroys;
 
   /// When walking the use list, if we index into a struct element, keep track
   /// of this, so that any indexes into tuple subelements don't affect the
@@ -145,9 +144,9 @@ class ElementUseCollector {
 public:
   ElementUseCollector(const PMOMemoryObjectInfo &TheMemory,
                       SmallVectorImpl<PMOMemoryUse> &Uses,
-                      SmallVectorImpl<SILInstruction *> &Releases)
+                      SmallVectorImpl<SILInstruction *> &Destroys)
       : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
-        Uses(Uses), Releases(Releases) {}
+        Uses(Uses), Destroys(Destroys) {}
 
   /// This is the main entry point for the use walker.  It collects uses from
   /// the address and the refcount result of the allocation.
@@ -178,10 +177,6 @@ bool ElementUseCollector::collectContainerUses(SILValue boxValue) {
     if (isa<DeallocBoxInst>(user))
       continue;
 
-    // Retaining the box doesn't effect the value inside the box.
-    if (isa<StrongRetainInst>(user) || isa<RetainValueInst>(user))
-      continue;
-
     // Like retaining, copies do not effect the underlying value. We do need to
     // recursively visit the copies users though.
     if (auto *cvi = dyn_cast<CopyValueInst>(user)) {
@@ -203,15 +198,14 @@ bool ElementUseCollector::collectContainerUses(SILValue boxValue) {
     //
     // That being said, if we want to eliminate the box completely we need to
     // know where the releases are so that we can release the value that would
-    // have been at +1 in the box at that time. So we add these to the Releases
+    // have been at +1 in the box at that time. So we add these to the Destroys
     // array.
     //
     // FIXME: Since we do not support promoting strong_release or release_value
     // today this will cause the underlying allocation to never be
     // eliminated. That should be implemented and fixed.
-    if (isa<StrongReleaseInst>(user) || isa<ReleaseValueInst>(user) ||
-        isa<DestroyValueInst>(user)) {
-      Releases.push_back(user);
+    if (isa<DestroyValueInst>(user)) {
+      Destroys.push_back(user);
       continue;
     }
 
@@ -425,7 +419,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
 
     // We model destroy_addr as a release of the entire value.
     if (isa<DestroyAddrInst>(User)) {
-      Releases.push_back(User);
+      Destroys.push_back(User);
       continue;
     }
 
@@ -480,8 +474,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
             [&](unsigned index, SILValue v) { ElementTmps.push_back(v); });
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
           B.createTrivialStoreOr(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
-                                 SI->getOwnershipQualifier(),
-                                 true /*supports unqualified*/);
+                                 SI->getOwnershipQualifier());
         SI->eraseFromParent();
         continue;
       }
@@ -524,9 +517,9 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
 
 /// collectPMOElementUsesFrom - Analyze all uses of the specified allocation
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
-/// and storing the information found into the Uses and Releases lists.
+/// and storing the information found into the Uses and Destroys lists.
 bool swift::collectPMOElementUsesFrom(
     const PMOMemoryObjectInfo &MemoryInfo, SmallVectorImpl<PMOMemoryUse> &Uses,
-    SmallVectorImpl<SILInstruction *> &Releases) {
-  return ElementUseCollector(MemoryInfo, Uses, Releases).collectFrom();
+    SmallVectorImpl<SILInstruction *> &Destroys) {
+  return ElementUseCollector(MemoryInfo, Uses, Destroys).collectFrom();
 }
