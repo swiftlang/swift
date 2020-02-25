@@ -101,6 +101,22 @@ public let PrimsNonStrongRef: [BenchmarkInfo] = ({
           touchGlobalInfo()
           blackHole(unmanagedPrimsState)
         }))
+    benchmarks.append(BenchmarkInfo(
+        name: "Prims.NonStrongRef.UnmanagedUGR",
+        runFunction: run_PrimsUnmanagedUGR,
+        tags: [.validation, .algorithm, .api],
+        setUpFunction: {
+          touchGlobalInfo()
+          blackHole(unmanagedUGRPrimsState)
+        }))
+    benchmarks.append(BenchmarkInfo(
+        name: "Prims.NonStrongRef.UnmanagedUGR.ClosureAccess",
+        runFunction: run_PrimsUnmanagedUGRClosureAccess,
+        tags: [.validation, .algorithm, .api],
+        setUpFunction: {
+          touchGlobalInfo()
+          blackHole(unmanagedUGRPrimsState)
+        }))
     return benchmarks
   })()
 
@@ -650,6 +666,7 @@ let weakPrimsState = PrimsState(WeakGraphNode.self)
 let unownedSafePrimsState = PrimsState(UnownedSafeGraphNode.self)
 let unownedUnsafePrimsState = PrimsState(UnownedUnsafeGraphNode.self)
 let unmanagedPrimsState = PrimsState(UnmanagedGraphNode.self)
+let unmanagedUGRPrimsState = PrimsState(UnmanagedUGRGraphNode.self)
 
 //===----------------------------------------------------------------------===//
 //                                 Protocols
@@ -762,6 +779,46 @@ func ==<T>(lhs: UnmanagedVarBox<T>, rhs: UnmanagedVarBox<T>) -> Bool {
 extension UnmanagedVarBox : Hashable where T : Hashable {
   func hash(into hasher: inout Hasher) {
     hasher.combine(ObjectIdentifier(value))
+  }
+}
+
+struct UnmanagedUGRVarBox<T : AnyObject & Hashable> {
+  var _value: Unmanaged<T>
+
+  init(_ inputValue: T) {
+    _value = Unmanaged<T>.passRetained(inputValue)
+  }
+}
+
+extension UnmanagedUGRVarBox : ValueBox where T : GraphNode {
+  typealias ValueType = T
+
+  func free() {
+    _value.release()
+  }
+
+  var value: T { return _value._withUnsafeGuaranteedRef { $0 } }
+
+  func withValue<Result>(_ f: (ValueType) throws -> Result) rethrows -> Result {
+    try _value._withUnsafeGuaranteedRef { try f($0) }
+  }
+}
+
+extension UnmanagedUGRVarBox : Equatable where T : Equatable {
+}
+
+func ==<T>(lhs: UnmanagedUGRVarBox<T>, rhs: UnmanagedUGRVarBox<T>) -> Bool {
+  return lhs._value._withUnsafeGuaranteedRef { x in
+    return rhs._value._withUnsafeGuaranteedRef { y in
+      return x == y
+    }}
+}
+
+extension UnmanagedUGRVarBox : Hashable where T : Hashable {
+  func hash(into hasher: inout Hasher) {
+    _value._withUnsafeGuaranteedRef {
+      hasher.combine(ObjectIdentifier($0))
+    }
   }
 }
 
@@ -884,6 +941,41 @@ extension UnmanagedGraphNode : Hashable {
 }
 
 func ==(lhs: UnmanagedGraphNode, rhs: UnmanagedGraphNode) -> Bool {
+  return lhs === rhs
+}
+
+
+final class UnmanagedUGRGraphNode {
+  /// This id is only meant for dumping the state of the graph. It is not meant
+  /// to be used functionally by the algorithm.
+  var id: Int
+
+  var adjList: Array<UnmanagedUGRVarBox<UnmanagedUGRGraphNode>>
+
+  init(id inputId: Int) {
+    id = inputId
+    adjList = Array<UnmanagedUGRVarBox<UnmanagedUGRGraphNode>>()
+  }
+
+  deinit {
+    for x in adjList {
+      x.free()
+    }
+  }
+}
+
+extension UnmanagedUGRGraphNode : GraphNode {
+  typealias BoxType = UnmanagedUGRVarBox<UnmanagedUGRGraphNode>
+}
+
+extension UnmanagedUGRGraphNode : Equatable {}
+extension UnmanagedUGRGraphNode : Hashable {
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
+  }
+}
+
+func ==(lhs: UnmanagedUGRGraphNode, rhs: UnmanagedUGRGraphNode) -> Bool {
   return lhs === rhs
 }
 
@@ -1232,6 +1324,22 @@ public func run_PrimsUnmanaged(_ N: Int) {
 @inline(never)
 public func run_PrimsUnmanagedClosureAccess(_ N: Int) {
   let state = unmanagedPrimsState
+  for _ in 0..<N {
+    run_PrimsNonStrongRefClosureAccess(state)
+  }
+}
+
+@inline(never)
+public func run_PrimsUnmanagedUGR(_ N: Int) {
+  let state = unmanagedUGRPrimsState
+  for _ in 0..<N {
+    run_PrimsNonStrongRef(state)
+  }
+}
+
+@inline(never)
+public func run_PrimsUnmanagedUGRClosureAccess(_ N: Int) {
+  let state = unmanagedUGRPrimsState
   for _ in 0..<N {
     run_PrimsNonStrongRefClosureAccess(state)
   }
