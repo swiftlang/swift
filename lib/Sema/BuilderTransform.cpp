@@ -920,38 +920,9 @@ public:
 
   Stmt *visitIfStmt(IfStmt *ifStmt, FunctionBuilderTarget target) {
     // Rewrite the condition.
-    auto condition = ifStmt->getCond();
-    for (auto &condElement : condition) {
-      switch (condElement.getKind()) {
-      case StmtConditionElement::CK_Availability:
-        continue;
-
-      case StmtConditionElement::CK_Boolean: {
-        auto condExpr = condElement.getBoolean();
-        auto finalCondExpr = rewriteExpr(condExpr);
-
-        // Load the condition if needed.
-        if (finalCondExpr->getType()->hasLValueType()) {
-          finalCondExpr = TypeChecker::addImplicitLoadExpr(ctx, finalCondExpr);
-        }
-
-        condElement.setBoolean(finalCondExpr);
-        continue;
-      }
-
-      case StmtConditionElement::CK_PatternBinding: {
-        ConstraintSystem &cs = solution.getConstraintSystem();
-        auto target = *cs.getStmtConditionTarget(&condElement);
-        auto resolvedTarget = rewriteTarget(target);
-        if (resolvedTarget) {
-          condElement.setInitializer(resolvedTarget->getAsExpr());
-          condElement.setPattern(resolvedTarget->getInitializationPattern());
-        }
-        continue;
-      }
-      }
-    }
-    ifStmt->setCond(condition);
+    if (auto condition = rewriteTarget(
+            SolutionApplicationTarget(ifStmt->getCond(), dc)))
+      ifStmt->setCond(*condition->getAsStmtCondition());
 
     assert(target.kind == FunctionBuilderTarget::TemporaryVar);
     auto temporaryVar = target.captured.first;
