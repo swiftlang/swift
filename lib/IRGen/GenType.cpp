@@ -67,6 +67,13 @@ TypeConverter::Types_t::getCacheFor(bool isDependent, TypeConverter::Mode mode) 
           : IndependentCache[unsigned(mode)]);
 }
 
+llvm::DenseMap<TypeBase *, const TypeLayoutEntry *> &
+TypeConverter::Types_t::getTypeLayoutCacheFor(bool isDependent,
+                                              TypeConverter::Mode mode) {
+  return (isDependent ? DependentTypeLayoutCache[unsigned(mode)]
+                      : IndependentTypeLayoutCache[unsigned(mode)]);
+}
+
 void TypeInfo::assign(IRGenFunction &IGF, Address dest, Address src,
                       IsTake_t isTake, SILType T, bool isOutlined) const {
   if (isTake) {
@@ -955,6 +962,11 @@ namespace {
                                const EnumPayload &payload,
                                Explosion &dest,
                                unsigned offset) const override {}
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType) const override {
+      return IGM.typeLayoutCache.getEmptyEntry();
+    }
   };
 
   /// A TypeInfo implementation for types represented as a single
@@ -1037,7 +1049,12 @@ namespace {
     llvm::ArrayType *getStorageType() const {
       return cast<llvm::ArrayType>(ScalarTypeInfo::getStorageType());
     }
-    
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
+
     unsigned getExplosionSize() const override {
       return 1;
     }
@@ -1123,6 +1140,10 @@ namespace {
                       Alignment align)
       : IndirectTypeInfo(storage, size, std::move(spareBits), align,
                          IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {}
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
@@ -1355,6 +1376,11 @@ void TypeConverter::setGenericContext(CanGenericSignature signature) {
   Types.getCacheFor(/*isDependent*/ true, Mode::Normal).clear();
   Types.getCacheFor(/*isDependent*/ true, Mode::Legacy).clear();
   Types.getCacheFor(/*isDependent*/ true, Mode::CompletelyFragile).clear();
+
+  Types.getTypeLayoutCacheFor(/*isDependent*/ true, Mode::Normal).clear();
+  Types.getTypeLayoutCacheFor(/*isDependent*/ true, Mode::Legacy).clear();
+  Types.getTypeLayoutCacheFor(/*isDependent*/ true, Mode::CompletelyFragile)
+      .clear();
 }
 
 CanGenericSignature IRGenModule::getCurGenericContext() {
@@ -1668,6 +1694,19 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
     return CanType(exemplified);
   }
 }
+const TypeLayoutEntry &TypeConverter::getTypeLayoutEntry(SILType T) {
+  auto astTy = T.getASTType();
+  auto cache =
+      Types.getTypeLayoutCacheFor(astTy->hasTypeParameter(), LoweringMode);
+  auto it = cache.find(astTy.getPointer());
+  if (it != cache.end()) {
+    return *it->second;
+  }
+  auto *ti = getTypeEntry(T.getASTType());
+  auto *entry = ti->buildTypeLayoutEntry(IGM, T);
+  cache[astTy.getPointer()] = entry;
+  return *entry;
+}
 
 const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
   // Cache this entry in the dependent or independent cache appropriate to it.
@@ -1836,9 +1875,12 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   PrettyStackTraceType stackTrace(IGM.Context, "converting", ty);
 
   switch (ty->getKind()) {
-  case TypeKind::Error:
-    llvm_unreachable("found an ErrorType in IR-gen");
-
+  case TypeKind::Error: {
+    // We might see error types if type checking has failed.
+    // Try to do something graceful and return an zero sized type.
+    auto &ctx = ty->getASTContext();
+    return convertTupleType(cast<TupleType>(ctx.TheEmptyTupleType));
+  }
 #define UNCHECKED_TYPE(id, parent) \
   case TypeKind::id: \
     llvm_unreachable("found a " #id "Type in IR-gen");
@@ -2080,6 +2122,11 @@ public:
                     IsNotBitwiseTakable, /* irrelevant */
                     IsFixedSize /* irrelevant */),
       NumExtraInhabitants(node.NumExtraInhabitants) {}
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+  }
 
   virtual unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
     return NumExtraInhabitants;

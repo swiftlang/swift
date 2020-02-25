@@ -738,9 +738,10 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     std::copy_if(
         loadedModuleFile->getDependencies().begin(),
         loadedModuleFile->getDependencies().end(), std::back_inserter(missing),
-        [&duplicates](const ModuleFile::Dependency &dependency) -> bool {
+        [&duplicates, &Ctx](const ModuleFile::Dependency &dependency) -> bool {
           if (dependency.isLoaded() || dependency.isHeader() ||
-              dependency.isImplementationOnly()) {
+              (dependency.isImplementationOnly() &&
+               Ctx.LangOpts.DebuggerSupport)) {
             return false;
           }
           return duplicates.insert(dependency.RawPath).second;
@@ -1108,6 +1109,11 @@ void SerializedASTFile::lookupObjCMethods(
        ObjCSelector selector,
        SmallVectorImpl<AbstractFunctionDecl *> &results) const {
   File.lookupObjCMethods(selector, results);
+}
+
+void SerializedASTFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                           SmallVectorImpl<Identifier> &spiGroups) const {
+  File.lookupImportedSPIGroups(importedModule, spiGroups);
 }
 
 Optional<CommentInfo>

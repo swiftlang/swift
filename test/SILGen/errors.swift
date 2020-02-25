@@ -311,7 +311,7 @@ protocol Doomed {
   func check() throws
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s6errors12DoomedStructVAA0B0A2aDP5checkyyKFTW : $@convention(witness_method: Doomed) (@in_guaranteed DoomedStruct) -> @error Error
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s6errors12DoomedStructVAA0B0A2aDP5checkyyKFTW :
 // CHECK:      [[SELF:%.*]] = load [trivial] %0 : $*DoomedStruct
 // CHECK:      [[T0:%.*]] = function_ref @$s6errors12DoomedStructV5checkyyKF : $@convention(method) (DoomedStruct) -> @error Error
 // CHECK-NEXT: try_apply [[T0]]([[SELF]])
@@ -324,7 +324,7 @@ struct DoomedStruct : Doomed {
   func check() throws {}
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s6errors11DoomedClassCAA0B0A2aDP5checkyyKFTW : $@convention(witness_method: Doomed) (@in_guaranteed DoomedClass) -> @error Error {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s6errors11DoomedClassCAA0B0A2aDP5checkyyKFTW :
 // CHECK:      [[BORROWED_SELF:%.*]] = load_borrow %0
 // CHECK:      [[T0:%.*]] = class_method [[BORROWED_SELF]] : $DoomedClass, #DoomedClass.check!1 : (DoomedClass) -> () throws -> (), $@convention(method) (@guaranteed DoomedClass) -> @error Error
 // CHECK-NEXT: try_apply [[T0]]([[BORROWED_SELF]])
@@ -339,7 +339,7 @@ class DoomedClass : Doomed {
   func check() throws {}
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s6errors11HappyStructVAA6DoomedA2aDP5checkyyKFTW : $@convention(witness_method: Doomed) (@in_guaranteed HappyStruct) -> @error Error
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s6errors11HappyStructVAA6DoomedA2aDP5checkyyKFTW :
 // CHECK:      [[T0:%.*]] = function_ref @$s6errors11HappyStructV5checkyyF : $@convention(method) (HappyStruct) -> ()
 // CHECK:      [[T1:%.*]] = apply [[T0]](%1)
 // CHECK:      [[T1:%.*]] = tuple ()
@@ -348,7 +348,7 @@ struct HappyStruct : Doomed {
   func check() {}
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s6errors10HappyClassCAA6DoomedA2aDP5checkyyKFTW : $@convention(witness_method: Doomed) (@in_guaranteed HappyClass) -> @error Error
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s6errors10HappyClassCAA6DoomedA2aDP5checkyyKFTW :
 // CHECK:      [[SELF:%.*]] = load_borrow %0 : $*HappyClass
 // CHECK:      [[T0:%.*]] = class_method [[SELF]] : $HappyClass, #HappyClass.check!1 : (HappyClass) -> () -> (), $@convention(method) (@guaranteed HappyClass) -> ()
 // CHECK:      [[T1:%.*]] = apply [[T0]]([[SELF]])

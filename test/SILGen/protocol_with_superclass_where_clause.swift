@@ -241,7 +241,7 @@ protocol SillyDefault where Self : ClassWithDefault<Int> {
 
 class ConformsToSillyDefault : ClassWithDefault<Int>, SillyDefault {}
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s24protocol_with_superclass22ConformsToSillyDefaultCAA0fG0A2aDP5makeTSiyFTW : $@convention(witness_method: SillyDefault) (@guaranteed ConformsToSillyDefault) -> Int
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s24protocol_with_superclass22ConformsToSillyDefaultCAA0fG0A2aDP5makeTSiyFTW :
 // CHECK: class_method %1 : $ClassWithDefault<Int>, #ClassWithDefault.makeT!1 : <T> (ClassWithDefault<T>) -> () -> T, $@convention(method) <τ_0_0> (@guaranteed ClassWithDefault<τ_0_0>) -> @out τ_0_0
 // CHECK: return
 

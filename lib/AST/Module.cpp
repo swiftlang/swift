@@ -549,6 +549,11 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
+void ModuleDecl::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spiGroups) const {
+  FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
+}
+
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
                               SmallVectorImpl<ValueDecl*> &result) const {
   getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
@@ -1167,6 +1172,8 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
       requiredFilter |= ModuleDecl::ImportFilterKind::Public;
     else if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    else if (desc.importOptions.contains(ImportFlags::SPIAccessControl))
+      requiredFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
     else
       requiredFilter |= ModuleDecl::ImportFilterKind::Private;
 
@@ -1410,6 +1417,7 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
   ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
   filter |= ModuleDecl::ImportFilterKind::Private;
+  filter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
 
   auto *topLevel = getParentModule();
 
@@ -1772,6 +1780,34 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
 
   // Now check this file's enclosing module in case there are re-exports.
   return !imports.isImportedBy(module, getParentModule());
+}
+
+void SourceFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spiGroups) const {
+  for (auto &import : Imports) {
+    if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
+        importedModule == std::get<ModuleDecl*>(import.module)) {
+      auto importedSpis = import.spiGroups;
+      spiGroups.append(importedSpis.begin(), importedSpis.end());
+    }
+  }
+}
+
+bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
+  if (!targetDecl->getAttrs().hasAttribute<SPIAccessControlAttr>())
+    return false;
+
+  auto targetModule = targetDecl->getModuleContext();
+  SmallVector<Identifier, 4> importedSpis;
+  lookupImportedSPIGroups(targetModule, importedSpis);
+
+  for (auto attr : targetDecl->getAttrs().getAttributes<SPIAccessControlAttr>())
+    for (auto declSPI : attr->getSPIGroups())
+      for (auto importedSPI : importedSpis)
+        if (importedSPI == declSPI)
+          return true;
+
+  return false;
 }
 
 bool SourceFile::shouldCrossImport() const {

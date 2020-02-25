@@ -17,10 +17,15 @@
 #ifndef SWIFT_AST_SUBSTITUTION_MAP_STORAGE_H
 #define SWIFT_AST_SUBSTITUTION_MAP_STORAGE_H
 
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "llvm/Support/TrailingObjects.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
 

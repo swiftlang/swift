@@ -751,6 +751,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, FILE_DEPENDENCY);
   BLOCK_RECORD(input_block, DEPENDENCY_DIRECTORY);
   BLOCK_RECORD(input_block, MODULE_INTERFACE_PATH);
+  BLOCK_RECORD(input_block, IMPORTED_MODULE_SPIS);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
 #define RECORD(X) BLOCK_RECORD(decls_block, X);
@@ -966,6 +967,7 @@ static ImportSet getImportsAsSet(const ModuleDecl *M,
 void Serializer::writeInputBlock(const SerializationOptions &options) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
   input_block::ImportedModuleLayout ImportedModule(Out);
+  input_block::ImportedModuleLayoutSPI ImportedModuleSPI(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
   input_block::ImportedHeaderLayout ImportedHeader(Out);
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
@@ -1012,6 +1014,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   allImportFilter |= ModuleDecl::ImportFilterKind::Public;
   allImportFilter |= ModuleDecl::ImportFilterKind::Private;
   allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  allImportFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
   M->getImportedModules(allImports, allImportFilter);
   ModuleDecl::removeDuplicateImports(allImports);
@@ -1022,6 +1025,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::Public);
   ImportSet privateImportSet =
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::Private);
+  ImportSet spiImportSet =
+      getImportsAsSet(M, ModuleDecl::ImportFilterKind::SPIAccessControl);
 
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
@@ -1066,14 +1071,26 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     // form here.
     if (publicImportSet.count(import))
       stableImportControl = ImportControl::Exported;
-    else if (privateImportSet.count(import))
+    else if (privateImportSet.count(import) || spiImportSet.count(import))
       stableImportControl = ImportControl::Normal;
     else
       stableImportControl = ImportControl::ImplementationOnly;
 
+    SmallVector<Identifier, 4> spis;
+    M->lookupImportedSPIGroups(import.second, spis);
+
     ImportedModule.emit(ScratchRecord,
                         static_cast<uint8_t>(stableImportControl),
-                        !import.first.empty(), importPath);
+                        !import.first.empty(), !spis.empty(), importPath);
+
+    if (!spis.empty()) {
+      SmallString<64> out;
+      llvm::raw_svector_ostream outStream(out);
+      swift::interleave(spis,
+                        [&outStream](Identifier next) { outStream << next.str(); },
+                        [&outStream] { outStream << StringRef("\0", 1); });
+      ImportedModuleSPI.emit(ScratchRecord, out);
+    }
   }
 
   if (!options.ModuleLinkName.empty()) {
@@ -2186,6 +2203,21 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       CDeclDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                       theAttr->isImplicit(),
                                       theAttr->Name);
+      return;
+    }
+
+    case DAK_SPIAccessControl: {
+      auto theAttr = cast<SPIAccessControlAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[SPIAccessControlDeclAttrLayout::Code];
+
+      SmallVector<IdentifierID, 4> spis;
+      for (auto spi : theAttr->getSPIGroups()) {
+        assert(!spi.empty() && "Empty SPI name");
+        spis.push_back(S.addDeclBaseNameRef(spi));
+      }
+
+      SPIAccessControlDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord,
+                                                 abbrCode, spis);
       return;
     }
 

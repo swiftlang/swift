@@ -816,6 +816,14 @@ bb0(%0 : $Int32):
   return %0 : $Int32
 }
 
+sil shared [transparent] [reabstraction_thunk] @$ss5Int32VIegd_ABIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int32) -> @out Int32 {
+bb0(%0 : $*Int32, %1 : $@callee_guaranteed () -> Int32):
+  %2 = apply %1() : $@callee_guaranteed () -> Int32
+  store %2 to %0 : $*Int32
+  %4 = tuple ()
+  return %4 : $()
+}
+
 /// A stub for OSLogMessage.init. The optimization is driven by this function.
 /// This function must take at least one argument which is required by the pass.
 sil [Onone] [_semantics "constant_evaluable"] [_semantics "oslog.message.init_stub"] @oslogMessageClosureArrayStubInit : $@convention(thin) (Builtin.Int1) -> @owned OSLogMessageClosureArrayStub {
@@ -826,12 +834,15 @@ bb0(%0 : $Builtin.Int1):
   %3 = apply %2<() -> Int32>(%1) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
   %4 = tuple_extract %3 : $(Array<() -> Int32>, Builtin.RawPointer), 0
   %5 = tuple_extract %3 : $(Array<() -> Int32>, Builtin.RawPointer), 1
-  %6 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*@callee_guaranteed () -> Int32
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*@callee_guaranteed <A> in () -> @out A for <Int32>
   %7 = integer_literal $Builtin.Int32, 81
   %8 = struct $Int32 (%7 : $Builtin.Int32)
   %9 = function_ref @closure1 : $@convention(thin) (Int32) -> Int32
   %10 = partial_apply [callee_guaranteed] %9(%8) : $@convention(thin) (Int32) -> Int32
-  store %10 to %6 : $*@callee_guaranteed () -> Int32
+  %11 = function_ref @$ss5Int32VIegd_ABIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int32) -> @out Int32 
+  %12 = partial_apply [callee_guaranteed] %11(%10) : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int32) -> @out Int32 
+  %13 = convert_function %12 : $@callee_guaranteed () -> @out Int32 to $@callee_guaranteed <A> in () -> @out A for <Int32>
+  store %13 to %6 : $*@callee_guaranteed <A> in () -> @out A for <Int32>
 
   // Create an instance of OSLogMessageClosureArrayStub using the above array
   // of closures.

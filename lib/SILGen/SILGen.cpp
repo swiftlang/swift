@@ -1460,7 +1460,6 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
                                                baseOperand, needsGenericContext,
                                                subs, decl, {},
                                                baseTy->getCanonicalType(),
-                                               M.getSwiftModule(),
                                                /*property descriptor*/ true);
   
   (void)SILProperty::create(M, /*serialized*/ false, decl, component);
@@ -1539,7 +1538,7 @@ public:
       sgm.TopLevelSGF = new SILGenFunction(sgm, *toplevel, sf);
       sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->getName();
       auto moduleCleanupLoc = CleanupLocation::getModuleCleanupLocation();
-      sgm.TopLevelSGF->prepareEpilog(Type(), true, moduleCleanupLoc);
+      sgm.TopLevelSGF->prepareEpilog(false, true, moduleCleanupLoc);
 
       // Create the argc and argv arguments.
       auto prologueLoc = RegularLocation::getModuleLocation();

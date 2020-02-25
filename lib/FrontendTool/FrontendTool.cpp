@@ -1197,6 +1197,18 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
         Instance.getMainModule());
   }
 
+  if (opts.InputsAndOutputs.hasPrivateModuleInterfaceOutputPath()) {
+    // Copy the settings from the module interface
+    ModuleInterfaceOptions privOpts = Invocation.getModuleInterfaceOptions();
+    privOpts.PrintSPIs = true;
+
+    hadAnyError |= printModuleInterfaceIfNeeded(
+        Invocation.getPrivateModuleInterfaceOutputPathForWholeModule(),
+        privOpts,
+        Invocation.getLangOptions(),
+        Instance.getMainModule());
+  }
+
   {
     hadAnyError |= writeTBDIfNeeded(Invocation, Instance);
   }

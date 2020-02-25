@@ -639,17 +639,23 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
     //  $@convention(thin) @noescape () -> () to
     //            $@noescape @callee_guaranteed () -> ()
     // %4 = apply %3() : $@noescape @callee_guaranteed () -> ()
-    if (auto *ThinToNoescapeCast = dyn_cast<ConvertFunctionInst>(CalleeValue)) {
+    if (auto *ConvertFn = dyn_cast<ConvertFunctionInst>(CalleeValue)) {
+      // If the conversion only changes the substitution level of the function,
+      // we can also look through it.
+      if (ConvertFn->onlyConvertsSubstitutions()) {
+        return stripCopiesAndBorrows(ConvertFn->getOperand());
+      }
+      
       auto FromCalleeTy =
-          ThinToNoescapeCast->getOperand()->getType().castTo<SILFunctionType>();
+          ConvertFn->getOperand()->getType().castTo<SILFunctionType>();
       if (FromCalleeTy->getExtInfo().hasContext())
         return CalleeValue;
-      auto ToCalleeTy = ThinToNoescapeCast->getType().castTo<SILFunctionType>();
+      auto ToCalleeTy = ConvertFn->getType().castTo<SILFunctionType>();
       auto EscapingCalleeTy = ToCalleeTy->getWithExtInfo(
           ToCalleeTy->getExtInfo().withNoEscape(false));
       if (FromCalleeTy != EscapingCalleeTy)
         return CalleeValue;
-      return stripCopiesAndBorrows(ThinToNoescapeCast->getOperand());
+      return stripCopiesAndBorrows(ConvertFn->getOperand());
     }
 
     // Ignore mark_dependence users. A partial_apply [stack] uses them to mark

@@ -19,10 +19,11 @@ struct MyError : Error {
 // We need a reabstraction thunk to convert from direct args/result to indirect
 // args/result, which is expected in the returned closure.
 
-// CHECK-LABEL: sil shared [noinline] @$s4test16generic_get_funcyxxcx_SbtlFSi_Tg5 : $@convention(thin) (Int, Bool) -> @owned @callee_guaranteed (@in_guaranteed Int) -> @out Int {
-// CHECK: [[F:%[0-9]+]] = function_ref @$s4test16generic_get_funcyxxcx_SbtlF0B0L_yxxlFSi_TG5 : $@convention(thin) (@in_guaranteed Int, Bool, @guaranteed <τ_0_0> { var τ_0_0 } <Int>) -> @out Int
-// CHECK: [[PA:%[0-9]+]] = partial_apply [callee_guaranteed] [[F]](%1, %{{[0-9]+}}) : $@convention(thin) (@in_guaranteed Int, Bool, @guaranteed <τ_0_0> { var τ_0_0 } <Int>) -> @out Int
-// CHECK: return [[PA]] : $@callee_guaranteed (@in_guaranteed Int) -> @out Int
+// CHECK-LABEL: sil shared [noinline] @$s4test16generic_get_funcyxxcx_SbtlFSi_Tg5 :
+// CHECK: [[F:%[0-9]+]] = function_ref @$s4test16generic_get_funcyxxcx_SbtlF0B0L_yxxlFSi_TG5 :
+// CHECK: [[PA:%[0-9]+]] = partial_apply [callee_guaranteed] [[F]](%1, %{{[0-9]+}}) :
+// CHECK: [[CONV:%[0-9]+]] = convert_function [[PA]]
+// CHECK: return [[CONV]] :
 @inline(never)
 func generic_get_func<T>(_ t1: T, _ b: Bool) -> (T) -> T {
 
@@ -35,10 +36,11 @@ func generic_get_func<T>(_ t1: T, _ b: Bool) -> (T) -> T {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @$s4test7testit1yS2icSbF : $@convention(thin) (Bool) -> @owned @callee_guaranteed (Int) -> Int {
-// CHECK: [[F:%[0-9]+]] = function_ref @$s4test16generic_get_funcyxxcx_SbtlFSi_Tg5 : $@convention(thin) (Int, Bool) -> @owned @callee_guaranteed (@in_guaranteed Int) -> @out Int
-// CHECK: [[CL:%[0-9]+]] = apply [[F]](%{{[0-9]+}}, %0) : $@convention(thin) (Int, Bool) -> @owned @callee_guaranteed (@in_guaranteed Int) -> @out Int
+// CHECK: [[F:%[0-9]+]] = function_ref @$s4test16generic_get_funcyxxcx_SbtlFSi_Tg5 :
+// CHECK: [[CL:%[0-9]+]] = apply [[F]](%{{[0-9]+}}, %0) :
+// CHECK: [[CL2:%[0-9]+]] = convert_function [[CL]]
 // CHECK: [[TH:%[0-9]+]] = function_ref @$sS2iIegnr_S2iIegyd_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (@in_guaranteed Int) -> @out Int) -> Int
-// CHECK: [[RET:%[0-9]+]] = partial_apply [callee_guaranteed] [[TH]]([[CL]])
+// CHECK: [[RET:%[0-9]+]] = partial_apply [callee_guaranteed] [[TH]]([[CL2]])
 // CHECK: return [[RET]] : $@callee_guaranteed (Int) -> Int
 @inline(never)
 func testit1(_ b: Bool) -> (Int) -> Int {
@@ -90,10 +92,11 @@ func testit3(_ b: Bool) -> Int {
 // We need a reabstraction thunk to convert from direct args/result to indirect
 // args/result, which is expected in the returned closure.
 
-// CHECK-LABEL: sil shared [noinline] @$s4test25generic_get_func_throwingyxxKcSblFSi_Tg5 : $@convention(thin) (Bool) -> @owned @callee_guaranteed (@in_guaranteed Int) -> (@out Int, @error Error) {
-// CHECK: [[F:%[0-9]+]] = function_ref @$s4test25generic_get_func_throwingyxxKcSblF0B0L_yxxKlFSi_TG5 : $@convention(thin) (@in_guaranteed Int, Bool) -> (@out Int, @error Error)
+// CHECK-LABEL: sil shared [noinline] @$s4test25generic_get_func_throwingyxxKcSblFSi_Tg5 :
+// CHECK: [[F:%[0-9]+]] = function_ref @$s4test25generic_get_func_throwingyxxKcSblF0B0L_yxxKlFSi_TG5 :
 // CHECK: [[PA:%[0-9]+]] = partial_apply [callee_guaranteed] [[F]](%0) : $@convention(thin) (@in_guaranteed Int, Bool) -> (@out Int, @error Error)
-// CHECK: return [[PA]] : $@callee_guaranteed (@in_guaranteed Int) -> (@out Int, @error Error)
+// CHECK: [[CONV:%[0-9]+]] = convert_function [[PA]]
+// CHECK: return [[CONV]] :
 @inline(never)
 func generic_get_func_throwing<T>(_ b: Bool) -> (T) throws -> T {
 
@@ -109,10 +112,11 @@ func generic_get_func_throwing<T>(_ b: Bool) -> (T) throws -> T {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @$s4test16testit1_throwingyS2iKcSbF : $@convention(thin) (Bool) -> @owned @callee_guaranteed (Int) -> (Int, @error Error) {
-// CHECK: [[F:%[0-9]+]] = function_ref @$s4test25generic_get_func_throwingyxxKcSblFSi_Tg5 : $@convention(thin) (Bool) -> @owned @callee_guaranteed (@in_guaranteed Int) -> (@out Int, @error Error)
-// CHECK: [[CL:%[0-9]+]] = apply [[F]](%0) : $@convention(thin) (Bool) -> @owned @callee_guaranteed (@in_guaranteed Int) -> (@out Int, @error Error)
-// CHECK: [[TH:%[0-9]+]] = function_ref @$sS2is5Error_pIegnrzo_S2isAA_pIegydzo_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (@in_guaranteed Int) -> (@out Int, @error Error)) -> (Int, @error Error)
-// CHECK: [[RET:%[0-9]+]] = partial_apply [callee_guaranteed] [[TH]]([[CL]])
+// CHECK: [[F:%[0-9]+]] = function_ref @$s4test25generic_get_func_throwingyxxKcSblFSi_Tg5 :
+// CHECK: [[CL:%[0-9]+]] = apply [[F]](%0) :
+// CHECK: [[CONV:%[0-9]+]] = convert_function [[CL]]
+// CHECK: [[TH:%[0-9]+]] = function_ref @$sS2is5Error_pIegnrzo_S2isAA_pIegydzo_TR :
+// CHECK: [[RET:%[0-9]+]] = partial_apply [callee_guaranteed] [[TH]]([[CONV]])
 // CHECK: return [[RET]] : $@callee_guaranteed (Int) -> (Int, @error Error)
 @inline(never)
 func testit1_throwing(_ b: Bool) -> (Int) throws -> Int {

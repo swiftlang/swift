@@ -42,7 +42,7 @@ final class Derived : Base, Initable {}
 // CHECK-NEXT:    [[FINAL:%.*]] = load [copy] [[BOX]]
 // CHECK:         return [[FINAL]]
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s4main7DerivedCAA8InitableA2aDP1xxSi_tcfCTW : $@convention(witness_method: Initable) (Int, @thick Derived.Type) -> @out Derived
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s4main7DerivedCAA8InitableA2aDP1xxSi_tcfCTW :
 // CHECK:         [[SELF:%.*]] = upcast %2 : $@thick Derived.Type to $@thick Base.Type
 // CHECK:         [[METHOD:%.*]] = function_ref @$s4main4BaseC1xACSi_tcfC
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]](%1, [[SELF]])

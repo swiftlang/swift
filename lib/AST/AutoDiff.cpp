@@ -12,6 +12,7 @@
 
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -72,13 +73,11 @@ static unsigned countNumFlattenedElementTypes(Type type) {
 }
 
 // TODO(TF-874): Simplify this helper and remove the `reverseCurryLevels` flag.
-// See TF-874 for WIP.
-void autodiff::getSubsetParameterTypes(IndexSubset *subset,
-                                       AnyFunctionType *type,
-                                       SmallVectorImpl<Type> &results,
-                                       bool reverseCurryLevels) {
+void AnyFunctionType::getSubsetParameters(
+    IndexSubset *parameterIndices,
+    SmallVectorImpl<AnyFunctionType::Param> &results, bool reverseCurryLevels) {
   SmallVector<AnyFunctionType *, 2> curryLevels;
-  unwrapCurryLevels(type, curryLevels);
+  unwrapCurryLevels(this, curryLevels);
 
   SmallVector<unsigned, 2> curryLevelParameterIndexOffsets(curryLevels.size());
   unsigned currentOffset = 0;
@@ -99,8 +98,43 @@ void autodiff::getSubsetParameterTypes(IndexSubset *subset,
     unsigned parameterIndexOffset =
         curryLevelParameterIndexOffsets[curryLevelIndex];
     for (unsigned paramIndex : range(curryLevel->getNumParams()))
-      if (subset->contains(parameterIndexOffset + paramIndex))
-        results.push_back(curryLevel->getParams()[paramIndex].getOldType());
+      if (parameterIndices->contains(parameterIndexOffset + paramIndex))
+        results.push_back(curryLevel->getParams()[paramIndex]);
+  }
+}
+
+void autodiff::getFunctionSemanticResultTypes(
+    AnyFunctionType *functionType,
+    SmallVectorImpl<AutoDiffSemanticFunctionResultType> &result,
+    GenericEnvironment *genericEnv) {
+  auto &ctx = functionType->getASTContext();
+
+  // Remap type in `genericEnv`, if specified.
+  auto remap = [&](Type type) {
+    if (!genericEnv)
+      return type;
+    return genericEnv->mapTypeIntoContext(type);
+  };
+
+  // Collect formal result type as a semantic result, unless it is
+  // `Void`.
+  auto formalResultType = functionType->getResult();
+  if (auto *resultFunctionType =
+          functionType->getResult()->getAs<AnyFunctionType>()) {
+    formalResultType = resultFunctionType->getResult();
+  }
+  if (!formalResultType->isEqual(ctx.TheEmptyTupleType))
+    result.push_back({remap(formalResultType), /*isInout*/ false});
+
+  // Collect `inout` parameters as semantic results.
+  for (auto param : functionType->getParams())
+    if (param.isInOut())
+      result.push_back({remap(param.getPlainType()), /*isInout*/ true});
+  if (auto *resultFunctionType =
+          functionType->getResult()->getAs<AnyFunctionType>()) {
+    for (auto param : resultFunctionType->getParams())
+      if (param.isInOut())
+        result.push_back({remap(param.getPlainType()), /*isInout*/ true});
   }
 }
 

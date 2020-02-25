@@ -97,18 +97,19 @@ extension _StringGuts {
 
   @inline(never) // slow-path
   private mutating func _foreignGrow(_ n: Int) {
-    // TODO(String performance): Skip intermediary array, transcode directly
-    // into a StringStorage space.
-    let selfUTF8 = Array(String(self).utf8)
-    selfUTF8.withUnsafeBufferPointer {
-      self = _StringGuts(__StringStorage.create(
-        initializingFrom: $0, capacity: n, isASCII: self.isASCII))
+    let newString = String(uninitializedCapacity: n) { buffer in
+      guard let count = _foreignCopyUTF8(into: buffer) else {
+       fatalError("String capacity was smaller than required")
+      }
+      return count
     }
+    self = newString._guts
   }
 
   // Ensure unique native storage with sufficient capacity for the following
   // append.
   private mutating func prepareForAppendInPlace(
+    totalCount: Int,
     otherUTF8Count otherCount: Int
   ) {
     defer {
@@ -127,11 +128,13 @@ extension _StringGuts {
     } else {
       sufficientCapacity = false
     }
+        
     if self.isUniqueNative && sufficientCapacity {
       return
     }
-
-    let totalCount = self.utf8Count + otherCount
+    
+    // If we have to resize anyway, and we fit in smol, we should have made one
+    _internalInvariant(totalCount > _SmallString.capacity)
 
     // Non-unique storage: just make a copy of the appropriate size, otherwise
     // grow like an array.
@@ -152,25 +155,76 @@ extension _StringGuts {
         return
       }
     }
-
     append(_StringGutsSlice(other))
+  }
+  
+  @inline(never)
+  @_effects(readonly)
+  private func _foreignConvertedToSmall() -> _SmallString {
+    let smol = String(uninitializedCapacity: _SmallString.capacity) { buffer in
+      guard let count = _foreignCopyUTF8(into: buffer) else {
+        fatalError("String capacity was smaller than required")
+      }
+      return count
+    }
+    _internalInvariant(smol._guts.isSmall)
+    return smol._guts.asSmall
+  }
+  
+  private func _convertedToSmall() -> _SmallString {
+    _internalInvariant(utf8Count <= _SmallString.capacity)
+    if _fastPath(isSmall) {
+      return asSmall
+    }
+    if isFastUTF8 {
+      return withFastUTF8 { _SmallString($0)! }
+    }
+    return _foreignConvertedToSmall()
   }
 
   internal mutating func append(_ slicedOther: _StringGutsSlice) {
     defer { self._invariantCheck() }
 
-    if self.isSmall && slicedOther._guts.isSmall {
+    let otherCount = slicedOther.utf8Count
+    
+    let totalCount = utf8Count + otherCount
+    
+    /*
+     Goal: determine if we need to allocate new native capacity
+     Possible scenarios in which we need to allocate:
+     • Not uniquely owned and native: we can't use the capacity to grow into,
+        have to become unique + native by allocating
+     • Not enough capacity: have to allocate to grow
+     
+     Special case: a non-smol String that can fit in a smol String but doesn't
+        meet the above criteria shouldn't throw away its buffer just to be smol.
+        The reasoning here is that it may be bridged or have reserveCapacity'd
+        in preparation for appending more later, in which case we would end up
+        have to allocate anyway to convert back from smol.
+     
+        If we would have to re-allocate anyway then that's not a problem and we
+        should just be smol.
+     
+        e.g. consider
+        var str = "" // smol
+        str.reserveCapacity(100) // large native unique
+        str += "<html>" // don't convert back to smol here!
+        str += htmlContents // because this would have to anyway!
+     */
+    let hasEnoughUsableSpace = isUniqueNative &&
+      nativeUnusedCapacity! >= otherCount
+    let shouldBeSmol = totalCount <= _SmallString.capacity &&
+      (isSmall || !hasEnoughUsableSpace)
+    
+    if shouldBeSmol {
+      let smolSelf = _convertedToSmall()
+      let smolOther = String(Substring(slicedOther))._guts._convertedToSmall()
       // TODO: In-register slicing
-      let smolSelf = self.asSmall
-      if let smol = slicedOther.withFastUTF8({ otherUTF8 in
-        return _SmallString(smolSelf, appending: _SmallString(otherUTF8)!)
-      }) {
-        self = _StringGuts(smol)
-        return
-      }
+      self = _StringGuts(_SmallString(smolSelf, appending: smolOther)!)
+      return
     }
-
-    prepareForAppendInPlace(otherUTF8Count: slicedOther.utf8Count)
+    
+    prepareForAppendInPlace(totalCount: totalCount, otherUTF8Count: otherCount)
 
     if slicedOther.isFastUTF8 {
       let otherIsASCII = slicedOther.isASCII
@@ -242,7 +296,6 @@ extension _StringGuts {
     self = result._guts
   }
 
-  @inline(__always) // Always-specialize
   internal mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C

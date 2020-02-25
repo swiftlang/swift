@@ -42,6 +42,15 @@ enum class DowngradeToWarning: bool {
   Yes
 };
 
+/// A uniquely-typed boolean to reduce the chances of accidentally inverting
+/// a check.
+///
+/// \see checkTypeAccessImpl
+enum class FromSPI: bool {
+  No,
+  Yes
+};
+
 /// Calls \p callback for each type in each requirement provided by
 /// \p source.
 static void forAllRequirementTypes(
@@ -78,7 +87,7 @@ protected:
 
   void checkTypeAccessImpl(
       Type type, TypeRepr *typeRepr, AccessScope contextAccessScope,
-      const DeclContext *useDC, bool mayBeInferred,
+      const DeclContext *useDC, bool mayBeInferred, FromSPI fromSPI,
       llvm::function_ref<CheckTypeAccessCallback> diagnose);
 
   void checkTypeAccess(
@@ -100,7 +109,7 @@ protected:
       llvm::function_ref<CheckTypeAccessCallback> diagnose) {
     forAllRequirementTypes(std::move(source), [&](Type type, TypeRepr *typeRepr) {
       checkTypeAccessImpl(type, typeRepr, accessScope, useDC,
-                          /*mayBeInferred*/false, diagnose);
+                          /*mayBeInferred*/false, FromSPI::No, diagnose);
     });
   }
 
@@ -189,10 +198,17 @@ public:
 /// using `Array` to mean `Array<Element>` in an extension of Array.) If
 /// \p typeRepr is known to be absent, it's okay to pass \c false for
 /// \p mayBeInferred.
+///
+/// If searching from an SPI context, pass \c FromSPI::YES for \p fromSPI.
+/// In this mode, all types must be public and diagnostic messages are adapted.
 void AccessControlCheckerBase::checkTypeAccessImpl(
     Type type, TypeRepr *typeRepr, AccessScope contextAccessScope,
-    const DeclContext *useDC, bool mayBeInferred,
+    const DeclContext *useDC, bool mayBeInferred, FromSPI fromSPI,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
+
+  if (fromSPI == FromSPI::Yes)
+    contextAccessScope = AccessScope::getPublic();
+
   auto &Context = useDC->getASTContext();
   if (Context.isAccessControlDisabled())
     return;
@@ -267,6 +283,17 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
 
   const TypeRepr *complainRepr = TypeAccessScopeDiagnoser::findTypeWithScope(
       typeRepr, problematicAccessScope, useDC, checkUsableFromInline);
+
+  if (fromSPI == FromSPI::Yes) {
+    // If in SPI mode, don't report SPI use from within the same module.
+    if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(complainRepr)) {
+      const ValueDecl *VD = CITR->getBoundDecl();
+      if (useDC->getParentModule() == VD->getModuleContext() &&
+          VD->getAttrs().hasAttribute<SPIAccessControlAttr>())
+        return;
+    }
+  }
+
   diagnose(problematicAccessScope, complainRepr, downgradeToWarning);
 }
 
@@ -290,9 +317,12 @@ void AccessControlCheckerBase::checkTypeAccess(
   const DeclContext *DC = context->getDeclContext();
   AccessScope contextAccessScope =
     context->getFormalAccessScope(
-      nullptr, checkUsableFromInline);
+      context->getDeclContext(), checkUsableFromInline);
+
+  auto fromSPI = static_cast<FromSPI>(
+      context->getAttrs().hasAttribute<SPIAccessControlAttr>());
   checkTypeAccessImpl(type, typeRepr, contextAccessScope, DC, mayBeInferred,
-                      diagnose);
+                      fromSPI, diagnose);
 }
 
 /// Highlights the given TypeRepr, and adds a note pointing to the type's
@@ -351,6 +381,8 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   };
 
   auto *DC = ownerDecl->getDeclContext();
+  auto fromSPI = static_cast<FromSPI>(
+     ownerDecl->getAttrs().hasAttribute<SPIAccessControlAttr>());
 
   for (auto param : *params) {
     if (param->getInherited().empty())
@@ -358,7 +390,8 @@ void AccessControlCheckerBase::checkGenericParamAccess(
     assert(param->getInherited().size() == 1);
     checkTypeAccessImpl(param->getInherited().front().getType(),
                         param->getInherited().front().getTypeRepr(),
-                        accessScope, DC, /*mayBeInferred*/false, callback);
+                        accessScope, DC, /*mayBeInferred*/false,
+                        fromSPI, callback);
   }
   callbackACEK = ACEK::Requirement;
 
@@ -957,16 +990,31 @@ public:
       bool isExplicit =
         fn->getAttrs().hasAttribute<AccessControlAttr>() ||
         isa<ProtocolDecl>(fn->getDeclContext());
-      auto diagID = diag::function_type_access;
-      if (downgradeToWarning == DowngradeToWarning::Yes)
-        diagID = diag::function_type_access_warn;
       auto fnAccess = isExplicit
         ? fn->getFormalAccess()
         : minAccessScope.requiredAccessForDiagnostics();
-      auto diag = fn->diagnose(diagID, isExplicit, fnAccess,
-                               isa<FileUnit>(fn->getDeclContext()), minAccess,
-                               functionKind, problemIsResult);
-      highlightOffendingType(diag, complainRepr);
+
+      // Report as an SPI problem if the type is at least as public as the decl.
+      AccessScope contextAccessScope =
+        fn->getFormalAccessScope(fn->getDeclContext(), checkUsableFromInline);
+      auto restrictedBySPI = !minAccessScope.isChildOf(contextAccessScope);
+      assert((!restrictedBySPI ||
+              fn->getAttrs().hasAttribute<SPIAccessControlAttr>()) &&
+             "There should be SPI attributes on this decl");
+
+      if (restrictedBySPI) {
+        auto diag = fn->diagnose(diag::function_type_spi, functionKind,
+                                 problemIsResult, minAccess);
+        highlightOffendingType(diag, complainRepr);
+      } else {
+        auto diagID = diag::function_type_access;
+        if (downgradeToWarning == DowngradeToWarning::Yes)
+          diagID = diag::function_type_access_warn;
+        auto diag = fn->diagnose(diagID, isExplicit, fnAccess,
+                                 isa<FileUnit>(fn->getDeclContext()), minAccess,
+                                 functionKind, problemIsResult);
+        highlightOffendingType(diag, complainRepr);
+      }
     }
   }
 
@@ -1463,10 +1511,12 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       const_cast<TypeRepr *>(typeRepr)->walk(TypeReprIdentFinder(
           [&](const ComponentIdentTypeRepr *component) {
         ModuleDecl *M = component->getBoundDecl()->getModuleContext();
-        if (!SF.isImportedImplementationOnly(M))
+        if (!SF.isImportedImplementationOnly(M) &&
+            !SF.isImportedAsSPI(component->getBoundDecl()))
           return true;
 
-        diagnoser.diagnoseType(component->getBoundDecl(), component);
+        diagnoser.diagnoseType(component->getBoundDecl(), component,
+                               SF.isImportedImplementationOnly(M));
         foundAnyIssues = true;
         // We still continue even in the diagnostic case to report multiple
         // violations.
@@ -1492,10 +1542,12 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
 
       void visitTypeDecl(const TypeDecl *typeDecl) {
         ModuleDecl *M = typeDecl->getModuleContext();
-        if (!SF.isImportedImplementationOnly(M))
+        if (!SF.isImportedImplementationOnly(M) &&
+            !SF.isImportedAsSPI(typeDecl))
           return;
 
-        diagnoser.diagnoseType(typeDecl, /*typeRepr*/nullptr);
+        diagnoser.diagnoseType(typeDecl, /*typeRepr*/nullptr,
+                               SF.isImportedImplementationOnly(M));
       }
 
       void visitSubstitutionMap(SubstitutionMap subs) {
@@ -1592,13 +1644,17 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
     });
   }
 
-  // This enum must be kept in sync with
-  // diag::decl_from_implementation_only_module and
+  // These enums must be kept in sync with
+  // diag::decl_from_hidden_module and
   // diag::conformance_from_implementation_only_module.
   enum class Reason : unsigned {
     General,
     ExtensionWithPublicMembers,
     ExtensionWithConditionalConformances
+  };
+  enum class HiddenImportKind : uint8_t {
+    ImplementationOnly,
+    SPI
   };
 
   class Diagnoser {
@@ -1608,12 +1664,17 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
     Diagnoser(const Decl *D, Reason reason) : D(D), reason(reason) {}
 
     void diagnoseType(const TypeDecl *offendingType,
-                      const TypeRepr *complainRepr) const {
+                      const TypeRepr *complainRepr,
+                      bool isImplementationOnly) const {
       ModuleDecl *M = offendingType->getModuleContext();
-      auto diag = D->diagnose(diag::decl_from_implementation_only_module,
+      HiddenImportKind importKind = isImplementationOnly?
+                                HiddenImportKind::ImplementationOnly:
+                                HiddenImportKind::SPI;
+      auto diag = D->diagnose(diag::decl_from_hidden_module,
                               offendingType->getDescriptiveKind(),
                               offendingType->getFullName(),
-                              static_cast<unsigned>(reason), M->getName());
+                              static_cast<unsigned>(reason), M->getName(),
+                              static_cast<unsigned>(importKind));
       highlightOffendingType(diag, complainRepr);
     }
 
@@ -1934,9 +1995,11 @@ public:
 
     auto &DE = PGD->getASTContext().Diags;
     auto diag =
-        DE.diagnose(diagLoc, diag::decl_from_implementation_only_module,
+        DE.diagnose(diagLoc, diag::decl_from_hidden_module,
                     PGD->getDescriptiveKind(), PGD->getName(),
-                    static_cast<unsigned>(Reason::General), M->getName());
+                    static_cast<unsigned>(Reason::General), M->getName(),
+                    static_cast<unsigned>(HiddenImportKind::ImplementationOnly)
+                    );
     if (refRange.isValid())
       diag.highlight(refRange);
     diag.flush();
