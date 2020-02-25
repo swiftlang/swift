@@ -484,15 +484,27 @@ func testDynamicMemberWithDefault(_ x: SR_11933) {
   _ = \SR_11933.[]
 }
 
+// SR-11743 - KeyPath Dynamic Member Lookup crash
 @dynamicMemberLookup
-protocol SR_11743 {
+protocol SR_11743_P {
   subscript(dynamicMember member: KeyPath<Self, Any>) -> Any { get }
 }
 
-extension SR_11743 {
+extension SR_11743_P {
   subscript(dynamicMember member: KeyPath<Self, Any>) -> Any {
     self[keyPath: member] // Ok
     // CHECK: function_ref @swift_getAtKeyPath
     // CHECK-NEXT: apply %{{.*}}<Self, Any>({{.*}})
+  }
+}
+
+@dynamicMemberLookup
+struct SR_11743_Struct {
+  let value: Int
+
+  subscript<T>(dynamicMember member: KeyPath<Self, T>) -> T {
+    return self[keyPath: member]
+    // CHECK: function_ref @swift_getAtKeyPath
+    // CHECK-NEXT: apply %{{.*}}<SR_11743_Struct, T>({{.*}})
   }
 }
