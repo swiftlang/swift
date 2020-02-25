@@ -141,6 +141,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RGBHistogram
     single-source/Radix2CooleyTukey
     single-source/RandomShuffle
+    single-source/RandomTree
     single-source/RandomValues
     single-source/RangeAssignment
     single-source/RangeIteration
