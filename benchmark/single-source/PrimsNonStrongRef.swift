@@ -43,10 +43,27 @@ public let PrimsNonStrongRef: [BenchmarkInfo] = ({
           touchGlobalInfo()
           blackHole(weakPrimsState)
         }))
+    // TODO: Stabilize weak benchmark.
+    benchmarks.append(BenchmarkInfo(
+        name: "Prims.NonStrongRef.Weak.ClosureAccess",
+        runFunction: run_PrimsWeakClosureAccess,
+        tags: [.validation, .algorithm],
+        setUpFunction: {
+          touchGlobalInfo()
+          blackHole(weakPrimsState)
+        }))
 #endif
     benchmarks.append(BenchmarkInfo(
         name: "Prims.NonStrongRef.UnownedSafe",
         runFunction: run_PrimsUnownedSafe,
+        tags: [.validation, .algorithm],
+        setUpFunction: {
+          touchGlobalInfo()
+          blackHole(unownedSafePrimsState)
+        }))
+    benchmarks.append(BenchmarkInfo(
+        name: "Prims.NonStrongRef.UnownedSafe.ClosureAccess",
+        runFunction: run_PrimsUnownedSafeClosureAccess,
         tags: [.validation, .algorithm],
         setUpFunction: {
           touchGlobalInfo()
@@ -61,8 +78,24 @@ public let PrimsNonStrongRef: [BenchmarkInfo] = ({
           blackHole(unownedUnsafePrimsState)
         }))
     benchmarks.append(BenchmarkInfo(
+        name: "Prims.NonStrongRef.UnownedUnsafe.ClosureAccess",
+        runFunction: run_PrimsUnownedUnsafeClosureAccess,
+        tags: [.validation, .algorithm],
+        setUpFunction: {
+          touchGlobalInfo()
+          blackHole(unownedUnsafePrimsState)
+        }))
+    benchmarks.append(BenchmarkInfo(
         name: "Prims.NonStrongRef.Unmanaged",
         runFunction: run_PrimsUnmanaged,
+        tags: [.validation, .algorithm, .api],
+        setUpFunction: {
+          touchGlobalInfo()
+          blackHole(unmanagedPrimsState)
+        }))
+    benchmarks.append(BenchmarkInfo(
+        name: "Prims.NonStrongRef.Unmanaged.ClosureAccess",
+        runFunction: run_PrimsUnmanagedClosureAccess,
         tags: [.validation, .algorithm, .api],
         setUpFunction: {
           touchGlobalInfo()
@@ -1059,6 +1092,41 @@ where Node.BoxType == Box, Box.ValueType == Node
   return treeEdges
 }
 
+func primsMainLoopClosureAccess<Node : GraphNode, Box>(
+  _ graph : Array<Node>,
+  _ fun : (Node.BoxType, Node.BoxType) -> Double) -> Array<Int?>
+where Node.BoxType == Box, Box.ValueType == Node
+{
+  var treeEdges = Array<Int?>(repeating:nil, count:graph.count)
+  let queue = PriorityQueue<Node>(count: graph.count)
+
+  // Make the minimum spanning tree root its own parent for simplicity.
+  queue.insert(EdgeCost(to: graph[0], cost: 0.0, from: graph[0]))
+
+  // Take an element with the smallest cost from the queue and add its
+  // neighbors to the queue if their cost was updated
+  while !queue.isEmpty {
+    // Add an edge with minimum cost to the spanning tree
+    let e = queue.pop()!
+    let newnode: Node.BoxType = e.to
+
+    // Add record about the edge newnode->e.from to treeEdges
+    treeEdges[newnode.withValue { $0.id }] = e.from.withValue { $0.id }
+
+    // Check all adjacent nodes and add edges, ending outside the tree, to the
+    // queue. If the queue already contains an edge to an adjacent node, we
+    // replace existing one with the new one in case the new one costs less.
+    for toNode: Box in (newnode.withValue { $0.adjList }) {
+      if treeEdges[toNode.withValue { $0.id }] != nil {
+        continue
+      }
+      let newcost = fun(newnode, toNode)
+      queue.insertOrUpdate(EdgeCost(to: toNode, cost: newcost, from: newnode))
+    }
+  }
+  return treeEdges
+}
+
 //===----------------------------------------------------------------------===//
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
@@ -1084,6 +1152,25 @@ func run_PrimsNonStrongRef<Node: GraphNode, Box>(_ state: PrimsState<Node, Box>)
   CheckResults(Int(cost) == 49324)
 }
 
+@inline(__always)
+func run_PrimsNonStrongRefClosureAccess<Node: GraphNode, Box>(_ state: PrimsState<Node, Box>) where Node.BoxType == Box, Box.ValueType == Node {
+  let graph = state.graph
+  let map = state.edgeToCostMap
+
+  // Find spanning tree
+  let treeEdges = primsMainLoopClosureAccess(graph, { (start: Box, end: Box) in
+      return map[Edge(start: start, end: end)]!
+    })
+
+  // Compute its cost in order to check results
+  var cost = 0.0
+  for i in 1..<treeEdges.count {
+    if let n = treeEdges[i] {
+      cost += map[Edge(start: Box(graph[n]), end: Box(graph[i]))]!
+    }
+  }
+  CheckResults(Int(cost) == 49324)
+}
 
 
 @inline(never)
@@ -1091,6 +1178,14 @@ public func run_PrimsWeak(_ N: Int) {
   let state = weakPrimsState
   for _ in 0..<N {
     run_PrimsNonStrongRef(state)
+  }
+}
+
+@inline(never)
+public func run_PrimsWeakClosureAccess(_ N: Int) {
+  let state = weakPrimsState
+  for _ in 0..<N {
+    run_PrimsNonStrongRefClosureAccess(state)
   }
 }
 
@@ -1103,6 +1198,14 @@ public func run_PrimsUnownedSafe(_ N: Int) {
 }
 
 @inline(never)
+public func run_PrimsUnownedSafeClosureAccess(_ N: Int) {
+  let state = unownedSafePrimsState
+  for _ in 0..<N {
+    run_PrimsNonStrongRefClosureAccess(state)
+  }
+}
+
+@inline(never)
 public func run_PrimsUnownedUnsafe(_ N: Int) {
   let state = unownedUnsafePrimsState
   for _ in 0..<N {
@@ -1111,9 +1214,25 @@ public func run_PrimsUnownedUnsafe(_ N: Int) {
 }
 
 @inline(never)
+public func run_PrimsUnownedUnsafeClosureAccess(_ N: Int) {
+  let state = unownedUnsafePrimsState
+  for _ in 0..<N {
+    run_PrimsNonStrongRefClosureAccess(state)
+  }
+}
+
+@inline(never)
 public func run_PrimsUnmanaged(_ N: Int) {
   let state = unmanagedPrimsState
   for _ in 0..<N {
     run_PrimsNonStrongRef(state)
+  }
+}
+
+@inline(never)
+public func run_PrimsUnmanagedClosureAccess(_ N: Int) {
+  let state = unmanagedPrimsState
+  for _ in 0..<N {
+    run_PrimsNonStrongRefClosureAccess(state)
   }
 }
