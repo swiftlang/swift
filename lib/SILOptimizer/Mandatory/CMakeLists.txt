@@ -17,7 +17,6 @@ silopt_register_sources(
   PredictableMemOpt.cpp
   PMOMemoryUseCollector.cpp
   RawSILInstLowering.cpp
-  SemanticARCOpts.cpp
   SILGenCleanup.cpp
   YieldOnceCheck.cpp
   MandatoryCombine.cpp
