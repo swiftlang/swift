@@ -771,6 +771,27 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
     p = result.firstElementAddress
     remainingCapacity = result.capacity
   }
+  
+  @_alwaysEmitIntoClient
+  internal mutating func _expandForAdd() {
+    let newCapacity = _growArrayCapacity(
+      oldCapacity: result.capacity,
+      minimumCapacity: result.capacity + 1,
+      elementSize: MemoryLayout<Element>.size
+    )
+    var newResult = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: newCapacity, minimumCapacity: 0)
+    p = newResult.firstElementAddress + result.capacity
+    remainingCapacity = newResult.capacity - result.capacity
+    if !result.isEmpty {
+      // This check prevents a data race writing to _swiftEmptyArrayStorage
+      // Since count is always 0 there, this code does nothing anyway
+      newResult.firstElementAddress.moveInitialize(
+        from: result.firstElementAddress, count: result.capacity)
+      result.count = 0
+    }
+    (result, newResult) = (newResult, result)
+  }
 
   /// Add an element to the buffer, reallocating if necessary.
   @inlinable
@@ -778,23 +799,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   internal mutating func add(_ element: Element) {
     if remainingCapacity == 0 {
       // Reallocate.
-      let newCapacity = _growArrayCapacity(
-        oldCapacity: result.capacity,
-        minimumCapacity: result.capacity + 1,
-        elementSize: MemoryLayout<Element>.size
-      )
-      var newResult = _ContiguousArrayBuffer<Element>(
-        _uninitializedCount: newCapacity, minimumCapacity: 0)
-      p = newResult.firstElementAddress + result.capacity
-      remainingCapacity = newResult.capacity - result.capacity
-      if !result.isEmpty {
-        // This check prevents a data race writing to _swiftEmptyArrayStorage
-        // Since count is always 0 there, this code does nothing anyway
-        newResult.firstElementAddress.moveInitialize(
-          from: result.firstElementAddress, count: result.capacity)
-        result.count = 0
-      }
-      (result, newResult) = (newResult, result)
+      _expandForAdd()
     }
     addWithExistingCapacity(element)
   }

@@ -143,7 +143,7 @@ internal func _growArrayCapacity(
   oldCapacity: Int, minimumCapacity: Int, elementSize: Int
 ) -> Int {
   if oldCapacity < minimumCapacity {
-    if minimumCapacity * elementSize <= 128 {
+    if minimumCapacity &* elementSize <= 128 {
       return minimumCapacity
     }
     // When appending to a large array, grow exponentially.
