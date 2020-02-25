@@ -3283,10 +3283,6 @@ public:
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator,
                            bool bindPatternVarsOneWay);
 
-  /// Determines whether we can generate constraints for this statement
-  /// condition.
-  static bool canGenerateConstraints(StmtCondition condition);
-
   /// Generate constraints for a statement condition.
   ///
   /// \returns true if there was an error in constraint generation, false

@@ -4166,21 +4166,6 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
   return cg.getTypeForPattern(pattern, locator, Type(), bindPatternVarsOneWay);
 }
 
-bool ConstraintSystem::canGenerateConstraints(StmtCondition condition) {
-  for (const auto &element : condition) {
-    switch (element.getKind()) {
-    case StmtConditionElement::CK_Availability:
-    case StmtConditionElement::CK_Boolean:
-      continue;
-
-    case StmtConditionElement::CK_PatternBinding:
-      return false;
-    }
-  }
-
-  return true;
-}
-
 bool ConstraintSystem::generateConstraints(StmtCondition condition,
                                            DeclContext *dc) {
   // FIXME: This should be folded into constraint generation for conditions.
@@ -4213,8 +4198,21 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
       continue;
     }
 
-    case StmtConditionElement::CK_PatternBinding:
-      llvm_unreachable("unhandled statement condition");
+    case StmtConditionElement::CK_PatternBinding: {
+      auto *pattern = TypeChecker::resolvePattern(
+          condElement.getPattern(), dc, /*isStmtCondition*/true);
+      if (!pattern)
+        return true;
+
+      auto target = SolutionApplicationTarget::forInitialization(
+          condElement.getInitializer(), dc, Type(),
+          pattern, /*bindPatternVarsOneWay=*/true);
+      if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+        return true;
+
+      setStmtConditionTarget(&condElement, target);
+      continue;
+    }
     }
   }
 
