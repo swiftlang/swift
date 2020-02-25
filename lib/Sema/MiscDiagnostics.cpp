@@ -3782,8 +3782,15 @@ static void diagDeprecatedObjCSelectors(const DeclContext *dc,
   const_cast<Expr *>(expr)->walk(ObjCSelectorWalker(dc, selectorTy));
 }
 
-        
-        
+/// Skip over syntactic patterns that aren't typed patterns.
+static Pattern *skipNonTypeSyntacticPatterns(Pattern *pattern) {
+  if (auto *pp = dyn_cast<ParenPattern>(pattern))
+    return skipNonTypeSyntacticPatterns(pp->getSubPattern());
+  if (auto *vp = dyn_cast<VarPattern>(pattern))
+    return skipNonTypeSyntacticPatterns(vp->getSubPattern());
+  return pattern;
+}
+
 /// Diagnose things like this, where 'i' is an Int, not an Int?
 ///     if let x: Int = i {
 static void
@@ -3815,7 +3822,19 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
         .highlight(subExpr->getSourceRange());
       return;
     }
-    
+
+    // Check for 'if let' to produce a tuned diagnostic.
+    if (isa<OptionalSomePattern>(skipNonTypeSyntacticPatterns(p))) {
+      ctx.Diags.diagnose(
+          cond.getIntroducerLoc(),
+          p->isImplicit()
+            ? diag::condition_optional_element_pattern_not_valid_type
+            : diag::optional_element_pattern_not_valid_type,
+         subExpr->getType())
+            .highlight(subExpr->getSourceRange());
+      return;
+    }
+
     ctx.Diags.diagnose(cond.getIntroducerLoc(),
                        diag::optional_check_nonoptional,
                        subExpr->getType())
