@@ -417,6 +417,7 @@ ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionMap Subs,
   SILType SubstCalleeSILTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
   auto SubstCalleeTy = SubstCalleeSILTy.getAs<SILFunctionType>();
+  
   SILFunctionConventions Conv(SubstCalleeTy,
                               ModuleConventions.hasValue()
                                   ? ModuleConventions.getValue()
@@ -553,6 +554,7 @@ PartialApplyInst *PartialApplyInst::create(
     OnStackKind onStack) {
   SILType SubstCalleeTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
+
   SILType ClosureType = SILBuilder::getPartialApplyResultType(
       F.getTypeExpansionContext(), SubstCalleeTy, Args.size(), F.getModule(), {},
       CalleeConvention, onStack);
@@ -2309,6 +2311,14 @@ ConvertFunctionInst *ConvertFunctionInst::create(
            "Can not convert in between ABI incompatible function types");
   }
   return CFI;
+}
+
+bool ConvertFunctionInst::onlyConvertsSubstitutions() const {
+  auto fromType = getOperand()->getType().castTo<SILFunctionType>();
+  auto toType = getType().castTo<SILFunctionType>();
+  auto &M = getModule();
+  
+  return fromType->getUnsubstitutedType(M) == toType->getUnsubstitutedType(M);
 }
 
 ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(

@@ -18,8 +18,9 @@ func test0() {
 // CHECK-NEXT: reabstraction thunk
 // CHECK-NEXT: [[T3:%.*]] = function_ref [[THUNK:@.*]] :
 // CHECK-NEXT: [[T4:%.*]] = partial_apply [callee_guaranteed] [[T3]]([[CVT]])
-// CHECK-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[T4]]
-// CHECK: destroy_value [[T4]]
+// CHECK-NEXT: [[T5:%.*]] = convert_function [[T4]]
+// CHECK-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[T5]]
+// CHECK: destroy_value [[T5]]
 // CHECK-NEXT: destroy_value [[T2]]
 // CHECK:      [[T0:%.*]] = function_ref @$s10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: apply [[T0]]<Int>([[CVT]])
@@ -38,10 +39,11 @@ func test0() {
 // MANDATORY-NEXT: //{{.*}}reabstraction thunk
 // MANDATORY-NEXT: [[T3:%.*]] = function_ref [[THUNK:@.*]] :
 // MANDATORY-NEXT: [[T4:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[T3]]([[CVT]])
+// MANDATORY-NEXT: [[T5:%.*]] = convert_function [[T4]]
 // MANDATORY-NEXT: strong_release [[T2]]
 // MANDATORY-NEXT: // function_ref
 // MANDATORY-NEXT: [[T0:%.*]] = function_ref @$s10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
-// MANDATORY-NEXT: apply [[T0]]<Int>([[T4]])
+// MANDATORY-NEXT: apply [[T0]]<Int>([[T5]])
 // MANDATORY-NEXT: dealloc_stack [[T4]] : $@noescape @callee_guaranteed (@in_guaranteed Int) -> @out Optional<Int>
 // MANDATORY-NEXT: strong_release [[T2]]
 // MANDATORY-NEXT: tuple ()

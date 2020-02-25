@@ -548,9 +548,9 @@ OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
     return Map();
 
   auto ownershipKindRange = makeTransformRange(results,
-                                               [&](const SILResultInfo &info) {
-                                                 return info.getOwnershipKind(*f);
-                                               });
+     [&](const SILResultInfo &info) {
+       return info.getOwnershipKind(*f, f->getLoweredFunctionType());
+     });
 
   // Then merge all of our ownership kinds. If we fail to merge, return an empty
   // map so we fail on all operands.

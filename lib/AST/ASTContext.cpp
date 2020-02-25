@@ -101,14 +101,17 @@ using AssociativityCacheType =
 
 struct OverrideSignatureKey {
   GenericSignature baseMethodSig;
-  GenericSignature derivedClassSig;
-  Type superclassTy;
+  GenericSignature derivedMethodSig;
+  Type superclassTy, subclassTy;
 
   OverrideSignatureKey(GenericSignature baseMethodSignature,
-                       GenericSignature derivedClassSignature,
-                       Type superclassType)
-      : baseMethodSig(baseMethodSignature),
-        derivedClassSig(derivedClassSignature), superclassTy(superclassType) {}
+                       GenericSignature derivedMethodSignature,
+                       Type superclassType,
+                       Type subclassType)
+    : baseMethodSig(baseMethodSignature),
+      derivedMethodSig(derivedMethodSignature),
+      superclassTy(superclassType),
+      subclassTy(subclassType) {}
 };
 
 namespace llvm {
@@ -119,13 +122,15 @@ template <> struct DenseMapInfo<OverrideSignatureKey> {
   static bool isEqual(const OverrideSignatureKey lhs,
                       const OverrideSignatureKey rhs) {
     return lhs.baseMethodSig.getPointer() == rhs.baseMethodSig.getPointer() &&
-           lhs.derivedClassSig.getPointer() == rhs.derivedClassSig.getPointer() &&
-           lhs.superclassTy.getPointer() == rhs.superclassTy.getPointer();
+           lhs.derivedMethodSig.getPointer() == rhs.derivedMethodSig.getPointer() &&
+           lhs.superclassTy.getPointer() == rhs.superclassTy.getPointer() &&
+           lhs.subclassTy.getPointer() == rhs.subclassTy.getPointer();
   }
 
   static inline OverrideSignatureKey getEmptyKey() {
     return OverrideSignatureKey(DenseMapInfo<GenericSignature>::getEmptyKey(),
                                 DenseMapInfo<GenericSignature>::getEmptyKey(),
+                                DenseMapInfo<Type>::getEmptyKey(),
                                 DenseMapInfo<Type>::getEmptyKey());
   }
 
@@ -133,14 +138,16 @@ template <> struct DenseMapInfo<OverrideSignatureKey> {
     return OverrideSignatureKey(
         DenseMapInfo<GenericSignature>::getTombstoneKey(),
         DenseMapInfo<GenericSignature>::getTombstoneKey(),
+        DenseMapInfo<Type>::getTombstoneKey(),
         DenseMapInfo<Type>::getTombstoneKey());
   }
 
   static unsigned getHashValue(const OverrideSignatureKey &Val) {
     return hash_combine(
         DenseMapInfo<GenericSignature>::getHashValue(Val.baseMethodSig),
-        DenseMapInfo<GenericSignature>::getHashValue(Val.derivedClassSig),
-        DenseMapInfo<Type>::getHashValue(Val.superclassTy));
+        DenseMapInfo<GenericSignature>::getHashValue(Val.derivedMethodSig),
+        DenseMapInfo<Type>::getHashValue(Val.superclassTy),
+        DenseMapInfo<Type>::getHashValue(Val.subclassTy));
   }
 };
 } // namespace llvm
@@ -3563,7 +3570,9 @@ CanSILFunctionType SILFunctionType::get(
   assert(coroutineKind == SILCoroutineKind::None || normalResults.empty());
   assert(coroutineKind != SILCoroutineKind::None || yields.empty());
   assert(!ext.isPseudogeneric() || genericSig);
-
+  
+  substitutions = substitutions.getCanonical();
+  
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,
                            yields, normalResults, errorResult,
@@ -4679,8 +4688,9 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   unsigned derivedDepth = 0;
 
   auto key = OverrideSignatureKey(baseGenericCtx->getGenericSignature(),
-                                  derivedClass->getGenericSignature(),
-                                  derivedClass->getSuperclass());
+                                  derivedGenericCtx->getGenericSignature(),
+                                  derivedClass->getSuperclass(),
+                                  derivedClass->getDeclaredInterfaceType());
 
   if (getImpl().overrideSigCache.find(key) !=
       getImpl().overrideSigCache.end()) {

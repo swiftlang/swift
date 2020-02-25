@@ -51,7 +51,8 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 
   // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1]] :
   // CHECK:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]]<T>()
-  // CHECK:   destroy_value [[METHOD]]
+  // CHECK:   [[METHOD_CONV:%.*]] = convert_function [[METHOD]]
+  // CHECK:   destroy_value [[METHOD_CONV]]
   _ = T.runce
 
   // CHECK:   [[METATYPE:%.*]] = metatype $@thick T.Type

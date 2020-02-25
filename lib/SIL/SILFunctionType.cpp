@@ -87,7 +87,8 @@ CanSILFunctionType SILFunctionType::getUnsubstitutedType(SILModule &M) const {
                               getCalleeConvention(),
                               params, yields, results, errorResult,
                               SubstitutionMap(), false,
-                              mutableThis->getASTContext());
+                              mutableThis->getASTContext(),
+                              getWitnessMethodConformanceOrInvalid());
 }
 
 CanType SILParameterInfo::getArgumentType(SILModule &M,
@@ -748,26 +749,55 @@ public:
 class SubstFunctionTypeCollector {
 public:
   TypeConverter &TC;
+  TypeExpansionContext Expansion;
   bool Enabled;
   
   SmallVector<GenericTypeParamType *, 4> substGenericParams;
   SmallVector<Requirement, 4> substRequirements;
   SmallVector<Type, 4> substReplacements;
+  SmallVector<ProtocolConformanceRef, 4> substConformances;
   
-  SubstFunctionTypeCollector(TypeConverter &TC, bool enabled)
-    : TC(TC), Enabled(enabled) {
+  SubstFunctionTypeCollector(TypeConverter &TC, TypeExpansionContext context,
+                             bool enabled)
+    : TC(TC), Expansion(context), Enabled(enabled) {
     }
   SubstFunctionTypeCollector(const SubstFunctionTypeCollector &) = delete;
   
   // Add a substitution for a fresh type variable, with the given replacement
   // type and layout constraint.
   CanType addSubstitution(LayoutConstraint layout,
-                          CanType substType) {
+                          CanType substType,
+                          ArchetypeType *upperBound,
+                      ArrayRef<ProtocolConformanceRef> substTypeConformances) {
     auto paramIndex = substGenericParams.size();
     auto param = CanGenericTypeParamType::get(0, paramIndex, TC.Context);
     
+    // Expand the bound type according to the expansion context.
+    if (Expansion.shouldLookThroughOpaqueTypeArchetypes()
+        && substType->hasOpaqueArchetype()) {
+      substType = substOpaqueTypesWithUnderlyingTypes(substType, Expansion);
+    }
+    
     substGenericParams.push_back(param);
     substReplacements.push_back(substType);
+    
+    LayoutConstraint upperBoundLayout;
+    Type upperBoundSuperclass;
+    ArrayRef<ProtocolDecl*> upperBoundConformances;
+    
+    // If the parameter is in a position with upper bound constraints, such
+    // as a generic nominal type with type constraints on its arguments, then
+    // preserve the constraints from that upper bound.
+    if (upperBound) {
+      upperBoundSuperclass = upperBound->getSuperclass();
+      upperBoundConformances = upperBound->getConformsTo();
+      upperBoundLayout = upperBound->getLayoutConstraint();
+    }
+    
+    if (upperBoundSuperclass) {
+      substRequirements.push_back(
+       Requirement(RequirementKind::Superclass, param, upperBoundSuperclass));
+    }
     
     // Preserve the layout constraint, if any, on the archetype in the
     // generic signature, generalizing away some constraints that
@@ -806,9 +836,26 @@ public:
         break;
       }
       
-      if (layout)
+      if (layout) {
+        // Pick the more specific of the upper bound layout and the layout
+        // we chose above.
+        if (upperBoundLayout) {
+          layout = layout.merge(upperBoundLayout);
+        }
+        
         substRequirements.push_back(
                       Requirement(RequirementKind::Layout, param, layout));
+      }
+    } else {
+      (void)0;
+    }
+    
+    for (unsigned i : indices(upperBoundConformances)) {
+      auto proto = upperBoundConformances[i];
+      auto conformance = substTypeConformances[i];
+      substRequirements.push_back(Requirement(RequirementKind::Conformance,
+                                              param, proto->getDeclaredType()));
+      substConformances.push_back(conformance);
     }
     
     return param;
@@ -828,10 +875,44 @@ public:
 
     // The entire original context could be a generic parameter.
     if (origType.isTypeParameter()) {
-      return addSubstitution(origType.getLayoutConstraint(), substType);
+      return addSubstitution(origType.getLayoutConstraint(), substType,
+                             nullptr, {});
     }
     
     auto origContextType = origType.getType();
+    
+    // TODO: If the substituted type is a subclass of the abstraction pattern
+    // type, then bail out. This should only come up when lowering override
+    // types for vtable entries, where we don't currently use substituted
+    // function types.
+    
+    auto areDifferentClasses = [](Type a, Type b) -> bool {
+      if (auto dynA = a->getAs<DynamicSelfType>()) {
+        a = dynA->getSelfType();
+      }
+      if (auto dynB = b->getAs<DynamicSelfType>()) {
+        b = dynB->getSelfType();
+      }
+      if (auto aClass = a->getClassOrBoundGenericClass()) {
+        if (auto bClass = b->getClassOrBoundGenericClass()) {
+          return aClass != bClass;
+        }
+      }
+      
+      return false;
+    };
+    
+    if (areDifferentClasses(substType, origContextType)) {
+      return substType;
+    }
+    if (auto substMeta = dyn_cast<MetatypeType>(substType)) {
+      if (auto origMeta = dyn_cast<MetatypeType>(origContextType)) {
+        if (areDifferentClasses(substMeta->getInstanceType(),
+                                origMeta->getInstanceType())) {
+          return substType;
+        }
+      }
+    }
     
     if (!origContextType->hasTypeParameter()
         && !origContextType->hasArchetype()) {
@@ -841,18 +922,32 @@ public:
              && !substType->hasArchetype());
       return substType;
     }
-
+    
     // Extract structural substitutions.
     if (origContextType->hasTypeParameter())
       origContextType = origType.getGenericSignature()->getGenericEnvironment()
         ->mapTypeIntoContext(origContextType)
         ->getCanonicalType(origType.getGenericSignature());
-    return origContextType
+
+    auto result = origContextType
       ->substituteBindingsTo(substType,
-        [&](ArchetypeType *archetype, CanType binding) -> CanType {
-          return addSubstitution(archetype->getLayoutConstraint(),
-                                 binding);
+        [&](ArchetypeType *archetype,
+            CanType binding,
+            ArchetypeType *upperBound,
+            ArrayRef<ProtocolConformanceRef> bindingConformances) -> CanType {
+          // TODO: ArchetypeType::getLayoutConstraint sometimes misses out on
+          // implied layout constraints. For now AnyObject is the only one we
+          // care about.
+          return addSubstitution(archetype->requiresClass()
+                                   ? LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Class)
+                                   : LayoutConstraint(),
+                                 binding,
+                                 upperBound,
+                                 bindingConformances);
         });
+    
+    assert(result && "substType was not bindable to abstraction pattern type?");
+    return result;
   }
 };
 
@@ -1586,12 +1681,21 @@ static CanSILFunctionType getSILFunctionType(
                                         substFormalResultType);
   }
 
+  
   SubstFunctionTypeCollector subst(TC,
+    expansionContext,
     TC.Context.LangOpts.EnableSubstSILFunctionTypesForFunctionValues
     // We don't currently use substituted function types for generic function
     // type lowering, though we should for generic methods on classes and
     // protocols.
-    && !genericSig);
+    && !genericSig
+    // We only currently use substituted function types for function values,
+    // which will have standard thin or thick representation. (Per the previous
+    // comment, it would be useful to do so for generic methods on classes and
+    // protocols too.)
+    && (extInfo.getSILRepresentation() == SILFunctionTypeRepresentation::Thick
+        || extInfo.getSILRepresentation() == SILFunctionTypeRepresentation::Thin
+        ));
 
   // Destructure the input tuple type.
   SmallVector<SILParameterInfo, 8> inputs;
@@ -1651,8 +1755,8 @@ static CanSILFunctionType getSILFunctionType(
                                          subst.substRequirements)
                        .getCanonicalSignature();
       substitutions = SubstitutionMap::get(genericSig,
-                                           subst.substReplacements,
-                                           ArrayRef<ProtocolConformanceRef>());
+                                   llvm::makeArrayRef(subst.substReplacements),
+                                   llvm::makeArrayRef(subst.substConformances));
       impliedSignature = true;
     }
   }
@@ -2766,6 +2870,8 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
              loweredInterfaceType.print(llvm::dbgs());
              llvm::dbgs() << "\n  SIL type: ";
              silFnType.print(llvm::dbgs());
+             llvm::dbgs() << "\n  Expansion context: "
+                           << expansion.shouldLookThroughOpaqueTypeArchetypes();
              llvm::dbgs() << "\n");
 
   auto resultBuf = Context.Allocate(sizeof(SILConstantInfo),
@@ -3022,27 +3128,44 @@ public:
   // SIL type lowering only does special things to tuples and functions.
 
   // When a function appears inside of another type, we only perform
-  // substitutions if it does not have a generic signature.
+  // substitutions if it is not polymorphic.
   CanSILFunctionType visitSILFunctionType(CanSILFunctionType origType) {
-    if (origType->getSubstGenericSignature()) {
-      if (auto subs = origType->getSubstitutions()) {
-        // Substitute the substitutions.
-        auto newSubs = subs.subst(Subst, Conformances);
-        return origType->withSubstitutions(newSubs);
-      }
-      
+    if (origType->isPolymorphic())
       return origType;
-    }
-
+    
     return substSILFunctionType(origType);
   }
 
   // Entry point for use by SILType::substGenericArgs().
   CanSILFunctionType substSILFunctionType(CanSILFunctionType origType) {
-    // TODO: Maybe this can be retired once substituted function types are
-    // used pervasively.
-    assert(!origType->getSubstitutions());
-    
+    if (auto subs = origType->getSubstitutions()) {
+      // Substitute the substitutions.
+      SubstOptions options = None;
+      if (shouldSubstituteOpaqueArchetypes)
+        options |= SubstFlags::SubstituteOpaqueArchetypes;
+      
+      // Expand substituted type according to the expansion context.
+      auto newSubs = subs.subst(Subst, Conformances, options);
+      
+      // If we need to look through opaque types in this context, re-substitute
+      // according to the expansion context.
+      if (typeExpansionContext.shouldLookThroughOpaqueTypeArchetypes()) {
+        newSubs = newSubs.subst([&](SubstitutableType *s) -> Type {
+          return substOpaqueTypesWithUnderlyingTypes(s->getCanonicalType(),
+                                                     typeExpansionContext);
+        }, [&](CanType dependentType,
+               Type conformingReplacementType,
+               ProtocolDecl *conformedProtocol) -> ProtocolConformanceRef {
+          return substOpaqueTypesWithUnderlyingTypes(
+                 ProtocolConformanceRef(conformedProtocol),
+                 conformingReplacementType->getCanonicalType(),
+                 typeExpansionContext);
+        }, SubstFlags::SubstituteOpaqueArchetypes);
+      }
+      
+      return origType->withSubstitutions(newSubs);
+    }
+
     SmallVector<SILResultInfo, 8> substResults;
     substResults.reserve(origType->getNumResults());
     for (auto origResult : origType->getResults()) {
@@ -3070,6 +3193,17 @@ public:
     if (auto conformance = origType->getWitnessMethodConformanceOrInvalid()) {
       assert(origType->getExtInfo().hasSelfParam());
       auto selfType = origType->getSelfParameter().getInterfaceType();
+      
+      // Apply substitutions using ourselves, because we're inside the
+      // implementation of SILType::subst here.
+      if (origType->getSubstitutions()) {
+        llvm::SaveAndRestore<TypeSubstitutionFn> OldSubst(Subst,
+                            QuerySubstitutionMap{origType->getSubstitutions()});
+        llvm::SaveAndRestore<LookupConformanceFn> OldConformances(Conformances,
+              LookUpConformanceInSubstitutionMap(origType->getSubstitutions()));
+        selfType = visit(selfType);
+      }
+      
       // The Self type can be nested in a few layers of metatypes (etc.).
       while (auto metatypeType = dyn_cast<MetatypeType>(selfType)) {
         auto next = metatypeType.getInstanceType();
@@ -3077,6 +3211,7 @@ public:
           break;
         selfType = next;
       }
+      
       witnessMethodConformance =
           conformance.subst(selfType, Subst, Conformances);
 
@@ -3107,7 +3242,8 @@ public:
                                 origType->getCoroutineKind(),
                                 origType->getCalleeConvention(), substParams,
                                 substYields, substResults, substErrorResult,
-                                SubstitutionMap(), false,
+                                origType->getSubstitutions(),
+                                origType->isGenericSignatureImplied(),
                                 TC.Context, witnessMethodConformance);
   }
 

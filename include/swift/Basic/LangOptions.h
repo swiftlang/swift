@@ -194,7 +194,7 @@ namespace swift {
     bool BuildRequestDependencyGraph = false;
 
     /// Enable SIL type lowering
-    bool EnableSubstSILFunctionTypesForFunctionValues = false;
+    bool EnableSubstSILFunctionTypesForFunctionValues = true;
 
     /// Whether to diagnose an ephemeral to non-ephemeral conversion as an
     /// error.

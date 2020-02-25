@@ -337,17 +337,19 @@ func convFuncExistential(_ f1: @escaping (Any) -> (Int) -> Int) {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sypS2iIegyd_Iegno_S2iIegyd_ypIeggr_TR : $@convention(thin) (@guaranteed @callee_guaranteed (Int) -> Int, @guaranteed @callee_guaranteed (@in_guaranteed Any) -> @owned @callee_guaranteed (Int) -> Int) -> @out Any {
-// CHECK:         alloc_stack $Any
+// CHECK:         [[EXISTENTIAL:%.*]] = alloc_stack $Any
 // CHECK:         [[COPIED_VAL:%.*]] = copy_value
 // CHECK:         function_ref @$sS2iIegyd_S2iIegnr_TR
-// CHECK-NEXT:    partial_apply [callee_guaranteed] {{%.*}}([[COPIED_VAL]])
-// CHECK-NEXT:    init_existential_addr %3 : $*Any, $(Int) -> Int
-// CHECK-NEXT:    store
+// CHECK-NEXT:    [[PA:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[COPIED_VAL]])
+// CHECK-NEXT:    [[CF:%.*]] = convert_function [[PA]]
+// CHECK-NEXT:    init_existential_addr [[EXISTENTIAL]] : $*Any, $(Int) -> Int
+// CHECK-NEXT:    store [[CF]]
 // CHECK-NEXT:    apply
 // CHECK:         function_ref @$sS2iIegyd_S2iIegnr_TR
 // CHECK-NEXT:    partial_apply
+// CHECK-NEXT:    convert_function
 // CHECK-NEXT:    init_existential_addr %0 : $*Any, $(Int) -> Int
-// CHECK-NEXT:    store {{.*}} to {{.*}} : $*@callee_guaranteed (@in_guaranteed Int) -> @out Int
+// CHECK-NEXT:    store {{.*}} to {{.*}} : $*@callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, Int>
 // CHECK:         return
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sS2iIegyd_S2iIegnr_TR : $@convention(thin) (@in_guaranteed Int, @guaranteed @callee_guaranteed (Int) -> Int) -> @out Int
@@ -438,12 +440,14 @@ func convTupleToOptionalDirect(_ f: @escaping (Int) -> (Int, Int)) -> (Int) -> (
   return f
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s19function_conversion27convTupleToOptionalIndirectyx_xtSgxcx_xtxclF : $@convention(thin) <T> (@guaranteed @callee_guaranteed (@in_guaranteed T) -> (@out T, @out T)) -> @owned @callee_guaranteed (@in_guaranteed T) -> @out Optional<(T, T)>
-// CHECK:       bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed T) -> (@out T, @out T)):
+// CHECK-LABEL: sil hidden [ossa] @$s19function_conversion27convTupleToOptionalIndirectyx_xtSgxcx_xtxclF : $@convention(thin) <T> (@guaranteed @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2> in (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <T, T, T>) -> @owned @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2> in (@in_guaranteed τ_0_0) -> @out Optional<(τ_0_1, τ_0_2)> for <T, T, T>
+// CHECK:       bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed <τ_0_0, τ_0_1, τ_0_2> in (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <T, T, T>):
 // CHECK:          [[FN:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT:     [[FN_CONV:%.*]] = convert_function [[FN]]
 // CHECK:          [[THUNK_FN:%.*]] = function_ref @$sxxxIegnrr_xx_xtSgIegnr_lTR
-// CHECK-NEXT:     [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<T>([[FN]])
-// CHECK-NEXT:     return [[THUNK]]
+// CHECK-NEXT:     [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<T>([[FN_CONV]])
+// CHECK-NEXT:     [[THUNK_CONV:%.*]] = convert_function [[THUNK]]
+// CHECK-NEXT:     return [[THUNK_CONV]]
 // CHECK-NEXT: } // end sil function '$s19function_conversion27convTupleToOptionalIndirectyx_xtSgxcx_xtxclF'
 
 // CHECK:       sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sxxxIegnrr_xx_xtSgIegnr_lTR : $@convention(thin) <T> (@in_guaranteed T, @guaranteed @callee_guaranteed (@in_guaranteed T) -> (@out T, @out T)) -> @out Optional<(T, T)>
@@ -671,4 +675,15 @@ struct FunctionConversionParameterSubstToOrigReabstractionTest {
 func dontCrash() {
   let userInfo = ["hello": "world"]
   let d = [AnyHashable: Any](uniqueKeysWithValues: userInfo.map { ($0.key, $0.value) })
+}
+
+struct Butt<T> {
+  var foo: () throws -> T
+}
+
+@_silgen_name("butt")
+func butt() -> Butt<Any>
+
+func foo() throws -> Any {
+  return try butt().foo()
 }

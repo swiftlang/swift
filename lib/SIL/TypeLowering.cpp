@@ -2740,6 +2740,10 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   bool DifferentFunctionTypesHaveDifferentRepresentation
     = Context.LangOpts.EnableSubstSILFunctionTypesForFunctionValues;
   
+  // TODO: For C language types we should consider the attached Clang types.
+  if (fnTy1->getLanguage() == SILFunctionLanguage::C)
+    DifferentFunctionTypesHaveDifferentRepresentation = false;
+  
   // Fast path -- if both functions were unwrapped from a CanSILFunctionType,
   // we might have pointer equality here.
   if (fnTy1 == fnTy2)

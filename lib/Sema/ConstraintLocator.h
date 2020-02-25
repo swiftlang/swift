@@ -68,6 +68,7 @@ public:
     case GenericParameter:
     case ProtocolRequirement:
     case Witness:
+    case PatternMatch:
       return 0;
 
     case ContextualType:
@@ -119,6 +120,7 @@ public:
       StoredWitness,
       StoredGenericSignature,
       StoredKeyPathDynamicMemberBase,
+      StoredPattern,
       StoredKindAndValue
     };
 
@@ -238,6 +240,9 @@ public:
 
       case StoredKeyPathDynamicMemberBase:
         return PathElementKind::KeyPathDynamicMember;
+
+      case StoredPattern:
+        return PathElementKind::PatternMatch;
 
       case StoredKindAndValue:
         return decodeStorage(storage).first;
@@ -800,6 +805,18 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::TernaryBranch;
+  }
+};
+
+class LocatorPathElt::PatternMatch final : public LocatorPathElt {
+public:
+  PatternMatch(Pattern *pattern)
+      : LocatorPathElt(LocatorPathElt::StoredPattern, pattern) {}
+
+  Pattern *getPattern() const { return getStoredPointer<Pattern>(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::PatternMatch;
   }
 };
 

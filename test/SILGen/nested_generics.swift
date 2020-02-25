@@ -48,7 +48,7 @@ struct Lunch<T : Pizza> where T.Topping : CuredMeat {
 // CHECK-LABEL: sil private [ossa] @$s15nested_generics5LunchV6DinnerV15coolCombination1t1uy7ToppingQz_AA4DeliC7MustardOyAA6PepperV_GtF0A7GenericL_1x1yqd0___qd0_0_tqd0___qd0_0_tAA5PizzaRzAA6HotDogRd__AA9CuredMeatAJRQAQ9CondimentRtd__r__0_lF : $@convention(thin) <T where T : Pizza, T.Topping : CuredMeat><U where U : HotDog, U.Condiment == Deli<Pepper>.Mustard><X, Y> (@in_guaranteed X, @in_guaranteed Y) -> (@out X, @out Y)
 
 // CHECK-LABEL: // nested_generics.Lunch.Dinner.init(firstCourse: A, secondCourse: Swift.Optional<A1>, leftovers: A, transformation: (A) -> A1) -> nested_generics.Lunch<A>.Dinner<A1>
-// CHECK-LABEL: sil hidden [ossa] @$s15nested_generics5LunchV6DinnerV11firstCourse06secondF09leftovers14transformationAEyx_qd__Gx_qd__Sgxqd__xctcfC : $@convention(method) <T where T : Pizza, T.Topping : CuredMeat><U where U : HotDog, U.Condiment == Deli<Pepper>.Mustard> (@owned T, @in Optional<U>, @owned T, @owned @callee_guaranteed (@guaranteed T) -> @out U, @thin Lunch<T>.Dinner<U>.Type) -> @out Lunch<T>.Dinner<U>
+// CHECK-LABEL: sil hidden [ossa] @$s15nested_generics5LunchV6DinnerV11firstCourse06secondF09leftovers14transformationAEyx_qd__Gx_qd__Sgxqd__xctcfC : $@convention(method) <T where T : Pizza, T.Topping : CuredMeat><U where U : HotDog, U.Condiment == Deli<Pepper>.Mustard> (@owned T, @in Optional<U>, @owned T, @owned @callee_guaranteed <τ_0_0, τ_0_1 where τ_0_0 : _RefCountedObject> in (@guaranteed τ_0_0) -> @out τ_0_1 for <T, U>, @thin Lunch<T>.Dinner<U>.Type) -> @out Lunch<T>.Dinner<U>
 
 // Non-generic nested inside generic
 

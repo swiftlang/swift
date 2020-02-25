@@ -96,9 +96,9 @@ bb0(%t : $*T):
 sil [ossa] @generic_caller3 : $@convention(thin) <A, B, C> () -> @owned @callee_guaranteed () -> () {
 bb0:
   %f = function_ref @generic_callee3 : $@convention(thin) <T, U> (@in_guaranteed T) -> ()
-  %t = alloc_stack $Optional<@callee_guaranteed (@in_guaranteed A) -> @out B>
+  %t = alloc_stack $Optional<@callee_guaranteed <X, Y> in (@in_guaranteed X) -> @out Y for <A, B>>
   %c = partial_apply [callee_guaranteed] %f<Optional<(A) -> B>, (B, (C) -> Int)>(%t) : $@convention(thin) <T, U> (@in_guaranteed T) -> ()
-  dealloc_stack %t : $*Optional<@callee_guaranteed (@in_guaranteed A) -> @out B>
+  dealloc_stack %t : $*Optional<@callee_guaranteed <X, Y> in (@in_guaranteed X) -> @out Y for <A, B>>
   return %c : $@callee_guaranteed () -> ()
 }
 

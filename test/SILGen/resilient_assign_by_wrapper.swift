@@ -62,10 +62,9 @@ extension ReabstractedSetter where T == Int {
     // CHECK: [[TH_F:%.*]] = thin_to_thick_function [[F]] : $@convention(thin) (Int) -> () to $@callee_guaranteed (Int) -> ()
     // CHECK: [[THUNK_REF:%.*]] = function_ref @$sSiIegy_SiIegn_TR : $@convention(thin) (@in_guaranteed Int, @guaranteed @callee_guaranteed (Int) -> ()) -> ()
     // CHECK: [[CF:%.*]] = partial_apply [callee_guaranteed] [[THUNK_REF]]([[TH_F]]) : $@convention(thin) (@in_guaranteed Int, @guaranteed @callee_guaranteed (Int) -> ()) -> ()
-    // CHECK: assign_by_wrapper [[CF]] : $@callee_guaranteed (@in_guaranteed Int) -> ()
+    // CHECK: [[CF2:%.*]] = convert_function [[CF]]
+    // CHECK: assign_by_wrapper [[CF2]]
     // CHECK-SAME: to {{%.*}} : $*WrapGod<(Int) -> ()>
-    // CHECK-SAME: init {{%.*}} : $@callee_guaranteed (@owned @callee_guaranteed (@in_guaranteed Int) -> ()) -> @out WrapGod<(Int) -> ()>
-    // CHECK-SAME: set {{%.*}} : $@callee_guaranteed (@owned @callee_guaranteed (@in_guaranteed Int) -> ()) -> ()
     self.value = { x in }
   }
 }

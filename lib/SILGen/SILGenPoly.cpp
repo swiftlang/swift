@@ -362,7 +362,7 @@ ManagedValue Transform::transform(ManagedValue v,
   const TypeLowering &expectedTL = SGF.getTypeLowering(outputOrigType,
                                                        outputSubstType);
   auto loweredResultTy = expectedTL.getLoweredType();
-
+  
   // Nothing to convert
   if (v.getType() == loweredResultTy)
     return v;
@@ -463,7 +463,7 @@ ManagedValue Transform::transform(ManagedValue v,
     inputSubstType = inputSelfType.getSelfType();
   }
 
-  //  - upcasts for classes
+  //  - casts for classes
   if (outputSubstType->getClassOrBoundGenericClass() &&
       inputSubstType->getClassOrBoundGenericClass()) {
     auto class1 = inputSubstType->getClassOrBoundGenericClass();
@@ -1443,7 +1443,7 @@ namespace {
         Outputs.push_back(input);
         return;
       }
-
+      
       switch (result.getConvention()) {
       // Direct translation is relatively easy.
       case ParameterConvention::Direct_Owned:
@@ -1587,6 +1587,48 @@ namespace {
   };
 } // end anonymous namespace
 
+/// Apply trivial conversions to a value to handle differences between the inner
+/// and outer types of a function conversion thunk.
+static ManagedValue applyTrivialConversions(SILGenFunction &SGF,
+                                            SILLocation loc,
+                                            ManagedValue innerValue,
+                                            SILType outerType) {
+  auto innerASTTy = innerValue.getType().getASTType();
+  auto outerASTTy = outerType.getASTType();
+
+  if (innerASTTy == outerASTTy) {
+    return innerValue;
+  }
+  if (innerASTTy->getClassOrBoundGenericClass()
+      && outerASTTy->getClassOrBoundGenericClass()) {
+    if (outerASTTy->isExactSuperclassOf(innerASTTy)) {
+      return SGF.B.createUpcast(loc, innerValue, outerType);
+    } else if (innerASTTy->isExactSuperclassOf(outerASTTy)) {
+      return SGF.B.createUncheckedRefCast(loc, innerValue, outerType);
+    }
+  } else if (auto innerFnTy = dyn_cast<SILFunctionType>(innerASTTy)) {
+    if (auto outerFnTy = dyn_cast<SILFunctionType>(outerASTTy)) {
+      auto abiDiffA =
+        SGF.SGM.Types.checkFunctionForABIDifferences(SGF.SGM.M,
+                                                     innerFnTy,
+                                                     outerFnTy);
+      auto abiDiffB =
+        SGF.SGM.Types.checkFunctionForABIDifferences(SGF.SGM.M,
+                                                     outerFnTy,
+                                                     innerFnTy);
+      
+      if (abiDiffA == TypeConverter::ABIDifference::CompatibleRepresentation
+        || abiDiffA == TypeConverter::ABIDifference::CompatibleCallingConvention
+        || abiDiffB == TypeConverter::ABIDifference::CompatibleRepresentation
+        || abiDiffB == TypeConverter::ABIDifference::CompatibleCallingConvention) {
+        return SGF.B.createConvertFunction(loc, innerValue, outerType);
+      }
+    }
+  }
+
+  llvm_unreachable("unhandled reabstraction type mismatch");
+}
+
 /// Forward arguments according to a function type's ownership conventions.
 static void forwardFunctionArguments(SILGenFunction &SGF,
                                      SILLocation loc,
@@ -1595,8 +1637,13 @@ static void forwardFunctionArguments(SILGenFunction &SGF,
                                      SmallVectorImpl<SILValue> &forwardedArgs) {
   auto argTypes = fTy->getParameters();
   for (auto index : indices(managedArgs)) {
-    auto &arg = managedArgs[index];
+    auto arg = managedArgs[index];
     auto argTy = argTypes[index];
+    auto argSubstTy = argTy.getArgumentType(SGF.SGM.M, fTy);
+    
+    arg = applyTrivialConversions(SGF, loc, arg,
+                                  SILType::getPrimitiveObjectType(argSubstTy));
+
     if (argTy.isConsumed()) {
       forwardedArgs.push_back(arg.ensurePlusOne(SGF, loc).forward(SGF));
       continue;
@@ -1620,7 +1667,7 @@ namespace {
   public:
     YieldInfo(SILGenModule &SGM, SILDeclRef function,
               CanSILFunctionType loweredType, SubstitutionMap subs) {
-      LoweredInfos = loweredType->getYields();
+      LoweredInfos = loweredType->getUnsubstitutedType(SGM.M)->getYields();
 
       auto accessor = cast<AccessorDecl>(function.getDecl());
       auto storage = accessor->getStorage();
@@ -1852,7 +1899,8 @@ public:
         SILFunctionConventions(innerFnType, SGF.SGM.M)
             .getNumIndirectSILResults());
 
-    PlanData data = {outerFnType->getResults(), innerFnType->getResults(),
+    PlanData data = {outerFnType->getUnsubstitutedType(SGF.SGM.M)->getResults(),
+                     innerFnType->getUnsubstitutedType(SGF.SGM.M)->getResults(),
                      innerIndirectResultAddrs, 0};
 
     // Recursively walk the result types.
@@ -2701,8 +2749,8 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
   // A helper function to add an outer direct result.
   auto addOuterDirectResult = [&](ManagedValue resultValue,
                                   SILResultInfo result) {
-    assert(resultValue.getType() ==
-           SGF.getSILTypeInContext(result, CanSILFunctionType()));
+    resultValue = applyTrivialConversions(SGF, Loc, resultValue,
+                        SGF.getSILTypeInContext(result, CanSILFunctionType()));
     outerDirectResults.push_back(resultValue.forward(SGF));
   };
 
@@ -3906,17 +3954,20 @@ ManagedValue
 SILGenFunction::createWithoutActuallyEscapingClosure(
     SILLocation loc, ManagedValue noEscapingFunctionValue, SILType escapingTy) {
 
-  auto escapingFnTy = escapingTy.castTo<SILFunctionType>();
+  auto escapingFnSubstTy = escapingTy.castTo<SILFunctionType>();
+  auto noEscapingFnSubstTy = noEscapingFunctionValue.getType()
+    .castTo<SILFunctionType>();
   // TODO: maybe this should use a more explicit instruction.
-  assert(escapingFnTy->getExtInfo() == noEscapingFunctionValue.getType()
-                                           .castTo<SILFunctionType>()
-                                           ->getExtInfo()
-                                           .withNoEscape(false));
+  assert(escapingFnSubstTy->getExtInfo() == noEscapingFnSubstTy->getExtInfo()
+                                                         .withNoEscape(false));
+
+  // Apply function type substitutions, since the code sequence for a thunk
+  // doesn't vary with function representation.
+  auto escapingFnTy = escapingFnSubstTy->getUnsubstitutedType(SGM.M);
+  auto noEscapingFnTy = noEscapingFnSubstTy->getUnsubstitutedType(SGM.M);
 
   SubstitutionMap interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
-  auto noEscapingFnTy =
-      noEscapingFunctionValue.getType().castTo<SILFunctionType>();
 
   CanType dynamicSelfType;
   auto thunkType = buildWithoutActuallyEscapingThunkType(
@@ -3938,11 +3989,22 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   // Create a copy for the noescape value, so we can mark_dependence upon the
   // original value.
   auto noEscapeValue = noEscapingFunctionValue.copy(*this, loc);
+  // Convert away function type substitutions.
+  if (noEscapingFnTy != noEscapingFnSubstTy) {
+    noEscapeValue = B.createConvertFunction(loc, noEscapeValue,
+                              SILType::getPrimitiveObjectType(noEscapingFnTy));
+  }
 
   auto thunkedFn =
     createPartialApplyOfThunk(*this, loc, thunk, interfaceSubs, dynamicSelfType,
                               escapingFnTy, noEscapeValue);
 
+  // Convert to the substituted escaping type.
+  if (escapingFnTy != escapingFnSubstTy) {
+    thunkedFn = B.createConvertFunction(loc, thunkedFn,
+                            SILType::getPrimitiveObjectType(escapingFnSubstTy));
+  }
+  
   // We need to ensure the 'lifetime' of the trivial values context captures. As
   // long as we represent these captures by the same value the following works.
   thunkedFn = emitManagedRValueWithCleanup(
@@ -4000,7 +4062,7 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   // escaping->noescape conversion.
   if (fnType != newFnType) {
     SILType resTy = SILType::getPrimitiveObjectType(newFnType);
-    fn = SGF.B.createConvertFunction(Loc, fn, resTy);
+    fn = SGF.B.createConvertFunction(Loc, fn.ensurePlusOne(SGF, Loc), resTy);
   }
 
   // Now do thin-to-thick if necessary.
@@ -4488,9 +4550,11 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   auto origWitnessFTy = getWitnessFunctionType(getTypeExpansionContext(), SGM,
                                                witness, witnessKind);
   auto witnessFTy = origWitnessFTy;
-  if (!witnessSubs.empty())
+  if (!witnessSubs.empty()) {
     witnessFTy = origWitnessFTy->substGenericArgs(SGM.M, witnessSubs,
                                                   getTypeExpansionContext());
+  }
+  auto witnessUnsubstTy = witnessFTy->getUnsubstitutedType(SGM.M);
 
   auto reqtSubstParams = reqtSubstTy.getParams();
   auto witnessSubstParams = witnessSubstTy.getParams();
@@ -4500,8 +4564,8 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
     assert(!isFree && "shouldn't have a free witness for a self-conformance");
     origParams.back() =
       emitOpenExistentialInSelfConformance(*this, loc, witness, witnessSubs,
-                                           origParams.back(),
-                                           witnessFTy->getSelfParameter());
+                                         origParams.back(),
+                                         witnessUnsubstTy->getSelfParameter());
   }
 
   // For a free function witness, discard the 'self' parameter of the
@@ -4517,7 +4581,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   AbstractionPattern witnessOrigTy(witnessInfo.LoweredType);
   TranslateArguments(*this, loc,
                      origParams, witnessParams,
-                     witnessFTy->getParameters())
+                     witnessUnsubstTy->getParameters())
     .translate(reqtOrigTy,
                reqtSubstParams,
                witnessOrigTy,

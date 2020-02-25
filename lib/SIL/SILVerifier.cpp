@@ -3995,7 +3995,8 @@ public:
 
   void checkYieldInst(YieldInst *YI) {
     CanSILFunctionType fnType =
-        F.getLoweredFunctionTypeInContext(F.getTypeExpansionContext());
+        F.getLoweredFunctionTypeInContext(F.getTypeExpansionContext())
+         ->getUnsubstitutedType(F.getModule());
     require(fnType->isCoroutine(),
             "yield in non-coroutine function");
 

@@ -84,16 +84,35 @@ SILType SILBuilder::getPartialApplyResultType(
       result = SILResultInfo(result.getReturnValueType(M, FTI),
                              ResultConvention::Owned);
   }
+  
+  // Do we still need the substitutions in the result?
+  bool needsSubstFunctionType = false;
+  for (auto param : newParams) {
+    needsSubstFunctionType |= param.getInterfaceType()->hasTypeParameter();
+  }
+  for (auto result : results) {
+    needsSubstFunctionType |= result.getInterfaceType()->hasTypeParameter();
+  }
+  for (auto yield : FTI->getYields()) {
+    needsSubstFunctionType |= yield.getInterfaceType()->hasTypeParameter();
+  }
 
-  auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
+  auto appliedFnType = SILFunctionType::get(needsSubstFunctionType
+                                              ? FTI->getSubstGenericSignature()
+                                              : nullptr,
+                                            extInfo,
                                             FTI->getCoroutineKind(),
                                             calleeConvention,
                                             newParams,
                                             FTI->getYields(),
                                             results,
                                             FTI->getOptionalErrorResult(),
-                                            SubstitutionMap(),
-                                            false,
+                                            needsSubstFunctionType
+                                              ? FTI->getSubstitutions()
+                                              : SubstitutionMap(),
+                                            needsSubstFunctionType
+                                              ? FTI->isGenericSignatureImplied()
+                                              : false,
                                             M.getASTContext());
 
   return SILType::getPrimitiveObjectType(appliedFnType);
