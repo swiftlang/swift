@@ -732,9 +732,12 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     SILFunction *mainFunction =
         SGM.getFunction(mainFunctionDeclRef, NotForDefinition);
 
+    NominalTypeDecl *mainType = cast<NominalTypeDecl>(mainFunc->getDeclContext());
+    auto metatype = B.createMetatype(mainType, getLoweredType(mainType->getInterfaceType()));
+
     auto mainFunctionRef = B.createFunctionRef(mainFunc, mainFunction);
 
-    B.createApply(mainFunc, mainFunctionRef, SubstitutionMap(), {});
+    B.createApply(mainFunc, mainFunctionRef, SubstitutionMap(), {metatype});
 
     SILValue returnValue = B.createIntegerLiteral(
         mainFunc, SILType::getBuiltinIntegerType(32, getASTContext()), 0);
