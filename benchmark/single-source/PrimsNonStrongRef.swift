@@ -628,11 +628,16 @@ protocol ValueBox : Hashable {
   init(_ inputValue: ValueType)
   var value: ValueType { get }
 
+  func withValue<Result>(_ f: (ValueType) throws -> Result) rethrows -> Result
   func free()
 }
 
 extension ValueBox {
   func free() {}
+  @_transparent
+  func withValue<Result>(_ f: (ValueType) throws -> Result) rethrows -> Result {
+    return try f(value)
+  }
 }
 
 protocol GraphNode {
