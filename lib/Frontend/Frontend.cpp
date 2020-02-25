@@ -433,7 +433,9 @@ bool CompilerInstance::setUpModuleLoaders() {
     auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
-        FEOpts.RemarkOnRebuildFromModuleInterface, IgnoreSourceInfoFile);
+        FEOpts.RemarkOnRebuildFromModuleInterface,
+        IgnoreSourceInfoFile,
+        FEOpts.DisableInterfaceFileLock);
     Context->addModuleLoader(std::move(PIML));
   }
 

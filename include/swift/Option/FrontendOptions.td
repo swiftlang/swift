@@ -681,4 +681,6 @@ def enable_type_layouts : Flag<["-"], "enable-type-layout">,
 def disable_type_layouts : Flag<["-"], "disable-type-layout">,
   HelpText<"Disable type layout based lowering">;
 
+def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
+  HelpText<"Don't lock interface file when building module">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

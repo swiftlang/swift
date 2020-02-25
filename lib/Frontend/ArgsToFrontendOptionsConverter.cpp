@@ -86,6 +86,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.RemarkOnRebuildFromModuleInterface |=
     Args.hasArg(OPT_Rmodule_interface_rebuild);
 
+  Opts.DisableInterfaceFileLock |= Args.hasArg(OPT_disable_interface_lockfile);
+
   computePrintStatsOptions();
   computeDebugTimeOptions();
   computeTBDOptions();

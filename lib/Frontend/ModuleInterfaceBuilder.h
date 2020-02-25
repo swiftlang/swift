@@ -42,6 +42,7 @@ class ModuleInterfaceBuilder {
   const bool serializeDependencyHashes;
   const bool trackSystemDependencies;
   const bool remarkOnRebuildFromInterface;
+  const bool disableInterfaceFileLock;
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
   CompilerInvocation subInvocation;
@@ -82,6 +83,7 @@ public:
                             bool serializeDependencyHashes = false,
                             bool trackSystemDependencies = false,
                             bool remarkOnRebuildFromInterface = false,
+                            bool disableInterfaceFileLock = false,
                             SourceLoc diagnosticLoc = SourceLoc(),
                             DependencyTracker *tracker = nullptr)
     : fs(*sourceMgr.getFileSystem()), diags(diags),
@@ -90,6 +92,7 @@ public:
       serializeDependencyHashes(serializeDependencyHashes),
       trackSystemDependencies(trackSystemDependencies),
       remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
+      disableInterfaceFileLock(disableInterfaceFileLock),
       diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {
     configureSubInvocation(searchPathOpts, langOpts, clangImporter);
   }
