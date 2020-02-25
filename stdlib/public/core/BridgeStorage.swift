@@ -71,8 +71,11 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
 
   @inlinable
   @inline(__always)
-  internal mutating func isUniquelyReferencedNative() -> Bool {
-    return _isUnique(&rawValue)
+  internal func isUniquelyReferencedNative() -> Bool {
+    let unmanaged = Unmanaged.passUnretained(rawValue)
+    return unmanaged._withUnsafeGuaranteedRef { (var ref) in
+      return _isUnique(&ref)
+    }
   }
 
   @inlinable
@@ -126,9 +129,12 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
 
   @inlinable
   @inline(__always)
-  internal mutating func isUniquelyReferencedUnflaggedNative() -> Bool {
+  internal func isUniquelyReferencedUnflaggedNative() -> Bool {
     _internalInvariant(isNative)
-    return _isUnique_native(&rawValue)
+    let unmanaged = Unmanaged.passUnretained(rawValue)
+    return unmanaged._withUnsafeGuaranteedRef { (var ref) in
+      return _isUnique_native(&ref)
+    }
   }
 
   @inlinable

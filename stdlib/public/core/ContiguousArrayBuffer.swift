@@ -467,9 +467,15 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     _internalInvariant(bounds.upperBound <= count)
 
     let initializedCount = bounds.upperBound - bounds.lowerBound
-    target.initialize(
-      from: firstElementAddress + bounds.lowerBound, count: initializedCount)
-    _fixLifetime(owner)
+    if _storage.isUniquelyReferenced() {
+      target.moveInitialize(
+          from: firstElementAddress + bounds.lowerBound, count: initializedCount)
+      _fixLifetime(owner)
+    } else {
+      target.initialize(
+        from: firstElementAddress + bounds.lowerBound, count: initializedCount)
+      _fixLifetime(owner)
+    }
     return target + initializedCount
   }
 
@@ -601,9 +607,6 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
 internal func += <Element, C: Collection>(
   lhs: inout _ContiguousArrayBuffer<Element>, rhs: __owned C
 ) where C.Element == Element {
-
-  var elementsToAppend = rhs //so we can _isUnique() it
-  
   let oldCount = lhs.count
   let newCount = oldCount + numericCast(elementsToAppend.count)
 
@@ -625,14 +628,7 @@ internal func += <Element, C: Collection>(
     buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(elementsToAppend.count))
   }
 
-  var (remainders,writtenUpTo) :
-    (C.Iterator, UnsafeMutableBufferPointer<Element>.Index)
-
-  if _isUnique(&elementsToAppend) {
-    (remainders,writtenUpTo) = buf.moveInitialize(from: elementsToAppend)
-  } else {
-    (remainders,writtenUpTo) = buf.initialize(from: elementsToAppend)
-  }
+  let (remainders,writtenUpTo) = buf.moveInitialize(from: elementsToAppend)
   
   // ensure that exactly rhs.count elements were written
   _precondition(remainders.next() == nil, "rhs underreported its count")

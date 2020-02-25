@@ -936,9 +936,7 @@ extension ArraySlice: RangeReplaceableCollection {
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
       
-    var elementsToAppend = newElements //so we can _isUnique() it
-
-    let newElementsCount = elementsToAppend.underestimatedCount
+    let newElementsCount = newElements.underestimatedCount
     reserveCapacityForAppend(newElementsCount: newElementsCount)
 
     let oldCount = self.count
@@ -947,14 +945,7 @@ extension ArraySlice: RangeReplaceableCollection {
                 start: startNewElements, 
                 count: self.capacity - oldCount)
 
-    var (remainder,writtenUpTo) :
-      (S.Iterator, UnsafeMutableBufferPointer<Element>.Index)
-        
-    if _isUnique(&elementsToAppend) {
-      (remainder, writtenUpTo) = buf.moveInitialize(from: elementsToAppend)
-    } else {
-      (remainder, writtenUpTo) = buf.initialize(from: elementsToAppend)
-    }
+    let (remainder,writtenUpTo) = buf.initialize(from: newElements)
       
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
@@ -1278,7 +1269,7 @@ extension ArraySlice {
       else { _preconditionFailure("Attempt to copy contents into nil buffer pointer") }
     _precondition(self.count <= buffer.count, 
       "Insufficient space allocated to copy array contents")
-
+    //TODO: _buffer._copyContents?
     if let s = _baseAddressIfContiguous {
       let isUnique = _buffer.isUniquelyReferenced()
       if isUnique {
