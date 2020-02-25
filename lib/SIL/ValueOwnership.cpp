@@ -319,7 +319,7 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
   // Otherwise, map our results to their ownership kinds and then merge them!
   auto resultOwnershipKinds =
       makeTransformRange(results, [&](const SILResultInfo &info) {
-        return info.getOwnershipKind(*f);
+        return info.getOwnershipKind(*f, ai->getSubstCalleeType());
       });
   auto mergedOwnershipKind = ValueOwnershipKind::merge(resultOwnershipKinds);
   if (!mergedOwnershipKind) {

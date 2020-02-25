@@ -16,6 +16,9 @@ func c<T, U, V>(_ x: (V) -> T, _: U) {}
 // CHECK-LABEL: sil {{.*}}003Hca{{.*}} : $@convention(thin) <T> (@noescape @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, T>) -> ()
 func ç<T>(_ x: (T) -> T) {}
 
+// CHECK-LABEL: sil {{.*}}returnsThrowing{{.*}} : $@convention(thin) <T, U, V> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2> in (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> (@out τ_0_1, @error Error) for <τ_0_1, τ_0_2> for <T, U, V>) -> ()
+func returnsThrowing<T, U, V>(_ x: (T) -> (U) throws -> V) {}
+
 
 // ...including unconstrained associated types
 
@@ -98,10 +101,32 @@ func r<T: PCAC> (_ x: (T) -> T.A) {}
 
 // Structural positions
 
-struct S<T, U> {}
+struct S<T, U> {
+  struct Nested<V> { 
+    struct NesNestedted<W> { }
+    struct NestedNonGeneric { }
+  }
+  struct NestedNonGeneric {
+    struct NesNestedted<W> { }
+    struct NestedNonGeneric { }
+  }
+}
 
 // CHECK-LABEL: sil {{.*}}1t{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_1 : _RefCountedObject, τ_0_3 : _RefCountedObject> in (S<τ_0_0, τ_0_1>) -> (@out τ_0_2, @owned τ_0_3) for <T, U, T, U>) -> ()
 func t<T, U: AnyObject>(_: (S<T, U>) -> (T, U)) {}
+
+// CHECK-LABEL: sil {{.*}}2t2{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3, τ_0_4 where τ_0_1 : _RefCountedObject, τ_0_2 : _RefCountedObject, τ_0_4 : _RefCountedObject> in (S<τ_0_0, τ_0_1>.Nested<τ_0_2>) -> (@out τ_0_3, @owned τ_0_4) for <T, U, U, T, U>) -> ()
+func t2<T, U: AnyObject>(_: (S<T, U>.Nested<U>) -> (T, U)) {}
+// CHECK-LABEL: sil {{.*}}2t3{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3, τ_0_4, τ_0_5 where τ_0_1 : _RefCountedObject, τ_0_2 : _RefCountedObject, τ_0_5 : _RefCountedObject> in (S<τ_0_0, τ_0_1>.Nested<τ_0_2>.NesNestedted<τ_0_3>) -> (@out τ_0_4, @owned τ_0_5) for <T, U, U, T, T, U>) -> ()
+func t3<T, U: AnyObject>(_: (S<T, U>.Nested<U>.NesNestedted<T>) -> (T, U)) {}
+// CHECK-LABEL: sil {{.*}}2t4{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3, τ_0_4 where τ_0_1 : _RefCountedObject, τ_0_2 : _RefCountedObject, τ_0_4 : _RefCountedObject> in (S<τ_0_0, τ_0_1>.Nested<τ_0_2>.NestedNonGeneric) -> (@out τ_0_3, @owned τ_0_4) for <T, U, U, T, U>) -> ()
+func t4<T, U: AnyObject>(_: (S<T, U>.Nested<U>.NestedNonGeneric) -> (T, U)) {}
+// CHECK-LABEL: sil {{.*}}2t5{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_1 : _RefCountedObject, τ_0_3 : _RefCountedObject> in (S<τ_0_0, τ_0_1>.NestedNonGeneric) -> (@out τ_0_2, @owned τ_0_3) for <T, U, T, U>) -> ()
+func t5<T, U: AnyObject>(_: (S<T, U>.NestedNonGeneric) -> (T, U)) {}
+// CHECK-LABEL: sil {{.*}}2t6{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3, τ_0_4 where τ_0_1 : _RefCountedObject, τ_0_4 : _RefCountedObject> in (S<τ_0_0, τ_0_1>.NestedNonGeneric.NesNestedted<τ_0_2>) -> (@out τ_0_3, @owned τ_0_4) for <T, U, T, T, U>) -> ()
+func t6<T, U: AnyObject>(_: (S<T, U>.NestedNonGeneric.NesNestedted<T>) -> (T, U)) {}
+// CHECK-LABEL: sil {{.*}}2t7{{.*}} : $@convention(thin) <T, U where U : AnyObject> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_1 : _RefCountedObject, τ_0_3 : _RefCountedObject> in (S<τ_0_0, τ_0_1>.NestedNonGeneric.NestedNonGeneric) -> (@out τ_0_2, @owned τ_0_3) for <T, U, T, U>) -> ()
+func t7<T, U: AnyObject>(_: (S<T, U>.NestedNonGeneric.NestedNonGeneric) -> (T, U)) {}
 
 // CHECK-LABEL: sil {{.*}}1u{{.*}} : $@convention(thin) <T> (@noescape @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2> in (S<τ_0_0, τ_0_1>) -> @out τ_0_2 for <T, T, T>) -> ()
 func u<T>(_: (S<T, T>) -> T) {}
@@ -118,6 +143,26 @@ func w<T>(_: (C<T, T>) -> T) {}
 // CHECK-LABEL: sil {{.*}}1x{{.*}} : $@convention(thin) <T, U, V where V : C<T, U>> (@noescape @callee_guaranteed <τ_0_0 where τ_0_0 : _RefCountedObject> in (@guaranteed τ_0_0) -> () for <V>) -> ()
 func x<T, U, V: C<T, U>>(_: (V) -> Void) {}
 
+// We can't generally lower away protocol constraints 
+// in nominal type argument positions, because they're necessary for the
+// substitutions to be valid, and associated types may influence the ABI of
+// the nominal type.
+
+struct SP<T: P> { var x: T.A }
+class CP<T: P> { }
+
+// CHECK-LABEL: sil {{.*}}1z{{.*}} : $@convention(thin) <T where T : P> (@noescape @callee_guaranteed <τ_0_0 where τ_0_0 : P> in (@in_guaranteed SP<τ_0_0>) -> () for <T>) -> ()
+func z<T: P>(_: (SP<T>) -> Void) {}
+
+struct SCP<T: P, U: CP<T>> {}
+
+// CHECK-LABEL: sil {{.*}}2z2{{.*}} : $@convention(thin) <T, U where T : P, U : CP<T>> (@noescape @callee_guaranteed  <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : CP<T>, τ_0_1 : _NativeClass> in (SCP<τ_0_0, τ_0_1>) -> () for <T, U>) -> ()
+func z2<T: P, U: CP<T>>(_: (SCP<T, U>) -> Void) {}
+// CHECK-LABEL: sil {{.*}}3z2a{{.*}} : $@convention(thin) <T, U where T : AnyObject, T : P, U : CP<T>> (@noescape @callee_guaranteed  <τ_0_0, τ_0_1 where τ_0_0 : _RefCountedObject, τ_0_0 : P, τ_0_1 : CP<T>, τ_0_1 : _NativeClass> in (SCP<τ_0_0, τ_0_1>) -> () for <T, U>) -> ()
+func z2a<T: P & AnyObject, U: CP<T>>(_: (SCP<T, U>) -> Void) {}
+
+// CHECK-LABEL: sil {{.*}}2z3{{.*}} : $@convention(thin) <T, U where T : P, U : CP<T>> (@noescape @callee_guaranteed <τ_0_0, τ_0_1 where τ_0_0 : _RefCountedObject, τ_0_1 : _RefCountedObject> in (S<τ_0_0, τ_0_1>) -> () for <U, U>) -> ()
+func z3<T: P, U: CP<T>>(_: (S<U, U>) -> Void) {}
 
 // Opaque types should not be extracted as substituted arguments because they
 // aren't freely substitutable.
@@ -127,3 +172,12 @@ dynamic func opaqueObject() -> some AnyObject { return C<Int, String>() }
 
 // CHECK-LABEL: sil {{.*}}1y{{.*}} : $@convention(thin) (@noescape @callee_guaranteed (@in_guaranteed @_opaqueReturnTypeOf("$s4main9opaqueAnyQryF", 0) {{.*}}) -> @owned @_opaqueReturnTypeOf("$s4main12opaqueObjectQryF", 0) {{.*}}) -> ()
 func y(_: (@_opaqueReturnTypeOf("$s4main9opaqueAnyQryF", 0) X) -> (@_opaqueReturnTypeOf("$s4main12opaqueObjectQryF", 0) X)) {}
+
+// Make sure type lowering doesn't choke on override signatures.
+class Foo {
+  func foo() -> Foo { return self }
+}
+
+class Bar<T>: Foo {
+  override func foo() -> Bar<T> { return self }
+}

@@ -59,8 +59,8 @@ func getInstanceFunc1<T: Foo>(t: T) -> () -> () {
 func getInstanceFunc2<T: Foo>(t: T) -> (T) -> () -> () {
 // CHECK: [[REF:%.*]] = function_ref @$s21partial_apply_generic3FooP12instanceFunc{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: partial_apply [callee_guaranteed] [[REF]]<T>(
+// CHECK-NEXT: convert_function
   return T.instanceFunc
-// CHECK-NOT: destroy_addr %0 : $*
 // CHECK-NEXT: return
 }
 
@@ -68,24 +68,27 @@ func getInstanceFunc2<T: Foo>(t: T) -> (T) -> () -> () {
 func getInstanceFunc3<T: Foo>(t: T.Type) -> (T) -> () -> () {
 // CHECK: [[REF:%.*]] = function_ref @$s21partial_apply_generic3FooP12instanceFunc{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: partial_apply [callee_guaranteed] [[REF]]<T>(
+// CHECK-NEXT: convert_function
   return t.instanceFunc
 // CHECK-NEXT: return
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s21partial_apply_generic23getNonCanonicalSelfFunc1tyq_cxcxm_t7CuddlesQy_RszAA5PandaR_r0_lF : $@convention(thin) <T, U where T == U.Cuddles, U : Panda> (@thick T.Type) -> @owned @callee_guaranteed (@in_guaranteed T) -> @owned @callee_guaranteed (@in_guaranteed U) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s21partial_apply_generic23getNonCanonicalSelfFunc1tyq_cxcxm_t7CuddlesQy_RszAA5PandaR_r0_lF :
 func getNonCanonicalSelfFunc<T : Foo, U : Panda>(t: T.Type) -> (T) -> (U) -> () where U.Cuddles == T {
-// CHECK: [[REF:%.*]] = function_ref @$s21partial_apply_generic3FooP21makesSelfNonCanonicalyyqd__7CuddlesQyd__RszAA5PandaRd__lFTc : $@convention(thin) <τ_0_0><τ_1_0 where τ_0_0 == τ_1_0.Cuddles, τ_1_0 : Panda> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed τ_1_0) -> ()
+// CHECK: [[REF:%.*]] = function_ref @$s21partial_apply_generic3FooP21makesSelfNonCanonicalyyqd__7CuddlesQyd__RszAA5PandaRd__lFTc :
 // CHECK-NEXT: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[REF]]<T, U>()
+// CHECK-NEXT: [[CLOSURE_CONV:%.*]] = convert_function [[CLOSURE]]
   return t.makesSelfNonCanonical
-// CHECK-NEXT: return [[CLOSURE]]
+// CHECK-NEXT: return [[CLOSURE_CONV]]
 }
 
 // curry thunk of Foo.makesSelfNonCanonical<A where ...> (A1) -> ()
-// CHECK-LABEL: sil shared [thunk] [ossa] @$s21partial_apply_generic3FooP21makesSelfNonCanonicalyyqd__7CuddlesQyd__RszAA5PandaRd__lFTc : $@convention(thin) <Self><T where Self == T.Cuddles, T : Panda> (@in_guaranteed Self) -> @owned @callee_guaranteed (@in_guaranteed T) -> () {
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s21partial_apply_generic3FooP21makesSelfNonCanonicalyyqd__7CuddlesQyd__RszAA5PandaRd__lFTc :
 // CHECK: bb0([[ARG:%.*]] : $*Self):
 // CHECK: [[REF:%.*]] = witness_method $Self, #Foo.makesSelfNonCanonical!1 : <Self><T where Self == T.Cuddles, T : Panda> (Self) -> (T) -> () : $@convention(witness_method: Foo) <τ_0_0><τ_1_0 where τ_0_0 == τ_1_0.Cuddles, τ_1_0 : Panda> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()
 // CHECK-NEXT: [[STACK:%.*]] = alloc_stack $Self
 // CHECK-NEXT: copy_addr [[ARG]] to [initialization] [[STACK]] : $*Self
 // CHECK-NEXT: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[REF]]<Self, T>([[STACK]])
+// CHECK-NEXT: [[CLOSURE_CONV:%.*]] = convert_function [[CLOSURE]]
 // CHECK-NEXT: dealloc_stack
-// CHECK-NEXT: return [[CLOSURE]]
+// CHECK-NEXT: return [[CLOSURE_CONV]]
