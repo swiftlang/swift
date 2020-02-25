@@ -8,8 +8,11 @@ import CoreGraphics
 var roomName : String?
 
 if let realRoomName = roomName as! NSString { // expected-warning{{forced cast from 'String?' to 'NSString' only unwraps and bridges; did you mean to use '!' with 'as'?}}
-// expected-error@-1{{initializer for conditional binding must have Optional type, not 'NSString'}}
-
+  // expected-error@-1{{initializer for conditional binding must have Optional type, not 'NSString'}}
+  // expected-warning@-2{{treating a forced downcast to 'NSString' as optional will never produce 'nil'}}
+  // expected-note@-3{{add parentheses around the cast to silence this warning}}
+  // expected-note@-4{{use 'as?' to perform a conditional downcast to 'NSString'}}
+  _ = realRoomName
 }
 
 var pi = 3.14159265358979

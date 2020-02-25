@@ -959,8 +959,7 @@ public:
   ///
   /// \returns the coerced pattern, or nullptr if the coercion failed.
   static Pattern *coercePatternToType(ContextualPattern pattern, Type type,
-                                      TypeResolutionOptions options,
-                                      TypeLoc tyLoc = TypeLoc());
+                                      TypeResolutionOptions options);
   static bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                    Type type);
 
