@@ -102,16 +102,14 @@ using AssociativityCacheType =
 struct OverrideSignatureKey {
   GenericSignature baseMethodSig;
   GenericSignature derivedMethodSig;
-  Type superclassTy, subclassTy;
+  Decl *subclassDecl;
 
   OverrideSignatureKey(GenericSignature baseMethodSignature,
                        GenericSignature derivedMethodSignature,
-                       Type superclassType,
-                       Type subclassType)
+                       Decl *subclassDecl)
     : baseMethodSig(baseMethodSignature),
       derivedMethodSig(derivedMethodSignature),
-      superclassTy(superclassType),
-      subclassTy(subclassType) {}
+      subclassDecl(subclassDecl) {}
 };
 
 namespace llvm {
@@ -123,31 +121,27 @@ template <> struct DenseMapInfo<OverrideSignatureKey> {
                       const OverrideSignatureKey rhs) {
     return lhs.baseMethodSig.getPointer() == rhs.baseMethodSig.getPointer() &&
            lhs.derivedMethodSig.getPointer() == rhs.derivedMethodSig.getPointer() &&
-           lhs.superclassTy.getPointer() == rhs.superclassTy.getPointer() &&
-           lhs.subclassTy.getPointer() == rhs.subclassTy.getPointer();
+           lhs.subclassDecl == rhs.subclassDecl;
   }
 
   static inline OverrideSignatureKey getEmptyKey() {
     return OverrideSignatureKey(DenseMapInfo<GenericSignature>::getEmptyKey(),
                                 DenseMapInfo<GenericSignature>::getEmptyKey(),
-                                DenseMapInfo<Type>::getEmptyKey(),
-                                DenseMapInfo<Type>::getEmptyKey());
+                                DenseMapInfo<Decl *>::getEmptyKey());
   }
 
   static inline OverrideSignatureKey getTombstoneKey() {
     return OverrideSignatureKey(
         DenseMapInfo<GenericSignature>::getTombstoneKey(),
         DenseMapInfo<GenericSignature>::getTombstoneKey(),
-        DenseMapInfo<Type>::getTombstoneKey(),
-        DenseMapInfo<Type>::getTombstoneKey());
+        DenseMapInfo<Decl *>::getTombstoneKey());
   }
 
   static unsigned getHashValue(const OverrideSignatureKey &Val) {
     return hash_combine(
         DenseMapInfo<GenericSignature>::getHashValue(Val.baseMethodSig),
         DenseMapInfo<GenericSignature>::getHashValue(Val.derivedMethodSig),
-        DenseMapInfo<Type>::getHashValue(Val.superclassTy),
-        DenseMapInfo<Type>::getHashValue(Val.subclassTy));
+        DenseMapInfo<Decl *>::getHashValue(Val.subclassDecl));
   }
 };
 } // namespace llvm
@@ -4500,8 +4494,7 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
 
   auto key = OverrideSignatureKey(baseGenericSig,
                                   derivedGenericSig,
-                                  derivedClass->getSuperclass(),
-                                  derivedClass->getDeclaredInterfaceType());
+                                  derivedClass);
 
   if (getImpl().overrideSigCache.find(key) !=
       getImpl().overrideSigCache.end()) {
