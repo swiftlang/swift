@@ -526,6 +526,15 @@ bool SILPerformanceInliner::isProfitableToInline(
   return true;
 }
 
+static bool returnsClosure(SILFunction *F) {
+  for (SILBasicBlock &BB : *F) {
+    if (auto *RI = dyn_cast<ReturnInst>(BB.getTerminator())) {
+      return isa<PartialApplyInst>(RI->getOperand());
+    }
+  }
+  return false;
+}
+
 /// Checks if a given generic apply should be inlined unconditionally, i.e.
 /// without any complex analysis using e.g. a cost model.
 /// It returns true if a function should be inlined.
@@ -569,6 +578,13 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
     // not true.
     return None;
   }
+
+  // The returned partial_apply of a thunk is most likely being optimized away
+  // if inlined. Because some thunks cannot be specialized (e.g. if an opened
+  // existential is in the subsitution list), we inline such thunks also in case
+  // they are generic.
+  if (Callee->isThunk() && returnsClosure(Callee))
+    return true;
 
   // All other generic functions should not be inlined if this kind of inlining
   // is disabled.

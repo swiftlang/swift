@@ -206,7 +206,6 @@ public struct Unmanaged<Instance: AnyObject> {
   public func _withUnsafeGuaranteedRef<Result>(
     _ body: (Instance) throws -> Result
   ) rethrows -> Result {
-    
     var tmp = self
     let fakeBase: Int? = nil
     return try body(Builtin.convertUnownedUnsafeToGuaranteed(fakeBase,
