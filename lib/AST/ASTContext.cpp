@@ -4483,8 +4483,11 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   if (derivedClass->getSuperclass().isNull())
     return nullptr;
 
-  if (baseGenericSig.isNull() || derivedGenericSig.isNull())
+  if (derivedGenericSig.isNull())
     return nullptr;
+
+  if (baseGenericSig.isNull())
+    return derivedGenericSig;
 
   auto baseClassSig = baseClass->getGenericSignature();
   auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
