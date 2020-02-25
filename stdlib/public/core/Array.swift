@@ -1198,9 +1198,7 @@ extension Array: RangeReplaceableCollection {
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
-    var elementsToAppend = newElements //so we can _isUnique() it
-      
-    let newElementsCount = elementsToAppend.underestimatedCount
+    let newElementsCount = newElements.underestimatedCount
     reserveCapacityForAppend(newElementsCount: newElementsCount)
 
     let oldCount = self.count
@@ -1209,14 +1207,7 @@ extension Array: RangeReplaceableCollection {
                 start: startNewElements, 
                 count: self.capacity - oldCount)
 
-    var (remainder,writtenUpTo) :
-      (S.Iterator, UnsafeMutableBufferPointer<Element>.Index)
-        
-    if _isUnique(&elementsToAppend) {
-      (remainder, writtenUpTo) = buf.moveInitialize(from: elementsToAppend)
-    } else {
-      (remainder, writtenUpTo) = buf.initialize(from: elementsToAppend)
-    }
+    var (remainder, writtenUpTo) = buf.initialize(from: newElements)
     
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)

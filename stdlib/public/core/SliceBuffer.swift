@@ -213,7 +213,7 @@ internal struct _SliceBuffer<Element>
   }
 
   @inlinable
-  internal mutating func isMutableAndUniquelyReferenced() -> Bool {
+  internal func isMutableAndUniquelyReferenced() -> Bool {
     // This is a performance optimization that ensures that the copy of self
     // that occurs at -Onone is destroyed before we call
     // isUniquelyReferenced. This code used to be:
@@ -306,8 +306,12 @@ internal struct _SliceBuffer<Element>
   }
 
   @inlinable
-  internal mutating func isUniquelyReferenced() -> Bool {
-    return isKnownUniquelyReferenced(&owner)
+  internal func isUniquelyReferenced() -> Bool {
+    let unmanaged = Unmanaged.passUnretained(owner)
+    return unmanaged._withUnsafeGuaranteedRef { ref in
+      var mutRef = ref
+      return _isUnique(&mutRef)
+    }
   }
 
   @inlinable

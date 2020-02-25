@@ -379,7 +379,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   }
 
   @inlinable
-  internal mutating func isMutableAndUniquelyReferenced() -> Bool {
+  internal func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
   }
 
@@ -467,7 +467,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     _internalInvariant(bounds.upperBound <= count)
 
     let initializedCount = bounds.upperBound - bounds.lowerBound
-    if _storage.isUniquelyReferenced() {
+    if isUniquelyReferenced() {
       target.moveInitialize(
           from: firstElementAddress + bounds.lowerBound, count: initializedCount)
       _fixLifetime(owner)
@@ -509,8 +509,12 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   ///   may need to be considered, such as whether the buffer could be
   ///   some immutable Cocoa container.
   @inlinable
-  internal mutating func isUniquelyReferenced() -> Bool {
-    return _isUnique(&_storage)
+  internal func isUniquelyReferenced() -> Bool {
+    let unmanaged = Unmanaged.passUnretained(_storage)
+    return unmanaged._withUnsafeGuaranteedRef { (ref) in
+      var mutRef = ref
+      return _isUnique(&mutRef)
+    }
   }
 
 #if _runtime(_ObjC)
@@ -608,12 +612,12 @@ internal func += <Element, C: Collection>(
   lhs: inout _ContiguousArrayBuffer<Element>, rhs: __owned C
 ) where C.Element == Element {
   let oldCount = lhs.count
-  let newCount = oldCount + numericCast(elementsToAppend.count)
+  let newCount = oldCount + numericCast(rhs.count)
 
   let buf: UnsafeMutableBufferPointer<Element>
   
   if _fastPath(newCount <= lhs.capacity) {
-    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(elementsToAppend.count))
+    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
     lhs.count = newCount
   }
   else {
@@ -625,10 +629,10 @@ internal func += <Element, C: Collection>(
       from: lhs.firstElementAddress, count: oldCount)
     lhs.count = 0
     (lhs, newLHS) = (newLHS, lhs)
-    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(elementsToAppend.count))
+    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
   }
 
-  let (remainders,writtenUpTo) = buf.moveInitialize(from: elementsToAppend)
+  var (remainders,writtenUpTo) = buf.initialize(from: rhs)
   
   // ensure that exactly rhs.count elements were written
   _precondition(remainders.next() == nil, "rhs underreported its count")
