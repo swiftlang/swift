@@ -1767,18 +1767,18 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   }
 
   auto voidToVoidFunctionType = FunctionType::get({}, context.TheEmptyTupleType);
+  auto nominalToVoidToVoidFunctionType = FunctionType::get({AnyFunctionType::Param(nominal->getInterfaceType())}, voidToVoidFunctionType);
   auto *func = FuncDecl::create(
-      context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
+      context, /*StaticLoc*/ nominal->getBraces().End, StaticSpellingKind::KeywordStatic,
       /*FuncLoc*/ location,
       DeclName(context, DeclBaseName(context.Id_MainEntryPoint),
                ParameterList::createEmpty(context)),
-      /*NameLoc*/ SourceLoc(), /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*NameLoc*/ nominal->getBraces().End, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, ParameterList::createEmpty(context),
       /*FnRetType=*/TypeLoc::withoutLoc(TupleType::getEmpty(context)),
-      nominal->getParentSourceFile());
+      nominal);
   func->setImplicit(true);
   func->setSynthesized(true);
-  func->setInterfaceType(voidToVoidFunctionType);
 
   auto *typeExpr = TypeExpr::createImplicit(nominal->getDeclaredType(), context);
 
@@ -1815,9 +1815,9 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   auto *body = BraceStmt::create(context, SourceLoc(), stmts,
                                 SourceLoc(), /*Implicit*/true);
   func->setBodyParsed(body);
-  func->setInterfaceType(voidToVoidFunctionType);
+  func->setInterfaceType(nominalToVoidToVoidFunctionType);
 
-  nominal->getParentSourceFile()->addTopLevelDecl(func);
+  nominal->addMember(func);
   // This function must be type-checked. Why?  Consider the following scenario:
   //
   //     protocol AlmostMainable {}
