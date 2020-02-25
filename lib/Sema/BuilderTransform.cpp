@@ -259,17 +259,13 @@ protected:
 
       // Generate constraints for the initialization.
       auto target = SolutionApplicationTarget::forInitialization(
-          patternBinding->getInit(index), dc, patternType, pattern);
+          patternBinding->getInit(index), dc, patternType, pattern,
+          /*bindPatternVarsOneWay=*/true);
       if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
         continue;
 
       // Keep track of this binding entry.
       applied.patternBindingEntries.insert({{patternBinding, index}, target});
-
-      // Bind the variables that occur in the pattern to the corresponding
-      // type entry for the pattern itself.
-      cs->bindVariablesInPattern(
-          pattern, cs->getConstraintLocator(target.getAsExpr()));
     }
   }
 

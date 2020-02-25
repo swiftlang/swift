@@ -1179,6 +1179,10 @@ class SolutionApplicationTarget {
 
       /// Whether the expression result will be discarded at the end.
       bool isDiscarded;
+
+      /// Whether to bind the variables encountered within the pattern to
+      /// fresh type variables via one-way constraints.
+      bool bindPatternVarsOneWay;
     } expression;
 
     struct {
@@ -1215,7 +1219,8 @@ public:
 
   /// Form a target for the initialization of a pattern from an expression.
   static SolutionApplicationTarget forInitialization(
-      Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern);
+      Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
+      bool bindPatternVarsOneWay);
 
   Expr *getAsExpr() const {
     switch (kind) {
@@ -1298,6 +1303,14 @@ public:
     return kind == Kind::expression &&
         expression.contextualPurpose == CTP_Initialization &&
         isa<OptionalSomePattern>(expression.pattern);
+  }
+
+  /// Whether to bind the types of any variables within the pattern via
+  /// one-way constraints.
+  bool shouldBindPatternVarsOneWay() const {
+    return kind == Kind::expression &&
+        expression.contextualPurpose == CTP_Initialization &&
+        expression.bindPatternVarsOneWay;
   }
 
   /// Retrieve the wrapped variable when initializing a pattern with a
@@ -3267,7 +3280,8 @@ public:
   /// value of the given expression.
   ///
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
-  Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator);
+  Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator,
+                           bool bindPatternVarsOneWay);
 
   /// Determines whether we can generate constraints for this statement
   /// condition.
@@ -3278,23 +3292,6 @@ public:
   /// \returns true if there was an error in constraint generation, false
   /// if generation succeeded.
   bool generateConstraints(StmtCondition condition, DeclContext *dc);
-
-  /// Provide a type for each variable that occurs within the given pattern,
-  /// by matching the pattern structurally with its already-computed pattern
-  /// type. The variables will either get a concrete type (when present in
-  /// the pattern type) or a fresh type variable bound to that part of the
-  /// pattern via a one-way constraint.
-  void bindVariablesInPattern(Pattern *pattern, Type patternType,
-                              ConstraintLocator *locator);
-
-  /// Provide a type for each variable that occurs within the given pattern,
-  /// by matching the pattern structurally with its already-computed pattern
-  /// type. The variables will either get a concrete type (when present in
-  /// the pattern type) or a fresh type variable bound to that part of the
-  /// pattern via a one-way constraint.
-  void bindVariablesInPattern(Pattern *pattern, ConstraintLocator *locator) {
-    bindVariablesInPattern(pattern, getType(pattern), locator);
-  }
 
   /// Generate constraints for a given set of overload choices.
   ///

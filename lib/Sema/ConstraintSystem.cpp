@@ -4106,6 +4106,7 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.pattern = nullptr;
   expression.wrappedVar = nullptr;
   expression.isDiscarded = isDiscarded;
+  expression.bindPatternVarsOneWay = false;
 }
 
 void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
@@ -4160,7 +4161,8 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
 }
 
 SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
-    Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern) {
+    Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
+    bool bindPatternVarsOneWay) {
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
   if (!isa<OptionalSomePattern>(pattern) &&
@@ -4182,6 +4184,7 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
       initializer, dc, CTP_Initialization, contextualType,
       /*isDiscarded=*/false);
   target.expression.pattern = pattern;
+  target.expression.bindPatternVarsOneWay = bindPatternVarsOneWay;
   target.maybeApplyPropertyWrapper();
   return target;
 }
