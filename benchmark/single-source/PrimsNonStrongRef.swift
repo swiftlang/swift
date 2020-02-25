@@ -45,7 +45,7 @@ public let PrimsNonStrongRef: [BenchmarkInfo] = ({
         }))
     // TODO: Stabilize weak benchmark.
     benchmarks.append(BenchmarkInfo(
-        name: "Prims.NonStrongRef.Weak.ClosureAccess",
+        name: "Prims.NonStrongRef.Weak.Closure",
         runFunction: run_PrimsWeakClosureAccess,
         tags: [.validation, .algorithm],
         setUpFunction: {
@@ -62,7 +62,7 @@ public let PrimsNonStrongRef: [BenchmarkInfo] = ({
           blackHole(unownedSafePrimsState)
         }))
     benchmarks.append(BenchmarkInfo(
-        name: "Prims.NonStrongRef.UnownedSafe.ClosureAccess",
+        name: "Prims.NonStrongRef.UnownedSafe.Closure",
         runFunction: run_PrimsUnownedSafeClosureAccess,
         tags: [.validation, .algorithm],
         setUpFunction: {
@@ -78,7 +78,7 @@ public let PrimsNonStrongRef: [BenchmarkInfo] = ({
           blackHole(unownedUnsafePrimsState)
         }))
     benchmarks.append(BenchmarkInfo(
-        name: "Prims.NonStrongRef.UnownedUnsafe.ClosureAccess",
+        name: "Prims.NonStrongRef.UnownedUnsafe.Closure",
         runFunction: run_PrimsUnownedUnsafeClosureAccess,
         tags: [.validation, .algorithm],
         setUpFunction: {
@@ -94,7 +94,7 @@ public let PrimsNonStrongRef: [BenchmarkInfo] = ({
           blackHole(unmanagedPrimsState)
         }))
     benchmarks.append(BenchmarkInfo(
-        name: "Prims.NonStrongRef.Unmanaged.ClosureAccess",
+        name: "Prims.NonStrongRef.Unmanaged.Closure",
         runFunction: run_PrimsUnmanagedClosureAccess,
         tags: [.validation, .algorithm, .api],
         setUpFunction: {
@@ -110,7 +110,7 @@ public let PrimsNonStrongRef: [BenchmarkInfo] = ({
           blackHole(unmanagedUGRPrimsState)
         }))
     benchmarks.append(BenchmarkInfo(
-        name: "Prims.NonStrongRef.UnmanagedUGR.ClosureAccess",
+        name: "Prims.NonStrongRef.UnmanagedUGR.Closure",
         runFunction: run_PrimsUnmanagedUGRClosureAccess,
         tags: [.validation, .algorithm, .api],
         setUpFunction: {
