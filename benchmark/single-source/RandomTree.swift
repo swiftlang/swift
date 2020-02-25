@@ -117,7 +117,7 @@ extension UnmanagedSearchTree {
       root.left.deallocate()
       root.right.deallocate()
     }
-    withExtendedLifetime(root) {}
+    root.release()
   }
 }
 
@@ -183,6 +183,7 @@ extension PointerSearchTree {
     guard let root = root else { return }
     root.pointee.left.deallocate()
     root.pointee.right.deallocate()
+    root.deallocate()
   }
 }
 
