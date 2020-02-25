@@ -1,5 +1,5 @@
 // REQUIRES: VENDOR=apple
-// REQUIRES: executable_only
+// REQUIRES: executable_test
 
 // 1. Create a skeleton of a framework
 // RUN: %empty-directory(%t/APIGrabBag.framework/Modules/APIGrabBag.swiftmodule)

@@ -5,7 +5,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: objc_interop
-// REQUIRES: executable_only
+// REQUIRES: executable_test
 
 import Foundation
 
