@@ -596,40 +596,6 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   internal var _storage: __ContiguousArrayStorageBase
 }
 
-/// Append the elements of `rhs` to `lhs`.
-@inlinable
-internal func += <Element, C: Collection>(
-  lhs: inout _ContiguousArrayBuffer<Element>, rhs: __owned C
-) where C.Element == Element {
-
-  let oldCount = lhs.count
-  let newCount = oldCount + numericCast(rhs.count)
-
-  let buf: UnsafeMutableBufferPointer<Element>
-  
-  if _fastPath(newCount <= lhs.capacity) {
-    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
-    lhs.count = newCount
-  }
-  else {
-    var newLHS = _ContiguousArrayBuffer<Element>(
-      _uninitializedCount: newCount,
-      minimumCapacity: _growArrayCapacity(lhs.capacity))
-
-    newLHS.firstElementAddress.moveInitialize(
-      from: lhs.firstElementAddress, count: oldCount)
-    lhs.count = 0
-    (lhs, newLHS) = (newLHS, lhs)
-    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
-  }
-
-  var (remainders,writtenUpTo) = buf.initialize(from: rhs)
-
-  // ensure that exactly rhs.count elements were written
-  _precondition(remainders.next() == nil, "rhs underreported its count")
-  _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")    
-}
-
 extension _ContiguousArrayBuffer: RandomAccessCollection {
   /// The position of the first element in a non-empty collection.
   ///
@@ -663,26 +629,9 @@ extension Sequence {
 internal func _copySequenceToContiguousArray<
   S: Sequence
 >(_ source: S) -> ContiguousArray<S.Element> {
-  let initialCapacity = source.underestimatedCount
-  var builder =
-    _UnsafePartiallyInitializedContiguousArrayBuffer<S.Element>(
-      initialCapacity: initialCapacity)
-
-  var iterator = source.makeIterator()
-
-  // FIXME(performance): use _copyContents(initializing:).
-
-  // Add elements up to the initial capacity without checking for regrowth.
-  for _ in 0..<initialCapacity {
-    builder.addWithExistingCapacity(iterator.next()!)
-  }
-
-  // Add remaining elements, if any.
-  while let element = iterator.next() {
-    builder.add(element)
-  }
-
-  return builder.finish()
+  var result = ContiguousArray()
+  result.append(source)
+  return result
 }
 
 extension Collection {
@@ -766,7 +715,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
     p = result.firstElementAddress
     remainingCapacity = result.capacity
   }
-
+  
   /// Add an element to the buffer, reallocating if necessary.
   @inlinable
   @inline(__always) // For performance reasons.
