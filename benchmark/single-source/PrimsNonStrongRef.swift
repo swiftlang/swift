@@ -35,7 +35,7 @@ public let PrimsNonStrongRef: [BenchmarkInfo] = ({
     var benchmarks: [BenchmarkInfo] = []
 #if false
     // TODO: Stabilize weak benchmark.
-    benchmarks..append(BenchmarkInfo(
+    benchmarks.append(BenchmarkInfo(
         name: "Prims.NonStrongRef.Weak",
         runFunction: run_PrimsWeak,
         tags: [.validation, .algorithm],
