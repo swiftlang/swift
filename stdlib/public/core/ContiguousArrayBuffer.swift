@@ -623,11 +623,19 @@ internal func += <Element, C: Collection>(
     buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
   }
 
-  var (remainders,writtenUpTo) = buf.initialize(from: rhs)
+  if _isUnique(&rhs) {
+    var (remainders,writtenUpTo) = buf.moveInitialize(from: rhs)
 
-  // ensure that exactly rhs.count elements were written
-  _precondition(remainders.next() == nil, "rhs underreported its count")
-  _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")    
+    // ensure that exactly rhs.count elements were written
+    _precondition(remainders.next() == nil, "rhs underreported its count")
+    _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
+  } else {
+    var (remainders,writtenUpTo) = buf.initialize(from: rhs)
+
+    // ensure that exactly rhs.count elements were written
+    _precondition(remainders.next() == nil, "rhs underreported its count")
+    _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
+  }
 }
 
 extension _ContiguousArrayBuffer: RandomAccessCollection {
