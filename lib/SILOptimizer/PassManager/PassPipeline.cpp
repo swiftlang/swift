@@ -397,15 +397,15 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
 
   P.addSemanticARCOpts();
 
-  // Strip ownership from non-transparent functions.
-  if (P.getOptions().StripOwnershipAfterSerialization)
-    P.addNonTransparentFunctionOwnershipModelEliminator();
-
   // Start by cloning functions from stdlib.
   P.addPerformanceSILLinker();
 
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueOpt();
+  
+  // Strip ownership from non-transparent functions.
+  if (P.getOptions().StripOwnershipAfterSerialization)
+    P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Add the outliner pass (Osize).
   P.addOutliner();
