@@ -536,3 +536,30 @@ tuplify(true) { c in
 // CHECK-SAME: Optional("matched without payload")
 // CHECK-SAME: "matched with payload", "hello!", 34
 // CHECK-SAME: "intentional mismatch"
+
+class Super { }
+
+class Sub : Super {
+  func subMethod() -> String {
+    return "subMethod"
+  }
+}
+
+func getSuper(wantSubclass: Bool) -> Super {
+  return wantSubclass ? Sub() : Super()
+}
+
+tuplify(true) { c in
+  "testIfLetAsMatching"
+  if case let sub as Sub = getSuper(wantSubclass: true) {
+    sub.subMethod()
+  }
+  if case let sub as Sub = getSuper(wantSubclass: false) {
+    fatalError("cannot match this")
+  } else {
+    "Superclass instance"
+  }
+}
+// CHECK: testIfLetAsMatching
+// CHECK-SAME: "subMethod"
+// CHECK-SAME: "Superclass instance"

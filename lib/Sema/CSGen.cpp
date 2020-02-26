@@ -2197,6 +2197,18 @@ namespace {
     /// type information with fresh type variables.
     ///
     /// \param pattern The pattern.
+    ///
+    /// \param locator The locator to use for generated constraints and
+    /// type variables.
+    ///
+    /// \param externalPatternType The type imposed by the enclosing pattern,
+    /// if any. This will be non-null in cases where there is, e.g., a
+    /// pattern such as "is SubClass".
+    ///
+    /// \param bindPatternVarsOneWay When true, generate fresh type variables
+    /// for the types of each variable declared within the pattern, along
+    /// with a one-way constraint binding that to the type to which the
+    /// variable will be ascribed or inferred.
     Type getTypeForPattern(Pattern *pattern, ConstraintLocatorBuilder locator,
                            Type externalPatternType,
                            bool bindPatternVarsOneWay) {
@@ -2257,14 +2269,9 @@ namespace {
         if (bindPatternVarsOneWay) {
           oneWayVarType = CS.createTypeVariable(
               CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
-          if (externalPatternType) {
-            CS.addConstraint(
-                ConstraintKind::OneWayEqual, oneWayVarType,
-                externalPatternType, locator);
-          } else {
-            CS.addConstraint(
-                ConstraintKind::OneWayEqual, oneWayVarType, varType, locator);
-          }
+          CS.addConstraint(
+              ConstraintKind::OneWayEqual, oneWayVarType,
+              externalPatternType ? externalPatternType : varType, locator);
         }
 
         // If there is an externally-imposed type.
@@ -2357,16 +2364,13 @@ namespace {
       case PatternKind::OptionalSome: {
         // Remove an optional from the object type.
         if (externalPatternType) {
-          if (Type objType = externalPatternType->getOptionalObjectType()) {
-            externalPatternType = objType;
-          } else {
-            Type objVar = CS.createTypeVariable(
-                CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
-            CS.addConstraint(
-                ConstraintKind::Equal, OptionalType::get(objVar),
-                externalPatternType, locator);
-            externalPatternType = objVar;
-          }
+          Type objVar = CS.createTypeVariable(
+              CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
+          CS.addConstraint(
+              ConstraintKind::OptionalObject, externalPatternType,
+              objVar, locator);
+
+          externalPatternType = objVar;
         }
 
         // The subpattern must have optional type.
