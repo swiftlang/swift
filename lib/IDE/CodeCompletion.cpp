@@ -1580,18 +1580,9 @@ private:
     archeTy = archeTy->getRoot();
 
     // For protocol, the 'archeTy' should match with the 'baseTy' which is the
-    // dynamic 'Self' type of the protocol.
-    if (archeTy->isEqual(selfTy))
-      return true;
-
-    // For nominal decls, 'archTy' should be one of the generic parameters.
-    if (selfTy->castTo<BoundGenericType>() &&
-        llvm::any_of(selfTy->castTo<BoundGenericType>()->getGenericArgs(),
-                     [&](const Type &T) { return archeTy->isEqual(T); }))
-      return true;
-
-
-    return false;
+    // dynamic 'Self' type of the protocol. For nominal decls, 'archTy' should
+    // be one of the generic params in 'selfTy'. Search 'archeTy' in 'baseTy'.
+    return selfTy.findIf([&](Type T) { return archeTy->isEqual(T); });
   }
 
 public:

@@ -34,6 +34,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_SELF | %FileCheck %s -check-prefix=PROTOCOL_SELF
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_EXT | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_EXT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED1 | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED2 | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED1_EXT | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED1_EXT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED2_EXT | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED2_EXT
 
 class A1<T1, T2, T3> {}
 
@@ -191,3 +195,34 @@ extension TA1 where #^NOMINAL_TYPEALIAS_EXT^# { }
 // NOMINAL_TYPEALIAS_EXT-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
 // NOMINAL_TYPEALIAS_EXT-DAG: Decl[TypeAlias]/CurrNominal:        U[#T.Q#];
 // NOMINAL_TYPEALIAS_EXT: End completions
+
+struct TA2<T: Assoc> {
+  struct Inner1<U> where #^NOMINAL_TYPEALIAS_NESTED1^# {
+    typealias X1 = T
+    typealias X2 = T.Q
+  }
+// NOMINAL_TYPEALIAS_NESTED1: Begin completions, 2 items
+// NOMINAL_TYPEALIAS_NESTED1-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
+// NOMINAL_TYPEALIAS_NESTED1-DAG: Decl[GenericTypeParam]/Local:       U[#U#];
+// NOMINAL_TYPEALIAS_NESTED1: End completions
+  struct Inner2 where #^NOMINAL_TYPEALIAS_NESTED2^# {
+    typealias X1 = T
+    typealias X2 = T.Q
+  }
+// NOMINAL_TYPEALIAS_NESTED2: Begin completions, 1 items
+// NOMINAL_TYPEALIAS_NESTED2-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
+// NOMINAL_TYPEALIAS_NESTED2: End completions
+}
+extension TA2.Inner1 where #^NOMINAL_TYPEALIAS_NESTED1_EXT^# {}
+// NOMINAL_TYPEALIAS_NESTED1_EXT: Begin completions, 4 items
+// NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
+// NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[GenericTypeParam]/Local:       U[#U#];
+// NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X1[#T#];
+// NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X2[#T.Q#];
+// NOMINAL_TYPEALIAS_NESTED1_EXT: End completions
+extension TA2.Inner2 where #^NOMINAL_TYPEALIAS_NESTED2_EXT^# {}
+// NOMINAL_TYPEALIAS_NESTED2_EXT: Begin completions, 3 items
+// NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
+// NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X1[#T#];
+// NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X2[#T.Q#];
+// NOMINAL_TYPEALIAS_NESTED2_EXT: End completions
