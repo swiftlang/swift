@@ -2073,6 +2073,32 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Looks up the decls that a scoped import references, ensuring the import is
+/// valid.
+///
+/// A "scoped import" is an import which only covers one particular
+/// declaration, such as:
+///
+///     import class Foundation.NSString
+///
+class ScopedImportLookupRequest
+    : public SimpleRequest<ScopedImportLookupRequest,
+                           ArrayRef<ValueDecl *>(ImportDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<ArrayRef<ValueDecl *>> evaluate(Evaluator &evaluator,
+                                                 ImportDecl *import) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

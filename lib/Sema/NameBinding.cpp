@@ -23,6 +23,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Parser.h"
@@ -66,10 +67,6 @@ namespace {
     /// If \c options includes \c PrivateImport, the filename we should import
     /// private declarations from.
     StringRef privateImportFileName;
-
-    /// The kind of declaration expected for a scoped import, or \c Module if
-    /// the import is not scoped.
-    Located<ImportKind> importKind;
 
     /// The module names being imported. There will usually be just one for the
     /// top-level module, but a submodule import will have more.
@@ -162,42 +159,6 @@ namespace {
                              Diag<Identifier> diagID);
   };
 
-  /// Represents an import whose options have been checked and module has been
-  /// loaded, but its scope (if it's a scoped import) has not been validated
-  /// and it has not been added to \c SF.
-  struct BoundImport {
-    /// The \c UnboundImport we bound to produce this import. Used to avoid
-    /// duplicating its fields.
-    UnboundImport unbound;
-
-    /// The \c ImportedModuleDesc that should be added to the source file for
-    /// this import.
-    ImportedModuleDesc desc;
-
-    /// The module we bound \c unbound to.
-    ModuleDecl *module;
-
-    /// If \c true, another, more specific \c BoundImport will validate the same
-    /// scope as this import, so validating this one is not necessary.
-    bool scopeValidatedElsewhere = true;
-
-    BoundImport(UnboundImport unbound, ImportedModuleDesc desc,
-                ModuleDecl *module, bool scopeValidatedElsewhere);
-
-    /// Validate the scope of the import, if needed.
-    ///
-    /// A "scoped import" is an import which only covers one particular
-    /// declaration, such as:
-    ///
-    ///     import class Foundation.NSString
-    ///
-    /// We validate the scope by making sure that the named declaration exists
-    /// and is of the kind indicated by the keyword. This can't be done until we
-    /// have bound all cross-import overlays, since a cross-import overlay could
-    /// provide the declaration.
-    void validateScope(SourceFile &SF);
-  };
-
   class NameBinder final : public DeclVisitor<NameBinder> {
     friend DeclVisitor<NameBinder>;
 
@@ -208,8 +169,8 @@ namespace {
     /// cross-imports found.
     SmallVector<UnboundImport, 4> unboundImports;
 
-    /// Imports which still need their scoped imports validated.
-    SmallVector<BoundImport, 16> unvalidatedImports;
+    /// The list of fully bound imports.
+    SmallVector<ImportedModuleDesc, 16> boundImports;
 
     /// All imported modules, including by re-exports, and including submodules.
     llvm::DenseSet<ImportedModuleDesc> visibleModules;
@@ -231,9 +192,10 @@ namespace {
       : SF(SF), ctx(SF.getASTContext())
     { }
 
-    /// Postprocess the imports this NameBinder has bound and collect them into
-    /// \p imports.
-    void finishImports(SmallVectorImpl<ImportedModuleDesc> &imports);
+    /// Retrieve the finalized imports.
+    ArrayRef<ImportedModuleDesc> getFinishedImports() const {
+      return boundImports;
+    }
 
   private:
     // Special behavior for these decls:
@@ -251,13 +213,12 @@ namespace {
       return ctx.Diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
 
-    /// Check a single unbound import, bind it, add it to \c unvalidatedImports,
+    /// Check a single unbound import, bind it, add it to \c boundImports,
     /// and add its cross-import overlays to \c unboundImports.
     void bindImport(UnboundImport &&I);
 
-    /// Adds \p I and \p M to \c unvalidatedImports and \c visibleModules.
-    void addImport(const UnboundImport &I, ModuleDecl *M,
-                   bool needsScopeValidation);
+    /// Adds \p I and \p M to \c boundImports and \c visibleModules.
+    void addImport(const UnboundImport &I, ModuleDecl *M);
 
     /// Adds \p desc and everything it re-exports to \c visibleModules using
     /// the settings from \c desc.
@@ -319,13 +280,7 @@ void swift::performNameBinding(SourceFile &SF) {
   for (auto D : SF.getTopLevelDecls())
     Binder.visit(D);
 
-  // Validate all scoped imports. We defer this until now because a scoped
-  // import of a cross-import overlay's declaring module can select declarations
-  // in the overlay, and we don't know all of the overlays we're loading until
-  // we've bound all imports in the file.
-  SmallVector<ImportedModuleDesc, 8> ImportedModules;
-  Binder.finishImports(ImportedModules);
-  SF.addImports(ImportedModules);
+  SF.addImports(Binder.getFinishedImports());
 
   SF.ASTStage = SourceFile::NameBound;
   verify(SF);
@@ -412,14 +367,13 @@ void NameBinder::bindImport(UnboundImport &&I) {
   I.validateOptions(topLevelModule, SF);
 
   if (topLevelModule && topLevelModule != M) {
-    // If we have distinct submodule and top-level module, add both, disabling
-    // the top-level module's scoped import validation.
-    addImport(I, M, true);
-    addImport(I, topLevelModule.get(), false);
+    // If we have distinct submodule and top-level module, add both.
+    addImport(I, M);
+    addImport(I, topLevelModule.get());
   }
   else {
     // Add only the import itself.
-    addImport(I, M, false);
+    addImport(I, M);
   }
 
   crossImport(M, I);
@@ -428,12 +382,10 @@ void NameBinder::bindImport(UnboundImport &&I) {
     ID.get()->setModule(M);
 }
 
-void NameBinder::addImport(const UnboundImport &I, ModuleDecl *M,
-                           bool scopeValidatedElsewhere) {
+void NameBinder::addImport(const UnboundImport &I, ModuleDecl *M) {
   auto importDesc = I.makeDesc(M);
-
   addVisibleModules(importDesc);
-  unvalidatedImports.emplace_back(I, importDesc, M, scopeValidatedElsewhere);
+  boundImports.push_back(importDesc);
 }
 
 //===----------------------------------------------------------------------===//
@@ -498,7 +450,6 @@ UnboundImport::getTopLevelModule(ModuleDecl *M, SourceFile &SF) {
 /// Create an UnboundImport for a user-written import declaration.
 UnboundImport::UnboundImport(ImportDecl *ID)
   : importLoc(ID->getLoc()), options(), privateImportFileName(),
-    importKind(ID->getImportKind(), ID->getKindLoc()),
     modulePath(ID->getModulePath()), declPath(ID->getDeclPath()),
     importOrUnderlyingModuleDecl(ID)
 {
@@ -679,20 +630,6 @@ void UnboundImport::diagnoseInvalidAttr(DeclAttrKind attrKind,
 // MARK: Scoped imports
 //===----------------------------------------------------------------------===//
 
-BoundImport::BoundImport(UnboundImport unbound, ImportedModuleDesc desc,
-                         ModuleDecl *module, bool scopeValidatedElsewhere)
-  : unbound(unbound), desc(desc), module(module),
-    scopeValidatedElsewhere(scopeValidatedElsewhere) {
-  assert(module && "Can't have an import bound to nothing");
-}
-
-void NameBinder::finishImports(SmallVectorImpl<ImportedModuleDesc> &imports) {
-  for (auto &unvalidated : unvalidatedImports) {
-    unvalidated.validateScope(SF);
-    imports.push_back(unvalidated.desc);
-  }
-}
-
 /// Returns true if a decl with the given \p actual kind can legally be
 /// imported via the given \p expected kind.
 static bool isCompatibleImportKind(ImportKind expected, ImportKind actual) {
@@ -759,65 +696,81 @@ static const char *getImportKindString(ImportKind kind) {
   llvm_unreachable("Unhandled ImportKind in switch.");
 }
 
-void BoundImport::validateScope(SourceFile &SF) {
-  if (unbound.importKind.Item == ImportKind::Module || scopeValidatedElsewhere)
-    return;
-
-  ASTContext &ctx = SF.getASTContext();
-
-  // If we're importing a specific decl, validate the import kind.
+llvm::Expected<ArrayRef<ValueDecl *>>
+ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
+                                    ImportDecl *import) const {
   using namespace namelookup;
 
-  // FIXME: Doesn't handle scoped testable imports correctly.
-  assert(unbound.declPath.size() == 1 && "can't handle sub-decl imports");
-  SmallVector<ValueDecl *, 8> decls;
-  lookupInModule(module, unbound.declPath.front().Item, decls,
-                 NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                 &SF);
+  auto importKind = import->getImportKind();
+  assert(importKind != ImportKind::Module);
 
+  // If we weren't able to load the module referenced by the import, we're done.
+  // The fact that we failed to load the module has already been diagnosed by
+  // name binding.
+  auto *module = import->getModule();
+  if (!module)
+    return ArrayRef<ValueDecl *>();
+
+  /// Validate the scoped import.
+  ///
+  /// We validate the scope by making sure that the named declaration exists
+  /// and is of the kind indicated by the keyword. This can't be done until
+  /// we've performed name binding, since that can introduce additional imports
+  /// (such as cross-import overlays) which could provide the declaration.
+  auto &ctx = module->getASTContext();
+  auto declPath = import->getDeclPath();
+  auto modulePath = import->getModulePath();
+  auto *topLevelModule = module->getTopLevelModule();
+
+  // Lookup the referenced decl in the top-level module. This is necessary as
+  // the Clang importer currently handles submodules by importing their decls
+  // into the top-level module.
+  // FIXME: Doesn't handle scoped testable imports correctly.
+  assert(declPath.size() == 1 && "can't handle sub-decl imports");
+  SmallVector<ValueDecl *, 8> decls;
+  lookupInModule(topLevelModule, declPath.front().Item, decls,
+                 NLKind::QualifiedLookup, ResolutionKind::Overloadable,
+                 import->getDeclContext()->getModuleScopeContext());
+
+  auto importLoc = import->getLoc();
   if (decls.empty()) {
-    ctx.Diags.diagnose(unbound.importLoc, diag::decl_does_not_exist_in_module,
-                       static_cast<unsigned>(unbound.importKind.Item),
-                       unbound.declPath.front().Item,
-                       unbound.modulePath.front().Item)
-      .highlight(SourceRange(unbound.declPath.front().Loc,
-                             unbound.declPath.back().Loc));
-    return;
+    ctx.Diags.diagnose(importLoc, diag::decl_does_not_exist_in_module,
+                       static_cast<unsigned>(importKind), declPath.front().Item,
+                       modulePath.front().Item)
+      .highlight(SourceRange(declPath.front().Loc, declPath.back().Loc));
+    return ArrayRef<ValueDecl *>();
   }
 
   Optional<ImportKind> actualKind = ImportDecl::findBestImportKind(decls);
   if (!actualKind.hasValue()) {
     // FIXME: print entire module name?
-    ctx.Diags.diagnose(unbound.importLoc, diag::ambiguous_decl_in_module,
-                       unbound.declPath.front().Item, module->getName());
+    ctx.Diags.diagnose(importLoc, diag::ambiguous_decl_in_module,
+                       declPath.front().Item, module->getName());
     for (auto next : decls)
       ctx.Diags.diagnose(next, diag::found_candidate);
 
-  } else if (!isCompatibleImportKind(unbound.importKind.Item, *actualKind)) {
+  } else if (!isCompatibleImportKind(importKind, *actualKind)) {
     Optional<InFlightDiagnostic> emittedDiag;
-    if (*actualKind == ImportKind::Type &&
-        isNominalImportKind(unbound.importKind.Item)) {
+    if (*actualKind == ImportKind::Type && isNominalImportKind(importKind)) {
       assert(decls.size() == 1 &&
              "if we start suggesting ImportKind::Type for, e.g., a mix of "
              "structs and classes, we'll need a different message here");
       assert(isa<TypeAliasDecl>(decls.front()) &&
              "ImportKind::Type is only the best choice for a typealias");
       auto *typealias = cast<TypeAliasDecl>(decls.front());
-      emittedDiag.emplace(ctx.Diags.diagnose(unbound.importLoc,
-          diag::imported_decl_is_wrong_kind_typealias,
+      emittedDiag.emplace(ctx.Diags.diagnose(
+          importLoc, diag::imported_decl_is_wrong_kind_typealias,
           typealias->getDescriptiveKind(),
           TypeAliasType::get(typealias, Type(), SubstitutionMap(),
                              typealias->getUnderlyingType()),
-                             getImportKindString(unbound.importKind.Item)));
+          getImportKindString(importKind)));
     } else {
-      emittedDiag.emplace(ctx.Diags.diagnose(unbound.importLoc,
-          diag::imported_decl_is_wrong_kind,
-          unbound.declPath.front().Item,
-          getImportKindString(unbound.importKind.Item),
-          static_cast<unsigned>(*actualKind)));
+      emittedDiag.emplace(ctx.Diags.diagnose(
+          importLoc, diag::imported_decl_is_wrong_kind, declPath.front().Item,
+          getImportKindString(importKind), static_cast<unsigned>(*actualKind)));
     }
 
-    emittedDiag->fixItReplace(SourceRange(unbound.importKind.Loc),
+    emittedDiag->fixItReplace(SourceRange(import->getKindLoc()),
                               getImportKindString(*actualKind));
     emittedDiag->flush();
 
@@ -825,8 +778,7 @@ void BoundImport::validateScope(SourceFile &SF) {
       ctx.Diags.diagnose(decls.front(), diag::decl_declared_here,
                          decls.front()->getFullName());
   }
-
-  unbound.getImportDecl().get()->setDecls(ctx.AllocateCopy(decls));
+  return ctx.AllocateCopy(decls);
 }
 
 //===----------------------------------------------------------------------===//
@@ -847,12 +799,9 @@ UnboundImport::UnboundImport(ASTContext &ctx,
                              const UnboundImport &base, Identifier overlayName,
                              const ImportedModuleDesc &declaringImport,
                              const ImportedModuleDesc &bystandingImport)
-  : importLoc(base.importLoc), options(), privateImportFileName(),
-    importKind({ ImportKind::Module, SourceLoc() }), modulePath(),
+  : importLoc(base.importLoc), options(), privateImportFileName(), modulePath(),
     // If the declaring import was scoped, inherit that scope in the
-    // overlay's import. Note that we do *not* set importKind; this keeps
-    // BoundImport::validateScope() from unnecessarily revalidating the
-    // scope.
+    // overlay's import.
     declPath(declaringImport.module.first),
     importOrUnderlyingModuleDecl(declaringImport.module.second)
 {
