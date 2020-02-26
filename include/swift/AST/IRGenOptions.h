@@ -267,7 +267,7 @@ public:
         LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
-        UseSwiftCall(false), UseTypeLayoutValueHandling(false), GenerateProfile(false),
+        UseSwiftCall(false), UseTypeLayoutValueHandling(true), GenerateProfile(false),
         EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
