@@ -164,7 +164,7 @@ assuming ``E``, ``F`` do not have any overriding declarations in the same file:
     return f.myPrivateVar
   }
 
-Advice: If WMO is enabled, Use 'internal' when declaration does not need to be accessed outside of module
+Advice: If WMO is enabled, use 'internal' when a declaration does not need to be accessed outside of module
 ---------------------------------------------------------------------------------------------------------
 
 WMO (see section above) causes the compiler to compile a module's
