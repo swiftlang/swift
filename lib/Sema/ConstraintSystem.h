@@ -1151,7 +1151,8 @@ struct DynamicCallableMethods {
 class SolutionApplicationTarget {
   enum class Kind {
     expression,
-    function
+    function,
+    stmtCondition
   } kind;
 
   union {
@@ -1189,6 +1190,11 @@ class SolutionApplicationTarget {
       AnyFunctionRef function;
       BraceStmt *body;
     } function;
+
+    struct {
+      StmtCondition stmtCondition;
+      DeclContext *dc;
+    } stmtCondition;
   };
 
   // If the pattern contains a single variable that has an attached
@@ -1211,6 +1217,12 @@ public:
   SolutionApplicationTarget(AnyFunctionRef fn)
       : SolutionApplicationTarget(fn, fn.getBody()) { }
 
+  SolutionApplicationTarget(StmtCondition stmtCondition, DeclContext *dc) {
+    kind = Kind::stmtCondition;
+    this->stmtCondition.stmtCondition = stmtCondition;
+    this->stmtCondition.dc = dc;
+  }
+
   SolutionApplicationTarget(AnyFunctionRef fn, BraceStmt *body) {
     kind = Kind::function;
     function.function = fn;
@@ -1228,6 +1240,7 @@ public:
       return expression.expression;
 
     case Kind::function:
+    case Kind::stmtCondition:
       return nullptr;
     }
   }
@@ -1239,6 +1252,9 @@ public:
 
     case Kind::function:
       return function.function.getAsDeclContext();
+
+    case Kind::stmtCondition:
+      return stmtCondition.dc;
     }
   }
 
@@ -1346,10 +1362,22 @@ public:
   Optional<AnyFunctionRef> getAsFunction() const {
     switch (kind) {
     case Kind::expression:
+    case Kind::stmtCondition:
       return None;
 
     case Kind::function:
       return function.function;
+    }
+  }
+
+  Optional<StmtCondition> getAsStmtCondition() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+      return None;
+
+      case Kind::stmtCondition:
+      return stmtCondition.stmtCondition;
     }
   }
 
@@ -1371,6 +1399,10 @@ public:
 
     case Kind::function:
       return function.body->getSourceRange();
+
+    case Kind::stmtCondition:
+      return SourceRange(stmtCondition.stmtCondition.front().getStartLoc(),
+                         stmtCondition.stmtCondition.back().getEndLoc());
     }
   }
 
@@ -1382,6 +1414,9 @@ public:
 
     case Kind::function:
       return function.function.getLoc();
+
+    case Kind::stmtCondition:
+      return stmtCondition.stmtCondition.front().getStartLoc();
     }
   }
 
@@ -4338,6 +4373,10 @@ public:
   /// \param target the target to which the solution will be applied.
   Optional<SolutionApplicationTarget> applySolution(
       Solution &solution, SolutionApplicationTarget target);
+
+  /// Apply the given solution to the given statement-condition.
+  Optional<StmtCondition> applySolution(
+      Solution &solution, StmtCondition condition, DeclContext *dc);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
