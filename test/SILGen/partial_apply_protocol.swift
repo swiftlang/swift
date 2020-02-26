@@ -30,13 +30,14 @@ func testClonable(c: Clonable) {
   // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}") Clonable>({{.*}}) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @thick τ_0_0.Type) -> @thick Clonable.Type
   let _: () -> Clonable.Type = c.cloneMetatype
 
-  // CHECK: [[METHOD_FN:%.*]] = witness_method $@opened("{{.*}}") Clonable, #Clonable.getCloneFn!1 : {{.*}}, {{.*}} : $*@opened("{{.*}}") Clonable : $@convention(witness_method: Clonable) <τ_0_0 where τ_0_0 : Clonable> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed () -> @out τ_0_0
-  // CHECK: [[RESULT:%.*]] = apply [[METHOD_FN]]<@opened("{{.*}}") Clonable>({{.*}}) : $@convention(witness_method: Clonable) <τ_0_0 where τ_0_0 : Clonable> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed () -> @out τ_0_0
+  // CHECK: [[METHOD_FN:%.*]] = witness_method $@opened("{{.*}}") Clonable, #Clonable.getCloneFn!1
+  // CHECK: [[RESULT:%.*]] = apply [[METHOD_FN]]<@opened("{{.*}}") Clonable>({{.*}})
+  // CHECK: [[CONV_RESULT:%.*]] = convert_function [[RESULT]]
   // CHECK: [[THUNK_FN:%.*]] = function_ref @$sxIegr_22partial_apply_protocol8Clonable_pIegr_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable
-  // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}") Clonable>([[RESULT]])
+  // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}") Clonable>([[CONV_RESULT]])
   let _: () -> Clonable = c.getCloneFn()
 
-  // CHECK: [[THUNK_FN:%.*]] = function_ref @$sxIegr_Iego_22partial_apply_protocol8Clonable_pIegr_Iego_AaBRzlTR
+  // CHECK: [[THUNK_FN:%.*]] = function_ref @$sxlyxIsegr_Iego_22partial_apply_protocol8Clonable_pIegr_Iego_AaBRzlTR
   // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}") Clonable>({{.*}})
   let _: () -> () -> Clonable = c.getCloneFn
 }
@@ -85,11 +86,12 @@ func testClonable(c: Clonable) {
 // CHECK-NEXT:    [[OUTER_RESULT:%.*]] = init_existential_metatype [[INNER_RESULT]]
 // CHECK-NEXT:    return [[OUTER_RESULT]]
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sxIegr_Iego_22partial_apply_protocol8Clonable_pIegr_Iego_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @owned @callee_guaranteed () -> @out τ_0_0) -> @owned @callee_guaranteed () -> @out Clonable
-// CHECK:       bb0(%0 : @guaranteed $@callee_guaranteed () -> @owned @callee_guaranteed () -> @out τ_0_0):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sxlyxIsegr_Iego_22partial_apply_protocol8Clonable_pIegr_Iego_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @owned @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <τ_0_0>) -> @owned @callee_guaranteed () -> @out Clonable
+// CHECK:       bb0(%0 :
 // CHECK-NEXT:    [[INNER_RESULT:%.*]] = apply %0()
+// CHECK-NEXT:    [[INNER_RESULT_CONV:%.*]] = convert_function [[INNER_RESULT]]
 // CHECK:         [[THUNK_FN:%.*]] = function_ref @$sxIegr_22partial_apply_protocol8Clonable_pIegr_AaBRzlTR
-// CHECK-NEXT:    [[OUTER_RESULT:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<τ_0_0>([[INNER_RESULT]])
+// CHECK-NEXT:    [[OUTER_RESULT:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<τ_0_0>([[INNER_RESULT_CONV]])
 // CHECK-NEXT:    return [[OUTER_RESULT]]
 
 //===----------------------------------------------------------------------===//
@@ -112,22 +114,23 @@ func testClonableInGenericContext<T>(c: Clonable, t: T) {
   // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}") Clonable>({{.*}}) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @thick τ_0_0.Type) -> @thick Clonable.Type
   let _: () -> Clonable.Type = c.cloneMetatype
 
-  // CHECK: [[METHOD_FN:%.*]] = witness_method $@opened("{{.*}}") Clonable, #Clonable.getCloneFn!1 : {{.*}}, {{.*}} : $*@opened("{{.*}}") Clonable : $@convention(witness_method: Clonable) <τ_0_0 where τ_0_0 : Clonable> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed () -> @out τ_0_0
-  // CHECK: [[RESULT:%.*]] = apply [[METHOD_FN]]<@opened("{{.*}}") Clonable>({{.*}}) : $@convention(witness_method: Clonable) <τ_0_0 where τ_0_0 : Clonable> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed () -> @out τ_0_0
+  // CHECK: [[METHOD_FN:%.*]] = witness_method $@opened("{{.*}}") Clonable, #Clonable.getCloneFn!1 :
+  // CHECK: [[RESULT:%.*]] = apply [[METHOD_FN]]<@opened("{{.*}}") Clonable>({{.*}})
+  // CHECK: [[RESULT_CONV:%.*]] = convert_function [[RESULT]]
   // CHECK: [[THUNK_FN:%.*]] = function_ref @$sxIegr_22partial_apply_protocol8Clonable_pIegr_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable
-  // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}") Clonable>([[RESULT]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable
+  // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}") Clonable>([[RESULT_CONV]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable
   let _: () -> Clonable = c.getCloneFn()
 
-  // CHECK: [[THUNK_FN:%.*]] = function_ref @$sxIegr_Iego_22partial_apply_protocol8Clonable_pIegr_Iego_AaBRzlTR
-  // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}") Clonable>({{.*}}) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @owned @callee_guaranteed () -> @out τ_0_0) -> @owned @callee_guaranteed () -> @out Clonable
+  // CHECK: [[THUNK_FN:%.*]] = function_ref @$sxlyxIsegr_Iego_22partial_apply_protocol8Clonable_pIegr_Iego_AaBRzlTR
+  // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<@opened("{{.*}}") Clonable>({{.*}}) 
   let _: () -> () -> Clonable = c.getCloneFn
 
   // CHECK: [[THUNK_FN:%.*]] = function_ref @$sxqd__Iegnr_x22partial_apply_protocol8Clonable_pIegnr_AaBRd__r__lTR : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0) -> @out τ_1_0) -> @out Clonable
   // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<T, @opened("{{.*}}") Clonable>({{.*}}) : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0) -> @out τ_1_0) -> @out Clonable
   let _: (T) -> Clonable = c.genericClone
 
-  // CHECK: [[THUNK_FN:%.*]] = function_ref @$sxqd__Iegr_Iegno_x22partial_apply_protocol8Clonable_pIegr_Iegno_AaBRd__r__lTR : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed () -> @out τ_1_0) -> @owned @callee_guaranteed () -> @out Clonable
-  // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<T, @opened("{{.*}}") Clonable>({{.*}}) : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed () -> @out τ_1_0) -> @owned @callee_guaranteed () -> @out Clonable
+  // CHECK: [[THUNK_FN:%.*]] = function_ref @$sxxlyqd__Isegr_Iegno_x22partial_apply_protocol8Clonable_pIegr_Iegno_AaBRd__r__lTR :
+  // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<T, @opened("{{.*}}") Clonable>({{.*}}) :
   let _: (T) -> () -> Clonable = c.genericGetCloneFn
 }
 
@@ -141,11 +144,12 @@ func testClonableInGenericContext<T>(c: Clonable, t: T) {
 // CHECK-NEXT:      dealloc_stack [[INNER_RESULT]]
 // CHECK-NEXT:      return [[EMPTY]]
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sxqd__Iegr_Iegno_x22partial_apply_protocol8Clonable_pIegr_Iegno_AaBRd__r__lTR : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed () -> @out τ_1_0) -> @owned @callee_guaranteed () -> @out Clonable
-// CHECK:         bb0(%0 : $*τ_0_0, %1 : @guaranteed $@callee_guaranteed (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed () -> @out τ_1_0):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sxxlyqd__Isegr_Iegno_x22partial_apply_protocol8Clonable_pIegr_Iegno_AaBRd__r__lTR : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <τ_1_0>) -> @owned @callee_guaranteed () -> @out Clonable {
+// CHECK: bb0(%0 : $*τ_0_0, %1 : @guaranteed $@callee_guaranteed (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <τ_1_0>):
 // CHECK-NEXT:      [[RES:%.*]] = apply %1(%0)
+// CHECK-NEXT:      [[RES_CONV:%.*]] = convert_function [[RES]]
 // CHECK:           [[THUNK_FN:%.*]] = function_ref @$sqd__Iegr_22partial_apply_protocol8Clonable_pIegr_AaBRd__r__lTR
-// CHECK-NEXT:      [[RESULT:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<τ_0_0, τ_1_0>([[RES]])
+// CHECK-NEXT:      [[RESULT:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<τ_0_0, τ_1_0>([[RES_CONV]])
 // CHECK-NEXT:      return [[RESULT]]
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sqd__Iegr_22partial_apply_protocol8Clonable_pIegr_AaBRd__r__lTR : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_1_0) -> @out Clonable {

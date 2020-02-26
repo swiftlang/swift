@@ -269,9 +269,13 @@ extension Outer : MyEquatable where Value : MyEquatable {
   public static func isEqual (lhs: Outer<Value>, rhs: Outer<Value>) -> Builtin.Int1
 }
 
-sil @$closure : $@convention(method) <Value where Value : MyEquatable> (Outer<Value>, Outer<Value>, @thin Outer<Value>.Type) -> Builtin.Int1
+public struct Outermost<Value> {
+}
 
-sil @$dont_crash_test_caputre_specialized_conditional_conformance : $@convention(thin) <Element where Element : MyEquatable> (Outer<Inner<Element>>) -> () {
+sil @$closure : $@convention(method) <Value where Value : MyEquatable> (Outer<Value>, Outer<Value>, @thin Outer<Value>.Type) -> Builtin.Int1
+sil @$closure2 : $@convention(method) <Value where Value : MyEquatable> (Outermost<Value>, Outermost<Value>, @thin Outermost<Value>.Type) -> Builtin.Int1
+
+sil @$dont_crash_test_capture_specialized_conditional_conformance : $@convention(thin) <Element where Element : MyEquatable> (Outer<Inner<Element>>) -> () {
 bb0(%0 : $Outer<Inner<Element>>):
   %2 = alloc_stack $Outer<Inner<Element>>
   store %0 to %2 : $*Outer<Inner<Element>>
@@ -283,6 +287,17 @@ bb0(%0 : $Outer<Inner<Element>>):
   %15 = tuple ()
   return %15 : $()
 }
+
+sil @$dont_crash_test_capture_specialized_conditional_conformance_nested : $@convention(thin) <Element where Element : MyEquatable> (Outer<Inner<Element>>) -> () {
+bb0(%0 : $Outer<Inner<Element>>):
+  %4 = metatype $@thin Outermost<Outer<Inner<Element>>>.Type
+  %5 = function_ref @$closure2 : $@convention(method) <Value where Value : MyEquatable> (Outermost<Value>, Outermost<Value>, @thin Outermost<Value>.Type) -> Builtin.Int1
+  %6 = partial_apply [callee_guaranteed] %5<Outer<Inner<Element>>>(%4) : $@convention(method) <Value where Value : MyEquatable> (Outermost<Value>, Outermost<Value>, @thin Outermost<Value>.Type) -> Builtin.Int1
+  strong_release %6 : $@callee_guaranteed (Outermost<Outer<Inner<Element>>>, Outermost<Outer<Inner<Element>>>) -> Builtin.Int1
+  %15 = tuple ()
+  return %15 : $()
+}
+
 
 sil_vtable WeakBox {}
 sil_vtable C {}

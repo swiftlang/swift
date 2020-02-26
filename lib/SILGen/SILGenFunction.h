@@ -530,6 +530,13 @@ public:
     return F.getTypeLowering(type);
   }
 
+  SILType getSILInterfaceType(SILParameterInfo param) const {
+    return silConv.getSILType(param, CanSILFunctionType());
+  }
+  SILType getSILInterfaceType(SILResultInfo result) const {
+    return silConv.getSILType(result, CanSILFunctionType());
+  }
+
   SILType getSILType(SILParameterInfo param, CanSILFunctionType fnTy) const {
     return silConv.getSILType(param, fnTy);
   }
@@ -1507,6 +1514,7 @@ public:
   RValue emitApplyOfPropertyWrapperBackingInitializer(
       SILLocation loc,
       VarDecl *var,
+      SubstitutionMap subs,
       RValue &&originalValue,
       SGFContext C = SGFContext());
 

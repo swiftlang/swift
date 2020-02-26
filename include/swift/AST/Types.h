@@ -892,14 +892,26 @@ public:
   /// Visit this type and the argument type in parallel, invoking the callback
   /// function with each archetype-to-substituted-type binding. The callback
   /// may return a new type to substitute into the result type, or return
-  /// CanType() to error out of the operation.
+  /// CanType() to error out of the operation. Each invocation of the callback
+  /// receives three arguments:
+  /// - The `orig` archetype from a position in `this` type.
+  /// - The `subst` type in the same structural position of `ty` that is trying to be bound
+  ///  to `orig`.
+  /// - The `upperBound` archetype, which if set, indicates the minimum set of constraints
+  ///  that any type substituted in this structural position must conform to. May be null,
+  ///  indicating an unconstrained context.
+  /// - If `upperBound` is set, then the `substConformances` array will contain the
+  ///  protocol conformances for `subst` to each of the protocol requirements
+  ///  on `upperBound` in `getConformsTo` order.
   ///
   /// Returns the substituted type, or a null CanType() if this type
   /// is not bindable to the substituted type, or the callback returns
   /// CanType().
   CanType substituteBindingsTo(Type ty,
-         llvm::function_ref<CanType(ArchetypeType*, CanType)> substFn);
-
+         llvm::function_ref<CanType(ArchetypeType *orig,
+                CanType subst,
+                ArchetypeType *upperBound,
+                ArrayRef<ProtocolConformanceRef> substConformances)> substFn);
   
   /// Determines whether this type is similar to \p other as defined by
   /// \p matchOptions.
@@ -1161,6 +1173,8 @@ public:
   /// object type.
   TypeTraitResult canBeClass();
 
+  Type replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const; // in SILType.cpp
+  
   /// Return the tangent space of the given type, if it exists. Otherwise,
   /// return `None`.
   Optional<TangentSpace>
@@ -3962,7 +3976,7 @@ public:
   }
 
   ValueOwnershipKind
-  getOwnershipKind(SILFunction &) const; // in SILType.cpp
+  getOwnershipKind(SILFunction &, CanSILFunctionType fTy) const; // in SILType.cpp
 
   bool operator==(SILResultInfo rhs) const {
     return TypeAndConvention == rhs.TypeAndConvention;

@@ -36,7 +36,7 @@ public protocol NSKeyValueObservingCustomization : NSObjectProtocol {
     static func automaticallyNotifiesObservers(for key: AnyKeyPath) -> Bool
 }
 
-fileprivate extension NSObject {
+private extension NSObject {
     
     @objc class func __old_unswizzled_automaticallyNotifiesObservers(forKey key: String?) -> Bool {
         fatalError("Should never be reached")
@@ -113,7 +113,7 @@ fileprivate extension NSObject {
     /// Temporarily maps a `String` to an `AnyKeyPath` that can be retrieved with `_bridgeKeyPath(_:)`.
     ///
     /// This uses a per-thread storage so key paths on other threads don't interfere.
-    @nonobjc fileprivate static func _withBridgeableKeyPath(from keyPathString: String, to keyPath: AnyKeyPath, block: () -> Void) {
+    @nonobjc static func _withBridgeableKeyPath(from keyPathString: String, to keyPath: AnyKeyPath, block: () -> Void) {
         _ = __KVOKeyPathBridgeMachinery.swizzler
         let key = BridgeKey(keyPathString)
         let oldValue = Thread.current.threadDictionary[key]
@@ -122,7 +122,7 @@ fileprivate extension NSObject {
         block()
     }
     
-    @nonobjc fileprivate static func _bridgeKeyPath(_ keyPath:String?) -> AnyKeyPath? {
+    @nonobjc static func _bridgeKeyPath(_ keyPath:String?) -> AnyKeyPath? {
         guard let keyPath = keyPath else { return nil }
         return Thread.current.threadDictionary[BridgeKey(keyPath)] as? AnyKeyPath
     }

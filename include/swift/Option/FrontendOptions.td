@@ -677,4 +677,10 @@ def previous_module_installname_map_file
 
 def enable_type_layouts : Flag<["-"], "enable-type-layout">,
   HelpText<"Enable type layout based lowering">;
+
+def disable_type_layouts : Flag<["-"], "disable-type-layout">,
+  HelpText<"Disable type layout based lowering">;
+
+def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
+  HelpText<"Don't lock interface file when building module">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

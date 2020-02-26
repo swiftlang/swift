@@ -433,7 +433,9 @@ bool CompilerInstance::setUpModuleLoaders() {
     auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
-        FEOpts.RemarkOnRebuildFromModuleInterface, IgnoreSourceInfoFile);
+        FEOpts.RemarkOnRebuildFromModuleInterface,
+        IgnoreSourceInfoFile,
+        FEOpts.DisableInterfaceFileLock);
     Context->addModuleLoader(std::move(PIML));
   }
 
@@ -640,7 +642,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
   return MainModule;
 }
 
-static void addAdditionalInitialImportsTo(
+void CompilerInstance::addAdditionalInitialImportsTo(
     SourceFile *SF, const CompilerInstance::ImplicitImports &implicitImports) {
   SmallVector<SourceFile::ImportedModuleDesc, 4> additionalImports;
 

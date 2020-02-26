@@ -1933,6 +1933,11 @@ public:
   SILType getSubstCalleeSILType() const {
     return SubstCalleeType;
   }
+  
+  void setSubstCalleeType(CanSILFunctionType t) {
+    SubstCalleeType = SILType::getPrimitiveObjectType(t);
+  }
+  
   SILFunctionConventions getSubstCalleeConv() const {
     return SILFunctionConventions(getSubstCalleeType(), this->getModule());
   }
@@ -4314,6 +4319,11 @@ public:
   bool withoutActuallyEscaping() const {
     return SILInstruction::Bits.ConvertFunctionInst.WithoutActuallyEscaping;
   }
+            
+  /// Returns `true` if the function conversion is between types with the same
+  /// argument and return types, as well as all other attributes, after substitution,
+  /// such as converting `$<A, B> in (A) -> B for <Int, String>` to `(Int) -> String`.
+  bool onlyConvertsSubstitutions() const;
 };
 
 /// ConvertEscapeToNoEscapeInst - Change the type of a escaping function value

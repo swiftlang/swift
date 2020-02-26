@@ -259,17 +259,13 @@ protected:
 
       // Generate constraints for the initialization.
       auto target = SolutionApplicationTarget::forInitialization(
-          patternBinding->getInit(index), dc, patternType, pattern);
+          patternBinding->getInit(index), dc, patternType, pattern,
+          /*bindPatternVarsOneWay=*/true);
       if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
         continue;
 
       // Keep track of this binding entry.
       applied.patternBindingEntries.insert({{patternBinding, index}, target});
-
-      // Bind the variables that occur in the pattern to the corresponding
-      // type entry for the pattern itself.
-      cs->bindVariablesInPattern(
-          pattern, cs->getConstraintLocator(target.getAsExpr()));
     }
   }
 
@@ -335,7 +331,7 @@ protected:
       addChild(captureExpr(expr, /*oneWay=*/true, node.get<Expr *>()));
     }
 
-    if (!cs)
+    if (!cs || hadError)
       return nullptr;
 
     // Call Builder.buildBlock(... args ...)
@@ -380,10 +376,6 @@ protected:
   static bool isBuildableIfChainRecursive(IfStmt *ifStmt,
                                           unsigned &numPayloads,
                                           bool &isOptional) {
-    // Check whether we can handle the conditional.
-    if (!ConstraintSystem::canGenerateConstraints(ifStmt->getCond()))
-      return false;
-
     // The 'then' clause contributes a payload.
     numPayloads++;
 
@@ -451,6 +443,14 @@ protected:
                                  unsigned numPayloads, bool isOptional,
                                  bool isTopLevel = false) {
     assert(payloadIndex < numPayloads);
+
+    // First generate constraints for the conditions. This can introduce
+    // variable bindings that will be used within the "then" branch.
+    if (cs && cs->generateConstraints(ifStmt->getCond(), dc)) {
+      hadError = true;
+      return nullptr;
+    }
+
     // Make sure we recursively visit both sides even if we're not
     // building expressions.
 
@@ -505,12 +505,6 @@ protected:
       elseExpr = buildWrappedChainPayload(
           buildVarRef(*elseChainVar, ifStmt->getEndLoc()),
           payloadIndex + 1, numPayloads, isOptional);
-    }
-
-    // Generate constraints for the conditions.
-    if (cs->generateConstraints(ifStmt->getCond(), dc)) {
-      hadError = true;
-      return nullptr;
     }
 
     // The operand should have optional type if we had optional results,
@@ -926,30 +920,9 @@ public:
 
   Stmt *visitIfStmt(IfStmt *ifStmt, FunctionBuilderTarget target) {
     // Rewrite the condition.
-    auto condition = ifStmt->getCond();
-    for (auto &condElement : condition) {
-      switch (condElement.getKind()) {
-      case StmtConditionElement::CK_Availability:
-        continue;
-
-      case StmtConditionElement::CK_Boolean: {
-        auto condExpr = condElement.getBoolean();
-        auto finalCondExpr = rewriteExpr(condExpr);
-
-        // Load the condition if needed.
-        if (finalCondExpr->getType()->hasLValueType()) {
-          finalCondExpr = TypeChecker::addImplicitLoadExpr(ctx, finalCondExpr);
-        }
-
-        condElement.setBoolean(finalCondExpr);
-        continue;
-      }
-
-      case StmtConditionElement::CK_PatternBinding:
-        llvm_unreachable("unhandled statement condition");
-      }
-    }
-    ifStmt->setCond(condition);
+    if (auto condition = rewriteTarget(
+            SolutionApplicationTarget(ifStmt->getCond(), dc)))
+      ifStmt->setCond(*condition->getAsStmtCondition());
 
     assert(target.kind == FunctionBuilderTarget::TemporaryVar);
     auto temporaryVar = target.captured.first;
@@ -1380,6 +1353,11 @@ public:
 
     // Otherwise, recurse into the statement normally.
     return std::make_pair(true, S);
+  }
+
+  /// Ignore patterns.
+  std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
+    return { false, pat };
   }
 };
 

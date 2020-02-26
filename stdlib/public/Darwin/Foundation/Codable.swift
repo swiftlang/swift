@@ -39,7 +39,7 @@ extension DecodingError {
     /// - parameter value: The value whose type to describe.
     /// - returns: A string describing `value`.
     /// - precondition: `value` is one of the types below.
-    fileprivate static func _typeDescription(of value: Any) -> String {
+    private static func _typeDescription(of value: Any) -> String {
         if value is NSNull {
             return "a null value"
         } else if value is NSNumber /* FIXME: If swift-corelibs-foundation isn't updated to use NSNumber, this check will be necessary: || value is Int || value is Double */ {

@@ -794,7 +794,7 @@ emitKeyPathComponent(IRGenModule &IGM,
 
       switch (getClassFieldAccess(IGM, loweredBaseContextTy, property)) {
       case FieldAccess::ConstantDirect: {
-        // Known constant fixed offset.
+        // Known compile-time constant field offset.
         auto offset = tryEmitConstantClassFragilePhysicalMemberOffset(
             IGM, loweredClassTy, property);
         assert(offset && "no constant offset for ConstantDirect field?!");
@@ -804,6 +804,9 @@ emitKeyPathComponent(IRGenModule &IGM,
       case FieldAccess::NonConstantDirect: {
         // A constant offset that's determined at class realization time.
         // We have to load the offset from a global ivar.
+        //
+        // This means the field offset is constant at runtime, but is not known
+        // at compile time.
         auto header = KeyPathComponentHeader
           ::forClassComponentWithUnresolvedIndirectOffset(property->isLet());
         fields.addInt32(header.getData());
@@ -814,10 +817,15 @@ emitKeyPathComponent(IRGenModule &IGM,
       }
       case FieldAccess::ConstantIndirect: {
         // An offset that depends on the instance's generic parameterization,
-        // but whose field offset is at a known vtable offset.
+        // but whose field offset is at a known metadata offset.
         auto header = KeyPathComponentHeader
           ::forClassComponentWithUnresolvedFieldOffset(property->isLet());
         fields.addInt32(header.getData());
+
+        // FIXME: This doesn't support classes with resilient ancestry, because
+        // the offset into the metadata is itself not constant.
+        //
+        // SILGen emits the descriptor as a computed property in this case.
         auto fieldOffset = getClassFieldOffsetOffset(
             IGM, loweredClassTy.getClassOrBoundGenericClass(), property);
         fields.addInt32(fieldOffset.getValue());

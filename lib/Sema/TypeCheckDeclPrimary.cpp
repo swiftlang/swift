@@ -1231,6 +1231,10 @@ public:
   
   void visitImportDecl(ImportDecl *ID) {
     TypeChecker::checkDeclAttributes(ID);
+
+    // Force the lookup of decls referenced by a scoped import in case it emits
+    // diagnostics.
+    (void)ID->getDecls();
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {

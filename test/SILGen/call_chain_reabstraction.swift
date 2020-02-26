@@ -8,8 +8,9 @@ struct A {
         // CHECK-LABEL: sil hidden [ossa] @$s24call_chain_reabstraction1AV1f{{[_0-9a-zA-Z]*}}F
         // CHECK:         [[G:%.*]] = function_ref @$s24call_chain_reabstraction1AV1g{{[_0-9a-zA-Z]*}}F
         // CHECK:         [[G2:%.*]] = apply [[G]]<A>
+        // CHECK:         [[G3:%.*]] = convert_function [[G2]]
         // CHECK:         [[REABSTRACT_THUNK:%.*]] = function_ref @$s24call_chain_reabstraction1AVA2CIegynr_A3CIegyyd_TR
-        // CHECK:         [[REABSTRACT:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_THUNK]]([[G2]])
+        // CHECK:         [[REABSTRACT:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_THUNK]]([[G3]])
         // CHECK:         [[BORROW:%.*]] = begin_borrow [[REABSTRACT]]
         // CHECK:         apply [[BORROW]]([[SELF:%.*]], [[SELF]])
         // CHECK:         destroy_value [[REABSTRACT]]

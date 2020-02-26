@@ -47,6 +47,7 @@ class NormalProtocolConformance;
 class ProtocolConformanceRef;
 class ProtocolDecl;
 class ProtocolType;
+class SILModule;
 class StructDecl;
 class SubstitutableType;
 class SubstitutionMap;

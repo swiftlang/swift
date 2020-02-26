@@ -42,3 +42,14 @@ extension Int {
 
 
 var (div, mod) = (9 / 4, 9 % 4)
+
+// rdar://problem/56212087 - solver fails to infer correct type for a generic parameter (Any vs. String)
+func test_transitive_inference_of_default_literal_types() {
+  func foo<T: ExpressibleByStringLiteral>(_: String, _: T) -> T {
+    fatalError()
+  }
+
+  func bar(_: Any?) {}
+
+  bar(foo("", "")) // Ok
+}

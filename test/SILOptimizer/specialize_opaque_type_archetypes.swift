@@ -412,9 +412,9 @@ func testIt<T>(cl: (Int64) throws -> T) {
 // CHECK-LABEL: sil shared [noinline] @$s1A16testPartialApplyyyxAA2P4RzlFAA2PAV_Tg5
 // CHECK:  [[PA:%.*]] = alloc_stack $PA
 // CHECK:  store %0 to [[PA]] : $*PA
-// CHECK:  [[F:%.*]] = function_ref @$s1A2PAVAA2P4A2aDP3fooy2ATQzs5Int64VFTW : $@convention(witness_method: P4) (Int64, @in_guaranteed PA) -> @out Int64
-// CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[PA]]) : $@convention(witness_method: P4) (Int64, @in_guaranteed PA) -> @out Int64
-// CHECK:  convert_function [[C]] : $@callee_guaranteed (Int64) -> @out Int64 to $@callee_guaranteed (Int64) -> (@out Int64, @error Error)
+// CHECK:  [[F:%.*]] = function_ref @$s1A2PAVAA2P4A2aDP3fooy2ATQzs5Int64VFTW :
+// CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[PA]])
+// CHECK:  convert_function [[C]] :
 @inline(never)
 func testPartialApply<T: P4>(_ t: T) {
   let fun = t.foo

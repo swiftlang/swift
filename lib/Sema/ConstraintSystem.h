@@ -868,6 +868,10 @@ public:
   /// Contextual types introduced by this solution.
   std::vector<std::pair<const Expr *, ContextualTypeInfo>> contextualTypes;
 
+  /// Maps statement condition entries to their solution application targets.
+  llvm::MapVector<const StmtConditionElement *, SolutionApplicationTarget>
+    stmtConditionTargets;
+
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
 
@@ -1047,8 +1051,15 @@ struct MemberLookupResult {
   /// If there is a favored candidate in the viable list, this indicates its
   /// index.
   unsigned FavoredChoice = ~0U;
-  
-  
+
+  /// The number of optional unwraps that were applied implicitly in the
+  /// lookup, for contexts where that is permitted.
+  unsigned numImplicitOptionalUnwraps = 0;
+
+  /// The base lookup type used to find the results, which will be non-null
+  /// only when it differs from the provided base type.
+  Type actualBaseType;
+
   /// This enum tracks reasons why a candidate is not viable.
   enum UnviableReason {
     /// This uses a type like Self in its signature that cannot be used on an
@@ -1140,7 +1151,8 @@ struct DynamicCallableMethods {
 class SolutionApplicationTarget {
   enum class Kind {
     expression,
-    function
+    function,
+    stmtCondition
   } kind;
 
   union {
@@ -1168,12 +1180,21 @@ class SolutionApplicationTarget {
 
       /// Whether the expression result will be discarded at the end.
       bool isDiscarded;
+
+      /// Whether to bind the variables encountered within the pattern to
+      /// fresh type variables via one-way constraints.
+      bool bindPatternVarsOneWay;
     } expression;
 
     struct {
       AnyFunctionRef function;
       BraceStmt *body;
     } function;
+
+    struct {
+      StmtCondition stmtCondition;
+      DeclContext *dc;
+    } stmtCondition;
   };
 
   // If the pattern contains a single variable that has an attached
@@ -1196,6 +1217,12 @@ public:
   SolutionApplicationTarget(AnyFunctionRef fn)
       : SolutionApplicationTarget(fn, fn.getBody()) { }
 
+  SolutionApplicationTarget(StmtCondition stmtCondition, DeclContext *dc) {
+    kind = Kind::stmtCondition;
+    this->stmtCondition.stmtCondition = stmtCondition;
+    this->stmtCondition.dc = dc;
+  }
+
   SolutionApplicationTarget(AnyFunctionRef fn, BraceStmt *body) {
     kind = Kind::function;
     function.function = fn;
@@ -1204,7 +1231,8 @@ public:
 
   /// Form a target for the initialization of a pattern from an expression.
   static SolutionApplicationTarget forInitialization(
-      Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern);
+      Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
+      bool bindPatternVarsOneWay);
 
   Expr *getAsExpr() const {
     switch (kind) {
@@ -1212,6 +1240,7 @@ public:
       return expression.expression;
 
     case Kind::function:
+    case Kind::stmtCondition:
       return nullptr;
     }
   }
@@ -1223,6 +1252,9 @@ public:
 
     case Kind::function:
       return function.function.getAsDeclContext();
+
+    case Kind::stmtCondition:
+      return stmtCondition.dc;
     }
   }
 
@@ -1289,6 +1321,14 @@ public:
         isa<OptionalSomePattern>(expression.pattern);
   }
 
+  /// Whether to bind the types of any variables within the pattern via
+  /// one-way constraints.
+  bool shouldBindPatternVarsOneWay() const {
+    return kind == Kind::expression &&
+        expression.contextualPurpose == CTP_Initialization &&
+        expression.bindPatternVarsOneWay;
+  }
+
   /// Retrieve the wrapped variable when initializing a pattern with a
   /// property wrapper.
   VarDecl *getInitializationWrappedVar() const {
@@ -1322,10 +1362,22 @@ public:
   Optional<AnyFunctionRef> getAsFunction() const {
     switch (kind) {
     case Kind::expression:
+    case Kind::stmtCondition:
       return None;
 
     case Kind::function:
       return function.function;
+    }
+  }
+
+  Optional<StmtCondition> getAsStmtCondition() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+      return None;
+
+      case Kind::stmtCondition:
+      return stmtCondition.stmtCondition;
     }
   }
 
@@ -1347,6 +1399,10 @@ public:
 
     case Kind::function:
       return function.body->getSourceRange();
+
+    case Kind::stmtCondition:
+      return SourceRange(stmtCondition.stmtCondition.front().getStartLoc(),
+                         stmtCondition.stmtCondition.back().getEndLoc());
     }
   }
 
@@ -1358,6 +1414,9 @@ public:
 
     case Kind::function:
       return function.function.getLoc();
+
+    case Kind::stmtCondition:
+      return stmtCondition.stmtCondition.front().getStartLoc();
     }
   }
 
@@ -1486,6 +1545,10 @@ private:
   llvm::MapVector<TypedNode, Type> NodeTypes;
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
       KeyPathComponentTypes;
+
+  /// Maps statement condition entries to their solution application targets.
+  llvm::MapVector<const StmtConditionElement *, SolutionApplicationTarget>
+    stmtConditionTargets;
 
   /// Contextual type information for expressions that are part of this
   /// constraint system.
@@ -2068,6 +2131,9 @@ public:
     /// The length of \c contextualTypes.
     unsigned numContextualTypes;
 
+    /// The length of \c stmtConditionTargets.
+    unsigned numStmtConditionTargets;
+
     /// The previous score.
     Score PreviousScore;
 
@@ -2353,6 +2419,22 @@ public:
     if (result)
       return result->purpose;
     return CTP_Unused;
+  }
+
+  void setStmtConditionTarget(
+      const StmtConditionElement *element, SolutionApplicationTarget target) {
+    assert(element != nullptr && "Expected non-null condition element!");
+    assert(stmtConditionTargets.count(element) == 0 &&
+           "Already set this condition target");
+    stmtConditionTargets.insert({element, target});
+  }
+
+  Optional<SolutionApplicationTarget> getStmtConditionTarget(
+      const StmtConditionElement *element) const {
+    auto known = stmtConditionTargets.find(element);
+    if (known == stmtConditionTargets.end())
+      return None;
+    return known->second;
   }
 
   /// Retrieve the constraint locator for the given anchor and
@@ -3233,34 +3315,14 @@ public:
   /// value of the given expression.
   ///
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
-  Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator);
-
-  /// Determines whether we can generate constraints for this statement
-  /// condition.
-  static bool canGenerateConstraints(StmtCondition condition);
+  Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator,
+                           bool bindPatternVarsOneWay);
 
   /// Generate constraints for a statement condition.
   ///
   /// \returns true if there was an error in constraint generation, false
   /// if generation succeeded.
   bool generateConstraints(StmtCondition condition, DeclContext *dc);
-
-  /// Provide a type for each variable that occurs within the given pattern,
-  /// by matching the pattern structurally with its already-computed pattern
-  /// type. The variables will either get a concrete type (when present in
-  /// the pattern type) or a fresh type variable bound to that part of the
-  /// pattern via a one-way constraint.
-  void bindVariablesInPattern(Pattern *pattern, Type patternType,
-                              ConstraintLocator *locator);
-
-  /// Provide a type for each variable that occurs within the given pattern,
-  /// by matching the pattern structurally with its already-computed pattern
-  /// type. The variables will either get a concrete type (when present in
-  /// the pattern type) or a fresh type variable bound to that part of the
-  /// pattern via a one-way constraint.
-  void bindVariablesInPattern(Pattern *pattern, ConstraintLocator *locator) {
-    bindVariablesInPattern(pattern, getType(pattern), locator);
-  }
 
   /// Generate constraints for a given set of overload choices.
   ///
@@ -4311,6 +4373,10 @@ public:
   /// \param target the target to which the solution will be applied.
   Optional<SolutionApplicationTarget> applySolution(
       Solution &solution, SolutionApplicationTarget target);
+
+  /// Apply the given solution to the given statement-condition.
+  Optional<StmtCondition> applySolution(
+      Solution &solution, StmtCondition condition, DeclContext *dc);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
