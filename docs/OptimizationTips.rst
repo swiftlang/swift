@@ -21,20 +21,13 @@ Enabling Optimizations
 ======================
 
 The first thing one should always do is to enable optimization. Swift provides
-four different optimization levels:
+three different optimization levels:
 
 - ``-Onone``: This is meant for normal development. It performs minimal
   optimizations and preserves all debug info.
 - ``-O``: This is meant for most production code. The compiler performs
   aggressive optimizations that can drastically change the type and amount of
   emitted code. Debug information will be emitted but will be lossy.
-- ``-Ounchecked``: This is a special optimization mode meant for specific
-  libraries or applications where one is willing to trade safety for
-  performance.  The compiler will remove all overflow checks as well as some
-  implicit type checks.  This is not intended to be used in general since it may
-  result in undetected memory safety issues and integer overflows. Only use this
-  if you have carefully reviewed that your code is safe with respect to integer
-  overflow and type casts.
 - ``-Osize``: This is a special optimization mode where the compiler prioritizes
   code size over performance.
 
