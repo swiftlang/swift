@@ -616,21 +616,6 @@ namespace {
       return !isa<FuncDecl>(member) || !cast<FuncDecl>(member)->isMutating();
     }
 
-    unsigned getNaturalArgumentCount(ValueDecl *member) {
-      if (isa<AbstractFunctionDecl>(member)) {
-        // For functions, close the existential once the function
-        // has been fully applied.
-        return 2;
-      } else {
-        // For storage, close the existential either when it's
-        // accessed (if it's an rvalue only) or when it is loaded or
-        // stored (if it's an lvalue).
-        assert(isa<AbstractStorageDecl>(member) &&
-              "unknown member when opening existential");
-        return 1;
-      }
-    }
-
     /// If the expression might be a dynamic method call, return the base
     /// value for the call.
     Expr *getBaseExpr(Expr *expr) {
@@ -730,7 +715,7 @@ namespace {
 
       // Determine the number of applications that need to occur before
       // we can close this existential, and record it.
-      unsigned maxArgCount = getNaturalArgumentCount(member);
+      unsigned maxArgCount = member->getNumCurryLevels();
       unsigned depth = ExprStack.size() - getArgCount(maxArgCount);
 
       // Invalid case -- direct call of a metatype. Has one less argument
