@@ -491,3 +491,48 @@ tuplify(true) { c in
 // CHECK-SAME: hello
 // CHECK-SAME: true
 
+// Use if let / if case with various forms of decomposition.
+func getOptionalInt(_: Bool) -> Int? { return 25 }
+
+enum E {
+  case a
+  case b(Int, String?)
+}
+
+func getE(_ i: Int) -> E {
+  switch i {
+  case 0:
+    return .a
+  case 1:
+    return .b(17, "hello")
+  case 2:
+    return .b(42, nil)
+  default:
+    fatalError("Unhandled case")
+  }
+}
+
+tuplify(true) { c in
+  "testIfLetMatching"
+  if let theValue = getOptionalInt(c) {
+    theValue + 17
+  }
+  if case let .a = getE(0) {
+    "matched without payload"
+  }
+  if case let .b(i, s?) = getE(1) {
+    "matched with payload"
+    s + "!"
+    i + 17
+  }
+  if case let .b(i, s?) = getE(2) {
+    fatalError("cannot match this")
+  } else {
+    "intentional mismatch"
+  }
+}
+// CHECK: testIfLetMatching
+// CHECK-SAME: Optional(42)
+// CHECK-SAME: Optional("matched without payload")
+// CHECK-SAME: "matched with payload", "hello!", 34
+// CHECK-SAME: "intentional mismatch"

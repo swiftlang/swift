@@ -1857,6 +1857,10 @@ ModuleDecl *ClangImporter::getImportedHeaderModule() const {
   return Impl.ImportedHeaderUnit->getParentModule();
 }
 
+ModuleDecl *ClangImporter::getWrapperForModule(const clang::Module *mod) const {
+  return Impl.getWrapperForModule(mod)->getParentModule();
+}
+
 PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
     : platformKind(targetPlatform(langOpts)) {
   switch (platformKind) {

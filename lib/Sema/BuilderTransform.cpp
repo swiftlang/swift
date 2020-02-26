@@ -259,17 +259,13 @@ protected:
 
       // Generate constraints for the initialization.
       auto target = SolutionApplicationTarget::forInitialization(
-          patternBinding->getInit(index), dc, patternType, pattern);
+          patternBinding->getInit(index), dc, patternType, pattern,
+          /*bindPatternVarsOneWay=*/true);
       if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
         continue;
 
       // Keep track of this binding entry.
       applied.patternBindingEntries.insert({{patternBinding, index}, target});
-
-      // Bind the variables that occur in the pattern to the corresponding
-      // type entry for the pattern itself.
-      cs->bindVariablesInPattern(
-          pattern, cs->getConstraintLocator(target.getAsExpr()));
     }
   }
 
@@ -380,10 +376,6 @@ protected:
   static bool isBuildableIfChainRecursive(IfStmt *ifStmt,
                                           unsigned &numPayloads,
                                           bool &isOptional) {
-    // Check whether we can handle the conditional.
-    if (!ConstraintSystem::canGenerateConstraints(ifStmt->getCond()))
-      return false;
-
     // The 'then' clause contributes a payload.
     numPayloads++;
 
@@ -451,6 +443,14 @@ protected:
                                  unsigned numPayloads, bool isOptional,
                                  bool isTopLevel = false) {
     assert(payloadIndex < numPayloads);
+
+    // First generate constraints for the conditions. This can introduce
+    // variable bindings that will be used within the "then" branch.
+    if (cs && cs->generateConstraints(ifStmt->getCond(), dc)) {
+      hadError = true;
+      return nullptr;
+    }
+
     // Make sure we recursively visit both sides even if we're not
     // building expressions.
 
@@ -505,12 +505,6 @@ protected:
       elseExpr = buildWrappedChainPayload(
           buildVarRef(*elseChainVar, ifStmt->getEndLoc()),
           payloadIndex + 1, numPayloads, isOptional);
-    }
-
-    // Generate constraints for the conditions.
-    if (cs->generateConstraints(ifStmt->getCond(), dc)) {
-      hadError = true;
-      return nullptr;
     }
 
     // The operand should have optional type if we had optional results,
@@ -945,8 +939,16 @@ public:
         continue;
       }
 
-      case StmtConditionElement::CK_PatternBinding:
-        llvm_unreachable("unhandled statement condition");
+      case StmtConditionElement::CK_PatternBinding: {
+        ConstraintSystem &cs = solution.getConstraintSystem();
+        auto target = *cs.getStmtConditionTarget(&condElement);
+        auto resolvedTarget = rewriteTarget(target);
+        if (resolvedTarget) {
+          condElement.setInitializer(resolvedTarget->getAsExpr());
+          condElement.setPattern(resolvedTarget->getInitializationPattern());
+        }
+        continue;
+      }
       }
     }
     ifStmt->setCond(condition);

@@ -21,6 +21,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileUnit.h"
@@ -438,6 +439,21 @@ SourceLookupCache &ModuleDecl::getSourceLookupCache() const {
         std::make_unique<SourceLookupCache>(*this);
   }
   return *Cache;
+}
+
+ModuleDecl *ModuleDecl::getTopLevelModule() {
+  // If this is a Clang module, ask the Clang importer for the top-level module.
+  // We need to check isNonSwiftModule() to ensure we don't look through
+  // overlays.
+  if (isNonSwiftModule()) {
+    if (auto *underlying = findUnderlyingClangModule()) {
+      auto &ctx = getASTContext();
+      auto *clangLoader = ctx.getClangModuleLoader();
+      return clangLoader->getWrapperForModule(underlying->getTopLevelModule());
+    }
+  }
+  // Swift modules don't currently support submodules.
+  return this;
 }
 
 static bool isParsedModule(const ModuleDecl *mod) {
