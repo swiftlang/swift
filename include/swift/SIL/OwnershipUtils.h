@@ -564,6 +564,14 @@ bool getAllBorrowIntroducingValues(
 Optional<BorrowScopeIntroducingValue>
 getSingleBorrowIntroducingValue(SILValue value);
 
+/// Look up through the def-use chain of \p inputValue, looking for an initial
+/// "borrow" introducing value. If at any point, we find two introducers or we
+/// find a point in the chain we do not understand, we bail and return false. If
+/// we are able to understand all of the def-use graph and only find a single
+/// introducer, then we return a .some(BorrowScopeIntroducingValue).
+Optional<BorrowScopeIntroducingValue>
+getSingleBorrowIntroducingValue(SILValue inputValue);
+
 } // namespace swift
 
 #endif

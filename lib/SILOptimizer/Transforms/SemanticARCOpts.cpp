@@ -1091,45 +1091,50 @@ public:
     if (!field->getField()->isLet()) {
       return answer(true);
     }
-    
-    // The lifetime of the `let` is guaranteed if it's dominated by the
-    // guarantee on the base. Check for a borrow.
-    SILValue baseObject = field->getOperand();
-    auto beginBorrow = dyn_cast<BeginBorrowInst>(baseObject);
-    if (beginBorrow)
-      baseObject = beginBorrow->getOperand();
-    baseObject = stripCasts(baseObject);
 
-    // A guaranteed argument trivially keeps the base alive for the duration of
-    // the projection.
-    if (auto *arg = dyn_cast<SILFunctionArgument>(baseObject)) {
-      if (arg->getArgumentConvention().isGuaranteedConvention()) {
+    // The lifetime of the `let` is guaranteed if it's dominated by the
+    // guarantee on the base. See if we can find a single borrow introducer for
+    // this object. If we could not find a single such borrow introducer, assume
+    // that our property is conservatively written to.
+    SILValue baseObject = field->getOperand();
+    auto value = getSingleBorrowIntroducingValue(baseObject);
+    if (!value) {
+      return answer(true);
+    }
+
+    // Ok, we have a single borrow introducing value. First do a quick check if
+    // we have a non-local scope that is a function argument. In such a case, we
+    // know statically that our let can not be written to in the current
+    // function. To be conservative, assume that all other non-local scopes
+    // write to memory.
+    if (!value->isLocalScope()) {
+      if (value->kind == BorrowScopeIntroducingValueKind::SILFunctionArgument) {
         return answer(false);
       }
-    }
-    
-    // See if there's a borrow of the base object our load is based on.
-    SILValue borrowInst;
-    if (isa<LoadBorrowInst>(baseObject)) {
-      borrowInst = baseObject;
-    } else {
-      borrowInst = beginBorrow;
-    }
-    // TODO: We could also look at a guaranteed phi argument and see whether
-    // the loaded copy is dominated by it.
-    if (!borrowInst)
-      return answer(true);
 
-    // Use the linear lifetime checker to check whether the copied
-    // value is dominated by the lifetime of the borrow it's based on.
-    SmallVector<SILInstruction *, 4> baseEndBorrows;
-    llvm::copy(borrowInst->getUsersOfType<EndBorrowInst>(),
-               std::back_inserter(baseEndBorrows));
+      // TODO: Once we model Coroutine results as non-local scopes, we should be
+      // able to return false here for them as well.
+      return answer(true);
+    }
+
+    // TODO: This is disabled temporarily for guaranteed phi args just for
+    // staging purposes. Thus be conservative and assume true in these cases.
+    if (value->kind == BorrowScopeIntroducingValueKind::Phi) {
+      return answer(true);
+    }
+
+    // Ok, we now know that we have a local scope whose lifetime we need to
+    // analyze. With that in mind, gather up the lifetime ending uses of our
+    // borrow scope introducing value and then use the linear lifetime checker
+    // to check whether the copied value is dominated by the lifetime of the
+    // borrow it's based on.
+    SmallVector<SILInstruction *, 4> endScopeInsts;
+    value->getLocalScopeEndingInstructions(endScopeInsts);
 
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
     // Returns true on success. So we invert.
-    bool foundError = !checker.validateLifetime(baseObject, baseEndBorrows,
+    bool foundError = !checker.validateLifetime(baseObject, endScopeInsts,
                                                 liveRange.getDestroys());
     return answer(foundError);
   }
