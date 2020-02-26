@@ -4756,10 +4756,9 @@ getLoweredFunctionPointer(IRGenSILFunction &IGF, SILValue v) {
 
 void IRGenSILFunction::visitThinToThickFunctionInst(
                                             swift::ThinToThickFunctionInst *i) {
-
-  if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
-    auto fn = getLoweredFunctionPointer(*this, i->getCallee());
-    auto fnTy = i->getCallee()->getType().castTo<SILFunctionType>();
+  auto fn = getLoweredFunctionPointer(*this, i->getCallee());
+  auto fnTy = i->getCallee()->getType().castTo<SILFunctionType>();
+  if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::Wasm && !fnTy->hasErrorResult()) {
     Optional<FunctionPointer> staticFn;
     if (fn.isConstant()) staticFn = fn;
     auto thunkFn = getThinToThickForwarder(IGM, staticFn, fnTy);
