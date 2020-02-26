@@ -228,6 +228,16 @@ class Noot : Aap {
   override func map() -> (S?) -> () -> Noot {}
 }
 
+// rdar://problem/59669591
+class Base {
+  func returnsOptional() -> Int? { return nil }
+}
+
+class Derived<Foo> : Base {
+  // The thunk here needs to be generic.
+  override func returnsOptional() -> Int { return 0 }
+}
+
 // CHECK-LABEL: sil private [thunk] [ossa] @$s13vtable_thunks3BarC3foo{{[_0-9a-zA-Z]*}}FTV : $@convention(method) (@guaranteed @callee_guaranteed (Int) -> Int, @guaranteed Bar) -> @owned Optional<@callee_guaranteed (Int) -> Int>
 // CHECK:         [[IMPL:%.*]] = function_ref @$s13vtable_thunks3BarC3foo{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[IMPL]]
@@ -256,6 +266,8 @@ class Noot : Aap {
 // CHECK:         [[INNER:%.*]] = apply %1([[ARG]])
 // CHECK:         [[OUTER:%.*]] = convert_function [[INNER]] : $@callee_guaranteed () -> @owned Noot to $@callee_guaranteed () -> @owned Optional<Aap>
 // CHECK:         return [[OUTER]]
+
+// CHECK-LABEL: sil private [thunk] [ossa] @$s13vtable_thunks7DerivedC15returnsOptionalSiyFAA4BaseCADSiSgyFTV : $@convention(method) <τ_0_0> (@guaranteed Derived<τ_0_0>) -> Optional<Int> {
 
 // CHECK-LABEL: sil_vtable D {
 // CHECK:         #B.iuo!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
@@ -321,3 +333,8 @@ class Noot : Aap {
 // CHECK-LABEL: sil_vtable NoThrowVariance {
 // CHECK:         #ThrowVariance.mightThrow!1: {{.*}} : @$s13vtable_thunks{{[A-Z0-9a-z_]*}}F
 
+// CHECK-LABEL: sil_vtable Base {
+// CHECK:         #Base.returnsOptional!1: (Base) -> () -> Int? : @$s13vtable_thunks4BaseC15returnsOptionalSiSgyF
+
+// CHECK-LABEL: sil_vtable Derived {
+// CHECK:         #Base.returnsOptional!1: (Base) -> () -> Int? : @$s13vtable_thunks7DerivedC15returnsOptionalSiyFAA4BaseCADSiSgyFTV [override]
