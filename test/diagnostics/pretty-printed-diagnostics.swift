@@ -13,7 +13,7 @@ func baz() {
   bar(a: "hello, world!")
 }
 
-struct Foo: Codable {
+struct Foo {
   var x: Int
   var x: Int
 }
@@ -37,6 +37,10 @@ let abc = "👍
 let x = {
   let y = 1
   return y
+}
+
+struct B: Decodable {
+  let a: Foo
 }
 
 // Test fallback for non-ASCII characters.
@@ -64,33 +68,12 @@ let x = {
 
 
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:18:7
-// CHECK: 16 | struct Foo: Codable {
+// CHECK: 16 | struct Foo {
 // CHECK: 17 |   var x: Int
 // CHECK:    |       ^ note: 'x' previously declared here
 // CHECK: 18 |   var x: Int
 // CHECK:    |       ^ error: invalid redeclaration of 'x'
 // CHECK: 19 | }
-
-// Test fallback for invalid locations.
-// CHECK: Unknown Location
-// CHECK:    | error: invalid redeclaration of 'x'
-// CHECK:    | note: 'x' previously declared here
-
-// Test cross-file and decl anchored diagnostics.
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:16:8
-// CHECK: 15 |
-// CHECK: 16 | struct Foo: Codable {
-// CHECK:    |        ^ error: type 'Foo' does not conform to protocol 'Encodable'
-// CHECK: 17 |   var x: Int
-// CHECK: 18 |   var x: Int
-// CHECK:    |       ^ note: cannot automatically synthesize 'Encodable' because
-// CHECK:    |       ^ note: cannot automatically synthesize 'Encodable' because
-// CHECK: 19 | }
-// CHECK: Swift.Encodable:2:10
-// CHECK: 1 | public protocol Encodable {
-// CHECK: 2 |     func encode(to encoder: Encoder) throws
-// CHECK:   |          ^ note: protocol requires function 'encode(to:)' with type 'Encodable'
-// CHECK: 3 | }
 
 // Test out-of-line fix-its on notes.
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:28:1
@@ -124,6 +107,19 @@ let x = {
 // CHECK: 37 | let x = { () -> Result in
 // CHECK:    |         ^ error: unable to infer complex closure return type; add explicit type to disambiguate
 // CHECK: 38 |   let y = 1
+
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:42:8
+// CHECK: 41 |
+// CHECK: 42 | struct B: Decodable {
+// CHECK:    |        ^ error: type 'B' does not conform to protocol 'Decodable'
+// CHECK: 43 |   let a: Foo
+// CHECK:    |       ^ note: cannot automatically synthesize 'Decodable' because 'Foo' does not conform to 'Decodable'
+// CHECK: 44 | }
+// CHECK: Swift.Decodable:2:5
+// CHECK: 1 | public protocol Decodable {
+// CHECK: 2 |     init(from decoder: Decoder) throws
+// CHECK:   |     ^ note: protocol requires initializer 'init(from:)' with type 'Decodable'
+// CHECK: 3 | }
 
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:6:5
 // CHECK: 5 | func foo(a: Int, b: Int) {
