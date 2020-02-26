@@ -3838,11 +3838,14 @@ public:
   /// The body of an autoclosure always consists of a single expression.
   Expr *getSingleExpressionBody() const;
 
-  /// Unwraps a curry thunk.
+  /// Unwraps a curry thunk. Basically, this gives you what the old AST looked
+  /// like, before Sema started building curry thunks. This is really only
+  /// meant for legacy usages.
   ///
-  /// If this is a double curry thunk, return the original DeclRefExpr.
-  /// If this is a single curry thunk, return the ApplyExpr for the self call.
-  /// Otherwise, return null.
+  /// The behavior is as follows, based on the kind:
+  /// - for double curry thunks, returns the original DeclRefExpr.
+  /// - for single curry thunks, returns the ApplyExpr for the self call.
+  /// - otherwise, returns nullptr for convenience.
   Expr *getUnwrappedCurryThunkExpr() const;
 
   // Implement isa/cast/dyncast/etc.
