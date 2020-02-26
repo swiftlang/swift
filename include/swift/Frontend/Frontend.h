@@ -653,6 +653,9 @@ public: // for static functions in Frontend.cpp
     explicit ImplicitImports(CompilerInstance &compiler);
   };
 
+  static void addAdditionalInitialImportsTo(
+    SourceFile *SF, const ImplicitImports &implicitImports);
+
 private:
   void addMainFileToModule(const ImplicitImports &implicitImports);
 
