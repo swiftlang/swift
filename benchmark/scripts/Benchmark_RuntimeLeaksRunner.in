@@ -89,6 +89,7 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            universal_newlines=True,
         )
         error_out = p.communicate()[1].split("\n")
         result = p.returncode
@@ -102,7 +103,7 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
         try:
             args = [data, num_iters]
             result = perf_test_driver.run_with_timeout(self.run_test_inner, args)
-        except Exception, e:
+        except Exception as e:
             sys.stderr.write(
                 "Child Process Failed! (%s,%s). Error: %s\n"
                 % (data["path"], data["test_name"], e)

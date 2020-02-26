@@ -30,6 +30,7 @@ class `ReportFormatter` creates the test comparison report in specified format.
 from __future__ import print_function
 
 import argparse
+import functools
 import re
 import sys
 from bisect import bisect, bisect_left, bisect_right
@@ -142,7 +143,7 @@ class PerformanceTestSamples(object):
     @property
     def all_samples(self):
         """List of all samples in ascending order."""
-        return sorted(self.samples + self.outliers, key=lambda s: s.i)
+        return sorted(self.samples + self.outliers, key=lambda s: s.i or -1)
 
     @property
     def min(self):
@@ -189,13 +190,16 @@ class PerformanceTestSamples(object):
         return 0 if self.count < 2 else sqrt(self.S_runtime / (self.count - 1))
 
     @staticmethod
-    def running_mean_variance((k, M_, S_), x):
+    def running_mean_variance(stats, x):
         """Compute running variance, B. P. Welford's method.
 
         See Knuth TAOCP vol 2, 3rd edition, page 232, or
         https://www.johndcook.com/blog/standard_deviation/
         M is mean, Standard Deviation is defined as sqrt(S/k-1)
         """
+
+        (k, M_, S_) = stats
+
         k = float(k + 1)
         M = M_ + (x - M_) / k
         S = S_ + (x - M_) * (x - M)
@@ -247,7 +251,7 @@ class PerformanceTestResult(object):
             runtimes = csv_row[3:mem_index] if memory or meta else csv_row[3:]
             if delta:
                 runtimes = [int(x) if x else 0 for x in runtimes]
-                runtimes = reduce(
+                runtimes = functools.reduce(
                     lambda l, x: l.append(l[-1] + x) or l if l else [x],  # runnin
                     runtimes,
                     None,
@@ -315,7 +319,8 @@ class PerformanceTestResult(object):
         """
         # Statistics
         if self.samples and r.samples:
-            map(self.samples.add, r.samples.samples)
+            for sample in r.samples.samples:
+                self.samples.add(sample)
             sams = self.samples
             self.num_samples = sams.num_samples
             self.min, self.max, self.median, self.mean, self.sd = (
@@ -490,7 +495,7 @@ class LogParser(object):
                 names[r.name].merge(r)
             return names
 
-        return reduce(add_or_merge, tests, dict())
+        return functools.reduce(add_or_merge, tests, dict())
 
     @staticmethod
     def results_from_string(log_contents):
@@ -544,10 +549,12 @@ class TestComparator(object):
         def compare(name):
             return ResultComparison(old_results[name], new_results[name])
 
-        comparisons = map(compare, comparable_tests)
+        comparisons = list(map(compare, comparable_tests))
 
         def partition(l, p):
-            return reduce(lambda x, y: x[not p(y)].append(y) or x, l, ([], []))
+            return functools.reduce(
+                lambda x, y: x[not p(y)].append(y) or x, l, ([], [])
+            )
 
         decreased, not_decreased = partition(
             comparisons, lambda c: c.ratio < (1 - delta_threshold)
@@ -668,7 +675,7 @@ class ReportFormatter(object):
         def max_widths(maximum, widths):
             return map(max, zip(maximum, widths))
 
-        return reduce(max_widths, widths, [0] * 5)
+        return list(functools.reduce(max_widths, widths, [0] * 5))
 
     def _formatted_text(
         self, label_formatter, COLUMN_SEPARATOR, DELIMITER_ROW, SEPARATOR, SECTION
