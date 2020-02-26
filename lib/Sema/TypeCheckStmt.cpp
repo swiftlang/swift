@@ -1466,8 +1466,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         isa<DotSyntaxCallExpr>(E) ? cast<DotSyntaxCallExpr>(E)->getFn() : E;
 
     if (auto *Fn = dyn_cast<ApplyExpr>(expr)) {
-      if (auto *declRef = dyn_cast<DeclRefExpr>(Fn->getFn())) {
-        if (auto *FD = dyn_cast<AbstractFunctionDecl>(declRef->getDecl())) {
+      if (auto *calledValue = Fn->getCalledValue()) {
+        if (auto *FD = dyn_cast<AbstractFunctionDecl>(calledValue)) {
           if (FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
             isDiscardable = true;
           }
