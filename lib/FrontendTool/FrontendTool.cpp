@@ -775,7 +775,8 @@ static bool buildModuleFromInterface(const CompilerInvocation &Invocation,
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.TrackSystemDeps, FEOpts.RemarkOnRebuildFromModuleInterface);
+      FEOpts.TrackSystemDeps, FEOpts.RemarkOnRebuildFromModuleInterface,
+      FEOpts.DisableInterfaceFileLock);
 }
 
 static bool compileLLVMIR(const CompilerInvocation &Invocation,
