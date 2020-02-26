@@ -5067,24 +5067,10 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
 RValue SILGenFunction::emitApplyOfPropertyWrapperBackingInitializer(
     SILLocation loc,
     VarDecl *var,
+    SubstitutionMap subs,
     RValue &&originalValue,
     SGFContext C) {
   SILDeclRef constant(var, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
-
-  SubstitutionMap subs;
-  auto varDC = var->getInnermostDeclContext();
-  if (auto genericSig = varDC->getGenericSignatureOfContext()) {
-    subs = SubstitutionMap::get(
-        genericSig,
-        [&](SubstitutableType *type) {
-          if (auto gp = type->getAs<GenericTypeParamType>()) {
-            return F.mapTypeIntoContext(gp);
-          }
-
-          return Type(type);
-        },
-        LookUpConformanceInModule(varDC->getParentModule()));
-  }
 
   FormalEvaluationScope writebackScope(*this);
 

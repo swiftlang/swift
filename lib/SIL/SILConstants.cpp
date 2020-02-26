@@ -20,7 +20,7 @@ using namespace swift;
 
 namespace swift {
 llvm::cl::opt<unsigned>
-    ConstExprLimit("constexpr-limit", llvm::cl::init(2048),
+    ConstExprLimit("constexpr-limit", llvm::cl::init(3072),
                    llvm::cl::desc("Number of instructions interpreted in a"
                                   " constexpr function"));
 }
