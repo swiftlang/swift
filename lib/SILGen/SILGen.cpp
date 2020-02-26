@@ -612,9 +612,13 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   // Note: Do not provide any SILLocation. You can set it afterwards.
   SILGenFunctionBuilder builder(*this);
-  auto *F = builder.getOrCreateFunction(constant.hasDecl() ? constant.getDecl()
-                                                           : (Decl *)nullptr,
-                                        constant, forDefinition);
+  auto &IGM = *this;
+  auto *F = builder.getOrCreateFunction(
+      constant.hasDecl() ? constant.getDecl() : (Decl *)nullptr, constant,
+      forDefinition,
+      [&IGM](SILLocation loc, SILDeclRef constant) -> SILFunction * {
+        return IGM.getFunction(constant, NotForDefinition);
+      });
   setUpForProfiling(constant, F, forDefinition);
 
   assert(F && "SILFunction should have been defined");
