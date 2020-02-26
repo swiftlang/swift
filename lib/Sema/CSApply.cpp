@@ -7171,13 +7171,8 @@ namespace {
               [&](SolutionApplicationTarget target) {
                 auto resultTarget = rewriteTarget(target);
                 if (resultTarget) {
-
-                  if (auto expr = resultTarget->getAsExpr()) {
+                  if (auto expr = resultTarget->getAsExpr())
                     Rewriter.solution.setExprTypes(expr);
-                  } else if (auto stmtCondition =
-                                 resultTarget->getAsStmtCondition()) {
-
-                  }
                 }
 
                 return resultTarget;
@@ -7454,6 +7449,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
           return None;
 
         // Load the condition if needed.
+        solution.setExprTypes(finalCondExpr);
         if (finalCondExpr->getType()->hasLValueType()) {
           ASTContext &ctx = solution.getConstraintSystem().getASTContext();
           finalCondExpr = TypeChecker::addImplicitLoadExpr(ctx, finalCondExpr);
@@ -7470,6 +7466,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
         if (!resolvedTarget)
           return None;
 
+        solution.setExprTypes(resolvedTarget->getAsExpr());
         condElement.setInitializer(resolvedTarget->getAsExpr());
         condElement.setPattern(resolvedTarget->getInitializationPattern());
         continue;
@@ -7490,8 +7487,8 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
         [&](SolutionApplicationTarget target) {
           auto resultTarget = rewriteTarget(target);
           if (resultTarget) {
-            SetExprTypes typeSetter(solution);
-            resultTarget->walk(typeSetter);
+            if (auto expr = resultTarget->getAsExpr())
+              solution.setExprTypes(expr);
           }
 
           return resultTarget;
