@@ -338,10 +338,12 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
 
 static void addIndirectResultAttributes(IRGenModule &IGM,
                                         llvm::AttributeList &attrs,
-                                        unsigned paramIndex, bool allowSRet) {
+                                        unsigned paramIndex, bool allowSRet,
+                                        bool noCapture = true) {
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::NoAlias);
-  b.addAttribute(llvm::Attribute::NoCapture);
+  if (noCapture)
+    b.addAttribute(llvm::Attribute::NoCapture);
   if (allowSRet)
     b.addAttribute(llvm::Attribute::StructRet);
   attrs = attrs.addAttributes(IGM.getLLVMContext(),
@@ -428,7 +430,7 @@ namespace {
 
   private:
     void expand(SILParameterInfo param);
-    llvm::Type *addIndirectResult();
+    llvm::Type *addIndirectResult(bool noCapture = true);
 
     SILFunctionConventions getSILFuncConventions() const {
       return SILFunctionConventions(FnType, IGM.getSILModule());
@@ -482,7 +484,8 @@ llvm::Type *SignatureExpansion::addIndirectResult() {
   auto resultType = getSILFuncConventions().getSILResultType(
       IGM.getMaximalTypeExpansionContext());
   const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
-  addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), claimSRet());
+  addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), claimSRet(),
+                              noCapture);
   addPointerParameter(resultTI.getStorageType());
   return IGM.VoidTy;
 }
@@ -1306,6 +1309,9 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   // Convert each parameter to a Clang type.
   for (auto param : params) {
     auto clangTy = IGM.getClangType(param, FnType);
+    if (clangTy->isVoidType()) {
+      continue;
+    }
     paramTys.push_back(clangTy);
   }
 
@@ -1330,8 +1336,17 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   }
 
   // If we return indirectly, that is the first parameter type.
-  if (returnInfo.isIndirect()) {
-    addIndirectResult();
+  bool formalIndirect = FnType->getNumResults() > 0 &&
+                        FnType->getSingleResult().isFormalIndirect();
+  if (formalIndirect || returnInfo.isIndirect()) {
+    // Specify "nocapture" if we're returning the result indirectly for
+    // low-level ABI reasons, as the called function never sees the implicit
+    // output parameter.
+    // On the other hand, if the result is a formal indirect result in SIL, that
+    // means that the Clang function has an explicit output parameter (e.g. it's
+    // a C++ constructor), which it might capture -- so don't specify
+    // "nocapture" in that case.
+    addIndirectResult(/* noCapture = */ returnInfo.isIndirect());
   }
 
   size_t firstParamToLowerNormally = 0;

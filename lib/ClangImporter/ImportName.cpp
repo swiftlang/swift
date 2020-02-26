@@ -1600,6 +1600,20 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   ArrayRef<const clang::ParmVarDecl *> params;
   switch (D->getDeclName().getNameKind()) {
   case clang::DeclarationName::CXXConstructorName:
+    isInitializer = true;
+    isFunction = true;
+    result.info.initKind = CtorInitializerKind::Designated;
+    baseName = "init";
+    // Add empty argument names.
+    if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(D)) {
+      for (size_t i = 0; i < ctor->param_size(); ++i) {
+        argumentNames.push_back(StringRef());
+      }
+      if (ctor->isVariadic())
+        argumentNames.push_back(StringRef());
+    }
+    break;
+
   case clang::DeclarationName::CXXConversionFunctionName:
   case clang::DeclarationName::CXXDestructorName:
   case clang::DeclarationName::CXXLiteralOperatorName:

@@ -403,7 +403,19 @@ clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
 }
 
 clang::CanQualType GenClangType::visitMetatypeType(CanMetatypeType type) {
-  return getClangMetatypeType(getClangASTContext());
+  assert(type->hasRepresentation() &&
+         "metatype should have been assigned a representation by SIL");
+  switch (type->getRepresentation()) {
+  case MetatypeRepresentation::Thin:
+    return getClangASTContext().VoidTy;
+
+  case MetatypeRepresentation::Thick:
+    llvm_unreachable("thick metatypes don't have a corresponding Clang type");
+
+  case MetatypeRepresentation::ObjC:
+    return getClangMetatypeType(getClangASTContext());
+  }
+  llvm_unreachable("bad representation");
 }
 
 clang::CanQualType

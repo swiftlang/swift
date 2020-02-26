@@ -3589,7 +3589,11 @@ void ClangImporter::getMangledName(raw_ostream &os,
   if (!Impl.Mangler)
     Impl.Mangler.reset(Impl.getClangASTContext().createMangleContext());
 
-  Impl.Mangler->mangleName(clangDecl, os);
+  if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(clangDecl)) {
+    Impl.Mangler->mangleCXXCtor(ctor, clang::Ctor_Complete, os);
+  } else {
+    Impl.Mangler->mangleName(clangDecl, os);
+  }
 }
 
 // ---------------------------------------------------------------------------

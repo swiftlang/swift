@@ -3378,6 +3378,11 @@ namespace {
           continue;
         }
 
+        if (auto CD = dyn_cast<ConstructorDecl>(member)) {
+          ctors.push_back(CD);
+          continue;
+        }
+
         if (auto MD = dyn_cast<FuncDecl>(member)) {
           methods.push_back(MD);
           continue;
@@ -3434,12 +3439,14 @@ namespace {
 
       bool hasReferenceableFields = !members.empty();
 
-      if (hasZeroInitializableStorage) {
+      if (hasZeroInitializableStorage &&
+          !Impl.SwiftContext.LangOpts.EnableCXXInterop) {
         // Add constructors for the struct.
         ctors.push_back(createDefaultConstructor(Impl, result));
       }
 
-      if (hasReferenceableFields && hasMemberwiseInitializer) {
+      if (hasReferenceableFields && hasMemberwiseInitializer &&
+          !Impl.SwiftContext.LangOpts.EnableCXXInterop) {
         // The default zero initializer suppresses the implicit value
         // constructor that would normally be formed, so we have to add that
         // explicitly as well.
@@ -3489,6 +3496,28 @@ namespace {
       }
 
       return result;
+    }
+
+    Decl *VisitCXXRecordDecl(const clang::CXXRecordDecl *decl) {
+      auto &clangSema = Impl.getClangSema();
+      // Make Clang define the implicit default constructor if the class needs
+      // it. Make sure we only do this if the class has been fully defined and
+      // we're not in a dependent context (this is equivalent to the logic in
+      // CanDeclareSpecialMemberFunction in Clang's SemaLookup.cpp).
+      if (decl->getDefinition() && !decl->isBeingDefined() &&
+          !decl->isDependentContext() &&
+          decl->needsImplicitDefaultConstructor()) {
+        // Casting away const here should be OK because
+        // SwiftDeclConverter::Visit() is in practice called with a non-const
+        // argument.
+        clang::CXXConstructorDecl *ctor =
+            clangSema.DeclareImplicitDefaultConstructor(
+                const_cast<clang::CXXRecordDecl *>(decl));
+        clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
+                                                   ctor);
+      }
+
+      return VisitRecordDecl(decl);
     }
 
     Decl *VisitClassTemplateSpecializationDecl(
@@ -3745,6 +3774,9 @@ namespace {
                              ImportedName importedName,
                              Optional<ImportedName> correctSwiftName,
                              Optional<AccessorInfo> accessorInfo) {
+      if (decl->isDeleted())
+        return nullptr;
+
       auto dc =
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
@@ -3753,7 +3785,6 @@ namespace {
       DeclName name = accessorInfo ? DeclName() : importedName.getDeclName();
       auto selfIdx = importedName.getSelfIndex();
 
-      FuncDecl *result = nullptr;
       ImportedType importedType;
       bool selfIsInOut = false;
       ParameterList *bodyParams = nullptr;
@@ -3855,27 +3886,44 @@ namespace {
       if (!importedType)
         return nullptr;
 
-      auto resultTy = importedType.getType();
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
-      result = createFuncOrAccessor(
-          Impl.SwiftContext, loc, accessorInfo, name,
-          nameLoc, bodyParams, resultTy,
-          /*async*/ false, /*throws*/ false, dc, decl);
 
-      if (!dc->isModuleScopeContext()) {
-        if (selfIsInOut)
-          result->setSelfAccessKind(SelfAccessKind::Mutating);
-        else
-          result->setSelfAccessKind(SelfAccessKind::NonMutating);
-        if (selfIdx) {
-          result->setSelfIndex(selfIdx.getValue());
-        } else {
-          result->setStatic();
-          result->setImportAsStaticMember();
+      AbstractFunctionDecl *result = nullptr;
+      if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl)) {
+        // TODO: Is failable, throws etc. correct?
+        DeclName ctorName(Impl.SwiftContext, DeclBaseName::createConstructor(),
+                          bodyParams);
+        result = Impl.createDeclWithClangNode<ConstructorDecl>(
+            decl, AccessLevel::Public, ctorName, loc, /*failable=*/false,
+            /*FailabilityLoc=*/SourceLoc(), /*Throws=*/false,
+            /*ThrowsLoc=*/SourceLoc(), bodyParams, /*GenericParams=*/nullptr,
+            dc);
+      } else {
+        auto resultTy = importedType.getType();
+
+        FuncDecl *func = createFuncOrAccessor(
+            Impl.SwiftContext, loc, accessorInfo, name,
+            nameLoc, bodyParams, resultTy,
+            /*async*/ false, /*throws*/ false, dc, decl);
+        result = func;
+
+        if (!dc->isModuleScopeContext()) {
+          if (selfIsInOut)
+            func->setSelfAccessKind(SelfAccessKind::Mutating);
+          else
+            func->setSelfAccessKind(SelfAccessKind::NonMutating);
+          if (selfIdx) {
+            func->setSelfIndex(selfIdx.getValue());
+          } else {
+            func->setStatic();
+            func->setImportAsStaticMember();
+          }
         }
+        // Someday, maybe this will need to be 'open' for C++ virtual methods.
+        func->setAccess(AccessLevel::Public);
       }
 
       result->setIsObjC(false);
@@ -3889,8 +3937,6 @@ namespace {
         result->getAttrs().add(new (Impl.SwiftContext)
                                    FinalAttr(/*IsImplicit=*/true));
 
-      // Someday, maybe this will need to be 'open' for C++ virtual methods.
-      result->setAccess(AccessLevel::Public);
       finishFuncDecl(decl, result);
 
       // If this is a compatibility stub, mark it as such.
