@@ -34,6 +34,11 @@ extension A {
 
 let abc = "👍
 
+let x = {
+  let y = 1
+  return y
+}
+
 // Test fallback for non-ASCII characters.
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:35:11
 // CHECK: 34 |
@@ -114,6 +119,11 @@ let abc = "👍
 // CHECK:    |                ^ note: Remove '=' to make 'x' a computed property [remove '= '] [replace 'let' with 'var']
 // CHECK: 33 | }
 
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:37:9
+// CHECK: 36 |
+// CHECK: 37 | let x = { () -> Result in
+// CHECK:    |         ^ error: unable to infer complex closure return type; add explicit type to disambiguate
+// CHECK: 38 |   let y = 1
 
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:6:5
 // CHECK: 5 | func foo(a: Int, b: Int) {

@@ -194,8 +194,22 @@ namespace {
     bool maybePrintInsertionAfter(int Byte, raw_ostream &Out) {
       for (auto fixIt : FixIts) {
         if ((int)fixIt.EndByte - 1 == Byte) {
-          Out.changeColor(ColoredStream::Colors::GREEN, true);
-          Out << fixIt.Text;
+          Out.changeColor(ColoredStream::Colors::GREEN, /*bold*/ true);
+          for (unsigned i = 0; i < fixIt.Text.size(); ++i) {
+            // Invert text colors for editor placeholders.
+            if (i + 1 < fixIt.Text.size() && fixIt.Text.substr(i, 2) == "<#") {
+              Out.changeColor(ColoredStream::Colors::GREEN, /*bold*/ true,
+                              /*background*/ true);
+              ++i;
+            } else if (i + 1 < fixIt.Text.size() &&
+                       fixIt.Text.substr(i, 2) == "#>") {
+              Out.changeColor(ColoredStream::Colors::GREEN, /*bold*/ true,
+                              /*background*/ false);
+              ++i;
+            } else {
+              Out << fixIt.Text[i];
+            }
+          }
           Out.resetColor();
           return true;
         }
