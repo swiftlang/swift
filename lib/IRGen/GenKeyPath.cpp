@@ -222,7 +222,8 @@ getAccessorForComputedComponent(IRGenModule &IGM,
       componentArgsBuf = params.claimNext();
       // Pass the argument pointer down to the underlying function, if it
       // wants it.
-      if (hasSubscriptIndices) {
+      // Always forward extra argument to match callee and caller signature on WebAssembly
+      if (hasSubscriptIndices || IGM.TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
         forwardedArgs.add(componentArgsBuf);
       }
       break;
