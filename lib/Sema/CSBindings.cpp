@@ -314,6 +314,20 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     type = first;
     kind = AllowedBindingKind::Supertypes;
   } else {
+    // If the left-hand side of a relational constraint is a
+    // type variable representing a closure type, let's delay
+    // attempting any bindings related to any type variables
+    // on the other side since it could only be either a closure
+    // parameter or a result type, and we can't get a full set
+    // of bindings for them until closure's body is opened.
+    if (auto *typeVar = first->getAs<TypeVariableType>()) {
+      if (typeVar->getImpl().isClosureType()) {
+        result.InvolvesTypeVariables = true;
+        result.FullyBound = true;
+        return None;
+      }
+    }
+
     // Can't infer anything.
     if (result.InvolvesTypeVariables)
       return None;
