@@ -36,8 +36,8 @@ In the Xcode UI, one can modify the current optimization level as follows:
 ...
 
 
-Whole Module Optimizations
-==========================
+Whole Module Optimizations (WMO)
+================================
 
 By default Swift compiles each file individually. This allows Xcode to
 compile multiple files in parallel very quickly. However, compiling
@@ -48,8 +48,11 @@ mode is enabled using the ``swiftc`` command line flag
 ``-whole-module-optimization``. Programs that are compiled in this
 mode will most likely take longer to compile, but may run faster.
 
-This mode can be enabled using the Xcode build setting 'Whole Module Optimization'.
+This mode can be enabled using the Xcode build setting 'Whole Module
+Optimization'.
 
+NOTE: In sections below, for brevity purposes, we will refer to 'Whole
+Module Optimization' by the abbreviation 'WMO'.
 
 Reducing Dynamic Dispatch
 =========================
@@ -160,6 +163,20 @@ assuming ``E``, ``F`` do not have any overriding declarations in the same file:
   func usingF(_ f: F) -> Int {
     return f.myPrivateVar
   }
+
+Advice: If WMO is enabled, Use 'internal' when declaration does not need to be accessed outside of module
+---------------------------------------------------------------------------------------------------------
+
+WMO (see section above) causes the compiler to compile a module's
+sources all together at once. This allows the optimizer to have module
+wide visibility when compiling individual declarations. Since an
+internal declaration is not visible outside of the current module, the
+optimizer can then infer `final` by automatically discovering all
+potentially overridding declarations.
+
+NOTE: Since in Swift the default access control level is ``internal``
+anyways, by enabling Whole Module Optimization, one can gain
+additional devirtualization without any further work.
 
 Using Container Types Efficiently
 =================================
