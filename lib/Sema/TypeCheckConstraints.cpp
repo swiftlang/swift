@@ -2386,7 +2386,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                    DeclContext *DC,
                                    Type patternType) {
   auto target = SolutionApplicationTarget::forInitialization(
-      initializer, DC, patternType, pattern);
+      initializer, DC, patternType, pattern, /*bindPatternVarsOneWay=*/false);
 
   // Type-check the initializer.
   bool unresolvedTypeExprs = false;
@@ -2579,7 +2579,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
-      InitType = cs.generateConstraints(pattern, elementLocator);
+      InitType = cs.generateConstraints(
+          pattern, elementLocator, /*bindPatternVarsOneWay=*/false);
       if (!InitType)
         return true;
 
