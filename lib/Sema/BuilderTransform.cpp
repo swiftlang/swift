@@ -331,7 +331,7 @@ protected:
       addChild(captureExpr(expr, /*oneWay=*/true, node.get<Expr *>()));
     }
 
-    if (!cs)
+    if (!cs || hadError)
       return nullptr;
 
     // Call Builder.buildBlock(... args ...)
@@ -1353,6 +1353,11 @@ public:
 
     // Otherwise, recurse into the statement normally.
     return std::make_pair(true, S);
+  }
+
+  /// Ignore patterns.
+  std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
+    return { false, pat };
   }
 };
 
