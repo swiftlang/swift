@@ -775,14 +775,16 @@ public:
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
-  Decl *importDeclCached(const clang::NamedDecl *ClangDecl, Version version);
+  Decl *importDeclCached(const clang::NamedDecl *ClangDecl, Version version,
+                         bool UseCanonicalDecl = true);
 
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
                        bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
 
   Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
                                Version version,
-                               bool SuperfluousTypedefsAreTransparent);
+                               bool SuperfluousTypedefsAreTransparent,
+                               bool UseCanonicalDecl);
 
   /// Same as \c importDeclReal, but for use inside importer
   /// implementation.
@@ -790,9 +792,11 @@ public:
   /// Unlike \c importDeclReal, this function for convenience transparently
   /// looks through superfluous typedefs and returns the imported underlying
   /// decl in that case.
-  Decl *importDecl(const clang::NamedDecl *ClangDecl, Version version) {
+  Decl *importDecl(const clang::NamedDecl *ClangDecl, Version version,
+                   bool UseCanonicalDecl = true) {
     return importDeclAndCacheImpl(ClangDecl, version,
-                                  /*SuperfluousTypedefsAreTransparent=*/true);
+                                  /*SuperfluousTypedefsAreTransparent=*/true,
+                                  /*UseCanonicalDecl*/UseCanonicalDecl);
   }
 
   /// Import the given Clang declaration into Swift.  Use this function
@@ -803,7 +807,8 @@ public:
   /// not be represented in Swift.
   Decl *importDeclReal(const clang::NamedDecl *ClangDecl, Version version) {
     return importDeclAndCacheImpl(ClangDecl, version,
-                                  /*SuperfluousTypedefsAreTransparent=*/false);
+                                  /*SuperfluousTypedefsAreTransparent=*/false,
+                                  /*UseCanonicalDecl*/true);
   }
 
   /// Import a cloned version of the given declaration, which is part of

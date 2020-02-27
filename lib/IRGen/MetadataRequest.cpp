@@ -607,6 +607,19 @@ static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
   return MetadataResponse::forComplete(metadata);
 }
 
+static llvm::Value *
+emitIdempotentClassMetadataInitialization(IRGenFunction &IGF,
+                                          llvm::Value *metadata) {
+  if (IGF.IGM.ObjCInterop) {
+    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCClassPtrTy);
+    metadata = IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
+                                      metadata);
+    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
+  }
+
+  return metadata;
+}
+
 /// Returns a metadata reference for a nominal type.
 ///
 /// This is only valid in a couple of special cases:
@@ -615,6 +628,10 @@ static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
 /// 2) The nominal type is a value type with a fixed size from this
 ///    resilience domain, in which case we can reference the constant
 ///    metadata directly.
+/// 3) The nominal type is a class with known Swift metadata and
+///   a fixed layout from this resilience domain, in which case we only
+///   need perform idempotent class initialization to realize it
+///   in the ObjC runtime.
 ///
 /// In any other case, a metadata accessor should be called instead.
 static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
@@ -625,11 +642,21 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
 
   if (!theDecl->isGenericContext()) {
     assert(!IGF.IGM.isResilient(theDecl, ResilienceExpansion::Maximal));
-    // TODO: If Obj-C interop is off, we can relax this to allow referencing
-    // class metadata too.
-    assert(isa<StructDecl>(theDecl) || isa<EnumDecl>(theDecl));
-    auto metadata = IGF.IGM.getAddrOfTypeMetadata(theType);
-    return MetadataResponse::forComplete(metadata);
+    if (auto response = IGF.tryGetLocalTypeMetadata(theType, request)) {
+      return response;
+    }
+
+    llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(theType);
+    
+    // We need to realize classes with the ObjC runtime.
+    if (auto c = dyn_cast<ClassDecl>(theDecl)) {
+      
+      assert(hasKnownSwiftMetadata(IGF.IGM, c));
+      metadata = emitIdempotentClassMetadataInitialization(IGF, metadata);
+    }
+    auto response = MetadataResponse::forComplete(metadata);
+    IGF.setScopedLocalTypeMetadata(theType, response);
+    return response;
   }
 
   // We are applying generic parameters to a generic type.
@@ -796,11 +823,43 @@ bool irgen::shouldCacheTypeMetadataAccess(IRGenModule &IGM, CanType type) {
   if (type->hasDynamicSelfType())
     return false;
 
-  // Statically addressable metadata does not need a cache.
+  // Nongeneric, nonresilient classes with known Swift metadata need to be
+  // realized with the Objective-C runtime, but that only requires a single
+  // runtime call that already has a fast path exit for already-realized
+  // classes, so we don't need to put up another layer of caching in front.
+  //
+  // TODO: On platforms without ObjC interop, we can do direct access to
+  // Swift metadata without a runtime call at all.
+  if (auto clas = dyn_cast<ClassType>(type)) {
+    if (!hasKnownSwiftMetadata(IGM, clas))
+      return true;
+    auto strategy = IGM.getClassMetadataStrategy(clas->getDecl());
+    return strategy != ClassMetadataStrategy::Fixed;
+  }
+  
+  // Trivially accessible metadata does not need a cache.
   if (isCompleteTypeMetadataStaticallyAddressable(IGM, type))
     return false;
   
   return true;
+}
+
+/// Should requests for the given type's metadata go through an accessor?
+static bool shouldTypeMetadataAccessUseAccessor(IRGenModule &IGM, CanType type){
+  // Anything that requires caching should go through an accessor to outline
+  // the cache check.
+  if (shouldCacheTypeMetadataAccess(IGM, type))
+    return true;
+  
+  // Fixed-metadata classes don't require caching, but we still want to go
+  // through the accessor to outline the ObjC realization.
+  // TODO: On non-Apple platforms, fixed classes should not need any
+  // initialization so should be directly addressable.
+  if (isa<ClassType>(type)) {
+    return true;
+  }
+  
+  return false;
 }
 
 /// Return the standard access strategy for getting a non-dependent
@@ -1958,19 +2017,6 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
   return MetadataResponse::handle(IGF, DynamicMetadataRequest(request), result);
 }
 
-static llvm::Value *
-emitIdempotentClassMetadataInitialization(IRGenFunction &IGF,
-                                          llvm::Value *metadata) {
-  if (IGF.IGM.ObjCInterop) {
-    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCClassPtrTy);
-    metadata = IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
-                                      metadata);
-    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
-  }
-
-  return metadata;
-}
-
 /// Emit the body of a metadata accessor function for the given type.
 ///
 /// This function is appropriate for ordinary situations where the
@@ -2012,16 +2058,15 @@ emitDirectTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   // metadata using this function.
   assert(!requiresForeignTypeMetadata(typeDecl));
 
-  // Classes that might not have Swift metadata use a different
-  // access pattern.
   if (auto classDecl = dyn_cast<ClassDecl>(typeDecl)) {
-    if (!hasKnownSwiftMetadata(IGF.IGM, classDecl)) {
-      return MetadataResponse::forComplete(emitObjCMetadataRef(IGF, classDecl));
-    }
-
-    llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type);
-    return MetadataResponse::forComplete(
-      emitIdempotentClassMetadataInitialization(IGF, metadata));
+    // For known-Swift metadata, we can perform a direct reference with
+    // potentially idempotent initialization.
+    if (hasKnownSwiftMetadata(IGF.IGM, classDecl))
+      return emitDirectTypeMetadataRef(IGF, type, request);
+  
+    // Classes that might not have Swift metadata use a different
+    // access pattern.
+    return MetadataResponse::forComplete(emitObjCMetadataRef(IGF, classDecl));
   }
 
   // We should not be doing more serious work along this path.
@@ -2559,7 +2604,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   }
   
   if (type->hasArchetype() ||
-      !shouldCacheTypeMetadataAccess(IGM, type)) {
+      !shouldTypeMetadataAccessUseAccessor(IGM, type)) {
     return emitDirectTypeMetadataRef(*this, type, request);
   }
 

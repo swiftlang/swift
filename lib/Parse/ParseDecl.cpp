@@ -4629,21 +4629,24 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // Parse the optional where-clause.
   TrailingWhereClause *trailingWhereClause = nullptr;
+  bool trailingWhereHadCodeCompletion = false;
   if (Tok.is(tok::kw_where)) {
     SourceLoc whereLoc;
     SmallVector<RequirementRepr, 4> requirements;
     bool firstTypeInComplete;
     auto whereStatus = parseGenericWhereClause(whereLoc, requirements,
                                                firstTypeInComplete);
+    if (whereStatus.hasCodeCompletion()) {
+      if (isCodeCompletionFirstPass())
+        return whereStatus;
+      trailingWhereHadCodeCompletion = true;
+    }
+
     if (whereStatus.isSuccess()) {
       trailingWhereClause = TrailingWhereClause::create(Context, whereLoc,
                                                         requirements);
-    } else if (whereStatus.hasCodeCompletion()) {
-      if (CodeCompletion && firstTypeInComplete) {
-        CodeCompletion->completeGenericParams(extendedType.getPtrOrNull());
-      } else
-        return makeParserCodeCompletionResult<ExtensionDecl>();
     }
+    status |= whereStatus;
   }
 
   ExtensionDecl *ext = ExtensionDecl::create(Context, ExtensionLoc,
@@ -4652,6 +4655,8 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                              CurDeclContext,
                                              trailingWhereClause);
   ext->getAttrs() = Attributes;
+  if (trailingWhereHadCodeCompletion && CodeCompletion)
+    CodeCompletion->setParsedDecl(ext);
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
@@ -7079,12 +7084,16 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   TrailingWhereClause *TrailingWhere = nullptr;
+  bool whereClauseHadCodeCompletion = false;
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseProtocolOrAssociatedTypeWhereClause(
         TrailingWhere, /*isProtocol=*/true);
-    if (whereStatus.shouldStopParsing())
-      return whereStatus;
+    if (whereStatus.hasCodeCompletion()) {
+      if (isCodeCompletionFirstPass())
+        return whereStatus;
+      whereClauseHadCodeCompletion = true;
+    }
   }
 
   ProtocolDecl *Proto = new (Context)
@@ -7093,6 +7102,8 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // No need to setLocalDiscriminator: protocols can't appear in local contexts.
 
   Proto->getAttrs() = Attributes;
+  if (whereClauseHadCodeCompletion && CodeCompletion)
+    CodeCompletion->setParsedDecl(Proto);
 
   ContextChange CC(*this, Proto);
   Scope ProtocolBodyScope(this, ScopeKind::ProtocolBody);

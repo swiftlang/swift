@@ -23,10 +23,10 @@ import Bar
 
 // RUN: %sourcekitd-test \
 // RUN:   -req=track-compiles == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=3:1 -name main.swift -text-input %t/State1.swift -- main.swift -F %S/../Inputs/libIDE-mock-sdk == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=3:1 -name main.swift -text-input %t/State2.swift -- main.swift -F %S/../Inputs/libIDE-mock-sdk == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=3:1 -name main.swift -text-input %t/State3.swift -- main.swift -F %S/../Inputs/libIDE-mock-sdk == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=3:1 -name main.swift -text-input %t/State4.swift -- main.swift -F %S/../Inputs/libIDE-mock-sdk > %t.response
+// RUN:   -req=complete -pos=3:1 -name main.swift -text-input %t/State1.swift -- main.swift -F %S/../Inputs/libIDE-mock-sdk == \
+// RUN:   -req=complete -pos=3:1 -name main.swift -text-input %t/State2.swift -- main.swift -F %S/../Inputs/libIDE-mock-sdk == \
+// RUN:   -req=complete -pos=3:1 -name main.swift -text-input %t/State3.swift -- main.swift -F %S/../Inputs/libIDE-mock-sdk == \
+// RUN:   -req=complete -pos=3:1 -name main.swift -text-input %t/State4.swift -- main.swift -F %S/../Inputs/libIDE-mock-sdk > %t.response
 // RUN: %FileCheck --check-prefix=RESULT %s < %t.response
 // RUN: %FileCheck --check-prefix=TRACE %s < %t.response
 

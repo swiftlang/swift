@@ -54,7 +54,7 @@ function(_add_swift_lipo_target)
         DEPENDS ${source_targets})
   endif()
 endfunction()
-
+ 
 # Add a single variant of a new Swift library.
 #
 # Usage:
@@ -1103,7 +1103,7 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS_OSX
         SWIFT_MODULE_DEPENDS_TVOS
         SWIFT_MODULE_DEPENDS_WATCHOS
-	SWIFT_MODULE_DEPENDS_WASI
+	    SWIFT_MODULE_DEPENDS_WASI
         SWIFT_MODULE_DEPENDS_WINDOWS
         SWIFT_MODULE_DEPENDS_FROM_SDK
         TARGET_SDKS

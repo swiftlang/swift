@@ -55,10 +55,10 @@ func dummy(x: ) {
 
 // RUN: %sourcekitd-test \
 // RUN:   -req=track-compiles == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=7:21 -name file.swift -text-input %t/State1.swift -- file.swift == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=9:25 -name file.swift -text-input %t/State2.swift -- file.swift == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=10:27 -name file.swift -text-input %t/State3.swift -- file.swift == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=10:15 -name file.swift -text-input %t/State4.swift -- file.swift > %t.response
+// RUN:   -req=complete -pos=7:21 -name file.swift -text-input %t/State1.swift -- file.swift == \
+// RUN:   -req=complete -pos=9:25 -name file.swift -text-input %t/State2.swift -- file.swift == \
+// RUN:   -req=complete -pos=10:27 -name file.swift -text-input %t/State3.swift -- file.swift == \
+// RUN:   -req=complete -pos=10:15 -name file.swift -text-input %t/State4.swift -- file.swift > %t.response
 // RUN: %FileCheck --check-prefix=RESULT %s < %t.response
 // RUN: %FileCheck --check-prefix=TRACE %s < %t.response
 

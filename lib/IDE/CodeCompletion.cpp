@@ -1375,7 +1375,7 @@ public:
                               Optional<StmtKind> ParentKind) override;
   void completeAfterPoundDirective() override;
   void completePlatformCondition() override;
-  void completeGenericParams(TypeLoc TL) override;
+  void completeGenericRequirement() override;
   void completeAfterIfStmt(bool hasElse) override;
 
   void doneParsing() override;
@@ -1463,7 +1463,8 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
     EnumElement,
     Type,
     TypeInDeclContext,
-    ImportFromModule
+    ImportFromModule,
+    GenericRequirement,
   };
 
   LookupKind Kind;
@@ -1563,6 +1564,25 @@ private:
       }
     }
     return false;
+  }
+
+  /// Returns \c true if \p TAD is usable as a first type of a requirement in
+  /// \c where clause for a context.
+  /// \p selfTy must be a \c Self type of the context.
+  static bool canBeUsedAsRequirementFirstType(Type selfTy, TypeAliasDecl *TAD) {
+    auto T = TAD->getDeclaredInterfaceType();
+    auto subMap = selfTy->getMemberSubstitutionMap(TAD->getParentModule(), TAD);
+    T = T.subst(subMap)->getCanonicalType();
+
+    ArchetypeType *archeTy = T->getAs<ArchetypeType>();
+    if (!archeTy)
+      return false;
+    archeTy = archeTy->getRoot();
+
+    // For protocol, the 'archeTy' should match with the 'baseTy' which is the
+    // dynamic 'Self' type of the protocol. For nominal decls, 'archTy' should
+    // be one of the generic params in 'selfTy'. Search 'archeTy' in 'baseTy'.
+    return selfTy.findIf([&](Type T) { return archeTy->isEqual(T); });
   }
 
 public:
@@ -2513,6 +2533,7 @@ public:
     case LookupKind::EnumElement:
     case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
+    case LookupKind::GenericRequirement:
       llvm_unreachable("cannot have a method call while doing a "
                        "type completion");
     case LookupKind::ImportFromModule:
@@ -3151,13 +3172,19 @@ public:
         return;
       }
 
-      if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
-        addTypeAliasRef(TAD, Reason, dynamicLookupInfo);
+      if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
+        addGenericTypeParamRef(GP, Reason, dynamicLookupInfo);
         return;
       }
 
-      if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
-        addGenericTypeParamRef(GP, Reason, dynamicLookupInfo);
+      LLVM_FALLTHROUGH;
+    case LookupKind::GenericRequirement:
+
+      if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D)) {
+        if (Kind == LookupKind::GenericRequirement &&
+            !canBeUsedAsRequirementFirstType(BaseType, TAD))
+          return;
+        addTypeAliasRef(TAD, Reason, dynamicLookupInfo);
         return;
       }
 
@@ -3920,6 +3947,33 @@ public:
     } else if (!BaseType->is<ModuleType>()) {
       addKeyword("Type", MetatypeType::get(BaseType));
     }
+  }
+
+  void getGenericRequirementCompletions(DeclContext *DC) {
+    auto genericSig = DC->getGenericSignatureOfContext();
+    if (!genericSig)
+      return;
+
+    for (auto GPT : genericSig->getGenericParams()) {
+      addGenericTypeParamRef(GPT->getDecl(),
+                             DeclVisibilityKind::GenericParameter, {});
+    }
+
+    // For non-protocol nominal type decls, only suggest generic parameters.
+    if (auto D = DC->getAsDecl())
+      if (isa<NominalTypeDecl>(D) && !isa<ProtocolDecl>(D))
+        return;
+
+    auto typeContext = DC->getInnermostTypeContext();
+    if (!typeContext)
+      return;
+
+    auto selfTy = typeContext->getSelfTypeInContext();
+    Kind = LookupKind::GenericRequirement;
+    this->BaseType = selfTy;
+    NeedLeadingDot = false;
+    lookupVisibleMemberDecls(*this, MetatypeType::get(selfTy),
+                             CurrDeclContext, IncludeInstanceMembers);
   }
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
@@ -4831,10 +4885,9 @@ void CodeCompletionCallbacksImpl::completeAfterIfStmt(bool hasElse) {
   }
 }
 
-void CodeCompletionCallbacksImpl::completeGenericParams(TypeLoc TL) {
+void CodeCompletionCallbacksImpl::completeGenericRequirement() {
   CurDeclContext = P.CurDeclContext;
-  Kind = CompletionKind::GenericParams;
-  ParsedTypeLoc = TL;
+  Kind = CompletionKind::GenericRequirement;
 }
 
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
@@ -4969,7 +5022,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AfterPoundDirective:
   case CompletionKind::PlatformConditon:
-  case CompletionKind::GenericParams:
+  case CompletionKind::GenericRequirement:
   case CompletionKind::KeyPathExprObjC:
   case CompletionKind::KeyPathExprSwift:
   case CompletionKind::PrecedenceGroup:
@@ -5559,15 +5612,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::GenericParams:
-    if (auto GT = ParsedTypeLoc.getType()->getAnyGeneric()) {
-      if (auto Params = GT->getGenericParams()) {
-        for (auto GP : Params->getParams()) {
-          Lookup.addGenericTypeParamRef(
-              GP, DeclVisibilityKind::GenericParameter, {});
-        }
-      }
-    }
+  case CompletionKind::GenericRequirement:
+    Lookup.getGenericRequirementCompletions(CurDeclContext);
     break;
   case CompletionKind::PrecedenceGroup:
     Lookup.getPrecedenceGroupCompletions(SyntxKind);

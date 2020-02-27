@@ -2753,8 +2753,10 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     // Add the extensions produced by importing categories.
     for (auto category : lookupTable->categories()) {
       if (auto extension = cast_or_null<ExtensionDecl>(
-              owner.importDecl(category, owner.CurrentVersion)))
+              owner.importDecl(category, owner.CurrentVersion,
+                               /*UseCanonical*/false))) {
         results.push_back(extension);
+      }
     }
 
     auto findEnclosingExtension = [](Decl *importedDecl) -> ExtensionDecl * {
