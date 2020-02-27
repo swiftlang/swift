@@ -472,7 +472,8 @@ void InstructionDeleter::deleteIfDead(SILInstruction *inst,
                                       CallbackTy callback) {
   if (isInstructionTriviallyDead(inst) ||
       isScopeAffectingInstructionDead(inst)) {
-    deleteInstruction(inst, callback, /*Fix lifetime of operands*/ true);
+    deleteInstruction(inst, callback,
+      /*Fix lifetime of operands*/ inst->getFunction()->hasOwnership());
   }
 }
 
