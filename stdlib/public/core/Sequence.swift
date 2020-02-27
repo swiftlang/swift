@@ -124,7 +124,7 @@
 ///
 /// For example, consider a custom `Countdown` sequence. You can initialize the
 /// `Countdown` sequence with a starting integer and then iterate over the
-/// count down to zero. The `Countdown` structure's definition is short: It
+/// countdown to zero. The `Countdown` structure's definition is short: It
 /// contains only the starting count and the `makeIterator()` method required
 /// by the `Sequence` protocol.
 ///
