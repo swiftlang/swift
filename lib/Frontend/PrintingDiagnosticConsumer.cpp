@@ -234,22 +234,6 @@ namespace {
       return false;
     }
 
-    // Given a byte number in the original source line, map it to a byte number
-    // in the annotated source line, taking fix-it insertions into account.
-    unsigned mapLineByte(unsigned sourceByte) {
-      unsigned mappedByte = sourceByte;
-      for (auto fixIt : FixIts) {
-        if (fixIt.EndByte <= sourceByte)
-          mappedByte += fixIt.Text.size();
-      }
-      // Tabs are mapped to 2 spaces so they have a known column width.
-      for (unsigned i = 0; i < sourceByte; ++i) {
-        if (LineText[i] == '\t')
-          mappedByte += 1;
-      }
-      return mappedByte;
-    }
-
     unsigned lineByteOffsetForLoc(SourceManager &SM, SourceLoc Loc) {
       SourceLoc lineStart = SM.getLocForLineCol(SM.findBufferContainingLoc(Loc),
                                                 getLineNumber(), 1);
@@ -300,14 +284,31 @@ namespace {
       Out.resetColor();
       Out << "\n";
 
+      // Maps a byte in the original source line to a column in the annotated
+      // line.
+      unsigned *byteToColumnMap = new unsigned[LineText.size()];
+      unsigned extraColumns = 0;
+      for (unsigned i = 0; i < LineText.size(); ++i) {
+        for (auto fixIt : FixIts) {
+          if (fixIt.EndByte == i)
+            extraColumns += fixIt.Text.size();
+        }
+        // Tabs are mapped to 2 spaces so they have a known column width.
+        if (LineText[i] == '\t')
+          extraColumns += 1;
+
+        byteToColumnMap[i] = i + extraColumns;
+      }
+
       // If the entire line is composed of ASCII characters, we can position '~'
       // characters in the appropriate columns on the following line to
       // represent highlights.
       if (isASCII) {
-        auto highlightLine = std::string(mapLineByte(LineText.size()), ' ');
+        auto highlightLine =
+            std::string(byteToColumnMap[LineText.size() - 1] + 1, ' ');
         for (auto highlight : Highlights) {
           for (unsigned i = highlight.StartByte; i < highlight.EndByte; ++i)
-            highlightLine[mapLineByte(i)] = '~';
+            highlightLine[byteToColumnMap[i]] = '~';
         }
 
         if (!Highlights.empty()) {
@@ -326,7 +327,7 @@ namespace {
       for (auto msg : Messages) {
         printEmptyGutter(LineNumberIndent, Out);
         if (isASCII) {
-          Out << std::string(mapLineByte(msg.Byte), ' ') << "^ ";
+          Out << std::string(byteToColumnMap[msg.Byte], ' ') << "^ ";
           printDiagnosticKind(msg.Kind, Out);
           Out << " " << msg.Text << "\n";
         } else {
@@ -335,6 +336,7 @@ namespace {
           Out << " " << msg.Text << "\n";
         }
       }
+      delete[] byteToColumnMap;
     }
   };
 
