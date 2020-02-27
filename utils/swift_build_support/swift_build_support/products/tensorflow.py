@@ -188,7 +188,7 @@ class TensorFlow(product.Product):
             _get_tensorflow_library(host_target)
 
         subdir = None
-        if host_target.startswith('macsox'):
+        if host_target.startswith('macosx'):
             subdir = 'macosx'
         if host_target.startswith('linux'):
             subdir = 'linux'
