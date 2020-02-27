@@ -105,10 +105,10 @@ internal func _parseSmall<Result: FixedWidthInteger>(
   let first = word1 & 0xff
   if first < 0x30 { // Plus, minus or an invalid character.
     guard _fastPath(count > 1), // Disallow "-"/"+" without any digits.
-      _fastPath(Result.isSigned && first == _ascii("-"))
-      || _fastPath(first == _ascii("+"))
+      _fastPath(Result.isSigned && first == UInt8(ascii: "-"))
+      || _fastPath(first == UInt8(ascii: "+"))
       else { return nil }
-    hasMinus = _fastPath(first == _ascii("-"))
+    hasMinus = _fastPath(first == UInt8(ascii: "-"))
     word1 = (word1 ^ first) | 0x30 // Clear first char and a "0".
   } else {
     guard _fastPath(count > 0) else { return nil }
@@ -150,7 +150,7 @@ internal func _parseBase10Unsigned(
   func convertToDigits(_ word: UInt64, bitCount: Int) -> UInt64? {
     let shift = (64 &- bitCount) // bitCount must be >0.
     // Convert characters to digits.
-    var digits = word &- _allLanes(_ascii("0"))
+    var digits = word &- _allLanes(UInt8(ascii: "0"))
     // Align digits to big end and shift out garbage.
     digits &<<= shift
     // Check limits.
@@ -226,16 +226,18 @@ internal func _parseHexUnsigned(
     // "a"..."z" == 0x61...0x7A
     var chunk = chunk
     var invalid = chunk // Could have high bits set due to non-ascii.
-    let letterFlags = (chunk &+ _allLanes(0x7f - _ascii("9"))) & _allLanes(0x80)
+    let letterFlags = (chunk &+ _allLanes(0x7f - UInt8(ascii: "9")))
+      & _allLanes(0x80)
     let letterValueMask = letterFlags &- (letterFlags &>> 7)
     // Make letters uppercase (zero bit 5).
     chunk = chunk & ~(_allLanes(0x20) & letterValueMask)
     // Check all letters are above "A" or above.
-    let belowA = _allLanes(0x7f + _ascii("A")) &- chunk
+    let belowA = _allLanes(0x7f + UInt8(ascii: "A")) &- chunk
     invalid |= (belowA & letterFlags)
     // Convert characters to digits.
-    let extraLetterOffset = _allLanes(_ascii("A") - (_ascii("9") + 1))
-    var digits = chunk &- _allLanes(_ascii("0"))
+    let extraLetterOffset =
+      _allLanes(UInt8(ascii: "A") - (UInt8(ascii: "9") + 1))
+    var digits = chunk &- _allLanes(UInt8(ascii: "0"))
       &- (extraLetterOffset & letterValueMask)
     // Align digits to big end.
     digits &<<= shift
@@ -274,7 +276,7 @@ internal func _parseBinaryUnsigned(
   func parseChunk(chunk: UInt64, bitCount: Int) -> UInt64? {
     let shift = 64 &- bitCount // Note: bitCount must be >0.
     // Convert characters to digits.
-    var digits = chunk &- _allLanes(_ascii("0"))
+    var digits = chunk &- _allLanes(UInt8(ascii: "0"))
     // Align digits to big end and shift out garbage.
     digits &<<= shift
     // The following check is enough, even if the original value overflowed.
@@ -330,10 +332,10 @@ where Iterator.Element == UInt8 {
   guard _fastPath(first_ != nil), var first = first_ else { return nil }
   // Handle sign.
   let hasMinus: Bool
-  if first < _ascii("0") { // Both "+" and "-" are < any digit/letter.
-    guard _fastPath(Result.isSigned && first == _ascii("-"))
-      || _fastPath(first == _ascii("+")) else { return nil }
-    hasMinus = (first == _ascii("-"))
+  if first < UInt8(ascii: "0") { // Both "+" and "-" are < any digit/letter.
+    guard _fastPath(Result.isSigned && first == UInt8(ascii: "-"))
+      || _fastPath(first == UInt8(ascii: "+")) else { return nil }
+    hasMinus = (first == UInt8(ascii: "-"))
     // Get a new first character.
     let second_ = utf8.next()
     guard _fastPath(second_ != nil), let second = second_ else { return nil }
@@ -358,10 +360,10 @@ internal func _parseFromUTF8Unsigned<
 >(first: UInt8, rest utf8: inout Iterator, radix: Int) -> Result?
 where Iterator.Element == UInt8, Result: UnsignedInteger {
   func parseCodeUnit(_ cu: UInt8) -> Result? {
-    var digit = UInt(cu &- _ascii("0"))
+    var digit = UInt(cu &- UInt8(ascii: "0"))
     if radix > 10 {
       // Clear bit 5 to uppercase, and invalidate digits under "A".
-      let letterOffset = (cu & ~0x20) &- _ascii("A")
+      let letterOffset = (cu & ~0x20) &- UInt8(ascii: "A")
       // Convert to a value, widening to ensure we don't roll any back over.
       let letterValue = UInt(letterOffset) &+ 10
       // Make a all-bits mask based on whether digit >= 10.
@@ -385,11 +387,6 @@ where Iterator.Element == UInt8, Result: UnsignedInteger {
     guard _fastPath(!overflow1 && !overflow2) else { return nil }
   }
   return result
-}
-
-@_alwaysEmitIntoClient
-internal func _ascii(_ c: Unicode.Scalar) -> UTF8.CodeUnit {
-  return UTF8.CodeUnit(c.value)
 }
 
 @_alwaysEmitIntoClient
