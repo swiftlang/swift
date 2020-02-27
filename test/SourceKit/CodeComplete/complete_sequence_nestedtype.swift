@@ -16,9 +16,9 @@ struct Outer {
 
 // RUN: %sourcekitd-test \
 // RUN:   -req=track-compiles == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=8:13 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=8:13 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=13:11 %s -- %s \
+// RUN:   -req=complete -pos=8:13 %s -- %s == \
+// RUN:   -req=complete -pos=8:13 %s -- %s == \
+// RUN:   -req=complete -pos=13:11 %s -- %s \
 // RUN:   > %t.response
 // RUN: %FileCheck --check-prefix=RESULT  %s < %t.response
 // RUN: %FileCheck --check-prefix=TRACE  %s < %t.response
