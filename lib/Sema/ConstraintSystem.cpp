@@ -1454,28 +1454,8 @@ ConstraintSystem::getTypeOfMemberReference(
 
   openedType = openedType->removeArgumentLabels(numRemovedArgumentLabels);
 
-  if (!outerDC->getSelfProtocolDecl()) {
-    // Class methods returning Self as well as constructors get the
-    // result replaced with the base object type.
-    if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-      if (func->hasDynamicSelfResult() &&
-          !baseObjTy->getOptionalObjectType()) {
-        openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
-      }
-    } else if (auto *decl = dyn_cast<SubscriptDecl>(value)) {
-      if (decl->getElementInterfaceType()->hasDynamicSelfType()) {
-        openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
-      }
-    } else if (auto *decl = dyn_cast<VarDecl>(value)) {
-      if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
-        openedType = openedType->replaceCovariantResultType(baseObjTy, 1);
-      }
-    }
-  }
-
   // If we are looking at a member of an existential, open the existential.
   Type baseOpenedTy = baseObjTy;
-
   if (baseObjTy->isExistentialType()) {
     auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
     OpenedExistentialTypes.push_back({ getConstraintLocator(locator),
@@ -1484,8 +1464,7 @@ ConstraintSystem::getTypeOfMemberReference(
   }
 
   // Constrain the 'self' object type.
-  auto openedFnType = openedType->castTo<FunctionType>();
-  auto openedParams = openedFnType->getParams();
+  auto openedParams = openedType->castTo<FunctionType>()->getParams();
   assert(openedParams.size() == 1);
 
   Type selfObjTy = openedParams.front().getPlainType()->getMetatypeInstanceType();
@@ -1513,16 +1492,35 @@ ConstraintSystem::getTypeOfMemberReference(
   }
 
   // Compute the type of the reference.
-  Type type;
+  Type type = openedType;
+
+  if (!outerDC->getSelfProtocolDecl()) {
+    // Class methods returning Self as well as constructors get the
+    // result replaced with the base object type.
+    if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+      if (func->hasDynamicSelfResult() &&
+          !baseObjTy->getOptionalObjectType()) {
+        type = type->replaceCovariantResultType(baseObjTy, 2);
+      }
+    } else if (auto *decl = dyn_cast<SubscriptDecl>(value)) {
+      if (decl->getElementInterfaceType()->hasDynamicSelfType()) {
+        type = type->replaceCovariantResultType(baseObjTy, 2);
+      }
+    } else if (auto *decl = dyn_cast<VarDecl>(value)) {
+      if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
+        type = type->replaceCovariantResultType(baseObjTy, 1);
+      }
+    }
+  }
+
   if (hasAppliedSelf) {
     // For a static member referenced through a metatype or an instance
     // member referenced through an instance, strip off the 'self'.
-    type = openedFnType->getResult();
+    type = type->castTo<FunctionType>()->getResult();
   } else {
     // For an unbound instance method reference, replace the 'Self'
     // parameter with the base type.
-    openedType = openedFnType->replaceSelfParameterType(baseObjTy);
-    type = openedType;
+    type = type->replaceSelfParameterType(baseObjTy);
   }
 
   // When accessing protocol members with an existential base, replace

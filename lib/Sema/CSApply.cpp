@@ -535,7 +535,8 @@ namespace {
         cs.cacheExprTypes(base);
 
         return buildMemberRef(base, SourceLoc(), overload, loc, locator,
-                              locator, implicit, semantics);
+                              locator, implicit, /*extraUncurryLevel=*/false,
+                              semantics);
       }
 
       if (isa<TypeDecl>(decl) && !isa<ModuleDecl>(decl)) {
@@ -615,21 +616,6 @@ namespace {
       return !isa<FuncDecl>(member) || !cast<FuncDecl>(member)->isMutating();
     }
 
-    unsigned getNaturalArgumentCount(ValueDecl *member) {
-      if (isa<AbstractFunctionDecl>(member)) {
-        // For functions, close the existential once the function
-        // has been fully applied.
-        return 2;
-      } else {
-        // For storage, close the existential either when it's
-        // accessed (if it's an rvalue only) or when it is loaded or
-        // stored (if it's an lvalue).
-        assert(isa<AbstractStorageDecl>(member) &&
-              "unknown member when opening existential");
-        return 1;
-      }
-    }
-
     /// If the expression might be a dynamic method call, return the base
     /// value for the call.
     Expr *getBaseExpr(Expr *expr) {
@@ -674,11 +660,6 @@ namespace {
           break;
         prev = result;
       }
-
-      // Invalid case -- direct call of a metatype. Has one less argument
-      // application because there's no ".init".
-      if (isa<ApplyExpr>(ExprStack.back()))
-        argCount--;
 
       return argCount;
     }
@@ -734,8 +715,13 @@ namespace {
 
       // Determine the number of applications that need to occur before
       // we can close this existential, and record it.
-      unsigned maxArgCount = getNaturalArgumentCount(member);
+      unsigned maxArgCount = member->getNumCurryLevels();
       unsigned depth = ExprStack.size() - getArgCount(maxArgCount);
+
+      // Invalid case -- direct call of a metatype. Has one less argument
+      // application because there's no ".init".
+      if (isa<ApplyExpr>(ExprStack.back()))
+        depth++;
 
       // Create the opaque opened value. If we started with a
       // metatype, it's a metatype.
@@ -804,7 +790,7 @@ namespace {
                          SelectedOverload overload, DeclNameLoc memberLoc,
                          ConstraintLocatorBuilder locator,
                          ConstraintLocatorBuilder memberLocator, bool Implicit,
-                         AccessSemantics semantics) {
+                         bool extraUncurryLevel, AccessSemantics semantics) {
       auto choice = overload.choice;
       auto openedType = overload.openedType;
       auto openedFullType = overload.openedFullType;
@@ -830,7 +816,6 @@ namespace {
 
       // Build a member reference.
       auto memberRef = resolveConcreteDeclRef(member, memberLocator);
-      auto refTy = solution.simplifyType(openedFullType);
 
       // If we're referring to the member of a module, it's just a simple
       // reference.
@@ -838,7 +823,7 @@ namespace {
         assert(semantics == AccessSemantics::Ordinary &&
                "Direct property access doesn't make sense for this");
         auto ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
-        cs.setType(ref, refTy);
+        cs.setType(ref, simplifyType(openedFullType));
         ref->setFunctionRefKind(choice.getFunctionRefKind());
         auto *DSBI = cs.cacheType(new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, ref, cs.getType(ref)));
@@ -857,6 +842,11 @@ namespace {
         return result;
       }
 
+      bool isUnboundInstanceMember =
+        (!baseIsInstance && member->isInstanceMember());
+
+      auto refTy = simplifyType(openedFullType);
+
       // The formal type of the 'self' value for the member's declaration.
       Type containerTy = getBaseType(refTy->castTo<FunctionType>());
 
@@ -866,37 +856,19 @@ namespace {
 
       // If we opened up an existential when referencing this member, update
       // the base accordingly.
+      bool openedExistential = false;
+
+      // For a partial application, we have to open the existential inside
+      // the thunk itself.
       auto knownOpened = solution.OpenedExistentialTypes.find(
                            getConstraintSystem().getConstraintLocator(
                              memberLocator));
-      bool openedExistential = false;
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
+        // Open the existential before performing the member reference.
         base = openExistentialReference(base, knownOpened->second, member);
         baseTy = knownOpened->second;
         selfTy = baseTy;
         openedExistential = true;
-      }
-
-      // If this is a method whose result type is dynamic Self, or a
-      // construction, replace the result type with the actual object type.
-      Type dynamicSelfFnType;
-      if (!member->getDeclContext()->getSelfProtocolDecl()) {
-        if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-          if (func->hasDynamicSelfResult() &&
-              !baseTy->getOptionalObjectType()) {
-            refTy = refTy->replaceCovariantResultType(containerTy, 2);
-            if (!baseTy->isEqual(containerTy)) {
-              dynamicSelfFnType = refTy->replaceCovariantResultType(baseTy, 2);
-            }
-          }
-        } else if (auto *decl = dyn_cast<VarDecl>(member)) {
-          if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
-            refTy = refTy->replaceCovariantResultType(containerTy, 1);
-            if (!baseTy->isEqual(containerTy)) {
-              dynamicSelfFnType = refTy->replaceCovariantResultType(baseTy, 1);
-            }
-          }
-        }
       }
 
       // References to properties with accessors and storage usually go
@@ -952,9 +924,9 @@ namespace {
 
         // If the base was an opened existential, erase the opened
         // existential.
-        if (openedExistential &&
-            refType->hasOpenedExistential(knownOpened->second)) {
-          refType = refType->eraseOpenedExistential(knownOpened->second);
+        if (openedExistential) {
+          refType = refType->eraseOpenedExistential(
+              baseTy->castTo<OpenedArchetypeType>());
         }
 
         cs.setType(ref, refType);
@@ -1003,7 +975,7 @@ namespace {
 
       // For properties, build member references.
       if (isa<VarDecl>(member)) {
-        if (!baseIsInstance && member->isInstanceMember()) {
+        if (isUnboundInstanceMember) {
           assert(memberLocator.getBaseLocator() && 
                  cs.UnevaluatedRootExprs.count(
                    memberLocator.getBaseLocator()->getAnchor()) &&
@@ -1020,31 +992,46 @@ namespace {
                                         memberLoc, Implicit, semantics);
         memberRefExpr->setIsSuper(isSuper);
 
-        // Skip the synthesized 'self' input type of the opened type.
         cs.setType(memberRefExpr, simplifyType(openedType));
         Expr *result = memberRefExpr;
         closeExistential(result, locator);
-        if (dynamicSelfFnType) {
-          result = new (context) CovariantReturnConversionExpr(result,
-                                                            dynamicSelfFnType);
-          cs.cacheType(result);
-          cs.setType(result, simplifyType(openedType));
+
+        if (cast<VarDecl>(member)->getValueInterfaceType()
+                                 ->hasDynamicSelfType()) {
+          if (!baseTy->isEqual(containerTy)) {
+            result = new (context) CovariantReturnConversionExpr(
+                result, simplifyType(openedType));
+            cs.cacheType(result);
+          }
         }
         return forceUnwrapIfExpected(result, choice, memberLocator);
       }
-      
+
+      if (member->getInterfaceType()->hasDynamicSelfType())
+        refTy = refTy->replaceCovariantResultType(containerTy, 2);
+
       // Handle all other references.
       auto declRefExpr = new (context) DeclRefExpr(memberRef, memberLoc,
                                                    Implicit, semantics);
       declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
+      declRefExpr->setType(refTy);
       cs.setType(declRefExpr, refTy);
       Expr *ref = declRefExpr;
 
-      // If the reference needs to be converted, do so now.
-      if (dynamicSelfFnType) {
-        ref = new (context) CovariantFunctionConversionExpr(ref,
+      // If this is a method whose result type is dynamic Self, or a
+      // construction, replace the result type with the actual object type.
+      if (!member->getDeclContext()->getSelfProtocolDecl()) {
+        if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+          if (func->hasDynamicSelfResult() &&
+              !baseTy->getOptionalObjectType()) {
+            if (!baseTy->isEqual(containerTy)) {
+              auto dynamicSelfFnType = refTy->replaceCovariantResultType(baseTy, 2);
+              ref = new (context) CovariantFunctionConversionExpr(ref,
                                                             dynamicSelfFnType);
-        cs.cacheType(ref);
+              cs.cacheType(ref);
+            }
+          }
+        }
       }
 
       ApplyExpr *apply;
@@ -1052,7 +1039,13 @@ namespace {
         // FIXME: Provide type annotation.
         ref = forceUnwrapIfExpected(ref, choice, memberLocator);
         apply = new (context) ConstructorRefCallExpr(ref, base);
-      } else if (!baseIsInstance && member->isInstanceMember()) {
+      } else if (isUnboundInstanceMember) {
+        auto refType = cs.simplifyType(openedType);
+        if (!cs.getType(ref)->isEqual(refType)) {
+          ref = new (context) FunctionConversionExpr(ref, refType);
+          cs.cacheType(ref);
+        }
+
         // Reference to an unbound instance method.
         Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
                                                               ref,
@@ -2339,7 +2332,7 @@ namespace {
       return buildMemberRef(
           expr->getBase(), expr->getDotLoc(), selected, expr->getNameLoc(),
           cs.getConstraintLocator(expr), memberLocator, expr->isImplicit(),
-          expr->getAccessSemantics());
+          /*extraUncurryLevel=*/false, expr->getAccessSemantics());
     }
 
     Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
@@ -2382,7 +2375,8 @@ namespace {
       auto *exprLoc = cs.getConstraintLocator(expr);
       auto result = buildMemberRef(
           base, expr->getDotLoc(), selected, expr->getNameLoc(), exprLoc,
-          memberLocator, expr->isImplicit(), AccessSemantics::Ordinary);
+          memberLocator, expr->isImplicit(), /*extraUncurryLevel=*/true,
+          AccessSemantics::Ordinary);
       if (!result)
         return nullptr;
 
@@ -2530,7 +2524,8 @@ namespace {
       if (cs.getType(base)->is<AnyMetatypeType>()) {
         return buildMemberRef(
             base, dotLoc, overload, nameLoc, cs.getConstraintLocator(expr),
-            ctorLocator, implicit, AccessSemantics::Ordinary);
+            ctorLocator, implicit, /*extraUncurryLevel=*/true,
+            AccessSemantics::Ordinary);
       }
 
       // The subexpression must be either 'self' or 'super'.
@@ -2703,7 +2698,8 @@ namespace {
       case OverloadChoiceKind::DeclViaDynamic:
         return buildMemberRef(base, dotLoc, selected, nameLoc,
                               cs.getConstraintLocator(expr), memberLocator,
-                              implicit, AccessSemantics::Ordinary);
+                              implicit, /*extraUncurryLevel=*/false,
+                              AccessSemantics::Ordinary);
 
       case OverloadChoiceKind::TupleIndex: {
         Type toType = simplifyType(cs.getType(expr));
@@ -6547,7 +6543,8 @@ static Expr *buildCallAsFunctionMethodRef(
   auto *fn = apply->getFn();
   auto *declRef = rewriter.buildMemberRef(
       fn, /*dotLoc*/ SourceLoc(), selected, DeclNameLoc(fn->getEndLoc()),
-      calleeLoc, calleeLoc, /*implicit*/ true, AccessSemantics::Ordinary);
+      calleeLoc, calleeLoc, /*implicit*/ true,
+      /*extraUncurryLevel=*/true, AccessSemantics::Ordinary);
   if (!declRef)
     return nullptr;
   declRef->setImplicit(apply->isImplicit());
@@ -6581,7 +6578,8 @@ ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
   // Construct expression referencing the `dynamicallyCall` method.
   auto member = buildMemberRef(fn, SourceLoc(), selected,
                                DeclNameLoc(method->getNameLoc()), loc, loc,
-                               /*implicit*/ true, AccessSemantics::Ordinary);
+                               /*implicit=*/true, /*extraUncurryLevel=*/true,
+                               AccessSemantics::Ordinary);
 
   // Construct argument to the method (either an array or dictionary
   // expression).
@@ -6942,7 +6940,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // constructor call expr itself has the apply's 'implicitness'.
   Expr *declRef = buildMemberRef(fn, /*dotLoc=*/SourceLoc(), *selected,
                                  DeclNameLoc(fn->getEndLoc()), locator,
-                                 ctorLocator, /*Implicit=*/true,
+                                 ctorLocator, /*implicit=*/true,
+                                 /*extraUncurryLevel=*/true,
                                  AccessSemantics::Ordinary);
   if (!declRef)
     return nullptr;
