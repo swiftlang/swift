@@ -1177,8 +1177,12 @@ public:
     // WebAssembly: hack: comdat + custom section = explosion
     // the comdat code assumes section name would be unique for each comdat
     // this doesn't happen for metadata.
-    if (Triple.isOSBinFormatWasm())
+    // And avoid to create GOT because wasm32 doesn't support
+    // dynamic linking yet
+    if (Triple.isOSBinFormatWasm()) {
+      GV->setDSOLocal(true);
       return;
+    }
 
     if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
         IRL.Linkage == llvm::GlobalValue::WeakODRLinkage)
