@@ -113,7 +113,7 @@ class PerformanceTestSamples(object):
 
     @property
     def all_samples(self):
-        """List of all samples in ascending order."""
+        """List of all samples in original order."""
         return self._all_samples
 
     @property
@@ -236,6 +236,7 @@ class PerformanceTestResult(object):
             self.samples = PerformanceTestSamples(
                 self.name, [int(runtime) for runtime in runtimes])
             self.samples.exclude_outliers(top_only=True)
+            self.independent_runs = [self.samples]
             sams = self.samples
             self.min, self.max, self.median, self.mean, self.sd = \
                 sams.min, sams.max, sams.median, sams.mean, sams.sd
@@ -277,12 +278,18 @@ class PerformanceTestResult(object):
         """
         # Statistics
         if self.samples and r.samples:
-            self.samples.samples = sorted(
-                self.samples.samples + r.samples.samples)
-            self.samples._recompute_stats()
+            if hasattr(self, 'independent_runs'):
+                self.independent_runs.append(r.samples)
+            else:
+                self.independent_runs = [self.samples, r.samples]
+            outliers = self.samples.outliers + r.samples.outliers
+            all_samples = self.samples.all_samples + r.samples.all_samples
+            self.samples = PerformanceTestSamples(
+                self.name, sorted(self.samples.samples + r.samples.samples))
             sams = self.samples
             self.num_samples += r.num_samples
-            sams.outliers += r.samples.outliers
+            sams.outliers = outliers
+            sams._all_samples = all_samples
             self.min, self.max, self.median, self.mean, self.sd = \
                 sams.min, sams.max, sams.median, sams.mean, sams.sd
         else:

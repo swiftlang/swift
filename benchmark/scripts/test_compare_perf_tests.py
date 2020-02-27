@@ -423,17 +423,28 @@ class TestPerformanceTestResult(unittest.TestCase):
         r = results[0]
         self.assertEqual(as_tuple(r),
                          (200, 21, 18, 967, 996, 1008, None, None, None))
+        self.assertEqual(len(r.independent_runs), 1)
+        self.assertEqual(r.independent_runs[0], r.samples)
+
         # merging optional --meta data
         results[1].mem_pages = 9
         results[1].involuntary_cs = 1
         results[1].yield_count = 4
         r.merge(results[1])  # 18 + 17 = 35, after merge using only ventiles
         self.assertEqual(as_tuple(r), (400, 42, 35, 967, 983, 1010, 9, 1, 4))
+
         results[2].mem_pages = 7
         results[2].involuntary_cs = 2
         results[2].yield_count = 6
         r.merge(results[2])  # 35 + 18 = 53; sum yields and context switches
         self.assertEqual(as_tuple(r), (600, 63, 53, 967, 989, 1029, 7, 3, 10))
+
+        self.assertEqual(len(r.samples.all_samples), 63)
+        self.assertEqual(r.samples.outliers, [1019, 1095, 2922, 1040, 1186,
+                                              1880, 6470, 1057, 1281, 4183])
+        self.assertEqual(len(r.independent_runs), 3)
+        self.assertEqual([i.count for i in r.independent_runs], [18, 17, 18])
+        self.assertEqual([i.min for i in r.independent_runs], [967, 972, 986])
 
 
 class TestResultComparison(unittest.TestCase):
@@ -744,6 +755,9 @@ Totals,2"""
         samples = result.samples
         self.assertTrue(isinstance(samples, PerformanceTestSamples))
         self.assertEqual(samples.count, 8)
+        self.assertEqual(
+            samples.all_samples,
+            [355883, 358817, 353552, 350815, 363094, 369169, 376131, 364245])
 
     def test_excludes_outliers_from_samples(self):
         verbose_log = """Running DropFirstAnySeqCntRangeLazy for 10 samples.
