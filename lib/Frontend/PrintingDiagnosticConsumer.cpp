@@ -242,6 +242,11 @@ namespace {
         if (fixIt.EndByte <= sourceByte)
           mappedByte += fixIt.Text.size();
       }
+      // Tabs are mapped to 2 spaces so they have a known column width.
+      for (unsigned i = 0; i < sourceByte; ++i) {
+        if (LineText[i] == '\t')
+          mappedByte += 1;
+      }
       return mappedByte;
     }
 
@@ -283,7 +288,10 @@ namespace {
       for (unsigned i = 0; i < LineText.size(); ++i) {
         isASCII = isASCII && static_cast<unsigned char>(LineText[i]) <= 127;
         applyStyleForLineByte(i, Out, deleted);
-        Out << LineText[i];
+        if (LineText[i] == '\t')
+          Out << "  ";
+        else
+          Out << LineText[i];
         if (maybePrintInsertionAfter(i, Out)) {
           deleted = false;
         }

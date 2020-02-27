@@ -43,6 +43,9 @@ struct B: Decodable {
   let a: Foo
 }
 
+// The line below is indented with tabs, not spaces.
+			foo(b: 1, a: 2)
+
 // Test fallback for non-ASCII characters.
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:35:11
 // CHECK: 34 |
@@ -120,6 +123,13 @@ struct B: Decodable {
 // CHECK: 2 |     init(from decoder: Decoder) throws
 // CHECK:   |     ^ note: protocol requires initializer 'init(from:)' with type 'Decodable'
 // CHECK: 3 | }
+
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:47:14
+// CHECK: 46 | // The line below is indented with tabs, not spaces.
+// CHECK: 47 |       foo(a: 2, b: 1, a: 2)
+// CHECK:    |                 ~~~~  ~~~~
+// CHECK:    |                       ^ error: argument 'a' must precede argument 'b' [remove ', a: 2' and insert 'a: 2, ']
+// CHECK: 48 |
 
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:6:5
 // CHECK: 5 | func foo(a: Int, b: Int) {
