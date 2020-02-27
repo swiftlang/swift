@@ -30,6 +30,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 
@@ -457,6 +458,10 @@ struct SemanticARCOptVisitor
 
 } // end anonymous namespace
 
+static llvm::cl::opt<bool>
+VerifyAfterTransform("sil-semantic-arc-opts-verify-after-transform",
+                     llvm::cl::init(false), llvm::cl::Hidden);
+
 bool SemanticARCOptVisitor::processWorklist() {
   // NOTE: The madeChange here is not strictly necessary since we only have
   // items added to the worklist today if we have already made /some/ sort of
@@ -492,6 +497,9 @@ bool SemanticARCOptVisitor::processWorklist() {
         deleteAllDebugUses(defInst);
         eraseInstruction(defInst);
         madeChange = true;
+        if (VerifyAfterTransform) {
+          F.verify();
+        }
         continue;
       }
     }
@@ -499,7 +507,11 @@ bool SemanticARCOptVisitor::processWorklist() {
     // Otherwise, if we have a single value instruction (to be expanded later
     // perhaps), try to visit that value recursively.
     if (auto *svi = dyn_cast<SingleValueInstruction>(next)) {
-      madeChange |= visit(svi);
+      bool madeSingleChange = visit(svi);
+      madeChange |= madeSingleChange;
+      if (VerifyAfterTransform && madeSingleChange) {
+        F.verify();
+      }
       continue;
     }
   }
