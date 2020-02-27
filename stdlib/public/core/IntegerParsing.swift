@@ -44,7 +44,7 @@ extension FixedWidthInteger {
   ///   - radix: The radix, or base, to use for converting `text` to an integer
   ///     value. `radix` must be in the range `2...36`. The default is 10.
   @inlinable @inline(__always)
-  public init?<S : StringProtocol>(_ text: S, radix: Int = 10) {
+  public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
     precondition(2...36 ~= radix)
     let result_: Self?
     if let text = text as? String, text._guts.isSmall {
@@ -87,7 +87,7 @@ extension FixedWidthInteger {
 }
 
 @inlinable @inline(__always)
-internal func _parseSmall<Result : FixedWidthInteger>(
+internal func _parseSmall<Result: FixedWidthInteger>(
   _ rawGuts: _StringObject.RawBitPattern, radix: Int
 ) -> Result? {
   // We work with the bytes as they are arranged in the StringObject,
@@ -310,7 +310,7 @@ internal func _parseBinaryUnsigned(
 
 @inlinable
 internal func _parseFromUTF8<
-  Iterator : IteratorProtocol, Result : FixedWidthInteger
+  Iterator: IteratorProtocol, Result: FixedWidthInteger
 >(_ utf8: inout Iterator, radix: Int) -> Result?
 where Iterator.Element == UInt8 {
   return _parseFromUTF8Inlined(&utf8, radix: radix)
@@ -318,7 +318,7 @@ where Iterator.Element == UInt8 {
 
 @inlinable @inline(__always)
 internal func _parseFromUTF8Inlined<
-  Iterator : IteratorProtocol, Result : FixedWidthInteger
+  Iterator: IteratorProtocol, Result: FixedWidthInteger
 >(_ utf8: inout Iterator, radix: Int) -> Result?
 where Iterator.Element == UInt8 {
   typealias UResult = Result.Magnitude
@@ -354,9 +354,9 @@ where Iterator.Element == UInt8 {
 
 @inlinable @inline(__always)
 internal func _parseFromUTF8Unsigned<
-  Iterator : IteratorProtocol, Result : FixedWidthInteger
+  Iterator: IteratorProtocol, Result: FixedWidthInteger
 >(first: UInt8, rest utf8: inout Iterator, radix: Int) -> Result?
-where Iterator.Element == UInt8, Result : UnsignedInteger {
+where Iterator.Element == UInt8, Result: UnsignedInteger {
   func parseCodeUnit(_ cu: UInt8) -> Result? {
     var digit = UInt(cu &- _ascii("0"))
     if radix > 10 {
