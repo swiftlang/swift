@@ -8,8 +8,8 @@
 import gizmo
 
 // CHECK: [[CLASS:%objc_class]] = type
-// CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[HOOZIT:%T10objc_super6HoozitC]] = type
+// CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[PARTIAL_APPLY_CLASS:%T10objc_super12PartialApplyC]] = type
 // CHECK: [[SUPER:%objc_super]] = type
 // CHECK: [[OBJC:%objc_object]] = type

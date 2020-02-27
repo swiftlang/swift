@@ -277,7 +277,7 @@ bb0(%0 : $*ConformingStruct):
   // concrete Self type.
 
   // CHECK-NEXT: [[SELF:%.*]] = bitcast %T19protocol_resilience16ConformingStructV* %0 to %swift.opaque*
-  // CHECK-NEXT: call swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself [[SELF]], %swift.type* bitcast ({{i32|i64}}* {{.*}}) to %swift.type*), i8** %SelfWitnessTable)
+  // CHECK-NEXT: call swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself [[SELF]], %swift.type* %Self, i8** %SelfWitnessTable)
   %fn1 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
   %ignore1 = apply %fn1<ConformingStruct>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 
