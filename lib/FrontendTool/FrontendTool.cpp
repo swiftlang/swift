@@ -418,11 +418,16 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
       llvm::report_fatal_error("Expected loaded modules to be non-null.");
     if (loadedDecl == mainModule)
       continue;
-    if (loadedDecl->getModuleFilename().empty())
-      llvm::report_fatal_error(
-        "Don't know how to handle modules with empty names."
-        " One potential reason for getting an empty module name might"
-        " be that the module could not be deserialized correctly.");
+    if (loadedDecl->getModuleFilename().empty()) {
+      // FIXME: rdar://problem/59853077
+      // Ideally, this shouldn't happen. As a temporary workaround, avoid
+      // crashing with a message while we investigate the problem.
+      llvm::errs() << "WARNING: Module '" << loadedDecl->getName().str()
+                   << "' has an empty filename. This is probably an "
+                   << "invariant violation.\n"
+                   << "Please report it as a compiler bug.\n";
+      continue;
+    }
     pathToModuleDecl.insert(
       std::make_pair(loadedDecl->getModuleFilename(), loadedDecl));
   }
