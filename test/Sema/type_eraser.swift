@@ -7,36 +7,103 @@ class AnyP: P {
 @_typeEraser(AnyP)
 protocol P {}
 
-class ConcreteP: P {}
+struct ConcreteP: P, Hashable {}
 
-dynamic func opaque() -> some P {
+// CHECK-LABEL: testBasic
+dynamic func testBasic() -> some P {
   // CHECK: underlying_to_opaque_expr{{.*}}'some P'
   // CHECK-NEXT: call_expr implicit type='AnyP'{{.*}}arg_labels=erasing:
   // CHECK: call_expr type='ConcreteP'
   ConcreteP()
 }
 
-class AnyQ: Q {
-  init<T: Q>(erasing: T) {}
+// CHECK-LABEL: testTypeAlias
+typealias AliasForP = P
+dynamic func testTypeAlias() -> some AliasForP {
+  // CHECK: underlying_to_opaque_expr{{.*}}'some P'
+  // CHECK-NEXT: call_expr implicit type='AnyP'{{.*}}arg_labels=erasing:
+  // CHECK: call_expr type='ConcreteP'
+  ConcreteP()
 }
-@_typeEraser(AnyQ)
-protocol Q {}
 
-struct ConcreteQ: Q {}
+// CHECK-LABEL: testNoDynamic
+func testNoDynamic() -> some P {
+  // CHECK: underlying_to_opaque_expr{{.*}}'some P'
+  // CHECK-NEXT: call_expr type='ConcreteP'
+  ConcreteP()
+}
 
+// CHECK-LABEL: testNoOpaque
+dynamic func testNoOpaque() -> P {
+  // CHECK: erasure_expr implicit type='P'
+  // CHECK-NEXT: normal_conformance type=ConcreteP protocol=P
+  // CHECK-NEXT: call_expr type='ConcreteP'
+  ConcreteP()
+}
+
+// CHECK-LABEL: testComposition
+typealias Composition = P & Hashable
+dynamic func testComposition() -> some Composition {
+  // CHECK: underlying_to_opaque_expr{{.*}}'some Hashable & P'
+  // CHECK-NEXT: call_expr type='ConcreteP'
+  ConcreteP()
+}
+
+// CHECK-LABEL: struct_decl{{.*}}Builder
 @_functionBuilder
 struct Builder {
-  static func buildBlock(_ params: Q...) -> ConcreteQ {
-    return ConcreteQ()
+  static func buildBlock(_ params: P...) -> ConcreteP {
+    return ConcreteP()
   }
 }
 
-// CHECK-LABEL: transformFnBody
-@Builder
-dynamic var transformFnBody: some Q {
-  // CHECK: return_stmt
-  // CHECK-NEXT: underlying_to_opaque_expr implicit type='some Q'
-  // CHECK-NEXT: call_expr implicit type='AnyQ'{{.*}}arg_labels=erasing:
-  // CHECK: declref_expr implicit type='@lvalue ConcreteQ'
-  ConcreteQ()
+// CHECK-LABEL: TestFunctionBuilder
+class TestFunctionBuilder {
+  // CHECK-LABEL: testTransformFnBody
+  @Builder dynamic var testTransformFnBody: some P {
+    // CHECK: return_stmt
+    // CHECK-NEXT: underlying_to_opaque_expr implicit type='some P'
+    // CHECK-NEXT: call_expr implicit type='AnyP'{{.*}}arg_labels=erasing:
+    // CHECK: declref_expr implicit type='@lvalue ConcreteP'
+    ConcreteP()
+  }
+
+  // CHECK-LABEL: func_decl{{.*}}takesBuilder
+  func takesBuilder(@Builder closure: () -> ConcreteP) -> ConcreteP { closure() }
+
+  // CHECK-LABEL: testClosureBuilder
+  dynamic var testClosureBuilder: some P {
+    // CHECK: underlying_to_opaque_expr implicit type='some P'
+    // CHECK-NEXT: call_expr implicit type='AnyP'{{.*}}arg_labels=erasing:
+    // CHECK: closure_expr type='() -> ConcreteP'
+    takesBuilder {
+      // CHECK: return_stmt
+      // CHECK-NEXT: load_expr implicit type='ConcreteP'
+      ConcreteP()
+    }
+  }
+}
+
+// CHECK-LABEL: class_decl{{.*}}DynamicReplacement
+class DynamicReplacement {
+  dynamic func testDynamicReplaceable() -> some P {
+    // CHECK: underlying_to_opaque_expr implicit type='some P'
+    // CHECK-NEXT: call_expr implicit type='AnyP'{{.*}}arg_labels=erasing:
+    // CHECK: call_expr type='ConcreteP'
+    ConcreteP()
+  }
+}
+
+// CHECK-LABEL: extension_decl{{.*}}DynamicReplacement
+extension DynamicReplacement {
+  // CHECK-LABEL: testDynamicReplacement
+  @_dynamicReplacement(for: testDynamicReplaceable)
+  func testDynamicReplacement() -> some P {
+    print("not single expr return")
+    // CHECK: return_stmt
+    // CHECK-NEXT: underlying_to_opaque_expr implicit type='some P'
+    // CHECK-NEXT: call_expr implicit type='AnyP'{{.*}}arg_labels=erasing:
+    // CHECK: call_expr type='ConcreteP'
+    return ConcreteP()
+  }
 }
