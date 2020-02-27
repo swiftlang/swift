@@ -569,7 +569,10 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
   llvm_unreachable("Unknown decl kind");
 }
 
-const Decl::CachedExternalSourceLocs *Decl::calculateSerializedLocs() const {
+const Decl::CachedExternalSourceLocs *Decl::getSerializedLocs() const {
+  if (CachedSerializedLocs) {
+    return CachedSerializedLocs;
+  }
   auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
   auto Locs = File->getBasicLocsForDecl(this);
   if (!Locs.hasValue()) {
@@ -585,6 +588,14 @@ Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \
   CASE(StartLoc)
   CASE(EndLoc)
 #undef CASE
+
+  for (const auto &LineColumnAndLength : Locs->DocRanges) {
+    auto Start = SM.getLocFromExternalSource(Locs->SourceFilePath,
+      LineColumnAndLength.first.Line,
+      LineColumnAndLength.first.Column);
+    Result->DocRanges.push_back({ Start, LineColumnAndLength.second });
+  }
+
   return Result;
 }
 
@@ -625,10 +636,7 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   case FileUnitKind::SerializedAST: {
     if (!SerializedOK)
       return SourceLoc();
-    if (!CachedLocs) {
-      CachedLocs = calculateSerializedLocs();
-    }
-    return CachedLocs->Loc;
+    return getSerializedLocs()->Loc;
   }
   case FileUnitKind::Builtin:
   case FileUnitKind::ClangModule:

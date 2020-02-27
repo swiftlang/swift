@@ -103,12 +103,17 @@ void Symbol::serializeNames(llvm::json::OStream &OS) const {
   });
 }
 
-void Symbol::serializePosition(StringRef Key,
-                               unsigned Line, unsigned ByteOffset,
+void Symbol::serializePosition(StringRef Key, SourceLoc Loc,
+                               SourceManager &SourceMgr,
                                llvm::json::OStream &OS) const {
+  // Note: Line and columns are zero-based in this serialized format.
+  auto LineAndColumn = SourceMgr.getLineAndColumn(Loc);
+  auto Line = LineAndColumn.first - 1;
+  auto Column = LineAndColumn.second - 1;
+
   OS.attributeObject(Key, [&](){
     OS.attribute("line", Line);
-    OS.attribute("character", ByteOffset);
+    OS.attribute("character", Column);
   });
 }
 
@@ -116,21 +121,20 @@ void Symbol::serializeRange(size_t InitialIndentation,
                             SourceRange Range, SourceManager &SourceMgr,
                             llvm::json::OStream &OS) const {
   OS.attributeObject("range", [&](){
-    auto StartLineAndColumn = SourceMgr.getLineAndColumn(Range.Start);
-    auto StartLine = StartLineAndColumn.first;
-    auto StartColumn = StartLineAndColumn.second + InitialIndentation;
-    serializePosition("start", StartLine, StartColumn, OS);
+    // Note: Line and columns in the serialized format are zero-based.
+    auto Start = Range.Start.getAdvancedLoc(InitialIndentation);
+    serializePosition("start", Start, SourceMgr, OS);
 
-    auto EndLineAndColumn = SourceMgr.getLineAndColumn(Range.End);
-    auto EndLine = EndLineAndColumn.first;
-    auto EndColumn = EndLineAndColumn.second + InitialIndentation;
-    serializePosition("end", EndLine, EndColumn, OS);
+    auto End = SourceMgr.isBeforeInBuffer(Range.End, Start)
+      ? Start
+      : Range.End;
+    serializePosition("end", End, SourceMgr, OS);
   });
 }
 
 void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
   OS.attributeObject("docComment", [&](){
-    auto LL = Graph.Ctx.getLineList(VD->getRawComment());
+    auto LL = Graph.Ctx.getLineList(VD->getRawComment(/*SerializedOK=*/true));
     size_t InitialIndentation = LL.getLines().empty()
       ? 0
       : markup::measureIndentation(LL.getLines().front().Text);
@@ -281,6 +285,22 @@ void Symbol::serializeAccessLevelMixin(llvm::json::OStream &OS) const {
   OS.attribute("accessLevel", getAccessLevelSpelling(VD->getFormalAccess()));
 }
 
+void Symbol::serializeLocationMixin(llvm::json::OStream &OS) const {
+  auto Loc = VD->getLoc(/*SerializedOK=*/true);
+  if (Loc.isInvalid()) {
+    return;
+  }
+  auto FileName = VD->getASTContext().SourceMgr.getDisplayNameForLoc(Loc);
+  OS.attributeObject("location", [&](){
+    if (!FileName.empty()) {
+      SmallString<1024> FileURI("file://");
+      FileURI.append(FileName);
+      OS.attribute("uri", FileURI.str());
+    }
+    serializePosition("position", Loc, Graph.M.getASTContext().SourceMgr, OS);
+  });
+}
+
 llvm::Optional<StringRef>
 Symbol::getDomain(PlatformAgnosticAvailabilityKind AgnosticKind,
                   PlatformKind Kind) const {
@@ -392,5 +412,6 @@ void Symbol::serialize(llvm::json::OStream &OS) const {
     serializeDeclarationFragmentMixin(OS);
     serializeAccessLevelMixin(OS);
     serializeAvailabilityMixin(OS);
+    serializeLocationMixin(OS);
   });
 }

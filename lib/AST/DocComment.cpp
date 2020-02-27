@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/RawComment.h"
@@ -502,13 +503,22 @@ StringRef Decl::getBriefComment() const {
   if (!this->canHaveComment())
     return StringRef();
 
-  // Ensure the serialized doc is populated to ASTContext.
-  auto RC = getRawComment();
-
   // Check the cache in ASTContext.
   auto &Context = getASTContext();
   if (Optional<StringRef> Comment = Context.getBriefComment(this))
     return Comment.getValue();
+
+  // Check if the serialized module may have the brief comment available.
+  if (auto *Unit =
+          dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+    if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
+      Context.setBriefComment(this, C->Brief);
+      return C->Brief;
+    }
+  }
+
+  // Otherwise, parse the brief from the raw comment itself.
+  auto RC = getRawComment();
 
   StringRef Result;
   if (RC.isEmpty())
