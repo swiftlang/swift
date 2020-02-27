@@ -379,8 +379,6 @@ class TestPerformanceTestResult(unittest.TestCase):
 1,AngryPhonebook,1,12270,12270,12270,0,12270,10498048""".split('\n')[1:]
         results = map(PerformanceTestResult,
                       [line.split(',') for line in tests])
-        results[2].setup = 9
-        results[3].setup = 7
 
         def as_tuple(r):
             return (r.num_samples, r.min, r.max, round(r.mean, 2),
@@ -392,9 +390,11 @@ class TestPerformanceTestResult(unittest.TestCase):
         r.merge(results[1])
         self.assertEqual(as_tuple(r),  # drops SD and median, +max_rss
                          (2, 12045, 12325, 12185, None, None, 10510336, None))
+        results[2].setup = 9
         r.merge(results[2])
         self.assertEqual(as_tuple(r),  # picks smaller of the MAX_RSS, +setup
                          (3, 11616, 12325, 11995.33, None, None, 10502144, 9))
+        results[3].setup = 7
         r.merge(results[3])
         self.assertEqual(as_tuple(r),  # picks smaller of the setup values
                          (4, 11616, 12325, 12064, None, None, 10498048, 7))
@@ -417,14 +417,23 @@ class TestPerformanceTestResult(unittest.TestCase):
 
         def as_tuple(r):
             return (r.num_samples, r.samples.num_samples, r.samples.count,
-                    r.min, r.samples.median, r.max)
+                    r.min, r.samples.median, r.max,
+                    r.mem_pages, r.involuntary_cs, r.yield_count)
 
         r = results[0]
-        self.assertEqual(as_tuple(r), (200, 21, 18, 967, 996, 1008))
+        self.assertEqual(as_tuple(r),
+                         (200, 21, 18, 967, 996, 1008, None, None, None))
+        # merging optional --meta data
+        results[1].mem_pages = 9
+        results[1].involuntary_cs = 1
+        results[1].yield_count = 4
         r.merge(results[1])  # 18 + 17 = 35, after merge using only ventiles
-        self.assertEqual(as_tuple(r), (400, 42, 35, 967, 983, 1010))
-        r.merge(results[2])  # 35 + 18 = 53
-        self.assertEqual(as_tuple(r), (600, 63, 53, 967, 989, 1029))
+        self.assertEqual(as_tuple(r), (400, 42, 35, 967, 983, 1010, 9, 1, 4))
+        results[2].mem_pages = 7
+        results[2].involuntary_cs = 2
+        results[2].yield_count = 6
+        r.merge(results[2])  # 35 + 18 = 53; sum yields and context switches
+        self.assertEqual(as_tuple(r), (600, 63, 53, 967, 989, 1029, 7, 3, 10))
 
 
 class TestResultComparison(unittest.TestCase):

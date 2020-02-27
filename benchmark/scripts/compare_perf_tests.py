@@ -294,12 +294,19 @@ class PerformanceTestResult(object):
             self.num_samples += r.num_samples
             self.median, self.sd = None, None
 
-        # Metadata
+        # Collate the Metadata
         def minimum(a, b):  # work around None being less than everything
             return (min(filter(lambda x: x is not None, [a, b])) if any([a, b])
                     else None)
+
+        def sum_none(a, b):  # work around None being less than everything
+            return (sum(filter(lambda x: x is not None, [a, b])) if any([a, b])
+                    else None)
         self.max_rss = minimum(self.max_rss, r.max_rss)
+        self.mem_pages = minimum(self.mem_pages, r.mem_pages)
         self.setup = minimum(self.setup, r.setup)
+        self.involuntary_cs = sum_none(self.involuntary_cs, r.involuntary_cs)
+        self.yield_count = sum_none(self.yield_count, r.yield_count)
 
 
 class ResultComparison(object):
