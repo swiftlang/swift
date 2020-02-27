@@ -213,7 +213,7 @@ internal struct _SliceBuffer<Element>
   }
 
   @inlinable
-  internal func isMutableAndUniquelyReferenced() -> Bool {
+  internal mutating func isMutableAndUniquelyReferenced() -> Bool {
     // This is a performance optimization that ensures that the copy of self
     // that occurs at -Onone is destroyed before we call
     // isUniquelyReferenced. This code used to be:
@@ -250,8 +250,16 @@ internal struct _SliceBuffer<Element>
     _internalInvariant(bounds.upperBound >= bounds.lowerBound)
     _internalInvariant(bounds.upperBound <= endIndex)
     let c = bounds.count
-    target.initialize(from: subscriptBaseAddress + bounds.lowerBound, count: c)
-    return target + c
+    let unmanaged = Unmanaged.passUnretained(owner)
+    return unmanaged._withUnsafeGuaranteedRef { (ref) in
+      var mutRef = ref
+      if _isUnique(&mutRef) {
+        target.moveInitialize(from: subscriptBaseAddress + bounds.lowerBound, count: c)
+      } else {
+        target.initialize(from: subscriptBaseAddress + bounds.lowerBound, count: c)
+      }
+      return target + c
+    }
   }
 
   public __consuming func _copyContents(
@@ -306,12 +314,8 @@ internal struct _SliceBuffer<Element>
   }
 
   @inlinable
-  internal func isUniquelyReferenced() -> Bool {
-    let unmanaged = Unmanaged.passUnretained(owner)
-    return unmanaged._withUnsafeGuaranteedRef { ref in
-      var mutRef = ref
-      return _isUnique(&mutRef)
-    }
+  internal mutating func isUniquelyReferenced() -> Bool {
+    return isKnownUniquelyReferenced(&owner)
   }
 
   @inlinable
