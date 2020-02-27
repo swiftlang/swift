@@ -3799,9 +3799,11 @@ bool ConstraintSystem::repairFailures(
     if (tupleLocator->isLastElement<LocatorPathElt::SequenceElementType>())
       break;
 
-    // Generic argument failures have a more general fix which is attached to a
-    // parent type and aggregates all argument failures into a single fix.
-    if (tupleLocator->isLastElement<LocatorPathElt::GenericArgument>())
+    // Generic argument/requirement failures have a more general fix which
+    // is attached to a parent type and aggregates all argument failures
+    // into a single fix.
+    if (tupleLocator->isLastElement<LocatorPathElt::AnyRequirement>() ||
+        tupleLocator->isLastElement<LocatorPathElt::GenericArgument>())
       break;
 
     ConstraintFix *fix;
