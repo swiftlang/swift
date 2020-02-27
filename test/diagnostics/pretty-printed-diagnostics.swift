@@ -46,6 +46,11 @@ struct B: Decodable {
 // The line below is indented with tabs, not spaces.
 			foo(b: 1, a: 2)
 
+let 👍👍👍 = {
+  let y = 1
+  return y
+}
+
 // Test fallback for non-ASCII characters.
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:35:11
 // CHECK: 34 |
@@ -65,7 +70,7 @@ struct B: Decodable {
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:9:11
 // CHECK:  8 |
 // CHECK:  9 | foo(a: 2, b: 1, a: 2)
-// CHECK:    |           ~~~~  ~~~~
+// CHECK:    |     ++++++~~~~------
 // CHECK:    |                 ^ error: argument 'a' must precede argument 'b' [remove ', a: 2' and insert 'a: 2, ']
 // CHECK: 10 |
 
@@ -100,7 +105,7 @@ struct B: Decodable {
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:32:16
 // CHECK: 31 | extension A {
 // CHECK: 32 |   let x: Int = { 42 }()
-// CHECK:    |                ~~~~~~
+// CHECK:    |                ~~~~~~++
 // CHECK:    |                ^ error: function produces expected type 'Int'; did you mean to call it with '()'?
 // CHECK:    |                ^ note: Remove '=' to make 'x' a computed property [remove '= ' and replace 'let' with 'var']
 // CHECK: 33 | }
@@ -108,6 +113,7 @@ struct B: Decodable {
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:37:9
 // CHECK: 36 |
 // CHECK: 37 | let x = { () -> Result in
+// CHECK:    |          +++++++++++++++++
 // CHECK:    |         ^ error: unable to infer complex closure return type; add explicit type to disambiguate
 // CHECK: 38 |   let y = 1
 
@@ -127,9 +133,15 @@ struct B: Decodable {
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:47:14
 // CHECK: 46 | // The line below is indented with tabs, not spaces.
 // CHECK: 47 |       foo(a: 2, b: 1, a: 2)
-// CHECK:    |                 ~~~~  ~~~~
+// CHECK:    |           ++++++~~~~------
 // CHECK:    |                       ^ error: argument 'a' must precede argument 'b' [remove ', a: 2' and insert 'a: 2, ']
 // CHECK: 48 |
+
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:49:20
+// CHECK: 48 |
+// CHECK: 49 | let 👍👍👍 = {
+// CHECK:    | --> error: unable to infer complex closure return type; add explicit type to disambiguate [insert ' () -> <#Result#> in ']
+// CHECK: 50 |   let y = 1
 
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:6:5
 // CHECK: 5 | func foo(a: Int, b: Int) {

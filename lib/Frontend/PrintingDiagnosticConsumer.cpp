@@ -208,7 +208,11 @@ namespace {
     }
 
     // Insert fix-it replacement text at the appropriate point in the line.
-    bool maybePrintInsertionAfter(int Byte, raw_ostream &Out) {
+    bool maybePrintInsertionAfter(int Byte, bool isLineASCII,
+                                  raw_ostream &Out) {
+      if (!isLineASCII)
+        return false;
+
       for (auto fixIt : FixIts) {
         if ((int)fixIt.EndByte - 1 == Byte) {
           Out.changeColor(ColoredStream::Colors::GREEN, /*bold*/ true);
@@ -264,58 +268,101 @@ namespace {
     void render(unsigned LineNumberIndent, raw_ostream &Out) {
       printNumberedGutter(LineNumber, LineNumberIndent, Out);
 
-      // Print the source line byte-by-byte, emitting ANSI escape sequences as
-      // needed to style fix-its, and checking for non-ASCII characters.
-      bool deleted = false;
+      // Determine if the line is all-ASCII. This will determine a number of
+      // later formatting decisions.
       bool isASCII = true;
-      maybePrintInsertionAfter(-1, Out);
-      for (unsigned i = 0; i < LineText.size(); ++i) {
+      for (unsigned i = 0; i < LineText.size(); ++i)
         isASCII = isASCII && static_cast<unsigned char>(LineText[i]) <= 127;
-        applyStyleForLineByte(i, Out, deleted);
-        if (LineText[i] == '\t')
-          Out << "  ";
-        else
-          Out << LineText[i];
-        if (maybePrintInsertionAfter(i, Out)) {
-          deleted = false;
-        }
-      }
-      maybePrintInsertionAfter(LineText.size(), Out);
-      Out.resetColor();
-      Out << "\n";
 
-      // Maps a byte in the original source line to a column in the annotated
+      // Map a byte in the original source line to a column in the annotated
       // line.
-      unsigned *byteToColumnMap = new unsigned[LineText.size()];
+      unsigned *byteToColumnMap = new unsigned[LineText.size() + 1];
       unsigned extraColumns = 0;
-      for (unsigned i = 0; i < LineText.size(); ++i) {
-        for (auto fixIt : FixIts) {
-          if (fixIt.EndByte == i)
-            extraColumns += fixIt.Text.size();
+      // We count one past the end of LineText to handle trailing fix-it
+      // insertions.
+      for (unsigned i = 0; i < LineText.size() + 1; ++i) {
+        if (isASCII) {
+          for (auto fixIt : FixIts) {
+            if (fixIt.EndByte == i) {
+              extraColumns += fixIt.Text.size() -
+                              StringRef(fixIt.Text).count("<#") * 2 -
+                              StringRef(fixIt.Text).count("#>") * 2;
+            }
+          }
         }
         // Tabs are mapped to 2 spaces so they have a known column width.
-        if (LineText[i] == '\t')
+        if (i < LineText.size() && LineText[i] == '\t')
           extraColumns += 1;
 
         byteToColumnMap[i] = i + extraColumns;
       }
 
+      // Print the source line byte-by-byte, emitting ANSI escape sequences as
+      // needed to style fix-its, and checking for non-ASCII characters.
+      bool deleted = false;
+      maybePrintInsertionAfter(-1, isASCII, Out);
+      for (unsigned i = 0; i < LineText.size(); ++i) {
+        applyStyleForLineByte(i, Out, deleted);
+        if (LineText[i] == '\t')
+          Out << "  ";
+        else
+          Out << LineText[i];
+        if (maybePrintInsertionAfter(i, isASCII, Out)) {
+          deleted = false;
+        }
+      }
+      maybePrintInsertionAfter(LineText.size(), isASCII, Out);
+      Out.resetColor();
+      Out << "\n";
+
       // If the entire line is composed of ASCII characters, we can position '~'
       // characters in the appropriate columns on the following line to
       // represent highlights.
       if (isASCII) {
-        auto highlightLine =
-            std::string(byteToColumnMap[LineText.size() - 1] + 1, ' ');
+        auto highlightLine = std::string(byteToColumnMap[LineText.size()], ' ');
         for (auto highlight : Highlights) {
           for (unsigned i = highlight.StartByte; i < highlight.EndByte; ++i)
             highlightLine[byteToColumnMap[i]] = '~';
         }
 
-        if (!Highlights.empty()) {
+        for (auto fixIt : FixIts) {
+          // Mark deletions.
+          for (unsigned i = fixIt.StartByte; i < fixIt.EndByte; ++i)
+            highlightLine[byteToColumnMap[i]] = '-';
+
+          // Mark insertions.
+          for (unsigned i = byteToColumnMap[fixIt.StartByte - 1] + 1;
+               i < byteToColumnMap[fixIt.StartByte]; ++i)
+            highlightLine[i] = '+';
+        }
+
+        if (!(Highlights.empty() && FixIts.empty())) {
           printEmptyGutter(LineNumberIndent, Out);
-          Out.changeColor(ColoredStream::Colors::BLUE, true);
-          Out << highlightLine << "\n";
+          auto currentColor = ColoredStream::Colors::WHITE;
+          for (unsigned i = 0; i < highlightLine.size(); ++i) {
+            llvm::raw_ostream::Colors charColor;
+            switch (highlightLine[i]) {
+            case '+':
+              charColor = ColoredStream::Colors::GREEN;
+              break;
+            case '-':
+              charColor = ColoredStream::Colors::RED;
+              break;
+            case '~':
+              charColor = ColoredStream::Colors::BLUE;
+              break;
+            default:
+              charColor = ColoredStream::Colors::WHITE;
+              break;
+            }
+            if (currentColor != charColor) {
+              currentColor = charColor;
+              Out.changeColor(charColor, /*bold*/ true);
+            }
+            Out << highlightLine[i];
+          }
           Out.resetColor();
+          Out << "\n";
         }
       }
 
