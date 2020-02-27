@@ -17,20 +17,24 @@ jobs:
       - uses: actions/checkout@v1
         with:
           path: swift
+      - uses: actions/cache@v1
+        with:
+          path: ../build-cache
+          key: ${{ runner.os }}-sccache-v1
       - name: Build Linux installable archive
-        run: ./utils/webassembly/ci-linux.sh
+        run: ./utils/webassembly/ci.sh
       - name: Upload Linux installable archive
         uses: actions/upload-artifact@v1
         with:
           name: linux-installable
           path: ../swiftwasm-linux.tar.gz
-      - name: Pack test results
-        run: tar cJf swift-test-results.tar.gz ../build/*/swift-linux-x86_64/swift-test-results
-      - name: Upload test results
-        uses: actions/upload-artifact@v1
-        with:
-          name: linux-test-results
-          path: ./swift-test-results.tar.gz
+#      - name: Pack test results
+#        run: tar cJf swift-test-results.tar.gz ../build/*/swift-linux-x86_64/swift-test-results
+#      - name: Upload test results
+#        uses: actions/upload-artifact@v1
+#        with:
+#          name: linux-test-results
+#          path: ./swift-test-results.tar.gz
 
   macos_build:
     timeout-minutes: 0
@@ -40,8 +44,12 @@ jobs:
       - uses: actions/checkout@v1
         with:
           path: swift
+      - uses: actions/cache@v1
+        with:
+          path: ../build-cache
+          key: ${{ runner.os }}-sccache-v1
       - name: Build macOS installable archive
-        run: ./utils/webassembly/ci-mac.sh
+        run: ./utils/webassembly/ci.sh
       - name: Upload macOS installable archive
         uses: actions/upload-artifact@v1
         with:

@@ -3,11 +3,10 @@
 set -ex
 
 brew uninstall python@2 || true
-brew install cmake ninja llvm
+brew install cmake ninja llvm sccache
 
-SOURCE_PATH="$( cd "$(dirname $0)/../../.." && pwd  )" 
+SOURCE_PATH="$( cd "$(dirname $0)/../../../../" && pwd  )"
 SWIFT_PATH=$SOURCE_PATH/swift
-BUILD_SCRIPT=$SWIFT_PATH/utils/webassembly/build-mac.sh
 cd $SWIFT_PATH
 
 ./utils/update-checkout --clone --scheme wasm --skip-repository swift
@@ -38,7 +37,3 @@ ln -s wasm32-wasi wasi-sdk/share/wasi-sysroot/lib/wasm32-wasi-unknown
 
 wget -O icu.tar.xz "https://github.com/swiftwasm/icu4c-wasi/releases/download/0.3.0/icu4c-wasi.tar.xz"
 tar xf icu.tar.xz
-
-$BUILD_SCRIPT --release --debug-swift-stdlib --verbose
-# Run test but ignore failure temporarily
-$BUILD_SCRIPT --release --debug-swift-stdlib --verbose -t || true

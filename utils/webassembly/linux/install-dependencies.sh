@@ -46,3 +46,10 @@ ln -s wasm32-wasi wasi-sdk/share/wasi-sysroot/lib/wasm32-wasi-unknown
 
 wget -O icu.tar.xz "https://github.com/swiftwasm/icu4c-wasi/releases/download/0.3.0/icu4c-wasi.tar.xz"
 tar xf icu.tar.xz
+
+# Install sccache
+
+sudo mkdir /opt/sccache && cd /opt/sccache
+wget -O - "https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz" | \
+  sudo tar xz --strip-components 1
+sudo ln -sf /opt/sccache/sccache /usr/local/bin
