@@ -3564,6 +3564,21 @@ public:
   /// Given expression represents computed result of the closure.
   Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType);
 
+  /// Builds a type-erased return expression that can be used in dynamic
+  /// replacement.
+  ///
+  /// An expression needs type erasure if:
+  ///  1. The expression is a return value.
+  ///  2. The enclosing function is dynamic or a dynamic replacement.
+  ///  3. The enclosing function returns an opaque type.
+  ///  4. The opaque type conforms to (exactly) one protocol, and the protocol
+  ///     has a declared type eraser.
+  ///
+  /// \returns the transformed return expression, or the original expression if
+  /// no type erasure is needed.
+  Expr *buildTypeErasedExpr(Expr *expr, DeclContext *dc, Type contextualType,
+                            ContextualTypePurpose purpose);
+
 private:
   /// Determines whether or not a given conversion at a given locator requires
   /// the creation of a temporary value that's only valid for a limited scope.

@@ -16,3 +16,27 @@ dynamic func opaque() -> some P {
   ConcreteP()
 }
 
+class AnyQ: Q {
+  init<T: Q>(erasing: T) {}
+}
+@_typeEraser(AnyQ)
+protocol Q {}
+
+struct ConcreteQ: Q {}
+
+@_functionBuilder
+struct Builder {
+  static func buildBlock(_ params: Q...) -> ConcreteQ {
+    return ConcreteQ()
+  }
+}
+
+// CHECK-LABEL: transformFnBody
+@Builder
+dynamic var transformFnBody: some Q {
+  // CHECK: return_stmt
+  // CHECK-NEXT: underlying_to_opaque_expr implicit type='some Q'
+  // CHECK-NEXT: call_expr implicit type='AnyQ'{{.*}}arg_labels=erasing:
+  // CHECK: declref_expr implicit type='@lvalue ConcreteQ'
+  ConcreteQ()
+}

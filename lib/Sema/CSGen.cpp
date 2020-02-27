@@ -3903,38 +3903,6 @@ static bool generateInitPatternConstraints(
   return false;
 }
 
-static Expr *eraseTypeForDynamicReplacement(SolutionApplicationTarget target,
-                                            Expr *expr) {
-  auto purpose = target.getExprContextualTypePurpose();
-  auto *dc = target.getDeclContext();
-  auto *decl = dyn_cast_or_null<ValueDecl>(dc->getAsDecl());
-  if (!decl)
-    return expr;
-
-  if (!(purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr) ||
-      !(decl->isDynamic() || decl->getDynamicallyReplacedDecl()))
-    return expr;
-
-  auto *opaque =
-      target.getExprContextualType()->getAs<OpaqueTypeArchetypeType>();
-  if (!opaque)
-    return expr;
-
-  auto protocols = opaque->getConformsTo();
-  if (protocols.size() != 1)
-    return expr;
-
-  auto *attr = protocols.front()->getAttrs().getAttribute<TypeEraserAttr>();
-  if (!attr)
-    return expr;
-
-  auto typeEraser = attr->getTypeEraserLoc().getType();
-  auto &ctx = dc->getASTContext();
-  return CallExpr::createImplicit(ctx,
-                                  TypeExpr::createImplicit(typeEraser, ctx),
-                                  {expr}, {ctx.Id_erasing});
-}
-
 bool ConstraintSystem::generateConstraints(
     SolutionApplicationTarget &target,
     FreeTypeVariableBinding allowFreeTypeVariables) {
@@ -3951,7 +3919,9 @@ bool ConstraintSystem::generateConstraints(
       target.setExprConversionType(TypeChecker::getOptionalType(expr->getLoc(), var));
     }
 
-    expr = eraseTypeForDynamicReplacement(target, expr);
+    expr = buildTypeErasedExpr(expr, target.getDeclContext(),
+                               target.getExprContextualType(),
+                               target.getExprContextualTypePurpose());
 
     // Generate constraints for the main system.
     expr = generateConstraints(expr, target.getDeclContext());

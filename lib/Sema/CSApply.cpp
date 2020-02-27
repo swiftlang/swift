@@ -7417,6 +7417,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       return None;
 
     result.setFunctionBody(newBody);
+    fn.getAbstractFunctionDecl()->setHasSingleExpressionBody(false);
   }
 
   // Follow-up tasks.

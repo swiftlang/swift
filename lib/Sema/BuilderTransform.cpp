@@ -210,6 +210,10 @@ public:
       return None;
 
     applied.returnExpr = buildVarRef(bodyVar, stmt->getEndLoc());
+    applied.returnExpr = cs->buildTypeErasedExpr(applied.returnExpr,
+                                                 dc, applied.bodyResultType,
+                                                 CTP_ReturnStmt);
+
     applied.returnExpr = cs->generateConstraints(applied.returnExpr, dc);
     if (!applied.returnExpr) {
       hadError = true;
