@@ -18,9 +18,9 @@ _ = Bar(a: 12, b: 42)
 // Enabled.
 // RUN: %sourcekitd-test \
 // RUN:   -req=track-compiles == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=14:11 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=13:15 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=16:22 %s -- %s > %t.response
+// RUN:   -req=complete -pos=14:11 %s -- %s == \
+// RUN:   -req=complete -pos=13:15 %s -- %s == \
+// RUN:   -req=complete -pos=16:22 %s -- %s > %t.response
 // RUN: %FileCheck --check-prefix=RESULT %s < %t.response
 // RUN: %FileCheck --check-prefix=TRACE %s < %t.response
 
