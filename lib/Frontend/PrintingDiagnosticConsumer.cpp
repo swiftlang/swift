@@ -210,6 +210,8 @@ namespace {
     // Insert fix-it replacement text at the appropriate point in the line.
     bool maybePrintInsertionAfter(int Byte, bool isLineASCII,
                                   raw_ostream &Out) {
+      // Don't print insertions inline for non-ASCII lines, because we can't
+      // print an underline beneath them.
       if (!isLineASCII)
         return false;
 
@@ -278,12 +280,14 @@ namespace {
       // line.
       unsigned *byteToColumnMap = new unsigned[LineText.size() + 1];
       unsigned extraColumns = 0;
-      // We count one past the end of LineText to handle trailing fix-it
+      // We count one past the end of LineText here to handle trailing fix-it
       // insertions.
       for (unsigned i = 0; i < LineText.size() + 1; ++i) {
         if (isASCII) {
           for (auto fixIt : FixIts) {
             if (fixIt.EndByte == i) {
+              // We don't print editor placeholder indicators, so make sure we
+              // don't count them here.
               extraColumns += fixIt.Text.size() -
                               StringRef(fixIt.Text).count("<#") * 2 -
                               StringRef(fixIt.Text).count("#>") * 2;
@@ -336,6 +340,7 @@ namespace {
             highlightLine[i] = '+';
         }
 
+        // Print the highlight line with the appropriate colors.
         if (!(Highlights.empty() && FixIts.empty())) {
           printEmptyGutter(LineNumberIndent, Out);
           auto currentColor = ColoredStream::Colors::WHITE;
