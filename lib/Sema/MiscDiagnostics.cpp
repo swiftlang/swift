@@ -4337,7 +4337,10 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       auto property = lastComponent.getDeclRef().getDecl();
       if (!property)
         return;
-      if (property->isObjCDynamic())
+      auto propertyVar = cast<VarDecl>(property);
+      if (propertyVar->isObjCDynamic() ||
+          (propertyVar->isObjC() &&
+           propertyVar->getParsedAccessor(AccessorKind::Set)))
         return;
       C.Diags
           .diagnose(expr->getLoc(),
