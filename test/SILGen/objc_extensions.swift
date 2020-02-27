@@ -114,14 +114,13 @@ func testOverrideProperty(_ obj: Sub) {
 
 testOverrideProperty(Sub())
 
-// CHECK-LABEL: sil shared [thunk] [ossa] @$s15objc_extensions3SubC3fooyyFTc
-// CHECK:         function_ref @$s15objc_extensions3SubC3fooyyFTD
-// CHECK: } // end sil function '$s15objc_extensions3SubC3fooyyFTc'
-// CHECK:       sil shared [transparent] [serializable] [thunk] [ossa] @$s15objc_extensions3SubC3fooyyFTD
-// CHECK:       bb0([[SELF:%.*]] : @guaranteed $Sub):
-// CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
-// CHECK:         objc_method [[SELF_COPY]] : $Sub, #Sub.foo!1.foreign
-// CHECK: } // end sil function '$s15objc_extensions3SubC3fooyyFTD'
+// CHECK-LABEL: sil private [ossa] @$s15objc_extensions9testCurryyyAA3SubCFyycADcfu_ : $@convention(thin) (@guaranteed Sub) -> @owned @callee_guaranteed () -> ()
+// CHECK: function_ref @$s15objc_extensions9testCurryyyAA3SubCFyycADcfu_yycfu0_ : $@convention(thin) (@guaranteed Sub) -> ()
+// CHECK: } // end sil function '$s15objc_extensions9testCurryyyAA3SubCFyycADcfu_'
+
+// CHECK-LABEL: sil private [ossa] @$s15objc_extensions9testCurryyyAA3SubCFyycADcfu_yycfu0_ : $@convention(thin) (@guaranteed Sub) -> ()
+// CHECK: objc_method %0 : $Sub, #Sub.foo!1.foreign : (Sub) -> () -> (), $@convention(objc_method) (Sub) -> ()
+// CHECK: } // end sil function '$s15objc_extensions9testCurryyyAA3SubCFyycADcfu_yycfu0_'
 func testCurry(_ x: Sub) {
   _ = x.foo
 }
