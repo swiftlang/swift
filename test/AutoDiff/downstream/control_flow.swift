@@ -536,9 +536,9 @@ ControlFlowTests.test("Enums") {
     }
   }
   expectEqual((Dense.TangentVector(w1: 10), 20),
-              Dense(w1: 4, w2: 5).gradient(at: 2, in: { dense, x in dense(x) }))
+              gradient(at: Dense(w1: 4, w2: 5), 2) { dense, x in dense(x) })
   expectEqual((Dense.TangentVector(w1: 2), 4),
-              Dense(w1: 4, w2: nil).gradient(at: 2, in: { dense, x in dense(x) }))
+              gradient(at: Dense(w1: 4, w2: nil), 2) { dense, x in dense(x) })
 
   indirect enum Indirect {
     case e(Float, Enum)

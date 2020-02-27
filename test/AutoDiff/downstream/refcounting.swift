@@ -130,4 +130,4 @@ struct UsesMethodOfNoDerivativeMember : Differentiable {
   }
 }
 
-_ = UsesMethodOfNoDerivativeMember().pullback(at: .zero) { $0.applied(to: $1) }
+_ = pullback(at: UsesMethodOfNoDerivativeMember(), .zero) { $0.applied(to: $1) }

@@ -15,7 +15,7 @@ protocol DiffReq : Differentiable {
 extension DiffReq where TangentVector : AdditiveArithmetic {
   @inline(never)  // Prevent specialization, to test all witness code.
   func gradF(at x: Tracked<Float>) -> (Self.TangentVector, Tracked<Float>) {
-    return (valueWithPullback(at: x) { s, x in s.f(x) }).1(1)
+    return (valueWithPullback(at: self, x) { s, x in s.f(x) }).1(1)
   }
 }
 

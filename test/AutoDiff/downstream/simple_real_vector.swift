@@ -59,7 +59,7 @@ public struct TF189: Differentiable {
   @noDerivative public let nonTrivial: NonTrivial
 
   func foo(input: Vector) -> Vector {
-    return self.pullback(at: input) { m, x in
+    return pullback(at: self, input) { m, x in
       m.applied(to: x)
     }(.zero).1
   }

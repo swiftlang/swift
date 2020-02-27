@@ -77,7 +77,7 @@ extension DummyLayer {
   -> (Output,
     (Self.Output.TangentVector)
     -> (Self.TangentVector, Self.Input.TangentVector)) {
-    return Swift.valueWithPullback(at: self, input) { $0.requirement($1) }
+    return valueWithPullback(at: self, input) { $0.requirement($1) }
   }
 }
 
