@@ -110,7 +110,7 @@ namespace {
     /// diagnostics for '<unknown>:0' should be considered as unexpected.
     bool verifyUnknown();
 
-    void printRemainingDiagnostics();
+    void printRemainingDiagnostics() const;
 
     /// If there are any -verify errors (e.g. differences between expectations
     /// and actual diagnostics produced), apply fixits to the original source
@@ -698,9 +698,12 @@ bool DiagnosticVerifier::verifyUnknown() {
   return HadError;
 }
 
-void DiagnosticVerifier::printRemainingDiagnostics() {
-  for (const auto &diag: CapturedDiagnostics) {
-    SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), diag);
+void DiagnosticVerifier::printRemainingDiagnostics() const {
+  for (const auto &diag : CapturedDiagnostics) {
+    SM.getLLVMSourceMgr().PrintMessage(
+        llvm::errs(), diag.getLoc(), diag.getKind(),
+        "diagnostic produced by Clang: " + diag.getMessage(),
+        /*Ranges=*/ {}, diag.getFixIts());
   }
 }
 
