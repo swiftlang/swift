@@ -313,6 +313,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
       // Skip claimed arguments.
       if (claimedArgs[i]) {
+        assert(!forVariadic && "Cannot be for a variadic claim");
         // Note that we have already claimed an argument with the same name.
         if (!claimedWithSameName)
           claimedWithSameName = i;
@@ -322,6 +323,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       // We found a match.  If the match wasn't the next one, we have
       // potentially out of order arguments.
       if (i != nextArgIdx) {
+        assert(!forVariadic && "Cannot be for a variadic claim");
         // Avoid claiming un-labeled defaulted parameters
         // by out-of-order un-labeled arguments or parts
         // of variadic argument sequence, because that might
@@ -330,8 +332,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
         // func foo(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
         // foo(1, c: 2, 3) // -> `3` will be claimed as '_ b:'.
         // ```
-        if (argLabel.empty() &&
-            (paramInfo.hasDefaultArgument(i) || !forVariadic))
+        if (argLabel.empty())
           continue;
 
         potentiallyOutOfOrder = true;

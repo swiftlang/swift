@@ -1,15 +1,19 @@
-// Check that we generate the right code with the flag.
-// RUN: %target-swift-emit-silgen -enable-experimental-concise-pound-file -module-name Foo %/s | %FileCheck %s
+// Check that we generate the right strings.
+// RUN: %target-swift-emit-silgen -module-name Foo %/s | %FileCheck %s
 
-// Check that we give errors for use of #filePath if concise #file isn't enabled.
-// FIXME: Drop if we stop rejecting this.
+// Even if concise #file is not available, we now allow you to write #filePath.
+// Check that we don't diagnose any errors in this file.
 // RUN: %target-typecheck-verify-swift -module-name Foo %s
 
-// FIXME: Once this feature becomes non-experimental, we should duplicate
+// #filePath should appear in swiftinterfaces with this change.
+// RUN: %target-swift-frontend-typecheck -module-name Foo -emit-module-interface-path %t.swiftinterface %s
+// RUN: %FileCheck -check-prefix SWIFTINTERFACE %s < %t.swiftinterface
+
+// FIXME: Once this feature has been fully staged in, we should duplicate
 // existing #file tests and delete this file.
 
 func directUse() {
-  print(#filePath) // expected-error {{use of unknown directive '#filePath'}}
+  print(#filePath)
 
 // CHECK-LABEL: sil {{.*}} @$s3Foo9directUseyyF
 // CHECK: string_literal utf8 "SOURCE_DIR/test/SILGen/magic_identifier_filepath.swift"
@@ -22,5 +26,5 @@ func indirectUse() {
 // CHECK: string_literal utf8 "SOURCE_DIR/test/SILGen/magic_identifier_filepath.swift"
 }
 
-func functionWithFilePathDefaultArgument(file: String = #filePath) {}
-// expected-error@-1 {{use of unknown directive '#filePath'}}
+public func functionWithFilePathDefaultArgument(file: String = #filePath) {}
+// SWIFTINTERFACE: public func functionWithFilePathDefaultArgument(file: Swift.String = #filePath)
