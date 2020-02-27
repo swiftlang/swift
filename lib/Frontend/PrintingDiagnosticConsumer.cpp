@@ -128,13 +128,30 @@ namespace {
   static void describeFixIt(SourceManager &SM, DiagnosticInfo::FixIt fixIt,
                             raw_ostream &Out) {
     if (fixIt.getRange().getByteLength() == 0) {
-      Out << "[insert '" << fixIt.getText() << "']";
+      Out << "insert '" << fixIt.getText() << "'";
     } else if (fixIt.getText().empty()) {
-      Out << "[remove '" << SM.extractText(fixIt.getRange()) << "']";
+      Out << "remove '" << SM.extractText(fixIt.getRange()) << "'";
     } else {
-      Out << "[replace '" << SM.extractText(fixIt.getRange()) << "' with '"
-          << fixIt.getText() << "']";
+      Out << "replace '" << SM.extractText(fixIt.getRange()) << "' with '"
+          << fixIt.getText() << "'";
     }
+  }
+
+  static void describeFixIts(SourceManager &SM,
+                             ArrayRef<DiagnosticInfo::FixIt> fixIts,
+                             raw_ostream &Out) {
+    Out << "[";
+    for (unsigned i = 0; i < fixIts.size(); ++i) {
+      if (fixIts.size() > 2 && i + 1 == fixIts.size()) {
+        Out << ", and ";
+      } else if (fixIts.size() > 2 && i > 0) {
+        Out << ", ";
+      } else if (fixIts.size() == 2 && i == 1) {
+        Out << " and ";
+      }
+      describeFixIt(SM, fixIts[i], Out);
+    }
+    Out << "]";
   }
 
   /// Represents a single line of source code annotated with optional messages,
@@ -543,13 +560,13 @@ static void annotateSnippetWithInfo(SourceManager &SM,
     llvm::raw_svector_ostream Out(Text);
     DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
                                            Info.FormatArgs);
-    // For notes, show associated fix-its as part of the message. This is a
-    // better experience when notes offer a choice of fix-its.
-    if (Info.Kind == DiagnosticKind::Note) {
-      for (auto fixIt : Info.FixIts) {
-        Out << " ";
-        describeFixIt(SM, fixIt, Out);
-      }
+    // Show associated fix-its as part of the message. This is a
+    // better experience when notes offer a choice of fix-its. It's redundant
+    // for fix-its which are also displayed inline, but helps improve
+    // readability in some situations.
+    if (!Info.FixIts.empty()) {
+      Out << " ";
+      describeFixIts(SM, Info.FixIts, Out);
     }
   }
 

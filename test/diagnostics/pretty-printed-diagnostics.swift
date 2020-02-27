@@ -63,7 +63,7 @@ struct B: Decodable {
 // CHECK: 8 |
 // CHECK: 9 | foo(a: 2, b: 1, a: 2)
 // CHECK:   |           ~~~~  ~~~~
-// CHECK:   |                 ^ error: argument 'a' must precede argument 'b'
+// CHECK:   |                 ^ error: argument 'a' must precede argument 'b' [remove ', a: 2' and insert 'a: 2, ']
 // CHECK: 10 |
 
 
@@ -99,7 +99,7 @@ struct B: Decodable {
 // CHECK: 32 |   let x: Int = { 42 }()
 // CHECK:    |                ~~~~~~
 // CHECK:    |                ^ error: function produces expected type 'Int'; did you mean to call it with '()'?
-// CHECK:    |                ^ note: Remove '=' to make 'x' a computed property [remove '= '] [replace 'let' with 'var']
+// CHECK:    |                ^ note: Remove '=' to make 'x' a computed property [remove '= ' and replace 'let' with 'var']
 // CHECK: 33 | }
 
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:37:9
