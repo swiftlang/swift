@@ -379,7 +379,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   }
 
   @inlinable
-  internal func isMutableAndUniquelyReferenced() -> Bool {
+  internal mutating func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
   }
 
@@ -467,16 +467,23 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     _internalInvariant(bounds.upperBound <= count)
 
     let initializedCount = bounds.upperBound - bounds.lowerBound
-    if isUniquelyReferenced() {
-      target.moveInitialize(
-          from: firstElementAddress + bounds.lowerBound, count: initializedCount)
-      _fixLifetime(owner)
-    } else {
-      target.initialize(
-        from: firstElementAddress + bounds.lowerBound, count: initializedCount)
-      _fixLifetime(owner)
+    let unmanaged = Unmanaged.passUnretained(_storage)
+    return unmanaged._withUnsafeGuaranteedRef { (ref) in
+      var mutRef = ref
+      if _isUnique(&mutRef) {
+        target.moveInitialize(
+            from: firstElementAddress + bounds.lowerBound,
+            count: initializedCount
+        )
+      } else {
+        target.initialize(
+          from: firstElementAddress + bounds.lowerBound,
+          count: initializedCount
+        )
+      }
+      _fixLifetime(_storage)
+      return target + initializedCount
     }
-    return target + initializedCount
   }
 
   public __consuming func _copyContents(
@@ -509,12 +516,8 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   ///   may need to be considered, such as whether the buffer could be
   ///   some immutable Cocoa container.
   @inlinable
-  internal func isUniquelyReferenced() -> Bool {
-    let unmanaged = Unmanaged.passUnretained(_storage)
-    return unmanaged._withUnsafeGuaranteedRef { (ref) in
-      var mutRef = ref
-      return _isUnique(&mutRef)
-    }
+  internal mutating func isUniquelyReferenced() -> Bool {
+    return _isUnique(&_storage)
   }
 
 #if _runtime(_ObjC)

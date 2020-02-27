@@ -101,7 +101,7 @@ extension _ArrayBuffer {
 
   /// Returns `true` iff this buffer's storage is uniquely-referenced.
   @inlinable
-  internal func isUniquelyReferenced() -> Bool {
+  internal mutating func isUniquelyReferenced() -> Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return _storage.isUniquelyReferencedUnflaggedNative()
     }
