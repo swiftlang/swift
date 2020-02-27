@@ -371,12 +371,10 @@ namespace {
     }
 
     unsigned getLineNumberIndent() {
-      unsigned indent = 0;
-      for (auto line : AnnotatedLines) {
-        unsigned digits = floor(1 + log10(line.getLineNumber()));
-        indent = std::max(digits, indent);
-      }
-      return indent;
+      // The lines are already in sorted ascending order, and we render one line
+      // after the last one for context. Use the last line number plus one to
+      // determine the indent.
+      return floor(1 + log10(AnnotatedLines.back().getLineNumber() + 1));
     }
 
     void printNumberedLine(SourceManager &SM, unsigned BufferID,

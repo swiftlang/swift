@@ -63,10 +63,10 @@ struct B: Decodable {
 
 // Test inline fix-it rendering.
 // CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:9:11
-// CHECK: 8 |
-// CHECK: 9 | foo(a: 2, b: 1, a: 2)
-// CHECK:   |           ~~~~  ~~~~
-// CHECK:   |                 ^ error: argument 'a' must precede argument 'b' [remove ', a: 2' and insert 'a: 2, ']
+// CHECK:  8 |
+// CHECK:  9 | foo(a: 2, b: 1, a: 2)
+// CHECK:    |           ~~~~  ~~~~
+// CHECK:    |                 ^ error: argument 'a' must precede argument 'b' [remove ', a: 2' and insert 'a: 2, ']
 // CHECK: 10 |
 
 
