@@ -424,6 +424,10 @@ private:
   /// \c DeclUSRsTable.
   StringRef BasicDeclLocsData;
 
+  /// An array of fixed-size location data for each `SingleRawComment` piece
+  /// of declaration's documentation `RawComment`s.
+  StringRef DocRangesData;
+
   struct ModuleBits {
     /// The decl ID of the main class in this module file, if it has one.
     unsigned EntryPointDeclID : 31;

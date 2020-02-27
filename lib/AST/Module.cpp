@@ -726,6 +726,14 @@ SourceFile::getBasicLocsForDecl(const Decl *D) const {
   SourceManager &SM = getASTContext().SourceMgr;
   BasicDeclLocs Result;
   Result.SourceFilePath = SM.getDisplayNameForLoc(D->getLoc());
+
+  for (const auto &SRC : D->getRawComment().Comments) {
+    Result.DocRanges.push_back(std::make_pair(
+      LineColumn { SRC.StartLine, SRC.StartColumn },
+      SRC.Range.getByteLength())
+    );
+  }
+
   auto setLineColumn = [&SM](LineColumn &Home, SourceLoc Loc) {
     if (Loc.isValid()) {
       std::tie(Home.Line, Home.Column) = SM.getLineAndColumn(Loc);
