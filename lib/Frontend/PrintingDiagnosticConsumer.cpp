@@ -378,7 +378,9 @@ namespace {
           printDiagnosticKind(msg.Kind, Out);
           Out << " " << msg.Text << "\n";
         } else {
+          Out.changeColor(ColoredStream::Colors::BLUE, /*bold*/true);
           Out << "--> ";
+          Out.resetColor();
           printDiagnosticKind(msg.Kind, Out);
           Out << " " << msg.Text << "\n";
         }
