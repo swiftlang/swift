@@ -37,10 +37,11 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   return fn;
 }
 
-void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
-                                               DeclAttributes &Attrs,
-                                               SILModule &M,
-                                               SILDeclRef constant) {
+void SILFunctionBuilder::addFunctionAttributes(
+    SILFunction *F, DeclAttributes &Attrs, SILModule &M,
+    llvm::function_ref<SILFunction *(SILLocation loc, SILDeclRef constant)>
+        getOrCreateDeclaration,
+    SILDeclRef constant) {
 
   for (auto *A : Attrs.getAttributes<SemanticsAttr>())
     F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
@@ -92,8 +93,7 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
     return;
 
   SILDeclRef declRef(replacedDecl, constant.kind, false);
-  auto *replacedFunc =
-      getOrCreateFunction(replacedDecl, declRef, NotForDefinition);
+  auto *replacedFunc = getOrCreateDeclaration(replacedDecl, declRef);
 
   assert(replacedFunc->getLoweredFunctionType() ==
              F->getLoweredFunctionType() ||
@@ -102,10 +102,11 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
   F->setDynamicallyReplacedFunction(replacedFunc);
 }
 
-SILFunction *
-SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
-                                        ForDefinition_t forDefinition,
-                                        ProfileCounter entryCount) {
+SILFunction *SILFunctionBuilder::getOrCreateFunction(
+    SILLocation loc, SILDeclRef constant, ForDefinition_t forDefinition,
+    llvm::function_ref<SILFunction *(SILLocation loc, SILDeclRef constant)>
+        getOrCreateDeclaration,
+    ProfileCounter entryCount) {
   auto nameTmp = constant.mangle();
   auto constantType = mod.Types.getConstantFunctionType(
       TypeExpansionContext::minimal(), constant);
@@ -169,9 +170,11 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
       // Add attributes for e.g. computed properties.
-      addFunctionAttributes(F, storage->getAttrs(), mod);
+      addFunctionAttributes(F, storage->getAttrs(), mod,
+                            getOrCreateDeclaration);
     }
-    addFunctionAttributes(F, decl->getAttrs(), mod, constant);
+    addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
+                          constant);
   }
 
   return F;
