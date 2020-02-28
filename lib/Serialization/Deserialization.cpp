@@ -4208,6 +4208,19 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      case decls_block::TypeEraser_DECL_ATTR: {
+        bool isImplicit;
+        TypeID typeEraserID;
+        serialization::decls_block::TypeEraserDeclAttrLayout::readRecord(
+            scratch, isImplicit, typeEraserID);
+
+        auto typeEraser = MF.getType(typeEraserID);
+        assert(!isImplicit);
+        Attr = new (ctx) TypeEraserAttr(SourceLoc(), SourceRange(),
+                                        TypeLoc::withoutLoc(typeEraser));
+        break;
+      }
+
       case decls_block::Custom_DECL_ATTR: {
         bool isImplicit;
         TypeID typeID;

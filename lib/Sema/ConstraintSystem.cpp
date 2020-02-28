@@ -4078,6 +4078,36 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
   return result;
 }
 
+Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
+                                            Type contextualType,
+                                            ContextualTypePurpose purpose) {
+  if (!(purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr))
+    return expr;
+
+  auto *decl = dyn_cast_or_null<ValueDecl>(dc->getAsDecl());
+  if (!decl ||
+      !(decl->isDynamic() || decl->getDynamicallyReplacedDecl()))
+    return expr;
+
+  auto *opaque = contextualType->getAs<OpaqueTypeArchetypeType>();
+  if (!opaque)
+    return expr;
+
+  auto protocols = opaque->getConformsTo();
+  if (protocols.size() != 1)
+    return expr;
+
+  auto *attr = protocols.front()->getAttrs().getAttribute<TypeEraserAttr>();
+  if (!attr)
+    return expr;
+
+  auto typeEraser = attr->getTypeEraserLoc().getType();
+  auto &ctx = dc->getASTContext();
+  return CallExpr::createImplicit(ctx,
+                                  TypeExpr::createImplicit(typeEraser, ctx),
+                                  {expr}, {ctx.Id_erasing});
+}
+
 /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
 /// constraint system, return the decl that it references.
 ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
