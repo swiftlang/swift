@@ -92,12 +92,36 @@ class PrintTypeInfo {
     Indent -= 2;
   }
 
+  void printCases(const RecordTypeInfo &TI) {
+    Indent += 2;
+    int Index = -1;
+    for (auto Field : TI.getFields()) {
+      Index += 1;
+      fprintf(file, "\n");
+      printHeader("case");
+      if (!Field.Name.empty())
+        printField("name", Field.Name);
+      printField("index", std::to_string(Index));
+      if (Field.TR) {
+        printField("offset", std::to_string(Field.Offset));
+        printRec(Field.TI);
+      }
+      fprintf(file, ")");
+    }
+    Indent -= 2;
+  }
+
 public:
   PrintTypeInfo(FILE *file, unsigned Indent)
     : file(file), Indent(Indent) {}
 
   void print(const TypeInfo &TI) {
     switch (TI.getKind()) {
+    case TypeInfoKind::Invalid:
+      printHeader("invalid");
+      fprintf(file, ")");
+      return;
+
     case TypeInfoKind::Builtin:
       printHeader("builtin");
       printBasic(TI);
@@ -115,13 +139,22 @@ public:
         break;
       case RecordKind::NoPayloadEnum:
         printHeader("no_payload_enum");
-        break;
+        printBasic(TI);
+        printCases(RecordTI);
+        fprintf(file, ")");
+        return;
       case RecordKind::SinglePayloadEnum:
         printHeader("single_payload_enum");
-        break;
+        printBasic(TI);
+        printCases(RecordTI);
+        fprintf(file, ")");
+        return;
       case RecordKind::MultiPayloadEnum:
         printHeader("multi_payload_enum");
-        break;
+        printBasic(TI);
+        printCases(RecordTI);
+        fprintf(file, ")");
+        return;
       case RecordKind::Tuple:
         printHeader("tuple");
         break;
@@ -199,6 +232,105 @@ BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
       Name(builder.getTypeRefString(
               builder.readTypeRef(descriptor, descriptor->TypeName)))
 {}
+
+bool RecordTypeInfo::readExtraInhabitant(remote::MemoryReader &reader,
+                                         remote::RemoteAddress address,
+                                         uint64_t *inhabitant) const {
+  switch (SubKind) {
+  case RecordKind::Invalid:
+  case RecordKind::ThickFunction:
+  case RecordKind::OpaqueExistential:
+  case RecordKind::ClosureContext:
+    return false;
+
+  case RecordKind::ClassExistential:
+  case RecordKind::ExistentialMetatype:
+  case RecordKind::ErrorExistential:
+  case RecordKind::ClassInstance: {
+    return false; // XXX TODO XXX
+  }
+
+  case RecordKind::Tuple:
+  case RecordKind::Struct: {
+    // Tuples and Structs inherit XIs from their most capacious member
+    FieldInfo *mostCapaciousField = nullptr;
+    for (auto Field : Fields) {
+      if (mostCapaciousField == nullptr
+          || (Field.TI.getNumExtraInhabitants()
+              > mostCapaciousField->TI.getNumExtraInhabitants())) {
+        mostCapaciousField = &Field;
+      }
+    }
+    auto fieldAddress = remote::RemoteAddress(address.getAddressData()
+                                              + mostCapaciousField->Offset);
+    return mostCapaciousField->TI.readExtraInhabitant(
+      reader, fieldAddress, inhabitant);
+  }
+
+  case RecordKind::NoPayloadEnum: {
+    // No payload enums export XIs
+    auto EnumSize = getSize();
+    if (EnumSize == 0) {
+      *inhabitant = 0;
+      return true;
+    }
+    uint64_t value;
+    if (!reader.readInteger(address, EnumSize, &value)) {
+      return false;
+    }
+    if (value < getFields().size()) {
+      *inhabitant = 0;
+    } else {
+      *inhabitant = value - getFields().size() + 1;
+    }
+    return true;
+  }
+
+  case RecordKind::SinglePayloadEnum: {
+    // Single payload enums inherit XIs from their payload type
+    auto Fields = getFields();
+    FieldInfo PayloadCase = Fields[0];
+    if (!PayloadCase.TR)
+      return false;
+    unsigned long NonPayloadCaseCount = Fields.size() - 1;
+    unsigned long PayloadExtraInhabitants = PayloadCase.TI.getNumExtraInhabitants();
+    unsigned discriminator = 0;
+    auto PayloadSize = PayloadCase.TI.getSize();
+    if (NonPayloadCaseCount >= PayloadExtraInhabitants) {
+      // More cases than inhabitants, we need a separate discriminator
+      auto TagInfo = getEnumTagCounts(PayloadSize, NonPayloadCaseCount, 1);
+      auto TagSize = TagInfo.numTagBytes;
+      auto TagAddress = remote::RemoteAddress(address.getAddressData() + PayloadSize);
+      if (!reader.readInteger(TagAddress, TagSize, &discriminator))
+        return false;
+    }
+
+    if (PayloadExtraInhabitants == 0) {
+      *inhabitant = 0;
+      return true;
+    } else if (discriminator == 0) {
+      if (PayloadCase.TI.readExtraInhabitant(reader, address, inhabitant)) {
+        if (*inhabitant <= NonPayloadCaseCount) {
+          *inhabitant = 0;
+        } else {
+          *inhabitant -= NonPayloadCaseCount;
+        }
+        return true;
+      }
+    } else {
+      *inhabitant = 0; // XXX CHECK THIS XXX
+      return true;
+    }
+
+    return false;
+  }
+
+  case RecordKind::MultiPayloadEnum:// XXX TODO
+    return false;
+    
+  }
+  return false;
+}
 
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
@@ -537,7 +669,7 @@ void RecordTypeInfoBuilder::addField(const std::string &Name,
                              TI->getAlignment(),
                              TI->getNumExtraInhabitants(),
                              TI->isBitwiseTakable());
-  Fields.push_back({Name, offset, TR, *TI});
+  Fields.push_back({Name, offset, -1, TR, *TI});
 }
 
 const RecordTypeInfo *RecordTypeInfoBuilder::build() {
@@ -963,6 +1095,10 @@ class EnumTypeInfoBuilder {
     return Case.TR;
   }
 
+  void addCase(const std::string &Name) {
+    Cases.push_back({Name, /*offset=*/0, /*value=*/-1, nullptr, TypeInfo()});
+  }
+
   void addCase(const std::string &Name, const TypeRef *TR,
                const TypeInfo *TI) {
     if (TI == nullptr) {
@@ -975,7 +1111,7 @@ class EnumTypeInfoBuilder {
     Alignment = std::max(Alignment, TI->getAlignment());
     BitwiseTakable &= TI->isBitwiseTakable();
 
-    Cases.push_back({Name, /*offset=*/0, TR, *TI});
+    Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, *TI});
   }
 
 public:
@@ -998,14 +1134,17 @@ public:
     for (auto Case : Fields) {
       if (Case.TR == nullptr) {
         NoPayloadCases++;
-        continue;
+        addCase(Case.Name);
+      } else {
+        PayloadCases.push_back(Case);
+        auto *CaseTR = getCaseTypeRef(Case);
+        auto *CaseTI = TC.getTypeInfo(CaseTR);
+        addCase(Case.Name, CaseTR, CaseTI);
       }
-
-      PayloadCases.push_back(Case);
     }
 
-    // NoPayloadEnumImplStrategy
     if (PayloadCases.empty()) {
+      // NoPayloadEnumImplStrategy
       Kind = RecordKind::NoPayloadEnum;
       switch (NoPayloadCases) {
       case 0:
@@ -1017,14 +1156,15 @@ public:
                                           NoPayloadCases,
                                           /*payloadCases=*/0);
         Size += tagCounts.numTagBytes;
+        Alignment = tagCounts.numTagBytes;
         NumExtraInhabitants =
           (1 << (tagCounts.numTagBytes * 8)) - tagCounts.numTags;
         NumExtraInhabitants = std::min(NumExtraInhabitants,
                      unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
       }
       }
-    // SinglePayloadEnumImplStrategy
     } else if (PayloadCases.size() == 1) {
+      // SinglePayloadEnumImplStrategy
       auto *CaseTR = getCaseTypeRef(PayloadCases[0]);
       auto *CaseTI = TC.getTypeInfo(CaseTR);
 
@@ -1034,37 +1174,33 @@ public:
         return CaseTI;
 
       Kind = RecordKind::SinglePayloadEnum;
-      addCase(PayloadCases[0].Name, CaseTR, CaseTI);
 
       // If we were unable to lower the payload type, do not proceed
       // further.
       if (CaseTI != nullptr) {
         // Below logic should match the runtime function
         // swift_initEnumMetadataSinglePayload().
-        NumExtraInhabitants = CaseTI->getNumExtraInhabitants();
-        if (NumExtraInhabitants >= NoPayloadCases) {
+        auto PayloadExtraInhabitants = CaseTI->getNumExtraInhabitants();
+        if (PayloadExtraInhabitants >= NoPayloadCases) {
           // Extra inhabitants can encode all no-payload cases.
-          NumExtraInhabitants -= NoPayloadCases;
+          NumExtraInhabitants = PayloadExtraInhabitants - NoPayloadCases;
         } else {
           // Not enough extra inhabitants for all cases. We have to add an
           // extra tag field.
           NumExtraInhabitants = 0;
-          Size += getEnumTagCounts(Size,
-                                   NoPayloadCases - NumExtraInhabitants,
-                                   /*payloadCases=*/1).numTagBytes;
+          auto tagCounts = getEnumTagCounts(Size,
+                                            NoPayloadCases - NumExtraInhabitants,
+                                            /*payloadCases=*/1);
+          Size += tagCounts.numTagBytes;
+          Alignment = std::max(Alignment, tagCounts.numTagBytes);
         }
       }
 
-    // MultiPayloadEnumImplStrategy
     } else {
+      // MultiPayloadEnumImplStrategy
       Kind = RecordKind::MultiPayloadEnum;
 
       // Check if this is a dynamic or static multi-payload enum
-      for (auto Case : PayloadCases) {
-        auto *CaseTR = getCaseTypeRef(Case);
-        auto *CaseTI = TC.getTypeInfo(CaseTR);
-        addCase(Case.Name, CaseTR, CaseTI);
-      }
 
       // If we have a fixed descriptor for this type, it is a fixed-size
       // multi-payload enum that possibly uses payload spare bits.
@@ -1103,9 +1239,8 @@ public:
       Stride = 1;
 
     return TC.makeTypeInfo<RecordTypeInfo>(
-        Size, Alignment, Stride,
-        NumExtraInhabitants, BitwiseTakable,
-        Kind, Cases);
+        Size, Alignment, Stride, NumExtraInhabitants,
+        BitwiseTakable, Kind, Cases);
   }
 };
 
@@ -1323,7 +1458,7 @@ public:
           if (Field.Name == "object") {
             auto *FieldTI = rebuildStorageTypeInfo(&Field.TI, Kind);
             BitwiseTakable &= FieldTI->isBitwiseTakable();
-            Fields.push_back({Field.Name, Field.Offset, Field.TR, *FieldTI});
+            Fields.push_back({Field.Name, Field.Offset, /*value=*/-1, Field.TR, *FieldTI});
             continue;
           }
           Fields.push_back(Field);

@@ -61,6 +61,50 @@ public:
                      sizeof(IntegerType));
   }
 
+  /// Attempts to read an integer of the specified size from the given
+  /// address in the remote process.
+  ///
+  /// Returns false if the operation failed, the request size is not
+  /// 1, 2, 4, or 8, or the request size is larger than the provided destination.
+  template <typename IntegerType>
+  bool readInteger(RemoteAddress address, size_t bytes, IntegerType *dest) {
+    if (bytes > sizeof(IntegerType))
+      return false;
+    switch (bytes) {
+    case 1: {
+      uint8_t n;
+      if (!readInteger(address, &n))
+        return false;
+      *dest = n;
+      break;
+    }
+    case 2: {
+      uint16_t n;
+      if (!readInteger(address, &n))
+        return false;
+      *dest = n;
+      break;
+    }
+    case 4: {
+      uint32_t n;
+      if (!readInteger(address, &n))
+        return false;
+      *dest = n;
+      break;
+    }
+    case 8: {
+      uint64_t n;
+      if (!readInteger(address, &n))
+        return false;
+      *dest = n;
+      break;
+    }
+    default:
+      return false;
+    }
+    return true;
+  }
+
   /// Attempts to read 'size' bytes from the given address in the remote process.
   ///
   /// Returns a pointer to the requested data and a function that must be called to
@@ -125,6 +169,58 @@ public:
     return resolvePointer(address, pointerData);
   }
           
+
+  // Parse extra inhabitants stored in a pointer.
+  // Sets *extraInhabitant to 0 if the pointer at this address
+  // is actually a valid pointer.
+  // Otherwise, it sets *extraInhabitant to the inhabitant
+  // index (counting from 1).
+  // In practice, this generally means that a NULL pointer gets
+  // mapped to 1, but the details depend on the particular target.
+
+  // TODO: What is the correct API here?  What does the client
+  // need to tell us about the pointer in order for us to correctly
+  // parse it?  For example, do we need to know if this is a Swift
+  // or Obj-C object reference as opposed to a non-object pointer?
+  bool readPointerXI(RemoteAddress address,
+                     uint64_t *extraInhabitant,
+                     bool isNativeRefCounted) {
+    uint8_t PointerSize;
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize, nullptr, &PointerSize)) {
+      return false;
+    }
+
+    uint64_t rawPointerValue;
+    if (!readInteger(address, PointerSize, &rawPointerValue)) {
+      return false;
+    }
+
+    // TODO: Should these values come from queryDataLayout?
+    int ignoredLowerBits;
+    uint64_t leastValidPointerValue;
+    switch (PointerSize) {
+    case 4:
+      ignoredLowerBits = 0;
+      leastValidPointerValue = 0x1000;
+      break;
+    case 8:
+      ignoredLowerBits = 1;
+      leastValidPointerValue = 0x100000000;
+      break;
+    default:
+      printf("  unknown pointer size\n");
+      return false;
+    }
+
+    if (rawPointerValue >= leastValidPointerValue) {
+      *extraInhabitant = 0; // Valid value, not an XI
+    } else {
+      // We count XIs from 1.
+      *extraInhabitant = 1 + (rawPointerValue >> ignoredLowerBits);
+    }
+    return true;
+  }
+
   virtual ~MemoryReader() = default;
 };
 

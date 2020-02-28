@@ -250,6 +250,9 @@ swift_reflection_genericArgumentCountOfTypeRef(swift_typeref_t OpaqueTypeRef) {
 
 swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   switch (TI.getKind()) {
+  case TypeInfoKind::Invalid: {
+    return SWIFT_UNKNOWN;
+  }
   case TypeInfoKind::Builtin: {
     auto &BuiltinTI = cast<BuiltinTypeInfo>(TI);
     if (BuiltinTI.getMangledTypeName() == "Bp")
@@ -413,25 +416,37 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
   return Success;
 }
 
-int swift_reflection_projectEnum(SwiftReflectionContextRef ContextRef,
-                                 swift_addr_t EnumAddress,
-                                 swift_typeref_t EnumTypeRef,
-                                 unsigned *CaseIndex,
-                                 swift_addr_t *PayloadAddr) {
+int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
+                                      swift_addr_t EnumAddress,
+                                      swift_typeref_t EnumTypeRef,
+                                      uint64_t *CaseIndex) {
   auto Context = ContextRef->nativeContext;
   auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
   auto RemoteEnumAddress = RemoteAddress(EnumAddress);
-  RemoteAddress RemotePayloadAddr(nullptr);
-  auto Success = Context->projectEnum(RemoteEnumAddress,
-                                      EnumTR,
-                                      CaseIndex,
-                                      &RemotePayloadAddr);
+  return Context->projectEnumValue(RemoteEnumAddress, EnumTR, CaseIndex);
+}
 
-  if (Success) {
-    *PayloadAddr = RemotePayloadAddr.getAddressData();
+int swift_reflection_getEnumCaseTypeRef(SwiftReflectionContextRef ContextRef,
+                                        swift_typeref_t EnumTypeRef,
+                                        unsigned CaseIndex,
+                                        char **CaseName,
+                                        swift_typeref_t *PayloadTypeRef) {
+  *PayloadTypeRef = 0;
+  *CaseName = nullptr;
+  auto Context = ContextRef->nativeContext;
+  auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
+  const TypeRef *PayloadTR = nullptr;
+  std::string Name;
+  auto success = Context->getEnumCaseTypeRef(EnumTR, CaseIndex,
+                                             Name, &PayloadTR);
+  if (success) {
+    *PayloadTypeRef = reinterpret_cast<swift_typeref_t>(PayloadTR);
+    // FIXME: Is there a better way to return a string here?
+    // Just returning Case.Name.c_str() doesn't work as the backing data gets
+    // released at the end of this function.
+    *CaseName = strdup(Name.c_str());
   }
-
-  return Success;
+  return success;
 }
 
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {

@@ -23,6 +23,7 @@
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Object/COFF.h"
 
+#include "swift/ABI/Enum.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
@@ -710,10 +711,101 @@ public:
     }
   }
 
-  bool projectEnum(RemoteAddress EnumAddress,
-                   const TypeRef *EnumTR,
-                   unsigned *CaseIndex,
-                   RemoteAddress *OutPayloadAddr) {
+  bool projectEnumValue(RemoteAddress EnumAddress,
+                        const TypeRef *EnumTR,
+                        uint64_t *CaseIndex) {
+    if (EnumTR == nullptr)
+      return false;
+    auto EnumTI = getTypeInfo(EnumTR);
+    if (EnumTI == nullptr)
+      return false;
+
+    auto EnumRecordTI = dyn_cast<const RecordTypeInfo>(EnumTI);
+    if (EnumRecordTI == nullptr)
+      return false;
+    auto EnumSize = EnumRecordTI->getSize();
+
+    auto Fields = EnumRecordTI->getFields();
+    auto FieldCount = Fields.size();
+    if (FieldCount == 0) {
+      return false;  // No fields?
+    }
+    if (FieldCount == 1) {
+      *CaseIndex = 0; // Only possible field
+      return true;
+    }
+
+    switch (EnumRecordTI->getRecordKind()) {
+
+    case RecordKind::NoPayloadEnum: {
+      if (EnumSize == 0) {
+        *CaseIndex = 0;
+        return true;
+      }
+      return getReader().readInteger(EnumAddress, EnumSize, CaseIndex);
+    }
+
+    case RecordKind::SinglePayloadEnum: {
+      FieldInfo PayloadCase = Fields[0];
+      if (!PayloadCase.TR)
+        return false;
+      unsigned long NonPayloadCaseCount = FieldCount - 1;
+      unsigned long PayloadExtraInhabitants = PayloadCase.TI.getNumExtraInhabitants();
+      unsigned discriminator = 0;
+      auto PayloadSize = PayloadCase.TI.getSize();
+      if (NonPayloadCaseCount >= PayloadExtraInhabitants) {
+        // There are more cases than inhabitants, we need a separate discriminator.
+        auto TagInfo = getEnumTagCounts(PayloadSize, NonPayloadCaseCount, 1);
+        auto TagSize = TagInfo.numTagBytes;
+        auto TagAddress = RemoteAddress(EnumAddress.getAddressData() + PayloadSize);
+        if (!getReader().readInteger(TagAddress, TagSize, &discriminator))
+          return false;
+      }
+
+      if (PayloadExtraInhabitants == 0) {
+        // Payload has no XI, so discriminator fully determines the case
+        *CaseIndex = discriminator;
+        return true;
+      } else if (discriminator == 0) {
+        // The value overlays the payload ... ask the payload to decode it.
+        uint64_t t;
+        if (PayloadCase.TI.readExtraInhabitant(getReader(), EnumAddress, &t)
+            && (t <= NonPayloadCaseCount)) {
+          *CaseIndex = t;
+          return true;
+        }
+        return false;
+      } else {
+        // The entire payload area is available for additional cases:
+        auto TagSize = std::max(PayloadSize, 4U); // XXX TODO XXX CHECK THIS
+        auto offset = 1 + PayloadExtraInhabitants; // Cases coded with discriminator = 0
+        unsigned casesInPayload = 1 << (TagSize * 8U);
+        unsigned payloadCode;
+        if (!getReader().readInteger(EnumAddress, TagSize, &payloadCode))
+          return false;
+        *CaseIndex = offset + (discriminator - 1) * casesInPayload + payloadCode;
+        return true;
+      }
+    }
+
+    case RecordKind::MultiPayloadEnum: {
+      // TODO: Support multipayload enums
+      break;
+    }
+
+    default:
+      // Unknown record kind.
+      break;
+    }
+    return false;
+  }
+
+  bool getEnumCaseTypeRef(const TypeRef *EnumTR,
+                          unsigned CaseIndex,
+                          std::string &Name,
+                          const TypeRef **OutPayloadTR) {
+    *OutPayloadTR = nullptr;
+
     if (EnumTR == nullptr)
       return false;
 
@@ -725,38 +817,15 @@ public:
     if (EnumRecordTI == nullptr)
       return false;
 
-    switch (EnumRecordTI->getRecordKind()) {
-    case RecordKind::NoPayloadEnum:
-      *OutPayloadAddr = RemoteAddress(nullptr);
-      switch (EnumRecordTI->getSize()) {
-      case 0: {
-        *CaseIndex = 0;
-        return true;
-      }
-      case 1: {
-        uint8_t n;
-        if (!getReader().readInteger(EnumAddress, &n))
-          return false;
-        *CaseIndex = n;
-        return true;
-      }
-      case 2: {
-        uint16_t n;
-        if (!getReader().readInteger(EnumAddress, &n))
-          return false;
-        *CaseIndex = n;
-        return true;
-      }
-      default:
-        // We don't try to handle enums with more than 65536 cases.
-        return false;
-      }
-    default:
-      // Unknown record kind.
+    auto NumCases = EnumRecordTI->getNumFields();
+    if (CaseIndex >= NumCases) {
       return false;
+    } else {
+      const auto Case = EnumRecordTI->getFields()[CaseIndex];
+      Name = Case.Name;
+      *OutPayloadTR = Case.TR;
+      return true;
     }
-
-    return false;
   }
 
   /// Return a description of the layout of a value with the given type.
