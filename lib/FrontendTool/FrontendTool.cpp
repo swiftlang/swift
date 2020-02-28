@@ -2197,6 +2197,18 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                        Invocation.getFrontendOptions().DumpAPIPath);
   }
 
+  // Verify reference dependencies of the current compilation job *before*
+  // verifying diagnostics so that the former can be tested via the latter.
+  if (Invocation.getFrontendOptions().VerifyDependencies) {
+    if (!Instance->getPrimarySourceFiles().empty()) {
+      HadError |= swift::verifyDependencies(Instance->getSourceMgr(),
+                                            Instance->getPrimarySourceFiles());
+    } else {
+      HadError |= swift::verifyDependencies(Instance->getSourceMgr(),
+                                            Instance->getMainModule()->getFiles());
+    }
+  }
+
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
     HadError = verifyDiagnostics(
         Instance->getSourceMgr(),
