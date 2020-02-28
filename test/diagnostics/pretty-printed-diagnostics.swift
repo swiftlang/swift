@@ -52,14 +52,14 @@ let 👍👍👍 = {
 }
 
 // Test fallback for non-ASCII characters.
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:11
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:11
 // CHECK: [[#LINE-1]] |
 // CHECK: [[#LINE]]   | let abc = "👍
 // CHECK:             | --> error: unterminated string literal
 // CHECK: [[#LINE+1]] |
 
 // Test underlining.
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:3
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:3
 // CHECK: [[#LINE-1]] |
 // CHECK: [[#LINE]]   | 1 + 2
 // CHECK:             | ~   ~
@@ -67,7 +67,7 @@ let 👍👍👍 = {
 // CHECK: [[#LINE+1]] |
 
 // Test inline fix-it rendering.
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:11
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:11
 // CHECK:  [[#LINE-1]] |
 // CHECK:  [[#LINE]]   | foo(a: 2, b: 1, a: 2)
 // CHECK:              |     ++++++~~~~------
@@ -75,7 +75,7 @@ let 👍👍👍 = {
 // CHECK: [[#LINE+1]]  |
 
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:7
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:7
 // CHECK: [[#LINE-2]] | struct Foo {
 // CHECK: [[#LINE-1]] |   var x: Int
 // CHECK:             |       ^ note: 'x' previously declared here
@@ -84,7 +84,7 @@ let 👍👍👍 = {
 // CHECK: [[#LINE+1]] | }
 
 // Test out-of-line fix-its on notes.
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:1
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:1
 // CHECK: [[#LINE-1]] | }
 // CHECK: [[#LINE]]   | bazz()
 // CHECK:             | ~~~~~~
@@ -95,14 +95,14 @@ let 👍👍👍 = {
 // CHECK: [[#LINE+1]] |
 
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:7
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:7
 // CHECK: [[#LINE-1]] | extension A {
 // CHECK: [[#LINE]]   |   let x: Int = { 42 }
 // CHECK:             |       ^ error: extensions must not contain stored properties
 // CHECK: [[#LINE+1]] | }
 
 // Test complex out-of-line fix-its.
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:16
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:16
 // CHECK: [[#LINE-1]] | extension A {
 // CHECK: [[#LINE]]   |   let x: Int = { 42 }()
 // CHECK:             |                ~~~~~~++
@@ -110,14 +110,14 @@ let 👍👍👍 = {
 // CHECK:             |                ^ note: Remove '=' to make 'x' a computed property [remove '= ' and replace 'let' with 'var']
 // CHECK: [[#LINE+1]] | }
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:9
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:9
 // CHECK: [[#LINE-1]] |
 // CHECK: [[#LINE]]   | let x = { () -> Result in
 // CHECK:             |          +++++++++++++++++
 // CHECK:             |         ^ error: unable to infer complex closure return type; add explicit type to disambiguate
 // CHECK: [[#LINE+1]] |   let y = 1
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:8
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:8
 // CHECK: [[#LINE-1]] |
 // CHECK: [[#LINE]]   | struct B: Decodable {
 // CHECK:             |        ^ error: type 'B' does not conform to protocol 'Decodable'
@@ -130,20 +130,20 @@ let 👍👍👍 = {
 // CHECK:   |     ^ note: protocol requires initializer 'init(from:)' with type 'Decodable'
 // CHECK: 3 | }
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:14
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:14
 // CHECK: [[#LINE-1]] | // The line below is indented with tabs, not spaces.
 // CHECK: [[#LINE]]   |       foo(a: 2, b: 1, a: 2)
 // CHECK:             |           ++++++~~~~------
 // CHECK:             |                       ^ error: argument 'a' must precede argument 'b' [remove ', a: 2' and insert 'a: 2, ']
 // CHECK: [[#LINE+1]] |
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:20
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:20
 // CHECK: [[#LINE-1]] |
 // CHECK: [[#LINE]]   | let 👍👍👍 = {
 // CHECK:    | --> error: unable to infer complex closure return type; add explicit type to disambiguate [insert ' () -> <#Result#> in ']
 // CHECK: [[#LINE+1]] |   let y = 1
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:5
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:5
 // CHECK: [[#LINE-1]] | func foo(a: Int, b: Int) {
 // CHECK: [[#LINE]]   |   a + b
 // CHECK:             |   ~   ~
@@ -151,7 +151,7 @@ let 👍👍👍 = {
 // CHECK: [[#LINE+1]] | }
 
 // Test snippet truncation.
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:3
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:3
 // CHECK: [[#LINE-1]] | func baz() {
 // CHECK: [[#LINE]]   |   bar(a: "hello, world!")
 // CHECK:             |   ^ error: no exact matches in call to global function 'bar'
