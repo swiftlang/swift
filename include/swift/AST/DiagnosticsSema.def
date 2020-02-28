@@ -4795,7 +4795,7 @@ ERROR(property_wrapper_wrong_initial_value_init, none,
       "'wrappedValue' property type (%2) or an @autoclosure thereof",
       (DeclName, Type, Type))
 ERROR(property_wrapper_failable_init, none,
-      "%0 cannot be failable", (DeclName))
+      "property wrapper initializer %0 cannot be failable", (DeclName))
 ERROR(property_wrapper_type_requirement_not_accessible,none,
       "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
       "more restrictive access than its enclosing property wrapper type %3 "

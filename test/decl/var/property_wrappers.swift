@@ -112,7 +112,7 @@ struct MultipleInitialValues<Value> {
 struct InitialValueFailable<Value> {
   var wrappedValue: Value
 
-  init?(wrappedValue initialValue: Value) { // expected-error{{'init(wrappedValue:)' cannot be failable}}
+  init?(wrappedValue initialValue: Value) { // expected-error{{property wrapper initializer 'init(wrappedValue:)' cannot be failable}}
     return nil
   }
 }
@@ -121,7 +121,7 @@ struct InitialValueFailable<Value> {
 struct InitialValueFailableIUO<Value> {
   var wrappedValue: Value
 
-  init!(wrappedValue initialValue: Value) {  // expected-error{{'init(wrappedValue:)' cannot be failable}}
+  init!(wrappedValue initialValue: Value) {  // expected-error{{property wrapper initializer 'init(wrappedValue:)' cannot be failable}}
     return nil
   }
 }
