@@ -3800,9 +3800,11 @@ bool ConstraintSystem::repairFailures(
     if (tupleLocator->isLastElement<LocatorPathElt::SequenceElementType>())
       break;
 
-    // Generic argument failures have a more general fix which is attached to a
-    // parent type and aggregates all argument failures into a single fix.
-    if (tupleLocator->isLastElement<LocatorPathElt::GenericArgument>())
+    // Generic argument/requirement failures have a more general fix which
+    // is attached to a parent type and aggregates all argument failures
+    // into a single fix.
+    if (tupleLocator->isLastElement<LocatorPathElt::AnyRequirement>() ||
+        tupleLocator->isLastElement<LocatorPathElt::GenericArgument>())
       break;
 
     ConstraintFix *fix;
@@ -6034,10 +6036,29 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
   }
 
+  // If we have candidates, and we're doing a member lookup for a pattern
+  // match, unwrap optionals and try again to allow implicit creation of
+  // optional "some" patterns (spelled "?").
+  if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
+      memberLocator &&
+      memberLocator->isLastElement<LocatorPathElt::PatternMatch>() &&
+      instanceTy->getOptionalObjectType() &&
+      baseObjTy->is<AnyMetatypeType>()) {
+    SmallVector<Type, 2> optionals;
+    Type instanceObjectTy = instanceTy->lookThroughAllOptionalTypes(optionals);
+    Type metaObjectType = MetatypeType::get(instanceObjectTy);
+    auto result = performMemberLookup(
+        constraintKind, memberName, metaObjectType,
+        functionRefKind, memberLocator, includeInaccessibleMembers);
+    result.numImplicitOptionalUnwraps = optionals.size();
+    result.actualBaseType = metaObjectType;
+    return result;
+  }
+
   // If we're looking into a metatype for an unresolved member lookup, look
   // through optional types.
   //
-  // FIXME: The short-circuit here is lame.
+  // FIXME: Unify with the above code path.
   if (result.ViableCandidates.empty() &&
       baseObjTy->is<AnyMetatypeType>() &&
       constraintKind == ConstraintKind::UnresolvedValueMember) {
@@ -6095,25 +6116,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         result.addUnviable(choice, subscripts.UnviableReasons[index]);
       }
     }
-  }
-
-  // If we have candidates, and we're doing a member lookup for a pattern
-  // match, unwrap optionals and try again to allow implicit creation of
-  // optional "some" patterns (spelled "?").
-  if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
-      memberLocator &&
-      memberLocator->isLastElement<LocatorPathElt::PatternMatch>() &&
-      instanceTy->getOptionalObjectType() &&
-      baseObjTy->is<AnyMetatypeType>()) {
-    SmallVector<Type, 2> optionals;
-    Type instanceObjectTy = instanceTy->lookThroughAllOptionalTypes(optionals);
-    Type metaObjectType = MetatypeType::get(instanceObjectTy);
-    auto result = performMemberLookup(
-        constraintKind, memberName, metaObjectType,
-        functionRefKind, memberLocator, includeInaccessibleMembers);
-    result.numImplicitOptionalUnwraps = optionals.size();
-    result.actualBaseType = metaObjectType;
-    return result;
   }
 
   // If we have no viable or unviable candidates, and we're generating,

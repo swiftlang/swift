@@ -256,6 +256,21 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (auto *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
     CtorRefs.push_back(CtorRefE);
 
+  if (auto *ACE = dyn_cast<AutoClosureExpr>(E)) {
+    if (auto *SubExpr = ACE->getUnwrappedCurryThunkExpr()) {
+      if (auto *DRE = dyn_cast<DeclRefExpr>(SubExpr)) {
+        if (!passReference(DRE->getDecl(), DRE->getType(),
+                                  DRE->getNameLoc(),
+                          ReferenceMetaData(getReferenceKind(Parent.getAsExpr(), DRE),
+                                            OpAccess))) {
+          return { false, nullptr };
+        }
+
+        return { true, E };
+      }
+    }
+  }
+
   if (!isa<InOutExpr>(E) &&
       !isa<LoadExpr>(E) &&
       !isa<OpenExistentialExpr>(E) &&

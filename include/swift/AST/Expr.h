@@ -284,10 +284,10 @@ protected:
     Discriminator : 16
   );
 
-  SWIFT_INLINE_BITFIELD(AutoClosureExpr, AbstractClosureExpr, 1,
-    /// True if this autoclosure was built for a function conversion, and
-    /// not an actual @autoclosure parameter.
-    IsThunk : 1
+  SWIFT_INLINE_BITFIELD(AutoClosureExpr, AbstractClosureExpr, 2,
+    /// If the autoclosure was built for a curry thunk, the thunk kind is
+    /// stored here.
+    Kind : 2
   );
 
   SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1,
@@ -3790,6 +3790,20 @@ class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
 
 public:
+  enum class Kind : uint8_t {
+    // An autoclosure with type () -> Result. Formed from type checking an
+    // @autoclosure argument in a function call.
+    None = 0,
+
+    // An autoclosure with type (Args...) -> Result. Formed from type checking a
+    // partial application.
+    SingleCurryThunk = 1,
+
+    // An autoclosure with type (Self) -> (Args...) -> Result. Formed from type
+    // checking a partial application.
+    DoubleCurryThunk = 2
+  };
+
   AutoClosureExpr(Expr *Body, Type ResultTy, unsigned Discriminator,
                   DeclContext *Parent)
       : AbstractClosureExpr(ExprKind::AutoClosure, ResultTy, /*Implicit=*/true,
@@ -3797,15 +3811,15 @@ public:
     if (Body != nullptr)
       setBody(Body);
 
-    Bits.AutoClosureExpr.IsThunk = false;
+    Bits.AutoClosureExpr.Kind = 0;
   }
 
-  bool isThunk() const {
-    return Bits.AutoClosureExpr.IsThunk;
+  Kind getThunkKind() const {
+    return Kind(Bits.AutoClosureExpr.Kind);
   }
 
-  void setIsThunk(bool isThunk) {
-    Bits.AutoClosureExpr.IsThunk = isThunk;
+  void setThunkKind(Kind K) {
+    Bits.AutoClosureExpr.Kind = uint8_t(K);
   }
 
   SourceRange getSourceRange() const;
@@ -3823,6 +3837,16 @@ public:
   ///
   /// The body of an autoclosure always consists of a single expression.
   Expr *getSingleExpressionBody() const;
+
+  /// Unwraps a curry thunk. Basically, this gives you what the old AST looked
+  /// like, before Sema started building curry thunks. This is really only
+  /// meant for legacy usages.
+  ///
+  /// The behavior is as follows, based on the kind:
+  /// - for double curry thunks, returns the original DeclRefExpr.
+  /// - for single curry thunks, returns the ApplyExpr for the self call.
+  /// - otherwise, returns nullptr for convenience.
+  Expr *getUnwrappedCurryThunkExpr() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Expr *E) {

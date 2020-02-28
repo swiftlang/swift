@@ -43,7 +43,8 @@ struct Symbol {
 
   void serializeNames(llvm::json::OStream &OS) const;
 
-  void serializePosition(StringRef Key, unsigned Line, unsigned ByteOffset,
+  void serializePosition(StringRef Key, SourceLoc Loc,
+                         SourceManager &SourceMgr,
                          llvm::json::OStream &OS) const;
 
   void serializeRange(size_t InitialIdentation,
@@ -67,6 +68,8 @@ struct Symbol {
   void serializeDeclarationFragmentMixin(llvm::json::OStream &OS) const;
 
   void serializeAccessLevelMixin(llvm::json::OStream &OS) const;
+
+  void serializeLocationMixin(llvm::json::OStream &OS) const;
 
   llvm::Optional<StringRef>
   getDomain(PlatformAgnosticAvailabilityKind AgnosticKind,
