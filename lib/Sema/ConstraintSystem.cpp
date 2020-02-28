@@ -91,13 +91,13 @@ ConstraintSystem::~ConstraintSystem() {
 void ConstraintSystem::incrementScopeCounter() {
   CountScopes++;
   // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumConstraintScopes++;
+  if (auto *Stats = getASTContext().Stats)
+    Stats->getFrontendCounters().NumConstraintScopes++;
 }
 
 void ConstraintSystem::incrementLeafScopes() {
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumLeafScopes++;
+  if (auto *Stats = getASTContext().Stats)
+    Stats->getFrontendCounters().NumLeafScopes++;
 }
 
 bool ConstraintSystem::hasFreeTypeVariables() {

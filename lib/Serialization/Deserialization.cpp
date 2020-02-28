@@ -477,8 +477,8 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
       fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
   assert(next.Kind == llvm::BitstreamEntry::Record);
 
-  if (getContext().Stats)
-    getContext().Stats->getFrontendCounters().NumConformancesDeserialized++;
+  if (auto *Stats = getContext().Stats)
+    Stats->getFrontendCounters().NumConformancesDeserialized++;
 
   unsigned kind = fatalIfUnexpected(Cursor.readRecord(next.ID, scratch));
   switch (kind) {

@@ -2033,7 +2033,8 @@ TypeChecker::typeCheckExpression(
   Expr *expr = target.getAsExpr();
   DeclContext *dc = target.getDeclContext();
   auto &Context = dc->getASTContext();
-  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr", expr);
+  FrontendStatsTracer StatsTracer(Context.Stats,
+                                  "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // First, pre-check the expression, validating any types that occur in the
@@ -2144,7 +2145,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
                                  FreeTypeVariableBinding allowFreeTypeVariables,
                                    ExprTypeCheckListener *listener) {
   auto &Context = dc->getASTContext();
-  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr-no-apply", expr);
+  FrontendStatsTracer StatsTracer(Context.Stats,
+                                  "typecheck-expr-no-apply", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
   referencedDecl = nullptr;
 
@@ -2229,7 +2231,8 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
     FreeTypeVariableBinding allowFreeTypeVariables,
     ExprTypeCheckListener *listener) {
   auto &Context = dc->getASTContext();
-  FrontendStatsTracer StatsTracer(Context.Stats, "get-possible-types-no-apply", expr);
+  FrontendStatsTracer StatsTracer(Context.Stats,
+                                  "get-possible-types-no-apply", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // Construct a constraint system from this expression.
@@ -2831,7 +2834,8 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
 bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                        Type rhsType) {
   auto &Context = DC->getASTContext();
-  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr-pattern", EP);
+  FrontendStatsTracer StatsTracer(Context.Stats,
+                                  "typecheck-expr-pattern", EP);
   PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
 
   // Create a 'let' binding to stand in for the RHS value.

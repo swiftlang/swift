@@ -812,7 +812,8 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
   emitAbstractFuncDecl(fd);
 
   if (fd->hasBody()) {
-    FrontendStatsTracer Tracer(getASTContext().Stats, "SILGen-funcdecl", fd);
+    FrontendStatsTracer Tracer(getASTContext().Stats,
+                               "SILGen-funcdecl", fd);
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);

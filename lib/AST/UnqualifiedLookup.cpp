@@ -490,7 +490,8 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   auto localCounter = lookupCounter;
   (void)localCounter; // for debugging
 #endif
-  FrontendStatsTracer StatsTracer(Ctx.Stats, "performUnqualifedLookup",
+  FrontendStatsTracer StatsTracer(Ctx.Stats,
+                                  "performUnqualifedLookup",
                                   DC->getParentSourceFile());
 
   const Optional<bool> initialIsCascadingUse = getInitialIsCascadingUse();
