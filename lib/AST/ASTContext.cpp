@@ -617,13 +617,12 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
 
 /// Set a new stats reporter.
 void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
-  Stats = stats;
-  evaluator.setStatsReporter(stats);
-
   if (stats) {
     stats->getFrontendCounters().NumASTBytesAllocated =
         getAllocator().getBytesAllocated();
   }
+  evaluator.setStatsReporter(stats);
+  Stats = stats;
 }
 
 RC<syntax::SyntaxArena> ASTContext::getSyntaxArena() const {
