@@ -1,17 +1,22 @@
 {
-  "./a.swift": {
-    "object": "./a.o",
-    "swift-dependencies": "./a.swiftdeps"
-  },
-  "./b.swift": {
-    "object": "./b.o",
-    "swift-dependencies": "./b.swiftdeps"
-  },
-  "./main.swift": {
+  "main.swift": {
     "object": "./main.o",
     "swift-dependencies": "./main.swiftdeps"
+  },
+  "definesAB.swift": {
+    "object": "./definesAB.o",
+    "swift-dependencies": "./definesAB.swiftdeps"
+  },
+  "usesA.swift": {
+    "object": "./usesA.o",
+    "swift-dependencies": "./usesA.swiftdeps"
+  },
+  "usesB.swift": {
+    "object": "./usesB.o",
+    "swift-dependencies": "./usesB.swiftdeps"
   },
   "": {
     "swift-dependencies": "./main~buildrecord.swiftdeps"
   }
 }
+
