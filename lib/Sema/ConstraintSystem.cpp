@@ -1812,71 +1812,71 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
   llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");
 }
 
-/// \returns true if given declaration is an instance method marked as
-/// `mutating`, false otherwise.
-bool isMutatingMethod(const ValueDecl *decl) {
-  if (!(decl->isInstanceMember() && isa<FuncDecl>(decl)))
-    return false;
-  return cast<FuncDecl>(decl)->isMutating();
-}
-
-static bool shouldCheckForPartialApplication(ConstraintSystem &cs,
-                                             const ValueDecl *decl,
-                                             ConstraintLocator *locator) {
-  auto *anchor = locator->getAnchor();
-  if (!(anchor && isa<UnresolvedDotExpr>(anchor)))
-    return false;
-
-  // If this is a reference to instance method marked as 'mutating'
-  // it should be checked for invalid partial application.
-  if (isMutatingMethod(decl))
-    return true;
-
-  // Another unsupported partial application is related
-  // to constructor delegation via `self.init` or `super.init`.
-
-  if (!isa<ConstructorDecl>(decl))
-    return false;
-
-  auto *UDE = cast<UnresolvedDotExpr>(anchor);
-  // This is `super.init`
-  if (UDE->getBase()->isSuperExpr())
-    return true;
-
-  // Or this might be `self.init`.
-  if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
-    if (auto *baseDecl = DRE->getDecl())
-      return baseDecl->getBaseName() == cs.getASTContext().Id_self;
-  }
-
-  return false;
-}
-
 /// Try to identify and fix failures related to partial function application
 /// e.g. partial application of `init` or 'mutating' instance methods.
 static std::pair<bool, unsigned>
-isInvalidPartialApplication(ConstraintSystem &cs, const ValueDecl *member,
+isInvalidPartialApplication(ConstraintSystem &cs,
+                            const AbstractFunctionDecl *member,
                             ConstraintLocator *locator) {
-  if (!shouldCheckForPartialApplication(cs, member, locator))
-    return {false, 0};
+  auto *UDE = dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor());
+  if (UDE == nullptr)
+    return {false,0};
 
-  auto anchor = cast<UnresolvedDotExpr>(locator->getAnchor());
-  // If this choice is a partial application of `init` or
-  // `mutating` instance method we should report that it's not allowed.
   auto baseTy =
-      cs.simplifyType(cs.getType(anchor->getBase()))->getWithoutSpecifierType();
+      cs.simplifyType(cs.getType(UDE->getBase()))->getWithoutSpecifierType();
 
-  // Partial applications are not allowed only for constructor
-  // delegation, reference on the metatype is considered acceptable.
-  if (baseTy->is<MetatypeType>() && isa<ConstructorDecl>(member))
-    return {false, 0};
+  auto isInvalidIfPartiallyApplied = [&]() {
+    if (auto *FD = dyn_cast<FuncDecl>(member)) {
+      // 'mutating' instance methods cannot be partially applied.
+      if (FD->isMutating())
+        return true;
+
+      // Instance methods cannot be referenced on 'super' from a static
+      // context.
+      if (UDE->getBase()->isSuperExpr() &&
+          baseTy->is<MetatypeType>() &&
+          !FD->isStatic())
+        return true;
+    }
+
+    // Another unsupported partial application is related
+    // to constructor delegation via 'self.init' or 'super.init'.
+    //
+    // Note that you can also write 'self.init' or 'super.init'
+    // inside a static context -- since 'self' is a metatype there
+    // it doesn't have the special delegation meaning that it does
+    // in the body of a constructor.
+    if (isa<ConstructorDecl>(member) && !baseTy->is<MetatypeType>()) {
+      // Check for a `super.init` delegation...
+      if (UDE->getBase()->isSuperExpr())
+        return true;
+
+      // ... and `self.init` delegation. Note that in a static context,
+      // `self.init` is just an ordinary partial application; it's OK
+      // because there's no associated instance for delegation.
+      if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
+        if (auto *baseDecl = DRE->getDecl()) {
+          if (baseDecl->getBaseName() == cs.getASTContext().Id_self)
+            return true;
+        }
+      }
+    }
+
+    return false;
+  };
+
+  if (!isInvalidIfPartiallyApplied())
+    return {false,0};
 
   // If base is a metatype it would be ignored (unless this is an initializer
   // call), but if it is some other type it means that we have a single
   // application level already.
-  unsigned level = baseTy->is<MetatypeType>() ? 0 : 1;
-  if (auto *call = dyn_cast_or_null<CallExpr>(cs.getParentExpr(anchor))) {
-    level += dyn_cast_or_null<CallExpr>(cs.getParentExpr(call)) ? 2 : 1;
+  unsigned level = 0;
+  if (!baseTy->is<MetatypeType>())
+    level++;
+
+  if (auto *call = dyn_cast_or_null<CallExpr>(cs.getParentExpr(UDE))) {
+    level += 1;
   }
 
   return {true, level};
@@ -2357,39 +2357,41 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       }
     }
 
-    // Check whether applying this overload would result in invalid
-    // partial function application e.g. partial application of
-    // mutating method or initializer.
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+      // Check whether applying this overload would result in invalid
+      // partial function application e.g. partial application of
+      // mutating method or initializer.
 
-    // This check is supposed to be performed without
-    // `shouldAttemptFixes` because name lookup can't
-    // detect that particular partial application is
-    // invalid, so it has to return all of the candidates.
+      // This check is supposed to be performed without
+      // `shouldAttemptFixes` because name lookup can't
+      // detect that particular partial application is
+      // invalid, so it has to return all of the candidates.
 
-    bool isInvalidPartialApply;
-    unsigned level;
+      bool isInvalidPartialApply;
+      unsigned level;
 
-    std::tie(isInvalidPartialApply, level) =
-        isInvalidPartialApplication(*this, decl, locator);
+      std::tie(isInvalidPartialApply, level) =
+          isInvalidPartialApplication(*this, afd, locator);
 
-    if (isInvalidPartialApply) {
-      // No application at all e.g. `Foo.bar`.
-      if (level == 0) {
-        // Swift 4 and earlier failed to diagnose a reference to a mutating
-        // method without any applications at all, which would get
-        // miscompiled into a function with undefined behavior. Warn for
-        // source compatibility.
-        bool isWarning = !getASTContext().isSwiftVersionAtLeast(5);
-        (void)recordFix(
-            AllowInvalidPartialApplication::create(isWarning, *this, locator));
-      } else if (level == 1) {
-        // `Self` parameter is applied, e.g. `foo.bar` or `Foo.bar(&foo)`
-        (void)recordFix(AllowInvalidPartialApplication::create(
-            /*isWarning=*/false, *this, locator));
+      if (isInvalidPartialApply) {
+        // No application at all e.g. `Foo.bar`.
+        if (level == 0) {
+          // Swift 4 and earlier failed to diagnose a reference to a mutating
+          // method without any applications at all, which would get
+          // miscompiled into a function with undefined behavior. Warn for
+          // source compatibility.
+          bool isWarning = !getASTContext().isSwiftVersionAtLeast(5);
+          (void)recordFix(
+              AllowInvalidPartialApplication::create(isWarning, *this, locator));
+        } else if (level == 1) {
+          // `Self` parameter is applied, e.g. `foo.bar` or `Foo.bar(&foo)`
+          (void)recordFix(AllowInvalidPartialApplication::create(
+              /*isWarning=*/false, *this, locator));
+        }
+
+        // Otherwise both `Self` and arguments are applied,
+        // e.g. `foo.bar()` or `Foo.bar(&foo)()`, and there is nothing to do.
       }
-
-      // Otherwise both `Self` and arguments are applied,
-      // e.g. `foo.bar()` or `Foo.bar(&foo)()`, and there is nothing to do.
     }
   }
 
