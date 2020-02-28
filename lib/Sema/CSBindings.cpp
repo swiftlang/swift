@@ -1043,6 +1043,25 @@ bool TypeVarBindingProducer::computeNext() {
       if (auto simplifiedSuper = CS.checkTypeOfBinding(TypeVar, supertype))
         addNewBinding(binding.withType(*simplifiedSuper));
     }
+
+    auto srcLocator = binding.getLocator();
+    if (srcLocator &&
+        srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
+        !type->hasTypeVariable() && CS.isCollectionType(type)) {
+      // If the type binding comes from the argument conversion, let's
+      // instead of binding collection types directly, try to bind
+      // using temporary type variables substituted for element
+      // types, that's going to ensure that subtype relationship is
+      // always preserved.
+      auto *BGT = type->castTo<BoundGenericType>();
+      auto UGT = UnboundGenericType::get(BGT->getDecl(), BGT->getParent(),
+                                         BGT->getASTContext());
+
+      auto dstLocator = TypeVar->getImpl().getLocator();
+      auto newType = CS.openUnboundGenericType(UGT, dstLocator)
+                         ->reconstituteSugar(/*recursive=*/false);
+      addNewBinding(binding.withType(newType));
+    }
   }
 
   if (newBindings.empty())
@@ -1061,20 +1080,6 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   if (Binding.hasDefaultedLiteralProtocol()) {
     type = cs.openUnboundGenericType(type, dstLocator);
-    type = type->reconstituteSugar(/*recursive=*/false);
-  } else if (srcLocator &&
-             srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
-             !type->hasTypeVariable() && cs.isCollectionType(type)) {
-    // If the type binding comes from the argument conversion, let's
-    // instead of binding collection types directly, try to bind
-    // using temporary type variables substituted for element
-    // types, that's going to ensure that subtype relationship is
-    // always preserved.
-    auto *BGT = type->castTo<BoundGenericType>();
-    auto UGT = UnboundGenericType::get(BGT->getDecl(), BGT->getParent(),
-                                       BGT->getASTContext());
-
-    type = cs.openUnboundGenericType(UGT, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
