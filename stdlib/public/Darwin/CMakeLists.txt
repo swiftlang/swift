@@ -37,7 +37,7 @@ set(all_overlays
   GLKit
   HomeKit
   IOKit
-#  Intents
+  Intents
   MapKit
   MediaPlayer
   Metal
