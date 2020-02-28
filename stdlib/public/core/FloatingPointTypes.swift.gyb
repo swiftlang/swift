@@ -37,6 +37,11 @@ SignificandBitCount = self_type.significand_bits
 ExponentBitCount = self_type.exponent_bits
 RawSignificand = 'UInt' + str(SignificandSize)
 
+def Availability(bits):
+    if bits == 16:
+        return '@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)'
+    return ''
+
 if Self == 'Float16':
     SelfDocComment = '''\
 /// A half-precision (16b), floating-point value type.'''
@@ -62,6 +67,7 @@ else:
 % end
 
 ${SelfDocComment}
+${Availability(bits)}
 @frozen
 public struct ${Self} {
   public // @testable
@@ -80,6 +86,7 @@ public struct ${Self} {
   }
 }
 
+${Availability(bits)}
 extension ${Self}: CustomStringConvertible {
   /// A textual representation of the value.
   public var description: String {
@@ -100,6 +107,7 @@ extension ${Self}: CustomStringConvertible {
   }
 }
 
+${Availability(bits)}
 extension ${Self}: CustomDebugStringConvertible {
   /// A textual representation of the value, suitable for debugging.
   public var debugDescription: String {
@@ -116,6 +124,7 @@ extension ${Self}: CustomDebugStringConvertible {
   }
 }
 
+${Availability(bits)}
 extension ${Self}: TextOutputStreamable {
   public func write<Target>(to target: inout Target) where Target: TextOutputStream {
 % if bits == 16:
@@ -131,6 +140,7 @@ extension ${Self}: TextOutputStreamable {
   }
 }
 
+${Availability(bits)}
 extension ${Self}: BinaryFloatingPoint {
 
   // Floating-point types are always symmetric, so Magnitude is Self.
@@ -895,6 +905,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 }
 
+${Availability(bits)}
 extension ${Self}: _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLiteral {
   @_transparent
   public
@@ -913,6 +924,7 @@ extension ${Self}: _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLite
 % end
 
 % builtinFloatLiteralBits = 80
+${Availability(bits)}
 extension ${Self}: _ExpressibleByBuiltinFloatLiteral {
   @_transparent
   public
@@ -935,6 +947,7 @@ extension ${Self}: _ExpressibleByBuiltinFloatLiteral {
 #else
 
 % builtinFloatLiteralBits = 64
+${Availability(bits)}
 extension ${Self}: _ExpressibleByBuiltinFloatLiteral {
   @_transparent
   public
@@ -954,6 +967,7 @@ extension ${Self}: _ExpressibleByBuiltinFloatLiteral {
 #endif
 % end
 
+${Availability(bits)}
 extension ${Self}: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
@@ -1000,6 +1014,7 @@ extension ${Self}: _HasCustomAnyHashableRepresentation {
 }
 % end
 
+${Availability(bits)}
 extension ${Self} {
   @inlinable // FIXME(inline-always)
   public var magnitude: ${Self} {
@@ -1010,6 +1025,7 @@ extension ${Self} {
   }
 }
 
+${Availability(bits)}
 extension ${Self} {
   @_transparent
   public static prefix func - (x: ${Self}) -> ${Self} {
@@ -1022,6 +1038,7 @@ extension ${Self} {
 //===----------------------------------------------------------------------===//
 
 // Construction from other concrete types.
+${Availability(bits)}
 extension ${Self} {
 
   // We "shouldn't" need this, but the typechecker barfs on an expression
@@ -1081,6 +1098,7 @@ extension ${Self} {
   ///     // z.isNaN == true
   ///
   /// - Parameter other: The value to use for the new instance.
+  ${Availability(srcBits)}
   @inlinable // FIXME(inline-always)
   @inline(__always)
   public init(_ other: ${That}) {
@@ -1123,6 +1141,7 @@ extension ${Self} {
   ///     // z == nil
   ///
   /// - Parameter other: The value to use for the new instance.
+  ${Availability(srcBits)}
   @inlinable
   @inline(__always)
   public init?(exactly other: ${That}) {
@@ -1151,6 +1170,7 @@ extension ${Self} {
 //  tweaking the overload resolution rules, or by removing the other
 //  definitions in the standard lib, or both.
 
+${Availability(bits)}
 extension ${Self} {
   @_transparent
   public static func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
@@ -1185,6 +1205,7 @@ extension ${Self} {
 // Strideable Conformance
 //===----------------------------------------------------------------------===//
 
+${Availability(bits)}
 extension ${Self}: Strideable {
   @_transparent
   public func distance(to other: ${Self}) -> ${Self} {

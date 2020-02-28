@@ -1151,6 +1151,9 @@ public struct ${Self}
   /// - Parameter source: A floating-point value to convert to an integer.
   ///   `source` must be representable in this type after rounding toward
   ///   zero.
+%     if FloatType == 'Float16':
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+%     end
   @_transparent
   public init(_ source: ${FloatType}) {
     _precondition(source.isFinite,
@@ -1178,6 +1181,9 @@ public struct ${Self}
   ///     // y == nil
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
+%     if FloatType == 'Float16':
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+%     end
   @_transparent
   public init?(exactly source: ${FloatType}) {
     // The value passed as `source` must not be infinite, NaN, or exceed the
