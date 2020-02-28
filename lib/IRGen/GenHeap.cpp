@@ -33,6 +33,7 @@
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -481,7 +482,8 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
   ConstantInitBuilder builder(IGM);
   auto fields = builder.beginStruct(IGM.FullBoxMetadataStructTy);
 
-  fields.add(dtorFn);
+  fields.addSignedPointer(dtorFn, IGM.getOptions().PointerAuth.HeapDestructors,
+                          PointerAuthEntity::Special::HeapDestructor);
   fields.addNullPointer(IGM.WitnessTablePtrTy);
   {
     auto kindStruct = fields.beginStruct(IGM.TypeMetadataStructTy);

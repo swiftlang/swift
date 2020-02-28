@@ -85,6 +85,11 @@ typedef enum {
   /// should be populated with the size of size_t in the remote process, in
   /// bytes.
   DLQ_GetSizeSize,
+
+  /// The query should ignore inBuffer, and treat outBuffer as pointer-sized
+  /// buffer (the size of a target pointer, not a swift_addr_t) which should be
+  /// populated with the mask of pointer addressable bits.
+  DLQ_GetPtrAuthMask,
 } DataLayoutQueryType;
 
 /// Data layout query function, which returns answers based on query types (from

@@ -296,6 +296,8 @@ public:
         DiagName = "import conditional"; break;
       case PlatformConditionKind::TargetEnvironment:
         DiagName = "target environment"; break;
+      case PlatformConditionKind::PtrAuth:
+        DiagName = "pointer authentication scheme"; break;
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }

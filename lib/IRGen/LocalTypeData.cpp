@@ -708,6 +708,11 @@ void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
     out << "ValueWitnessTable";
   } else {
     assert(isSingletonKind());
+    if (Value >= ValueWitnessDiscriminatorBase) {
+      auto witness = ValueWitness(Value - ValueWitnessDiscriminatorBase);
+      out << "Discriminator(" << getValueWitnessName(witness) << ")";
+      return;
+    }
     ValueWitness witness = ValueWitness(Value - ValueWitnessBase);
     out << getValueWitnessName(witness);
   }

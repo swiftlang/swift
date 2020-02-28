@@ -40,6 +40,15 @@ class InProcessMemoryReader final : public MemoryReader {
         *result = sizeof(size_t);
         return true;
       }
+      case DLQ_GetPtrAuthMask: {
+        auto result = static_cast<uintptr_t *>(outBuffer);
+#if __has_feature(ptrauth_calls)
+        *result = (uintptr_t)ptrauth_strip((void*)0x0007ffffffffffff, 0);
+#else
+        *result = (uintptr_t)~0ull;
+#endif
+        return true;
+      }
     }
 
     return false;

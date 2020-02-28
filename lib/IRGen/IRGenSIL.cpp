@@ -69,6 +69,7 @@
 #include "GenObjC.h"
 #include "GenOpaque.h"
 #include "GenPoly.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
@@ -2718,7 +2719,13 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, bool isAbort) {
   continuation = Builder.CreateBitCast(continuation,
                                        sig.getType()->getPointerTo());
 
-  FunctionPointer callee(continuation, sig);
+
+  auto schemaAndEntity =
+    getCoroutineResumeFunctionPointerAuth(IGM, i->getOrigCalleeType());
+  auto pointerAuth = PointerAuthInfo::emit(*this, schemaAndEntity.first,
+                                           coroutine.Buffer.getAddress(),
+                                           schemaAndEntity.second);
+  FunctionPointer callee(continuation, pointerAuth, sig);
 
   Builder.CreateCall(callee, {
     coroutine.Buffer.getAddress(),
@@ -5573,7 +5580,11 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
     auto sig = IGM.getSignature(methodType);
     fnPtr = Builder.CreateBitCast(fnPtr, sig.getType()->getPointerTo());
 
-    FunctionPointer fn(fnPtr, sig);
+    auto &schema = getOptions().PointerAuth.SwiftClassMethodPointers;
+    auto authInfo =
+      PointerAuthInfo::emit(*this, schema, /*storageAddress=*/nullptr, method);
+
+    FunctionPointer fn(fnPtr, authInfo, sig);
 
     setLoweredFunctionPointer(i, fn);
     return;

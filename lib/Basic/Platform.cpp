@@ -286,6 +286,7 @@ getArchForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   //          .Case ("armv7s", "armv7s")
   //          .Case ("armv7k", "armv7k")
   //          .Case ("armv7", "armv7")
+  //          .Case ("arm64e", "arm64e")
               .Default(tripleArchName);
 }
 

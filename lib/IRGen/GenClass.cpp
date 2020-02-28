@@ -46,6 +46,7 @@
 #include "GenFunc.h"
 #include "GenMeta.h"
 #include "GenObjC.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -1377,9 +1378,12 @@ namespace {
       if (hasUpdater) {
         //   Class _Nullable (*metadataUpdateCallback)(Class _Nonnull cls,
         //                                             void * _Nullable arg);
-        b.add(IGM.getAddrOfObjCMetadataUpdateFunction(
+        auto *impl = IGM.getAddrOfObjCMetadataUpdateFunction(
                 TheEntity.get<ClassDecl *>(),
-                NotForDefinition));
+                NotForDefinition);
+        const auto &schema =
+          IGM.getOptions().PointerAuth.ObjCMethodListFunctionPointers;
+        b.addSignedPointer(impl, schema, PointerAuthEntity());
       }
 
       // };
@@ -2438,7 +2442,11 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                       IGF.IGM.getPointerAlignment());
   auto fnPtr = IGF.emitInvariantLoad(slot);
 
-  return FunctionPointer(fnPtr, signature);
+  auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
+  auto authInfo =
+    PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
+
+  return FunctionPointer(fnPtr, authInfo, signature);
 }
 
 FunctionPointer

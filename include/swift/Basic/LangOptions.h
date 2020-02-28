@@ -439,7 +439,7 @@ namespace swift {
     }
 
   private:
-    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 5>
+    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 6>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };
