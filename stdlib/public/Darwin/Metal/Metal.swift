@@ -90,7 +90,7 @@ extension MTLDevice {
     
     @available(macOS 10.13, iOS 11.0, tvOS 11.0, *)
     public func getDefaultSamplePositions(sampleCount: Int) -> [MTLSamplePosition] {
-        return [MTLSamplePosition](unsafeUninitializedCapacity: sampleCount) { buf, initializedCount
+        return [MTLSamplePosition](unsafeUninitializedCapacity: sampleCount) { buf, initializedCount in
             __getDefaultSamplePositions(buf, count: sampleCount)
             initializedCount = sampleCount
         }
@@ -264,7 +264,7 @@ extension MTLRenderPassDescriptor {
     @available(macOS 10.13, iOS 11.0, tvOS 11.0, *)
     public func getSamplePositions() -> [MTLSamplePosition] {
         let numPositions = __getSamplePositions(nil, count: 0)
-        return [MTLSamplePosition](unsafeUninitializedCapacity: numPositions) { buf, initializedCount
+        return [MTLSamplePosition](unsafeUninitializedCapacity: numPositions) { buf, initializedCount in
             __getSamplePositions(buf, count: numPositions)
             initializedCount = numPositions
         }
