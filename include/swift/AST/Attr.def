@@ -520,7 +520,7 @@ SIMPLE_DECL_ATTR(_inheritsConvenienceInitializers,
   93)
 
 DECL_ATTR(_typeEraser, TypeEraser,
-  OnProtocol | UserInaccessible | NotSerialized |
+  OnProtocol | UserInaccessible |
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   94)
 

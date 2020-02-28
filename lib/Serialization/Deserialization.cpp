@@ -477,8 +477,8 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
       fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
   assert(next.Kind == llvm::BitstreamEntry::Record);
 
-  if (getContext().Stats)
-    getContext().Stats->getFrontendCounters().NumConformancesDeserialized++;
+  if (auto *Stats = getContext().Stats)
+    Stats->getFrontendCounters().NumConformancesDeserialized++;
 
   unsigned kind = fatalIfUnexpected(Cursor.readRecord(next.ID, scratch));
   switch (kind) {
@@ -4205,6 +4205,19 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         assert(!isImplicit && "Need to update for implicit");
         Attr = DynamicReplacementAttr::create(
             ctx, DeclNameRef({ ctx, baseName, pieces }), &MF, replacedFunID);
+        break;
+      }
+
+      case decls_block::TypeEraser_DECL_ATTR: {
+        bool isImplicit;
+        TypeID typeEraserID;
+        serialization::decls_block::TypeEraserDeclAttrLayout::readRecord(
+            scratch, isImplicit, typeEraserID);
+
+        auto typeEraser = MF.getType(typeEraserID);
+        assert(!isImplicit);
+        Attr = new (ctx) TypeEraserAttr(SourceLoc(), SourceRange(),
+                                        TypeLoc::withoutLoc(typeEraser));
         break;
       }
 

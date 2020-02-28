@@ -7859,8 +7859,8 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
 void ClangImporter::Implementation::startedImportingEntity() {
   ++NumTotalImportedEntities;
   // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (SwiftContext.Stats)
-    SwiftContext.Stats->getFrontendCounters().NumTotalClangImportedEntities++;
+  if (auto *Stats = SwiftContext.Stats)
+    Stats->getFrontendCounters().NumTotalClangImportedEntities++;
 }
 
 /// Look up associated type requirements in the conforming type.
@@ -8563,7 +8563,8 @@ static void loadAllMembersOfSuperclassIfNeeded(ClassDecl *CD) {
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
-  FrontendStatsTracer tracer(D->getASTContext().Stats, "load-all-members", D);
+  FrontendStatsTracer tracer(D->getASTContext().Stats,
+                             "load-all-members", D);
   assert(D);
 
   // Check whether we're importing an Objective-C container of some sort.

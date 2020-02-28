@@ -91,13 +91,13 @@ ConstraintSystem::~ConstraintSystem() {
 void ConstraintSystem::incrementScopeCounter() {
   CountScopes++;
   // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumConstraintScopes++;
+  if (auto *Stats = getASTContext().Stats)
+    Stats->getFrontendCounters().NumConstraintScopes++;
 }
 
 void ConstraintSystem::incrementLeafScopes() {
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumLeafScopes++;
+  if (auto *Stats = getASTContext().Stats)
+    Stats->getFrontendCounters().NumLeafScopes++;
 }
 
 bool ConstraintSystem::hasFreeTypeVariables() {
@@ -4076,6 +4076,36 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
 
   cacheExprTypes(result);
   return result;
+}
+
+Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
+                                            Type contextualType,
+                                            ContextualTypePurpose purpose) {
+  if (!(purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr))
+    return expr;
+
+  auto *decl = dyn_cast_or_null<ValueDecl>(dc->getAsDecl());
+  if (!decl ||
+      !(decl->isDynamic() || decl->getDynamicallyReplacedDecl()))
+    return expr;
+
+  auto *opaque = contextualType->getAs<OpaqueTypeArchetypeType>();
+  if (!opaque)
+    return expr;
+
+  auto protocols = opaque->getConformsTo();
+  if (protocols.size() != 1)
+    return expr;
+
+  auto *attr = protocols.front()->getAttrs().getAttribute<TypeEraserAttr>();
+  if (!attr)
+    return expr;
+
+  auto typeEraser = attr->getTypeEraserLoc().getType();
+  auto &ctx = dc->getASTContext();
+  return CallExpr::createImplicit(ctx,
+                                  TypeExpr::createImplicit(typeEraser, ctx),
+                                  {expr}, {ctx.Id_erasing});
 }
 
 /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the

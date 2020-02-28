@@ -2173,7 +2173,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_RestatedObjCConformance:
     case DAK_ClangImporterSynthesizedType:
     case DAK_PrivateImport:
-    case DAK_TypeEraser:
       llvm_unreachable("cannot serialize attribute");
 
     case DAK_Count:
@@ -2361,6 +2360,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DynamicReplacementDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, false, /*implicit flag*/
           S.addDeclRef(afd), pieces.size(), pieces);
+      return;
+    }
+
+    case DAK_TypeEraser: {
+      auto abbrCode = S.DeclTypeAbbrCodes[TypeEraserDeclAttrLayout::Code];
+      auto attr = cast<TypeEraserAttr>(DA);
+      auto typeEraser = attr->getTypeEraserLoc().getType();
+      TypeEraserDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                           attr->isImplicit(),
+                                           S.addTypeRef(typeEraser));
       return;
     }
 

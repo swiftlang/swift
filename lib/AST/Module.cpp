@@ -629,7 +629,8 @@ void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
     stats->getFrontendCounters().NumModuleLookupClassMember++;
 
   if (isParsedModule(this)) {
-    FrontendStatsTracer tracer(getASTContext().Stats, "source-file-lookup-class-member");
+    FrontendStatsTracer tracer(getASTContext().Stats,
+                               "source-file-lookup-class-member");
     auto &cache = getSourceLookupCache();
     cache.populateMemberCache(*this);
     cache.lookupClassMember(accessPath, name, results);
@@ -642,7 +643,8 @@ void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
 void SourceFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
-  FrontendStatsTracer tracer(getASTContext().Stats, "source-file-lookup-class-member");
+  FrontendStatsTracer tracer(getASTContext().Stats,
+                             "source-file-lookup-class-member");
   auto &cache = getCache();
   cache.populateMemberCache(*this);
   cache.lookupClassMember(accessPath, name, results);
