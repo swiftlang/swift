@@ -53,7 +53,7 @@ class PythonKit(product.Product):
                 '-G', 'Ninja',
                 '-D', 'BUILD_SHARED_LIBS=YES',
                 '-D', 'CMAKE_INSTALL_PREFIX={}/usr'.format(
-                    self.args.install_destdir),
+                    self.install_toolchain_path()),
                 '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
                 '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
                 '-B', self.build_dir,
