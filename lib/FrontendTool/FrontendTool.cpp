@@ -1779,51 +1779,6 @@ static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
   return false;
 }
 
-static StringRef
-silOptModeArgStr(OptimizationMode mode) {
-  switch (mode) {
- case OptimizationMode::ForSpeed:
-   return "O";
- case OptimizationMode::ForSize:
-   return "Osize";
- default:
-   return "Onone";
-  }
-}
-
-static std::unique_ptr<UnifiedStatsReporter>
-computeStatsReporter(const CompilerInvocation &Invocation, CompilerInstance *Instance) {
-  const std::string &StatsOutputDir =
-      Invocation.getFrontendOptions().StatsOutputDir;
-  std::unique_ptr<UnifiedStatsReporter> StatsReporter;
-  if (StatsOutputDir.empty())
-    return std::unique_ptr<UnifiedStatsReporter>();
-
-  auto &FEOpts = Invocation.getFrontendOptions();
-  auto &LangOpts = Invocation.getLangOptions();
-  auto &SILOpts = Invocation.getSILOptions();
-  std::string InputName =
-      FEOpts.InputsAndOutputs.getStatsFileMangledInputName();
-  StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
-  const std::string &OutFile =
-      FEOpts.InputsAndOutputs.lastInputProducingOutput().outputFilename();
-  StringRef OutputType = llvm::sys::path::extension(OutFile);
-  std::string TripleName = LangOpts.Target.normalize();
-  auto Trace = Invocation.getFrontendOptions().TraceStats;
-  auto ProfileEvents = Invocation.getFrontendOptions().ProfileEvents;
-  auto ProfileEntities = Invocation.getFrontendOptions().ProfileEntities;
-  SourceManager *SM = &Instance->getSourceMgr();
-  clang::SourceManager *CSM = nullptr;
-  if (auto *clangImporter = static_cast<ClangImporter *>(
-          Instance->getASTContext().getClangModuleLoader())) {
-    CSM = &clangImporter->getClangASTContext().getSourceManager();
-  }
-  return std::make_unique<UnifiedStatsReporter>(
-      "swift-frontend", FEOpts.ModuleName, InputName, TripleName, OutputType,
-      OptType, StatsOutputDir, SM, CSM, Trace,
-      ProfileEvents, ProfileEntities);
-}
-
 /// Creates a diagnostic consumer that handles dispatching diagnostics to
 /// multiple output files, based on the supplementary output paths specified by
 /// \p inputsAndOutputs.
@@ -2182,15 +2137,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1);
-  }
-
-  std::unique_ptr<UnifiedStatsReporter> StatsReporter =
-      computeStatsReporter(Invocation, Instance.get());
-  if (StatsReporter) {
-    // Install stats-reporter somewhere visible for subsystems that
-    // need to bump counters as they work, rather than measure
-    // accumulated work on completion (mostly: TypeChecker).
-    Instance->getASTContext().setStatsReporter(StatsReporter.get());
   }
 
   // The compiler instance has been configured; notify our observer.
