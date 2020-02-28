@@ -2,10 +2,10 @@
 
 // REQUIRES: CPU=x86_64
 
-// CHECK: [[C:%T7unowned1CC]] = type <{ [[REF:%swift.refcounted]] }>
-// CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK: [[A:%T7unowned1AV]] = type <{ %swift.unowned }>
+// CHECK-DAG: [[TYPE:%swift.type]] = type
+// CHECK-DAG: [[C:%T7unowned1CC]] = type <{ [[REF:%swift.refcounted]] }>
+// CHECK-DAG: [[OPAQUE:%swift.opaque]] = type opaque
+// CHECK-DAG: [[A:%T7unowned1AV]] = type <{ %swift.unowned }>
 
 import Builtin
 
