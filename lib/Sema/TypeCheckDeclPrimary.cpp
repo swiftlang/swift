@@ -1172,11 +1172,11 @@ public:
   ASTContext &getASTContext() const { return Ctx; }
 
   void visit(Decl *decl) {
-    if (getASTContext().Stats)
-      getASTContext().Stats->getFrontendCounters().NumDeclsTypechecked++;
+    if (auto *Stats = getASTContext().Stats)
+      Stats->getFrontendCounters().NumDeclsTypechecked++;
 
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "typecheck-decl",
-                                    decl);
+    FrontendStatsTracer StatsTracer(getASTContext().Stats,
+                                    "typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
     DeclVisitor<DeclChecker>::visit(decl);

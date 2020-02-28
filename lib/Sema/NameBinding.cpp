@@ -265,7 +265,8 @@ namespace {
 ///
 /// Name binding operates on a parsed but otherwise unvalidated AST.
 void swift::performNameBinding(SourceFile &SF) {
-  FrontendStatsTracer tracer(SF.getASTContext().Stats, "Name binding");
+  FrontendStatsTracer tracer(SF.getASTContext().Stats,
+                             "Name binding");
 
   // Make sure we skip adding the standard library imports if the
   // source file is empty.

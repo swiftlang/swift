@@ -121,7 +121,8 @@ void swift::performCodeCompletionSecondPass(
   auto &SF = *state->ParentContext->getParentSourceFile();
   auto &Ctx = SF.getASTContext();
 
-  FrontendStatsTracer tracer(Ctx.Stats, "CodeCompletionSecondPass");
+  FrontendStatsTracer tracer(Ctx.Stats,
+                             "CodeCompletionSecondPass");
 
   auto BufferID = Ctx.SourceMgr.getCodeCompletionBufferID();
   Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);

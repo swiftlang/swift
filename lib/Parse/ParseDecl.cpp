@@ -6413,8 +6413,8 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   ParseFunctionBody CC(*this, AFD);
   setLocalDiscriminatorToParamList(AFD->getParameters());
 
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+  if (auto *Stats = Context.Stats)
+    Stats->getFrontendCounters().NumFunctionsParsed++;
 
   // In implicit getter, if a CC token is the first token after '{', it might
   // be a start of an accessor block. Perform special completion for that.

@@ -1743,8 +1743,8 @@ bool TypeChecker::validateType(ASTContext &Context, TypeLoc &Loc,
   if (Loc.wasValidated())
     return Loc.isError();
 
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumTypesValidated++;
+  if (auto *Stats = Context.Stats)
+    Stats->getFrontendCounters().NumTypesValidated++;
 
   Type type = resolution.resolveType(Loc.getTypeRepr(), options);
   Loc.setType(type);
@@ -1865,7 +1865,8 @@ namespace {
 Type TypeResolution::resolveType(TypeRepr *TyR,
                               TypeResolutionOptions options) {
   auto &ctx = getASTContext();
-  FrontendStatsTracer StatsTracer(ctx.Stats, "resolve-type", TyR);
+  FrontendStatsTracer StatsTracer(ctx.Stats,
+                                  "resolve-type", TyR);
   PrettyStackTraceTypeRepr stackTrace(ctx, "resolving", TyR);
 
   TypeResolver typeResolver(*this);

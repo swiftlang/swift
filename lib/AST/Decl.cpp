@@ -5026,8 +5026,8 @@ ProtocolDecl::setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
 
   ++NumLazyRequirementSignatures;
   // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumLazyRequirementSignatures++;
+  if (auto *Stats = getASTContext().Stats)
+    Stats->getFrontendCounters().NumLazyRequirementSignatures++;
 }
 
 ArrayRef<Requirement> ProtocolDecl::getCachedRequirementSignature() const {
