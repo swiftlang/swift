@@ -52,114 +52,114 @@ let 👍👍👍 = {
 }
 
 // Test fallback for non-ASCII characters.
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:35:11
-// CHECK: 34 |
-// CHECK: 35 | let abc = "👍
-// CHECK:    | --> error: unterminated string literal
-// CHECK: 36 |
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:11
+// CHECK: [[#LINE-1]] |
+// CHECK: [[#LINE]]   | let abc = "👍
+// CHECK:             | --> error: unterminated string literal
+// CHECK: [[#LINE+1]] |
 
 // Test underlining.
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:3:3
-// CHECK: 2 |
-// CHECK: 3 | 1 + 2
-// CHECK:   | ~   ~
-// CHECK:   |   ^ warning: result of operator '+' is unused
-// CHECK: 4 |
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:3
+// CHECK: [[#LINE-1]] |
+// CHECK: [[#LINE]]   | 1 + 2
+// CHECK:             | ~   ~
+// CHECK:             |   ^ warning: result of operator '+' is unused
+// CHECK: [[#LINE+1]] |
 
 // Test inline fix-it rendering.
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:9:11
-// CHECK:  8 |
-// CHECK:  9 | foo(a: 2, b: 1, a: 2)
-// CHECK:    |     ++++++~~~~------
-// CHECK:    |                 ^ error: argument 'a' must precede argument 'b' [remove ', a: 2' and insert 'a: 2, ']
-// CHECK: 10 |
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:11
+// CHECK:  [[#LINE-1]] |
+// CHECK:  [[#LINE]]   | foo(a: 2, b: 1, a: 2)
+// CHECK:              |     ++++++~~~~------
+// CHECK:              |                 ^ error: argument 'a' must precede argument 'b' [remove ', a: 2' and insert 'a: 2, ']
+// CHECK: [[#LINE+1]]  |
 
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:18:7
-// CHECK: 16 | struct Foo {
-// CHECK: 17 |   var x: Int
-// CHECK:    |       ^ note: 'x' previously declared here
-// CHECK: 18 |   var x: Int
-// CHECK:    |       ^ error: invalid redeclaration of 'x'
-// CHECK: 19 | }
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:7
+// CHECK: [[#LINE-2]] | struct Foo {
+// CHECK: [[#LINE-1]] |   var x: Int
+// CHECK:             |       ^ note: 'x' previously declared here
+// CHECK: [[#LINE]]   |   var x: Int
+// CHECK:             |       ^ error: invalid redeclaration of 'x'
+// CHECK: [[#LINE+1]] | }
 
 // Test out-of-line fix-its on notes.
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:28:1
-// CHECK: 27 | }
-// CHECK: 28 | bazz()
-// CHECK:    | ~~~~~~
-// CHECK:    | ^ error: call can throw but is not marked with 'try'
-// CHECK:    | ^ note: did you mean to use 'try'? [insert 'try ']
-// CHECK:    | ^ note: did you mean to handle error as optional value? [insert 'try? ']
-// CHECK:    | ^ note: did you mean to disable error propagation? [insert 'try! ']
-// CHECK: 29 |
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:1
+// CHECK: [[#LINE-1]] | }
+// CHECK: [[#LINE]]   | bazz()
+// CHECK:             | ~~~~~~
+// CHECK:             | ^ error: call can throw but is not marked with 'try'
+// CHECK:             | ^ note: did you mean to use 'try'? [insert 'try ']
+// CHECK:             | ^ note: did you mean to handle error as optional value? [insert 'try? ']
+// CHECK:             | ^ note: did you mean to disable error propagation? [insert 'try! ']
+// CHECK: [[#LINE+1]] |
 
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:32:7
-// CHECK: 31 | extension A {
-// CHECK: 32 |   let x: Int = { 42 }
-// CHECK:    |       ^ error: extensions must not contain stored properties
-// CHECK: 33 | }
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:7
+// CHECK: [[#LINE-1]] | extension A {
+// CHECK: [[#LINE]]   |   let x: Int = { 42 }
+// CHECK:             |       ^ error: extensions must not contain stored properties
+// CHECK: [[#LINE+1]] | }
 
 // Test complex out-of-line fix-its.
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:32:16
-// CHECK: 31 | extension A {
-// CHECK: 32 |   let x: Int = { 42 }()
-// CHECK:    |                ~~~~~~++
-// CHECK:    |                ^ error: function produces expected type 'Int'; did you mean to call it with '()'?
-// CHECK:    |                ^ note: Remove '=' to make 'x' a computed property [remove '= ' and replace 'let' with 'var']
-// CHECK: 33 | }
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:16
+// CHECK: [[#LINE-1]] | extension A {
+// CHECK: [[#LINE]]   |   let x: Int = { 42 }()
+// CHECK:             |                ~~~~~~++
+// CHECK:             |                ^ error: function produces expected type 'Int'; did you mean to call it with '()'?
+// CHECK:             |                ^ note: Remove '=' to make 'x' a computed property [remove '= ' and replace 'let' with 'var']
+// CHECK: [[#LINE+1]] | }
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:37:9
-// CHECK: 36 |
-// CHECK: 37 | let x = { () -> Result in
-// CHECK:    |          +++++++++++++++++
-// CHECK:    |         ^ error: unable to infer complex closure return type; add explicit type to disambiguate
-// CHECK: 38 |   let y = 1
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:9
+// CHECK: [[#LINE-1]] |
+// CHECK: [[#LINE]]   | let x = { () -> Result in
+// CHECK:             |          +++++++++++++++++
+// CHECK:             |         ^ error: unable to infer complex closure return type; add explicit type to disambiguate
+// CHECK: [[#LINE+1]] |   let y = 1
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:42:8
-// CHECK: 41 |
-// CHECK: 42 | struct B: Decodable {
-// CHECK:    |        ^ error: type 'B' does not conform to protocol 'Decodable'
-// CHECK: 43 |   let a: Foo
-// CHECK:    |       ^ note: cannot automatically synthesize 'Decodable' because 'Foo' does not conform to 'Decodable'
-// CHECK: 44 | }
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:8
+// CHECK: [[#LINE-1]] |
+// CHECK: [[#LINE]]   | struct B: Decodable {
+// CHECK:             |        ^ error: type 'B' does not conform to protocol 'Decodable'
+// CHECK: [[#LINE+1]] |   let a: Foo
+// CHECK:             |       ^ note: cannot automatically synthesize 'Decodable' because 'Foo' does not conform to 'Decodable'
+// CHECK: [[#LINE+2]] | }
 // CHECK: Swift.Decodable:2:5
 // CHECK: 1 | public protocol Decodable {
 // CHECK: 2 |     init(from decoder: Decoder) throws
 // CHECK:   |     ^ note: protocol requires initializer 'init(from:)' with type 'Decodable'
 // CHECK: 3 | }
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:47:14
-// CHECK: 46 | // The line below is indented with tabs, not spaces.
-// CHECK: 47 |       foo(a: 2, b: 1, a: 2)
-// CHECK:    |           ++++++~~~~------
-// CHECK:    |                       ^ error: argument 'a' must precede argument 'b' [remove ', a: 2' and insert 'a: 2, ']
-// CHECK: 48 |
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:14
+// CHECK: [[#LINE-1]] | // The line below is indented with tabs, not spaces.
+// CHECK: [[#LINE]]   |       foo(a: 2, b: 1, a: 2)
+// CHECK:             |           ++++++~~~~------
+// CHECK:             |                       ^ error: argument 'a' must precede argument 'b' [remove ', a: 2' and insert 'a: 2, ']
+// CHECK: [[#LINE+1]] |
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:49:20
-// CHECK: 48 |
-// CHECK: 49 | let 👍👍👍 = {
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:20
+// CHECK: [[#LINE-1]] |
+// CHECK: [[#LINE]]   | let 👍👍👍 = {
 // CHECK:    | --> error: unable to infer complex closure return type; add explicit type to disambiguate [insert ' () -> <#Result#> in ']
-// CHECK: 50 |   let y = 1
+// CHECK: [[#LINE+1]] |   let y = 1
 
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:6:5
-// CHECK: 5 | func foo(a: Int, b: Int) {
-// CHECK: 6 |   a + b
-// CHECK:   |   ~   ~
-// CHECK:   |     ^ warning: result of operator '+' is unused
-// CHECK: 7 | }
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:5
+// CHECK: [[#LINE-1]] | func foo(a: Int, b: Int) {
+// CHECK: [[#LINE]]   |   a + b
+// CHECK:             |   ~   ~
+// CHECK:             |     ^ warning: result of operator '+' is unused
+// CHECK: [[#LINE+1]] | }
 
 // Test snippet truncation.
-// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:13:3
-// CHECK: 12 | func baz() {
-// CHECK: 13 |   bar(a: "hello, world!")
-// CHECK:    |   ^ error: no exact matches in call to global function 'bar'
-// CHECK: 14 | }
+// CHECK: SOURCE_DIR/test/diagnostics/pretty-printed-diagnostics.swift:[[#LINE:]]:3
+// CHECK: [[#LINE-1]] | func baz() {
+// CHECK: [[#LINE]]   |   bar(a: "hello, world!")
+// CHECK:             |   ^ error: no exact matches in call to global function 'bar'
+// CHECK: [[#LINE+1]] | }
 // CHECK:   ...
-// CHECK: 20 |
-// CHECK: 21 | func bar(a: Int) {}
-// CHECK:    |      ^ note: candidate expects value of type 'Int' for parameter #1
-// CHECK: 22 | func bar(a: Float) {}
-// CHECK:    |      ^ note: candidate expects value of type 'Float' for parameter #1
-// CHECK: 23 |
+// CHECK: [[#LINE:]]  |
+// CHECK: [[#LINE+1]] | func bar(a: Int) {}
+// CHECK:             |      ^ note: candidate expects value of type 'Int' for parameter #1
+// CHECK: [[#LINE+2]] | func bar(a: Float) {}
+// CHECK:             |      ^ note: candidate expects value of type 'Float' for parameter #1
+// CHECK: [[#LINE+3]] |
