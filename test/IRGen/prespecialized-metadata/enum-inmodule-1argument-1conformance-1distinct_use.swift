@@ -17,7 +17,9 @@
 // CHECK-SAME: }> <{
 // CHECK-SAME:    i8** getelementptr inbounds (%swift.enum_vwtable, %swift.enum_vwtable* @"$s4main5ValueOySiGWV", i32 0, i32 0),
 // CHECK-SAME:    [[INT]] 513,
-// CHECK-SAME:    %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8, i32, i32, i32 }>* @"$s4main5ValueOMn" to %swift.type_descriptor*),
+// CHECK-SAME:    %swift.type_descriptor* bitcast (
+// CHECK-SAME:      {{.*}}$s4main5ValueOMn{{.*}} to %swift.type_descriptor*
+// CHECK-SAME:    ),
 // CHECK-SAME:    %swift.type* @"$sSiN",
 // CHECK-SAME:    i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$sSi4main1PAAWP", i32 0, i32 0),
 // CHECK-SAME:    i64 3
@@ -92,6 +94,14 @@ doit()
 // CHECK-SAME:     [[INT]] 0 
 // CHECK-SAME:   }
 // CHECK: [[EXIT_NORMAL]]:
-// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[ERASED_TYPE]], i8* [[ERASED_TABLE]], i8* undef, %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8, i32, i32, i32 }>* @"$s4main5ValueOMn" to %swift.type_descriptor*))
+// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
+// CHECK-SAME:     [[INT]] %0, 
+// CHECK-SAME:     i8* [[ERASED_TYPE]], 
+// CHECK-SAME:     i8* [[ERASED_TABLE]], 
+// CHECK-SAME:     i8* undef, 
+// CHECK-SAME:     %swift.type_descriptor* bitcast (
+// CHECK-SAME:       {{.*}}$s4main5ValueOMn{{.*}} to %swift.type_descriptor*
+// CHECK-SAME:     )
+// CHECK-SAME:   )
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

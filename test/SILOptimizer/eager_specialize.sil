@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
 // RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer -sil-deadfuncelim  %s | %FileCheck --check-prefix=CHECK-DEADFUNCELIM %s
-// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s -o %t.sil && %target-swift-frontend -module-name=eager_specialize -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IRGEN %s
+// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s -o %t.sil && %target-swift-frontend -module-name=eager_specialize -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IRGEN --check-prefix=CHECK-IRGEN-%target-cpu %s
 // RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer -sil-inline-generics=true -inline %s | %FileCheck --check-prefix=CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE %s
 
 sil_stage canonical
@@ -727,7 +727,9 @@ bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
 // CHECK-IRGEN-NEXT:   %5 = getelementptr inbounds i8*, i8** %S.valueWitnesses
 // CHECK-IRGEN-NEXT:   %6 = load i8*, i8** %5
 // CHECK-IRGEN-NEXT:   %initializeWithCopy = {{.*}}
-// CHECK-IRGEN-NEXT:   %7 = call {{.*}} %initializeWithCopy
+// CHECK-IRGEN-arm64e-NEXT:   ptrtoint i8** %5 to i64
+// CHECK-IRGEN-arm64e-NEXT:   call i64 @llvm.ptrauth.blend.i64
+// CHECK-IRGEN-NEXT:   call {{.*}} %initializeWithCopy
 // CHECK-IRGEN-NEXT:   ret void
 // CHECK-IRGEN-NEXT: }
 
