@@ -21,7 +21,9 @@
 #include "swift/Basic/LLVM.h"
 
 namespace swift {
+  class FileUnit;
   class SourceManager;
+  class SourceFile;
 
   /// Set up the specified source manager so that diagnostics are captured
   /// instead of being printed.
@@ -34,6 +36,9 @@ namespace swift {
   /// This returns true if there are any mismatches found.
   bool verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
                          bool autoApplyFixes, bool ignoreUnknown);
+
+  bool verifyDependencies(SourceManager &SM, ArrayRef<FileUnit *> SFs);
+  bool verifyDependencies(SourceManager &SM, ArrayRef<SourceFile *> SFs);
 }
 
 #endif
