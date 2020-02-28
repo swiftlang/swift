@@ -1460,6 +1460,55 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
                            Opts, allSymbols);
 }
 
+enum class DeallocatableResources {
+  None,
+  SILModule,
+  SILModuleAndASTContext,
+};
+static DeallocatableResources
+computeDeallocatableResources(const CompilerInvocation &Invocation,
+                              const CompilerInstance &Instance) {
+  // If the stats reporter is installed, we need the ASTContext and SILModule
+  // to live through the entire compilation process.
+  if (Instance.getASTContext().Stats) {
+    return DeallocatableResources::None;
+  }
+
+  // If we're going to dump the API of the module, we cannot tear down
+  // the ASTContext, as that would cause the module to be freed prematurely.
+  if (!Invocation.getFrontendOptions().DumpAPIPath.empty()) {
+    return DeallocatableResources::SILModule;
+  }
+
+  // If there are multiple primary inputs it is too soon to free
+  // the ASTContext, etc.. OTOH, if this compilation generates code for > 1
+  // primary input, then freeing it after processing the last primary is
+  // unlikely to reduce the peak heap size. So, only optimize the
+  // single-primary-case (or WMO).
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.hasMultiplePrimaryInputs()) {
+    return DeallocatableResources::SILModule;
+  }
+
+  return DeallocatableResources::SILModuleAndASTContext;
+}
+
+static void
+freeDeallocatableResourcesIfPossible(const CompilerInvocation &Invocation,
+                                     CompilerInstance &Instance) {
+  switch (computeDeallocatableResources(Invocation, Instance)) {
+  case DeallocatableResources::None:
+    break;
+  case DeallocatableResources::SILModule:
+    Instance.freeSILModule();
+    break;
+  case DeallocatableResources::SILModuleAndASTContext:
+    Instance.freeSILModule();
+    Instance.freeASTContext();
+    break;
+  }
+}
+
 static bool generateCode(const CompilerInvocation &Invocation,
                          CompilerInstance &Instance, StringRef OutputFilename,
                          llvm::Module *IRModule,
@@ -1469,19 +1518,8 @@ static bool generateCode(const CompilerInvocation &Invocation,
   version::Version EffectiveLanguageVersion =
       Instance.getASTContext().LangOpts.EffectiveLanguageVersion;
 
-  if (!Stats) {
-    // Free up some compiler resources now that we have an IRModule.
-    Instance.freeSILModule();
-
-    // If there are multiple primary inputs it is too soon to free
-    // the ASTContext, etc.. OTOH, if this compilation generates code for > 1
-    // primary input, then freeing it after processing the last primary is
-    // unlikely to reduce the peak heap size. So, only optimize the
-    // single-primary-case (or WMO).
-    if (!Invocation.getFrontendOptions()
-             .InputsAndOutputs.hasMultiplePrimaryInputs())
-      Instance.freeASTContext();
-  }
+  // Free up some compiler resources now that we have an IRModule.
+  freeDeallocatableResourcesIfPossible(Invocation, Instance);
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(Invocation.getIRGenOptions(), Instance.getDiags(),
