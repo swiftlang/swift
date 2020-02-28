@@ -995,6 +995,8 @@ public:
 
 IEEESemantics getFPSemantics(BuiltinFloatType *fpType) {
   switch (fpType->getFPKind()) {
+  case BuiltinFloatType::IEEE16:
+    return IEEESemantics(16, 5, 10, false);
   case BuiltinFloatType::IEEE32:
     return IEEESemantics(32, 8, 23, false);
   case BuiltinFloatType::IEEE64:
