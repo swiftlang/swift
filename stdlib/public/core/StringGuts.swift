@@ -324,9 +324,12 @@ public // SPI(corelibs-foundation)
 func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   guard let s = p else { return nil }
   let count = Int(_swift_stdlib_strlen(s))
-  var result = [CChar](repeating: 0, count: count + 1)
-  for i in 0..<count {
-    result[i] = s[i]
+  let result = [CChar](unsafeUninitializedCapacity: count + 1) { buf, initializedCount in
+    for i in 0..<count {
+      buf[i] = s[i]
+    }
+    buf[count] = 0
+    initializedCount = count + 1
   }
   return result
 }
