@@ -1579,9 +1579,6 @@ class TempRValueOptPass : public SILFunctionTransform {
 
 /// The main entry point of the pass.
 void TempRValueOptPass::run() {
-  if (getFunction()->hasOwnership())
-    return;
-
   LLVM_DEBUG(llvm::dbgs() << "Copy Peephole in Func "
                           << getFunction()->getName() << "\n");
 
