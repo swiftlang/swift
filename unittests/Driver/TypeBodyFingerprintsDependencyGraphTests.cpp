@@ -798,8 +798,9 @@ TEST(ModuleDepGraph, UseFingerprints) {
 
   // Because when A1 changes, B1 and not B2 is affected, only jobs1 and job2
   // should be recompiled, except type fingerprints is off!
+  // Include a dependency on A1, to ensure it does not muck things up.
 
-  simulateLoad(graph, &job0, {{NodeKind::nominal, {"A1@1", "A2@2"}}});
+  simulateLoad(graph, &job0, {{NodeKind::nominal, {"A1@1", "A2@2", "A1->"}}});
   simulateLoad(graph, &job1, {{NodeKind::nominal, {"B1", "A1->"}}});
   simulateLoad(graph, &job2, {{NodeKind::nominal, {"C1", "A2->"}}});
   simulateLoad(graph, &job3, {{NodeKind::nominal, {"D1"}}});
