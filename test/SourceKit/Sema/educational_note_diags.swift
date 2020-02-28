@@ -4,7 +4,7 @@ extension (Int, Int) {}
 
 // DESCRIPTIVE:      key.description: "non-nominal type
 // DESCRIPTIVE:      key.educational_note_paths: [
-// DESCRIPTIVE-NEXT:   "/educational/notes/path/prefix/nominal-types.md"
+// DESCRIPTIVE-NEXT:   "/educational/notes/path/prefix{{/|\\\\}}nominal-types.md"
 // DESCRIPTIVE-NEXT: ]
 
 // RUN: %sourcekitd-test -req=sema %s -- %s | %FileCheck %s -check-prefix=DESCRIPTIVE-DISABLED
