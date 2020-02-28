@@ -3756,6 +3756,8 @@ bool PartialApplicationFailure::diagnoseAsError() {
           anchor, ConstraintLocator::ConstructorMember))) {
     kind = anchor->getBase()->isSuperExpr() ? RefKind::SuperInit
                                             : RefKind::SelfInit;
+  } else if (anchor->getBase()->isSuperExpr()) {
+    kind = RefKind::SuperMethod;
   }
 
   auto diagnostic = CompatibilityWarning
