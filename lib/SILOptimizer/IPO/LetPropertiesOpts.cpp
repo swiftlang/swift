@@ -203,8 +203,8 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
     };
 
     // Look for any instructions accessing let properties.
-    if (isa<RefElementAddrInst>(Load) || isa<StructElementAddrInst>(Load)
-        || isa<BeginAccessInst>(Load)) {
+    if (isa<RefElementAddrInst>(Load) || isa<StructElementAddrInst>(Load) ||
+        isa<BeginAccessInst>(Load) || isa<BeginBorrowInst>(Load)) {
       auto proj = cast<SingleValueInstruction>(Load);
 
       // Copy the initializer into the function
@@ -216,7 +216,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
         ++UI;
 
         // A nested begin_access will be mapped as a separate "Load".
-        if (isa<BeginAccessInst>(User))
+        if (isa<BeginAccessInst>(User) || isa<BeginBorrowInst>(User))
           continue;
 
         if (!canReplaceLoadSequence(User))
@@ -372,18 +372,6 @@ bool LetPropertiesOpt::isConstantLetProperty(VarDecl *Property) {
   LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property
                           << "' has no unknown uses\n");
 
-  // Only properties of simple types can be optimized.
-
-  // FIXME: Expansion
-  auto &TL = Module->Types.getTypeLowering(Property->getType(),
-                                           TypeExpansionContext::minimal());
-  if (!TL.isTrivial()) {
-     LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property
-                             << "' is not of trivial type\n");
-    SkipProcessing.insert(Property);
-    return false;
-  }
-
   PotentialConstantLetProperty.insert(Property);
 
   return true;
@@ -412,6 +400,8 @@ LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
            && "Store instruction should store into a proper let property");
     (void) Dest;
     value = SI->getSrc();
+  } else if (auto *copyAddr = dyn_cast<CopyAddrInst>(I)) {
+    value = copyAddr->getSrc();
   }
 
   // Check if it's just a copy from another instance of the struct.
@@ -530,8 +520,9 @@ void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
                           << *Property << "':\n";
              llvm::dbgs() << "The instructions are:\n"; I->dumpInContext());
 
-  if (isa<RefElementAddrInst>(I) || isa<StructElementAddrInst>(I)
-      || isa<BeginAccessInst>(I)) {
+  if (isa<RefElementAddrInst>(I) || isa<StructElementAddrInst>(I) ||
+      isa<BeginAccessInst>(I) || isa<CopyAddrInst>(I) ||
+      isa<BeginBorrowInst>(I)) {
     // Check if there is a store to this property.
     auto projection = cast<SingleValueInstruction>(I);
     for (auto Use : getNonDebugUses(projection)) {
@@ -541,8 +532,17 @@ void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
 
       // Each begin_access is analyzed as a separate property access. Do not
       // consider a begin_access a use of the current projection.
-      if (isa<BeginAccessInst>(User))
+      if (isa<BeginAccessInst>(User) || isa<BeginBorrowInst>(I))
         continue;
+
+      if (auto *copyAddr = dyn_cast<CopyAddrInst>(User)) {
+        if (copyAddr->getSrc() != projection ||
+            !analyzeInitValue(copyAddr, Property)) {
+          SkipProcessing.insert(Property);
+          return;
+        }
+        continue;
+      }
 
       if (auto *SI = dyn_cast<StoreInst>(User)) {
         // There is a store into this property.
@@ -581,9 +581,6 @@ void LetPropertiesOpt::run(SILModuleTransform *T) {
     // optimized, because they may contain access to the let
     // properties.
     bool NonRemovable = !F.shouldOptimize();
-
-    // FIXME: We should be able to handle ownership.
-    NonRemovable &= !F.hasOwnership();
 
     for (auto &BB : F) {
       for (auto &I : BB)
