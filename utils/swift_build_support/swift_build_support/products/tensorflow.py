@@ -60,8 +60,13 @@ class TensorFlowSwiftAPIs(product.Product):
         except OSError:
             pass
 
-        with shell.pushd(self.build_dir):
+        # SWIFT_ENABLE_TENSORFLOW
+        target = ''
+        if host_target.startswith('macosx'):
+            target = '-DCMAKE_Swift_COMPILER_TARGET=x86_64-apple-macosx10.13'
+        # SWIFT_ENABLE_TENSORFLOW END
 
+        with shell.pushd(self.build_dir):
             shell.call([
                 self.toolchain.cmake,
                 '-G', 'Ninja',
@@ -71,8 +76,8 @@ class TensorFlowSwiftAPIs(product.Product):
                 '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
                 '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
                 # SWIFT_ENABLE_TENSORFLOW
+                target,
                 '-D', 'USE_BUNDLED_CTENSORFLOW=YES',
-                # SWIFT_ENABLE_TENSORFLOW END
                 '-D', 'TensorFlow_INCLUDE_DIR={}'.format(tensorflow_source_dir),
                 '-D', 'TensorFlow_LIBRARY={}'.format(
                     os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow',
@@ -80,6 +85,7 @@ class TensorFlowSwiftAPIs(product.Product):
                 '-D', 'CMAKE_Swift_FLAGS={}'.format('-L{}'.format(
                     os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow'))
                 ),
+                # SWIFT_ENABLE_TENSORFLOW END
                 '-B', self.build_dir,
                 '-S', self.source_dir,
             ])
