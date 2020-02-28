@@ -133,7 +133,8 @@ void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
   if (SF.shouldBuildSyntaxTree())
     DelayBodyParsing = false;
 
-  FrontendStatsTracer tracer(SF.getASTContext().Stats, "Parsing");
+  FrontendStatsTracer tracer(SF.getASTContext().Stats,
+                             "Parsing");
   Parser P(BufferID, SF, /*SIL*/ nullptr, PersistentState, STreeCreator,
            DelayBodyParsing);
   PrettyStackTraceParser StackTrace(P);
@@ -152,7 +153,8 @@ void swift::parseSourceFileSIL(SourceFile &SF, SILParserState *sil) {
   auto bufferID = SF.getBufferID();
   assert(bufferID);
 
-  FrontendStatsTracer tracer(SF.getASTContext().Stats, "Parsing SIL");
+  FrontendStatsTracer tracer(SF.getASTContext().Stats,
+                             "Parsing SIL");
   Parser parser(*bufferID, SF, sil->Impl.get(),
                 /*persistentParserState*/ nullptr,
                 /*syntaxTreeCreator*/ nullptr, /*delayBodyParsing*/ false);

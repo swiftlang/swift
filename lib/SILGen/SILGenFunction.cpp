@@ -41,7 +41,8 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
     : SGM(SGM), F(F), silConv(SGM.M), FunctionDC(DC),
       StartOfPostmatter(F.end()), B(*this), OpenedArchetypesTracker(&F),
       CurrentSILLoc(F.getLocation()), Cleanups(*this),
-      StatsTracer(SGM.M.getASTContext().Stats, "SILGen-function", &F) {
+      StatsTracer(SGM.M.getASTContext().Stats,
+                  "SILGen-function", &F) {
   assert(DC && "creating SGF without a DeclContext?");
   B.setInsertionPoint(createBasicBlock());
   B.setCurrentDebugScope(F.getDebugScope());

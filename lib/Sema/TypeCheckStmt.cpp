@@ -408,7 +408,8 @@ public:
   
   template<typename StmtTy>
   bool typeCheckStmt(StmtTy *&S) {
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "typecheck-stmt", S);
+    FrontendStatsTracer StatsTracer(getASTContext().Stats,
+                                    "typecheck-stmt", S);
     PrettyStackTraceStmt trace(getASTContext(), "type-checking", S);
     StmtTy *S2 = cast_or_null<StmtTy>(visit(S));
     if (S2 == nullptr)
