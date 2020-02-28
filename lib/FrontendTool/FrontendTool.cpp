@@ -1468,6 +1468,12 @@ computeDeallocatableResources(const CompilerInvocation &Invocation,
     return DeallocatableResources::SILModule;
   }
 
+  // Verifying incremental dependencies relies on access to the Swift Module's
+  // source files. We can still free the SIL module, though.
+  if (Invocation.getFrontendOptions().VerifyDependencies) {
+    return DeallocatableResources::SILModule;
+  }
+
   // If there are multiple primary inputs it is too soon to free
   // the ASTContext, etc.. OTOH, if this compilation generates code for > 1
   // primary input, then freeing it after processing the last primary is
