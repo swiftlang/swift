@@ -788,6 +788,12 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   return hasUnderscoredNaming();
 }
 
+bool Decl::isStdlibDecl() const {
+  DeclContext *DC = getDeclContext();
+  return DC->isModuleScopeContext() &&
+         DC->getParentModule()->isStdlibModule();
+}
+
 AvailabilityContext Decl::getAvailabilityForLinkage() const {
   auto containingContext =
       AvailabilityInference::annotatedAvailableRange(this, getASTContext());

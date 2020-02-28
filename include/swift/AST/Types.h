@@ -780,6 +780,9 @@ public:
 
   /// Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);
+  
+  /// Check if this is a nominal type defined at the top level of the Swift module
+  bool isStdlibType();
 
   /// If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.
