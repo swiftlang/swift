@@ -1825,6 +1825,8 @@ isInvalidPartialApplication(ConstraintSystem &cs,
   auto baseTy =
       cs.simplifyType(cs.getType(UDE->getBase()))->getWithoutSpecifierType();
 
+  bool problematicSuper = false;
+
   auto isInvalidIfPartiallyApplied = [&]() {
     if (auto *FD = dyn_cast<FuncDecl>(member)) {
       // 'mutating' instance methods cannot be partially applied.
@@ -1835,8 +1837,10 @@ isInvalidPartialApplication(ConstraintSystem &cs,
       // context.
       if (UDE->getBase()->isSuperExpr() &&
           baseTy->is<MetatypeType>() &&
-          !FD->isStatic())
+          !FD->isStatic()) {
+        problematicSuper = true;
         return true;
+      }
     }
 
     // Another unsupported partial application is related
@@ -1848,8 +1852,10 @@ isInvalidPartialApplication(ConstraintSystem &cs,
     // in the body of a constructor.
     if (isa<ConstructorDecl>(member) && !baseTy->is<MetatypeType>()) {
       // Check for a `super.init` delegation...
-      if (UDE->getBase()->isSuperExpr())
+      if (UDE->getBase()->isSuperExpr()) {
+        problematicSuper = true;
         return true;
+      }
 
       // ... and `self.init` delegation. Note that in a static context,
       // `self.init` is just an ordinary partial application; it's OK
@@ -1877,6 +1883,8 @@ isInvalidPartialApplication(ConstraintSystem &cs,
 
   if (auto *call = dyn_cast_or_null<CallExpr>(cs.getParentExpr(UDE))) {
     level += 1;
+    if (dyn_cast_or_null<CallExpr>(cs.getParentExpr(call)))
+      level += problematicSuper ? 0 : 1;
   }
 
   return {true, level};
