@@ -219,3 +219,22 @@ enum CaseStaticAmbiguity {
 
   static func C(_: Int) -> CaseStaticAmbiguity { return .C(true) }
 }
+
+// Case name/static member ambiguity along with implicit optional unwrapping.
+enum HasPayload {
+  case payload(Int, Bool)
+
+  static func payload(_ bool: Bool, int: Int) -> HasPayload {
+    .payload(int, bool)
+  }
+}
+
+class UsesPayload {
+  private var eOpt: HasPayload? = nil
+
+  deinit {
+    if case .payload(_, let x) = eOpt {
+      _ = x
+    }
+  }
+}
