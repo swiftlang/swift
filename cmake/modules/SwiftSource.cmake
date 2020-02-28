@@ -140,6 +140,120 @@ function(add_swift_source_group sources)
     HEADER_FILE_ONLY true)
 endfunction()
 
+# Look up extra flags for a module that matches a regexp.
+function(_add_extra_swift_flags_for_module module_name result_var_name)
+  set(result_list)
+  list(LENGTH SWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS listlen)
+  if (${listlen} GREATER 0)
+    math(EXPR listlen "${listlen}-1")
+    foreach(i RANGE 0 ${listlen} 2)
+      list(GET SWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS ${i} regex)
+      if (module_name MATCHES "${regex}")
+        math(EXPR ip1 "${i}+1")
+        list(GET SWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS ${ip1} flags)
+        list(APPEND result_list ${flags})
+        message(STATUS "Matched '${regex}' to module '${module_name}'. Compiling ${module_name} with special flags: ${flags}")
+      endif()
+    endforeach()
+  endif()
+  list(LENGTH SWIFT_EXPERIMENTAL_EXTRA_NEGATIVE_REGEXP_FLAGS listlen)
+  if (${listlen} GREATER 0)
+    math(EXPR listlen "${listlen}-1")
+    foreach(i RANGE 0 ${listlen} 2)
+      list(GET SWIFT_EXPERIMENTAL_EXTRA_NEGATIVE_REGEXP_FLAGS ${i} regex)
+      if (NOT module_name MATCHES "${regex}")
+        math(EXPR ip1 "${i}+1")
+        list(GET SWIFT_EXPERIMENTAL_EXTRA_NEGATIVE_REGEXP_FLAGS ${ip1} flags)
+        list(APPEND result_list ${flags})
+        message(STATUS "Matched NEGATIVE '${regex}' to module '${module_name}'. Compiling ${module_name} with special flags: ${flags}")
+      endif()
+    endforeach()
+  endif()
+  set("${result_var_name}" ${result_list} PARENT_SCOPE)
+endfunction()
+
+function(_add_variant_swift_compile_flags
+    sdk arch build_type enable_assertions result_var_name)
+  set(result ${${result_var_name}})
+
+  cmake_parse_arguments(
+    VARIANT             # prefix
+    ""                  # options
+    "MACCATALYST_BUILD_FLAVOR"  # single-value args
+    ""                  # multi-value args
+    ${ARGN})
+
+  # On Windows, we don't set SWIFT_SDK_WINDOWS_PATH_ARCH_{ARCH}_PATH, so don't include it.
+  # On Android the sdk is split to two different paths for includes and libs, so these
+  # need to be set manually.
+  if (NOT "${sdk}" STREQUAL "WINDOWS" AND NOT "${sdk}" STREQUAL "ANDROID")
+    list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}")
+  endif()
+
+  is_darwin_based_sdk("${sdk}" IS_DARWIN)
+  if(IS_DARWIN)
+    set(sdk_deployment_version "${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
+    get_target_triple(target target_variant "${sdk}" "${arch}"
+    MACCATALYST_BUILD_FLAVOR "${VARIANT_MACCATALYST_BUILD_FLAVOR}"
+    DEPLOYMENT_VERSION "${sdk_deployment_version}")
+
+    list(APPEND result "-target" "${target}")
+    if(target_variant)
+      list(APPEND result "-target-variant" "${target_variant}")
+    endif()
+  else()
+    list(APPEND result
+        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
+  endif()
+
+  if("${sdk}" STREQUAL "ANDROID")
+    swift_android_include_for_arch(${arch} ${arch}_swift_include)
+    foreach(path IN LISTS ${arch}_swift_include)
+      list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
+    endforeach()
+  elseif("${sdk}" STREQUAL "WASI")
+    list(APPEND result "-Xcc" "-D_WASI_EMULATED_MMAN")
+  endif()
+
+  if(NOT BUILD_STANDALONE)
+    list(APPEND result "-resource-dir" "${SWIFTLIB_DIR}")
+  endif()
+
+  if(IS_DARWIN)
+    # We collate -F with the framework path to avoid unwanted deduplication
+    # of options by target_compile_options -- this way no undesired
+    # side effects are introduced should a new search path be added.
+    list(APPEND result
+      "-F${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/../../../Developer/Library/Frameworks")
+  endif()
+
+  is_build_type_optimized("${build_type}" optimized)
+  if(optimized)
+    list(APPEND result "-O")
+  else()
+    list(APPEND result "-Onone")
+  endif()
+
+  is_build_type_with_debuginfo("${build_type}" debuginfo)
+  if(debuginfo)
+    list(APPEND result "-g")
+  endif()
+
+  if(enable_assertions)
+    list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
+  endif()
+
+  if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+    list(APPEND result "-D" "SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
+  endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+    list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING")
+  endif()
+
+  set("${result_var_name}" "${result}" PARENT_SCOPE)
+endfunction()
+
 # Compile a swift file into an object file (as a library).
 #
 # Usage:

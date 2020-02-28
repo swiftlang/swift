@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend  -O -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -O -emit-sil -primary-file %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LIB %s
 
 // Check that values of static let and global let variables are propagated into their uses
 // and enable further optimizations like constant propagation, simplifications, etc.
@@ -13,11 +14,26 @@ let I = 100
 let J = 200
 let S = "String1"
 
+// CHECK-LIB-LABEL: sil_global [let] @$s25globalopt_let_propagation5VOL_5Sivp : $Int = {
+// CHECK-LIB-NEXT:   integer_literal {{.*}}, 20005
+// CHECK-LIB-NEXT:   struct $Int
+// CHECK-LIB-NEXT: }
+public let VOL_5 = VOL_4 + 1
+public let VOL_4 = VOL_3 + 1
+public let VOL_3 = VOL_2 + 1
+public let VOL_2 = VOL_1 + 1
+public let VOL_1 = VOLUME1 + 1
+
 let VOLUME1 = I * J
 let VOLUME2 = J * 2
 let VOLUME3 = I + 10
 let maxSize = Int.max >> 1
 
+// CHECK-LIB-LABEL: sil_global [let] @$s25globalopt_let_propagation19notUsedInSameModuleSivp : $Int = {
+// CHECK-LIB-NEXT:   integer_literal {{.*}}, 27
+// CHECK-LIB-NEXT:   struct $Int
+// CHECK-LIB-NEXT: }
+public let notUsedInSameModule = 27
 
 struct IntWrapper1 {
   let val: Int

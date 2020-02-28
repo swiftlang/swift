@@ -34,8 +34,8 @@ extension Bar {
 
 // RUN: %sourcekitd-test \
 // RUN:   -req=track-compiles == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=7:11 %t/file1.swift -- %t/file1.swift %t/file2.swift == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=6:11 %t/file2.swift -- %t/file1.swift %t/file2.swift > %t.response
+// RUN:   -req=complete -pos=7:11 %t/file1.swift -- %t/file1.swift %t/file2.swift == \
+// RUN:   -req=complete -pos=6:11 %t/file2.swift -- %t/file1.swift %t/file2.swift > %t.response
 // RUN: %FileCheck --check-prefix=RESULT  %s < %t.response
 // RUN: %FileCheck --check-prefix=TRACE  %s < %t.response
 

@@ -491,6 +491,7 @@ bool SemanticARCOptVisitor::processWorklist() {
       if (isInstructionTriviallyDead(defInst)) {
         deleteAllDebugUses(defInst);
         eraseInstruction(defInst);
+        madeChange = true;
         continue;
       }
     }

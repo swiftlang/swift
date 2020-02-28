@@ -4,6 +4,11 @@
 // RUN: %FileCheck %s < %t.txt
 // RUN: %FileCheck --check-prefix=NEGATIVE %s < %t.txt
 
+// Note: It is a bit confusing but the -debug-only flag means that this info
+// will be printed only in the presence of assertions.
+//
+// REQUIRES: asserts
+
 import Darwin
 import ctypes
 
