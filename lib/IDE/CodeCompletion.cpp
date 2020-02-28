@@ -2379,8 +2379,9 @@ public:
     return SemanticContextKind::OtherModule;
   }
 
-  void addSubscriptCallPattern(const AnyFunctionType *AFT,
-                               const SubscriptDecl *SD) {
+  void addSubscriptCallPattern(
+      const AnyFunctionType *AFT, const SubscriptDecl *SD,
+      const Optional<SemanticContextKind> SemanticContext = None) {
     foundFunction(AFT);
     auto genericSig =
         SD->getInnermostDeclContext()->getGenericSignatureOfContext();
@@ -2390,7 +2391,8 @@ public:
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
-        getSemanticContextKind(SD), expectedTypeContext);
+        SemanticContext ? *SemanticContext : getSemanticContextKind(SD),
+        expectedTypeContext);
     Builder.setAssociatedDecl(SD);
     setClangDeclKeywords(SD, Pairs, Builder);
     if (!HaveLParen)
@@ -2409,8 +2411,9 @@ public:
       addTypeAnnotation(Builder, AFT->getResult());
   }
 
-  void addFunctionCallPattern(const AnyFunctionType *AFT,
-                              const AbstractFunctionDecl *AFD = nullptr) {
+  void addFunctionCallPattern(
+      const AnyFunctionType *AFT, const AbstractFunctionDecl *AFD = nullptr,
+      const Optional<SemanticContextKind> SemanticContext = None) {
     if (AFD) {
       auto genericSig =
           AFD->getInnermostDeclContext()->getGenericSignatureOfContext();
@@ -2426,7 +2429,8 @@ public:
           Sink,
           AFD ? CodeCompletionResult::ResultKind::Declaration
               : CodeCompletionResult::ResultKind::Pattern,
-          getSemanticContextKind(AFD), expectedTypeContext);
+          SemanticContext ? *SemanticContext : getSemanticContextKind(AFD),
+          expectedTypeContext);
       if (AFD) {
         Builder.setAssociatedDecl(AFD);
         setClangDeclKeywords(AFD, Pairs, Builder);
@@ -3216,11 +3220,11 @@ public:
     return true;
   }
 
-  bool tryFunctionCallCompletions(Type ExprType, const ValueDecl *VD) {
+  bool tryFunctionCallCompletions(Type ExprType, const ValueDecl *VD, Optional<SemanticContextKind> SemanticContext = None) {
     ExprType = ExprType->getRValueType();
     if (auto AFT = ExprType->getAs<AnyFunctionType>()) {
       if (auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(VD)) {
-        addFunctionCallPattern(AFT, AFD);
+        addFunctionCallPattern(AFT, AFD, SemanticContext);
       } else {
         addFunctionCallPattern(AFT);
       }
@@ -5354,12 +5358,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       ExprContextInfo ParentContextInfo(CurDeclContext, ParsedExpr);
       Lookup.setExpectedTypes(ParentContextInfo.getPossibleTypes(),
                               ParentContextInfo.isSingleExpressionBody());
-      if (ExprType && ((*ExprType)->is<AnyFunctionType>() ||
-                       (*ExprType)->is<AnyMetatypeType>())) {
-        Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
-      } else {
+      if (!ContextInfo.getPossibleCallees().empty()) {
         for (auto &typeAndDecl : ContextInfo.getPossibleCallees())
-          Lookup.tryFunctionCallCompletions(typeAndDecl.first, typeAndDecl.second);
+          Lookup.tryFunctionCallCompletions(typeAndDecl.Type, typeAndDecl.Decl,
+                                            typeAndDecl.SemanticContext);
+      } else if (ExprType && ((*ExprType)->is<AnyFunctionType>() ||
+                              (*ExprType)->is<AnyMetatypeType>())) {
+        Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
       }
     } else {
       // Add argument labels, then fallthrough to get values.
@@ -5485,12 +5490,14 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         !ContextInfo.getPossibleCallees().empty()) {
       Lookup.setHaveLParen(true);
       for (auto &typeAndDecl : ContextInfo.getPossibleCallees()) {
-        if (auto SD = dyn_cast_or_null<SubscriptDecl>(typeAndDecl.second)) {
-          Lookup.addSubscriptCallPattern(typeAndDecl.first, SD);
+        if (auto SD = dyn_cast_or_null<SubscriptDecl>(typeAndDecl.Decl)) {
+          Lookup.addSubscriptCallPattern(typeAndDecl.Type, SD,
+                                         typeAndDecl.SemanticContext);
         } else {
           Lookup.addFunctionCallPattern(
-              typeAndDecl.first,
-              dyn_cast_or_null<AbstractFunctionDecl>(typeAndDecl.second));
+              typeAndDecl.Type,
+              dyn_cast_or_null<AbstractFunctionDecl>(typeAndDecl.Decl),
+              typeAndDecl.SemanticContext);
         }
       }
       Lookup.setHaveLParen(false);
