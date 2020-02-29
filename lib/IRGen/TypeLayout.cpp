@@ -1270,8 +1270,8 @@ static void emitMemCpy(IRGenFunction &IGF, Address dest, Address src,
   auto byteDestAddr = Builder.CreateBitOrPointerCast(dest.getAddress(), IGM.Int8PtrTy);
   auto byteSrcAddr =
       Builder.CreateBitOrPointerCast(src.getAddress(), IGM.Int8PtrTy);
-  Builder.CreateMemCpy(byteDestAddr, dest.getAlignment().getValue(),
-                       byteSrcAddr, src.getAlignment().getValue(), size);
+  Builder.CreateMemCpy(byteDestAddr, llvm::MaybeAlign(dest.getAlignment()),
+                       byteSrcAddr, llvm::MaybeAlign(src.getAlignment()), size);
 }
 
 llvm::BasicBlock *
