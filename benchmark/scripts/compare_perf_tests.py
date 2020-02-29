@@ -58,6 +58,7 @@ class PerformanceTestSamples(object):
         self.mean = 0.0
         self.S_runtime = 0.0  # For computing running variance
         if samples:
+            self._override_all_samples = None
             self._all_samples = samples
             ascending = sorted(samples)
             self.samples = samples if samples == ascending else ascending
@@ -114,7 +115,8 @@ class PerformanceTestSamples(object):
     @property
     def all_samples(self):
         """List of all samples in original order."""
-        return self._all_samples
+        return (self._all_samples if not self._override_all_samples else
+                self._override_all_samples())
 
     @property
     def min(self):
@@ -282,14 +284,19 @@ class PerformanceTestResult(object):
                 self.independent_runs.append(r.samples)
             else:
                 self.independent_runs = [self.samples, r.samples]
+
             outliers = self.samples.outliers + r.samples.outliers
-            all_samples = self.samples.all_samples + r.samples.all_samples
             self.samples = PerformanceTestSamples(
                 self.name, sorted(self.samples.samples + r.samples.samples))
             sams = self.samples
+
+            def all_samples():
+                return [s for samples in self.independent_runs
+                        for s in samples.all_samples]
+
+            sams._override_all_samples = all_samples
             self.num_samples += r.num_samples
             sams.outliers = outliers
-            sams._all_samples = all_samples
             self.min, self.max, self.median, self.mean, self.sd = \
                 sams.min, sams.max, sams.median, sams.mean, sams.sd
         else:
