@@ -663,26 +663,9 @@ extension Sequence {
 internal func _copySequenceToContiguousArray<
   S: Sequence
 >(_ source: S) -> ContiguousArray<S.Element> {
-  let initialCapacity = source.underestimatedCount
-  var builder =
-    _UnsafePartiallyInitializedContiguousArrayBuffer<S.Element>(
-      initialCapacity: initialCapacity)
-
-  var iterator = source.makeIterator()
-
-  // FIXME(performance): use _copyContents(initializing:).
-
-  // Add elements up to the initial capacity without checking for regrowth.
-  for _ in 0..<initialCapacity {
-    builder.addWithExistingCapacity(iterator.next()!)
-  }
-
-  // Add remaining elements, if any.
-  while let element = iterator.next() {
-    builder.add(element)
-  }
-
-  return builder.finish()
+  var result = ContiguousArray<S.Element>()
+  result.append(contentsOf: source)
+  return ContiguousArray(result)
 }
 
 extension Collection {

@@ -832,6 +832,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   ///   `newElements`, over many calls to `append(contentsOf:)` on the same
   ///   array.
   @inlinable
+  @inline(never)
   @_semantics("array.append_contentsOf")
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
@@ -858,25 +859,8 @@ extension ContiguousArray: RangeReplaceableCollection {
       _buffer.count += writtenCount
     }
 
-    if writtenUpTo == buf.endIndex {
-      // there may be elements that didn't fit in the existing buffer,
-      // append them in slow sequence-only mode
-      var newCount = _getCount()
-      var nextItem = remainder.next()
-      while nextItem != nil {
-        reserveCapacityForAppend(newElementsCount: 1)
-
-        let currentCapacity = _getCapacity()
-        let base = _buffer.firstElementAddress
-
-        // fill while there is another item and spare capacity
-        while let next = nextItem, newCount < currentCapacity {
-          (base + newCount).initialize(to: next)
-          newCount += 1
-          nextItem = remainder.next()
-        }
-        _buffer.count = newCount
-      }
+    if _slowPath(writtenUpTo == buf.endIndex) {
+      remainder._bulkAppend(to: &self)
     }
   }
 

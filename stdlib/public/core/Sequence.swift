@@ -1159,6 +1159,54 @@ extension IteratorSequence: IteratorProtocol, Sequence {
   }
 }
 
+extension IteratorProtocol {
+  @inlinable
+  internal mutating func _bulkAppendStackBuffer<C: RangeReplaceableCollection>(
+    to collection: inout C
+  ) where C.Element == Element {
+    var stackBuf: (
+      Element?, Element?, Element?, Element?,
+      Element?, Element?, Element?, Element?,
+      Element?, Element?, Element?, Element?,
+      Element?, Element?, Element?, Element?
+    ) = (
+      nil, nil, nil, nil,
+      nil, nil, nil, nil,
+      nil, nil, nil, nil,
+      nil, nil, nil, nil
+    ) //16
+    Swift.withUnsafeBytes(of: &stackBuf) {
+      let ptr = UnsafeMutablePointer(mutating:
+        $0.baseAddress._unsafelyUnwrappedUnchecked
+          .assumingMemoryBound(to: Element?.self)
+      )
+      let buffer = UnsafeMutableBufferPointer(start: ptr, count: 16)
+      var stackBufCount = 0
+      repeat {
+        while let element = next(), stackBufCount < 16 {
+          buffer[stackBufCount] = element
+          stackBufCount += 1
+        }
+        collection.append(contentsOf: buffer.lazy.compactMap { $0 })
+      } while stackBufCount > 0
+    }
+  }
+  
+  @inlinable
+  internal mutating func _bulkAppend<C: RangeReplaceableCollection>(
+    to collection: inout C
+  ) where C.Element == Element {
+    let elementSize = MemoryLayout<Element>.stride
+    if _fastPath(elementSize <= 16) {
+      _bulkAppendStackBuffer(to: &collection)
+    } else {
+      while let element = next() {
+        collection.append(element)
+      }
+    }
+  }
+}
+
 /* FIXME: ideally for compatability we would declare
 extension Sequence {
   @available(swift, deprecated: 5, message: "")
