@@ -47,7 +47,9 @@ public:
 
   virtual bool finishProcessing() override;
 
-  void flush(bool includeTrailingBreak = false);
+  void flush(bool includeTrailingBreak);
+
+  virtual void flush() override { flush(false); }
 
   void forceColors() {
     ForceColors = true;

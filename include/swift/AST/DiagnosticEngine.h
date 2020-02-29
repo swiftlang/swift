@@ -705,6 +705,11 @@ namespace swift {
       return state.getShowDiagnosticsAfterFatalError();
     }
 
+    void flushConsumers() {
+      for (auto consumer : Consumers)
+        consumer->flush();
+    }
+
     /// Whether to skip emitting warnings
     void setSuppressWarnings(bool val) { state.setSuppressWarnings(val); }
     bool getSuppressWarnings() const {

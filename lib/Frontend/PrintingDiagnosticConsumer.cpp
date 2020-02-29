@@ -513,7 +513,7 @@ namespace {
       Out.resetColor();
 
       // Print one extra line at the top for context.
-      if (AnnotatedLines.front().getLineNumber() > 0)
+      if (AnnotatedLines.front().getLineNumber() > 1)
         printNumberedLine(SM, BufferID,
                           AnnotatedLines.front().getLineNumber() - 1,
                           lineNumberIndent, Out);
@@ -704,7 +704,7 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
 
 bool PrintingDiagnosticConsumer::finishProcessing() {
   // If there's an in-flight snippet, flush it.
-  flush();
+  flush(false);
   return false;
 }
 
@@ -831,6 +831,9 @@ PrintingDiagnosticConsumer::~PrintingDiagnosticConsumer() = default;
 std::string SourceManager::getLineString(unsigned BufferID,
                                          unsigned LineNumber) {
   SourceLoc Loc = getLocForLineCol(BufferID, LineNumber, 1);
+  if (Loc.isInvalid())
+    return "";
+
   auto CurMB = LLVMSourceMgr.getMemoryBuffer(findBufferContainingLoc(Loc));
   const char *LineStart = Loc.Value.getPointer();
   const char *BufStart = CurMB->getBufferStart();
