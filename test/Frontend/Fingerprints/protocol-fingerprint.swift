@@ -1,5 +1,5 @@
 
-// Test per-type-body fingerprints
+// Test per-type-body fingerprints: the protocol case.
 //
 
 // =============================================================================
@@ -10,7 +10,7 @@
 
 
 // RUN: %empty-directory(%t)
-// RUN: cp %S/Inputs/type-fingerprint/* %t
+// RUN: cp %S/Inputs/protocol-fingerprint/* %t
 // RUN: cp %t/definesAB{-before,}.swift
 
 // Seeing weird failure on CI, so set the mod times
@@ -47,7 +47,7 @@
 // Establish status quo
 
 // RUN: %empty-directory(%t)
-// RUN: cp %S/Inputs/type-fingerprint/* %t
+// RUN: cp %S/Inputs/protocol-fingerprint/* %t
 // RUN: cp %t/definesAB{-before,}.swift
 
 // Seeing weird failure on CI, so set the mod times
