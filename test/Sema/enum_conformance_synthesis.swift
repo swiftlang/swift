@@ -336,9 +336,13 @@ func pit(_ a: Angel, against b: Angel) -> Bool {
   return a < b
 }
 
-// enums with non-conforming payloads don’t get synthesized Comparable 
-enum Notice: Comparable { // expected-error{{type 'Notice' does not conform to protocol 'Comparable'}}
-  case taylor((Int, Int)), taylornation(Int) // expected-note {{'taylor' declared here}} // expected-note {{'taylor' declared here}}
+// This used to test that `case taylor((Int, Int))` prevented synthesis of
+// Comparable for this enum, but now that tuples are Comparable rework this to
+// test if this enum can synthesize conformance with tuple cases.
+enum Notice: Comparable {
+  // Added (Double, Double) to silence single tuple in associated case warning.
+  case taylor((Int, Int), (Double, Double))
+  case taylornation(Int)
 }
 
 // neither do enums with raw values 

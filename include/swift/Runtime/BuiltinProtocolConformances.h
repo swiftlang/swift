@@ -20,11 +20,26 @@ namespace swift {
 
 // public protocol Equatable {}
 #define SWIFT_EQUATABLE_MANGLING SQ
+// public protocol Comparable {}
+#define SWIFT_COMPARABLE_MANGLING SL
 
 #define PROTOCOL_DESCRIPTOR_MANGLING Mp
 
 #define PROTOCOL_DESCRIPTOR_SYM(Proto) \
           MANGLE_SYM(MANGLING_CONCAT2(Proto, PROTOCOL_DESCRIPTOR_MANGLING))
+
+// MachO requires a leading underscore for symbols
+#if defined(__MACH__)
+#define SYMBOL(name) "_" name
+#else
+#define SYMBOL(name) name
+#endif
+
+#define TUPLE_EQUATABLE_CONF SYMBOL("_swift_tupleEquatable_conf")
+#define TUPLE_EQUATABLE_WT SYMBOL("_swift_tupleEquatable_wt")
+
+#define TUPLE_COMPARABLE_CONF SYMBOL("_swift_tupleComparable_conf")
+#define TUPLE_COMPARABLE_WT SYMBOL("_swift_tupleComparable_wt")
 
 template<unsigned int NumWitnesses>
 struct _WitnessTable {
@@ -32,8 +47,15 @@ struct _WitnessTable {
   const void *Witnesses[NumWitnesses];
 };
 
-/// The builtin protocol conformance witness table for (A...) : Swift.Equatable
-// in Swift.
+template<unsigned int NumWitnessTables, unsigned int NumWitnesses>
+struct _DependentWitnessTable {
+  const ProtocolConformanceDescriptor *Conformance;
+  const WitnessTable *WitnessTables[NumWitnessTables];
+  const void *Witnesses[NumWitnesses];
+};
+
+/// The builtin protocol conformance witness table for (A...): Swift.Equatable
+/// in Swift.
 SWIFT_RUNTIME_EXPORT
 const _WitnessTable<1> _swift_tupleEquatable_wt;
 
@@ -44,13 +66,18 @@ bool _swift_tupleEquatable_equals(OpaqueValue *tuple1, OpaqueValue *tuple2,
                                   SWIFT_CONTEXT Metadata *swiftSelf,
                                   Metadata *Self, void *witnessTable);
 
-// MachO requires a leading underscore for symbols.
-#if defined(__MACH__)
-#define TUPLE_EQUATABLE_CONF "__swift_tupleEquatable_conf"
-#define TUPLE_EQUATABLE_WT "__swift_tupleEquatable_wt"
-#else
-#define TUPLE_EQUATABLE_CONF "_swift_tupleEquatable_conf"
-#define TUPLE_EQUATABLE_WT "_swift_tupleEquatable_wt"
-#endif
+
+/// The builtin protocol conformance witness table for (A...): Swift.Comparable
+/// in Swift.
+SWIFT_RUNTIME_EXPORT
+const _DependentWitnessTable<1, 4> _swift_tupleComparable_wt;
+
+/// The protocol witness for static Swift.Comparable.< infix(A, A) -> Swift.Bool
+/// in conformance (A...): Swift.Comparable in Swift.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+bool _swift_tupleComparable_lessThan(OpaqueValue *tuple1, OpaqueValue *tuple2,
+                                     SWIFT_CONTEXT Metadata *swiftSelf,
+                                     Metadata *Self, void *witnessTable);
+
 
 } // end namespace swift

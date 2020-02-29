@@ -865,20 +865,24 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     return ProtocolConformanceRef(protocol);
 
   // Tuples have builtin conformances implemented within the runtime.
-  // These conformances so far consist of Equatable.
   if (auto tuple = type->getAs<TupleType>()) {
-    if (protocol == ctx.getProtocol(KnownProtocolKind::Equatable)) {
-      // Ensure that every element in this tuple conforms to Equatable.
-      for (auto eltTy : tuple->getElementTypes()) {
-        auto conformance = lookupConformance(eltTy, protocol);
+    // They only conform to Equatable and Comparable right now.
+    auto equatable = ctx.getProtocol(KnownProtocolKind::Equatable);
+    auto comparable = ctx.getProtocol(KnownProtocolKind::Comparable);
 
-        if (conformance.isInvalid())
-          return ProtocolConformanceRef::forInvalid();
-      }
+    if (protocol != equatable && protocol != comparable)
+      return ProtocolConformanceRef::forInvalid();
 
-      auto conformance = ctx.getBuiltinConformance(tuple, protocol);
-      return ProtocolConformanceRef(conformance);
+    // Ensure that every element in this tuple conforms to Equatable.
+    for (auto eltTy : tuple->getElementTypes()) {
+      auto conformance = lookupConformance(eltTy, protocol);
+
+      if (conformance.isInvalid())
+        return ProtocolConformanceRef::forInvalid();
     }
+
+    auto conformance = ctx.getBuiltinConformance(tuple, protocol);
+    return ProtocolConformanceRef(conformance);
   }
 
   auto nominal = type->getAnyNominal();
