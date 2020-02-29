@@ -402,7 +402,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
 
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueOpt();
-  
+
   // Strip ownership from non-transparent functions.
   if (P.getOptions().StripOwnershipAfterSerialization)
     P.addNonTransparentFunctionOwnershipModelEliminator();
