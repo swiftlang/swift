@@ -1880,3 +1880,18 @@ open class OpenPropertyWrapperWithPublicInit {
   
   open var wrappedValue: String = "Hello, world"
 }
+
+// SR-11654
+
+struct SR_11654_S {}
+
+class SR_11654_C {
+  @Foo var property: SR_11654_S?
+}
+
+func sr_11654_generic_func<T>(_ argument: T?) -> T? {
+  return argument
+}
+
+let sr_11654_c = SR_11654_C()
+_ = sr_11654_generic_func(sr_11654_c.property) // Okay

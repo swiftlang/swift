@@ -45,6 +45,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "iOS",
   "Linux",
   "FreeBSD",
+  "OpenBSD",
   "Windows",
   "Android",
   "PS4",
@@ -257,6 +258,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   case llvm::Triple::FreeBSD:
     addPlatformConditionValue(PlatformConditionKind::OS, "FreeBSD");
+    break;
+  case llvm::Triple::OpenBSD:
+    addPlatformConditionValue(PlatformConditionKind::OS, "OpenBSD");
     break;
   case llvm::Triple::Win32:
     if (Target.getEnvironment() == llvm::Triple::Cygnus)

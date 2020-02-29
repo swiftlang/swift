@@ -174,6 +174,16 @@ public:
   ~Cygwin() = default;
 };
 
+class LLVM_LIBRARY_VISIBILITY OpenBSD : public GenericUnix {
+protected:
+  std::string getDefaultLinker() const override;
+
+public:
+  OpenBSD(const Driver &D, const llvm::Triple &Triple)
+      : GenericUnix(D, Triple) {}
+  ~OpenBSD() = default;
+};
+
 } // end namespace toolchains
 } // end namespace driver
 } // end namespace swift

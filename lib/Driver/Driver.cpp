@@ -267,6 +267,8 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
     return std::make_unique<toolchains::GenericUnix>(*this, target);
   case llvm::Triple::FreeBSD:
     return std::make_unique<toolchains::GenericUnix>(*this, target);
+  case llvm::Triple::OpenBSD:
+    return std::make_unique<toolchains::OpenBSD>(*this, target);
   case llvm::Triple::Win32:
     if (target.isWindowsCygwinEnvironment())
       return std::make_unique<toolchains::Cygwin>(*this, target);

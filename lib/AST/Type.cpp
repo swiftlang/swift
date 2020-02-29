@@ -751,6 +751,15 @@ bool TypeBase::isExistentialWithError() {
   return layout.isExistentialWithError(getASTContext());
 }
 
+bool TypeBase::isStdlibType() {
+  if (auto *NTD = getAnyNominal()) {
+    auto *DC = NTD->getDeclContext();
+    return DC->isModuleScopeContext() &&
+           DC->getParentModule()->isStdlibModule();
+  }
+  return false;
+}
+
 /// Remove argument labels from the function type.
 Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   // If there is nothing to remove, don't.
