@@ -113,7 +113,7 @@ extension ${Self}: CustomDebugStringConvertible {
   public var debugDescription: String {
 % if bits == 16:
     // TODO: replace with real _float16ToString implementation
-    var (buffer, length) = _float32ToString(Float(self), debug: false)
+    var (buffer, length) = _float32ToString(Float(self), debug: true)
 % else:
     var (buffer, length) = _float${bits}ToString(self, debug: true)
 % end
