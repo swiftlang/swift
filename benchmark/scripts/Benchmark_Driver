@@ -34,6 +34,7 @@ import re
 import subprocess
 import sys
 import time
+from functools import reduce
 
 from compare_perf_tests import LogParser
 
@@ -65,7 +66,7 @@ class BenchmarkDriver(object):
 
     def _invoke(self, cmd):
         return self._subprocess.check_output(
-            cmd, stderr=self._subprocess.STDOUT)
+            cmd, stderr=self._subprocess.STDOUT, universal_newlines=True)
 
     @property
     def test_harness(self):
@@ -144,7 +145,7 @@ class BenchmarkDriver(object):
             verbose, measure_memory, quantile, gather_metadata)
         output = self._invoke(cmd)
         results = self.parser.results_from_string(output)
-        return results.items()[0][1] if test else results
+        return list(results.items())[0][1] if test else results
 
     def _cmd_run(self, test, num_samples, num_iters, sample_time, min_samples,
                  verbose, measure_memory, quantile, gather_metadata):
@@ -219,9 +220,9 @@ class BenchmarkDriver(object):
             print(format(values))
 
         def result_values(r):
-            return map(str, [r.test_num, r.name, r.num_samples, r.min,
-                             r.samples.q1, r.median, r.samples.q3, r.max,
-                             r.max_rss])
+            return [str(value) for value in
+                    [r.test_num, r.name, r.num_samples, r.min,
+                     r.samples.q1, r.median, r.samples.q3, r.max, r.max_rss]]
 
         header = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'Q1(μs)', 'MEDIAN(μs)',
                   'Q3(μs)', 'MAX(μs)', 'MAX_RSS(B)']
@@ -303,7 +304,11 @@ class MarkdownReportHandler(logging.StreamHandler):
         msg = self.format(record)
         stream = self.stream
         try:
-            if (isinstance(msg, unicode) and
+            unicode_type = unicode  # Python 2
+        except NameError:
+            unicode_type = str  # Python 3
+        try:
+            if (isinstance(msg, unicode_type) and
                     getattr(stream, 'encoding', None)):
                 stream.write(msg.encode(stream.encoding))
             else:
@@ -415,10 +420,10 @@ class BenchmarkDoctor(object):
         setup, ratio = BenchmarkDoctor._setup_overhead(measurements)
         setup = 0 if ratio < 0.05 else setup
         runtime = min(
-            [(result.samples.min - correction) for i_series in
-             [BenchmarkDoctor._select(measurements, num_iters=i)
-              for correction in [(setup / i) for i in [1, 2]]
-              ] for result in i_series])
+            [(result.samples.min - correction) for correction, i_series in
+             [(correction, BenchmarkDoctor._select(measurements, num_iters=i))
+              for i, correction in [(i, setup // i) for i in [1, 2]]]
+             for result in i_series])
 
         threshold = 1000
         if threshold < runtime:
@@ -473,7 +478,7 @@ class BenchmarkDoctor(object):
 
     @staticmethod
     def _reasonable_setup_time(measurements):
-        setup = min([result.setup
+        setup = min([result.setup or 0
                      for result in BenchmarkDoctor._select(measurements)])
         if 200000 < setup:  # 200 ms
             BenchmarkDoctor.log_runtime.error(
@@ -537,7 +542,7 @@ class BenchmarkDoctor(object):
 
         def capped(s):
             return min(s, 200)
-        run_args = [(capped(num_samples), 1), (capped(num_samples / 2), 2)]
+        run_args = [(capped(num_samples), 1), (capped(num_samples // 2), 2)]
         opts = self.driver.args.optimization
         opts = opts if isinstance(opts, list) else [opts]
         self.log.debug(
@@ -691,6 +696,7 @@ def parse_args(args):
     subparsers = parser.add_subparsers(
         title='Swift benchmark driver commands',
         help='See COMMAND -h for additional arguments', metavar='COMMAND')
+    subparsers.required = True
 
     shared_benchmarks_parser = argparse.ArgumentParser(add_help=False)
     benchmarks_group = shared_benchmarks_parser.add_mutually_exclusive_group()

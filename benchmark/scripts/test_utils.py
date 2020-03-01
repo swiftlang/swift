@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # ===--- test_utils.py ---------------------------------------------------===//
@@ -24,8 +24,20 @@ common unit testing patterns that is used in this project.
 
 import logging
 import sys
-from StringIO import StringIO
+
+# Cross-version compatibility layer
+try:
+    from StringIO import StringIO  # for Python 2
+except ImportError:
+    from io import StringIO  # for Python 3
 from contextlib import contextmanager
+
+if sys.version_info < (3, 4):  # imp.load_source is deprecated in Python 3.4
+    from imp import load_source
+else:
+    def load_source(name, path):
+        from importlib.machinery import SourceFileLoader
+        return SourceFileLoader(name, path).load_module()
 
 
 @contextmanager

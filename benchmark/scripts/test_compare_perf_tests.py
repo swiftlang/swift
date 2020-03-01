@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # ===--- test_compare_perf_tests.py --------------------------------------===//
@@ -377,8 +377,7 @@ class TestPerformanceTestResult(unittest.TestCase):
 1,AngryPhonebook,1,12325,12325,12325,0,12325,10510336
 1,AngryPhonebook,1,11616,11616,11616,0,11616,10502144
 1,AngryPhonebook,1,12270,12270,12270,0,12270,10498048""".split('\n')[1:]
-        results = map(PerformanceTestResult,
-                      [line.split(',') for line in tests])
+        results = [PerformanceTestResult(line.split(',')) for line in tests]
 
         def as_tuple(r):
             return (r.num_samples, r.min, r.max, round(r.mean, 2),
@@ -524,17 +523,13 @@ class OldAndNewLog(unittest.TestCase):
 
     old_results = dict([(r.name, r)
                         for r in
-                        map(PerformanceTestResult,
-                            [line.split(',')
-                             for line in
-                             old_log_content.splitlines()])])
+                        [PerformanceTestResult(line.split(','))
+                         for line in old_log_content.splitlines()]])
 
     new_results = dict([(r.name, r)
                         for r in
-                        map(PerformanceTestResult,
-                            [line.split(',')
-                             for line in
-                             new_log_content.splitlines()])])
+                        [PerformanceTestResult(line.split(','))
+                         for line in new_log_content.splitlines()]])
 
     old_results['D'] = PerformanceTestResult(
         '184,D,200,648,4,1,5,9,5,3,45,40,3,1,,,,1,1,,4,4,4,268'.split(','),
@@ -721,7 +716,7 @@ Totals,2"""
         concatenated_logs = """4,ArrayAppend,20,23641,29000,24990,0,24990
 4,ArrayAppend,1,20000,20000,20000,0,20000"""
         results = LogParser.results_from_string(concatenated_logs)
-        self.assertEqual(results.keys(), ['ArrayAppend'])
+        self.assertEqual(list(results.keys()), ['ArrayAppend'])
         result = results['ArrayAppend']
         self.assertTrue(isinstance(result, PerformanceTestResult))
         self.assertEqual(result.min, 20000)
@@ -743,7 +738,7 @@ Totals,2"""
     Sample 3,364245
 3,Array2D,4,363094,376131,368159,5931,369169"""
         results = LogParser.results_from_string(concatenated_logs)
-        self.assertEqual(results.keys(), ['Array2D'])
+        self.assertEqual(list(results.keys()), ['Array2D'])
         result = results['Array2D']
         self.assertTrue(isinstance(result, PerformanceTestResult))
         self.assertEqual(result.min, 350815)
@@ -1135,8 +1130,12 @@ class Test_compare_perf_tests_main(OldAndNewLog, FileSystemIntegration):
         report_out = out.getvalue()
 
         if test_output:
-            with open(report_file, 'r') as f:
-                report = f.read()
+            if sys.version_info < (3, 0):
+                with open(report_file, 'r') as f:
+                    report = f.read()
+            else:
+                with open(report_file, 'r', encoding='utf-8') as f:
+                    report = f.read()
             # because print adds newline, add one here, too:
             report_file = str(report + '\n')
         else:

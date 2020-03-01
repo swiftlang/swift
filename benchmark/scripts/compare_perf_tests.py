@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # ===--- compare_perf_tests.py -------------------------------------------===//
@@ -33,6 +33,7 @@ import re
 import sys
 from bisect import bisect_left, bisect_right
 from collections import namedtuple
+from functools import reduce
 from math import ceil, sqrt
 
 
@@ -164,13 +165,14 @@ class PerformanceTestSamples(object):
                 sqrt(self.S_runtime / (self.count - 1)))
 
     @staticmethod
-    def running_mean_variance((k, M_, S_), x):
+    def running_mean_variance(stats, x):
         """Compute running variance, B. P. Welford's method.
 
         See Knuth TAOCP vol 2, 3rd edition, page 232, or
         https://www.johndcook.com/blog/standard_deviation/
         M is mean, Standard Deviation is defined as sqrt(S/k-1)
         """
+        (k, M_, S_) = stats
         k = float(k + 1)
         M = M_ + (x - M_) / k
         S = S_ + (x - M_) * (x - M)
@@ -662,7 +664,7 @@ class ReportFormatter(object):
         def max_widths(maximum, widths):
             return map(max, zip(maximum, widths))
 
-        return reduce(max_widths, widths, [0] * 4)
+        return list(reduce(max_widths, widths, [0] * 4))
 
     def _formatted_text(self, label_formatter, ventile_formatter,
                         COLUMN_SEPARATOR, DELIMITER_ROW, SEPARATOR, SECTION):
@@ -679,7 +681,8 @@ class ReportFormatter(object):
 
         def header(title, column_labels):
             labels = (column_labels if not self.single_table else
-                      map(label_formatter, (title, ) + column_labels[1:]))
+                      [label_formatter(c)
+                       for c in (title, ) + column_labels[1:]])
             h = (('' if not self.header_printed else SEPARATOR) +
                  row(labels) +
                  (row(DELIMITER_ROW) if not self.header_printed else ''))
@@ -852,8 +855,12 @@ def main():
     print(report)
 
     if args.output:
-        with open(args.output, 'w') as f:
-            f.write(report)
+        if sys.version_info < (3, 0):
+            with open(args.output, 'w') as f:
+                f.write(report)
+        else:
+            with open(args.output, 'w', encoding='utf-8') as f:
+                f.write(report)
 
 
 if __name__ == '__main__':

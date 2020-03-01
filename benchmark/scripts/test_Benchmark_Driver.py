@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # ===--- test_Benchmark_Driver.py ----------------------------------------===//
@@ -17,12 +17,11 @@ import logging
 import os
 import time
 import unittest
-from StringIO import StringIO
-from imp import load_source
 
 from compare_perf_tests import PerformanceTestResult
 
 from test_utils import Mock, MockLoggingHandler, Stub, captured_output
+from test_utils import StringIO, load_source
 
 # import Benchmark_Driver  # doesn't work because it misses '.py' extension
 Benchmark_Driver = load_source(
@@ -45,7 +44,7 @@ class Test_parse_args(unittest.TestCase):
     def test_requires_command_argument(self):
         with captured_output() as (_, err):
             self.assertRaises(SystemExit, parse_args, [])
-        self.assert_contains(['usage:', 'COMMAND', 'too few arguments'],
+        self.assert_contains(['usage:', 'COMMAND', 'error:', 'arguments'],
                              err.getvalue())
 
     def test_command_help_lists_commands(self):
@@ -150,7 +149,7 @@ class SubprocessMock(Mock):
         super(SubprocessMock, self).__init__(responses)
 
         def _check_output(args, stdin=None, stdout=None, stderr=None,
-                          shell=False):
+                          shell=False, universal_newlines=False):
             return self.record_and_respond(args, stdin, stdout, stderr, shell)
         self.check_output = _check_output
 
@@ -387,7 +386,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         def assert_log_written(out, log_file, content):
             self.assertEqual(out.getvalue(),
                              'Logging results to: ' + log_file + '\n')
-            with open(log_file, 'rU') as f:
+            with open(log_file, 'r') as f:
                 text = f.read()
             self.assertEqual(text, "formatted output")
 
