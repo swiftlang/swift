@@ -866,11 +866,14 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
 
   // Tuples have builtin conformances implemented within the runtime.
   if (auto tuple = type->getAs<TupleType>()) {
-    // They only conform to Equatable and Comparable right now.
+    // They only conform to Equatable, Comparable, and Hashable right now.
     auto equatable = ctx.getProtocol(KnownProtocolKind::Equatable);
     auto comparable = ctx.getProtocol(KnownProtocolKind::Comparable);
+    auto hashable = ctx.getProtocol(KnownProtocolKind::Hashable);
 
-    if (protocol != equatable && protocol != comparable)
+    if (protocol != equatable &&
+        protocol != comparable &&
+        protocol != hashable)
       return ProtocolConformanceRef::forInvalid();
 
     // Ensure that every element in this tuple conforms to Equatable.

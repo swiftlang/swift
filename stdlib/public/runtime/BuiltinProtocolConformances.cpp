@@ -271,3 +271,131 @@ bool swift::_swift_tupleComparable_lessThan(OpaqueValue *tuple1,
   // each other.
   return false;
 }
+
+//===----------------------------------------------------------------------===//
+// Tuple Hashable Conformance
+//===----------------------------------------------------------------------===//
+
+extern const ProtocolDescriptor
+PROTOCOL_DESCRIPTOR_SYM(SWIFT_HASHABLE_MANGLING);
+
+#if defined(__ELF__)
+// Create a GOT equivalent for the Hashable reference.
+__asm(
+  "  .type got.$sSHMp, @object\n"
+  "  .section .data.rel.ro\n"
+  "  .p2align 3\n"
+  "got.$sSHMp:\n"
+  "  .quad ($sSHMp)\n"
+  "  .size got.$sSHMp, 8\n"
+);
+#endif
+
+// Define the conformance descriptor for tuple Hashable. We do this in
+// assembly to work around relative reference issues.
+__asm(
+  #if defined(__ELF__)
+  "  .protected " TUPLE_HASHABLE_CONF "\n"
+  "  .type " TUPLE_HASHABLE_CONF ", @object\n"
+  "  .section .rodata\n"
+  #elif defined(__MACH__)
+  "  .section __TEXT,__const\n"
+  #endif
+  "  .globl " TUPLE_HASHABLE_CONF "\n"
+  "  .p2align 2\n"
+  TUPLE_HASHABLE_CONF ":\n"
+  #if defined(__ELF__)
+  // This is an indirectable relative reference to the GOT equivalent for the
+  // Hashable protocol descriptor, hence why we add 1 to indicate indirect.
+  "  .long (got.$sSHMp - (" TUPLE_HASHABLE_CONF ")) + 1\n"
+  #elif defined(__MACH__)
+  "  .long _$sSHMp@GOTPCREL + 5\n"
+  #endif
+  // 769 is the MetadataKind::Tuple
+  "  .long 769\n"
+  // This is a direct relative reference to the witness table defined below.
+  "  .long ((" TUPLE_HASHABLE_WT ") - (" TUPLE_HASHABLE_CONF ")) - 8\n"
+  // 32 are the ConformanceFlags with the type reference bit set to MetadataKind.
+  "  .long 32\n"
+  #if defined(__ELF__)
+  "  .size " TUPLE_HASHABLE_CONF ", 16\n"
+  #endif
+);
+
+extern const ProtocolConformanceDescriptor _swift_tupleHashable_conf;
+
+// Swift._hashValue<A where A: Swift.Hashable>(for: A) -> Swift.Int
+#define SWIFT_HASHVALUE_FUNC $ss10_hashValue3forSix_tSHRzlF
+// (extension in Swift):
+// Swift.Hashable._rawHashValue(
+//   seed: Swift.Int
+// ) -> Swift.Int
+#define SWIFT_HASHABLE_RAWHASHVALUE_DEFAULT_IMPL \
+        $sSHsE13_rawHashValue4seedS2i_tF
+// Swift.Hasher.combine<A where A: Swift.Hashable>(A) -> ()
+#define SWIFT_HASHER_COMBINE_FUNC $ss6HasherV7combineyyxSHRzlF
+
+// These are all function values that we reinterpret in the witness table.
+extern void *SWIFT_HASHVALUE_FUNC;
+extern void *SWIFT_HASHABLE_RAWHASHVALUE_DEFAULT_IMPL;
+extern void *SWIFT_HASHER_COMBINE_FUNC;
+
+SWIFT_RUNTIME_EXPORT
+const _DependentWitnessTable<1, 3> swift::_swift_tupleHashable_wt = {
+  &_swift_tupleHashable_conf,
+  {
+    reinterpret_cast<const WitnessTable *>(&_swift_tupleEquatable_wt)
+  },
+  {
+    reinterpret_cast<void *>(_swift_tupleHashable_hashValue),
+    reinterpret_cast<void *>(_swift_tupleHashable_hash),
+    reinterpret_cast<void *>(&SWIFT_HASHABLE_RAWHASHVALUE_DEFAULT_IMPL)
+  }
+};
+
+using HashValueFn = SWIFT_CC(swift) intptr_t(OpaqueValue *value, Metadata *Self,
+                                             void *witnessTable);
+using HasherCombineFn = SWIFT_CC(swift) void(OpaqueValue *value,
+                                             const Metadata *Self,
+                                             const WitnessTable *witnessTable,
+                                             SWIFT_CONTEXT OpaqueValue *hasher);
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+intptr_t swift::_swift_tupleHashable_hashValue(SWIFT_CONTEXT OpaqueValue *tuple,
+                                               Metadata *Self,
+                                               void *witnessTable) {
+  auto _hashValue = reinterpret_cast<HashValueFn *>(&SWIFT_HASHVALUE_FUNC);
+  return _hashValue(tuple, Self, witnessTable);
+}
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+void swift::_swift_tupleHashable_hash(OpaqueValue *hasher,
+                                      SWIFT_CONTEXT OpaqueValue *tuple,
+                                      Metadata *Self, void *witnessTable) {
+  auto tupleTy = cast<TupleTypeMetadata>(Self);
+
+  // Loop through all elements, and hash them into the Hasher.
+  for (size_t i = 0; i != tupleTy->NumElements; i += 1) {
+    auto elt = tupleTy->getElement(i);
+
+    // Ensure we actually have a conformance to Hashable for this element type.
+    auto hashable = &PROTOCOL_DESCRIPTOR_SYM(SWIFT_HASHABLE_MANGLING);
+    auto hashableConformance = swift_conformsToProtocol(elt.Type, hashable);
+
+    // If we don't have a conformance then something somewhere messed up in
+    // deciding that this tuple type was Hashable...??
+    if (!hashableConformance)
+      fatalError(0, "tuple element must be Hashable when hashing a tuple.");
+
+    // Get the element value from the tuple.
+    auto value = reinterpret_cast<OpaqueValue *>(
+                    reinterpret_cast<char *>(tuple) + elt.Offset);
+
+    auto hasherCombine
+        = reinterpret_cast<HasherCombineFn *>(&SWIFT_HASHER_COMBINE_FUNC);
+
+    // Call the combine function on the hasher for this element value and we're
+    // done!
+    hasherCombine(value, elt.Type, hashableConformance, hasher);
+  }
+}

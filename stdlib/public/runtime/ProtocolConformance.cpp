@@ -493,6 +493,9 @@ PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
 extern const ProtocolDescriptor
 PROTOCOL_DESCRIPTOR_SYM(SWIFT_COMPARABLE_MANGLING);
 
+extern const ProtocolDescriptor
+PROTOCOL_DESCRIPTOR_SYM(SWIFT_HASHABLE_MANGLING);
+
 static bool tupleConformsToProtocol(const Metadata *type,
                                     const ProtocolDescriptor *protocol) {
   auto tuple = cast<TupleTypeMetadata>(type);
@@ -501,7 +504,10 @@ static bool tupleConformsToProtocol(const Metadata *type,
   // reject all other protocols.
   auto equatable = &PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
   auto comparable = &PROTOCOL_DESCRIPTOR_SYM(SWIFT_COMPARABLE_MANGLING);
-  if (protocol != equatable && protocol != comparable)
+  auto hashable = &PROTOCOL_DESCRIPTOR_SYM(SWIFT_HASHABLE_MANGLING);
+  if (protocol != equatable &&
+      protocol != comparable &&
+      protocol != hashable)
     return false;
 
   for (size_t i = 0; i != tuple->NumElements; i += 1) {
@@ -515,6 +521,7 @@ static bool tupleConformsToProtocol(const Metadata *type,
 
 extern const ProtocolConformanceDescriptor _swift_tupleEquatable_conf;
 extern const ProtocolConformanceDescriptor _swift_tupleComparable_conf;
+extern const ProtocolConformanceDescriptor _swift_tupleHashable_conf;
 
 static const ProtocolConformanceDescriptor *getTupleConformanceDescriptor(
                                            const ProtocolDescriptor *protocol) {
@@ -526,6 +533,11 @@ static const ProtocolConformanceDescriptor *getTupleConformanceDescriptor(
   if (protocol == &PROTOCOL_DESCRIPTOR_SYM(SWIFT_COMPARABLE_MANGLING)) {
     return reinterpret_cast<const ProtocolConformanceDescriptor *>(
               &_swift_tupleComparable_conf);
+  }
+
+  if (protocol == &PROTOCOL_DESCRIPTOR_SYM(SWIFT_HASHABLE_MANGLING)) {
+    return reinterpret_cast<const ProtocolConformanceDescriptor *>(
+              &_swift_tupleHashable_conf);
   }
 
   return nullptr;

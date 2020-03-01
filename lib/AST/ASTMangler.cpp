@@ -201,11 +201,14 @@ std::string ASTMangler::mangleWitnessTable(const RootProtocolConformance *C) {
       auto &ctx = C->getType()->getASTContext();
       auto equatable = ctx.getProtocol(KnownProtocolKind::Equatable);
       auto comparable = ctx.getProtocol(KnownProtocolKind::Comparable);
+      auto hashable = ctx.getProtocol(KnownProtocolKind::Hashable);
 
       if (C->getProtocol() == equatable) {
         return "_swift_tupleEquatable_wt";
       } else if (C->getProtocol() == comparable) {
         return "_swift_tupleComparable_wt";
+      } else if (C->getProtocol() == hashable) {
+        return "_swift_tupleHashable_wt";
       } else {
         llvm_unreachable("mangling unknown tuple witness table protocol");
       }

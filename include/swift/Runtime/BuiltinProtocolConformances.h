@@ -22,6 +22,8 @@ namespace swift {
 #define SWIFT_EQUATABLE_MANGLING SQ
 // public protocol Comparable {}
 #define SWIFT_COMPARABLE_MANGLING SL
+// public protocol Hashable {}
+#define SWIFT_HASHABLE_MANGLING SH
 
 #define PROTOCOL_DESCRIPTOR_MANGLING Mp
 
@@ -40,6 +42,9 @@ namespace swift {
 
 #define TUPLE_COMPARABLE_CONF SYMBOL("_swift_tupleComparable_conf")
 #define TUPLE_COMPARABLE_WT SYMBOL("_swift_tupleComparable_wt")
+
+#define TUPLE_HASHABLE_CONF SYMBOL("_swift_tupleHashable_conf")
+#define TUPLE_HASHABLE_WT SYMBOL("_swift_tupleHashable_wt")
 
 template<unsigned int NumWitnesses>
 struct _WitnessTable {
@@ -79,5 +84,22 @@ bool _swift_tupleComparable_lessThan(OpaqueValue *tuple1, OpaqueValue *tuple2,
                                      SWIFT_CONTEXT Metadata *swiftSelf,
                                      Metadata *Self, void *witnessTable);
 
+/// The builtin protocol conformance witness table for (A...): Swift.Hashable
+/// in Swift.
+SWIFT_RUNTIME_EXPORT
+const _DependentWitnessTable<1, 3> _swift_tupleHashable_wt;
+
+/// The protocol witness for Swift.Hashable.hashValue.getter: Swift.Int in
+// conformance (A...): Swift.Hashable in Swift.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+intptr_t _swift_tupleHashable_hashValue(SWIFT_CONTEXT OpaqueValue *tuple,
+                                        Metadata *Self, void *witnessTable);
+
+/// The protocol witness for static Swift.Hashable.hash(into:) in conformance
+/// (A...): Swift.Hashable in Swift.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+void _swift_tupleHashable_hash(OpaqueValue *hasher,
+                               SWIFT_CONTEXT OpaqueValue *tuple,
+                               Metadata *Self, void *witnessTable);
 
 } // end namespace swift
