@@ -4517,13 +4517,13 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
                       bool &hadError) {
 
   // Record the curly braces but nothing inside.
-  if (IDC->areDependenciesUsingTokenHashesForTypeBodies()) {
+  if (IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()) {
     recordTokenHash("{");
     recordTokenHash("}");
   }
   llvm::MD5 tokenHashForThisDeclList;
   llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(
-      CurrentTokenHash, IDC->areDependenciesUsingTokenHashesForTypeBodies()
+      CurrentTokenHash, IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()
                             ? &tokenHashForThisDeclList
                             : CurrentTokenHash);
 
