@@ -814,7 +814,7 @@ public:
   /// available.
   Optional<std::string> getBodyFingerprint() const;
 
-  bool areDependenciesUsingTokenHashesForTypeBodies() const;
+  bool areTokensHashedForThisBodyInsteadOfInterfaceHash() const;
 
 private:
   /// Add a member to the list for iteration purposes, but do not notify the

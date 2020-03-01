@@ -721,8 +721,7 @@ FrontendSourceFileDepGraphFactory::getInterfaceHash(SourceFile *SF) {
   return interfaceHash.str().str();
 }
 
-/// At present, only nominals, protocols, and extensions have (body)
-/// fingerprints
+/// At present, only \c NominalTypeDecls have (body) fingerprints
 Optional<std::string> FrontendSourceFileDepGraphFactory::getFingerprintIfAny(
     std::pair<const NominalTypeDecl *, const ValueDecl *>) {
   return None;
