@@ -941,6 +941,14 @@ class TestReportFormatter(OldAndNewLog):
                 <td align='left'>10458</td>
                 <td align='left'>+0.0%</td>
                 <td align='left'><font color='black'>1.00x</font></td>
+        </tr>""",
+            """
+        <tr>
+                <td align='left'>ArrayAppend</td>
+                <td align='left'>23641</td>
+                <td align='left'>20000</td>
+                <td align='left'>-15.4%</td>
+                <td align='left'><font color='green'>1.18x (?)</font></td>
         </tr>"""
         ])
 

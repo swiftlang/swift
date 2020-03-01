@@ -329,24 +329,24 @@ class ResultComparison(object):
     It computes speedup ratio and improvement delta (%).
     """
 
-    def __init__(self, old, new):
+    def __init__(self, old_result, new_result):
         """Initialize with old and new `PerformanceTestResult`s to compare."""
-        self.old = old
-        self.new = new
-        assert old.name == new.name
-        self.name = old.name  # Test name, convenience accessor
+        self.old = old_result
+        self.new = new_result
+        assert old_result.name == new_result.name
+        self.name = old_result.name  # Test name, convenience accessor
 
-        # Speedup ratio
-        self.ratio = (old.min + 0.001) / (new.min + 0.001)
+        # Location estimates + "epsilon" to prevent division by 0
+        old = old_result.min + 0.001
+        new = new_result.min + 0.001
 
-        # Test runtime improvement in %
-        ratio = (new.min + 0.001) / (old.min + 0.001)
-        self.delta = ((ratio - 1) * 100)
+        self.ratio = old / new  # Speedup ratio
+        self.delta = ((new / old) - 1) * 100  # Test runtime improvement in %
 
-        # Indication of dubious changes: when result's MIN falls inside the
-        # (MIN, MAX) interval of result they are being compared with.
-        self.is_dubious = ((old.min < new.min and new.min < old.max) or
-                           (new.min < old.min and old.min < new.max))
+        # Indication of dubious changes: when results' ranges overlap
+        o_min, o_max, n_min, n_max = \
+            self.old.min, self.old.max, self.new.min, self.new.max
+        self.is_dubious = (o_min <= n_max and n_min <= o_max)
 
 
 class LogParser(object):
@@ -695,11 +695,16 @@ class ReportFormatter(object):
             return (r if not is_strong else
                     r[:-1] + (bold_first(r[-1]), ))
 
-        def table(title, results, is_strong=False, is_open=False):
+        def table(title, results, is_strong=False, is_open=False,
+                  mark_dubious=True):
             if not results:
                 return ''
+
+            def dubious(r):
+                return ventile_formatter(r) if mark_dubious else ''
+
             rows = [row(format_columns(
-                ReportFormatter.values(r, ventile_formatter), is_strong))
+                ReportFormatter.values(r, dubious), is_strong))
                 for r in results]
             table = (header(title if self.single_table else '',
                             ReportFormatter.header_for(results[0])) +
@@ -712,7 +717,8 @@ class ReportFormatter(object):
             table('Regression', self.comparator.decreased, True, True),
             table('Improvement', self.comparator.increased, True),
             ('' if self.changes_only else
-             table('No Changes', self.comparator.unchanged)),
+             table('No Changes', self.comparator.unchanged,
+                   mark_dubious=False)),
             table('Added', self.comparator.added, is_open=True),
             table('Removed', self.comparator.removed, is_open=True)
         ])
@@ -771,9 +777,12 @@ class ReportFormatter(object):
         def header(contents):
             return self.HTML_HEADER_ROW.format(* contents)
 
-        def table(title, results, speedup_color):
+        def table(title, results, speedup_color, mark_dubious=True):
+            def dubious(r):
+                return ' (?)' if mark_dubious else ''
+
             rows = [
-                row(*(ReportFormatter.values(r) + (speedup_color,)))
+                row(*(ReportFormatter.values(r, dubious) + (speedup_color,)))
                 for r in results
             ]
             return ('' if not rows else
@@ -786,7 +795,8 @@ class ReportFormatter(object):
                 table('Regression', self.comparator.decreased, 'red'),
                 table('Improvement', self.comparator.increased, 'green'),
                 ('' if self.changes_only else
-                 table('No Changes', self.comparator.unchanged, 'black')),
+                 table('No Changes', self.comparator.unchanged, 'black',
+                       mark_dubious=False)),
                 table('Added', self.comparator.added, ''),
                 table('Removed', self.comparator.removed, '')
             ]))
