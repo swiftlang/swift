@@ -554,134 +554,24 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDeclsOfAGivenType(
 // MARK: FrontendSourceFileDepGraphFactory - adding collections of used Decls
 //==============================================================================
 
-namespace {
-/// Extracts uses out of a SourceFile
-class UsedDeclEnumerator {
-  SourceFile *SF;
-  const DependencyTracker &depTracker;
-  StringRef swiftDeps;
-
-  /// Cache these for efficiency
-  const DependencyKey sourceFileInterface;
-  const DependencyKey sourceFileImplementation;
-
-  const bool includeIntrafileDeps;
-
-  function_ref<void(const DependencyKey &, const DependencyKey &)> createDefUse;
-
-public:
-  UsedDeclEnumerator(
-      SourceFile *SF, const DependencyTracker &depTracker, StringRef swiftDeps,
-      bool includeIntrafileDeps,
-      function_ref<void(const DependencyKey &, const DependencyKey &)>
-          createDefUse)
-      : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps),
-        sourceFileInterface(DependencyKey::createKeyForWholeSourceFile(
-            DeclAspect::interface, swiftDeps)),
-        sourceFileImplementation(DependencyKey::createKeyForWholeSourceFile(
-            DeclAspect::implementation, swiftDeps)),
-        includeIntrafileDeps(includeIntrafileDeps), createDefUse(createDefUse) {
-  }
-
-public:
-  void enumerateAllUses() {
-    enumerateSimpleUses<NodeKind::topLevel>(
-        SF->getReferencedNameTracker()->getTopLevelNames());
-    enumerateSimpleUses<NodeKind::dynamicLookup>(
-        SF->getReferencedNameTracker()->getDynamicLookupNames());
-    enumerateExternalUses();
-    enumerateCompoundUses();
-  }
-
-private:
-  void enumerateUse(NodeKind kind, StringRef context, StringRef name,
-                    bool isCascadingUse) {
-    // Assume that what is depended-upon is the interface
-    createDefUse(DependencyKey(kind, DeclAspect::interface, context.str(), name.str()),
-                 isCascadingUse ? sourceFileInterface
-                                : sourceFileImplementation);
-  }
-  template <NodeKind kind>
-  void enumerateSimpleUses(llvm::DenseMap<DeclBaseName, bool> cascadesByName) {
-    for (const auto &p : cascadesByName)
-      enumerateUse(kind, "", p.getFirst().userFacingName(), p.getSecond());
-  }
-
-  void enumerateCompoundUses() {
-    enumerateNominalUses(std::move(computeHoldersOfCascadingMembers()));
-    enumerateMemberUses();
-  }
-
-  std::unordered_set<std::string> computeHoldersOfCascadingMembers() {
-    std::unordered_set<std::string> holdersOfCascadingMembers;
-    for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
-      {
-        bool isPrivate = p.getFirst().first->isPrivateToEnclosingFile();
-        if (isPrivate && !includeIntrafileDeps)
-          continue;
-      }
-      std::string context =
-          DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
-              p.getFirst().first);
-      bool isCascading = p.getSecond();
-      if (isCascading)
-        holdersOfCascadingMembers.insert(context);
-    }
-    return holdersOfCascadingMembers;
-  }
-
-  void enumerateNominalUses(
-      const std::unordered_set<std::string> &&holdersOfCascadingMembers) {
-    for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
-      {
-        bool isPrivate = p.getFirst().first->isPrivateToEnclosingFile();
-        if (isPrivate && !includeIntrafileDeps)
-          continue;
-      }
-      const NominalTypeDecl *nominal = p.getFirst().first;
-
-      std::string context =
-          DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
-              nominal);
-      const bool isCascadingUse = holdersOfCascadingMembers.count(context) != 0;
-      enumerateUse(NodeKind::nominal, context, "", isCascadingUse);
-    }
-  }
-
-  void enumerateMemberUses() {
-    for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
-      const NominalTypeDecl *nominal = p.getFirst().first;
-      const auto rawName = p.getFirst().second;
-      const bool isPotentialMember = rawName.empty();
-      const bool isCascadingUse = p.getSecond();
-      if (isPotentialMember) {
-        std::string context = DependencyKey::computeContextForProvidedEntity<
-            NodeKind::potentialMember>(nominal);
-        enumerateUse(NodeKind::potentialMember, context, "", isCascadingUse);
-      } else {
-        std::string context =
-            DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
-                nominal);
-        std::string name = rawName.userFacingName();
-        enumerateUse(NodeKind::member, context, name, isCascadingUse);
-      }
-    }
-  }
-
-  void enumerateExternalUses() {
-    // external dependencies always cascade
-    for (StringRef s : depTracker.getDependencies())
-      enumerateUse(NodeKind::externalDepend, "", s, true);
-  }
-};
-} // end namespace
-
 void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
-  UsedDeclEnumerator(SF, depTracker, swiftDeps, includePrivateDeps,
-                     [&](const DependencyKey &def, const DependencyKey &use) {
-                       addAUsedDecl(def, use);
-                     })
-      .enumerateAllUses();
+  const DependencyKey sourceFileInterface =
+      DependencyKey::createKeyForWholeSourceFile(DeclAspect::interface,
+                                                 swiftDeps);
+
+  const DependencyKey sourceFileImplementation =
+      DependencyKey::createKeyForWholeSourceFile(DeclAspect::implementation,
+                                                 swiftDeps);
+
+  SF->getReferencedNameTracker()->enumerateAllUses(
+      includePrivateDeps, depTracker,
+      [&](const fine_grained_dependencies::NodeKind kind, StringRef context,
+          StringRef name, const bool isCascadingUse) {
+        addAUsedDecl(DependencyKey(kind, DeclAspect::interface, context.str(),
+                                   name.str()),
+                     isCascadingUse ? sourceFileInterface
+                                    : sourceFileImplementation);
+      });
 }
 
 //==============================================================================
