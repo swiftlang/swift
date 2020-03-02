@@ -545,13 +545,24 @@ private:
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const BorrowScopeIntroducingValue &value);
 
-/// Look up through the def-use chain of \p inputValue, recording any "borrow"
-/// introducing values that we find into \p out. If at any point, we find a
-/// point in the chain we do not understand, we bail and return false. If we are
-/// able to understand all of the def-use graph, we know that we have found all
-/// of the borrow introducing values, we return true.
-bool getUnderlyingBorrowIntroducingValues(
-    SILValue inputValue, SmallVectorImpl<BorrowScopeIntroducingValue> &out);
+/// Look up the def-use graph starting at use \p inputOperand, recording any
+/// "borrow" introducing values that we find into \p out. If at any point, we
+/// find a point in the chain we do not understand, we bail and return false. If
+/// we are able to understand all of the def-use graph, we know that we have
+/// found all of the borrow introducing values, we return true.
+///
+/// NOTE: This may return multiple borrow introducing values in cases where
+/// there are phi-like nodes in the IR like any true phi block arguments or
+/// aggregate literal instructions (struct, tuple, enum, etc.).
+bool getAllBorrowIntroducingValues(
+    SILValue value, SmallVectorImpl<BorrowScopeIntroducingValue> &out);
+
+/// Look up the def-use graph starting at \p inputOperand and see if
+/// we can find a single BorrowScopeIntroducingValue for \p
+/// inputOperand. Returns None if there are multiple such introducers
+/// or if while processing we find a user we do not understand.
+Optional<BorrowScopeIntroducingValue>
+getSingleBorrowIntroducingValue(SILValue value);
 
 } // namespace swift
 
