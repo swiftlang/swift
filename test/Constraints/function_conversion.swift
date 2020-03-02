@@ -63,3 +63,8 @@ noEscapeParam = escapingParam // expected-error {{converting non-escaping value 
 
 escapingParam = takesAny
 noEscapeParam = takesAny // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
+
+// rdar://problem/59773317 - Improve type error message when returning (or escaping) a function-typed value as an optional of that type
+func rdar_59773317(x: () -> Int) -> (() -> Int)? { // expected-note {{parameter 'x' is implicitly non-escaping}}
+  return x // expected-error {{using non-escaping parameter 'x' in a context expecting an @escaping closure}}
+}
