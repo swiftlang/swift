@@ -264,7 +264,7 @@ public:
   bool DisableInterfaceFileLock = false;
 
   /// Should we enable the dependency verifier for all primary files known to this frontend?
-  bool VerifyDependencies = false;
+  bool EnableIncrementalDependencyVerifier = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {

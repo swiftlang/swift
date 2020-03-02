@@ -176,7 +176,7 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
-  Opts.VerifyDependencies |= Args.hasArg(OPT_verify_incremental_dependencies);
+  Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames();
