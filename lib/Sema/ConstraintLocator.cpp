@@ -243,6 +243,11 @@ bool ConstraintLocator::isForCoercion() const {
   return anchor && isa<CoerceExpr>(anchor) && getPath().empty();
 }
 
+bool ConstraintLocator::isForOptionalTry() const {
+  auto *anchor = getAnchor();
+  return anchor && isa<OptionalTryExpr>(anchor) && getPath().empty();
+}
+
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter.
   return isForGenericParameter() ?

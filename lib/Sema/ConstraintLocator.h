@@ -371,6 +371,9 @@ public:
   /// Determine whether this locator points to the coercion expression.
   bool isForCoercion() const;
 
+  /// Determine whether this locator points to the `try?` expression.
+  bool isForOptionalTry() const;
+
   /// Attempts to cast the first path element of the locator to a specific
   /// \c LocatorPathElt subclass, returning \c None if either unsuccessful or
   /// the locator has no path elements.
