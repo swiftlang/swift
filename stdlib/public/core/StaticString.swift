@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,11 +19,53 @@
 
 /// A string type designed to represent text that is known at compile time.
 ///
-/// Instances of the `StaticString` type are immutable. `StaticString` provides
-/// limited, pointer-based access to its contents, unlike Swift's more
-/// commonly used `String` type. A static string can store its value as a
-/// pointer to an ASCII code unit sequence, as a pointer to a UTF-8 code unit
-/// sequence, or as a single Unicode scalar value.
+/// Instances of the `StaticString` type are immutable.
+///
+/// `StaticString` provides only low-level access to its contents, unlike
+/// Swift's more commonly used `String` type. A static string can use
+/// either of the following as its storage:
+///
+/// * a pointer to a null-terminated sequence of UTF-8 code units:
+///
+///       let emoji: StaticString = "\u{1F600}"
+///       emoji.hasPointerRepresentation  //-> true
+///       emoji.isASCII                   //-> false
+///       emoji.unicodeScalar             //-> Fatal error!
+///       emoji.utf8CodeUnitCount         //-> 4
+///       emoji.utf8Start[0]              //-> 0xF0
+///       emoji.utf8Start[1]              //-> 0x9F
+///       emoji.utf8Start[2]              //-> 0x98
+///       emoji.utf8Start[3]              //-> 0x80
+///       emoji.utf8Start[4]              //-> 0x00
+///
+/// * a single Unicode scalar value, under very limited circumstances:
+///
+///       struct MyStaticScalar: ExpressibleByUnicodeScalarLiteral {
+///           typealias UnicodeScalarLiteralType = StaticString
+///           let value: StaticString
+///           init(unicodeScalarLiteral value: StaticString) {
+///               self.value = value
+///           }
+///       }
+///
+///       let emoji: StaticString = MyStaticScalar("\u{1F600}").value
+///       emoji.hasPointerRepresentation  //-> false
+///       emoji.isASCII                   //-> false
+///       emoji.unicodeScalar.value       //-> 0x1F600
+///       emoji.utf8CodeUnitCount         //-> Fatal error!
+///       emoji.utf8Start                 //-> Fatal error!
+///
+/// You can use the `withUTF8Buffer(_:)` method to access a static string's
+/// contents, regardless of which representation the static string uses.
+///
+///     emoji.withUTF8Buffer { utf8 in
+///         utf8.count  //-> 4
+///         utf8[0]     //-> 0xF0
+///         utf8[1]     //-> 0x9F
+///         utf8[2]     //-> 0x98
+///         utf8[3]     //-> 0x80
+///         utf8[4]     //-> Fatal error!
+///     }
 @frozen
 public struct StaticString
   : _ExpressibleByBuiltinUnicodeScalarLiteral,
@@ -42,7 +84,7 @@ public struct StaticString
   internal var _startPtrOrData: Builtin.Word
 
   /// If `_startPtrOrData` is a pointer, contains the length of the UTF-8 data
-  /// in bytes.
+  /// in bytes (excluding the null terminator).
   @usableFromInline
   internal var _utf8CodeUnitCount: Builtin.Word
 
@@ -51,16 +93,15 @@ public struct StaticString
   /// - bit 0: set to 0 if `_startPtrOrData` is a pointer, or to 1 if it is a
   ///   Unicode scalar.
   ///
-  /// - bit 1: set to 1 if `_startPtrOrData` is a pointer and string data is
-  ///   ASCII.
+  /// - bit 1: set to 1 if `_startPtrOrData` either points to an ASCII code unit
+  ///   sequence, or stores an ASCII scalar value.
   @usableFromInline
   internal var _flags: Builtin.Int8
 
-  /// A pointer to the beginning of the string's UTF-8 encoded representation.
+  /// A pointer to a null-terminated sequence of UTF-8 code units.
   ///
-  /// The static string must store a pointer to either ASCII or UTF-8 code
-  /// units. Accessing this property when `hasPointerRepresentation` is
-  /// `false` triggers a runtime error.
+  /// - Important: Accessing this property when `hasPointerRepresentation` is
+  ///   `false` triggers a runtime error.
   @_transparent
   public var utf8Start: UnsafePointer<UInt8> {
     _precondition(
@@ -69,11 +110,10 @@ public struct StaticString
     return UnsafePointer(bitPattern: UInt(_startPtrOrData))!
   }
 
-  /// The stored Unicode scalar value.
+  /// A single Unicode scalar value.
   ///
-  /// The static string must store a single Unicode scalar value. Accessing
-  /// this property when `hasPointerRepresentation` is `true` triggers a
-  /// runtime error.
+  /// - Important: Accessing this property when `hasPointerRepresentation` is
+  ///   `true` triggers a runtime error.
   @_transparent
   public var unicodeScalar: Unicode.Scalar {
     _precondition(
@@ -82,10 +122,10 @@ public struct StaticString
     return Unicode.Scalar(UInt32(UInt(_startPtrOrData)))!
   }
 
-  /// The length in bytes of the static string's ASCII or UTF-8 representation.
+  /// The number of UTF-8 code units (excluding the null terminator).
   ///
-  /// - Warning: If the static string stores a single Unicode scalar value, the
-  ///   value of `utf8CodeUnitCount` is unspecified.
+  /// - Important: Accessing this property when `hasPointerRepresentation` is
+  ///   `false` triggers a runtime error.
   @_transparent
   public var utf8CodeUnitCount: Int {
     _precondition(
@@ -99,29 +139,25 @@ public struct StaticString
     return Builtin.inttoptr_Word(_startPtrOrData)
   }
 
-  /// A Boolean value indicating whether the static string stores a pointer to
-  /// ASCII or UTF-8 code units.
+  /// A Boolean value that indicates whether the static string stores a
+  /// pointer to a null-terminated sequence of UTF-8 code units.
+  ///
+  /// If `hasPointerRepresentation` is `false`, the static string stores a
+  /// single Unicode scalar value.
   @_transparent
   public var hasPointerRepresentation: Bool {
     return (UInt8(_flags) & 0x1) == 0
   }
 
-  /// A Boolean value that is `true` if the static string stores a pointer to
-  /// ASCII code units.
-  ///
-  /// Use this property in conjunction with `hasPointerRepresentation` to
-  /// determine whether a static string with pointer representation stores an
-  /// ASCII or UTF-8 code unit sequence.
-  ///
-  /// - Warning: If the static string stores a single Unicode scalar value, the
-  ///   value of `isASCII` is unspecified.
+  /// A Boolean value that indicates whether the static string represents only
+  /// ASCII code units (or an ASCII scalar value).
   @_transparent
   public var isASCII: Bool {
     return (UInt8(_flags) & 0x2) != 0
   }
 
   /// Invokes the given closure with a buffer containing the static string's
-  /// UTF-8 code unit sequence.
+  /// UTF-8 code unit sequence (excluding the null terminator).
   ///
   /// This method works regardless of whether the static string stores a
   /// pointer or a single Unicode scalar value.
@@ -132,12 +168,13 @@ public struct StaticString
   /// - Parameter body: A closure that takes a buffer pointer to the static
   ///   string's UTF-8 code unit sequence as its sole argument. If the closure
   ///   has a return value, that value is also used as the return value of the
-  ///   `withUTF8Buffer(invoke:)` method. The pointer argument is valid only
-  ///   for the duration of the method's execution.
+  ///   `withUTF8Buffer(_:)` method. The pointer argument is valid only for the
+  ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure.
   @_transparent
   public func withUTF8Buffer<R>(
-    _ body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
+    _ body: (UnsafeBufferPointer<UInt8>) -> R
+  ) -> R {
     if hasPointerRepresentation {
       return body(UnsafeBufferPointer(
         start: utf8Start, count: utf8CodeUnitCount))
@@ -256,7 +293,7 @@ public struct StaticString
     self = value
   }
 
-  /// A string representation of the static string.
+  /// A textual representation of the static string.
   public var description: String {
     return withUTF8Buffer { String._uncheckedFromUTF8($0) }
   }
