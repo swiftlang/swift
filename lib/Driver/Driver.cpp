@@ -179,8 +179,8 @@ static void validateDebugInfoArgs(DiagnosticEngine &diags,
       diags.diagnose(SourceLoc(), diag::error_invalid_debug_prefix_map, A);
 }
 
-static void validateVerifyIncrementalArgs(DiagnosticEngine &diags,
-                                          const ArgList &args) {
+static void validateVerifyIncrementalDependencyArgs(DiagnosticEngine &diags,
+                                                    const ArgList &args) {
   // No option? No problem!
   if (!args.hasArg(options::OPT_verify_incremental_dependencies)) {
     return;
@@ -257,7 +257,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
   validateCompilationConditionArgs(diags, args);
   validateSearchPathArgs(diags, args);
   validateAutolinkingArgs(diags, args, T);
-  validateVerifyIncrementalArgs(diags, args);
+  validateVerifyIncrementalDependencyArgs(diags, args);
 }
 
 std::unique_ptr<ToolChain>

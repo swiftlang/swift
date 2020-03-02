@@ -15,9 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Parse/Lexer.h"
@@ -40,9 +42,10 @@ namespace {
 /// An expectation contains additional information about the expectation
 /// \c Kind, which matches one of the few kinds of dependency entry that are
 /// currently representable in the dependency graph, and an expectation
-/// \c Flavor which must either be \c private or \c cascading.
+/// \c Scope which must either be \c private or \c cascading.
 ///
-/// The supported set of expectations is given by the following matrix:
+/// As not all combinations of scopes and kinds makes sense, and to ease the addition of further
+/// combinations of the two, the supported set of expectations is given by the following matrix:
 ///
 #define EXPECTATION_MATRIX                                                     \
   MATRIX_ENTRY("expected-no-dependency", None, Negative)                       \
@@ -55,6 +58,15 @@ namespace {
   MATRIX_ENTRY("expected-cascading-member", Cascading, Member)                 \
   MATRIX_ENTRY("expected-private-dynamic-member", Private, DynamicMember)      \
   MATRIX_ENTRY("expected-cascading-dynamic-member", Cascading, DynamicMember)
+///
+/// To add a new supported combination, update \c Expectation::Kind and
+/// \c Expectation::Scope, then define a new \c MATRIX_ENTRY with the following information:
+///
+/// MATRIX_ENTRY(<Expectation-Selector-String>, Expectation::Scope, Expectation::Kind)
+///
+/// Where \c <Expectation-Selector-String> matches the grammar for an expectation. The
+/// verifier's parsing routines use this matrix to automatically keep the parser in harmony with the
+/// internal representation of the expectation.
 struct Expectation {
 public:
   enum class Kind : uint8_t {
@@ -67,9 +79,14 @@ public:
     DynamicMember,
   };
 
-  enum class Flavor : uint8_t {
+  enum class Scope : uint8_t {
+    /// There is no scope information associated with this expectation.
+    ///
+    /// This is currently only true of negative expectations and provides expectations.
     None,
+    /// The dependency does not cascade.
     Private,
+    /// The dependency cascades.
     Cascading,
   };
 
@@ -77,38 +94,46 @@ public:
   const char *ExpectedStart, *ExpectedEnd = nullptr;
 
   /// Additional information about the expectation.
-  std::pair<Expectation::Kind, Expectation::Flavor> Info;
+  struct {
+    Expectation::Kind Kind;
+    Expectation::Scope Scope;
+  } Info;
 
   /// The raw input buffer for the message text, the part in the {{...}}
   StringRef MessageRange;
 
 public:
-  Expectation(const char *ExpectedStart, Expectation::Kind k,
-              Expectation::Flavor f)
-      : ExpectedStart(ExpectedStart), Info{k, f} {}
+  Expectation(const char *estart, const char *eend, Expectation::Kind k,
+              Expectation::Scope f, StringRef r)
+      : ExpectedStart(estart), ExpectedEnd(eend), Info{k, f}, MessageRange(r) {
+        assert(ExpectedStart <= MessageRange.data() &&
+               "Message range appears before expected start!");
+        assert(MessageRange.data()+MessageRange.size() <= ExpectedEnd &&
+               "Message range extends beyond expected end!");
+      }
 
   bool isCascading() const {
-    return Info.second == Expectation::Flavor::Cascading;
+    return Info.Scope == Expectation::Scope::Cascading;
   }
 };
 
 /// An \c Obligation represents a compiler-provided entry in the set of
-/// dependencies for a given source file. Similar to an \c Expectation an \c
-/// Obligation contains a name, information about its kind and flavor, and an
+/// dependencies for a given source file. Similar to an \c Expectation an
+/// \c Obligation contains a name, information about its kind and flavor, and an
 /// extra source location that can be used to guide where diagnostics are
-/// emitted. Unlike an \c Obligation, it provides an extra piece of state that
+/// emitted. Unlike an \c Expectation, it provides an extra piece of state that
 /// represents the obligation's "fulfillment status".
 ///
-/// All \c Obligations begin in the \c Active state. Once an obligation has been
+/// All \c Obligations begin in the \c Owed state. Once an obligation has been
 /// paired with a matching \c Expectation, the obligation may then transition to
 /// either \c Fulfilled if it has been satisfied completely, or \c Failed
 /// otherwise. The verifier turns all unfulfilled obligations into errors.
 struct Obligation {
   /// The state of an \c Obligation
   enum class State : uint8_t {
-    /// The \c Obligation is active and has not been paired with a corresponding
+    /// The \c Obligation is owed and has not been paired with a corresponding
     /// \c Expectation.
-    Active,
+    Owed,
     /// The \c Obligation is fulfilled.
     Fulfilled,
     /// The \c Obligation was matched against an \c Expectation, but that
@@ -119,6 +144,9 @@ struct Obligation {
 
   /// A token returned when an \c Obligation is fulfilled or failed. An \c
   /// Obligation is the only type that may construct fulfillment tokens.
+  ///
+  /// \c FullfillmentToken prevents misuse of the \c Obligation
+  /// structure by requiring its state to be changed along all program paths.
   struct FullfillmentToken {
     friend Obligation;
 
@@ -160,18 +188,7 @@ struct Obligation {
     }
 
     static Key forExpectation(const Expectation &E) {
-      switch (E.Info.first) {
-      case Expectation::Kind::Negative:
-        return Key::forNegative(E.MessageRange);
-      case Expectation::Kind::Provides:
-        return Key::forProvides(E.MessageRange);
-      case Expectation::Kind::Member:
-        return Key::forMember(E.MessageRange);
-      case Expectation::Kind::PotentialMember:
-        return Key::forPotentialMember(E.MessageRange);
-      case Expectation::Kind::DynamicMember:
-        return Key::forDynamicMember(E.MessageRange);
-      }
+      return Key{E.MessageRange, E.Info.Kind};
     }
 
   public:
@@ -195,48 +212,43 @@ struct Obligation {
   };
 
 private:
-  DeclBaseName name;
-  std::pair<Expectation::Kind, Expectation::Flavor> info;
-  SourceLoc contextLoc;
+  StringRef name;
+  std::pair<Expectation::Kind, Expectation::Scope> info;
   State state;
 
 public:
-  Obligation(DeclBaseName name, Expectation::Kind k, Expectation::Flavor f,
-             SourceLoc loc)
-      : name(name), info{k, f}, contextLoc{loc}, state(State::Active) {
+  Obligation(StringRef name, Expectation::Kind k, Expectation::Scope f)
+      : name(name), info{k, f}, state(State::Owed) {
     assert(k != Expectation::Kind::Negative &&
            "Cannot form negative obligation!");
   }
 
   Expectation::Kind getKind() const { return info.first; }
-  DeclBaseName getName() const { return name; }
+  StringRef getName() const { return name; }
   bool getCascades() const {
-    return info.second == Expectation::Flavor::Cascading;
+    return info.second == Expectation::Scope::Cascading;
   }
   StringRef describeCascade() const {
     switch (info.second) {
-    case Expectation::Flavor::None:
+    case Expectation::Scope::None:
       llvm_unreachable("Cannot describe obligation with no cascade info");
-    case Expectation::Flavor::Private:
+    case Expectation::Scope::Private:
       return "non-cascading";
-    case Expectation::Flavor::Cascading:
+    case Expectation::Scope::Cascading:
       return "cascading";
     }
   }
 
 public:
-  SourceLoc getLocation() const { return contextLoc; }
-
-public:
-  bool isActive() const { return state == State::Active; }
+  bool isOwed() const { return state == State::Owed; }
   FullfillmentToken fullfill() {
-    assert(state == State::Active &&
+    assert(state == State::Owed &&
            "Cannot fulfill an obligation more than once!");
     state = State::Fulfilled;
     return FullfillmentToken{};
   }
   FullfillmentToken fail() {
-    assert(state == State::Active &&
+    assert(state == State::Owed &&
            "Cannot fail an obligation more than once!");
     state = State::Failed;
     return FullfillmentToken{};
@@ -248,11 +260,12 @@ public:
 /// in the referenced name trackers associated with that file.
 class DependencyVerifier {
   SourceManager &SM;
+  const DependencyTracker &DT;
   std::vector<llvm::SMDiagnostic> Errors = {};
-  llvm::BumpPtrAllocator StringAllocator;
 
 public:
-  explicit DependencyVerifier(SourceManager &SM) : SM(SM) {}
+  explicit DependencyVerifier(SourceManager &SM, const DependencyTracker &DT)
+      : SM(SM), DT(DT) {}
 
   bool verifyFile(const SourceFile *SF);
 
@@ -263,6 +276,7 @@ public:
   using NegativeExpectationMap = llvm::StringMap<Expectation>;
 
 private:
+  /// These routines return \c true on failure, \c false otherwise.
   bool parseExpectations(const SourceFile *SF,
                          std::vector<Expectation> &Expectations);
   bool constructObligations(const SourceFile *SF, ObligationMap &map);
@@ -279,7 +293,7 @@ private:
 
 private:
   /// Given an \c ObligationMap and an \c Expectation, attempt to identify a
-  /// corresponding active \c Obligation and verify it. If there is a matching
+  /// corresponding owed \c Obligation and verify it. If there is a matching
   /// obligation, the \p fulfill callback is given the obligation. Otherwise \p
   /// fail is called with the unmatched expectation value.
   void matchExpectationOrFail(
@@ -289,32 +303,28 @@ private:
     auto entry = OM.find(Obligation::Key::forExpectation(expectation));
     if (entry == OM.end()) {
       return fail(expectation);
+    } else {
+      fulfill(entry->second);
     }
-
-    fulfill(entry->second);
   }
 
-  /// For each active \c Obligation, call the provided callback with its
+  /// For each owed \c Obligation, call the provided callback with its
   /// relevant name data and the Obligation itself.
   void
-  forEachActiveObligation(ObligationMap &OM,
-                          llvm::function_ref<void(StringRef, Obligation &)> f) {
+  forEachOwedObligation(ObligationMap &OM,
+                        llvm::function_ref<void(StringRef, Obligation &)> f) {
     for (auto &p : OM) {
-      if (p.second.isActive())
+      if (p.second.isOwed())
         f(p.first.Name, p.second);
     }
   }
 
 private:
-  StringRef bumpAllocateData(const char *Data, size_t Length) {
-    char *Ptr = StringAllocator.Allocate<char>(Length + 1);
-    memcpy(Ptr, Data, Length);
-    *(Ptr + Length) = 0;
-    return StringRef(Ptr, Length);
-  }
-
-  StringRef allocateString(StringRef S) {
-    return bumpAllocateData(S.data(), S.size());
+  StringRef copyDemangledTypeName(ASTContext &Ctx, StringRef str) {
+    Demangle::DemangleOptions Opts;
+    Opts.ShowPrivateDiscriminators = false;
+    Opts.DisplayModuleNames = true;
+    return Ctx.AllocateCopy(Demangle::demangleTypeAsString(str, Opts));
   }
 
 private:
@@ -353,8 +363,8 @@ bool DependencyVerifier::parseExpectations(
   }
 
   const auto BufferID = MaybeBufferID.getValue();
-  CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
-  StringRef InputFile = SM.extractText(EntireRange);
+  const CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
+  const StringRef InputFile = SM.extractText(EntireRange);
 
   for (size_t Match = InputFile.find("expected-"); Match != StringRef::npos;
        Match = InputFile.find("expected-", Match + 1)) {
@@ -362,13 +372,13 @@ bool DependencyVerifier::parseExpectations(
     const char *DiagnosticLoc = MatchStart.data();
 
     Expectation::Kind ExpectedKind;
-    Expectation::Flavor ExpectedFlavor;
+    Expectation::Scope ExpectedScope;
     {
-#define MATRIX_ENTRY(STRING, FLAVOR, KIND)                                     \
-  .StartsWith(STRING, [&]() {                                                  \
+#define MATRIX_ENTRY(EXPECTATION_SELECTOR, SCOPE, KIND)                        \
+  .StartsWith(EXPECTATION_SELECTOR, [&]() {                                    \
     ExpectedKind = Expectation::Kind::KIND;                                    \
-    ExpectedFlavor = Expectation::Flavor::FLAVOR;                              \
-    MatchStart = MatchStart.substr(strlen(STRING));                            \
+    ExpectedScope = Expectation::Scope::SCOPE;                                 \
+    MatchStart = MatchStart.substr(strlen(EXPECTATION_SELECTOR));              \
   })
 
       // clang-format off
@@ -382,34 +392,32 @@ bool DependencyVerifier::parseExpectations(
     // Skip any whitespace before the {{.
     MatchStart = MatchStart.substr(MatchStart.find_first_not_of(" \t"));
 
-    size_t TextStartIdx = MatchStart.find("{{");
+    const size_t TextStartIdx = MatchStart.find("{{");
     if (TextStartIdx == StringRef::npos) {
       addError(MatchStart.data(), "expected {{ in expectation");
       continue;
     }
 
-    Expectation Expected(DiagnosticLoc, ExpectedKind, ExpectedFlavor);
-
-    size_t End = MatchStart.find("}}");
+    const size_t End = MatchStart.find("}}");
     if (End == StringRef::npos) {
       addError(MatchStart.data(),
                "didn't find '}}' to match '{{' in expectation");
       continue;
     }
 
-    llvm::SmallString<256> Buf;
-    Expected.MessageRange = MatchStart.slice(2, End);
-
     // Check if the next expectation should be in the same line.
     StringRef AfterEnd = MatchStart.substr(End + strlen("}}"));
     AfterEnd = AfterEnd.substr(AfterEnd.find_first_not_of(" \t"));
-    Expected.ExpectedEnd = AfterEnd.data();
+    const char *ExpectedEnd = AfterEnd.data();
+
 
     // Strip out the trailing whitespace.
-    while (isspace(Expected.ExpectedEnd[-1]))
-      --Expected.ExpectedEnd;
+    while (isspace(ExpectedEnd[-1]))
+      --ExpectedEnd;
 
-    Expectations.push_back(Expected);
+    Expectations.emplace_back(DiagnosticLoc, ExpectedEnd,
+                              ExpectedKind, ExpectedScope,
+                              MatchStart.slice(2, End));
   }
   return false;
 }
@@ -419,57 +427,53 @@ bool DependencyVerifier::constructObligations(const SourceFile *SF,
   auto *tracker = SF->getReferencedNameTracker();
   assert(tracker && "Constructed source file without referenced name tracker!");
 
-  // Top-level names match via unqualified references.
-  for (const auto &p : tracker->getTopLevelNames()) {
-    auto str = p.getFirst().userFacingName();
-    Obligations.insert({Obligation::Key::forProvides(str),
-                        {p.getFirst(), Expectation::Kind::Provides,
-                         Expectation::Flavor::None, SourceLoc()}});
-  }
-
-  // Dynamic member names match via unqualified references.
-  for (const auto &p : tracker->getDynamicLookupNames()) {
-    auto str = p.getFirst().userFacingName();
-    Obligations.insert({Obligation::Key::forDynamicMember(str),
-                        {p.getFirst(), Expectation::Kind::DynamicMember,
-                         p.getSecond() ? Expectation::Flavor::Cascading
-                                       : Expectation::Flavor::Private,
-                         SourceLoc()}});
-  }
-
-  llvm::SmallString<128> Str;
-  llvm::raw_svector_ostream OS(Str);
-
-  PrintOptions Options = PrintOptions::printEverything();
-  Options.FullyQualifiedTypes = true;
-  for (const auto &p : tracker->getUsedMembers()) {
-    Str.clear();
-    StreamPrinter printer{OS};
-
-    auto *nominalDeclContext = p.getFirst().first;
-    nominalDeclContext->getDeclaredType().print(printer, Options);
-
-    // Potential members match via qualified reference to the subject.
-    auto memberName = p.getFirst().second;
-    if (memberName.empty()) {
-      auto key = allocateString(OS.str());
-      Obligations.insert(
-          {Obligation::Key::forPotentialMember(key),
-           {p.getFirst().second, Expectation::Kind::PotentialMember,
-            p.getSecond() ? Expectation::Flavor::Cascading
-                          : Expectation::Flavor::Private,
-            SourceLoc()}});
-    } else {
-      // Member constraints match via fully-qualified name.
-      OS << "." << memberName.userFacingName();
-      auto key = allocateString(OS.str());
-      Obligations.insert({Obligation::Key::forMember(key),
-                          {p.getFirst().second, Expectation::Kind::Member,
-                           p.getSecond() ? Expectation::Flavor::Cascading
-                                         : Expectation::Flavor::Private,
-                           nominalDeclContext->getLoc()}});
-    }
-  }
+  auto &Ctx = SF->getASTContext();
+  tracker->enumerateAllUses(
+      /*includeIntrafileDeps*/ true, DT,
+      [&](const fine_grained_dependencies::NodeKind kind, StringRef context,
+          StringRef name, const bool isCascadingUse) {
+        using NodeKind = fine_grained_dependencies::NodeKind;
+        switch (kind) {
+        case NodeKind::externalDepend:
+          // We only care about the referenced name trackers for now. The set of
+          // external dependencies is often quite a large subset of the SDK.
+          return;
+        case NodeKind::nominal:
+          // Nominals duplicate member entries. We care about the member itself.
+          return;
+        case NodeKind::potentialMember: {
+          auto key = copyDemangledTypeName(Ctx, context);
+          Obligations.insert({Obligation::Key::forPotentialMember(key),
+                              {name, Expectation::Kind::PotentialMember,
+                               isCascadingUse ? Expectation::Scope::Cascading
+                                              : Expectation::Scope::Private}});
+        }
+          break;
+        case NodeKind::member: {
+          auto demContext = copyDemangledTypeName(Ctx, context);
+          auto key = Ctx.AllocateCopy((demContext + "." + name).str());
+          Obligations.insert({Obligation::Key::forMember(key),
+                              {context, Expectation::Kind::Member,
+                               isCascadingUse ? Expectation::Scope::Cascading
+                                              : Expectation::Scope::Private}});
+        }
+          break;
+        case NodeKind::dynamicLookup:
+          Obligations.insert({Obligation::Key::forDynamicMember(name),
+                              {context, Expectation::Kind::DynamicMember,
+                               isCascadingUse ? Expectation::Scope::Cascading
+                                              : Expectation::Scope::Private}});
+          break;
+        case NodeKind::topLevel:
+        case NodeKind::sourceFileProvide:
+          Obligations.insert({Obligation::Key::forProvides(name),
+                              {name, Expectation::Kind::Provides,
+                               Expectation::Scope::None}});
+          break;
+        case NodeKind::kindCount:
+          llvm_unreachable("Given count node?");
+        }
+      });
 
   return false;
 }
@@ -482,7 +486,7 @@ bool DependencyVerifier::verifyObligations(
 
   for (auto &expectation : ExpectedDependencies) {
     const bool wantsCascade = expectation.isCascading();
-    switch (expectation.Info.first) {
+    switch (expectation.Info.Kind) {
     case Expectation::Kind::Negative:
       // We'll verify negative expectations separately.
       NegativeExpectations.insert({expectation.MessageRange, expectation});
@@ -529,7 +533,7 @@ bool DependencyVerifier::verifyObligations(
           },
           [this](const Expectation &e) {
             addFormattedDiagnostic(
-                e, "expected superclass dependency does not exist: {0}",
+                e, "expected potential member dependency does not exist: {0}",
                 e.MessageRange);
           });
       break;
@@ -559,7 +563,7 @@ bool DependencyVerifier::verifyObligations(
 
 bool DependencyVerifier::verifyNegativeExpectations(
     ObligationMap &Obligations, NegativeExpectationMap &NegativeExpectations) {
-  forEachActiveObligation(Obligations, [&](StringRef key, Obligation &p) {
+  forEachOwedObligation(Obligations, [&](StringRef key, Obligation &p) {
     auto entry = NegativeExpectations.find(key);
     if (entry == NegativeExpectations.end()) {
       return;
@@ -577,19 +581,11 @@ bool DependencyVerifier::diagnoseUnfulfilledObligations(
     const SourceFile *SF, ObligationMap &Obligations) {
   CharSourceRange EntireRange = SM.getRangeForBuffer(*SF->getBufferID());
   StringRef InputFile = SM.extractText(EntireRange);
-  forEachActiveObligation(Obligations, [&](StringRef key, Obligation &p) {
-    const char *Loc = NULL;
-    if (p.getLocation().isValid()) {
-      // If we have a recommended location, try to use it.
-      Loc = (const char *)p.getLocation().getOpaquePointerValue();
-    } else {
-      // Otherwise diagnose the input buffer.
-      // HACK: Diagnosing the end of the buffer will print a carat pointing
-      // at the file path, but not print any of the buffer's contents, which
-      // might be misleading.
-      Loc = InputFile.end();
-    }
-
+  forEachOwedObligation(Obligations, [&](StringRef key, Obligation &p) {
+    // HACK: Diagnosing the end of the buffer will print a carat pointing
+    // at the file path, but not print any of the buffer's contents, which
+    // might be misleading.
+    const char *Loc = InputFile.end();
     switch (p.getKind()) {
     case Expectation::Kind::Negative:
       llvm_unreachable("Obligations may not be negative; only Expectations!");
@@ -600,7 +596,7 @@ bool DependencyVerifier::diagnoseUnfulfilledObligations(
     case Expectation::Kind::DynamicMember:
       addFormattedDiagnostic(Loc,
                              "unexpected {0} dynamic member dependency: {1}",
-                             p.describeCascade(), p.getName().userFacingName());
+                             p.describeCascade(), p.getName());
       break;
     case Expectation::Kind::PotentialMember:
       addFormattedDiagnostic(Loc,
@@ -609,7 +605,7 @@ bool DependencyVerifier::diagnoseUnfulfilledObligations(
       break;
     case Expectation::Kind::Provides:
       addFormattedDiagnostic(Loc, "unexpected provided entity: {0}",
-                             p.getName().userFacingName());
+                             p.getName());
       break;
     }
   });
@@ -655,12 +651,13 @@ bool DependencyVerifier::verifyFile(const SourceFile *SF) {
 }
 
 //===----------------------------------------------------------------------===//
-// Main entrypoints
+// MARK: Main entrypoints
 //===----------------------------------------------------------------------===//
 
-bool swift::verifyDependencies(SourceManager &SM, ArrayRef<FileUnit *> SFs) {
+bool swift::verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
+                               ArrayRef<FileUnit *> SFs) {
   bool HadError = false;
-  DependencyVerifier Verifier{SM};
+  DependencyVerifier Verifier{SM, DT};
   for (const auto *FU : SFs) {
     if (const auto *SF = dyn_cast<SourceFile>(FU))
       HadError |= Verifier.verifyFile(SF);
@@ -668,9 +665,10 @@ bool swift::verifyDependencies(SourceManager &SM, ArrayRef<FileUnit *> SFs) {
   return HadError;
 }
 
-bool swift::verifyDependencies(SourceManager &SM, ArrayRef<SourceFile *> SFs) {
+bool swift::verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
+                               ArrayRef<SourceFile *> SFs) {
   bool HadError = false;
-  DependencyVerifier Verifier{SM};
+  DependencyVerifier Verifier{SM, DT};
   for (const auto *SF : SFs) {
     HadError |= Verifier.verifyFile(SF);
   }

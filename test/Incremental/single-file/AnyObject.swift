@@ -8,27 +8,26 @@ import Foundation
 
 // expected-provides {{LookupFactory}}
 // expected-provides {{NSObject}}
-// expected-private-superclass {{ObjectiveC.NSObject}}
+// expected-private-superclass {{__C.NSObject}}
 // expected-private-conformance {{Foundation._KeyValueCodingAndObserving}}
 // expected-private-conformance {{Swift.Hashable}}
 // expected-private-conformance {{Swift.Equatable}}
 // expected-private-conformance {{Swift.CustomDebugStringConvertible}}
 // expected-private-conformance {{Swift.CVarArg}}
-// expected-private-conformance {{ObjectiveC.NSObjectProtocol}}
 // expected-private-conformance {{Swift.CustomStringConvertible}}
 @objc private class LookupFactory: NSObject {
   // expected-provides {{AssignmentPrecedence}}
   // expected-provides {{IntegerLiteralType}}
   // expected-provides {{FloatLiteralType}}
   // expected-provides {{Int}}
-  // expected-cascading-member {{ObjectiveC.NSObject.someMember}}
-  // expected-cascading-member {{ObjectiveC.NSObject.Int}}
+  // expected-cascading-member {{__C.NSObject.someMember}}
+  // expected-cascading-member {{__C.NSObject.Int}}
   // expected-cascading-member {{main.LookupFactory.Int}}
   @objc var someMember: Int = 0
-  // expected-cascading-member {{ObjectiveC.NSObject.someMethod}}
+  // expected-cascading-member {{__C.NSObject.someMethod}}
   @objc func someMethod() {}
 
-  // expected-cascading-member {{ObjectiveC.NSObject.init}}
+  // expected-cascading-member {{__C.NSObject.init}}
   // expected-cascading-member {{main.LookupFactory.init}}
   // expected-cascading-member {{main.LookupFactory.deinit}}
   // expected-cascading-member {{main.LookupFactory.someMember}}

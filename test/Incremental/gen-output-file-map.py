@@ -18,7 +18,7 @@ def find_swift_files(path):
         for filename in files:
             if not filename.endswith('.swift'):
                 continue
-            yield filename
+            yield (parent, filename)
 
 
 def main(arguments):
@@ -26,6 +26,9 @@ def main(arguments):
         description='Generate an output file map for the given directory')
     parser.add_argument('-o', dest='output_dir',
                         help='Directory to which the file map will be emitted')
+    parser.add_argument('-r', dest='response_output_file',
+                        help="""Directory to which a matching response file
+                                will be emitted""")
     parser.add_argument('input_dir', help='a directory of swift files')
     args = parser.parse_args(arguments)
 
@@ -45,19 +48,26 @@ def main(arguments):
     if not swift_files:
         fatal("no swift files in the given input directory")
 
+    response_file_contents = []
     all_records = {}
-    for swift_file in swift_files:
+    for (root, swift_file) in swift_files:
         file_name = os.path.splitext(swift_file)[0]
         all_records['./' + swift_file] = {
             'object': './' + file_name + '.o',
             'swift-dependencies': './' + file_name + '.swiftdeps',
         }
+        response_file_contents.append(os.path.join(root, swift_file))
     all_records[""] = {
         'swift-dependencies': './main-buildrecord.swiftdeps'
     }
 
     with open(output_path, 'w') as f:
         json.dump(all_records, f)
+
+    if args.response_output_file is not None:
+        with open(args.response_output_file, 'w') as f:
+            for line in response_file_contents:
+                f.write(line + " ")
 
 
 if __name__ == '__main__':

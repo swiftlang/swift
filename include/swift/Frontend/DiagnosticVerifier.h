@@ -21,6 +21,7 @@
 #include "swift/Basic/LLVM.h"
 
 namespace swift {
+  class DependencyTracker;
   class FileUnit;
   class SourceManager;
   class SourceFile;
@@ -37,8 +38,10 @@ namespace swift {
   bool verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
                          bool autoApplyFixes, bool ignoreUnknown);
 
-  bool verifyDependencies(SourceManager &SM, ArrayRef<FileUnit *> SFs);
-  bool verifyDependencies(SourceManager &SM, ArrayRef<SourceFile *> SFs);
+  bool verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
+                          ArrayRef<FileUnit *> SFs);
+  bool verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
+                          ArrayRef<SourceFile *> SFs);
 }
 
 #endif

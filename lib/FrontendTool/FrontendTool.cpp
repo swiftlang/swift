@@ -1482,7 +1482,7 @@ computeDeallocatableResources(const CompilerInvocation &Invocation,
 
   // Verifying incremental dependencies relies on access to the Swift Module's
   // source files. We can still free the SIL module, though.
-  if (Invocation.getFrontendOptions().VerifyDependencies) {
+  if (Invocation.getFrontendOptions().EnableIncrementalDependencyVerifier) {
     return DeallocatableResources::SILModule;
   }
 
@@ -2199,13 +2199,15 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   // Verify reference dependencies of the current compilation job *before*
   // verifying diagnostics so that the former can be tested via the latter.
-  if (Invocation.getFrontendOptions().VerifyDependencies) {
+  if (Invocation.getFrontendOptions().EnableIncrementalDependencyVerifier) {
     if (!Instance->getPrimarySourceFiles().empty()) {
       HadError |= swift::verifyDependencies(Instance->getSourceMgr(),
+                                            *Instance->getDependencyTracker(),
                                             Instance->getPrimarySourceFiles());
     } else {
-      HadError |= swift::verifyDependencies(Instance->getSourceMgr(),
-                                            Instance->getMainModule()->getFiles());
+      HadError |= swift::verifyDependencies(
+          Instance->getSourceMgr(), *Instance->getDependencyTracker(),
+          Instance->getMainModule()->getFiles());
     }
   }
 
