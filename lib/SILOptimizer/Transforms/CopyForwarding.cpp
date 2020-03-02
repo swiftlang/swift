@@ -333,10 +333,12 @@ public:
   bool visitApplyInst(ApplyInst *Apply) {
     switch (getAddressArgConvention(Apply, Address, Oper)) {
     case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Constant:
       return true;
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Indirect_Out:
       return false;
     default:
       llvm_unreachable("unexpected calling convention for copy_addr user");
@@ -347,7 +349,7 @@ public:
       Oper = &CopyInst->getAllOperands()[CopyAddrInst::Src];
       return CopyInst->isTakeOfSrc();
     }
-    assert(!CopyInst->isInitializationOfDest() && "illegal reinitialization");
+    // TODO: should we check instead that there's a destroy_addr prior to this instruction?
     Oper = &CopyInst->getAllOperands()[CopyAddrInst::Dest];
     return true;
   }
@@ -991,9 +993,12 @@ bool CopyForwarding::forwardPropagateCopy() {
   // Scan forward recording all operands that use CopyDest until we see the
   // next deinit of CopyDest.
   SmallVector<Operand*, 16> ValueUses;
-  auto SI = CurrentCopy->getIterator(), SE = CurrentCopy->getParent()->end();
+  auto SI = CopyDest.getDefiningInstruction()->getIterator(),
+            SE = CurrentCopy->getParent()->end();
   for (++SI; SI != SE; ++SI) {
     SILInstruction *UserInst = &*SI;
+    if (UserInst == CurrentCopy)
+      continue;
     // If we see another use of Src, then the source location is reinitialized
     // before the Dest location is deinitialized. So we really need the copy.
     if (SrcUserInsts.count(UserInst)) {
@@ -1015,8 +1020,38 @@ bool CopyForwarding::forwardPropagateCopy() {
     // If this use cannot be analyzed, then abort.
     if (!AnalyzeUse.Oper)
       return false;
-    // Otherwise record the operand.
-    ValueUses.push_back(AnalyzeUse.Oper);
+
+    // We want to make sure that we can optimize the following:
+    //    x = alloc_stack
+    //    apply fn(x)
+    //    copy_addr y to x
+    //    apply fn2(x)
+    // into:
+    //    x = alloc_stack
+    //    apply fn(x)
+    //    apply fn2(y)
+    // But, we need to make sure that we bail in the following case:
+    //    x = alloc_stack
+    //    e = struct_element_addr x
+    //    copy_addr to x
+    //    use e
+    // To do this we check if all uses of the dest user (UserInst) dominate the
+    // current copy if the current copy is dominated by UserInst.
+    DominanceInfo domInfo(CurrentCopy->getFunction());
+    if (domInfo.dominates(UserInst, CurrentCopy)) {
+      auto *userVal = dyn_cast<SingleValueInstruction>(UserInst);
+      if (!userVal)
+        return false;
+
+      for (auto *userUse : userVal->getUses()) {
+        // If we find a user that comes after the current copy, bail.
+        if (domInfo.dominates(CurrentCopy, userUse->getUser()))
+          return false;
+      }
+    } else {
+      // Otherwise record the operand.
+      ValueUses.push_back(AnalyzeUse.Oper);
+    }
     // If this is a deinit, we're done searching.
     if (seenDeinit)
       break;
@@ -1029,9 +1064,7 @@ bool CopyForwarding::forwardPropagateCopy() {
   // profitable. However, it does allow eliminating the earlier copy, and we may
   // later be able to eliminate this initialization copy.
   if (auto Copy = dyn_cast<CopyAddrInst>(&*SI)) {
-    if (Copy->getDest() == CopyDest) {
-      assert(!Copy->isInitializationOfDest() && "expected a deinit");
-
+    if (Copy->getDest() == CopyDest && !Copy->isInitializationOfDest()) {
       DestroyAddrInst *Destroy =
           SILBuilderWithScope(Copy).createDestroyAddr(Copy->getLoc(), CopyDest);
       Copy->setIsInitializationOfDest(IsInitialization);
@@ -1475,10 +1508,6 @@ class CopyForwardingPass : public SILFunctionTransform
 {
   void run() override {
     if (!EnableCopyForwarding && !EnableDestroyHoisting)
-      return;
-
-    // FIXME: We should be able to support [ossa].
-    if (getFunction()->hasOwnership())
       return;
 
     LLVM_DEBUG(llvm::dbgs() << "Copy Forwarding in Func "
