@@ -46,16 +46,16 @@ namespace {
 
 class LiveRange {
   /// A list of destroy_values of the live range.
-  SmallVector<SILInstruction *, 16> destroys;
+  SmallVector<SILInstruction *, 2> destroys;
 
   /// A list of forwarding instructions that forward our destroys ownership, but
   /// that are also able to forward guaranteed ownership.
-  SmallVector<SILInstruction *, 16> generalForwardingInsts;
+  SmallVector<SILInstruction *, 2> generalForwardingInsts;
 
   /// Consuming users that we were not able to understand as a forwarding
   /// instruction or a destroy_value. These must be passed a strongly control
   /// equivalent +1 value.
-  SmallVector<SILInstruction *, 16> unknownConsumingUsers;
+  SmallVector<SILInstruction *, 2> unknownConsumingUsers;
 
 public:
   LiveRange(SILValue value);
