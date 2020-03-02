@@ -7,7 +7,6 @@
 # REQUIRES: long_test
 # REQUIRES: nonexecutable_test
 
-# XFAIL: OS=macosx
 # https://bugs.swift.org/browse/SR-9847
 
 from __future__ import print_function
