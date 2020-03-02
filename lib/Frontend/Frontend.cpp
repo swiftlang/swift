@@ -906,8 +906,6 @@ void CompilerInstance::parseAndCheckTypesUpTo(
     const ImplicitImports &implicitImports, SourceFile::ASTStage_t limitStage) {
   FrontendStatsTracer tracer(getStatsReporter(), "parse-and-check-types");
 
-  PersistentState = std::make_unique<PersistentParserState>();
-
   bool hadLoadError = parsePartialModulesAndLibraryFiles(implicitImports);
   if (Invocation.isCodeCompletion()) {
     // When we are doing code completion, make sure to emit at least one
@@ -978,8 +976,7 @@ void CompilerInstance::parseLibraryFile(
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
   Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
-  parseIntoSourceFile(*NextInput, BufferID, PersistentState.get(),
-                      /*DelayedBodyParsing=*/!IsPrimary);
+  parseIntoSourceFile(*NextInput, BufferID, /*DelayedBodyParsing=*/!IsPrimary);
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
 
@@ -1026,7 +1023,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
   Diags.setSuppressWarnings(DidSuppressWarnings || !mainIsPrimary);
 
   // Parse the Swift decls into the source file.
-  parseIntoSourceFile(MainFile, MainBufferID, PersistentState.get(),
+  parseIntoSourceFile(MainFile, MainBufferID,
                       /*delayBodyParsing*/ !mainIsPrimary);
 
   // For a primary, also perform type checking if needed. Otherwise, just do
@@ -1096,6 +1093,11 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
     recordPrimarySourceFile(inputFile);
   }
 
+  if (bufferID == SourceMgr.getCodeCompletionBufferID()) {
+    assert(!CodeCompletionFile && "Multiple code completion files?");
+    CodeCompletionFile = inputFile;
+  }
+
   return inputFile;
 }
 
@@ -1121,9 +1123,6 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
                                   MainBufferID);
   }
 
-  PersistentState = std::make_unique<PersistentParserState>();
-  PersistentState->PerformConditionEvaluation = EvaluateConditionals;
-
   auto shouldDelayBodies = [&](unsigned bufferID) -> bool {
     if (!CanDelayBodies)
       return false;
@@ -1141,8 +1140,8 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
         SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
         BufferID);
 
-    parseIntoSourceFile(*NextInput, BufferID, PersistentState.get(),
-                        shouldDelayBodies(BufferID));
+    parseIntoSourceFile(*NextInput, BufferID, shouldDelayBodies(BufferID),
+                        EvaluateConditionals);
   }
 
   // Now parse the main file.
@@ -1152,8 +1151,8 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
     MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
     assert(MainBufferID == MainFile.getBufferID());
 
-    parseIntoSourceFile(MainFile, MainBufferID, PersistentState.get(),
-                        shouldDelayBodies(MainBufferID));
+    parseIntoSourceFile(MainFile, MainBufferID, shouldDelayBodies(MainBufferID),
+                        EvaluateConditionals);
   }
 
   assert(Context->LoadedModules.size() == 1 &&
@@ -1161,7 +1160,6 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
 }
 
 void CompilerInstance::freeASTContext() {
-  PersistentState.reset();
   TheSILTypes.reset();
   Context.reset();
   MainModule = nullptr;

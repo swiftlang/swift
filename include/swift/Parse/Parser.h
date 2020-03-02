@@ -223,6 +223,13 @@ public:
   /// lazily parsed and type checked.
   bool DelayBodyParsing;
 
+  /// Whether to evaluate the conditions of #if decls, meaning that the bodies
+  /// of any active clauses are hoisted such that they become sibling nodes with
+  /// the #if decl.
+  // FIXME: When condition evaluation moves to a later phase, remove this bit
+  // and adjust the client call 'performParseOnly'.
+  bool EvaluateConditionals;
+
   /// The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
 
@@ -401,16 +408,16 @@ public:
          SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true);
+         bool DelayBodyParsing = true, bool EvaluateConditionals = true);
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState = nullptr,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true);
+         bool DelayBodyParsing = true, bool EvaluateConditionals = true);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
          SILParserTUStateBase *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true);
+         bool DelayBodyParsing = true, bool EvaluateConditionals = true);
   ~Parser();
 
   /// Returns true if the buffer being parsed is allowed to contain SIL.
