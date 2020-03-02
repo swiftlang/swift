@@ -990,11 +990,15 @@ bool CopyForwarding::forwardPropagateCopy() {
     }
   }
 
-  // Scan forward recording all operands that use CopyDest until we see the
-  // next deinit of CopyDest.
+  // Scan from CopyDest recording all operands that use CopyDest until we see
+  // the next deinit of CopyDest. We only want to scan one bb so, if CopyDest
+  // isn't in CurrentCopy's bb then scan from the begining of the bb.
+  auto SI = CopyDest.getDefiningInstruction()->getIterator();
+  if (CopyDest->getParentBlock() != CurrentCopy->getParentBlock()) {
+    SI = CurrentCopy->getParentBlock()->begin();
+  }
   SmallVector<Operand*, 16> ValueUses;
-  auto SI = CopyDest.getDefiningInstruction()->getIterator(),
-            SE = CurrentCopy->getParent()->end();
+  auto SE = CurrentCopy->getParent()->end();
   for (++SI; SI != SE; ++SI) {
     SILInstruction *UserInst = &*SI;
     if (UserInst == CurrentCopy)
