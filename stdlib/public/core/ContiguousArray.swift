@@ -832,7 +832,6 @@ extension ContiguousArray: RangeReplaceableCollection {
   ///   `newElements`, over many calls to `append(contentsOf:)` on the same
   ///   array.
   @inlinable
-  @inline(never)
   @_semantics("array.append_contentsOf")
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
