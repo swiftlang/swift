@@ -4214,7 +4214,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
       if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
         return true;
 
-      setStmtConditionTarget(&condElement, target);
+      setSolutionApplicationTarget(&condElement, target);
       continue;
     }
     }

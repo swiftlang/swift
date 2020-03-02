@@ -803,6 +803,10 @@ struct ContextualTypeInfo {
   Type getType() const { return typeLoc.getType(); }
 };
 
+
+/// Key to the constraint solver's mapping from AST nodes to their corresponding
+/// solution application targets.
+using SolutionApplicationTargetsKey = const StmtConditionElement *;
 /// A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -868,9 +872,9 @@ public:
   /// Contextual types introduced by this solution.
   std::vector<std::pair<const Expr *, ContextualTypeInfo>> contextualTypes;
 
-  /// Maps statement condition entries to their solution application targets.
-  llvm::MapVector<const StmtConditionElement *, SolutionApplicationTarget>
-    stmtConditionTargets;
+  /// Maps AST nodes to their solution application targets.
+  llvm::MapVector<SolutionApplicationTargetsKey, SolutionApplicationTarget>
+    solutionApplicationTargets;
 
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
@@ -1546,9 +1550,9 @@ private:
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
       KeyPathComponentTypes;
 
-  /// Maps statement condition entries to their solution application targets.
-  llvm::MapVector<const StmtConditionElement *, SolutionApplicationTarget>
-    stmtConditionTargets;
+  /// Maps AST entries to their solution application targets.
+  llvm::MapVector<SolutionApplicationTargetsKey, SolutionApplicationTarget>
+    solutionApplicationTargets;
 
   /// Contextual type information for expressions that are part of this
   /// constraint system.
@@ -2131,8 +2135,8 @@ public:
     /// The length of \c contextualTypes.
     unsigned numContextualTypes;
 
-    /// The length of \c stmtConditionTargets.
-    unsigned numStmtConditionTargets;
+    /// The length of \c solutionApplicationTargets.
+    unsigned numSolutionApplicationTargets;
 
     /// The previous score.
     Score PreviousScore;
@@ -2421,18 +2425,18 @@ public:
     return CTP_Unused;
   }
 
-  void setStmtConditionTarget(
-      const StmtConditionElement *element, SolutionApplicationTarget target) {
-    assert(element != nullptr && "Expected non-null condition element!");
-    assert(stmtConditionTargets.count(element) == 0 &&
-           "Already set this condition target");
-    stmtConditionTargets.insert({element, target});
+  void setSolutionApplicationTarget(
+      SolutionApplicationTargetsKey key, SolutionApplicationTarget target) {
+    assert(key && "Expected non-null solution application target key!");
+    assert(solutionApplicationTargets.count(key) == 0 &&
+           "Already set this solution application target");
+    solutionApplicationTargets.insert({key, target});
   }
 
-  Optional<SolutionApplicationTarget> getStmtConditionTarget(
-      const StmtConditionElement *element) const {
-    auto known = stmtConditionTargets.find(element);
-    if (known == stmtConditionTargets.end())
+  Optional<SolutionApplicationTarget> getSolutionApplicationTarget(
+      SolutionApplicationTargetsKey key) const {
+    auto known = solutionApplicationTargets.find(key);
+    if (known == solutionApplicationTargets.end())
       return None;
     return known->second;
   }

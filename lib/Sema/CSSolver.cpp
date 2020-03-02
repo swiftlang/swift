@@ -172,7 +172,7 @@ Solution ConstraintSystem::finalize() {
   solution.contextualTypes.assign(
       contextualTypes.begin(), contextualTypes.end());
 
-  solution.stmtConditionTargets = stmtConditionTargets;
+  solution.solutionApplicationTargets = solutionApplicationTargets;
 
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
@@ -246,9 +246,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register the statement condition targets.
-  for (const auto &stmtConditionTarget : solution.stmtConditionTargets) {
-    if (!getStmtConditionTarget(stmtConditionTarget.first))
-      setStmtConditionTarget(stmtConditionTarget.first, stmtConditionTarget.second);
+  for (const auto &target : solution.solutionApplicationTargets) {
+    if (!getSolutionApplicationTarget(target.first))
+      setSolutionApplicationTarget(target.first, target.second);
+  }
   }
 
   // Register the conformances checked along the way to arrive to solution.
@@ -463,7 +464,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
   numContextualTypes = cs.contextualTypes.size();
-  numStmtConditionTargets = cs.stmtConditionTargets.size();
+  numSolutionApplicationTargets = cs.solutionApplicationTargets.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -541,8 +542,8 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any contextual types.
   truncate(cs.contextualTypes, numContextualTypes);
 
-  // Remove any statement condition types.
-  truncate(cs.stmtConditionTargets, numStmtConditionTargets);
+  // Remove any solution application targets.
+  truncate(cs.solutionApplicationTargets, numSolutionApplicationTargets);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;

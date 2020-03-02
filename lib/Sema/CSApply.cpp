@@ -7461,7 +7461,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
       case StmtConditionElement::CK_PatternBinding: {
         ConstraintSystem &cs = solution.getConstraintSystem();
-        auto target = *cs.getStmtConditionTarget(&condElement);
+        auto target = *cs.getSolutionApplicationTarget(&condElement);
         auto resolvedTarget = rewriteTarget(target);
         if (!resolvedTarget)
           return None;
