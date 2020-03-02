@@ -233,9 +233,9 @@ BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
               builder.readTypeRef(descriptor, descriptor->TypeName)))
 {}
 
-bool RecordTypeInfo::readExtraInhabitant(remote::MemoryReader &reader,
-                                         remote::RemoteAddress address,
-                                         uint64_t *inhabitant) const {
+bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                              remote::RemoteAddress address,
+                                              int *extraInhabitantIndex) const {
   switch (SubKind) {
   case RecordKind::Invalid:
   case RecordKind::ThickFunction:
@@ -263,15 +263,15 @@ bool RecordTypeInfo::readExtraInhabitant(remote::MemoryReader &reader,
     }
     auto fieldAddress = remote::RemoteAddress(address.getAddressData()
                                               + mostCapaciousField->Offset);
-    return mostCapaciousField->TI.readExtraInhabitant(
-      reader, fieldAddress, inhabitant);
+    return mostCapaciousField->TI.readExtraInhabitantIndex(
+      reader, fieldAddress, extraInhabitantIndex);
   }
 
   case RecordKind::NoPayloadEnum: {
     // No payload enums export XIs
     auto EnumSize = getSize();
     if (EnumSize == 0) {
-      *inhabitant = 0;
+      *extraInhabitantIndex = -1;
       return true;
     }
     uint64_t value;
@@ -279,9 +279,9 @@ bool RecordTypeInfo::readExtraInhabitant(remote::MemoryReader &reader,
       return false;
     }
     if (value < getFields().size()) {
-      *inhabitant = 0;
+      *extraInhabitantIndex = -1;
     } else {
-      *inhabitant = value - getFields().size() + 1;
+      *extraInhabitantIndex = value - getFields().size();
     }
     return true;
   }
@@ -306,19 +306,21 @@ bool RecordTypeInfo::readExtraInhabitant(remote::MemoryReader &reader,
     }
 
     if (PayloadExtraInhabitants == 0) {
-      *inhabitant = 0;
+      *extraInhabitantIndex = -1;
       return true;
     } else if (discriminator == 0) {
-      if (PayloadCase.TI.readExtraInhabitant(reader, address, inhabitant)) {
-        if (*inhabitant <= NonPayloadCaseCount) {
-          *inhabitant = 0;
+      if (PayloadCase.TI.readExtraInhabitantIndex(reader, address, extraInhabitantIndex)) {
+        if (*extraInhabitantIndex < 0) {
+          // Do nothing.
+        } else if ((unsigned long)*extraInhabitantIndex < NonPayloadCaseCount) {
+          *extraInhabitantIndex = -1;
         } else {
-          *inhabitant -= NonPayloadCaseCount;
+          *extraInhabitantIndex -= NonPayloadCaseCount;
         }
         return true;
       }
     } else {
-      *inhabitant = 0; // XXX CHECK THIS XXX
+      *extraInhabitantIndex = -1; // XXX CHECK THIS XXX
       return true;
     }
 

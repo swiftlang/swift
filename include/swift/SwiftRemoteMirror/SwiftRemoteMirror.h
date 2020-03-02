@@ -239,7 +239,7 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
                                       swift_addr_t EnumAddress,
                                       swift_typeref_t EnumTypeRef,
-                                      uint64_t *CaseIndex);
+                                      int *CaseIndex);
 
 /// Finds information about a particular enum case.
 ///
@@ -252,7 +252,7 @@ int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
 SWIFT_REMOTE_MIRROR_LINKAGE
 int swift_reflection_getEnumCaseTypeRef(SwiftReflectionContextRef ContextRef,
                                         swift_typeref_t EnumTypeRef,
-                                        unsigned CaseIndex,
+                                        int CaseIndex,
                                         char **CaseName,
                                         swift_typeref_t *PayloadTypeRef);
 

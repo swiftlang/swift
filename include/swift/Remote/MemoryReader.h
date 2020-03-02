@@ -171,52 +171,59 @@ public:
           
 
   // Parse extra inhabitants stored in a pointer.
-  // Sets *extraInhabitant to 0 if the pointer at this address
+  // Sets *extraInhabitant to -1 if the pointer at this address
   // is actually a valid pointer.
   // Otherwise, it sets *extraInhabitant to the inhabitant
-  // index (counting from 1).
-  // In practice, this generally means that a NULL pointer gets
-  // mapped to 1, but the details depend on the particular target.
-
-  // TODO: What is the correct API here?  What does the client
-  // need to tell us about the pointer in order for us to correctly
-  // parse it?  For example, do we need to know if this is a Swift
-  // or Obj-C object reference as opposed to a non-object pointer?
-  bool readPointerXI(RemoteAddress address,
-                     uint64_t *extraInhabitant,
-                     bool isNativeRefCounted) {
+  // index (counting from 0).
+  bool readHeapObjectExtraInhabitantIndex(RemoteAddress address,
+                                          int *extraInhabitantIndex) {
     uint8_t PointerSize;
-    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize, nullptr, &PointerSize)) {
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize,
+                         nullptr, &PointerSize)) {
       return false;
     }
-
-    uint64_t rawPointerValue;
-    if (!readInteger(address, PointerSize, &rawPointerValue)) {
+    uint64_t LeastValidPointerValue;
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetLeastValidPointerValue,
+                         nullptr, &LeastValidPointerValue)) {
       return false;
     }
-
-    // TODO: Should these values come from queryDataLayout?
-    int ignoredLowerBits;
-    uint64_t leastValidPointerValue;
-    switch (PointerSize) {
-    case 4:
-      ignoredLowerBits = 0;
-      leastValidPointerValue = 0x1000;
-      break;
-    case 8:
-      ignoredLowerBits = 1;
-      leastValidPointerValue = 0x100000000;
-      break;
-    default:
-      printf("  unknown pointer size\n");
+    uint8_t ObjCReservedLowBits;
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetObjCReservedLowBits,
+                         nullptr, &ObjCReservedLowBits)) {
       return false;
     }
-
-    if (rawPointerValue >= leastValidPointerValue) {
-      *extraInhabitant = 0; // Valid value, not an XI
+    uint64_t RawPointerValue;
+    if (!readInteger(address, PointerSize, &RawPointerValue)) {
+      return false;
+    }
+    if (RawPointerValue >= LeastValidPointerValue) {
+      *extraInhabitantIndex = -1; // Valid value, not an XI
     } else {
-      // We count XIs from 1.
-      *extraInhabitant = 1 + (rawPointerValue >> ignoredLowerBits);
+      *extraInhabitantIndex = (RawPointerValue >> ObjCReservedLowBits);
+    }
+    return true;
+  }
+
+  bool readFunctionPointerExtraInhabitantIndex(RemoteAddress address,
+                                               int *extraInhabitantIndex) {
+    uint8_t PointerSize;
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize,
+                         nullptr, &PointerSize)) {
+      return false;
+    }
+    uint64_t LeastValidPointerValue;
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetLeastValidPointerValue,
+                         nullptr, &LeastValidPointerValue)) {
+      return false;
+    }
+    uint64_t RawPointerValue;
+    if (!readInteger(address, PointerSize, &RawPointerValue)) {
+      return false;
+    }
+    if (RawPointerValue >= LeastValidPointerValue) {
+      *extraInhabitantIndex = -1; // Valid value, not an XI
+    } else {
+      *extraInhabitantIndex = RawPointerValue;
     }
     return true;
   }

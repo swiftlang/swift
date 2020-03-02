@@ -535,12 +535,28 @@ swift_reflection_interop_minimalDataLayoutQueryFunction4(
   void *ReaderContext,
   DataLayoutQueryType type,
   void *inBuffer, void *outBuffer) {
-  if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
+  switch (type) {
+  case DLQ_GetPointerSize:
+  case DLQ_GetSizeSize: {
     uint8_t *result = (uint8_t *)outBuffer;
     *result = 4;
     return 1;
   }
-  return 0;
+  case DLQ_GetObjCReservedLowBits: {
+    uint8_t *result = (uint8_t *)outBuffer;
+    // Swift assumes this for all 32-bit platforms, including Darwin
+    *result = 0;
+    return 1;
+  }
+  case DLQ_GetLeastValidPointerValue: {
+    uint64_t *result = (uint64_t *)outBuffer;
+    // Swift assumes this for all 32-bit platforms, including Darwin
+    *result = 0x1000;
+    return 1;
+  }
+  default:
+    return 0;
+  }
 }
 
 static inline int
@@ -548,12 +564,34 @@ swift_reflection_interop_minimalDataLayoutQueryFunction8(
   void *ReaderContext,
   DataLayoutQueryType type,
   void *inBuffer, void *outBuffer) {
-  if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
+  switch (type) {
+  case DLQ_GetPointerSize:
+  case DLQ_GetSizeSize: {
     uint8_t *result = (uint8_t *)outBuffer;
     *result = 8;
     return 1;
   }
-  return 0;
+  case DLQ_GetObjCReservedLowBits: {
+    uint8_t *result = (uint8_t *)outBuffer;
+#if __APPLE__ && __x86_64__
+    *result = 1;
+#else
+    *result = 0;
+#endif
+    return 1;
+  }
+  case DLQ_GetLeastValidPointerValue: {
+    uint64_t *result = (uint64_t *)outBuffer;
+#if __APPLE__
+    *result = 0x100000000;
+#else
+    *result = 0x1000
+#endif
+    return 1;
+  }
+  default:
+    return 0;
+  }
 }
 
 static inline SwiftReflectionInteropContextRef

@@ -63,6 +63,26 @@ static int minimalDataLayoutQueryFunction(void *ReaderContext,
     *result = WordSize;
     return 1;
   }
+  if (type == DLQ_GetObjCReservedLowBits) {
+    auto result = static_cast<uint8_t *>(outBuffer);
+#if __APPLE__ && __x86_64__
+    *result = 1; // Only 64-bit macOS (Not x86_64 iOS simulator!)
+#else
+    *result = 0;
+#endif
+    return 1;
+  }
+  if (type == DLQ_GetLeastValidPointerValue) {
+    auto result = static_cast<uint64_t *>(outBuffer);
+#if __APPLE__
+    if (WordSize == 8) {
+      *result = 0x100000000; // Only 64-bit Apple platforms
+      return 1;
+    }
+#endif
+    *result = 0x1000;
+    return 1;
+  }
   return 0;
 }
 
@@ -419,7 +439,7 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
 int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
                                       swift_addr_t EnumAddress,
                                       swift_typeref_t EnumTypeRef,
-                                      uint64_t *CaseIndex) {
+                                      int *CaseIndex) {
   auto Context = ContextRef->nativeContext;
   auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
   auto RemoteEnumAddress = RemoteAddress(EnumAddress);
@@ -428,7 +448,7 @@ int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
 
 int swift_reflection_getEnumCaseTypeRef(SwiftReflectionContextRef ContextRef,
                                         swift_typeref_t EnumTypeRef,
-                                        unsigned CaseIndex,
+                                        int CaseIndex,
                                         char **CaseName,
                                         swift_typeref_t *PayloadTypeRef) {
   *PayloadTypeRef = 0;

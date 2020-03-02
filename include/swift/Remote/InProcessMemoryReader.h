@@ -30,18 +30,40 @@ class InProcessMemoryReader final : public MemoryReader {
   bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
                        void *outBuffer) override {
     switch (type) {
-      case DLQ_GetPointerSize: {
-        auto result = static_cast<uint8_t *>(outBuffer);
-        *result = sizeof(void *);
-        return true;
-      }
-      case DLQ_GetSizeSize: {
-        auto result = static_cast<uint8_t *>(outBuffer);
-        *result = sizeof(size_t);
-        return true;
-      }
+    case DLQ_GetPointerSize: {
+      auto result = static_cast<uint8_t *>(outBuffer);
+      *result = sizeof(void *);
+      return true;
     }
-
+    case DLQ_GetSizeSize: {
+      auto result = static_cast<uint8_t *>(outBuffer);
+      *result = sizeof(size_t);
+      return true;
+    }
+    case DLQ_GetObjCReservedLowBits: {
+      auto result = static_cast<uint8_t *>(outBuffer);
+#if __APPLE__ && __x86_64__
+      // ObjC on 64-bit macOS reserves the bottom bit of all pointers.
+      *result = 1;
+#endif
+      // Non-Apple platforms obviously do not reserve the bottom bit.
+      // Other Apple platforms (notably including the 64-bit iOS simulator
+      // running on x86_64) do not reserve the bottom bit.
+      *result = 0;
+      return true;
+    }
+    case DLQ_GetLeastValidPointerValue: {
+      auto result = static_cast<uint64_t *>(outBuffer);
+#if __APPLE__
+      if (sizeof(void *) == 8) {
+        *result = 0x100000000;
+        return true;
+      }
+#endif
+      *result = 0x1000;
+      return true;
+    }
+    }
     return false;
   }
 

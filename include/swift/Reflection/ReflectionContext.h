@@ -713,7 +713,7 @@ public:
 
   bool projectEnumValue(RemoteAddress EnumAddress,
                         const TypeRef *EnumTR,
-                        uint64_t *CaseIndex) {
+                        int *CaseIndex) {
     if (EnumTR == nullptr)
       return false;
     auto EnumTI = getTypeInfo(EnumTR);
@@ -768,10 +768,15 @@ public:
         return true;
       } else if (discriminator == 0) {
         // The value overlays the payload ... ask the payload to decode it.
-        uint64_t t;
-        if (PayloadCase.TI.readExtraInhabitant(getReader(), EnumAddress, &t)
-            && (t <= NonPayloadCaseCount)) {
-          *CaseIndex = t;
+        int t;
+        if (!PayloadCase.TI.readExtraInhabitantIndex(getReader(), EnumAddress, &t)) {
+          return false;
+        }
+        if (t < 0) {
+          *CaseIndex = 0;
+          return true;
+        } else if ((unsigned long)t <= NonPayloadCaseCount) {
+          *CaseIndex = t + 1;
           return true;
         }
         return false;

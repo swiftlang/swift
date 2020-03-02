@@ -437,6 +437,26 @@ public:
       *result = wordSize;
       return true;
     }
+    case DLQ_GetObjCReservedLowBits: {
+      auto result = static_cast<uint8_t *>(outBuffer);
+#if __APPLE__ && __x86_64__
+      *result = 1;
+#else
+      *result = 0;
+#endif
+      return true;
+    }
+    case DLQ_GetLeastValidPointerValue: {
+      auto result = static_cast<uint8_t *>(outBuffer);
+#if __APPLE__
+      if (wordSize == 8) {
+        *result = 0x100000000; // Only for Apple 64-bit platforms
+        return true;
+      }
+#endif
+      *result = 0x1000;
+      return true;
+    }
     }
 
     return false;

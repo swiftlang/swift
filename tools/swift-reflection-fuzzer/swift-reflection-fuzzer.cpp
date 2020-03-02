@@ -63,6 +63,26 @@ public:
       *result = sizeof(size_t);
       return true;
     }
+    case DLQ_GetObjCReservedLowBits: {
+      auto result = static_cast<uint8_t *>(outBuffer);
+#if __APPLE__ && __x86_64__
+      *result = 1;
+#else
+      *result = 0;
+#endif
+      return true;
+    }
+    case DLQ_GetLeastValidPointerValue: {
+      auto result = static_cast<uint64_t *>(outBuffer);
+#if __APPLE__
+      if (sizeof(void *) == 8) {
+        *result = 0x100000000;
+        return true;
+      }
+#endif
+      *result = 0x1000;
+      return true;
+    }
     }
 
     return false;

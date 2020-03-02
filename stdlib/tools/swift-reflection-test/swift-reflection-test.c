@@ -145,6 +145,26 @@ static int PipeMemoryReader_queryDataLayout(void *Context,
       *result = sizeof(size_t);
       return 1;
     }
+    case DLQ_GetObjCReservedLowBits: {
+      uint8_t *result = (uint8_t *)outBuffer;
+#if __APPLE__ && __x86_64__
+      *result = 1;
+#else
+      *result = 0;
+#endif
+      return 1;
+    }
+    case DLQ_GetLeastValidPointerValue: {
+      uint64_t *result = (uint64_t *)outBuffer;
+#if __APPLE__
+      if (sizeof(void *) == 8) {
+        *result = 0x100000000; // Only for Apple 64-bit platforms
+        return 1;
+      }
+#endif
+      *result = 0x1000;
+      return 1;
+    }
   }
 
   return 0;
@@ -525,7 +545,7 @@ int reflectEnum(SwiftReflectionContextRef RC,
     return 1;
   }
 
-  uint64_t CaseIndex;
+  int CaseIndex;
   if (!swift_reflection_projectEnumValue(RC, EnumInstance, EnumTypeRef, &CaseIndex)) {
     printf("swift_reflection_projectEnumValue failed.\n");
     PipeMemoryReader_sendDoneMessage(&Pipe);
@@ -598,7 +618,7 @@ int reflectEnumValue(SwiftReflectionContextRef RC,
       break;
     }
 
-    uint64_t CaseIndex;
+    int CaseIndex;
     if (!swift_reflection_projectEnumValue(RC, EnumInstance, EnumTypeRef, &CaseIndex)) {
       printf("swift_reflection_projectEnumValue failed.\n");
       PipeMemoryReader_sendDoneMessage(&Pipe);

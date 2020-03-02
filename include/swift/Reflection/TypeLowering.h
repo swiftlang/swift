@@ -142,11 +142,11 @@ public:
 
   // Using the provided reader, inspect our value.
   // Return false if we can't inspect value.
-  // Set *inhabitant to zero if the value is valid (not an XI)
-  // Else set *inhabitant to the XI value (counting from 1)
-  virtual bool readExtraInhabitant(remote::MemoryReader &reader,
-                                   remote::RemoteAddress address,
-                                   uint64_t *inhabitant) const {
+  // Set *inhabitant to <0 if the value is valid (not an XI)
+  // Else set *inhabitant to the XI value (counting from 0)
+  virtual bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                        remote::RemoteAddress address,
+                                        int *index) const {
     return false;
   }
 
@@ -173,15 +173,15 @@ public:
     return Name;
   }
 
-  bool readExtraInhabitant(remote::MemoryReader &reader,
-                           remote::RemoteAddress address,
-                           uint64_t *inhabitant) const {
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *extraInhabitantIndex) const {
     if (getNumExtraInhabitants() == 0) {
-      *inhabitant = 0;
+      *extraInhabitantIndex = -1;
       return true;
     }
     // XXX Has extra inhabitants, so it must be a pointer?
-    return reader.readPointerXI(address, inhabitant, /* native */ true);
+    return reader.readHeapObjectExtraInhabitantIndex(address, extraInhabitantIndex);
   }
 
   static bool classof(const TypeInfo *TI) {
@@ -207,9 +207,9 @@ public:
   unsigned getNumFields() const { return Fields.size(); }
   const std::vector<FieldInfo> &getFields() const { return Fields; }
 
-  bool readExtraInhabitant(remote::MemoryReader &reader,
-                           remote::RemoteAddress address,
-                           uint64_t *inhabitant) const;
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *index) const;
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Record;
@@ -239,15 +239,14 @@ public:
     return Refcounting;
   }
 
-  bool readExtraInhabitant(remote::MemoryReader &reader,
-                           remote::RemoteAddress address,
-                           uint64_t *inhabitant) const {
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *extraInhabitantIndex) const {
     if (getNumExtraInhabitants() == 0) {
-      *inhabitant = 0;
+      *extraInhabitantIndex = -1;
       return true;
     }
-    auto isNative = (Refcounting == ReferenceCounting::Native);
-    return reader.readPointerXI(address, inhabitant, isNative);
+    return reader.readHeapObjectExtraInhabitantIndex(address, extraInhabitantIndex);
   }
 
   static bool classof(const TypeInfo *TI) {
