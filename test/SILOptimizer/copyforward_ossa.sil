@@ -9,10 +9,10 @@ import Builtin
 import Swift
 
 class AClass {}
-sil @f_in : $@convention(thin) <T> (@in T) -> ()
-sil @f_in_guaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
-sil @f_out : $@convention(thin) <T> () -> @out T
-sil @f_owned : $@convention(thin) <T> (@owned T) -> ()
+sil [ossa] @f_in : $@convention(thin) <T> (@in T) -> ()
+sil [ossa] @f_in_guaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil [ossa] @f_out : $@convention(thin) <T> () -> @out T
+sil [ossa] @f_owned : $@convention(thin) <T> (@owned T) -> ()
 
 protocol P {
   init(_ i : Int32)

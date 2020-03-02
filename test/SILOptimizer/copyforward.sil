@@ -120,8 +120,6 @@ bb1(%1 : $*T):
   return %r1 : $()
 }
 
-// TODO: fixme
-
 //CHECK-LABEL: forward_noinit
 //CHECK-NOT: copy_addr
 //CHECK: destroy_addr
