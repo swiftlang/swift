@@ -585,7 +585,7 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' PSEUDO-GENERIC? FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= CALLEE-ESCAPE? CALLEE-CONVENTION FUNC-REPRESENTATION? PARAM-CONVENTION* RESULT-CONVENTION* ('z' RESULT-CONVENTION)
+  FUNC-ATTRIBUTES ::= CALLEE-ESCAPE? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? PARAM-CONVENTION* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION)?
 
   PSEUDO-GENERIC ::= 'P'
 
@@ -602,6 +602,9 @@ mangled in to disambiguate.
   FUNC-REPRESENTATION ::= 'J'                // ObjC method
   FUNC-REPRESENTATION ::= 'K'                // closure
   FUNC-REPRESENTATION ::= 'W'                // protocol witness
+
+  COROUTINE-KIND ::= 'A'                     // yield-once coroutine
+  COROUTINE-KIND ::= 'G'                     // yield-many coroutine
 
   PARAM-CONVENTION ::= 'i'                   // indirect in
   PARAM-CONVENTION ::= 'c'                   // indirect in constant
