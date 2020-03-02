@@ -462,8 +462,8 @@ bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakTrackingVH> &Worklist) {
         if (Res1 != -Res2) {
           dbgs() << "MERGEFUNC-SANITY: Non-symmetric; triple: " << TripleNumber
                  << "\n";
-          F1->dump();
-          F2->dump();
+          LLVM_DEBUG(F1->dump());
+          LLVM_DEBUG(F2->dump());
           Valid = false;
         }
 
@@ -500,9 +500,9 @@ bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakTrackingVH> &Worklist) {
                    << TripleNumber << "\n";
             dbgs() << "Res1, Res3, Res4: " << Res1 << ", " << Res3 << ", "
                    << Res4 << "\n";
-            F1->dump();
-            F2->dump();
-            F3->dump();
+            LLVM_DEBUG(F1->dump());
+            LLVM_DEBUG(F2->dump());
+            LLVM_DEBUG(F3->dump());
             Valid = false;
           }
         }
