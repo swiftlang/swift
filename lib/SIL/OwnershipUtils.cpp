@@ -73,6 +73,16 @@ bool swift::isOwnedForwardingValueKind(SILNodeKind kind) {
   }
 }
 
+bool swift::isOwnedForwardingInstruction(SILInstruction *inst) {
+  auto kind = inst->getKind();
+  switch (kind) {
+  case SILInstructionKind::BranchInst:
+    return true;
+  default:
+    return isOwnershipForwardingValueKind(SILNodeKind(kind));
+  }
+}
+
 bool swift::isGuaranteedForwardingValue(SILValue value) {
   // If we have an argument from a transforming terminator, we can forward
   // guaranteed.

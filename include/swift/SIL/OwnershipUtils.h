@@ -218,6 +218,10 @@ bool isGuaranteedForwardingValue(SILValue value);
 /// forward guaranteed ownership.
 bool isOwnedForwardingValueKind(SILNodeKind kind);
 
+/// Does this SILInstruction 'forward' owned ownership, but may not be able to
+/// forward guaranteed ownership.
+bool isOwnedForwardingInstruction(SILInstruction *inst);
+
 struct BorrowScopeOperandKind {
   enum Kind {
     BeginBorrow,
