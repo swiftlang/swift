@@ -72,40 +72,12 @@ static std::string mangleTypeAsContext(const NominalTypeDecl *NTD) {
 // MARK: Privacy queries
 //==============================================================================
 
-static bool declIsPrivate(const ValueDecl *VD) {
-  return VD->getFormalAccess() <= AccessLevel::FilePrivate;
-}
-
-/// Return true if \param D cannot affect other files.
-static bool declIsPrivate(const Decl *D) {
-  if (auto *VD = dyn_cast<ValueDecl>(D))
-    return declIsPrivate(VD);
-  switch (D->getKind()) {
-  case DeclKind::Import:
-  case DeclKind::PatternBinding:
-  case DeclKind::EnumCase:
-  case DeclKind::TopLevelCode:
-  case DeclKind::IfConfig:
-  case DeclKind::PoundDiagnostic:
-    return true;
-
-  case DeclKind::Extension:
-  case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
-    return false;
-
-  default:
-    llvm_unreachable("everything else is a ValueDecl");
-  }
-}
-
 /// Return true if \ref ED does not contain a member that can affect other
 /// files.
 static bool allMembersArePrivate(const ExtensionDecl *ED) {
-  return std::all_of(ED->getMembers().begin(), ED->getMembers().end(),
-                     [](const Decl *d) { return declIsPrivate(d); });
-  //                     declIsPrivate);
+  return std::all_of(
+      ED->getMembers().begin(), ED->getMembers().end(),
+      [](const Decl *d) { return d->isPrivateToEnclosingFile(); });
 }
 
 /// \ref inheritedType, an inherited protocol, return true if this inheritance
@@ -125,7 +97,7 @@ static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
          "Should not have a subclass existential "
          "in the inheritance clause of an extension");
   for (auto protoTy : layout.getProtocols()) {
-    if (!declIsPrivate(protoTy->getDecl()))
+    if (!protoTy->getDecl()->isPrivateToEnclosingFile())
       return false;
   }
 
@@ -448,8 +420,9 @@ private:
     const bool exposedProtocolIsExtended =
         ED && !allInheritedProtocolsArePrivate(ED);
     if (ED && !includePrivateDecls && !exposedProtocolIsExtended &&
-        std::all_of(ED->getMembers().begin(), ED->getMembers().end(),
-                    [&](const Decl *D) { return declIsPrivate(D); })) {
+        std::all_of(
+            ED->getMembers().begin(), ED->getMembers().end(),
+            [&](const Decl *D) { return D->isPrivateToEnclosingFile(); })) {
       return;
     }
     if (includePrivateDecls || !ED || exposedProtocolIsExtended)
@@ -485,7 +458,8 @@ private:
         continue;
       for (const auto *member : ED->getMembers())
         if (const auto *VD = dyn_cast<ValueDecl>(member))
-          if (VD->hasName() && (includePrivateDecls || !declIsPrivate(VD))) {
+          if (VD->hasName() &&
+              (includePrivateDecls || !VD->isPrivateToEnclosingFile())) {
             const auto *const NTD = ED->getExtendedNominal();
             if (NTD)
               valuesInExtensions.push_back(std::make_pair(NTD, VD));
@@ -534,7 +508,7 @@ private:
 
   /// Return true if \param D should be excluded on privacy grounds.
   bool excludeIfPrivate(const Decl *const D) {
-    return !includePrivateDecls && declIsPrivate(D);
+    return !includePrivateDecls && D->isPrivateToEnclosingFile();
   }
 };
 } // namespace
@@ -642,7 +616,7 @@ private:
     std::unordered_set<std::string> holdersOfCascadingMembers;
     for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
       {
-        bool isPrivate = declIsPrivate(p.getFirst().first);
+        bool isPrivate = p.getFirst().first->isPrivateToEnclosingFile();
         if (isPrivate && !includeIntrafileDeps)
           continue;
       }
@@ -660,7 +634,7 @@ private:
       const std::unordered_set<std::string> &&holdersOfCascadingMembers) {
     for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
       {
-        bool isPrivate = declIsPrivate(p.getFirst().first);
+        bool isPrivate = p.getFirst().first->isPrivateToEnclosingFile();
         if (isPrivate && !includeIntrafileDeps)
           continue;
       }
