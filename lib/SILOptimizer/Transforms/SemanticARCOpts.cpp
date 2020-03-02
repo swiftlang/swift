@@ -657,8 +657,10 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // Find all borrow introducers for our copy operand. If we are unable to find
   // all of the reproducers (due to pattern matching failure), conservatively
   // return false. We can not optimize.
-  if (!getUnderlyingBorrowIntroducingValues(cvi->getOperand(),
-                                            borrowScopeIntroducers))
+  //
+  // NOTE: We can get multiple introducers if our copy_value's operand
+  // value runs through a phi or an aggregate forming instruction.
+  if (!getAllBorrowIntroducingValues(cvi->getOperand(), borrowScopeIntroducers))
     return false;
 
   // Then go over all of our uses and see if the value returned by our copy
