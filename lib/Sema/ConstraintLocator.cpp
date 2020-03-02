@@ -234,13 +234,15 @@ bool ConstraintLocator::isForContextualType() const {
 }
 
 bool ConstraintLocator::isForAssignment() const {
-  auto *anchor = getAnchor();
-  return anchor && isa<AssignExpr>(anchor) && getPath().empty();
+  return directlyAt<AssignExpr>();
 }
 
 bool ConstraintLocator::isForCoercion() const {
-  auto *anchor = getAnchor();
-  return anchor && isa<CoerceExpr>(anchor) && getPath().empty();
+  return directlyAt<CoerceExpr>();
+}
+
+bool ConstraintLocator::isForOptionalTry() const {
+  return directlyAt<OptionalTryExpr>();
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {

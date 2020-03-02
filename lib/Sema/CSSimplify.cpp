@@ -3609,6 +3609,10 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isHole() || rhs->isHole())
       return true;
 
+    // If either side is not yet resolved, it's too early for this fix.
+    if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
+      break;
+
     auto purpose = getContextualTypePurpose(anchor);
     if (rhs->isVoid() &&
         (purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr)) {
@@ -3649,33 +3653,16 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
-    // If either side is not yet resolved, it's too early for this fix.
-    if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
-      break;
-
-    // If contextual type is an existential value, it's handled
-    // after conversion restriction is attempted.
-    if (rhs->isExistentialType())
-      break;
-
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       break;
 
-    // If there is a deep equality, superclass restriction
-    // already recorded, let's not add bother ignoring
-    // contextual type, because actual fix is going to
-    // be performed once restriction is applied.
-    if (hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
-      break;
-
-    if (hasConversionOrRestriction(
-            ConversionRestrictionKind::MetatypeToExistentialMetatype))
-      break;
-
-    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) &&
-        !hasConversionOrRestriction(
-            ConversionRestrictionKind::OptionalToOptional))
+    // If there are any restrictions here we need to wait and let
+    // `simplifyRestrictedConstraintImpl` handle them.
+    if (llvm::any_of(conversionsOrFixes,
+                     [](const RestrictionOrFix &correction) {
+                       return bool(correction.getRestriction());
+                     }))
       break;
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
@@ -8532,7 +8519,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto impact = 2;
     if (loc->isForAssignment() || loc->isForCoercion() ||
         loc->isForContextualType() ||
-        loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+        loc->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
+        loc->isForOptionalTry()) {
       if (restriction == ConversionRestrictionKind::Superclass) {
         if (auto *fix =
                 CoerceToCheckedCast::attempt(*this, fromType, toType, loc))
