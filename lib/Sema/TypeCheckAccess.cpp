@@ -204,9 +204,6 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     const DeclContext *useDC, bool mayBeInferred, FromSPI fromSPI,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
 
-  if (fromSPI == FromSPI::Yes)
-    contextAccessScope = AccessScope::getPublic();
-
   auto &Context = useDC->getASTContext();
   if (Context.isAccessControlDisabled())
     return;
@@ -250,7 +247,13 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
         contextAccessScope.isChildOf(*typeReprAccessScope)) {
       // Only if both the Type and the TypeRepr follow the access rules can
       // we exit; otherwise we have to emit a diagnostic.
-      return;
+
+      if (typeReprAccessScope->isPublic() != contextAccessScope.isPublic() ||
+          !typeReprAccessScope->isSPI() ||
+          contextAccessScope.isSPI()) {
+        // And we exit only if there is no SPI violation.
+        return;
+      }
     }
     problematicAccessScope = *typeReprAccessScope;
 
@@ -281,15 +284,6 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
 
   const TypeRepr *complainRepr = TypeAccessScopeDiagnoser::findTypeWithScope(
       typeRepr, problematicAccessScope, useDC, checkUsableFromInline);
-
-  if (fromSPI == FromSPI::Yes) {
-    // If in SPI mode, don't report SPI use from within the same module.
-    if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(complainRepr)) {
-      const ValueDecl *VD = CITR->getBoundDecl();
-      if (useDC->getParentModule() == VD->getModuleContext() && VD->isSPI())
-        return;
-    }
-  }
 
   diagnose(problematicAccessScope, complainRepr, downgradeToWarning);
 }
@@ -368,7 +362,8 @@ void AccessControlCheckerBase::checkGenericParamAccess(
         (thisDowngrade == DowngradeToWarning::No &&
          downgradeToWarning == DowngradeToWarning::Yes) ||
         (!complainRepr &&
-         typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+         typeAccessScope.hasEqualDeclContextWith(minAccessScope)) ||
+         typeAccessScope.isSPI()) {
       minAccessScope = typeAccessScope;
       complainRepr = thisComplainRepr;
       accessControlErrorKind = callbackACEK;
@@ -397,7 +392,7 @@ void AccessControlCheckerBase::checkGenericParamAccess(
                            const_cast<GenericContext *>(ownerCtx)),
                          accessScope, DC, callback);
 
-  if (minAccessScope.isPublic())
+  if (minAccessScope.isPublic() && !minAccessScope.isSPI())
     return;
 
   // FIXME: Promote these to an error in the next -swift-version break.
@@ -980,7 +975,7 @@ public:
       });
     }
 
-    if (!minAccessScope.isPublic()) {
+    if (!minAccessScope.isPublic() || minAccessScope.isSPI()) {
       auto minAccess = minAccessScope.accessLevelForDiagnostics();
       auto functionKind = isa<ConstructorDecl>(fn)
         ? FK_Initializer
@@ -995,14 +990,11 @@ public:
       // Report as an SPI problem if the type is at least as public as the decl.
       AccessScope contextAccessScope =
         fn->getFormalAccessScope(fn->getDeclContext(), checkUsableFromInline);
-      auto restrictedBySPI = !minAccessScope.isChildOf(contextAccessScope);
-      assert((!restrictedBySPI ||
-              fn->getAttrs().hasAttribute<SPIAccessControlAttr>()) &&
-             "There should be SPI attributes on this decl");
 
-      if (restrictedBySPI) {
+      if (contextAccessScope.isSPI()) {
         auto diag = fn->diagnose(diag::function_type_spi, functionKind,
-                                 problemIsResult, minAccess);
+                                 problemIsResult, minAccess,
+                                 minAccess >= AccessLevel::Public);
         highlightOffendingType(diag, complainRepr);
       } else {
         auto diagID = diag::function_type_access;
@@ -1709,7 +1701,7 @@ public:
     AccessScope accessScope =
         VD->getFormalAccessScope(nullptr,
                                  /*treatUsableFromInlineAsPublic*/true);
-    if (accessScope.isPublic())
+    if (accessScope.isPublic() && !accessScope.isSPI())
       return false;
 
     // Is this a stored property in a non-resilient struct or class?

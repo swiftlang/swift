@@ -143,17 +143,17 @@ FIXIT(insert_type_qualification,"%0.",(Type))
 
 ERROR(candidate_inaccessible,none,
       "%0 is inaccessible due to "
-      "'%select{private|fileprivate|internal|SPI|SPI}1' protection level",
+      "'%select{private|fileprivate|internal|@_spi|@_spi}1' protection level",
       (DeclBaseName, AccessLevel))
 
 NOTE(note_candidate_inaccessible,none,
      "%0 is inaccessible due to "
-     "'%select{private|fileprivate|internal|%error|%error}1' protection level",
+     "'%select{private|fileprivate|internal|@_spi|@_spi}1' protection level",
      (DeclName, AccessLevel))
 
 ERROR(init_candidate_inaccessible,none,
       "%0 initializer is inaccessible due to "
-      "'%select{private|fileprivate|internal|SPI|SPI}1' protection level",
+      "'%select{private|fileprivate|internal|@_spi|@_spi}1' protection level",
       (Type, AccessLevel))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
@@ -1649,15 +1649,15 @@ ERROR(function_type_access,none,
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its %select{parameter|result}5 uses "
-      "%select{a private|a fileprivate|an internal|%error|%error}3 type",
+      "%select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}3 type",
       (bool, AccessLevel, bool, AccessLevel, unsigned, bool))
 ERROR(function_type_spi,none,
       "%select{function|method|initializer}0 "
       "cannot be declared '@_spi' "
       "because its %select{parameter|result}1 uses "
-      "%select{a private|a fileprivate|an internal|%error|%error}2 type "
-      "without a compatible '@_spi'",
-      (unsigned, bool, AccessLevel))
+      "%select{a private|a fileprivate|an internal|a public|an open}2 type"
+      "%select{| that is not '@_spi'}3",
+      (unsigned, bool, AccessLevel, bool))
 WARNING(function_type_access_warn,none,
         "%select{function|method|initializer}4 "
         "%select{should be declared %select{private|fileprivate|internal|%error|%error}1"
@@ -2295,14 +2295,14 @@ ERROR(generic_param_access,none,
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|public|open}2}1 "
       "because its generic %select{parameter|requirement}5 uses "
-      "%select{a private|a fileprivate|an internal|%error|%error}3 type",
+      "%select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}3 type",
       (DescriptiveDeclKind, bool, AccessLevel, AccessLevel, bool, bool))
 WARNING(generic_param_access_warn,none,
         "%0 %select{should be declared "
         "%select{private|fileprivate|internal|%error|%error}3"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}2}1 "
         "because its generic %select{parameter|requirement}5 uses "
-        "%select{a private|a fileprivate|an internal|%error|%error}3 type",
+        "%select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}3 type",
         (DescriptiveDeclKind, bool, AccessLevel, AccessLevel, bool, bool))
 ERROR(generic_param_usable_from_inline,none,
       "type referenced from a "
@@ -3873,8 +3873,8 @@ ERROR(class_super_access,none,
       "%select{private|fileprivate|internal|%error|%error}1|private or fileprivate}3"
       "|cannot be declared %select{in this context|fileprivate|internal|public|open}1}0 "
       "because its superclass "
-      "%select{is %select{private|fileprivate|internal|%error|%error}2"
-      "|uses %select{a private|a fileprivate|an internal|%error|%error}2 "
+      "%select{is %select{private|fileprivate|internal|'@_spi'|'@_spi'}2"
+      "|uses %select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}2 "
       "type as a generic parameter}4",
       (bool, AccessLevel, AccessLevel, bool, bool))
 WARNING(class_super_access_warn,none,
@@ -3882,8 +3882,8 @@ WARNING(class_super_access_warn,none,
       "%select{private|fileprivate|internal|%error|%error}1"
       "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
       "because its superclass "
-      "%select{is %select{private|fileprivate|internal|%error|%error}2"
-      "|uses %select{a private|a fileprivate|an internal|%error|%error}2 "
+      "%select{is %select{private|fileprivate|internal|'@_spi'|'@_spi'}2"
+      "|uses %select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}2 "
       "type as a generic parameter}4",
       (bool, AccessLevel, AccessLevel, bool, bool))
 ERROR(class_super_not_usable_from_inline,none,
@@ -4594,19 +4594,14 @@ ERROR(local_type_in_inlinable_function,
       (DeclName, unsigned))
 
 ERROR(resilience_decl_unavailable,
-      none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
+      none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|'@_spi'|'@_spi'}2 and "
       "cannot be referenced from " FRAGILE_FUNC_KIND "3",
       (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
 WARNING(resilience_decl_unavailable_warn,
-        none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
+        none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|'@_spi'|'@_spi'}2 and "
         "should not be referenced from " FRAGILE_FUNC_KIND "3",
         (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
-
-ERROR(resilience_decl_unavailable_spi,
-      none, DECL_OR_ACCESSOR "4 %1 is imported as SPI; "
-      "it cannot be referenced from " FRAGILE_FUNC_KIND "3",
-      (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
 ERROR(inlinable_decl_ref_from_hidden_module,
       none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
