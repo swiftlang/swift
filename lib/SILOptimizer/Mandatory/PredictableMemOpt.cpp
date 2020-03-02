@@ -609,7 +609,7 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
       result = builder.emitCopyValueOperation(Loc, borrowedResult);
       SmallVector<BorrowScopeIntroducingValue, 4> introducers;
       bool foundIntroducers =
-          getUnderlyingBorrowIntroducingValues(borrowedResult, introducers);
+          getAllBorrowIntroducingValues(borrowedResult, introducers);
       (void)foundIntroducers;
       assert(foundIntroducers);
       for (auto value : introducers) {
@@ -631,7 +631,7 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
       result = builder.emitCopyValueOperation(Loc, borrowedResult);
       SmallVector<BorrowScopeIntroducingValue, 4> introducers;
       bool foundIntroducers =
-          getUnderlyingBorrowIntroducingValues(borrowedResult, introducers);
+          getAllBorrowIntroducingValues(borrowedResult, introducers);
       (void)foundIntroducers;
       assert(foundIntroducers);
       for (auto value : introducers) {
