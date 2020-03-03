@@ -1319,9 +1319,21 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
 
+  bool considerParameterSources = true;
+  for (auto param : params) {
+    SILType argType = IGF.IGM.silConv.getSILType(param, origType);
+    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
+    auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
+
+    if (!isa<FixedTypeInfo>(ti)) {
+      considerParameterSources = false;
+      break;
+    }
+  }
+
   // Reserve space for polymorphic bindings.
   auto bindings =
-      NecessaryBindings::forPartialApplyForwarder(IGF.IGM, origType, subs);
+      NecessaryBindings::forPartialApplyForwarder(IGF.IGM, origType, subs, considerParameterSources);
 
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;

@@ -101,7 +101,7 @@ protected:
 
   FulfillmentMap Fulfillments;
 
-  bool ForPartialApplyForwarder;
+  bool ConsiderParameterSources;
 
   GenericSignature::ConformsToArray getConformsTo(Type t) {
     return Generics->getConformsTo(t);
@@ -114,7 +114,7 @@ protected:
   }
 
 public:
-  PolymorphicConvention(IRGenModule &IGM, CanSILFunctionType fnType, bool forPartialApplyForwarder);
+  PolymorphicConvention(IRGenModule &IGM, CanSILFunctionType fnType, bool considerParameterSources);
 
   ArrayRef<MetadataSource> getSources() const { return Sources; }
 
@@ -182,9 +182,9 @@ private:
 
 PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
                                              CanSILFunctionType fnType,
-                                             bool forPartialApplyForwarder = false)
+                                             bool considerParameterSources = true)
   : IGM(IGM), M(*IGM.getSwiftModule()), FnType(fnType),
-    ForPartialApplyForwarder(forPartialApplyForwarder) {
+    ConsiderParameterSources(considerParameterSources) {
   initGenerics();
 
   auto rep = fnType->getRepresentation();
@@ -222,10 +222,12 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
       considerParameter(params[selfIndex], selfIndex, true);
     }
 
-      // Now consider the rest of the parameters.
-      for (auto index : indices(params)) {
-        if (index != selfIndex)
-          considerParameter(params[index], index, false);
+      if (ConsiderParameterSources) {
+        // Now consider the rest of the parameters.
+        for (auto index : indices(params)) {
+          if (index != selfIndex)
+            considerParameter(params[index], index, false);
+        }
       }
   }
 }
@@ -389,10 +391,10 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
-      // Don't consider ClassPointer source for partial_apply forwader.
+      // Don't consider ClassPointer source and Metadata source for partial_apply forwader with non fixed layout.
       // If not, we may end up with missing TypeMetadata for a type dependent generic parameter
       // while generating code for destructor of HeapLayout.
-      if (ForPartialApplyForwarder) return;
+      if (!ConsiderParameterSources) return;
       // Classes are sources of metadata.
       if (type->getClassOrBoundGenericClass()) {
         considerNewTypeSource(MetadataSource::Kind::ClassPointer,
@@ -3008,14 +3010,16 @@ NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
 NecessaryBindings
 NecessaryBindings::forPartialApplyForwarder(IRGenModule &IGM,
                                           CanSILFunctionType origType,
-                                          SubstitutionMap subs) {
+                                          SubstitutionMap subs,
+                                          bool considerParameterSources) {
   return computeBindings(IGM, origType, subs,
-                         true /*forPartialApplyForwarder*/);
+                         true  /*forPartialApplyForwarder*/,
+                         considerParameterSources);
 }
 
 NecessaryBindings NecessaryBindings::computeBindings(
     IRGenModule &IGM, CanSILFunctionType origType, SubstitutionMap subs,
-    bool forPartialApplyForwarder) {
+    bool forPartialApplyForwarder, bool considerParameterSources) {
 
   NecessaryBindings bindings;
   bindings.forPartialApply = forPartialApplyForwarder;
@@ -3025,7 +3029,7 @@ NecessaryBindings NecessaryBindings::computeBindings(
     return bindings;
 
   // Figure out what we're actually required to pass:
-  PolymorphicConvention convention(IGM, origType, forPartialApplyForwarder);
+  PolymorphicConvention convention(IGM, origType, considerParameterSources);
 
   //  - unfulfilled requirements
   convention.enumerateUnfulfilledRequirements(
