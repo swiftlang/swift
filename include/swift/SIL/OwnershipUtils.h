@@ -371,13 +371,6 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 bool getAllBorrowIntroducingValues(
     SILValue value, SmallVectorImpl<BorrowScopeIntroducingValue> &out);
 
-/// Look up the def-use graph starting at \p inputOperand and see if
-/// we can find a single BorrowScopeIntroducingValue for \p
-/// inputOperand. Returns None if there are multiple such introducers
-/// or if while processing we find a user we do not understand.
-Optional<BorrowScopeIntroducingValue>
-getSingleBorrowIntroducingValue(SILValue value);
-
 /// Look up through the def-use chain of \p inputValue, looking for an initial
 /// "borrow" introducing value. If at any point, we find two introducers or we
 /// find a point in the chain we do not understand, we bail and return false. If
@@ -465,6 +458,153 @@ private:
   /// its usage since it assumes the code passed in is well formed.
   InteriorPointerOperand(Operand *op, InteriorPointerOperandKind kind)
       : operand(op), kind(kind) {}
+};
+
+struct OwnedValueIntroducerKind {
+  enum Kind {
+    /// An owned value that is a result of an Apply.
+    Apply,
+
+    /// An owned value returned as a result of applying a begin_apply.
+    BeginApply,
+
+    /// An owned value that is an argument that is in one of the successor
+    /// blocks of a try_apply. This represents in a sense the try applies
+    /// result.
+    TryApply,
+
+    /// An owned value produced as a result of performing a copy_value on some
+    /// other value.
+    Copy,
+
+    /// An owned value produced as a result of performing a load [copy] on a
+    /// memory location.
+    LoadCopy,
+
+    /// An owned value produced as a result of performing a load [take] from a
+    /// memory location.
+    LoadTake,
+
+    /// An owned value that is a result of a true phi argument.
+    ///
+    /// A true phi argument here is defined as an SIL phi argument that only has
+    /// branch predecessors.
+    Phi,
+
+    /// An owned value that is a function argument.
+    FunctionArgument,
+
+    /// An owned value that is a new partial_apply that has been formed.
+    PartialApplyInit,
+
+    /// An owned value from the formation of a new alloc_box.
+    AllocBoxInit,
+
+    /// An owned value from the formataion of a new alloc_ref.
+    AllocRefInit,
+  };
+
+  static Optional<OwnedValueIntroducerKind> get(SILValue value) {
+    if (value.getOwnershipKind() != ValueOwnershipKind::Owned)
+      return None;
+
+    switch (value->getKind()) {
+    default:
+      return None;
+    case ValueKind::ApplyInst:
+      return OwnedValueIntroducerKind(Apply);
+    case ValueKind::BeginApplyResult:
+      return OwnedValueIntroducerKind(BeginApply);
+    case ValueKind::SILPhiArgument: {
+      auto *phiArg = cast<SILPhiArgument>(value);
+      if (dyn_cast_or_null<TryApplyInst>(phiArg->getSingleTerminator())) {
+        return OwnedValueIntroducerKind(TryApply);
+      }
+      if (llvm::all_of(phiArg->getParent()->getPredecessorBlocks(),
+                       [](SILBasicBlock *block) {
+                         return isa<BranchInst>(block->getTerminator());
+                       })) {
+        return OwnedValueIntroducerKind(Phi);
+      }
+      return None;
+    }
+    case ValueKind::SILFunctionArgument:
+      return OwnedValueIntroducerKind(FunctionArgument);
+    case ValueKind::CopyValueInst:
+      return OwnedValueIntroducerKind(Copy);
+    case ValueKind::LoadInst: {
+      auto qual = cast<LoadInst>(value)->getOwnershipQualifier();
+      if (qual == LoadOwnershipQualifier::Take)
+        return OwnedValueIntroducerKind(LoadTake);
+      if (qual == LoadOwnershipQualifier::Copy)
+        return OwnedValueIntroducerKind(LoadCopy);
+      return None;
+    }
+    case ValueKind::PartialApplyInst:
+      return OwnedValueIntroducerKind(PartialApplyInit);
+    case ValueKind::AllocBoxInst:
+      return OwnedValueIntroducerKind(AllocBoxInit);
+    case ValueKind::AllocRefInst:
+      return OwnedValueIntroducerKind(AllocRefInit);
+    }
+    llvm_unreachable("Default should have caught this");
+  }
+
+  Kind value;
+
+  OwnedValueIntroducerKind(Kind newValue) : value(newValue) {}
+  OwnedValueIntroducerKind(const OwnedValueIntroducerKind &other)
+      : value(other.value) {}
+  operator Kind() const { return value; }
+
+  void print(llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              OwnedValueIntroducerKind kind);
+
+/// A higher level construct for working with values that introduce a new
+/// "owned" value.
+///
+/// An owned "introducer" is a value that signals in a SIL program the begin of
+/// a new semantic @owned ownership construct that is live without respect to
+/// any other values in the function. This introducer value is then either used
+/// directly, forwarded then used, and then finally destroyed.
+///
+/// NOTE: Previous incarnations of this concept used terms like "RC-identity".
+struct OwnedValueIntroducer {
+  /// The actual underlying value that introduces the new owned value.
+  SILValue value;
+
+  /// The kind of "introducer" that we use to classify any of various possible
+  /// underlying introducing values.
+  OwnedValueIntroducerKind kind;
+
+  /// If a value is an owned value introducer we can recognize, return
+  /// .some(OwnedValueIntroducer). Otherwise, return None.
+  static Optional<OwnedValueIntroducer> get(SILValue value) {
+    auto kind = OwnedValueIntroducerKind::get(value);
+    if (!kind)
+      return None;
+    return OwnedValueIntroducer(value, *kind);
+  }
+
+  bool operator==(const OwnedValueIntroducer &other) const {
+    return value == other.value;
+  }
+
+  bool operator!=(const OwnedValueIntroducer &other) const {
+    return !(*this == other);
+  }
+
+  bool operator<(const OwnedValueIntroducer &other) const {
+    return value < other.value;
+  }
+
+private:
+  OwnedValueIntroducer(SILValue value, OwnedValueIntroducerKind kind)
+      : value(value), kind(kind) {}
 };
 
 } // namespace swift
