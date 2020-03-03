@@ -97,4 +97,52 @@ extension UnsafeAtomicState {
       ordering: ordering)
     return (success, Value(rawValue: Int(bitPattern: originalWord))!)
   }
+
+  /// Perform an atomic compare and exchange operation with the specified
+  /// success/failure memory orderings.
+  ///
+  /// This operation is equivalent to the following pseudocode:
+  ///
+  /// ```
+  /// atomic(self) { currentValue in
+  ///   let original = currentValue
+  ///   guard original == expected else { return (false, original) }
+  ///   currentValue = desired
+  ///   return (true, original)
+  /// }
+  /// ```
+  ///
+  /// The `ordering` argument specifies the memory ordering to use when the
+  /// operation manages to update the current value, while `failureOrdering`
+  /// will be used when the operation leaves the value intact.
+  ///
+  /// The `failureOrdering` argument currently isn't allowed to introduce a
+  /// synchronization constraint that isn't also guaranteed by `ordering`.
+  /// (This limitation may be lifted in the future.) For example:
+  ///
+  /// ```
+  /// // OK
+  /// ptr.compareExchange(
+  ///   expected: 1, desired: 2,
+  ///   ordering: .acquiringAndReleasing, failureOrdering: .relaxed)
+  ///
+  /// // Not supported:
+  /// ptr.compareExchange(
+  ///   expected: 3, desired: 0,
+  ///   ordering: .releasing, failureOrdering: .acquiring)
+  /// ```
+  @_transparent @_alwaysEmitIntoClient
+  public func compareExchange(
+    expected: Value,
+    desired: Value,
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
+  ) -> (exchanged: Bool, original: Value) {
+    let (success, originalWord) = _ptr._atomicCompareExchangeWord(
+      expected: UInt(bitPattern: expected.rawValue),
+      desired: UInt(bitPattern: desired.rawValue),
+      ordering: ordering,
+      failureOrdering: failureOrdering)
+    return (success, Value(rawValue: Int(bitPattern: originalWord))!)
+  }
 }
