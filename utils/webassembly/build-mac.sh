@@ -28,8 +28,4 @@ $SWIFT_PATH/utils/build-script --wasm \
   --wasi-icu-uc "$SOURCE_PATH/icu_out/lib/libicuuc.a" \
   --wasi-icu-uc-include "$SOURCE_PATH/icu_out/include" \
   --wasi-sdk "$SOURCE_PATH/wasi-sdk" \
-  --install-swift \
-  --install-prefix="/opt/swiftwasm-sdk" \
-  --install-destdir="$SOURCE_PATH/install" \
-  --installable-package="$SOURCE_PATH/swiftwasm-macos.tar.gz" \
   "$@"

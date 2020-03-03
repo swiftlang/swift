@@ -27,7 +27,7 @@ jobs:
         uses: actions/upload-artifact@v1
         with:
           name: linux-installable
-          path: ../swiftwasm-linux.tar.gz
+          path: ../swift-wasm-5.2-DEVELOPMENT-SNAPSHOT-*-linux.tar.gz
 #      - name: Pack test results
 #        run: tar cJf swift-test-results.tar.gz ../build/*/swift-linux-x86_64/swift-test-results
 #      - name: Upload test results
@@ -54,7 +54,7 @@ jobs:
         uses: actions/upload-artifact@v1
         with:
           name: macos-installable
-          path: ../swiftwasm-macos.tar.gz
+          path: ../swift-wasm-5.2-DEVELOPMENT-SNAPSHOT-*-osx.tar.gz
       - name: Upload packaging scripts
         uses: actions/upload-artifact@v1
         with:

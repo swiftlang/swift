@@ -6,12 +6,12 @@ SOURCE_PATH="$( cd "$(dirname $0)/../../.." && pwd  )"
 SWIFT_PATH=$SOURCE_PATH/swift
 UTILS_PATH=$SWIFT_PATH/utils/webassembly
 if [[ "$(uname)" == "Linux" ]]; then
-  BUILD_SCRIPT=$UTILS_PATH/build-linux.sh
   DEPENDENCIES_SCRIPT=$UTILS_PATH/linux/install-dependencies.sh
 else
-  BUILD_SCRIPT=$UTILS_PATH/build-mac.sh
   DEPENDENCIES_SCRIPT=$UTILS_PATH/macos/install-dependencies.sh
 fi
+
+BUILD_SCRIPT=$UTILS_PATH/build-toolchain.sh
 
 $DEPENDENCIES_SCRIPT
 
