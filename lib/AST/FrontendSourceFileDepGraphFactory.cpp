@@ -72,40 +72,12 @@ static std::string mangleTypeAsContext(const NominalTypeDecl *NTD) {
 // MARK: Privacy queries
 //==============================================================================
 
-static bool declIsPrivate(const ValueDecl *VD) {
-  return VD->getFormalAccess() <= AccessLevel::FilePrivate;
-}
-
-/// Return true if \param D cannot affect other files.
-static bool declIsPrivate(const Decl *D) {
-  if (auto *VD = dyn_cast<ValueDecl>(D))
-    return declIsPrivate(VD);
-  switch (D->getKind()) {
-  case DeclKind::Import:
-  case DeclKind::PatternBinding:
-  case DeclKind::EnumCase:
-  case DeclKind::TopLevelCode:
-  case DeclKind::IfConfig:
-  case DeclKind::PoundDiagnostic:
-    return true;
-
-  case DeclKind::Extension:
-  case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
-    return false;
-
-  default:
-    llvm_unreachable("everything else is a ValueDecl");
-  }
-}
-
 /// Return true if \ref ED does not contain a member that can affect other
 /// files.
 static bool allMembersArePrivate(const ExtensionDecl *ED) {
-  return std::all_of(ED->getMembers().begin(), ED->getMembers().end(),
-                     [](const Decl *d) { return declIsPrivate(d); });
-  //                     declIsPrivate);
+  return std::all_of(
+      ED->getMembers().begin(), ED->getMembers().end(),
+      [](const Decl *d) { return d->isPrivateToEnclosingFile(); });
 }
 
 /// \ref inheritedType, an inherited protocol, return true if this inheritance
@@ -125,7 +97,7 @@ static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
          "Should not have a subclass existential "
          "in the inheritance clause of an extension");
   for (auto protoTy : layout.getProtocols()) {
-    if (!declIsPrivate(protoTy->getDecl()))
+    if (!protoTy->getDecl()->isPrivateToEnclosingFile())
       return false;
   }
 
@@ -448,8 +420,9 @@ private:
     const bool exposedProtocolIsExtended =
         ED && !allInheritedProtocolsArePrivate(ED);
     if (ED && !includePrivateDecls && !exposedProtocolIsExtended &&
-        std::all_of(ED->getMembers().begin(), ED->getMembers().end(),
-                    [&](const Decl *D) { return declIsPrivate(D); })) {
+        std::all_of(
+            ED->getMembers().begin(), ED->getMembers().end(),
+            [&](const Decl *D) { return D->isPrivateToEnclosingFile(); })) {
       return;
     }
     if (includePrivateDecls || !ED || exposedProtocolIsExtended)
@@ -485,7 +458,8 @@ private:
         continue;
       for (const auto *member : ED->getMembers())
         if (const auto *VD = dyn_cast<ValueDecl>(member))
-          if (VD->hasName() && (includePrivateDecls || !declIsPrivate(VD))) {
+          if (VD->hasName() &&
+              (includePrivateDecls || !VD->isPrivateToEnclosingFile())) {
             const auto *const NTD = ED->getExtendedNominal();
             if (NTD)
               valuesInExtensions.push_back(std::make_pair(NTD, VD));
@@ -534,7 +508,7 @@ private:
 
   /// Return true if \param D should be excluded on privacy grounds.
   bool excludeIfPrivate(const Decl *const D) {
-    return !includePrivateDecls && declIsPrivate(D);
+    return !includePrivateDecls && D->isPrivateToEnclosingFile();
   }
 };
 } // namespace
@@ -580,134 +554,24 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDeclsOfAGivenType(
 // MARK: FrontendSourceFileDepGraphFactory - adding collections of used Decls
 //==============================================================================
 
-namespace {
-/// Extracts uses out of a SourceFile
-class UsedDeclEnumerator {
-  SourceFile *SF;
-  const DependencyTracker &depTracker;
-  StringRef swiftDeps;
-
-  /// Cache these for efficiency
-  const DependencyKey sourceFileInterface;
-  const DependencyKey sourceFileImplementation;
-
-  const bool includeIntrafileDeps;
-
-  function_ref<void(const DependencyKey &, const DependencyKey &)> createDefUse;
-
-public:
-  UsedDeclEnumerator(
-      SourceFile *SF, const DependencyTracker &depTracker, StringRef swiftDeps,
-      bool includeIntrafileDeps,
-      function_ref<void(const DependencyKey &, const DependencyKey &)>
-          createDefUse)
-      : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps),
-        sourceFileInterface(DependencyKey::createKeyForWholeSourceFile(
-            DeclAspect::interface, swiftDeps)),
-        sourceFileImplementation(DependencyKey::createKeyForWholeSourceFile(
-            DeclAspect::implementation, swiftDeps)),
-        includeIntrafileDeps(includeIntrafileDeps), createDefUse(createDefUse) {
-  }
-
-public:
-  void enumerateAllUses() {
-    enumerateSimpleUses<NodeKind::topLevel>(
-        SF->getReferencedNameTracker()->getTopLevelNames());
-    enumerateSimpleUses<NodeKind::dynamicLookup>(
-        SF->getReferencedNameTracker()->getDynamicLookupNames());
-    enumerateExternalUses();
-    enumerateCompoundUses();
-  }
-
-private:
-  void enumerateUse(NodeKind kind, StringRef context, StringRef name,
-                    bool isCascadingUse) {
-    // Assume that what is depended-upon is the interface
-    createDefUse(DependencyKey(kind, DeclAspect::interface, context.str(), name.str()),
-                 isCascadingUse ? sourceFileInterface
-                                : sourceFileImplementation);
-  }
-  template <NodeKind kind>
-  void enumerateSimpleUses(llvm::DenseMap<DeclBaseName, bool> cascadesByName) {
-    for (const auto &p : cascadesByName)
-      enumerateUse(kind, "", p.getFirst().userFacingName(), p.getSecond());
-  }
-
-  void enumerateCompoundUses() {
-    enumerateNominalUses(std::move(computeHoldersOfCascadingMembers()));
-    enumerateMemberUses();
-  }
-
-  std::unordered_set<std::string> computeHoldersOfCascadingMembers() {
-    std::unordered_set<std::string> holdersOfCascadingMembers;
-    for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
-      {
-        bool isPrivate = declIsPrivate(p.getFirst().first);
-        if (isPrivate && !includeIntrafileDeps)
-          continue;
-      }
-      std::string context =
-          DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
-              p.getFirst().first);
-      bool isCascading = p.getSecond();
-      if (isCascading)
-        holdersOfCascadingMembers.insert(context);
-    }
-    return holdersOfCascadingMembers;
-  }
-
-  void enumerateNominalUses(
-      const std::unordered_set<std::string> &&holdersOfCascadingMembers) {
-    for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
-      {
-        bool isPrivate = declIsPrivate(p.getFirst().first);
-        if (isPrivate && !includeIntrafileDeps)
-          continue;
-      }
-      const NominalTypeDecl *nominal = p.getFirst().first;
-
-      std::string context =
-          DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
-              nominal);
-      const bool isCascadingUse = holdersOfCascadingMembers.count(context) != 0;
-      enumerateUse(NodeKind::nominal, context, "", isCascadingUse);
-    }
-  }
-
-  void enumerateMemberUses() {
-    for (const auto &p : SF->getReferencedNameTracker()->getUsedMembers()) {
-      const NominalTypeDecl *nominal = p.getFirst().first;
-      const auto rawName = p.getFirst().second;
-      const bool isPotentialMember = rawName.empty();
-      const bool isCascadingUse = p.getSecond();
-      if (isPotentialMember) {
-        std::string context = DependencyKey::computeContextForProvidedEntity<
-            NodeKind::potentialMember>(nominal);
-        enumerateUse(NodeKind::potentialMember, context, "", isCascadingUse);
-      } else {
-        std::string context =
-            DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
-                nominal);
-        std::string name = rawName.userFacingName();
-        enumerateUse(NodeKind::member, context, name, isCascadingUse);
-      }
-    }
-  }
-
-  void enumerateExternalUses() {
-    // external dependencies always cascade
-    for (StringRef s : depTracker.getDependencies())
-      enumerateUse(NodeKind::externalDepend, "", s, true);
-  }
-};
-} // end namespace
-
 void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
-  UsedDeclEnumerator(SF, depTracker, swiftDeps, includePrivateDeps,
-                     [&](const DependencyKey &def, const DependencyKey &use) {
-                       addAUsedDecl(def, use);
-                     })
-      .enumerateAllUses();
+  const DependencyKey sourceFileInterface =
+      DependencyKey::createKeyForWholeSourceFile(DeclAspect::interface,
+                                                 swiftDeps);
+
+  const DependencyKey sourceFileImplementation =
+      DependencyKey::createKeyForWholeSourceFile(DeclAspect::implementation,
+                                                 swiftDeps);
+
+  SF->getReferencedNameTracker()->enumerateAllUses(
+      includePrivateDeps, depTracker,
+      [&](const fine_grained_dependencies::NodeKind kind, StringRef context,
+          StringRef name, const bool isCascadingUse) {
+        addAUsedDecl(DependencyKey(kind, DeclAspect::interface, context.str(),
+                                   name.str()),
+                     isCascadingUse ? sourceFileInterface
+                                    : sourceFileImplementation);
+      });
 }
 
 //==============================================================================
