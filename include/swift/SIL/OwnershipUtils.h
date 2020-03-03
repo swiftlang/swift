@@ -364,8 +364,6 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const BorrowScopeOperand &operand);
 
 struct BorrowScopeIntroducingValueKind {
-  using UnderlyingKindTy = std::underlying_type<ValueKind>::type;
-
   /// Enum we use for exhaustive pattern matching over borrow scope introducers.
   enum Kind {
     LoadBorrow,
@@ -374,8 +372,10 @@ struct BorrowScopeIntroducingValueKind {
     Phi,
   };
 
-  static Optional<BorrowScopeIntroducingValueKind> get(ValueKind kind) {
-    switch (kind) {
+  static Optional<BorrowScopeIntroducingValueKind> get(SILValue value) {
+    if (value.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+      return None;
+    switch (value->getKind()) {
     default:
       return None;
     case ValueKind::LoadBorrowInst:
@@ -384,8 +384,15 @@ struct BorrowScopeIntroducingValueKind {
       return BorrowScopeIntroducingValueKind(BeginBorrow);
     case ValueKind::SILFunctionArgument:
       return BorrowScopeIntroducingValueKind(SILFunctionArgument);
-    case ValueKind::SILPhiArgument:
+    case ValueKind::SILPhiArgument: {
+      if (llvm::any_of(value->getParentBlock()->getPredecessorBlocks(),
+                       [](SILBasicBlock *block) {
+                         return !isa<BranchInst>(block->getTerminator());
+                       })) {
+        return None;
+      }
       return BorrowScopeIntroducingValueKind(Phi);
+    }
     }
   }
 
@@ -441,53 +448,14 @@ struct BorrowScopeIntroducingValue {
   BorrowScopeIntroducingValueKind kind;
   SILValue value;
 
-  BorrowScopeIntroducingValue(LoadBorrowInst *lbi)
-      : kind(BorrowScopeIntroducingValueKind::LoadBorrow), value(lbi) {}
-  BorrowScopeIntroducingValue(BeginBorrowInst *bbi)
-      : kind(BorrowScopeIntroducingValueKind::BeginBorrow), value(bbi) {}
-  BorrowScopeIntroducingValue(SILFunctionArgument *arg)
-      : kind(BorrowScopeIntroducingValueKind::SILFunctionArgument), value(arg) {
-    assert(arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed);
-  }
-  BorrowScopeIntroducingValue(SILPhiArgument *arg)
-      : kind(BorrowScopeIntroducingValueKind::Phi), value(arg) {
-    assert(llvm::all_of(arg->getParent()->getPredecessorBlocks(),
-                        [](SILBasicBlock *block) {
-                          return isa<BranchInst>(block->getTerminator());
-                        }) &&
-           "Phi argument incoming values must come from branch insts!");
-    assert(arg->isPhiArgument() && "Can only accept a true phi argument!");
-    assert(arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed);
-  }
-
-  BorrowScopeIntroducingValue(SILValue v)
-      : kind(*BorrowScopeIntroducingValueKind::get(v->getKind())), value(v) {
-    // Validate that if we have a phi argument that all our predecessors have
-    // branches as terminators.
-    assert(!isa<SILPhiArgument>(v) ||
-           (llvm::all_of(v->getParentBlock()->getPredecessorBlocks(),
-                         [](SILBasicBlock *block) {
-                           return isa<BranchInst>(block->getTerminator());
-                         }) &&
-            "Phi argument incoming values must come from branch insts!"));
-
-    assert(v.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
-  }
-
   /// If value is a borrow introducer return it after doing some checks.
+  ///
+  /// This is the only way to construct a BorrowScopeIntroducingValue. We make
+  /// the primary constructor private for this reason.
   static Optional<BorrowScopeIntroducingValue> get(SILValue value) {
-    auto kind = BorrowScopeIntroducingValueKind::get(value->getKind());
-    if (!kind || value.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+    auto kind = BorrowScopeIntroducingValueKind::get(value);
+    if (!kind)
       return None;
-    // If kind is phi and we were not passed something with all branch
-    // predecessors, return None.
-    if ((*kind) == BorrowScopeIntroducingValueKind::Phi &&
-        llvm::any_of(value->getParentBlock()->getPredecessorBlocks(),
-                     [](SILBasicBlock *block) {
-                       return !isa<BranchInst>(block->getTerminator());
-                     }))
-      return None;
-    // Otherwise, create our value directly.
     return BorrowScopeIntroducingValue(*kind, value);
   }
 
