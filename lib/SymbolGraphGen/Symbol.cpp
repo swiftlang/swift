@@ -49,25 +49,40 @@ void Symbol::serializeKind(llvm::json::OStream &OS) const {
     serializeKind("swift.protocol", "Protocol", OS);
     break;
   case swift::DeclKind::Constructor:
-    serializeKind("swift.initializer", "Initializer", OS);
+    serializeKind("swift.init", "Initializer", OS);
     break;
   case swift::DeclKind::Func:
-    serializeKind("swift.function", "Function", OS);
+    if (VD->isOperator()) {
+      serializeKind("swift.func.op", "Operator", OS);
+    } else if (VD->isStatic()) {
+      serializeKind("swift.type.method", "Type Method", OS);
+    } else if (VD->getDeclContext()->getSelfNominalTypeDecl()){
+      serializeKind("swift.method", "Instance Method", OS);
+    } else {
+      serializeKind("swift.func", "Function", OS);
+    }
     break;
   case swift::DeclKind::Var:
-    serializeKind("swift.variable", "Variable", OS);
+    if (VD->isStatic()) {
+      serializeKind("swift.type.property", "Type Property", OS);
+    } else if (VD->getDeclContext()->getSelfNominalTypeDecl()) {
+      serializeKind("swift.property", "Instance Property", OS);
+    } else {
+      serializeKind("swift.var", "Global Variable", OS);
+    }
+    break;
+  case swift::DeclKind::Subscript:
+    if (VD->isStatic()) {
+      serializeKind("swift.type.subscript", "Type Subscript", OS);
+    } else {
+      serializeKind("swift.subscript", "Instance Subscript", OS);
+    }
     break;
   case swift::DeclKind::TypeAlias:
     serializeKind("swift.typealias", "Type Alias", OS);
     break;
-  case swift::DeclKind::InfixOperator:
-    serializeKind("swift.infixOperator", "Infix Operator", OS);
-    break;
-  case swift::DeclKind::PrefixOperator:
-    serializeKind("swift.prefixOperator", "Prefix Operator", OS);
-    break;
-  case swift::DeclKind::PostfixOperator:
-    serializeKind("swift.postfixOperator", "Postfix Operator", OS);
+  case swift::DeclKind::AssociatedType:
+    serializeKind("swift.associatedtype", "Associated Type", OS);
     break;
   default:
     llvm_unreachable("Unsupported declaration kind for symbol graph");
