@@ -37,25 +37,25 @@ public final class _stdlib_AtomicInt {
 
   @discardableResult
   public func fetchAndAdd(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicLoadThenWrappingIncrementWord(
+    let word = _valuePtr._atomicSerializedLoadThenWrappingIncrementWord(
       by: UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndAnd(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicLoadThenBitwiseAndWord(
+    let word = _valuePtr._atomicSerializedLoadThenBitwiseAndWord(
       UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndOr(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicLoadThenBitwiseOrWord(
+    let word = _valuePtr._atomicSerializedLoadThenBitwiseOrWord(
       UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndXor(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicLoadThenBitwiseXorWord(
+    let word = _valuePtr._atomicSerializedLoadThenBitwiseXorWord(
       UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
@@ -75,7 +75,7 @@ public final class _stdlib_AtomicInt {
 
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
     let expectedWord = UInt(bitPattern: expected)
-    let (success, originalWord) = _valuePtr._atomicCompareThenExchangeWord(
+    let (success, originalWord) = _valuePtr._atomicSerializedCompareThenExchangeWord(
       expected: expectedWord,
       desired: UInt(bitPattern: desired))
     expected = Int(bitPattern: originalWord)

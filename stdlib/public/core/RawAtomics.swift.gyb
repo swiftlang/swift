@@ -18,23 +18,23 @@
       ('acquiring',              'Acquiring',              'acquiring',               'acquire',   'acquire'),
       ('releasing',              'Releasing',              'releasing',               'release',   'monotonic'),
       ('acquiringAndReleasing',  'AcquiringAndReleasing',  'acquiring-and-releasing', 'acqrel',    'acquire'),
-      ('sequentiallyConsistent', '',                       'sequentially consistent', 'seqcst',    'seqcst'),
+      ('sequentiallyConsistent', 'Serialized',             'sequentially consistent', 'seqcst',    'seqcst'),
     ]
 
   def loadOrderings():
     return [
-      # Swift enum case,         API name,    doc name,                  llvm name
-      ('relaxed',                'Relaxed',   'relaxed',                 'monotonic'),
-      ('acquiring',              'Acquiring', 'acquiring',               'acquire'),
-      ('sequentiallyConsistent', '',          'sequentially consistent', 'seqcst'),
+      # Swift enum case,         API name,     doc name,                  llvm name
+      ('relaxed',                'Relaxed',    'relaxed',                 'monotonic'),
+      ('acquiring',              'Acquiring',  'acquiring',               'acquire'),
+      ('sequentiallyConsistent', 'Serialized', 'sequentially consistent', 'seqcst'),
     ]
 
   def storeOrderings():
     return [
-      # Swift enum case,         API name,    doc name,                  llvm name
-      ('relaxed',                'Relaxed',   'relaxed',                 'monotonic'),
-      ('releasing',              'Releasing', 'releasing',               'release'),
-      ('sequentiallyConsistent', '',          'sequentially consistent', 'seqcst'),
+      # Swift enum case,         API name,     doc name,                  llvm name
+      ('relaxed',                'Relaxed',    'relaxed',                 'monotonic'),
+      ('releasing',              'Releasing',  'releasing',               'release'),
+      ('sequentiallyConsistent', 'Serialized', 'sequentially consistent', 'seqcst'),
     ]
 
   integerOperations = [
@@ -86,7 +86,7 @@ extension UnsafeMutableRawPointer {
     case .acquiring:
       return _atomicAcquiringLoadWord()
     default:
-      return _atomicLoadWord()
+      return _atomicSerializedLoadWord()
     }
   }
 }
@@ -129,7 +129,7 @@ extension UnsafeMutableRawPointer {
     case .releasing:
       _atomicReleasingStoreWord(desired)
     default:
-      _atomicStoreWord(desired)
+      _atomicSerializedStoreWord(desired)
     }
   }
 }
@@ -181,7 +181,7 @@ extension UnsafeMutableRawPointer {
     case .acquiringAndReleasing:
       return _atomicAcquiringAndReleasingExchangeWord(desired)
     default:
-      return _atomicExchangeWord(desired)
+      return _atomicSerializedExchangeWord(desired)
     }
   }
 }
@@ -269,7 +269,7 @@ extension UnsafeMutableRawPointer {
         expected: expected,
         desired: desired)
     default:
-      return _atomicCompareThenExchangeWord(
+      return _atomicSerializedCompareThenExchangeWord(
         expected: expected,
         desired: desired)
     }
@@ -338,7 +338,7 @@ extension UnsafeMutableRawPointer {
     case .acquiringAndReleasing:
       return _atomicAcquiringAndReleasingLoadThen${swiftName}Word(${argLabel(label)}operand)
     default:
-      return _atomicLoadThen${swiftName}Word(${argLabel(label)}operand)
+      return _atomicSerializedLoadThen${swiftName}Word(${argLabel(label)}operand)
     }
   }
 % end

@@ -30,39 +30,39 @@ public final class _stdlib_AtomicInt {
   }
 
   public func store(_ desired: Int) {
-    _valuePtr._atomicStoreWord(UInt(bitPattern: desired))
+    _valuePtr._atomicSerializedStoreWord(UInt(bitPattern: desired))
   }
 
   public func load() -> Int {
-    Int(bitPattern: _valuePtr._atomicLoadWord())
+    Int(bitPattern: _valuePtr._atomicSerializedLoadWord())
   }
 
   @discardableResult
   public func fetchAndAdd(_ operand: Int) -> Int {
     let operandWord = UInt(bitPattern: operand)
     let originalWord =
-      _valuePtr._atomicLoadThenWrappingIncrementWord(by: operandWord)
+      _valuePtr._atomicSerializedLoadThenWrappingIncrementWord(by: operandWord)
     return Int(bitPattern: originalWord)
   }
   @discardableResult
   public func fetchAndAnd(_ operand: Int) -> Int {
     let operandWord = UInt(bitPattern: operand)
     let originalWord =
-      _valuePtr._atomicLoadThenBitwiseAndWord(operandWord)
+      _valuePtr._atomicSerializedLoadThenBitwiseAndWord(operandWord)
     return Int(bitPattern: originalWord)
   }
   @discardableResult
   public func fetchAndOr(_ operand: Int) -> Int {
     let operandWord = UInt(bitPattern: operand)
     let originalWord =
-      _valuePtr._atomicLoadThenBitwiseOrWord(operandWord)
+      _valuePtr._atomicSerializedLoadThenBitwiseOrWord(operandWord)
     return Int(bitPattern: originalWord)
   }
   @discardableResult
   public func fetchAndXor(_ operand: Int) -> Int {
     let operandWord = UInt(bitPattern: operand)
     let originalWord =
-      _valuePtr._atomicLoadThenBitwiseXorWord(operandWord)
+      _valuePtr._atomicSerializedLoadThenBitwiseXorWord(operandWord)
     return Int(bitPattern: originalWord)
   }
 
@@ -80,7 +80,7 @@ public final class _stdlib_AtomicInt {
   }
 
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
-    let (won, oldValue) = _valuePtr._atomicCompareThenExchangeWord(
+    let (won, oldValue) = _valuePtr._atomicSerializedCompareThenExchangeWord(
       expected: UInt(bitPattern: expected),
       desired: UInt(bitPattern: desired))
     expected = Int(bitPattern: oldValue)
