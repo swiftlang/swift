@@ -198,22 +198,22 @@ bb0:
   // YAML-NEXT: Pass:            sil-inliner
   // YAML-NEXT: Name:            sil.Inlined
   // YAML-NEXT: DebugLoc:
-  // YAML-NEXT:   File:            {{.*}}inliner_coldblocks.sil
-  // YAML-NEXT:   Line:            223
-  // YAML-NEXT:   Column:          3
+  // YAML:        File:            {{.*}}inliner_coldblocks.sil
+  // YAML:        Line:            223
+  // YAML:        Column:          3
   // YAML-NEXT: Function:        regular_large_callee
   // YAML-NEXT: Args:
   // YAML-NEXT:   - Callee:          '"update_global"'
   // YAML-NEXT:     DebugLoc:
-  // YAML-NEXT:       File:            {{.*}}inliner_coldblocks.sil
-  // YAML-NEXT:       Line:            20
-  // YAML-NEXT:       Column:          6
+  // YAML:          File:            {{.*}}inliner_coldblocks.sil
+  // YAML:            Line:            20
+  // YAML:            Column:          6
   // YAML-NEXT:   - String:          ' inlined into '
   // YAML-NEXT:   - Caller:          '"regular_large_callee"'
   // YAML-NEXT:     DebugLoc:
-  // YAML-NEXT:       File:            {{.*}}inliner_coldblocks.sil
-  // YAML-NEXT:       Line:            162
-  // YAML-NEXT:       Column:          6
+  // YAML:            File:            {{.*}}inliner_coldblocks.sil
+  // YAML:            Line:            162
+  // YAML:            Column:          6
   // YAML-NEXT:   - String:          ' (cost = '
   // YAML-NEXT:   - Cost:            '{{.*}}'
   // YAML-NEXT:   - String:          ', benefit = '
@@ -238,17 +238,17 @@ bb0:
   // YAML-NEXT: Pass:            sil-inliner
   // YAML-NEXT: Name:            sil.NoInlinedCost
   // YAML-NEXT: DebugLoc:
-  // YAML-NEXT:   File:            {{.*}}inliner_coldblocks.sil
-  // YAML-NEXT:   Line:            258
-  // YAML-NEXT:   Column:          8
+  // YAML:        File:            {{.*}}inliner_coldblocks.sil
+  // YAML:        Line:            258
+  // YAML:        Column:          8
   // YAML-NEXT: Function:        dont_inline_regular_large_callee
   // YAML-NEXT: Args:
   // YAML-NEXT:   - String:          'Not profitable to inline function '
   // YAML-NEXT:   - Callee:          '"regular_large_callee"'
   // YAML-NEXT:     DebugLoc:
-  // YAML-NEXT:       File:            {{.*}}inliner_coldblocks.sil
-  // YAML-NEXT:       Line:            162
-  // YAML-NEXT:       Column:          6
+  // YAML:       File:            {{.*}}inliner_coldblocks.sil
+  // YAML:       Line:            162
+  // YAML:       Column:          6
   // YAML-NEXT:   - String:          ' (cost = '
   // YAML-NEXT:   - Cost:            '{{.*}}'
   // YAML-NEXT:   - String:          ', benefit = '

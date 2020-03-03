@@ -67,6 +67,7 @@ class SILUndef;
 class SourceFile;
 class SerializedSILLoader;
 class SILFunctionBuilder;
+class SILRemarkStreamer;
 
 namespace Lowering {
 class SILGenModule;
@@ -232,13 +233,11 @@ private:
   // The list of SILProperties in the module.
   PropertyListType properties;
 
-  /// This is the underlying raw stream of OptRecordStream.
-  ///
-  /// It is also owned by SILModule in order to keep their lifetime in sync.
-  std::unique_ptr<llvm::raw_ostream> OptRecordRawStream;
+  /// The remark output stream used to record SIL remarks to a file.
+  std::unique_ptr<llvm::raw_fd_ostream> silRemarkStream;
 
-  /// If non-null, the YAML file where remarks should be recorded.
-  std::unique_ptr<llvm::yaml::Output> OptRecordStream;
+  /// The remark streamer used to serialize SIL remarks to a file.
+  std::unique_ptr<swift::SILRemarkStreamer> silRemarkStreamer;
 
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
   llvm::DenseMap<Identifier, IntrinsicInfo> IntrinsicIDCache;
@@ -524,9 +523,12 @@ public:
     return coverageMaps;
   }
 
-  llvm::yaml::Output *getOptRecordStream() { return OptRecordStream.get(); }
-  void setOptRecordStream(std::unique_ptr<llvm::yaml::Output> &&Stream,
-                          std::unique_ptr<llvm::raw_ostream> &&RawStream);
+  swift::SILRemarkStreamer *getSILRemarkStreamer() {
+    return silRemarkStreamer.get();
+  }
+  void setSILRemarkStreamer(
+      std::unique_ptr<llvm::raw_fd_ostream> &&remarkStream,
+      std::unique_ptr<swift::SILRemarkStreamer> &&remarkStreamer);
 
   // This is currently limited to VarDecl because the visibility of global
   // variables and class properties is straightforward, while the visibility of

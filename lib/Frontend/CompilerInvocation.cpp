@@ -1000,6 +1000,20 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
 
+  if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_EQ)) {
+    llvm::Expected<llvm::remarks::Format> formatOrErr =
+        llvm::remarks::parseFormat(A->getValue());
+    if (llvm::Error err = formatOrErr.takeError()) {
+      Diags.diagnose(SourceLoc(), diag::error_creating_remark_serializer,
+                     toString(std::move(err)));
+      return true;
+    }
+    Opts.OptRecordFormat = *formatOrErr;
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_passes))
+    Opts.OptRecordPasses = A->getValue();
+
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
     Opts.OptRecordFile = A->getValue();
 
