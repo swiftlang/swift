@@ -136,7 +136,7 @@ void ReferencedNameTracker::enumerateMemberUses(
       std::string context =
           DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
               nominal);
-      std::string name = std::string(rawName.userFacingName());
+      std::string name = rawName.userFacingName().str();
       enumerateUsedDecl(NodeKind::member, context, name, isCascadingUse);
     }
   }
