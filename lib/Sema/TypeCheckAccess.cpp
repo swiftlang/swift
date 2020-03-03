@@ -171,8 +171,6 @@ public:
                                            AccessScope accessScope,
                                            const DeclContext *useDC,
                                            bool treatUsableFromInlineAsPublic) {
-    assert(!accessScope.isPublic() &&
-           "why would we need to find a public access scope?");
     if (TR == nullptr)
       return nullptr;
     TypeAccessScopeDiagnoser diagnoser(accessScope, useDC,
