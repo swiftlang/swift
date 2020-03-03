@@ -47,6 +47,7 @@ BUNDLE_PREFIX=
 INSTALLER_PACKAGE=
 SWIFT_PACKAGE_BASE=
 SWIFT_PACKAGE_GPU=
+SWIFT_PACKAGE_X10=
 SWIFT_PACKAGE_NOTEST=
 SWIFT_PACKAGE_INSTALLER=
 # SWIFT_ENABLE_TENSORFLOW
@@ -98,6 +99,14 @@ while [ $# -ne 0 ]; do
       exit 1
     fi
   ;;
+  -x|--x10)
+    if [ "$(uname -s)" == "Linux" ]; then
+      SWIFT_PACKAGE_X10=,x10
+    else
+      echo "--x10 is not supported on \"$(uname -s)\". See --help"
+      exit 1
+    fi
+  ;;
   *)
     if [ ${FIRST_ARG_PROCESSED} -ne 0 ]; then
       echo "Unrecognised argument \"$1\""
@@ -109,7 +118,7 @@ while [ $# -ne 0 ]; do
   shift
 done
 
-SWIFT_PACKAGE="${SWIFT_PACKAGE_BASE}${SWIFT_PACKAGE_GPU}${SWIFT_PACKAGE_NOTEST}${SWIFT_PACKAGE_INSTALLER}"
+SWIFT_PACKAGE="${SWIFT_PACKAGE_BASE}${SWIFT_PACKAGE_GPU}${SWIFT_PACKAGE_X10}${SWIFT_PACKAGE_NOTEST}${SWIFT_PACKAGE_INSTALLER}"
 
 # Get host name.
 HOST=
