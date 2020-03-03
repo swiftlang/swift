@@ -68,3 +68,15 @@ noEscapeParam = takesAny // expected-error {{converting non-escaping value to 'A
 func rdar_59773317(x: () -> Int) -> (() -> Int)? { // expected-note {{parameter 'x' is implicitly non-escaping}}
   return x // expected-error {{using non-escaping parameter 'x' in a context expecting an @escaping closure}}
 }
+
+// rdar://problem/59703585 - Wrong error message when signature of a C function type and Swift implementation mismatch
+func rdar_59703585() {
+  typealias Fn = @convention(c) (UnsafePointer<Int8>?, UnsafeMutableRawPointer?) -> Void
+
+  func swiftCallback(someString: UnsafePointer<Int8>, someObject: UnsafeMutableRawPointer?) {}
+
+  var cb: Fn? = nil
+
+  cb = swiftCallback
+  // expected-error@-1 {{cannot assign value of type '(UnsafePointer<Int8>, UnsafeMutableRawPointer?) -> ()' to type 'Fn?' (aka 'Optional<@convention(c) (Optional<UnsafePointer<Int8>>, Optional<UnsafeMutableRawPointer>) -> ()>')}}
+}

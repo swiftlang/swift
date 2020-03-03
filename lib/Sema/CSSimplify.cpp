@@ -3788,6 +3788,12 @@ bool ConstraintSystem::repairFailures(
         tupleLocator->isLastElement<LocatorPathElt::GenericArgument>())
       break;
 
+    // If the mismatch is a part of either optional-to-optional or
+    // value-to-optional conversions, let's allow fix refer to a complete
+    // top level type and not just a part of it.
+    if (tupleLocator->findLast<LocatorPathElt::OptionalPayload>())
+      break;
+
     ConstraintFix *fix;
     if (tupleLocator->isLastElement<LocatorPathElt::FunctionArgument>()) {
       fix = AllowFunctionTypeMismatch::create(*this, lhs, rhs, tupleLocator, index);

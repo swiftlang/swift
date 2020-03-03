@@ -1884,6 +1884,12 @@ bool ContextualFailure::diagnoseAsError() {
       return true;
     }
 
+    if (isa<AssignExpr>(anchor)) {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_convert_assign,
+                     getFromType(), getToType());
+      return true;
+    }
+
     return false;
   }
 
