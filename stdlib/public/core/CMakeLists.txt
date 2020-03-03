@@ -217,6 +217,7 @@ set(SWIFTLIB_SOURCES
   UnsafeAtomicLazyReference.swift
   UnsafeAtomicUnmanaged.swift
   UnsafeAtomicMutablePointer.swift
+  UnsafeAtomicState.swift
   VarArgs.swift
   Zip.swift
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
