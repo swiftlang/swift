@@ -1225,15 +1225,15 @@ extension Array: RangeReplaceableCollection {
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
       
-    let wasCollection = newElements.withContiguousStorageIfAvailable {
-      (contentsBuffer: UnsafeBufferPointer<Element>) -> Bool in
-      append(contentsOf: contentsBuffer)
-      return true
-    }
+    //let wasCollection = newElements.withContiguousStorageIfAvailable {
+    //  (contentsBuffer: UnsafeBufferPointer<Element>) -> Bool in
+    //  append(contentsOf: contentsBuffer)
+    //  return true
+    //}
     
-    if _fastPath(wasCollection != nil) {
-      return
-    }
+    //if _fastPath(wasCollection != nil) {
+    //  return
+    //}
 
     let newElementsCount = newElements.underestimatedCount
     reserveCapacityForAppend(newElementsCount: newElementsCount)
