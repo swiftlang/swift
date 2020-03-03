@@ -29,6 +29,7 @@ sil @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
 class Klass {}
 sil @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
 sil @guaranteed_fakeoptional_klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+sil @guaranteed_fakeoptional_classlet_user : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
 
 struct MyInt {
   var value: Builtin.Int32
@@ -1497,6 +1498,162 @@ bb2:
   br bb3
 
 bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_functionarg : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'convert_load_copy_to_load_borrow_despite_switch_enum_functionarg'
+sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_functionarg : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<ClassLet>):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+  switch_enum %0 : $FakeOptional<ClassLet>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%1 : @guaranteed $ClassLet):
+  %2 = ref_element_addr %1 : $ClassLet, #ClassLet.aLet
+  %3 = load [copy] %2 : $*Klass
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_beginborrow : $@convention(thin) (@owned FakeOptional<ClassLet>) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'convert_load_copy_to_load_borrow_despite_switch_enum_beginborrow'
+sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_beginborrow : $@convention(thin) (@owned FakeOptional<ClassLet>) -> () {
+bb0(%0 : @owned $FakeOptional<ClassLet>):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+  %0a = begin_borrow %0 : $FakeOptional<ClassLet>
+  switch_enum %0a : $FakeOptional<ClassLet>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%1 : @guaranteed $ClassLet):
+  %2 = ref_element_addr %1 : $ClassLet, #ClassLet.aLet
+  %3 = load [copy] %2 : $*Klass
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  end_borrow %0a : $FakeOptional<ClassLet>
+  destroy_value %0 : $FakeOptional<ClassLet>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_loadborrow : $@convention(thin) (@in_guaranteed FakeOptional<ClassLet>) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'convert_load_copy_to_load_borrow_despite_switch_enum_loadborrow'
+sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_loadborrow : $@convention(thin) (@in_guaranteed FakeOptional<ClassLet>) -> () {
+bb0(%0 : $*FakeOptional<ClassLet>):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+  %0a = load_borrow %0 : $*FakeOptional<ClassLet>
+  switch_enum %0a : $FakeOptional<ClassLet>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%1 : @guaranteed $ClassLet):
+  %2 = ref_element_addr %1 : $ClassLet, #ClassLet.aLet
+  %3 = load [copy] %2 : $*Klass
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  end_borrow %0a : $FakeOptional<ClassLet>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// TODO: We can support this in a little bit once the rest of SemanticARCOpts is
+// guaranteed to be safe with guaranteed phis.
+//
+// CHECK-LABEL: sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_guaranteedphi_1 : $@convention(thin) (@owned FakeOptional<ClassLet>) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'convert_load_copy_to_load_borrow_despite_switch_enum_guaranteedphi_1'
+sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_guaranteedphi_1 : $@convention(thin) (@owned FakeOptional<ClassLet>) -> () {
+bb0(%0 : @owned $FakeOptional<ClassLet>):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+  cond_br undef, bb0a, bb0b
+
+bb0a:
+  %0a = begin_borrow %0 : $FakeOptional<ClassLet>
+  br bb0c(%0a : $FakeOptional<ClassLet>)
+
+bb0b:
+  %0b = begin_borrow %0 : $FakeOptional<ClassLet>
+  br bb0c(%0b : $FakeOptional<ClassLet>)
+
+bb0c(%0c : @guaranteed $FakeOptional<ClassLet>):
+  switch_enum %0c : $FakeOptional<ClassLet>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%1 : @guaranteed $ClassLet):
+  %2 = ref_element_addr %1 : $ClassLet, #ClassLet.aLet
+  %3 = load [copy] %2 : $*Klass
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  end_borrow %0c : $FakeOptional<ClassLet>
+  destroy_value %0 : $FakeOptional<ClassLet>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that if begin_borrow has a consuming end scope use, we can still
+// eliminate load [copy].
+//
+// CHECK-LABEL: sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_guaranteedphi_2 : $@convention(thin) (@owned FakeOptional<ClassLet>) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'convert_load_copy_to_load_borrow_despite_switch_enum_guaranteedphi_2'
+sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_guaranteedphi_2 : $@convention(thin) (@owned FakeOptional<ClassLet>) -> () {
+bb0(%0 : @owned $FakeOptional<ClassLet>):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %0a = begin_borrow %0 : $FakeOptional<ClassLet>
+  br bb3(%0a : $FakeOptional<ClassLet>)
+
+bb2:
+  %0b = begin_borrow %0 : $FakeOptional<ClassLet>
+  %0b2 = unchecked_enum_data %0b : $FakeOptional<ClassLet>, #FakeOptional.some!enumelt.1
+  %2 = ref_element_addr %0b2 : $ClassLet, #ClassLet.aLet
+  %3 = load [copy] %2 : $*Klass
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  br bb3(%0b : $FakeOptional<ClassLet>)
+
+bb3(%0c : @guaranteed $FakeOptional<ClassLet>):
+  %f2 = function_ref @guaranteed_fakeoptional_classlet_user : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
+  apply %f2(%0c) : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
+  end_borrow %0c : $FakeOptional<ClassLet>
+  destroy_value %0 : $FakeOptional<ClassLet>
   %9999 = tuple()
   return %9999 : $()
 }
