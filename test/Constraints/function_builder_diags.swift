@@ -399,3 +399,18 @@ func testOverloadedSwitch() {
     }
   }
 }
+
+// Check exhaustivity.
+func testNonExhaustiveSwitch(e: E) {
+    tuplify(true) { c in
+    "testSwitch"
+    switch e { // expected-error{{switch must be exhaustive}}
+      // expected-note @-1{{add missing case: '.b(_, .none)'}}
+    case .a:
+      "a"
+    case .b(let i, let s?):
+      i * 2
+      s + "!"
+    }
+  }
+}
