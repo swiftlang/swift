@@ -1176,7 +1176,34 @@ extension Array: RangeReplaceableCollection {
     _reserveCapacityAssumingUniqueBuffer(oldCount: oldCount)
     _appendElementAssumeUniqueAndCapacity(oldCount, newElement: newElement)
   }
+  
+  @inlinable
+  @_semantics("array.append_contentsOf")
+  public mutating func append<C: Collection>(
+    contentsOf newElements: __owned C
+  ) where C.Element == Element {
+    let newElementsCount = newElements.count
+    reserveCapacityForAppend(newElementsCount: newElementsCount)
 
+    let oldCount = self.count
+    let startNewElements = _buffer.firstElementAddress + oldCount
+    let buf = UnsafeMutableBufferPointer(
+                start: startNewElements,
+                count: self.capacity - oldCount)
+
+    let (_, writtenUpTo) = buf.initialize(from: newElements)
+
+    let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
+
+    // This check prevents a data race writing to _swiftEmptyArrayStorage
+    if writtenCount > 0 {
+      _buffer.count += writtenCount
+    }
+
+    _precondition(newElementsCount == writtenCount,
+      "invalid Collection: number of elements in collection unequal to 'count'")
+  }
+  
   /// Adds the elements of a sequence to the end of the array.
   ///
   /// Use this method to append the elements of a sequence to the end of this
@@ -1197,6 +1224,16 @@ extension Array: RangeReplaceableCollection {
   @_semantics("array.append_contentsOf")
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
+      
+    let wasCollection = newElements.withContiguousStorageIfAvailable {
+      (contentsBuffer: UnsafeBufferPointer<Element>) -> Bool in
+      append(contentsOf: contentsBuffer)
+      return true
+    }
+    
+    if _fastPath(wasCollection != nil) {
+      return
+    }
 
     let newElementsCount = newElements.underestimatedCount
     reserveCapacityForAppend(newElementsCount: newElementsCount)
@@ -1221,17 +1258,6 @@ extension Array: RangeReplaceableCollection {
     }
 
     if _slowPath(writtenUpTo == buf.endIndex) {
-
-      // A shortcut for appending an Array: If newElements is an Array then it's
-      // guaranteed that buf.initialize(from: newElements) already appended all
-      // elements. It reduces code size, because the following code
-      // can be removed by the optimizer by constant folding this check in a
-      // generic specialization.
-      if newElements is [Element] {
-        _internalInvariant(remainder.next() == nil)
-        return
-      }
-
       // there may be elements that didn't fit in the existing buffer,
       // append them in slow sequence-only mode
       var newCount = _getCount()

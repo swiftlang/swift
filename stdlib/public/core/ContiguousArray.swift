@@ -814,6 +814,33 @@ extension ContiguousArray: RangeReplaceableCollection {
     _reserveCapacityAssumingUniqueBuffer(oldCount: oldCount)
     _appendElementAssumeUniqueAndCapacity(oldCount, newElement: newElement)
   }
+  
+  @inlinable
+  @_semantics("array.append_contentsOf")
+  public mutating func append<C: Collection>(
+    contentsOf newElements: __owned C
+  ) where C.Element == Element {
+    let newElementsCount = newElements.count
+    reserveCapacityForAppend(newElementsCount: newElementsCount)
+
+    let oldCount = self.count
+    let startNewElements = _buffer.firstElementAddress + oldCount
+    let buf = UnsafeMutableBufferPointer(
+                start: startNewElements,
+                count: self.capacity - oldCount)
+
+    let (_, writtenUpTo) = buf.initialize(from: newElements)
+
+    let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
+
+    // This check prevents a data race writing to _swiftEmptyArrayStorage
+    if writtenCount > 0 {
+      _buffer.count += writtenCount
+    }
+
+    _precondition(newElementsCount == writtenCount,
+      "invalid Collection: number of elements in collection unequal to 'count'")
+  }
 
   /// Adds the elements of a sequence to the end of the array.
   ///
@@ -836,6 +863,16 @@ extension ContiguousArray: RangeReplaceableCollection {
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
+    let wasCollection = newElements.withContiguousStorageIfAvailable {
+      (contentsBuffer: UnsafeBufferPointer<Element>) -> Bool in
+      append(contentsOf: contentsBuffer)
+      return true
+    }
+    
+    if _fastPath(wasCollection != nil) {
+      return
+    }
+      
     let newElementsCount = newElements.underestimatedCount
     reserveCapacityForAppend(newElementsCount: newElementsCount)
 
