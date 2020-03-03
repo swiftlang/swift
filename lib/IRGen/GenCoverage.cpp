@@ -145,6 +145,7 @@ void IRGenModule::emitCoverageMapping() {
   auto *RecordsVal = llvm::ConstantArray::get(RecordsTy, FunctionRecords);
 
   // Create the coverage data header.
+  const unsigned NRecords = 0;
   llvm::Type *CovDataHeaderTypes[] = {
 #define COVMAP_HEADER(Type, LLVMType, Name, Init) LLVMType,
 #include "llvm/ProfileData/InstrProfData.inc"
