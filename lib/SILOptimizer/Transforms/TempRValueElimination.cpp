@@ -18,6 +18,7 @@
 
 #define DEBUG_TYPE "sil-temp-rvalue-opt"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -25,6 +26,7 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
+#include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -50,7 +52,7 @@ namespace {
 ///
 ///   %temp = alloc_stack $T
 ///   copy_addr %src to [initialization] %temp : $*T
-///   // no writes to %src and %temp
+///   // no writes to %src or %temp
 ///   destroy_addr %temp : $*T
 ///   dealloc_stack %temp : $*T
 ///
@@ -67,7 +69,7 @@ class TempRValueOptPass : public SILFunctionTransform {
                     SmallPtrSetImpl<SILInstruction *> &loadInsts);
 
   bool
-  checkNoSourceModification(CopyAddrInst *copyInst,
+  checkNoSourceModification(CopyAddrInst *copyInst, SILValue copySrc,
                             const SmallPtrSetImpl<SILInstruction *> &useInsts);
 
   bool
@@ -117,6 +119,9 @@ bool TempRValueOptPass::collectLoads(
     LLVM_DEBUG(llvm::dbgs()
                << "  Temp use may write/destroy its source" << *user);
     return false;
+
+  case SILInstructionKind::BeginAccessInst:
+    return cast<BeginAccessInst>(user)->getAccessKind() == SILAccessKind::Read;
 
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst: {
@@ -227,7 +232,8 @@ bool TempRValueOptPass::collectLoads(
 /// of the temporary and look for the last use, which effectively ends the
 /// lifetime.
 bool TempRValueOptPass::checkNoSourceModification(
-    CopyAddrInst *copyInst, const SmallPtrSetImpl<SILInstruction *> &useInsts) {
+    CopyAddrInst *copyInst, SILValue copySrc,
+    const SmallPtrSetImpl<SILInstruction *> &useInsts) {
   unsigned numLoadsFound = 0;
   auto iter = std::next(copyInst->getIterator());
   // We already checked that the useful lifetime of the temporary ends in
@@ -244,7 +250,7 @@ bool TempRValueOptPass::checkNoSourceModification(
     if (numLoadsFound == useInsts.size())
       return true;
 
-    if (aa->mayWriteToMemory(inst, copyInst->getSrc())) {
+    if (aa->mayWriteToMemory(inst, copySrc)) {
       LLVM_DEBUG(llvm::dbgs() << "  Source modified by" << *iter);
       return false;
     }
@@ -336,8 +342,15 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   if (!tempObj)
     return false;
 
-  assert(tempObj != copyInst->getSrc() &&
-         "can't initialize temporary with itself");
+  // The copy's source address must not be a scoped instruction, like
+  // begin_borrow. When the temporary object is eliminated, it's uses are
+  // replaced with the copy's source. Therefore, the source address must be
+  // valid at least until the next instruction that may write to or destroy the
+  // source. End-of-scope markers, such as end_borrow, do not write to or
+  // destroy memory, so scoped addresses are not valid replacements.
+  SILValue copySrc = stripAccessMarkers(copyInst->getSrc());
+
+  assert(tempObj != copySrc && "can't initialize temporary with itself");
 
   // Scan all uses of the temporary storage (tempObj) to verify they all refer
   // to the value initialized by this copy. It is sufficient to check that the
@@ -363,12 +376,12 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
       }
     }
 
-    if (!collectLoads(useOper, user, tempObj, copyInst->getSrc(), loadInsts))
+    if (!collectLoads(useOper, user, tempObj, copySrc, loadInsts))
       return false;
   }
 
   // Check if the source is modified within the lifetime of the temporary.
-  if (!checkNoSourceModification(copyInst, loadInsts))
+  if (!checkNoSourceModification(copyInst, copySrc, loadInsts))
     return false;
 
   ValueLifetimeAnalysis::Frontier tempAddressFrontier;
@@ -391,7 +404,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     switch (user->getKind()) {
     case SILInstructionKind::DestroyAddrInst:
       if (copyInst->isTakeOfSrc()) {
-        use->set(copyInst->getSrc());
+        use->set(copySrc);
       } else {
         user->dropAllReferences();
         toDelete.push_back(user);
@@ -408,7 +421,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
         if (cai->isTakeOfSrc() && !copyInst->isTakeOfSrc())
           cai->setIsTakeOfSrc(IsNotTake);
       }
-      use->set(copyInst->getSrc());
+      use->set(copySrc);
       break;
     }
     case SILInstructionKind::LoadInst: {
@@ -447,9 +460,9 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
 
     // ASSUMPTION: no operations that may be handled by this default clause can
     // destroy tempObj. This includes operations that load the value from memory
-    // and release it.
+    // and release it or cast the address before destroying it.
     default:
-      use->set(copyInst->getSrc());
+      use->set(copySrc);
       break;
     }
   }
@@ -474,33 +487,50 @@ void TempRValueOptPass::run() {
   bool changed = false;
 
   // Find all copy_addr instructions.
+  llvm::SmallVector<CopyAddrInst *, 8> deadCopies;
   for (auto &block : *getFunction()) {
-    auto ii = block.begin();
-    while (ii != block.end()) {
+    // Increment the instruction iterator only after calling
+    // tryOptimizeCopyIntoTemp because the instruction after CopyInst might be
+    // deleted, but copyInst itself won't be deleted until later.
+    for (auto ii = block.begin(); ii != block.end(); ++ii) {
       auto *copyInst = dyn_cast<CopyAddrInst>(&*ii);
 
       if (copyInst) {
         // In case of success, this may delete instructions, but not the
         // CopyInst itself.
         changed |= tryOptimizeCopyIntoTemp(copyInst);
-      }
-
-      // Increment the instruction iterator here. We can't do it at the begin of
-      // the loop because the instruction after CopyInst might be deleted in
-      // in tryOptimizeCopyIntoTemp. We can't do it at the end of the loop
-      // because the CopyInst might be deleted in the following code.
-      ++ii;
-
-      // Remove identity copies which are a result of this optimization.
-      if (copyInst && copyInst->getSrc() == copyInst->getDest()) {
-        // This is either the CopyInst which just got optimized or it is a
-        // follow-up from an earlier iteration, where another copy_addr copied
-        // the temporary back to the source location.
-        copyInst->eraseFromParent();
+        // Remove identity copies which either directly result from successfully
+        // calling tryOptimizeCopyIntoTemp or was created by an earlier
+        // iteration, where another copy_addr copied the temporary back to the
+        // source location.
+        if (stripAccessMarkers(copyInst->getSrc()) == copyInst->getDest()) {
+          changed = true;
+          deadCopies.push_back(copyInst);
+        }
       }
     }
   }
-
+  // Delete the copies and any unused address operands.
+  // The same copy may have been added multiple times.
+  sortUnique(deadCopies);
+  for (auto *deadCopy : deadCopies) {
+    assert(changed);
+    auto *srcInst = deadCopy->getSrc()->getDefiningInstruction();
+    deadCopy->eraseFromParent();
+    // Simplify any access scope markers that were only used by the dead
+    // copy_addr and other potentially unused addresses.
+    if (srcInst) {
+      if (SILValue result = simplifyInstruction(srcInst)) {
+        replaceAllSimplifiedUsesAndErase(
+            srcInst, result, [](SILInstruction *instToKill) {
+              // SimplifyInstruction is not in the business of removing
+              // copy_addr. If it were, then we would need to update deadCopies.
+              assert(!isa<CopyAddrInst>(instToKill));
+              instToKill->eraseFromParent();
+            });
+      }
+    }
+  }
   if (changed) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
