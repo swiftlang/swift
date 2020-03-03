@@ -419,11 +419,12 @@ class BenchmarkDoctor(object):
         name = measurements['name']
         setup, ratio = BenchmarkDoctor._setup_overhead(measurements)
         setup = 0 if ratio < 0.05 else setup
-        runtime = min(
-            [(result.samples.min - correction) for correction, i_series in
-             [(correction, BenchmarkDoctor._select(measurements, num_iters=i))
-              for i, correction in [(i, setup // i) for i in [1, 2]]]
-             for result in i_series])
+        runtimes = []
+        for i in [1, 2]:
+            correction = setup // i
+            for result in BenchmarkDoctor._select(measurements, num_iters=i):
+                runtimes.append(result.samples.min - correction)
+        runtime = min(runtimes)
 
         threshold = 1000
         if threshold < runtime:
