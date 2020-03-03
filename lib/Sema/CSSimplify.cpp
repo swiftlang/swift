@@ -476,8 +476,8 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     }
 
     // Claim the parameter/argument pair.
-    claimedArgs[numArgs-1] = true;
-    ++numClaimedArgs;
+    claim(params[lastParamIdx].getLabel(), numArgs - 1,
+          /*ignoreNameClash=*/true);
     // Let's claim the trailing closure unless it's an extra argument.
     if (!isExtraClosure)
       parameterBindings[lastParamIdx].push_back(numArgs - 1);
