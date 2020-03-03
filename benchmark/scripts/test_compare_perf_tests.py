@@ -463,6 +463,9 @@ class TestResultComparison(unittest.TestCase):
         self.assertAlmostEqual(rc.ratio, 12325.0 / 11616.0)
         self.assertAlmostEqual(rc.delta, (((11616.0 / 12325.0) - 1) * 100),
                                places=3)
+        self.assertEqual(rc.location, 'MIN')
+        self.assertEqual([rc.old_location, rc.new_location],
+                         [rc.old.min, rc.new.min])
         # handle test results that sometimes change to zero, when compiler
         # optimizes out the body of the incorrectly written test
         rc = ResultComparison(self.r0, self.r0)
@@ -488,6 +491,94 @@ class TestResultComparison(unittest.TestCase):
         self.assertTrue(ResultComparison(self.r1, self.r2).is_dubious)
         # other way around: old.min < new.min < old.max
         self.assertTrue(ResultComparison(self.r2, self.r1).is_dubious)
+
+    def test_use_most_stable_location_for_comparison(self):
+        """
+        Select the most stable location estimate (MIN, P05, P10, Q1, MED).
+
+        When the results contain samples from multiple independent runs, use
+        the empirical distribution to select the location estimate with lowest
+        variance and use it in result comparison.
+        """
+        def compare(log):
+            results = [
+                PerformanceTestResult(l.split(','), quantiles=True, delta=True)
+                for l in log.split('\n')[1:-1]]
+            results[0].merge(results[1])
+            results[2].merge(results[3])
+            return ResultComparison(results[0], results[2])
+
+        # --quantile=20 --delta FlattenListFlatMap
+        rc = compare("""
+0,F,21,3721,147,1689,83,44,138,95,6,3,19,19,26,23,45,64,88,84,34,56,233,1
+0,F,21,5284,16,560,23,25,15,29,13,6,4,19,16,15,26,32,31,72,23,26,104,1
+0,F,21,5318,82,507,25,13,23,12,4,9,25,23,27,14,27,13,6,8,38,89,265,1
+0,F,21,4701,12,1151,28,13,32,5,11,26,9,33,16,28,14,13,46,185,126,16,64,1
+""")
+        self.assertTrue(rc.is_dubious)
+        self.assertEqual([rc.old.min, rc.new.min], [3721, 4701])
+        self.assertEqual([rc.old.median, rc.new.median], [5975, 5988])
+        self.assertEqual(rc.location, 'MED')
+        self.assertEqual([rc.old_location, rc.new_location], [5975, 5988])
+        # self.assertAlmostEqual(rc.delta, 26.34, places=2)  # delta from MIN
+        self.assertAlmostEqual(rc.delta, 0.22, places=2)  # delta from MED
+
+        # --quantile=20 --delta ObjectiveCBridgeStubToNSDateRef O
+        rc = compare("""
+0,O,21,128,8,1,,4,3,3,2,,,3,,1,,,,3,,1,2,1
+0,O,21,119,16,2,,3,3,1,5,,,,1,2,1,,2,1,1,,2,1
+0,O,21,125,7,5,,1,5,1,3,2,,,,2,1,1,1,2,1,1,2,1
+0,O,21,119,17,,1,,2,5,4,1,,,,1,1,,1,,,3,3,1
+""")
+        self.assertTrue(rc.is_dubious)
+        self.assertEqual([rc.old.min, rc.new.min], [119, 119])
+        self.assertEqual([rc.old.samples.quantile(0.1),
+                          rc.new.samples.quantile(0.1)], [137, 136])
+        self.assertEqual(rc.location, 'P10')
+        self.assertEqual([rc.old_location, rc.new_location], [137, 136])
+        self.assertAlmostEqual(rc.delta, -0.73, places=2)
+
+        # --quantile=20 --delta DictionaryBridgeToObjC_Bridge -Onone
+        rc = compare("""
+0,D,21,15,,,,,,,,,,,,,1,,,,,,,
+0,D,21,15,,,,,,,,,,,,,,,,,,,,
+0,D,21,14,1,,,,,,,,,,,,,,,,,,,
+0,D,21,15,,,,,,,,,,1,,,,,,,1,,,
+""")
+        self.assertTrue(rc.is_dubious)
+        self.assertEqual([rc.old.min, rc.new.min], [15, 14])
+        self.assertEqual([rc.old.samples.quantile(0.05),
+                          rc.new.samples.quantile(0.05)], [15, 15])
+        # self.assertEqual(rc.location, 'P10')
+        self.assertEqual(rc.location, 'P05')
+        self.assertEqual([rc.old_location, rc.new_location], [15, 15])
+
+    def test_stable_location_vs_outlier_runs(self):
+        "Location estimate should be robust in presence of outlier runs."
+        def synth(min):
+            r = ('0,S,21,' + str(min) + ',1,1,,,1,,,,,1,,,,,2,,,,,').split(',')
+            return PerformanceTestResult(r, quantiles=True, delta=True)
+
+        s, t, u = synth(100), synth(100), synth(100)
+        self.assertEqual(
+            [s.min, s.samples.quantile(0.05), s.samples.quantile(0.1),
+             s.samples.q1, s.median, s.samples.q3],
+            [100, 101, 102, 103, 104, 106])
+
+        [s.merge(synth(100)) for i in range(1, 11)]
+        [t.merge(synth(100)) for i in range(1, 10)]
+        [u.merge(synth(100)) for i in range(1, 9)]
+        t.merge(synth(94))  # one outlier run
+        u.merge(synth(94))  # two outlier runs
+        u.merge(synth(94))
+
+        rst = ResultComparison(s, t)
+        self.assertEqual(rst.location, 'Q1')
+        self.assertEqual([rst.old_location, rst.new_location], [103, 102])
+
+        rsu = ResultComparison(s, u)
+        self.assertEqual(rsu.location, 'MED')
+        self.assertEqual([rsu.old_location, rsu.new_location], [104, 103])
 
 
 class FileSystemIntegration(unittest.TestCase):

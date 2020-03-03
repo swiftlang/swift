@@ -338,17 +338,57 @@ class ResultComparison(object):
         assert old_result.name == new_result.name
         self.name = old_result.name  # Test name, convenience accessor
 
-        # Location estimates + "epsilon" to prevent division by 0
-        old = old_result.min + 0.001
-        new = new_result.min + 0.001
+        self.find_most_stable_location_estimates()
+
+        # To avoid division by 0 in ratios, adjust the values by "epsilon"
+        old = self.old_location + 0.001
+        new = self.new_location + 0.001
 
         self.ratio = old / new  # Speedup ratio
         self.delta = ((new / old) - 1) * 100  # Test runtime improvement in %
 
         # Indication of dubious changes: when results' ranges overlap
         o_min, o_max, n_min, n_max = \
-            self.old.min, self.old.max, self.new.min, self.new.max
+            old_result.min, old_result.max, new_result.min, new_result.max
         self.is_dubious = (o_min <= n_max and n_min <= o_max)
+
+    def find_most_stable_location_estimates(self):
+        def independent_runs(result):
+            return (result.independent_runs
+                    if (hasattr(result, 'independent_runs') and
+                        len(result.independent_runs) > 1) else None)
+
+        old_runs = independent_runs(self.old)
+        new_runs = independent_runs(self.new)
+
+        if (old_runs is None or new_runs is None):
+            self.location = 'MIN'
+            self.old_location = self.old.min
+            self.new_location = self.new.min
+            return
+
+        locations = ['MIN', 'P05', 'P10', 'Q1', 'MED']
+        quantiles = [0.0, 0.05, 0.1, 0.25, 0.5]
+
+        # Mix in the aggregated samples to bias selection against outlier runs
+        old_runs += [self.old.samples]
+        new_runs += [self.new.samples]
+
+        def q_sd(runs):
+            """Compute standard deviation for given quantile across runs."""
+            # Adjust σ by 1 to always pick smaller σ in case one of variance
+            # factors is less than 1 or a 0. The multiplicative identity is 1.
+            return [PerformanceTestSamples('', values).sd + 1
+                    for values in [[run.quantile(q) for run in runs]
+                                   for q in quantiles]]
+
+        self.location, most_stable_location, _, _ = \
+            min(zip(locations, quantiles, q_sd(old_runs), q_sd(new_runs)),
+                # Compute "cross-sample" variance: σ₁×σ₂
+                key=lambda t: t[2] * t[3])
+
+        self.old_location = self.old.samples.quantile(most_stable_location)
+        self.new_location = self.new.samples.quantile(most_stable_location)
 
 
 class LogParser(object):
@@ -583,7 +623,7 @@ class ReportFormatter(object):
             if isinstance(result, PerformanceTestResult) else
             # isinstance(result, ResultComparison)
             (result.name,
-             str(result.old.min), str(result.new.min),
+             str(result.old_location), str(result.new_location),
              '{0:+.1f}%'.format(result.delta),
              '{0:.2f}x{1}'.format(
                  result.ratio,
