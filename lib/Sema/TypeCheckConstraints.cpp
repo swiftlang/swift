@@ -1774,15 +1774,30 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
   auto traversePath = [&](Expr *expr, bool isInParsedPath,
                           bool emitErrors = true) {
     Expr *outermostExpr = expr;
+    // We can end up in scenarios where the key path has contextual type,
+    // but is missing a leading dot. This can happen when we have an
+    // implicit TypeExpr or an implicit DeclRefExpr.
+    auto diagnoseMissingDot = [&]() {
+      DE.diagnose(expr->getLoc(),
+                  diag::expr_swift_keypath_not_starting_with_dot)
+          .fixItInsert(expr->getStartLoc(), ".");
+    };
     while (1) {
       // Base cases: we've reached the top.
       if (auto TE = dyn_cast<TypeExpr>(expr)) {
         assert(!isInParsedPath);
         rootType = TE->getTypeRepr();
+        if (TE->isImplicit() && !KPE->expectsContextualRoot())
+          diagnoseMissingDot();
         return;
       } else if (isa<KeyPathDotExpr>(expr)) {
         assert(isInParsedPath);
         // Nothing here: the type is either the root, or is inferred.
+        return;
+      } else if (!KPE->expectsContextualRoot() && expr->isImplicit() &&
+                 isa<DeclRefExpr>(expr)) {
+        assert(!isInParsedPath);
+        diagnoseMissingDot();
         return;
       }
 
