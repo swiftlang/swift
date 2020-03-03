@@ -246,3 +246,15 @@ extension AtomicUpdateOrdering: CustomStringConvertible {
     }
   }
 }
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@_transparent // Debug performance
+public func atomicMemoryFence(ordering: AtomicUpdateOrdering) {
+  switch ordering {
+  case .relaxed: break
+  case .acquiring: Builtin.fence_acquire()
+  case .releasing: Builtin.fence_release()
+  case .acquiringAndReleasing: Builtin.fence_acqrel()
+  default: Builtin.fence_seqcst()
+  }
+}
