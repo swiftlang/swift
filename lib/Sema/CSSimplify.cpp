@@ -539,12 +539,10 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
           // If we found a parameter to fulfill, do it.
           if (bestScore > 0) {
             // Bind this parameter to the argument.
-            nextArgIdx = argIdx;
             paramIdx = unfulfilledNamedParams[best];
             auto paramLabel = params[paramIdx].getLabel();
 
             parameterBindings[paramIdx].push_back(claim(paramLabel, argIdx));
-            skipClaimedArgs();
 
             // Erase this parameter from the list of unfulfilled named
             // parameters, so we don't try to fulfill it again.
