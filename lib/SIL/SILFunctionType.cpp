@@ -3087,8 +3087,30 @@ public:
     return substSILFunctionType(origType);
   }
 
+  /// When substituting into the given function type, should we build
+  /// a substituted function type or do component-wise substitutions?
+  bool shouldBuildSubstitutedFunctionType(CanSILFunctionType origType) {
+    // shouldSubstituteOpaqueArchetypes is a different mode of operation
+    // that requires component-wise substitution.
+    if (shouldSubstituteOpaqueArchetypes) return false;
+
+    // We can only build substituted function types for generic types.
+    if (!origType->getSubstGenericSignature()) return false;
+
+    // We're currently only building substituted function types for
+    // non-method types.
+    auto rep = origType->getRepresentation();
+    return (rep == SILFunctionTypeRepresentation::Thin ||
+            rep == SILFunctionTypeRepresentation::Thick ||
+            rep == SILFunctionTypeRepresentation::Closure ||
+            rep == SILFunctionTypeRepresentation::Block ||
+            rep == SILFunctionTypeRepresentation::CFunctionPointer);
+  }
+
   // Entry point for use by SILType::substGenericArgs().
   CanSILFunctionType substSILFunctionType(CanSILFunctionType origType) {
+    // If we already have a substituted function type, we just need to
+    // substitute the substitutions.
     if (auto subs = origType->getSubstitutions()) {
       // Substitute the substitutions.
       SubstOptions options = None;
@@ -3116,6 +3138,27 @@ public:
       
       return origType->withSubstitutions(newSubs);
     }
+
+    // If we should build a substituted function type, we can just
+    // buiild a substitution map and use that.
+    if (shouldBuildSubstitutedFunctionType(origType)) {
+      // Build a substitution map for the signature.
+      auto newSubs = SubstitutionMap::get(origType->getSubstGenericSignature(),
+                                          Subst, Conformances);
+      return SILFunctionType::get(origType->getSubstGenericSignature(),
+                                  origType->getExtInfo(),
+                                  origType->getCoroutineKind(),
+                                  origType->getCalleeConvention(),
+                                  origType->getParameters(),
+                                  origType->getYields(),
+                                  origType->getResults(),
+                                  origType->getOptionalErrorResult(),
+                                  newSubs,
+                                  /*is generic signature implied*/ true,
+                                  origType->getASTContext());
+    }
+
+    // Otherwise, we need to substitute component-by-component.
 
     SmallVector<SILResultInfo, 8> substResults;
     substResults.reserve(origType->getNumResults());
@@ -3203,17 +3246,9 @@ public:
                                      type.getCategory());
   }
 
-  SILResultInfo substInterface(SILResultInfo orig) {
-    return SILResultInfo(visit(orig.getInterfaceType()), orig.getConvention());
-  }
-
-  SILYieldInfo substInterface(SILYieldInfo orig) {
-    return SILYieldInfo(visit(orig.getInterfaceType()), orig.getConvention());
-  }
-
-  SILParameterInfo substInterface(SILParameterInfo orig) {
-    return SILParameterInfo(visit(orig.getInterfaceType()),
-                            orig.getConvention(), orig.getDifferentiability());
+  template <class T>
+  T substInterface(T orig) {
+    return orig.getWithInterfaceType(visit(orig.getInterfaceType()));
   }
 
   /// Tuples need to have their component types substituted by these

@@ -1325,7 +1325,7 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   // Collect the type infos for the context parameters.
   for (auto param : params) {
-    SILType argType = IGF.IGM.silConv.getSILType(param, origType);
+    SILType argType = IGF.IGM.silConv.getSILType(param, substType);
 
     auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
 

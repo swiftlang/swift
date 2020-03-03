@@ -759,7 +759,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
   CanSILFunctionType FnTy;
   {
     FnTy = OrigF->getLoweredFunctionType()->substGenericArgs(
-        M, SubstMap, getResilienceExpansion());
+        M, SubstMap, getResilienceExpansion())->getUnsubstitutedType(M);
     // FIXME: Some of the added new requirements may not have been taken into
     // account by the substGenericArgs. So, canonicalize in the context of the
     // specialized signature.
@@ -795,6 +795,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
 
   unsigned IndirectResultIdx = 0;
   for (SILResultInfo RI : SubstFTy->getResults()) {
+    RI = RI.getWithInterfaceType(RI.getReturnValueType(M, SubstFTy));
     if (RI.isFormalIndirect()) {
       bool isTrivial = TrivialArgs.test(IndirectResultIdx);
       if (isFormalResultConverted(IndirectResultIdx++)) {
@@ -804,7 +805,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
         auto C = (isTrivial
                   ? ResultConvention::Unowned
                   : ResultConvention::Owned);
-        SpecializedResults.push_back(SILResultInfo(RI.getReturnValueType(M, SubstFTy), C));
+        SpecializedResults.push_back(RI.getWithConvention(C));
         continue;
       }
     }
@@ -813,6 +814,8 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   }
   unsigned ParamIdx = 0;
   for (SILParameterInfo PI : SubstFTy->getParameters()) {
+    PI = PI.getWithInterfaceType(PI.getArgumentType(M, SubstFTy));
+
     bool isTrivial = TrivialArgs.test(param2ArgIndex(ParamIdx));
     if (!isParamConverted(ParamIdx++)) {
       // No conversion: re-use the original, substituted parameter info.
@@ -832,10 +835,12 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
         C = ParameterConvention::Direct_Owned;
       }
     }
-    SpecializedParams.push_back(SILParameterInfo(PI.getArgumentType(M, SubstFTy), C));
+    PI = PI.getWithConvention(C);
+    SpecializedParams.push_back(PI);
   }
   for (SILYieldInfo YI : SubstFTy->getYields()) {
-    // For now, always just use the original, substituted parameter info.
+    // For now, always just use the original, substituted yield info.
+    YI = YI.getWithInterfaceType(YI.getYieldValueType(M, SubstFTy));
     SpecializedYields.push_back(YI);
   }
   return SILFunctionType::get(

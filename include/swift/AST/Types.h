@@ -3832,6 +3832,12 @@ public:
     return SILParameterInfo(type, getConvention(), getDifferentiability());
   }
 
+  /// Return a version of this parameter info with the convention replaced.
+  SILParameterInfo getWithConvention(ParameterConvention convention) const {
+    return SILParameterInfo(getInterfaceType(), convention,
+                            getDifferentiability());
+  }
+
   /// Transform this SILParameterInfo by applying the user-provided
   /// function to its type.
   ///
@@ -3943,6 +3949,10 @@ public:
   SILResultInfo getWithInterfaceType(CanType type) const {
     return SILResultInfo(type, getConvention());
   }
+  /// Return a version of this result info with the convention replaced.
+  SILResultInfo getWithConvention(ResultConvention convention) const {
+    return SILResultInfo(getInterfaceType(), convention);
+  }
 
   // Does this result convention require indirect storage? This reflects a
   // SILFunctionType's formal (immutable) conventions, as opposed to the
@@ -4000,8 +4010,15 @@ public:
     : SILParameterInfo(type, conv) {
   }
 
+  CanType getYieldValueType(SILModule &M, const SILFunctionType *fnType) const {
+    return getArgumentType(M, fnType);
+  }
+
   SILYieldInfo getWithInterfaceType(CanType type) const {
     return SILYieldInfo(type, getConvention());
+  }
+  SILYieldInfo getWithConvention(YieldConvention convention) const {
+    return SILYieldInfo(getInterfaceType(), convention);
   }
 
   template<typename F>

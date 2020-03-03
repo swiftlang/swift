@@ -293,10 +293,10 @@ bb0(%0 : $*T, %1 : $*T):
   %pa = partial_apply [callee_guaranteed] %f1<T, T>(%1) : $@convention(thin) <T, U> (@in T, @in U) -> ()
   br bb1
 bb1:
-  %a1 = apply %pa(%0) : $@callee_guaranteed (@in T) -> ()
+  %a1 = apply %pa(%0) : $@callee_guaranteed <X,Y> in (@in X) -> () for <T, T>
   cond_br undef, bb1, bb2
 bb2:
-  strong_release %pa : $@callee_guaranteed (@in T) -> ()
+  strong_release %pa : $@callee_guaranteed <X,Y> in (@in X) -> () for <T, T>
   %r = tuple ()
   return %r : $()
 }
@@ -314,7 +314,7 @@ sil @test_generic_partial_apply_apply_inguaranteed : $@convention(thin) <T> (@in
 bb0(%0 : $*T, %1 : $*T):
   %f1 = function_ref @generic_callee_inguaranteed : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
   %pa = partial_apply %f1<T, T>(%1) : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
-  %a1 = apply %pa(%0) : $@callee_owned (@in_guaranteed T) -> ()
+  %a1 = apply %pa(%0) : $@callee_owned <X, Y> in (@in_guaranteed X) -> () for <T, T>
   destroy_addr %0 : $*T
   %r = tuple ()
   return %r : $()

@@ -92,3 +92,14 @@ func getNonCanonicalSelfFunc<T : Foo, U : Panda>(t: T.Type) -> (T) -> (U) -> () 
 // CHECK-NEXT: [[CLOSURE_CONV:%.*]] = convert_function [[CLOSURE]]
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: return [[CLOSURE_CONV]]
+
+func genericFunction<T,U>(t: T) -> U {
+  while true {}
+}
+struct A<T,U> {
+  func wantsGeneric(fn: (T) -> U) {}
+}
+
+func testGenericToConcrete<T, U>(a: A<T,U>) {
+  a.wantsGeneric(fn: genericFunction)
+}

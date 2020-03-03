@@ -930,7 +930,8 @@ bb0(%0 : $*U, %1 : $Builtin.Int32, %2 : @owned $@callee_owned (Builtin.Int32) ->
   %2copy = copy_value %2 : $@callee_owned (Builtin.Int32) -> @out U
   %9 = function_ref @reabstractionThunk : $@convention(thin) <τ_0_0> (@in Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> @out τ_0_0) -> @out τ_0_0
   %10 = partial_apply %9<U>(%2copy) : $@convention(thin) <τ_0_0> (@in Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> @out τ_0_0) -> @out τ_0_0
-  %11 = apply %5<Builtin.Int32, U>(%0, %6, %10) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @owned @callee_owned (@in τ_0_0) -> @out τ_0_1) -> @out τ_0_1
+  %10adjusted = convert_function %10 : $@callee_owned <τ_0_0> in (@in Builtin.Int32) -> @out τ_0_0 for <U> to $@callee_owned (@in Builtin.Int32) -> @out U
+  %11 = apply %5<Builtin.Int32, U>(%0, %6, %10adjusted) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @owned @callee_owned (@in τ_0_0) -> @out τ_0_1) -> @out τ_0_1
   dealloc_stack %6 : $*Builtin.Int32
   destroy_value %2 : $@callee_owned (Builtin.Int32) -> @out U
   %14 = tuple ()
