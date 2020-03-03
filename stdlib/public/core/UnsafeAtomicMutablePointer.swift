@@ -86,13 +86,9 @@ extension UnsafeAtomicMutablePointer {
   ///
   /// ```
   /// atomic(self, ordering: ordering) { value in
-  ///   if value == expected {
-  ///      value = desired
-  ///      return true
-  ///   } else {
-  ///      expected = value
-  ///      return false
-  ///   }
+  ///   guard value == expected else { return (false, value) }
+  ///   value = desired
+  ///   return (true, expected)
   /// }
   /// ```
   ///
