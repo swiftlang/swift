@@ -318,3 +318,44 @@ struct DupLabelSubscript {
 
 let dupLabelSubscriptStruct = DupLabelSubscript()
 let _ = dupLabelSubscriptStruct[foo: 5, foo: 5] // ok
+
+// Bogus behavior of subtype constraints with tuple types
+// https://bugs.swift.org/browse/SR-12261
+
+func mismatchedLabelsAreNotOK1(
+  _ x: @escaping ((id: Int, data: String), Int) -> ())
+    -> ((id: Int, daata: String), Int) -> () {
+  return x
+  // expected-error@-1 {{cannot convert return expression of type '((id: Int, data: String), Int) -> ()' to return type '((id: Int, daata: String), Int) -> ()'}}
+}
+
+func mismatchedLabelsAreNotOK2(
+  _ x: @escaping ((id: Int, String), Int) -> ())
+    -> ((Int, id: String), Int) -> () {
+  return x
+  // expected-error@-1 {{cannot convert return expression of type '((id: Int, String), Int) -> ()' to return type '((Int, id: String), Int) -> ()'}}
+}
+
+func introducingLabelsIsOK(
+  _ x: @escaping ((id: Int, data: String), Int) -> ())
+    -> ((Int, String), Int) -> () {
+  return x
+}
+
+func eliminatingLabelsIsOK(
+  _ x: @escaping ((Int, String), Int) -> ())
+    -> ((id: Int, data: String), Int) -> () {
+  return x
+}
+
+func introducingAndEliminatingLabelsIsOK(
+  _ x: @escaping ((Int, data: String), Int) -> ())
+    -> ((id: Int, String), Int) -> () {
+  return x
+}
+
+func eliminatingAndIntroducingLabelsIsOK(
+  _ x: @escaping ((id: Int, String), Int) -> ())
+    -> ((Int, data: String), Int) -> () {
+  return x
+}

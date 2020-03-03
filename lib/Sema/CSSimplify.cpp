@@ -1151,8 +1151,13 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
         if (kind <= ConstraintKind::Equal)
           return getTypeMatchFailure(locator);
 
-        // For subtyping constraints, just make sure that this name isn't
-        // used at some other position.
+        // With a subtype constraint, we require an exact name match if both
+        // labels are provided.
+        if (elt1.hasName() && elt2.hasName())
+          return getTypeMatchFailure(locator);
+
+        // Otherwise, we're allowed to introduce or eliminate labels, as long
+        // as the labels are disjoint.
         if (elt2.hasName() && tuple1->getNamedElementId(elt2.getName()) != -1)
           return getTypeMatchFailure(locator);
       }
