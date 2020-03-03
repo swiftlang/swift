@@ -221,7 +221,7 @@ extension UnsafeAtomicUInt {
     by delta: UInt = 1,
     ordering: AtomicUpdateOrdering
   ) {
-    _ptr._atomicLoadThenWrappingIncrementWord(by: delta, ordering: ordering)
+    _ = _ptr._atomicLoadThenWrappingIncrementWord(by: delta, ordering: ordering)
   }
 
   @_transparent @_alwaysEmitIntoClient
@@ -229,6 +229,6 @@ extension UnsafeAtomicUInt {
     by delta: UInt = 1,
     ordering: AtomicUpdateOrdering
   ) {
-    _ptr._atomicLoadThenWrappingDecrementWord(by: delta, ordering: ordering)
+    _ = _ptr._atomicLoadThenWrappingDecrementWord(by: delta, ordering: ordering)
   }
 }
