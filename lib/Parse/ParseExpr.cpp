@@ -3200,12 +3200,16 @@ ParserStatus Parser::parseMultipleTrailingClosures(
     SourceLoc &LBrace, SourceLoc &RBrace,
     SmallVectorImpl<TrailingClosure> &closures) {
   // Consume '{' of the trailing closure
-  LBrace = consumeToken();
+  LBrace = consumeToken(tok::l_brace);
 
   // There could N labeled closures depending on the number of arguments.
   do {
-    if (!(Tok.canBeArgumentLabel() && peekToken().is(tok::colon)))
-      return makeParserError();
+    if (!(Tok.canBeArgumentLabel() && peekToken().is(tok::colon))) {
+      diagnose(Tok.getLoc(),
+               diag::expected_argument_label_followed_by_closure_literal);
+      skipUntilDeclStmtRBrace(tok::r_brace);
+      break;
+    }
 
     Identifier label;
     auto labelLoc = consumeArgumentLabel(label);
@@ -3229,7 +3233,8 @@ ParserStatus Parser::parseMultipleTrailingClosures(
   } while (!Tok.is(tok::r_brace));
 
   // Consume `}` of the trailing closure.
-  RBrace = consumeToken();
+  parseMatchingToken(tok::r_brace, RBrace,
+                     diag::expected_multiple_closures_block_rbrace, LBrace);
 
   return makeParserSuccess();
 }
