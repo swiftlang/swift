@@ -627,6 +627,9 @@ protected:
     // type for use in matching the various patterns.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
     if (cs) {
+      // Form a one-way constraint to prevent backward propagation.
+      subjectExpr = new (ctx) OneWayExpr(subjectExpr);
+
       // FIXME: Add contextual type purpose for switch subjects?
       SolutionApplicationTarget target(subjectExpr, dc, CTP_Unused, Type(),
                                        /*isDiscarded=*/false);

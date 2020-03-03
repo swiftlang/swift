@@ -377,3 +377,25 @@ func testSwitch(e: E) {
   }
 }
 
+// Ensure that we don't back-propagate constraints to the subject
+// expression. This is a potential avenue for future exploration, but
+// is currently not supported by switch statements outside of function
+// builders. It's better to be consistent for now.
+enum E2 {
+  case b(Int, String?) // expected-note{{'b' declared here}}
+}
+
+func getSomeEnumOverloaded(_: Double) -> E { return .a }
+func getSomeEnumOverloaded(_: Int) -> E2 { return .b(0, nil) }
+
+func testOverloadedSwitch() {
+  tuplify(true) { c in
+    // FIXME: Bad source location.
+    switch getSomeEnumOverloaded(17) { // expected-error{{type 'E2' has no member 'a'; did you mean 'b'?}}
+    case .a:
+      "a"
+    default:
+      "default"
+    }
+  }
+}
