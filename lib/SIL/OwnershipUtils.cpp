@@ -12,6 +12,7 @@
 
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/Basic/Defer.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 

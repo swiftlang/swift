@@ -17,6 +17,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
