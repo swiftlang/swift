@@ -2066,3 +2066,34 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   checkTopLevelErrorHandling(TLCD);
   performTopLevelDeclDiagnostics(TLCD);
 }
+
+void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
+  llvm::SmallDenseMap<Identifier, VarDecl *, 4> latestVars;
+  auto recordVar = [&](VarDecl *var) {
+    if (!var->hasName())
+      return;
+
+    // If there is an existing variable with this name, set it as the
+    // parent of this new variable.
+    auto &entry = latestVars[var->getName()];
+    if (entry) {
+      assert(!var->getParentVarDecl() ||
+             var->getParentVarDecl() == entry);
+      var->setParentVarDecl(entry);
+    }
+
+    // Record this variable as the latest with this name.
+    entry = var;
+  };
+
+  // Wire up the parent var decls for each variable that occurs within
+  // the patterns of each case item. in source order.
+  for (const auto &caseItem : caseStmt->getCaseLabelItems()) {
+    caseItem.getPattern()->forEachVariable(recordVar);
+  }
+
+  // Wire up the case body variables to the latest patterns.
+  for (auto bodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    recordVar(bodyVar);
+  }
+}
