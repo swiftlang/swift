@@ -4,6 +4,8 @@ set -x
 SOURCE_PATH="$(cd "$(dirname $0)/../../.." && pwd)"
 UTILS_PATH="$(cd "$(dirname $0)" && pwd)"
 
+WASI_SDK_PATH=$SOURCE_PATH/wasi-sdk
+
 case $(uname -s) in
   Darwin)
     OS_SUFFIX=osx
@@ -25,6 +27,9 @@ DAY=$(date +"%d")
 TOOLCHAIN_VERSION="5.2.${YEAR}${MONTH}${DAY}"
 TOOLCHAIN_NAME="swift-wasm-5.2-DEVELOPMENT-SNAPSHOT-${YEAR}-${MONTH}-${DAY}-a"
 ARCHIVE="${TOOLCHAIN_NAME}-${OS_SUFFIX}.tar.gz"
+INSTALLABLE_PACKAGE=$SOURCE_PATH/$ARCHIVE
+
+PACKAGE_ARTIFACT="$SOURCE_PATH/swift-wasm-5.2-DEVELOPMENT-SNAPSHOT-${OS_SUFFIX}.tar.gz"
 
 BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
 DISPLAY_NAME_SHORT="Swift for WebAssembly Development Snapshot"
@@ -32,7 +37,7 @@ DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 
 $BUILD_SCRIPT \
   --install_destdir="$SOURCE_PATH/install" \
-  --installable_package="$SOURCE_PATH/$ARCHIVE" \
+  --installable_package="$INSTALLABLE_PACKAGE" \
   --install-prefix=/$TOOLCHAIN_NAME/usr \
   --install-swift \
   --darwin-toolchain-bundle-identifier="${BUNDLE_IDENTIFIER}" \
@@ -41,3 +46,16 @@ $BUILD_SCRIPT \
   --darwin-toolchain-name="${TOOLCHAIN_NAME}" \
   --darwin-toolchain-version="${TOOLCHAIN_VERSION}" \
   "$@"
+
+TMP_DIR=$(mktemp -d)
+cd $TMP_DIR
+tar xfz $INSTALLABLE_PACKAGE $TOOLCHAIN_NAME
+cd $TMP_DIR/$TOOLCHAIN_NAME
+
+# Merge wasi-sdk and toolchain
+cp -r $WASI_SDK_PATH/lib/clang usr/lib
+cp $WASI_SDK_PATH/bin/* usr/bin
+cp -r $WASI_SDK_PATH/share/wasi-sysroot usr/share
+
+cd $TMP_DIR
+tar cfz $PACKAGE_ARTIFACT $TOOLCHAIN_NAME
