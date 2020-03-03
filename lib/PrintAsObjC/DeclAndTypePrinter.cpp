@@ -32,6 +32,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/SourceManager.h"
 
 using namespace swift;
 using namespace swift::objc_translation;
