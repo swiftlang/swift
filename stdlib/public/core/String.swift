@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -484,14 +484,14 @@ extension String {
     ) throws -> Int
   ) rethrows {
     self = try String(
-      uninitializedCapacity: capacity,
+      _uninitializedCapacity: capacity,
       initializingUTF8With: initializer
     )
   }
   
   @inline(__always)
   internal init(
-    uninitializedCapacity capacity: Int,
+    _uninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
     ) throws -> Int
@@ -800,7 +800,7 @@ extension String {
   public func lowercased() -> String {
     if _fastPath(_guts.isFastASCII) {
       return _guts.withFastUTF8 { utf8 in
-        return String(uninitializedCapacity: utf8.count) { buffer in
+        return String(_uninitializedCapacity: utf8.count) { buffer in
           for i in 0 ..< utf8.count {
             buffer[i] = _lowercaseASCII(utf8[i])
           }
@@ -860,7 +860,7 @@ extension String {
   public func uppercased() -> String {
     if _fastPath(_guts.isFastASCII) {
       return _guts.withFastUTF8 { utf8 in
-        return String(uninitializedCapacity: utf8.count) { buffer in
+        return String(_uninitializedCapacity: utf8.count) { buffer in
           for i in 0 ..< utf8.count {
             buffer[i] = _uppercaseASCII(utf8[i])
           }

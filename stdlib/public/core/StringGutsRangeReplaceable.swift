@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -97,7 +97,7 @@ extension _StringGuts {
 
   @inline(never) // slow-path
   private mutating func _foreignGrow(_ n: Int) {
-    let newString = String(uninitializedCapacity: n) { buffer in
+    let newString = String(_uninitializedCapacity: n) { buffer in
       guard let count = _foreignCopyUTF8(into: buffer) else {
        fatalError("String capacity was smaller than required")
       }
@@ -161,7 +161,7 @@ extension _StringGuts {
   @inline(never)
   @_effects(readonly)
   private func _foreignConvertedToSmall() -> _SmallString {
-    let smol = String(uninitializedCapacity: _SmallString.capacity) { buffer in
+    let smol = String(_uninitializedCapacity: _SmallString.capacity) { buffer in
       guard let count = _foreignCopyUTF8(into: buffer) else {
         fatalError("String capacity was smaller than required")
       }
