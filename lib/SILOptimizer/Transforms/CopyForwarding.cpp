@@ -353,9 +353,6 @@ public:
     Oper = &CopyInst->getAllOperands()[CopyAddrInst::Dest];
     return true;
   }
-  bool visitStoreInst(StoreInst *Store) {
-    llvm_unreachable("illegal reinitialization or store of an address");
-  }
   bool visitDestroyAddrInst(DestroyAddrInst *UserInst) {
     Oper = &UserInst->getOperandRef();
     return true;
