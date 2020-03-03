@@ -228,8 +228,7 @@ protected:
   Optional<Score> getBestScore() const { return CS.solverState->BestScore; }
 
   void filterSolutions(SmallVectorImpl<Solution> &solutions, bool minimize) {
-    if (!CS.retainAllSolutions())
-      CS.filterSolutions(solutions, minimize);
+    CS.filterSolutions(solutions, minimize);
   }
 
   /// Check whether constraint solver is running in "debug" mode,

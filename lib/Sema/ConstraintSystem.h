@@ -1004,24 +1004,20 @@ using ConstraintList = llvm::ilist<Constraint>;
 enum class ConstraintSystemFlags {
   /// Whether we allow the solver to attempt fixes to the system.
   AllowFixes = 0x01,
-  
-  /// If set, this is going to prevent constraint system from erasing all
-  /// discovered solutions except the best one.
-  ReturnAllDiscoveredSolutions = 0x04,
 
   /// Set if the client wants diagnostics suppressed.
-  SuppressDiagnostics = 0x08,
+  SuppressDiagnostics = 0x02,
 
   /// If set, the client wants a best-effort solution to the constraint system,
   /// but can tolerate a solution where all of the constraints are solved, but
   /// not all type variables have been determined.  In this case, the constraint
   /// system is not applied to the expression AST, but the ConstraintSystem is
   /// left in-tact.
-  AllowUnresolvedTypeVariables = 0x10,
+  AllowUnresolvedTypeVariables = 0x04,
 
   /// If set, constraint system always reuses type of pre-typechecked
   /// expression, and doesn't dig into its subexpressions.
-  ReusePrecheckedType = 0x20,
+  ReusePrecheckedType = 0x08,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2168,13 +2164,6 @@ public:
   bool hasFreeTypeVariables();
 
 private:
-  /// Indicates if the constraint system should retain all of the
-  /// solutions it has deduced regardless of their score.
-  bool retainAllSolutions() const {
-    return Options.contains(
-        ConstraintSystemFlags::ReturnAllDiscoveredSolutions);
-  }
-
   /// Finalize this constraint system; we're done attempting to solve
   /// it.
   ///
