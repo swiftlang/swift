@@ -1244,6 +1244,32 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
   return fixLifetime;
 }
 
+llvm::Constant *IRGenModule::getFixedClassInitializationFn() {
+  if (FixedClassInitializationFn)
+    return *FixedClassInitializationFn;
+  
+  // If ObjC interop is disabled, we don't need to do fixed class
+  // initialization.
+  llvm::Constant *fn;
+  if (!ObjCInterop) {
+    fn = nullptr;
+  } else {
+    // In new enough ObjC runtimes, objc_opt_self provides a direct fast path
+    // to realize a class.
+    if (getAvailabilityContext()
+         .isContainedIn(Context.getSwift51Availability())) {
+      fn = getObjCOptSelfFn();
+    }
+    // Otherwise, the Swift runtime always provides a `get
+    else {
+      fn = getGetInitializedObjCClassFn();
+    }
+  }
+  
+  FixedClassInitializationFn = fn;
+  return fn;
+}
+
 /// Fix the lifetime of a live value. This communicates to the LLVM level ARC
 /// optimizer not to touch this value.
 void IRGenFunction::emitFixLifetime(llvm::Value *value) {
