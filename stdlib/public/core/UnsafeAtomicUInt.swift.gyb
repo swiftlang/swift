@@ -32,6 +32,8 @@
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
 public struct UnsafeAtomicUInt {
+  public typealias Value = UInt
+
   @usableFromInline
   internal let _ptr: UnsafeMutableRawPointer
 
@@ -135,7 +137,7 @@ extension UnsafeAtomicUInt {
   @_transparent @_alwaysEmitIntoClient
   @discardableResult
   public func loadThen${name}(
-    ${label} operand: Int,
+    ${label} operand: UInt,
     ordering: AtomicUpdateOrdering
   ) -> UInt {
     _ptr._atomicLoadThen${name}Word(${argLabel(label)}operand, ordering: ordering)
@@ -152,7 +154,7 @@ extension UnsafeAtomicUInt {
   /// - Returns: The new value after the operation.
   @_transparent @_alwaysEmitIntoClient
   public func ${lowerFirst(name)}ThenLoad(
-    ${label} operand: Int,
+    ${label} operand: UInt,
     ordering: AtomicUpdateOrdering
   ) -> UInt {
     _ptr._atomicLoadThen${name}Word(

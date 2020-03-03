@@ -33,6 +33,8 @@
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
 public struct UnsafeAtomicInt {
+  public typealias Value = Int
+
   @usableFromInline
   internal let _ptr: UnsafeMutableRawPointer
 
@@ -115,9 +117,8 @@ extension UnsafeAtomicInt {
     desired: Int,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Int) {
-    let expectedWord = UInt(bitPattern: expected)
     let (success, originalWord) = _ptr._atomicCompareExchangeWord(
-      expected: expectedWord,
+      expected: UInt(bitPattern: expected),
       desired: UInt(bitPattern: desired),
       ordering: ordering)
     return (success, Int(bitPattern: originalWord))
