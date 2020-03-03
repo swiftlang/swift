@@ -1858,23 +1858,24 @@ extension BinaryFloatingPoint {
     if source.significandWidth <= leadingBitIndex {
       return (value, true)
     }
-    // We promise to round to the closest representation, and if two
-    // representable values are equally close, the value with more trailing
-    // zeros in its significand bit pattern. Therefore, we must take a look at
-    // the bits that we've just truncated.
+    // We promise to round to the closest representation. Therefore, we must
+    // take a look at the bits that we've just truncated.
     let ulp = (1 as Source.RawSignificand) << -shift
     let truncatedBits = source.significandBitPattern & (ulp - 1)
     if truncatedBits < ulp / 2 {
       return (value, false)
     }
     let rounded = source.sign == .minus ? value.nextDown : value.nextUp
-    guard _fastPath(
-      truncatedBits != ulp / 2 ||
-        exponentBitPattern.trailingZeroBitCount <
-          rounded.exponentBitPattern.trailingZeroBitCount) else {
-      return (value, false)
+    if _fastPath(truncatedBits > ulp / 2) {
+      return (rounded, false)
     }
-    return (rounded, false)
+    // If two representable values are equally close, we return the value with
+    // more trailing zeros in its significand bit pattern.
+    return
+      significandBitPattern.trailingZeroBitCount >
+        rounded.significandBitPattern.trailingZeroBitCount
+      ? (value, false)
+      : (rounded, false)
   }
 
   /// Creates a new instance from the given value, rounded to the closest
