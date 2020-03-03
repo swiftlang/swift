@@ -1,7 +1,12 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking
 
+enum Either<T,U> {
+  case first(T)
+  case second(U)
+}
+
 @_functionBuilder
-struct TupleBuilder { // expected-note 2{{struct 'TupleBuilder' declared here}}
+struct TupleBuilder { // expected-note 3{{struct 'TupleBuilder' declared here}}
   static func buildBlock() -> () { }
   
   static func buildBlock<T1>(_ t1: T1) -> T1 {
@@ -30,6 +35,13 @@ struct TupleBuilder { // expected-note 2{{struct 'TupleBuilder' declared here}}
 
   static func buildDo<T>(_ value: T) -> T { return value }
   static func buildIf<T>(_ value: T?) -> T? { return value }
+
+  static func buildEither<T,U>(first value: T) -> Either<T,U> {
+    return .first(value)
+  }
+  static func buildEither<T,U>(second value: U) -> Either<T,U> {
+    return .second(value)
+  }
 }
 
 @_functionBuilder
@@ -342,3 +354,26 @@ struct X<T> {
     }
   }
 }
+
+// switch statements don't allow fallthrough
+enum E {
+  case a
+  case b(Int, String?)
+}
+
+func testSwitch(e: E) {
+  tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    case .a:
+      "a"
+    case .b(let i, let s?):
+      i * 2
+      s + "!"
+      fallthrough // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilder'}}
+    case .b(let i, nil):
+      "just \(i)"
+    }
+  }
+}
+

@@ -803,10 +803,18 @@ struct ContextualTypeInfo {
   Type getType() const { return typeLoc.getType(); }
 };
 
+/// Describes the information about a case label item that needs to be tracked
+/// within the constraint system.
+struct CaseLabelItemInfo {
+  Pattern *pattern;
+  Expr *guardExpr;
+};
 
 /// Key to the constraint solver's mapping from AST nodes to their corresponding
 /// solution application targets.
-using SolutionApplicationTargetsKey = const StmtConditionElement *;
+using SolutionApplicationTargetsKey =
+    PointerUnion<const StmtConditionElement *, const Stmt *>;
+
 /// A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -875,6 +883,11 @@ public:
   /// Maps AST nodes to their solution application targets.
   llvm::MapVector<SolutionApplicationTargetsKey, SolutionApplicationTarget>
     solutionApplicationTargets;
+
+  /// Maps case label items to information tracked about them as they are
+  /// being solved.
+  llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
+      caseLabelItems;
 
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
@@ -1156,7 +1169,8 @@ class SolutionApplicationTarget {
   enum class Kind {
     expression,
     function,
-    stmtCondition
+    stmtCondition,
+    caseLabelItem,
   } kind;
 
   union {
@@ -1199,6 +1213,11 @@ class SolutionApplicationTarget {
       StmtCondition stmtCondition;
       DeclContext *dc;
     } stmtCondition;
+
+    struct {
+      CaseLabelItem *caseLabelItem;
+      DeclContext *dc;
+    } caseLabelItem;
   };
 
   // If the pattern contains a single variable that has an attached
@@ -1233,6 +1252,12 @@ public:
     function.body = body;
   }
 
+  SolutionApplicationTarget(CaseLabelItem *caseLabelItem, DeclContext *dc) {
+    kind = Kind::caseLabelItem;
+    this->caseLabelItem.caseLabelItem = caseLabelItem;
+    this->caseLabelItem.dc = dc;
+  }
+
   /// Form a target for the initialization of a pattern from an expression.
   static SolutionApplicationTarget forInitialization(
       Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
@@ -1245,6 +1270,7 @@ public:
 
     case Kind::function:
     case Kind::stmtCondition:
+    case Kind::caseLabelItem:
       return nullptr;
     }
   }
@@ -1259,6 +1285,9 @@ public:
 
     case Kind::stmtCondition:
       return stmtCondition.dc;
+
+    case Kind::caseLabelItem:
+      return caseLabelItem.dc;
     }
   }
 
@@ -1367,6 +1396,7 @@ public:
     switch (kind) {
     case Kind::expression:
     case Kind::stmtCondition:
+    case Kind::caseLabelItem:
       return None;
 
     case Kind::function:
@@ -1378,10 +1408,23 @@ public:
     switch (kind) {
     case Kind::expression:
     case Kind::function:
+    case Kind::caseLabelItem:
       return None;
 
-      case Kind::stmtCondition:
+    case Kind::stmtCondition:
       return stmtCondition.stmtCondition;
+    }
+  }
+
+  Optional<CaseLabelItem *> getAsCaseLabelItem() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+      return None;
+
+    case Kind::caseLabelItem:
+      return caseLabelItem.caseLabelItem;
     }
   }
 
@@ -1407,6 +1450,9 @@ public:
     case Kind::stmtCondition:
       return SourceRange(stmtCondition.stmtCondition.front().getStartLoc(),
                          stmtCondition.stmtCondition.back().getEndLoc());
+
+    case Kind::caseLabelItem:
+      return caseLabelItem.caseLabelItem->getSourceRange();
     }
   }
 
@@ -1421,6 +1467,9 @@ public:
 
     case Kind::stmtCondition:
       return stmtCondition.stmtCondition.front().getStartLoc();
+
+    case Kind::caseLabelItem:
+      return caseLabelItem.caseLabelItem->getStartLoc();
     }
   }
 
@@ -1557,6 +1606,10 @@ private:
   /// Contextual type information for expressions that are part of this
   /// constraint system.
   llvm::MapVector<const Expr *, ContextualTypeInfo> contextualTypes;
+
+  /// Information about each case label item tracked by the constraint system.
+  llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
+      caseLabelItems;
 
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
@@ -2138,6 +2191,9 @@ public:
     /// The length of \c solutionApplicationTargets.
     unsigned numSolutionApplicationTargets;
 
+    /// The length of \c caseLabelItems.
+    unsigned numCaseLabelItems;
+
     /// The previous score.
     Score PreviousScore;
 
@@ -2438,6 +2494,21 @@ public:
     auto known = solutionApplicationTargets.find(key);
     if (known == solutionApplicationTargets.end())
       return None;
+    return known->second;
+  }
+
+  void setCaseLabelItemInfo(const CaseLabelItem *item, CaseLabelItemInfo info) {
+    assert(item != nullptr);
+    assert(caseLabelItems.count(item) == 0);
+    caseLabelItems[item] = info;
+  }
+
+  Optional<CaseLabelItemInfo> getCaseLabelItemInfo(
+      const CaseLabelItem *item) const {
+    auto known = caseLabelItems.find(item);
+    if (known == caseLabelItems.end())
+      return None;
+
     return known->second;
   }
 
@@ -3327,6 +3398,16 @@ public:
   /// \returns true if there was an error in constraint generation, false
   /// if generation succeeded.
   bool generateConstraints(StmtCondition condition, DeclContext *dc);
+
+  /// Generate constraints for a case statement.
+  ///
+  /// \param subjectType The type of the "subject" expression in the enclosing
+  /// switch statement.
+  ///
+  /// \returns true if there was an error in constraint generation, false
+  /// if generation succeeded.
+  bool generateConstraints(CaseStmt *caseStmt, DeclContext *dc,
+                           Type subjectType, ConstraintLocator *locator);
 
   /// Generate constraints for a given set of overload choices.
   ///
