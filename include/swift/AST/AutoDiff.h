@@ -441,7 +441,10 @@ struct SILAutoDiffIndices {
   /// Creates a set of AD indices from the given source index and a bit vector
   /// representing parameter indices.
   /*implicit*/ SILAutoDiffIndices(IndexSubset *parameters, IndexSubset *results)
-      : parameters(parameters), results(results) {}
+      : parameters(parameters), results(results) {
+    assert(parameters && "Parameter indices must be non-null");
+    assert(results && "Result indices must be non-null");
+  }
 
   bool operator==(const SILAutoDiffIndices &other) const;
 
@@ -469,7 +472,11 @@ struct SILAutoDiffIndices {
 
   // TODO: Print multiple results
   std::string mangle() const {
-    std::string result = "src_" + llvm::utostr(*results->begin()) + "_wrt_";
+    std::string result = "src_";
+    interleave(results->getIndices(),
+               [&](unsigned idx) { result += llvm::utostr(idx); },
+               [&] { result += '_'; });
+    result += "_wrt_";
     interleave(parameters->getIndices(),
                [&](unsigned idx) { result += llvm::utostr(idx); },
                [&] { result += '_'; });

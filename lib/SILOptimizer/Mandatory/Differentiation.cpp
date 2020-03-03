@@ -956,8 +956,8 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
     DifferentiationInvoker invoker) {
   auto origFnOperand = dfi->getOriginalFunction();
   auto origFnTy = origFnOperand->getType().castTo<SILFunctionType>();
-  auto parameterIndices = dfi->getParameterIndices();
-  auto resultIndices = dfi->getResultIndices();
+  auto *parameterIndices = dfi->getParameterIndices();
+  auto *resultIndices = dfi->getResultIndices();
 
   // Handle curry thunk applications specially.
   if (auto *ai = dyn_cast<ApplyInst>(origFnOperand)) {
@@ -1046,7 +1046,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
     }
   }
 
-  SILAutoDiffIndices desiredIndices(0, parameterIndices);
+  SILAutoDiffIndices desiredIndices(parameterIndices, resultIndices);
   SmallVector<SILValue, 2> derivativeFns;
   SmallVector<AllocStackInst *, 2> newBuffersToDealloc;
   for (auto derivativeFnKind : {AutoDiffDerivativeFunctionKind::JVP,
