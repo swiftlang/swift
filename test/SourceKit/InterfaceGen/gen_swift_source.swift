@@ -16,3 +16,6 @@
 
 // RUN: %sourcekitd-test -req=interface-gen %S/Inputs/Foo3.swift -- %S/Inputs/Foo3.swift | %FileCheck -check-prefix=CHECK3 %s
 // CHECK3: public class C {
+// CHECK3: public struct MyStruct {
+// CHECK3:   public mutating func mutatingFunc()
+// CHECK3:   public var mutVar: Int { mutating get nonmutating set }

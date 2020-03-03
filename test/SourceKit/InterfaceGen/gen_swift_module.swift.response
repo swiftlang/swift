@@ -5,6 +5,13 @@ public class MyClass {
     public func pub_method()
 }
 
+public struct MyStruct {
+
+    public mutating func mutatingFunc()
+
+    public var mutVar: Int { mutating get nonmutating set }
+}
+
 public func pub_function()
 
 
@@ -57,11 +64,86 @@ public func pub_function()
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 89,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 96,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 112,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 119,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 128,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 94,
+    key.offset: 133,
+    key.length: 12
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 153,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 160,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 164,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 172,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 178,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 187,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 191,
+    key.length: 11
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 203,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 212,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 219,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 224,
     key.length: 12
   }
 ]
@@ -70,6 +152,12 @@ public func pub_function()
     key.kind: source.lang.swift.ref.module,
     key.offset: 7,
     key.length: 17,
+    key.is_system: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 172,
+    key.length: 3,
     key.is_system: 1
   }
 ]
@@ -111,16 +199,76 @@ public func pub_function()
     ]
   },
   {
-    key.kind: source.lang.swift.decl.function.free,
+    key.kind: source.lang.swift.decl.struct,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.name: "pub_function()",
+    key.name: "MyStruct",
     key.offset: 89,
-    key.length: 19,
-    key.nameoffset: 94,
-    key.namelength: 14,
+    key.length: 121,
+    key.nameoffset: 96,
+    key.namelength: 8,
+    key.bodyoffset: 106,
+    key.bodylength: 103,
     key.attributes: [
       {
         key.offset: 82,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ],
+    key.substructure: [
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.accessibility: source.lang.swift.accessibility.public,
+        key.name: "mutatingFunc()",
+        key.offset: 128,
+        key.length: 19,
+        key.nameoffset: 133,
+        key.namelength: 14,
+        key.attributes: [
+          {
+            key.offset: 119,
+            key.length: 8,
+            key.attribute: source.decl.attribute.mutating
+          },
+          {
+            key.offset: 112,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.var.instance,
+        key.accessibility: source.lang.swift.accessibility.public,
+        key.name: "mutVar",
+        key.offset: 160,
+        key.length: 48,
+        key.typename: "Int",
+        key.nameoffset: 164,
+        key.namelength: 6,
+        key.bodyoffset: 177,
+        key.bodylength: 30,
+        key.attributes: [
+          {
+            key.offset: 153,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ]
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.accessibility: source.lang.swift.accessibility.public,
+    key.name: "pub_function()",
+    key.offset: 219,
+    key.length: 19,
+    key.nameoffset: 224,
+    key.namelength: 14,
+    key.attributes: [
+      {
+        key.offset: 212,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }

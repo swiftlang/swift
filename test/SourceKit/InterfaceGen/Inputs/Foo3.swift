@@ -6,3 +6,11 @@ public class C {
     }
   }
 }
+
+public struct MyStruct {
+  public mutating func mutatingFunc() {}
+  public var mutVar: Int {
+    mutating get { 1 }
+    nonmutating set {}
+  }
+}
