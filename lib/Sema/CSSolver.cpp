@@ -70,13 +70,11 @@ Solution ConstraintSystem::finalize() {
 
   // Update the best score we've seen so far.
   auto &ctx = getASTContext();
-  if (!retainAllSolutions()) {
-    assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
-           !solverState->BestScore || CurrentScore <= *solverState->BestScore);
+  assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
+         !solverState->BestScore || CurrentScore <= *solverState->BestScore);
 
-    if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
-      solverState->BestScore = CurrentScore;
-    }
+  if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
+    solverState->BestScore = CurrentScore;
   }
 
   for (auto tv : getTypeVariables()) {
@@ -1311,8 +1309,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Filter deduced solutions, try to figure out if there is
   // a single best solution to use, if not explicitly disabled
   // by constraint system options.
-  if (!retainAllSolutions())
-    filterSolutions(solutions);
+  filterSolutions(solutions);
 
   // We fail if there is no solution or the expression was too complex.
   return solutions.empty() || getExpressionTooComplex(solutions);

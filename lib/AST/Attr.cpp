@@ -985,6 +985,20 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_TypeEraser: {
+    Printer.printAttrName("@_typeEraser");
+    Printer << "(";
+    Printer.callPrintNamePre(PrintNameContext::Attribute);
+    auto typeLoc = cast<TypeEraserAttr>(this)->getTypeEraserLoc();
+    if (auto type = typeLoc.getType())
+      type->print(Printer, Options);
+    else
+      typeLoc.getTypeRepr()->print(Printer, Options);
+    Printer.printNamePost(PrintNameContext::Attribute);
+    Printer << ")";
+    break;
+  }
+
   case DAK_Custom: {
     Printer.callPrintNamePre(PrintNameContext::Attribute);
     Printer << "@";

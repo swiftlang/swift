@@ -577,6 +577,9 @@ ERROR(expr_swift_keypath_invalid_component,none,
       "invalid component of Swift key path", ())
 ERROR(expr_swift_keypath_not_starting_with_type,none,
       "a Swift key path must begin with a type", ())
+ERROR(expr_swift_keypath_not_starting_with_dot,none,
+      "a Swift key path with contextual root must begin with a leading dot",
+      ())
 ERROR(expr_smart_keypath_value_covert_to_contextual_type,none,
       "key path value type %0 cannot be converted to contextual type %1",
       (Type, Type))
@@ -3285,14 +3288,16 @@ ERROR(partial_application_of_function_invalid,none,
       "partial application of %select{"
         "'mutating' method|"
         "'super.init' initializer chain|"
-        "'self.init' initializer delegation"
+        "'self.init' initializer delegation|"
+        "'super' instance method with metatype base"
       "}0 is not allowed",
       (unsigned))
 WARNING(partial_application_of_function_invalid_swift4,none,
       "partial application of %select{"
         "'mutating' method|"
         "'super.init' initializer chain|"
-        "'self.init' initializer delegation"
+        "'self.init' initializer delegation|"
+        "'super' instance method with metatype base"
       "}0 is not allowed; calling the function has undefined behavior and will "
       "be an error in future Swift versions",
       (unsigned))
@@ -4795,7 +4800,7 @@ ERROR(property_wrapper_wrong_initial_value_init, none,
       "'wrappedValue' property type (%2) or an @autoclosure thereof",
       (DeclName, Type, Type))
 ERROR(property_wrapper_failable_init, none,
-      "%0 cannot be failable", (DeclName))
+      "property wrapper initializer %0 cannot be failable", (DeclName))
 ERROR(property_wrapper_type_requirement_not_accessible,none,
       "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
       "more restrictive access than its enclosing property wrapper type %3 "

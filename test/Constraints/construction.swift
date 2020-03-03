@@ -216,7 +216,6 @@ func rdar_50668864() {
   struct Foo {
     init(anchors: [Int]) { // expected-note {{'init(anchors:)' declared here}}
       self = .init { _ in [] } // expected-error {{trailing closure passed to parameter of type '[Int]' that does not accept a closure}}
-      // expected-error@-1 {{generic parameter 'Element' could not be inferred}}
     }
   }
 }

@@ -112,19 +112,20 @@ using namespace swift::syntax;
 void SILParserTUStateBase::anchor() { }
 
 void swift::performCodeCompletionSecondPass(
-    PersistentParserState &ParserState,
-    CodeCompletionCallbacksFactory &Factory) {
-  if (!ParserState.hasCodeCompletionDelayedDeclState())
+    SourceFile &SF, CodeCompletionCallbacksFactory &Factory) {
+  // If we didn't find the code completion token, bail.
+  auto *parserState = SF.getDelayedParserState();
+  if (!parserState->hasCodeCompletionDelayedDeclState())
     return;
 
-  auto state = ParserState.takeCodeCompletionDelayedDeclState();
-  auto &SF = *state->ParentContext->getParentSourceFile();
+  auto state = parserState->takeCodeCompletionDelayedDeclState();
   auto &Ctx = SF.getASTContext();
 
-  FrontendStatsTracer tracer(Ctx.Stats, "CodeCompletionSecondPass");
+  FrontendStatsTracer tracer(Ctx.Stats,
+                             "CodeCompletionSecondPass");
 
   auto BufferID = Ctx.SourceMgr.getCodeCompletionBufferID();
-  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
+  Parser TheParser(BufferID, SF, nullptr, parserState, nullptr);
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
       Factory.createCodeCompletionCallbacks(TheParser));
@@ -365,15 +366,15 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions,
-               bool DelayBodyParsing)
+               bool DelayBodyParsing, bool EvaluateConditionals)
     : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState,
-             std::move(SPActions), DelayBodyParsing) {}
+             std::move(SPActions), DelayBodyParsing, EvaluateConditionals) {}
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
                SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions,
-               bool DelayBodyParsing)
+               bool DelayBodyParsing, bool EvaluateConditionals)
     : Parser(
           std::unique_ptr<Lexer>(new Lexer(
               SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
@@ -388,7 +389,8 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
               SF.shouldBuildSyntaxTree()
                   ? TriviaRetentionMode::WithTrivia
                   : TriviaRetentionMode::WithoutTrivia)),
-          SF, SIL, PersistentState, std::move(SPActions), DelayBodyParsing) {}
+          SF, SIL, PersistentState, std::move(SPActions), DelayBodyParsing,
+          EvaluateConditionals) {}
 
 namespace {
 
@@ -509,7 +511,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions,
-               bool DelayBodyParsing)
+               bool DelayBodyParsing, bool EvaluateConditionals)
   : SourceMgr(SF.getASTContext().SourceMgr),
     Diags(SF.getASTContext().Diags),
     SF(SF),
@@ -519,6 +521,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     Context(SF.getASTContext()),
     CurrentTokenHash(SF.getInterfaceHashPtr()),
     DelayBodyParsing(DelayBodyParsing),
+    EvaluateConditionals(EvaluateConditionals),
     TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF, L->getBufferID()) :
                 new ConsumeTokenReceiver()),

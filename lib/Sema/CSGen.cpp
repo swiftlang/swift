@@ -4100,6 +4100,10 @@ bool ConstraintSystem::generateConstraints(
       target.setExprConversionType(TypeChecker::getOptionalType(expr->getLoc(), var));
     }
 
+    expr = buildTypeErasedExpr(expr, target.getDeclContext(),
+                               target.getExprContextualType(),
+                               target.getExprContextualTypePurpose());
+
     // Generate constraints for the main system.
     expr = generateConstraints(expr, target.getDeclContext());
     if (!expr)

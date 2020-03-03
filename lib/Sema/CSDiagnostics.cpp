@@ -515,18 +515,8 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
   if (!ODRE)
     return false;
 
-  auto isStdlibType = [](Type type) {
-    if (auto *NTD = type->getAnyNominal()) {
-      auto *DC = NTD->getDeclContext();
-      return DC->isModuleScopeContext() &&
-             DC->getParentModule()->isStdlibModule();
-    }
-
-    return false;
-  };
-
   auto name = ODRE->getDecls().front()->getBaseName();
-  if (!(name.isOperator() && isStdlibType(getLHS()) && isStdlibType(getRHS())))
+  if (!(name.isOperator() && getLHS()->isStdlibType() && getRHS()->isStdlibType()))
     return false;
 
   // If this is an operator reference and both types are from stdlib,
@@ -1887,6 +1877,12 @@ bool ContextualFailure::diagnoseAsError() {
     
     if (diagnoseCoercionToUnrelatedType())
       return true;
+
+    if (isa<OptionalTryExpr>(anchor)) {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_convert_initializer_value,
+                     getFromType(), getToType());
+      return true;
+    }
 
     return false;
   }
@@ -3756,6 +3752,8 @@ bool PartialApplicationFailure::diagnoseAsError() {
           anchor, ConstraintLocator::ConstructorMember))) {
     kind = anchor->getBase()->isSuperExpr() ? RefKind::SuperInit
                                             : RefKind::SelfInit;
+  } else if (anchor->getBase()->isSuperExpr()) {
+    kind = RefKind::SuperMethod;
   }
 
   auto diagnostic = CompatibilityWarning

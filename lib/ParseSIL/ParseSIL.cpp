@@ -113,9 +113,16 @@ void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
   out << '\n';
 }
 
+/// A thunk that deletes an allocated PersistentParserState. This is needed for
+/// us to be able to forward declare a unique_ptr to the state in the AST.
+static void deletePersistentParserState(PersistentParserState *state) {
+  delete state;
+}
+
 void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
-                                PersistentParserState *PersistentState,
-                                bool DelayBodyParsing) {
+                                bool DelayBodyParsing,
+                                bool EvaluateConditionals) {
+  auto &ctx = SF.getASTContext();
   std::shared_ptr<SyntaxTreeCreator> STreeCreator;
   if (SF.shouldBuildSyntaxTree()) {
     STreeCreator = std::make_shared<SyntaxTreeCreator>(
@@ -133,9 +140,18 @@ void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
   if (SF.shouldBuildSyntaxTree())
     DelayBodyParsing = false;
 
-  FrontendStatsTracer tracer(SF.getASTContext().Stats, "Parsing");
-  Parser P(BufferID, SF, /*SIL*/ nullptr, PersistentState, STreeCreator,
-           DelayBodyParsing);
+  // If this buffer is for code completion, hook up the state needed by its
+  // second pass.
+  PersistentParserState *state = nullptr;
+  if (ctx.SourceMgr.getCodeCompletionBufferID() == BufferID) {
+    state = new PersistentParserState();
+    SF.setDelayedParserState({state, &deletePersistentParserState});
+  }
+
+  FrontendStatsTracer tracer(SF.getASTContext().Stats,
+                             "Parsing");
+  Parser P(BufferID, SF, /*SIL*/ nullptr, state, STreeCreator, DelayBodyParsing,
+           EvaluateConditionals);
   PrettyStackTraceParser StackTrace(P);
 
   llvm::SaveAndRestore<NullablePtr<llvm::MD5>> S(P.CurrentTokenHash,
@@ -152,7 +168,8 @@ void swift::parseSourceFileSIL(SourceFile &SF, SILParserState *sil) {
   auto bufferID = SF.getBufferID();
   assert(bufferID);
 
-  FrontendStatsTracer tracer(SF.getASTContext().Stats, "Parsing SIL");
+  FrontendStatsTracer tracer(SF.getASTContext().Stats,
+                             "Parsing SIL");
   Parser parser(*bufferID, SF, sil->Impl.get(),
                 /*persistentParserState*/ nullptr,
                 /*syntaxTreeCreator*/ nullptr, /*delayBodyParsing*/ false);

@@ -589,7 +589,7 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
   if (allowUninitialized) return classObject;
 
   // TODO: memoize this the same way that we memoize Swift type metadata?
-  return IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
+  return IGF.Builder.CreateCall(IGF.IGM.getFixedClassInitializationFn(),
                                 classObject);
 }
 
@@ -614,7 +614,7 @@ emitIdempotentClassMetadataInitialization(IRGenFunction &IGF,
                                           llvm::Value *metadata) {
   if (IGF.IGM.ObjCInterop) {
     metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCClassPtrTy);
-    metadata = IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
+    metadata = IGF.Builder.CreateCall(IGF.IGM.getFixedClassInitializationFn(),
                                       metadata);
     metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
   }

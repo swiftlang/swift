@@ -180,7 +180,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::KFreeBSD:
   case llvm::Triple::Lv2:
   case llvm::Triple::NetBSD:
-  case llvm::Triple::OpenBSD:
   case llvm::Triple::Solaris:
   case llvm::Triple::Minix:
   case llvm::Triple::RTEMS:
@@ -207,6 +206,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return triple.isAndroid() ? "android" : "linux";
   case llvm::Triple::FreeBSD:
     return "freebsd";
+  case llvm::Triple::OpenBSD:
+    return "openbsd";
   case llvm::Triple::Win32:
     switch (triple.getEnvironment()) {
     case llvm::Triple::Cygnus:

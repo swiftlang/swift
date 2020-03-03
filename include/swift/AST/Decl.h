@@ -665,9 +665,10 @@ private:
     SourceLoc Loc;
     SourceLoc StartLoc;
     SourceLoc EndLoc;
+    SmallVector<CharSourceRange, 4> DocRanges;
   };
-  mutable CachedExternalSourceLocs const *CachedLocs = nullptr;
-  const CachedExternalSourceLocs *calculateSerializedLocs() const;
+  mutable CachedExternalSourceLocs const *CachedSerializedLocs = nullptr;
+  const CachedExternalSourceLocs *getSerializedLocs() const;
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
@@ -828,7 +829,7 @@ public:
   }
 
   /// \returns the unparsed comment attached to this declaration.
-  RawComment getRawComment() const;
+  RawComment getRawComment(bool SerializedOK = false) const;
 
   Optional<StringRef> getGroupName() const;
 
@@ -882,6 +883,9 @@ public:
   bool hasUnderscoredNaming() const;
 
   bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
+  
+  /// Check if this is a declaration defined at the top level of the Swift module
+  bool isStdlibDecl() const;
 
   AvailabilityContext getAvailabilityForLinkage() const;
 
@@ -915,6 +919,9 @@ public:
   ///
   /// If this returns true, the decl can be safely casted to ValueDecl.
   bool isPotentiallyOverridable() const;
+
+  /// Returns true if this Decl cannot be seen by any other source file
+  bool isPrivateToEnclosingFile() const;
 
   /// If an alternative module name is specified for this decl, e.g. using
   /// @_originalDefinedIn attribute, this function returns this module name.

@@ -629,7 +629,8 @@ void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
     stats->getFrontendCounters().NumModuleLookupClassMember++;
 
   if (isParsedModule(this)) {
-    FrontendStatsTracer tracer(getASTContext().Stats, "source-file-lookup-class-member");
+    FrontendStatsTracer tracer(getASTContext().Stats,
+                               "source-file-lookup-class-member");
     auto &cache = getSourceLookupCache();
     cache.populateMemberCache(*this);
     cache.lookupClassMember(accessPath, name, results);
@@ -642,7 +643,8 @@ void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
 void SourceFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
-  FrontendStatsTracer tracer(getASTContext().Stats, "source-file-lookup-class-member");
+  FrontendStatsTracer tracer(getASTContext().Stats,
+                             "source-file-lookup-class-member");
   auto &cache = getCache();
   cache.populateMemberCache(*this);
   cache.lookupClassMember(accessPath, name, results);
@@ -726,6 +728,14 @@ SourceFile::getBasicLocsForDecl(const Decl *D) const {
   SourceManager &SM = getASTContext().SourceMgr;
   BasicDeclLocs Result;
   Result.SourceFilePath = SM.getDisplayNameForLoc(D->getLoc());
+
+  for (const auto &SRC : D->getRawComment().Comments) {
+    Result.DocRanges.push_back(std::make_pair(
+      LineColumn { SRC.StartLine, SRC.StartColumn },
+      SRC.Range.getByteLength())
+    );
+  }
+
   auto setLineColumn = [&SM](LineColumn &Home, SourceLoc Loc) {
     if (Loc.isValid()) {
       std::tie(Home.Line, Home.Column) = SM.getLineAndColumn(Loc);

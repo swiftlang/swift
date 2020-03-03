@@ -1330,16 +1330,7 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
   if (!anchor)
     return 1;
 
-  auto isStdlibType = [&](Type type) {
-    if (auto *NTD = type->getAnyNominal()) {
-      auto *DC = NTD->getDeclContext();
-      return DC->isModuleScopeContext() &&
-             DC->getParentModule()->isStdlibModule();
-    }
-    return false;
-  };
-
-  if (requirementType && isStdlibType(cs.simplifyType(requirementType))) {
+  if (requirementType && cs.simplifyType(requirementType)->isStdlibType()) {
     if (auto last = locator.last()) {
       if (auto requirement = last->getAs<LocatorPathElt::AnyRequirement>()) {
         auto kind = requirement->getRequirementKind();
@@ -2551,6 +2542,9 @@ static ConstraintFix *fixPropertyWrapperFailure(
     if (baseTy->isEqual(type))
       return nullptr;
 
+    if (baseTy->is<TypeVariableType>() || type->is<TypeVariableType>())
+      return nullptr;
+
     if (!attemptFix(*resolvedOverload, decl, type))
       return nullptr;
 
@@ -3295,24 +3289,6 @@ bool ConstraintSystem::repairFailures(
     if (elt.getKind() != ConstraintLocator::ApplyArgToParam)
       break;
 
-    if (auto *fix = fixPropertyWrapperFailure(
-            *this, lhs, loc,
-            [&](SelectedOverload overload, VarDecl *decl, Type newBase) {
-              // FIXME: There is currently no easy way to avoid attempting
-              // fixes, matchTypes do not propagate `TMF_ApplyingFix` flag.
-              llvm::SaveAndRestore<ConstraintSystemOptions> options(
-                  Options, Options - ConstraintSystemFlags::AllowFixes);
-
-              TypeMatchOptions flags;
-              return matchTypes(newBase, rhs, ConstraintKind::Subtype, flags,
-                                getConstraintLocator(locator))
-                  .isSuccess();
-            },
-            rhs)) {
-      conversionsOrFixes.push_back(fix);
-      break;
-    }
-
     // If argument in l-value type and parameter is `inout` or a pointer,
     // let's see if it's generic parameter matches and suggest adding explicit
     // `&`.
@@ -3381,6 +3357,24 @@ bool ConstraintSystem::repairFailures(
                        return bool(correction.getRestriction());
                      }))
       break;
+
+    if (auto *fix = fixPropertyWrapperFailure(
+            *this, lhs, loc,
+            [&](SelectedOverload overload, VarDecl *decl, Type newBase) {
+              // FIXME: There is currently no easy way to avoid attempting
+              // fixes, matchTypes do not propagate `TMF_ApplyingFix` flag.
+              llvm::SaveAndRestore<ConstraintSystemOptions> options(
+                  Options, Options - ConstraintSystemFlags::AllowFixes);
+
+              TypeMatchOptions flags;
+              return matchTypes(newBase, rhs, ConstraintKind::Subtype, flags,
+                                getConstraintLocator(locator))
+                  .isSuccess();
+            },
+            rhs)) {
+      conversionsOrFixes.push_back(fix);
+      break;
+    }
 
     // If this is an implicit 'something-to-pointer' conversion
     // it's going to be diagnosed by specialized fix which deals
@@ -3615,6 +3609,10 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isHole() || rhs->isHole())
       return true;
 
+    // If either side is not yet resolved, it's too early for this fix.
+    if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
+      break;
+
     auto purpose = getContextualTypePurpose(anchor);
     if (rhs->isVoid() &&
         (purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr)) {
@@ -3655,33 +3653,16 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
-    // If either side is not yet resolved, it's too early for this fix.
-    if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
-      break;
-
-    // If contextual type is an existential value, it's handled
-    // after conversion restriction is attempted.
-    if (rhs->isExistentialType())
-      break;
-
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       break;
 
-    // If there is a deep equality, superclass restriction
-    // already recorded, let's not add bother ignoring
-    // contextual type, because actual fix is going to
-    // be performed once restriction is applied.
-    if (hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
-      break;
-
-    if (hasConversionOrRestriction(
-            ConversionRestrictionKind::MetatypeToExistentialMetatype))
-      break;
-
-    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) &&
-        !hasConversionOrRestriction(
-            ConversionRestrictionKind::OptionalToOptional))
+    // If there are any restrictions here we need to wait and let
+    // `simplifyRestrictedConstraintImpl` handle them.
+    if (llvm::any_of(conversionsOrFixes,
+                     [](const RestrictionOrFix &correction) {
+                       return bool(correction.getRestriction());
+                     }))
       break;
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
@@ -3800,9 +3781,11 @@ bool ConstraintSystem::repairFailures(
     if (tupleLocator->isLastElement<LocatorPathElt::SequenceElementType>())
       break;
 
-    // Generic argument failures have a more general fix which is attached to a
-    // parent type and aggregates all argument failures into a single fix.
-    if (tupleLocator->isLastElement<LocatorPathElt::GenericArgument>())
+    // Generic argument/requirement failures have a more general fix which
+    // is attached to a parent type and aggregates all argument failures
+    // into a single fix.
+    if (tupleLocator->isLastElement<LocatorPathElt::AnyRequirement>() ||
+        tupleLocator->isLastElement<LocatorPathElt::GenericArgument>())
       break;
 
     ConstraintFix *fix;
@@ -6034,10 +6017,29 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
   }
 
+  // If we have candidates, and we're doing a member lookup for a pattern
+  // match, unwrap optionals and try again to allow implicit creation of
+  // optional "some" patterns (spelled "?").
+  if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
+      memberLocator &&
+      memberLocator->isLastElement<LocatorPathElt::PatternMatch>() &&
+      instanceTy->getOptionalObjectType() &&
+      baseObjTy->is<AnyMetatypeType>()) {
+    SmallVector<Type, 2> optionals;
+    Type instanceObjectTy = instanceTy->lookThroughAllOptionalTypes(optionals);
+    Type metaObjectType = MetatypeType::get(instanceObjectTy);
+    auto result = performMemberLookup(
+        constraintKind, memberName, metaObjectType,
+        functionRefKind, memberLocator, includeInaccessibleMembers);
+    result.numImplicitOptionalUnwraps = optionals.size();
+    result.actualBaseType = metaObjectType;
+    return result;
+  }
+
   // If we're looking into a metatype for an unresolved member lookup, look
   // through optional types.
   //
-  // FIXME: The short-circuit here is lame.
+  // FIXME: Unify with the above code path.
   if (result.ViableCandidates.empty() &&
       baseObjTy->is<AnyMetatypeType>() &&
       constraintKind == ConstraintKind::UnresolvedValueMember) {
@@ -6095,25 +6097,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         result.addUnviable(choice, subscripts.UnviableReasons[index]);
       }
     }
-  }
-
-  // If we have candidates, and we're doing a member lookup for a pattern
-  // match, unwrap optionals and try again to allow implicit creation of
-  // optional "some" patterns (spelled "?").
-  if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
-      memberLocator &&
-      memberLocator->isLastElement<LocatorPathElt::PatternMatch>() &&
-      instanceTy->getOptionalObjectType() &&
-      baseObjTy->is<AnyMetatypeType>()) {
-    SmallVector<Type, 2> optionals;
-    Type instanceObjectTy = instanceTy->lookThroughAllOptionalTypes(optionals);
-    Type metaObjectType = MetatypeType::get(instanceObjectTy);
-    auto result = performMemberLookup(
-        constraintKind, memberName, metaObjectType,
-        functionRefKind, memberLocator, includeInaccessibleMembers);
-    result.numImplicitOptionalUnwraps = optionals.size();
-    result.actualBaseType = metaObjectType;
-    return result;
   }
 
   // If we have no viable or unviable candidates, and we're generating,
@@ -8536,7 +8519,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto impact = 2;
     if (loc->isForAssignment() || loc->isForCoercion() ||
         loc->isForContextualType() ||
-        loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+        loc->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
+        loc->isForOptionalTry()) {
       if (restriction == ConversionRestrictionKind::Superclass) {
         if (auto *fix =
                 CoerceToCheckedCast::attempt(*this, fromType, toType, loc))

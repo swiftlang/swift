@@ -389,3 +389,7 @@ std::string toolchains::Cygwin::getDefaultLinker() const {
 }
 
 std::string toolchains::Cygwin::getTargetForLinker() const { return ""; }
+
+std::string toolchains::OpenBSD::getDefaultLinker() const {
+  return "lld";
+}

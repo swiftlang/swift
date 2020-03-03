@@ -4517,13 +4517,13 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
                       bool &hadError) {
 
   // Record the curly braces but nothing inside.
-  if (IDC->areDependenciesUsingTokenHashesForTypeBodies()) {
+  if (IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()) {
     recordTokenHash("{");
     recordTokenHash("}");
   }
   llvm::MD5 tokenHashForThisDeclList;
   llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(
-      CurrentTokenHash, IDC->areDependenciesUsingTokenHashesForTypeBodies()
+      CurrentTokenHash, IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()
                             ? &tokenHashForThisDeclList
                             : CurrentTokenHash);
 
@@ -6413,8 +6413,8 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   ParseFunctionBody CC(*this, AFD);
   setLocalDiscriminatorToParamList(AFD->getParameters());
 
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+  if (auto *Stats = Context.Stats)
+    Stats->getFrontendCounters().NumFunctionsParsed++;
 
   // In implicit getter, if a CC token is the first token after '{', it might
   // be a start of an accessor block. Perform special completion for that.

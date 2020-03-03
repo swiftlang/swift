@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <UnitTestSourceFileDepGraphFactory.h>
+#include "UnitTestSourceFileDepGraphFactory.h"
 
 using namespace swift;
 using namespace swift::fine_grained_dependencies;

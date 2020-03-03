@@ -400,10 +400,11 @@ class CompilerInstance {
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
   std::unique_ptr<SILModule> TheSILModule;
 
-  std::unique_ptr<PersistentParserState> PersistentState;
-
   /// Null if no tracker.
   std::unique_ptr<DependencyTracker> DepTracker;
+  /// If there is no stats output directory by the time the
+  /// instance has completed its setup, this will be null.
+  std::unique_ptr<UnifiedStatsReporter> Stats;
 
   mutable ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
@@ -427,6 +428,9 @@ class CompilerInstance {
   /// invariant is that any SourceFile in this set with an associated
   /// buffer will also have its buffer ID in PrimaryBufferIDs.
   std::vector<SourceFile *> PrimarySourceFiles;
+
+  /// The file that has been registered for code completion.
+  NullablePtr<SourceFile> CodeCompletionFile;
 
   /// Return whether there is an entry in PrimaryInputs for buffer \p BufID.
   bool isPrimaryInput(unsigned BufID) const {
@@ -488,6 +492,8 @@ public:
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
   const DependencyTracker *getDependencyTracker() const { return DepTracker.get(); }
 
+  UnifiedStatsReporter *getStatsReporter() const { return Stats.get(); }
+
   SILModule *getSILModule() {
     return TheSILModule.get();
   }
@@ -545,12 +551,13 @@ public:
     return Invocation;
   }
 
-  bool hasPersistentParserState() const {
-    return bool(PersistentState);
-  }
+  /// If a code completion buffer has been set, returns the corresponding source
+  /// file.
+  NullablePtr<SourceFile> getCodeCompletionFile() { return CodeCompletionFile; }
 
-  PersistentParserState &getPersistentParserState() {
-    return *PersistentState.get();
+  /// Set a new file that we're performing code completion on.
+  void setCodeCompletionFile(SourceFile *file) {
+    CodeCompletionFile = file;
   }
 
 private:
@@ -571,6 +578,7 @@ private:
 
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
+  void setupStatsReporter();
   Optional<unsigned> setUpCodeCompletionBuffer();
 
   /// Set up all state in the CompilerInstance to process the given input file.
@@ -617,10 +625,8 @@ public:
 
   /// Performs mandatory, diagnostic, and optimization passes over the SIL.
   /// \param silModule The SIL module that was generated during SILGen.
-  /// \param stats A stats reporter that will report optimization statistics.
   /// \returns true if any errors occurred.
-  bool performSILProcessing(SILModule *silModule,
-                            UnifiedStatsReporter *stats = nullptr);
+  bool performSILProcessing(SILModule *silModule);
 
 private:
   SourceFile *

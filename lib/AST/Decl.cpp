@@ -569,7 +569,10 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
   llvm_unreachable("Unknown decl kind");
 }
 
-const Decl::CachedExternalSourceLocs *Decl::calculateSerializedLocs() const {
+const Decl::CachedExternalSourceLocs *Decl::getSerializedLocs() const {
+  if (CachedSerializedLocs) {
+    return CachedSerializedLocs;
+  }
   auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
   auto Locs = File->getBasicLocsForDecl(this);
   if (!Locs.hasValue()) {
@@ -585,6 +588,14 @@ Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \
   CASE(StartLoc)
   CASE(EndLoc)
 #undef CASE
+
+  for (const auto &LineColumnAndLength : Locs->DocRanges) {
+    auto Start = SM.getLocFromExternalSource(Locs->SourceFilePath,
+      LineColumnAndLength.first.Line,
+      LineColumnAndLength.first.Column);
+    Result->DocRanges.push_back({ Start, LineColumnAndLength.second });
+  }
+
   return Result;
 }
 
@@ -625,10 +636,7 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   case FileUnitKind::SerializedAST: {
     if (!SerializedOK)
       return SourceLoc();
-    if (!CachedLocs) {
-      CachedLocs = calculateSerializedLocs();
-    }
-    return CachedLocs->Loc;
+    return getSerializedLocs()->Loc;
   }
   case FileUnitKind::Builtin:
   case FileUnitKind::ClangModule:
@@ -786,6 +794,12 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   }
 
   return hasUnderscoredNaming();
+}
+
+bool Decl::isStdlibDecl() const {
+  DeclContext *DC = getDeclContext();
+  return DC->isModuleScopeContext() &&
+         DC->getParentModule()->isStdlibModule();
 }
 
 AvailabilityContext Decl::getAvailabilityForLinkage() const {
@@ -5018,8 +5032,8 @@ ProtocolDecl::setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
 
   ++NumLazyRequirementSignatures;
   // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumLazyRequirementSignatures++;
+  if (auto *Stats = getASTContext().Stats)
+    Stats->getFrontendCounters().NumLazyRequirementSignatures++;
 }
 
 ArrayRef<Requirement> ProtocolDecl::getCachedRequirementSignature() const {
@@ -8053,4 +8067,27 @@ void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
     simple_display(out, func);
   else
     out << "closure";
+}
+
+bool Decl::isPrivateToEnclosingFile() const {
+  if (auto *VD = dyn_cast<ValueDecl>(this))
+    return VD->getFormalAccess() <= AccessLevel::FilePrivate;
+  switch (getKind()) {
+  case DeclKind::Import:
+  case DeclKind::PatternBinding:
+  case DeclKind::EnumCase:
+  case DeclKind::TopLevelCode:
+  case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
+    return true;
+
+  case DeclKind::Extension:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    return false;
+
+  default:
+    llvm_unreachable("everything else is a ValueDecl");
+  }
 }
