@@ -35,6 +35,7 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
+#include "clang/AST/ASTContext.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
@@ -141,6 +142,15 @@ CompilerInvocation::getModuleInterfaceOutputPathForWholeModule() const {
       .SupplementaryOutputs.ModuleInterfaceOutputPath;
 }
 
+std::string
+CompilerInvocation::getPrivateModuleInterfaceOutputPathForWholeModule() const {
+  assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
+         "PrivateModuleInterfaceOutputPath only makes sense when the whole "
+         "module can be seen");
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.PrivateModuleInterfaceOutputPath;
+}
+
 SerializationOptions CompilerInvocation::computeSerializationOptions(
     const SupplementaryOutputPaths &outs, bool moduleIsPublic) const {
   const FrontendOptions &opts = getFrontendOptions();
@@ -229,6 +239,56 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   return false;
 }
 
+void CompilerInstance::setupStatsReporter() {
+  const auto &Invok = getInvocation();
+  const std::string &StatsOutputDir =
+      Invok.getFrontendOptions().StatsOutputDir;
+  if (StatsOutputDir.empty())
+    return;
+
+  auto silOptModeArgStr = [](OptimizationMode mode) -> StringRef {
+    switch (mode) {
+    case OptimizationMode::ForSpeed:
+      return "O";
+    case OptimizationMode::ForSize:
+      return "Osize";
+    default:
+      return "Onone";
+    }
+  };
+
+  auto getClangSourceManager = [](ASTContext &Ctx) -> clang::SourceManager * {
+    if (auto *clangImporter = static_cast<ClangImporter *>(
+            Ctx.getClangModuleLoader())) {
+      return &clangImporter->getClangASTContext().getSourceManager();
+    }
+    return nullptr;
+  };
+
+  const auto &FEOpts = Invok.getFrontendOptions();
+  const auto &LangOpts = Invok.getLangOptions();
+  const auto &SILOpts = Invok.getSILOptions();
+  const std::string &OutFile =
+      FEOpts.InputsAndOutputs.lastInputProducingOutput().outputFilename();
+  auto Reporter = std::make_unique<UnifiedStatsReporter>(
+      "swift-frontend",
+      FEOpts.ModuleName,
+      FEOpts.InputsAndOutputs.getStatsFileMangledInputName(),
+      LangOpts.Target.normalize(),
+      llvm::sys::path::extension(OutFile),
+      silOptModeArgStr(SILOpts.OptMode),
+      StatsOutputDir,
+      &getSourceMgr(),
+      getClangSourceManager(getASTContext()),
+      Invok.getFrontendOptions().TraceStats,
+      Invok.getFrontendOptions().ProfileEvents,
+      Invok.getFrontendOptions().ProfileEntities);
+  // Hand the stats reporter down to the ASTContext so the rest of the compiler
+  // can use it.
+  getASTContext().setStatsReporter(Reporter.get());
+  Stats = std::move(Reporter);
+}
+
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
@@ -271,6 +331,8 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   if (setUpASTContextIfNeeded())
     return true;
+
+  setupStatsReporter();
 
   return false;
 }
@@ -424,7 +486,9 @@ bool CompilerInstance::setUpModuleLoaders() {
     auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
-        FEOpts.RemarkOnRebuildFromModuleInterface, IgnoreSourceInfoFile);
+        FEOpts.RemarkOnRebuildFromModuleInterface,
+        IgnoreSourceInfoFile,
+        FEOpts.DisableInterfaceFileLock);
     Context->addModuleLoader(std::move(PIML));
   }
 
@@ -631,7 +695,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
   return MainModule;
 }
 
-static void addAdditionalInitialImportsTo(
+void CompilerInstance::addAdditionalInitialImportsTo(
     SourceFile *SF, const CompilerInstance::ImplicitImports &implicitImports) {
   SmallVector<SourceFile::ImportedModuleDesc, 4> additionalImports;
 
@@ -701,7 +765,7 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
     return performParseOnly();
   }
 
-  FrontendStatsTracer tracer(Context->Stats, "perform-sema");
+  FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
 
   ModuleDecl *mainModule = getMainModule();
   Context->LoadedModules[mainModule->getName()] = mainModule;
@@ -759,7 +823,7 @@ CompilerInstance::ImplicitImports::ImplicitImports(CompilerInstance &compiler) {
 }
 
 bool CompilerInstance::loadStdlib() {
-  FrontendStatsTracer tracer(Context->Stats, "load-stdlib");
+  FrontendStatsTracer tracer(getStatsReporter(), "load-stdlib");
   ModuleDecl *M = Context->getStdlibModule(true);
 
   if (!M) {
@@ -778,7 +842,7 @@ bool CompilerInstance::loadStdlib() {
 }
 
 ModuleDecl *CompilerInstance::importUnderlyingModule() {
-  FrontendStatsTracer tracer(Context->Stats, "import-underlying-module");
+  FrontendStatsTracer tracer(getStatsReporter(), "import-underlying-module");
   ModuleDecl *objCModuleUnderlyingMixedFramework =
       static_cast<ClangImporter *>(Context->getClangModuleLoader())
           ->loadModule(SourceLoc(),
@@ -791,7 +855,7 @@ ModuleDecl *CompilerInstance::importUnderlyingModule() {
 }
 
 ModuleDecl *CompilerInstance::importBridgingHeader() {
-  FrontendStatsTracer tracer(Context->Stats, "import-bridging-header");
+  FrontendStatsTracer tracer(getStatsReporter(), "import-bridging-header");
   const StringRef implicitHeaderPath =
       Invocation.getFrontendOptions().ImplicitObjCHeaderPath;
   auto clangImporter =
@@ -806,7 +870,7 @@ ModuleDecl *CompilerInstance::importBridgingHeader() {
 
 void CompilerInstance::getImplicitlyImportedModules(
     SmallVectorImpl<ModuleDecl *> &importModules) {
-  FrontendStatsTracer tracer(Context->Stats, "get-implicitly-imported-modules");
+  FrontendStatsTracer tracer(getStatsReporter(), "get-implicitly-imported-modules");
   for (auto &ImplicitImportModuleName :
        Invocation.getFrontendOptions().ImplicitImportModuleNames) {
     if (Lexer::isIdentifier(ImplicitImportModuleName)) {
@@ -840,7 +904,7 @@ void CompilerInstance::addMainFileToModule(
 
 void CompilerInstance::parseAndCheckTypesUpTo(
     const ImplicitImports &implicitImports, SourceFile::ASTStage_t limitStage) {
-  FrontendStatsTracer tracer(Context->Stats, "parse-and-check-types");
+  FrontendStatsTracer tracer(getStatsReporter(), "parse-and-check-types");
 
   PersistentState = std::make_unique<PersistentParserState>();
 
@@ -902,7 +966,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
 
 void CompilerInstance::parseLibraryFile(
     unsigned BufferID, const ImplicitImports &implicitImports) {
-  FrontendStatsTracer tracer(Context->Stats, "parse-library-file");
+  FrontendStatsTracer tracer(getStatsReporter(), "parse-library-file");
 
   auto *NextInput = createSourceFileForMainModule(
       SourceFileKind::Library, implicitImports.kind, BufferID);
@@ -924,7 +988,7 @@ void CompilerInstance::parseLibraryFile(
 
 bool CompilerInstance::parsePartialModulesAndLibraryFiles(
     const ImplicitImports &implicitImports) {
-  FrontendStatsTracer tracer(Context->Stats,
+  FrontendStatsTracer tracer(getStatsReporter(),
                              "parse-partial-modules-and-library-files");
   bool hadLoadError = false;
   // Parse all the partial modules first.
@@ -949,7 +1013,7 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
 void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     SourceFile::ASTStage_t LimitStage) {
   assert(LimitStage >= SourceFile::NameBound);
-  FrontendStatsTracer tracer(Context->Stats,
+  FrontendStatsTracer tracer(getStatsReporter(),
                              "parse-and-typecheck-main-file");
   bool mainIsPrimary =
       (isWholeModuleCompilation() || isPrimaryInput(MainBufferID));
@@ -1172,8 +1236,7 @@ static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
   C.NumSILOptGlobalVariables += Module.getSILGlobalList().size();
 }
 
-bool CompilerInstance::performSILProcessing(SILModule *silModule,
-                                            UnifiedStatsReporter *stats) {
+bool CompilerInstance::performSILProcessing(SILModule *silModule) {
   if (performMandatorySILPasses(Invocation, silModule))
     return true;
 
@@ -1185,7 +1248,7 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule,
 
   performSILOptimizations(Invocation, silModule);
 
-  if (stats)
+  if (auto *stats = getStatsReporter())
     countStatsPostSILOpt(*stats, *silModule);
 
   {

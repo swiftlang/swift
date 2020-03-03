@@ -468,9 +468,72 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
       OrigThinToThick->getLoc(), OrigThinToThick->getOperand(),
       SILType::getPrimitiveObjectType(NewTy));
 }
-/// Replace a convert_function that only has refcounting uses with its
-/// operand.
+
 SILInstruction *SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *CFI) {
+  // If this conversion only changes substitutions, then rewrite applications
+  // of the converted function as applications of the original.
+  //
+  // (full_apply (convert_function[only_converts_substitutions] x)) => (full_apply x)
+  // (partial_apply (convert_function[only_converts_substitutions] x)) => (convert_function (partial_apply x))
+  //
+  // TODO: We could generalize this to handle other ABI-compatible cases, by
+  // inserting the necessary casts around the arguments.
+  if (CFI->onlyConvertsSubstitutions()) {
+    auto usei = CFI->use_begin();
+    while (usei != CFI->use_end()) {
+      auto use = *usei++;
+      auto user = use->getUser();
+      if (isa<ApplySite>(user) && use->getOperandNumber() == 0) {
+        auto applySite = ApplySite(user);
+        // If this is a partial_apply, insert a convert_function back to the
+        // original result type.
+
+        if (auto pa = dyn_cast<PartialApplyInst>(user)) {
+          auto partialApplyTy = pa->getType();
+          Builder.setInsertionPoint(std::next(pa->getIterator()));
+          
+          SmallVector<SILValue, 4> args(pa->getArguments().begin(),
+                                        pa->getArguments().end());
+          
+          auto newPA = Builder.createPartialApply(pa->getLoc(),
+                                  CFI->getConverted(),
+                                  pa->getSubstitutionMap(),
+                                  args,
+                                  pa->getFunctionType()->getCalleeConvention());
+          auto newConvert = Builder.createConvertFunction(pa->getLoc(),
+                                                          newPA, partialApplyTy,
+                                                          false);
+          pa->replaceAllUsesWith(newConvert);
+          eraseInstFromFunction(*pa);
+          
+          continue;
+        }
+        
+        // For full apply sites, we only need to replace the `convert_function`
+        // with the original value.
+        use->set(CFI->getConverted());
+        applySite.setSubstCalleeType(
+                      CFI->getConverted()->getType().castTo<SILFunctionType>());
+      }
+    }
+  }
+  
+  // (convert_function (convert_function x)) => (convert_function x)
+  if (auto subCFI = dyn_cast<ConvertFunctionInst>(CFI->getConverted())) {
+    // If we convert the function type back to itself, we can replace the
+    // conversion completely.
+    if (subCFI->getConverted()->getType() == CFI->getType()) {
+      CFI->replaceAllUsesWith(subCFI->getConverted());
+      eraseInstFromFunction(*CFI);
+      return nullptr;
+    }
+    
+    // Otherwise, we can still bypass the intermediate conversion.
+    CFI->getOperandRef().set(subCFI->getConverted());
+  }
+  
+  // Replace a convert_function that only has refcounting uses with its
+  // operand.
   auto anyNonRefCountUse =
     std::any_of(CFI->use_begin(),
                 CFI->use_end(),

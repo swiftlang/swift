@@ -110,7 +110,9 @@ public:
 #define SHOULD_NEVER_VISIT_INST(INST)                                          \
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
       INST##Inst *i) {                                                         \
-    llvm_unreachable("Visited instruction that should never be visited?!");    \
+    llvm::errs() << "Unhandled inst: " << *i;                                  \
+    llvm::report_fatal_error(                                                  \
+        "Visited instruction that should never be visited?!");                 \
   }
 SHOULD_NEVER_VISIT_INST(AllocBox)
 SHOULD_NEVER_VISIT_INST(AllocExistentialBox)
@@ -415,8 +417,19 @@ OperandOwnershipKindClassifier::checkTerminatorArgumentMatchesDestBB(
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitBranchInst(BranchInst *bi) {
-  return checkTerminatorArgumentMatchesDestBB(bi->getDestBB(),
-                                              getOperandIndex());
+  ValueOwnershipKind destBlockArgOwnershipKind =
+      bi->getDestBB()->getArgument(getOperandIndex())->getOwnershipKind();
+
+  // If we have a guaranteed parameter, treat this as consuming.
+  if (destBlockArgOwnershipKind == ValueOwnershipKind::Guaranteed) {
+    return Map::compatibilityMap(destBlockArgOwnershipKind,
+                                 UseLifetimeConstraint::MustBeInvalidated);
+  }
+
+  // Otherwise, defer to defaults.
+  auto lifetimeConstraint =
+      destBlockArgOwnershipKind.getForwardingLifetimeConstraint();
+  return Map::compatibilityMap(destBlockArgOwnershipKind, lifetimeConstraint);
 }
 
 OperandOwnershipKindMap
@@ -528,9 +541,9 @@ OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
     return Map();
 
   auto ownershipKindRange = makeTransformRange(results,
-                                               [&](const SILResultInfo &info) {
-                                                 return info.getOwnershipKind(*f);
-                                               });
+     [&](const SILResultInfo &info) {
+       return info.getOwnershipKind(*f, f->getLoweredFunctionType());
+     });
 
   // Then merge all of our ownership kinds. If we fail to merge, return an empty
   // map so we fail on all operands.

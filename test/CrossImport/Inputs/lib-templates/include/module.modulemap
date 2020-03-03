@@ -1,0 +1,1 @@
+module ClangLibrary { header "clang_library.h" }

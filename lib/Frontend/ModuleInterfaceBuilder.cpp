@@ -390,7 +390,15 @@ bool ModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
                                               bool ShouldSerializeDeps,
                           std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                           llvm::function_ref<void()> RemarkRebuild) {
-
+  auto build = [&]() {
+    if (RemarkRebuild) {
+      RemarkRebuild();
+    }
+    return buildSwiftModuleInternal(OutPath, ShouldSerializeDeps, ModuleBuffer);
+  };
+  if (disableInterfaceFileLock) {
+    return build();
+  }
   while (1) {
   // Attempt to lock the interface file. Only one process is allowed to build
   // module from the interface so we don't consume too much memory when multiple
@@ -412,15 +420,12 @@ bool ModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
     LLVM_FALLTHROUGH;
   }
   case llvm::LockFileManager::LFS_Owned: {
-    if (RemarkRebuild) {
-      RemarkRebuild();
-    }
-    return buildSwiftModuleInternal(OutPath, ShouldSerializeDeps, ModuleBuffer);
+    return build();
   }
   case llvm::LockFileManager::LFS_Shared: {
     // Someone else is responsible for building the module. Wait for them to
     // finish.
-    switch (Locked.waitForUnlock()) {
+    switch (Locked.waitForUnlock(256)) {
     case llvm::LockFileManager::Res_Success: {
       // This process may have a different module output path. If the other
       // process doesn't build the interface to this output path, we should try

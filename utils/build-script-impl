@@ -460,6 +460,10 @@ function set_build_options_for_host() {
     SWIFT_HOST_VARIANT_ARCH=$architecture
 
     case ${host} in
+        android-aarch64)
+            SWIFT_HOST_TRIPLE="aarch64-unknown-linux-android"
+            llvm_target_arch="AArch64"
+            ;;
         linux-armv6)
             SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
             llvm_target_arch="ARM"
@@ -1550,12 +1554,18 @@ for host in "${ALL_HOSTS[@]}"; do
 
             swift)
 
+                if [[ "${ANDROID_API_LEVEL}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_ANDROID_API_LEVEL:STRING="${ANDROID_API_LEVEL}"
+                    )
+                fi
+
                 if [[ ! "${SKIP_BUILD_ANDROID}" ]]; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
                         -DSWIFT_ANDROID_NDK_GCC_VERSION:STRING="${ANDROID_NDK_GCC_VERSION}"
-                        -DSWIFT_ANDROID_API_LEVEL:STRING="${ANDROID_API_LEVEL}"
                         -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC:STRING="${ANDROID_ICU_UC}"
                         -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
                         -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
@@ -2168,6 +2178,8 @@ for host in "${ALL_HOSTS[@]}"; do
               HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
             elif [[ "$(uname -s)" == "Haiku" ]] ; then
               HOST_CXX_HEADERS_DIR="/boot/system/develop/headers/c++"
+            elif [[ "${ANDROID_DATA}" ]] ; then
+              HOST_CXX_HEADERS_DIR="$PREFIX/include/c++"
             else # Linux
               HOST_CXX_HEADERS_DIR="/usr/include/c++"
             fi

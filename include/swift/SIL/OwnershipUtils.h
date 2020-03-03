@@ -199,22 +199,30 @@ bool isValueAddressOrTrivial(SILValue v);
 /// These operations forward both owned and guaranteed ownership.
 bool isOwnershipForwardingValueKind(SILNodeKind kind);
 
+/// Is this an instruction that can forward both owned and guaranteed ownership
+/// kinds.
+bool isOwnershipForwardingInst(SILInstruction *i);
+
+/// Is this an instruction that can forward guaranteed ownership.
+bool isGuaranteedForwardingInst(SILInstruction *i);
+
 /// These operations forward guaranteed ownership, but don't necessarily forward
 /// owned values.
 bool isGuaranteedForwardingValueKind(SILNodeKind kind);
 
+/// Is this a value that is the result of an operation that forwards owned
+/// ownership.
 bool isGuaranteedForwardingValue(SILValue value);
 
-bool isOwnershipForwardingInst(SILInstruction *i);
-
-bool isGuaranteedForwardingInst(SILInstruction *i);
+/// Is this a node kind that can forward owned ownership, but may not be able to
+/// forward guaranteed ownership.
+bool isOwnedForwardingValueKind(SILNodeKind kind);
 
 struct BorrowScopeOperandKind {
-  using UnderlyingKindTy = std::underlying_type<SILInstructionKind>::type;
-
-  enum Kind : UnderlyingKindTy {
-    BeginBorrow = UnderlyingKindTy(SILInstructionKind::BeginBorrowInst),
-    BeginApply = UnderlyingKindTy(SILInstructionKind::BeginApplyInst),
+  enum Kind {
+    BeginBorrow,
+    BeginApply,
+    Branch,
   };
 
   Kind value;
@@ -232,6 +240,8 @@ struct BorrowScopeOperandKind {
       return BorrowScopeOperandKind(BeginBorrow);
     case SILInstructionKind::BeginApplyInst:
       return BorrowScopeOperandKind(BeginApply);
+    case SILInstructionKind::BranchInst:
+      return BorrowScopeOperandKind(Branch);
     }
   }
 
@@ -242,9 +252,15 @@ struct BorrowScopeOperandKind {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               BorrowScopeOperandKind kind);
 
+struct BorrowScopeIntroducingValue;
+
 /// An operand whose user instruction introduces a new borrow scope for the
 /// operand's value. The value of the operand must be considered as implicitly
 /// borrowed until the user's corresponding end scope instruction.
+///
+/// NOTE: We do not require that the guaranteed scope be represented by a
+/// guaranteed value in the same function: see begin_apply. In such cases, we
+/// require instead an end_* instruction to mark the end of the scope's region.
 struct BorrowScopeOperand {
   BorrowScopeOperandKind kind;
   Operand *op;
@@ -270,6 +286,66 @@ struct BorrowScopeOperand {
 
   void visitEndScopeInstructions(function_ref<void(Operand *)> func) const;
 
+  /// Returns true if this borrow scope operand consumes guaranteed
+  /// values and produces a new scope afterwards.
+  bool consumesGuaranteedValues() const {
+    switch (kind) {
+    case BorrowScopeOperandKind::BeginBorrow:
+    case BorrowScopeOperandKind::BeginApply:
+      return false;
+    case BorrowScopeOperandKind::Branch:
+      return true;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  /// Is this a borrow scope operand that can open new borrow scopes
+  /// for owned values.
+  bool canAcceptOwnedValues() const {
+    switch (kind) {
+    case BorrowScopeOperandKind::BeginBorrow:
+    case BorrowScopeOperandKind::BeginApply:
+      return true;
+    case BorrowScopeOperandKind::Branch:
+      return false;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  /// Is the result of this instruction also a borrow introducer?
+  ///
+  /// TODO: This needs a better name.
+  bool areAnyUserResultsBorrowIntroducers() const {
+    // TODO: Can we derive this by running a borrow introducer check ourselves?
+    switch (kind) {
+    case BorrowScopeOperandKind::BeginBorrow:
+    case BorrowScopeOperandKind::Branch:
+      return true;
+    case BorrowScopeOperandKind::BeginApply:
+      return false;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  /// Visit all of the results of the operand's user instruction that are
+  /// consuming uses.
+  void visitUserResultConsumingUses(function_ref<void(Operand *)> visitor);
+
+  /// Visit all of the "results" of the user of this operand that are borrow
+  /// scope introducers for the specific scope that this borrow scope operand
+  /// summarizes.
+  void visitBorrowIntroducingUserResults(
+      function_ref<void(BorrowScopeIntroducingValue)> visitor);
+
+  /// Passes to visitor all of the consuming uses of this use's using
+  /// instruction.
+  ///
+  /// This enables one to walk the def-use chain of guaranteed phis for a single
+  /// guaranteed scope by using a worklist and checking if any of the operands
+  /// are BorrowScopeOperands.
+  void visitConsumingUsesOfBorrowIntroducingUserResults(
+      function_ref<void(Operand *)> visitor);
+
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
@@ -287,10 +363,11 @@ struct BorrowScopeIntroducingValueKind {
   using UnderlyingKindTy = std::underlying_type<ValueKind>::type;
 
   /// Enum we use for exhaustive pattern matching over borrow scope introducers.
-  enum Kind : UnderlyingKindTy {
-    LoadBorrow = UnderlyingKindTy(ValueKind::LoadBorrowInst),
-    BeginBorrow = UnderlyingKindTy(ValueKind::BeginBorrowInst),
-    SILFunctionArgument = UnderlyingKindTy(ValueKind::SILFunctionArgument),
+  enum Kind {
+    LoadBorrow,
+    BeginBorrow,
+    SILFunctionArgument,
+    Phi,
   };
 
   static Optional<BorrowScopeIntroducingValueKind> get(ValueKind kind) {
@@ -303,6 +380,8 @@ struct BorrowScopeIntroducingValueKind {
       return BorrowScopeIntroducingValueKind(BeginBorrow);
     case ValueKind::SILFunctionArgument:
       return BorrowScopeIntroducingValueKind(SILFunctionArgument);
+    case ValueKind::SILPhiArgument:
+      return BorrowScopeIntroducingValueKind(Phi);
     }
   }
 
@@ -323,6 +402,7 @@ struct BorrowScopeIntroducingValueKind {
     switch (value) {
     case BorrowScopeIntroducingValueKind::BeginBorrow:
     case BorrowScopeIntroducingValueKind::LoadBorrow:
+    case BorrowScopeIntroducingValueKind::Phi:
       return true;
     case BorrowScopeIntroducingValueKind::SILFunctionArgument:
       return false;
@@ -365,9 +445,28 @@ struct BorrowScopeIntroducingValue {
       : kind(BorrowScopeIntroducingValueKind::SILFunctionArgument), value(arg) {
     assert(arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed);
   }
+  BorrowScopeIntroducingValue(SILPhiArgument *arg)
+      : kind(BorrowScopeIntroducingValueKind::Phi), value(arg) {
+    assert(llvm::all_of(arg->getParent()->getPredecessorBlocks(),
+                        [](SILBasicBlock *block) {
+                          return isa<BranchInst>(block->getTerminator());
+                        }) &&
+           "Phi argument incoming values must come from branch insts!");
+    assert(arg->isPhiArgument() && "Can only accept a true phi argument!");
+    assert(arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed);
+  }
 
   BorrowScopeIntroducingValue(SILValue v)
       : kind(*BorrowScopeIntroducingValueKind::get(v->getKind())), value(v) {
+    // Validate that if we have a phi argument that all our predecessors have
+    // branches as terminators.
+    assert(!isa<SILPhiArgument>(v) ||
+           (llvm::all_of(v->getParentBlock()->getPredecessorBlocks(),
+                         [](SILBasicBlock *block) {
+                           return isa<BranchInst>(block->getTerminator());
+                         }) &&
+            "Phi argument incoming values must come from branch insts!"));
+
     assert(v.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
   }
 
@@ -376,6 +475,15 @@ struct BorrowScopeIntroducingValue {
     auto kind = BorrowScopeIntroducingValueKind::get(value->getKind());
     if (!kind || value.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
       return None;
+    // If kind is phi and we were not passed something with all branch
+    // predecessors, return None.
+    if ((*kind) == BorrowScopeIntroducingValueKind::Phi &&
+        llvm::any_of(value->getParentBlock()->getPredecessorBlocks(),
+                     [](SILBasicBlock *block) {
+                       return !isa<BranchInst>(block->getTerminator());
+                     }))
+      return None;
+    // Otherwise, create our value directly.
     return BorrowScopeIntroducingValue(*kind, value);
   }
 
@@ -413,6 +521,11 @@ struct BorrowScopeIntroducingValue {
                              SmallVectorImpl<SILInstruction *> &scratchSpace,
                              SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
                              DeadEndBlocks &deadEndBlocks) const;
+
+  /// Given a local borrow scope introducer, visit all non-forwarding consuming
+  /// users. This means that this looks through guaranteed block arguments.
+  bool visitLocalScopeTransitiveEndingUses(
+      function_ref<void(Operand *)> visitor) const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }

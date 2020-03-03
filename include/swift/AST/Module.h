@@ -124,6 +124,8 @@ enum class ResilienceStrategy : unsigned {
   Resilient
 };
 
+class OverlayFile;
+
 /// The minimum unit of compilation.
 ///
 /// A module is made up of several file-units, which are all part of the same
@@ -203,6 +205,9 @@ private:
 
   SmallVector<FileUnit *, 2> Files;
 
+  llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
+    declaredCrossImports;
+
   std::unique_ptr<SourceLookupCache> Cache;
   SourceLookupCache &getSourceLookupCache() const;
 
@@ -251,6 +256,22 @@ public:
   bool isClangModule() const;
   void addFile(FileUnit &newFile);
   void removeFile(FileUnit &existingFile);
+
+  /// Add a file declaring a cross-import overlay.
+  void addCrossImportOverlayFile(StringRef file);
+
+  /// Append to \p overlayNames the names of all modules that this module
+  /// declares should be imported when \p bystanderName is imported.
+  ///
+  /// This operation is asymmetric: you will get different results if you
+  /// reverse the positions of the two modules involved in the cross-import.
+  void findDeclaredCrossImportOverlays(
+      Identifier bystanderName, SmallVectorImpl<Identifier> &overlayNames,
+      SourceLoc diagLoc) const;
+
+  /// Get the list of all modules this module declares a cross-import with.
+  void getDeclaredCrossImportBystanders(
+      SmallVectorImpl<Identifier> &bystanderNames);
 
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
@@ -333,6 +354,11 @@ public:
   void setIsNonSwiftModule(bool flag = true) {
     Bits.ModuleDecl.IsNonSwiftModule = flag;
   }
+
+  /// Retrieve the top-level module. If this module is already top-level, this
+  /// returns itself. If this is a submodule such as \c Foo.Bar.Baz, this
+  /// returns the module \c Foo.
+  ModuleDecl *getTopLevelModule();
 
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
@@ -437,6 +463,11 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
 
+  /// Find all SPI names imported from \p importedModule by this module,
+  /// collecting the identifiers in \p spiGroups.
+  void lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                          SmallVectorImpl<Identifier> &spiGroups) const;
+
   /// \sa getImportedModules
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.
@@ -444,7 +475,13 @@ public:
     /// Include "regular" imports with no special annotation.
     Private = 1 << 1,
     /// Include imports declared with `@_implementationOnly`.
-    ImplementationOnly = 1 << 2
+    ImplementationOnly = 1 << 2,
+    /// Include imports of SPIs declared with `@_spi`
+    SPIAccessControl = 1 << 3,
+    /// Include imports shadowed by a separately-imported overlay (i.e. a
+    /// cross-import overlay). Unshadowed imports are included whether or not
+    /// this flag is specified.
+    ShadowedBySeparateOverlay = 1 << 4
   };
   /// \sa getImportedModules
   using ImportFilter = OptionSet<ImportFilterKind>;

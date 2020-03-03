@@ -33,7 +33,7 @@ using namespace swift;
 using namespace irgen;
 
 static llvm::cl::opt<bool> EnableTrapDebugInfo(
-    "enable-trap-debug-info", llvm::cl::Hidden,
+    "enable-trap-debug-info", llvm::cl::init(true), llvm::cl::Hidden,
     llvm::cl::desc("Generate failure-message functions in the debug info"));
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
@@ -103,7 +103,8 @@ void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
 
 void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
                                llvm::Value *size, Alignment align) {
-  Builder.CreateMemCpy(dest, align.getValue(), src, align.getValue(), size);
+  Builder.CreateMemCpy(dest, llvm::MaybeAlign(align.getValue()), src,
+                       llvm::MaybeAlign(align.getValue()), size);
 }
 
 void IRGenFunction::emitMemCpy(Address dest, Address src, Size size) {

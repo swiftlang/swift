@@ -242,6 +242,11 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     // associated with it directly or rather with
     // one of its parents.
     if (auto *decl = overload->choice.getDeclOrNull()) {
+      // If declaration is an operator let's always use
+      // it to produce `in reference to` diagnostics.
+      if (decl->isOperator())
+        return decl;
+
       auto *DC = decl->getDeclContext();
 
       do {
@@ -510,18 +515,8 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
   if (!ODRE)
     return false;
 
-  auto isStdlibType = [](Type type) {
-    if (auto *NTD = type->getAnyNominal()) {
-      auto *DC = NTD->getDeclContext();
-      return DC->isModuleScopeContext() &&
-             DC->getParentModule()->isStdlibModule();
-    }
-
-    return false;
-  };
-
   auto name = ODRE->getDecls().front()->getBaseName();
-  if (!(name.isOperator() && isStdlibType(getLHS()) && isStdlibType(getRHS())))
+  if (!(name.isOperator() && getLHS()->isStdlibType() && getRHS()->isStdlibType()))
     return false;
 
   // If this is an operator reference and both types are from stdlib,
@@ -570,8 +565,6 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_closure_result;
   case CTP_ArrayElement:
     return diag::cannot_convert_array_element;
-  // TODO(diagnostics): Make dictionary related diagnostics take prescedence
-  // over CSDiag. Currently these won't ever be produced.
   case CTP_DictionaryKey:
     return diag::cannot_convert_dict_key;
   case CTP_DictionaryValue:
@@ -2261,13 +2254,31 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
     return false;
 
   auto *srcFT = getFromType()->getAs<FunctionType>();
-  if (!srcFT || !srcFT->getParams().empty())
+  if (!srcFT ||
+      !(srcFT->getParams().empty() ||
+        getLocator()->isLastElement<LocatorPathElt::PatternMatch>()))
     return false;
 
   auto toType = getToType();
   if (toType->is<AnyFunctionType>() ||
       !TypeChecker::isConvertibleTo(srcFT->getResult(), toType, getDC()))
     return false;
+
+  // Diagnose cases where the pattern tried to match associated values but
+  // the case we found had none.
+  if (auto match =
+          getLocator()->getLastElementAs<LocatorPathElt::PatternMatch>()) {
+    if (auto enumElementPattern =
+            dyn_cast<EnumElementPattern>(match->getPattern())) {
+      emitDiagnostic(enumElementPattern->getNameLoc(),
+                     diag::enum_element_pattern_assoc_values_mismatch,
+                     enumElementPattern->getName());
+      emitDiagnostic(enumElementPattern->getNameLoc(),
+                     diag::enum_element_pattern_assoc_values_remove)
+        .fixItRemove(enumElementPattern->getSubPattern()->getSourceRange());
+      return true;
+    }
+  }
 
   auto *anchor = getAnchor();
   emitDiagnostic(anchor->getLoc(), diag::missing_nullary_call,
@@ -3735,6 +3746,8 @@ bool PartialApplicationFailure::diagnoseAsError() {
           anchor, ConstraintLocator::ConstructorMember))) {
     kind = anchor->getBase()->isSuperExpr() ? RefKind::SuperInit
                                             : RefKind::SelfInit;
+  } else if (anchor->getBase()->isSuperExpr()) {
+    kind = RefKind::SuperMethod;
   }
 
   auto diagnostic = CompatibilityWarning
@@ -4480,14 +4493,17 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
                         SM, tuple->getElement(ArgIdx - 1)->getEndLoc()),
                     firstRange.End);
     diag.fixItRemove(removalRange);
-    diag.fixItInsert(secondRange.Start, text.str() + ", ");
+    diag.fixItInsert(secondRange.Start,
+                     text.str() + (isa<BinaryExpr>(anchor) ? "" : ", "));
   };
 
   // There are 4 diagnostic messages variations depending on
   // labeled/unlabeled arguments.
   if (first.empty() && second.empty()) {
     addFixIts(emitDiagnostic(diagLoc,
-                             diag::argument_out_of_order_unnamed_unnamed,
+                             isa<BinaryExpr>(anchor)
+                                 ? diag::argument_out_of_order_binary_op
+                                 : diag::argument_out_of_order_unnamed_unnamed,
                              ArgIdx + 1, PrevArgIdx + 1));
   } else if (first.empty() && !second.empty()) {
     addFixIts(emitDiagnostic(diagLoc, diag::argument_out_of_order_unnamed_named,
@@ -5043,9 +5059,7 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
       continue;
 
     auto type = resolveType(typeVar);
-    // This could happen if the diagnostic is used by CSDiag.
-    if (type->is<TypeVariableType>())
-      continue;
+    assert(!type->is<TypeVariableType>());
 
     // If this is one of the defaulted parameter types, attempt
     // to emit placeholder for it instead of `Any`.

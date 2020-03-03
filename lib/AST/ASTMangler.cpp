@@ -753,11 +753,6 @@ static const char *getMetatypeRepresentationOp(MetatypeRepresentation Rep) {
   llvm_unreachable("Unhandled MetatypeRepresentation in switch.");
 }
 
-static bool isStdlibType(const TypeDecl *decl) {
-  DeclContext *dc = decl->getDeclContext();
-  return dc->isModuleScopeContext() && dc->getParentModule()->isStdlibModule();
-}
-
 /// Whether to mangle the given type as generic.
 static bool shouldMangleAsGeneric(Type type) {
   if (!type)
@@ -986,7 +981,7 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
         if (tryMangleTypeSubstitution(tybase))
           return;
 
-        if (isStdlibType(Decl) && Decl->getName().str() == "Optional") {
+        if (Decl->isStdlibDecl() && Decl->getName().str() == "Optional") {
           auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
           assert(GenArgs.size() == 1);
           appendType(GenArgs[0], forDecl);
@@ -2483,7 +2478,7 @@ void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) 
 
 bool ASTMangler::tryAppendStandardSubstitution(const GenericTypeDecl *decl) {
   // Bail out if our parent isn't the swift standard library.
-  if (!isStdlibType(decl))
+  if (!decl->isStdlibDecl())
     return false;
 
   if (isa<NominalTypeDecl>(decl)) {

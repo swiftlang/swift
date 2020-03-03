@@ -520,3 +520,10 @@ func testArgumentLabelReferencing() {
   // expected-note@-5 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to 'takesTwoPointers(ptr:ptr:)'}}
   // expected-note@-6 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 }
+
+func ambiguous_fn(@_nonEphemeral _ ptr: UnsafePointer<Int>) {} // expected-note {{found this candidate}}
+func ambiguous_fn(_ ptr: UnsafeRawPointer) {} // expected-note {{found this candidate}}
+
+func test_ambiguity_with_function_instead_of_argument(_ x: inout Int) {
+  ambiguous_fn(&x) // expected-error {{ambiguous use of 'ambiguous_fn'}}
+}

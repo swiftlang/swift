@@ -472,7 +472,8 @@ void InstructionDeleter::deleteIfDead(SILInstruction *inst,
                                       CallbackTy callback) {
   if (isInstructionTriviallyDead(inst) ||
       isScopeAffectingInstructionDead(inst)) {
-    deleteInstruction(inst, callback, /*Fix lifetime of operands*/ true);
+    deleteInstruction(inst, callback,
+      /*Fix lifetime of operands*/ inst->getFunction()->hasOwnership());
   }
 }
 
@@ -826,9 +827,6 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *builder,
   // No cast is required if types are the same.
   if (srcTy == destTy)
     return value;
-
-  assert(srcTy.isAddress() == destTy.isAddress()
-         && "Addresses aren't compatible with values");
 
   if (srcTy.isAddress() && destTy.isAddress()) {
     // Cast between two addresses and that's it.

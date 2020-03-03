@@ -125,6 +125,21 @@ public:
 
   bool check();
 
+  /// Depending on our initialization, either return false or call Func and
+  /// throw an error.
+  bool handleError(function_ref<void()> &&messagePrinterFunc) const {
+    if (errorBehavior.shouldPrintMessage()) {
+      messagePrinterFunc();
+    }
+
+    if (errorBehavior.shouldReturnFalse()) {
+      return false;
+    }
+
+    assert(errorBehavior.shouldAssert() && "At this point, we should assert");
+    llvm_unreachable("triggering standard assertion failure routine");
+  }
+
 private:
   bool checkUses();
   bool isCompatibleDefUse(Operand *op, ValueOwnershipKind ownershipKind);
@@ -149,21 +164,10 @@ private:
   bool isSubobjectProjectionWithLifetimeEndingUses(
       SILValue value,
       const SmallVectorImpl<Operand *> &lifetimeEndingUsers) const;
-
-  /// Depending on our initialization, either return false or call Func and
-  /// throw an error.
-  bool handleError(function_ref<void()> &&messagePrinterFunc) const {
-    if (errorBehavior.shouldPrintMessage()) {
-      messagePrinterFunc();
-    }
-
-    if (errorBehavior.shouldReturnFalse()) {
-      return false;
-    }
-
-    assert(errorBehavior.shouldAssert() && "At this point, we should assert");
-    llvm_unreachable("triggering standard assertion failure routine");
-  }
+  bool
+  discoverImplicitRegularUsers(const BorrowScopeOperand &initialScopedOperand,
+                               SmallVectorImpl<Operand *> &implicitRegularUsers,
+                               bool isGuaranteed);
 };
 
 } // end anonymous namespace
@@ -235,6 +239,55 @@ bool SILValueOwnershipChecker::isCompatibleDefUse(
   return false;
 }
 
+/// Returns true if an error was found.
+bool SILValueOwnershipChecker::discoverImplicitRegularUsers(
+    const BorrowScopeOperand &initialScopedOperand,
+    SmallVectorImpl<Operand *> &implicitRegularUsers, bool isGuaranteed) {
+  if (!initialScopedOperand.areAnyUserResultsBorrowIntroducers()) {
+    initialScopedOperand.visitEndScopeInstructions(
+        [&](Operand *op) { implicitRegularUsers.push_back(op); });
+    return false;
+  }
+
+  // Ok, we have an instruction that introduces a new borrow scope and its
+  // result is that borrow scope. In such a case, we need to not just add the
+  // end scope instructions of this scoped operand, but also look through any
+  // guaranteed phis and add their end_borrow to this list as well.
+  SmallVector<BorrowScopeOperand, 8> worklist;
+  SmallPtrSet<Operand *, 8> visitedValue;
+  worklist.push_back(initialScopedOperand);
+  visitedValue.insert(initialScopedOperand.op);
+  bool foundError = false;
+  while (!worklist.empty()) {
+    auto scopedOperand = worklist.pop_back_val();
+    scopedOperand.visitConsumingUsesOfBorrowIntroducingUserResults(
+        [&](Operand *op) {
+          if (auto subSub = BorrowScopeOperand::get(op)) {
+            if (!visitedValue.insert(op).second) {
+              handleError([&] {
+                llvm::errs()
+                    << "Function: " << op->getUser()->getFunction()->getName()
+                    << "\n"
+                    << "Implicit Regular User Guaranteed Phi Cycle!\n"
+                    << "User: " << *op->getUser()
+                    << "Initial: " << initialScopedOperand << "\n";
+              });
+              foundError = true;
+              return;
+            }
+
+            worklist.push_back(*subSub);
+            visitedValue.insert(subSub->op);
+            return;
+          }
+
+          implicitRegularUsers.push_back(op);
+        });
+  }
+
+  return foundError;
+}
+
 bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
     SmallVectorImpl<Operand *> &lifetimeEndingUsers,
     SmallVectorImpl<Operand *> &nonLifetimeEndingUsers,
@@ -280,14 +333,23 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
       continue;
     }
 
-    // Otherwise, check if we have a borrow scope operand. In such a case, add
-    // the borrow scope operand's end scope instructions as implicit regular
-    // users so we can ensure that the borrow scope operand's scope is
-    // completely within our value's scope.
-    if (auto scopedOperand = BorrowScopeOperand::get(op)) {
-      scopedOperand->visitEndScopeInstructions(
-          [&](Operand *op) { implicitRegularUsers.push_back(op); });
+    // Otherwise, check if we have a borrow scope operand. In such a case, we
+    // need to add the borrow scope operand's end scope instructions as implicit
+    // regular users so we can ensure that the borrow scope operand's scope is
+    // completely within the owned value's scope. If we do not have a borrow
+    // scope operand, just continue, we are done.
+    auto initialScopedOperand = BorrowScopeOperand::get(op);
+    if (!initialScopedOperand) {
+      continue;
     }
+
+    // If our scoped operand is not also a borrow introducer, then we know that
+    // we do not need to consider guaranteed phis and thus can just add the
+    // initial end scope instructions without any further work.
+    //
+    // Maybe: Is borrow scope non-local?
+    foundError |= discoverImplicitRegularUsers(*initialScopedOperand,
+                                               implicitRegularUsers, false);
   }
 
   return foundError;
@@ -331,53 +393,83 @@ bool SILValueOwnershipChecker::gatherUsers(
     if (user->isTypeDependentOperand(*op))
       continue;
 
-    // First check if this recursive use is compatible with our values ownership
-    // kind. If not, flag the error and continue so that we can report more
-    // errors.
+    // First check if this recursive use is compatible with our values
+    // ownership kind. If not, flag the error and continue so that we can
+    // report more errors.
     if (!isCompatibleDefUse(op, ValueOwnershipKind::Guaranteed)) {
       foundError = true;
       continue;
     }
 
-    if (op->isConsumingUse()) {
-      LLVM_DEBUG(llvm::dbgs() << "        Lifetime Ending User: " << *user);
-      lifetimeEndingUsers.push_back(op);
-    } else {
-      LLVM_DEBUG(llvm::dbgs() << "        Regular User: " << *user);
-      nonLifetimeEndingUsers.push_back(op);
-    }
-
+    // If we are visiting a non-first level user and we
     // If we are guaranteed, but are not a guaranteed forwarding inst, we add
     // the end scope instructions of any new sub-scopes. This ensures that the
     // parent scope completely encloses the child borrow scope.
     //
     // Example: A guaranteed parameter of a co-routine.
+
+    // Now check if we have a non guaranteed forwarding inst...
     if (!isGuaranteedForwardingInst(user)) {
-      // First check if we are visiting an operand that introduces a new
-      // sub-scope. If we do, we need to preserve
-      if (auto scopedOperand = BorrowScopeOperand::get(op)) {
-        scopedOperand->visitEndScopeInstructions(
-            [&](Operand *op) { implicitRegularUsers.push_back(op); });
+      // First check if we are visiting an operand that is a consuming use...
+      if (op->isConsumingUse()) {
+        // If its underlying value is our original value, then this is a true
+        // lifetime ending use. Otherwise, we have a guaranteed value that has
+        // an end_borrow on a forwarded value which is not supported in any
+        // case, so emit an error.
+        if (op->get() != value) {
+          handleError([&] {
+            llvm::errs() << "Function: " << value->getFunction()->getName()
+                         << "\n"
+                         << "Invalid End Borrow!\n"
+                         << "Original Value: " << value
+                         << "End Borrow: " << *op->getUser() << "\n";
+          });
+          foundError = true;
+          continue;
+        }
+
+        // Otherwise, track this as a lifetime ending use of our underlying
+        // value and continue.
+        LLVM_DEBUG(llvm::dbgs() << "        Lifetime Ending User: " << *user);
+        lifetimeEndingUsers.push_back(op);
+        continue;
       }
 
-      // Then continue.
+      // Ok, our operand does not consume guaranteed values. Check if it is a
+      // BorrowScopeOperand and if so, add its end scope instructions as
+      // implicit regular users of our value.
+      if (auto scopedOperand = BorrowScopeOperand::get(op)) {
+        assert(!scopedOperand->consumesGuaranteedValues());
+
+        foundError |= discoverImplicitRegularUsers(*scopedOperand,
+                                                   implicitRegularUsers, true);
+      }
+
+      // And then add the op to the non lifetime ending user list.
+      LLVM_DEBUG(llvm::dbgs() << "        Regular User: " << *user);
+      nonLifetimeEndingUsers.push_back(op);
       continue;
     }
 
-    // At this point, we know that we must have a forwarded subobject. Since the
-    // base type is guaranteed, we know that the subobject is either guaranteed
-    // or trivial. We now split into two cases, if the user is a terminator or
-    // not. If we do not have a terminator, then just add the uses of all of
-    // User's results to the worklist.
+    // At this point since we have a forwarded subobject, we know this is a non
+    // lifetime ending user.
+    LLVM_DEBUG(llvm::dbgs() << "        Regular User: " << *user);
+    nonLifetimeEndingUsers.push_back(op);
+
+    // At this point, we know that we must have a forwarded subobject. Since
+    // the base type is guaranteed, we know that the subobject is either
+    // guaranteed or trivial. We now split into two cases, if the user is a
+    // terminator or not. If we do not have a terminator, then just add the
+    // uses of all of User's results to the worklist.
     if (user->getResults().size()) {
       for (SILValue result : user->getResults()) {
         if (result.getOwnershipKind() == ValueOwnershipKind::None) {
           continue;
         }
 
-        // Now, we /must/ have a guaranteed subobject, so let's assert that the
-        // user is actually guaranteed and add the subobject's users to our
-        // worklist.
+        // Now, we /must/ have a guaranteed subobject, so let's assert that
+        // the user is actually guaranteed and add the subobject's users to
+        // our worklist.
         assert(result.getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
                "Our value is guaranteed and this is a forwarding instruction. "
                "Should have guaranteed ownership as well.");
@@ -388,7 +480,6 @@ bool SILValueOwnershipChecker::gatherUsers(
     }
 
     assert(user->getResults().empty());
-
     auto *ti = dyn_cast<TermInst>(user);
     if (!ti) {
       continue;
@@ -405,18 +496,18 @@ bool SILValueOwnershipChecker::gatherUsers(
         if (succBlock->args_empty())
           continue;
 
-        // Otherwise, make sure that all arguments are trivial or guaranteed. If
-        // we fail, emit an error.
+        // Otherwise, make sure that all arguments are trivial or guaranteed.
+        // If we fail, emit an error.
         //
         // TODO: We could ignore this error and emit a more specific error on
         // the actual terminator.
         for (auto *succArg : succBlock->getSILPhiArguments()) {
-          // *NOTE* We do not emit an error here since we want to allow for more
-          // specific errors to be found during use_verification.
+          // *NOTE* We do not emit an error here since we want to allow for
+          // more specific errors to be found during use_verification.
           //
           // TODO: Add a flag that associates the terminator instruction with
-          // needing to be verified. If it isn't verified appropriately, assert
-          // when the verifier is destroyed.
+          // needing to be verified. If it isn't verified appropriately,
+          // assert when the verifier is destroyed.
           auto succArgOwnershipKind = succArg->getOwnershipKind();
           if (!succArgOwnershipKind.isCompatibleWith(
                   ValueOwnershipKind::Guaranteed)) {
@@ -436,14 +527,10 @@ bool SILValueOwnershipChecker::gatherUsers(
       continue;
     }
 
-    // Otherwise, we are dealing with the merging of true phis. To work with
-    // this we will eventually need to create a notion of forwarding borrow
-    // scopes.
-
-    // But until then, we validate that the argument has an end_borrow that acts
-    // as a subscope that is compeltely enclosed within the scopes of all
-    // incoming values. We require all of our arguments to be either trivial or
-    // guaranteed.
+    // We should not have a true phi here. So validate that our argument has an
+    // end_borrow that acts as a subscope that is compeltely enclosed within the
+    // scopes of all incoming values. We require all of our arguments to be
+    // either trivial or guaranteed.
     for (auto &succ : ti->getSuccessors()) {
       auto *succBlock = succ.getBB();
 
@@ -454,8 +541,8 @@ bool SILValueOwnershipChecker::gatherUsers(
       // Otherwise, make sure that all arguments are trivial or guaranteed. If
       // we fail, emit an error.
       //
-      // TODO: We could ignore this error and emit a more specific error on the
-      // actual terminator.
+      // TODO: We could ignore this error and emit a more specific error on
+      // the actual terminator.
       for (auto *succArg : succBlock->getSILPhiArguments()) {
         // *NOTE* We do not emit an error here since we want to allow for more
         // specific errors to be found during use_verification.

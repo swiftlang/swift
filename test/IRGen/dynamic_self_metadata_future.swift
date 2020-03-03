@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -target %module-target-future -emit-ir -parse-as-library | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
+// RUN: %target-swift-frontend -prespecialize-generic-metadata %s -target %module-target-future -emit-ir -parse-as-library | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
 
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
@@ -57,23 +57,7 @@ class C {
   // CHECK-SAME:     {{.*}} @"$s28dynamic_self_metadata_future1GVyxGAA1PAAMc" 
   // CHECK-SAME:     to %swift.protocol_conformance_descriptor*
   // CHECK-SAME:   ), 
-  // CHECK-SAME:   %swift.type* getelementptr inbounds (
-  // CHECK-SAME:     %swift.full_type, 
-  // CHECK-SAME:     %swift.full_type* bitcast (
-  // CHECK-SAME:       <{ 
-  // CHECK-SAME:         i8**, 
-  // CHECK-SAME:         [[INT]], 
-  // CHECK-SAME:         %swift.type_descriptor*, 
-  // CHECK-SAME:         %swift.type*, 
-  // CHECK-SAME:         i32, 
-  // CHECK-SAME:         {{(\[4 x i8\])?}}, 
-  // CHECK-SAME:         i64 
-  // CHECK-SAME:       }>* @"$s28dynamic_self_metadata_future1GVyAA1CCXDGMf" 
-  // CHECK-SAME:       to %swift.full_type*
-  // CHECK-SAME:     ), 
-  // CHECK-SAME:     i32 0, 
-  // CHECK-SAME:     i32 1
-  // CHECK-SAME:   ), 
+  // CHECK-SAME:   %swift.type* %{{[0-9]+}},
   // CHECK-SAME:   i8*** undef
   // CHECK-SAME: )
 }

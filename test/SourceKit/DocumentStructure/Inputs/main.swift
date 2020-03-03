@@ -165,3 +165,6 @@ public extension Outer2 {
   }
 }
 #endif
+
+@objc(FPBarProto)
+protocol BarProtocol {}

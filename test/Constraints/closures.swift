@@ -456,13 +456,7 @@ extension Collection {
   }
 }
 func fn_r28909024(n: Int) {
-  // FIXME(diagnostics): Unfortunately there is no easy way to fix this diagnostic issue at the moment
-  // because the problem is related to ordering of the bindings - we'd attempt to bind result of the expression
-  // to contextual type of `Void` which prevents solver from discovering correct types for range - 0..<10
-  // (since both arguments are literal they are ranked lower than contextual type).
-  //
-  // Good diagnostic for this is - `unexpected non-void return value in void function`
-  return (0..<10).r28909024 { // expected-error {{expression type 'Range<Int>.Index' (aka 'Int') is ambiguous without more context}}
+  return (0..<10).r28909024 { // expected-error {{unexpected non-void return value in void function}} expected-note {{did you mean to add a return type?}}
     _ in true
   }
 }
@@ -977,5 +971,24 @@ func test_correct_inference_of_closure_result_in_presence_of_optionals() {
         let _ = foo(v) // Ok, v is inferred as `B`
   else {
     return;
+  }
+}
+
+// rdar://problem/59741308 - inference fails with tuple element has to joined to supertype
+func rdar_59741308() {
+  class Base {
+    func foo(_: Int) {}
+  }
+
+  class A : Base {}
+  class B : Base {}
+
+  func test() {
+    // Note that `0`, and `1` here are going to be type variables
+    // which makes join impossible until it's already to late for
+    // it to be useful.
+    [(A(), 0), (B(), 1)].forEach { base, value in
+      base.foo(value) // Ok
+    }
   }
 }

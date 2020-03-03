@@ -422,6 +422,12 @@ def emit_module_interface_path :
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
 
+def emit_private_module_interface_path :
+  Separate<["-"], "emit-private-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
+         DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
+
 def avoid_emit_module_source_info :
   Flag<["-"], "avoid-emit-module-source-info">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -491,7 +497,7 @@ def enable_experimental_differentiable_programming : Flag<["-"], "enable-experim
 def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable experimental concise '#file' identifier and '#filePath' alternative">;
+  HelpText<"Enable experimental concise '#file' identifier">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,

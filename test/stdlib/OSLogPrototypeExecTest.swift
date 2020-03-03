@@ -172,6 +172,31 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     h.log("\(10, align: .left(columns: 5))")
   }
 
+  func logWithDynamicPrecisionAndAlignment(
+    _ h: Logger,
+    _ value: Int,
+    columns: Int,
+    minDigits: Int
+  ) {
+    h.log(
+      """
+       dynamic precision/alignment:  \
+       \(value,
+        format: .decimal(minDigits: minDigits),
+        align: .right(columns: columns))
+       """)
+  }
+
+  OSLogTestSuite.test("dynamic precision and alignment") {
+    let h = Logger()
+    // Format specifier: "%*.*ld", expected output: "      0019"
+    logWithDynamicPrecisionAndAlignment(h, 19, columns: 10, minDigits: 4)
+    // Prints three stars in a diagonal.
+    for i in 0..<3 {
+      h.log("\("*", align: .right(columns: 10 - i))")
+    }
+  }
+
   OSLogTestSuite.test("string formatting") {
     let h = Logger()
     let smallString = "a"
@@ -272,29 +297,56 @@ internal struct OSLogBufferChecker {
     return argumentBytes
   }
 
-  /// Check whether the bytes starting from `startIndex` contain the encoding
-  /// for an Int.
-  internal func checkInt<T>(
+  /// Check whether the bytes starting from `startIndex` contain the encoding for a
+  /// numerical value.
+  internal func checkNumeric<T>(
     startIndex: Int,
     flag: ArgumentFlag,
-    expectedInt: T
-  ) where T : FixedWidthInteger {
+    type: ArgumentType,
+    expectedValue: T
+  ) where T : Numeric {
     let byteSize = UInt8(MemoryLayout<T>.size)
     let argumentBytes =
       checkArgumentHeadersAndGetBytes(
         startIndex: startIndex,
         size: byteSize,
         flag: flag,
-        type: .scalar)
-    withUnsafeBytes(of: expectedInt) { expectedBytes in
+        type: type)
+    withUnsafeBytes(of: expectedValue) { expectedBytes in
       for i in 0..<Int(byteSize) {
         expectEqual(
           expectedBytes[i],
           argumentBytes[i],
           "mismatch at byte number \(i) "
-            + "of the expected value \(expectedInt)")
+            + "of the expected value \(expectedValue)")
       }
     }
+  }
+
+  /// Check whether the bytes starting from `startIndex` contain the encoding for an Int.
+  internal func checkInt<T>(
+    startIndex: Int,
+    flag: ArgumentFlag,
+    expectedInt: T
+  ) where T : FixedWidthInteger {
+    checkNumeric(
+      startIndex: startIndex,
+      flag: flag,
+      type: .scalar,
+      expectedValue: expectedInt)
+  }
+
+  /// Check whether the bytes starting from `startIndex` contain the encoding for a count.
+  internal func checkCount(
+    startIndex: Int,
+    flag: ArgumentFlag,
+    expectedCount: Int
+  ) {
+    checkNumeric(
+      startIndex: startIndex,
+      flag: flag,
+      type: .count,
+      expectedValue: CInt(expectedCount))
   }
 
   /// Check whether the bytes starting from `startIndex` contain the encoding
@@ -743,11 +795,30 @@ InterpolationTestSuite.test("Unsigned integer with explicit positive sign") {
 }
 
 InterpolationTestSuite.test("Integer formatting with precision") {
-  let intValue = 10
+  let intValue = 1200
   _checkFormatStringAndBuffer(
   "\(intValue, format: .decimal(minDigits: 10))") {
     (formatString, buffer) in
-    expectEqual("%.10ld", formatString)
+    expectEqual("%.*ld", formatString)
+
+    // The buffer should contain two arguments: precision and the actual argument.
+    let bufferChecker = OSLogBufferChecker(buffer)
+    bufferChecker.checkSummaryBytes(
+      argumentCount: 2,
+      hasPrivate: false,
+      hasNonScalar: false
+    )
+    bufferChecker.checkArguments(
+     { bufferChecker.checkCount(
+         startIndex: $0,
+         flag: .autoFlag,
+         expectedCount: 10)
+     },
+     { bufferChecker.checkInt(
+         startIndex: $0,
+         flag: .autoFlag,
+         expectedInt: intValue)
+     })
   }
 }
 
@@ -759,7 +830,40 @@ InterpolationTestSuite.test("Integer formatting with alignment") {
     \(intValue, align: .left(columns: 5), privacy: .private)
     """) {
     (formatString, buffer) in
-      expectEqual("%10ld %{private}-5ld", formatString)
+      expectEqual("%*ld %{private}-*ld", formatString)
+  }
+}
+
+InterpolationTestSuite.test("Integer formatting with precision and alignment") {
+  let intValue = 1200
+  _checkFormatStringAndBuffer(
+  "\(intValue, format: .decimal(minDigits: 10), align: .left(columns: 7))") {
+    (formatString, buffer) in
+    expectEqual("%-*.*ld", formatString)
+
+    // The buffer must contain three arguments: width, precision, and the argument.
+    let bufferChecker = OSLogBufferChecker(buffer)
+    bufferChecker.checkSummaryBytes(
+      argumentCount: 3,
+      hasPrivate: false,
+      hasNonScalar: false
+    )
+    bufferChecker.checkArguments(
+     { bufferChecker.checkCount(
+         startIndex: $0,
+         flag: .autoFlag,
+         expectedCount: 7)
+     },
+     { bufferChecker.checkCount(
+         startIndex: $0,
+         flag: .autoFlag,
+         expectedCount: 10)
+     },
+     { bufferChecker.checkInt(
+         startIndex: $0,
+         flag: .autoFlag,
+         expectedInt: intValue)
+     })
   }
 }
 
@@ -772,7 +876,7 @@ InterpolationTestSuite.test("String with alignment") {
     \(concatString, align: .left(columns: 7), privacy: .public)
     """) {
     (formatString, buffer) in
-      expectEqual("%10s %{public}-7s", formatString)
+      expectEqual("%*s %{public}-*s", formatString)
   }
 }
 

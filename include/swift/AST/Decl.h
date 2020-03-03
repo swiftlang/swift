@@ -665,9 +665,10 @@ private:
     SourceLoc Loc;
     SourceLoc StartLoc;
     SourceLoc EndLoc;
+    SmallVector<CharSourceRange, 4> DocRanges;
   };
-  mutable CachedExternalSourceLocs const *CachedLocs = nullptr;
-  const CachedExternalSourceLocs *calculateSerializedLocs() const;
+  mutable CachedExternalSourceLocs const *CachedSerializedLocs = nullptr;
+  const CachedExternalSourceLocs *getSerializedLocs() const;
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
@@ -828,7 +829,7 @@ public:
   }
 
   /// \returns the unparsed comment attached to this declaration.
-  RawComment getRawComment() const;
+  RawComment getRawComment(bool SerializedOK = false) const;
 
   Optional<StringRef> getGroupName() const;
 
@@ -882,6 +883,9 @@ public:
   bool hasUnderscoredNaming() const;
 
   bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
+  
+  /// Check if this is a declaration defined at the top level of the Swift module
+  bool isStdlibDecl() const;
 
   AvailabilityContext getAvailabilityForLinkage() const;
 
@@ -1527,8 +1531,6 @@ private:
 
   /// The resolved module.
   ModuleDecl *Mod = nullptr;
-  /// The resolved decls if this is a decl import.
-  ArrayRef<ValueDecl *> Decls;
 
   ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
              SourceLoc KindLoc, ArrayRef<AccessPathElement> Path);
@@ -1581,8 +1583,9 @@ public:
   ModuleDecl *getModule() const { return Mod; }
   void setModule(ModuleDecl *M) { Mod = M; }
 
-  ArrayRef<ValueDecl *> getDecls() const { return Decls; }
-  void setDecls(ArrayRef<ValueDecl *> Ds) { Decls = Ds; }
+  /// For a scoped import such as 'import class Foundation.NSString', retrieve
+  /// the decls it references. Otherwise, returns an empty array.
+  ArrayRef<ValueDecl *> getDecls() const;
 
   const clang::Module *getClangModule() const {
     return getClangNode().getClangModule();
@@ -4685,6 +4688,10 @@ public:
   /// If the accessor is not needed for ABI reasons, this returns nullptr.
   /// To ensure an accessor is always returned, use getSynthesizedAccessor().
   AccessorDecl *getOpaqueAccessor(AccessorKind kind) const;
+
+  /// Collect all opaque accessors.
+  ArrayRef<AccessorDecl*>
+    getOpaqueAccessors(llvm::SmallVectorImpl<AccessorDecl*> &scratch) const;
 
   /// Return an accessor that was written in source. Returns null if the
   /// accessor was not explicitly defined by the user.

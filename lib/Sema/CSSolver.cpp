@@ -172,6 +172,8 @@ Solution ConstraintSystem::finalize() {
   solution.contextualTypes.assign(
       contextualTypes.begin(), contextualTypes.end());
 
+  solution.stmtConditionTargets = stmtConditionTargets;
+
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
 
@@ -241,6 +243,12 @@ void ConstraintSystem::applySolution(const Solution &solution) {
       setContextualType(contextualType.first, contextualType.second.typeLoc,
                         contextualType.second.purpose);
     }
+  }
+
+  // Register the statement condition targets.
+  for (const auto &stmtConditionTarget : solution.stmtConditionTargets) {
+    if (!getStmtConditionTarget(stmtConditionTarget.first))
+      setStmtConditionTarget(stmtConditionTarget.first, stmtConditionTarget.second);
   }
 
   // Register the conformances checked along the way to arrive to solution.
@@ -455,6 +463,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
   numContextualTypes = cs.contextualTypes.size();
+  numStmtConditionTargets = cs.stmtConditionTargets.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -531,6 +540,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any contextual types.
   truncate(cs.contextualTypes, numContextualTypes);
+
+  // Remove any statement condition types.
+  truncate(cs.stmtConditionTargets, numStmtConditionTargets);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -1116,8 +1128,7 @@ static bool debugConstraintSolverForTarget(
 /// diagnostic.
 static void maybeProduceFallbackDiagnostic(
     ConstraintSystem &cs, SolutionApplicationTarget target) {
-  if (cs.Options.contains(ConstraintSystemFlags::SubExpressionDiagnostics) ||
-      cs.Options.contains(ConstraintSystemFlags::SuppressDiagnostics))
+  if (cs.Options.contains(ConstraintSystemFlags::SuppressDiagnostics))
     return;
 
   // Before producing fatal error here, let's check if there are any "error"
@@ -2174,7 +2185,7 @@ void ConstraintSystem::partitionDisjunction(
       if (!funcDecl)
         return false;
 
-      if (!funcDecl->getAttrs().isUnavailable(getASTContext()))
+      if (!isDeclUnavailable(funcDecl, constraint->getLocator()))
         return false;
 
       unavailable.push_back(index);
@@ -2266,6 +2277,9 @@ Constraint *ConstraintSystem::selectDisjunction() {
 }
 
 bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {
+  if (isUnavailable())
+    cs.increaseScore(SK_Unavailable);
+
   cs.simplifyDisjunctionChoice(Choice);
 
   if (ExplicitConversion)

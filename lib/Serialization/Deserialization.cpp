@@ -477,8 +477,8 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
       fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
   assert(next.Kind == llvm::BitstreamEntry::Record);
 
-  if (getContext().Stats)
-    getContext().Stats->getFrontendCounters().NumConformancesDeserialized++;
+  if (auto *Stats = getContext().Stats)
+    Stats->getFrontendCounters().NumConformancesDeserialized++;
 
   unsigned kind = fatalIfUnexpected(Cursor.readRecord(next.ID, scratch));
   switch (kind) {
@@ -581,7 +581,11 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
     ProtocolConformanceXrefLayout::readRecord(scratch, protoID, nominalID,
                                               moduleID);
 
-    auto nominal = cast<NominalTypeDecl>(getDecl(nominalID));
+    auto maybeNominal = getDeclChecked(nominalID);
+    if (!maybeNominal)
+      return maybeNominal.takeError();
+
+    auto nominal = cast<NominalTypeDecl>(maybeNominal.get());
     PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
     auto proto = cast<ProtocolDecl>(getDecl(protoID));
     PrettyStackTraceDecl traceTo("... to", proto);
@@ -4204,6 +4208,19 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      case decls_block::TypeEraser_DECL_ATTR: {
+        bool isImplicit;
+        TypeID typeEraserID;
+        serialization::decls_block::TypeEraserDeclAttrLayout::readRecord(
+            scratch, isImplicit, typeEraserID);
+
+        auto typeEraser = MF.getType(typeEraserID);
+        assert(!isImplicit);
+        Attr = new (ctx) TypeEraserAttr(SourceLoc(), SourceRange(),
+                                        TypeLoc::withoutLoc(typeEraser));
+        break;
+      }
+
       case decls_block::Custom_DECL_ATTR: {
         bool isImplicit;
         TypeID typeID;
@@ -4269,6 +4286,20 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         derivativeAttr->setOriginalFunction(origDecl);
         derivativeAttr->setDerivativeKind(*derivativeKind);
         Attr = derivativeAttr;
+        break;
+      }
+
+      case decls_block::SPIAccessControl_DECL_ATTR: {
+        ArrayRef<uint64_t> spiIds;
+        serialization::decls_block::SPIAccessControlDeclAttrLayout::readRecord(
+                                                               scratch, spiIds);
+
+        SmallVector<Identifier, 4> spis;
+        for (auto id : spiIds)
+          spis.push_back(MF.getIdentifier(id));
+
+        Attr = SPIAccessControlAttr::create(ctx, SourceLoc(),
+                                            SourceRange(), spis);
         break;
       }
 

@@ -14,7 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/Basic/FileTypes.h"
+#include "swift/Basic/Platform.h"
 #include "clang/Frontend/Utils.h"
 #include "swift/ClangImporter/ClangImporter.h"
 
@@ -52,6 +57,92 @@ DependencyTracker::getDependencies() const {
 std::shared_ptr<clang::DependencyCollector>
 DependencyTracker::getClangCollector() {
   return clangCollector;
+}
+
+static bool findOverlayFilesInDirectory(SourceLoc diagLoc, StringRef path,
+                                        ModuleDecl *module,
+                                        DependencyTracker * const tracker) {
+  using namespace llvm::sys;
+  using namespace file_types;
+
+  ASTContext &ctx = module->getASTContext();
+  auto fs = ctx.SourceMgr.getFileSystem();
+
+  std::error_code error;
+  for (auto dir = fs->dir_begin(path, error);
+       !error && dir != llvm::vfs::directory_iterator();
+       dir.increment(error)) {
+    StringRef file = dir->path();
+    if (lookupTypeForExtension(path::extension(file)) != TY_SwiftOverlayFile)
+      continue;
+
+    module->addCrossImportOverlayFile(file);
+
+    // FIXME: Better to add it only if we load it.
+    if (tracker)
+      tracker->addDependency(file, module->isSystemModule());
+  }
+
+  if (error && error != std::errc::no_such_file_or_directory) {
+    ctx.Diags.diagnose(diagLoc, diag::cannot_list_swiftcrossimport_dir,
+                       module->getName(), error.message(), path);
+  }
+  return !error;
+}
+
+void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
+                                    FileUnit *file) {
+  using namespace llvm::sys;
+  using namespace file_types;
+
+  auto &langOpts = module->getASTContext().LangOpts;
+
+  // This method constructs several paths to directories near the module and
+  // scans them for .swiftoverlay files. These paths can be in various
+  // directories and have a few different filenames at the end, but I'll
+  // illustrate the path transformations by showing examples for a module
+  // defined by a swiftinterface at:
+  //
+  // /usr/lib/swift/FooKit.swiftmodule/x86_64-apple-macos.swiftinterface
+
+  // dirPath = /usr/lib/swift/FooKit.swiftmodule
+  SmallString<64> dirPath{file->getModuleDefiningPath()};
+  if (dirPath.empty())
+    return;
+
+  // dirPath = /usr/lib/swift/
+  path::remove_filename(dirPath);
+
+  // dirPath = /usr/lib/swift/FooKit.swiftcrossimport
+  path::append(dirPath, file->getExportedModuleName());
+  path::replace_extension(dirPath, getExtension(TY_SwiftCrossImportDir));
+
+  // Search for swiftoverlays that apply to all platforms.
+  if (!findOverlayFilesInDirectory(diagLoc, dirPath, module, dependencyTracker))
+    // If we diagnosed an error, or we didn't find the directory at all, don't
+    // bother trying the target-specific directories.
+    return;
+
+  // dirPath = /usr/lib/swift/FooKit.swiftcrossimport/x86_64-apple-macos
+  auto moduleTriple = getTargetSpecificModuleTriple(langOpts.Target);
+  path::append(dirPath, moduleTriple.str());
+
+  // Search for swiftoverlays specific to the target triple's platform.
+  findOverlayFilesInDirectory(diagLoc, dirPath, module, dependencyTracker);
+
+  // The rest of this handles target variant triples, which are only used for
+  // certain MacCatalyst builds.
+  if (!langOpts.TargetVariant)
+    return;
+
+  // dirPath = /usr/lib/swift/FooKit.swiftcrossimport/x86_64-apple-ios-macabi
+  path::remove_filename(dirPath);
+  auto moduleVariantTriple =
+      getTargetSpecificModuleTriple(*langOpts.TargetVariant);
+  path::append(dirPath, moduleVariantTriple.str());
+
+  // Search for swiftoverlays specific to the target variant's platform.
+  findOverlayFilesInDirectory(diagLoc, dirPath, module, dependencyTracker);
 }
 
 } // namespace swift

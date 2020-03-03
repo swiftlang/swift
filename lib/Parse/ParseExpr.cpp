@@ -600,9 +600,10 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     pathResult = parseExprPostfixSuffix(inner, /*isExprBasic=*/true,
                                         /*periodHasKeyPathBehavior=*/false,
                                         unusedHasBindOptional);
-    if (pathResult.isParseError())
-      return pathResult;
   }
+
+  if (!rootResult.getPtrOrNull() && !pathResult.getPtrOrNull())
+    return pathResult;
 
   auto keypath = new (Context) KeyPathExpr(
       backslashLoc, rootResult.getPtrOrNull(), pathResult.getPtrOrNull());
@@ -618,7 +619,8 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     return makeParserCodeCompletionResult(keypath);
   }
 
-  return makeParserResult(keypath);
+  ParserStatus parseStatus = ParserStatus(rootResult) | ParserStatus(pathResult);
+  return makeParserResult(parseStatus, keypath);
 }
 
 ///   expr-keypath-objc:
@@ -1464,16 +1466,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     LLVM_FALLTHROUGH;
   }
 
-  case tok::pound_filePath:
-    // Check twice because of fallthrough--this is ugly but temporary.
-    if (Tok.is(tok::pound_filePath) && !Context.LangOpts.EnableConcisePoundFile)
-      diagnose(Tok.getLoc(), diag::unknown_pound_expr, "filePath");
-    // Continue since we actually do know how to handle it. This avoids extra
-    // diagnostics.
-    LLVM_FALLTHROUGH;
-
   case tok::pound_column:
   case tok::pound_file:
+  case tok::pound_filePath:
   case tok::pound_function:
   case tok::pound_line:
   case tok::pound_dsohandle: {

@@ -300,6 +300,8 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
   auto moduleInterfaceOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_interface_path);
+  auto privateModuleInterfaceOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_private_module_interface_path);
   auto moduleSourceInfoOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_source_info_path);
   auto ldAddCFileOutput  = getSupplementaryFilenamesFromArguments(
@@ -307,7 +309,8 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
-      !moduleInterfaceOutput || !moduleSourceInfoOutput || !ldAddCFileOutput) {
+      !moduleInterfaceOutput || !privateModuleInterfaceOutput ||
+      !moduleSourceInfoOutput || !ldAddCFileOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -328,6 +331,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
     sop.TBDPath = (*TBD)[i];
     sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[i];
+    sop.PrivateModuleInterfaceOutputPath = (*privateModuleInterfaceOutput)[i];
     sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[i];
     sop.LdAddCFilePath = (*ldAddCFileOutput)[i];
     result.push_back(sop);
@@ -422,6 +426,8 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   // There is no non-path form of -emit-interface-path
   auto ModuleInterfaceOutputPath =
       pathsFromArguments.ModuleInterfaceOutputPath;
+  auto PrivateModuleInterfaceOutputPath =
+      pathsFromArguments.PrivateModuleInterfaceOutputPath;
 
   ID emitModuleOption;
   std::string moduleExtension;
@@ -447,6 +453,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.LoadedModuleTracePath = loadedModuleTracePath;
   sop.TBDPath = tbdPath;
   sop.ModuleInterfaceOutputPath = ModuleInterfaceOutputPath;
+  sop.PrivateModuleInterfaceOutputPath = PrivateModuleInterfaceOutputPath;
   sop.ModuleSourceInfoOutputPath = moduleSourceInfoOutputPath;
   sop.LdAddCFilePath = pathsFromArguments.LdAddCFilePath;
   return sop;
@@ -527,7 +534,9 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_ModuleTrace, paths.LoadedModuleTracePath},
       {file_types::TY_TBD, paths.TBDPath},
       {file_types::TY_SwiftModuleInterfaceFile,
-       paths.ModuleInterfaceOutputPath}};
+       paths.ModuleInterfaceOutputPath},
+      {file_types::TY_PrivateSwiftModuleInterfaceFile,
+       paths.PrivateModuleInterfaceOutputPath}};
   for (const std::pair<file_types::ID, std::string &> &typeAndString :
        typesAndStrings) {
     auto const out = map->find(typeAndString.first);
@@ -548,6 +557,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
         options::OPT_serialize_diagnostics_path,
         options::OPT_emit_loaded_module_trace_path,
         options::OPT_emit_module_interface_path,
+        options::OPT_emit_private_module_interface_path,
         options::OPT_emit_module_source_info_path,
         options::OPT_emit_tbd_path,
         options::OPT_emit_ldadd_cfile_path)) {

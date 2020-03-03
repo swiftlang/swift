@@ -40,7 +40,6 @@ bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::SelectEnumInst:
   case SILNodeKind::SwitchEnumInst:
   case SILNodeKind::CheckedCastBranchInst:
-  case SILNodeKind::BranchInst:
   case SILNodeKind::CondBranchInst:
   case SILNodeKind::DestructureStructInst:
   case SILNodeKind::DestructureTupleInst:
@@ -59,6 +58,15 @@ bool swift::isGuaranteedForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::StructExtractInst:
   case SILNodeKind::OpenExistentialValueInst:
   case SILNodeKind::OpenExistentialBoxValueInst:
+    return true;
+  default:
+    return isOwnershipForwardingValueKind(kind);
+  }
+}
+
+bool swift::isOwnedForwardingValueKind(SILNodeKind kind) {
+  switch (kind) {
+  case SILNodeKind::BranchInst:
     return true;
   default:
     return isOwnershipForwardingValueKind(kind);
@@ -99,6 +107,9 @@ void BorrowScopeOperandKind::print(llvm::raw_ostream &os) const {
   case Kind::BeginApply:
     os << "BeginApply";
     return;
+  case Kind::Branch:
+    os << "Branch";
+    return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
@@ -113,7 +124,7 @@ void BorrowScopeOperand::print(llvm::raw_ostream &os) const {
   os << "BorrowScopeOperand:\n"
         "Kind: " << kind << "\n"
         "Value: " << op->get()
-     << "User: " << op->getUser();
+     << "User: " << *op->getUser();
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
@@ -127,7 +138,7 @@ void BorrowScopeOperand::visitEndScopeInstructions(
   switch (kind) {
   case BorrowScopeOperandKind::BeginBorrow:
     for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
-      if (isa<EndBorrowInst>(use->getUser())) {
+      if (use->isConsumingUse()) {
         func(use);
       }
     }
@@ -139,8 +150,92 @@ void BorrowScopeOperand::visitEndScopeInstructions(
     }
     return;
   }
+  case BorrowScopeOperandKind::Branch:
+    for (auto *succBlock :
+         cast<BranchInst>(op->getUser())->getSuccessorBlocks()) {
+      auto *arg = succBlock->getArgument(op->getOperandNumber());
+      for (auto *use : arg->getUses()) {
+        if (use->isConsumingUse()) {
+          func(use);
+        }
+      }
+    }
+    return;
   }
   llvm_unreachable("Covered switch isn't covered");
+}
+
+void BorrowScopeOperand::visitBorrowIntroducingUserResults(
+    function_ref<void(BorrowScopeIntroducingValue)> visitor) {
+  switch (kind) {
+  case BorrowScopeOperandKind::BeginApply:
+    llvm_unreachable("Never has borrow introducer results!");
+  case BorrowScopeOperandKind::BeginBorrow: {
+    auto value =
+        *BorrowScopeIntroducingValue::get(cast<BeginBorrowInst>(op->getUser()));
+    return visitor(value);
+  }
+  case BorrowScopeOperandKind::Branch: {
+    auto *bi = cast<BranchInst>(op->getUser());
+    for (auto *succBlock : bi->getSuccessorBlocks()) {
+      auto value = *BorrowScopeIntroducingValue::get(
+          succBlock->getArgument(op->getOperandNumber()));
+      visitor(value);
+    }
+    return;
+  }
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
+void BorrowScopeOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
+    function_ref<void(Operand *)> func) {
+  // First visit all of the results of our user that are borrow introducing
+  // values.
+  visitBorrowIntroducingUserResults([&](BorrowScopeIntroducingValue value) {
+    // Visit the scope ending instructions of this value. If any of them are
+    // consuming borrow scope operands, visit the consuming uses of the
+    // results or successor arguments.
+    //
+    // This enables one to walk the def-use chain of guaranteed phis for a
+    // single guaranteed scope.
+    value.visitLocalScopeEndingUses([&](Operand *valueUser) {
+      if (auto subBorrowScopeOp = BorrowScopeOperand::get(valueUser)) {
+        if (subBorrowScopeOp->consumesGuaranteedValues()) {
+          subBorrowScopeOp->visitUserResultConsumingUses(func);
+          return;
+        }
+      }
+
+      // Otherwise, if we don't have a borrow scope operand that consumes
+      // guaranteed values, just visit value user.
+      func(valueUser);
+    });
+  });
+}
+
+void BorrowScopeOperand::visitUserResultConsumingUses(
+    function_ref<void(Operand *)> visitor) {
+  auto *ti = dyn_cast<TermInst>(op->getUser());
+  if (!ti) {
+    for (SILValue result : op->getUser()->getResults()) {
+      for (auto *use : result->getUses()) {
+        if (use->isConsumingUse()) {
+          visitor(use);
+        }
+      }
+    }
+    return;
+  }
+
+  for (auto *succBlock : ti->getSuccessorBlocks()) {
+    auto *arg = succBlock->getArgument(op->getOperandNumber());
+    for (auto *use : arg->getUses()) {
+      if (use->isConsumingUse()) {
+        visitor(use);
+      }
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -157,6 +252,9 @@ void BorrowScopeIntroducingValueKind::print(llvm::raw_ostream &os) const {
     return;
   case BorrowScopeIntroducingValueKind::LoadBorrow:
     os << "LoadBorrowInst";
+    return;
+  case BorrowScopeIntroducingValueKind::Phi:
+    os << "Phi";
     return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
@@ -177,6 +275,7 @@ void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
     llvm_unreachable("Should only call this with a local scope");
   case BorrowScopeIntroducingValueKind::BeginBorrow:
   case BorrowScopeIntroducingValueKind::LoadBorrow:
+  case BorrowScopeIntroducingValueKind::Phi:
     for (auto *use : value->getUses()) {
       if (use->isConsumingUse()) {
 	scopeEndingInsts.push_back(use->getUser());
@@ -195,6 +294,7 @@ void BorrowScopeIntroducingValue::visitLocalScopeEndingUses(
     llvm_unreachable("Should only call this with a local scope");
   case BorrowScopeIntroducingValueKind::LoadBorrow:
   case BorrowScopeIntroducingValueKind::BeginBorrow:
+  case BorrowScopeIntroducingValueKind::Phi:
     for (auto *use : value->getUses()) {
       if (use->isConsumingUse()) {
         visitor(use);
@@ -287,11 +387,54 @@ bool BorrowScopeIntroducingValue::areInstructionsWithinScope(
   if (!isLocalScope())
     return true;
 
-  // Otherwise, gather up our local scope ending instructions.
-  visitLocalScopeEndingUses([&scratchSpace](Operand *op) {
+  // Otherwise, gather up our local scope ending instructions, looking through
+  // guaranteed phi nodes.
+  visitLocalScopeTransitiveEndingUses([&scratchSpace](Operand *op) {
     scratchSpace.emplace_back(op->getUser());
   });
 
   LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
   return checker.validateLifetime(value, scratchSpace, instructions);
+}
+
+bool BorrowScopeIntroducingValue::visitLocalScopeTransitiveEndingUses(
+    function_ref<void(Operand *)> visitor) const {
+  assert(isLocalScope());
+
+  SmallVector<Operand *, 32> worklist;
+  SmallPtrSet<Operand *, 16> beenInWorklist;
+  for (auto *use : value->getUses()) {
+    if (!use->isConsumingUse())
+      continue;
+    worklist.push_back(use);
+    beenInWorklist.insert(use);
+  }
+
+  bool foundError = false;
+  while (!worklist.empty()) {
+    auto *op = worklist.pop_back_val();
+    assert(op->isConsumingUse() && "Expected only consuming uses");
+
+    // See if we have a borrow scope operand. If we do not, then we know we are
+    // a final consumer of our borrow scope introducer. Visit it and continue.
+    auto scopeOperand = BorrowScopeOperand::get(op);
+    if (!scopeOperand) {
+      visitor(op);
+      continue;
+    }
+
+    scopeOperand->visitConsumingUsesOfBorrowIntroducingUserResults(
+        [&](Operand *op) {
+          assert(op->isConsumingUse() && "Expected only consuming uses");
+          // Make sure we haven't visited this consuming operand yet. If we
+          // have, signal an error and bail without re-visiting the operand.
+          if (!beenInWorklist.insert(op).second) {
+            foundError = true;
+            return;
+          }
+          worklist.push_back(op);
+        });
+  }
+
+  return foundError;
 }

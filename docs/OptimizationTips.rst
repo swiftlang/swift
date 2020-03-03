@@ -21,20 +21,13 @@ Enabling Optimizations
 ======================
 
 The first thing one should always do is to enable optimization. Swift provides
-four different optimization levels:
+three different optimization levels:
 
 - ``-Onone``: This is meant for normal development. It performs minimal
   optimizations and preserves all debug info.
 - ``-O``: This is meant for most production code. The compiler performs
   aggressive optimizations that can drastically change the type and amount of
   emitted code. Debug information will be emitted but will be lossy.
-- ``-Ounchecked``: This is a special optimization mode meant for specific
-  libraries or applications where one is willing to trade safety for
-  performance.  The compiler will remove all overflow checks as well as some
-  implicit type checks.  This is not intended to be used in general since it may
-  result in undetected memory safety issues and integer overflows. Only use this
-  if you have carefully reviewed that your code is safe with respect to integer
-  overflow and type casts.
 - ``-Osize``: This is a special optimization mode where the compiler prioritizes
   code size over performance.
 
@@ -43,8 +36,8 @@ In the Xcode UI, one can modify the current optimization level as follows:
 ...
 
 
-Whole Module Optimizations
-==========================
+Whole Module Optimizations (WMO)
+================================
 
 By default Swift compiles each file individually. This allows Xcode to
 compile multiple files in parallel very quickly. However, compiling
@@ -55,8 +48,11 @@ mode is enabled using the ``swiftc`` command line flag
 ``-whole-module-optimization``. Programs that are compiled in this
 mode will most likely take longer to compile, but may run faster.
 
-This mode can be enabled using the Xcode build setting 'Whole Module Optimization'.
+This mode can be enabled using the Xcode build setting 'Whole Module
+Optimization'.
 
+NOTE: In sections below, for brevity purposes, we will refer to 'Whole
+Module Optimization' by the abbreviation 'WMO'.
 
 Reducing Dynamic Dispatch
 =========================
@@ -167,6 +163,20 @@ assuming ``E``, ``F`` do not have any overriding declarations in the same file:
   func usingF(_ f: F) -> Int {
     return f.myPrivateVar
   }
+
+Advice: If WMO is enabled, use 'internal' when a declaration does not need to be accessed outside of module
+-----------------------------------------------------------------------------------------------------------
+
+WMO (see section above) causes the compiler to compile a module's
+sources all together at once. This allows the optimizer to have module
+wide visibility when compiling individual declarations. Since an
+internal declaration is not visible outside of the current module, the
+optimizer can then infer `final` by automatically discovering all
+potentially overridding declarations.
+
+NOTE: Since in Swift the default access control level is ``internal``
+anyways, by enabling Whole Module Optimization, one can gain
+additional devirtualization without any further work.
 
 Using Container Types Efficiently
 =================================
@@ -544,6 +554,38 @@ protocols as class-only protocols to get better runtime performance.
 
 .. https://developer.apple.com/library/ios/documentation/Swift/Conceptual/Swift_Programming_Language/Protocols.html
 
+The Cost of Let/Var when Captured by Escaping Closures
+======================================================
+
+While one may think that the distinction in between let/var is just
+about language semantics, there are also performance
+considerations. Remember that any time one creates a binding for a
+closure, one is forcing the compiler to emit an escaping closure,
+e.x.:
+
+::
+
+  let f: () -> () = { ... } // Escaping closure
+  // Contrasted with:
+  ({ ... })() // Non Escaping closure
+  x.map { ... } // Non Escaping closure
+
+When a var is captured by an escaping closure, the compiler must
+allocate a heap box to store the var so that both the closure
+creator/closure can read/write to the value. This even includes
+situations where the underlying type of the captured binding is
+trivial! In contrast, when captured a `let` is captured by value. As
+such, the compiler stores a copy of the value directly into the
+closure's storage without needing a box.
+
+Advice: Pass var as an `inout` if closure not actually escaping
+---------------------------------------------------------------
+
+If one is using an escaping closure for expressivity purposes, but is
+actually using a closure locally, pass vars as inout parameters
+instead of by using captures. The inout will ensure that a heap box is
+not allocated for the variables and avoid any retain/release traffic
+from the heap box being passed around.
 
 Unsupported Optimization Attributes
 ===================================

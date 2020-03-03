@@ -418,9 +418,9 @@ CanType swift::getSILBoxFieldLoweredType(TypeExpansionContext context,
 }
 
 ValueOwnershipKind
-SILResultInfo::getOwnershipKind(SILFunction &F) const {
+SILResultInfo::getOwnershipKind(SILFunction &F,
+                                CanSILFunctionType FTy) const {
   auto &M = F.getModule();
-  auto FTy = F.getLoweredFunctionType();
 
   bool IsTrivial = getSILStorageType(M, FTy).isTrivial(F);
   switch (getConvention()) {
@@ -614,4 +614,60 @@ bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
 
   // Other types are preserved through lowering.
   return loweredType.getASTType() == formalType;
+}
+
+Type
+TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const {
+  return Type(const_cast<TypeBase*>(this)).transform([&](Type t) -> Type {
+    if (auto f = t->getAs<SILFunctionType>()) {
+      auto sft = f->getUnsubstitutedType(M);
+      
+      // Also eliminate substituted function types in the arguments, yields,
+      // and returns of the function type.
+      bool didChange = false;
+      SmallVector<SILParameterInfo, 4> newParams;
+      SmallVector<SILYieldInfo, 4> newYields;
+      SmallVector<SILResultInfo, 4> newResults;
+      Optional<SILResultInfo> newErrorResult;
+      for (auto param : sft->getParameters()) {
+        auto newParamTy = param.getInterfaceType()
+          ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
+          ->getCanonicalType();
+        didChange |= param.getInterfaceType() != newParamTy;
+        newParams.push_back(SILParameterInfo(newParamTy, param.getConvention()));
+      }
+      for (auto yield : sft->getYields()) {
+        auto newYieldTy = yield.getInterfaceType()
+          ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
+          ->getCanonicalType();
+        didChange |= yield.getInterfaceType() != newYieldTy;
+        newYields.push_back(SILYieldInfo(newYieldTy, yield.getConvention()));
+      }
+      for (auto result : sft->getResults()) {
+        auto newResultTy = result.getInterfaceType()
+          ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
+          ->getCanonicalType();
+        didChange |= result.getInterfaceType() != newResultTy;
+        newResults.push_back(SILResultInfo(newResultTy, result.getConvention()));
+      }
+      if (auto error = sft->getOptionalErrorResult()) {
+        auto newErrorTy = error->getInterfaceType()
+          ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
+          ->getCanonicalType();
+        didChange |= error->getInterfaceType() != newErrorTy;
+        newErrorResult = SILResultInfo(newErrorTy, error->getConvention());
+      }
+      
+      if (!didChange)
+        return sft;
+      
+      return SILFunctionType::get(sft->getSubstGenericSignature(),
+                                  sft->getExtInfo(), sft->getCoroutineKind(),
+                                  sft->getCalleeConvention(),
+                                  newParams, newYields, newResults,
+                                  newErrorResult, SubstitutionMap(), false,
+                                  M.getASTContext());
+    }
+    return t;
+  });
 }

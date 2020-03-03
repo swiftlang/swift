@@ -260,6 +260,9 @@ public:
   /// module interface file?
   bool RemarkOnRebuildFromModuleInterface = false;
 
+  /// Should we lock .swiftinterface while generating .swiftmodule from it?
+  bool DisableInterfaceFileLock = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.

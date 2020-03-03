@@ -1319,7 +1319,7 @@ bool ClangImporter::Implementation::importHeader(
   addMacrosToLookupTable(*BridgingHeaderLookupTable, getNameImporter());
 
   // Finish loading any extra modules that were (transitively) imported.
-  handleDeferredImports();
+  handleDeferredImports(diagLoc);
 
   // Wrap all Clang imports under a Swift import decl.
   for (auto &Import : BridgeHeaderTopLevelImports) {
@@ -1376,7 +1376,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
     // We already imported this with -include-pch above, so we should have
     // collected a bunch of PCH-encoded module imports that we just need to
     // replay in handleDeferredImports.
-    Impl.handleDeferredImports();
+    Impl.handleDeferredImports(diagLoc);
     return false;
   }
 
@@ -1752,7 +1752,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   if (!clangModule)
     return nullptr;
 
-  return finishLoadingClangModule(clangModule, /*preferOverlay=*/false);
+  return finishLoadingClangModule(importLoc, clangModule,
+                                  /*preferOverlay=*/false);
 }
 
 ModuleDecl *
@@ -1772,7 +1773,7 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
 }
 
 ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
-    const clang::Module *clangModule, bool findOverlay) {
+    SourceLoc importLoc, const clang::Module *clangModule, bool findOverlay) {
   assert(clangModule);
 
   // Bump the generation count.
@@ -1803,6 +1804,8 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     wrapperUnit =
       new (SwiftContext) ClangModuleUnit(*result, *this, clangModule);
     result->addFile(*wrapperUnit);
+    SwiftContext.getClangModuleLoader()
+        ->findOverlayFiles(importLoc, result, wrapperUnit);
     cacheEntry.setPointerAndInt(wrapperUnit, true);
 
     // Force load overlays for all imported modules.
@@ -1812,7 +1815,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
   }
 
   if (clangModule->isSubModule()) {
-    finishLoadingClangModule(clangModule->getTopLevelModule(), true);
+    finishLoadingClangModule(importLoc, clangModule->getTopLevelModule(), true);
   } else {
     ModuleDecl *&loaded = SwiftContext.LoadedModules[result->getName()];
     if (!loaded)
@@ -1830,8 +1833,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
 // submodule ID from a bridging PCH, or those already loaded as clang::Modules
 // in response to an import directive in a bridging header -- and call
 // finishLoadingClangModule on each.
-void ClangImporter::Implementation::handleDeferredImports()
-{
+void ClangImporter::Implementation::handleDeferredImports(SourceLoc diagLoc) {
   clang::ASTReader &R = *Instance->getASTReader();
   llvm::SmallSet<clang::serialization::SubmoduleID, 32> seenSubmodules;
   for (clang::serialization::SubmoduleID ID : PCHImportedSubmodules) {
@@ -1847,13 +1849,17 @@ void ClangImporter::Implementation::handleDeferredImports()
   // officially supported with bridging headers: app targets and unit tests
   // only. Unfortunately that's not enforced.
   for (size_t i = 0; i < ImportedHeaderExports.size(); ++i) {
-    (void)finishLoadingClangModule(ImportedHeaderExports[i],
+    (void)finishLoadingClangModule(diagLoc, ImportedHeaderExports[i],
                                    /*preferOverlay=*/true);
   }
 }
 
 ModuleDecl *ClangImporter::getImportedHeaderModule() const {
   return Impl.ImportedHeaderUnit->getParentModule();
+}
+
+ModuleDecl *ClangImporter::getWrapperForModule(const clang::Module *mod) const {
+  return Impl.getWrapperForModule(mod)->getParentModule();
 }
 
 PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
@@ -1995,6 +2001,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   auto file = new (SwiftContext) ClangModuleUnit(*wrapper, *this,
                                                  underlying);
   wrapper->addFile(*file);
+  SwiftContext.getClangModuleLoader()->findOverlayFiles(SourceLoc(), wrapper, file);
   cacheEntry.setPointer(file);
 
   return file;
@@ -2742,8 +2749,10 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     // Add the extensions produced by importing categories.
     for (auto category : lookupTable->categories()) {
       if (auto extension = cast_or_null<ExtensionDecl>(
-              owner.importDecl(category, owner.CurrentVersion)))
+              owner.importDecl(category, owner.CurrentVersion,
+                               /*UseCanonical*/false))) {
         results.push_back(extension);
+      }
     }
 
     auto findEnclosingExtension = [](Decl *importedDecl) -> ExtensionDecl * {
@@ -3292,6 +3301,14 @@ ClangModuleUnit::ClangModuleUnit(ModuleDecl &M,
   // Capture the file metadata before it goes away.
   if (clangModule)
     ASTSourceDescriptor = {*clangModule};
+}
+
+StringRef ClangModuleUnit::getModuleDefiningPath() const {
+  if (!clangModule || clangModule->DefinitionLoc.isInvalid())
+    return "";
+
+  auto &clangSourceMgr = owner.getClangASTContext().getSourceManager();
+  return clangSourceMgr.getFilename(clangModule->DefinitionLoc);
 }
 
 Optional<clang::ExternalASTSource::ASTSourceDescriptor>

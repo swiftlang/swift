@@ -562,6 +562,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   ModuleDecl::ImportFilter importFilter;
   importFilter |= ModuleDecl::ImportFilterKind::Public;
   importFilter |= ModuleDecl::ImportFilterKind::Private;
+  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
   module->getImportedModules(imports, importFilter);
   StringScratchSpace moduleNameScratch;
@@ -602,6 +603,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
   importFilter |= ModuleDecl::ImportFilterKind::Public;
   importFilter |= ModuleDecl::ImportFilterKind::Private;
   importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
   primarySourceFile->getImportedModules(imports, importFilter);
   StringScratchSpace moduleNameScratch;

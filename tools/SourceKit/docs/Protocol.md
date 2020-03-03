@@ -418,6 +418,7 @@ of diagnostic entries. A diagnostic entry has this format:
     [opts] <key.fixits>:    (array) [fixit+] // one or more entries for fixits
     [opts] <key.ranges>:    (array) [range+] // one or more entries for ranges
     [opts] <key.diagnostics>: (array) [diagnostic+] // one or more sub-diagnostic entries
+    [opts] <key.educational_note_paths>: (array) [string+] // one or more absolute paths of educational notes, formatted as Markdown
 }
 ```
 

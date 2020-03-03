@@ -375,6 +375,7 @@ public:
   /// mode, so return the ModuleInterfaceOutputPath when in that mode and
   /// fail an assert if not in that mode.
   std::string getModuleInterfaceOutputPathForWholeModule() const;
+  std::string getPrivateModuleInterfaceOutputPathForWholeModule() const;
 
   std::string getLdAddCFileOutputPathForWholeModule() const;
 
@@ -403,6 +404,9 @@ class CompilerInstance {
 
   /// Null if no tracker.
   std::unique_ptr<DependencyTracker> DepTracker;
+  /// If there is no stats output directory by the time the
+  /// instance has completed its setup, this will be null.
+  std::unique_ptr<UnifiedStatsReporter> Stats;
 
   mutable ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
@@ -487,6 +491,8 @@ public:
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
   const DependencyTracker *getDependencyTracker() const { return DepTracker.get(); }
 
+  UnifiedStatsReporter *getStatsReporter() const { return Stats.get(); }
+
   SILModule *getSILModule() {
     return TheSILModule.get();
   }
@@ -570,6 +576,7 @@ private:
 
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
+  void setupStatsReporter();
   Optional<unsigned> setUpCodeCompletionBuffer();
 
   /// Set up all state in the CompilerInstance to process the given input file.
@@ -616,10 +623,8 @@ public:
 
   /// Performs mandatory, diagnostic, and optimization passes over the SIL.
   /// \param silModule The SIL module that was generated during SILGen.
-  /// \param stats A stats reporter that will report optimization statistics.
   /// \returns true if any errors occurred.
-  bool performSILProcessing(SILModule *silModule,
-                            UnifiedStatsReporter *stats = nullptr);
+  bool performSILProcessing(SILModule *silModule);
 
 private:
   SourceFile *
@@ -651,6 +656,9 @@ public: // for static functions in Frontend.cpp
 
     explicit ImplicitImports(CompilerInstance &compiler);
   };
+
+  static void addAdditionalInitialImportsTo(
+    SourceFile *SF, const ImplicitImports &implicitImports);
 
 private:
   void addMainFileToModule(const ImplicitImports &implicitImports);

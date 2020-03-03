@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-stdlib-swift-target-future
+// RUN: %target-run-simple-swift(-Xfrontend -prespecialize-generic-metadata -target %module-target-future)
 // REQUIRES: executable_test
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
@@ -19,6 +19,7 @@
 // Executing on the simulator within __abort_with_payload with "No ABI plugin located for triple x86_64h-apple-ios -- shared libraries will not be registered!"
 // UNSUPPORTED: CPU=x86_64 && OS=ios
 // UNSUPPORTED: CPU=x86_64 && OS=tvos
+// UNSUPPORTED: CPU=x86_64 && OS=watchos
 // UNSUPPORTED: CPU=i386 && OS=watchos
 // UNSUPPORTED: use_os_stdlib
 

@@ -2054,6 +2054,51 @@ public:
   void cacheResult(IndexSubset *value) const;
 };
 
+/// Checks whether a type eraser has a viable initializer.
+class TypeEraserHasViableInitRequest
+    : public SimpleRequest<TypeEraserHasViableInitRequest,
+                           bool(TypeEraserAttr *, ProtocolDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, TypeEraserAttr *attr,
+                                ProtocolDecl *protocol) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Looks up the decls that a scoped import references, ensuring the import is
+/// valid.
+///
+/// A "scoped import" is an import which only covers one particular
+/// declaration, such as:
+///
+///     import class Foundation.NSString
+///
+class ScopedImportLookupRequest
+    : public SimpleRequest<ScopedImportLookupRequest,
+                           ArrayRef<ValueDecl *>(ImportDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<ArrayRef<ValueDecl *>> evaluate(Evaluator &evaluator,
+                                                 ImportDecl *import) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
