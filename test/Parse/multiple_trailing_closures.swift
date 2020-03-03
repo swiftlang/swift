@@ -71,3 +71,18 @@ multiple_trailing_with_defaults(duration: 42) {
   completion: {}
 }
 
+foo {
+  a: { 42 }
+  b: { 42 }
+
+  _ = 1 + 2
+  // expected-error@-1 {{expected an argument label followed by a closure literal}}
+}
+
+foo { // expected-note {{to match this opening '{'}}
+  a: { 42 }
+  b: { "" }
+
+  func foo() {} // expected-error {{expected an argument label followed by a closure literal}}
+  // expected-error@-1 {{expected '}' at the end of a trailing closures block}}
+} // expected-error {{extraneous '}' at top level}}
