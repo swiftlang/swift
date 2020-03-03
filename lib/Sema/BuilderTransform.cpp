@@ -1127,6 +1127,8 @@ public:
       ++caseIndex;
     }
 
+    TypeChecker::checkSwitchExhaustiveness(switchStmt, dc, /*limited=*/false);
+
     return switchStmt;
   }
 
