@@ -632,7 +632,8 @@ private:
   SourceFile *
   createSourceFileForMainModule(SourceFileKind FileKind,
                                 SourceFile::ImplicitModuleImportKind ImportKind,
-                                Optional<unsigned> BufferID);
+                                Optional<unsigned> BufferID,
+                                SourceFile::ParsingOptions options = {});
 
 public:
   void freeASTContext();

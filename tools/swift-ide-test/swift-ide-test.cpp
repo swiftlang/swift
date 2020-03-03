@@ -1123,8 +1123,6 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
     registerParseRequestFunctions(Parser.getParser().Context.evaluator);
     registerTypeCheckerRequestFunctions(Parser.getParser().Context.evaluator);
 
-    // Collecting syntactic information shouldn't evaluate # conditions.
-    Parser.getParser().EvaluateConditionals = false;
     Parser.getDiagnosticEngine().addConsumer(PrintDiags);
 
     (void)Parser.parse();
@@ -1359,9 +1357,6 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
   registerParseRequestFunctions(Parser.getParser().Context.evaluator);
   registerTypeCheckerRequestFunctions(
       Parser.getParser().Context.evaluator);
-
-  // Collecting syntactic information shouldn't evaluate # conditions.
-  Parser.getParser().EvaluateConditionals = false;
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;

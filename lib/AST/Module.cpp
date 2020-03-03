@@ -1896,10 +1896,11 @@ static void performAutoImport(
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
                        ImplicitModuleImportKind ModImpKind,
-                       bool KeepParsedTokens, bool BuildSyntaxTree)
-  : FileUnit(FileUnitKind::Source, M),
-    BufferID(bufferID ? *bufferID : -1),
-    Kind(K), SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
+                       bool KeepParsedTokens, bool BuildSyntaxTree,
+                       ParsingOptions parsingOpts)
+    : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
+      ParsingOpts(parsingOpts), Kind(K),
+      SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
   M.getASTContext().addDestructorCleanup(*this);
   performAutoImport(*this, ModImpKind);
 
@@ -1951,6 +1952,23 @@ bool SourceFile::canBeParsedInFull() const {
     return false;
   }
   llvm_unreachable("unhandled kind");
+}
+
+bool SourceFile::hasDelayedBodyParsing() const {
+  if (ParsingOpts.contains(ParsingFlags::DisableDelayedBodies))
+    return false;
+
+  // Not supported right now.
+  if (Kind == SourceFileKind::REPL || Kind == SourceFileKind::SIL)
+    return false;
+  if (hasInterfaceHash())
+    return false;
+  if (shouldCollectToken())
+    return false;
+  if (shouldBuildSyntaxTree())
+    return false;
+
+  return true;
 }
 
 bool FileUnit::walk(ASTWalker &walker) {
