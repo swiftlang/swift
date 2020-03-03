@@ -63,6 +63,7 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/TBDGen/TBDGen.h"
@@ -75,6 +76,8 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Option/OptTable.h"
+#include "llvm/Remarks/RemarkSerializer.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -708,21 +711,6 @@ static void countStatsPostSILGen(UnifiedStatsReporter &Stats,
   C.NumSILGenWitnessTables += Module.getWitnessTableList().size();
   C.NumSILGenDefaultWitnessTables += Module.getDefaultWitnessTableList().size();
   C.NumSILGenGlobalVariables += Module.getSILGlobalList().size();
-}
-
-static std::unique_ptr<llvm::raw_fd_ostream>
-createOptRecordFile(StringRef Filename, DiagnosticEngine &DE) {
-  if (Filename.empty())
-    return nullptr;
-
-  std::error_code EC;
-  auto File = std::make_unique<llvm::raw_fd_ostream>(Filename, EC,
-                                                      llvm::sys::fs::F_None);
-  if (EC) {
-    DE.diagnose(SourceLoc(), diag::cannot_open_file, Filename, EC.message());
-    return nullptr;
-  }
-  return File;
 }
 
 static bool precompileBridgingHeader(const CompilerInvocation &Invocation,
@@ -1569,14 +1557,10 @@ static bool performCompileStepsPostSILGen(
     return Context.hadError();
   }
 
-  std::unique_ptr<llvm::raw_fd_ostream> OptRecordFile =
-      createOptRecordFile(SILOpts.OptRecordFile, Instance.getDiags());
-  if (OptRecordFile) {
-    auto Output =
-        std::make_unique<llvm::yaml::Output>(*OptRecordFile,
-                                              &Instance.getSourceMgr());
-    SM->setOptRecordStream(std::move(Output), std::move(OptRecordFile));
-  }
+  auto pair = createSILRemarkStreamer(
+      *SM, SILOpts.OptRecordFile, SILOpts.OptRecordPasses,
+      SILOpts.OptRecordFormat, Instance.getDiags(), Instance.getSourceMgr());
+  SM->setSILRemarkStreamer(std::move(pair.first), std::move(pair.second));
 
   // This is the action to be used to serialize SILModule.
   // It may be invoked multiple times, but it will perform
