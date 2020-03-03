@@ -213,7 +213,7 @@ extension UnsafeMutableRawPointer {
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment hook
-  func _atomic${apiOrder}CompareThenExchangeWord(
+  func _atomic${apiOrder}CompareExchangeWord(
     expected: UInt,
     desired: UInt
   ) -> (exchanged: Bool, original: UInt) {
@@ -246,30 +246,30 @@ extension UnsafeMutableRawPointer {
   @_transparent // Debug performance
   @usableFromInline
   internal
-  func _atomicCompareThenExchangeWord(
+  func _atomicCompareExchangeWord(
     expected: UInt,
     desired: UInt,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: UInt) {
     switch ordering {
     case .relaxed:
-      return _atomicRelaxedCompareThenExchangeWord(
+      return _atomicRelaxedCompareExchangeWord(
         expected: expected,
         desired: desired)
     case .acquiring:
-      return _atomicAcquiringCompareThenExchangeWord(
+      return _atomicAcquiringCompareExchangeWord(
         expected: expected,
         desired: desired)
     case .releasing:
-      return _atomicReleasingCompareThenExchangeWord(
+      return _atomicReleasingCompareExchangeWord(
         expected: expected,
         desired: desired)
     case .acquiringAndReleasing:
-      return _atomicAcquiringAndReleasingCompareThenExchangeWord(
+      return _atomicAcquiringAndReleasingCompareExchangeWord(
         expected: expected,
         desired: desired)
     default:
-      return _atomicSerializedCompareThenExchangeWord(
+      return _atomicSerializedCompareExchangeWord(
         expected: expected,
         desired: desired)
     }

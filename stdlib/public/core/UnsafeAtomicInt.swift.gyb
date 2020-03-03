@@ -116,7 +116,7 @@ extension UnsafeAtomicInt {
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Int) {
     let expectedWord = UInt(bitPattern: expected)
-    let (success, originalWord) = _ptr._atomicCompareThenExchangeWord(
+    let (success, originalWord) = _ptr._atomicCompareExchangeWord(
       expected: expectedWord,
       desired: UInt(bitPattern: desired),
       ordering: ordering)

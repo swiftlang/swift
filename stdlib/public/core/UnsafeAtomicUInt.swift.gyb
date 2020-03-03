@@ -111,7 +111,7 @@ extension UnsafeAtomicUInt {
     desired: UInt,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: UInt) {
-    _ptr._atomicCompareThenExchangeWord(
+    _ptr._atomicCompareExchangeWord(
       expected: expected,
       desired: desired,
       ordering: ordering)

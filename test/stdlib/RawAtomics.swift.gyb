@@ -102,23 +102,23 @@ suite.test("simple_atomic${apiOrder}ExchangeWord") {
 % end
 
 % for _, apiOrder, _, _, _ in rmwOrderings():
-suite.test("simple_atomic${apiOrder}CompareThenExchangeWord") {
+suite.test("simple_atomic${apiOrder}CompareExchangeWord") {
   withWordPtr(initialValue: 0, expectedResult: 2) { ptr in
-    var (exchanged, original) = ptr._atomic${apiOrder}CompareThenExchangeWord(
+    var (exchanged, original) = ptr._atomic${apiOrder}CompareExchangeWord(
       expected: 0,
       desired: 1)
     expectTrue(exchanged)
     expectEqual(0, original)
     expectEqual(1, ptr._atomicRelaxedLoadWord())
 
-    (exchanged, original) = ptr._atomic${apiOrder}CompareThenExchangeWord(
+    (exchanged, original) = ptr._atomic${apiOrder}CompareExchangeWord(
       expected: 0,
       desired: 2)
     expectFalse(exchanged)
     expectEqual(1, original)
     expectEqual(1, ptr._atomicRelaxedLoadWord())
 
-    (exchanged, original) = ptr._atomic${apiOrder}CompareThenExchangeWord(
+    (exchanged, original) = ptr._atomic${apiOrder}CompareExchangeWord(
       expected: original,
       desired: 2)
     expectTrue(exchanged)

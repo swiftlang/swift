@@ -104,7 +104,7 @@ extension UnsafeAtomicUnmanaged {
   ) -> (exchanged: Bool, original: Value) {
     let desiredWord = UInt(bitPattern: desired?.toOpaque())
     let expectedWord = UInt(bitPattern: expected?.toOpaque())
-    let (success, originalWord) = _ptr._atomicCompareThenExchangeWord(
+    let (success, originalWord) = _ptr._atomicCompareExchangeWord(
       expected: expectedWord,
       desired: desiredWord,
       ordering: ordering)

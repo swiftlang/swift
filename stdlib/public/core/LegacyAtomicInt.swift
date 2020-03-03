@@ -80,7 +80,7 @@ public final class _stdlib_AtomicInt {
   }
 
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
-    let (won, oldValue) = _valuePtr._atomicSerializedCompareThenExchangeWord(
+    let (won, oldValue) = _valuePtr._atomicSerializedCompareExchangeWord(
       expected: UInt(bitPattern: expected),
       desired: UInt(bitPattern: desired))
     expected = Int(bitPattern: oldValue)

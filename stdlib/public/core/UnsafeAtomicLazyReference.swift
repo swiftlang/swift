@@ -68,7 +68,7 @@ extension UnsafeAtomicLazyReference {
     let desiredWord = UInt(bitPattern: desiredUnmanaged.toOpaque())
     var currentWord: UInt = 0
     var success: Bool
-    (success, currentWord) = _ptr._atomicCompareThenExchangeWord(
+    (success, currentWord) = _ptr._atomicCompareExchangeWord(
       expected: currentWord,
       desired: desiredWord,
       ordering: .acquiringAndReleasing)

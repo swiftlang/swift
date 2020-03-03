@@ -92,7 +92,7 @@ extension UnsafeAtomicState {
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Value) {
     let expectedWord = UInt(bitPattern: expected.rawValue)
-    let (success, originalWord) = _ptr._atomicCompareThenExchangeWord(
+    let (success, originalWord) = _ptr._atomicCompareExchangeWord(
       expected: expectedWord,
       desired: UInt(bitPattern: desired.rawValue),
       ordering: ordering)
