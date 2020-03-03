@@ -58,6 +58,14 @@ bool isOwnedForwardingValueKind(SILNodeKind kind);
 /// forward guaranteed ownership.
 bool isOwnedForwardingInstruction(SILInstruction *inst);
 
+/// Does this value 'forward' owned ownership, but may not be able to forward
+/// guaranteed ownership.
+///
+/// This will be either a multiple value instruction resuilt, a single value
+/// instruction that forwards or an argument that forwards the ownership from a
+/// previous terminator.
+bool isOwnedForwardingValue(SILValue value);
+
 struct BorrowScopeOperandKind {
   enum Kind {
     BeginBorrow,
@@ -606,6 +614,17 @@ private:
   OwnedValueIntroducer(SILValue value, OwnedValueIntroducerKind kind)
       : value(value), kind(kind) {}
 };
+
+/// Look up the def-use graph starting at use \p inputOperand, recording any
+/// values that act as "owned" introducers.
+///
+/// NOTE: This may return multiple owned introducers in cases where there are
+/// phi-like nodes in the IR like any true phi block arguments or aggregate
+/// literal instructions (struct, tuple, enum, etc.).
+bool getAllOwnedValueIntroducers(SILValue value,
+                                 SmallVectorImpl<OwnedValueIntroducer> &out);
+
+Optional<OwnedValueIntroducer> getSingleOwnedValueIntroducer(SILValue value);
 
 } // namespace swift
 

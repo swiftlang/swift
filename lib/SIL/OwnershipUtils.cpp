@@ -85,6 +85,17 @@ bool swift::isOwnedForwardingInstruction(SILInstruction *inst) {
   }
 }
 
+bool swift::isOwnedForwardingValue(SILValue value) {
+  switch (value->getKind()) {
+  // Phi arguments always forward ownership.
+  case ValueKind::SILPhiArgument:
+    return true;
+  default:
+    return isOwnedForwardingValueKind(
+        value->getKindOfRepresentativeSILNodeInObject());
+  }
+}
+
 bool swift::isGuaranteedForwardingValue(SILValue value) {
   // If we have an argument from a transforming terminator, we can forward
   // guaranteed.
@@ -95,6 +106,7 @@ bool swift::isGuaranteedForwardingValue(SILValue value) {
       }
     }
   }
+
   return isGuaranteedForwardingValueKind(
       value->getKindOfRepresentativeSILNodeInObject());
 }
@@ -444,6 +456,49 @@ bool BorrowScopeIntroducingValue::visitInteriorPointerOperands(
 }
 
 //===----------------------------------------------------------------------===//
+//                          Owned Value Introducers
+//===----------------------------------------------------------------------===//
+
+void OwnedValueIntroducerKind::print(llvm::raw_ostream &os) const {
+  switch (value) {
+  case OwnedValueIntroducerKind::Apply:
+    os << "Apply";
+    return;
+  case OwnedValueIntroducerKind::BeginApply:
+    os << "BeginApply";
+    return;
+  case OwnedValueIntroducerKind::TryApply:
+    os << "TryApply";
+    return;
+  case OwnedValueIntroducerKind::Copy:
+    os << "Copy";
+    return;
+  case OwnedValueIntroducerKind::LoadCopy:
+    os << "LoadCopy";
+    return;
+  case OwnedValueIntroducerKind::LoadTake:
+    os << "LoadTake";
+    return;
+  case OwnedValueIntroducerKind::Phi:
+    os << "Phi";
+    return;
+  case OwnedValueIntroducerKind::FunctionArgument:
+    os << "FunctionArgument";
+    return;
+  case OwnedValueIntroducerKind::PartialApplyInit:
+    os << "PartialApplyInit";
+    return;
+  case OwnedValueIntroducerKind::AllocBoxInit:
+    os << "AllocBoxInit";
+    return;
+  case OwnedValueIntroducerKind::AllocRefInit:
+    os << "AllocRefInit";
+    return;
+  }
+  llvm_unreachable("Covered switch isn't covered");
+}
+
+//===----------------------------------------------------------------------===//
 //                       Introducer Searching Routines
 //===----------------------------------------------------------------------===//
 
@@ -515,6 +570,106 @@ swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isGuaranteedForwardingValue(currentValue)) {
+      if (auto *i = currentValue->getDefiningInstruction()) {
+        auto instOps = i->getOperandValues(true /*ignore type dependent ops*/);
+        // If we have multiple incoming values, return .None. We can't handle
+        // this.
+        auto begin = instOps.begin();
+        if (std::next(begin) != instOps.end()) {
+          return None;
+        }
+        // Otherwise, set currentOp to the single operand and continue.
+        currentValue = *begin;
+        continue;
+      }
+
+      // Otherwise, we should have a block argument that is defined by a single
+      // predecessor terminator.
+      auto *arg = cast<SILPhiArgument>(currentValue);
+      auto *termInst = arg->getSingleTerminator();
+      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst->getNumOperands() == 1 &&
+             "Transformation terminators should only have single operands");
+      currentValue = termInst->getAllOperands()[0].get();
+      continue;
+    }
+
+    // Otherwise, this is an introducer we do not understand. Bail and return
+    // None.
+    return None;
+  }
+
+  llvm_unreachable("Should never hit this");
+}
+
+bool swift::getAllOwnedValueIntroducers(
+    SILValue inputValue, SmallVectorImpl<OwnedValueIntroducer> &out) {
+  if (inputValue.getOwnershipKind() != ValueOwnershipKind::Owned)
+    return false;
+
+  SmallVector<SILValue, 32> worklist;
+  worklist.emplace_back(inputValue);
+
+  while (!worklist.empty()) {
+    SILValue value = worklist.pop_back_val();
+
+    // First check if v is an introducer. If so, stash it and continue.
+    if (auto introducer = OwnedValueIntroducer::get(value)) {
+      out.push_back(*introducer);
+      continue;
+    }
+
+    // If v produces .none ownership, then we can ignore it. It is important
+    // that we put this before checking for guaranteed forwarding instructions,
+    // since we want to ignore guaranteed forwarding instructions that in this
+    // specific case produce a .none value.
+    if (value.getOwnershipKind() == ValueOwnershipKind::None)
+      continue;
+
+    // Otherwise if v is an ownership forwarding value, add its defining
+    // instruction
+    if (isOwnedForwardingValue(value)) {
+      if (auto *i = value->getDefiningInstruction()) {
+        llvm::copy(i->getOperandValues(true /*skip type dependent ops*/),
+                   std::back_inserter(worklist));
+        continue;
+      }
+
+      // Otherwise, we should have a block argument that is defined by a single
+      // predecessor terminator.
+      auto *arg = cast<SILPhiArgument>(value);
+      auto *termInst = arg->getSingleTerminator();
+      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst->getNumOperands() == 1 &&
+             "Transforming terminators should always have a single operand");
+      worklist.push_back(termInst->getAllOperands()[0].get());
+      continue;
+    }
+
+    // Otherwise, this is an introducer we do not understand. Bail and return
+    // false.
+    return false;
+  }
+
+  return true;
+}
+
+Optional<OwnedValueIntroducer>
+swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
+  if (inputValue.getOwnershipKind() != ValueOwnershipKind::Owned)
+    return None;
+
+  SILValue currentValue = inputValue;
+  while (true) {
+    // First check if our initial value is an introducer. If we have one, just
+    // return it.
+    if (auto introducer = OwnedValueIntroducer::get(currentValue)) {
+      return introducer;
+    }
+
+    // Otherwise if v is an ownership forwarding value, add its defining
+    // instruction
+    if (isOwnedForwardingValue(currentValue)) {
       if (auto *i = currentValue->getDefiningInstruction()) {
         auto instOps = i->getOperandValues(true /*ignore type dependent ops*/);
         // If we have multiple incoming values, return .None. We can't handle
