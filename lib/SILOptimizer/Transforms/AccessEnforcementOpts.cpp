@@ -1020,7 +1020,7 @@ static bool mergeAccesses(
   info.id = 0;
   for (auto sccIt = scc_begin(F); !sccIt.isAtEnd(); ++sccIt) {
     ++info.id;
-    info.hasLoop = sccIt.hasLoop();
+    info.hasLoop = sccIt.hasCycle();
     for (auto *bb : *sccIt) {
       blockToSCCMap.insert(std::make_pair(bb, info));
     }
