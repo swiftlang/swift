@@ -3659,11 +3659,10 @@ resolveDifferentiableAttrOriginalFunction(DifferentiableAttr *attr) {
     }
   }
   // Non-`get` accessors are not yet supported: `set`, `read`, and `modify`.
-  // TODO(TF-129): Enable `set` when differentiation supports inout parameters.
   // TODO(TF-1080): Enable `read` and `modify` when differentiation supports
   // coroutines.
   if (auto *accessor = dyn_cast_or_null<AccessorDecl>(original))
-    if (!accessor->isGetter())
+    if (!accessor->isGetter() && !accessor->isSetter())
       original = nullptr;
   // Diagnose if original `AbstractFunctionDecl` could not be resolved.
   if (!original) {
