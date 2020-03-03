@@ -984,7 +984,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     info->ChildDiagnosticInfo = childInfoPtrs;
     
     SmallVector<std::string, 1> educationalNotePaths;
-    if (useDescriptiveDiagnostics) {
+    if (useEducationalNotes) {
       auto associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()];
       while (associatedNotes && *associatedNotes) {
         SmallString<128> notePath(getDiagnosticDocumentationPath());
