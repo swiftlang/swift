@@ -21,6 +21,56 @@
 
 using namespace swift;
 
+SILValue swift::stripAccessMarkers(SILValue v) {
+  while (true) {
+    switch (v->getKind()) {
+    default:
+      return v;
+
+    case ValueKind::BeginBorrowInst:
+    case ValueKind::BeginAccessInst:
+      v = cast<SingleValueInstruction>(v)->getOperand(0);
+    }
+  }
+}
+
+// TODO: When the optimizer stops stripping begin_access markers, then we should
+// be able to assert that the result is a BeginAccessInst and the default case
+// is unreachable.
+SILValue swift::getAccessedAddress(SILValue v) {
+  assert(v->getType().isAddress());
+  while (true) {
+    switch (v->getKind()) {
+    default:
+      return v;
+
+    case ValueKind::BeginBorrowInst:
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleElementAddrInst:
+    case ValueKind::UncheckedTakeEnumDataAddrInst:
+    case ValueKind::TailAddrInst:
+    case ValueKind::IndexAddrInst:
+      v = cast<SingleValueInstruction>(v)->getOperand(0);
+      continue;
+    };
+  }
+}
+
+bool swift::isLetAddress(SILValue accessedAddress) {
+  assert(accessedAddress == getAccessedAddress(accessedAddress)
+         && "caller must find the address root");
+  // Is this an address of a "let" class member?
+  if (auto *rea = dyn_cast<RefElementAddrInst>(accessedAddress))
+    return rea->getField()->isLet();
+
+  // Is this an address of a global "let"?
+  if (auto *gai = dyn_cast<GlobalAddrInst>(accessedAddress)) {
+    auto *globalDecl = gai->getReferencedGlobal()->getDecl();
+    return globalDecl && globalDecl->isLet();
+  }
+  return false;
+}
+
 AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
   assert(base && "invalid storage base");
   initKind(kind);
