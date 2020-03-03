@@ -455,7 +455,7 @@ namespace {
 
     void addMessage(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                     StringRef Message) {
-      Messages.push_back({lineByteOffsetForLoc(SM, Loc), Kind, std::string(Message)});
+      Messages.push_back({lineByteOffsetForLoc(SM, Loc), Kind, Message.str()});
     }
 
     void addHighlight(SourceManager &SM, CharSourceRange Range) {
@@ -465,7 +465,7 @@ namespace {
 
     void addFixIt(SourceManager &SM, CharSourceRange Range, StringRef Text) {
       FixIts.push_back({lineByteOffsetForLoc(SM, Range.getStart()),
-                        lineByteOffsetForLoc(SM, Range.getEnd()), std::string(Text)});
+                        lineByteOffsetForLoc(SM, Range.getEnd()), Text.str()});
     }
 
     void render(unsigned LineNumberIndent, raw_ostream &Out) {
