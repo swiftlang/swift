@@ -121,8 +121,8 @@ sil_property #ExternalReabstractions.ro <T> (
 sil_property #ExternalReabstractions.reabstracted <T> (
   settable_property $() -> (),
     id ##ExternalReabstractions.reabstracted,
-    getter @get_reabstracted : $@convention(thin) <T> (@in_guaranteed ExternalReabstractions<T>) -> @out @callee_guaranteed () -> @out (),
-    setter @set_reabstracted : $@convention(thin) <T> (@in_guaranteed @callee_guaranteed () -> @out (), @inout ExternalReabstractions<T>) -> ())
+    getter @get_reabstracted : $@convention(thin) <T> (@in_guaranteed ExternalReabstractions<T>) -> @out @callee_guaranteed <U> in () -> @out U for <()>,
+    setter @set_reabstracted : $@convention(thin) <T> (@in_guaranteed @callee_guaranteed <U> in () -> @out U for <()>, @inout ExternalReabstractions<T>) -> ())
 
 // All trivial descriptors should share a definition by aliasing to the common
 // definition
@@ -148,5 +148,5 @@ sil @set_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed T
 sil @get_computed_generic_subscript : $@convention(thin) <T: Comparable><U: Hashable> (@in_guaranteed ExternalGeneric<T>, UnsafeRawPointer) -> @out T
 sil @set_computed_generic_subscript : $@convention(thin) <T: Comparable><U: Hashable> (@in_guaranteed T, @inout ExternalGeneric<T>, UnsafeRawPointer) -> ()
 
-sil @get_reabstracted : $@convention(thin) <T> (@in_guaranteed ExternalReabstractions<T>) -> @out @callee_guaranteed () -> @out ()
-sil @set_reabstracted : $@convention(thin) <T> (@in_guaranteed @callee_guaranteed () -> @out (), @inout ExternalReabstractions<T>) -> ()
+sil @get_reabstracted : $@convention(thin) <T> (@in_guaranteed ExternalReabstractions<T>) -> @out @callee_guaranteed <U> in () -> @out U for <()>
+sil @set_reabstracted : $@convention(thin) <T> (@in_guaranteed @callee_guaranteed <U> in () -> @out U for <()>, @inout ExternalReabstractions<T>) -> ()

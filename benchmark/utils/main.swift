@@ -136,6 +136,7 @@ import RC4
 import RGBHistogram
 import Radix2CooleyTukey
 import RandomShuffle
+import RandomTree
 import RandomValues
 import RangeAssignment
 import RangeIteration
@@ -320,6 +321,7 @@ registerBenchmark(RC4Test)
 registerBenchmark(RGBHistogram)
 registerBenchmark(Radix2CooleyTukey)
 registerBenchmark(RandomShuffle)
+registerBenchmark(RandomTree)
 registerBenchmark(RandomValues)
 registerBenchmark(RangeAssignment)
 registerBenchmark(RangeIteration)

@@ -23,6 +23,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
 
@@ -111,6 +112,23 @@ struct AutoDiffConfig {
 
   void print(llvm::raw_ostream &s = llvm::outs()) const;
   SWIFT_DEBUG_DUMP;
+};
+
+/// A semantic function result type: either a formal function result type or
+/// an `inout` parameter type. Used in derivative function type calculation.
+struct AutoDiffSemanticFunctionResultType {
+  Type type;
+  bool isInout;
+};
+
+/// Key for caching SIL derivative function types.
+struct SILAutoDiffDerivativeFunctionKey {
+  SILFunctionType *originalType;
+  IndexSubset *parameterIndices;
+  IndexSubset *resultIndices;
+  AutoDiffDerivativeFunctionKind kind;
+  CanGenericSignature derivativeFnGenSig;
+  bool isReabstractionThunk;
 };
 
 class ParsedAutoDiffParameter {
@@ -252,11 +270,17 @@ using SILDifferentiabilityWitnessKey = std::pair<StringRef, AutoDiffConfig>;
 /// Automatic differentiation utility namespace.
 namespace autodiff {
 
-/// Appends the subset's parameter's types to `results`, in the order in
-/// which they appear in the function type.
-void getSubsetParameterTypes(IndexSubset *indices, AnyFunctionType *type,
-                             SmallVectorImpl<Type> &results,
-                             bool reverseCurryLevels = false);
+/// Given a function type, collects its semantic result types in type order
+/// into `result`: first, the formal result type (if non-`Void`), followed by
+/// `inout` parameter types.
+///
+/// The function type may have at most two parameter lists.
+///
+/// Remaps the original semantic result using `genericEnv`, if specified.
+void getFunctionSemanticResultTypes(
+    AnyFunctionType *functionType,
+    SmallVectorImpl<AutoDiffSemanticFunctionResultType> &result,
+    GenericEnvironment *genericEnv = nullptr);
 
 /// "Constrained" derivative generic signatures require all differentiability
 /// parameters to conform to the `Differentiable` protocol.
@@ -281,8 +305,11 @@ namespace llvm {
 
 using swift::AutoDiffConfig;
 using swift::AutoDiffDerivativeFunctionKind;
+using swift::CanGenericSignature;
 using swift::GenericSignature;
 using swift::IndexSubset;
+using swift::SILAutoDiffDerivativeFunctionKey;
+using swift::SILFunctionType;
 
 template <typename T> struct DenseMapInfo;
 
@@ -351,6 +378,50 @@ template <> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
                       const AutoDiffDerivativeFunctionKind &RHS) {
     return static_cast<AutoDiffDerivativeFunctionKind::innerty>(LHS) ==
         static_cast<AutoDiffDerivativeFunctionKind::innerty>(RHS);
+  }
+};
+
+template <> struct DenseMapInfo<SILAutoDiffDerivativeFunctionKey> {
+  static bool isEqual(const SILAutoDiffDerivativeFunctionKey lhs,
+                      const SILAutoDiffDerivativeFunctionKey rhs) {
+    return lhs.originalType == rhs.originalType &&
+           lhs.parameterIndices == rhs.parameterIndices &&
+           lhs.resultIndices == rhs.resultIndices &&
+           lhs.kind.rawValue == rhs.kind.rawValue &&
+           lhs.derivativeFnGenSig == rhs.derivativeFnGenSig &&
+           lhs.isReabstractionThunk == rhs.isReabstractionThunk;
+  }
+
+  static inline SILAutoDiffDerivativeFunctionKey getEmptyKey() {
+    return {DenseMapInfo<SILFunctionType *>::getEmptyKey(),
+            DenseMapInfo<IndexSubset *>::getEmptyKey(),
+            DenseMapInfo<IndexSubset *>::getEmptyKey(),
+            AutoDiffDerivativeFunctionKind::innerty(
+                DenseMapInfo<unsigned>::getEmptyKey()),
+            CanGenericSignature(DenseMapInfo<GenericSignature>::getEmptyKey()),
+            (bool)DenseMapInfo<unsigned>::getEmptyKey()};
+  }
+
+  static inline SILAutoDiffDerivativeFunctionKey getTombstoneKey() {
+    return {
+        DenseMapInfo<SILFunctionType *>::getTombstoneKey(),
+        DenseMapInfo<IndexSubset *>::getTombstoneKey(),
+        DenseMapInfo<IndexSubset *>::getTombstoneKey(),
+        AutoDiffDerivativeFunctionKind::innerty(
+            DenseMapInfo<unsigned>::getTombstoneKey()),
+        CanGenericSignature(DenseMapInfo<GenericSignature>::getTombstoneKey()),
+        (bool)DenseMapInfo<unsigned>::getTombstoneKey()};
+  }
+
+  static unsigned getHashValue(const SILAutoDiffDerivativeFunctionKey &Val) {
+    return hash_combine(
+        DenseMapInfo<SILFunctionType *>::getHashValue(Val.originalType),
+        DenseMapInfo<IndexSubset *>::getHashValue(Val.parameterIndices),
+        DenseMapInfo<IndexSubset *>::getHashValue(Val.resultIndices),
+        DenseMapInfo<unsigned>::getHashValue((unsigned)Val.kind.rawValue),
+        DenseMapInfo<GenericSignature>::getHashValue(Val.derivativeFnGenSig),
+        DenseMapInfo<unsigned>::getHashValue(
+            (unsigned)Val.isReabstractionThunk));
   }
 };
 

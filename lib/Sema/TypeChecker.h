@@ -839,12 +839,6 @@ public:
                               FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
 
-  static void getPossibleTypesOfExpressionWithoutApplying(
-      Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
-      FreeTypeVariableBinding allowFreeTypeVariables =
-          FreeTypeVariableBinding::Disallow,
-      ExprTypeCheckListener *listener = nullptr);
-
   /// Return the type of operator function for specified LHS, or a null
   /// \c Type on error.
   static FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
@@ -959,8 +953,7 @@ public:
   ///
   /// \returns the coerced pattern, or nullptr if the coercion failed.
   static Pattern *coercePatternToType(ContextualPattern pattern, Type type,
-                                      TypeResolutionOptions options,
-                                      TypeLoc tyLoc = TypeLoc());
+                                      TypeResolutionOptions options);
   static bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                    Type type);
 
@@ -1660,6 +1653,28 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
                                      GenericSignature sig,
                                      SubstitutionMap Substitutions,
                                      bool isExtension);
+
+/// Bind all of the pattern variables that occur within a case statement and
+/// all of its case items to their "parent" pattern variables, forming chains
+/// of variables with the same name.
+///
+/// Given a case such as:
+/// \code
+/// case .a(let x), .b(let x), .c(let x):
+/// \endcode
+///
+/// Each case item contains a (different) pattern variable named.
+/// "x". This function will set the "parent" variable of the
+/// second and third "x" variables to the "x" variable immediately
+/// to its left. A fourth "x" will be the body case variable,
+/// whose parent will be set to the "x" within the final case
+/// item.
+///
+/// Each of the "x" variables must eventually have the same type, and agree on
+/// let vs. var. This function does not perform any of that validation, leaving
+/// it to later stages.
+void bindSwitchCasePatternVars(CaseStmt *stmt);
+
 } // end namespace swift
 
 #endif

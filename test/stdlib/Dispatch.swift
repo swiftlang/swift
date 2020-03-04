@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 // REQUIRES: libdispatch
 // UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=linux-android
 
 import Dispatch
 import StdlibUnittest

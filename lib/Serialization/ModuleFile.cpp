@@ -1460,6 +1460,9 @@ bool ModuleFile::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
       case decl_locs_block::DECL_USRS:
         DeclUSRsTable = readDeclUSRsTable(scratch, blobData);
         break;
+      case decl_locs_block::DOC_RANGES:
+        DocRangesData = blobData;
+        break;
       default:
         // Unknown index kind, which this version of the compiler won't use.
         break;
@@ -1644,16 +1647,33 @@ ModuleFile::ModuleFile(
         case input_block::IMPORTED_MODULE: {
           unsigned rawImportControl;
           bool scoped;
+          bool hasSPI;
           input_block::ImportedModuleLayout::readRecord(scratch,
                                                         rawImportControl,
-                                                        scoped);
+                                                        scoped, hasSPI);
           auto importKind = getActualImportControl(rawImportControl);
           if (!importKind) {
             // We don't know how to import this dependency.
             info.status = error(Status::Malformed);
             return;
           }
-          Dependencies.push_back({blobData, importKind.getValue(), scoped});
+
+          StringRef spiBlob;
+          if (hasSPI) {
+            scratch.clear();
+
+            llvm::BitstreamEntry entry =
+                fatalIfUnexpected(cursor.advance(AF_DontPopBlockAtEnd));
+            unsigned recordID =
+                fatalIfUnexpected(cursor.readRecord(entry.ID, scratch, &spiBlob));
+            assert(recordID == input_block::IMPORTED_MODULE_SPIS);
+            input_block::ImportedModuleLayoutSPI::readRecord(scratch);
+            (void) recordID;
+          } else {
+            spiBlob = StringRef();
+          }
+
+          Dependencies.push_back({blobData, spiBlob, importKind.getValue(), scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {
@@ -1990,6 +2010,14 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       Located<Identifier> accessPathElem = { scopeID, SourceLoc() };
       dependency.Import = {ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)),
                            module};
+    }
+
+    // SPI
+    StringRef spisStr = dependency.RawSPIs;
+    while (!spisStr.empty()) {
+      StringRef nextComponent;
+      std::tie(nextComponent, spisStr) = spisStr.split('\0');
+      dependency.spiGroups.push_back(ctx.getIdentifier(nextComponent));
     }
 
     if (!module->hasResolvedImports()) {
@@ -2531,6 +2559,17 @@ void ModuleFile::lookupObjCMethods(
   }
 }
 
+void ModuleFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spiGroups) const {
+  for (auto &dep : Dependencies) {
+    auto depSpis = dep.spiGroups;
+    if (dep.Import.second == importedModule &&
+        !depSpis.empty()) {
+      spiGroups.append(depSpis.begin(), depSpis.end());
+    }
+  }
+}
+
 void
 ModuleFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
   for (auto &lib : LinkLibraries)
@@ -2661,7 +2700,10 @@ ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
   // Size of BasicDeclLocs in the buffer.
   // FilePathOffset + LocNum * LineColumn
   uint32_t LineColumnCount = 3;
-  uint32_t RecordSize = NumSize + NumSize * 2 * LineColumnCount;
+  uint32_t RecordSize =
+    NumSize + // Offset into source filename blob
+    NumSize + // Offset into doc ranges blob
+    NumSize * 2 * LineColumnCount; // Line/column of: Loc, StartLoc, EndLoc
   uint32_t RecordOffset = RecordSize * UsrId;
   assert(RecordOffset < BasicDeclLocsData.size());
   assert(BasicDeclLocsData.size() % RecordSize == 0);
@@ -2675,6 +2717,23 @@ ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
   size_t TerminatorOffset = FilePath.find('\0');
   assert(TerminatorOffset != StringRef::npos && "unterminated string data");
   Result.SourceFilePath = FilePath.slice(0, TerminatorOffset);
+
+  const auto DocRangesOffset = ReadNext();
+  if (DocRangesOffset) {
+    assert(!DocRangesData.empty());
+    const auto *Data = DocRangesData.data() + DocRangesOffset;
+    const auto NumLocs = endian::readNext<uint32_t, little, unaligned>(Data);
+    assert(NumLocs);
+
+    for (uint32_t i = 0; i < NumLocs; ++i) {
+      LineColumn LC;
+      LC.Line = endian::readNext<uint32_t, little, unaligned>(Data);
+      LC.Column = endian::readNext<uint32_t, little, unaligned>(Data);
+      auto Length = endian::readNext<uint32_t, little, unaligned>(Data);
+      Result.DocRanges.push_back(std::make_pair(LC, Length));
+    }
+  }
+
 #define READ_FIELD(X)                                                         \
 Result.X.Line = ReadNext();                                                   \
 Result.X.Column = ReadNext();

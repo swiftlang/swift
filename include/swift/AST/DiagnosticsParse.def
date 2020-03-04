@@ -428,8 +428,14 @@ ERROR(operator_decl_inner_scope,none,
       "'operator' may only be declared at file scope", ())
 ERROR(expected_operator_name_after_operator,PointsToFirstBadToken,
       "expected operator name in operator declaration", ())
-ERROR(identifier_when_expecting_operator,PointsToFirstBadToken,
-      "%0 is considered to be an identifier, not an operator", (Identifier))
+ERROR(identifier_within_operator_name,PointsToFirstBadToken,
+      "'%0' is considered an identifier and must not "
+      "appear within an operator name", (StringRef))
+ERROR(operator_name_invalid_char,PointsToFirstBadToken,
+      "'%0' is not allowed in operator names", (StringRef))
+ERROR(postfix_operator_name_cannot_start_with_unwrap,PointsToFirstBadToken,
+      "postfix operator names starting with '?' or '!' are disallowed "
+      "to avoid collisions with built-in unwrapping operators", ())
 
 ERROR(deprecated_operator_body,PointsToFirstBadToken,
       "operator should no longer be declared with body", ())
@@ -821,7 +827,7 @@ ERROR(sil_box_expected_r_angle,none,
 ERROR(sil_function_subst_expected_l_angle,none,
       "expected '<' to begin SIL function type substitution list after 'for'", ())
 ERROR(sil_function_subst_expected_r_angle,none,
-      "expected '>' to begin SIL function type substitution list after 'for'", ())
+      "expected '>' to end SIL function type substitution list after 'for <...'", ())
 
 // Opaque types
 ERROR(opaque_mid_composition,none,
@@ -1378,6 +1384,8 @@ ERROR(projection_value_property_not_identifier,none,
 // Access control
 ERROR(attr_access_expected_set,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))
+ERROR(attr_access_expected_spi_name,none,
+      "expected an SPI identifier as subject of the '@_spi' attribute", ())
 
 // Attributes
 ERROR(attr_renamed, none,

@@ -1091,6 +1091,7 @@ class PartialApplicationFailure final : public FailureDiagnostic {
     MutatingMethod,
     SuperInit,
     SelfInit,
+    SuperMethod,
   };
 
   bool CompatibilityWarning;

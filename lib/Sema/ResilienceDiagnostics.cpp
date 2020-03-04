@@ -184,6 +184,11 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::resilience_decl_unavailable_warn;
 
+  // If SPI, don't mention the access level.
+  const SourceFile *SF = DC->getParentSourceFile();
+  if (SF && SF->isImportedAsSPI(D))
+    diagID = diag::resilience_decl_unavailable_spi;
+
   Context.Diags.diagnose(
            loc, diagID,
            D->getDescriptiveKind(), diagName,
@@ -206,15 +211,19 @@ static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
                                       const SourceFile &userSF,
                                       FragileFunctionKind fragileKind) {
   auto definingModule = D->getModuleContext();
-  if (!userSF.isImportedImplementationOnly(definingModule))
+
+  bool isImplementationOnly =
+    userSF.isImportedImplementationOnly(definingModule);
+  if (!isImplementationOnly && !userSF.isImportedAsSPI(D))
     return false;
 
   // TODO: different diagnostics
   ASTContext &ctx = definingModule->getASTContext();
-  ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_implementation_only,
+  ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module,
                      D->getDescriptiveKind(), D->getFullName(),
                      static_cast<unsigned>(fragileKind),
-                     definingModule->getName());
+                     definingModule->getName(),
+                     static_cast<unsigned>(!isImplementationOnly));
   return true;
 }
 

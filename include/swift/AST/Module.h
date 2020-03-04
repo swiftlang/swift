@@ -355,6 +355,11 @@ public:
     Bits.ModuleDecl.IsNonSwiftModule = flag;
   }
 
+  /// Retrieve the top-level module. If this module is already top-level, this
+  /// returns itself. If this is a submodule such as \c Foo.Bar.Baz, this
+  /// returns the module \c Foo.
+  ModuleDecl *getTopLevelModule();
+
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
   }
@@ -458,6 +463,11 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
 
+  /// Find all SPI names imported from \p importedModule by this module,
+  /// collecting the identifiers in \p spiGroups.
+  void lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                          SmallVectorImpl<Identifier> &spiGroups) const;
+
   /// \sa getImportedModules
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.
@@ -466,6 +476,8 @@ public:
     Private = 1 << 1,
     /// Include imports declared with `@_implementationOnly`.
     ImplementationOnly = 1 << 2,
+    /// Include imports of SPIs declared with `@_spi`
+    SPIAccessControl = 1 << 3,
     /// Include imports shadowed by a separately-imported overlay (i.e. a
     /// cross-import overlay). Unshadowed imports are included whether or not
     /// this flag is specified.

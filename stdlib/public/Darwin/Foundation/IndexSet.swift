@@ -115,7 +115,7 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     public typealias ReferenceType = NSIndexSet
     public typealias Element = Int
     
-    fileprivate var _handle: _MutablePairHandle<NSIndexSet, NSMutableIndexSet>
+    private var _handle: _MutablePairHandle<NSIndexSet, NSMutableIndexSet>
     
     /// Initialize an `IndexSet` with a range of integers.
     public init(integersIn range: Range<Element>) {
@@ -664,11 +664,11 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     
     // MARK: - Bridging Support
     
-    fileprivate var reference: NSIndexSet {
+    private var reference: NSIndexSet {
         return _handle.reference
     }
     
-    fileprivate init(reference: __shared NSIndexSet) {
+    private init(reference: __shared NSIndexSet) {
         _handle = _MutablePairHandle(reference)
     }
 }
@@ -700,7 +700,7 @@ private struct IndexSetBoundaryIterator : IteratorProtocol {
     private var i1UsedLower: Bool
     private var i2UsedLower: Bool
     
-    fileprivate init(_ is1: IndexSet, _ is2: IndexSet) {
+    init(_ is1: IndexSet, _ is2: IndexSet) {
         i1 = is1.rangeView.makeIterator()
         i2 = is2.rangeView.makeIterator()
         
@@ -712,7 +712,7 @@ private struct IndexSetBoundaryIterator : IteratorProtocol {
         i2UsedLower = false
     }
     
-    fileprivate mutating func next() -> Element? {
+    mutating func next() -> Element? {
         if i1Range == nil && i2Range == nil {
             return nil
         }
@@ -814,7 +814,7 @@ private enum _MutablePair<ImmutableType, MutableType> {
 /// a.k.a. Box
 private final class _MutablePairHandle<ImmutableType : NSObject, MutableType : NSObject>
   where ImmutableType : NSMutableCopying, MutableType : NSMutableCopying {
-    fileprivate var _pointer: _MutablePair<ImmutableType, MutableType>
+    var _pointer: _MutablePair<ImmutableType, MutableType>
     
     /// Initialize with an immutable reference instance.
     ///

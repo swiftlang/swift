@@ -47,6 +47,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
+#include "llvm/Remarks/RemarkFormat.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
@@ -267,6 +268,8 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
     return std::make_unique<toolchains::GenericUnix>(*this, target);
   case llvm::Triple::FreeBSD:
     return std::make_unique<toolchains::GenericUnix>(*this, target);
+  case llvm::Triple::OpenBSD:
+    return std::make_unique<toolchains::OpenBSD>(*this, target);
   case llvm::Triple::Win32:
     if (target.isWindowsCygwinEnvironment())
       return std::make_unique<toolchains::Cygwin>(*this, target);
@@ -1600,7 +1603,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
   } else if (Args.hasArg(options::OPT_emit_objc_header,
                          options::OPT_emit_objc_header_path,
                          options::OPT_emit_module_interface,
-                         options::OPT_emit_module_interface_path) &&
+                         options::OPT_emit_module_interface_path,
+                         options::OPT_emit_private_module_interface_path) &&
              OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
     // An option has been passed which requires whole-module knowledge, but we
     // don't have that. Generate a module, but treat it as an intermediate
@@ -1940,8 +1944,10 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_ImportedModules:
       case file_types::TY_TBD:
       case file_types::TY_ModuleTrace:
-      case file_types::TY_OptRecord:
+      case file_types::TY_YAMLOptRecord:
+      case file_types::TY_BitstreamOptRecord:
       case file_types::TY_SwiftModuleInterfaceFile:
+      case file_types::TY_PrivateSwiftModuleInterfaceFile:
       case file_types::TY_SwiftCrossImportDir:
       case file_types::TY_SwiftOverlayFile:
         // We could in theory handle assembly or LLVM input, but let's not.
@@ -2734,7 +2740,12 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
 
   if (C.getArgs().hasArg(options::OPT_emit_module_interface,
                          options::OPT_emit_module_interface_path))
-    chooseModuleInterfacePath(C, JA, workingDirectory, Buf, Output.get());
+    chooseModuleInterfacePath(C, JA, workingDirectory, Buf,
+      file_types::TY_SwiftModuleInterfaceFile, Output.get());
+
+  if (C.getArgs().hasArg(options::OPT_emit_private_module_interface_path))
+    chooseModuleInterfacePath(C, JA, workingDirectory, Buf,
+      file_types::TY_PrivateSwiftModuleInterfaceFile, Output.get());
 
   if (C.getArgs().hasArg(options::OPT_update_code) && isa<CompileJobAction>(JA))
     chooseRemappingOutputPath(C, OutputMap, Output.get());
@@ -2759,6 +2770,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                                   Output.get());
 
   if (C.getArgs().hasArg(options::OPT_save_optimization_record,
+                         options::OPT_save_optimization_record_EQ,
                          options::OPT_save_optimization_record_path))
     chooseOptimizationRecordPath(C, workingDirectory, Buf, Output.get());
 
@@ -3065,9 +3077,10 @@ void Driver::chooseRemappingOutputPath(Compilation &C,
 }
 
 void Driver::chooseModuleInterfacePath(Compilation &C, const JobAction *JA,
-                                          StringRef workingDirectory,
-                                          llvm::SmallString<128> &buffer,
-                                          CommandOutput *output) const {
+                                       StringRef workingDirectory,
+                                       llvm::SmallString<128> &buffer,
+                                       file_types::ID fileType,
+                                       CommandOutput *output) const {
   switch (C.getOutputInfo().CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::BatchModeCompile:
@@ -3083,13 +3096,14 @@ void Driver::chooseModuleInterfacePath(Compilation &C, const JobAction *JA,
     llvm_unreachable("these modes aren't usable with 'swiftc'");
   }
 
+  auto pathOpt = fileType == file_types::TY_SwiftModuleInterfaceFile?
+    options::OPT_emit_module_interface_path:
+    options::OPT_emit_private_module_interface_path;
+
   StringRef outputPath = *getOutputFilenameFromPathArgOrAsTopLevel(
-      C.getOutputInfo(), C.getArgs(),
-      options::OPT_emit_module_interface_path,
-      file_types::TY_SwiftModuleInterfaceFile,
+      C.getOutputInfo(), C.getArgs(), pathOpt, fileType,
       /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
-  output->setAdditionalOutputForType(file_types::TY_SwiftModuleInterfaceFile,
-                                     outputPath);
+  output->setAdditionalOutputForType(fileType, outputPath);
 }
 
 void Driver::chooseSerializedDiagnosticsPath(Compilation &C,
@@ -3193,12 +3207,18 @@ void Driver::chooseOptimizationRecordPath(Compilation &C,
                                           CommandOutput *Output) const {
   const OutputInfo &OI = C.getOutputInfo();
   if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+    llvm::Expected<file_types::ID> FileType =
+        C.getToolChain().remarkFileTypeFromArgs(C.getArgs());
+    if (!FileType) {
+      Diags.diagnose({}, diag::error_creating_remark_serializer,
+                     llvm::toString(FileType.takeError()));
+      return;
+    }
     auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
-        OI, C.getArgs(), options::OPT_save_optimization_record_path,
-        file_types::TY_OptRecord, /*TreatAsTopLevelOutput=*/true,
-        workingDirectory, Buf);
+        OI, C.getArgs(), options::OPT_save_optimization_record_path, *FileType,
+        /*TreatAsTopLevelOutput=*/true, workingDirectory, Buf);
 
-    Output->setAdditionalOutputForType(file_types::TY_OptRecord, filename);
+    Output->setAdditionalOutputForType(*FileType, filename);
   } else
     // FIXME: We should use the OutputMap in this case.
     Diags.diagnose({}, diag::warn_opt_remark_disabled);

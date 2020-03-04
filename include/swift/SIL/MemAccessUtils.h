@@ -46,7 +46,50 @@
 
 namespace swift {
 
-// stripAddressAccess() is declared in InstructionUtils.h.
+/// Get the base address of a formal access by stripping access markers and
+/// borrows.
+///
+/// If \p v is an address, then the returned value is also an address
+/// (pointer-to-address is not stripped).
+SILValue stripAccessMarkers(SILValue v);
+
+/// Attempt to return the address corresponding to a variable's formal access
+/// by stripping indexing and address projections.
+///
+/// \p v must be an address.
+///
+/// Returns an address. If the a formal access was successfully identified, and
+/// access markers have not yet been removed, then the returned address is
+/// produced by a begin_access marker.
+///
+/// To get the base address of the formal access behind the access marker,
+/// either call stripAccessMarkers() on the returned value, or call
+/// getAccessedAddress() on \p v.
+///
+/// To identify the underlying storage object of the access, use
+/// findAccessedStorage() on either \p v or the returned address.
+SILValue getAddressAccess(SILValue v);
+
+/// Convenience for stripAccessMarkers(getAddressAccess(V)).
+SILValue getAccessedAddress(SILValue v);
+
+/// Return true if \p accessedAddress points to a let-variable.
+///
+/// Precondition: \p accessedAddress must be an address-type value representing
+/// the base of a formal access (not a projection within the access).
+///
+/// let-variables are only written during let-variable initialization, which is
+/// assumed to store directly to the same, unaliased accessedAddress.
+///
+/// The address of a let-variable must be the base of a formal access . A 'let'
+/// member of a struct is *not* a let-variable, because it's memory may be
+/// written when formally modifying the outer struct. A let-variable is either
+/// an entire local variable, global variable, or class property (this is the
+/// definition of the base address of a formal access).
+///
+/// The caller should derive the accessed address using
+/// stripAccessMarkers(getAccessedAddress(ptr)).
+bool isLetAddress(SILValue accessedAddress);
 
 inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
   return !(a == SILAccessKind::Read && b == SILAccessKind::Read);
@@ -104,7 +147,7 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
 class AccessedStorage {
 public:
   /// Enumerate over all valid begin_access bases. Clients can use a covered
-  /// switch to warn if findAccessedAddressBase ever adds a case.
+  /// switch to warn if AccessedStorage ever adds a case.
   enum Kind : uint8_t {
     Box,
     Stack,

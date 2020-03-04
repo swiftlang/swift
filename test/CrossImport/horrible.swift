@@ -13,13 +13,13 @@ import HorribleGoose
 //
 
 import UnitaryGoose
-// expected-error@-1 {{cannot list cross-import overlays for 'UnitaryGoose': Not a directory}}
+// expected-error@-1 {{cannot list cross-import overlays for 'UnitaryGoose':}}
 
 // FIXME: It might be better to diagnose these errors on HorribleGoose's import
 // decl, since they actually belong to HorribleGoose. (SR-12223)
 
 import FlockOfGoose
-// expected-error@-1 {{cannot load cross-import overlay for 'HorribleGoose' and 'FlockOfGoose': Is a directory}}
+// expected-error@-1 {{cannot load cross-import overlay for 'HorribleGoose' and 'FlockOfGoose':}}
 
 import GibberishGoose
 // expected-error@-1 {{cannot load cross-import overlay for 'HorribleGoose' and 'GibberishGoose': not a mapping}}

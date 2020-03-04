@@ -1176,8 +1176,16 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
   SmallVector<ParsedAutoDiffParameter, 8> parameters;
 
   // Parse trailing comma, if it exists, and check for errors.
-  auto consumeIfTrailingComma = [&]() -> bool {
-    if (!consumeIf(tok::comma)) return false;
+  auto consumeIfTrailingComma = [&](bool requireComma = false) -> bool {
+    if (!consumeIf(tok::comma)) {
+      // If comma is required but does not exist and ')' has not been reached,
+      // diagnose missing comma.
+      if (requireComma && !Tok.is(tok::r_paren)) {
+        diagnose(getEndOfPreviousLoc(), diag::expected_separator, ",");
+        return true;
+      }
+      return false;
+    }
     // Diagnose trailing comma before ')'.
     if (Tok.is(tok::r_paren)) {
       diagnose(Tok, diag::unexpected_separator, ",");
@@ -1211,7 +1219,7 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
               baseType, original))
         return makeParserError();
     }
-    if (consumeIfTrailingComma())
+    if (consumeIfTrailingComma(/*requireComma*/ true))
       return makeParserError();
     // Parse the optional 'wrt' differentiability parameters clause.
     if (isIdentifier(Tok, "wrt") &&
@@ -1250,8 +1258,16 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
   SmallVector<ParsedAutoDiffParameter, 8> parameters;
 
   // Parse trailing comma, if it exists, and check for errors.
-  auto consumeIfTrailingComma = [&]() -> bool {
-    if (!consumeIf(tok::comma)) return false;
+  auto consumeIfTrailingComma = [&](bool requireComma = false) -> bool {
+    if (!consumeIf(tok::comma)) {
+      // If comma is required but does not exist and ')' has not been reached,
+      // diagnose missing comma.
+      if (requireComma && !Tok.is(tok::r_paren)) {
+        diagnose(Tok, diag::expected_separator, ",");
+        return true;
+      }
+      return false;
+    }
     // Diagnose trailing comma before ')'.
     if (Tok.is(tok::r_paren)) {
       diagnose(Tok, diag::unexpected_separator, ",");
@@ -1286,7 +1302,7 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
               baseType, original))
         return makeParserError();
     }
-    if (consumeIfTrailingComma())
+    if (consumeIfTrailingComma(/*requireComma*/ true))
       return makeParserError();
     // Parse the optional 'wrt' linearity parameters clause.
     if (Tok.is(tok::identifier) && Tok.getText() == "wrt" &&
@@ -1624,6 +1640,39 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       Attributes.add(new (Context) SetterAccessAttr(AtLoc, AttrRange, access));
     }
 
+    break;
+  }
+
+  case DAK_SPIAccessControl: {
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    SmallVector<Identifier, 4> spiGroups;
+
+    if (!Tok.is(tok::identifier) ||
+        Tok.isContextualKeyword("set")) {
+      diagnose(getEndOfPreviousLoc(), diag::attr_access_expected_spi_name);
+      consumeToken();
+      consumeIf(tok::r_paren);
+      return false;
+    }
+
+    auto text = Tok.getText();
+    spiGroups.push_back(Context.getIdentifier(text));
+    consumeToken();
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    AttrRange = SourceRange(Loc, Tok.getLoc());
+    Attributes.add(SPIAccessControlAttr::create(Context, AtLoc, AttrRange,
+                                                spiGroups));
     break;
   }
 
@@ -4468,13 +4517,13 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
                       bool &hadError) {
 
   // Record the curly braces but nothing inside.
-  if (IDC->areDependenciesUsingTokenHashesForTypeBodies()) {
+  if (IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()) {
     recordTokenHash("{");
     recordTokenHash("}");
   }
   llvm::MD5 tokenHashForThisDeclList;
   llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(
-      CurrentTokenHash, IDC->areDependenciesUsingTokenHashesForTypeBodies()
+      CurrentTokenHash, IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()
                             ? &tokenHashForThisDeclList
                             : CurrentTokenHash);
 
@@ -4520,7 +4569,7 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
 bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
                                        bool &HasNestedClassDeclarations) {
   // If explicitly disabled, respect the flag.
-  if (!DelayBodyParsing)
+  if (!isDelayedParsingEnabled())
     return false;
   // Recovering parser status later for #sourceLocation is not-trivial and
   // it may not worth it.
@@ -4580,21 +4629,24 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // Parse the optional where-clause.
   TrailingWhereClause *trailingWhereClause = nullptr;
+  bool trailingWhereHadCodeCompletion = false;
   if (Tok.is(tok::kw_where)) {
     SourceLoc whereLoc;
     SmallVector<RequirementRepr, 4> requirements;
     bool firstTypeInComplete;
     auto whereStatus = parseGenericWhereClause(whereLoc, requirements,
                                                firstTypeInComplete);
+    if (whereStatus.hasCodeCompletion()) {
+      if (isCodeCompletionFirstPass())
+        return whereStatus;
+      trailingWhereHadCodeCompletion = true;
+    }
+
     if (whereStatus.isSuccess()) {
       trailingWhereClause = TrailingWhereClause::create(Context, whereLoc,
                                                         requirements);
-    } else if (whereStatus.hasCodeCompletion()) {
-      if (CodeCompletion && firstTypeInComplete) {
-        CodeCompletion->completeGenericParams(extendedType.getPtrOrNull());
-      } else
-        return makeParserCodeCompletionResult<ExtensionDecl>();
     }
+    status |= whereStatus;
   }
 
   ExtensionDecl *ext = ExtensionDecl::create(Context, ExtensionLoc,
@@ -4603,6 +4655,8 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                              CurDeclContext,
                                              trailingWhereClause);
   ext->getAttrs() = Attributes;
+  if (trailingWhereHadCodeCompletion && CodeCompletion)
+    CodeCompletion->setParsedDecl(ext);
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
@@ -6359,8 +6413,8 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   ParseFunctionBody CC(*this, AFD);
   setLocalDiscriminatorToParamList(AFD->getParameters());
 
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+  if (auto *Stats = Context.Stats)
+    Stats->getFrontendCounters().NumFunctionsParsed++;
 
   // In implicit getter, if a CC token is the first token after '{', it might
   // be a start of an accessor block. Perform special completion for that.
@@ -6395,7 +6449,10 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
 
   llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(CurrentTokenHash, nullptr);
 
-  if (isDelayedParsingEnabled()) {
+  // If we can delay parsing this body, or this is the first pass of code
+  // completion, skip until the end. If we encounter a code completion token
+  // while skipping, we'll make a note of it.
+  if (isDelayedParsingEnabled() || isCodeCompletionFirstPass()) {
     consumeAbstractFunctionBody(AFD, AFD->getAttrs());
     return;
   }
@@ -7030,12 +7087,16 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   TrailingWhereClause *TrailingWhere = nullptr;
+  bool whereClauseHadCodeCompletion = false;
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseProtocolOrAssociatedTypeWhereClause(
         TrailingWhere, /*isProtocol=*/true);
-    if (whereStatus.shouldStopParsing())
-      return whereStatus;
+    if (whereStatus.hasCodeCompletion()) {
+      if (isCodeCompletionFirstPass())
+        return whereStatus;
+      whereClauseHadCodeCompletion = true;
+    }
   }
 
   ProtocolDecl *Proto = new (Context)
@@ -7044,6 +7105,8 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // No need to setLocalDiscriminator: protocols can't appear in local contexts.
 
   Proto->getAttrs() = Attributes;
+  if (whereClauseHadCodeCompletion && CodeCompletion)
+    CodeCompletion->setParsedDecl(Proto);
 
   ContextChange CC(*this, Proto);
   Scope ProtocolBodyScope(this, ScopeKind::ProtocolBody);
@@ -7436,24 +7499,58 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc OperatorLoc = consumeToken(tok::kw_operator);
   bool AllowTopLevel = Flags.contains(PD_AllowTopLevel);
 
-  if (!Tok.isAnyOperator() && !Tok.is(tok::exclaim_postfix)) {
-    // A common error is to try to define an operator with something in the
-    // unicode plane considered to be an operator, or to try to define an
-    // operator like "not".  Diagnose this specifically.
-    if (Tok.is(tok::identifier))
-      diagnose(Tok, diag::identifier_when_expecting_operator,
-               Context.getIdentifier(Tok.getText()));
-    else
-      diagnose(Tok, diag::expected_operator_name_after_operator);
+  const auto maybeDiagnoseInvalidCharInOperatorName = [this](const Token &Tk) {
+    if (Tk.is(tok::identifier) &&
+        DeclAttribute::getAttrKindFromString(Tk.getText()) ==
+          DeclAttrKind::DAK_Count) {
+      diagnose(Tk, diag::identifier_within_operator_name, Tk.getText());
+      return true;
+    } else if (Tk.isNot(tok::colon, tok::l_brace, tok::semi) &&
+               Tk.isPunctuation()) {
+      diagnose(Tk, diag::operator_name_invalid_char,
+               Tk.getText().take_front());
+      return true;
+    }
+    return false;
+  };
 
-    // To improve recovery, check to see if we have a { right after this token.
-    // If so, swallow until the end } to avoid tripping over the body of the
-    // malformed operator decl.
+  // Postfix operators starting with ? or ! conflict with builtin
+  // unwrapping operators.
+  if (Attributes.hasAttribute<PostfixAttr>())
+    if (!Tok.getText().empty() && (Tok.getRawText().front() == '?' ||
+                                   Tok.getRawText().front() == '!'))
+      diagnose(Tok, diag::postfix_operator_name_cannot_start_with_unwrap);
+
+  // A common error is to try to define an operator with something in the
+  // unicode plane considered to be an operator, or to try to define an
+  // operator like "not".  Analyze and diagnose this specifically.
+  if (Tok.isAnyOperator() || Tok.isAny(tok::exclaim_postfix,
+                                       tok::question_infix,
+                                       tok::question_postfix,
+                                       tok::equal, tok::arrow)) {
+    if (peekToken().getLoc() == Tok.getRange().getEnd() &&
+      maybeDiagnoseInvalidCharInOperatorName(peekToken())) {
+      consumeToken();
+
+      // If there's a deprecated body, skip it to improve recovery.
+      if (peekToken().is(tok::l_brace)) {
+        consumeToken();
+        skipSingle();
+      }
+      return nullptr;
+    }
+  } else {
+    if (maybeDiagnoseInvalidCharInOperatorName(Tok)) {
+      // We're done diagnosing.
+    } else {
+      diagnose(Tok, diag::expected_operator_name_after_operator);
+    }
+
+    // If there's a deprecated body, skip it to improve recovery.
     if (peekToken().is(tok::l_brace)) {
       consumeToken();
       skipSingle();
     }
-
     return nullptr;
   }
 
@@ -7461,11 +7558,6 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   Identifier Name = Context.getIdentifier(Tok.getText());
   SourceLoc NameLoc = consumeToken();
-
-  if (Attributes.hasAttribute<PostfixAttr>()) {
-    if (!Name.empty() && (Name.get()[0] == '?' || Name.get()[0] == '!'))
-      diagnose(NameLoc, diag::expected_operator_name_after_operator);      
-  }
 
   auto Result = parseDeclOperatorImpl(OperatorLoc, Name, NameLoc, Attributes);
 

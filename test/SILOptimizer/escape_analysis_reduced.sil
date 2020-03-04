@@ -499,17 +499,18 @@ bb2:
 }
 
 // CHECK-LABEL: CG of testPendingMerge
-// CHECK-NEXT:   Arg %0 Esc: A, Succ: (%22)
-// CHECK-NEXT:   Arg [ref] %1 Esc: G, Succ: (%9.1)
+// CHECK-NEXT:   Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:   Con %0.1 Esc: A, Succ: %1, %4.1
+// CHECK-NEXT:   Arg [ref] %1 Esc: A, Succ: (%9.1)
 // CHECK-NEXT:   Val %2 Esc: , Succ: (%9)
 // CHECK-NEXT:   Val %4 Esc: , Succ: (%4.1)
-// CHECK-NEXT:   Con %4.1 Esc: A, Succ: (%9.1), %7, %9
-// CHECK-NEXT:   Val %5 Esc: , Succ: (%7)
-// CHECK-NEXT:   Con %7 Esc: A, Succ: (%9.1)
+// CHECK-NEXT:   Con %4.1 Esc: A, Succ: (%9.1), %5.1, %9
+// CHECK-NEXT:   Val %5 Esc: , Succ: (%5.1)
+// CHECK-NEXT:   Con %5.1 Esc: A, Succ: %1
 // CHECK-NEXT:   Con [ref] %9 Esc: A, Succ: (%9.1)
-// CHECK-NEXT:   Con [int] %9.1 Esc: G, Succ: (%9.1), %1
-// CHECK-NEXT:   Con %22 Esc: A, Succ: (%22.1)
-// CHECK-NEXT:   Con %22.1 Esc: A, Succ: %1, %4.1
+// CHECK-NEXT:   Con [int] %9.1 Esc: G, Succ: (%9.2)
+// CHECK-NEXT:   Con %9.2 Esc: G, Succ: (%9.3)
+// CHECK-NEXT:   Con %9.3 Esc: G, Succ:
 // CHECK-LABEL: End
 sil private @testPendingMerge : $@convention(thin) (@owned VariableNode) -> (@out ASTNode, @error Error) {
 bb0(%0 : $*ASTNode, %1 : $VariableNode):

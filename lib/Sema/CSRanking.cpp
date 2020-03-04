@@ -94,9 +94,6 @@ bool ConstraintSystem::worseThanBestSolution() const {
   if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
 
-  if (retainAllSolutions())
-    return false;
-
   if (!solverState || !solverState->BestScore ||
       CurrentScore <= *solverState->BestScore)
     return false;
@@ -798,6 +795,21 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // If the systems made the same choice, there's nothing interesting here.
     if (sameOverloadChoice(choice1, choice2))
       continue;
+
+    // If constraint system is underconstrained e.g. because there are
+    // editor placeholders, it's possible to end up with multiple solutions
+    // where each ambiguous declaration is going to have its own overload kind:
+    //
+    // func foo(_: Int) -> [Int] { ... }
+    // func foo(_: Double) -> (result: String, count: Int) { ... }
+    //
+    // _ = foo(<#arg#>).count
+    //
+    // In this case solver would produce 2 solutions: one where `count`
+    // is a property reference on `[Int]` and another one is tuple access
+    // for a `count:` element.
+    if (choice1.isDecl() != choice2.isDecl())
+      return SolutionCompareResult::Incomparable;
 
     auto decl1 = choice1.getDecl();
     auto dc1 = decl1->getDeclContext();

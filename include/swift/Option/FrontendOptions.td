@@ -131,8 +131,12 @@ def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
   HelpText<"Do not automatically import declared cross-import overlays.">;
 
-def enable_descriptive_diagnostics : Flag<["-"], "enable-descriptive-diagnostics">,
-  HelpText<"Show descriptive diagnostic information, if available.">;
+def enable_educational_notes : Flag<["-"], "enable-educational-notes">,
+  HelpText<"Show educational notes, if available.">;
+  
+def enable_experimental_diagnostic_formatting :
+  Flag<["-"], "enable-experimental-diagnostic-formatting">,
+  HelpText<"Enable experimental diagnostic formatting features.">;
   
 def diagnostic_documentation_path
   : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
@@ -674,4 +678,13 @@ def emit_ldadd_cfile_path
 def previous_module_installname_map_file
   : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,
     HelpText<"Path to a Json file indicating module name to installname map for @_originallyDefinedIn">;
+
+def enable_type_layouts : Flag<["-"], "enable-type-layout">,
+  HelpText<"Enable type layout based lowering">;
+
+def disable_type_layouts : Flag<["-"], "disable-type-layout">,
+  HelpText<"Disable type layout based lowering">;
+
+def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
+  HelpText<"Don't lock interface file when building module">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

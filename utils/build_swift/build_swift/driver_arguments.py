@@ -223,7 +223,11 @@ def _apply_default_arguments(args):
         args.test_watchos_simulator = False
 
     if not args.build_android:
-        args.test_android = False
+        # If building natively on an Android host, allow running the test suite
+        # without the NDK config.
+        if not StdlibDeploymentTarget.Android.contains(StdlibDeploymentTarget
+                                                       .host_target().name):
+            args.test_android = False
         args.test_android_host = False
 
     if not args.test_android:
@@ -825,6 +829,8 @@ def create_argument_parser():
     option('--only-executable-test', toggle_true,
            help='Only run executable tests. Does nothing if host-test is not '
                 'allowed')
+    option('--only-non-executable-test', toggle_true,
+           help='Only run non-executable tests.')
 
     option('--test-paths', append,
            type=argparse.ShellSplitType(),

@@ -1843,6 +1843,46 @@ Expr *AutoClosureExpr::getSingleExpressionBody() const {
   return cast<ReturnStmt>(Body->getFirstElement().get<Stmt *>())->getResult();
 }
 
+Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
+  switch (getThunkKind()) {
+  case AutoClosureExpr::Kind::None:
+    break;
+
+  case AutoClosureExpr::Kind::SingleCurryThunk: {
+    auto *body = getSingleExpressionBody();
+    body = body->getSemanticsProvidingExpr();
+    if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
+      return outerCall->getFn();
+    }
+
+    assert(false && "Malformed curry thunk?");
+    break;
+  }
+
+  case AutoClosureExpr::Kind::DoubleCurryThunk: {
+    auto *body = getSingleExpressionBody();
+    if (auto *innerClosure = dyn_cast<AutoClosureExpr>(body)) {
+      assert(innerClosure->getThunkKind() ==
+               AutoClosureExpr::Kind::SingleCurryThunk);
+      auto *innerBody = innerClosure->getSingleExpressionBody();
+      innerBody = innerBody->getSemanticsProvidingExpr();
+      if (auto *outerCall = dyn_cast<ApplyExpr>(innerBody)) {
+        if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {
+          if (auto *declRef = dyn_cast<DeclRefExpr>(innerCall->getFn())) {
+            return declRef;
+          }
+        }
+      }
+    }
+
+    assert(false && "Malformed curry thunk?");
+    break;
+  }
+  }
+
+  return nullptr;
+}
+
 FORWARD_SOURCE_LOCS_TO(UnresolvedPatternExpr, subPattern)
 
 TypeExpr::TypeExpr(TypeLoc TyLoc)

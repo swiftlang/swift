@@ -41,7 +41,7 @@ const unsigned char SWIFTSOURCEINFO_SIGNATURE[] = { 0xF0, 0x9F, 0x8F, 0x8E };
 ///
 /// See docs/StableBitcode.md for information on how to make
 /// backwards-compatible changes using the LLVM bitcode format.
-const uint16_t SWIFTSOURCEINFO_VERSION_MAJOR = 1;
+const uint16_t SWIFTSOURCEINFO_VERSION_MAJOR = 2;
 
 /// Serialized swiftsourceinfo format minor version number.
 ///
@@ -49,7 +49,7 @@ const uint16_t SWIFTSOURCEINFO_VERSION_MAJOR = 1;
 /// interesting to test for. A backwards-compatible change is one where an \e
 /// old compiler can read the new format without any problems (usually by
 /// ignoring new information).
-const uint16_t SWIFTSOURCEINFO_VERSION_MINOR = 1; // Last change: skipping 0 for testing purposes
+const uint16_t SWIFTSOURCEINFO_VERSION_MINOR = 0; // Last change: add doc comment ranges
 
 /// The hash seed used for the string hashes(llvm::djbHash) in a .swiftsourceinfo file.
 const uint32_t SWIFTSOURCEINFO_HASH_SEED = 5387;
@@ -71,6 +71,7 @@ namespace decl_locs_block {
     BASIC_DECL_LOCS = 1,
     DECL_USRS,
     TEXT_DATA,
+    DOC_RANGES,
   };
 
   using BasicDeclLocsLayout = BCRecordLayout<
@@ -87,6 +88,11 @@ namespace decl_locs_block {
   using TextDataLayout = BCRecordLayout<
     TEXT_DATA,        // record ID
     BCBlob            // a list of 0-terminated string segments
+  >;
+
+  using DocRangesLayout = BCRecordLayout<
+    DOC_RANGES,         // record ID
+    BCBlob
   >;
 
 } // namespace sourceinfo_block

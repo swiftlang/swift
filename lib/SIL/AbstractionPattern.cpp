@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/SIL/TypeLowering.h"
@@ -233,14 +234,28 @@ bool AbstractionPattern::requiresClass() const {
 }
 
 LayoutConstraint AbstractionPattern::getLayoutConstraint() const {
+  // TODO: `ArchetypeType::getLayoutConstraint` and
+  // `GenericSignature::getLayoutConstraint` don't always propagate implied
+  // layout constraints from protocol/class constraints. `requiresClass`
+  // is, for the time being, the only one we really care about, though, and
+  // it behaves correctly.
+  if (requiresClass()) {
+    return LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Class);
+  }
+  return LayoutConstraint();
+
+#if GET_LAYOUT_CONSTRAINT_WORKED_THE_WAY_I_WANT
   switch (getKind()) {
   case Kind::Opaque:
     return LayoutConstraint();
   case Kind::Type:
   case Kind::Discard: {
     auto type = getType();
-    if (auto archetype = dyn_cast<ArchetypeType>(type))
-      return archetype->getLayoutConstraint();
+    if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+      auto archetypeSig = archetype->getGenericEnvironment()
+                                   ->getGenericSignature();
+      return archetypeSig->getLayoutConstraint(archetype->getInterfaceType());
+    }
     else if (isa<DependentMemberType>(type) ||
              isa<GenericTypeParamType>(type)) {
       assert(GenericSig &&
@@ -252,6 +267,7 @@ LayoutConstraint AbstractionPattern::getLayoutConstraint() const {
   default:
     return LayoutConstraint();
   }
+#endif
 }
 
 bool AbstractionPattern::matchesTuple(CanTupleType substType) {
@@ -274,11 +290,16 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
     return getNumTupleElements_Stored() == substType->getNumElements();
   case Kind::ClangType:
   case Kind::Type:
-  case Kind::Discard:
+  case Kind::Discard: {
     if (isTypeParameter())
       return true;
-    auto tuple = dyn_cast<TupleType>(getType());
-    return (tuple && tuple->getNumElements() == substType->getNumElements());
+    auto type = getType();
+    if (auto tuple = dyn_cast<TupleType>(type))
+      return (tuple->getNumElements() == substType->getNumElements());
+    if (isa<OpaqueTypeArchetypeType>(type))
+      return true;
+    return false;
+  }
   }
   llvm_unreachable("bad kind");
 }

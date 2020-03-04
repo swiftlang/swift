@@ -37,6 +37,9 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.windows.txt
 // RUN: %FileCheck -check-prefix WINDOWS-x86_64 %s < %t.windows.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -target amd64-unknown-openbsd -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.openbsd.txt
+// RUN: %FileCheck -check-prefix OPENBSD-amd64 %s < %t.openbsd.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-unknown-linux-gnu %s -Lbar -o dynlib.out 2>&1 > %t.linux.dynlib.txt
 // RUN: %FileCheck -check-prefix LINUX_DYNLIB-x86_64 %s < %t.linux.dynlib.txt
 
@@ -263,6 +266,22 @@
 // WINDOWS-x86_64-DAG: -lboo
 // WINDOWS-x86_64-DAG: -Xlinker -undefined
 // WINDOWS-x86_64: -o linker
+
+// OPENBSD-amd64: swift
+// OPENBSD-amd64: -o [[OBJECTFILE:.*]]
+
+// OPENBSD-amd64: clang
+// OPENBSD-amd64-DAG: -fuse-ld=lld
+// OPENBSD-amd64-DAG: [[OBJECTFILE]]
+// OPENBSD-amd64-DAG: -lswiftCore
+// OPENBSD-amd64-DAG: -L [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)]]
+// OPENBSD-amd64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
+// OPENBSD-amd64-DAG: -F foo -iframework car -F cdr
+// OPENBSD-amd64-DAG: -framework bar
+// OPENBSD-amd64-DAG: -L baz
+// OPENBSD-amd64-DAG: -lboo
+// OPENBSD-amd64-DAG: -Xlinker -undefined
+// OPENBSD-amd64: -o linker
 
 
 // COMPLEX: {{(bin/)?}}ld{{"? }}

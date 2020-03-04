@@ -91,13 +91,13 @@ ConstraintSystem::~ConstraintSystem() {
 void ConstraintSystem::incrementScopeCounter() {
   CountScopes++;
   // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumConstraintScopes++;
+  if (auto *Stats = getASTContext().Stats)
+    Stats->getFrontendCounters().NumConstraintScopes++;
 }
 
 void ConstraintSystem::incrementLeafScopes() {
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumLeafScopes++;
+  if (auto *Stats = getASTContext().Stats)
+    Stats->getFrontendCounters().NumLeafScopes++;
 }
 
 bool ConstraintSystem::hasFreeTypeVariables() {
@@ -1454,28 +1454,8 @@ ConstraintSystem::getTypeOfMemberReference(
 
   openedType = openedType->removeArgumentLabels(numRemovedArgumentLabels);
 
-  if (!outerDC->getSelfProtocolDecl()) {
-    // Class methods returning Self as well as constructors get the
-    // result replaced with the base object type.
-    if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-      if (func->hasDynamicSelfResult() &&
-          !baseObjTy->getOptionalObjectType()) {
-        openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
-      }
-    } else if (auto *decl = dyn_cast<SubscriptDecl>(value)) {
-      if (decl->getElementInterfaceType()->hasDynamicSelfType()) {
-        openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
-      }
-    } else if (auto *decl = dyn_cast<VarDecl>(value)) {
-      if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
-        openedType = openedType->replaceCovariantResultType(baseObjTy, 1);
-      }
-    }
-  }
-
   // If we are looking at a member of an existential, open the existential.
   Type baseOpenedTy = baseObjTy;
-
   if (baseObjTy->isExistentialType()) {
     auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
     OpenedExistentialTypes.push_back({ getConstraintLocator(locator),
@@ -1484,8 +1464,7 @@ ConstraintSystem::getTypeOfMemberReference(
   }
 
   // Constrain the 'self' object type.
-  auto openedFnType = openedType->castTo<FunctionType>();
-  auto openedParams = openedFnType->getParams();
+  auto openedParams = openedType->castTo<FunctionType>()->getParams();
   assert(openedParams.size() == 1);
 
   Type selfObjTy = openedParams.front().getPlainType()->getMetatypeInstanceType();
@@ -1513,16 +1492,35 @@ ConstraintSystem::getTypeOfMemberReference(
   }
 
   // Compute the type of the reference.
-  Type type;
+  Type type = openedType;
+
+  if (!outerDC->getSelfProtocolDecl()) {
+    // Class methods returning Self as well as constructors get the
+    // result replaced with the base object type.
+    if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+      if (func->hasDynamicSelfResult() &&
+          !baseObjTy->getOptionalObjectType()) {
+        type = type->replaceCovariantResultType(baseObjTy, 2);
+      }
+    } else if (auto *decl = dyn_cast<SubscriptDecl>(value)) {
+      if (decl->getElementInterfaceType()->hasDynamicSelfType()) {
+        type = type->replaceCovariantResultType(baseObjTy, 2);
+      }
+    } else if (auto *decl = dyn_cast<VarDecl>(value)) {
+      if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
+        type = type->replaceCovariantResultType(baseObjTy, 1);
+      }
+    }
+  }
+
   if (hasAppliedSelf) {
     // For a static member referenced through a metatype or an instance
     // member referenced through an instance, strip off the 'self'.
-    type = openedFnType->getResult();
+    type = type->castTo<FunctionType>()->getResult();
   } else {
     // For an unbound instance method reference, replace the 'Self'
     // parameter with the base type.
-    openedType = openedFnType->replaceSelfParameterType(baseObjTy);
-    type = openedType;
+    type = type->replaceSelfParameterType(baseObjTy);
   }
 
   // When accessing protocol members with an existential base, replace
@@ -1814,71 +1812,71 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
   llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");
 }
 
-/// \returns true if given declaration is an instance method marked as
-/// `mutating`, false otherwise.
-bool isMutatingMethod(const ValueDecl *decl) {
-  if (!(decl->isInstanceMember() && isa<FuncDecl>(decl)))
-    return false;
-  return cast<FuncDecl>(decl)->isMutating();
-}
-
-static bool shouldCheckForPartialApplication(ConstraintSystem &cs,
-                                             const ValueDecl *decl,
-                                             ConstraintLocator *locator) {
-  auto *anchor = locator->getAnchor();
-  if (!(anchor && isa<UnresolvedDotExpr>(anchor)))
-    return false;
-
-  // If this is a reference to instance method marked as 'mutating'
-  // it should be checked for invalid partial application.
-  if (isMutatingMethod(decl))
-    return true;
-
-  // Another unsupported partial application is related
-  // to constructor delegation via `self.init` or `super.init`.
-
-  if (!isa<ConstructorDecl>(decl))
-    return false;
-
-  auto *UDE = cast<UnresolvedDotExpr>(anchor);
-  // This is `super.init`
-  if (UDE->getBase()->isSuperExpr())
-    return true;
-
-  // Or this might be `self.init`.
-  if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
-    if (auto *baseDecl = DRE->getDecl())
-      return baseDecl->getBaseName() == cs.getASTContext().Id_self;
-  }
-
-  return false;
-}
-
 /// Try to identify and fix failures related to partial function application
 /// e.g. partial application of `init` or 'mutating' instance methods.
 static std::pair<bool, unsigned>
-isInvalidPartialApplication(ConstraintSystem &cs, const ValueDecl *member,
+isInvalidPartialApplication(ConstraintSystem &cs,
+                            const AbstractFunctionDecl *member,
                             ConstraintLocator *locator) {
-  if (!shouldCheckForPartialApplication(cs, member, locator))
-    return {false, 0};
+  auto *UDE = dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor());
+  if (UDE == nullptr)
+    return {false,0};
 
-  auto anchor = cast<UnresolvedDotExpr>(locator->getAnchor());
-  // If this choice is a partial application of `init` or
-  // `mutating` instance method we should report that it's not allowed.
   auto baseTy =
-      cs.simplifyType(cs.getType(anchor->getBase()))->getWithoutSpecifierType();
+      cs.simplifyType(cs.getType(UDE->getBase()))->getWithoutSpecifierType();
 
-  // Partial applications are not allowed only for constructor
-  // delegation, reference on the metatype is considered acceptable.
-  if (baseTy->is<MetatypeType>() && isa<ConstructorDecl>(member))
-    return {false, 0};
+  auto isInvalidIfPartiallyApplied = [&]() {
+    if (auto *FD = dyn_cast<FuncDecl>(member)) {
+      // 'mutating' instance methods cannot be partially applied.
+      if (FD->isMutating())
+        return true;
+
+      // Instance methods cannot be referenced on 'super' from a static
+      // context.
+      if (UDE->getBase()->isSuperExpr() &&
+          baseTy->is<MetatypeType>() &&
+          !FD->isStatic())
+        return true;
+    }
+
+    // Another unsupported partial application is related
+    // to constructor delegation via 'self.init' or 'super.init'.
+    //
+    // Note that you can also write 'self.init' or 'super.init'
+    // inside a static context -- since 'self' is a metatype there
+    // it doesn't have the special delegation meaning that it does
+    // in the body of a constructor.
+    if (isa<ConstructorDecl>(member) && !baseTy->is<MetatypeType>()) {
+      // Check for a `super.init` delegation...
+      if (UDE->getBase()->isSuperExpr())
+        return true;
+
+      // ... and `self.init` delegation. Note that in a static context,
+      // `self.init` is just an ordinary partial application; it's OK
+      // because there's no associated instance for delegation.
+      if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
+        if (auto *baseDecl = DRE->getDecl()) {
+          if (baseDecl->getBaseName() == cs.getASTContext().Id_self)
+            return true;
+        }
+      }
+    }
+
+    return false;
+  };
+
+  if (!isInvalidIfPartiallyApplied())
+    return {false,0};
 
   // If base is a metatype it would be ignored (unless this is an initializer
   // call), but if it is some other type it means that we have a single
   // application level already.
-  unsigned level = baseTy->is<MetatypeType>() ? 0 : 1;
-  if (auto *call = dyn_cast_or_null<CallExpr>(cs.getParentExpr(anchor))) {
-    level += dyn_cast_or_null<CallExpr>(cs.getParentExpr(call)) ? 2 : 1;
+  unsigned level = 0;
+  if (!baseTy->is<MetatypeType>())
+    level++;
+
+  if (auto *call = dyn_cast_or_null<CallExpr>(cs.getParentExpr(UDE))) {
+    level += 1;
   }
 
   return {true, level};
@@ -2359,39 +2357,41 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       }
     }
 
-    // Check whether applying this overload would result in invalid
-    // partial function application e.g. partial application of
-    // mutating method or initializer.
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+      // Check whether applying this overload would result in invalid
+      // partial function application e.g. partial application of
+      // mutating method or initializer.
 
-    // This check is supposed to be performed without
-    // `shouldAttemptFixes` because name lookup can't
-    // detect that particular partial application is
-    // invalid, so it has to return all of the candidates.
+      // This check is supposed to be performed without
+      // `shouldAttemptFixes` because name lookup can't
+      // detect that particular partial application is
+      // invalid, so it has to return all of the candidates.
 
-    bool isInvalidPartialApply;
-    unsigned level;
+      bool isInvalidPartialApply;
+      unsigned level;
 
-    std::tie(isInvalidPartialApply, level) =
-        isInvalidPartialApplication(*this, decl, locator);
+      std::tie(isInvalidPartialApply, level) =
+          isInvalidPartialApplication(*this, afd, locator);
 
-    if (isInvalidPartialApply) {
-      // No application at all e.g. `Foo.bar`.
-      if (level == 0) {
-        // Swift 4 and earlier failed to diagnose a reference to a mutating
-        // method without any applications at all, which would get
-        // miscompiled into a function with undefined behavior. Warn for
-        // source compatibility.
-        bool isWarning = !getASTContext().isSwiftVersionAtLeast(5);
-        (void)recordFix(
-            AllowInvalidPartialApplication::create(isWarning, *this, locator));
-      } else if (level == 1) {
-        // `Self` parameter is applied, e.g. `foo.bar` or `Foo.bar(&foo)`
-        (void)recordFix(AllowInvalidPartialApplication::create(
-            /*isWarning=*/false, *this, locator));
+      if (isInvalidPartialApply) {
+        // No application at all e.g. `Foo.bar`.
+        if (level == 0) {
+          // Swift 4 and earlier failed to diagnose a reference to a mutating
+          // method without any applications at all, which would get
+          // miscompiled into a function with undefined behavior. Warn for
+          // source compatibility.
+          bool isWarning = !getASTContext().isSwiftVersionAtLeast(5);
+          (void)recordFix(
+              AllowInvalidPartialApplication::create(isWarning, *this, locator));
+        } else if (level == 1) {
+          // `Self` parameter is applied, e.g. `foo.bar` or `Foo.bar(&foo)`
+          (void)recordFix(AllowInvalidPartialApplication::create(
+              /*isWarning=*/false, *this, locator));
+        }
+
+        // Otherwise both `Self` and arguments are applied,
+        // e.g. `foo.bar()` or `Foo.bar(&foo)()`, and there is nothing to do.
       }
-
-      // Otherwise both `Self` and arguments are applied,
-      // e.g. `foo.bar()` or `Foo.bar(&foo)()`, and there is nothing to do.
     }
   }
 
@@ -2778,45 +2778,61 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
 
   auto &DE = cs.getASTContext().Diags;
 
-  llvm::SmallDenseMap<TypeVariableType *, SmallVector<Type, 4>> conflicts;
+  llvm::SmallDenseMap<TypeVariableType *,
+                      std::pair<GenericTypeParamType *, SourceLoc>, 4>
+      genericParams;
+  // Consider only representative type variables shared across
+  // all of the solutions.
+  for (auto *typeVar : cs.getTypeVariables()) {
+    if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+      auto *locator = typeVar->getImpl().getLocator();
+      auto *repr = cs.getRepresentative(typeVar);
+      // If representative is another generic parameter let's
+      // use its generic parameter type instead of originator's,
+      // but it's possible that generic parameter is equated to
+      // some other type e.g.
+      //
+      // func foo<T>(_: T) -> T {}
+      //
+      // In this case when reference to function `foo` is "opened"
+      // type variable representing `T` would be equated to
+      // type variable representing a result type of the reference.
+      if (auto *reprGP = repr->getImpl().getGenericParameter())
+        GP = reprGP;
 
-  for (const auto &binding : solutions[0].typeBindings) {
-    auto *typeVar = binding.first;
+      genericParams[repr] = {GP, locator->getAnchor()->getLoc()};
+    }
+  }
 
-    if (!typeVar->getImpl().getGenericParameter())
-      continue;
+  llvm::SmallDenseMap<std::pair<GenericTypeParamType *, SourceLoc>,
+                      SmallVector<Type, 4>>
+      conflicts;
+
+  for (const auto &entry : genericParams) {
+    auto *typeVar = entry.first;
+    auto GP = entry.second;
 
     llvm::SmallSetVector<Type, 4> arguments;
-    arguments.insert(binding.second);
-
-    if (!llvm::all_of(solutions.slice(1), [&](const Solution &solution) {
-          auto binding = solution.typeBindings.find(typeVar);
-          if (binding == solution.typeBindings.end())
-            return false;
-
-          // Contextual opaque result type is uniquely identified by
-          // declaration it's associated with, so we have to compare
-          // declarations instead of using pointer equality on such types.
-          if (auto *opaque =
-                  binding->second->getAs<OpaqueTypeArchetypeType>()) {
-            auto *decl = opaque->getDecl();
-            arguments.remove_if([&](Type argType) -> bool {
-              if (auto *otherOpaque =
-                      argType->getAs<OpaqueTypeArchetypeType>()) {
-                return decl == otherOpaque->getDecl();
-              }
-              return false;
-            });
+    for (const auto &solution : solutions) {
+      auto type = solution.typeBindings.lookup(typeVar);
+      // Contextual opaque result type is uniquely identified by
+      // declaration it's associated with, so we have to compare
+      // declarations instead of using pointer equality on such types.
+      if (auto *opaque = type->getAs<OpaqueTypeArchetypeType>()) {
+        auto *decl = opaque->getDecl();
+        arguments.remove_if([&](Type argType) -> bool {
+          if (auto *otherOpaque = argType->getAs<OpaqueTypeArchetypeType>()) {
+            return decl == otherOpaque->getDecl();
           }
+          return false;
+        });
+      }
 
-          arguments.insert(binding->second);
-          return true;
-        }))
-      continue;
-
-    if (arguments.size() > 1) {
-      conflicts[typeVar].append(arguments.begin(), arguments.end());
+      arguments.insert(type);
     }
+
+    if (arguments.size() > 1)
+      conflicts[GP].append(arguments.begin(), arguments.end());
   }
 
   auto getGenericTypeDecl = [&](ArchetypeType *archetype) -> ValueDecl * {
@@ -2833,8 +2849,10 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
 
   bool diagnosed = false;
   for (auto &conflict : conflicts) {
-    auto *typeVar = conflict.first;
-    auto *locator = typeVar->getImpl().getLocator();
+    SourceLoc loc;
+    GenericTypeParamType *GP;
+
+    std::tie(GP, loc) = conflict.first;
     auto conflictingArguments = conflict.second;
 
     llvm::SmallString<64> arguments;
@@ -2859,10 +2877,8 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
         },
         [&OS] { OS << " vs. "; });
 
-    auto *anchor = locator->getAnchor();
-    DE.diagnose(anchor->getLoc(),
-                diag::conflicting_arguments_for_generic_parameter,
-                typeVar->getImpl().getGenericParameter(), OS.str());
+    DE.diagnose(loc, diag::conflicting_arguments_for_generic_parameter, GP,
+                OS.str());
     diagnosed = true;
   }
 
@@ -4062,6 +4078,36 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
   return result;
 }
 
+Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
+                                            Type contextualType,
+                                            ContextualTypePurpose purpose) {
+  if (!(purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr))
+    return expr;
+
+  auto *decl = dyn_cast_or_null<ValueDecl>(dc->getAsDecl());
+  if (!decl ||
+      !(decl->isDynamic() || decl->getDynamicallyReplacedDecl()))
+    return expr;
+
+  auto *opaque = contextualType->getAs<OpaqueTypeArchetypeType>();
+  if (!opaque)
+    return expr;
+
+  auto protocols = opaque->getConformsTo();
+  if (protocols.size() != 1)
+    return expr;
+
+  auto *attr = protocols.front()->getAttrs().getAttribute<TypeEraserAttr>();
+  if (!attr)
+    return expr;
+
+  auto typeEraser = attr->getTypeEraserLoc().getType();
+  auto &ctx = dc->getASTContext();
+  return CallExpr::createImplicit(ctx,
+                                  TypeExpr::createImplicit(typeEraser, ctx),
+                                  {expr}, {ctx.Id_erasing});
+}
+
 /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
 /// constraint system, return the decl that it references.
 ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
@@ -4106,6 +4152,7 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.pattern = nullptr;
   expression.wrappedVar = nullptr;
   expression.isDiscarded = isDiscarded;
+  expression.bindPatternVarsOneWay = false;
 }
 
 void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
@@ -4160,7 +4207,8 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
 }
 
 SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
-    Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern) {
+    Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
+    bool bindPatternVarsOneWay) {
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
   if (!isa<OptionalSomePattern>(pattern) &&
@@ -4182,6 +4230,7 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
       initializer, dc, CTP_Initialization, contextualType,
       /*isDiscarded=*/false);
   target.expression.pattern = pattern;
+  target.expression.bindPatternVarsOneWay = bindPatternVarsOneWay;
   target.maybeApplyPropertyWrapper();
   return target;
 }

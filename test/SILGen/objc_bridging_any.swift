@@ -664,7 +664,7 @@ class AnyHashableClass : NSObject {
 // CHECK: [[BRIDGE:%.*]] = function_ref @$sSq19_bridgeToObjectiveCyXlyF
 // CHECK: [[FN:%.*]] = function_ref @$sIeg_ytIegr_TR
 // CHECK: partial_apply [callee_guaranteed] [[FN]]
-// CHECK: [[SELF:%.*]] = alloc_stack $Optional<@callee_guaranteed () -> @out ()>
+// CHECK: [[SELF:%.*]] = alloc_stack $Optional<@callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <()>>
 // CHECK: apply [[BRIDGE]]<() -> ()>([[SELF]])
 func bridgeOptionalFunctionToAnyObject(fn: (() -> ())?) -> AnyObject {
   return fn as AnyObject

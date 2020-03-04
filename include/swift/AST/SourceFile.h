@@ -18,6 +18,8 @@
 
 namespace swift {
 
+class PersistentParserState;
+
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
@@ -56,6 +58,10 @@ public:
     /// Mutually exclusive with Exported.
     ImplementationOnly = 0x8,
 
+    // The module is imported to have access to named SPIs which is an
+    // implementation detail of this file.
+    SPIAccessControl = 0x10,
+
     /// Used for DenseMap.
     Reserved = 0x80
   };
@@ -66,16 +72,53 @@ public:
   struct ImportedModuleDesc {
     ModuleDecl::ImportedModule module;
     ImportOptions importOptions;
+
+    // Filename for a @_private import.
     StringRef filename;
 
+    // Names of explicitly imported SPIs.
+    ArrayRef<Identifier> spiGroups;
+
     ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options,
-                       StringRef filename = {})
-        : module(module), importOptions(options), filename(filename) {
+                       StringRef filename = {},
+                       ArrayRef<Identifier> spiGroups = {})
+        : module(module), importOptions(options), filename(filename),
+          spiGroups(spiGroups) {
       assert(!(importOptions.contains(ImportFlags::Exported) &&
                importOptions.contains(ImportFlags::ImplementationOnly)) ||
              importOptions.contains(ImportFlags::Reserved));
     }
   };
+
+  /// Flags that direct how the source file is parsed.
+  enum class ParsingFlags : uint8_t {
+    /// Whether to disable delayed parsing for nominal type, extension, and
+    /// function bodies.
+    ///
+    /// If set, type and function bodies will be parsed eagerly. Otherwise they
+    /// will be lazily parsed when their contents is queried. This lets us avoid
+    /// building AST nodes when they're not needed.
+    ///
+    /// This is set for primary files, since we want to type check all
+    /// declarations and function bodies anyway, so there's no benefit in lazy
+    /// parsing.
+    DisableDelayedBodies = 1 << 0,
+
+    /// Whether to disable evaluating the conditions of #if decls.
+    ///
+    /// If set, #if decls are parsed as-is. Otherwise, the bodies of any active
+    /// clauses are hoisted such that they become sibling nodes with the #if
+    /// decl.
+    ///
+    /// FIXME: When condition evaluation moves to a later phase, remove this
+    /// and adjust the client call 'performParseOnly'.
+    DisablePoundIfEvaluation = 1 << 1,
+
+    /// Whether to suppress warnings when parsing. This is set for secondary
+    /// files, as they get parsed multiple times.
+    SuppressWarnings = 1 << 2
+  };
+  using ParsingOptions = OptionSet<ParsingFlags>;
 
 private:
   std::unique_ptr<SourceLookupCache> Cache;
@@ -119,6 +162,9 @@ private:
   /// If not, we can fast-path module checks.
   bool HasImplementationOnlyImports = false;
 
+  /// The parsing options for the file.
+  ParsingOptions ParsingOpts;
+
   /// The scope map that describes this source file.
   std::unique_ptr<ASTScope> Scope;
 
@@ -142,6 +188,16 @@ private:
   /// be part of the underlying module. (ClangImporter overlays use a different
   /// mechanism which is not SourceFile-dependent.)
   SeparatelyImportedOverlayMap separatelyImportedOverlays;
+
+  /// A pointer to PersistentParserState with a function reference to its
+  /// deleter to handle the fact that it's forward declared.
+  using ParserStatePtr =
+      std::unique_ptr<PersistentParserState, void (*)(PersistentParserState *)>;
+
+  /// Stores delayed parser state that code completion needs to be able to
+  /// resume parsing at the code completion token in the file.
+  ParserStatePtr DelayedParserState =
+      ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
 
   friend ASTContext;
   friend Impl;
@@ -172,6 +228,9 @@ public:
     assert(count <= Decls.size() && "Can only truncate top-level decls!");
     Decls.resize(count);
   }
+
+  /// Retrieve the parsing options for the file.
+  ParsingOptions getParsingOptions() const { return ParsingOpts; }
 
   /// A cache of syntax nodes that can be reused when creating the syntax tree
   /// for this file.
@@ -247,7 +306,7 @@ public:
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
-             bool KeepSyntaxTree = false);
+             bool KeepSyntaxTree = false, ParsingOptions parsingOpts = {});
 
   ~SourceFile();
 
@@ -271,6 +330,15 @@ public:
   }
 
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
+
+  /// Find all SPI names imported from \p importedModule by this file,
+  /// collecting the identifiers in \p spiGroups.
+  virtual void
+  lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                         SmallVectorImpl<Identifier> &spiGroups) const override;
+
+  // Is \p targetDecl accessible as an explictly imported SPI from this file?
+  bool isImportedAsSPI(const ValueDecl *targetDecl) const;
 
   bool shouldCrossImport() const;
 
@@ -385,6 +453,20 @@ public:
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
 
+  /// Retrieves the previously set delayed parser state, asserting that it
+  /// exists.
+  PersistentParserState *getDelayedParserState() {
+    auto *state = DelayedParserState.get();
+    assert(state && "Didn't set any delayed parser state!");
+    return state;
+  }
+
+  /// Record delayed parser state for the source file. This is needed for code
+  /// completion's second pass.
+  void setDelayedParserState(ParserStatePtr &&state) {
+    DelayedParserState = std::move(state);
+  }
+
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;
 
@@ -487,6 +569,10 @@ public:
 
   bool isSuitableForASTScopes() const { return canBeParsedInFull(); }
 
+  /// Whether the bodies of types and functions within this file can be lazily
+  /// parsed.
+  bool hasDelayedBodyParsing() const;
+
   syntax::SourceFileSyntax getSyntaxRoot() const;
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
@@ -509,6 +595,11 @@ private:
 
   std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
 };
+
+inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
+                                            SourceFile::ParsingFlags rhs) {
+  return SourceFile::ParsingOptions(lhs) | rhs;
+}
 
 inline SourceFile &
 ModuleDecl::getMainSourceFile(SourceFileKind expectedKind) const {

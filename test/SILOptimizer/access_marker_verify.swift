@@ -558,8 +558,7 @@ enum OptionalWithMap<Wrapped> {
     }
   }
 }
-// CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify15OptionalWithMapO3mapyqd__Sgqd__xKXEKlF : $@convention(method) <Wrapped><U> (@noescape @callee_guaranteed (@in_guaranteed Wrapped) -> (@out U, @error Error), @in_guaranteed OptionalWithMap<Wrapped>) -> (@out Optional<U>, @error Error) {
-// CHECK: bb0(%0 : $*Optional<U>, %1 : $@noescape @callee_guaranteed (@in_guaranteed Wrapped) -> (@out U, @error Error), %2 : $*OptionalWithMap<Wrapped>):
+// CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify15OptionalWithMapO3mapyqd__Sgqd__xKXEKlF : $@convention(method) <Wrapped><U> (@noescape @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> (@out τ_0_1, @error Error) for <Wrapped, U>, @in_guaranteed OptionalWithMap<Wrapped>) -> (@out Optional<U>, @error Error)
 // CHECK: [[STK:%.]] = alloc_stack $OptionalWithMap<Wrapped>
 // CHECK-NOT: begin_access
 // CHECK: copy_addr %2 to [initialization] [[STK]] : $*OptionalWithMap<Wrapped>
@@ -765,24 +764,26 @@ protocol Abstractable {
 class C : Abstractable {
   var storedFunction: () -> Int = { 0 }
 }
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20access_marker_verify1CCAA12AbstractableA2aDP14storedFunction6ResultQzycvMTW : $@yield_once @convention(witness_method: Abstractable) (@inout C) -> @yields @inout @callee_guaranteed () -> @out Int
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20access_marker_verify1CCAA12AbstractableA2aDP14storedFunction6ResultQzycvMTW :
 // CHECK:      bb0(%0 : $*C):
 // CHECK-NEXT:   [[SELF:%.*]] = load_borrow %0 : $*C
 // CHECK-NEXT:   [[MODIFY:%.*]] = class_method [[SELF]] : $C, #C.storedFunction!modify.1
 // CHECK-NEXT:   ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]([[SELF]])
-// CHECK-NEXT:   [[TEMP:%.*]] = alloc_stack $@callee_guaranteed () -> @out Int
+// CHECK-NEXT:   [[TEMP:%.*]] = alloc_stack
 // CHECK-NEXT:   [[OLD_FN:%.*]] = load [take] [[ADDR]]
 // CHECK-NEXT:   // function_ref thunk
 // CHECK-NEXT:   [[THUNK:%.*]] = function_ref @$sSiIegd_SiIegr_TR
 // CHECK-NEXT:   [[THUNKED_OLD_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[OLD_FN]])
-// CHECK-NEXT:   store [[THUNKED_OLD_FN]] to [init] [[TEMP]] :
-// CHECK-NEXT:   yield [[TEMP]] : $*@callee_guaranteed () -> @out Int, resume bb1, unwind bb2
+// CHECK-NEXT:   [[CONVERTED_OLD_FN:%.*]] = convert_function [[THUNKED_OLD_FN]]
+// CHECK-NEXT:   store [[CONVERTED_OLD_FN]] to [init] [[TEMP]] :
+// CHECK-NEXT:   yield [[TEMP]] : {{.*}}, resume bb1, unwind bb2
 
 // CHECK:      bb1:
 // CHECK-NEXT:   [[NEW_FN:%.*]] = load [take] [[TEMP]]
+// CHECK-NEXT:   [[NEW_FN_CONV:%.*]] = convert_function [[NEW_FN]]
 // CHECK-NEXT:   // function_ref thunk
 // CHECK-NEXT:   [[THUNK:%.*]] = function_ref @$sSiIegr_SiIegd_TR
-// CHECK-NEXT:   [[THUNKED_NEW_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[NEW_FN]])
+// CHECK-NEXT:   [[THUNKED_NEW_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[NEW_FN_CONV]])
 // CHECK-NEXT:   store [[THUNKED_NEW_FN]] to [init] [[ADDR]] :
 // CHECK-NEXT:   dealloc_stack [[TEMP]]
 // CHECK-NEXT:   end_apply [[TOKEN]]
@@ -792,9 +793,10 @@ class C : Abstractable {
 
 // CHECK:      bb2:
 // CHECK-NEXT:   [[NEW_FN:%.*]] = load [take] [[TEMP]]
+// CHECK-NEXT:   [[NEW_FN_CONV:%.*]] = convert_function [[NEW_FN]]
 // CHECK-NEXT:   // function_ref thunk
 // CHECK-NEXT:   [[THUNK:%.*]] = function_ref @$sSiIegr_SiIegd_TR
-// CHECK-NEXT:   [[THUNKED_NEW_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[NEW_FN]])
+// CHECK-NEXT:   [[THUNKED_NEW_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[NEW_FN_CONV]])
 // CHECK-NEXT:   store [[THUNKED_NEW_FN]] to [init] [[ADDR]] :
 // CHECK-NEXT:   dealloc_stack [[TEMP]]
 // CHECK-NEXT:   abort_apply [[TOKEN]]

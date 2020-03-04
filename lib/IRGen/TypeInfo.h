@@ -54,6 +54,7 @@ namespace irgen {
   class OwnedAddress;
   class RValue;
   class RValueSchema;
+  class TypeLayoutEntry;
 
 /// Ways in which an object can fit into a fixed-size buffer.
 enum class FixedPacking {
@@ -309,6 +310,10 @@ public:
 
   /// A convenience for getting the schema of a single type.
   ExplosionSchema getSchema() const;
+
+  /// Build the type layout for this type info.
+  virtual TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                                SILType T) const = 0;
 
   /// Allocate a variable of this type on the stack.
   virtual StackAddress allocateStack(IRGenFunction &IGF, SILType T,

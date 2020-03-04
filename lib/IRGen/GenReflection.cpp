@@ -469,7 +469,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
                                       nullptr,
                                       symbolName);
   ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
-  var->setAlignment(2);
+  var->setAlignment(llvm::MaybeAlign(2));
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
 
@@ -982,8 +982,11 @@ public:
                            SubstitutionMap Subs,
                            const HeapLayout &Layout)
     : ReflectionMetadataBuilder(IGM),
-      OrigCalleeType(OrigCalleeType),
-      SubstCalleeType(SubstCalleeType), Subs(Subs),
+      // TODO: Preserve substitutions, since they may affect representation in
+      // the box
+      OrigCalleeType(OrigCalleeType->getUnsubstitutedType(IGM.getSILModule())),
+      SubstCalleeType(SubstCalleeType->getUnsubstitutedType(IGM.getSILModule())),
+      Subs(Subs),
       Layout(Layout) {}
 
   using MetadataSourceMap
@@ -1128,9 +1131,17 @@ public:
           return t;
         })->getCanonicalType();
       }
+      
+      // TODO: We should preserve substitutions in SILFunctionType captures
+      // once the runtime MetadataReader can understand them, since they can
+      // affect representation.
+      //
+      // For now, eliminate substitutions from the capture representation.
+      SwiftType =
+        SwiftType->replaceSubstitutedSILFunctionTypesWithUnsubstituted(IGM.getSILModule())
+                 ->getCanonicalType();
 
-      CaptureTypes.push_back(
-          SILType::getPrimitiveObjectType(SwiftType->getCanonicalType()));
+      CaptureTypes.push_back(SILType::getPrimitiveObjectType(SwiftType));
     }
 
     return CaptureTypes;

@@ -152,6 +152,11 @@ namespace {
                                   spareBits);
     }
 
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
+
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
     }
@@ -209,6 +214,11 @@ namespace {
       llvm_unreachable("[" #name "] function type"); \
     }
 #include "swift/AST/ReferenceStorage.def"
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
 
     static Size getFirstElementSize(IRGenModule &IGM) {
       return IGM.getPointerSize();
@@ -378,6 +388,10 @@ namespace {
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Block;
     }
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
   };
   
   /// The type info class for the on-stack representation of an ObjC block.
@@ -396,6 +410,10 @@ namespace {
         CaptureOffset(captureOffset)
     {}
     
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
     // The lowered type should be an LLVM struct comprising the block header
     // (IGM.ObjCBlockStructTy) as its first element and the capture as its
     // second.
@@ -1292,8 +1310,9 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   SmallVector<ParameterConvention, 4> argConventions;
 
   // Reserve space for polymorphic bindings.
-  auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
-                                                            origType, subs);
+  auto bindings =
+      NecessaryBindings::forPartialApplyForwarder(IGF.IGM, origType, subs);
+
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
     auto bindingsSize = bindings.getBufferSize(IGF.IGM);

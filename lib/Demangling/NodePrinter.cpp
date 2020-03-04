@@ -395,6 +395,7 @@ private:
     case Node::Kind::ImplicitClosure:
     case Node::Kind::ImplParameter:
     case Node::Kind::ImplResult:
+    case Node::Kind::ImplYield:
     case Node::Kind::ImplErrorResult:
     case Node::Kind::InOut:
     case Node::Kind::InfixOperator:
@@ -766,6 +767,7 @@ private:
         transitionTo(Inputs);
         print(child);
       } else if (child->getKind() == Node::Kind::ImplResult
+                 || child->getKind() == Node::Kind::ImplYield
                  || child->getKind() == Node::Kind::ImplErrorResult) {
         if (curState == Results) Printer << ", ";
         transitionTo(Results);
@@ -2010,7 +2012,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ImplErrorResult:
     Printer << "@error ";
-    LLVM_FALLTHROUGH;
+    printChildren(Node, " ");
+    return nullptr;
+  case Node::Kind::ImplYield:
+    Printer << "@yields ";
+    printChildren(Node, " ");
+    return nullptr;
   case Node::Kind::ImplParameter:
   case Node::Kind::ImplResult:
     printChildren(Node, " ");

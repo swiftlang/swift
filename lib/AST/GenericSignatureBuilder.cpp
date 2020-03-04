@@ -3458,8 +3458,8 @@ void EquivalenceClass::modified(GenericSignatureBuilder &builder) {
 GenericSignatureBuilder::GenericSignatureBuilder(
                                ASTContext &ctx)
   : Context(ctx), Diags(Context.Diags), Impl(new Implementation) {
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumGenericSignatureBuilders++;
+  if (auto *Stats = Context.Stats)
+    Stats->getFrontendCounters().NumGenericSignatureBuilders++;
 }
 
 GenericSignatureBuilder::GenericSignatureBuilder(

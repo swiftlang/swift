@@ -530,7 +530,7 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
   auto var = new llvm::GlobalVariable(IGM.Module, varTy, isConstant, linkage,
                                       init, name);
   var->setSection(section);
-  var->setAlignment(alignment.getValue());
+  var->setAlignment(llvm::MaybeAlign(alignment.getValue()));
   disableAddressSanitizer(IGM, var);
 
   // Mark the variable as used if doesn't have external linkage.
@@ -1945,7 +1945,7 @@ llvm::GlobalVariable *swift::irgen::createVariable(
                   linkInfo.getVisibility(),
                   linkInfo.getDLLStorage()})
       .to(var);
-  var->setAlignment(alignment.getValue());
+  var->setAlignment(llvm::MaybeAlign(alignment.getValue()));
 
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.
@@ -1998,7 +1998,7 @@ swift::irgen::createLinkerDirectiveVariable(IRGenModule &IGM, StringRef name) {
   ApplyIRLinkage({Linkage,
                   llvm::GlobalValue::VisibilityTypes::DefaultVisibility,
         llvm::GlobalValue::DLLStorageClassTypes::DefaultStorageClass}).to(var);
-  var->setAlignment(Alignment);
+  var->setAlignment(llvm::MaybeAlign(Alignment));
   disableAddressSanitizer(IGM, var);
   IGM.addUsedGlobal(var);
   return var;
@@ -2667,7 +2667,10 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
   
   // rdar://problem/53836960: i386 ld64 also mis-links relative references
   // to GOT entries.
-  if (!IGM.Triple.isOSDarwin() || IGM.Triple.getArch() != llvm::Triple::x86) {
+  // rdar://problem/59782487: issue with on-device JITd expressions.
+  // The JIT gets confused by private vars accessed accross object files.
+  if (!IGM.getOptions().UseJIT &&
+      (!IGM.Triple.isOSDarwin() || IGM.Triple.getArch() != llvm::Triple::x86)) {
     gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
   } else {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
@@ -2684,8 +2687,8 @@ llvm::Constant *IRGenModule::getOrCreateGOTEquivalent(llvm::Constant *global,
     return gotEntry;
   }
 
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumGOTEntries++;
+  if (auto *Stats = Context.Stats)
+    Stats->getFrontendCounters().NumGOTEntries++;
 
   // Use the global as the initializer for an anonymous constant. LLVM can treat
   // this as equivalent to the global's GOT entry.
@@ -3287,7 +3290,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
 
   var->setInitializer(initializer);
   var->setSection(sectionName);
-  var->setAlignment(4);
+  var->setAlignment(llvm::MaybeAlign(4));
 
   disableAddressSanitizer(*this, var);
   
@@ -3338,8 +3341,8 @@ llvm::Constant *IRGenModule::emitFieldDescriptors() {
 
   var->setInitializer(llvm::ConstantArray::get(arrayTy, elts));
   var->setSection(sectionName);
-  var->setAlignment(4);
-  
+  var->setAlignment(llvm::MaybeAlign(4));
+
   disableAddressSanitizer(*this, var);
   
   addUsedGlobal(var);

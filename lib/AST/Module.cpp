@@ -21,6 +21,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileUnit.h"
@@ -440,6 +441,21 @@ SourceLookupCache &ModuleDecl::getSourceLookupCache() const {
   return *Cache;
 }
 
+ModuleDecl *ModuleDecl::getTopLevelModule() {
+  // If this is a Clang module, ask the Clang importer for the top-level module.
+  // We need to check isNonSwiftModule() to ensure we don't look through
+  // overlays.
+  if (isNonSwiftModule()) {
+    if (auto *underlying = findUnderlyingClangModule()) {
+      auto &ctx = getASTContext();
+      auto *clangLoader = ctx.getClangModuleLoader();
+      return clangLoader->getWrapperForModule(underlying->getTopLevelModule());
+    }
+  }
+  // Swift modules don't currently support submodules.
+  return this;
+}
+
 static bool isParsedModule(const ModuleDecl *mod) {
   // FIXME: If we ever get mixed modules that contain both SourceFiles and other
   // kinds of file units, this will break; there all callers of this function should
@@ -549,6 +565,11 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
+void ModuleDecl::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spiGroups) const {
+  FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
+}
+
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
                               SmallVectorImpl<ValueDecl*> &result) const {
   getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
@@ -608,7 +629,8 @@ void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
     stats->getFrontendCounters().NumModuleLookupClassMember++;
 
   if (isParsedModule(this)) {
-    FrontendStatsTracer tracer(getASTContext().Stats, "source-file-lookup-class-member");
+    FrontendStatsTracer tracer(getASTContext().Stats,
+                               "source-file-lookup-class-member");
     auto &cache = getSourceLookupCache();
     cache.populateMemberCache(*this);
     cache.lookupClassMember(accessPath, name, results);
@@ -621,7 +643,8 @@ void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
 void SourceFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
-  FrontendStatsTracer tracer(getASTContext().Stats, "source-file-lookup-class-member");
+  FrontendStatsTracer tracer(getASTContext().Stats,
+                             "source-file-lookup-class-member");
   auto &cache = getCache();
   cache.populateMemberCache(*this);
   cache.lookupClassMember(accessPath, name, results);
@@ -705,6 +728,14 @@ SourceFile::getBasicLocsForDecl(const Decl *D) const {
   SourceManager &SM = getASTContext().SourceMgr;
   BasicDeclLocs Result;
   Result.SourceFilePath = SM.getDisplayNameForLoc(D->getLoc());
+
+  for (const auto &SRC : D->getRawComment().Comments) {
+    Result.DocRanges.push_back(std::make_pair(
+      LineColumn { SRC.StartLine, SRC.StartColumn },
+      SRC.Range.getByteLength())
+    );
+  }
+
   auto setLineColumn = [&SM](LineColumn &Home, SourceLoc Loc) {
     if (Loc.isValid()) {
       std::tie(Home.Line, Home.Column) = SM.getLineAndColumn(Loc);
@@ -1167,6 +1198,8 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
       requiredFilter |= ModuleDecl::ImportFilterKind::Public;
     else if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    else if (desc.importOptions.contains(ImportFlags::SPIAccessControl))
+      requiredFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
     else
       requiredFilter |= ModuleDecl::ImportFilterKind::Private;
 
@@ -1410,6 +1443,7 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
   ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
   filter |= ModuleDecl::ImportFilterKind::Private;
+  filter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
 
   auto *topLevel = getParentModule();
 
@@ -1774,6 +1808,34 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   return !imports.isImportedBy(module, getParentModule());
 }
 
+void SourceFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spiGroups) const {
+  for (auto &import : Imports) {
+    if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
+        importedModule == std::get<ModuleDecl*>(import.module)) {
+      auto importedSpis = import.spiGroups;
+      spiGroups.append(importedSpis.begin(), importedSpis.end());
+    }
+  }
+}
+
+bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
+  if (!targetDecl->getAttrs().hasAttribute<SPIAccessControlAttr>())
+    return false;
+
+  auto targetModule = targetDecl->getModuleContext();
+  SmallVector<Identifier, 4> importedSpis;
+  lookupImportedSPIGroups(targetModule, importedSpis);
+
+  for (auto attr : targetDecl->getAttrs().getAttributes<SPIAccessControlAttr>())
+    for (auto declSPI : attr->getSPIGroups())
+      for (auto importedSPI : importedSpis)
+        if (importedSPI == declSPI)
+          return true;
+
+  return false;
+}
+
 bool SourceFile::shouldCrossImport() const {
   return Kind != SourceFileKind::SIL && Kind != SourceFileKind::Interface &&
          getASTContext().LangOpts.EnableCrossImportOverlays;
@@ -1834,10 +1896,11 @@ static void performAutoImport(
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
                        ImplicitModuleImportKind ModImpKind,
-                       bool KeepParsedTokens, bool BuildSyntaxTree)
-  : FileUnit(FileUnitKind::Source, M),
-    BufferID(bufferID ? *bufferID : -1),
-    Kind(K), SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
+                       bool KeepParsedTokens, bool BuildSyntaxTree,
+                       ParsingOptions parsingOpts)
+    : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
+      ParsingOpts(parsingOpts), Kind(K),
+      SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
   M.getASTContext().addDestructorCleanup(*this);
   performAutoImport(*this, ModImpKind);
 
@@ -1889,6 +1952,23 @@ bool SourceFile::canBeParsedInFull() const {
     return false;
   }
   llvm_unreachable("unhandled kind");
+}
+
+bool SourceFile::hasDelayedBodyParsing() const {
+  if (ParsingOpts.contains(ParsingFlags::DisableDelayedBodies))
+    return false;
+
+  // Not supported right now.
+  if (Kind == SourceFileKind::REPL || Kind == SourceFileKind::SIL)
+    return false;
+  if (hasInterfaceHash())
+    return false;
+  if (shouldCollectToken())
+    return false;
+  if (shouldBuildSyntaxTree())
+    return false;
+
+  return true;
 }
 
 bool FileUnit::walk(ASTWalker &walker) {

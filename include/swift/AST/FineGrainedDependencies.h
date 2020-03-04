@@ -17,6 +17,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/ReferenceDependencyKeys.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -350,34 +351,6 @@ bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
 // MARK: Enums
 //==============================================================================
 
-/// Encode the current sorts of dependencies as kinds of nodes in the dependency
-/// graph, splitting the current *member* into \ref member and \ref
-/// potentialMember and adding \ref sourceFileProvide.
-
-enum class NodeKind {
-  topLevel,
-  nominal,
-  /// In the status quo scheme, *member* dependencies could have blank names
-  /// for the member, to indicate that the provider might add members.
-  /// This code uses a separate kind, \ref potentialMember. The holder field is
-  /// unused.
-  potentialMember,
-  /// Corresponding to the status quo *member* dependency with a non-blank
-  /// member.
-  member,
-  dynamicLookup,
-  externalDepend,
-  sourceFileProvide,
-  /// For iterating through the NodeKinds.
-  kindCount
-};
-
-/// Used for printing out NodeKinds to dot files, and dumping nodes for
-/// debugging.
-const std::string NodeKindNames[]{
-    "topLevel",      "nominal",        "potentialMember",  "member",
-    "dynamicLookup", "externalDepend", "sourceFileProvide"};
-
 
 /// Instead of the status quo scheme of two kinds of "Depends", cascading and
 /// non-cascading this code represents each entity ("Provides" in the status
@@ -397,7 +370,6 @@ template <typename FnT> void forEachAspect(FnT fn) {
   for (size_t i = 0; i < size_t(DeclAspect::aspectCount); ++i)
     fn(DeclAspect(i));
 }
-
 
 /// A pair of nodes that represent the two aspects of a given entity.
 /// Templated in order to serve for either SourceFileDepGraphNodes or
@@ -584,7 +556,6 @@ struct std::hash<typename swift::fine_grained_dependencies::NodeKind> {
     return size_t(kind);
   }
 };
-
 
 namespace swift {
 namespace fine_grained_dependencies {

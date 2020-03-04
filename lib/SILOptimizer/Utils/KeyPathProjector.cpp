@@ -430,8 +430,7 @@ public:
           break;
         }
         case AccessType::Set: {
-          // We can destroy the old value and write the new value in its place.
-          builder.createDestroyAddr(loc, optAddr);
+          // Write the new value directly into optAddr.
           auto objAddr = builder.createInitEnumDataAddr(loc, optAddr, someDecl, objType);
           
           callback(objAddr);

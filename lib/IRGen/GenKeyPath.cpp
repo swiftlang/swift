@@ -483,8 +483,10 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         auto destEnv = IGF.Builder.CreateInBoundsGEP(destArgsBuf, offset);
         
         auto align = IGM.getPointerAlignment().getValue();
-        IGF.Builder.CreateMemCpy(destEnv, align, sourceEnv, align,
-          IGM.getPointerSize().getValue() * requirements.size());
+        IGF.Builder.CreateMemCpy(destEnv, llvm::MaybeAlign(align), sourceEnv,
+                                 llvm::MaybeAlign(align),
+                                 IGM.getPointerSize().getValue() *
+                                     requirements.size());
       }
       
       IGF.Builder.CreateRetVoid();
@@ -640,8 +642,9 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       }
       
       auto align = IGM.getPointerAlignment().getValue();
-      IGF.Builder.CreateMemCpy(destGenericEnv, align, src, align,
-                         IGM.getPointerSize().getValue() * requirements.size());
+      IGF.Builder.CreateMemCpy(
+          destGenericEnv, llvm::MaybeAlign(align), src, llvm::MaybeAlign(align),
+          IGM.getPointerSize().getValue() * requirements.size());
     }
     IGF.Builder.CreateRetVoid();
   }
@@ -791,7 +794,7 @@ emitKeyPathComponent(IRGenModule &IGM,
 
       switch (getClassFieldAccess(IGM, loweredBaseContextTy, property)) {
       case FieldAccess::ConstantDirect: {
-        // Known constant fixed offset.
+        // Known compile-time constant field offset.
         auto offset = tryEmitConstantClassFragilePhysicalMemberOffset(
             IGM, loweredClassTy, property);
         assert(offset && "no constant offset for ConstantDirect field?!");
@@ -801,6 +804,9 @@ emitKeyPathComponent(IRGenModule &IGM,
       case FieldAccess::NonConstantDirect: {
         // A constant offset that's determined at class realization time.
         // We have to load the offset from a global ivar.
+        //
+        // This means the field offset is constant at runtime, but is not known
+        // at compile time.
         auto header = KeyPathComponentHeader
           ::forClassComponentWithUnresolvedIndirectOffset(property->isLet());
         fields.addInt32(header.getData());
@@ -811,10 +817,15 @@ emitKeyPathComponent(IRGenModule &IGM,
       }
       case FieldAccess::ConstantIndirect: {
         // An offset that depends on the instance's generic parameterization,
-        // but whose field offset is at a known vtable offset.
+        // but whose field offset is at a known metadata offset.
         auto header = KeyPathComponentHeader
           ::forClassComponentWithUnresolvedFieldOffset(property->isLet());
         fields.addInt32(header.getData());
+
+        // FIXME: This doesn't support classes with resilient ancestry, because
+        // the offset into the metadata is itself not constant.
+        //
+        // SILGen emits the descriptor as a computed property in this case.
         auto fieldOffset = getClassFieldOffsetOffset(
             IGM, loweredClassTy.getClassOrBoundGenericClass(), property);
         fields.addInt32(fieldOffset.getValue());
@@ -1176,7 +1187,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                             llvm::GlobalValue::PrivateLinkage,
                                             llvm::ConstantInt::get(OnceTy, 0),
                                             "keypath_once");
-    onceVar->setAlignment(getPointerAlignment().getValue());
+    onceVar->setAlignment(llvm::MaybeAlign(getPointerAlignment().getValue()));
     fields.addRelativeAddress(onceVar);
   } else {
     fields.addInt32(0);
@@ -1292,7 +1303,7 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
                                     fields.finishAndCreateFuture()));
       var->setConstant(true);
       var->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-      var->setAlignment(4);
+      var->setAlignment(llvm::MaybeAlign(4));
 
       TheTrivialPropertyDescriptor = var;
     } else {
@@ -1353,5 +1364,5 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
                                 fields.finishAndCreateFuture()));
   var->setConstant(true);
   var->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-  var->setAlignment(4);
+  var->setAlignment(llvm::MaybeAlign(4));
 }
