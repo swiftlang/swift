@@ -1825,10 +1825,7 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   lookupImportedSPIGroups(targetModule, importedSPIGroups);
   if (importedSPIGroups.empty()) return false;
 
-  auto declSPIGroups = evaluateOrDefault(
-                        targetDecl->getASTContext().evaluator,
-                        SPIGroupsRequest{ targetDecl },
-                        ArrayRef<Identifier>());
+  auto declSPIGroups = targetDecl->getSPIGroups();
 
   // Note: If we reach a point where there are many SPI imports or SPI groups
   // on decls we could optimize this further by using a set.
@@ -1840,14 +1837,29 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   return false;
 }
 
+bool Decl::isSPI() const {
+  return !getSPIGroups().empty();
+}
+
+ArrayRef<Identifier> Decl::getSPIGroups() const {
+  if (auto vd = dyn_cast<ValueDecl>(this)) {
+    if (vd->getFormalAccess() < AccessLevel::Public)
+      return ArrayRef<Identifier>();
+  } else if (!isa<ExtensionDecl>(this))
+    return ArrayRef<Identifier>();
+
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SPIGroupsRequest{ this },
+                           ArrayRef<Identifier>());
+}
+
 llvm::Expected<llvm::ArrayRef<Identifier>>
 SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
   // Applies only to public ValueDecls and ExtensionDecls.
-  if (auto vd = dyn_cast<ValueDecl>(decl)) {
-    if (vd->getFormalAccess() < AccessLevel::Public)
-      return ArrayRef<Identifier>();
-  } else if (!isa<ExtensionDecl>(decl))
-    return ArrayRef<Identifier>();
+  if (auto vd = dyn_cast<ValueDecl>(decl))
+    assert(vd->getFormalAccess() >= AccessLevel::Public);
+  else
+    assert(isa<ExtensionDecl>(decl));
 
   // First, look for local attributes.
   llvm::SetVector<Identifier> spiGroups;
@@ -1861,9 +1873,7 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
     // Then in the extended nominal type.
     if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
       auto extended = extension->getExtendedNominal();
-      auto extSPIs = evaluateOrDefault(ctx.evaluator,
-                                       SPIGroupsRequest{ extended },
-                                       ArrayRef<Identifier>());
+      auto extSPIs = extended->getSPIGroups();
       if (!extSPIs.empty()) return extSPIs;
     }
 
@@ -1871,9 +1881,7 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
     auto parent = decl->getDeclContext();
     if (auto parentD = parent->getAsDecl()) {
       if (!isa<ModuleDecl>(parentD)) {
-        return evaluateOrDefault(ctx.evaluator,
-                                 SPIGroupsRequest{ parentD },
-                                 ArrayRef<Identifier>());
+        return parentD->getSPIGroups();
       }
     }
   }

@@ -288,8 +288,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     // If in SPI mode, don't report SPI use from within the same module.
     if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(complainRepr)) {
       const ValueDecl *VD = CITR->getBoundDecl();
-      if (useDC->getParentModule() == VD->getModuleContext() &&
-          VD->getAttrs().hasAttribute<SPIAccessControlAttr>())
+      if (useDC->getParentModule() == VD->getModuleContext() && VD->isSPI())
         return;
     }
   }
@@ -319,8 +318,7 @@ void AccessControlCheckerBase::checkTypeAccess(
     context->getFormalAccessScope(
       context->getDeclContext(), checkUsableFromInline);
 
-  auto fromSPI = static_cast<FromSPI>(
-      context->getAttrs().hasAttribute<SPIAccessControlAttr>());
+  auto fromSPI = static_cast<FromSPI>(context->isSPI());
   checkTypeAccessImpl(type, typeRepr, contextAccessScope, DC, mayBeInferred,
                       fromSPI, diagnose);
 }
@@ -381,8 +379,10 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   };
 
   auto *DC = ownerDecl->getDeclContext();
-  auto fromSPI = static_cast<FromSPI>(
-     ownerDecl->getAttrs().hasAttribute<SPIAccessControlAttr>());
+  auto fromSPI = FromSPI::No;
+  if (auto ownerValueDecl = dyn_cast<ValueDecl>(ownerDecl)) {
+    fromSPI = static_cast<FromSPI>(ownerValueDecl->isSPI());
+  }
 
   for (auto param : *params) {
     if (param->getInherited().empty())

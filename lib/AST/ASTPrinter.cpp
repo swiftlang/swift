@@ -156,8 +156,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
               return true;
 
           // Always print SPI decls if `PrintSPIs`.
-          if (options.PrintSPIs &&
-              VD->getAttrs().hasAttribute<SPIAccessControlAttr>())
+          if (options.PrintSPIs && VD->isSPI())
             return true;
 
           return false;
