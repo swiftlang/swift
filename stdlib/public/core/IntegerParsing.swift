@@ -105,9 +105,8 @@ internal func _parseSmall<Result: FixedWidthInteger>(
   let first = word1 & 0xff
   if first < 0x30 { // Plus, minus or an invalid character.
     guard _fastPath(count > 1), // Disallow "-"/"+" without any digits.
-      _fastPath(Result.isSigned && first == UInt8(ascii: "-"))
-      || _fastPath(first == UInt8(ascii: "+"))
-      else { return nil }
+      _fastPath(first == UInt8(ascii: "-"))
+      || _fastPath(first == UInt8(ascii: "+")) else { return nil }
     hasMinus = _fastPath(first == UInt8(ascii: "-"))
     word1 = (word1 ^ first) | 0x30 // Clear first char and a "0".
   } else {
@@ -134,9 +133,14 @@ internal func _parseSmall<Result: FixedWidthInteger>(
   // Apply sign & check limits.
   // Note: This assumes Result is stored as two's complement,
   //   which is already assumed elsewhere in the stdlib.
-  let max = Result.max.magnitude &+ (hasMinus ? 1 : 0)
-  guard _fastPath(result <= max) else { return nil }
-  if hasMinus { result = 0 &- result }
+  if Result.isSigned {
+    let max = Result.max.magnitude &+ (hasMinus ? 1 : 0)
+    guard _fastPath(result <= max) else { return nil }
+    if hasMinus { result = 0 &- result }
+  } else {
+    guard _fastPath(!hasMinus) || result == 0,
+      _fastPath(result <= Result.max.magnitude) else { return nil }
+  }
   // Or ensure the compiler generates a conditional negate.
   return Result(truncatingIfNeeded: result)
 }
@@ -333,7 +337,7 @@ where Iterator.Element == UInt8 {
   // Handle sign.
   let hasMinus: Bool
   if first < UInt8(ascii: "0") { // Both "+" and "-" are < any digit/letter.
-    guard _fastPath(Result.isSigned && first == UInt8(ascii: "-"))
+    guard _fastPath(first == UInt8(ascii: "-"))
       || _fastPath(first == UInt8(ascii: "+")) else { return nil }
     hasMinus = (first == UInt8(ascii: "-"))
     // Get a new first character.
@@ -348,9 +352,14 @@ where Iterator.Element == UInt8 {
     = _parseFromUTF8Unsigned(first: first, rest: &utf8, radix: radix)
   guard _fastPath(result_ != nil), var result = result_ else { return nil }
   // Apply sign & check limits.
-  let max = Result.max.magnitude &+ (hasMinus ? 1 : 0)
-  guard _fastPath(result <= max) else { return nil }
-  if hasMinus { result = 0 &- result }
+  if Result.isSigned {
+    let max = Result.max.magnitude &+ (hasMinus ? 1 : 0)
+    guard _fastPath(result <= max) else { return nil }
+    if hasMinus { result = 0 &- result }
+  } else {
+    guard _fastPath(!hasMinus) || result == 0,
+      _fastPath(result <= Result.max.magnitude) else { return nil }
+  }
   return Result(truncatingIfNeeded: result)
 }
 
