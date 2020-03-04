@@ -3170,16 +3170,18 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
 /// }
 static bool isBlockOfMultipleTrailingClosures(bool isExprBasic, Parser &P) {
   assert(isValidTrailingClosure(isExprBasic, P));
+
+  // If closure doesn't start from a label there is no reason
+  // to look any farther.
+  {
+    const auto &nextTok = P.peekToken();
+    if (!nextTok.canBeArgumentLabel() || nextTok.is(tok::kw__) ||
+        nextTok.getText()[0] == '$')
+      return false;
+  }
+
   Parser::BacktrackingScope backtrack(P);
   P.consumeToken(tok::l_brace);
-
-  if (!P.Tok.canBeArgumentLabel() || P.Tok.is(tok::kw__))
-    return false;
-
-  auto text = P.Tok.getText();
-  if (text[0] == '$')
-    return false;
-
   P.consumeToken(); // Consume Label text.
 
   if (!P.Tok.is(tok::colon))
