@@ -685,6 +685,12 @@ class ReportFormatter(object):
         v += ventiles(result.old.samples, OLD_QUARTILE)
         v += MIDDLE
         v += ventiles(result.new.samples, NEW_QUARTILE)
+        v += MIDDLE
+        v += MIDDLE.join([ventiles(s, OLD_QUARTILE) for s in
+                          result.old.independent_runs])
+        v += MIDDLE
+        v += MIDDLE.join([ventiles(s, NEW_QUARTILE) for s in
+                          result.new.independent_runs])
         v += END
         return v
 
