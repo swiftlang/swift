@@ -3184,10 +3184,8 @@ static bool isBlockOfMultipleTrailingClosures(bool isExprBasic, Parser &P) {
   P.consumeToken(tok::l_brace);
   P.consumeToken(); // Consume Label text.
 
-  if (!P.Tok.is(tok::colon))
+  if (!P.consumeIf(tok::colon)) // Consume `:`
     return false;
-
-  P.consumeToken(); // Consume `:`
 
   // If the next token after the label is not a left brace
   // that means what follows is not a valid closure, which
@@ -3204,9 +3202,11 @@ ParserStatus Parser::parseMultipleTrailingClosures(
   // Consume '{' of the trailing closure
   LBrace = consumeToken(tok::l_brace);
 
+  ParserStatus Status;
   // There could N labeled closures depending on the number of arguments.
   do {
     if (!(Tok.canBeArgumentLabel() && peekToken().is(tok::colon))) {
+      Status.setIsParseError();
       diagnose(Tok.getLoc(),
                diag::expected_argument_label_followed_by_closure_literal);
       skipUntilDeclStmtRBrace(tok::r_brace);
@@ -3224,6 +3224,8 @@ ParserStatus Parser::parseMultipleTrailingClosures(
     if (closure.isNull())
       return makeParserError();
 
+    Status |= closure;
+
     closures.push_back({label, labelLoc, closure.get()});
 
     // Recover if blocks are separated by comma instead of newline.
@@ -3235,10 +3237,13 @@ ParserStatus Parser::parseMultipleTrailingClosures(
   } while (!Tok.is(tok::r_brace));
 
   // Consume `}` of the trailing closure.
-  parseMatchingToken(tok::r_brace, RBrace,
-                     diag::expected_multiple_closures_block_rbrace, LBrace);
+  if (parseMatchingToken(tok::r_brace, RBrace,
+                         diag::expected_multiple_closures_block_rbrace,
+                         LBrace)) {
+    Status.setIsParseError();
+  }
 
-  return makeParserSuccess();
+  return Status;
 }
 
 ParserStatus
