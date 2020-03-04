@@ -978,7 +978,11 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
 
   llvm::MachO::Target target(triple);
   file.addTarget(target);
-
+  // Add target variant
+  if (ctx.LangOpts.TargetVariant.hasValue()) {
+    llvm::MachO::Target targetVar(*ctx.LangOpts.TargetVariant);
+    file.addTarget(targetVar);
+  }
   StringSet symbols;
   auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
   TBDGenVisitor visitor(file, {target}, &symbols,
