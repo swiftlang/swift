@@ -1253,12 +1253,13 @@ extension Array: RangeReplaceableCollection {
       contentsOf: newElements,
       newElementsCount: newElementsCount
     )
+      
+    var nextItem = remainder.next()
 
-    if _slowPath(writtenUpTo == buf.endIndex) {
+    if _slowPath(nextItem != nil) {
       // there may be elements that didn't fit in the existing buffer,
       // append them in slow sequence-only mode
       var newCount = _getCount()
-      var nextItem = remainder.next()
       while nextItem != nil {
         reserveCapacityForAppend(newElementsCount: 1)
 
