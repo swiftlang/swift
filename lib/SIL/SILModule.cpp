@@ -729,3 +729,18 @@ SILLinkage swift::getDeclSILLinkage(const ValueDecl *decl) {
   }
   return linkage;
 }
+
+void swift::simple_display(llvm::raw_ostream &out, const SILModule *M) {
+  if (!M) {
+    out << "(null)";
+    return;
+  }
+  out << "SIL for ";
+  simple_display(out, M->getSwiftModule());
+}
+
+SourceLoc swift::extractNearestSourceLoc(const SILModule *M) {
+  if (!M)
+    return SourceLoc();
+  return extractNearestSourceLoc(M->getSwiftModule());
+}

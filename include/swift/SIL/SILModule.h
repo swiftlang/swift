@@ -777,6 +777,13 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
   return OS;
 }
 
+/// Print a simple description of a SILModule for the request evaluator.
+void simple_display(llvm::raw_ostream &out, const SILModule *M);
+
+/// Retrieve a SourceLoc for a SILModule that the request evaluator can use for
+/// diagnostics.
+SourceLoc extractNearestSourceLoc(const SILModule *SM);
+
 namespace Lowering {
 /// Determine whether the given class will be allocated/deallocated using the
 /// Objective-C runtime, i.e., +alloc and -dealloc.
