@@ -246,6 +246,9 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'QualifiedDeclName': 242,
     'CatchItem': 243,
     'CatchItemList': 244,
+    'MultipleTrailingClosureClause': 245,
+    'MultipleTrailingClosureElementList': 246,
+    'MultipleTrailingClosureElement': 247,
 }
 
 
