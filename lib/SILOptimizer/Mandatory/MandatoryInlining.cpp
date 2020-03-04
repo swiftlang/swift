@@ -136,7 +136,7 @@ static void fixupReferenceCounts(
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
       LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-      auto error = checker.checkValue(pai, {{applySite.getCalleeOperand()}}, {},
+      auto error = checker.checkValue(pai, {applySite.getCalleeOperand()}, {},
                                       errorBehavior, &leakingBlocks);
       if (error.getFoundLeak()) {
         while (!leakingBlocks.empty()) {
