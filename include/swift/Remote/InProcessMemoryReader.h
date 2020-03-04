@@ -21,6 +21,10 @@
 
 #include <cstring>
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <TargetConditionals.h>
+#endif
+
 namespace swift {
 namespace remote {
 
@@ -42,7 +46,7 @@ class InProcessMemoryReader final : public MemoryReader {
     }
     case DLQ_GetObjCReservedLowBits: {
       auto result = static_cast<uint8_t *>(outBuffer);
-#if __APPLE__ && __x86_64__
+#if __APPLE__ && __x86_64__ && !defined(TARGET_OS_IOS) && !defined(TARGET_OS_WATCH) && !defined(TARGET_OS_TV)
       // ObjC on 64-bit macOS reserves the bottom bit of all pointers.
       *result = 1;
 #endif
@@ -56,10 +60,12 @@ class InProcessMemoryReader final : public MemoryReader {
       auto result = static_cast<uint64_t *>(outBuffer);
 #if __APPLE__
       if (sizeof(void *) == 8) {
+        // Swift reserves the first 4GiB on 64-bit Apple platforms
         *result = 0x100000000;
         return true;
       }
 #endif
+      // Swift reserves the first 4KiB everywhere else
       *result = 0x1000;
       return true;
     }

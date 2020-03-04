@@ -24,6 +24,10 @@ unsigned long long swift_reflection_classIsSwiftMask = 2;
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/Runtime/Unreachable.h"
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <TargetConditionals.h>
+#endif
+
 using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
@@ -58,6 +62,18 @@ template <uint8_t WordSize>
 static int minimalDataLayoutQueryFunction(void *ReaderContext,
                                           DataLayoutQueryType type,
                                           void *inBuffer, void *outBuffer) {
+    // TODO: The following should be set based on the target.
+    // This code sets it to match the platform this code was compiled for.
+#if __APPLE__
+  auto applePlatform = true;
+#else
+  auto applePlatform = false;
+#endif
+#if __APPLE__ && (defined(TARGET_OS_IOS) || defined(TARGET_OS_WATCH) || defined(TARGET_OS_TV))
+  auto iosDerivedPlatform = true;
+#else
+  auto iosDerivedPlatform = false;
+#endif
   if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
     auto result = static_cast<uint8_t *>(outBuffer);
     *result = WordSize;
@@ -65,27 +81,35 @@ static int minimalDataLayoutQueryFunction(void *ReaderContext,
   }
   if (type == DLQ_GetObjCReservedLowBits) {
     auto result = static_cast<uint8_t *>(outBuffer);
-#if __APPLE__ && __x86_64__
-    *result = 1; // Only 64-bit macOS (Not x86_64 iOS simulator!)
-#else
-    *result = 0;
-#endif
+    if (applePlatform && !iosDerivedPlatform && wordSize == 8) {
+      // Obj-C reserves low bit on 64-bit macOS only.
+      // Other Apple platforms don't reserve this bit (even when
+      // running on x86_64-based simulators).
+      *result = 1;
+    } else {
+      *result = 0;
+    }
     return 1;
   }
   if (type == DLQ_GetLeastValidPointerValue) {
     auto result = static_cast<uint64_t *>(outBuffer);
-#if __APPLE__
-    if (WordSize == 8) {
-      *result = 0x100000000; // Only 64-bit Apple platforms
-      return 1;
+    if (applePlatform && wordSize == 8) {
+      // Swift reserves the first 4GiB on all 64-bit Apple platforms
+      *result = 0x100000000;
+    } else {
+      // Swift reserves the first 4KiB everywhere else
+      *result = 0x1000;
     }
-#endif
-    *result = 0x1000;
     return 1;
   }
   return 0;
 }
 
+// Caveat: This basically only works correctly if running on the same
+// host as the target.  Otherwise, you'll need to use
+// swift_reflection_createReflectionContextWithDataLayout() below
+// with an appropriate data layout query function that understands
+// the target environment.
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(void *ReaderContext,
                                          uint8_t PointerSize,

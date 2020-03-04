@@ -31,6 +31,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <TargetConditionals.h>
+#endif
+
 using namespace llvm::object;
 
 using namespace swift;
@@ -65,7 +69,7 @@ public:
     }
     case DLQ_GetObjCReservedLowBits: {
       auto result = static_cast<uint8_t *>(outBuffer);
-#if __APPLE__ && __x86_64__
+#if __APPLE__ && __x86_64__ && !defined(TARGET_OS_IOS) && !defined(TARGET_OS_WATCH) && !defined(TARGET_OS_TV)
       *result = 1;
 #else
       *result = 0;
@@ -76,10 +80,12 @@ public:
       auto result = static_cast<uint64_t *>(outBuffer);
 #if __APPLE__
       if (sizeof(void *) == 8) {
+        // Swift reserves the first 4GiB on 64-bit Apple platforms
         *result = 0x100000000;
         return true;
       }
 #endif
+      // Swift reserves the first 4KiB everywhere else
       *result = 0x1000;
       return true;
     }

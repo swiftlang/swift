@@ -34,6 +34,10 @@
 #include <fcntl.h>
 #endif
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <TargetConditionals.h>
+#endif
+
 #if defined(__clang__) || defined(__GNUC__)
 #define NORETURN __attribute__((noreturn))
 #elif defined(_MSC_VER)
@@ -147,7 +151,8 @@ static int PipeMemoryReader_queryDataLayout(void *Context,
     }
     case DLQ_GetObjCReservedLowBits: {
       uint8_t *result = (uint8_t *)outBuffer;
-#if __APPLE__ && __x86_64__
+#if __APPLE__ && __x86_64__ && !defined(TARGET_OS_IOS) && !defined(TARGET_OS_WATCH) && !defined(TARGET_OS_TV)
+      // Only for 64-bit macOS (not iOS, not even when simulated on x86_64)
       *result = 1;
 #else
       *result = 0;
@@ -158,10 +163,12 @@ static int PipeMemoryReader_queryDataLayout(void *Context,
       uint64_t *result = (uint64_t *)outBuffer;
 #if __APPLE__
       if (sizeof(void *) == 8) {
-        *result = 0x100000000; // Only for Apple 64-bit platforms
+        // Swift reserves the first 4GiB on Apple 64-bit platforms
+        *result = 0x100000000;
         return 1;
       }
 #endif
+      // Swift reserves the first 4KiB everywhere else
       *result = 0x1000;
       return 1;
     }
