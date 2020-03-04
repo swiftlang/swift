@@ -22,37 +22,39 @@
 using namespace swift;
 
 SILValue swift::stripAccessMarkers(SILValue v) {
-  while (true) {
-    switch (v->getKind()) {
-    default:
-      return v;
-
-    case ValueKind::BeginBorrowInst:
-    case ValueKind::BeginAccessInst:
-      v = cast<SingleValueInstruction>(v)->getOperand(0);
-    }
+  while (auto *bai = dyn_cast<BeginAccessInst>(v)) {
+    v = bai->getOperand();
   }
+  return v;
+}
+
+// The resulting projection must have an address-type operand at index zero
+// representing the projected address.
+SingleValueInstruction *swift::isAccessProjection(SILValue v) {
+  switch (v->getKind()) {
+  default:
+    return nullptr;
+
+  case ValueKind::StructElementAddrInst:
+  case ValueKind::TupleElementAddrInst:
+  case ValueKind::UncheckedTakeEnumDataAddrInst:
+  case ValueKind::TailAddrInst:
+  case ValueKind::IndexAddrInst:
+    return cast<SingleValueInstruction>(v);
+  };
 }
 
 // TODO: When the optimizer stops stripping begin_access markers, then we should
 // be able to assert that the result is a BeginAccessInst and the default case
 // is unreachable.
 SILValue swift::getAccessedAddress(SILValue v) {
-  assert(v->getType().isAddress());
   while (true) {
-    switch (v->getKind()) {
-    default:
+    assert(v->getType().isAddress());
+    auto *projection = isAccessProjection(v);
+    if (!projection)
       return v;
 
-    case ValueKind::BeginBorrowInst:
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleElementAddrInst:
-    case ValueKind::UncheckedTakeEnumDataAddrInst:
-    case ValueKind::TailAddrInst:
-    case ValueKind::IndexAddrInst:
-      v = cast<SingleValueInstruction>(v)->getOperand(0);
-      continue;
-    };
+    v = projection->getOperand(0);
   }
 }
 
