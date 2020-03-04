@@ -96,7 +96,7 @@ def main():
     argparser.add_argument(
         '-num-reruns', type=int,
         help="The number of re-runs until it's assumed to be a real change",
-        default=8)
+        default=10)
     argparser.add_argument(
         '-platform', type=str,
         help='The benchmark build platform', default='macosx')
@@ -153,18 +153,14 @@ def test_opt_levels(args):
 
 
 def measure(driver, tests, i):
-    """Log and measure samples of the tests with the given driver.
-
-    Collect increasing number of samples, depending on the iteration.
-    """
-    num_samples = min(i + 3, 10)
-    msg = '    Iteration {0} for {1}: num samples = {2}, '.format(
-        i, driver.args.tests, num_samples)
+    """Log and measure samples of the tests with the given driver."""
+    msg = '    Iteration {0} for {1}:, '.format(i, driver.args.tests)
     msg += ('running all tests' if driver.all_tests == tests else
             're-testing {0} tests'.format(len(tests)))
     log(msg)
     driver.tests = tests
-    return driver.run(num_samples=num_samples, sample_time=0.0025)
+    return driver.run(
+        num_iters=1, min_samples=10, sample_time=0.05, quantile=20)
 
 
 def merge(results, other_results):
@@ -178,18 +174,17 @@ def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
                      num_reruns, output_file):
     """Detect performance changes in benchmarks.
 
-    Start fast with few samples per benchmark and gradually spend more time
-    gathering more precise measurements of the change candidates.
+    Gather more independent measurements of the change candidates.
     """
 
-    i, unchanged_length_count = 0, 0
+    i, run_count = 0, 0
     old, new = [BenchmarkDriver(DriverArgs(dir, optimization=opt_level))
                 for dir in [old_dir, new_dir]]
     results = [measure(driver, driver.tests, i) for driver in [old, new]]
     tests = TestComparator(results[0], results[1], threshold)
-    changed = tests.decreased + tests.increased
+    changed = tests.decreased + tests.increased + tests.added
 
-    while len(changed) > 0 and unchanged_length_count < num_reruns:
+    while len(changed) > 0 and run_count < num_reruns:
         i += 1
         if VERBOSE:
             log('        test again: ' + str([test.name for test in changed]))
@@ -197,12 +192,8 @@ def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
                          measure(driver, [test.name for test in changed], i))
                    for the_results, driver in zip(results, [old, new])]
         tests = TestComparator(results[0], results[1], threshold)
-        changed = tests.decreased + tests.increased
-
-        if len(old.tests) == len(changed):
-            unchanged_length_count += 1
-        else:
-            unchanged_length_count = 0
+        changed = tests.decreased + tests.increased + tests.added
+        run_count += 1
 
     log('')
     return report_results("Performance: -" + opt_level, None, None,
