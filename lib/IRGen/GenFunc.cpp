@@ -1319,6 +1319,10 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
 
+ // Go over the params and check if any of them can cause the HeapLayout to be non-fixed
+ // This is needed because we should not consider parameters of kind ClassPointer and Metadata sources
+ // If not, we may end up with missing TypeMetadata for a type dependent generic parameter
+ // while generating code for destructor of HeapLayout.
   bool considerParameterSources = true;
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(param, origType);

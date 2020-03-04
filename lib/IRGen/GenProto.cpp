@@ -391,7 +391,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
-      // Don't consider ClassPointer source and Metadata source for partial_apply forwader with non fixed layout.
+      // Don't consider ClassPointer source and Metadata source for partial_apply forwarder with non fixed layout.
       // If not, we may end up with missing TypeMetadata for a type dependent generic parameter
       // while generating code for destructor of HeapLayout.
       if (!ConsiderParameterSources) return;
