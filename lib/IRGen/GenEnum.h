@@ -463,8 +463,10 @@ public:
 
   void emitResilientTagIndices(IRGenModule &IGM) const;
 
-protected:
-
+  virtual bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                                   unsigned index) const {
+    return false;
+  }
 
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;
