@@ -232,7 +232,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   parameterBindings.resize(numParams);
 
   // Keep track of which arguments we have claimed from the argument tuple.
-  unsigned nextArgIdx = 0, numArgs = args.size();
+  unsigned numArgs = args.size();
   SmallVector<bool, 4> claimedArgs(numArgs, false);
   SmallVector<Identifier, 4> actualArgNames;
   unsigned numClaimedArgs = 0;
@@ -278,18 +278,18 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   };
 
   // Local function that skips over any claimed arguments.
-  auto skipClaimedArgs = [&]() {
+  auto skipClaimedArgs = [&](unsigned &nextArgIdx) {
     while (nextArgIdx != numArgs && claimedArgs[nextArgIdx])
       ++nextArgIdx;
   };
 
   // Local function that retrieves the next unclaimed argument with the given
   // name (which may be empty). This routine claims the argument.
-  auto claimNextNamed
-    = [&](Identifier paramLabel, bool ignoreNameMismatch,
-          bool forVariadic = false) -> Optional<unsigned> {
+  auto claimNextNamed = [&](unsigned &nextArgIdx, Identifier paramLabel,
+                            bool ignoreNameMismatch,
+                            bool forVariadic = false) -> Optional<unsigned> {
     // Skip over any claimed arguments.
-    skipClaimedArgs();
+    skipClaimedArgs(nextArgIdx);
 
     // If we've claimed all of the arguments, there's nothing more to do.
     if (numClaimedArgs == numArgs)
@@ -380,13 +380,14 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   // Local function that attempts to bind the given parameter to arguments in
   // the list.
   bool haveUnfulfilledParams = false;
-  auto bindNextParameter = [&](bool ignoreNameMismatch) {
+  auto bindNextParameter = [&](unsigned &nextArgIdx, bool ignoreNameMismatch) {
     const auto &param = params[paramIdx];
 
     // Handle variadic parameters.
     if (param.isVariadic()) {
       // Claim the next argument with the name of this parameter.
-      auto claimed = claimNextNamed(param.getLabel(), ignoreNameMismatch);
+      auto claimed =
+          claimNextNamed(nextArgIdx, param.getLabel(), ignoreNameMismatch);
 
       // If there was no such argument, leave the parameter unfulfilled.
       if (!claimed) {
@@ -407,7 +408,8 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       {
         nextArgIdx = *claimed;
         // Claim any additional unnamed arguments.
-        while ((claimed = claimNextNamed(Identifier(), false, true))) {
+        while (
+            (claimed = claimNextNamed(nextArgIdx, Identifier(), false, true))) {
           parameterBindings[paramIdx].push_back(*claimed);
         }
       }
@@ -417,7 +419,8 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     }
 
     // Try to claim an argument for this parameter.
-    if (auto claimed = claimNextNamed(param.getLabel(), ignoreNameMismatch)) {
+    if (auto claimed =
+            claimNextNamed(nextArgIdx, param.getLabel(), ignoreNameMismatch)) {
       parameterBindings[paramIdx].push_back(*claimed);
       return;
     }
@@ -480,10 +483,13 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       parameterBindings[lastParamIdx].push_back(numArgs - 1);
   }
 
-  // Mark through the parameters, binding them to their arguments.
-  for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
-    if (parameterBindings[paramIdx].empty())
-      bindNextParameter(false);
+  {
+    unsigned nextArgIdx = 0;
+    // Mark through the parameters, binding them to their arguments.
+    for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
+      if (parameterBindings[paramIdx].empty())
+        bindNextParameter(nextArgIdx, false);
+    }
   }
 
   // If we have any unclaimed arguments, complain about those.
@@ -560,14 +566,14 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     // semi-positionally.
     if (numClaimedArgs != numArgs) {
       // Restart at the first argument/parameter.
-      nextArgIdx = 0;
+      unsigned nextArgIdx = 0;
       haveUnfulfilledParams = false;
       for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
         // Skip fulfilled parameters.
         if (!parameterBindings[paramIdx].empty())
           continue;
 
-        bindNextParameter(true);
+        bindNextParameter(nextArgIdx, true);
       }
     }
 
