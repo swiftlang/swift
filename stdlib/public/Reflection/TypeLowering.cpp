@@ -746,7 +746,7 @@ TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
   return TI;
 }
 
-/// Thick functions consist of a function pointer. We do not use
+/// Thin functions consist of a function pointer. We do not use
 /// Builtin.RawPointer here, since the extra inhabitants differ.
 const TypeInfo *
 TypeConverter::getThinFunctionTypeInfo() {
