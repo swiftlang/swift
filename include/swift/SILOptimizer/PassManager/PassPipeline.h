@@ -28,6 +28,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "llvm/ADT/Hashing.h"
 #include <vector>
 
 namespace swift {
@@ -98,12 +99,50 @@ public:
   PipelineRange getPipelines() const {
     return {PipelineStages.begin(), PipelineStages.end()};
   }
+
+  friend bool operator==(const SILPassPipelinePlan &lhs,
+                         const SILPassPipelinePlan &rhs) {
+    // FIXME: Comparing the SILOptions by identity should work in practice, but
+    // we don't currently prevent them from being copied. We should consider
+    // either making them move-only, or properly implementing == for them.
+    return &lhs.Options == &rhs.Options && lhs.Kinds == rhs.Kinds &&
+           lhs.PipelineStages == rhs.PipelineStages;
+  }
+
+  friend bool operator!=(const SILPassPipelinePlan &lhs,
+                         const SILPassPipelinePlan &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend llvm::hash_code hash_value(const SILPassPipelinePlan &plan) {
+    using namespace llvm;
+    auto &kinds = plan.Kinds;
+    auto &stages = plan.PipelineStages;
+    return hash_combine(&plan.Options,
+                        hash_combine_range(kinds.begin(), kinds.end()),
+                        hash_combine_range(stages.begin(), stages.end()));
+  }
 };
 
 struct SILPassPipeline final {
   unsigned ID;
   StringRef Name;
   unsigned KindOffset;
+
+  friend bool operator==(const SILPassPipeline &lhs,
+                         const SILPassPipeline &rhs) {
+    return lhs.ID == rhs.ID && lhs.Name.equals(rhs.Name) &&
+           lhs.KindOffset == rhs.KindOffset;
+  }
+
+  friend bool operator!=(const SILPassPipeline &lhs,
+                         const SILPassPipeline &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend llvm::hash_code hash_value(const SILPassPipeline &pipeline) {
+    return llvm::hash_combine(pipeline.ID, pipeline.Name, pipeline.KindOffset);
+  }
 };
 
 inline void SILPassPipelinePlan::startPipeline(StringRef Name) {
