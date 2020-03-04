@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
+
 /// Specifies the memory ordering semantics of an atomic load operation.
 @frozen
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -252,9 +254,9 @@ extension AtomicUpdateOrdering: CustomStringConvertible {
 public func atomicMemoryFence(ordering: AtomicUpdateOrdering) {
   switch ordering {
   case .relaxed: break
-  case .acquiring: Builtin.fence_acquire()
-  case .releasing: Builtin.fence_release()
-  case .acquiringAndReleasing: Builtin.fence_acqrel()
-  default: Builtin.fence_seqcst()
+  case .acquiring: _atomicAcquiringMemoryFence()
+  case .releasing: _atomicReleasingMemoryFence()
+  case .acquiringAndReleasing: _atomicAcquiringAndReleasingMemoryFence()
+  default: _atomicSerializedMemoryFence()
   }
 }

@@ -198,17 +198,6 @@
     "Hashing.swift",
     "Bitset.swift"
   ],
-  "Atomics": [
-    "AtomicMemoryOrderings.swift",
-    "RawAtomics.swift",
-    "UnsafeAtomicLazyReference.swift",
-    "UnsafeAtomicInt.swift",
-    "UnsafeAtomicUInt.swift",
-    "UnsafeAtomicUnmanaged.swift",
-    "UnsafeAtomicMutablePointer.swift",
-    "UnsafeAtomicState.swift",
-    "LegacyAtomicInt.swift"
-  ],
   "Misc": [
     "ErrorType.swift",
     "Identifiable.swift",
@@ -236,7 +225,9 @@
     "Comparable.swift",
     "Codable.swift",
     "LegacyABI.swift",
-    "MigrationSupport.swift"
+    "MigrationSupport.swift",
+    "RawAtomics.swift",
+    "LegacyAtomicInt.swift"  
   ],
   "Result": [
     "Result.swift"

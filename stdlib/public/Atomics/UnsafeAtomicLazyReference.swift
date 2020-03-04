@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
+
 /// An atomic optional strong reference that can be set (initialized) exactly
 /// once, but read many times.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -77,7 +79,6 @@ extension UnsafeAtomicLazyReference {
       // we performed on `desired`.
       desiredUnmanaged.release()
     }
-    _precondition(currentWord != 0)
     let result = Unmanaged<Instance>.fromOpaque(
       UnsafeRawPointer(bitPattern: currentWord)!)
     return result.takeUnretainedValue()

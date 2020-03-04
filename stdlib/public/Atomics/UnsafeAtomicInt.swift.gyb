@@ -27,6 +27,7 @@
   ]
 }%
 
+import Swift
 
 /// Provides atomic operations on a signed integer value that is stored at a
 /// stable memory location.

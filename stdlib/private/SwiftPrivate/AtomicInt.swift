@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
+@_implementationOnly import Atomics
 
 // This type intentionally shadows the stdlib one
 @available(swift, introduced: 5.0)

@@ -12,6 +12,7 @@
 
 import Swift
 import SwiftShims
+@_implementationOnly import Atomics
 
 public func _stdlib_getHardwareConcurrency() -> Int {
   // This is effectively a re-export of this shims function

@@ -10,44 +10,43 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Provides atomic operations on an unsafe mutable pointer value that is stored
-/// at a stable memory location.
+import Swift
+
+/// Provides atomic operations on an `Int`-representable value of a trivial type
+/// (such as a simple Int-backed enum type) that is stored at a stable memory
+/// location.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct UnsafeAtomicMutablePointer<Pointee> {
-  public typealias Value = UnsafeMutablePointer<Pointee>?
-
+public struct UnsafeAtomicState<Value: RawRepresentable>
+where Value.RawValue == Int {
   @usableFromInline
   internal let _ptr: UnsafeMutableRawPointer
 
   @_transparent // Debug performance
-  public init(at address: UnsafeMutablePointer<Value>) {
+  public init(at address: UnsafeMutablePointer<Int>) {
+    precondition(_isPOD(Value.self))
     self._ptr = UnsafeMutableRawPointer(address)
   }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicMutablePointer {
+extension UnsafeAtomicState {
   @inlinable
-  public var address: UnsafeMutablePointer<Value> {
-    _ptr.assumingMemoryBound(to: Value.self)
+  public var address: UnsafeMutablePointer<Int> {
+    _ptr.assumingMemoryBound(to: Int.self)
   }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicMutablePointer {
+extension UnsafeAtomicState {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
   public func load(ordering: AtomicLoadOrdering) -> Value {
-    let value = _ptr._atomicLoadWord(ordering: ordering)
-    return UnsafeMutablePointer(bitPattern: value)
+    let v = Int(bitPattern: _ptr._atomicLoadWord(ordering: ordering))
+    return Value(rawValue: v)!
   }
-}
 
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicMutablePointer {
   /// Atomically sets the current value to `desired`,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
@@ -55,13 +54,10 @@ extension UnsafeAtomicMutablePointer {
     _ desired: Value,
     ordering: AtomicStoreOrdering
   ) {
-    let desiredWord = UInt(bitPattern: desired)
+    let desiredWord = UInt(bitPattern: desired.rawValue)
     _ptr._atomicStoreWord(desiredWord, ordering: ordering)
   }
-}
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicMutablePointer {
   /// Atomically sets the current value to `desired` and returns the previous
   /// value, with the specified memory ordering.
   ///
@@ -71,16 +67,13 @@ extension UnsafeAtomicMutablePointer {
     _ desired: Value,
     ordering: AtomicUpdateOrdering
   ) -> Value {
-    let desiredWord = UInt(bitPattern: desired)
+    let desiredWord = UInt(bitPattern: desired.rawValue)
     let resultWord = _ptr._atomicExchangeWord(desiredWord, ordering: ordering)
-    return UnsafeMutablePointer(bitPattern: resultWord)
+    return Value(rawValue: Int(bitPattern: resultWord))!
   }
-}
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicMutablePointer {
   /// Perform an atomic compare and exchange operation with
-  /// the specified ordering constraints.
+  /// the specified memory ordering.
   ///
   /// This operation is equivalent to the following pseudocode:
   ///
@@ -100,18 +93,13 @@ extension UnsafeAtomicMutablePointer {
     desired: Value,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Value) {
-    let desiredWord = UInt(bitPattern: desired)
-    let expectedWord = UInt(bitPattern: expected)
     let (success, originalWord) = _ptr._atomicCompareExchangeWord(
-      expected: expectedWord,
-      desired: desiredWord,
+      expected: UInt(bitPattern: expected.rawValue),
+      desired: UInt(bitPattern: desired.rawValue),
       ordering: ordering)
-    return (success, UnsafeMutablePointer(bitPattern: originalWord))
+    return (success, Value(rawValue: Int(bitPattern: originalWord))!)
   }
-}
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicMutablePointer {
   /// Perform an atomic compare and exchange operation with the specified
   /// success/failure memory orderings.
   ///
@@ -153,10 +141,10 @@ extension UnsafeAtomicMutablePointer {
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Value) {
     let (success, originalWord) = _ptr._atomicCompareExchangeWord(
-      expected: UInt(bitPattern: expected),
-      desired: UInt(bitPattern: desired),
+      expected: UInt(bitPattern: expected.rawValue),
+      desired: UInt(bitPattern: desired.rawValue),
       ordering: ordering,
       failureOrdering: failureOrdering)
-    return (success, UnsafeMutablePointer(bitPattern: originalWord))
+    return (success, Value(rawValue: Int(bitPattern: originalWord))!)
   }
 }

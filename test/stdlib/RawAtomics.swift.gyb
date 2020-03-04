@@ -13,24 +13,36 @@
       ('acquiring',              'Acquiring',              'acquiring',               'acquire',   'acquire'),
       ('releasing',              'Releasing',              'releasing',               'release',   'monotonic'),
       ('acquiringAndReleasing',  'AcquiringAndReleasing',  'acquiring-and-releasing', 'acqrel',    'acquire'),
-      ('sequentiallyConsistent', '',                       'sequentially consistent', 'seqcst',    'seqcst'),
+      ('sequentiallyConsistent', 'Serialized',             'sequentially consistent', 'seqcst',    'seqcst'),
     ]
 
   def loadOrderings():
     return [
-      # Swift enum case,         API name,    doc name,                  llvm name
-      ('relaxed',                'Relaxed',   'relaxed',                 'monotonic'),
-      ('acquiring',              'Acquiring', 'acquiring',               'acquire'),
-      ('sequentiallyConsistent', '',          'sequentially consistent', 'seqcst'),
+      # Swift enum case,         API name,     doc name,                  llvm name
+      ('relaxed',                'Relaxed',    'relaxed',                 'monotonic'),
+      ('acquiring',              'Acquiring',  'acquiring',               'acquire'),
+      ('sequentiallyConsistent', 'Serialized', 'sequentially consistent', 'seqcst'),
     ]
 
   def storeOrderings():
     return [
-      # Swift enum case,         API name,    doc name,                  llvm name
-      ('relaxed',                'Relaxed',   'relaxed',                 'monotonic'),
-      ('releasing',              'Releasing', 'releasing',               'release'),
-      ('sequentiallyConsistent', '',          'sequentially consistent', 'seqcst'),
+      # Swift enum case,         API name,     doc name,                  llvm name
+      ('relaxed',                'Relaxed',    'relaxed',                 'monotonic'),
+      ('releasing',              'Releasing',  'releasing',               'release'),
+      ('sequentiallyConsistent', 'Serialized', 'sequentially consistent', 'seqcst'),
     ]
+
+  def isStrongerThan(rmw, load): # See llvm/Support/AtomicOrdering.h
+    if rmw == "sequentiallyConsistent":
+      return load == "relaxed" or load == "acquiring"
+    if rmw == "acquiringAndReleasing":
+      return load == "relaxed"
+    if rmw == "releasing":
+      return False
+    if rmw == "acquiring":
+      return load == "relaxed"
+    if rmw == "relaxed":
+      return False
 
   integerOperations = [
     # Swift name,         llvm name,  operator, label, doc
@@ -46,6 +58,7 @@
 }%
 
 import StdlibUnittest
+import Atomics
 
 let suite = TestSuite("RawAtomics")
 defer { runAllTests() }
@@ -126,6 +139,37 @@ suite.test("simple_atomic${apiOrder}CompareExchangeWord") {
     expectEqual(2, ptr._atomicRelaxedLoadWord())
   }
 }
+% end
+
+% for swiftOrder, apiOrder, docOrder, llvmOrder, _ in rmwOrderings():
+%   for swiftFailOrder, apiFailOrder, docFailOrder, llvmFailOrder in loadOrderings():
+%      if isStrongerThan(swiftOrder, swiftFailOrder):
+suite.test("simple_atomic${apiOrder}Or${apiFailOrder}CompareExchangeWord") {
+  withWordPtr(initialValue: 0, expectedResult: 2) { ptr in
+    var (exchanged, original) = ptr._atomic${apiOrder}Or${apiFailOrder}CompareExchangeWord(
+      expected: 0,
+      desired: 1)
+    expectTrue(exchanged)
+    expectEqual(0, original)
+    expectEqual(1, ptr._atomicRelaxedLoadWord())
+
+    (exchanged, original) = ptr._atomic${apiOrder}Or${apiFailOrder}CompareExchangeWord(
+      expected: 0,
+      desired: 2)
+    expectFalse(exchanged)
+    expectEqual(1, original)
+    expectEqual(1, ptr._atomicRelaxedLoadWord())
+
+    (exchanged, original) = ptr._atomic${apiOrder}Or${apiFailOrder}CompareExchangeWord(
+      expected: original,
+      desired: 2)
+    expectTrue(exchanged)
+    expectEqual(1, original)
+    expectEqual(2, ptr._atomicRelaxedLoadWord())
+  }
+}
+%     end
+%   end
 % end
 
 % for (swiftName, _, operator, label, _) in integerOperations:
