@@ -21,6 +21,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-linear-lifetime-checker"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/OwnershipUtils.h"
