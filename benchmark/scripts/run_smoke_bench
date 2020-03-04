@@ -88,11 +88,9 @@ def main():
         help='In addition to stdout, write the results into a markdown file')
     argparser.add_argument(
         '-threshold', type=float,
-        help='The performance threshold in %% which triggers a re-run',
-        default=5)
-    argparser.add_argument(
-        '-num-samples', type=int,
-        help='The (minimum) number of samples to run', default=3)
+        help='The performance threshold in %% which triggers a re-run'
+             ' (default: 5)',
+        default=5.0)
     argparser.add_argument(
         '-num-reruns', type=int,
         help="The number of re-runs until it's assumed to be a real change",
@@ -123,8 +121,9 @@ def test_opt_levels(args):
         if not args.skip_performance:
             if test_performance(opt_level, args.oldbuilddir[0],
                                 args.newbuilddir[0],
-                                float(args.threshold) / 100, args.num_samples,
-                                args.num_reruns, output_file):
+                                args.threshold / 100,
+                                args.num_reruns,
+                                output_file):
                 changes = True
 
         # There is no point in reporting code size for Onone.
@@ -145,7 +144,7 @@ def test_opt_levels(args):
 
     if output_file:
         if changes:
-            output_file.write(get_info_text())
+            output_file.write(get_info_text(args.threshold))
         else:
             output_file.write("### No performance and code size changes")
         output_file.close()
@@ -154,13 +153,14 @@ def test_opt_levels(args):
 
 def measure(driver, tests, i):
     """Log and measure samples of the tests with the given driver."""
-    msg = '    Iteration {0} for {1}:, '.format(i, driver.args.tests)
+    msg = '    Iteration {0} for {1}: '.format(i, driver.args.tests)
     msg += ('running all tests' if driver.all_tests == tests else
             're-testing {0} tests'.format(len(tests)))
     log(msg)
     driver.tests = tests
     return driver.run(
-        num_iters=1, min_samples=10, sample_time=0.05, quantile=20)
+        num_iters=1, min_samples=10, sample_time=0.05, quantile=20,
+        gather_metadata=True)
 
 
 def merge(results, other_results):
@@ -170,21 +170,20 @@ def merge(results, other_results):
     return results
 
 
-def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
+def test_performance(opt_level, old_dir, new_dir, threshold,
                      num_reruns, output_file):
     """Detect performance changes in benchmarks.
 
     Gather more independent measurements of the change candidates.
     """
-
-    i, run_count = 0, 0
+    i = 0
     old, new = [BenchmarkDriver(DriverArgs(dir, optimization=opt_level))
                 for dir in [old_dir, new_dir]]
     results = [measure(driver, driver.tests, i) for driver in [old, new]]
     tests = TestComparator(results[0], results[1], threshold)
     changed = tests.decreased + tests.increased + tests.added
 
-    while len(changed) > 0 and run_count < num_reruns:
+    while len(changed) > 0 and i < num_reruns:
         i += 1
         if VERBOSE:
             log('        test again: ' + str([test.name for test in changed]))
@@ -193,11 +192,10 @@ def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
                    for the_results, driver in zip(results, [old, new])]
         tests = TestComparator(results[0], results[1], threshold)
         changed = tests.decreased + tests.increased + tests.added
-        run_count += 1
 
     log('')
     return report_results("Performance: -" + opt_level, None, None,
-                          threshold * 1.4, output_file, *results)
+                          threshold, output_file, *results)
 
 
 def report_code_size(opt_level, old_dir, new_dir, platform, output_file):
@@ -259,11 +257,11 @@ def report_results(title, old_lines, new_lines, threshold, output_file,
     return False
 
 
-def get_info_text():
+def get_info_text(threshold):
     text = """
 <details>
   <summary><strong>How to read the data</strong></summary>
-The tables contain differences in performance which are larger than 8% and
+The tables contain differences in performance which are larger than {0}% and
 differences in code size which are larger than 1%.
 
 If you see any unexpected regressions, you should consider fixing the
@@ -279,7 +277,7 @@ performance team (@eeckstein).
 <details>
   <summary><strong>Hardware Overview</strong></summary>
 
-"""
+""".format(threshold)
     po = subprocess.check_output(['system_profiler', 'SPHardwareDataType'])
     for line in po.splitlines():
         selection = ['Model Name',
