@@ -751,6 +751,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, FILE_DEPENDENCY);
   BLOCK_RECORD(input_block, DEPENDENCY_DIRECTORY);
   BLOCK_RECORD(input_block, MODULE_INTERFACE_PATH);
+  BLOCK_RECORD(input_block, IMPORTED_MODULE_SPIS);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
 #define RECORD(X) BLOCK_RECORD(decls_block, X);
@@ -966,6 +967,7 @@ static ImportSet getImportsAsSet(const ModuleDecl *M,
 void Serializer::writeInputBlock(const SerializationOptions &options) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
   input_block::ImportedModuleLayout ImportedModule(Out);
+  input_block::ImportedModuleLayoutSPI ImportedModuleSPI(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
   input_block::ImportedHeaderLayout ImportedHeader(Out);
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
@@ -1012,6 +1014,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   allImportFilter |= ModuleDecl::ImportFilterKind::Public;
   allImportFilter |= ModuleDecl::ImportFilterKind::Private;
   allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  allImportFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
   M->getImportedModules(allImports, allImportFilter);
   ModuleDecl::removeDuplicateImports(allImports);
@@ -1022,6 +1025,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::Public);
   ImportSet privateImportSet =
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::Private);
+  ImportSet spiImportSet =
+      getImportsAsSet(M, ModuleDecl::ImportFilterKind::SPIAccessControl);
 
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
@@ -1066,14 +1071,26 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     // form here.
     if (publicImportSet.count(import))
       stableImportControl = ImportControl::Exported;
-    else if (privateImportSet.count(import))
+    else if (privateImportSet.count(import) || spiImportSet.count(import))
       stableImportControl = ImportControl::Normal;
     else
       stableImportControl = ImportControl::ImplementationOnly;
 
+    SmallVector<Identifier, 4> spis;
+    M->lookupImportedSPIGroups(import.second, spis);
+
     ImportedModule.emit(ScratchRecord,
                         static_cast<uint8_t>(stableImportControl),
-                        !import.first.empty(), importPath);
+                        !import.first.empty(), !spis.empty(), importPath);
+
+    if (!spis.empty()) {
+      SmallString<64> out;
+      llvm::raw_svector_ostream outStream(out);
+      swift::interleave(spis,
+                        [&outStream](Identifier next) { outStream << next.str(); },
+                        [&outStream] { outStream << StringRef("\0", 1); });
+      ImportedModuleSPI.emit(ScratchRecord, out);
+    }
   }
 
   if (!options.ModuleLinkName.empty()) {
@@ -2188,6 +2205,21 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_SPIAccessControl: {
+      auto theAttr = cast<SPIAccessControlAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[SPIAccessControlDeclAttrLayout::Code];
+
+      SmallVector<IdentifierID, 4> spis;
+      for (auto spi : theAttr->getSPIGroups()) {
+        assert(!spi.empty() && "Empty SPI name");
+        spis.push_back(S.addDeclBaseNameRef(spi));
+      }
+
+      SPIAccessControlDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord,
+                                                 abbrCode, spis);
+      return;
+    }
+
     case DAK_Alignment: {
       auto *theAlignment = cast<AlignmentAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[AlignmentDeclAttrLayout::Code];
@@ -2328,6 +2360,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DynamicReplacementDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, false, /*implicit flag*/
           S.addDeclRef(afd), pieces.size(), pieces);
+      return;
+    }
+
+    case DAK_TypeEraser: {
+      auto abbrCode = S.DeclTypeAbbrCodes[TypeEraserDeclAttrLayout::Code];
+      auto attr = cast<TypeEraserAttr>(DA);
+      auto typeEraser = attr->getTypeEraserLoc().getType();
+      TypeEraserDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                           attr->isImplicit(),
+                                           S.addTypeRef(typeEraser));
       return;
     }
 
@@ -2583,7 +2625,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           std::unique_ptr<DeclMembersTable> &memberTable =
             S.DeclMemberNames[VD->getBaseName()].second;
           if (!memberTable) {
-            memberTable = llvm::make_unique<DeclMembersTable>();
+            memberTable = std::make_unique<DeclMembersTable>();
           }
           (*memberTable)[parentID].push_back(memberID);
         }
@@ -2593,7 +2635,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           std::unique_ptr<DeclMembersTable> &memberTable =
             S.DeclMemberNames[A->getMemberName().getBaseName()].second;
           if (!memberTable) {
-            memberTable = llvm::make_unique<DeclMembersTable>();
+            memberTable = std::make_unique<DeclMembersTable>();
           }
           (*memberTable)[parentID].push_back(memberID);
         }
@@ -4832,8 +4874,7 @@ static void collectInterestingNestedDeclarations(
   }
 }
 
-void Serializer::writeAST(ModuleOrSourceFile DC,
-                          bool enableNestedTypeLookupTable) {
+void Serializer::writeAST(ModuleOrSourceFile DC) {
   DeclTable topLevelDecls, operatorDecls, operatorMethodDecls;
   DeclTable precedenceGroupDecls;
   ObjCMethodTable objcMethods;
@@ -4984,8 +5025,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     index_block::ObjCMethodTableLayout ObjCMethodTable(Out);
     writeObjCMethodTable(ObjCMethodTable, objcMethods);
 
-    if (enableNestedTypeLookupTable &&
-        !nestedTypeDecls.empty()) {
+    if (!nestedTypeDecls.empty()) {
       index_block::NestedTypeDeclsLayout NestedTypeDeclsTable(Out);
       writeNestedTypeDeclsTable(NestedTypeDeclsTable, nestedTypeDecls);
     }
@@ -5041,7 +5081,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     S.writeHeader(options);
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
-    S.writeAST(DC, options.EnableNestedTypeLookupTable);
+    S.writeAST(DC);
   }
 
   S.writeToStream(os);
@@ -5070,7 +5110,7 @@ void swift::serializeToBuffers(
     if (hadError)
       return;
     if (moduleBuffer)
-      *moduleBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
+      *moduleBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
                         std::move(buf), options.OutputPath);
   }
 
@@ -5087,7 +5127,7 @@ void swift::serializeToBuffers(
       return false;
     });
     if (moduleDocBuffer)
-      *moduleDocBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
+      *moduleDocBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
                            std::move(buf), options.DocOutputPath);
   }
 
@@ -5104,8 +5144,8 @@ void swift::serializeToBuffers(
       return false;
     });
     if (moduleSourceInfoBuffer)
-      *moduleSourceInfoBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
-        std::move(buf), options.SourceInfoOutputPath);
+      *moduleSourceInfoBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
+          std::move(buf), options.SourceInfoOutputPath);
   }
 }
 

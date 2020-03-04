@@ -474,7 +474,7 @@ func ff_implicitInjectIntoOptionalExpr(_ int: Int) -> Int? {
 }
 
 func ff_implicitTupleShuffle(_ input: (one: Int, two: Int)) -> (two: Int, one: Int) {
-    input
+    input // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
 }
 
 func ff_implicitCollectionUpcast(_ deriveds: [Derived]) -> [Base] {
@@ -1005,7 +1005,7 @@ var fvs_stubMyOwnFatalError: () {
 var fvs_forceTryExplicit: String {
     get { "ok" }
     set {
-        return try! failableIdentity("shucks") // expected-error {{cannot convert value of type 'String' to expected argument type '()'}}
+        return try! failableIdentity("shucks") // expected-error {{unexpected non-void return value in void function}}
     }
 }
 

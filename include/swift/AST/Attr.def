@@ -519,6 +519,11 @@ SIMPLE_DECL_ATTR(_inheritsConvenienceInitializers,
   APIStableToAdd | ABIStableToAdd | APIBreakingToRemove | ABIBreakingToRemove,
   93)
 
+DECL_ATTR(_typeEraser, TypeEraser,
+  OnProtocol | UserInaccessible |
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
+  94)
+
 SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
   OnFunc |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
@@ -535,7 +540,11 @@ DECL_ATTR(derivative, Derivative,
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   97)
 
-// NOTE: 98 is unused
+DECL_ATTR(_spi, SPIAccessControl,
+  OnFunc | OnExtension | OnGenericType | OnVar | OnSubscript | OnConstructor |
+  OnImport | AllowMultipleAttributes | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  98)
 
 DECL_ATTR(transpose, Transpose,
   OnFunc | LongAttribute | AllowMultipleAttributes |

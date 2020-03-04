@@ -62,6 +62,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Combos
     single-source/DataBenchmarks
     single-source/DeadArray
+    single-source/DevirtualizeProtocolComposition
     single-source/DictOfArraysToArrayOfDicts
     single-source/DictTest
     single-source/DictTest2
@@ -140,6 +141,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RGBHistogram
     single-source/Radix2CooleyTukey
     single-source/RandomShuffle
+    single-source/RandomTree
     single-source/RandomValues
     single-source/RangeAssignment
     single-source/RangeIteration

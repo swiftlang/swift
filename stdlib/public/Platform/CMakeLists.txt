@@ -99,9 +99,11 @@ foreach(sdk ${SWIFT_SDKS})
 
     list(APPEND glibc_modulemap_target_list ${glibc_modulemap_target})
 
-    # If this SDK is a target for a non-native host, create a native modulemap
-    # without a sysroot prefix. This is the one we'll install instead.
-    if(NOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}" STREQUAL "/")
+    # If this SDK is a target for a non-native host, except if it's for Android
+    # with its own native sysroot, create a native modulemap without a sysroot
+    # prefix. This is the one we'll install instead.
+    if(NOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}" STREQUAL "/" AND
+       NOT (${sdk} STREQUAL ANDROID AND NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL ""))
       set(glibc_sysroot_relative_modulemap_out "${module_dir}/sysroot-relative-modulemaps/glibc.modulemap")
 
       string(REPLACE "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}"

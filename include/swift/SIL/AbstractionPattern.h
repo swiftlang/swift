@@ -675,7 +675,7 @@ public:
           isa<GenericTypeParamType>(type)) {
         return true;
       }
-      if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+      if (isa<ArchetypeType>(type)) {
         return true;
       }
       return false;

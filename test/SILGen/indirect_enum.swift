@@ -51,7 +51,8 @@ func TreeA_reabstract(_ f: @escaping (Int) -> Int) {
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK:         [[THUNK:%.*]] = function_ref @$sS2iIegyd_S2iIegnr_TR
 // CHECK-NEXT:    [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[ARG_COPY]])
-// CHECK-NEXT:    store [[FN]] to [init] [[PB]]
+// CHECK-NEXT:    [[FNC:%.*]] = convert_function [[FN]]
+// CHECK-NEXT:    store [[FNC]] to [init] [[PB]]
 // CHECK-NEXT:    [[LEAF:%.*]] = enum $TreeA<(Int) -> Int>, #TreeA.Leaf!enumelt.1, [[BOX]]
 // CHECK-NEXT:    destroy_value [[LEAF]]
 // CHECK: return

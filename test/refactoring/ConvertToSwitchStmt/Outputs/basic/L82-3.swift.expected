@@ -1,0 +1,150 @@
+enum E {
+  case first
+  case second
+  case third
+  case fourth
+}
+
+func someFunc(e: E) {
+  if e == .first {
+    print("first")
+  } else if e == .second {
+    print("second")
+  }
+  else {
+    print("default")
+  }
+}
+
+func twoStringBody(e: E) {
+  if e == .first {
+    print("first string")
+    print("second string")
+  } else {
+    print("default")
+  }
+}
+
+func withoutElse(e: E) {
+  if e == .first {
+    print("first")
+  } else if e == .second {
+    print("second")
+  } else if e == .third {
+    print("third")
+  }
+}
+
+func checkInverseCondition(e: E) {
+  if .first == e {
+    print("first")
+  } else if .second == e {
+    print("second")
+  } else {
+    print("default")
+  }
+}
+
+func checkCaseCondition() {
+  let someOptional: Int? = 42
+  if case .some(let x) = someOptional {
+    print(x)
+  }
+
+  if case let x? = someOptional {
+    print(x)
+  }
+}
+
+func checkOptionalBindingCondition(optional: String?) {
+  if let unwraped = optional {
+    print(unwraped)
+  }
+
+  if var unwraped = optional {
+    unwraped += "!"
+    print(unwraped)
+  }
+}
+
+func checkMultipleOrConditions(e: E) {
+  if e == .first || e == .second || e == .third {
+    print("1-3")
+  } else if e == .fourth { 
+    print("4")
+  } else { 
+    print(">4")
+  }
+}
+
+enum Foo { case a, b, c }
+func checkLabeledCondition(e: Foo, f: Foo) {
+  outerLabel: switch e {
+case .a:
+innerLabel: switch f {
+    case .a:
+      break outerLabel
+    default:
+      break innerLabel
+    }
+    print("outside switch")
+default:
+break
+}
+  print("outside if")
+}
+
+enum Barcode {
+  case upc(Int, Int, Int, Int)
+  case qrCode(String)
+}
+func checkEnumWithAssociatedValues(productBarcode: Barcode) {
+  if case .upc(let numberSystem, let manufacturer, let product, let check) = productBarcode {
+    print("UPC : \(numberSystem), \(manufacturer), \(product), \(check).")
+  } else if case let .qrCode(productCode) = productBarcode {
+    print("QR code: \(productCode).")
+  }
+}
+
+struct MyType: Equatable { let v: String }
+func checkEquatableProtocol(x: Int, y: MyType) {
+  if x == 5 {
+    print("5")
+  } else if x == 4 {
+    print("4")
+  } else if 1...3 ~= x {
+    print("1...3")
+  } else {
+    print("default")
+  }
+
+  if y == MyType(v: "bye") {
+    print("bye")
+  } else if y == MyType(v: "tchau") {
+    print("tchau")
+  } else {
+    print("default")
+  }
+}
+
+func checkEmptyBody(e: E) {
+  if e == .first {}
+  else if e == .second {
+    print("second")
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

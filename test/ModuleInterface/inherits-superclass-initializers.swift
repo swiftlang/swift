@@ -24,6 +24,27 @@ open class Base {
 // CHECK: }
 }
 
+// CHECK-NOT: @_hasMissingDesignatedInitializers
+// CHECK: open class InlineBase {
+open class InlineBase {
+  // CHECK-NEXT: public init(arg: Swift.Int)
+  public init(arg: Int) {
+    print("public init from Inline Base")
+  }
+
+  // CHECK-NOT: @usableFromInline init(secret: Swift.Int)
+  @usableFromInline
+  internal init(secret: Int) {
+    print("secret init from Inline Base")
+  }
+
+  // CHECK: convenience public init()
+  public convenience init() {
+    self.init(secret: 42)
+  }
+  // CHECK: }
+}
+
 // CHECK: @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers public class Sub : Module.Base {
 public class Sub : Base {
   // CHECK: override public init(arg: Swift.Int)

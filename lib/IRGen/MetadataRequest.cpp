@@ -285,7 +285,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
 
   ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
   if (alignment)
-    var->setAlignment(alignment);
+    var->setAlignment(llvm::MaybeAlign(alignment));
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
 
@@ -404,7 +404,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
                                       nullptr,
                                       symbolName);
   ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
-  var->setAlignment(2);
+  var->setAlignment(llvm::MaybeAlign(2));
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
   
@@ -556,7 +556,7 @@ irgen::tryEmitConstantTypeMetadataRef(IRGenModule &IGM, CanType type,
                                       SymbolReferenceKind refKind) {
   if (IGM.isStandardLibrary())
     return ConstantReference();
-  if (!isTypeMetadataAccessTrivial(IGM, type))
+  if (isCompleteTypeMetadataStaticallyAddressable(IGM, type))
     return ConstantReference();
   return IGM.getAddrOfTypeMetadata(type, refKind);
 }
@@ -587,7 +587,7 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
   if (allowUninitialized) return classObject;
 
   // TODO: memoize this the same way that we memoize Swift type metadata?
-  return IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
+  return IGF.Builder.CreateCall(IGF.IGM.getFixedClassInitializationFn(),
                                 classObject);
 }
 
@@ -607,6 +607,19 @@ static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
   return MetadataResponse::forComplete(metadata);
 }
 
+static llvm::Value *
+emitIdempotentClassMetadataInitialization(IRGenFunction &IGF,
+                                          llvm::Value *metadata) {
+  if (IGF.IGM.ObjCInterop) {
+    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCClassPtrTy);
+    metadata = IGF.Builder.CreateCall(IGF.IGM.getFixedClassInitializationFn(),
+                                      metadata);
+    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
+  }
+
+  return metadata;
+}
+
 /// Returns a metadata reference for a nominal type.
 ///
 /// This is only valid in a couple of special cases:
@@ -615,6 +628,10 @@ static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
 /// 2) The nominal type is a value type with a fixed size from this
 ///    resilience domain, in which case we can reference the constant
 ///    metadata directly.
+/// 3) The nominal type is a class with known Swift metadata and
+///   a fixed layout from this resilience domain, in which case we only
+///   need perform idempotent class initialization to realize it
+///   in the ObjC runtime.
 ///
 /// In any other case, a metadata accessor should be called instead.
 static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
@@ -625,11 +642,21 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
 
   if (!theDecl->isGenericContext()) {
     assert(!IGF.IGM.isResilient(theDecl, ResilienceExpansion::Maximal));
-    // TODO: If Obj-C interop is off, we can relax this to allow referencing
-    // class metadata too.
-    assert(isa<StructDecl>(theDecl) || isa<EnumDecl>(theDecl));
-    auto metadata = IGF.IGM.getAddrOfTypeMetadata(theType);
-    return MetadataResponse::forComplete(metadata);
+    if (auto response = IGF.tryGetLocalTypeMetadata(theType, request)) {
+      return response;
+    }
+
+    llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(theType);
+    
+    // We need to realize classes with the ObjC runtime.
+    if (auto c = dyn_cast<ClassDecl>(theDecl)) {
+      
+      assert(hasKnownSwiftMetadata(IGF.IGM, c));
+      metadata = emitIdempotentClassMetadataInitialization(IGF, metadata);
+    }
+    auto response = MetadataResponse::forComplete(metadata);
+    IGF.setScopedLocalTypeMetadata(theType, response);
+    return response;
   }
 
   // We are applying generic parameters to a generic type.
@@ -684,11 +711,6 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
     return false;
   }
 
-  if (isa<EnumType>(type) || isa<BoundGenericEnumType>(type)) {
-    // TODO: Support enums.
-    return false;
-  }
-
   if (isa<ClassType>(type) || isa<BoundGenericClassType>(type)) {
     // TODO: Support classes.
     return false;
@@ -727,7 +749,7 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
     };
     auto isExistential = [&]() { return argument->isExistentialType(); };
     auto metadataAccessIsTrivial = [&]() {
-      return irgen::isTypeMetadataAccessTrivial(IGM,
+      return irgen::isCompleteTypeMetadataStaticallyAddressable(IGM,
                                                 argument->getCanonicalType());
     };
     return !isGenericWithoutPrespecializedConformance() && !isExistential() && 
@@ -737,9 +759,9 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
   && IGM.getTypeInfoForUnlowered(type).isFixedSize(ResilienceExpansion::Maximal);
 }
 
-/// Is it basically trivial to access the given metadata?  If so, we don't
-/// need a cache variable in its accessor.
-bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
+/// Is complete metadata for the given type available at a fixed address?
+bool irgen::isCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM,
+                                                        CanType type) {
   assert(!type->hasArchetype());
 
   // Value type metadata only requires dynamic initialization on first
@@ -780,10 +802,6 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   if (isa<SILBoxType>(type))
     return true;
 
-  // DynamicSelfType is actually local.
-  if (type->hasDynamicSelfType())
-    return true;
-
   if (isa<BoundGenericStructType>(type) || isa<BoundGenericEnumType>(type)) {
     auto nominalType = cast<BoundGenericType>(type);
     auto *nominalDecl = nominalType->getDecl();
@@ -796,6 +814,51 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
                                                             type);
   }
 
+  return false;
+}
+
+/// Should requests for the given type's metadata be cached?
+bool irgen::shouldCacheTypeMetadataAccess(IRGenModule &IGM, CanType type) {
+  // DynamicSelfType is actually local.
+  if (type->hasDynamicSelfType())
+    return false;
+
+  // Nongeneric, nonresilient classes with known Swift metadata need to be
+  // realized with the Objective-C runtime, but that only requires a single
+  // runtime call that already has a fast path exit for already-realized
+  // classes, so we don't need to put up another layer of caching in front.
+  //
+  // TODO: On platforms without ObjC interop, we can do direct access to
+  // Swift metadata without a runtime call at all.
+  if (auto clas = dyn_cast<ClassType>(type)) {
+    if (!hasKnownSwiftMetadata(IGM, clas))
+      return true;
+    auto strategy = IGM.getClassMetadataStrategy(clas->getDecl());
+    return strategy != ClassMetadataStrategy::Fixed;
+  }
+  
+  // Trivially accessible metadata does not need a cache.
+  if (isCompleteTypeMetadataStaticallyAddressable(IGM, type))
+    return false;
+  
+  return true;
+}
+
+/// Should requests for the given type's metadata go through an accessor?
+static bool shouldTypeMetadataAccessUseAccessor(IRGenModule &IGM, CanType type){
+  // Anything that requires caching should go through an accessor to outline
+  // the cache check.
+  if (shouldCacheTypeMetadataAccess(IGM, type))
+    return true;
+  
+  // Fixed-metadata classes don't require caching, but we still want to go
+  // through the accessor to outline the ObjC realization.
+  // TODO: On non-Apple platforms, fixed classes should not need any
+  // initialization so should be directly addressable.
+  if (isa<ClassType>(type)) {
+    return true;
+  }
+  
   return false;
 }
 
@@ -1873,7 +1936,8 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
                 IGM.Int8PtrTy, // arg 1
                 IGM.Int8PtrTy, // arg 2
                 IGM.TypeContextDescriptorPtrTy) // type context descriptor
-        .getCallee());
+        .getCallee()
+        ->stripPointerCasts());
 
     if (thunkFn->empty()) {
       ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
@@ -1935,7 +1999,7 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
       : llvm::UndefValue::get(IGM.Int8PtrTy);
 
-    std::array<llvm::Value *, 3> argValues{arg0, arg1, arg2};
+    std::array<llvm::Value *, 3> argValues = {arg0, arg1, arg2};
 
     emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
         IGF, params, nominal, genericArgs,
@@ -1951,19 +2015,6 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
   }
   
   return MetadataResponse::handle(IGF, DynamicMetadataRequest(request), result);
-}
-
-static llvm::Value *
-emitIdempotentClassMetadataInitialization(IRGenFunction &IGF,
-                                          llvm::Value *metadata) {
-  if (IGF.IGM.ObjCInterop) {
-    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCClassPtrTy);
-    metadata = IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
-                                      metadata);
-    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
-  }
-
-  return metadata;
 }
 
 /// Emit the body of a metadata accessor function for the given type.
@@ -2007,20 +2058,19 @@ emitDirectTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   // metadata using this function.
   assert(!requiresForeignTypeMetadata(typeDecl));
 
-  // Classes that might not have Swift metadata use a different
-  // access pattern.
   if (auto classDecl = dyn_cast<ClassDecl>(typeDecl)) {
-    if (!hasKnownSwiftMetadata(IGF.IGM, classDecl)) {
-      return MetadataResponse::forComplete(emitObjCMetadataRef(IGF, classDecl));
-    }
-
-    llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type);
-    return MetadataResponse::forComplete(
-      emitIdempotentClassMetadataInitialization(IGF, metadata));
+    // For known-Swift metadata, we can perform a direct reference with
+    // potentially idempotent initialization.
+    if (hasKnownSwiftMetadata(IGF.IGM, classDecl))
+      return emitDirectTypeMetadataRef(IGF, type, request);
+  
+    // Classes that might not have Swift metadata use a different
+    // access pattern.
+    return MetadataResponse::forComplete(emitObjCMetadataRef(IGF, classDecl));
   }
 
   // We should not be doing more serious work along this path.
-  assert(isTypeMetadataAccessTrivial(IGF.IGM, type));
+  assert(isCompleteTypeMetadataStaticallyAddressable(IGF.IGM, type));
 
   // Okay, everything else is built from a Swift metadata object.
   llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type);
@@ -2068,7 +2118,7 @@ irgen::createTypeMetadataAccessFunction(IRGenModule &IGM, CanType type,
 
   // If our preferred access method is to go via an accessor, it means
   // there is some non-trivial computation that needs to be cached.
-  if (isTypeMetadataAccessTrivial(IGM, type)) {
+  if (!shouldCacheTypeMetadataAccess(IGM, type)) {
     cacheStrategy = CacheStrategy::None;
   } else {
     switch (cacheStrategy) {
@@ -2198,7 +2248,7 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
       // others may require accessors to trigger instantiation.
       //
       // TODO: Also need to count the parent type's generic arguments.
-      if (isTypeMetadataAccessTrivial(IGM, nom)) {
+      if (!shouldCacheTypeMetadataAccess(IGM, nom)) {
         NumAddresses += 1;
       } else {
         NumCalls += 1;
@@ -2354,7 +2404,8 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
       IGM.getModule()
           ->getOrInsertFunction(instantiationFnName, IGF.IGM.TypeMetadataPtrTy,
                                 cache->getType())
-          .getCallee());
+          .getCallee()
+          ->stripPointerCasts());
   if (instantiationFn->empty()) {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
       .to(instantiationFn);
@@ -2548,8 +2599,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   }
   
   if (type->hasArchetype() ||
-      isTypeMetadataAccessTrivial(IGM, type)) {
-    // FIXME: propagate metadata request!
+      !shouldTypeMetadataAccessUseAccessor(IGM, type)) {
     return emitDirectTypeMetadataRef(*this, type, request);
   }
 
@@ -2589,144 +2639,116 @@ namespace {
   ///
   /// NOTE: If you modify the special cases in this, you should update
   /// isTypeMetadataForLayoutAccessible in SIL.cpp.
-  class EmitTypeMetadataRefForLayout
-    : public CanTypeVisitor<EmitTypeMetadataRefForLayout, llvm::Value *,
-                            DynamicMetadataRequest> {
-  private:
-    IRGenFunction &IGF;
-  public:
-    EmitTypeMetadataRefForLayout(IRGenFunction &IGF) : IGF(IGF) {}
+class EmitTypeMetadataRefForLayout
+    : public CanTypeVisitor<EmitTypeMetadataRefForLayout, CanType> {
+public:
+  EmitTypeMetadataRefForLayout() {}
 
-    llvm::Value *emitDirectMetadataRef(CanType type,
-                                       DynamicMetadataRequest request) {
-      return IGF.IGM.getAddrOfTypeMetadata(type);
+  /// For most types, we can just emit the usual metadata.
+  CanType visitType(CanType t) { return t; }
+
+  CanType visitBoundGenericEnumType(CanBoundGenericEnumType ty) {
+    // Optionals have a lowered payload type, so we recurse here.
+    if (auto objectTy = ty.getOptionalObjectType()) {
+      auto payloadTy = visit(objectTy);
+      if (payloadTy == objectTy)
+        return ty;
+      auto &C = ty->getASTContext();
+      auto optDecl = C.getOptionalDecl();
+      return CanType(BoundGenericEnumType::get(optDecl, Type(), payloadTy));
     }
 
-    /// For most types, we can just emit the usual metadata.
-    llvm::Value *visitType(CanType t, DynamicMetadataRequest request) {
-      return IGF.emitTypeMetadataRef(t, request).getMetadata();
+    // Otherwise, generic arguments are not lowered.
+    return ty;
+  }
+
+  CanType visitTupleType(CanTupleType ty) {
+    bool changed = false;
+    SmallVector<TupleTypeElt, 4> loweredElts;
+    loweredElts.reserve(ty->getNumElements());
+
+    for (auto i : indices(ty->getElementTypes())) {
+      auto substEltType = ty.getElementType(i);
+      auto &substElt = ty->getElement(i);
+
+      // Make sure we don't have something non-materializable.
+      auto Flags = substElt.getParameterFlags();
+      assert(Flags.getValueOwnership() == ValueOwnership::Default);
+      assert(!Flags.isVariadic());
+
+      CanType loweredSubstEltType = visit(substEltType);
+      changed =
+          (changed || substEltType != loweredSubstEltType || !Flags.isNone());
+
+      // Note: we drop @escaping and @autoclosure which can still appear on
+      // materializable tuple types.
+      //
+      // FIXME: Replace this with an assertion that the original tuple element
+      // did not have any flags.
+      loweredElts.emplace_back(loweredSubstEltType, substElt.getName(),
+                               ParameterTypeFlags());
     }
 
-    llvm::Value *visitBoundGenericEnumType(CanBoundGenericEnumType type,
-                                           DynamicMetadataRequest request) {
-      // Optionals have a lowered payload type, so we recurse here.
-      if (auto objectTy = type.getOptionalObjectType()) {
-        if (auto metadata = tryGetLocal(type, request))
-          return metadata;
+    if (!changed)
+      return ty;
 
-        auto payloadMetadata = visit(objectTy, request);
-        llvm::Value *args[] = { payloadMetadata };
-        llvm::Type *types[] = { IGF.IGM.TypeMetadataPtrTy };
+    // The cast should succeed, because if we end up with a one-element
+    // tuple type here, it must have a label.
+    return cast<TupleType>(
+        CanType(TupleType::get(loweredElts, ty->getASTContext())));
+  }
 
-        // Call the generic metadata accessor function.
-        llvm::Function *accessor =
-            IGF.IGM.getAddrOfGenericTypeMetadataAccessFunction(
-                type->getDecl(), types, NotForDefinition);
+  CanType visitAnyFunctionType(CanAnyFunctionType ty) {
+    llvm_unreachable("not a SIL type");
+  }
 
-        auto response =
-          IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, args,
-                                                        request);
-
-        return setLocal(type, response);
-      }
-
-      // Otherwise, generic arguments are not lowered.
-      return visitType(type, request);
+  CanType visitSILFunctionType(CanSILFunctionType ty) {
+    // All function types have the same layout regardless of arguments or
+    // abstraction level. Use the metadata for () -> () for thick functions,
+    // or AnyObject for block functions.
+    auto &C = ty->getASTContext();
+    switch (ty->getRepresentation()) {
+    case SILFunctionType::Representation::Thin:
+    case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::WitnessMethod:
+    case SILFunctionType::Representation::ObjCMethod:
+    case SILFunctionType::Representation::CFunctionPointer:
+    case SILFunctionType::Representation::Closure:
+      // A thin function looks like a plain pointer.
+      // FIXME: Except for extra inhabitants?
+      return C.TheRawPointerType;
+    case SILFunctionType::Representation::Thick:
+      // All function types look like () -> ().
+      // FIXME: It'd be nice not to have to call through the runtime here.
+      return CanFunctionType::get({}, C.TheEmptyTupleType);
+    case SILFunctionType::Representation::Block:
+      // All block types look like AnyObject.
+      return C.getAnyObjectType();
     }
 
-    llvm::Value *visitTupleType(CanTupleType type,
-                                DynamicMetadataRequest request) {
-      if (auto metadata = tryGetLocal(type, request))
-        return metadata;
+    llvm_unreachable("Not a valid SILFunctionType.");
+  }
 
-      auto response = emitTupleTypeMetadataRef(IGF, type, request,
-                                               /*labels*/ false,
-          [&](CanType eltType, DynamicMetadataRequest eltRequest) {
-        // This use of 'forComplete' is technically questionable, but in
-        // this class we're always producing responses we can ignore, so
-        // it's okay.
-        return MetadataResponse::forComplete(visit(eltType, eltRequest));
-      });
+  CanType visitAnyMetatypeType(CanAnyMetatypeType ty) {
+    assert(ty->hasRepresentation() && "not a lowered metatype");
+    auto &C = ty->getASTContext();
+    switch (ty->getRepresentation()) {
+    case MetatypeRepresentation::Thin:
+      // Thin metatypes are empty, so they look like the empty tuple type.
+      return C.TheEmptyTupleType;
 
-      return setLocal(type, response);
+    case MetatypeRepresentation::Thick:
+    case MetatypeRepresentation::ObjC:
+      // Thick and ObjC metatypes look like pointers with extra inhabitants.
+      // Get the metatype metadata from the runtime.
+      // FIXME: It'd be nice not to need a runtime call here; we should just
+      // have a standard aligned-pointer type metadata.
+      return ty;
     }
 
-    llvm::Value *visitAnyFunctionType(CanAnyFunctionType type,
-                                      DynamicMetadataRequest request) {
-      llvm_unreachable("not a SIL type");
-    }
-      
-    llvm::Value *visitSILFunctionType(CanSILFunctionType type,
-                                      DynamicMetadataRequest request) {
-      // All function types have the same layout regardless of arguments or
-      // abstraction level. Use the metadata for () -> () for thick functions,
-      // or AnyObject for block functions.
-      auto &C = type->getASTContext();
-      switch (type->getRepresentation()) {
-      case SILFunctionType::Representation::Thin:
-      case SILFunctionType::Representation::Method:
-      case SILFunctionType::Representation::WitnessMethod:
-      case SILFunctionType::Representation::ObjCMethod:
-      case SILFunctionType::Representation::CFunctionPointer:
-      case SILFunctionType::Representation::Closure:
-        // A thin function looks like a plain pointer.
-        // FIXME: Except for extra inhabitants?
-        return emitDirectMetadataRef(C.TheRawPointerType, request);
-      case SILFunctionType::Representation::Thick:
-        // All function types look like () -> ().
-        // FIXME: It'd be nice not to have to call through the runtime here.
-        return IGF.emitTypeMetadataRef(
-                 CanFunctionType::get({}, C.TheEmptyTupleType),
-                                       request).getMetadata();
-      case SILFunctionType::Representation::Block:
-        // All block types look like AnyObject.
-        return emitDirectMetadataRef(C.getAnyObjectType(), request);
-      }
-
-      llvm_unreachable("Not a valid SILFunctionType.");
-    }
-
-    llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type,
-                                      DynamicMetadataRequest request) {
-      
-      assert(type->hasRepresentation()
-             && "not a lowered metatype");
-
-      switch (type->getRepresentation()) {
-      case MetatypeRepresentation::Thin:
-        // Thin metatypes are empty, so they look like the empty tuple type.
-        return emitEmptyTupleTypeMetadataRef(IGF.IGM);
-
-      case MetatypeRepresentation::Thick:
-      case MetatypeRepresentation::ObjC:
-        // Thick and ObjC metatypes look like pointers with extra inhabitants.
-        // Get the metatype metadata from the runtime.
-        // FIXME: It'd be nice not to need a runtime call here; we should just
-        // have a standard aligned-pointer type metadata.
-        return IGF.emitTypeMetadataRef(type);
-      }
-
-      llvm_unreachable("Not a valid MetatypeRepresentation.");
-    }
-
-    /// Try to find the metatype in local data.
-    llvm::Value *tryGetLocal(CanType type, DynamicMetadataRequest request) {
-      auto response = IGF.tryGetLocalTypeMetadataForLayout(
-                                          SILType::getPrimitiveObjectType(type),
-                                          request);
-      assert(request.canResponseStatusBeIgnored());
-      return (response ? response.getMetadata() : nullptr);
-    }
-
-    /// Set the metatype in local data.
-    llvm::Value *setLocal(CanType type, MetadataResponse response) {
-      IGF.setScopedLocalTypeMetadataForLayout(
-                                      SILType::getPrimitiveObjectType(type),
-                                      response);
-      return response.getMetadata();
-    }
-
-  };
+    llvm_unreachable("Not a valid MetatypeRepresentation.");
+  }
+};
 } // end anonymous namespace
 
 llvm::Value *IRGenFunction::emitTypeMetadataRefForLayout(SILType type) {
@@ -2734,11 +2756,22 @@ llvm::Value *IRGenFunction::emitTypeMetadataRefForLayout(SILType type) {
 }
 
 llvm::Value *
-IRGenFunction::emitTypeMetadataRefForLayout(SILType type,
+IRGenFunction::emitTypeMetadataRefForLayout(SILType ty,
                                             DynamicMetadataRequest request) {
   assert(request.canResponseStatusBeIgnored());
-  return EmitTypeMetadataRefForLayout(*this).visit(type.getASTType(),
-                                                   request);
+
+  if (auto response =
+          tryGetLocalTypeMetadataForLayout(ty.getObjectType(), request)) {
+    assert(request.canResponseStatusBeIgnored() || !response.isValid());
+    return response.getMetadata();
+  }
+
+  // Map to a layout equivalent AST type.
+  auto layoutEquivalentType =
+      EmitTypeMetadataRefForLayout().visit(ty.getASTType());
+  auto response = emitTypeMetadataRef(layoutEquivalentType, request);
+  setScopedLocalTypeMetadataForLayout(ty.getObjectType(), response);
+  return response.getMetadata();
 }
 
 namespace {

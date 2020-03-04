@@ -9,6 +9,7 @@ add_swift_target_library(swiftOSLogPrototype
   OSLogIntegerTypes.swift
   OSLogStringTypes.swift
   OSLogNSObjectType.swift
+  OSLogFloatingPointTypes.swift
 
   SWIFT_MODULE_DEPENDS_IOS Darwin os ObjectiveC
   SWIFT_MODULE_DEPENDS_OSX Darwin os ObjectiveC

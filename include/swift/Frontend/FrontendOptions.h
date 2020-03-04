@@ -177,11 +177,6 @@ public:
   /// entity.
   bool ProfileEntities = false;
 
-  /// If true, serialization encodes an extra lookup table for use in module-
-  /// merging when emitting partial modules (the per-file modules in a non-WMO
-  /// build).
-  bool EnableSerializationNestedTypeLookupTable = true;
-
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
   bool EnableSourceImport = false;
@@ -264,6 +259,9 @@ public:
   /// Should we warn if an imported module needed to be rebuilt from a
   /// module interface file?
   bool RemarkOnRebuildFromModuleInterface = false;
+
+  /// Should we lock .swiftinterface while generating .swiftmodule from it?
+  bool DisableInterfaceFileLock = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {

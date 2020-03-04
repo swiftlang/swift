@@ -417,6 +417,7 @@ ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionMap Subs,
   SILType SubstCalleeSILTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
   auto SubstCalleeTy = SubstCalleeSILTy.getAs<SILFunctionType>();
+  
   SILFunctionConventions Conv(SubstCalleeTy,
                               ModuleConventions.hasValue()
                                   ? ModuleConventions.getValue()
@@ -553,6 +554,7 @@ PartialApplyInst *PartialApplyInst::create(
     OnStackKind onStack) {
   SILType SubstCalleeTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
+
   SILType ClosureType = SILBuilder::getPartialApplyResultType(
       F.getTypeExpansionContext(), SubstCalleeTy, Args.size(), F.getModule(), {},
       CalleeConvention, onStack);
@@ -603,6 +605,50 @@ TryApplyInst *TryApplyInst::create(
   return ::new (buffer) TryApplyInst(loc, callee, substCalleeTy, subs, args,
                                      typeDependentOperands,
                                      normalBB, errorBB, specializationInfo);
+}
+
+SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
+    SILModule &module, DifferentiabilityWitnessFunctionKind witnessKind,
+    SILDifferentiabilityWitness *witness) {
+  auto fnTy = witness->getOriginalFunction()->getLoweredFunctionType();
+  CanGenericSignature witnessCanGenSig;
+  if (auto witnessGenSig = witness->getDerivativeGenericSignature())
+    witnessCanGenSig = witnessGenSig->getCanonicalSignature();
+  auto *parameterIndices = witness->getParameterIndices();
+  auto *resultIndices = witness->getResultIndices();
+  if (auto derivativeKind = witnessKind.getAsDerivativeFunctionKind()) {
+    bool isReabstractionThunk =
+        witness->getOriginalFunction()->isThunk() == IsReabstractionThunk;
+    auto diffFnTy = fnTy->getAutoDiffDerivativeFunctionType(
+        parameterIndices, *resultIndices->begin(), *derivativeKind,
+        module.Types, LookUpConformanceInModule(module.getSwiftModule()),
+        witnessCanGenSig, isReabstractionThunk);
+    return SILType::getPrimitiveObjectType(diffFnTy);
+  }
+  assert(witnessKind == DifferentiabilityWitnessFunctionKind::Transpose);
+  auto transposeFnTy = fnTy->getAutoDiffTransposeFunctionType(
+      parameterIndices, module.Types,
+      LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
+  return SILType::getPrimitiveObjectType(transposeFnTy);
+}
+
+DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
+    SILModule &module, SILDebugLocation debugLoc,
+    DifferentiabilityWitnessFunctionKind witnessKind,
+    SILDifferentiabilityWitness *witness, Optional<SILType> functionType)
+    : InstructionBase(debugLoc, functionType
+                                    ? *functionType
+                                    : getDifferentiabilityWitnessType(
+                                          module, witnessKind, witness)),
+      witnessKind(witnessKind), witness(witness),
+      hasExplicitFunctionType(functionType) {
+  assert(witness && "Differentiability witness must not be null");
+#ifndef NDEBUG
+  if (functionType.hasValue()) {
+    assert(module.getStage() == SILStage::Lowered &&
+           "Explicit type is valid only in lowered SIL");
+  }
+#endif
 }
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
@@ -2115,6 +2161,14 @@ ConvertFunctionInst *ConvertFunctionInst::create(
            "Can not convert in between ABI incompatible function types");
   }
   return CFI;
+}
+
+bool ConvertFunctionInst::onlyConvertsSubstitutions() const {
+  auto fromType = getOperand()->getType().castTo<SILFunctionType>();
+  auto toType = getType().castTo<SILFunctionType>();
+  auto &M = getModule();
+  
+  return fromType->getUnsubstitutedType(M) == toType->getUnsubstitutedType(M);
 }
 
 ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(

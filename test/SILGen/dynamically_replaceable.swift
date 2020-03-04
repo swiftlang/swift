@@ -418,3 +418,13 @@ struct WrapperWithInitialValue<T> {
 public struct SomeStruct {
   @WrapperWithInitialValue var t = false
 }
+
+// Make sure that declaring the replacement before the original does not assert.
+@_dynamicReplacement(for: orig)
+func opaqueReplacement() -> Int {
+  return 2
+}
+
+dynamic func orig() -> Int {
+  return 1
+}

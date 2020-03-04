@@ -836,17 +836,50 @@ public:
   }
 };
 
+template<typename Runtime> struct TargetContextDescriptor;
+
+template<typename Runtime>
+using TargetRelativeContextPointer =
+  RelativeIndirectablePointer<const TargetContextDescriptor<Runtime>,
+                              /*nullable*/ true>;
+
+using RelativeContextPointer = TargetRelativeContextPointer<InProcess>;
+
+template<typename Runtime, typename IntTy,
+         template<typename _Runtime> class Context = TargetContextDescriptor>
+using RelativeContextPointerIntPair =
+  RelativeIndirectablePointerIntPair<const Context<Runtime>, IntTy,
+                              /*nullable*/ true, int32_t>;
+
+template<typename Runtime> struct TargetMethodDescriptor;
+
+template<typename Runtime>
+using TargetRelativeMethodDescriptorPointer =
+  RelativeIndirectablePointer<const TargetMethodDescriptor<Runtime>,
+                              /*nullable*/ true>;
+
+using RelativeMethodDescriptorPointer =
+  TargetRelativeMethodDescriptorPointer<InProcess>;
+
+template<typename Runtime> struct TargetProtocolRequirement;
+
+template<typename Runtime>
+using TargetRelativeProtocolRequirementPointer =
+  RelativeIndirectablePointer<const TargetProtocolRequirement<Runtime>,
+                              /*nullable*/ true>;
+
+using RelativeProtocolRequirementPointer =
+  TargetRelativeProtocolRequirementPointer<InProcess>;
+
 /// An entry in the method override table, referencing a method from one of our
 /// ancestor classes, together with an implementation.
 template <typename Runtime>
 struct TargetMethodOverrideDescriptor {
   /// The class containing the base method.
-  TargetRelativeIndirectablePointer<Runtime, TargetClassDescriptor<Runtime>,
-                                    /*nullable*/ true> Class;
+  TargetRelativeContextPointer<Runtime> Class;
 
   /// The base method.
-  TargetRelativeIndirectablePointer<Runtime, TargetMethodDescriptor<Runtime>,
-                                    /*nullable*/ true> Method;
+  TargetRelativeMethodDescriptorPointer<Runtime> Method;
 
   /// The implementation of the override.
   TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> Impl;
@@ -1424,6 +1457,32 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
     StoredSize *asWords = reinterpret_cast<StoredSize *>(this);
     asWords += offset;
     return *asWords;
+  }
+
+  bool isCanonicalStaticallySpecializedGenericMetadata() const {
+    auto *description = getDescription();
+    if (!description->isGeneric())
+      return false;
+
+    auto *trailingFlags = getTrailingFlags();
+    if (trailingFlags == nullptr)
+      return false;
+
+    return trailingFlags->isCanonicalStaticSpecialization();
+  }
+
+  const MetadataTrailingFlags *getTrailingFlags() const {
+    auto description = getDescription();
+    auto flags = description->getFullGenericContextHeader()
+                     .DefaultInstantiationPattern->PatternFlags;
+    if (!flags.hasTrailingFlags())
+      return nullptr;
+    auto offset =
+        getGenericArgumentOffset() +
+        description->getFullGenericContextHeader().Base.getNumArguments() +
+        (hasPayloadSize() ? 1 : 0);
+    auto asWords = reinterpret_cast<const void *const *>(this);
+    return reinterpret_cast<const MetadataTrailingFlags *>(asWords + offset);
   }
 
   static constexpr int32_t getGenericArgumentOffset() {
@@ -2029,7 +2088,7 @@ using GenericBoxHeapMetadata = TargetGenericBoxHeapMetadata<InProcess>;
 /// pointer to the protocol requirement descriptor.
 template <typename Runtime>
 struct TargetResilientWitness {
-  RelativeIndirectablePointer<TargetProtocolRequirement<Runtime>> Requirement;
+  TargetRelativeProtocolRequirementPointer<Runtime> Requirement;
   RelativeDirectPointer<void> Witness;
 };
 using ResilientWitness = TargetResilientWitness<InProcess>;
@@ -2165,21 +2224,14 @@ public:
 
 using TypeMetadataRecord = TargetTypeMetadataRecord<InProcess>;
 
-template<typename Runtime> struct TargetContextDescriptor;
-
-template<typename Runtime>
-using RelativeContextPointer =
-  RelativeIndirectablePointer<const TargetContextDescriptor<Runtime>,
-                              /*nullable*/ true>;
-
 /// The structure of a protocol reference record.
 template <typename Runtime>
 struct TargetProtocolRecord {
   /// The protocol referenced.
   ///
   /// The remaining low bit is reserved for future use.
-  RelativeIndirectablePointerIntPair<TargetProtocolDescriptor<Runtime>,
-                                     /*reserved=*/bool>
+  RelativeContextPointerIntPair<Runtime, /*reserved=*/bool,
+                                TargetProtocolDescriptor>
     Protocol;
 };
 using ProtocolRecord = TargetProtocolRecord<InProcess>;
@@ -2307,7 +2359,7 @@ template <typename Runtime>
 struct TargetProtocolConformanceDescriptor final
   : public swift::ABI::TrailingObjects<
              TargetProtocolConformanceDescriptor<Runtime>,
-             RelativeContextPointer<Runtime>,
+             TargetRelativeContextPointer<Runtime>,
              TargetGenericRequirementDescriptor<Runtime>,
              TargetResilientWitnessesHeader<Runtime>,
              TargetResilientWitness<Runtime>,
@@ -2315,7 +2367,7 @@ struct TargetProtocolConformanceDescriptor final
 
   using TrailingObjects = swift::ABI::TrailingObjects<
                              TargetProtocolConformanceDescriptor<Runtime>,
-                             RelativeContextPointer<Runtime>,
+                             TargetRelativeContextPointer<Runtime>,
                              TargetGenericRequirementDescriptor<Runtime>,
                              TargetResilientWitnessesHeader<Runtime>,
                              TargetResilientWitness<Runtime>,
@@ -2382,7 +2434,8 @@ public:
   const TargetContextDescriptor<Runtime> *getRetroactiveContext() const {
     if (!Flags.isRetroactive()) return nullptr;
 
-    return this->template getTrailingObjects<RelativeContextPointer<Runtime>>();
+    return this->template getTrailingObjects<
+        TargetRelativeContextPointer<Runtime>>();
   }
 
   /// Whether this conformance is non-unique because it has been synthesized
@@ -2455,7 +2508,7 @@ public:
 
 private:
   size_t numTrailingObjects(
-                        OverloadToken<RelativeContextPointer<Runtime>>) const {
+                        OverloadToken<TargetRelativeContextPointer<Runtime>>) const {
     return Flags.isRetroactive() ? 1 : 0;
   }
 
@@ -2501,7 +2554,7 @@ struct TargetContextDescriptor {
   ContextDescriptorFlags Flags;
   
   /// The parent context, or null if this is a top-level context.
-  RelativeContextPointer<Runtime> Parent;
+  TargetRelativeContextPointer<Runtime> Parent;
 
   bool isGeneric() const { return Flags.isGeneric(); }
   bool isUnique() const { return Flags.isUnique(); }

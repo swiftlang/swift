@@ -152,7 +152,7 @@ public class Concrete : Derived<Int> {
 //// Metadata initialization function for 'Derived' copies superclass vtable
 //// and installs overrides for 'm2()' and 'init()'.
 
-// CHECK-LABEL: define internal %swift.type* @"$s14generic_vtable7DerivedCMi"(%swift.type_descriptor*, i8**, i8*)
+// CHECK-LABEL: define internal %swift.type* @"$s14generic_vtable7DerivedCMi"(%swift.type_descriptor* %0, i8** %1, i8* %2)
 
 // - 2 immediate members:
 //   - type metadata for generic parameter T,
@@ -161,7 +161,7 @@ public class Concrete : Derived<Int> {
 // CHECK: ret %swift.type* [[METADATA]]
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable7DerivedCMr"
-// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8* %0, i8** %1) {{.*}} {
 // CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* [[METADATA]], [[INT]] 0, {{.*}})
 
 // CHECK: ret %swift.metadata_response
@@ -173,7 +173,7 @@ public class Concrete : Derived<Int> {
 
 //// Metadata response function for 'Concrete' is fairly simple.
 
-// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable8ConcreteCMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable8ConcreteCMr"(%swift.type* %0, i8* %1, i8** %2)
 // -- ClassLayoutFlags is 256 / 0x100, HasStaticVTable
 // CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, {{.*}})
 // CHECK: ret %swift.metadata_response

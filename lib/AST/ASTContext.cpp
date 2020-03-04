@@ -101,14 +101,15 @@ using AssociativityCacheType =
 
 struct OverrideSignatureKey {
   GenericSignature baseMethodSig;
-  GenericSignature derivedClassSig;
-  Type superclassTy;
+  GenericSignature derivedMethodSig;
+  Decl *subclassDecl;
 
   OverrideSignatureKey(GenericSignature baseMethodSignature,
-                       GenericSignature derivedClassSignature,
-                       Type superclassType)
-      : baseMethodSig(baseMethodSignature),
-        derivedClassSig(derivedClassSignature), superclassTy(superclassType) {}
+                       GenericSignature derivedMethodSignature,
+                       Decl *subclassDecl)
+    : baseMethodSig(baseMethodSignature),
+      derivedMethodSig(derivedMethodSignature),
+      subclassDecl(subclassDecl) {}
 };
 
 namespace llvm {
@@ -119,28 +120,28 @@ template <> struct DenseMapInfo<OverrideSignatureKey> {
   static bool isEqual(const OverrideSignatureKey lhs,
                       const OverrideSignatureKey rhs) {
     return lhs.baseMethodSig.getPointer() == rhs.baseMethodSig.getPointer() &&
-           lhs.derivedClassSig.getPointer() == rhs.derivedClassSig.getPointer() &&
-           lhs.superclassTy.getPointer() == rhs.superclassTy.getPointer();
+           lhs.derivedMethodSig.getPointer() == rhs.derivedMethodSig.getPointer() &&
+           lhs.subclassDecl == rhs.subclassDecl;
   }
 
   static inline OverrideSignatureKey getEmptyKey() {
     return OverrideSignatureKey(DenseMapInfo<GenericSignature>::getEmptyKey(),
                                 DenseMapInfo<GenericSignature>::getEmptyKey(),
-                                DenseMapInfo<Type>::getEmptyKey());
+                                DenseMapInfo<Decl *>::getEmptyKey());
   }
 
   static inline OverrideSignatureKey getTombstoneKey() {
     return OverrideSignatureKey(
         DenseMapInfo<GenericSignature>::getTombstoneKey(),
         DenseMapInfo<GenericSignature>::getTombstoneKey(),
-        DenseMapInfo<Type>::getTombstoneKey());
+        DenseMapInfo<Decl *>::getTombstoneKey());
   }
 
   static unsigned getHashValue(const OverrideSignatureKey &Val) {
     return hash_combine(
         DenseMapInfo<GenericSignature>::getHashValue(Val.baseMethodSig),
-        DenseMapInfo<GenericSignature>::getHashValue(Val.derivedClassSig),
-        DenseMapInfo<Type>::getHashValue(Val.superclassTy));
+        DenseMapInfo<GenericSignature>::getHashValue(Val.derivedMethodSig),
+        DenseMapInfo<Decl *>::getHashValue(Val.subclassDecl));
   }
 };
 } // namespace llvm
@@ -504,7 +505,8 @@ static ModuleDecl *createBuiltinModule(ASTContext &ctx) {
 
 inline ASTContext::Implementation &ASTContext::getImpl() const {
   auto pointer = reinterpret_cast<char*>(const_cast<ASTContext*>(this));
-  auto offset = llvm::alignAddr((void*)sizeof(*this), alignof(Implementation));
+  auto offset = llvm::alignAddr((void *)sizeof(*this),
+                                llvm::Align(alignof(Implementation)));
   return *reinterpret_cast<Implementation*>(pointer + offset);
 }
 
@@ -524,7 +526,8 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
   auto size = llvm::alignTo(sizeof(ASTContext) + sizeof(Implementation), align);
   auto mem = AlignedAlloc(size, align);
   auto impl = reinterpret_cast<void*>((char*)mem + sizeof(ASTContext));
-  impl = reinterpret_cast<void*>(llvm::alignAddr(impl,alignof(Implementation)));
+  impl = reinterpret_cast<void *>(
+      llvm::alignAddr(impl, llvm::Align(alignof(Implementation))));
   new (impl) Implementation();
   return new (mem)
       ASTContext(langOpts, typeckOpts, SearchPathOpts, SourceMgr, Diags);
@@ -614,13 +617,12 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
 
 /// Set a new stats reporter.
 void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
-  Stats = stats;
-  evaluator.setStatsReporter(stats);
-
   if (stats) {
     stats->getFrontendCounters().NumASTBytesAllocated =
         getAllocator().getBytesAllocated();
   }
+  evaluator.setStatsReporter(stats);
+  Stats = stats;
 }
 
 RC<syntax::SyntaxArena> ASTContext::getSyntaxArena() const {
@@ -1547,7 +1549,7 @@ void ASTContext::registerGenericSignatureBuilder(
 
   ++NumRegisteredGenericSignatureBuilders;
   genericSignatureBuilders[canSig] =
-    llvm::make_unique<GenericSignatureBuilder>(std::move(builder));
+    std::make_unique<GenericSignatureBuilder>(std::move(builder));
 }
 
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
@@ -3375,7 +3377,9 @@ CanSILFunctionType SILFunctionType::get(
   assert(coroutineKind == SILCoroutineKind::None || normalResults.empty());
   assert(coroutineKind != SILCoroutineKind::None || yields.empty());
   assert(!ext.isPseudogeneric() || genericSig);
-
+  
+  substitutions = substitutions.getCanonical();
+  
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,
                            yields, normalResults, errorResult,
@@ -4460,29 +4464,29 @@ CanGenericSignature ASTContext::getOpenedArchetypeSignature(CanType existential,
 GenericSignature 
 ASTContext::getOverrideGenericSignature(const ValueDecl *base,
                                         const ValueDecl *derived) {
-  auto baseGenericCtx = base->getAsGenericContext();
-  auto derivedGenericCtx = derived->getAsGenericContext();
-
-  if (!baseGenericCtx || !derivedGenericCtx)
-    return nullptr;
-
-  if (base == derived)
-    return derivedGenericCtx->getGenericSignature();
+  assert(isa<AbstractFunctionDecl>(base) || isa<SubscriptDecl>(base));
+  assert(isa<AbstractFunctionDecl>(derived) || isa<SubscriptDecl>(derived));
 
   auto baseClass = base->getDeclContext()->getSelfClassDecl();
-  if (!baseClass)
-    return nullptr;
-
   auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
-  if (!derivedClass)
-    return nullptr;
+
+  assert(baseClass != nullptr);
+  assert(derivedClass != nullptr);
+
+  auto baseGenericSig = base->getAsGenericContext()->getGenericSignature();
+  auto derivedGenericSig = derived->getAsGenericContext()->getGenericSignature();
+
+  if (base == derived)
+    return derivedGenericSig;
 
   if (derivedClass->getSuperclass().isNull())
     return nullptr;
 
-  if (baseGenericCtx->getGenericSignature().isNull() ||
-      derivedGenericCtx->getGenericSignature().isNull())
+  if (derivedGenericSig.isNull())
     return nullptr;
+
+  if (baseGenericSig.isNull())
+    return derivedGenericSig;
 
   auto baseClassSig = baseClass->getGenericSignature();
   auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
@@ -4490,9 +4494,9 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
 
   unsigned derivedDepth = 0;
 
-  auto key = OverrideSignatureKey(baseGenericCtx->getGenericSignature(),
-                                  derivedClass->getGenericSignature(),
-                                  derivedClass->getSuperclass());
+  auto key = OverrideSignatureKey(baseGenericSig,
+                                  derivedGenericSig,
+                                  derivedClass);
 
   if (getImpl().overrideSigCache.find(key) !=
       getImpl().overrideSigCache.end()) {
@@ -4503,7 +4507,7 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     derivedDepth = derivedSig->getGenericParams().back()->getDepth() + 1;
 
   SmallVector<GenericTypeParamType *, 2> addedGenericParams;
-  if (auto *gpList = derivedGenericCtx->getGenericParams()) {
+  if (auto *gpList = derived->getAsGenericContext()->getGenericParams()) {
     for (auto gp : *gpList) {
       addedGenericParams.push_back(
           gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
@@ -4537,7 +4541,7 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   };
 
   SmallVector<Requirement, 2> addedRequirements;
-  for (auto reqt : baseGenericCtx->getGenericSignature()->getRequirements()) {
+  for (auto reqt : baseGenericSig->getRequirements()) {
     if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
       addedRequirements.push_back(*substReqt);
     }

@@ -17,6 +17,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Markup/Markup.h"
+#include "SymbolGraph.h"
 
 namespace swift {
 namespace symbolgraphgen {
@@ -26,6 +27,9 @@ struct SymbolGraphASTWalker;
 
 /// A symbol from a module: a node in a graph.
 struct Symbol {
+  /// The symbol graph in which this symbol resides.
+  SymbolGraph &Graph;
+
   const ValueDecl *VD;
 
   void serializeKind(StringRef Identifier, StringRef DisplayName,
@@ -33,27 +37,23 @@ struct Symbol {
 
   void serializeKind(llvm::json::OStream &OS) const;
 
-  void serializeIdentifier(SymbolGraphASTWalker &Walker,
-                           llvm::json::OStream &OS) const;
+  void serializeIdentifier(llvm::json::OStream &OS) const;
 
-  void serializePathComponents(SymbolGraphASTWalker &Walker,
-                               llvm::json::OStream &OS) const;
+  void serializePathComponents(llvm::json::OStream &OS) const;
 
-  void serializeNames(SymbolGraphASTWalker &Walker,
-                      llvm::json::OStream &OS) const;
+  void serializeNames(llvm::json::OStream &OS) const;
 
-  void serializePosition(StringRef Key, unsigned Line, unsigned ByteOffset,
+  void serializePosition(StringRef Key, SourceLoc Loc,
+                         SourceManager &SourceMgr,
                          llvm::json::OStream &OS) const;
 
   void serializeRange(size_t InitialIdentation,
                       SourceRange Range, SourceManager &SourceMgr,
                       llvm::json::OStream &OS) const;
 
-  void serializeDocComment(SymbolGraphASTWalker &Walker,
-                           llvm::json::OStream &OS) const;
+  void serializeDocComment(llvm::json::OStream &OS) const;
 
-  void serializeFunctionSignature(SymbolGraphASTWalker &Walker,
-                                  llvm::json::OStream &OS) const;
+  void serializeFunctionSignature(llvm::json::OStream &OS) const;
 
   void serializeGenericParam(const swift::GenericTypeParamType &Param,
                              llvm::json::OStream &OS) const;
@@ -63,13 +63,13 @@ struct Symbol {
 
   void serializeSwiftGenericMixin(llvm::json::OStream &OS) const;
 
-  void serializeSwiftExtensionMixin(SymbolGraphASTWalker &Walker,
-                                    llvm::json::OStream &OS) const;
+  void serializeSwiftExtensionMixin(llvm::json::OStream &OS) const;
 
-  void serializeDeclarationFragmentMixin(SymbolGraphASTWalker &Walker,
-                                         llvm::json::OStream &OS) const;
+  void serializeDeclarationFragmentMixin(llvm::json::OStream &OS) const;
 
   void serializeAccessLevelMixin(llvm::json::OStream &OS) const;
+
+  void serializeLocationMixin(llvm::json::OStream &OS) const;
 
   llvm::Optional<StringRef>
   getDomain(PlatformAgnosticAvailabilityKind AgnosticKind,
@@ -77,8 +77,7 @@ struct Symbol {
 
   void serializeAvailabilityMixin(llvm::json::OStream &OS) const;
 
-  void serialize(SymbolGraphASTWalker &Walker,
-                 llvm::json::OStream &OS) const;
+  void serialize(llvm::json::OStream &OS) const;
   
   bool operator==(const Symbol &Other) const {
     return VD == Other.VD;

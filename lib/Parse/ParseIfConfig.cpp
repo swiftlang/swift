@@ -609,7 +609,7 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
 
   bool shouldEvaluate =
       // Don't evaluate if it's in '-parse' mode, etc.
-      State->PerformConditionEvaluation &&
+      shouldEvaluatePoundIfDecls() &&
       // If it's in inactive #if ... #endif block, there's no point to do it.
       !getScopeInfo().isInactiveConfigBlock();
 

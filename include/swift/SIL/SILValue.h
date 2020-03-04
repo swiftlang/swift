@@ -272,8 +272,21 @@ public:
   /// otherwise.
   inline Operand *getSingleUse() const;
 
+  /// Returns .some(single user) if this value is non-trivial, we are in ossa,
+  /// and it has a single consuming user. Returns .none otherwise.
+  inline Operand *getSingleConsumingUse() const;
+
   template <class T>
   inline T *getSingleUserOfType() const;
+
+  template <class T> inline T *getSingleConsumingUserOfType() const;
+
+  /// Returns true if this operand has exactly two.
+  ///
+  /// This is useful if one has found a predefined set of 2 unique users and
+  /// wants to check if there are any other users without iterating over the
+  /// entire use list.
+  inline bool hasTwoUses() const;
 
   /// Helper struct for DowncastUserFilterRange
   struct UseToUser;
@@ -644,6 +657,18 @@ public:
   OperandOwnershipKindMap
   getOwnershipKindMap(bool isForwardingSubValue = false) const;
 
+  /// Returns true if this operand acts as a use that consumes its associated
+  /// value.
+  bool isConsumingUse() const {
+    // Type dependent uses can never be consuming and do not have valid
+    // ownership maps since they do not participate in the ownership system.
+    if (isTypeDependent())
+      return false;
+    auto map = getOwnershipKindMap();
+    auto constraint = map.getLifetimeConstraint(get().getOwnershipKind());
+    return constraint == UseLifetimeConstraint::MustBeInvalidated;
+  }
+
 private:
   void removeFromCurrent() {
     if (!Back) return;
@@ -740,17 +765,48 @@ inline Operand *ValueBase::getSingleUse() const {
   return Op;
 }
 
-template <class T>
-inline T *ValueBase::getSingleUserOfType() const {
-  T *Result = nullptr;
-  for (auto *Op : getUses()) {
-    if (auto *Tmp = dyn_cast<T>(Op->getUser())) {
-      if (Result)
+inline Operand *ValueBase::getSingleConsumingUse() const {
+  Operand *result = nullptr;
+  for (auto *op : getUses()) {
+    if (op->isConsumingUse()) {
+      if (result) {
         return nullptr;
-      Result = Tmp;
+      }
+      result = op;
     }
   }
-  return Result;
+  return result;
+}
+
+inline bool ValueBase::hasTwoUses() const {
+  auto iter = use_begin(), end = use_end();
+  for (unsigned i = 0; i < 2; ++i) {
+    if (iter == end)
+      return false;
+    ++iter;
+  }
+  return iter == end;
+}
+
+template <class T>
+inline T *ValueBase::getSingleUserOfType() const {
+  T *result = nullptr;
+  for (auto *op : getUses()) {
+    if (auto *tmp = dyn_cast<T>(op->getUser())) {
+      if (result)
+        return nullptr;
+      result = tmp;
+    }
+  }
+  return result;
+}
+
+template <class T> inline T *ValueBase::getSingleConsumingUserOfType() const {
+  auto *op = getSingleConsumingUse();
+  if (!op)
+    return nullptr;
+
+  return dyn_cast<T>(op->getUser());
 }
 
 struct ValueBase::UseToUser {

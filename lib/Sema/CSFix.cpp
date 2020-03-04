@@ -283,6 +283,11 @@ getStructuralTypeContext(ConstraintSystem &cs, ConstraintLocator *locator) {
     return std::make_tuple(CTP_AssignSource,
                            cs.getType(assignExpr->getSrc()),
                            cs.getType(assignExpr->getDest()));
+  } else if (auto *call = dyn_cast<CallExpr>(locator->getAnchor())) {
+    assert(isa<TypeExpr>(call->getFn()));
+    return std::make_tuple(CTP_Initialization,
+                           cs.getType(call->getFn())->getMetatypeInstanceType(),
+                           cs.getType(call->getArg()));
   }
 
   return None;
@@ -477,6 +482,24 @@ bool DefineMemberBasedOnUse::diagnose(bool asNote) const {
   auto failure = MissingMemberFailure(getConstraintSystem(), BaseType,
                                       Name, getLocator());
   return AlreadyDiagnosed || failure.diagnose(asNote);
+}
+
+bool
+DefineMemberBasedOnUse::diagnoseForAmbiguity(ArrayRef<Solution> solutions) const {
+  Type concreteBaseType;
+  for (const auto &solution: solutions) {
+    auto baseType = solution.simplifyType(BaseType);
+    if (!concreteBaseType)
+      concreteBaseType = baseType;
+
+    if (concreteBaseType->getCanonicalType() != baseType->getCanonicalType()) {
+      getConstraintSystem().getASTContext().Diags.diagnose(getAnchor()->getLoc(),
+          diag::unresolved_member_no_inference, Name);
+      return true;
+    }
+  }
+
+  return diagnose();
 }
 
 DefineMemberBasedOnUse *
@@ -1086,6 +1109,12 @@ UseValueTypeOfRawRepresentative::attempt(ConstraintSystem &cs, Type argType,
         cs, rawRepresentableType, valueType, cs.getConstraintLocator(locator));
 
   return nullptr;
+}
+
+unsigned AllowArgumentMismatch::getParamIdx() const {
+  const auto *locator = getLocator();
+  auto elt = locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
+  return elt.getParamIdx();
 }
 
 bool AllowArgumentMismatch::diagnose(bool asNote) const {

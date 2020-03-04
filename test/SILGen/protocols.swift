@@ -260,7 +260,7 @@ class ClassWithGetter : PropertyWithGetter {
 
 // Make sure we are generating a protocol witness that calls the class method on
 // ClassWithGetter.
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9protocols15ClassWithGetterCAA08PropertycD0A2aDP1aSivgTW : $@convention(witness_method: PropertyWithGetter) (@in_guaranteed ClassWithGetter) -> Int {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9protocols15ClassWithGetterCAA08PropertycD0A2aDP1aSivgTW :
 // CHECK: bb0([[C:%.*]] : $*ClassWithGetter):
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load_borrow %0
 // CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetter, #ClassWithGetter.a!getter.1 : (ClassWithGetter) -> () -> Int, $@convention(method) (@guaranteed ClassWithGetter) -> Int
@@ -283,7 +283,7 @@ class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
   }
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivgTW : $@convention(witness_method: PropertyWithGetterSetter) (@in_guaranteed ClassWithGetterSetter) -> Int {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivgTW :
 // CHECK: bb0([[C:%.*]] : $*ClassWithGetterSetter):
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load_borrow %0
 // CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetterSetter, #ClassWithGetterSetter.b!getter.1 : (ClassWithGetterSetter) -> () -> Int, $@convention(method) (@guaranteed ClassWithGetterSetter) -> Int
@@ -334,7 +334,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
 // thunking code being too dumb but it is harmless to program
 // correctness.
 //
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9protocols24StructWithStoredPropertyVAA0eC6GetterA2aDP1aSivgTW : $@convention(witness_method: PropertyWithGetter) (@in_guaranteed StructWithStoredProperty) -> Int {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9protocols24StructWithStoredPropertyVAA0eC6GetterA2aDP1aSivgTW :
 // CHECK: bb0([[C:%.*]] : $*StructWithStoredProperty):
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [trivial] [[C]]
 // CHECK-NEXT: function_ref
@@ -361,7 +361,7 @@ struct StructWithStoredClassProperty : PropertyWithGetter {
   // CHECK-NEXT: return %2 : $Int
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9protocols29StructWithStoredClassPropertyVAA0fC6GetterA2aDP1aSivgTW : $@convention(witness_method: PropertyWithGetter) (@in_guaranteed StructWithStoredClassProperty) -> Int {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9protocols29StructWithStoredClassPropertyVAA0fC6GetterA2aDP1aSivgTW :
 // CHECK: bb0([[C:%.*]] : $*StructWithStoredClassProperty):
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load_borrow [[C]]
 // CHECK-NEXT: function_ref

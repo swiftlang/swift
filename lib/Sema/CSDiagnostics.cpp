@@ -242,6 +242,11 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     // associated with it directly or rather with
     // one of its parents.
     if (auto *decl = overload->choice.getDeclOrNull()) {
+      // If declaration is an operator let's always use
+      // it to produce `in reference to` diagnostics.
+      if (decl->isOperator())
+        return decl;
+
       auto *DC = decl->getDeclContext();
 
       do {
@@ -510,18 +515,8 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
   if (!ODRE)
     return false;
 
-  auto isStdlibType = [](Type type) {
-    if (auto *NTD = type->getAnyNominal()) {
-      auto *DC = NTD->getDeclContext();
-      return DC->isModuleScopeContext() &&
-             DC->getParentModule()->isStdlibModule();
-    }
-
-    return false;
-  };
-
   auto name = ODRE->getDecls().front()->getBaseName();
-  if (!(name.isOperator() && isStdlibType(getLHS()) && isStdlibType(getRHS())))
+  if (!(name.isOperator() && getLHS()->isStdlibType() && getRHS()->isStdlibType()))
     return false;
 
   // If this is an operator reference and both types are from stdlib,
@@ -570,8 +565,6 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_closure_result;
   case CTP_ArrayElement:
     return diag::cannot_convert_array_element;
-  // TODO(diagnostics): Make dictionary related diagnostics take prescedence
-  // over CSDiag. Currently these won't ever be produced.
   case CTP_DictionaryKey:
     return diag::cannot_convert_dict_key;
   case CTP_DictionaryValue:
@@ -728,7 +721,7 @@ bool LabelingFailure::diagnoseAsNote() {
     return false;
 
   SmallVector<Identifier, 4> argLabels;
-  if (auto *paren = dyn_cast<ParenExpr>(argExpr)) {
+  if (isa<ParenExpr>(argExpr)) {
     argLabels.push_back(Identifier());
   } else if (auto *tuple = dyn_cast<TupleExpr>(argExpr)) {
     argLabels.append(tuple->getElementNames().begin(),
@@ -1304,7 +1297,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
               diag::assignment_dynamic_property_has_immutable_base;
       }
     }
-  } else if (auto sub = dyn_cast<SubscriptExpr>(diagExpr)) {
+  } else if (isa<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;
   } else {
     subElementDiagID = diag::assignment_lhs_is_immutable_variable;
@@ -1885,6 +1878,18 @@ bool ContextualFailure::diagnoseAsError() {
     if (diagnoseCoercionToUnrelatedType())
       return true;
 
+    if (isa<OptionalTryExpr>(anchor)) {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_convert_initializer_value,
+                     getFromType(), getToType());
+      return true;
+    }
+
+    if (isa<AssignExpr>(anchor)) {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_convert_assign,
+                     getFromType(), getToType());
+      return true;
+    }
+
     return false;
   }
 
@@ -2169,7 +2174,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
       if (auto *TE = dyn_cast<TupleExpr>(parentExpr)) {
         // In case of dictionary e.g. `[42: nil]` we need to figure
         // out whether nil is a "key" or a "value".
-        if (auto *DE = dyn_cast<DictionaryExpr>(enclosingExpr)) {
+        if (isa<DictionaryExpr>(enclosingExpr)) {
           assert(TE->getNumElements() == 2);
           CTP = TE->getElement(0) == anchor ? CTP_DictionaryKey
                                             : CTP_DictionaryValue;
@@ -2185,7 +2190,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
       if (isa<ApplyExpr>(enclosingExpr) || isa<SubscriptExpr>(enclosingExpr) ||
           isa<KeyPathExpr>(enclosingExpr))
         CTP = CTP_CallArgument;
-    } else if (auto *CE = dyn_cast<CoerceExpr>(parentExpr)) {
+    } else if (isa<CoerceExpr>(parentExpr)) {
       // `nil` is passed as a left-hand side of the coercion
       // operator e.g. `nil as Foo`
       CTP = CTP_CoerceOperand;
@@ -2261,13 +2266,31 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
     return false;
 
   auto *srcFT = getFromType()->getAs<FunctionType>();
-  if (!srcFT || !srcFT->getParams().empty())
+  if (!srcFT ||
+      !(srcFT->getParams().empty() ||
+        getLocator()->isLastElement<LocatorPathElt::PatternMatch>()))
     return false;
 
   auto toType = getToType();
   if (toType->is<AnyFunctionType>() ||
       !TypeChecker::isConvertibleTo(srcFT->getResult(), toType, getDC()))
     return false;
+
+  // Diagnose cases where the pattern tried to match associated values but
+  // the case we found had none.
+  if (auto match =
+          getLocator()->getLastElementAs<LocatorPathElt::PatternMatch>()) {
+    if (auto enumElementPattern =
+            dyn_cast<EnumElementPattern>(match->getPattern())) {
+      emitDiagnostic(enumElementPattern->getNameLoc(),
+                     diag::enum_element_pattern_assoc_values_mismatch,
+                     enumElementPattern->getName());
+      emitDiagnostic(enumElementPattern->getNameLoc(),
+                     diag::enum_element_pattern_assoc_values_remove)
+        .fixItRemove(enumElementPattern->getSubPattern()->getSourceRange());
+      return true;
+    }
+  }
 
   auto *anchor = getAnchor();
   emitDiagnostic(anchor->getLoc(), diag::missing_nullary_call,
@@ -3601,10 +3624,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         // Give a customized message if we're accessing a member type
         // of a protocol -- otherwise a diagnostic talking about
         // static members doesn't make a whole lot of sense
-        if (auto TAD = dyn_cast<TypeAliasDecl>(Member)) {
+        if (isa<TypeAliasDecl>(Member)) {
           Diag.emplace(emitDiagnostic(loc, diag::typealias_outside_of_protocol,
                                       Name));
-        } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
+        } else if (isa<AssociatedTypeDecl>(Member)) {
           Diag.emplace(emitDiagnostic(loc, diag::assoc_type_outside_of_protocol,
                                       Name));
         } else if (isa<ConstructorDecl>(Member)) {
@@ -3735,6 +3758,8 @@ bool PartialApplicationFailure::diagnoseAsError() {
           anchor, ConstraintLocator::ConstructorMember))) {
     kind = anchor->getBase()->isSuperExpr() ? RefKind::SuperInit
                                             : RefKind::SelfInit;
+  } else if (anchor->getBase()->isSuperExpr()) {
+    kind = RefKind::SuperMethod;
   }
 
   auto diagnostic = CompatibilityWarning
@@ -4480,14 +4505,17 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
                         SM, tuple->getElement(ArgIdx - 1)->getEndLoc()),
                     firstRange.End);
     diag.fixItRemove(removalRange);
-    diag.fixItInsert(secondRange.Start, text.str() + ", ");
+    diag.fixItInsert(secondRange.Start,
+                     text.str() + (isa<BinaryExpr>(anchor) ? "" : ", "));
   };
 
   // There are 4 diagnostic messages variations depending on
   // labeled/unlabeled arguments.
   if (first.empty() && second.empty()) {
     addFixIts(emitDiagnostic(diagLoc,
-                             diag::argument_out_of_order_unnamed_unnamed,
+                             isa<BinaryExpr>(anchor)
+                                 ? diag::argument_out_of_order_binary_op
+                                 : diag::argument_out_of_order_unnamed_unnamed,
                              ArgIdx + 1, PrevArgIdx + 1));
   } else if (first.empty() && !second.empty()) {
     addFixIts(emitDiagnostic(diagLoc, diag::argument_out_of_order_unnamed_named,
@@ -4792,6 +4820,23 @@ bool InvalidUseOfAddressOf::diagnoseAsError() {
 bool ExtraneousReturnFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
   emitDiagnostic(anchor->getLoc(), diag::cannot_return_value_from_void_func);
+  if (auto FD = dyn_cast<FuncDecl>(getDC())) {
+    // We only want to emit the note + fix-it if the function does not
+    // have an explicit return type. The reason we also need to check
+    // whether the parameter list has a valid loc is to guard against
+    // cases like like 'var foo: () { return 1 }' as here that loc will
+    // be invalid. We also need to check that the name is not empty,
+    // because certain decls will have empty name (like setters).
+    if (FD->getBodyResultTypeLoc().getLoc().isInvalid() &&
+        FD->getParameters()->getStartLoc().isValid() &&
+        !FD->getName().empty()) {
+      auto fixItLoc = Lexer::getLocForEndOfToken(
+          getASTContext().SourceMgr, FD->getParameters()->getEndLoc());
+      emitDiagnostic(anchor->getLoc(), diag::add_return_type_note)
+          .fixItInsert(fixItLoc, " -> <#Return Type#>");
+    }
+  }
+
   return true;
 }
 
@@ -5026,9 +5071,7 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
       continue;
 
     auto type = resolveType(typeVar);
-    // This could happen if the diagnostic is used by CSDiag.
-    if (type->is<TypeVariableType>())
-      continue;
+    assert(!type->is<TypeVariableType>());
 
     // If this is one of the defaulted parameter types, attempt
     // to emit placeholder for it instead of `Any`.
@@ -5567,40 +5610,6 @@ bool ArgumentMismatchFailure::diagnoseArchetypeMismatch() const {
 
   if (!(paramDecl && argDecl))
     return false;
-
-  auto describeGenericType = [&](ValueDecl *genericParam,
-                                 bool includeName = false) -> std::string {
-    if (!genericParam)
-      return "";
-
-    Decl *parent = nullptr;
-    if (auto *AT = dyn_cast<AssociatedTypeDecl>(genericParam)) {
-      parent = AT->getProtocol();
-    } else {
-      auto *dc = genericParam->getDeclContext();
-      parent = dc->getInnermostDeclarationDeclContext();
-    }
-
-    if (!parent)
-      return "";
-
-    llvm::SmallString<64> result;
-    llvm::raw_svector_ostream OS(result);
-
-    OS << Decl::getDescriptiveKindName(genericParam->getDescriptiveKind());
-
-    if (includeName && genericParam->hasName())
-      OS << " '" << genericParam->getBaseName() << "'";
-
-    OS << " of ";
-    OS << Decl::getDescriptiveKindName(parent->getDescriptiveKind());
-    if (auto *decl = dyn_cast<ValueDecl>(parent)) {
-      if (decl->hasName())
-        OS << " '" << decl->getFullName() << "'";
-    }
-
-    return OS.str();
-  };
 
   emitDiagnostic(
       getAnchor()->getLoc(), diag::cannot_convert_argument_value_generic, argTy,

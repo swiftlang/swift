@@ -913,6 +913,11 @@ static bool isDependentConformance(
 
     auto assocConformance =
       conformance->getAssociatedConformance(req.getFirstType(), assocProtocol);
+
+    // We migh be presented with a broken AST.
+    if (assocConformance.isInvalid())
+      return false;
+
     if (assocConformance.isAbstract() ||
         isDependentConformance(IGM,
                                assocConformance.getConcrete()
@@ -2157,7 +2162,8 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
                                        initializer)
         : getAddrOfWitnessTable(conf, initializer));
     global->setConstant(isConstantWitnessTable(wt));
-    global->setAlignment(getWitnessTableAlignment().getValue());
+    global->setAlignment(
+        llvm::MaybeAlign(getWitnessTableAlignment().getValue()));
     tableSize = wtableBuilder.getTableSize();
   } else {
     initializer.abandon();
@@ -2732,9 +2738,54 @@ void NecessaryBindings::addTypeMetadata(CanType type) {
   Requirements.insert({type, nullptr});
 }
 
+/// Add all the abstract conditional conformances in the specialized
+/// conformance to the \p requirements.
+static void addAbstractConditionalRequirements(
+    SpecializedProtocolConformance *specializedConformance,
+    llvm::SetVector<GenericRequirement> &requirements) {
+  auto subMap = specializedConformance->getSubstitutionMap();
+  auto condRequirements =
+      specializedConformance->getConditionalRequirementsIfAvailable();
+  if (!condRequirements)
+    return;
+
+  for (auto req : *condRequirements) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+    auto *proto =
+        req.getSecondType()->castTo<ProtocolType>()->getDecl();
+    auto ty = req.getFirstType()->getCanonicalType();
+    if (!isa<ArchetypeType>(ty))
+      continue;
+    auto conformance = subMap.lookupConformance(ty, proto);
+    if (!conformance.isAbstract())
+      continue;
+    requirements.insert({ty, conformance.getAbstract()});
+  }
+  // Recursively add conditional requirements.
+  for (auto &conf : subMap.getConformances()) {
+    if (conf.isAbstract())
+      continue;
+    auto specializedConf =
+        dyn_cast<SpecializedProtocolConformance>(conf.getConcrete());
+    if (!specializedConf)
+      continue;
+    addAbstractConditionalRequirements(specializedConf, requirements);
+  }
+}
+
 void NecessaryBindings::addProtocolConformance(CanType type,
                                                ProtocolConformanceRef conf) {
-  if (!conf.isAbstract()) return;
+  if (!conf.isAbstract()) {
+    auto specializedConf =
+        dyn_cast<SpecializedProtocolConformance>(conf.getConcrete());
+    // The partial apply forwarder does not have the context to reconstruct
+    // abstract conditional conformance requirements.
+    if (forPartialApply && specializedConf) {
+      addAbstractConditionalRequirements(specializedConf, Requirements);
+    }
+    return;
+  }
   assert(isa<ArchetypeType>(type));
 
   // TODO: pass something about the root conformance necessary to
@@ -2925,7 +2976,24 @@ NecessaryBindings
 NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
                                           CanSILFunctionType origType,
                                           SubstitutionMap subs) {
+  return computeBindings(IGM, origType, subs,
+                         false /*forPartialApplyForwarder*/);
+}
+
+NecessaryBindings
+NecessaryBindings::forPartialApplyForwarder(IRGenModule &IGM,
+                                          CanSILFunctionType origType,
+                                          SubstitutionMap subs) {
+  return computeBindings(IGM, origType, subs,
+                         true /*forPartialApplyForwarder*/);
+}
+
+NecessaryBindings NecessaryBindings::computeBindings(
+    IRGenModule &IGM, CanSILFunctionType origType, SubstitutionMap subs,
+    bool forPartialApplyForwarder) {
+
   NecessaryBindings bindings;
+  bindings.forPartialApply = forPartialApplyForwarder;
 
   // Bail out early if we don't have polymorphic parameters.
   if (!hasPolymorphicParameters(origType))

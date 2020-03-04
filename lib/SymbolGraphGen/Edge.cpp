@@ -20,15 +20,15 @@ using namespace symbolgraphgen;
 void Edge::serialize(llvm::json::OStream &OS) const {
   OS.object([&](){
     OS.attribute("kind", Kind.Name);
-    OS.attribute("source", Walker->getUSR(Source));
-    OS.attribute("target", Walker->getUSR(Target));
+    OS.attribute("source", Graph->getUSR(Source));
+    OS.attribute("target", Graph->getUSR(Target));
 
     // In case a dependent module isn't available, serialize a fallback name.
     auto TargetModuleName = Target->getModuleContext()->getName().str();
 
-    if (TargetModuleName != Walker->M.getName().str()) {
+    if (TargetModuleName != Graph->M.getName().str()) {
       SmallVector<SmallString<32>, 8> TargetPathComponents;
-      Walker->getPathComponents(Target, TargetPathComponents);
+      Graph->getPathComponents(Target, TargetPathComponents);
 
       SmallString<128> Scratch(TargetModuleName);
       for (auto it = TargetPathComponents.begin();

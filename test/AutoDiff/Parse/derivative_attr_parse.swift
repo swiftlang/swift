@@ -85,7 +85,15 @@ func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
-func localDerivativeRegistration() {
+// TF-1168: missing comma before `wrt:`.
+// expected-error @+2 {{expected ',' separator}}
+// expected-error @+1 {{expected declaration}}
+@derivative(of: foo wrt: x)
+func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
+  return (x, { $0 })
+}
+
+func testLocalDerivativeRegistration() {
   // expected-error @+1 {{attribute '@derivative' can only be used in a non-local scope}}
   @derivative(of: sin)
   func dsin()

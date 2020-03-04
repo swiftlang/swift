@@ -299,10 +299,6 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 /// Otherwise, return an empty type.
 SILType computeTBAAType(SILValue V);
 
-/// Check if \p V points to a let-member.
-/// Nobody can write into let members.
-bool isLetPointer(SILValue V);
-
 } // end namespace swift
 
 namespace llvm {

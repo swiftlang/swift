@@ -64,18 +64,20 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
 // CHECK-NEXT: [[FN:%.*]] = class_method [[SELF]] : $Base, #Base.storedFunction!modify.1
 // CHECK-NEXT: ([[SUPER_ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[FN]]([[SELF]])
-// CHECK-NEXT: [[SUB_ADDR:%.*]] = alloc_stack $@callee_guaranteed () -> @out Int
+// CHECK-NEXT: [[SUB_ADDR:%.*]] = alloc_stack $@callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <Int>
 // CHECK-NEXT: [[SUPER_FN:%.*]] = load [take] [[SUPER_ADDR]]
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @$sSiIegd_SiIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[SUPER_FN]])
-// CHECK-NEXT: store [[T1]] to [init] [[SUB_ADDR]]
-// CHECK-NEXT: yield [[SUB_ADDR]] : $*@callee_guaranteed () -> @out Int, resume bb1, unwind bb2
+// CHECK-NEXT: [[T2:%.*]] = convert_function [[T1]]
+// CHECK-NEXT: store [[T2]] to [init] [[SUB_ADDR]]
+// CHECK-NEXT: yield [[SUB_ADDR]] : ${{.*}}, resume bb1, unwind bb2
 // CHECK:    bb1:
 // CHECK-NEXT: [[SUB_FN:%.*]] = load [take] [[SUB_ADDR]]
+// CHECK-NEXT: [[CVT_FN:%.*]] = convert_function [[SUB_FN]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @$sSiIegr_SiIegd_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out Int) -> Int
-// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[SUB_FN]])
+// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[CVT_FN]])
 // CHECK-NEXT: store [[T1]] to [init] [[SUPER_ADDR]]
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
 // CHECK-NEXT: end_apply [[TOKEN]]
@@ -90,18 +92,20 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[FN:%.*]] = function_ref @$s6modify4BaseC19finalStoredFunctionSiycvM
 // CHECK-NEXT: ([[SUPER_ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[FN]]([[SELF]])
-// CHECK-NEXT: [[SUB_ADDR:%.*]] = alloc_stack $@callee_guaranteed () -> @out Int
+// CHECK-NEXT: [[SUB_ADDR:%.*]] = alloc_stack $@callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <Int>
 // CHECK-NEXT: [[SUPER_FN:%.*]] = load [take] [[SUPER_ADDR]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @$sSiIegd_SiIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[SUPER_FN]])
-// CHECK-NEXT: store [[T1]] to [init] [[SUB_ADDR]]
-// CHECK-NEXT: yield [[SUB_ADDR]] : $*@callee_guaranteed () -> @out Int, resume bb1, unwind bb2
+// CHECK-NEXT: [[T2:%.*]] = convert_function [[T1]]
+// CHECK-NEXT: store [[T2]] to [init] [[SUB_ADDR]]
+// CHECK-NEXT: yield [[SUB_ADDR]] : $*{{.*}}, resume bb1, unwind bb2
 // CHECK:    bb1:
 // CHECK-NEXT: [[SUB_FN:%.*]] = load [take] [[SUB_ADDR]]
+// CHECK-NEXT: [[CVT_FN:%.*]] = convert_function [[SUB_FN]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @$sSiIegr_SiIegd_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out Int) -> Int
-// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[SUB_FN]])
+// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[CVT_FN]])
 // CHECK-NEXT: store [[T1]] to [init] [[SUPER_ADDR]]
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
 // CHECK-NEXT: end_apply [[TOKEN]]
@@ -115,18 +119,20 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[FN:%.*]] = function_ref @$s6modify4BaseC14staticFunctionSiycvMZ
 // CHECK-NEXT: ([[SUPER_ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[FN]]([[SELF]])
-// CHECK-NEXT: [[SUB_ADDR:%.*]] = alloc_stack $@callee_guaranteed () -> @out Int
+// CHECK-NEXT: [[SUB_ADDR:%.*]] = alloc_stack $@callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <Int>
 // CHECK-NEXT: [[SUPER_FN:%.*]] = load [take] [[SUPER_ADDR]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @$sSiIegd_SiIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[SUPER_FN]])
-// CHECK-NEXT: store [[T1]] to [init] [[SUB_ADDR]]
-// CHECK-NEXT: yield [[SUB_ADDR]] : $*@callee_guaranteed () -> @out Int, resume bb1, unwind bb2
+// CHECK-NEXT: [[T2:%.*]] = convert_function [[T1]]
+// CHECK-NEXT: store [[T2]] to [init] [[SUB_ADDR]]
+// CHECK-NEXT: yield [[SUB_ADDR]] : $*{{.*}}, resume bb1, unwind bb2
 // CHECK:    bb1:
 // CHECK-NEXT: [[SUB_FN:%.*]] = load [take] [[SUB_ADDR]]
+// CHECK-NEXT: [[CVT_FN:%.*]] = convert_function [[SUB_FN]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @$sSiIegr_SiIegd_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out Int) -> Int
-// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[SUB_FN]])
+// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[CVT_FN]])
 // CHECK-NEXT: store [[T1]] to [init] [[SUPER_ADDR]]
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
 // CHECK-NEXT: end_apply [[TOKEN]]
@@ -290,7 +296,7 @@ struct Bill : Totalled {
 // CHECK:   end_access [[ACCESS]]
 // CHECK: }
 
-// CHECK-LABEL:  sil private [transparent] [thunk] [ossa] @$s6modify4BillVAA8TotalledA2aDP5totalSivMTW : $@yield_once @convention(witness_method: Totalled) (@inout Bill) -> @yields @inout Int {
+// CHECK-LABEL:  sil private [transparent] [thunk] [ossa] @$s6modify4BillVAA8TotalledA2aDP5totalSivMTW :
 // CHECK:        bb0([[SELF:%.*]] : $*Bill):
 // CHECK:          [[T0:%.*]] = function_ref @$s6modify4BillV5totalSivM
 // CHECK-NEXT:     ([[T1:%.*]], [[TOKEN:%.*]]) = begin_apply [[T0]]([[SELF]])

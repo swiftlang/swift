@@ -86,6 +86,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.RemarkOnRebuildFromModuleInterface |=
     Args.hasArg(OPT_Rmodule_interface_rebuild);
 
+  Opts.DisableInterfaceFileLock |= Args.hasArg(OPT_disable_interface_lockfile);
+
   computePrintStatsOptions();
   computeDebugTimeOptions();
   computeTBDOptions();
@@ -174,8 +176,6 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
-  Opts.EnableSerializationNestedTypeLookupTable &=
-      !Args.hasArg(OPT_disable_serialization_nested_type_lookup_table);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames();

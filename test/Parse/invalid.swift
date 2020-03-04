@@ -134,7 +134,7 @@ let x: () = ()
 !x // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 
 func sr8202_foo(@NSApplicationMain x: Int) {} // expected-error {{@NSApplicationMain may only be used on 'class' declarations}}
-func sr8202_bar(@available(iOS, deprecated: 0) x: Int) {} // expected-error {{'@availability' attribute cannot be applied to this declaration}}
+func sr8202_bar(@available(iOS, deprecated: 0) x: Int) {} // expected-error {{'@available' attribute cannot be applied to this declaration}}
 func sr8202_baz(@discardableResult x: Int) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
 func sr8202_qux(@objcMembers x: String) {} // expected-error {{@objcMembers may only be used on 'class' declarations}}
 func sr8202_quux(@weak x: String) {} // expected-error {{'weak' is a declaration modifier, not an attribute}} expected-error {{'weak' may only be used on 'var' declarations}}
@@ -143,5 +143,5 @@ class sr8202_cls<@NSApplicationMain T: AnyObject> {} // expected-error {{@NSAppl
 func sr8202_func<@discardableResult T>(x: T) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
 enum sr8202_enum<@indirect T> {} // expected-error {{'indirect' is a declaration modifier, not an attribute}} expected-error {{'indirect' modifier cannot be applied to this declaration}}
 protocol P {
-  @available(swift, introduced: 4.2) associatedtype Assoc // expected-error {{'@availability' attribute cannot be applied to this declaration}}
+  @available(swift, introduced: 4.2) associatedtype Assoc // expected-error {{'@available' attribute cannot be applied to this declaration}}
 }

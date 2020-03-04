@@ -18,6 +18,8 @@
 
 namespace swift {
 
+class PersistentParserState;
+
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
@@ -54,7 +56,14 @@ public:
     /// elsewhere.
     ///
     /// Mutually exclusive with Exported.
-    ImplementationOnly = 0x8
+    ImplementationOnly = 0x8,
+
+    // The module is imported to have access to named SPIs which is an
+    // implementation detail of this file.
+    SPIAccessControl = 0x10,
+
+    /// Used for DenseMap.
+    Reserved = 0x80
   };
 
   /// \see ImportFlags
@@ -63,15 +72,53 @@ public:
   struct ImportedModuleDesc {
     ModuleDecl::ImportedModule module;
     ImportOptions importOptions;
+
+    // Filename for a @_private import.
     StringRef filename;
 
+    // Names of explicitly imported SPIs.
+    ArrayRef<Identifier> spiGroups;
+
     ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options,
-                       StringRef filename = {})
-        : module(module), importOptions(options), filename(filename) {
+                       StringRef filename = {},
+                       ArrayRef<Identifier> spiGroups = {})
+        : module(module), importOptions(options), filename(filename),
+          spiGroups(spiGroups) {
       assert(!(importOptions.contains(ImportFlags::Exported) &&
-               importOptions.contains(ImportFlags::ImplementationOnly)));
+               importOptions.contains(ImportFlags::ImplementationOnly)) ||
+             importOptions.contains(ImportFlags::Reserved));
     }
   };
+
+  /// Flags that direct how the source file is parsed.
+  enum class ParsingFlags : uint8_t {
+    /// Whether to disable delayed parsing for nominal type, extension, and
+    /// function bodies.
+    ///
+    /// If set, type and function bodies will be parsed eagerly. Otherwise they
+    /// will be lazily parsed when their contents is queried. This lets us avoid
+    /// building AST nodes when they're not needed.
+    ///
+    /// This is set for primary files, since we want to type check all
+    /// declarations and function bodies anyway, so there's no benefit in lazy
+    /// parsing.
+    DisableDelayedBodies = 1 << 0,
+
+    /// Whether to disable evaluating the conditions of #if decls.
+    ///
+    /// If set, #if decls are parsed as-is. Otherwise, the bodies of any active
+    /// clauses are hoisted such that they become sibling nodes with the #if
+    /// decl.
+    ///
+    /// FIXME: When condition evaluation moves to a later phase, remove this
+    /// and adjust the client call 'performParseOnly'.
+    DisablePoundIfEvaluation = 1 << 1,
+
+    /// Whether to suppress warnings when parsing. This is set for secondary
+    /// files, as they get parsed multiple times.
+    SuppressWarnings = 1 << 2
+  };
+  using ParsingOptions = OptionSet<ParsingFlags>;
 
 private:
   std::unique_ptr<SourceLookupCache> Cache;
@@ -115,6 +162,9 @@ private:
   /// If not, we can fast-path module checks.
   bool HasImplementationOnlyImports = false;
 
+  /// The parsing options for the file.
+  ParsingOptions ParsingOpts;
+
   /// The scope map that describes this source file.
   std::unique_ptr<ASTScope> Scope;
 
@@ -127,6 +177,27 @@ private:
 
   /// The list of top-level declarations in the source file.
   std::vector<Decl *> Decls;
+
+  using SeparatelyImportedOverlayMap =
+    llvm::SmallDenseMap<ModuleDecl *, llvm::SmallPtrSet<ModuleDecl *, 1>>;
+
+  /// Keys are modules which are shadowed by one or more separately-imported
+  /// overlays; values are the list of overlays shadowing them.
+  ///
+  /// This is used by cross-import overlays to make their members appear to
+  /// be part of the underlying module. (ClangImporter overlays use a different
+  /// mechanism which is not SourceFile-dependent.)
+  SeparatelyImportedOverlayMap separatelyImportedOverlays;
+
+  /// A pointer to PersistentParserState with a function reference to its
+  /// deleter to handle the fact that it's forward declared.
+  using ParserStatePtr =
+      std::unique_ptr<PersistentParserState, void (*)(PersistentParserState *)>;
+
+  /// Stores delayed parser state that code completion needs to be able to
+  /// resume parsing at the code completion token in the file.
+  ParserStatePtr DelayedParserState =
+      ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
 
   friend ASTContext;
   friend Impl;
@@ -157,6 +228,9 @@ public:
     assert(count <= Decls.size() && "Can only truncate top-level decls!");
     Decls.resize(count);
   }
+
+  /// Retrieve the parsing options for the file.
+  ParsingOptions getParsingOptions() const { return ParsingOpts; }
 
   /// A cache of syntax nodes that can be reused when creating the syntax tree
   /// for this file.
@@ -232,7 +306,7 @@ public:
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
-             bool KeepSyntaxTree = false);
+             bool KeepSyntaxTree = false, ParsingOptions parsingOpts = {});
 
   ~SourceFile();
 
@@ -257,11 +331,39 @@ public:
 
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
-  /// This is a hack for 'main' file parsing and the integrated REPL.
+  /// Find all SPI names imported from \p importedModule by this file,
+  /// collecting the identifiers in \p spiGroups.
+  virtual void
+  lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                         SmallVectorImpl<Identifier> &spiGroups) const override;
+
+  // Is \p targetDecl accessible as an explictly imported SPI from this file?
+  bool isImportedAsSPI(const ValueDecl *targetDecl) const;
+
+  bool shouldCrossImport() const;
+
+  /// Register a separately-imported overlay as shadowing the module that
+  /// declares it.
   ///
-  /// FIXME: Refactor main file parsing to not pump the parser incrementally.
-  /// FIXME: Remove the integrated REPL.
-  void clearLookupCache();
+  /// \returns true if the overlay was added; false if it already existed.
+  bool addSeparatelyImportedOverlay(ModuleDecl *overlay,
+                                    ModuleDecl *declaring) {
+    return std::get<1>(separatelyImportedOverlays[declaring].insert(overlay));
+  }
+
+  /// Retrieves a list of separately imported overlays which are shadowing
+  /// \p declaring. If any \p overlays are returned, qualified lookups into
+  /// \p declaring should be performed into \p overlays instead; since they
+  /// are overlays, they will re-export \p declaring, but will also augment it
+  /// with additional symbols.
+  void getSeparatelyImportedOverlays(
+      ModuleDecl *declaring, SmallVectorImpl<ModuleDecl *> &overlays) {
+    auto i = separatelyImportedOverlays.find(declaring);
+    if (i == separatelyImportedOverlays.end()) return;
+
+    auto &value = std::get<1>(*i);
+    overlays.append(value.begin(), value.end());
+  }
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
@@ -350,6 +452,20 @@ public:
 
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
+
+  /// Retrieves the previously set delayed parser state, asserting that it
+  /// exists.
+  PersistentParserState *getDelayedParserState() {
+    auto *state = DelayedParserState.get();
+    assert(state && "Didn't set any delayed parser state!");
+    return state;
+  }
+
+  /// Record delayed parser state for the source file. This is needed for code
+  /// completion's second pass.
+  void setDelayedParserState(ParserStatePtr &&state) {
+    DelayedParserState = std::move(state);
+  }
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;
@@ -453,6 +569,10 @@ public:
 
   bool isSuitableForASTScopes() const { return canBeParsedInFull(); }
 
+  /// Whether the bodies of types and functions within this file can be lazily
+  /// parsed.
+  bool hasDelayedBodyParsing() const;
+
   syntax::SourceFileSyntax getSyntaxRoot() const;
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
@@ -475,6 +595,11 @@ private:
 
   std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
 };
+
+inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
+                                            SourceFile::ParsingFlags rhs) {
+  return SourceFile::ParsingOptions(lhs) | rhs;
+}
 
 inline SourceFile &
 ModuleDecl::getMainSourceFile(SourceFileKind expectedKind) const {
@@ -513,5 +638,59 @@ inline void simple_display(llvm::raw_ostream &out, const SourceFile *SF) {
   out << "source_file " << '\"' << SF->getFilename() << '\"';
 }
 } // end namespace swift
+
+namespace llvm {
+
+template<>
+struct DenseMapInfo<swift::SourceFile::ImportOptions> {
+  using ImportOptions = swift::SourceFile::ImportOptions;
+
+  using UnsignedDMI = DenseMapInfo<uint8_t>;
+
+  static inline ImportOptions getEmptyKey() {
+    return ImportOptions(UnsignedDMI::getEmptyKey());
+  }
+  static inline ImportOptions getTombstoneKey() {
+    return ImportOptions(UnsignedDMI::getTombstoneKey());
+  }
+  static inline unsigned getHashValue(ImportOptions options) {
+    return UnsignedDMI::getHashValue(options.toRaw());
+  }
+  static bool isEqual(ImportOptions a, ImportOptions b) {
+    return UnsignedDMI::isEqual(a.toRaw(), b.toRaw());
+  }
+};
+
+template<>
+struct DenseMapInfo<swift::SourceFile::ImportedModuleDesc> {
+  using ImportedModuleDesc = swift::SourceFile::ImportedModuleDesc;
+
+  using ImportedModuleDMI = DenseMapInfo<swift::ModuleDecl::ImportedModule>;
+  using ImportOptionsDMI = DenseMapInfo<swift::SourceFile::ImportOptions>;
+  using StringRefDMI = DenseMapInfo<StringRef>;
+
+  static inline ImportedModuleDesc getEmptyKey() {
+    return ImportedModuleDesc(ImportedModuleDMI::getEmptyKey(),
+                              ImportOptionsDMI::getEmptyKey(),
+                              StringRefDMI::getEmptyKey());
+  }
+  static inline ImportedModuleDesc getTombstoneKey() {
+    return ImportedModuleDesc(ImportedModuleDMI::getTombstoneKey(),
+                              ImportOptionsDMI::getTombstoneKey(),
+                              StringRefDMI::getTombstoneKey());
+  }
+  static inline unsigned getHashValue(const ImportedModuleDesc &import) {
+    return combineHashValue(ImportedModuleDMI::getHashValue(import.module),
+           combineHashValue(ImportOptionsDMI::getHashValue(import.importOptions),
+                            StringRefDMI::getHashValue(import.filename)));
+  }
+  static bool isEqual(const ImportedModuleDesc &a,
+                      const ImportedModuleDesc &b) {
+    return ImportedModuleDMI::isEqual(a.module, b.module) &&
+           ImportOptionsDMI::isEqual(a.importOptions, b.importOptions) &&
+           StringRefDMI::isEqual(a.filename, b.filename);
+  }
+};
+}
 
 #endif

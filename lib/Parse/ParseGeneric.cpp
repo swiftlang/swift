@@ -279,6 +279,14 @@ ParserStatus Parser::parseGenericWhereClause(
     Optional<SyntaxParsingContext> BodyContext;
     BodyContext.emplace(SyntaxContext);
 
+    if (Tok.is(tok::code_complete)) {
+      if (CodeCompletion)
+        CodeCompletion->completeGenericRequirement();
+      consumeToken(tok::code_complete);
+      Status.setHasCodeCompletion();
+      break;
+    }
+
     // Parse the leading type. It doesn't necessarily have to be just a type
     // identifier if we're dealing with a same-type constraint.
     ParserResult<TypeRepr> FirstType = parseType();

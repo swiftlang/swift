@@ -28,6 +28,10 @@ from build_swift.build_swift import defaults
 from build_swift.build_swift import driver_arguments
 from build_swift.build_swift import migration
 from build_swift.build_swift import presets
+from build_swift.build_swift.constants import BUILD_SCRIPT_IMPL_PATH
+from build_swift.build_swift.constants import SWIFT_BUILD_ROOT
+from build_swift.build_swift.constants import SWIFT_REPO_NAME
+from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
 import six
 
@@ -35,25 +39,18 @@ from swift_build_support.swift_build_support import products
 from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support import targets
 from swift_build_support.swift_build_support import workspace
-from swift_build_support.swift_build_support.SwiftBuildSupport import (
-    HOME,
-    SWIFT_BUILD_ROOT,
-    SWIFT_REPO_NAME,
-    SWIFT_SOURCE_ROOT,
-)
 from swift_build_support.swift_build_support.cmake import CMake
 from swift_build_support.swift_build_support.host_specific_configuration \
     import HostSpecificConfiguration
-from swift_build_support.swift_build_support.targets import \
-    StdlibDeploymentTarget
+from swift_build_support.swift_build_support.targets import StdlibDeploymentTarget
 from swift_build_support.swift_build_support.toolchain import host_toolchain
 
 
 # -----------------------------------------------------------------------------
 # Constants
 
-BUILD_SCRIPT_IMPL = os.path.join(
-    SWIFT_SOURCE_ROOT, SWIFT_REPO_NAME, "utils", "build-script-impl")
+# TODO: Remove this constant, it's really not helpful.
+HOME = os.environ.get("HOME", "/")
 
 
 # -----------------------------------------------------------------------------
@@ -220,8 +217,10 @@ def validate_arguments(toolchain, args):
 
     targets_needing_toolchain = [
         'build_indexstoredb',
+        'build_playgroundsupport',
         'build_pythonkit',
         'build_sourcekitlsp',
+        'build_tensorflow_swift_apis',
         'build_toolchainbenchmarks',
         'tsan_libdispatch_test',
     ]
@@ -270,9 +269,13 @@ def default_stdlib_deployment_targets(args):
 def apply_default_arguments(toolchain, args):
     # Infer if ninja is required
     ninja_required = (
-        args.cmake_generator == 'Ninja' or args.build_foundation or
-        args.build_pythonkit or args.build_sourcekitlsp or
-        args.build_indexstoredb)
+        args.build_foundation or
+        args.build_indexstoredb or
+        args.build_pythonkit or
+        args.build_sourcekitlsp or
+        args.build_tensorflow_swift_apis or
+        args.cmake_generator == 'Ninja'
+    )
     if ninja_required and toolchain.ninja is None:
         args.build_ninja = True
 
@@ -321,7 +324,11 @@ def apply_default_arguments(toolchain, args):
     android_tgts = [tgt for tgt in args.stdlib_deployment_targets
                     if StdlibDeploymentTarget.Android.contains(tgt)]
     if not args.android and len(android_tgts) > 0:
-        args.android = True
+        # If building natively on an Android host, avoid the NDK
+        # cross-compilation configuration.
+        if not StdlibDeploymentTarget.Android.contains(StdlibDeploymentTarget
+                                                       .host_target().name):
+            args.android = True
         args.build_android = False
 
     # Include the Darwin supported architectures in the CMake options.
@@ -548,8 +555,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-libdispatch"]
         if not args.build_libicu:
             impl_args += ["--skip-build-libicu"]
-        if not args.build_playgroundsupport:
-            impl_args += ["--skip-build-playgroundsupport"]
         if args.build_swift_dynamic_stdlib:
             impl_args += ["--build-swift-dynamic-stdlib"]
         if args.build_swift_static_stdlib:
@@ -589,14 +594,15 @@ class BuildScriptInvocation(object):
         if not args.test and not args.long_test and not args.stress_test:
             impl_args += ["--skip-test-swift"]
         if not args.test:
-            impl_args += ["--skip-test-cmark",
-                          "--skip-test-lldb",
-                          "--skip-test-llbuild",
-                          "--skip-test-xctest",
-                          "--skip-test-foundation",
-                          "--skip-test-libdispatch",
-                          "--skip-test-libicu",
-                          "--skip-test-playgroundsupport"]
+            impl_args += [
+                "--skip-test-cmark",
+                "--skip-test-lldb",
+                "--skip-test-llbuild",
+                "--skip-test-xctest",
+                "--skip-test-foundation",
+                "--skip-test-libdispatch",
+                "--skip-test-libicu",
+            ]
         if not args.test_linux:
             impl_args += ["--skip-test-linux"]
         if not args.test_freebsd:
@@ -657,6 +663,10 @@ class BuildScriptInvocation(object):
                 "--android-icu-i18n-include", args.android_icu_i18n_include,
                 "--android-icu-data", args.android_icu_data,
             ]
+        # If building natively on an Android host, only pass the API level.
+        if StdlibDeploymentTarget.Android.contains(StdlibDeploymentTarget
+                                                   .host_target().name):
+            impl_args += ["--android-api-level", args.android_api_level]
         if args.android_deploy_device_path:
             impl_args += [
                 "--android-deploy-device-path",
@@ -819,8 +829,12 @@ class BuildScriptInvocation(object):
             product_classes.append(products.SwiftEvolve)
         if self.args.build_indexstoredb:
             product_classes.append(products.IndexStoreDB)
+        if self.args.build_playgroundsupport:
+            product_classes.append(products.PlaygroundSupport)
         if self.args.build_pythonkit:
             product_classes.append(products.PythonKit)
+        if self.args.build_tensorflow_swift_apis:
+            product_classes.append(products.TensorFlowSwiftAPIs)
         if self.args.build_sourcekitlsp:
             product_classes.append(products.SourceKitLSP)
         if self.args.build_toolchainbenchmarks:
@@ -839,7 +853,7 @@ class BuildScriptInvocation(object):
         # `build-script-impl`.
         if self.args.legacy_impl:
             # Execute the underlying build script implementation.
-            shell.call_without_sleeping([BUILD_SCRIPT_IMPL] + self.impl_args,
+            shell.call_without_sleeping([BUILD_SCRIPT_IMPL_PATH] + self.impl_args,
                                         env=self.impl_env, echo=True)
             return
 
@@ -961,7 +975,7 @@ class BuildScriptInvocation(object):
 
     def _execute_action(self, action_name):
         shell.call_without_sleeping(
-            [BUILD_SCRIPT_IMPL] + self.impl_args +
+            [BUILD_SCRIPT_IMPL_PATH] + self.impl_args +
             ["--only-execute", action_name],
             env=self.impl_env, echo=self.args.verbose_build)
 
@@ -1142,7 +1156,7 @@ def main_normal():
         # If we received any impl args, check if `build-script-impl` would
         # accept them or not before any further processing.
         try:
-            migration.check_impl_args(BUILD_SCRIPT_IMPL,
+            migration.check_impl_args(BUILD_SCRIPT_IMPL_PATH,
                                       args.build_script_impl_args)
         except ValueError as e:
             exit_rejecting_arguments(e, parser)

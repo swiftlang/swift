@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 538; // swiftmodules from swiftinterfaces have nested types tables
+const uint16_t SWIFTMODULE_VERSION_MINOR = 544; // TypeEraser
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -797,16 +797,23 @@ namespace input_block {
     SEARCH_PATH,
     FILE_DEPENDENCY,
     DEPENDENCY_DIRECTORY,
-    MODULE_INTERFACE_PATH
+    MODULE_INTERFACE_PATH,
+    IMPORTED_MODULE_SPIS,
   };
 
   using ImportedModuleLayout = BCRecordLayout<
     IMPORTED_MODULE,
     ImportControlField, // import kind
     BCFixed<1>,         // scoped?
+    BCFixed<1>,         // has spis?
     BCBlob // module name, with submodule path pieces separated by \0s.
            // If the 'scoped' flag is set, the final path piece is an access
            // path within the module.
+  >;
+
+  using ImportedModuleLayoutSPI = BCRecordLayout<
+    IMPORTED_MODULE_SPIS,
+    BCBlob // SPI names, separated by \0s
   >;
 
   using LinkLibraryLayout = BCRecordLayout<
@@ -1670,7 +1677,11 @@ namespace decls_block {
     BCBlob      // _silgen_name
   >;
 
-  
+  using SPIAccessControlDeclAttrLayout = BCRecordLayout<
+    SPIAccessControl_DECL_ATTR,
+    BCArray<IdentifierIDField>  // SPI names
+  >;
+
   using AlignmentDeclAttrLayout = BCRecordLayout<
     Alignment_DECL_ATTR,
     BCFixed<1>, // implicit flag
@@ -1844,6 +1855,12 @@ namespace decls_block {
     DeclIDField, // replaced function
     BCVBR<4>,   // # of arguments (+1) or zero if no name
     BCArray<IdentifierIDField>
+  >;
+
+  using TypeEraserDeclAttrLayout = BCRecordLayout<
+    TypeEraser_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    TypeIDField // type eraser type
   >;
 
   using CustomDeclAttrLayout = BCRecordLayout<

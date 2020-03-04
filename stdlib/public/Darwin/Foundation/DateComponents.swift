@@ -265,7 +265,7 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
 
     // MARK: - Bridging Helpers
     
-    fileprivate init(reference: __shared NSDateComponents) {
+    private init(reference: __shared NSDateComponents) {
         _handle = _MutableHandle(reference: reference)
     }
 

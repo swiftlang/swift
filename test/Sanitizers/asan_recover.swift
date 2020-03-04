@@ -2,6 +2,9 @@
 // REQUIRES: asan_runtime
 // UNSUPPORTED: windows
 
+// TODO(rdar://problem/58702902) Re-enable on Linux once rdar://problem/58640751 is fixed.
+// UNSUPPORTED: OS=linux-gnu
+
 // Check with recovery instrumentation and runtime option to continue execution.
 // RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=address -sanitize-recover=address -import-objc-header %S/asan_interface.h -emit-ir -o %t.asan_recover.ll
 // RUN: %FileCheck -check-prefix=CHECK-IR -input-file=%t.asan_recover.ll %s
@@ -30,7 +33,7 @@
 
 // FIXME: We need this so we can flush stdout but this won't
 // work on other Platforms (e.g. Windows).
-#if os(Linux)
+#if canImport(Glibc)
     import Glibc
 #else
     import Darwin.C

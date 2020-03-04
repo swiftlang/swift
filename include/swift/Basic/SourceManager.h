@@ -76,6 +76,10 @@ public:
     CodeCompletionOffset = Offset;
   }
 
+  bool hasCodeCompletionBuffer() const {
+    return CodeCompletionBufferID != 0U;
+  }
+
   unsigned getCodeCompletionBufferID() const {
     return CodeCompletionBufferID;
   }
@@ -251,6 +255,8 @@ public:
     return Offset.hasValue() ? getLocForOffset(BufferId, Offset.getValue()) :
                                SourceLoc();
   }
+
+  std::string getLineString(unsigned BufferID, unsigned LineNumber);
 
   SourceLoc getLocFromExternalSource(StringRef Path, unsigned Line, unsigned Col);
 private:

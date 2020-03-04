@@ -408,7 +408,8 @@ public:
   
   template<typename StmtTy>
   bool typeCheckStmt(StmtTy *&S) {
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "typecheck-stmt", S);
+    FrontendStatsTracer StatsTracer(getASTContext().Stats,
+                                    "typecheck-stmt", S);
     PrettyStackTraceStmt trace(getASTContext(), "type-checking", S);
     StmtTy *S2 = cast_or_null<StmtTy>(visit(S));
     if (S2 == nullptr)
@@ -1466,8 +1467,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         isa<DotSyntaxCallExpr>(E) ? cast<DotSyntaxCallExpr>(E)->getFn() : E;
 
     if (auto *Fn = dyn_cast<ApplyExpr>(expr)) {
-      if (auto *declRef = dyn_cast<DeclRefExpr>(Fn->getFn())) {
-        if (auto *FD = dyn_cast<AbstractFunctionDecl>(declRef->getDecl())) {
+      if (auto *calledValue = Fn->getCalledValue()) {
+        if (auto *FD = dyn_cast<AbstractFunctionDecl>(calledValue)) {
           if (FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
             isDiscardable = true;
           }
@@ -1932,15 +1933,6 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
                                             SourceLoc endTypeCheckLoc) const {
   ASTContext &ctx = AFD->getASTContext();
 
-  // Accounting for type checking of function bodies.
-  // FIXME: We could probably take this away, given that the request-evaluator
-  // does much of it for us.
-  FrontendStatsTracer StatsTracer(ctx.Stats, "typecheck-fn", AFD);
-  PrettyStackTraceDecl StackEntry("type-checking", AFD);
-
-  if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumFunctionsTypechecked++;
-
   Optional<FunctionBodyTimer> timer;
   const auto &tyOpts = ctx.TypeCheckerOpts;
   if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
@@ -2073,4 +2065,35 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   TLCD->setBody(Body);
   checkTopLevelErrorHandling(TLCD);
   performTopLevelDeclDiagnostics(TLCD);
+}
+
+void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
+  llvm::SmallDenseMap<Identifier, VarDecl *, 4> latestVars;
+  auto recordVar = [&](VarDecl *var) {
+    if (!var->hasName())
+      return;
+
+    // If there is an existing variable with this name, set it as the
+    // parent of this new variable.
+    auto &entry = latestVars[var->getName()];
+    if (entry) {
+      assert(!var->getParentVarDecl() ||
+             var->getParentVarDecl() == entry);
+      var->setParentVarDecl(entry);
+    }
+
+    // Record this variable as the latest with this name.
+    entry = var;
+  };
+
+  // Wire up the parent var decls for each variable that occurs within
+  // the patterns of each case item. in source order.
+  for (const auto &caseItem : caseStmt->getCaseLabelItems()) {
+    caseItem.getPattern()->forEachVariable(recordVar);
+  }
+
+  // Wire up the case body variables to the latest patterns.
+  for (auto bodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    recordVar(bodyVar);
+  }
 }

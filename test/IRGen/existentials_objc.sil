@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %t %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -disable-type-layout -sdk %S/Inputs -I %t %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -22,7 +22,7 @@ bb0(%0 : $*Any, %1 : $T):
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} swiftcc void @init_opaque_existential([[ANY:%Any]]* noalias nocapture sret, [[GIZMO:%.*]]*, [[TYPE:%.*]]* %T) {{.*}} {
+// CHECK-DAG:   define{{( protected)?}} swiftcc void @init_opaque_existential([[ANY:%Any]]* noalias nocapture sret %0, [[GIZMO:%.*]]* %1, [[TYPE:%.*]]* %T) {{.*}} {
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 1
 // CHECK-NEXT:    store [[TYPE]]* %T, [[TYPE]]** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 0
@@ -38,11 +38,11 @@ bb0(%0 : $*Any, %1 : $*Any):
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} swiftcc void @take_opaque_existential([[ANY:%Any]]* noalias nocapture sret, %Any* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-DAG:   define{{( protected)?}} swiftcc void @take_opaque_existential([[ANY:%Any]]* noalias nocapture sret %0, %Any* noalias nocapture dereferenceable({{.*}}) %1) {{.*}} {
 // CHECK: call %Any* @"$sypWOb"(%Any* %1, %Any* %0)
 // CHECK-NEXT:    ret void
 
-// CHECK-DAG:   define linkonce_odr hidden %Any* @"$sypWOb"(%Any*, %Any*)
+// CHECK-DAG:   define linkonce_odr hidden %Any* @"$sypWOb"(%Any* %0, %Any* %1)
 // CHECK:       %2 = bitcast %Any* %1 to i8*
 // CHECK-NEXT:  %3 = bitcast %Any* %0 to i8*
 // CHECK-NEXT:  call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 8 %2, i8* align 8 %3, i64 32, i1 false)
@@ -52,7 +52,7 @@ bb0(%0 : $*Any, %1 : $*Any):
 @objc protocol OP {}
 @objc protocol OP2: OP {}
 
-// CHECK-DAG: define{{( protected)?}} swiftcc %objc_object* @init_existential_objc_to_objc(%objc_object*) {{.*}} {
+// CHECK-DAG: define{{( protected)?}} swiftcc %objc_object* @init_existential_objc_to_objc(%objc_object* %0) {{.*}} {
 // CHECK:       ret %objc_object* %0
 sil @init_existential_objc_to_objc : $@convention(thin) (@owned OP2) -> @owned OP {
 entry(%o : $OP2):
@@ -62,7 +62,7 @@ entry(%o : $OP2):
 
 protocol CP: class {}
 
-// CHECK-DAG: define{{( protected)?}} swiftcc { %objc_object*, i8** } @class_existential_unowned(%objc_object*, i8**) {{.*}} {
+// CHECK-DAG: define{{( protected)?}} swiftcc { %objc_object*, i8** } @class_existential_unowned(%objc_object* %0, i8** %1) {{.*}} {
 sil @class_existential_unowned : $@convention(thin) (@owned CP) -> @owned CP {
 entry(%s : $CP):
   %u1 = alloc_stack $@sil_unowned CP
@@ -100,7 +100,7 @@ entry(%s : $CP):
   return %z : $CP
 }
 
-// CHECK-DAG: define{{( protected)?}} swiftcc void @class_existential_weak({ %swift.weak, i8** }* noalias nocapture sret, i64, i64)
+// CHECK-DAG: define{{( protected)?}} swiftcc void @class_existential_weak({ %swift.weak, i8** }* noalias nocapture sret %0, i64 %1, i64 %2)
 sil @class_existential_weak : $@convention(thin) (@owned CP?) -> @out @sil_weak CP? {
 entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[V:%.*]] = alloca { %swift.weak, i8** }
@@ -158,7 +158,7 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
  @objc optional func funcA()
 }
 
-// CHECK: define swiftcc void @useObjcProtocol(%objc_object* swiftself)
+// CHECK: define swiftcc void @useObjcProtocol(%objc_object* swiftself %0)
 // CHECK: entry:
 // CHECK:   load i8*, i8** @"\01L_selector(funcA)"
 // CHECK:   load i8*, i8** @"\01L_selector(respondsToSelector:)"

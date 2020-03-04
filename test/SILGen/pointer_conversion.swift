@@ -268,7 +268,7 @@ func functionInoutToPointer() {
   // CHECK: [[BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
   var f: () -> () = {}
 
-  // CHECK: [[REABSTRACT_BUF:%.*]] = alloc_stack $@callee_guaranteed () -> @out ()
+  // CHECK: [[REABSTRACT_BUF:%.*]] = alloc_stack $@callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <()>
   // CHECK: address_to_pointer [[REABSTRACT_BUF]]
   takesMutableVoidPointer(&f)
 }

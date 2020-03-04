@@ -53,21 +53,20 @@ sil @sil_combine_partial_apply_callee : $@convention(thin) (@in S1, @in S2, @in_
 // CHECK-LABEL: sil @sil_combine_dead_partial_apply : $@convention(thin) (@in S2, @in S4, @inout S5, S6, @owned S7, @guaranteed S8) -> () {
 // CHECK: bb0([[IN_ARG:%.*]] : $*S2, [[INGUARANTEED_ARG:%.*]] : $*S4, [[INOUT_ARG:%.*]] : $*S5, [[UNOWNED_ARG:%.*]] : $S6, [[OWNED_ARG:%.*]] : $S7, [[GUARANTEED_ARG:%.*]] : $S8):
 //
-// CHECK: [[IN_ADDRESS_1:%.*]] = alloc_stack $S1
-// CHECK: [[IN_ARG_1:%.*]] = alloc_stack $S2
-// CHECK: [[INGUARANTEED_ADDRESS_1:%.*]] = alloc_stack $S3
-// CHECK: [[INGUARANTEED_ARG_1:%.*]] = alloc_stack $S4
-//
 // CHECK: function_ref unknown
 // CHECK: [[UNKNOWN_FUNC:%.*]] = function_ref @unknown
 // CHECK-NEXT: [[IN_ADDRESS:%.*]] = alloc_stack $S1
 // CHECK-NEXT: [[INGUARANTEED_ADDRESS:%.*]] = alloc_stack $S3
 //
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
-// CHECK: copy_addr [take] [[INGUARANTEED_ARG]] to [initialization] [[INGUARANTEED_ARG_1]]
-// CHECK: copy_addr [take] [[INGUARANTEED_ADDRESS]] to [initialization] [[INGUARANTEED_ADDRESS_1]]
-// CHECK: copy_addr [take] [[IN_ARG]] to [initialization] [[IN_ARG_1]]
+// CHECK: [[IN_ADDRESS_1:%.*]] = alloc_stack $S1
 // CHECK: copy_addr [take] [[IN_ADDRESS]] to [initialization] [[IN_ADDRESS_1]]
+// CHECK: [[IN_ARG_1:%.*]] = alloc_stack $S2
+// CHECK: copy_addr [take] [[IN_ARG]] to [initialization] [[IN_ARG_1]]
+// CHECK: [[INGUARANTEED_ADDRESS_1:%.*]] = alloc_stack $S3
+// CHECK: copy_addr [take] [[INGUARANTEED_ADDRESS]] to [initialization] [[INGUARANTEED_ADDRESS_1]]
+// CHECK: [[INGUARANTEED_ARG_1:%.*]] = alloc_stack $S4
+// CHECK: copy_addr [take] [[INGUARANTEED_ARG]] to [initialization] [[INGUARANTEED_ARG_1]]
 //
 // Then make sure that the destroys are placed after the destroy_value of the
 // partial_apply (which is after this apply)...
@@ -77,6 +76,10 @@ sil @sil_combine_partial_apply_callee : $@convention(thin) (@in S1, @in S2, @in_
 // CHECK-NEXT: destroy_addr [[IN_ARG_1]]
 // CHECK-NEXT: destroy_addr [[INGUARANTEED_ADDRESS_1]]
 // CHECK-NEXT: destroy_addr [[INGUARANTEED_ARG_1]]
+// CHECK-NEXT: dealloc_stack [[INGUARANTEED_ARG_1]]
+// CHECK-NEXT: dealloc_stack [[INGUARANTEED_ADDRESS_1]]
+// CHECK-NEXT: dealloc_stack [[IN_ARG_1]]
+// CHECK-NEXT: dealloc_stack [[IN_ADDRESS_1]]
 // CHECK-NEXT: release_value [[UNOWNED_ARG]]
 // CHECK-NEXT: release_value [[OWNED_ARG]]
 // CHECK-NEXT: release_value [[GUARANTEED_ARG]]
@@ -86,10 +89,6 @@ sil @sil_combine_partial_apply_callee : $@convention(thin) (@in S1, @in S2, @in_
 // CHECK-NEXT: dealloc_stack [[INGUARANTEED_ADDRESS]]
 // CHECK-NEXT: dealloc_stack [[IN_ADDRESS]]
 // CHECK-NEXT: tuple
-// CHECK-NEXT: dealloc_stack [[INGUARANTEED_ARG_1]]
-// CHECK-NEXT: dealloc_stack [[INGUARANTEED_ADDRESS_1]]
-// CHECK-NEXT: dealloc_stack [[IN_ARG_1]]
-// CHECK-NEXT: dealloc_stack [[IN_ADDRESS_1]]
 // CHECK-NEXT: return
 // CHECK-NEXT: } // end sil function 'sil_combine_dead_partial_apply'
 sil @sil_combine_dead_partial_apply : $@convention(thin) (@in S2, @in S4, @inout S5, S6, @owned S7, @guaranteed S8) -> () {
@@ -131,7 +130,6 @@ sil @sil_combine_partial_apply_callee_2 : $@convention(thin) (@in S1) -> ()
 
 // CHECK-LABEL: sil @sil_combine_dead_partial_apply_non_overlapping_lifetime : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:   [[NEW_ALLOC_STACK:%.*]] = alloc_stack $S1
 // CHECK-NEXT: function_ref unknown
 // CHECK-NEXT: [[UNKNOWN_FUNC:%.*]] = function_ref @unknown : $@convention(thin) () -> ()
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
@@ -141,21 +139,25 @@ sil @sil_combine_partial_apply_callee_2 : $@convention(thin) (@in S1) -> ()
 // CHECK:   [[ORIGINAL_ALLOC_STACK:%.*]] = alloc_stack $S1
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
+// CHECK-NEXT: [[NEW_ALLOC_STACK:%.*]] = alloc_stack $S1
 // CHECK-NEXT: copy_addr [take] [[ORIGINAL_ALLOC_STACK]] to [initialization] [[NEW_ALLOC_STACK]]
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
-// CHECK-NEXT: dealloc_stack [[ORIGINAL_ALLOC_STACK]]
 // CHECK-NEXT: apply
 // CHECK-NEXT: cond_br undef, bb2, bb3
 //
 // CHECK: bb2:
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
 // CHECK-NEXT: destroy_addr [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: dealloc_stack [[ORIGINAL_ALLOC_STACK]]
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
 // CHECK-NEXT:   br bb4
 //
 // CHECK: bb3:
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
 // CHECK-NEXT:   destroy_addr [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: dealloc_stack [[ORIGINAL_ALLOC_STACK]]
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
 // CHECK-NEXT:   br bb4
 //
@@ -163,7 +165,6 @@ sil @sil_combine_partial_apply_callee_2 : $@convention(thin) (@in S1) -> ()
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
 // CHECK-NEXT: tuple
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
-// CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
 // CHECK: } // end sil function 'sil_combine_dead_partial_apply_non_overlapping_lifetime'
 sil @sil_combine_dead_partial_apply_non_overlapping_lifetime : $@convention(thin) () -> () {
 bb0:
@@ -204,16 +205,22 @@ bb4:
 sil @try_apply_func : $@convention(thin) () -> (Builtin.Int32, @error Error)
 
 // CHECK-LABEL: sil @sil_combine_dead_partial_apply_try_apply : $@convention(thin) () -> ((), @error Error) {
-// CHECK: bb0:
-// CHECK:   [[NEW_ALLOC_STACK:%.*]] = alloc_stack $S1
-// CHECK-NEXT: br bb1
+// CHECK: bb1:
+// CHECK-NEXT: [[ORIGINAL_ALLOC_STACK:%.*]] = alloc_stack $S1
+// CHECK-NEXT: [[NEW_ALLOC_STACK:%.*]] = alloc_stack $S1
+// CHECK: bb2:
+// CHECK-NEXT: destroy_addr [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: dealloc_stack [[ORIGINAL_ALLOC_STACK]]
+// CHECK: bb3:
+// CHECK-NEXT: destroy_addr [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: dealloc_stack [[ORIGINAL_ALLOC_STACK]]
 // CHECK: bb5(
 // CHECK-NEXT: tuple
-// CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
 // CHECK-NEXT: return
 // CHECK: bb6(
 // CHECK-NEXT: builtin "willThrow"
-// CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
 // CHECK-NEXT: throw
 // CHECK: } // end sil function 'sil_combine_dead_partial_apply_try_apply'
 sil @sil_combine_dead_partial_apply_try_apply : $@convention(thin) () -> ((), @error Error) {
@@ -267,31 +274,40 @@ bb0:
   return %9999 : $()
 }
 
-// First make sure we do not handle this specific partial_apply case since we
-// are using @in parameters.
-//
 // CHECK-LABEL: sil @test_generic_partial_apply_apply_in :
-// CHECK: partial_apply
+// CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
+// CHECK:   [[STACK:%.*]] = alloc_stack $T
+// CHECK:   copy_addr [take] [[ARG1]] to [initialization] [[STACK]]
+// CHECK: bb1:
+// CHECK:   [[STACK3:%.*]] = alloc_stack $T
+// CHECK:   copy_addr [[STACK]] to [initialization] [[STACK3]]
+// CHECK:   apply {{%.*}}<T, T>([[ARG0]], [[STACK3]])
+// CHECK:   dealloc_stack [[STACK3]]
+// CHECK: bb2:
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
 // CHECK: } // end sil function 'test_generic_partial_apply_apply_in'
 sil @test_generic_partial_apply_apply_in : $@convention(thin) <T> (@in T, @in T) -> () {
 bb0(%0 : $*T, %1 : $*T):
   %f1 = function_ref @generic_callee_in : $@convention(thin) <T, U> (@in T, @in U) -> ()
-  %pa = partial_apply %f1<T, T>(%1) : $@convention(thin) <T, U> (@in T, @in U) -> ()
-  %a1 = apply %pa(%0) : $@callee_owned (@in T) -> ()
+  %pa = partial_apply [callee_guaranteed] %f1<T, T>(%1) : $@convention(thin) <T, U> (@in T, @in U) -> ()
+  br bb1
+bb1:
+  %a1 = apply %pa(%0) : $@callee_guaranteed (@in T) -> ()
+  cond_br undef, bb1, bb2
+bb2:
+  strong_release %pa : $@callee_guaranteed (@in T) -> ()
   %r = tuple ()
   return %r : $()
 }
 
-// Now check that we /do/ handle the in_guaranteed case.
+// Now check that we handle the in_guaranteed case.
 // CHECK-LABEL: sil @test_generic_partial_apply_apply_inguaranteed : $@convention(thin) <T> (@in T, @in T) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
-// CHECK:   [[STACK1:%.*]] = alloc_stack $T
-// CHECK:   [[STACK2:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK2]]
-// CHECK:   copy_addr [take] [[ARG1]] to [initialization] [[STACK1]]
-// CHECK:   apply {{%.*}}<T, T>([[ARG0]], [[STACK2]])
-// CHECK:   destroy_addr [[STACK1]]
-// CHECK:   destroy_addr [[STACK2]]
+// CHECK:   [[STACK:%.*]] = alloc_stack $T
+// CHECK:   copy_addr [take] [[ARG1]] to [initialization] [[STACK]]
+// CHECK:   apply {{%.*}}<T, T>([[ARG0]], [[STACK]])
+// CHECK:   destroy_addr [[STACK]]
 // CHECK:   destroy_addr [[ARG0]]
 // CHECK: } // end sil function 'test_generic_partial_apply_apply_inguaranteed'
 sil @test_generic_partial_apply_apply_inguaranteed : $@convention(thin) <T> (@in T, @in T) -> () {
@@ -304,24 +320,27 @@ bb0(%0 : $*T, %1 : $*T):
   return %r : $()
 }
 
-// Today when we optimize (apply (partial_apply)) -> apply, we can not handle
-// dependent types since the algorithm attempts to create an alloc_stack at the
-// beginning/end of the function. In such a case, the dependent type may not be
-// alive at that point, so the compiler will crash. This test ensures that we do
-// not optimize this case.
-//
-// CHECK-LABEL: sil @sil_combine_applied_partialapply_to_apply_with_dependent_type : $@convention(thin) (@in SwiftP) -> () {
-// CHECK: [[PAI:%.*]] = partial_apply
-// CHECK: apply [[PAI]]
-sil @sil_combine_applied_partialapply_to_apply_with_dependent_type : $@convention(thin) (@in SwiftP) -> () {
+// CHECK-LABEL: sil @sil_combine_applied_partialapply_to_apply_with_dependent_type : $@convention(thin) (@in_guaranteed SwiftP) -> () {
+// CHECK: bb0({{.*}}):
+// CHECK:   [[EX:%.*]] = open_existential_addr
+// CHECK:   [[METHOD:%.*]] = witness_method
+// CHECK:   [[STACK1:%.*]] = alloc_stack $@opened
+// CHECK:   copy_addr [[EX]] to [initialization] [[STACK1]]
+// CHECK:   [[STACK2:%.*]] = alloc_stack $@opened
+// CHECK:   copy_addr [take] [[STACK1]] to [initialization] [[STACK2]]
+// CHECK:   apply [[METHOD]]<@opened{{.*}}>([[STACK2]])
+// CHECK:   destroy_addr [[STACK2]]
+// CHECK:   dealloc_stack [[STACK2]]
+// CHECK:   dealloc_stack [[STACK1]]
+// CHECK: } // end sil function 'sil_combine_applied_partialapply_to_apply_with_dependent_type'
+sil @sil_combine_applied_partialapply_to_apply_with_dependent_type : $@convention(thin) (@in_guaranteed SwiftP) -> () {
 bb0(%0 : $*SwiftP):
-  %0b = alloc_stack $SwiftP
-  %1 = open_existential_addr mutable_access %0b : $*SwiftP to $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  %1 = open_existential_addr immutable_access %0 : $*SwiftP to $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
   %2 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP, #SwiftP.foo!1, %1 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
   %0c = alloc_stack $@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  copy_addr %1 to [initialization] %0c : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
   %3 = partial_apply %2<@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP>(%0c) : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
   dealloc_stack %0c : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
-  dealloc_stack %0b : $*SwiftP
   %4 = apply %3() : $@callee_owned () -> ()
   %9999 = tuple()
   return %9999 : $()
@@ -475,8 +494,8 @@ sil @guaranteed_closure : $@convention(thin) (@guaranteed C) -> ()
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK: strong_retain [[ARG]]
 // CHECK: [[F:%.*]] = function_ref @guaranteed_closure
-// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]])
 // CHECK: strong_retain [[ARG]]
+// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]])
 // CHECK: apply [[F]]
 // Don't release the closure context -- it is @callee_guaranteed.
 // CHECK-NOT: strong_release [[C]] : $@callee_guaranteed () -> ()
@@ -635,14 +654,11 @@ sil @guaranteed_closure_throws2 : $@convention(thin) (Builtin.Int32, @guaranteed
 // CHECK-LABEL: sil @test_guaranteed_closure_try_apply_on_stack
 // CHECK: bb0
 // CHECK: strong_retain
-// CHECK: strong_retain
 // CHECK: try_apply
 // CHECK: bb1
 // CHECK: strong_release
-// CHECK: strong_release
 // CHECK: br bb3
 // CHECK: bb2
-// CHECK: strong_release
 // CHECK: strong_release
 // CHECK: br bb3
 sil @test_guaranteed_closure_try_apply_on_stack : $@convention(thin) (@guaranteed C, Builtin.Int32) ->  () {
@@ -738,9 +754,6 @@ sil @closure_with_guaranteed_args : $@convention(method) (@guaranteed CC1) -> ()
 //   or consumed indirect arguments should be copied into temporaries. This should
 //   happen just before that partial_apply instruction.
 //
-// - The temporaries are allocated at the beginning of the function and
-//   deallocated at the end.
-//
 // - Before each apply of the partial_apply, we retain values of any arguments
 //   which are of non-address type.  This is required because they could be
 //   consumed (i.e. released by the callee).
@@ -750,18 +763,27 @@ sil @closure_with_guaranteed_args : $@convention(method) (@guaranteed CC1) -> ()
 //
 // We do this separately for each type of argument.
 
-// We do not handle this today.
-//
 // CHECK-LABEL: sil @test_apply_of_partial_apply_in : $@convention(thin) (@in CC1) -> () {
-// CHECK: [[PA:%.*]] = partial_apply
-// CHECK: apply [[PA]](
+// CHECK:   [[FUNC:%.*]] = function_ref
+// CHECK:   [[STACK1:%.*]] = alloc_stack $CC1
+// CHECK:   copy_addr [take] %0 to [initialization] [[STACK1]]
+// CHECK:   cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK:   destroy_addr [[STACK1]]
+// CHECK:   dealloc_stack [[STACK1]]
+// CHECK: bb2:
+// CHECK:   [[STACK2:%.*]] = alloc_stack $CC1
+// CHECK:   copy_addr [[STACK1]] to [initialization] [[STACK2]]
+// CHECK:   apply [[FUNC]]([[STACK2]])
+// CHECK:   dealloc_stack [[STACK2]]
+// CHECK:   destroy_addr [[STACK1]]
+// CHECK:   dealloc_stack [[STACK1]]
+// CHECK: bb3:
 // CHECK: } // end sil function 'test_apply_of_partial_apply_in'
 sil @test_apply_of_partial_apply_in : $@convention(thin) (@in CC1) -> () {
 bb0(%0 : $*CC1):
   %1 = function_ref @closure_with_in_args : $@convention(method) (@in CC1) -> ()
-  %2 = alloc_stack $CC1
-  copy_addr [take] %0 to [initialization] %2 : $*CC1
-  %3 = partial_apply %1(%2) : $@convention(method) (@in CC1) -> ()
+  %3 = partial_apply %1(%0) : $@convention(method) (@in CC1) -> ()
   cond_br undef, bb1, bb2
 
 bb1:
@@ -773,7 +795,6 @@ bb2:
   br bb3
 
 bb3:
-  dealloc_stack %2 : $*CC1
   %9999 = tuple()
   return %9999 : $()
 }
@@ -781,29 +802,23 @@ bb3:
 // CHECK-LABEL: sil @test_apply_of_partial_apply_inguaranteed : $@convention(thin) (@in CC1) -> () {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK:   [[STACK1:%.*]] = alloc_stack $CC1
+// CHECK:   copy_addr [take] [[ARG]] to [initialization] [[STACK1]]
 // CHECK:   [[STACK2:%.*]] = alloc_stack $CC1
-// CHECK:   [[STACK3:%.*]] = alloc_stack $CC1
-// CHECK:   copy_addr [take] [[ARG]] to [initialization] [[STACK3]]
-// CHECK:   copy_addr [[STACK3]] to [initialization] [[STACK2]] : $*CC1
-// CHECK:   copy_addr [take] [[STACK3]] to [initialization] [[STACK1]]
+// CHECK:   copy_addr [take] [[STACK1]] to [initialization] [[STACK2]]
 // CHECK:   cond_br undef, bb1, bb2
 //
 // CHECK: bb1:
-// CHECK:   destroy_addr [[STACK1]]
-// CHECK:   [[STACK2_VAL:%.*]] = load [[STACK2]]
-// CHECK:   strong_release [[STACK2_VAL]]
+// CHECK:   destroy_addr [[STACK2]]
+// CHECK:   dealloc_stack [[STACK2]]
 // CHECK:   br bb3
 //
 // CHECK: bb2:
 // CHECK:   apply {{%.*}}([[STACK2]]) : $@convention(method) (@in_guaranteed CC1) -> ()
-// CHECK:   destroy_addr [[STACK1]]
-// CHECK:   [[STACK2_VAL:%.*]] = load [[STACK2]]
-// CHECK:   strong_release [[STACK2_VAL]]
+// CHECK:   destroy_addr [[STACK2]]
+// CHECK:   dealloc_stack [[STACK2]]
 // CHECK:   br bb3
 //
 // CHECK: bb3:
-// CHECK:   dealloc_stack [[STACK3]]
-// CHECK:   dealloc_stack [[STACK2]]
 // CHECK:   dealloc_stack [[STACK1]]
 // CHECK: } // end sil function 'test_apply_of_partial_apply_inguaranteed'
 sil @test_apply_of_partial_apply_inguaranteed : $@convention(thin) (@in CC1) -> () {
@@ -839,7 +854,7 @@ bb3:
 //
 // CHECK: bb2:
 // CHECK:   strong_retain [[LOAD_ARG]]
-// CHECK:   apply {{%.*}}([[STACK2]]) : $@convention(method) (@owned CC1) -> ()
+// CHECK:   apply {{%.*}}([[LOAD_ARG]]) : $@convention(method) (@owned CC1) -> ()
 // CHECK:   strong_release [[LOAD_ARG]]
 // CHECK:   br bb3
 //
@@ -875,9 +890,7 @@ bb3:
 // CHECK:   br bb3
 //
 // CHECK: bb2:
-// CHECK:   strong_retain [[LOAD_ARG]]
-// CHECK:   apply {{%.*}}([[STACK2]]) : $@convention(method) (@guaranteed CC1) -> ()
-// CHECK:   strong_release [[LOAD_ARG]]
+// CHECK:   apply {{%.*}}([[LOAD_ARG]]) : $@convention(method) (@guaranteed CC1) -> ()
 // CHECK:   strong_release [[LOAD_ARG]]
 // CHECK:   br bb3
 //
@@ -908,17 +921,19 @@ bb3:
 
 // CHECK-LABEL: sil @test_stack_insertion_for_partial_apply_apply
 // CHECK:     bb0({{.*}}):
-// CHECK-NEXT:  [[T:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT:  alloc_stack $Bool
-// CHECK-NEXT:  [[S2:%[0-9]+]] = alloc_stack $Int
-// CHECK:       copy_addr [[S2]] to [initialization] [[T]]
+// CHECK-NEXT:  [[S1:%[0-9]+]] = alloc_stack $Int
+// CHECK:       store %0 to [[S1]]
+// CHECK:       [[S2:%[0-9]+]] = alloc_stack $Int
+// CHECK:       copy_addr [[S1]] to [initialization] [[S2]]
+// CHECK:       apply {{.*}}(%1, [[S2]])
+// CHECK:       destroy_addr [[S2]] : $*Int
 // CHECK:       dealloc_stack [[S2]] : $*Int
-// CHECK:       apply
+// CHECK:       dealloc_stack [[S1]] : $*Int
 // CHECK:     bb1:
 // CHECK-NOT:   dealloc_stack
 // CHECK:     bb2:
 // CHECK:       dealloc_stack {{.*}} : $*Bool
-// CHECK:       dealloc_stack [[T]] : $*Int
 // CHECK:       return
 sil @test_stack_insertion_for_partial_apply_apply : $@convention(thin) (Int, Double) -> () {
 bb0(%0 : $Int, %1 : $Double):

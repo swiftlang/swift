@@ -93,6 +93,7 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARCHETYPE_GENERIC_1 | %FileCheck %s -check-prefix=ARCHETYPE_GENERIC_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PARAM_WITH_ERROR_AUTOCLOSURE| %FileCheck %s -check-prefix=PARAM_WITH_ERROR_AUTOCLOSURE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPECHECKED_OVERLOADED | %FileCheck %s -check-prefix=TYPECHECKED_OVERLOADED
 
 var i1 = 1
 var i2 = 2
@@ -737,7 +738,7 @@ struct Wrap<T> {
 func testGenricMethodOnGenericOfArchetype<Wrapped>(value: Wrap<Wrapped>) {
   value.method(#^ARCHETYPE_GENERIC_1^#)
 // ARCHETYPE_GENERIC_1: Begin completions
-// ARCHETYPE_GENERIC_1: Decl[InstanceMethod]/CurrNominal:   ['(']{#(fn): (Wrapped) -> _##(Wrapped) -> _#}[')'][#Wrap<_>#];
+// ARCHETYPE_GENERIC_1: Decl[InstanceMethod]/CurrNominal:   ['(']{#(fn): (Wrapped) -> U##(Wrapped) -> U#}[')'][#Wrap<U>#];
 }
 
 struct TestHasErrorAutoclosureParam {
@@ -750,4 +751,18 @@ struct TestHasErrorAutoclosureParam {
 // PARAM_WITH_ERROR_AUTOCLOSURE: Decl[InstanceMethod]/CurrNominal:   ['(']{#value: <<error type>>#}[')'][#Void#];
 // PARAM_WITH_ERROR_AUTOCLOSURE: End completions
   }
+}
+
+struct MyType {
+  func overloaded() {}
+  func overloaded(_ int: Int) {}
+  func overloaded(name: String, value: String) {}
+}
+func testTypecheckedOverloaded(value: MyType) {
+  value.overloaded(#^TYPECHECKED_OVERLOADED^#)
+// TYPECHECKED_OVERLOADED: Begin completions
+// TYPECHECKED_OVERLOADED-DAG: Decl[InstanceMethod]/CurrNominal:   ['('][')'][#Void#];
+// TYPECHECKED_OVERLOADED-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#(int): Int#}[')'][#Void#];
+// TYPECHECKED_OVERLOADED-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#name: String#}, {#value: String#}[')'][#Void#];
+// TYPECHECKED_OVERLOADED: End completions
 }

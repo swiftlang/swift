@@ -17,7 +17,7 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_VALUETRACKING_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_VALUETRACKING_H
 
-#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 
@@ -50,7 +50,8 @@ bool pointsToLocalObject(SILValue V);
 /// indirection (e.g. ref_element_addr, project_box, etc.).
 inline bool isUniquelyIdentified(SILValue V) {
   return pointsToLocalObject(V)
-         || isExclusiveArgument(getUnderlyingAddressRoot(V));
+         || (V->getType().isAddress()
+             && isExclusiveArgument(getAccessedAddress(V)));
 }
 
 enum class IsZeroKind {

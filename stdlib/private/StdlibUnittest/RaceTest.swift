@@ -41,7 +41,7 @@ import SwiftPrivateLibcExtras
 import SwiftPrivateThreadExtras
 #if os(macOS) || os(iOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
@@ -562,7 +562,9 @@ class _InterruptibleSleep {
       return
     }
 
-    var timeout = timeval(tv_sec: duration, tv_usec: 0)
+    // WebAssembly/WASI on wasm32 is the only 32-bit platform with Int64 time_t,
+    // needs an explicit conversion to `time_t` because of this.
+    var timeout = timeval(tv_sec: time_t(duration), tv_usec: 0)
 
     var readFDs = _stdlib_fd_set()
     var writeFDs = _stdlib_fd_set()

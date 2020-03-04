@@ -417,7 +417,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   if (Builtin.ID == BuiltinValueKind::AssumeTrue) {
     llvm::Value *v = args.claimNext();
     if (v->getType() == IGF.IGM.Int1Ty) {
-      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::assume, v);
+      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::assume, v);
     }
     return;
   }
@@ -1012,7 +1012,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
                                /*constant*/ false,
                                llvm::GlobalValue::PrivateLinkage,
                                llvm::ConstantAggregateZero::get(flagStorageTy));
-    flag->setAlignment(IGF.IGM.getAtomicBoolAlignment().getValue());
+    flag->setAlignment(
+        llvm::MaybeAlign(IGF.IGM.getAtomicBoolAlignment().getValue()));
     entrypointArgs[6] = llvm::ConstantExpr::getBitCast(flag, IGF.IGM.Int8PtrTy);
 
     IGF.Builder.CreateCall(IGF.IGM.getSwift3ImplicitObjCEntrypointFn(),

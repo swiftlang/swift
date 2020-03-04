@@ -989,28 +989,9 @@ std::pair<Type, ConcreteDeclRef> swift::ide::getReferencedDecl(Expr *expr) {
     expr = selfApplyExpr->getFn();
 
   // Look through curry thunks.
-  if (auto *closure = dyn_cast<AutoClosureExpr>(expr)) {
-    if (closure->isThunk()) {
-      auto *body = closure->getSingleExpressionBody();
-      if (isa<AutoClosureExpr>(body) &&
-          closure->getParameters()->size() == 1)
-       expr = closure->getSingleExpressionBody();
-    }
-  }
-
-  if (auto *closure = dyn_cast<AutoClosureExpr>(expr)) {
-    if (closure->isThunk()) {
-      auto *body = closure->getSingleExpressionBody();
-      body = body->getSemanticsProvidingExpr();
-      if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
-        if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {
-          if (auto *declRef = dyn_cast<DeclRefExpr>(innerCall->getFn())) {
-            expr = declRef;
-          }
-        }
-      }
-    }
-  }
+  if (auto *closure = dyn_cast<AutoClosureExpr>(expr))
+    if (auto *unwrappedThunk = closure->getUnwrappedCurryThunkExpr())
+      expr = unwrappedThunk;
 
   // If this is an IUO result, unwrap the optional type.
   auto refDecl = expr->getReferencedDecl();

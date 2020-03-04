@@ -264,6 +264,9 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
 
+  // Pass on module names whose symbols should be embeded in tbd.
+  inputArgs.AddAllArgs(arguments, options::OPT_embed_tbd_for_module);
+
   if (auto *A = inputArgs.getLastArg(options::OPT_working_directory)) {
     // Add -Xcc -working-directory before any other -Xcc options to ensure it is
     // overridden by an explicit -Xcc -working-directory, although having a
@@ -420,8 +423,29 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-cross-module-optimization");
   }
                                  
-  addOutputsOfType(Arguments, context.Output, context.Args,
-                   file_types::TY_OptRecord, "-save-optimization-record-path");
+
+  file_types::ID remarksFileType = file_types::TY_YAMLOptRecord;
+  // If a specific format is specified for the remarks, forward that as is.
+  if (auto remarksFormat =
+          context.Args.getLastArg(options::OPT_save_optimization_record_EQ)) {
+    Arguments.push_back(context.Args.MakeArgString(
+        Twine("-save-optimization-record=") + remarksFormat->getValue()));
+    // If that's the case, add the proper output file for the type.
+    if (llvm::Expected<file_types::ID> fileType =
+            remarkFileTypeFromArgs(context.Args))
+      remarksFileType = *fileType;
+    else
+      consumeError(fileType.takeError()); // Don't report errors here. This will
+                                          // be reported later anyway.
+  }
+  addOutputsOfType(Arguments, context.Output, context.Args, remarksFileType,
+                   "-save-optimization-record-path");
+
+  if (auto remarksFilter = context.Args.getLastArg(
+          options::OPT_save_optimization_record_passes)) {
+    Arguments.push_back("-save-optimization-record-passes");
+    Arguments.push_back(remarksFilter->getValue());
+  }
 
   if (context.Args.hasArg(options::OPT_migrate_keep_objc_visibility)) {
     Arguments.push_back("-migrate-keep-objc-visibility");
@@ -556,9 +580,13 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_CompiledSource:
   case file_types::TY_ModuleTrace:
   case file_types::TY_TBD:
-  case file_types::TY_OptRecord:
+  case file_types::TY_YAMLOptRecord:
+  case file_types::TY_BitstreamOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_PrivateSwiftModuleInterfaceFile:
   case file_types::TY_SwiftSourceInfoFile:
+  case file_types::TY_SwiftCrossImportDir:
+  case file_types::TY_SwiftOverlayFile:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -673,6 +701,10 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::ID::TY_SwiftModuleInterfaceFile,
                    "-emit-module-interface-path");
+
+  addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
+                   "-emit-private-module-interface-path");
 
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SerializedDiagnostics,
@@ -805,9 +837,13 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_CompiledSource:
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
-    case file_types::TY_OptRecord:
+    case file_types::TY_YAMLOptRecord:
+    case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
+    case file_types::TY_PrivateSwiftModuleInterfaceFile:
     case file_types::TY_SwiftSourceInfoFile:
+    case file_types::TY_SwiftCrossImportDir:
+    case file_types::TY_SwiftOverlayFile:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -951,6 +987,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::ID::TY_SwiftModuleInterfaceFile,
                    "-emit-module-interface-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
+                   "-emit-private-module-interface-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");

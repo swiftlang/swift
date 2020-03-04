@@ -725,7 +725,7 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
                             requirement);
   };
 
-  if (auto memberTy = type->getAs<DependentMemberType>())
+  if (type->is<DependentMemberType>())
     return missingRequirementMatch(type);
 
   type = type->mapTypeOutOfContext();
@@ -4087,8 +4087,8 @@ void ConformanceChecker::resolveValueWitnesses() {
 void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   assert(!Conformance->isComplete() && "Conformance is already complete");
 
-  FrontendStatsTracer statsTracer(getASTContext().Stats, "check-conformance",
-                                  Conformance);
+  FrontendStatsTracer statsTracer(getASTContext().Stats,
+                                  "check-conformance", Conformance);
 
   llvm::SaveAndRestore<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
   SuppressDiagnostics = false;

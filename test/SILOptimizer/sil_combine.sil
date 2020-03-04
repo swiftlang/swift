@@ -1634,6 +1634,19 @@ bb0(%0 : $*AddressOnlyEnum):
   return %2 : $Builtin.Int32
 }
 
+// CHECK-LABEL: sil @dead_unchecked_take_enum_data_addr
+// CHECK:      bb0(%0 : $*AddressOnlyEnum):
+// CHECK-NEXT:   destroy_addr %0
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @dead_unchecked_take_enum_data_addr : $@convention(thin) (@in AddressOnlyEnum) -> () {
+bb0(%0 : $*AddressOnlyEnum):
+  %1 = unchecked_take_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.Loadable!enumelt.1
+  destroy_addr %1 : $*Builtin.Int32
+  %r = tuple ()
+  return %r : $()
+}
+
 sil @partial_apply_arg_fun : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> () {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %2 = tuple()
@@ -2640,6 +2653,107 @@ bb0(%0 : $*B):
   return %4 : $()
 }
 
+// CHECK-LABEL: sil @moved_retain_prevents_alloc_stack_deletion1
+// CHECK: copy_addr
+// CHECK: strong_retain
+// CHECK: destroy_addr
+// CHECK: } // end sil function 'moved_retain_prevents_alloc_stack_deletion1'
+sil @moved_retain_prevents_alloc_stack_deletion1 : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %3 = alloc_stack $B
+  %4 = alloc_stack $B
+  store %0 to %4 : $*B
+  copy_addr [take] %4 to [initialization] %3 : $*B
+  dealloc_stack %4 : $*B
+  strong_retain %0 : $B
+  destroy_addr %3 : $*B
+  dealloc_stack %3 : $*B
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil @moved_retain_prevents_alloc_stack_deletion2
+// CHECK:   copy_addr
+// CHECK: bb1:
+// CHECK:   strong_retain
+// CHECK:   destroy_addr
+// CHECK: bb2:
+// CHECK:   strong_retain
+// CHECK:   destroy_addr
+// CHECK: } // end sil function 'moved_retain_prevents_alloc_stack_deletion2'
+sil @moved_retain_prevents_alloc_stack_deletion2 : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %3 = alloc_stack $B
+  %4 = alloc_stack $B
+  store %0 to %4 : $*B
+  copy_addr [take] %4 to [initialization] %3 : $*B
+  dealloc_stack %4 : $*B
+  cond_br undef, bb1, bb2
+bb1:
+  strong_retain %0 : $B
+  destroy_addr %3 : $*B
+  dealloc_stack %3 : $*B
+  br bb3
+bb2:
+  strong_retain %0 : $B
+  destroy_addr %3 : $*B
+  dealloc_stack %3 : $*B
+  br bb3
+bb3:
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil @retain_is_after_stack_location
+// CHECK-NOT:   copy_addr
+// CHECK: } // end sil function 'retain_is_after_stack_location'
+sil @retain_is_after_stack_location : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %3 = alloc_stack $B
+  %4 = alloc_stack $B
+  store %0 to %4 : $*B
+  copy_addr [take] %4 to [initialization] %3 : $*B
+  dealloc_stack %4 : $*B
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_addr %3 : $*B
+  strong_retain %0 : $B
+  dealloc_stack %3 : $*B
+  br bb3
+bb2:
+  destroy_addr %3 : $*B
+  strong_retain %0 : $B
+  dealloc_stack %3 : $*B
+  br bb3
+bb3:
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil @moved_retain_prevents_alloc_stack_deletion3
+// CHECK:   copy_addr
+// CHECK: bb2:
+// CHECK:   strong_retain
+// CHECK:   destroy_addr
+// CHECK: } // end sil function 'moved_retain_prevents_alloc_stack_deletion3'
+sil @moved_retain_prevents_alloc_stack_deletion3 : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %3 = alloc_stack $B
+  %4 = alloc_stack $B
+  store %0 to %4 : $*B
+  copy_addr [take] %4 to [initialization] %3 : $*B
+  dealloc_stack %4 : $*B
+  br bb1
+bb1:
+  cond_br undef, bb1, bb2
+bb2:
+  strong_retain %0 : $B
+  destroy_addr %3 : $*B
+  dealloc_stack %3 : $*B
+  %14 = tuple ()
+  return %14 : $()
+}
+
 protocol someProtocol {
     var i: Int { get }
 }
@@ -2709,9 +2823,11 @@ bb3:
   br bb2(%14 : $Builtin.Int1)
 }
 
-// Make sure we do not crash on this and remove everything.
+// Make sure we do not crash on this and remove everything, except a trivial retain/release pair.
 // CHECK-LABEL: sil @partial_apply_retain_removal : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 // CHECK: bb0
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
 // CHECK-NEXT: return
 sil @partial_apply_retain_removal : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : $Builtin.NativeObject):
@@ -3333,6 +3449,19 @@ bb0(%0 : $*Builtin.Int64, %1 : $B):
   return %4 : $Builtin.Int64
 }
 
+// CHECK-LABEL: sil @mark_dependence_trivial_object_base :
+// CHECK: bb0(
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'mark_dependence_trivial_object_base'
+sil @mark_dependence_trivial_object_base : $@convention(thin) (@guaranteed B) -> @owned B {
+bb0(%0 : $B):
+  strong_retain %0 : $B
+  %1 = enum $Optional<Int>, #Optional.none!enumelt
+  %2 = mark_dependence %0 : $B on %1 : $Optional<Int>
+  return %2 : $B
+}
+
 protocol _NSArrayCore {}
 
 // CHECK-LABEL: sil @mark_dependence_base2
@@ -3534,4 +3663,27 @@ bb0(%0 : $@thin T.Type):
   // FIXME: Explicit specialization is required here when it shouldn't be
   %1 = builtin "isConcrete"<T>(%0 : $@thin T.Type) : $Builtin.Int1
   return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @convert_function_substitution : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> ()
+// CHECK:       bb0(%0 : $@callee_guaranteed () -> @out ()):
+// CHECK:         apply %0
+sil @convert_function_substitution : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> () {
+bb0(%0 : $@callee_guaranteed () -> @out ()):
+  %1 = convert_function %0 : $@callee_guaranteed () -> @out () to $@callee_guaranteed <A> in () -> @out A for <()>
+  %2 = alloc_stack $()
+  apply %1(%2) : $@callee_guaranteed <A> in () -> @out A for <()>
+  dealloc_stack %2 : $*()
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @convert_function_substitution_pa :
+sil @convert_function_substitution_pa : $@convention(thin) (@guaranteed @callee_guaranteed (@in Int, @in Int) -> @out (), @in Int) -> @owned @callee_guaranteed () -> @out () {
+bb0(%0 : $@callee_guaranteed (@in Int, @in Int) -> @out (), %1 : $*Int):
+  %2 = convert_function %0 : $@callee_guaranteed (@in Int, @in Int) -> @out () to $@callee_guaranteed <A, B, C> in (@in A, @in B) -> @out C for <Int, Int, ()>
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@callee_guaranteed <A, B, C> in (@in A, @in B) -> @out C for <Int, Int, ()>
+  %4 = partial_apply [callee_guaranteed] %3(%1) : $@callee_guaranteed <A, B, C> in (@in A) -> @out C for <Int, Int, ()>
+  %5 = convert_function %4 : $@callee_guaranteed <A, B, C> in () -> @out C for <Int, Int, ()> to $@callee_guaranteed () -> @out ()
+  return %5 : $@callee_guaranteed () -> @out ()
+
 }

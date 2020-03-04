@@ -173,9 +173,14 @@ public:
 
   LocalContext *CurLocalContext = nullptr;
 
-  bool isDelayedParsingEnabled() const {
-    return DelayBodyParsing || isCodeCompletionFirstPass();
-  }
+  /// Whether we should delay parsing nominal type, extension, and function
+  /// bodies.
+  bool isDelayedParsingEnabled() const;
+
+  /// Whether to evaluate the conditions of #if decls, meaning that the bodies
+  /// of any active clauses are hoisted such that they become sibling nodes with
+  /// the #if decl.
+  bool shouldEvaluatePoundIfDecls() const;
 
   void setCodeCompletionCallbacks(CodeCompletionCallbacks *Callbacks) {
     CodeCompletion = Callbacks;
@@ -212,16 +217,6 @@ public:
   /// trailing trivias for \c Tok.
   /// Always empty if !SF.shouldBuildSyntaxTree().
   ParsedTrivia TrailingTrivia;
-
-  /// Whether we should delay parsing nominal type and extension bodies,
-  /// and skip function bodies.
-  ///
-  /// This is false in primary files, since we want to type check all
-  /// declarations and function bodies.
-  ///
-  /// This is true for non-primary files, where declarations only need to be
-  /// lazily parsed and type checked.
-  bool DelayBodyParsing;
 
   /// The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
@@ -400,17 +395,14 @@ public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
          SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true);
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState = nullptr,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true);
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
          SILParserTUStateBase *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true);
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   ~Parser();
 
   /// Returns true if the buffer being parsed is allowed to contain SIL.
@@ -1122,6 +1114,8 @@ public:
                                        ParseDeclOptions Flags,
                                        DeclAttributes &Attributes,
                                        bool HasFuncKeyword = true);
+  ParserResult<BraceStmt>
+  parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
   BraceStmt *parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,

@@ -555,8 +555,8 @@ struct TestSingleExprSubscriptGlobal {
   }
 
 // TestSingleExprSubscriptGlobal: Begin completions
-// TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
-// TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal: int()[#Int#];
+// TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
+// TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
 // TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestSingleExprSubscriptGlobal: End completions
 }

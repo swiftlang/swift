@@ -716,7 +716,7 @@ namespace {
 
       if (auto *var = dyn_cast<VarDecl>(VD)) {
         PrintWithColorRAII(OS, TypeColor) << " type='";
-        if (auto varTy = var->hasInterfaceType())
+        if (var->hasInterfaceType())
           var->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
         else
           PrintWithColorRAII(OS, TypeColor) << "<null type>";

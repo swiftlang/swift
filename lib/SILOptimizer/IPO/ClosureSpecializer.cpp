@@ -780,7 +780,7 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
 /// Populate the body of the cloned closure, modifying instructions as
 /// necessary. This is where we create the actual specialized BB Arguments
 void ClosureSpecCloner::populateCloned() {
-  bool needToUpdateStackNesting = false;
+  bool invalidatedStackNesting = false;
   SILFunction *Cloned = getCloned();
   SILFunction *ClosureUser = CallSiteDesc.getApplyCallee();
 
@@ -880,11 +880,11 @@ void ClosureSpecCloner::populateCloned() {
           Builder.createReleaseValue(Loc, SILValue(NewClosure),
                                      Builder.getDefaultAtomicity());
         else
-          needToUpdateStackNesting |=
+          invalidatedStackNesting |=
               CallSiteDesc.destroyIfPartialApplyStack(Builder, NewClosure);
         for (auto PAI : NeedsRelease) {
           if (PAI->isOnStack())
-            needToUpdateStackNesting |=
+            invalidatedStackNesting |=
                 CallSiteDesc.destroyIfPartialApplyStack(Builder, PAI);
           else
             Builder.createReleaseValue(Loc, SILValue(PAI),
@@ -909,11 +909,11 @@ void ClosureSpecCloner::populateCloned() {
         Builder.createReleaseValue(Loc, SILValue(NewClosure),
                                    Builder.getDefaultAtomicity());
       else
-        needToUpdateStackNesting |=
+        invalidatedStackNesting |=
             CallSiteDesc.destroyIfPartialApplyStack(Builder, NewClosure);
       for (auto PAI : NeedsRelease) {
         if (PAI->isOnStack())
-          needToUpdateStackNesting |=
+          invalidatedStackNesting |=
               CallSiteDesc.destroyIfPartialApplyStack(Builder, PAI);
         else
           Builder.createReleaseValue(Loc, SILValue(PAI),
@@ -921,7 +921,7 @@ void ClosureSpecCloner::populateCloned() {
       }
     }
   }
-  if (needToUpdateStackNesting) {
+  if (invalidatedStackNesting) {
     StackNesting().correctStackNesting(Cloned);
   }
 }
@@ -971,6 +971,8 @@ void SILClosureSpecializerTransform::run() {
     // specialized all of their uses.
     LLVM_DEBUG(llvm::dbgs() << "Trying to remove dead closures!\n");
     sortUnique(PropagatedClosures);
+    bool invalidatedStackNesting = false;
+
     for (auto *Closure : PropagatedClosures) {
       LLVM_DEBUG(llvm::dbgs() << "    Visiting: " << *Closure);
       if (!tryDeleteDeadClosure(Closure)) {
@@ -981,6 +983,11 @@ void SILClosureSpecializerTransform::run() {
 
       LLVM_DEBUG(llvm::dbgs() << "        Deleted closure!\n");
       ++NumPropagatedClosuresEliminated;
+      invalidatedStackNesting = true;
+    }
+
+    if (invalidatedStackNesting) {
+      StackNesting().correctStackNesting(F);
     }
   }
 

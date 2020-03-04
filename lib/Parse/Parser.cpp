@@ -112,19 +112,20 @@ using namespace swift::syntax;
 void SILParserTUStateBase::anchor() { }
 
 void swift::performCodeCompletionSecondPass(
-    PersistentParserState &ParserState,
-    CodeCompletionCallbacksFactory &Factory) {
-  if (!ParserState.hasCodeCompletionDelayedDeclState())
+    SourceFile &SF, CodeCompletionCallbacksFactory &Factory) {
+  // If we didn't find the code completion token, bail.
+  auto *parserState = SF.getDelayedParserState();
+  if (!parserState->hasCodeCompletionDelayedDeclState())
     return;
 
-  auto state = ParserState.takeCodeCompletionDelayedDeclState();
-  auto &SF = *state->ParentContext->getParentSourceFile();
+  auto state = parserState->takeCodeCompletionDelayedDeclState();
   auto &Ctx = SF.getASTContext();
 
-  FrontendStatsTracer tracer(Ctx.Stats, "CodeCompletionSecondPass");
+  FrontendStatsTracer tracer(Ctx.Stats,
+                             "CodeCompletionSecondPass");
 
   auto BufferID = Ctx.SourceMgr.getCodeCompletionBufferID();
-  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
+  Parser TheParser(BufferID, SF, nullptr, parserState, nullptr);
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
       Factory.createCodeCompletionCallbacks(TheParser));
@@ -149,9 +150,6 @@ void Parser::performCodeCompletionSecondPassImpl(
     prevLoc = SourceMgr.getLocForOffset(BufferID, info.PrevOffset);
   // Set the parser position to the start of the delayed decl or the body.
   restoreParserPosition(getParserPosition(startLoc, prevLoc));
-
-  // Do not delay parsing in the second pass.
-  llvm::SaveAndRestore<bool> DisableDelayedBody(DelayBodyParsing, false);
 
   // Re-enter the lexical scope.
   Scope S(this, info.takeScope());
@@ -197,16 +195,7 @@ void Parser::performCodeCompletionSecondPassImpl(
 
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-
-    if (auto *P = AFD->getImplicitSelfDecl())
-      addToScope(P);
-    addParametersToScope(AFD->getParameters());
-
-    ParseFunctionBody CC(*this, AFD);
-    setLocalDiscriminatorToParamList(AFD->getParameters());
-
-    auto result = parseBraceItemList(diag::func_decl_without_brace);
-    AFD->setBody(result.getPtrOrNull());
+    AFD->setBodyParsed(parseAbstractFunctionBodyImpl(AFD).getPtrOrNull());
     break;
   }
   }
@@ -373,16 +362,14 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
-               std::shared_ptr<SyntaxParseActions> SPActions,
-               bool DelayBodyParsing)
+               std::shared_ptr<SyntaxParseActions> SPActions)
     : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState,
-             std::move(SPActions), DelayBodyParsing) {}
+             std::move(SPActions)) {}
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
                SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
-               std::shared_ptr<SyntaxParseActions> SPActions,
-               bool DelayBodyParsing)
+               std::shared_ptr<SyntaxParseActions> SPActions)
     : Parser(
           std::unique_ptr<Lexer>(new Lexer(
               SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
@@ -397,7 +384,7 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
               SF.shouldBuildSyntaxTree()
                   ? TriviaRetentionMode::WithTrivia
                   : TriviaRetentionMode::WithoutTrivia)),
-          SF, SIL, PersistentState, std::move(SPActions), DelayBodyParsing) {}
+          SF, SIL, PersistentState, std::move(SPActions)) {}
 
 namespace {
 
@@ -517,8 +504,7 @@ public:
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
-               std::shared_ptr<SyntaxParseActions> SPActions,
-               bool DelayBodyParsing)
+               std::shared_ptr<SyntaxParseActions> SPActions)
   : SourceMgr(SF.getASTContext().SourceMgr),
     Diags(SF.getASTContext().Diags),
     SF(SF),
@@ -527,7 +513,6 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     CurDeclContext(&SF),
     Context(SF.getASTContext()),
     CurrentTokenHash(SF.getInterfaceHashPtr()),
-    DelayBodyParsing(DelayBodyParsing),
     TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF, L->getBufferID()) :
                 new ConsumeTokenReceiver()),
@@ -552,6 +537,19 @@ Parser::~Parser() {
 }
 
 bool Parser::isInSILMode() const { return SF.Kind == SourceFileKind::SIL; }
+
+bool Parser::isDelayedParsingEnabled() const {
+  // Do not delay parsing during code completion's second pass.
+  if (CodeCompletion)
+    return false;
+
+  return SF.hasDelayedBodyParsing();
+}
+
+bool Parser::shouldEvaluatePoundIfDecls() const {
+  auto opts = SF.getParsingOptions();
+  return !opts.contains(SourceFile::ParsingFlags::DisablePoundIfEvaluation);
+}
 
 bool Parser::allowTopLevelCode() const {
   return SF.isScriptMode();
@@ -1180,7 +1178,9 @@ struct ParserUnit::Implementation {
         SF(new (Ctx) SourceFile(
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx), SFKind,
             BufferID, SourceFile::ImplicitModuleImportKind::None,
-            Opts.CollectParsedToken, Opts.BuildSyntaxTree)) {}
+            Opts.CollectParsedToken, Opts.BuildSyntaxTree,
+            SourceFile::ParsingFlags::DisableDelayedBodies |
+                SourceFile::ParsingFlags::DisablePoundIfEvaluation)) {}
 
   ~Implementation() {
     // We need to delete the parser before the context so that it can finalize
@@ -1206,8 +1206,7 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
 
   Impl.SF->SyntaxParsingCache = SyntaxCache;
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, /*SIL=*/nullptr,
-                                  /*PersistentState=*/nullptr, Impl.SPActions,
-                                  /*DelayBodyParsing=*/false));
+                                  /*PersistentState=*/nullptr, Impl.SPActions));
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
@@ -1224,7 +1223,7 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
                       TriviaRetentionMode::WithoutTrivia,
                       Offset, EndOffset));
   Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF, /*SIL=*/nullptr,
-    /*PersistentState=*/nullptr, Impl.SPActions, /*DelayBodyParsing=*/false));
+                                  /*PersistentState=*/nullptr, Impl.SPActions));
 }
 
 ParserUnit::~ParserUnit() {
