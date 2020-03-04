@@ -1245,6 +1245,18 @@ FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {
   return FixedPacking::Allocate;
 }
 
+bool TypeInfo::canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                                   unsigned index) const {
+  // If this type is POD, then its value witnesses are trivial, so can handle
+  // any bit pattern.
+  if (isPOD(ResilienceExpansion::Maximal)) {
+    return true;
+  }
+  
+  // By default, assume that extra inhabitants must be branched out on.
+  return false;
+}
+
 Address TypeInfo::indexArray(IRGenFunction &IGF, Address base,
                              llvm::Value *index, SILType T) const {
   // The stride of a Swift type may not match its LLVM size. If we know we have
