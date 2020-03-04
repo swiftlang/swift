@@ -105,3 +105,40 @@ func testMemberDeclarations<T, U: Comparable>(arg1: Class<T>, arg2: Class<U>) {
   arg1[] // expected-error {{subscript 'subscript()' requires that 'T' conform to 'Sequence'}}
   _ = Class<Array<Int>>()[Int.zero]
 }
+
+// Test nested types and requirements.
+
+struct Container<T> {
+  typealias NestedAlias = Bool where T == Int
+  // expected-note@-1 {{'NestedAlias' previously declared here}}
+  typealias NestedAlias = Bool where T == Bool
+  // expected-error@-1 {{invalid redeclaration of 'NestedAlias}}
+  typealias NestedAlias2 = T.Magnitude where T: FixedWidthInteger
+
+  class NestedClass where T: Equatable {}
+}
+
+extension Container where T: Sequence {
+  struct NestedStruct {}
+
+  struct NestedStruct2 where T.Element: Comparable {
+    enum NestedEnum where T.Element == Double {} // expected-note {{requirement specified as 'T.Element' == 'Double' [with T = String]}}
+  }
+
+  struct NestedStruct3<U: Whereable> {}
+}
+
+extension Container.NestedStruct3 {
+  func foo(arg: U) where U.Assoc == T {}
+}
+
+_ = Container<String>.NestedAlias2.self // expected-error {{type 'String' does not conform to protocol 'FixedWidthInteger'}}
+_ = Container<Container<Bool>>.NestedClass.self // expected-error {{type 'Container<Bool>' does not conform to protocol 'Equatable'}}
+_ = Container<Void>.NestedStruct.self // expected-error {{type 'Void' does not conform to protocol 'Sequence'}}
+_ = Container<Array<Void>>.NestedStruct2.self // expected-error {{type 'Void' does not conform to protocol 'Comparable'}}
+_ = Container<String>.NestedStruct2.NestedEnum.self // expected-error {{'Container<String>.NestedStruct2.NestedEnum' requires the types 'String.Element' (aka 'Character') and 'Double' be equivalent}}
+_ = Container<Int>.NestedAlias2.self
+_ = Container<Bool>.NestedClass.self
+_ = Container<String>.NestedStruct.self
+_ = Container<Array<UInt8>>.NestedStruct2.self
+_ = Container<Array<Double>>.NestedStruct2.NestedEnum.self
