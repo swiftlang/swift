@@ -400,7 +400,6 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       // If the argument is itself variadic, we're forwarding varargs
       // with a VarargExpansionExpr; don't collect any more arguments.
       if (args[*claimed].isVariadic()) {
-        skipClaimedArgs();
         return;
       }
 
@@ -414,14 +413,12 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       }
 
       nextArgIdx = currentNextArgIdx;
-      skipClaimedArgs();
       return;
     }
 
     // Try to claim an argument for this parameter.
     if (auto claimed = claimNextNamed(param.getLabel(), ignoreNameMismatch)) {
       parameterBindings[paramIdx].push_back(*claimed);
-      skipClaimedArgs();
       return;
     }
 
@@ -564,7 +561,6 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     if (numClaimedArgs != numArgs) {
       // Restart at the first argument/parameter.
       nextArgIdx = 0;
-      skipClaimedArgs();
       haveUnfulfilledParams = false;
       for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
         // Skip fulfilled parameters.
