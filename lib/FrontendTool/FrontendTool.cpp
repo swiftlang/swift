@@ -1465,6 +1465,12 @@ computeDeallocatableResources(const CompilerInvocation &Invocation,
     return DeallocatableResources::SILModule;
   }
 
+  // Verifying incremental dependencies relies on access to the Swift Module's
+  // source files. We can still free the SIL module, though.
+  if (Invocation.getFrontendOptions().EnableIncrementalDependencyVerifier) {
+    return DeallocatableResources::SILModule;
+  }
+
   // If there are multiple primary inputs it is too soon to free
   // the ASTContext, etc.. OTOH, if this compilation generates code for > 1
   // primary input, then freeing it after processing the last primary is
@@ -2175,6 +2181,20 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
     HadError = dumpAPI(Instance->getMainModule(),
                        Invocation.getFrontendOptions().DumpAPIPath);
+  }
+
+  // Verify reference dependencies of the current compilation job *before*
+  // verifying diagnostics so that the former can be tested via the latter.
+  if (Invocation.getFrontendOptions().EnableIncrementalDependencyVerifier) {
+    if (!Instance->getPrimarySourceFiles().empty()) {
+      HadError |= swift::verifyDependencies(Instance->getSourceMgr(),
+                                            *Instance->getDependencyTracker(),
+                                            Instance->getPrimarySourceFiles());
+    } else {
+      HadError |= swift::verifyDependencies(
+          Instance->getSourceMgr(), *Instance->getDependencyTracker(),
+          Instance->getMainModule()->getFiles());
+    }
   }
 
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
