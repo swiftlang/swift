@@ -121,6 +121,7 @@ def _get_tensorflow_library(host):
 
     raise RuntimeError('unknown host target {}'.format(host))
 
+
 def _silenced(op):
     def inner(*args, **kwargs):
         try:
@@ -129,9 +130,11 @@ def _silenced(op):
             pass
     return inner
 
+
 def _symlink(dest, src):
     _silenced(os.unlink)(src)
     os.symlink(dest, src)
+
 
 class TensorFlow(product.Product):
     @classmethod
@@ -220,24 +223,23 @@ class TensorFlow(product.Product):
 
         if host_target.startswith('linux'):
             versions = (
-                    'libtensorflow.so.2.1.0',
-                    'libtensorflow.so.2.1',
-                    'libtensorflow.so.2',
-                    'libtensorflow.so',
+                'libtensorflow.so.2.1.0',
+                'libtensorflow.so.2.1',
+                'libtensorflow.so.2',
+                'libtensorflow.so',
             )
         else:
             versions = (
-                    'libtensorflow.2.1.0.dylib',
-                    'libtensorflow.2.1.dylib',
-                    'libtensorflow.2.dylib',
-                    'libtensorflow.dylib',
+                'libtensorflow.2.1.0.dylib',
+                'libtensorflow.2.1.dylib',
+                'libtensorflow.2.dylib',
+                'libtensorflow.dylib',
             )
 
         for (index, value) in enumerate(versions[:-1]):
             _symlink(value,
-                     os.path.join(self.install_toolchain_path(),
-                                  'usr', 'lib', 'swift', subdir,
-                                   versions[index + 1]))
+                     os.path.join(self.install_toolchain_path(), 'usr', 'lib',
+                                  'swift', subdir, versions[index + 1]))
 
         _silenced(shutil.rmtree)(os.path.join(self.install_toolchain_path(),
                                               'usr', 'lib', 'swift',
