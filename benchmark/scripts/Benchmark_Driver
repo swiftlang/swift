@@ -184,7 +184,8 @@ class BenchmarkDriver(object):
             return a
 
         return reduce(merge_results,
-                      [self.run(test, num_iters=1, quantile=20,
+                      [self.run(test, num_iters=1, min_samples=10,
+                                sample_time=0.05, quantile=100,
                                 measure_memory=True, gather_metadata=True)
                        for _ in range(self.args.independent_samples)])
 

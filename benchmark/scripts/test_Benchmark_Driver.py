@@ -337,12 +337,13 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
             ('/benchmarks/Benchmark_O', 'b', '--quantile=4', '--delta'))
 
     def test_run_benchmark_independent_samples(self):
-        """Extract up to 20 measurements from an independent run."""
+        """Extract up to 100 measurements from an independent run."""
         self.driver.args.independent_samples = 3
         r = self.driver.run_independent_samples('b1')
         self.assertEqual(self.subprocess_mock.calls.count(
-            ('/benchmarks/Benchmark_O', 'b1', '--num-iters=1', '--memory',
-             '--meta', '--quantile=20', '--delta')), 3)
+            ('/benchmarks/Benchmark_O', 'b1', '--min-samples=10',
+             '--num-iters=1', '--sample-time=0.05',
+             '--memory', '--meta', '--quantile=100', '--delta')), 3)
         self.assertEqual(r.num_samples, 3)  # results are merged
 
     def test_run_and_log(self):
