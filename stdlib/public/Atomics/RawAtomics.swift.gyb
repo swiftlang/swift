@@ -98,6 +98,7 @@ extension UnsafeMutableRawPointer {
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
   ///   is correctly aligned for atomic access of an UInt value.
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @_semantics("atomics.constant_ordering")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   @usableFromInline
@@ -139,6 +140,7 @@ extension UnsafeMutableRawPointer {
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
   ///   is correctly aligned for atomic access of an UInt value.
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @_semantics("atomics.constant_ordering")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   @usableFromInline
@@ -189,6 +191,7 @@ extension UnsafeMutableRawPointer {
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
   ///   is correctly aligned for atomic access of an UInt value.
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @_semantics("atomics.constant_ordering")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public
@@ -269,6 +272,7 @@ extension UnsafeMutableRawPointer {
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
   ///   is correctly aligned for atomic access of an UInt value.
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @_semantics("atomics.constant_ordering")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public
@@ -385,6 +389,7 @@ extension UnsafeMutableRawPointer {
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
   ///   is correctly aligned for atomic access of an UInt value.
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @_semantics("atomics.constant_ordering")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public
@@ -483,6 +488,7 @@ extension UnsafeMutableRawPointer {
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
   ///   is correctly aligned for atomic access of an UInt value.
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @_semantics("atomics.constant_ordering")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   @usableFromInline

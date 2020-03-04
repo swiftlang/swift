@@ -21,6 +21,7 @@ public struct AtomicLoadOrdering {
   @usableFromInline
   internal var _rawValue: Int
 
+  @_semantics("constant_evaluable")
   @inlinable @_transparent // Debug performance
   internal init(_rawValue: Int) {
     self._rawValue = _rawValue
@@ -33,6 +34,7 @@ extension AtomicLoadOrdering {
 
   /// Guarantees the atomicity of the specific operation on which it is applied,
   /// but imposes no ordering constraints on any other reads or writes.
+  @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var relaxed: AtomicLoadOrdering {
@@ -42,12 +44,14 @@ extension AtomicLoadOrdering {
   /// An acquiring load prevents the effects of subsequent load and store
   /// operations on the current thread from appearing to happen before the
   /// effect of the atomic operation itself.
+  @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var acquiring: AtomicLoadOrdering {
     AtomicLoadOrdering(_rawValue: 1)
   }
 
+  @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var sequentiallyConsistent: AtomicLoadOrdering {
@@ -97,6 +101,7 @@ public struct AtomicStoreOrdering {
   @usableFromInline
   internal var _rawValue: Int
 
+  @_semantics("constant_evaluable")
   @inlinable @_transparent // Debug performance
   internal init(_rawValue: Int) {
     self._rawValue = _rawValue
@@ -109,6 +114,7 @@ extension AtomicStoreOrdering {
 
   /// Guarantees the atomicity of the specific operation on which it is applied,
   /// but imposes no ordering constraints on any other reads or writes.
+  @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var relaxed: AtomicStoreOrdering {
@@ -118,12 +124,14 @@ extension AtomicStoreOrdering {
   /// A releasing store prevents the effects of previous load and store
   /// operations on the current thread from appearing to happen after the effect
   /// of the atomic operation itself.
+  @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var releasing: AtomicStoreOrdering {
     AtomicStoreOrdering(_rawValue: 2)
   }
 
+  @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var sequentiallyConsistent: AtomicStoreOrdering {
@@ -174,6 +182,7 @@ public struct AtomicUpdateOrdering {
   @usableFromInline
   internal var _rawValue: Int
 
+  @_semantics("constant_evaluable")
   @inlinable @_transparent // Debug performance
   internal init(_rawValue: Int) {
     self._rawValue = _rawValue
@@ -186,6 +195,7 @@ extension AtomicUpdateOrdering {
 
   /// Guarantees the atomicity of the specific operation on which it is applied,
   /// but imposes no ordering constraints on any other reads or writes.
+  @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var relaxed: AtomicUpdateOrdering {
@@ -195,6 +205,7 @@ extension AtomicUpdateOrdering {
   /// An acquiring load prevents the effects of subsequent load and store
   /// operations on the current thread from appearing to happen before the
   /// effect of the atomic operation itself.
+  @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var acquiring: AtomicUpdateOrdering {
@@ -204,6 +215,7 @@ extension AtomicUpdateOrdering {
   /// A releasing store prevents the effects of previous load and store
   /// operations on the current thread from appearing to happen after the effect
   /// of the atomic operation itself.
+  @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var releasing: AtomicUpdateOrdering {
@@ -214,12 +226,14 @@ extension AtomicUpdateOrdering {
   /// `.releasing`; it prevents all neighboring load and store operations on the
   /// current thread from appearing to happen in a different order in relation
   /// to the atomic operation.
+  @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var acquiringAndReleasing: AtomicUpdateOrdering {
     AtomicUpdateOrdering(_rawValue: 3)
   }
 
+  @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var sequentiallyConsistent: AtomicUpdateOrdering {

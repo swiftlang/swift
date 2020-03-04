@@ -57,6 +57,7 @@ extension UnsafeAtomicUInt {
 extension UnsafeAtomicUInt {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func load(ordering: AtomicLoadOrdering) -> UInt {
     _ptr._atomicLoadWord(ordering: ordering)
@@ -68,6 +69,7 @@ extension UnsafeAtomicUInt {
 extension UnsafeAtomicUInt {
   /// Atomically sets the current value to `desired`,
   /// with the specified memory ordering.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func store(
     _ desired: UInt,
@@ -83,6 +85,7 @@ extension UnsafeAtomicUInt {
   /// value, with the specified memory ordering.
   ///
   /// - Returns: The original value.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func exchange(
     _ desired: UInt,
@@ -109,6 +112,7 @@ extension UnsafeAtomicUInt {
   ///
   /// This method implements a "strong" compare and exchange operation
   /// that does not permit spurious failures.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
     expected: UInt,
@@ -157,6 +161,7 @@ extension UnsafeAtomicUInt {
   ///   expected: 3, desired: 0,
   ///   ordering: .releasing, failureOrdering: .acquiring)
   /// ```
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
     expected: UInt,
@@ -185,6 +190,7 @@ extension UnsafeAtomicUInt {
   ///
   % end
   /// - Returns: The original value before the operation.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   @discardableResult
   public func loadThen${name}(
@@ -203,6 +209,7 @@ extension UnsafeAtomicUInt {
   ///
   % end
   /// - Returns: The new value after the operation.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func ${lowerFirst(name)}ThenLoad(
     ${label} operand: UInt,
@@ -218,6 +225,7 @@ extension UnsafeAtomicUInt {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeAtomicUInt {
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func wrappingIncrement(
     by delta: UInt = 1,
@@ -226,6 +234,7 @@ extension UnsafeAtomicUInt {
     _ = _ptr._atomicLoadThenWrappingIncrementWord(by: delta, ordering: ordering)
   }
 
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func wrappingDecrement(
     by delta: UInt = 1,

@@ -40,6 +40,7 @@ extension UnsafeAtomicUnmanaged {
 extension UnsafeAtomicUnmanaged {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func load(ordering: AtomicLoadOrdering) -> Value {
     let value = _ptr._atomicLoadWord(ordering: ordering)
@@ -53,6 +54,7 @@ extension UnsafeAtomicUnmanaged {
 extension UnsafeAtomicUnmanaged {
   /// Atomically sets the current value to `desired`,
   /// with the specified memory ordering.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func store(
     _ desired: Value,
@@ -69,6 +71,7 @@ extension UnsafeAtomicUnmanaged {
   /// value, with the specified memory ordering.
   ///
   /// - Returns: The original value.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func exchange(
     _ desired: Value,
@@ -98,6 +101,7 @@ extension UnsafeAtomicUnmanaged {
   ///
   /// This method implements a "strong" compare and exchange operation
   /// that does not permit spurious failures.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
     expected: Value,
@@ -155,6 +159,7 @@ extension UnsafeAtomicUnmanaged {
   ///   expected: 3, desired: 0,
   ///   ordering: .releasing, failureOrdering: .acquiring)
   /// ```
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
     expected: Value,

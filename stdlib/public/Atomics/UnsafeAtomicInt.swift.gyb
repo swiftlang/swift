@@ -57,6 +57,7 @@ extension UnsafeAtomicInt {
 extension UnsafeAtomicInt {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func load(ordering: AtomicLoadOrdering) -> Int {
     Int(bitPattern: _ptr._atomicLoadWord(ordering: ordering))
@@ -68,6 +69,7 @@ extension UnsafeAtomicInt {
 extension UnsafeAtomicInt {
   /// Atomically sets the current value to `desired`,
   /// with the specified memory ordering.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func store(
     _ desired: Int,
@@ -83,6 +85,7 @@ extension UnsafeAtomicInt {
   /// value, with the specified memory ordering.
   ///
   /// - Returns: The original value.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func exchange(
     _ desired: Int,
@@ -112,6 +115,7 @@ extension UnsafeAtomicInt {
   ///
   /// This method implements a "strong" compare and exchange operation
   /// that does not permit spurious failures.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
     expected: Int,
@@ -161,6 +165,7 @@ extension UnsafeAtomicInt {
   ///   expected: 3, desired: 0,
   ///   ordering: .releasing, failureOrdering: .acquiring)
   /// ```
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
     expected: Int,
@@ -189,6 +194,7 @@ extension UnsafeAtomicInt {
   ///
   % end
   /// - Returns: The original value before the operation.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   @discardableResult
   public func loadThen${name}(
@@ -210,6 +216,7 @@ extension UnsafeAtomicInt {
   ///
   % end
   /// - Returns: The new value after the operation.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func ${lowerFirst(name)}ThenLoad(
     ${label} operand: Int,
@@ -227,6 +234,7 @@ extension UnsafeAtomicInt {
   ///
   /// Note: This operation silently wraps around on overflow, like the
   /// `${op}` operator does on `Int` values.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func wrappingIncrement(
     by delta: Int = 1,
@@ -240,6 +248,7 @@ extension UnsafeAtomicInt {
   ///
   /// Note: This operation silently wraps around on overflow, like the
   /// `${op}` operator does on `Int` values.
+  @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func wrappingDecrement(
     by delta: Int = 1,
