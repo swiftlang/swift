@@ -184,6 +184,11 @@ Flag<["-"], "driver-verify-fine-grained-dependency-graph-after-every-import">,
 InternalDebugOpt,
 HelpText<"Debug DriverGraph by verifying it after every import">;
 
+def verify_incremental_dependencies :
+  Flag<["-"], "verify-incremental-dependencies">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enable the dependency verifier for each frontend job">;
+
 def driver_emit_fine_grained_dependency_dot_file_after_every_import :
 Flag<["-"], "driver-emit-fine-grained-dependency-dot-file-after-every-import">,
 InternalDebugOpt,
@@ -548,10 +553,20 @@ def Rpass_missed_EQ : Joined<["-"], "Rpass-missed=">,
 
 def save_optimization_record : Flag<["-"], "save-optimization-record">,
   Flags<[FrontendOption]>, HelpText<"Generate a YAML optimization record file">;
+def save_optimization_record_EQ : Joined<["-"], "save-optimization-record=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Generate an optimization record file in a specific format "
+           "(default: YAML)">, MetaVarName<"<format>">;
 def save_optimization_record_path :
   Separate<["-"], "save-optimization-record-path">,
   Flags<[FrontendOption, ArgumentIsPath]>,
-  HelpText<"Specify the file name of any generated YAML optimization record">;
+  HelpText<"Specify the file name of any generated optimization record">;
+def save_optimization_record_passes :
+  Separate<["-"], "save-optimization-record-passes">,
+  Flags<[FrontendOption]>,
+  HelpText<"Only include passes which match a specified regular expression in"
+           "the generated optimization record "
+           "(by default, include all passes)">, MetaVarName<"<regex>">;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,

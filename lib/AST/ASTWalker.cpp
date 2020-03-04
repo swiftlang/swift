@@ -398,11 +398,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     if (auto *rawLiteralExpr = ED->getRawValueUnchecked()) {
-      Expr *newRawExpr = doIt(rawLiteralExpr);
-      if (auto newRawLiteralExpr = dyn_cast<LiteralExpr>(newRawExpr))
-        ED->setRawValueExpr(newRawLiteralExpr);
-      else
+      if (Expr *newRawExpr = doIt(rawLiteralExpr)) {
+        auto *newLiteralRawExpr = cast<LiteralExpr>(newRawExpr);
+        ED->setRawValueExpr(newLiteralRawExpr);
+      } else {
         return true;
+      }
     }
     return false;
   }

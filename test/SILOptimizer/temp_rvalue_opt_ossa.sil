@@ -734,3 +734,28 @@ bb3(%obj3 : @owned $GS<Builtin.NativeObject>):
   apply %f(%obj3) : $@convention(thin) (@guaranteed GS<Builtin.NativeObject>) -> ()
   return %obj3 : $GS<Builtin.NativeObject>
 }
+
+// Test copy elimination with access markers on both the source and dest.
+//
+// CHECK-LABEL: sil [ossa] @takeWithAccess : $@convention(thin) (@in Klass) -> () {
+// CHECK: bb0(%0 : $*Klass):
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Klass
+// CHECK:   apply %{{.*}}([[ACCESS]]) : $@convention(thin) (@in_guaranteed Klass) -> ()
+// CHECK:   end_access [[ACCESS]] : $*Klass
+// CHECK:   destroy_addr %0 : $*Klass
+// CHECK-LABEL: } // end sil function 'takeWithAccess'
+sil [ossa] @takeWithAccess : $@convention(thin) (@in Klass) -> () {
+bb0(%0 : $*Klass):
+  %stack = alloc_stack $Klass
+  %access = begin_access [read] [static] %0 : $*Klass
+  copy_addr [take] %access to [initialization] %stack : $*Klass
+  end_access %access : $*Klass
+  %f = function_ref @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %access2 = begin_access [read] [static] %stack : $*Klass
+  %call = apply %f(%access2) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  end_access %access2 : $*Klass
+  destroy_addr %stack : $*Klass
+  dealloc_stack %stack : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}

@@ -15,6 +15,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
@@ -299,6 +300,74 @@ bool IsAddressWrittenToDefUseAnalysis::isWrittenToHelper(SILValue initialValue) 
 }
 
 //===----------------------------------------------------------------------===//
+//             Convert Forwarding Insts from Owned -> Guaranteed
+//===----------------------------------------------------------------------===//
+
+static void convertForwardingInstsFromOwnedToGuaranteed(
+    ArrayRef<SILInstruction *> guaranteedForwardingInsts) {
+  // Then change all of our guaranteed forwarding insts to have guaranteed
+  // ownership kind instead of what ever they previously had (ignoring trivial
+  // results);
+  while (!guaranteedForwardingInsts.empty()) {
+    auto *i = guaranteedForwardingInsts.back();
+    guaranteedForwardingInsts = guaranteedForwardingInsts.drop_back();
+
+    // If this is a term inst, just convert all of its incoming values that are
+    // owned to be guaranteed.
+    if (auto *ti = dyn_cast<TermInst>(i)) {
+      for (auto &succ : ti->getSuccessors()) {
+        auto *succBlock = succ.getBB();
+
+        // If we do not have any arguments, then continue.
+        if (succBlock->args_empty())
+          continue;
+
+        for (auto *succArg : succBlock->getSILPhiArguments()) {
+          // If we have an any value, just continue.
+          if (succArg->getOwnershipKind() == ValueOwnershipKind::Owned) {
+            succArg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+          }
+        }
+      }
+      continue;
+    }
+
+    assert(i->hasResults());
+    for (SILValue result : i->getResults()) {
+      if (auto *svi = dyn_cast<OwnershipForwardingSingleValueInst>(result)) {
+        if (svi->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          svi->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(result)) {
+        if (ofci->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          ofci->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      if (auto *sei = dyn_cast<OwnershipForwardingSelectEnumInstBase>(result)) {
+        if (sei->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          sei->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(result)) {
+        if (mvir->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          mvir->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      llvm_unreachable("unhandled forwarding instruction?!");
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                               Implementation
 //===----------------------------------------------------------------------===//
 
@@ -519,6 +588,10 @@ bool SemanticARCOptVisitor::processWorklist() {
   return madeChange;
 }
 
+//===----------------------------------------------------------------------===//
+//                     Redundant Borrow Scope Elimination
+//===----------------------------------------------------------------------===//
+
 bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   auto kind = bbi->getOperand().getOwnershipKind();
   SmallVector<EndBorrowInst *, 16> endBorrows;
@@ -555,69 +628,9 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   return true;
 }
 
-static void convertForwardingInstsFromOwnedToGuaranteed(
-    ArrayRef<SILInstruction *> guaranteedForwardingInsts) {
-  // Then change all of our guaranteed forwarding insts to have guaranteed
-  // ownership kind instead of what ever they previously had (ignoring trivial
-  // results);
-  while (!guaranteedForwardingInsts.empty()) {
-    auto *i = guaranteedForwardingInsts.back();
-    guaranteedForwardingInsts = guaranteedForwardingInsts.drop_back();
-
-    // If this is a term inst, just convert all of its incoming values that are
-    // owned to be guaranteed.
-    if (auto *ti = dyn_cast<TermInst>(i)) {
-      for (auto &succ : ti->getSuccessors()) {
-        auto *succBlock = succ.getBB();
-
-        // If we do not have any arguments, then continue.
-        if (succBlock->args_empty())
-          continue;
-
-        for (auto *succArg : succBlock->getSILPhiArguments()) {
-          // If we have an any value, just continue.
-          if (succArg->getOwnershipKind() == ValueOwnershipKind::Owned) {
-            succArg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-          }
-        }
-      }
-      continue;
-    }
-
-    assert(i->hasResults());
-    for (SILValue result : i->getResults()) {
-      if (auto *svi = dyn_cast<OwnershipForwardingSingleValueInst>(result)) {
-        if (svi->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          svi->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(result)) {
-        if (ofci->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          ofci->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      if (auto *sei = dyn_cast<OwnershipForwardingSelectEnumInstBase>(result)) {
-        if (sei->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          sei->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(result)) {
-        if (mvir->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          mvir->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      llvm_unreachable("unhandled forwarding instruction?!");
-    }
-  }
-}
+//===----------------------------------------------------------------------===//
+//                    CopyValue Optimizations Elimination
+//===----------------------------------------------------------------------===//
 
 // Eliminate a copy of a borrowed value, if:
 //

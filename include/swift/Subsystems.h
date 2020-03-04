@@ -108,12 +108,7 @@ namespace swift {
   /// \param SF The file within the module being parsed.
   ///
   /// \param BufferID The buffer to parse from.
-  ///
-  /// \param DelayBodyParsing Whether parsing of type and function bodies can be
-  /// delayed.
-  void parseIntoSourceFile(SourceFile &SF, unsigned BufferID,
-                           bool DelayBodyParsing = true,
-                           bool EvaluateConditionals = true);
+  void parseIntoSourceFile(SourceFile &SF, unsigned BufferID);
 
   /// Parse a source file's SIL declarations into a given SIL module.
   void parseSourceFileSIL(SourceFile &SF, SILParserState *sil);
@@ -373,6 +368,12 @@ namespace swift {
   /// should call this functions after forming the ASTContext.
   void registerSILGenRequestFunctions(Evaluator &evaluator);
 
+  /// Register SILOptimizer-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any SIL optimization
+  /// should call this functions after forming the ASTContext.
+  void registerSILOptimizerRequestFunctions(Evaluator &evaluator);
+
   /// Register TBDGen-level request functions with the evaluator.
   ///
   /// Clients that form an ASTContext and will perform any TBD generation
@@ -389,6 +390,9 @@ namespace swift {
   /// The ASTContext will automatically call these upon construction.
   /// Calling registerIDERequestFunctions will invoke this function as well.
   void registerIDETypeCheckRequestFunctions(Evaluator &evaluator);
+
+  /// Register SILOptimizer passes necessary for IRGen.
+  void registerIRGenSILTransforms(ASTContext &ctx);
 
 } // end namespace swift
 

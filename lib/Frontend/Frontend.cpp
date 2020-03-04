@@ -221,6 +221,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
   registerSILGenRequestFunctions(Context->evaluator);
+  registerSILOptimizerRequestFunctions(Context->evaluator);
   registerTBDGenRequestFunctions(Context->evaluator);
 
   // Migrator, indexing and typo correction need some IDE requests.
@@ -232,6 +233,9 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
           FrontendOptions::ActionType::REPL) {
     registerIDERequestFunctions(Context->evaluator);
   }
+
+  registerIRGenSILTransforms(*Context);
+
   if (setUpModuleLoaders())
     return true;
 
@@ -406,8 +410,8 @@ void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
     Diagnostics.setPrintDiagnosticNames(true);
   }
-  if (Invocation.getDiagnosticOptions().EnableDescriptiveDiagnostics) {
-    Diagnostics.setUseDescriptiveDiagnostics(true);
+  if (Invocation.getDiagnosticOptions().EnableEducationalNotes) {
+    Diagnostics.setUseEducationalNotes(true);
   }
   Diagnostics.setDiagnosticDocumentationPath(
       Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
@@ -970,16 +974,7 @@ void CompilerInstance::parseLibraryFile(
       SourceFileKind::Library, implicitImports.kind, BufferID);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
-  auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
-
-  auto &Diags = NextInput->getASTContext().Diags;
-  auto DidSuppressWarnings = Diags.getSuppressWarnings();
-  Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
-
-  parseIntoSourceFile(*NextInput, BufferID, /*DelayedBodyParsing=*/!IsPrimary);
-
-  Diags.setSuppressWarnings(DidSuppressWarnings);
-
+  parseIntoSourceFile(*NextInput, BufferID);
   performNameBinding(*NextInput);
 }
 
@@ -1023,8 +1018,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
   Diags.setSuppressWarnings(DidSuppressWarnings || !mainIsPrimary);
 
   // Parse the Swift decls into the source file.
-  parseIntoSourceFile(MainFile, MainBufferID,
-                      /*delayBodyParsing*/ !mainIsPrimary);
+  parseIntoSourceFile(MainFile, MainBufferID);
 
   // For a primary, also perform type checking if needed. Otherwise, just do
   // name binding.
@@ -1081,17 +1075,27 @@ void CompilerInstance::finishTypeChecking() {
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
     SourceFileKind fileKind, SourceFile::ImplicitModuleImportKind importKind,
-    Optional<unsigned> bufferID) {
+    Optional<unsigned> bufferID, SourceFile::ParsingOptions opts) {
   ModuleDecl *mainModule = getMainModule();
+
+  auto isPrimary = bufferID && isPrimaryInput(*bufferID);
+  if (isPrimary || isWholeModuleCompilation()) {
+    // Disable delayed body parsing for primaries.
+    opts |= SourceFile::ParsingFlags::DisableDelayedBodies;
+  } else {
+    // Suppress parse warnings for non-primaries, as they'll get parsed multiple
+    // times.
+    opts |= SourceFile::ParsingFlags::SuppressWarnings;
+  }
+
   SourceFile *inputFile = new (*Context)
       SourceFile(*mainModule, fileKind, bufferID, importKind,
                  Invocation.getLangOptions().CollectParsedToken,
-                 Invocation.getLangOptions().BuildSyntaxTree);
+                 Invocation.getLangOptions().BuildSyntaxTree, opts);
   MainModule->addFile(*inputFile);
 
-  if (bufferID && isPrimaryInput(*bufferID)) {
+  if (isPrimary)
     recordPrimarySourceFile(inputFile);
-  }
 
   if (bufferID == SourceMgr.getCodeCompletionBufferID()) {
     assert(!CodeCompletionFile && "Multiple code completion files?");
@@ -1113,6 +1117,12 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
          "only supports parsing .swift files");
   (void)Kind;
 
+  SourceFile::ParsingOptions parsingOpts;
+  if (!EvaluateConditionals)
+    parsingOpts |= SourceFile::ParsingFlags::DisablePoundIfEvaluation;
+  if (!CanDelayBodies)
+    parsingOpts |= SourceFile::ParsingFlags::DisableDelayedBodies;
+
   // Make sure the main file is the first file in the module but parse it last,
   // to match the parsing logic used when performing Sema.
   if (MainBufferID != NO_SUCH_BUFFER) {
@@ -1120,16 +1130,8 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
            Kind == InputFileKind::SwiftModuleInterface);
     createSourceFileForMainModule(Invocation.getSourceFileKind(),
                                   SourceFile::ImplicitModuleImportKind::None,
-                                  MainBufferID);
+                                  MainBufferID, parsingOpts);
   }
-
-  auto shouldDelayBodies = [&](unsigned bufferID) -> bool {
-    if (!CanDelayBodies)
-      return false;
-
-    // Don't delay bodies in whole module mode or for primary files.
-    return !(isWholeModuleCompilation() || isPrimaryInput(bufferID));
-  };
 
   // Parse all the library files.
   for (auto BufferID : InputSourceCodeBufferIDs) {
@@ -1138,10 +1140,9 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
 
     SourceFile *NextInput = createSourceFileForMainModule(
         SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
-        BufferID);
+        BufferID, parsingOpts);
 
-    parseIntoSourceFile(*NextInput, BufferID, shouldDelayBodies(BufferID),
-                        EvaluateConditionals);
+    parseIntoSourceFile(*NextInput, BufferID);
   }
 
   // Now parse the main file.
@@ -1151,8 +1152,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
     MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
     assert(MainBufferID == MainFile.getBufferID());
 
-    parseIntoSourceFile(MainFile, MainBufferID, shouldDelayBodies(MainBufferID),
-                        EvaluateConditionals);
+    parseIntoSourceFile(MainFile, MainBufferID);
   }
 
   assert(Context->LoadedModules.size() == 1 &&

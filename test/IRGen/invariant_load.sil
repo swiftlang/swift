@@ -9,6 +9,10 @@ struct X {
   var z: Builtin.Int32
 }
 
+class C {
+  @_hasStorage @_hasInitialValue final let prop: Builtin.Int32 { get }
+}
+
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @invariant_load
 sil [ossa] @invariant_load : $@convention(thin) (Builtin.RawPointer) -> () {
 entry(%p : $Builtin.RawPointer):
@@ -24,3 +28,13 @@ entry(%p : $Builtin.RawPointer):
   %z = load [trivial] %zp : $*Builtin.Int32
   return undef : $()
 }
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @testLetProp
+sil @testLetProp : $@convention(thin) (@guaranteed C) -> Builtin.Int32 {
+bb0(%0 : $C):
+  %propAdr = ref_element_addr %0 : $C, #C.prop
+  // CHECK: load i32, {{.*}} !invariant.load
+  %val = load %propAdr : $*Builtin.Int32
+  return %val : $Builtin.Int32
+}
+

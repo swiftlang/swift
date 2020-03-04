@@ -119,9 +119,7 @@ static void deletePersistentParserState(PersistentParserState *state) {
   delete state;
 }
 
-void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
-                                bool DelayBodyParsing,
-                                bool EvaluateConditionals) {
+void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID) {
   auto &ctx = SF.getASTContext();
   std::shared_ptr<SyntaxTreeCreator> STreeCreator;
   if (SF.shouldBuildSyntaxTree()) {
@@ -130,15 +128,14 @@ void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
         SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
   }
 
-  // Not supported right now.
-  if (SF.Kind == SourceFileKind::REPL)
-    DelayBodyParsing = false;
-  if (SF.hasInterfaceHash())
-    DelayBodyParsing = false;
-  if (SF.shouldCollectToken())
-    DelayBodyParsing = false;
-  if (SF.shouldBuildSyntaxTree())
-    DelayBodyParsing = false;
+  // If we've been asked to silence warnings, do so now. This is needed for
+  // secondary files, which can be parsed multiple times.
+  auto &diags = ctx.Diags;
+  auto didSuppressWarnings = diags.getSuppressWarnings();
+  auto shouldSuppress = SF.getParsingOptions().contains(
+      SourceFile::ParsingFlags::SuppressWarnings);
+  diags.setSuppressWarnings(didSuppressWarnings || shouldSuppress);
+  SWIFT_DEFER { diags.setSuppressWarnings(didSuppressWarnings); };
 
   // If this buffer is for code completion, hook up the state needed by its
   // second pass.
@@ -150,8 +147,7 @@ void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
 
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "Parsing");
-  Parser P(BufferID, SF, /*SIL*/ nullptr, state, STreeCreator, DelayBodyParsing,
-           EvaluateConditionals);
+  Parser P(BufferID, SF, /*SIL*/ nullptr, state, STreeCreator);
   PrettyStackTraceParser StackTrace(P);
 
   llvm::SaveAndRestore<NullablePtr<llvm::MD5>> S(P.CurrentTokenHash,
@@ -172,7 +168,7 @@ void swift::parseSourceFileSIL(SourceFile &SF, SILParserState *sil) {
                              "Parsing SIL");
   Parser parser(*bufferID, SF, sil->Impl.get(),
                 /*persistentParserState*/ nullptr,
-                /*syntaxTreeCreator*/ nullptr, /*delayBodyParsing*/ false);
+                /*syntaxTreeCreator*/ nullptr);
   PrettyStackTraceParser StackTrace(parser);
   parser.parseTopLevelSIL();
 }

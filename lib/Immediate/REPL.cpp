@@ -850,6 +850,11 @@ private:
   }
 
   bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
+    SWIFT_DEFER {
+      // Always flush diagnostic consumers after executing a line.
+      CI.getDiags().flushConsumers();
+    };
+
     // Parse the current line(s).
     auto InputBuf = llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
     SmallString<8> Name{"REPL_"};

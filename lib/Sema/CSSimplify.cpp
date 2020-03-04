@@ -3560,14 +3560,6 @@ bool ConstraintSystem::repairFailures(
     if (lhs->hasHole() || rhs->hasHole())
       return true;
 
-    // If dependent members are present here it's because the base doesn't
-    // conform to the associated type's protocol. We can only get here if we
-    // already applied a fix for the conformance failure.
-    if (lhs->hasDependentMember() || rhs->hasDependentMember()) {
-      increaseScore(SK_Fix);
-      return true;
-    }
-
     // If requirement is something like `T == [Int]` let's let
     // type matcher a chance to match generic parameters before
     // recording a fix, because then we'll know exactly how many
@@ -3786,6 +3778,12 @@ bool ConstraintSystem::repairFailures(
     // into a single fix.
     if (tupleLocator->isLastElement<LocatorPathElt::AnyRequirement>() ||
         tupleLocator->isLastElement<LocatorPathElt::GenericArgument>())
+      break;
+
+    // If the mismatch is a part of either optional-to-optional or
+    // value-to-optional conversions, let's allow fix refer to a complete
+    // top level type and not just a part of it.
+    if (tupleLocator->findLast<LocatorPathElt::OptionalPayload>())
       break;
 
     ConstraintFix *fix;
@@ -4189,15 +4187,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       llvm_unreachable("type variables should have already been handled by now");
 
     case TypeKind::DependentMember: {
-      // If one of the dependent member types has no type variables, the
-      // dependent member can't be simplified because the base doesn't conform
-      // to the associated type's protocol. We can only get here if we already
-      // applied a fix for the conformance failure.
-      if (!desugar1->hasTypeVariable() || !desugar2->hasTypeVariable()) {
-        increaseScore(SK_Fix);
-        return getTypeMatchSuccess();
-      }
-
       // Nothing we can solve yet, since we need to wait until
       // type variables will get resolved.
       return formUnsolvedResult();
