@@ -33,6 +33,7 @@ extension AtomicLoadOrdering {
 
   /// Guarantees the atomicity of the specific operation on which it is applied,
   /// but imposes no ordering constraints on any other reads or writes.
+  @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var relaxed: AtomicLoadOrdering {
     AtomicLoadOrdering(_rawValue: 0)
@@ -41,11 +42,13 @@ extension AtomicLoadOrdering {
   /// An acquiring load prevents the effects of subsequent load and store
   /// operations on the current thread from appearing to happen before the
   /// effect of the atomic operation itself.
+  @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var acquiring: AtomicLoadOrdering {
     AtomicLoadOrdering(_rawValue: 1)
   }
 
+  @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var sequentiallyConsistent: AtomicLoadOrdering {
     AtomicLoadOrdering(_rawValue: 4)
@@ -106,6 +109,7 @@ extension AtomicStoreOrdering {
 
   /// Guarantees the atomicity of the specific operation on which it is applied,
   /// but imposes no ordering constraints on any other reads or writes.
+  @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var relaxed: AtomicStoreOrdering {
     AtomicStoreOrdering(_rawValue: 0)
@@ -114,11 +118,13 @@ extension AtomicStoreOrdering {
   /// A releasing store prevents the effects of previous load and store
   /// operations on the current thread from appearing to happen after the effect
   /// of the atomic operation itself.
+  @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var releasing: AtomicStoreOrdering {
     AtomicStoreOrdering(_rawValue: 2)
   }
 
+  @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var sequentiallyConsistent: AtomicStoreOrdering {
     AtomicStoreOrdering(_rawValue: 4)
@@ -180,6 +186,7 @@ extension AtomicUpdateOrdering {
 
   /// Guarantees the atomicity of the specific operation on which it is applied,
   /// but imposes no ordering constraints on any other reads or writes.
+  @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var relaxed: AtomicUpdateOrdering {
     AtomicUpdateOrdering(_rawValue: 0)
@@ -188,6 +195,7 @@ extension AtomicUpdateOrdering {
   /// An acquiring load prevents the effects of subsequent load and store
   /// operations on the current thread from appearing to happen before the
   /// effect of the atomic operation itself.
+  @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var acquiring: AtomicUpdateOrdering {
     AtomicUpdateOrdering(_rawValue: 1)
@@ -196,6 +204,7 @@ extension AtomicUpdateOrdering {
   /// A releasing store prevents the effects of previous load and store
   /// operations on the current thread from appearing to happen after the effect
   /// of the atomic operation itself.
+  @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var releasing: AtomicUpdateOrdering {
     AtomicUpdateOrdering(_rawValue: 2)
@@ -205,11 +214,13 @@ extension AtomicUpdateOrdering {
   /// `.releasing`; it prevents all neighboring load and store operations on the
   /// current thread from appearing to happen in a different order in relation
   /// to the atomic operation.
+  @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var acquiringAndReleasing: AtomicUpdateOrdering {
     AtomicUpdateOrdering(_rawValue: 3)
   }
 
+  @_alwaysEmitIntoClient
   @_transparent // Debug performance
   public static var sequentiallyConsistent: AtomicUpdateOrdering {
     AtomicUpdateOrdering(_rawValue: 4)
