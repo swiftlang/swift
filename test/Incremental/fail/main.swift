@@ -1,4 +1,4 @@
-// REQUIRES: rdar://60030114
+// REQUIRES: rdar60030114
 
 // RUN: %empty-directory(%t)
 // RUN: %{python} %S/../gen-output-file-map.py -o %t %S/Inputs -r %t.resp
