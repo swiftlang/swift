@@ -493,10 +493,10 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   if (numClaimedArgs != numArgs) {
     // Find all of the named, unclaimed arguments.
     llvm::SmallVector<unsigned, 4> unclaimedNamedArgs;
-    for (nextArgIdx = 0; skipClaimedArgs(), nextArgIdx != numArgs;
-         ++nextArgIdx) {
-      if (!args[nextArgIdx].getLabel().empty())
-        unclaimedNamedArgs.push_back(nextArgIdx);
+    for (auto argIdx : indices(args)) {
+      if (claimedArgs[argIdx]) continue;
+      if (!args[argIdx].getLabel().empty())
+        unclaimedNamedArgs.push_back(argIdx);
     }
 
     if (!unclaimedNamedArgs.empty()) {
