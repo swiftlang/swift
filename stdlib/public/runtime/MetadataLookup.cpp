@@ -1687,6 +1687,13 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
     auto node = demangler.demangleSymbol(typeName);
     if (!node)
       return NO;
+
+    // If we successfully demangled but there is a suffix, then we did NOT use
+    // the entire name, and this is NOT a match. Reject it.
+    if (node->hasChildren() &&
+        node->getLastChild()->getKind() == Node::Kind::Suffix)
+      return NO;
+
     metadata = swift_getTypeByMangledNode(
       MetadataState::Complete, demangler, node,
       nullptr,
