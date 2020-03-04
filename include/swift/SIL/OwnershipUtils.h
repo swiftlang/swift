@@ -319,16 +319,15 @@ struct BorrowScopeIntroducingValue {
 
   bool isLocalScope() const { return kind.isLocalScope(); }
 
-  /// Returns true if the passed in set of instructions is completely within the
-  /// lifetime of this borrow introducer.
+  /// Returns true if the passed in set of uses is completely within
+  /// the lifetime of this borrow introducer.
   ///
   /// NOTE: Scratch space is used internally to this method to store the end
   /// borrow scopes if needed.
-  bool
-  areInstructionsWithinScope(ArrayRef<SILInstruction *> instructions,
-                             SmallVectorImpl<SILInstruction *> &scratchSpace,
-                             SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-                             DeadEndBlocks &deadEndBlocks) const;
+  bool areUsesWithinScope(ArrayRef<Operand *> instructions,
+                          SmallVectorImpl<Operand *> &scratchSpace,
+                          SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
+                          DeadEndBlocks &deadEndBlocks) const;
 
   /// Given a local borrow scope introducer, visit all non-forwarding consuming
   /// users. This means that this looks through guaranteed block arguments.

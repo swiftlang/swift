@@ -540,7 +540,7 @@ bool memInstMustInitialize(Operand *memOper);
 /// alloc_stack. If the alloc_stack is destroyed in pieces, we do not guarantee
 /// that the list of destroying users is a minimal jointly post-dominating set.
 bool isSingleInitAllocStack(AllocStackInst *asi,
-                            SmallVectorImpl<SILInstruction *> &destroyingUsers);
+                            SmallVectorImpl<Operand *> &destroyingUses);
 
 /// Return true if the given address producer may be the source of a formal
 /// access (a read or write of a potentially aliased, user visible variable).

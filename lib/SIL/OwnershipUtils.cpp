@@ -328,9 +328,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-bool BorrowScopeIntroducingValue::areInstructionsWithinScope(
-    ArrayRef<SILInstruction *> instructions,
-    SmallVectorImpl<SILInstruction *> &scratchSpace,
+bool BorrowScopeIntroducingValue::areUsesWithinScope(
+    ArrayRef<Operand *> uses, SmallVectorImpl<Operand *> &scratchSpace,
     SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
     DeadEndBlocks &deadEndBlocks) const {
   // Make sure that we clear our scratch space/utilities before we exit.
@@ -349,12 +348,11 @@ bool BorrowScopeIntroducingValue::areInstructionsWithinScope(
 
   // Otherwise, gather up our local scope ending instructions, looking through
   // guaranteed phi nodes.
-  visitLocalScopeTransitiveEndingUses([&scratchSpace](Operand *op) {
-    scratchSpace.emplace_back(op->getUser());
-  });
+  visitLocalScopeTransitiveEndingUses(
+      [&scratchSpace](Operand *op) { scratchSpace.emplace_back(op); });
 
   LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-  return checker.validateLifetime(value, scratchSpace, instructions);
+  return checker.validateLifetime(value, scratchSpace, uses);
 }
 
 bool BorrowScopeIntroducingValue::visitLocalScopeTransitiveEndingUses(

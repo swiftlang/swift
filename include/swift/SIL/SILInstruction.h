@@ -1875,6 +1875,7 @@ public:
   /// The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return NumStaticOperands; }
 
+  Operand *getCalleeOperand() { return &getAllOperands()[Callee]; }
   const Operand *getCalleeOperand() const { return &getAllOperands()[Callee]; }
   SILValue getCallee() const { return getCalleeOperand()->get(); }
 
