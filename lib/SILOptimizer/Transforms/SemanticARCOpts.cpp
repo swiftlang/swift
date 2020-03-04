@@ -771,12 +771,18 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
     }
     if (!foundNonDeadEnd && haveAnyLocalScopes)
       return false;
-    SmallVector<SILInstruction *, 8> scratchSpace;
+    // TODO: In a future commit, when LiveRange converts to work with
+    // operands, this will not be needed. This is just to simplify
+    // patches.
+    SmallVector<Operand *, 8> destroyOperands;
+    transform(destroys, std::back_inserter(destroyOperands),
+              [](SILInstruction *i) { return &i->getAllOperands()[0]; });
+    SmallVector<Operand *, 8> scratchSpace;
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     if (llvm::any_of(borrowScopeIntroducers,
                      [&](BorrowScopeIntroducingValue borrowScope) {
-                       return !borrowScope.areInstructionsWithinScope(
-                           destroys, scratchSpace, visitedBlocks,
+                       return !borrowScope.areUsesWithinScope(
+                           destroyOperands, scratchSpace, visitedBlocks,
                            getDeadEndBlocks());
                      })) {
       return false;
@@ -1141,14 +1147,23 @@ public:
     // borrow scope introducing value and then use the linear lifetime checker
     // to check whether the copied value is dominated by the lifetime of the
     // borrow it's based on.
-    SmallVector<SILInstruction *, 4> endScopeInsts;
-    value->getLocalScopeEndingInstructions(endScopeInsts);
+    SmallVector<Operand *, 4> endScopeInsts;
+    value->visitLocalScopeEndingUses(
+        [&](Operand *use) { endScopeInsts.push_back(use); });
 
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
     // Returns true on success. So we invert.
-    bool foundError = !checker.validateLifetime(baseObject, endScopeInsts,
-                                                liveRange.getDestroys());
+    auto destroys = liveRange.getDestroys();
+    // TODO: Once LiveRange uses operands, eliminate this!
+    SmallVector<Operand *, 16> destroyOperands;
+    transform(destroys, std::back_inserter(destroyOperands),
+              [](SILInstruction *i) {
+                assert(isa<DestroyValueInst>(i));
+                return &cast<DestroyValueInst>(i)->getAllOperands()[0];
+              });
+    bool foundError =
+        !checker.validateLifetime(baseObject, endScopeInsts, destroyOperands);
     return answer(foundError);
   }
   
@@ -1174,19 +1189,24 @@ public:
   /// See if we have an alloc_stack that is only written to once by an
   /// initializing instruction.
   void visitStackAccess(AllocStackInst *stack) {
-    SmallVector<SILInstruction *, 8> destroyAddrs;
-    bool initialAnswer = isSingleInitAllocStack(stack, destroyAddrs);
+    SmallVector<Operand *, 8> destroyAddrOperands;
+    bool initialAnswer = isSingleInitAllocStack(stack, destroyAddrOperands);
     if (!initialAnswer)
       return answer(true);
 
     // Then make sure that all of our load [copy] uses are within the
     // destroy_addr.
+    SmallVector<Operand *, 16> destroyOperands;
+    transform(liveRange.getDestroys(), std::back_inserter(destroyOperands),
+              [](SILInstruction *i) {
+                return &cast<DestroyValueInst>(i)->getAllOperands()[0];
+              });
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
     // Returns true on success. So we invert.
     bool foundError = !checker.validateLifetime(
-        stack, destroyAddrs /*consuming users*/,
-        liveRange.getDestroys() /*non consuming users*/);
+        stack, destroyAddrOperands /*consuming users*/,
+        destroyOperands /*non consuming users*/);
     return answer(foundError);
   }
 

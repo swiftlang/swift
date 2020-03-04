@@ -17,7 +17,6 @@
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1199,10 +1198,10 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
     // Then perform the linear lifetime check. If we succeed, continue. We have
     // no further work to do.
     auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
+    auto *loadOperand = &load->getAllOperands()[0];
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-    auto error = checker.checkValue(
-        phi, {BranchPropagatedUser(&load->getAllOperands()[0])}, {}, errorKind,
-        &leakingBlocks);
+    auto error =
+        checker.checkValue(phi, {loadOperand}, {}, errorKind, &leakingBlocks);
 
     if (!error.getFoundError()) {
       // If we did not find an error, then our copy_value must be strongly
@@ -1291,10 +1290,10 @@ void AvailableValueAggregator::addMissingDestroysForCopiedValues(
     // Then perform the linear lifetime check. If we succeed, continue. We have
     // no further work to do.
     auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
+    auto *loadOperand = &load->getAllOperands()[0];
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-    auto error = checker.checkValue(
-        cvi, {BranchPropagatedUser(&load->getAllOperands()[0])}, {}, errorKind,
-        &leakingBlocks);
+    auto error =
+        checker.checkValue(cvi, {loadOperand}, {}, errorKind, &leakingBlocks);
 
     if (!error.getFoundError()) {
       // If we did not find an error, then our copy_value must be strongly
