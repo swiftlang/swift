@@ -414,3 +414,16 @@ func testNonExhaustiveSwitch(e: E) {
     }
   }
 }
+
+// rdar://problem/59856491
+struct TestConstraintGenerationErrors {
+  @TupleBuilder var buildTupleFnBody: String {
+    String(nothing) // expected-error {{use of unresolved identifier 'nothing'}}
+  }
+
+  func buildTupleClosure() {
+    tuplify(true) { _ in
+      String(nothing) // expected-error {{use of unresolved identifier 'nothing'}}
+    }
+  }
+}

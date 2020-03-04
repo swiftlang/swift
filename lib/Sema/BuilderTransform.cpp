@@ -1297,11 +1297,13 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
     func->getBody()->walk(walker);
   }
 
-  // FIXME: check the result
-  cs.matchFunctionBuilder(func, builderType, resultContextType,
-                          resultConstraintKind,
-                          /*calleeLocator=*/cs.getConstraintLocator(fakeAnchor),
-                          /*FIXME:*/cs.getConstraintLocator(fakeAnchor));
+  if (auto result = cs.matchFunctionBuilder(
+          func, builderType, resultContextType, resultConstraintKind,
+          /*calleeLocator=*/cs.getConstraintLocator(fakeAnchor),
+          /*FIXME:*/cs.getConstraintLocator(fakeAnchor))) {
+    if (result->isFailure())
+      return nullptr;
+  }
 
   // Solve the constraint system.
   SmallVector<Solution, 4> solutions;
