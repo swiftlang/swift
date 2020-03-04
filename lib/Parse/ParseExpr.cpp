@@ -62,14 +62,8 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
     return makeParserResult(new (Context) UnresolvedPatternExpr(pattern.get()));
   }
   
-  auto expr = parseExprSequence(Message, isExprBasic,
+  return parseExprSequence(Message, isExprBasic,
                                 /*forConditionalDirective*/false);
-  if (expr.hasCodeCompletion())
-    return expr;
-  if (expr.isNull())
-    return nullptr;
-  
-  return makeParserResult(expr.get());
 }
 
 /// parseExprIs
@@ -173,7 +167,7 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
 
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
-  bool HasCodeCompletion = false;
+  ParserStatus SequenceStatus;
   bool PendingTernary = false;
 
   while (true) {
@@ -183,20 +177,18 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
     // Parse a unary expression.
     ParserResult<Expr> Primary =
       parseExprSequenceElement(Message, isExprBasic);
+    SequenceStatus |= Primary;
 
-    if (Primary.hasCodeCompletion()) {
-      HasCodeCompletion = true;
-      if (CodeCompletion)
+    if (SequenceStatus.hasCodeCompletion() && CodeCompletion)
         CodeCompletion->setLeadingSequenceExprs(SequencedExprs);
-    }
+
     if (Primary.isNull()) {
-      if (HasCodeCompletion) {
+      if (SequenceStatus.hasCodeCompletion()) {
         SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
         break;
       }
-      return Primary;
+      return nullptr;
     }
-
     SequencedExprs.push_back(Primary.get());
 
     // We know we can make a syntax node for ternary expression.
@@ -204,6 +196,9 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       SyntaxContext->createNodeInPlace(SyntaxKind::TernaryExpr);
       PendingTernary = false;
     }
+
+    if (SequenceStatus.isError() && !SequenceStatus.hasCodeCompletion())
+      break;
 
     if (isForConditionalDirective && Tok.isAtStartOfLine())
       break;
@@ -242,9 +237,8 @@ parse_operator:
       // Parse the middle expression of the ternary.
       ParserResult<Expr> middle =
           parseExprSequence(diag::expected_expr_after_if_question, isExprBasic);
+      SequenceStatus |= middle;
       ParserStatus Status = middle;
-      if (middle.hasCodeCompletion())
-        HasCodeCompletion = true;
       if (middle.isNull())
         return nullptr;
 
@@ -304,6 +298,7 @@ parse_operator:
       
       // Store the expr itself as a placeholder RHS. The real RHS is the
       // type parameter stored in the node itself.
+      SequenceStatus |= is;
       SequencedExprs.push_back(is.get());
       SequencedExprs.push_back(is.get());
       
@@ -320,6 +315,7 @@ parse_operator:
         
       // Store the expr itself as a placeholder RHS. The real RHS is the
       // type parameter stored in the node itself.
+      SequenceStatus |= as;
       SequencedExprs.push_back(as.get());
       SequencedExprs.push_back(as.get());
       
@@ -334,6 +330,7 @@ parse_operator:
       ParserResult<Expr> arrow = parseExprArrow();
       if (arrow.isNull() || arrow.hasCodeCompletion())
         return arrow;
+      SequenceStatus |= arrow;
       SequencedExprs.push_back(arrow.get());
       break;
     }
@@ -356,19 +353,13 @@ done:
   assert(!SequencedExprs.empty());
 
   // If we saw no operators, don't build a sequence.
-  if (SequencedExprs.size() == 1) {
-    auto Result = makeParserResult(SequencedExprs[0]);
-    if (HasCodeCompletion)
-      Result.setHasCodeCompletion();
-    return Result;
-  }
+  if (SequencedExprs.size() == 1)
+    return makeParserResult(SequenceStatus, SequencedExprs[0]);
 
   ExprSequnceContext.createNodeInPlace(SyntaxKind::ExprList);
   ExprSequnceContext.setCreateSyntax(SyntaxKind::SequenceExpr);
-  auto Result = makeParserResult(SequenceExpr::create(Context, SequencedExprs));
-  if (HasCodeCompletion)
-    Result.setHasCodeCompletion();
-  return Result;
+  return makeParserResult(SequenceStatus,
+                          SequenceExpr::create(Context, SequencedExprs));
 }
 
 /// parseExprSequenceElement
@@ -568,9 +559,12 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
 
   // FIXME: diagnostics
   ParserResult<Expr> rootResult, pathResult;
+  ParserStatus parseStatus;
+
   if (!startsWithSymbol(Tok, '.')) {
     rootResult = parseExprPostfix(diag::expr_keypath_expected_expr,
                                   /*isBasic=*/true);
+    parseStatus = rootResult;
 
     if (rootResult.isParseError())
       return rootResult;
@@ -600,10 +594,11 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     pathResult = parseExprPostfixSuffix(inner, /*isExprBasic=*/true,
                                         /*periodHasKeyPathBehavior=*/false,
                                         unusedHasBindOptional);
+    parseStatus |= pathResult;
   }
 
-  if (!rootResult.getPtrOrNull() && !pathResult.getPtrOrNull())
-    return pathResult;
+  if (rootResult.isNull() && pathResult.isNull())
+    return nullptr;
 
   auto keypath = new (Context) KeyPathExpr(
       backslashLoc, rootResult.getPtrOrNull(), pathResult.getPtrOrNull());
@@ -619,7 +614,6 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     return makeParserCodeCompletionResult(keypath);
   }
 
-  ParserStatus parseStatus = ParserStatus(rootResult) | ParserStatus(pathResult);
   return makeParserResult(parseStatus, keypath);
 }
 
