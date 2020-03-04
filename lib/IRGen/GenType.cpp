@@ -1294,8 +1294,11 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   // Whether the Objective-C runtime is guaranteed to invoke the class
   // metadata update callback when realizing a Swift class referenced from
   // Objective-C.
+  auto deploymentAvailability =
+    AvailabilityContext::forDeploymentTarget(IGM.Context);
   bool supportsObjCMetadataUpdateCallback =
-    IGM.Context.LangOpts.doesTargetSupportObjCMetadataUpdateCallback();
+    deploymentAvailability.isContainedIn(
+        IGM.Context.getObjCMetadataUpdateCallbackAvailability());
 
   // If our deployment target allows us to rely on the metadata update
   // callback being called, we don't have to emit a legacy layout for a

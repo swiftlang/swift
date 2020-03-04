@@ -624,9 +624,26 @@ public:
   void addDestructorCleanup(T &object) {
     addCleanup([&object]{ object.~T(); });
   }
+
+  /// Get the runtime availability of the class metadata update callback
+  /// mechanism for the target platform.
+  AvailabilityContext getObjCMetadataUpdateCallbackAvailability();
+
+  /// Get the runtime availability of the objc_getClass() hook for the target
+  /// platform.
+  AvailabilityContext getObjCGetClassHookAvailability();
   
-  /// Get the runtime availability of the opaque types language feature for the target platform.
+  /// Get the runtime availability of features introduced in the Swift 5.0
+  /// compiler for the target platform.
+  AvailabilityContext getSwift50Availability();
+
+  /// Get the runtime availability of the opaque types language feature for the
+  /// target platform.
   AvailabilityContext getOpaqueTypeAvailability();
+
+  /// Get the runtime availability of the objc_loadClassref() entry point for
+  /// the target platform.
+  AvailabilityContext getObjCClassStubsAvailability();
 
   /// Get the runtime availability of features introduced in the Swift 5.1
   /// compiler for the target platform.
