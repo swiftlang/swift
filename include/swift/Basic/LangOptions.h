@@ -390,33 +390,6 @@ namespace swift {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
-    // The following deployment targets ship an Objective-C runtime supporting
-    // the class metadata update callback mechanism:
-    //
-    // - macOS 10.14.4
-    // - iOS 12.2
-    // - tvOS 12.2
-    // - watchOS 5.2
-    bool doesTargetSupportObjCMetadataUpdateCallback() const;
-
-    // The following deployment targets ship an Objective-C runtime supporting
-    // the objc_getClass() hook:
-    //
-    // - macOS 10.14.4
-    // - iOS 12.2
-    // - tvOS 12.2
-    // - watchOS 5.2
-    bool doesTargetSupportObjCGetClassHook() const;
-
-    // The following deployment targets ship an Objective-C runtime supporting
-    // the objc_loadClassref() entry point:
-    //
-    // - macOS 10.15
-    // - iOS 13
-    // - tvOS 13
-    // - watchOS 6
-    bool doesTargetSupportObjCClassStubs() const;
-
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///
