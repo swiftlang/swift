@@ -669,6 +669,9 @@ public:
     return constraint == UseLifetimeConstraint::MustBeInvalidated;
   }
 
+  SILBasicBlock *getParentBlock() const;
+  SILFunction *getParentFunction() const;
+
 private:
   void removeFromCurrent() {
     if (!Back) return;
