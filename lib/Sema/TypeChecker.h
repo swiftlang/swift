@@ -1654,6 +1654,12 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
                                      SubstitutionMap Substitutions,
                                      bool isExtension);
 
+/// Check for restrictions on the use of the @unknown attribute on a
+/// case statement.
+void checkUnknownAttrRestrictions(
+    ASTContext &ctx, CaseStmt *caseBlock, CaseStmt *fallthroughDest,
+    bool &limitExhaustivityChecks);
+
 /// Bind all of the pattern variables that occur within a case statement and
 /// all of its case items to their "parent" pattern variables, forming chains
 /// of variables with the same name.
