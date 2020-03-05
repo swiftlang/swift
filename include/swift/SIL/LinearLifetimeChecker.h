@@ -15,7 +15,6 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
@@ -29,7 +28,6 @@ class SILInstruction;
 class SILModule;
 class SILValue;
 class DeadEndBlocks;
-class BranchPropagatedUser;
 
 namespace ownership {
 
@@ -167,29 +165,20 @@ public:
   /// \p leakingBlocks If non-null a list of blocks where the value was detected
   /// to leak. Can be used to insert missing destroys.
   LinearLifetimeError
-  checkValue(SILValue value, ArrayRef<BranchPropagatedUser> consumingUses,
-             ArrayRef<BranchPropagatedUser> nonConsumingUses,
+  checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
+             ArrayRef<Operand *> nonConsumingUses,
              ownership::ErrorBehaviorKind errorBehavior,
              SmallVectorImpl<SILBasicBlock *> *leakingBlocks = nullptr);
 
   /// Returns true that \p value forms a linear lifetime with consuming uses \p
   /// consumingUses, non consuming uses \p nonConsumingUses. Returns false
   /// otherwise.
-  bool validateLifetime(SILValue value,
-                        ArrayRef<BranchPropagatedUser> consumingUses,
-                        ArrayRef<BranchPropagatedUser> nonConsumingUses) {
+  bool validateLifetime(SILValue value, ArrayRef<Operand *> consumingUses,
+                        ArrayRef<Operand *> nonConsumingUses) {
     return !checkValue(value, consumingUses, nonConsumingUses,
                        ownership::ErrorBehaviorKind::ReturnFalse,
                        nullptr /*leakingBlocks*/)
                 .getFoundError();
-  }
-
-  bool validateLifetime(SILValue value,
-                        ArrayRef<SILInstruction *> consumingUses,
-                        ArrayRef<SILInstruction *> nonConsumingUses) {
-    return validateLifetime(
-        value, BranchPropagatedUser::convertFromInstArray(consumingUses),
-        BranchPropagatedUser::convertFromInstArray(nonConsumingUses));
   }
 };
 
