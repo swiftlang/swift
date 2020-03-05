@@ -77,6 +77,8 @@ class TempRValueOptPass : public SILFunctionTransform {
                          ValueLifetimeAnalysis::Frontier &tempAddressFrontier);
 
   bool tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst);
+  std::pair<SILBasicBlock::iterator, bool>
+  tryOptimizeStoreIntoTemp(StoreInst *si);
 
   void run() override;
 };
@@ -98,7 +100,7 @@ class TempRValueOptPass : public SILFunctionTransform {
 /// that may write to memory at \p address.
 bool TempRValueOptPass::collectLoads(
     Operand *userOp, SILInstruction *user, SingleValueInstruction *address,
-    SILValue srcObject, SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+    SILValue srcAddr, SmallPtrSetImpl<SILInstruction *> &loadInsts) {
   // All normal uses (loads) must be in the initialization block.
   // (The destroy and dealloc are commonly in a different block though.)
   if (user->getParent() != address->getParent())
@@ -136,8 +138,20 @@ bool TempRValueOptPass::collectLoads(
       return false;
     }
 
+    // If we do not have an src address, but are indirect, bail. We would need
+    // to perform function signature specialization to change the functions
+    // signature to pass something direct.
+    if (!srcAddr && convention.isIndirectConvention()) {
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "  Temp used to materialize value for indirect convention?! Can "
+             "not remove temporary without func sig opts"
+          << *user);
+      return false;
+    }
+
     // Check if there is another function argument, which is inout which might
-    // modify the source of the copy_addr.
+    // modify the source address if we have one.
     //
     // When a use of the temporary is an apply, then we need to prove that the
     // function called by the apply cannot modify the temporary's source
@@ -150,16 +164,18 @@ bool TempRValueOptPass::collectLoads(
     // alias with `src` because the `src` value must be initialized at the point
     // of the call. Hence, it is sufficient to check specifically for another
     // @inout that might alias with `src`.
-    auto calleeConv = apply.getSubstCalleeConv();
-    unsigned calleeArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg();
-    for (const auto &operand : apply.getArgumentOperands()) {
-      auto argConv = calleeConv.getSILArgumentConvention(calleeArgIdx);
-      if (argConv.isInoutConvention()) {
-        if (!aa->isNoAlias(operand.get(), srcObject)) {
-          return false;
+    if (srcAddr) {
+      auto calleeConv = apply.getSubstCalleeConv();
+      unsigned calleeArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg();
+      for (const auto &operand : apply.getArgumentOperands()) {
+        auto argConv = calleeConv.getSILArgumentConvention(calleeArgIdx);
+        if (argConv.isInoutConvention()) {
+          if (!aa->isNoAlias(operand.get(), srcAddr)) {
+            return false;
+          }
         }
+        ++calleeArgIdx;
       }
-      ++calleeArgIdx;
     }
 
     // Everything is okay with the function call. Register it as a "load".
@@ -167,6 +183,14 @@ bool TempRValueOptPass::collectLoads(
     return true;
   }
   case SILInstructionKind::OpenExistentialAddrInst: {
+    // If we do not have an srcAddr, bail. We do not support promoting this yet.
+    if (!srcAddr) {
+      LLVM_DEBUG(llvm::dbgs() << "  Temp has open_existential_addr use?! Can "
+                                 "not yet promote to value"
+                              << *user);
+      return false;
+    }
+
     // We only support open existential addr if the access is immutable.
     auto *oeai = cast<OpenExistentialAddrInst>(user);
     if (oeai->getAccessKind() != OpenedExistentialAccess::Immutable) {
@@ -179,21 +203,29 @@ bool TempRValueOptPass::collectLoads(
   }
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst: {
+    auto *proj = cast<SingleValueInstruction>(user);
+
+    if (!srcAddr) {
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "  Temp has addr_projection use?! Can not yet promote to value"
+          << *user);
+      return false;
+    }
+
     // Transitively look through projections on stack addresses.
-    auto proj = cast<SingleValueInstruction>(user);
     for (auto *projUseOper : proj->getUses()) {
       auto *user = projUseOper->getUser();
       if (user->isTypeDependentOperand(*projUseOper))
         continue;
 
-      if (!collectLoads(projUseOper, user, proj, srcObject, loadInsts))
+      if (!collectLoads(projUseOper, user, proj, srcAddr, loadInsts))
         return false;
     }
     return true;
   }
 
   case SILInstructionKind::LoadInst:
-  case SILInstructionKind::LoadBorrowInst:
     // Loads are the end of the data flow chain. The users of the load can't
     // access the temporary storage.
     //
@@ -208,6 +240,15 @@ bool TempRValueOptPass::collectLoads(
         return false;
       }
     }
+    loadInsts.insert(user);
+    return true;
+
+  case SILInstructionKind::LoadBorrowInst:
+    // If we do not have a source addr, we must be trying to eliminate a
+    // store. Until we check that the source object is not destroyed within the
+    // given range, we need bail.
+    if (!srcAddr)
+      return false;
     loadInsts.insert(user);
     return true;
 
@@ -474,6 +515,131 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   return true;
 }
 
+std::pair<SILBasicBlock::iterator, bool>
+TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
+  // If our store is an assign, bail.
+  if (si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign)
+    return {std::next(si->getIterator()), false};
+
+  auto *tempObj = dyn_cast<AllocStackInst>(si->getDest());
+  if (!tempObj) {
+    return {std::next(si->getIterator()), false};
+  }
+
+  // If our tempObj has a dynamic lifetime (meaning it is conditionally
+  // initialized, conditionally taken, etc), we can not convert its uses to SSA
+  // while eliminating it simply. So bail.
+  if (tempObj->hasDynamicLifetime()) {
+    return {std::next(si->getIterator()), false};
+  }
+
+  // Scan all uses of the temporary storage (tempObj) to verify they all refer
+  // to the value initialized by this copy. It is sufficient to check that the
+  // only users that modify memory are the copy_addr [initialization] and
+  // destroy_addr.
+  SmallPtrSet<SILInstruction *, 8> loadInsts;
+  for (auto *useOper : tempObj->getUses()) {
+    SILInstruction *user = useOper->getUser();
+
+    if (user == si)
+      continue;
+
+    // Destroys and deallocations are allowed to be in a different block.
+    if (isa<DestroyAddrInst>(user) || isa<DeallocStackInst>(user))
+      continue;
+
+    // Same for load [take] on the top level temp object. SILGen always takes
+    // whole values from temporaries. If we have load [take] on projections from
+    // our base, we fail since those would be re-initializations.
+    if (auto *li = dyn_cast<LoadInst>(user)) {
+      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+        continue;
+      }
+    }
+
+    // We pass in SILValue() since we do not have a source address.
+    if (!collectLoads(useOper, user, tempObj, SILValue(), loadInsts))
+      return {std::next(si->getIterator()), false};
+  }
+
+  // Since store is always a consuming operation, we do not need to worry about
+  // any lifetime constraints and can just replace all of the uses here. This
+  // contrasts with the copy_addr implementation where we need to consider the
+  // possibility that the source address is written to.
+  LLVM_DEBUG(llvm::dbgs() << "  Success: replace temp" << *tempObj);
+
+  // Do a "replaceAllUses" by either deleting the users or replacing them with
+  // the appropriate operation on the source value.
+  SmallVector<SILInstruction *, 4> toDelete;
+  for (auto *use : tempObj->getUses()) {
+    // If our store is the user, just skip it.
+    if (use->getUser() == si) {
+      continue;
+    }
+
+    SILInstruction *user = use->getUser();
+    switch (user->getKind()) {
+    case SILInstructionKind::DestroyAddrInst: {
+      SILBuilderWithScope builder(user);
+      builder.emitDestroyValueOperation(user->getLoc(), si->getSrc());
+      toDelete.push_back(user);
+      break;
+    }
+    case SILInstructionKind::DeallocStackInst:
+      toDelete.push_back(user);
+      break;
+    case SILInstructionKind::CopyAddrInst: {
+      auto *cai = cast<CopyAddrInst>(user);
+      assert(cai->getSrc() == tempObj);
+      SILBuilderWithScope builder(user);
+      auto qualifier = cai->isInitializationOfDest()
+                           ? StoreOwnershipQualifier::Init
+                           : StoreOwnershipQualifier::Assign;
+      SILValue src = si->getSrc();
+      if (!cai->isTakeOfSrc()) {
+        src = builder.emitCopyValueOperation(cai->getLoc(), src);
+      }
+      builder.emitStoreValueOperation(cai->getLoc(), src, cai->getDest(),
+                                      qualifier);
+      toDelete.push_back(cai);
+      break;
+    }
+    case SILInstructionKind::LoadInst: {
+      // Since store is always forwarding, we know that we should have our own
+      // value here. So, we should be able to just RAUW any load [take] and
+      // insert a copy + RAUW for any load [copy].
+      auto *li = cast<LoadInst>(user);
+      SILValue srcObject = si->getSrc();
+      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+        SILBuilderWithScope builder(li);
+        srcObject = builder.emitCopyValueOperation(li->getLoc(), srcObject);
+      }
+      li->replaceAllUsesWith(srcObject);
+      toDelete.push_back(li);
+      break;
+    }
+
+    // ASSUMPTION: no operations that may be handled by this default clause can
+    // destroy tempObj. This includes operations that load the value from memory
+    // and release it.
+    default:
+      llvm::errs() << "Unhandled user: " << *user;
+      llvm_unreachable("Unhandled case?!");
+      break;
+    }
+  }
+
+  while (!toDelete.empty()) {
+    auto *inst = toDelete.pop_back_val();
+    inst->dropAllReferences();
+    inst->eraseFromParent();
+  }
+  auto nextIter = std::next(si->getIterator());
+  si->eraseFromParent();
+  tempObj->eraseFromParent();
+  return {nextIter, true};
+}
+
 //===----------------------------------------------------------------------===//
 //                           High Level Entrypoint
 //===----------------------------------------------------------------------===//
@@ -492,10 +658,8 @@ void TempRValueOptPass::run() {
     // Increment the instruction iterator only after calling
     // tryOptimizeCopyIntoTemp because the instruction after CopyInst might be
     // deleted, but copyInst itself won't be deleted until later.
-    for (auto ii = block.begin(); ii != block.end(); ++ii) {
-      auto *copyInst = dyn_cast<CopyAddrInst>(&*ii);
-
-      if (copyInst) {
+    for (auto ii = block.begin(); ii != block.end();) {
+      if (auto *copyInst = dyn_cast<CopyAddrInst>(&*ii)) {
         // In case of success, this may delete instructions, but not the
         // CopyInst itself.
         changed |= tryOptimizeCopyIntoTemp(copyInst);
@@ -507,9 +671,21 @@ void TempRValueOptPass::run() {
           changed = true;
           deadCopies.push_back(copyInst);
         }
+        ++ii;
+        continue;
       }
+
+      if (auto *si = dyn_cast<StoreInst>(&*ii)) {
+        bool madeSingleChange;
+        std::tie(ii, madeSingleChange) = tryOptimizeStoreIntoTemp(si);
+        changed |= madeSingleChange;
+        continue;
+      }
+
+      ++ii;
     }
   }
+
   // Delete the copies and any unused address operands.
   // The same copy may have been added multiple times.
   sortUnique(deadCopies);
