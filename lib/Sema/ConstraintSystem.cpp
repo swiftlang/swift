@@ -1885,6 +1885,10 @@ isInvalidPartialApplication(ConstraintSystem &cs,
 std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
     const OverloadChoice &choice, ConstraintLocator *locator,
     Type boundType, Type refType) {
+  // If the declaration is unavailable, note that in the score.
+  if (isDeclUnavailable(choice.getDecl(), locator))
+    increaseScore(SK_Unavailable);
+
   bool bindConstraintCreated = false;
   const auto kind = choice.getKind();
   if (kind != OverloadChoiceKind::DeclViaDynamic &&
